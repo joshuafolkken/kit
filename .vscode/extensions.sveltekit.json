@@ -1,0 +1,22 @@
+{
+	"recommendations": [
+		"esbenp.prettier-vscode",
+		"dbaeumer.vscode-eslint",
+		"svelte.svelte-vscode",
+		"bradlc.vscode-tailwindcss",
+		"ms-playwright.playwright",
+		"vitest.explorer",
+		"lokalise.i18n-ally",
+		"streetsidesoftware.code-spell-checker",
+		"github.vscode-pull-request-github",
+		"github.vscode-github-actions",
+		"pkief.material-icon-theme",
+		"mhutchie.git-graph",
+		"usernamehw.errorlens",
+		"yoavbls.pretty-ts-errors",
+		"naumovs.color-highlight",
+		"vincaslt.highlight-matching-tag",
+		"eamodio.gitlens",
+		"sonarsource.sonarlint-vscode"
+	]
+}

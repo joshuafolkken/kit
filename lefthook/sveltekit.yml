@@ -1,0 +1,14 @@
+extends:
+  - ./base.yml
+
+pre-commit:
+  commands:
+    type-check:
+      glob: '*.{svelte,ts,js,mjs,cjs,yml}'
+      run: pnpm check
+
+pre-push:
+  commands:
+    test-e2e:
+      glob: '{*.{svelte,ts,js,mjs,cjs},package.json}'
+      run: PLAYWRIGHT_HTML_OPEN=never pnpm test:e2e

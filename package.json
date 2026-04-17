@@ -1,0 +1,112 @@
+{
+	"name": "@joshuafolkken/config",
+	"version": "0.1.0",
+	"type": "module",
+	"license": "MIT",
+	"packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
+	"engines": {
+		"node": ">=22.19.0"
+	},
+	"bin": {
+		"config-init": "./scripts/init.ts",
+		"config-sync": "./scripts/sync.ts"
+	},
+	"scripts": {
+		"preinstall": "pnpm dlx @aikidosec/safe-chain setup-ci",
+		"postinstall": "lefthook install",
+		"lefthook:install": "lefthook install",
+		"lefthook:uninstall": "lefthook uninstall",
+		"lefthook:commit": "lefthook run pre-commit",
+		"lefthook:push": "lefthook run pre-push",
+		"main:sync": "git checkout main && git pull",
+		"main:merge": "git pull origin main",
+		"lint": "pnpm lint:prettier && pnpm lint:eslint",
+		"lint:prettier": "prettier --check .",
+		"lint:eslint": "eslint . --cache --cache-strategy content",
+		"format": "pnpm format:prettier && pnpm format:eslint",
+		"format:prettier": "prettier --write .",
+		"format:eslint": "eslint . --fix --cache --cache-strategy content",
+		"cspell": "cspell lint --no-must-find-files --no-progress \"**/*.{ts,js,md,yaml,yml,json}\"",
+		"cspell:dot": "pnpm cspell . --dot",
+		"init": "tsx scripts/init.ts",
+		"sync": "tsx scripts/sync.ts",
+		"prevent-main-commit": "tsx scripts/prevent-main-commit.ts",
+		"check-commit-message": "tsx scripts/check-commit-message.ts",
+		"audit:security": "tsx scripts/security-audit.ts",
+		"overrides:check": "tsx scripts/overrides-check.ts",
+		"check:upstream": "tsx scripts/check-upstream-drift.ts",
+		"version:minor": "tsx scripts/bump-version.ts minor",
+		"version:major": "tsx scripts/bump-version.ts major",
+		"version:patch": "tsx scripts/bump-version.ts patch",
+		"latest": "pnpm latest:corepack && pnpm latest:update && pnpm audit:security",
+		"latest:corepack": "corepack use pnpm@latest",
+		"latest:update": "pnpm update --latest",
+		"prep": "tsx scripts-ai/prep.ts",
+		"issue:prep": "tsx scripts-ai/issue-prep.ts",
+		"git": "tsx scripts-ai/git-workflow.ts",
+		"git:followup": "tsx --env-file=.env scripts-ai/git-followup-workflow.ts",
+		"telegram:test": "tsx --env-file=.env scripts-ai/telegram-test.ts",
+		"check": "tsc --noEmit",
+		"test:unit": "vitest run"
+	},
+	"exports": {
+		"./eslint/base": "./eslint/base.js",
+		"./eslint/vanilla": "./eslint/vanilla.js",
+		"./eslint/sveltekit": "./eslint/sveltekit.js",
+		"./prettier": "./prettier/index.js",
+		"./tsconfig/base": "./tsconfig/base.jsonc",
+		"./tsconfig/sveltekit": "./tsconfig/sveltekit.jsonc",
+		"./cspell": "./cspell/index.yaml",
+		"./playwright/base": "./templates/playwright/base.ts"
+	},
+	"peerDependencies": {
+		"@playwright/test": ">=1.0.0",
+		"svelte": ">=5.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@playwright/test": {
+			"optional": true
+		},
+		"svelte": {
+			"optional": true
+		}
+	},
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com"
+	},
+	"pnpm": {
+		"overrides": {
+			"eslint-plugin-promise": "^7.2.1"
+		},
+		"onlyBuiltDependencies": [
+			"esbuild",
+			"lefthook",
+			"unrs-resolver"
+		]
+	},
+	"devDependencies": {
+		"@eslint/compat": "^2.0.5",
+		"@eslint/js": "^10.0.1",
+		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
+		"@stylistic/eslint-plugin": "^5.10.0",
+		"@types/node": "^25.6.0",
+		"cspell": "^10.0.0",
+		"eslint": "^10.2.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-import-resolver-typescript": "^4.4.4",
+		"eslint-plugin-import-x": "^4.16.2",
+		"eslint-plugin-promise": "^7.2.1",
+		"eslint-plugin-sonarjs": "^4.0.3",
+		"eslint-plugin-svelte": "^3.17.0",
+		"eslint-plugin-unicorn": "^64.0.0",
+		"globals": "^17.5.0",
+		"lefthook": "^2.1.6",
+		"prettier": "^3.8.3",
+		"prettier-plugin-svelte": "^3.5.1",
+		"prettier-plugin-tailwindcss": "^0.7.2",
+		"tsx": "^4.21.0",
+		"typescript": "^6.0.2",
+		"typescript-eslint": "^8.58.2",
+		"vitest": "^4.1.4"
+	}
+}

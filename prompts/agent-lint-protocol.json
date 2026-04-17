@@ -1,0 +1,79 @@
+{
+	"require_lint_zero": true,
+	"fail_on_warnings": true,
+	"final_report_check_paths": ["src"],
+	"changed_files_only_first": true,
+	"max_batch_size": 6,
+	"auto_fix_rounds": 3,
+	"report_template": "Lint: 0 errors (checked: ${paths})",
+	"check_dependent_files": true,
+	"check_all_modified_files": true,
+	"check_import_export_relations": true,
+	"fallback_to_directory_check": true,
+	"lint_check_guidelines": {
+		"always_check_modified_files": [
+			"編集したファイル",
+			"新規作成したファイル",
+			"削除したファイル（インポート元がある場合）"
+		],
+		"also_check_dependent_files": [
+			"変更したファイルからインポートしているファイル",
+			"変更したファイルがインポートしているファイル",
+			"同じ機能領域のファイル（同じディレクトリ内など）"
+		],
+		"recommended_check_methods": {
+			"explicit_file_paths": "変更したファイルのパスを明示的に指定してチェック",
+			"directory_level": "依存関係が複雑な場合はディレクトリ単位でチェック",
+			"broader_scope": "不確実な場合は広い範囲をチェック（例: scripts/gitディレクトリ全体）"
+		},
+		"common_mistakes_to_avoid": [
+			"1つのファイルだけをチェックして他の変更ファイルを見逃す",
+			"依存ファイルをチェック対象に含めない",
+			"新規作成したファイルをチェック対象に含めない"
+		]
+	},
+	"lint_check_verification": {
+		"read_lints_limitations": {
+			"description": "read_lintsツールには以下の制限がある",
+			"limitations": [
+				"一部のESLintルールを検出しない可能性がある（例: id-length, 識別子名の長さチェック）",
+				"Prettierのフォーマットチェックが含まれない",
+				"実際のpnpm run lintコマンドと結果に差異がある可能性"
+			]
+		},
+		"required_verification_steps": [
+			{
+				"step": 1,
+				"description": "read_lintsツールでESLintエラーをチェック",
+				"tool": "read_lints",
+				"note": "変更したすべてのファイルを明示的に指定"
+			},
+			{
+				"step": 2,
+				"description": "実際のlintコマンドで検証",
+				"command": "pnpm run lint -- <変更したファイルのパス>",
+				"note": "PrettierとESLintの両方が実行され、すべてのルールがチェックされる",
+				"required": true
+			},
+			{
+				"step": 3,
+				"description": "エラーが0件であることを確認してから報告",
+				"note": "pnpm run lintでエラーが見つかった場合は修正してから再実行"
+			}
+		],
+		"new_file_check": {
+			"description": "新規作成したファイルは特に注意してチェック",
+			"steps": [
+				"read_lintsでチェック",
+				"pnpm run lintで再確認（必須）",
+				"Prettierのフォーマットも確認"
+			]
+		},
+		"format_check": {
+			"description": "Prettierのフォーマットチェックも実行",
+			"command": "pnpm exec prettier --check <ファイルパス>",
+			"auto_fix_command": "pnpm exec prettier --write <ファイルパス>",
+			"note": "pnpm run lintにはPrettierのチェックが含まれているが、個別に実行することも可能"
+		}
+	}
+}

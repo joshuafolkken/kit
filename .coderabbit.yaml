@@ -1,0 +1,50 @@
+language: en-US
+
+reviews:
+  profile: chill
+  high_level_summary: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  path_filters:
+    - '!src/lib/paraglide/**'
+    - '!messages/**'
+    - '!pnpm-lock.yaml'
+    - '!worker-configuration.d.ts'
+    - '!**/*.d.ts'
+    - '!drizzle/**'
+    - '!static/**'
+    - '!*.config.*'
+
+knowledge_base:
+  opt_out: true
+
+tools:
+  github-checks:
+    enabled: false
+  languagetool:
+    enabled: false
+  shellcheck:
+    enabled: false
+  markdownlint:
+    enabled: false
+  ast-grep:
+    essential_rules: false
+  biome:
+    enabled: false
+  gitleaks:
+    enabled: false
+  hadolint:
+    enabled: false
+  yamllint:
+    enabled: false

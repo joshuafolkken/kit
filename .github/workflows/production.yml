@@ -1,0 +1,49 @@
+name: Release to Production
+on:
+  repository_dispatch:
+    types: [new-tag-created]
+  # push:
+  #   tags:
+  #     - 'v*' # v1.0.0 などのタグが Push された時に起動
+
+permissions:
+  contents: write
+
+jobs:
+  update-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # - name: Install pnpm
+      #   uses: pnpm/action-setup@v4
+
+      # - name: Setup Node.js
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: '24'
+      #     cache: 'pnpm'
+
+      # - name: Install dependencies
+      #   run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # - name: Apply D1 migrations
+      #   run: pnpm wrangler d1 migrations apply tasks-db --remote
+      #   env:
+      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update production branch
+        run: |
+          git fetch origin
+          git checkout production || git checkout -b production origin/production || git checkout -b production
+
+          git merge ${{ github.ref_name }} --no-ff -m "Release ${{ github.ref_name }}"
+          git push origin production

@@ -1,0 +1,7 @@
+# Normalize EOL for all files that Git considers text files.
+* text=auto eol=lf
+
+*.config.js linguist-vendored
+eslint/rules/** linguist-vendored
+
+scripts/*.ts linguist-language=TypeScript

@@ -1,0 +1,49 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"moduleResolution": "bundler",
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+
+		// Strictness
+		// Treat unused local variables as errors
+		"noUnusedLocals": true,
+		// Treat unused function parameters as errors
+		"noUnusedParameters": true,
+
+		// Disallow unused labels
+		"allowUnusedLabels": false,
+		// Disallow unreachable code
+		"allowUnreachableCode": false,
+
+		// Disallow fallthrough in switch statements
+		"noFallthroughCasesInSwitch": true,
+		// Require all code paths in a function to have an explicit return
+		"noImplicitReturns": true,
+
+		// Ensure each file can be safely transpiled independently (e.g. with Babel)
+		"isolatedModules": true,
+		// Require the override keyword when overriding methods
+		"noImplicitOverride": true,
+
+		// Strictly distinguish between optional properties and undefined
+		"exactOptionalPropertyTypes": true,
+		// Include undefined in index access results
+		"noUncheckedIndexedAccess": true,
+		// Disallow dot notation for index signature types
+		"noPropertyAccessFromIndexSignature": true,
+
+		// Preserve import/export syntax as-is and enforce explicit type-only imports
+		"verbatimModuleSyntax": true,
+		// Do not emit output files if type errors are present
+		"noEmitOnError": true,
+		// Use the ES2022 class fields spec
+		"useDefineForClassFields": true,
+
+		// Check side-effect-only imports (imports used only for types)
+		"noUncheckedSideEffectImports": true
+	}
+}

@@ -1,0 +1,50 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	// "name": "your-project-name",
+	"compatibility_date": "2026-01-22",
+	"compatibility_flags": ["nodejs_compat"],
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"workers_dev": true,
+	"preview_urls": true,
+
+	"observability": {
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 0.1,
+			"invocation_logs": true
+		},
+		"traces": {
+			"enabled": true,
+			"head_sampling_rate": 0.1
+		}
+	}
+
+	// "kv_namespaces": [
+	// 	{
+	// 		"binding": "CACHE",
+	// 		"id": "",
+	// 		"preview_id": ""
+	// 	}
+	// ],
+
+	// "routes": [
+	// 	{
+	// 		"pattern": "your-domain.com",
+	// 		"custom_domain": true
+	// 	}
+	// ],
+
+	// "d1_databases": [
+	// 	{
+	// 		"binding": "DB",
+	// 		"database_name": "your-db-name",
+	// 		"database_id": "",
+	// 		"migrations_dir": "drizzle/migrations"
+	// 		// "remote": true
+	// 	}
+	// ]
+}

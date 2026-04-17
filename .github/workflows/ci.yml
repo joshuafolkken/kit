@@ -1,0 +1,77 @@
+name: CI
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Setup ESLint cache
+        uses: actions/cache@v4
+        id: eslint-cache
+        with:
+          path: |
+            .eslintcache
+          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-eslint-cache-
+
+      - name: Setup safe-chain
+        run: pnpm dlx @aikidosec/safe-chain setup-ci
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Setup Go for osv-scanner
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install osv-scanner
+        # Intentionally unpinned: a vulnerability scanner should always pull the
+        # newest detector + advisory set. The determinism tradeoff is accepted.
+        run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
+
+      - name: Run security audit
+        run: osv-scanner --lockfile=pnpm-lock.yaml
+
+      - name: Run spell check
+        run: pnpm exec cspell . --dot
+
+      - name: Run prettier check
+        run: pnpm exec prettier --check .
+
+      - name: Run eslint check
+        run: pnpm exec eslint . --cache --cache-strategy content
+
+      - name: Run type check
+        run: pnpm check
+
+      - name: Run unit tests
+        run: pnpm test:unit

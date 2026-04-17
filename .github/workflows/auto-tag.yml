@@ -1,0 +1,93 @@
+name: Auto Tag on Version Change
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    name: Create Git Tag if Version Changed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Get current version
+        id: current_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Check if version changed
+        id: version_check
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
+
+          # 前のコミットのpackage.jsonを取得
+          if git show HEAD~1:package.json > /dev/null 2>&1; then
+            PREV_VERSION=$(git show HEAD~1:package.json | node -p "require('fs').readFileSync('/dev/stdin', 'utf8')" | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version")
+            echo "Previous version: $PREV_VERSION"
+            echo "Current version: $CURRENT_VERSION"
+
+            if [ "$CURRENT_VERSION" != "$PREV_VERSION" ]; then
+              echo "changed=true" >> $GITHUB_OUTPUT
+              echo "✅ Version changed from $PREV_VERSION to $CURRENT_VERSION"
+            else
+              echo "changed=false" >> $GITHUB_OUTPUT
+              echo "ℹ️ Version unchanged: $CURRENT_VERSION"
+            fi
+          else
+            # 初回コミットの場合
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "ℹ️ First commit, creating tag"
+          fi
+
+      - name: Check if tag already exists
+        id: tag_check
+        if: steps.version_check.outputs.changed == 'true'
+        run: |
+          VERSION="${{ steps.current_version.outputs.version }}"
+          TAG="v$VERSION"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag $TAG already exists, skipping tag creation"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag $TAG does not exist, will create it"
+          fi
+
+      - name: Create and push tag
+        id: create_tag
+        if: steps.version_check.outputs.changed == 'true' && steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.current_version.outputs.version }}"
+          TAG="v$VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "$TAG" -m "Release version $VERSION"
+          git push origin "$TAG"
+
+          echo "✅ Created and pushed tag: $TAG"
+          echo "completed=true" >> $GITHUB_OUTPUT
+
+      - name: Trigger next workflow
+        if: steps.create_tag.outputs.completed == 'true'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: new-tag-created

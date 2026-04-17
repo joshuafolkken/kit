@@ -1,0 +1,326 @@
+import { describe, expect, it } from 'vitest'
+import { init_logic } from './init-logic'
+
+describe('generate_eslint_config', () => {
+	it('returns sveltekit config for sveltekit type', () => {
+		expect(init_logic.generate_eslint_config('sveltekit')).toContain('create_sveltekit_config')
+	})
+
+	it('returns vanilla config for vanilla type', () => {
+		expect(init_logic.generate_eslint_config('vanilla')).toContain('create_vanilla_config')
+	})
+
+	it('sveltekit config imports svelte.config.js', () => {
+		expect(init_logic.generate_eslint_config('sveltekit')).toContain('./svelte.config.js')
+	})
+})
+
+describe('generate_prettier_config', () => {
+	it('imports config from the package', () => {
+		expect(init_logic.generate_prettier_config()).toContain("from '@joshuafolkken/config/prettier'")
+	})
+
+	it('spreads config into export', () => {
+		expect(init_logic.generate_prettier_config()).toContain('...config')
+	})
+})
+
+describe('generate_tsconfig', () => {
+	it('sveltekit includes svelte-kit extends and our config', () => {
+		const result = init_logic.generate_tsconfig('sveltekit')
+
+		expect(result).toContain('.svelte-kit/tsconfig.json')
+		expect(result).toContain('@joshuafolkken/config/tsconfig/sveltekit')
+	})
+
+	it('vanilla includes only our config', () => {
+		const result = init_logic.generate_tsconfig('vanilla')
+
+		expect(result).toContain('@joshuafolkken/config/tsconfig/base')
+		expect(result).not.toContain('.svelte-kit')
+	})
+})
+
+describe('generate_lefthook_config', () => {
+	it('sveltekit references the sveltekit yml', () => {
+		expect(init_logic.generate_lefthook_config('sveltekit')).toContain('sveltekit.yml')
+	})
+
+	it('vanilla references the vanilla yml', () => {
+		expect(init_logic.generate_lefthook_config('vanilla')).toContain('vanilla.yml')
+	})
+})
+
+describe('generate_playwright_config', () => {
+	it('imports create_playwright_config from the package', () => {
+		expect(init_logic.generate_playwright_config()).toContain(
+			"from '@joshuafolkken/config/playwright/base'",
+		)
+	})
+
+	it('includes dev_port and preview_port', () => {
+		const result = init_logic.generate_playwright_config()
+
+		expect(result).toContain('dev_port')
+		expect(result).toContain('preview_port')
+	})
+})
+
+describe('get_ai_copy_files', () => {
+	it('includes all AI markdown files', () => {
+		const result = init_logic.get_ai_copy_files()
+
+		expect(result).toContain('CLAUDE.md')
+		expect(result).toContain('AGENTS.md')
+		expect(result).toContain('GEMINI.md')
+	})
+
+	it('includes GitHub workflow and template files', () => {
+		const result = init_logic.get_ai_copy_files()
+
+		expect(result).toContain('.github/workflows/ci.yml')
+		expect(result).toContain('.github/workflows/auto-tag.yml')
+		expect(result).toContain('.github/workflows/production.yml')
+		expect(result).toContain('.github/workflows/sonar-cube.yml')
+		expect(result).toContain('.github/pull_request_template.md')
+	})
+
+	it('includes dotfiles and markdown files', () => {
+		const result = init_logic.get_ai_copy_files()
+
+		expect(result).toContain('.cursorrules')
+		expect(result).toContain('.coderabbit.yaml')
+		expect(result).toContain('.gitattributes')
+		expect(result).toContain('.gitignore')
+		expect(result).toContain('.mcp.json')
+		expect(result).toContain('.ncurc.json')
+		expect(result).toContain('.prettierignore')
+		expect(result).toContain('SECURITY.md')
+	})
+
+	it('includes toolchain and sonar config files', () => {
+		const result = init_logic.get_ai_copy_files()
+
+		expect(result).toContain('pnpm-workspace.yaml')
+		expect(result).toContain('sonar-project.properties')
+		expect(result).toContain('tsconfig.sonar.json')
+		expect(result).toContain('wrangler.jsonc')
+	})
+})
+
+describe('get_ai_copy_directories', () => {
+	it('includes prompts and scripts-ai', () => {
+		const result = init_logic.get_ai_copy_directories()
+
+		expect(result).toContain('prompts')
+		expect(result).toContain('scripts-ai')
+	})
+})
+
+describe('merge_npmrc', () => {
+	const LINES = init_logic.get_npmrc_lines()
+	const OTHER_LINE = 'other=value'
+	const ALL_LINES = LINES.join('\n')
+
+	it('adds all lines to empty content', () => {
+		expect(init_logic.merge_npmrc('')).toBe(`${ALL_LINES}\n`)
+	})
+
+	it('appends missing lines to existing content', () => {
+		const result = init_logic.merge_npmrc(`${OTHER_LINE}\n`)
+
+		expect(result).toBe(`${OTHER_LINE}\n${ALL_LINES}\n`)
+	})
+
+	it('adds newline before appending when content lacks trailing newline', () => {
+		const result = init_logic.merge_npmrc(OTHER_LINE)
+
+		expect(result).toBe(`${OTHER_LINE}\n${ALL_LINES}\n`)
+	})
+
+	it('returns content unchanged when all lines already present', () => {
+		const content = `${ALL_LINES}\n`
+
+		expect(init_logic.merge_npmrc(content)).toBe(content)
+	})
+
+	it('adds only missing lines when some are already present', () => {
+		const partial = `${LINES.slice(0, 1).join('')}\n`
+		const result = init_logic.merge_npmrc(partial)
+
+		for (const line of LINES) expect(result).toContain(line)
+	})
+})
+
+describe('merge_json_extends', () => {
+	it('adds extends when key is missing', () => {
+		const result = JSON.parse(init_logic.merge_json_extends('{}', 'my-config')) as {
+			extends: unknown
+		}
+
+		expect(result.extends).toStrictEqual(['my-config'])
+	})
+
+	it('converts string extends to array and appends entry', () => {
+		const result = JSON.parse(
+			init_logic.merge_json_extends('{"extends":"existing"}', 'my-config'),
+		) as { extends: unknown }
+
+		expect(result.extends).toStrictEqual(['existing', 'my-config'])
+	})
+
+	it('appends to existing array', () => {
+		const result = JSON.parse(
+			init_logic.merge_json_extends('{"extends":["existing"]}', 'my-config'),
+		) as { extends: unknown }
+
+		expect(result.extends).toStrictEqual(['existing', 'my-config'])
+	})
+
+	it('returns content unchanged when entry already in extends', () => {
+		const content = '{"extends":["my-config"]}'
+		const result = init_logic.merge_json_extends(content, 'my-config')
+
+		expect(result).toBe(content)
+	})
+})
+
+describe('merge_json_array_field', () => {
+	it('adds values to an empty array', () => {
+		const result = JSON.parse(
+			init_logic.merge_json_array_field('{"recommendations":[]}', 'recommendations', ['a', 'b']),
+		) as { recommendations: unknown }
+
+		expect(result.recommendations).toStrictEqual(['a', 'b'])
+	})
+
+	it('adds only values not already present', () => {
+		const result = JSON.parse(
+			init_logic.merge_json_array_field('{"recommendations":["a"]}', 'recommendations', ['a', 'b']),
+		) as { recommendations: unknown }
+
+		expect(result.recommendations).toStrictEqual(['a', 'b'])
+	})
+
+	it('returns content unchanged when all values already present', () => {
+		const content = '{"recommendations":["a","b"]}'
+		const result = init_logic.merge_json_array_field(content, 'recommendations', ['a', 'b'])
+
+		expect(result).toBe(content)
+	})
+})
+
+describe('merge_json_object', () => {
+	it('adds missing keys from updates', () => {
+		const result = JSON.parse(init_logic.merge_json_object('{"a":1}', { b: 2 })) as { b: number }
+
+		expect(result.b).toBe(2)
+	})
+
+	it('does not overwrite existing keys', () => {
+		const result = JSON.parse(init_logic.merge_json_object('{"a":1}', { a: 99, b: 2 })) as {
+			a: number
+			b: number
+		}
+
+		expect(result.a).toBe(1)
+		expect(result.b).toBe(2)
+	})
+
+	it('returns content unchanged when no new keys to add', () => {
+		const content = '{"a":1}'
+		const result = init_logic.merge_json_object(content, { a: 99 })
+
+		expect(result).toBe(content)
+	})
+})
+
+describe('get_suggested_scripts', () => {
+	it('includes postinstall for both types', () => {
+		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('postinstall')
+		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('postinstall')
+	})
+
+	it('includes lint for both types', () => {
+		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('lint')
+		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('lint')
+	})
+
+	it('includes sveltekit check scripts for sveltekit', () => {
+		const result = init_logic.get_suggested_scripts('sveltekit')
+
+		expect(result).toHaveProperty('check')
+		expect(result).toHaveProperty('check:ci')
+	})
+
+	it('does not include check for vanilla', () => {
+		expect(init_logic.get_suggested_scripts('vanilla')).not.toHaveProperty('check')
+	})
+})
+
+describe('merge_package_scripts', () => {
+	const SCRIPT_KEY = 'test:unit'
+	const SCRIPT_VAL = 'vitest run'
+
+	it('adds missing scripts', () => {
+		const result = JSON.parse(
+			init_logic.merge_package_scripts('{"scripts":{}}', { [SCRIPT_KEY]: SCRIPT_VAL }),
+		) as { scripts: Record<string, string> }
+
+		expect(result.scripts[SCRIPT_KEY]).toBe(SCRIPT_VAL)
+	})
+
+	it('does not overwrite existing scripts', () => {
+		const result = JSON.parse(
+			init_logic.merge_package_scripts(`{"scripts":{"${SCRIPT_KEY}":"existing"}}`, {
+				[SCRIPT_KEY]: SCRIPT_VAL,
+			}),
+		) as { scripts: Record<string, string> }
+
+		expect(result.scripts[SCRIPT_KEY]).toBe('existing')
+	})
+
+	it('returns content unchanged when all scripts present', () => {
+		const content = `{"scripts":{"${SCRIPT_KEY}":"${SCRIPT_VAL}"}}`
+
+		expect(init_logic.merge_package_scripts(content, { [SCRIPT_KEY]: SCRIPT_VAL })).toBe(content)
+	})
+
+	it('creates scripts key when missing from package json', () => {
+		const result = JSON.parse(
+			init_logic.merge_package_scripts('{}', { [SCRIPT_KEY]: SCRIPT_VAL }),
+		) as { scripts: Record<string, string> }
+
+		expect(result.scripts[SCRIPT_KEY]).toBe(SCRIPT_VAL)
+	})
+})
+
+describe('merge_yaml_list_entry', () => {
+	it('creates the key block when it does not exist', () => {
+		const result = init_logic.merge_yaml_list_entry('', 'extends', 'my-value')
+
+		expect(result).toContain('extends:')
+		expect(result).toContain('- my-value')
+	})
+
+	it('adds entry at the top of an existing list', () => {
+		const existing = 'extends:\n  - other-value\n'
+		const result = init_logic.merge_yaml_list_entry(existing, 'extends', 'my-value')
+
+		expect(result).toContain('my-value')
+		expect(result).toContain('other-value')
+	})
+
+	it('returns content unchanged when value already present', () => {
+		const content = 'extends:\n  - my-value\n'
+		const result = init_logic.merge_yaml_list_entry(content, 'extends', 'my-value')
+
+		expect(result).toBe(content)
+	})
+
+	it('appends key block with trailing newline when content has no trailing newline', () => {
+		const result = init_logic.merge_yaml_list_entry('other: value', 'extends', 'my-value')
+
+		expect(result).toMatch(/\nextends:\n {2}- my-value\n$/u)
+	})
+})

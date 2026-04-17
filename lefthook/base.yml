@@ -1,0 +1,46 @@
+pre-commit:
+  parallel: true
+  commands:
+    prevent-main-commit:
+      skip: git diff --cached --quiet
+      run: pnpm prevent-main-commit
+
+    audit:
+      run: pnpm audit:security
+
+    cspell:
+      glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json}'
+      run: pnpm exec cspell lint --no-must-find-files --no-progress {staged_files}
+
+    prettier:
+      glob: '*.{js,jsx,ts,tsx,mjs,cjs,html,css,scss,md,mdx,json,jsonc,yaml,yml}'
+      run: pnpm exec prettier --check --ignore-unknown {staged_files}
+
+    eslint:
+      glob: '*.{js,jsx,ts,tsx,mjs,cjs}'
+      run: pnpm exec eslint --quiet --cache --cache-strategy content {staged_files}
+
+  fail_text: |
+    Commit blocked due to quality checks failure.
+
+    Quick fixes:
+    • Run `pnpm format` to auto-format code
+    • Run `pnpm lint` to check and fix linting issues
+
+commit-msg:
+  commands:
+    check-commit-message:
+      run: pnpm check-commit-message {1}
+
+pre-push:
+  parallel: false
+  commands:
+    check:
+      run: pnpm check
+
+    test-unit:
+      run: pnpm test:unit --run
+
+  fail_text: |
+    Push blocked due to test failures.
+    • Run tests locally: `pnpm test:unit`
