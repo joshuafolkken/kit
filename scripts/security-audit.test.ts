@@ -97,8 +97,9 @@ describe('.github/workflows/ci.yml audit wiring', () => {
 	const content = load_file('.github/workflows/ci.yml')
 	const lines = content.split('\n').map((line) => line.trim())
 
-	it('runs osv-scanner against the pnpm lockfile', () => {
-		expect(content).toContain(`osv-scanner --lockfile=${PNPM_LOCKFILE}`)
+	it('runs osv-scanner against the pnpm lockfile via the official GitHub Action', () => {
+		expect(content).toContain('uses: google/osv-scanner-action')
+		expect(content).toContain(`scan-args: --lockfile=${PNPM_LOCKFILE}`)
 	})
 
 	it('does not call the retired pnpm audit command from CI', () => {

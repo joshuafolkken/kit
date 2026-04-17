@@ -48,18 +48,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Setup Go for osv-scanner
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-
-      - name: Install osv-scanner
-        # Intentionally unpinned: a vulnerability scanner should always pull the
-        # newest detector + advisory set. The determinism tradeoff is accepted.
-        run: go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
-
       - name: Run security audit
-        run: osv-scanner --lockfile=pnpm-lock.yaml
+        uses: google/osv-scanner-action@v2.3.4
+        with:
+          scan-args: --lockfile=pnpm-lock.yaml
 
       - name: Run spell check
         run: pnpm exec cspell . --dot
