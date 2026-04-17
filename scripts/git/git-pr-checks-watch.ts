@@ -32,7 +32,7 @@ function handle_watch_timeout(
 	if (guard.is_settled()) return
 	guard.settle()
 	child.kill()
-	console.info('⏱️ pr checks --watch timed out, falling through to polling.')
+	console.info('⏱️ pr checks --watch timed out.')
 	resolve({ timed_out: true })
 }
 
