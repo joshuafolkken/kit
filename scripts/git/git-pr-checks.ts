@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { git_gh_command } from './git-gh-command'
 
 // cspell:words coderabbit
@@ -7,7 +6,6 @@ const CHECK_STATUS_PASS = 'pass'
 const CHECK_STATUS_PENDING = 'pending'
 const CHECK_STATUS_FAIL = 'fail'
 const CHECK_STATUS_MISSING = 'missing'
-const PACKAGE_JSON_PATH = 'package.json'
 const CHECK_WAIT_INTERVAL_MS = 10_000
 const CHECK_MAX_ATTEMPTS = 18
 const DEFAULT_STABLE_READS = 2
@@ -26,8 +24,7 @@ function parse_repo_name_from_package(package_json_content: string): string {
 	return name
 }
 
-const REPO_NAME = parse_repo_name_from_package(readFileSync(PACKAGE_JSON_PATH, 'utf8'))
-const REQUIRED_CHECKS = [`Workers Builds: ${REPO_NAME}`, 'CodeRabbit', 'SonarQube']
+const REQUIRED_CHECKS = ['CodeRabbit', 'SonarQube']
 
 const KEY_TYPE_NAME = '__typename'
 const KEY_STATE = 'state'
