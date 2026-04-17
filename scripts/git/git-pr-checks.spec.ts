@@ -10,14 +10,11 @@ import {
 } from './git-pr-checks'
 
 const REPO_NAME = 'joshuafolkken-com'
-const THIS_PACKAGE_NAME = '@joshuafolkken/config'
-const WORKERS_BUILDS_FOR_THIS_REPO = `Workers Builds: ${THIS_PACKAGE_NAME}`
 const CODE_RABBIT = 'CodeRabbit'
 const SONAR_QUBE = 'SonarQube'
 const NO_SNAPSHOT_ERROR = 'No snapshot available for test.'
 
 const PASSING_ROLLUP: ReadonlyArray<RollupCheck> = [
-	{ name: WORKERS_BUILDS_FOR_THIS_REPO, status: 'pass' },
 	{ name: CODE_RABBIT, status: 'pass' },
 	{ name: SONAR_QUBE, status: 'pass' },
 ]
@@ -86,7 +83,6 @@ describe('evaluate_pr_state — failure paths', () => {
 	it('failure when a required check has failed', () => {
 		const snapshot = make_snapshot({
 			rollup: [
-				{ name: WORKERS_BUILDS_FOR_THIS_REPO, status: 'pass' },
 				{ name: CODE_RABBIT, status: 'fail' },
 				{ name: SONAR_QUBE, status: 'pass' },
 			],
@@ -106,7 +102,6 @@ describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () 
 	it('pending when a required rollup entry is still pending', () => {
 		const snapshot = make_snapshot({
 			rollup: [
-				{ name: WORKERS_BUILDS_FOR_THIS_REPO, status: 'pass' },
 				{ name: CODE_RABBIT, status: 'pending' },
 				{ name: SONAR_QUBE, status: 'pass' },
 			],
@@ -117,13 +112,22 @@ describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () 
 
 	it('pending when a required rollup entry is missing', () => {
 		const snapshot = make_snapshot({
-			rollup: [
-				{ name: WORKERS_BUILDS_FOR_THIS_REPO, status: 'pass' },
-				{ name: CODE_RABBIT, status: 'pass' },
-			],
+			rollup: [{ name: CODE_RABBIT, status: 'pass' }],
 		})
 
 		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('success when Workers Builds check is absent (not a required check for this repo)', () => {
+		const snapshot = make_snapshot({
+			rollup: [
+				{ name: 'Workers Builds: @joshuafolkken/config', status: 'missing' },
+				{ name: CODE_RABBIT, status: 'pass' },
+				{ name: SONAR_QUBE, status: 'pass' },
+			],
+		})
+
+		expect(evaluate_pr_state(snapshot)).toBe('success')
 	})
 })
 
@@ -140,8 +144,7 @@ describe('evaluate_pr_state — pending: merge state not CLEAN', () => {
 		const snapshot = make_snapshot({
 			merge_state_status: 'UNKNOWN',
 			rollup: [
-				{ name: WORKERS_BUILDS_FOR_THIS_REPO, status: 'pending' },
-				{ name: CODE_RABBIT, status: 'pass' },
+				{ name: CODE_RABBIT, status: 'pending' },
 				{ name: SONAR_QUBE, status: 'pass' },
 			],
 		})
@@ -165,16 +168,11 @@ describe('parse_pr_state_snapshot', () => {
 		const raw = JSON.stringify({
 			mergeStateStatus: 'CLEAN',
 			reviewDecision: 'APPROVED',
-			statusCheckRollup: [
-				check_run(WORKERS_BUILDS_FOR_THIS_REPO),
-				check_run(CODE_RABBIT),
-				check_run(SONAR_QUBE),
-			],
+			statusCheckRollup: [check_run(CODE_RABBIT), check_run(SONAR_QUBE)],
 		})
 
 		expect(parse_pr_state_snapshot(raw)).toStrictEqual({
 			rollup: [
-				{ name: WORKERS_BUILDS_FOR_THIS_REPO, status: 'pass' },
 				{ name: CODE_RABBIT, status: 'pass' },
 				{ name: SONAR_QUBE, status: 'pass' },
 			],
