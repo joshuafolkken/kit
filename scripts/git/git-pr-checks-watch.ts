@@ -2,6 +2,10 @@ import { spawn } from 'node:child_process'
 
 const PR_CHECKS_WATCH_TIMEOUT_MS = 120_000
 
+interface WatchResult {
+	timed_out: boolean
+}
+
 function resolve_exit_code(code: number | null): string {
 	return code === null ? 'unknown' : String(code)
 }
@@ -23,27 +27,27 @@ function create_watch_settle_guard(): {
 function handle_watch_timeout(
 	guard: ReturnType<typeof create_watch_settle_guard>,
 	child: ReturnType<typeof spawn>,
-	resolve: () => void,
+	resolve: (result: WatchResult) => void,
 ): void {
 	if (guard.is_settled()) return
 	guard.settle()
 	child.kill()
-	console.info('⏱️ pr checks --watch timed out, falling through to polling.')
-	resolve()
+	console.info('⏱️ pr checks --watch timed out.')
+	resolve({ timed_out: true })
 }
 
 function handle_watch_close(input: {
 	guard: ReturnType<typeof create_watch_settle_guard>
 	timeout_id: NodeJS.Timeout
 	code: number | null
-	callbacks: { resolve: () => void; reject: (error: Error) => void }
+	callbacks: { resolve: (result: WatchResult) => void; reject: (error: Error) => void }
 }): void {
 	if (input.guard.is_settled()) return
 	input.guard.settle()
 	clearTimeout(input.timeout_id)
 
 	if (input.code === 0) {
-		input.callbacks.resolve()
+		input.callbacks.resolve({ timed_out: false })
 	} else {
 		input.callbacks.reject(
 			new Error(`gh pr checks --watch exited with code ${resolve_exit_code(input.code)}`),
@@ -51,8 +55,8 @@ function handle_watch_close(input: {
 	}
 }
 
-async function pr_checks_watch(branch_name: string): Promise<void> {
-	await new Promise<void>((resolve, reject) => {
+async function pr_checks_watch(branch_name: string): Promise<WatchResult> {
+	return await new Promise<WatchResult>((resolve, reject) => {
 		// eslint-disable-next-line sonarjs/no-os-command-from-path -- gh is a well-known CLI tool and safe to execute
 		const child = spawn('gh', ['pr', 'checks', branch_name, '--watch'], {
 			stdio: 'inherit',
@@ -79,4 +83,11 @@ async function pr_checks_watch(branch_name: string): Promise<void> {
 
 const git_pr_checks_watch = { pr_checks_watch }
 
-export { git_pr_checks_watch, PR_CHECKS_WATCH_TIMEOUT_MS }
+export {
+	git_pr_checks_watch,
+	PR_CHECKS_WATCH_TIMEOUT_MS,
+	create_watch_settle_guard,
+	handle_watch_timeout,
+	handle_watch_close,
+}
+export type { WatchResult }

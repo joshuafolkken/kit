@@ -3,6 +3,7 @@ import { git_conflict } from './git-conflict'
 import { git_countdown } from './git-countdown'
 import { git_gh_command } from './git-gh-command'
 import type { IssueInfo } from './git-issue'
+import type { WatchResult } from './git-pr-checks-watch'
 import { git_pr_error } from './git-pr-error'
 import { git_pr_messages } from './git-pr-messages'
 
@@ -43,11 +44,12 @@ async function wait_before_check(): Promise<void> {
 	)
 }
 
-async function watch_pr_checks(branch_name: string): Promise<void> {
+async function watch_pr_checks(branch_name: string): Promise<WatchResult> {
 	console.info('')
 	console.info('📊 Watching PR status checks...')
 	console.info('')
-	await git_gh_command.pr_checks_watch(branch_name)
+
+	return await git_gh_command.pr_checks_watch(branch_name)
 }
 
 async function display_pr_url_if_available(branch_name: string): Promise<void> {
@@ -75,13 +77,25 @@ async function check_and_display_status(branch_name: string): Promise<void> {
 	await display_pr_url_if_available(branch_name)
 }
 
+async function handle_timed_out_watch(branch_name: string): Promise<void> {
+	console.info('⏱️ CI still running. Use `pnpm git:followup` to monitor progress.')
+	await display_pr_url_if_available(branch_name)
+}
+
 async function wait_and_check_status(branch_name: string): Promise<void> {
 	await wait_before_check()
+	let watch_result: WatchResult = { timed_out: false }
 
 	try {
-		await watch_pr_checks(branch_name)
+		watch_result = await watch_pr_checks(branch_name)
 	} catch (error) {
 		await handle_watch_error(branch_name, error)
+	}
+
+	if (watch_result.timed_out) {
+		await handle_timed_out_watch(branch_name)
+
+		return
 	}
 
 	await check_and_display_status(branch_name)
