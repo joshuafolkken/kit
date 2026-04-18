@@ -161,20 +161,20 @@ describe('merge_json_extends', () => {
 		expect(result.extends).toStrictEqual(['my-config'])
 	})
 
-	it('converts string extends to array and appends entry', () => {
+	it('converts string extends to array and prepends entry', () => {
 		const result = JSON.parse(
 			init_logic.merge_json_extends('{"extends":"existing"}', 'my-config'),
 		) as { extends: unknown }
 
-		expect(result.extends).toStrictEqual(['existing', 'my-config'])
+		expect(result.extends).toStrictEqual(['my-config', 'existing'])
 	})
 
-	it('appends to existing array', () => {
+	it('prepends to existing array', () => {
 		const result = JSON.parse(
 			init_logic.merge_json_extends('{"extends":["existing"]}', 'my-config'),
 		) as { extends: unknown }
 
-		expect(result.extends).toStrictEqual(['existing', 'my-config'])
+		expect(result.extends).toStrictEqual(['my-config', 'existing'])
 	})
 
 	it('returns content unchanged when entry already in extends', () => {
@@ -190,7 +190,7 @@ describe('merge_json_extends', () => {
 			extends: unknown
 		}
 
-		expect(result.extends).toStrictEqual(['existing', 'my-config'])
+		expect(result.extends).toStrictEqual(['my-config', 'existing'])
 	})
 })
 

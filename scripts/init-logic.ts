@@ -178,7 +178,7 @@ function merge_json_extends(content: string, entry: string): string {
 	const parsed = parse_jsonc(content) as WithExtends & Record<string, unknown>
 	const existing = normalize_extends(parsed.extends)
 	if (existing.includes(entry)) return content
-	parsed.extends = [...existing, entry]
+	parsed.extends = [entry, ...existing]
 
 	return `${JSON.stringify(parsed, undefined, '\t')}\n`
 }
