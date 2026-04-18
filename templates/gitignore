@@ -31,6 +31,17 @@ vite.config.ts.timestamp-*
 # Server config (contains internal infrastructure details)
 .server
 
+# Paraglide
+src/lib/paraglide
+project.inlang/cache/
+
+# SQLite
+*.db
+
+# Storybook
+*storybook.log
+storybook-static
+
 # ESLint cache
 .eslintcache
 
