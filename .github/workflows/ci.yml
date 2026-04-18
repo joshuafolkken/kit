@@ -67,3 +67,97 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test:unit
+
+  e2e-detect:
+    name: Detect E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for Playwright config
+        id: check
+        run: |
+          if [ -f playwright.config.ts ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  e2e:
+    name: E2E
+    needs: e2e-detect
+    if: needs.e2e-detect.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Playwright preview は localhost:4173。ワークフロー共通の BETTER_AUTH_URL（本番）を
+    # 引き継ぐと Better Auth が origin を拒否する（CI E2E では本番 URL は使わない）。
+    # ホスト/ポートは e2e/e2e-constants.ts の E2E_PREVIEW_PORT（4173）と一致させること。
+    env:
+      BETTER_AUTH_URL: http://localhost:4173
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Setup build cache
+        uses: actions/cache@v4
+        id: build-cache
+        with:
+          path: |
+            .svelte-kit
+          key: ${{ runner.os }}-build-cache-e2e-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('svelte.config.js', 'vite.config.ts', 'tsconfig.json', 'src/lib/server/auth.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-build-cache-e2e-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-build-cache-e2e-
+
+      - name: Setup Playwright cache
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-cache-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-cache-${{ hashFiles('pnpm-lock.yaml') }}
+            ${{ runner.os }}-playwright-cache-
+
+      - name: Setup safe-chain
+        run: pnpm dlx @aikidosec/safe-chain setup-ci
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Install Playwright system dependencies
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+
+      - name: Build application
+        env:
+          E2E_CLEANUP_ENABLED: '1'
+        run: pnpm run build
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
