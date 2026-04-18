@@ -30,7 +30,7 @@ function display_help(): void {
 🚦 PR Followup Workflow
 
 Usage:
-  pnpm git:followup [issue] [options]
+  jf-git-followup [issue] [options]
 
 Options:
   --branch                     Target branch name (default: current branch)

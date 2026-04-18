@@ -20,7 +20,7 @@ function display_help(): void {
 🚀 Git Workflow Script
 
 Usage:
-  pnpm git [issue] [suffix] [options]
+  jf-git [issue] [suffix] [options]
 
 Arguments:
   issue             Title and issue number (e.g., "feat: add login #42")
@@ -36,9 +36,9 @@ Options:
   -h, --help        Display this help message.
 
 Examples:
-  pnpm git "fix: bug #12" --skip-pr
-  pnpm git "better auth #67" "fix ci"   # commit: "better auth #67 fix ci"
-  pnpm git -h
+  jf-git "fix: bug #12" --skip-pr
+  jf-git "better auth #67" "fix ci"   # commit: "better auth #67 fix ci"
+  jf-git -h
 	`)
 }
 
