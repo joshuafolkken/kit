@@ -8,7 +8,7 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 	'minimum-release-age=1440',
 ]
 
-const CSPELL_IMPORT = '@joshuafolkken/config/cspell'
+const CSPELL_IMPORT = '"@joshuafolkken/config/cspell"'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
 
