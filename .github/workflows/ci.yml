@@ -149,10 +149,10 @@ jobs:
       - name: Build application
         env:
           E2E_CLEANUP_ENABLED: '1'
-        run: pnpm run build
+        run: pnpm build
 
       - name: Run E2E tests
-        run: pnpm run test:e2e
+        run: pnpm test:e2e
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
