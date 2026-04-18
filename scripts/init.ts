@@ -58,7 +58,7 @@ function build_cspell_action(): FileAction {
 		dest: 'cspell.config.yaml',
 		create: () => init_logic.generate_cspell_config(),
 		merge: (existing) =>
-			init_logic.merge_yaml_list_entry(existing, 'import', init_logic.get_cspell_import_value()),
+			init_logic.merge_cspell_import(existing, init_logic.get_cspell_import_value()),
 	}
 }
 
