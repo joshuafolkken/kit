@@ -265,6 +265,70 @@ function install_lefthook(): void {
 	}
 }
 
+function get_repo_name_with_owner(): string | undefined {
+	/* eslint-disable sonarjs/no-os-command-from-path */
+	const result = spawnSync(
+		'gh',
+		['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
+		{ encoding: 'utf8', cwd: PROJECT_ROOT },
+	)
+	/* eslint-enable sonarjs/no-os-command-from-path */
+	if (result.status !== 0 || !result.stdout) return undefined
+
+	return result.stdout.trim() || undefined
+}
+
+function copy_sonar_file_write(
+	template_source: string,
+	destination_path: string,
+	project_key: string,
+	organization: string,
+): void {
+	const content = init_logic.apply_sonar_template(
+		readFileSync(template_source, 'utf8'),
+		project_key,
+		organization,
+	)
+
+	writeFileSync(destination_path, content)
+}
+
+function copy_sonar_if_missing(
+	destination: string,
+	identifiers: ReturnType<typeof init_logic.derive_sonar_identifiers>,
+): void {
+	const destination_path = path.join(PROJECT_ROOT, destination)
+
+	if (existsSync(destination_path)) {
+		console.info(`  ⏭ skipped   ${destination} (already exists — run pnpm sync to update)`)
+
+		return
+	}
+
+	const template_source = path.join(PACKAGE_DIR, init_logic.get_sonar_template_source())
+
+	copy_sonar_file_write(
+		template_source,
+		destination_path,
+		identifiers.project_key,
+		identifiers.organization,
+	)
+	console.info(`  ✔ created   ${destination}`)
+}
+
+function copy_sonar_with_template(): void {
+	const destination = init_logic.get_sonar_template_destination()
+	const name_with_owner = get_repo_name_with_owner()
+
+	if (name_with_owner === undefined) {
+		console.warn(`  ⚠ skipped   ${destination} (gh repo view failed)`)
+
+		return
+	}
+
+	copy_sonar_if_missing(destination, init_logic.derive_sonar_identifiers(name_with_owner))
+}
+
 function run_ai_copies(): void {
 	const file_skips = init_logic
 		.get_ai_copy_files()
@@ -273,6 +337,8 @@ function run_ai_copies(): void {
 		.get_ai_copy_directories()
 		.map((directory_name) => execute_ai_directory_copy(directory_name))
 	const has_skips = [...file_skips, ...directory_skips].some(Boolean)
+
+	copy_sonar_with_template()
 
 	if (has_skips) {
 		console.info('\n  💡 Run `pnpm sync` to overwrite skipped AI files with the latest version.')
@@ -297,4 +363,8 @@ async function main(): Promise<void> {
 	console.info('\n✅ Done.\n')
 }
 
-await main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+
+const init = { copy_sonar_file_write }
+
+export { init }

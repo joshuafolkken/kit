@@ -115,9 +115,9 @@ describe('get_ai_copy_files', () => {
 		const result = init_logic.get_ai_copy_files()
 
 		expect(result).toContain('pnpm-workspace.yaml')
-		expect(result).toContain('sonar-project.properties')
 		expect(result).toContain('tsconfig.sonar.json')
 		expect(result).toContain('wrangler.jsonc')
+		expect(result).not.toContain('sonar-project.properties')
 	})
 })
 
