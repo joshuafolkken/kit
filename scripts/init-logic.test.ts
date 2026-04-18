@@ -347,9 +347,17 @@ describe('merge_yaml_list_entry', () => {
 		expect(result).toBe(content)
 	})
 
-	it('appends key block with trailing newline when content has no trailing newline', () => {
-		const result = init_logic.merge_yaml_list_entry('other: value', 'extends', 'my-value')
+	it('prepends key block at the top when key does not exist and content has other keys', () => {
+		const result = init_logic.merge_yaml_list_entry('other: value\n', 'extends', 'my-value')
 
-		expect(result).toMatch(/\nextends:\n {2}- my-value\n$/u)
+		expect(result).toMatch(/^extends:\n {2}- my-value\n/u)
+	})
+
+	it('prepends key block at the top when content is non-empty', () => {
+		const content = 'pre-commit:\n  commands:\n    test:\n      run: pnpm test\n'
+		const result = init_logic.merge_yaml_list_entry(content, 'extends', 'my-value')
+
+		expect(result.indexOf('extends:')).toBe(0)
+		expect(result).toContain('pre-commit:')
 	})
 })

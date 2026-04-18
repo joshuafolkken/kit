@@ -222,7 +222,9 @@ function merge_yaml_list_entry(content: string, key: string, value: string): str
 	const entry = `  - ${value}`
 	if (content.includes(`${key}:`)) return content.replace(`${key}:`, `${key}:\n${entry}`)
 
-	return `${content}${get_trailing_newline(content)}${key}:\n${entry}\n`
+	const separator = content.trim() ? '\n' : ''
+
+	return `${key}:\n${entry}\n${separator}${content}`
 }
 
 function find_version_line_end(content: string): number {
