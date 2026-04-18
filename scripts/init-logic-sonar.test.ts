@@ -36,6 +36,14 @@ describe('derive_sonar_identifiers', () => {
 	it('derives organization from owner part before slash', () => {
 		expect(init_logic.derive_sonar_identifiers(REPO_NAME).organization).toBe(ORGANIZATION)
 	})
+
+	it('throws on malformed input with no slash', () => {
+		expect(() => init_logic.derive_sonar_identifiers('noslash')).toThrow()
+	})
+
+	it('throws on malformed input with extra path segments', () => {
+		expect(() => init_logic.derive_sonar_identifiers('owner/repo/extra')).toThrow()
+	})
 })
 
 describe('get_sonar_template_source', () => {

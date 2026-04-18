@@ -286,8 +286,8 @@ function get_ai_copy_directories(): ReadonlyArray<string> {
 
 function apply_sonar_template(content: string, project_key: string, organization: string): string {
 	return content
-		.replace(SONAR_PROJECT_KEY_PLACEHOLDER, project_key)
-		.replace(SONAR_ORGANIZATION_PLACEHOLDER, organization)
+		.replaceAll(SONAR_PROJECT_KEY_PLACEHOLDER, project_key)
+		.replaceAll(SONAR_ORGANIZATION_PLACEHOLDER, organization)
 }
 
 interface SonarIdentifiers {
@@ -296,11 +296,15 @@ interface SonarIdentifiers {
 }
 
 function derive_sonar_identifiers(name_with_owner: string): SonarIdentifiers {
-	const slash_index = name_with_owner.indexOf('/')
+	const [organization, repository, ...extra] = name_with_owner.trim().split('/')
+
+	if (!organization || !repository || extra.length > 0) {
+		throw new Error(`Invalid GitHub repository nameWithOwner: ${name_with_owner}`)
+	}
 
 	return {
-		organization: name_with_owner.slice(0, slash_index),
-		project_key: name_with_owner.replace('/', '_'),
+		organization,
+		project_key: `${organization}_${repository}`,
 	}
 }
 
