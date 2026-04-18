@@ -45,9 +45,8 @@ pre-push:
       run: pnpm test:unit --run
 
   fail_text: |
-    🚫 Push blocked due to build or test failures
+    🚫 Push blocked due to test failures
     Please resolve the issues above before pushing.
 
     Troubleshooting:
-    • Check build errors: `pnpm run build`
-    • Run tests locally: `pnpm run test:unit` and `pnpm run test:e2e`
+    • Run tests locally: `pnpm run test:unit`
