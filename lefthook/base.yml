@@ -20,12 +20,18 @@ pre-commit:
       glob: '*.{js,jsx,ts,tsx,mjs,cjs}'
       run: pnpm exec eslint --quiet --cache --cache-strategy content {staged_files}
 
+    type-check:
+      glob: '*.{ts,js,mjs,cjs}'
+      run: pnpm check
+
   fail_text: |
-    Commit blocked due to quality checks failure.
+    🚫 Commit blocked due to quality checks failure
+    Please fix the issues above and try again.
 
     Quick fixes:
-    • Run `pnpm format` to auto-format code
-    • Run `pnpm lint` to check and fix linting issues
+    • Run `pnpm run format` to auto-format code
+    • Run `pnpm run lint` to check and fix linting issues
+    • Run `pnpm run check` to verify TypeScript types
 
 commit-msg:
   commands:
@@ -35,12 +41,13 @@ commit-msg:
 pre-push:
   parallel: false
   commands:
-    check:
-      run: pnpm check
-
     test-unit:
       run: pnpm test:unit --run
 
   fail_text: |
-    Push blocked due to test failures.
-    • Run tests locally: `pnpm test:unit`
+    🚫 Push blocked due to build or test failures
+    Please resolve the issues above before pushing.
+
+    Troubleshooting:
+    • Check build errors: `pnpm run build`
+    • Run tests locally: `pnpm run test:unit` and `pnpm run test:e2e`

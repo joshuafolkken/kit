@@ -3,8 +3,20 @@ extends:
 
 pre-commit:
   commands:
+    cspell:
+      glob: '*.{svelte,ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json}'
+      run: pnpm exec cspell lint --no-must-find-files --no-progress {staged_files}
+
+    prettier:
+      glob: '*.{svelte,js,jsx,ts,tsx,mjs,cjs,html,css,scss,md,mdx,json,jsonc,yaml,yml}'
+      run: pnpm exec prettier --check --ignore-unknown {staged_files}
+
+    eslint:
+      glob: '*.{svelte,js,jsx,ts,tsx,mjs,cjs}'
+      run: pnpm exec eslint --quiet --cache --cache-strategy content {staged_files}
+
     type-check:
-      glob: '*.{svelte,ts,js,mjs,cjs,yml}'
+      glob: '*.{svelte,ts,js,mjs,cjs}'
       run: pnpm check
 
 pre-push:
