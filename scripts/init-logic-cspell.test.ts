@@ -41,9 +41,9 @@ describe('merge_cspell_import', () => {
 		expect(init_logic.merge_cspell_import(content, CSPELL_VALUE)).toBe(content)
 	})
 
-	it('appends import block when no version key exists', () => {
+	it('appends import block at end when no version key exists', () => {
 		const result = init_logic.merge_cspell_import('words: []\n', CSPELL_VALUE)
 
-		expect(result).toContain(`import:\n  - ${CSPELL_VALUE}`)
+		expect(result).toBe(`words: []\nimport:\n  - ${CSPELL_VALUE}\n`)
 	})
 })

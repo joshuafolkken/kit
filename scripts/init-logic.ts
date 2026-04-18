@@ -225,11 +225,18 @@ function merge_yaml_list_entry(content: string, key: string, value: string): str
 	return `${content}${get_trailing_newline(content)}${key}:\n${entry}\n`
 }
 
+function find_version_line_end(content: string): number {
+	const start = content.search(/^version:/mu)
+	if (start === -1) return -1
+
+	return content.indexOf('\n', start)
+}
+
 function merge_cspell_import(content: string, value: string): string {
 	if (content.includes(value)) return content
 	if (content.includes('import:')) return merge_yaml_list_entry(content, 'import', value)
 	const block = `import:\n  - ${value}\n`
-	const version_line_end = content.indexOf('\n', content.indexOf('version:'))
+	const version_line_end = find_version_line_end(content)
 	if (version_line_end === -1) return `${content}${get_trailing_newline(content)}${block}`
 
 	return `${content.slice(0, version_line_end + 1)}${block}${content.slice(version_line_end + 1)}`
