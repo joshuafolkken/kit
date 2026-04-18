@@ -29,13 +29,11 @@ describe('get_suggested_scripts bin commands', () => {
 		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('git', 'jf-git')
 	})
 
-	it('uses node_modules path with env-file for git:followup', () => {
-		const result = init_logic.get_suggested_scripts('vanilla')['git:followup']
+	it('uses jf-bin commands for git:followup and telegram:test', () => {
+		const scripts = init_logic.get_suggested_scripts('vanilla')
 
-		expect(result).toContain(
-			'node_modules/@joshuafolkken/config/scripts-ai/git-followup-workflow.ts',
-		)
-		expect(result).toContain('--env-file=.env')
+		expect(scripts).toHaveProperty('git:followup', 'jf-git-followup')
+		expect(scripts).toHaveProperty('telegram:test', 'jf-telegram-test')
 	})
 
 	it('uses jf-bin commands for prevent-main-commit and check-commit-message', () => {
@@ -68,6 +66,12 @@ describe('transform_prompt_paths', () => {
 
 	it('returns content unchanged when no prompts/ references exist', () => {
 		const input = 'no references here'
+
+		expect(init_logic.transform_prompt_paths(input)).toBe(input)
+	})
+
+	it('does not replace non-backtick prompts/ occurrences', () => {
+		const input = 'see prompts/refactoring.md without backticks'
 
 		expect(init_logic.transform_prompt_paths(input)).toBe(input)
 	})

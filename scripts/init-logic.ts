@@ -49,7 +49,6 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 
 const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
 
-const PROMPTS_LOCAL_PREFIX = 'prompts/'
 const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/config/prompts/'
 
 const LEFTHOOK_EXTENDS: Record<ProjectType, string> = {
@@ -84,10 +83,8 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	'main:sync': 'git checkout main && git pull',
 	'main:merge': 'git pull origin main',
 	git: 'jf-git',
-	'git:followup':
-		'tsx --env-file=.env node_modules/@joshuafolkken/config/scripts-ai/git-followup-workflow.ts',
-	'telegram:test':
-		'tsx --env-file=.env node_modules/@joshuafolkken/config/scripts-ai/telegram-test.ts',
+	'git:followup': 'jf-git-followup',
+	'telegram:test': 'jf-telegram-test',
 	'issue:prep': 'jf-issue-prep',
 	prep: 'jf-prep',
 }
@@ -328,7 +325,7 @@ function get_suggested_scripts(type: ProjectType): Record<string, string> {
 }
 
 function transform_prompt_paths(content: string): string {
-	return content.replaceAll(PROMPTS_LOCAL_PREFIX, PROMPTS_PACKAGE_PREFIX)
+	return content.replaceAll(/`prompts\/([^`]+)`/gu, `\`${PROMPTS_PACKAGE_PREFIX}$1\``)
 }
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {

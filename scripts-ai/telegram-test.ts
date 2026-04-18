@@ -4,6 +4,12 @@ import { parseArgs, promisify } from 'node:util'
 import { telegram_notify } from '../scripts/git/telegram-notify'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
 
+try {
+	process.loadEnvFile('.env')
+} catch {
+	// .env is optional
+}
+
 const exec_file_async = promisify(execFile)
 
 const REPO_NAME_SEPARATOR = '/'

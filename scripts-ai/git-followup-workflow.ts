@@ -5,6 +5,12 @@ import { git_error } from '../scripts/git/git-error'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 
+try {
+	process.loadEnvFile('.env')
+} catch {
+	// .env is optional
+}
+
 // cspell:words coderabbit
 
 /* eslint-disable @typescript-eslint/naming-convention */
