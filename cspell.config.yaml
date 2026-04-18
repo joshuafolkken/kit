@@ -5,6 +5,8 @@ words:
   - docstrings
   - inlang
   - languagetool
+  - myorg
+  - myrepo
   - ncurc
   - shellcheck
   - vercel

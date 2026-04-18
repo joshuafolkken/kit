@@ -1,5 +1,10 @@
 import strip_json_comments from 'strip-json-comments'
 
+const SONAR_PROJECT_KEY_PLACEHOLDER = '{{PROJECT_KEY}}'
+const SONAR_ORGANIZATION_PLACEHOLDER = '{{ORGANIZATION}}'
+const SONAR_TEMPLATE_SRC = 'templates/sonar-project.properties'
+const SONAR_TEMPLATE_DEST = 'sonar-project.properties'
+
 type ProjectType = 'sveltekit' | 'vanilla'
 
 const NPMRC_LINES: ReadonlyArray<string> = [
@@ -24,7 +29,6 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.prettierignore',
 	'SECURITY.md',
 	'pnpm-workspace.yaml',
-	'sonar-project.properties',
 	'tsconfig.sonar.json',
 	'wrangler.jsonc',
 	'.github/workflows/ci.yml',
@@ -280,6 +284,34 @@ function get_ai_copy_directories(): ReadonlyArray<string> {
 	return AI_COPY_DIRECTORIES
 }
 
+function apply_sonar_template(content: string, project_key: string, organization: string): string {
+	return content
+		.replace(SONAR_PROJECT_KEY_PLACEHOLDER, project_key)
+		.replace(SONAR_ORGANIZATION_PLACEHOLDER, organization)
+}
+
+interface SonarIdentifiers {
+	project_key: string
+	organization: string
+}
+
+function derive_sonar_identifiers(name_with_owner: string): SonarIdentifiers {
+	const slash_index = name_with_owner.indexOf('/')
+
+	return {
+		organization: name_with_owner.slice(0, slash_index),
+		project_key: name_with_owner.replace('/', '_'),
+	}
+}
+
+function get_sonar_template_source(): string {
+	return SONAR_TEMPLATE_SRC
+}
+
+function get_sonar_template_destination(): string {
+	return SONAR_TEMPLATE_DEST
+}
+
 function get_suggested_scripts(type: ProjectType): Record<string, string> {
 	if (type === 'sveltekit') return { ...SUGGESTED_SCRIPTS_COMMON, ...SUGGESTED_SCRIPTS_SVELTEKIT }
 
@@ -321,7 +353,11 @@ const init_logic = {
 	get_ai_copy_directories,
 	get_suggested_scripts,
 	merge_package_scripts,
+	apply_sonar_template,
+	derive_sonar_identifiers,
+	get_sonar_template_source,
+	get_sonar_template_destination,
 }
 
 export { init_logic }
-export type { FileCopyMapping, ProjectType }
+export type { FileCopyMapping, ProjectType, SonarIdentifiers }
