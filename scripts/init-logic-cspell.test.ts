@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
-const CSPELL_VALUE = '@joshuafolkken/config/cspell'
+const CSPELL_VALUE = '"@joshuafolkken/config/cspell"'
 
 describe('generate_cspell_config', () => {
 	it('uses the short package import path and not node_modules', () => {
