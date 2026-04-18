@@ -8,6 +8,7 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+/dist
 
 # OS
 .DS_Store
@@ -60,3 +61,5 @@ e2e/.auth/chrome-profile/
 
 # Claude Code runtime artifacts
 .claude/scheduled_tasks.lock
+
+.pnpm-store

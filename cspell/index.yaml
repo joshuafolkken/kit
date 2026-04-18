@@ -1,20 +1,15 @@
 version: '0.2'
+useGitignore: true
 language: en
 ignorePaths:
-  - '**/node_modules/**'
-  - '**/build/**'
-  - '**/dist/**'
-  - '**/*.d.ts'
-  - '**/*.map'
-  - '**/*.min.js'
   - '**/.git/**'
   - '**/.gitignore'
-  - '**/*.svg'
   - '**/pnpm-lock.yaml'
-  - '**/.env*'
-  - '**/playwright-report/**'
-  - '**/.pnpm-store/**'
   - '**/.vscode/**'
+  #   - '**/*.d.ts'
+  #   - '**/*.map'
+  #   - '**/*.min.js'
+  #   - '**/*.svg'
 words:
   - bttf
   - COLLAB
