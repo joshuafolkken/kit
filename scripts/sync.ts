@@ -8,11 +8,15 @@ import { init_logic } from './init-logic'
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PROJECT_ROOT = process.cwd()
 
-function sync_file(filename: string): void {
-	const destination_path = path.join(PROJECT_ROOT, filename)
-
+function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
-	cpSync(path.join(PACKAGE_DIR, filename), destination_path)
+	const content = readFileSync(source_path, 'utf8')
+
+	writeFileSync(destination_path, init_logic.transform_prompt_paths(content))
+}
+
+function sync_file(filename: string): void {
+	sync_ai_file(path.join(PACKAGE_DIR, filename), path.join(PROJECT_ROOT, filename))
 	console.info(`  ✔ synced    ${filename}`)
 }
 
@@ -109,6 +113,6 @@ function main(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const sync = { sync_file_mapping, sync_sonar_file_write }
+const sync = { sync_file_mapping, sync_sonar_file_write, sync_ai_file }
 
 export { sync }

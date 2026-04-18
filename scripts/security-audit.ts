@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 import { spawnSync } from 'node:child_process'
 import { security_audit_logic } from './security-audit-logic'
 

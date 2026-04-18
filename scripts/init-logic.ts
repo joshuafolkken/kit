@@ -47,7 +47,9 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	{ src: 'templates/gitignore', dest: '.gitignore' },
 ]
 
-const AI_COPY_DIRECTORIES: ReadonlyArray<string> = ['prompts', 'scripts-ai']
+const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
+
+const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/config/prompts/'
 
 const LEFTHOOK_EXTENDS: Record<ProjectType, string> = {
 	sveltekit: 'node_modules/@joshuafolkken/config/lefthook/sveltekit.yml',
@@ -71,20 +73,20 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	cspell: 'cspell lint --no-must-find-files --no-progress "**/*.{ts,js,md,yaml,yml,json}"',
 	'cspell:dot': 'pnpm cspell . --dot',
 	'test:unit': 'vitest run',
-	'prevent-main-commit': 'tsx node_modules/@joshuafolkken/config/scripts/prevent-main-commit.ts',
-	'check-commit-message': 'tsx node_modules/@joshuafolkken/config/scripts/check-commit-message.ts',
-	'audit:security': 'tsx node_modules/@joshuafolkken/config/scripts/security-audit.ts',
+	'prevent-main-commit': 'jf-prevent-main-commit',
+	'check-commit-message': 'jf-check-commit-message',
+	'audit:security': 'jf-security-audit',
 	'lefthook:install': LEFTHOOK_INSTALL_CMD,
 	'lefthook:uninstall': 'lefthook uninstall',
 	'lefthook:commit': 'lefthook run pre-commit',
 	'lefthook:push': 'lefthook run pre-push',
 	'main:sync': 'git checkout main && git pull',
 	'main:merge': 'git pull origin main',
-	git: 'tsx scripts-ai/git-workflow.ts',
-	'git:followup': 'tsx scripts-ai/git-followup-workflow.ts',
-	'telegram:test': 'tsx --env-file=.env scripts-ai/telegram-test.ts',
-	'issue:prep': 'tsx scripts-ai/issue-prep.ts',
-	prep: 'tsx scripts-ai/prep.ts',
+	git: 'jf-git',
+	'git:followup': 'jf-git-followup',
+	'telegram:test': 'jf-telegram-test',
+	'issue:prep': 'jf-issue-prep',
+	prep: 'jf-prep',
 }
 
 const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
@@ -322,6 +324,10 @@ function get_suggested_scripts(type: ProjectType): Record<string, string> {
 	return SUGGESTED_SCRIPTS_COMMON
 }
 
+function transform_prompt_paths(content: string): string {
+	return content.replaceAll(/`prompts\/([^`]+)`/gu, `\`${PROMPTS_PACKAGE_PREFIX}$1\``)
+}
+
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
 	const parsed = parse_jsonc(content) as WithScripts
 	const existing = parsed.scripts ?? {}
@@ -357,6 +363,7 @@ const init_logic = {
 	get_ai_copy_directories,
 	get_suggested_scripts,
 	merge_package_scripts,
+	transform_prompt_paths,
 	apply_sonar_template,
 	derive_sonar_identifiers,
 	get_sonar_template_source,

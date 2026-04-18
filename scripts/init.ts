@@ -163,6 +163,13 @@ function execute_file_action(action: FileAction): void {
 	merge_existing_file(action.merge, destination_path, action.dest)
 }
 
+function copy_ai_file(source_path: string, destination_path: string): void {
+	const content = readFileSync(source_path, 'utf8')
+
+	mkdirSync(path.dirname(destination_path), { recursive: true })
+	writeFileSync(destination_path, init_logic.transform_prompt_paths(content))
+}
+
 function execute_ai_file_copy(filename: string): boolean {
 	const destination_path = path.join(PROJECT_ROOT, filename)
 
@@ -172,8 +179,7 @@ function execute_ai_file_copy(filename: string): boolean {
 		return true
 	}
 
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	cpSync(package_path(filename), destination_path)
+	copy_ai_file(package_path(filename), destination_path)
 	console.info(`  ✔ created   ${filename}`)
 
 	return false
@@ -365,6 +371,6 @@ async function main(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-const init = { copy_sonar_file_write }
+const init = { copy_sonar_file_write, copy_ai_file }
 
 export { init }

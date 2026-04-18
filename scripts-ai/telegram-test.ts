@@ -1,8 +1,14 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 import { execFile } from 'node:child_process'
 import { parseArgs, promisify } from 'node:util'
 import { telegram_notify } from '../scripts/git/telegram-notify'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
+
+try {
+	process.loadEnvFile('.env')
+} catch {
+	// .env is optional
+}
 
 const exec_file_async = promisify(execFile)
 

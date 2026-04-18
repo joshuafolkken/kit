@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 import { execute_check, get_current_branch, type CheckResult } from './common'
 
 function check_main_branch(): CheckResult {

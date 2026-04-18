@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 import { readFileSync } from 'node:fs'
 import { execute_check, get_current_branch, type CheckResult } from './common'
 

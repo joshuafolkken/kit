@@ -20,6 +20,9 @@ importers:
       svelte:
         specifier: '>=5.0.0'
         version: 5.55.4(@typescript-eslint/types@8.58.2)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
     devDependencies:
       '@eslint/compat':
         specifier: ^2.0.5
@@ -78,9 +81,6 @@ importers:
       prettier-plugin-tailwindcss:
         specifier: ^0.7.2
         version: 0.7.2(@ianvs/prettier-plugin-sort-imports@4.7.1(prettier@3.8.3))(prettier-plugin-svelte@3.5.1(prettier@3.8.3)(svelte@5.55.4(@typescript-eslint/types@8.58.2)))(prettier@3.8.3)
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3

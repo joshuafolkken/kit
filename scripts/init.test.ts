@@ -43,3 +43,32 @@ describe('copy_sonar_file_write', () => {
 		expect(existsSync(DEST_PATH)).toBe(true)
 	})
 })
+
+const NO_REFERENCES_CONTENT = 'no references here\n'
+
+describe('copy_ai_file', () => {
+	it('writes file content to destination', () => {
+		writeFileSync(TEMPLATE_PATH, NO_REFERENCES_CONTENT)
+		init.copy_ai_file(TEMPLATE_PATH, DEST_PATH)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(NO_REFERENCES_CONTENT)
+	})
+
+	it('transforms prompts/ references to node_modules package path', () => {
+		writeFileSync(TEMPLATE_PATH, 'see `prompts/refactoring.md`\n')
+		init.copy_ai_file(TEMPLATE_PATH, DEST_PATH)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(
+			'see `node_modules/@joshuafolkken/config/prompts/refactoring.md`\n',
+		)
+	})
+
+	it('creates destination directory when it does not exist', () => {
+		const nested_destination = path.join(TEST_DIR, 'nested', 'dir', 'CLAUDE.md')
+
+		writeFileSync(TEMPLATE_PATH, 'content\n')
+		init.copy_ai_file(TEMPLATE_PATH, nested_destination)
+
+		expect(existsSync(nested_destination)).toBe(true)
+	})
+})

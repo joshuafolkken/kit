@@ -91,3 +91,32 @@ describe('sync_file_mapping', () => {
 		expect(existsSync(DEST_PATH)).toBe(false)
 	})
 })
+
+const NO_REFERENCES_CONTENT = 'no references here\n'
+
+describe('sync_ai_file', () => {
+	it('writes file content to destination', () => {
+		writeFileSync(SRC_PATH, NO_REFERENCES_CONTENT)
+		sync.sync_ai_file(SRC_PATH, DEST_PATH)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(NO_REFERENCES_CONTENT)
+	})
+
+	it('transforms prompts/ references to node_modules package path', () => {
+		writeFileSync(SRC_PATH, 'see `prompts/refactoring.md`\n')
+		sync.sync_ai_file(SRC_PATH, DEST_PATH)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(
+			'see `node_modules/@joshuafolkken/config/prompts/refactoring.md`\n',
+		)
+	})
+
+	it('creates nested destination directory for ai file', () => {
+		const nested_destination = path.join(TEST_DIR, 'nested', 'dir', 'CLAUDE.md')
+
+		writeFileSync(SRC_PATH, 'content\n')
+		sync.sync_ai_file(SRC_PATH, nested_destination)
+
+		expect(existsSync(nested_destination)).toBe(true)
+	})
+})

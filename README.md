@@ -2,7 +2,7 @@
 
 Shared toolchain config for TypeScript / SvelteKit projects.
 
-Covers: ESLint · Prettier · TypeScript · Lefthook · cspell · VS Code · AI files (CLAUDE.md, AGENTS.md, GEMINI.md, prompts/, scripts-ai/)
+Covers: ESLint · Prettier · TypeScript · Lefthook · cspell · VS Code · AI files (CLAUDE.md, AGENTS.md, GEMINI.md)
 
 ## Authentication
 
@@ -28,7 +28,7 @@ GitHub Packages requires authentication even for public packages. Set up auth be
 
 ## Install
 
-Add the registry to `.npmrc` first (or let `config-init` do it):
+Add the registry to `.npmrc` first (or let `jf-init` do it):
 
 ```
 @joshuafolkken:registry=https://npm.pkg.github.com
@@ -45,7 +45,7 @@ pnpm add -D @joshuafolkken/config
 Run once after installing:
 
 ```bash
-pnpm exec config-init
+pnpm exec jf-init
 ```
 
 Auto-detects SvelteKit vs vanilla. Creates or merges:
@@ -63,7 +63,6 @@ Auto-detects SvelteKit vs vanilla. Creates or merges:
 | `.vscode/settings.json`               | Merges missing keys        |
 | `package.json`                        | Merges missing scripts     |
 | `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` | Copied (skipped if exists) |
-| `prompts/`, `scripts-ai/`             | Copied (skipped if exists) |
 
 Runs `lefthook install` at the end.
 
@@ -72,8 +71,28 @@ Runs `lefthook install` at the end.
 To overwrite AI files with the latest version from the package:
 
 ```bash
-pnpm exec config-sync
+pnpm exec jf-sync
 ```
+
+## CLI commands
+
+All scripts are distributed as `jf-*` bin commands available in `node_modules/.bin/` after installation:
+
+| Command                   | Description                              |
+| ------------------------- | ---------------------------------------- |
+| `jf-init`                 | Initialize config files in a new project |
+| `jf-sync`                 | Sync AI files from the package           |
+| `jf-git`                  | AI-assisted git workflow                 |
+| `jf-git-followup`         | AI-assisted PR follow-up workflow        |
+| `jf-telegram-test`        | Send a test Telegram notification        |
+| `jf-prep`                 | Pre-implementation preparation           |
+| `jf-issue-prep`           | Fetch GitHub issue details               |
+| `jf-bump-version`         | Bump package version                     |
+| `jf-overrides-check`      | Check pnpm overrides for drift           |
+| `jf-security-audit`       | Run security audit                       |
+| `jf-prevent-main-commit`  | Git hook: block direct commits to main   |
+| `jf-check-commit-message` | Git hook: validate commit message format |
+| `jf-check-upstream`       | Check for drift against upstream SHA     |
 
 ## Package exports
 

@@ -134,11 +134,8 @@ describe('get_ai_copy_file_mappings', () => {
 })
 
 describe('get_ai_copy_directories', () => {
-	it('includes prompts and scripts-ai', () => {
-		const result = init_logic.get_ai_copy_directories()
-
-		expect(result).toContain('prompts')
-		expect(result).toContain('scripts-ai')
+	it('returns an empty array', () => {
+		expect(init_logic.get_ai_copy_directories()).toHaveLength(0)
 	})
 })
 
@@ -286,29 +283,6 @@ describe('merge_json_object', () => {
 
 		expect(result.a).toBe(1)
 		expect(result.b).toBe(2)
-	})
-})
-
-describe('get_suggested_scripts', () => {
-	it('includes postinstall for both types', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('postinstall')
-		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('postinstall')
-	})
-
-	it('includes lint for both types', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('lint')
-		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('lint')
-	})
-
-	it('includes sveltekit check scripts for sveltekit', () => {
-		const result = init_logic.get_suggested_scripts('sveltekit')
-
-		expect(result).toHaveProperty('check')
-		expect(result).toHaveProperty('check:ci')
-	})
-
-	it('does not include check for vanilla', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).not.toHaveProperty('check')
 	})
 })
 

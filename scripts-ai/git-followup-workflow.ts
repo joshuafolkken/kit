@@ -1,9 +1,15 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 import { parseArgs } from 'node:util'
 import { git_branch } from '../scripts/git/git-branch'
 import { git_error } from '../scripts/git/git-error'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
+
+try {
+	process.loadEnvFile('.env')
+} catch {
+	// .env is optional
+}
 
 // cspell:words coderabbit
 
@@ -30,7 +36,7 @@ function display_help(): void {
 🚦 PR Followup Workflow
 
 Usage:
-  pnpm git:followup [issue] [options]
+  jf-git-followup [issue] [options]
 
 Options:
   --branch                     Target branch name (default: current branch)
