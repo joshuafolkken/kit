@@ -1,4 +1,4 @@
-const PACKAGE_NAME = '@joshuafolkken/config'
+const PACKAGE_NAME = '@joshuafolkken/kit'
 const UPDATE_COMMAND_PREFIX = 'pnpm add -D'
 
 function format_version_status(current: string, latest: string): string {

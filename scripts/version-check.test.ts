@@ -42,20 +42,20 @@ describe('version_check_logic.format_version_output — update available', () =>
 	})
 
 	it('shows pnpm add command with latest version', () => {
-		expect(output).toContain(`pnpm add -D @joshuafolkken/config@${LATEST_VERSION}`)
+		expect(output).toContain(`pnpm add -D @joshuafolkken/kit@${LATEST_VERSION}`)
 	})
 })
 
 describe('version_check_logic.format_update_command', () => {
 	it('includes the package name with version pinned', () => {
 		expect(version_check_logic.format_update_command('2.0.0')).toBe(
-			'pnpm add -D @joshuafolkken/config@2.0.0',
+			'pnpm add -D @joshuafolkken/kit@2.0.0',
 		)
 	})
 })
 
 describe('version_check_logic.PACKAGE_NAME', () => {
 	it('is the scoped npm package name', () => {
-		expect(version_check_logic.PACKAGE_NAME).toBe('@joshuafolkken/config')
+		expect(version_check_logic.PACKAGE_NAME).toBe('@joshuafolkken/kit')
 	})
 })

@@ -1,6 +1,6 @@
 # josh init — Detailed Behavior
 
-`josh init` sets up a new project with all the toolchain config files managed by `@joshuafolkken/config`. Run it once after installing the package.
+`josh init` sets up a new project with all the toolchain config files managed by `@joshuafolkken/kit`. Run it once after installing the package.
 
 ```bash
 pnpm josh init
@@ -41,7 +41,7 @@ The preset is **prepended** to the `extends` array so it does not override proje
 { "extends": ["./.svelte-kit/tsconfig.json"] }
 
 // after
-{ "extends": ["@joshuafolkken/config/tsconfig/sveltekit.jsonc", "./.svelte-kit/tsconfig.json"] }
+{ "extends": ["@joshuafolkken/kit/tsconfig/sveltekit.jsonc", "./.svelte-kit/tsconfig.json"] }
 ```
 
 ### eslint.config.js / prettier.config.js / playwright.config.ts
@@ -102,7 +102,7 @@ wrangler.jsonc
 sonar-project.properties  (generated from GitHub repo name)
 ```
 
-`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/config/prompts/` so they work correctly in the consuming project.
+`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/kit/prompts/` so they work correctly in the consuming project.
 
 `sonar-project.properties` is generated from the GitHub repo name fetched via `gh repo view`. If `gh` is not available or the repo cannot be identified, the file is skipped with a warning.
 

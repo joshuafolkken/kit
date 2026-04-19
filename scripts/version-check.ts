@@ -8,10 +8,10 @@ const CONFIG_PKG_PATH = path.join(
 	process.cwd(),
 	'node_modules',
 	'@joshuafolkken',
-	'config',
+	'kit',
 	'package.json',
 )
-const GH_API_PATH = '/users/joshuafolkken/packages/npm/config/versions?per_page=1'
+const GH_API_PATH = '/users/joshuafolkken/packages/npm/kit/versions?per_page=1'
 
 function read_current_version(): string {
 	const raw = readFileSync(CONFIG_PKG_PATH, 'utf8')

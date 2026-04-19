@@ -1,6 +1,6 @@
 # josh sync — Detailed Behavior
 
-`josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/config` package. Run it after upgrading the package.
+`josh sync` overwrites managed files in your project with the latest versions from the installed `@joshuafolkken/kit` package. Run it after upgrading the package.
 
 ```bash
 pnpm josh sync
@@ -49,7 +49,7 @@ The project key and organization are derived from the `owner/repo` slug:
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`:
 
 ```text
-`prompts/foo.md`  →  `node_modules/@joshuafolkken/config/prompts/foo.md`
+`prompts/foo.md`  →  `node_modules/@joshuafolkken/kit/prompts/foo.md`
 ```
 
 This transformation is applied to backtick-quoted paths matching the pattern `` `prompts/<path>` ``.
@@ -74,6 +74,6 @@ To update these, re-run `josh init` (it will merge safely) or edit them manually
 
 Run `josh sync` whenever you:
 
-- Upgrade `@joshuafolkken/config` to a new version
+- Upgrade `@joshuafolkken/kit` to a new version
 - Want to pull in updated GitHub workflow templates
 - Want to reset AI files (`CLAUDE.md`, `AGENTS.md`, etc.) to the latest package version after local edits

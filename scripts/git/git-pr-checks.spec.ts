@@ -121,7 +121,7 @@ describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () 
 	it('success when Workers Builds check is absent (not a required check for this repo)', () => {
 		const snapshot = make_snapshot({
 			rollup: [
-				{ name: 'Workers Builds: @joshuafolkken/config', status: 'missing' },
+				{ name: 'Workers Builds: @joshuafolkken/kit', status: 'missing' },
 				{ name: CODE_RABBIT, status: 'pass' },
 				{ name: SONAR_QUBE, status: 'pass' },
 			],

@@ -1,4 +1,4 @@
-# @joshuafolkken/config
+# @joshuafolkken/kit
 
 Shared toolchain config for TypeScript / SvelteKit projects.
 
@@ -44,7 +44,7 @@ Add the registry to `.npmrc` first (or let `josh init` do it):
 Then install:
 
 ```bash
-pnpm add -D @joshuafolkken/config
+pnpm add -D @joshuafolkken/kit
 ```
 
 ## Setup
@@ -111,31 +111,31 @@ Use individual configs directly if you prefer manual setup:
 // eslint.config.js
 
 // or
-import { create_sveltekit_config } from '@joshuafolkken/config/eslint/sveltekit'
-import { create_vanilla_config } from '@joshuafolkken/config/eslint/vanilla'
+import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
+import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 ```
 
 ```js
 // prettier.config.js
-import { config } from '@joshuafolkken/config/prettier'
+import { config } from '@joshuafolkken/kit/prettier'
 ```
 
 ```jsonc
 // tsconfig.json
-{ "extends": ["@joshuafolkken/config/tsconfig/base"] }
+{ "extends": ["@joshuafolkken/kit/tsconfig/base"] }
 // or sveltekit:
-{ "extends": [".svelte-kit/tsconfig.json", "@joshuafolkken/config/tsconfig/sveltekit"] }
+{ "extends": [".svelte-kit/tsconfig.json", "@joshuafolkken/kit/tsconfig/sveltekit"] }
 ```
 
 ```yaml
 # cspell.config.yaml
 import:
-  - node_modules/@joshuafolkken/config/cspell/index.yaml
+  - node_modules/@joshuafolkken/kit/cspell/index.yaml
 ```
 
 ```yaml
 # lefthook.yml
 extends:
-  - node_modules/@joshuafolkken/config/lefthook/vanilla.yml
+  - node_modules/@joshuafolkken/kit/lefthook/vanilla.yml
   # or sveltekit.yml
 ```

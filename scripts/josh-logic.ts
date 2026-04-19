@@ -66,7 +66,7 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 	},
 	version: {
 		script: 'scripts/version-check.ts',
-		description: 'Show current and latest @joshuafolkken/config version',
+		description: 'Show current and latest @joshuafolkken/kit version',
 		category: 'Versioning',
 	},
 	overrides: {

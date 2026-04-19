@@ -10,7 +10,7 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 	'minimum-release-age=1440',
 ]
 
-const CSPELL_IMPORT = '"@joshuafolkken/config/cspell"'
+const CSPELL_IMPORT = '"@joshuafolkken/kit/cspell"'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
 
@@ -62,16 +62,16 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 
 const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
 
-const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/config/prompts/'
+const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
 
 const LEFTHOOK_EXTENDS: Record<ProjectType, string> = {
-	sveltekit: 'node_modules/@joshuafolkken/config/lefthook/sveltekit.yml',
-	vanilla: 'node_modules/@joshuafolkken/config/lefthook/vanilla.yml',
+	sveltekit: 'node_modules/@joshuafolkken/kit/lefthook/sveltekit.yml',
+	vanilla: 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml',
 }
 
 const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
-	sveltekit: './node_modules/@joshuafolkken/config/tsconfig/sveltekit.jsonc',
-	vanilla: './node_modules/@joshuafolkken/config/tsconfig/base.jsonc',
+	sveltekit: './node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc',
+	vanilla: './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -101,7 +101,7 @@ const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
-const ESLINT_SVELTEKIT = `import { create_sveltekit_config } from '@joshuafolkken/config/eslint/sveltekit'
+const ESLINT_SVELTEKIT = `import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
 import svelteConfig from './svelte.config.js'
 
 export default create_sveltekit_config({
@@ -111,7 +111,7 @@ export default create_sveltekit_config({
 })
 `
 
-const ESLINT_VANILLA = `import { create_vanilla_config } from '@joshuafolkken/config/eslint/vanilla'
+const ESLINT_VANILLA = `import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 
 export default create_vanilla_config({
 \tgitignore_path: new URL('./.gitignore', import.meta.url),
@@ -119,7 +119,7 @@ export default create_vanilla_config({
 })
 `
 
-const PRETTIER_CONFIG = `import { config } from '@joshuafolkken/config/prettier'
+const PRETTIER_CONFIG = `import { config } from '@joshuafolkken/kit/prettier'
 
 export default {
 \t...config,
@@ -147,7 +147,7 @@ function generate_lefthook_config(type: ProjectType): string {
 	return `extends:\n  - ${LEFTHOOK_EXTENDS[type]}\n`
 }
 
-const PLAYWRIGHT_CONFIG = `import { create_playwright_config } from '@joshuafolkken/config/playwright/base'
+const PLAYWRIGHT_CONFIG = `import { create_playwright_config } from '@joshuafolkken/kit/playwright/base'
 
 export default create_playwright_config({
 \tdev_port: 5173,
