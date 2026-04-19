@@ -14,7 +14,7 @@ Unlike `josh init` (which skips existing files), `josh sync` **always overwrites
 
 These files are copied verbatim from the package, with one path transformation applied (see below):
 
-```
+```text
 CLAUDE.md           AGENTS.md           GEMINI.md
 .cursorrules        .coderabbit.yaml    .gitattributes
 .mcp.json           .ncurc.json         .prettierignore
@@ -48,7 +48,7 @@ The project key and organization are derived from the `owner/repo` slug:
 
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`:
 
-```
+```text
 `prompts/foo.md`  →  `node_modules/@joshuafolkken/config/prompts/foo.md`
 ```
 

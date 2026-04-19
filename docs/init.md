@@ -41,7 +41,7 @@ The preset is **prepended** to the `extends` array so it does not override proje
 { "extends": ["./.svelte-kit/tsconfig.json"] }
 
 // after
-{ "extends": ["./.svelte-kit/tsconfig.json", "@joshuafolkken/config/tsconfig/sveltekit.jsonc"] }
+{ "extends": ["@joshuafolkken/config/tsconfig/sveltekit.jsonc", "./.svelte-kit/tsconfig.json"] }
 ```
 
 ### eslint.config.js / prettier.config.js / playwright.config.ts
@@ -87,7 +87,7 @@ Retired scripts (previously managed, now removed): `git`, `git:followup`, `teleg
 
 The following files are **copied from the package** on first run. If a file already exists, it is skipped with a message suggesting `josh sync` to update it.
 
-```
+```text
 CLAUDE.md           AGENTS.md           GEMINI.md
 .cursorrules        .coderabbit.yaml    .gitattributes
 .mcp.json           .ncurc.json         .prettierignore
