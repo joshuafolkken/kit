@@ -24,6 +24,8 @@ const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 			'cspell',
 			'cspell:dot',
 			'test:unit',
+			'test:e2e',
+			'test',
 			'check',
 			'check:ci',
 		],
@@ -111,7 +113,7 @@ describe('josh_logic.format_help', () => {
 		const help = josh_logic.format_help()
 
 		for (const cmds of EXPECTED_COMMANDS_BY_CATEGORY.values()) {
-			const positions = cmds.map((cmd) => help.indexOf(`  ${cmd}`))
+			const positions = cmds.map((cmd) => help.indexOf(`\n  ${cmd} `))
 
 			for (let index = 1; index < positions.length; index++) {
 				const previous = positions[index - 1] ?? -1
@@ -182,6 +184,21 @@ describe('COMMAND_MAP shell commands', () => {
 
 	it('latest uses sh -c for chaining', () => {
 		expect(COMMAND_MAP['latest']?.shell?.[0]).toBe('sh')
+	})
+
+	it('test:e2e delegates to pnpm exec playwright test', () => {
+		const shell = COMMAND_MAP['test:e2e']?.shell ?? []
+
+		expect(shell).toContain('playwright')
+		expect(shell).toContain('pnpm')
+	})
+
+	it('test uses sh -c for chaining test:unit and test:e2e', () => {
+		const shell = COMMAND_MAP['test']?.shell ?? []
+
+		expect(shell[0]).toBe('sh')
+		expect(shell[2]).toContain('test:unit')
+		expect(shell[2]).toContain('test:e2e')
 	})
 	/* eslint-enable dot-notation */
 })

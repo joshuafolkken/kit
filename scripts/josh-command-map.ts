@@ -93,6 +93,16 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 		description: 'Run unit tests',
 		category: 'Development',
 	},
+	'test:e2e': {
+		shell: [...PE, 'playwright', 'test'],
+		description: 'Run E2E tests with Playwright',
+		category: 'Development',
+	},
+	test: {
+		shell: ['sh', '-c', 'pnpm josh test:unit && pnpm josh test:e2e'],
+		description: 'Run unit and E2E tests',
+		category: 'Development',
+	},
 	check: {
 		shell: [
 			'sh',

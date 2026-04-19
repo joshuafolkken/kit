@@ -43,6 +43,22 @@ Run unit tests with vitest.
 pnpm josh test:unit
 ```
 
+### `josh test:e2e`
+
+Run E2E tests with Playwright.
+
+```bash
+pnpm josh test:e2e
+```
+
+### `josh test`
+
+Run unit tests followed by E2E tests.
+
+```bash
+pnpm josh test
+```
+
 ### `josh check`
 
 Type-check a SvelteKit project. Requires `@sveltejs/kit` in dependencies.
