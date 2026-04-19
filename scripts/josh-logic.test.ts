@@ -7,16 +7,16 @@ const EXPECTED_COMMANDS = [
 	'init',
 	'sync',
 	'git',
-	'git-followup',
-	'telegram-test',
+	'followup',
+	'notify',
 	'prep',
-	'issue-prep',
-	'bump-version',
-	'overrides-check',
-	'security-audit',
+	'issue',
+	'bump',
+	'overrides',
+	'audit',
 	'prevent-main-commit',
 	'check-commit-message',
-	'version-check',
+	'version',
 	'install',
 ]
 
@@ -54,13 +54,15 @@ describe('josh_logic.format_help', () => {
 })
 
 describe('COMMAND_MAP env-file commands', () => {
-	it('git-followup includes --env-file=.env tsx argument', () => {
-		expect(COMMAND_MAP['git-followup']?.tsx_arguments).toContain(ENV_FILE_FLAG)
+	/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
+	it('followup includes --env-file=.env tsx argument', () => {
+		expect(COMMAND_MAP['followup']?.tsx_arguments).toContain(ENV_FILE_FLAG)
 	})
 
-	it('telegram-test includes --env-file=.env tsx argument', () => {
-		expect(COMMAND_MAP['telegram-test']?.tsx_arguments).toContain(ENV_FILE_FLAG)
+	it('notify includes --env-file=.env tsx argument', () => {
+		expect(COMMAND_MAP['notify']?.tsx_arguments).toContain(ENV_FILE_FLAG)
 	})
+	/* eslint-enable dot-notation */
 })
 
 describe('josh_logic.run_command', () => {

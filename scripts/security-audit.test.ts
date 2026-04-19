@@ -71,7 +71,7 @@ describe('package.json audit wiring', () => {
 	})
 
 	it('delegates security audit to pnpm josh in the latest script', () => {
-		expect(latest_script).toContain('pnpm josh security-audit')
+		expect(latest_script).toContain('pnpm josh audit')
 	})
 
 	it('no longer leaves the retired pnpm audit at the tail of the latest script', () => {
@@ -85,7 +85,7 @@ describe('lefthook/base.yml pre-commit audit wiring', () => {
 	const lines = content.split('\n').map((line) => line.trim())
 
 	it('runs security audit via pnpm josh on pre-commit', () => {
-		expect(content).toContain('run: pnpm josh security-audit')
+		expect(content).toContain('run: pnpm josh audit')
 	})
 
 	it('does not call the retired pnpm audit command from the pre-commit hook', () => {

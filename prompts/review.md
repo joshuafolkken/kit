@@ -9,7 +9,7 @@ This document is the **single source of truth** for Claude Code when reviewing t
 ## When to run
 
 - Before every `git commit` on a feature branch
-- Before running `pnpm josh git` / `pnpm josh git-followup` to open a PR
+- Before running `pnpm josh git` / `pnpm josh followup` to open a PR
 - Scope: the staged diff (`git diff --staged`) and the cumulative PR diff (`git diff main...HEAD`)
 
 Re-run after applying fixes until **no high or medium findings remain**. Low findings may be acknowledged and skipped with a reason.

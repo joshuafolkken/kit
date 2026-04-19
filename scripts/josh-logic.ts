@@ -16,24 +16,24 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 	init: { script: 'scripts/init.ts', description: 'Initialize config in a new project' },
 	sync: { script: 'scripts/sync.ts', description: 'Sync config files' },
 	git: { script: 'scripts-ai/git-workflow.ts', description: 'Git workflow helper' },
-	'git-followup': {
+	followup: {
 		script: 'scripts-ai/git-followup-workflow.ts',
 		description: 'Follow-up git workflow',
 		tsx_arguments: ENV_FILE_FLAGS,
 	},
-	'telegram-test': {
+	notify: {
 		script: 'scripts-ai/telegram-test.ts',
-		description: 'Send Telegram test notification',
+		description: 'Send Telegram notification',
 		tsx_arguments: ENV_FILE_FLAGS,
 	},
 	prep: { script: 'scripts-ai/prep.ts', description: 'Pre-implementation preparation' },
-	'issue-prep': { script: 'scripts-ai/issue-prep.ts', description: 'Fetch GitHub issue details' },
-	'bump-version': { script: 'scripts/bump-version.ts', description: 'Bump package version' },
-	'overrides-check': {
+	issue: { script: 'scripts-ai/issue-prep.ts', description: 'Fetch GitHub issue details' },
+	bump: { script: 'scripts/bump-version.ts', description: 'Bump package version' },
+	overrides: {
 		script: 'scripts/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',
 	},
-	'security-audit': { script: 'scripts/security-audit.ts', description: 'Run security audit' },
+	audit: { script: 'scripts/security-audit.ts', description: 'Run security audit' },
 	'prevent-main-commit': {
 		script: 'scripts/prevent-main-commit.ts',
 		description: 'Git hook: block commits to main',
@@ -42,7 +42,7 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 		script: 'scripts/check-commit-message.ts',
 		description: 'Git hook: validate commit message',
 	},
-	'version-check': {
+	version: {
 		script: 'scripts/version-check.ts',
 		description: 'Show current and latest @joshuafolkken/config version',
 	},
