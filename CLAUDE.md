@@ -118,6 +118,10 @@ Before every `git commit` — including follow-up commits on the same branch —
 - If a fix introduces new code, re-run the self-review on the updated diff. Iterate until no high/medium findings remain.
 - CI no longer runs a Claude review — the pre-commit self-review is the authoritative pass, so do not rely on a CI safety net.
 
+## Doc Sync Rules
+
+**CLAUDE.md, GEMINI.md, and AGENTS.md are paired documents.** Whenever any one of them is updated, apply the equivalent change to all three in the same commit. This includes rule additions, spec changes, wording fixes, and section additions. Never update one without checking the others.
+
 ## Git Rules
 
 - **No commits** unless explicitly requested by the user
@@ -173,6 +177,8 @@ See `prompts/collaboration-workflow.md` → "Auto-merge（default for `fullrun`�
 #### Completion notifications: always via `pnpm josh git-followup`
 
 Never send `completion` Telegram notifications manually with `pnpm josh telegram-test --task-type completion ...`. Always use `pnpm josh git-followup` — it fetches the PR URL via `gh pr view <branch> --json url` and always includes it, whereas the manual CLI does not auto-populate `--pr-url` and will produce a Telegram message missing the PR link.
+
+**Always run `pnpm josh git-followup` in the foreground** (no `&` suffix, no shell backgrounding). It waits for CI and can take several minutes; use the Bash tool with `timeout: 300000` (5 min). Background processes started with `&` inside a Bash tool call do not survive when the tool call returns — the command will silently disappear and the PR will remain unmerged.
 
 - Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh git-followup "<title> #<N>" --merge --notify-message "Implemented <title>:\n- <change1>\n- <change2>\n..."` each time you want to notify completion (notification is sent right before the merge).
 - `pnpm josh telegram-test` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications (no automated alternative exists for those).

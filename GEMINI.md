@@ -56,15 +56,27 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 For every code modification, follow this order exactly:
 
 0. **Test declaration** _(mandatory before writing any implementation code)_: Declare every change and its test. Do not touch implementation files until this list exists.
-   - **Tests are required for ALL code changes** — including bug fixes, timing/animation fixes, and refactors.
+
+   ```text
+   Change 1: <what changes>
+     → Test: <Unit|E2E> — <file path> — <what behavior it verifies>
+   Change 2: ...
+   ```
+
+   - **Tests are required for ALL code changes** — including bug fixes, timing/animation fixes, and refactors. No exceptions without explicit user approval.
    - Bug fix → regression test that would have caught the bug
    - UI / animation / timing fix → E2E test for the observable behavior change
    - Logic / utility change → unit test
    - **Refactoring → write unit/E2E tests that verify existing behavior BEFORE making any structural changes** — see `prompts/refactoring.md`
-   - If a test is genuinely infeasible, state the reason explicitly and obtain user approval before proceeding.
+   - **Non-runtime updates (pre-approved manual-only exception)**: Changes that do not add or modify any executable runtime code path may proceed with manual verification only — no automated test and no per-task approval required. Declare the change in Step 0, state why no runtime code is affected, and describe the manual verification plan. This covers:
+     - `.vscode/`, `.editorconfig`, and other editor / IDE preference files
+     - Documentation-only files (`*.md`, `prompts/*`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`)
+     - Non-executable config (`cspell.config.yaml`, `.gitignore`, `.prettierignore`, etc.)
+     - Purely cosmetic asset swaps with no code-side selector / path change
+   - If a test is genuinely infeasible for a change that **does** affect runtime code, state the reason explicitly and obtain user approval before proceeding.
 
 1. **Refactor first** _(mandatory before lint or tests)_: apply high/medium-priority refactoring to all new/modified code — see `prompts/refactoring.md`. Do not proceed until no high/medium items remain.
-2. **Tests**: add/update unit tests (Vitest) + E2E tests (Playwright) for all behavior changes — see `prompts/testing-guide.md`
+2. **Tests**: implement the tests declared in Step 0. See `prompts/testing-guide.md`.
    - **E2E cleanup / leaked data**: When fixing issues where E2E leaves database or UI artifacts, follow the **Regression fix workflow** in `prompts/testing-guide.md` (add a failing guard → fix → confirm green). Prefer stable selectors (`data-testid`) over locale-dependent strings for teardown.
 3. **Lint**: run `pnpm run lint` then `pnpm run check:ci`; fix all errors before reporting done. `pnpm run check:ci` matches CI's strict type-check — a green local run implies a green CI type-check. Do not substitute `pnpm run check` (incremental / fast) at gate time.
 4. **Spell check**: `pnpm cspell:dot`; add legitimate project terms to `cspell.config.yaml`
@@ -80,13 +92,15 @@ Run the full verification set **in order**. **Do not** skip or reorder steps. **
 
 **E2E:** The user runs `pnpm test` and shares the full output. Do **not** claim completion until the user confirms E2E passed or explicitly scopes it out.
 
+0. **Test gate** — Count (a) code changes made and (b) tests added/updated. If b = 0, allow the run to continue **only** when every change falls under the pre-approved non-runtime exception (see Code Change Rules Step 0) or the user has explicitly approved the infeasibility. Otherwise **stop** — go back to Code Change Rules Step 0 and add tests before continuing.
 1. **Refactor** — read and execute `prompts/refactoring.md` on all changed files. Converge until no high/medium items remain. **Do not proceed to step 2 until complete.**
 2. `pnpm run lint`
 3. `pnpm run check:ci` — strict type-check matching CI (uses `svelte-check`, not the incremental fast variant). A green local run must imply a green CI type-check; do not substitute `pnpm run check`.
 4. `pnpm cspell:dot`
 5. `pnpm test:unit --run`
-6. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
-7. **E2E**: Ask the user to run `pnpm test` and share the output. Fix any failures, then ask again.
+6. **Self-review** — follow `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean.
+7. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
+8. **E2E**: Ask the user to run `pnpm test` and share the output. Fix any failures, then ask again.
 
 If you changed **only** docs or config that does not affect tests, still run lint + check + cspell; run unit tests when there is any chance of impact.
 
@@ -95,10 +109,26 @@ If you changed **only** docs or config that does not affect tests, still run lin
 - When performing any refactoring, ALWAYS read and follow `prompts/refactoring.md` before starting.
 - Write tests for existing behavior **before** making any structural changes — this is mandatory and not optional.
 
+## Pre-commit Self-Review (mandatory)
+
+Before every `git commit` — including follow-up commits on the same branch — perform a self-review against `prompts/review.md`.
+
+- Scope: the staged diff (`git diff --staged`). Before opening or updating a PR, also review the cumulative branch diff (`git diff main...HEAD`).
+- Produce the full categorized output defined in `prompts/review.md`. Every category must have an explicit verdict (findings or `No issues`).
+- Resolve **all high and medium findings** before committing. Low findings may be skipped with a one-line reason.
+- If a fix introduces new code, re-run the self-review on the updated diff. Iterate until no high/medium findings remain.
+- CI no longer runs a Claude review — the pre-commit self-review is the authoritative pass, so do not rely on a CI safety net.
+
+## Doc Sync Rules
+
+**CLAUDE.md, GEMINI.md, and AGENTS.md are paired documents.** Whenever any one of them is updated, apply the equivalent change to all three in the same commit. This includes rule additions, spec changes, wording fixes, and section additions. Never update one without checking the others.
+
 ## Git Rules
 
 - **No commits** unless explicitly requested by the user
+- **No PR merges, branch deletions, force pushes, or other shared-state mutations** unless explicitly requested in the current turn. `pnpm josh git-followup` completing with the PR still OPEN is the expected end state — do not run `gh pr merge` on your own.
 - For git operations: use `scripts/git-workflow.ts` via `pnpm josh git`
+- **Start-of-conversation git status is a stale snapshot.** The `gitStatus` block in the environment preamble is captured once at session start and never refreshes. Before acting on any assumption about working-tree / index / stash / branch state, run `git status` live first. Never report state or propose a plan based on the snapshot alone.
 
 ## Collaboration Workflow
 
@@ -108,33 +138,45 @@ If you changed **only** docs or config that does not affect tests, still run lin
 
 #### `kickoff` — Planning phase only (plan → Issue → Telegram notify → stop)
 
-- `kickoff #<N>`: Read existing Issue #N → analyze requirements → post the plan to the Issue (if body is blank, use `gh issue edit <N> --body "<plan>"`; otherwise `gh issue comment <N> --body "<plan>"`) → send Telegram notification → **stop** (do not implement). Plan comments MUST be in English. Telegram notification: `pnpm josh telegram-test --task-type planning --issue-url "<issue-url>" --body=$'- <bullet1>\n- <bullet2>\n...'`. `--task-type` controls the header icon (`planning` 📋 / `completion` ✅ / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️). `--repo-name` and `--issue-title` are auto-fetched from `gh` when not supplied. Include line breaks between bullets for readability.
-- `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (1) Derive an English title from the conversation, or use the provided title. (2) Create Issue. (3) Post the plan in English. (4) Send Telegram notification. (5) **Stop**.
+- `kickoff #<N>`: Read existing Issue #N → **normalize the title**: if the title is not in English or can be phrased more clearly/conventionally, derive a better English title and run `gh issue edit <N> --title "<title>"` → analyze requirements → post the plan to the Issue (if body is blank, use `gh issue edit <N> --body "<plan>"`; otherwise `gh issue comment <N> --body "<plan>"`) → send Telegram notification → **stop** (do not implement). Plan comments MUST be in English. Telegram notification: `pnpm josh telegram-test --task-type planning --issue-url "<issue-url>" --body=$'- <bullet1>\n- <bullet2>\n...'`. `--task-type` controls the header icon (`planning` 📋 / `completion` ✅ / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️). `--repo-name` and `--issue-title` are auto-fetched from `gh` when not supplied. Include line breaks between bullets for readability. The Issue URL must be included.
+- `kickoff new` or `kickoff new "<title>"`: No Issue exists yet. Steps: (1) Derive an English title from the conversation, or use the provided title. (2) Create Issue: `gh issue create --title "<title>" --body "<body>"` — body follows the minimum template in `prompts/collaboration-workflow.md`, filled from conversation context. Capture the new Issue number `<N>`. (3) Post the plan in English (same body/comment logic as `kickoff #<N>`). (4) Send Telegram notification (same format as `kickoff #<N>`). (5) **Stop** — do not implement.
 
 #### `fullrun` — Full execution (plan → implement → PR → completion notify)
 
-- `fullrun #<N>`: Post the agreed plan to Issue #N (if the Issue body is blank, use `gh issue edit <N> --body "<plan>"` to fill the body; otherwise use `gh issue comment <N> --body "<plan>"`) → implement → `pnpm josh bump-version minor` → `pnpm josh git -y` → `pnpm josh git-followup` (full run from Step 3 onward in `prompts/collaboration-workflow.md`). Issue plan comments MUST be written in English. When running `pnpm josh git-followup`, compose an implementation summary in English and pass it via `--notify-message`. Format: `"<title>\n- <change1>\n- <change2>\n..."` (one bullet per meaningful change — what was added, changed, or fixed).
+- `fullrun #<N>`: Read Issue #N → **normalize the title**: if the title is not in English or can be phrased more clearly/conventionally, derive a better English title and run `gh issue edit <N> --title "<title>"` → post the agreed plan (if the Issue body is blank, use `gh issue edit <N> --body "<plan>"` to fill the body; otherwise use `gh issue comment <N> --body "<plan>"`) → implement → `pnpm josh bump-version minor` → `pnpm josh git -y` → `pnpm josh git-followup --merge` (full run from Step 3 onward in `prompts/collaboration-workflow.md`). Issue plan comments MUST be written in English. Before implementing, run `git switch main && git pull`, then `pnpm latest` (includes `pnpm audit`; fix with `overrides` in `package.json` if vulnerabilities found). **After `pnpm latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, investigate why it existed and restore it before proceeding (do NOT remove intentional overrides without user approval).** When running `pnpm josh git-followup --merge`, compose an implementation summary in English and pass it via `--notify-message`. Format: `"Implemented <title>:\n- <change1>\n- <change2>\n..."` (one bullet per meaningful change — what was added, changed, or fixed). **`pnpm josh git-followup --merge` waits for CI, verifies AI review findings, sends the completion notification, then merges — all in one step. If AI review blockers are found, followup exits non-zero; fix the findings and re-run `pnpm josh git-followup --merge`.**
+- `fullrun new` or `fullrun new "<title>"`: Shortcut that combines `kickoff new` + `fullrun #<N>` into a single run. Steps: (1) Derive an English title from the conversation, or use the provided title. (2) Create Issue: `gh issue create --title "<title>" --body "<body>"`. Capture the new Issue number `<N>`. (3) Post the agreed plan in English. (4) Run `git switch main && git pull`. (5) Run `pnpm latest`. **After `pnpm latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, restore it before proceeding.** (6) Implement. (7) `pnpm josh bump-version minor`. (8) `pnpm josh git -y "<title> #<N>"`. (9) `pnpm josh git-followup "<title> #<N>" --merge --notify-message "Implemented <title>:\n- <change1>\n- <change2>\n..."`.
 
 #### AI reviewer comment scan (automatic in `pnpm josh git-followup`)
 
-`pnpm josh git-followup` scans top-level PR comments from AI reviewers (Claude Review, CodeRabbit summary comments) **independently of CI status**. This scan runs after CI is green and after the existing CodeRabbit line-comment check. The goal is to ensure substantive findings posted by AI reviewers _after_ CI goes green are not silently shipped.
+`pnpm josh git-followup` scans top-level PR comments from AI reviewers (Claude Review, CodeRabbit summary comments) **independently of CI status**.
 
 - Blocker heuristics (conservative, structural — not NLP):
   - **Claude Review** (`author.login = claude`): body contains `### Issues`, `### Problem`, `#### Logic bug`, or a numbered finding heading like `### 1. ...`
-  - **CodeRabbit** (`author.login = coderabbitai` / `coderabbitai[bot]`): body contains `Actionable comments posted: N` with N > 0. Rate-limit notices (`rate limited by coderabbit.ai` / `Rate limit exceeded`) and "No actionable comments" summaries are ignored.
+  - **CodeRabbit** (`author.login = coderabbitai` / `coderabbitai[bot]`): body contains `Actionable comments posted: N` with N > 0. Rate-limit notices and "No actionable comments" summaries are ignored.
 - If blockers exist and **no** ignore reason is supplied: `pnpm josh git-followup` sends a `confirmation` Telegram and exits non-zero. Fix the findings (or provide an ignore reason) and re-run.
-- If blockers exist and `--ai-review-ignore-reason "<reason>"` is supplied: the workflow posts an ignore-reason comment to the PR (mirroring the CodeRabbit ignore-reason flow) and proceeds to completion.
+- If blockers exist and `--ai-review-ignore-reason "<reason>"` is supplied: the workflow posts an ignore-reason comment to the PR and proceeds to completion.
+
+#### `auto-merge` — Default `fullrun` behavior
+
+Every `fullrun` / `fullrun new` invocation uses `pnpm josh git-followup --merge`, which handles the full sequence internally: wait for CI → verify AI review findings → send completion notification → merge. Invoking `fullrun` is itself the explicit authorization to merge.
+
+- **AI review findings are checked automatically.** If blockers are found, it sends a `confirmation` Telegram and exits non-zero — fix the findings and re-run.
+- **CodeRabbit rate-limit is not a finding.** Treat it as "no findings" and proceed.
+- Do **not** pass `--delete-branch` unless the user asks.
+- If the merge fails, report the reason and stop — do not retry with different flags or bypass protections.
 
 #### Completion notifications: always via `pnpm josh git-followup`
 
-Never send `completion` Telegram notifications manually with `pnpm josh telegram-test --task-type completion ...`. Always use `pnpm josh git-followup` — it fetches the PR URL via `gh pr view <branch> --json url` and always includes it, whereas the manual CLI does not auto-populate `--pr-url` and will produce a Telegram message missing the PR link.
+Never send `completion` Telegram notifications manually with `pnpm josh telegram-test --task-type completion ...`. Always use `pnpm josh git-followup`.
 
-- Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh git-followup "<title> #<N>" --notify-message "<title>\n- <change1>\n- <change2>\n..."` each time you want to notify completion.
-- `pnpm josh telegram-test` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications (no automated alternative exists for those).
+**Always run `pnpm josh git-followup` in the foreground** (no `&` suffix, no shell backgrounding). It waits for CI and can take several minutes. Background processes started with `&` do not survive when the tool call returns — the command will silently disappear and the PR will remain unmerged.
+
+- Applies to the initial PR and every follow-up commit — re-run `pnpm josh git-followup "<title> #<N>" --merge --notify-message "..."` each time.
+- `pnpm josh telegram-test` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications.
 
 #### Mid-workflow stop notification (`confirmation`)
 
-Whenever the AI tool pauses a `kickoff`/`fullrun` mid-execution to wait for user confirmation (approval, clarification, scope decision, etc.), it MUST send a Telegram notification **before** stopping so the user is alerted off-screen:
+Whenever the AI tool pauses a `kickoff`/`fullrun` mid-execution to wait for user confirmation, it MUST send a Telegram notification **before** stopping:
 
 ```bash
 pnpm josh telegram-test --task-type confirmation --issue-url "<issue-url>" --body=$'<one-line reason>\n<what is needed from the user>'
