@@ -31,7 +31,7 @@ pre-commit:
     Quick fixes:
     • Run `josh format` to auto-format code
     • Run `josh lint` to check and fix linting issues
-    • Run `josh check` to verify TypeScript types
+    • Run `pnpm exec tsc --noEmit` to verify TypeScript types
 
 commit-msg:
   commands:
