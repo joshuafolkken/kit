@@ -175,7 +175,7 @@ function execute_ai_file_copy(filename: string): boolean {
 	const destination_path = path.join(PROJECT_ROOT, filename)
 
 	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${filename} (already exists — run pnpm sync to update)`)
+		console.info(`  ⏭ skipped   ${filename} (already exists — run josh sync to update)`)
 
 		return true
 	}
@@ -190,7 +190,7 @@ function execute_ai_directory_copy(directory_name: string): boolean {
 	const destination_path = path.join(PROJECT_ROOT, directory_name)
 
 	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${directory_name}/ (already exists — run pnpm sync to update)`)
+		console.info(`  ⏭ skipped   ${directory_name}/ (already exists — run josh sync to update)`)
 
 		return true
 	}
@@ -312,7 +312,7 @@ function copy_sonar_if_missing(
 	const destination_path = path.join(PROJECT_ROOT, destination)
 
 	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${destination} (already exists — run pnpm sync to update)`)
+		console.info(`  ⏭ skipped   ${destination} (already exists — run josh sync to update)`)
 
 		return
 	}
@@ -353,7 +353,7 @@ function run_ai_copies(): void {
 	copy_sonar_with_template()
 
 	if (has_skips) {
-		console.info('\n  💡 Run `pnpm sync` to overwrite skipped AI files with the latest version.')
+		console.info('\n  💡 Run `josh sync` to overwrite skipped AI files with the latest version.')
 	}
 }
 

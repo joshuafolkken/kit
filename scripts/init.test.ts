@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { init } from './init'
 
@@ -41,6 +42,22 @@ describe('copy_sonar_file_write', () => {
 		init.copy_sonar_file_write(TEMPLATE_PATH, DEST_PATH, 'org_repo', 'org')
 
 		expect(existsSync(DEST_PATH)).toBe(true)
+	})
+})
+
+const INIT_SOURCE = readFileSync(fileURLToPath(new URL('init.ts', import.meta.url)), 'utf8')
+
+describe('skip messages', () => {
+	it('reference josh sync not pnpm sync', () => {
+		expect(INIT_SOURCE).not.toContain('pnpm sync')
+	})
+
+	it('contain josh sync in file skip message', () => {
+		expect(INIT_SOURCE).toContain('run josh sync to update')
+	})
+
+	it('contain josh sync in summary tip message', () => {
+		expect(INIT_SOURCE).toContain('Run `josh sync`')
 	})
 })
 
