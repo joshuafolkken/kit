@@ -83,7 +83,7 @@ Issue: <issue-url>
 3. Telegram で計画開始を通知する:
 
    ```bash
-   pnpm josh telegram-test --task-type planning --issue-url "<issue-url>" --body "- <bullet1>\n- <bullet2>"
+   pnpm josh telegram-test --task-type planning --issue-url "<issue-url>" --body=$'- <bullet1>\n- <bullet2>'
    ```
 
    - `--task-type` はヘッダーのアイコンを決める（`planning` 📋 / `completion` ✅ / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️）

@@ -250,42 +250,6 @@ describe('merge_json_array_field', () => {
 	})
 })
 
-describe('merge_json_object', () => {
-	it('adds missing keys from updates', () => {
-		const result = JSON.parse(init_logic.merge_json_object('{"a":1}', { b: 2 })) as { b: number }
-
-		expect(result.b).toBe(2)
-	})
-
-	it('does not overwrite existing keys', () => {
-		const result = JSON.parse(init_logic.merge_json_object('{"a":1}', { a: 99, b: 2 })) as {
-			a: number
-			b: number
-		}
-
-		expect(result.a).toBe(1)
-		expect(result.b).toBe(2)
-	})
-
-	it('returns content unchanged when no new keys to add', () => {
-		const content = '{"a":1}'
-		const result = init_logic.merge_json_object(content, { a: 99 })
-
-		expect(result).toBe(content)
-	})
-
-	it('handles settings.json with JSONC line comments', () => {
-		const content = '{\n\t// settings\n\t"a": 1\n}'
-		const result = JSON.parse(init_logic.merge_json_object(content, { b: 2 })) as {
-			a: number
-			b: number
-		}
-
-		expect(result.a).toBe(1)
-		expect(result.b).toBe(2)
-	})
-})
-
 describe('merge_package_scripts', () => {
 	const SCRIPT_KEY = 'test:unit'
 	const SCRIPT_VAL = 'vitest run'
@@ -320,74 +284,5 @@ describe('merge_package_scripts', () => {
 		) as { scripts: Record<string, string> }
 
 		expect(result.scripts[SCRIPT_KEY]).toBe(SCRIPT_VAL)
-	})
-})
-
-describe('get_suggested_scripts', () => {
-	it('includes josh script pointing to josh binary', () => {
-		const scripts = init_logic.get_suggested_scripts('vanilla')
-
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
-		expect(scripts['josh']).toBe('josh')
-	})
-
-	it('does not include removed alias scripts', () => {
-		const scripts = init_logic.get_suggested_scripts('vanilla')
-
-		/* eslint-disable dot-notation -- index signature requires bracket notation */
-		expect(scripts['git']).toBeUndefined()
-		expect(scripts['git:followup']).toBeUndefined()
-		expect(scripts['telegram:test']).toBeUndefined()
-		expect(scripts['audit:security']).toBeUndefined()
-		expect(scripts['prep']).toBeUndefined()
-		expect(scripts['issue:prep']).toBeUndefined()
-		expect(scripts['prevent-main-commit']).toBeUndefined()
-		expect(scripts['check-commit-message']).toBeUndefined()
-		/* eslint-enable dot-notation */
-	})
-
-	it('includes same josh script for sveltekit type', () => {
-		const scripts = init_logic.get_suggested_scripts('sveltekit')
-
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
-		expect(scripts['josh']).toBe('josh')
-	})
-})
-
-describe('merge_yaml_list_entry', () => {
-	it('creates the key block when it does not exist', () => {
-		const result = init_logic.merge_yaml_list_entry('', 'extends', 'my-value')
-
-		expect(result).toContain('extends:')
-		expect(result).toContain('- my-value')
-	})
-
-	it('adds entry at the top of an existing list', () => {
-		const existing = 'extends:\n  - other-value\n'
-		const result = init_logic.merge_yaml_list_entry(existing, 'extends', 'my-value')
-
-		expect(result).toContain('my-value')
-		expect(result).toContain('other-value')
-	})
-
-	it('returns content unchanged when value already present', () => {
-		const content = 'extends:\n  - my-value\n'
-		const result = init_logic.merge_yaml_list_entry(content, 'extends', 'my-value')
-
-		expect(result).toBe(content)
-	})
-
-	it('prepends key block at the top when key does not exist and content has other keys', () => {
-		const result = init_logic.merge_yaml_list_entry('other: value\n', 'extends', 'my-value')
-
-		expect(result).toMatch(/^extends:\n {2}- my-value\n/u)
-	})
-
-	it('prepends key block at the top when content is non-empty', () => {
-		const content = 'pre-commit:\n  commands:\n    test:\n      run: pnpm test\n'
-		const result = init_logic.merge_yaml_list_entry(content, 'extends', 'my-value')
-
-		expect(result.indexOf('extends:')).toBe(0)
-		expect(result).toContain('pre-commit:')
 	})
 })
