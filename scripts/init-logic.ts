@@ -65,6 +65,7 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 /* eslint-disable @typescript-eslint/naming-convention */
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	postinstall: LEFTHOOK_INSTALL_CMD,
+	josh: 'josh',
 	lint: 'pnpm lint:prettier && pnpm lint:eslint',
 	'lint:prettier': 'prettier --check .',
 	'lint:eslint': 'eslint . --cache --cache-strategy content',
@@ -74,20 +75,12 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	cspell: 'cspell lint --no-must-find-files --no-progress "**/*.{ts,js,md,yaml,yml,json}"',
 	'cspell:dot': 'pnpm cspell . --dot',
 	'test:unit': 'vitest run',
-	'prevent-main-commit': 'josh prevent-main-commit',
-	'check-commit-message': 'josh check-commit-message',
-	'audit:security': 'josh security-audit',
 	'lefthook:install': LEFTHOOK_INSTALL_CMD,
 	'lefthook:uninstall': 'lefthook uninstall',
 	'lefthook:commit': 'lefthook run pre-commit',
 	'lefthook:push': 'lefthook run pre-push',
 	'main:sync': 'git checkout main && git pull',
 	'main:merge': 'git pull origin main',
-	git: 'josh git',
-	'git:followup': 'josh git-followup',
-	'telegram:test': 'josh telegram-test',
-	'issue:prep': 'josh issue-prep',
-	prep: 'josh prep',
 }
 
 const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {

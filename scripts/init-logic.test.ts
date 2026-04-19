@@ -323,6 +323,37 @@ describe('merge_package_scripts', () => {
 	})
 })
 
+describe('get_suggested_scripts', () => {
+	it('includes josh script pointing to josh binary', () => {
+		const scripts = init_logic.get_suggested_scripts('vanilla')
+
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['josh']).toBe('josh')
+	})
+
+	it('does not include removed alias scripts', () => {
+		const scripts = init_logic.get_suggested_scripts('vanilla')
+
+		/* eslint-disable dot-notation -- index signature requires bracket notation */
+		expect(scripts['git']).toBeUndefined()
+		expect(scripts['git:followup']).toBeUndefined()
+		expect(scripts['telegram:test']).toBeUndefined()
+		expect(scripts['audit:security']).toBeUndefined()
+		expect(scripts['prep']).toBeUndefined()
+		expect(scripts['issue:prep']).toBeUndefined()
+		expect(scripts['prevent-main-commit']).toBeUndefined()
+		expect(scripts['check-commit-message']).toBeUndefined()
+		/* eslint-enable dot-notation */
+	})
+
+	it('includes same josh script for sveltekit type', () => {
+		const scripts = init_logic.get_suggested_scripts('sveltekit')
+
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['josh']).toBe('josh')
+	})
+})
+
 describe('merge_yaml_list_entry', () => {
 	it('creates the key block when it does not exist', () => {
 		const result = init_logic.merge_yaml_list_entry('', 'extends', 'my-value')

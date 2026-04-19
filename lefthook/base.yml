@@ -3,10 +3,10 @@ pre-commit:
   commands:
     prevent-main-commit:
       skip: git diff --cached --quiet
-      run: pnpm prevent-main-commit
+      run: pnpm josh prevent-main-commit
 
     audit:
-      run: pnpm audit:security
+      run: pnpm josh security-audit
 
     cspell:
       glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json}'
@@ -36,7 +36,7 @@ pre-commit:
 commit-msg:
   commands:
     check-commit-message:
-      run: pnpm check-commit-message {1}
+      run: pnpm josh check-commit-message {1}
 
 pre-push:
   parallel: false

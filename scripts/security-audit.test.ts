@@ -66,12 +66,12 @@ describe('package.json audit wiring', () => {
 	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature forbids dot access on Record values
 	const latest_script = manifest.scripts?.['latest'] ?? ''
 
-	it('registers audit:security as a tsx wrapper entry', () => {
-		expect(manifest.scripts?.['audit:security']).toBe('tsx scripts/security-audit.ts')
+	it('does not register audit:security as a standalone script', () => {
+		expect(manifest.scripts?.['audit:security']).toBeUndefined()
 	})
 
-	it('uses audit:security inside the latest script', () => {
-		expect(latest_script).toContain('pnpm audit:security')
+	it('delegates security audit to pnpm josh in the latest script', () => {
+		expect(latest_script).toContain('pnpm josh security-audit')
 	})
 
 	it('no longer leaves the retired pnpm audit at the tail of the latest script', () => {
@@ -84,8 +84,8 @@ describe('lefthook/base.yml pre-commit audit wiring', () => {
 	const content = load_file('lefthook/base.yml')
 	const lines = content.split('\n').map((line) => line.trim())
 
-	it('runs audit:security on pre-commit', () => {
-		expect(content).toContain('run: pnpm audit:security')
+	it('runs security audit via pnpm josh on pre-commit', () => {
+		expect(content).toContain('run: pnpm josh security-audit')
 	})
 
 	it('does not call the retired pnpm audit command from the pre-commit hook', () => {

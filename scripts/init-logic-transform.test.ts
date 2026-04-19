@@ -30,26 +30,19 @@ describe('get_suggested_scripts common scripts', () => {
 })
 
 describe('get_suggested_scripts bin commands', () => {
-	it('uses josh subcommand for git script', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('git', 'josh git')
+	it('includes josh script pointing to josh binary', () => {
+		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('josh', 'josh')
 	})
 
-	it('uses josh subcommands for git:followup and telegram:test', () => {
+	it('does not include alias scripts replaced by pnpm josh', () => {
 		const scripts = init_logic.get_suggested_scripts('vanilla')
 
-		expect(scripts).toHaveProperty('git:followup', JOSH_GIT_FOLLOWUP)
-		expect(scripts).toHaveProperty('telegram:test', JOSH_TELEGRAM_TEST)
-	})
-
-	it('uses josh subcommands for prevent-main-commit and check-commit-message', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
-			'prevent-main-commit',
-			'josh prevent-main-commit',
-		)
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
-			'check-commit-message',
-			'josh check-commit-message',
-		)
+		expect(scripts).not.toHaveProperty('git')
+		expect(scripts).not.toHaveProperty('git:followup')
+		expect(scripts).not.toHaveProperty('telegram:test')
+		expect(scripts).not.toHaveProperty('prevent-main-commit')
+		expect(scripts).not.toHaveProperty('check-commit-message')
+		expect(scripts).not.toHaveProperty('audit:security')
 	})
 })
 
