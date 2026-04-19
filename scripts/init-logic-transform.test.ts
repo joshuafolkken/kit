@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
-const JOSH_GIT = 'josh git'
-const JOSH_GIT_FOLLOWUP = 'josh git-followup'
-const JOSH_TELEGRAM_TEST = 'josh telegram-test'
-const SCRIPTS_GIT_KEY = 'scripts.git'
+const JOSH_SCRIPT_VALUE = 'josh'
 
 describe('get_suggested_scripts common scripts', () => {
 	it('includes postinstall for both types', () => {
@@ -30,26 +27,22 @@ describe('get_suggested_scripts common scripts', () => {
 })
 
 describe('get_suggested_scripts bin commands', () => {
-	it('uses josh subcommand for git script', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('git', 'josh git')
+	it('includes josh script pointing to josh binary', () => {
+		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
+			JOSH_SCRIPT_VALUE,
+			JOSH_SCRIPT_VALUE,
+		)
 	})
 
-	it('uses josh subcommands for git:followup and telegram:test', () => {
+	it('does not include alias scripts replaced by pnpm josh', () => {
 		const scripts = init_logic.get_suggested_scripts('vanilla')
 
-		expect(scripts).toHaveProperty('git:followup', JOSH_GIT_FOLLOWUP)
-		expect(scripts).toHaveProperty('telegram:test', JOSH_TELEGRAM_TEST)
-	})
-
-	it('uses josh subcommands for prevent-main-commit and check-commit-message', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
-			'prevent-main-commit',
-			'josh prevent-main-commit',
-		)
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
-			'check-commit-message',
-			'josh check-commit-message',
-		)
+		expect(scripts).not.toHaveProperty('git')
+		expect(scripts).not.toHaveProperty('git:followup')
+		expect(scripts).not.toHaveProperty('telegram:test')
+		expect(scripts).not.toHaveProperty('prevent-main-commit')
+		expect(scripts).not.toHaveProperty('check-commit-message')
+		expect(scripts).not.toHaveProperty('audit:security')
 	})
 })
 
@@ -83,26 +76,120 @@ describe('transform_prompt_paths', () => {
 })
 
 describe('merge_package_scripts jf-* migration', () => {
-	it('migrates existing jf-git value to josh git', () => {
+	/* eslint-disable dot-notation -- index signature requires bracket notation */
+	it('removes jf-git script since git is a retired alias', () => {
 		const content = '{"scripts":{"git":"jf-git"}}'
-		const parsed: unknown = JSON.parse(init_logic.merge_package_scripts(content, {}))
+		const parsed = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
+			scripts: Record<string, string>
+		}
 
-		expect(parsed).toHaveProperty(SCRIPTS_GIT_KEY, JOSH_GIT)
+		expect(parsed.scripts['git']).toBeUndefined()
 	})
 
-	it('migrates multiple jf-* values in one pass', () => {
+	it('removes all jf-* aliases that map to retired script keys', () => {
 		const content =
-			'{"scripts":{"git":"jf-git","git:followup":"jf-git-followup","telegram:test":"jf-telegram-test"}}'
-		const parsed: unknown = JSON.parse(init_logic.merge_package_scripts(content, {}))
+			'{"scripts":{"git":"jf-git","git:followup":"jf-git-followup","telegram:test":"jf-telegram-test","build":"tsc"}}'
+		const parsed = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
+			scripts: Record<string, string>
+		}
 
-		expect(parsed).toHaveProperty(SCRIPTS_GIT_KEY, JOSH_GIT)
-		expect(parsed).toHaveProperty('scripts.git:followup', JOSH_GIT_FOLLOWUP)
-		expect(parsed).toHaveProperty('scripts.telegram:test', JOSH_TELEGRAM_TEST)
+		expect(parsed.scripts['git']).toBeUndefined()
+		expect(parsed.scripts['git:followup']).toBeUndefined()
+		expect(parsed.scripts['telegram:test']).toBeUndefined()
+		expect(parsed.scripts['build']).toBe('tsc')
 	})
 
 	it('leaves non-jf-* script values unchanged', () => {
 		const content = '{"scripts":{"build":"tsc"}}'
 
 		expect(init_logic.merge_package_scripts(content, {})).toBe(content)
+	})
+
+	it('removes retired alias scripts from existing package json', () => {
+		const content =
+			'{"scripts":{"git":"josh git","git:followup":"josh git-followup","telegram:test":"josh telegram-test","test:unit":"vitest run"}}'
+		const result = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
+			scripts: Record<string, string>
+		}
+
+		expect(result.scripts['git']).toBeUndefined()
+		expect(result.scripts['git:followup']).toBeUndefined()
+		expect(result.scripts['telegram:test']).toBeUndefined()
+		expect(result.scripts['test:unit']).toBe('vitest run')
+	})
+	/* eslint-enable dot-notation */
+})
+
+describe('merge_json_object', () => {
+	it('adds missing keys from updates', () => {
+		const result = JSON.parse(init_logic.merge_json_object('{"a":1}', { b: 2 })) as { b: number }
+
+		expect(result.b).toBe(2)
+	})
+
+	it('does not overwrite existing keys', () => {
+		const result = JSON.parse(init_logic.merge_json_object('{"a":1}', { a: 99, b: 2 })) as {
+			a: number
+			b: number
+		}
+
+		expect(result.a).toBe(1)
+		expect(result.b).toBe(2)
+	})
+
+	it('returns content unchanged when no new keys to add', () => {
+		const content = '{"a":1}'
+		const result = init_logic.merge_json_object(content, { a: 99 })
+
+		expect(result).toBe(content)
+	})
+
+	it('handles settings.json with JSONC line comments', () => {
+		const content = '{\n\t// settings\n\t"a": 1\n}'
+		const result = JSON.parse(init_logic.merge_json_object(content, { b: 2 })) as {
+			a: number
+			b: number
+		}
+
+		expect(result.a).toBe(1)
+		expect(result.b).toBe(2)
+	})
+})
+
+describe('merge_yaml_list_entry', () => {
+	it('creates the key block when it does not exist', () => {
+		const result = init_logic.merge_yaml_list_entry('', 'extends', 'my-value')
+
+		expect(result).toContain('extends:')
+		expect(result).toContain('- my-value')
+	})
+
+	it('adds entry at the top of an existing list', () => {
+		const existing = 'extends:\n  - other-value\n'
+		const result = init_logic.merge_yaml_list_entry(existing, 'extends', 'my-value')
+
+		expect(result).toContain('my-value')
+		expect(result).toContain('other-value')
+	})
+
+	it('returns content unchanged when value already present', () => {
+		const content = 'extends:\n  - my-value\n'
+		const result = init_logic.merge_yaml_list_entry(content, 'extends', 'my-value')
+
+		expect(result).toBe(content)
+	})
+
+	it('prepends key block at the top when key does not exist and content has other keys', () => {
+		const result = init_logic.merge_yaml_list_entry('other: value\n', 'extends', 'my-value')
+
+		expect(result).toMatch(/^extends:\n {2}- my-value\n/u)
+	})
+
+	it('prepends key block at the top when content is non-empty', () => {
+		const content = 'pre-commit:\n  commands:\n    test:\n      run: pnpm test\n'
+		const result = init_logic.merge_yaml_list_entry(content, 'extends', 'my-value')
+
+		expect(result.indexOf('extends:')).toBe(0)
+		expect(result).toContain('pre-commit:')
 	})
 })

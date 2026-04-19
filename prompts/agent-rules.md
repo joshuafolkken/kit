@@ -34,7 +34,7 @@ Whenever modifying, adding, or deleting any code:
 ## Git Rules
 
 - **No Commits**: DO NOT commit changes unless explicitly requested by the user.
-- **Workflow Awareness**: Use `scripts/git-workflow.ts` (via `pnpm git`) when the user asks for git operations.
+- **Workflow Awareness**: Use `scripts/git-workflow.ts` (via `pnpm josh git`) when the user asks for git operations.
 
 ---
 

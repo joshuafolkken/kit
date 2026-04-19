@@ -39,8 +39,13 @@ describe('package.json scripts', () => {
 	const manifest = load_manifest()
 	const scripts = manifest.scripts ?? {}
 
-	it('exposes the security audit command', () => {
-		expect(scripts['audit:security']).toBe('tsx scripts/security-audit.ts')
+	it('exposes josh as the unified CLI entry point', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['josh']).toBe('tsx scripts/josh.ts')
+	})
+
+	it('does not expose audit:security as a standalone script', () => {
+		expect(scripts['audit:security']).toBeUndefined()
 	})
 
 	it('does not use redundant pnpm run prefix in scripts', () => {

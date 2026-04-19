@@ -1,10 +1,6 @@
 import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations } from './init-logic-migrate'
-
-const SONAR_PROJECT_KEY_PLACEHOLDER = '{{PROJECT_KEY}}'
-const SONAR_ORGANIZATION_PLACEHOLDER = '{{ORGANIZATION}}'
-const SONAR_TEMPLATE_SRC = 'templates/sonar-project.properties'
-const SONAR_TEMPLATE_DEST = 'sonar-project.properties'
+import { init_logic_sonar } from './init-logic-sonar'
 
 type ProjectType = 'sveltekit' | 'vanilla'
 
@@ -17,6 +13,22 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 const CSPELL_IMPORT = '"@joshuafolkken/config/cspell"'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
+
+const RETIRED_MANAGED_SCRIPTS = new Set<string>([
+	'git',
+	'git:followup',
+	'telegram:test',
+	'audit:security',
+	'prep',
+	'issue:prep',
+	'prevent-main-commit',
+	'check-commit-message',
+	'version:major',
+	'version:minor',
+	'version:patch',
+	'version:current',
+	'overrides:check',
+])
 
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
@@ -65,6 +77,7 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 /* eslint-disable @typescript-eslint/naming-convention */
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	postinstall: LEFTHOOK_INSTALL_CMD,
+	josh: 'josh',
 	lint: 'pnpm lint:prettier && pnpm lint:eslint',
 	'lint:prettier': 'prettier --check .',
 	'lint:eslint': 'eslint . --cache --cache-strategy content',
@@ -74,20 +87,12 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	cspell: 'cspell lint --no-must-find-files --no-progress "**/*.{ts,js,md,yaml,yml,json}"',
 	'cspell:dot': 'pnpm cspell . --dot',
 	'test:unit': 'vitest run',
-	'prevent-main-commit': 'josh prevent-main-commit',
-	'check-commit-message': 'josh check-commit-message',
-	'audit:security': 'josh security-audit',
 	'lefthook:install': LEFTHOOK_INSTALL_CMD,
 	'lefthook:uninstall': 'lefthook uninstall',
 	'lefthook:commit': 'lefthook run pre-commit',
 	'lefthook:push': 'lefthook run pre-push',
 	'main:sync': 'git checkout main && git pull',
 	'main:merge': 'git pull origin main',
-	git: 'josh git',
-	'git:followup': 'josh git-followup',
-	'telegram:test': 'josh telegram-test',
-	'issue:prep': 'josh issue-prep',
-	prep: 'josh prep',
 }
 
 const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
@@ -287,38 +292,6 @@ function get_ai_copy_directories(): ReadonlyArray<string> {
 	return AI_COPY_DIRECTORIES
 }
 
-function apply_sonar_template(content: string, project_key: string, organization: string): string {
-	return content
-		.replaceAll(SONAR_PROJECT_KEY_PLACEHOLDER, project_key)
-		.replaceAll(SONAR_ORGANIZATION_PLACEHOLDER, organization)
-}
-
-interface SonarIdentifiers {
-	project_key: string
-	organization: string
-}
-
-function derive_sonar_identifiers(name_with_owner: string): SonarIdentifiers {
-	const [organization, repository, ...extra] = name_with_owner.trim().split('/')
-
-	if (!organization || !repository || extra.length > 0) {
-		throw new Error(`Invalid GitHub repository nameWithOwner: ${name_with_owner}`)
-	}
-
-	return {
-		organization,
-		project_key: `${organization}_${repository}`,
-	}
-}
-
-function get_sonar_template_source(): string {
-	return SONAR_TEMPLATE_SRC
-}
-
-function get_sonar_template_destination(): string {
-	return SONAR_TEMPLATE_DEST
-}
-
 function get_suggested_scripts(type: ProjectType): Record<string, string> {
 	if (type === 'sveltekit') return { ...SUGGESTED_SCRIPTS_COMMON, ...SUGGESTED_SCRIPTS_SVELTEKIT }
 
@@ -329,10 +302,16 @@ function transform_prompt_paths(content: string): string {
 	return content.replaceAll(/`prompts\/([^`]+)`/gu, `\`${PROMPTS_PACKAGE_PREFIX}$1\``)
 }
 
+function remove_retired_scripts(scripts: Record<string, string>): Record<string, string> {
+	return Object.fromEntries(
+		Object.entries(scripts).filter(([key]) => !RETIRED_MANAGED_SCRIPTS.has(key)),
+	)
+}
+
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
 	const parsed = parse_jsonc(content) as WithScripts
 	const existing = parsed.scripts ?? {}
-	const migrated = apply_jf_migrations(existing)
+	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
 	const to_add = Object.entries(scripts).filter(([key]) => !(key in migrated))
 	const did_migrate = JSON.stringify(migrated) !== JSON.stringify(existing)
 
@@ -367,11 +346,9 @@ const init_logic = {
 	get_suggested_scripts,
 	merge_package_scripts,
 	transform_prompt_paths,
-	apply_sonar_template,
-	derive_sonar_identifiers,
-	get_sonar_template_source,
-	get_sonar_template_destination,
+	...init_logic_sonar,
 }
 
 export { init_logic }
-export type { FileCopyMapping, ProjectType, SonarIdentifiers }
+export type { FileCopyMapping, ProjectType }
+export type { SonarIdentifiers } from './init-logic-sonar'
