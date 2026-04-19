@@ -46,6 +46,10 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 		script: 'scripts/version-check.ts',
 		description: 'Show current and latest @joshuafolkken/config version',
 	},
+	install: {
+		script: 'scripts/install-bin.ts',
+		description: 'Install josh to ~/.local/bin',
+	},
 }
 
 const HEADER = "josh — Joshua Folkken's dev toolkit"
