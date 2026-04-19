@@ -91,7 +91,7 @@ function sync_sonar_with_template(): void {
 }
 
 function main(): void {
-	console.info('\n🔄 Syncing @joshuafolkken/config AI files\n')
+	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	console.info('AI files:')
 
 	for (const filename of init_logic.get_ai_copy_files()) {

@@ -59,7 +59,7 @@ describe('copy_ai_file', () => {
 		init.copy_ai_file(TEMPLATE_PATH, DEST_PATH)
 
 		expect(readFileSync(DEST_PATH, 'utf8')).toBe(
-			'see `node_modules/@joshuafolkken/config/prompts/refactoring.md`\n',
+			'see `node_modules/@joshuafolkken/kit/prompts/refactoring.md`\n',
 		)
 	})
 

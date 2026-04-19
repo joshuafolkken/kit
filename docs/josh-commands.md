@@ -27,7 +27,7 @@ Overwrite managed files with the latest versions from the package.
 pnpm josh sync
 ```
 
-Run after upgrading `@joshuafolkken/config` to pull in updated AI files, GitHub workflow templates, and other managed files. See [sync.md](./sync.md) for the full list.
+Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, GitHub workflow templates, and other managed files. See [sync.md](./sync.md) for the full list.
 
 ### `josh install`
 

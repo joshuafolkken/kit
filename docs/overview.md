@@ -1,6 +1,6 @@
-# @joshuafolkken/config — Overview
+# @joshuafolkken/kit — Overview
 
-`@joshuafolkken/config` is a shared toolchain for TypeScript and SvelteKit projects. Install it once and get a consistent, opinionated development environment: linting, formatting, type-checking, git hooks, spell-checking, VS Code settings, and AI assistant files — all wired together.
+`@joshuafolkken/kit` is a shared toolchain for TypeScript and SvelteKit projects. Install it once and get a consistent, opinionated development environment: linting, formatting, type-checking, git hooks, spell-checking, VS Code settings, and AI assistant files — all wired together.
 
 ## What it provides
 
