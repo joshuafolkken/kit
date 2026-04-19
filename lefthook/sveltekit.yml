@@ -23,4 +23,4 @@ pre-push:
   commands:
     test-e2e:
       glob: '{*.{svelte,ts,js,mjs,cjs},package.json}'
-      run: PLAYWRIGHT_HTML_OPEN=never pnpm test:e2e
+      run: PLAYWRIGHT_HTML_OPEN=never pnpm exec playwright test
