@@ -1,6 +1,6 @@
 {
 	"name": "@joshuafolkken/config",
-	"version": "0.21.0",
+	"version": "0.22.0",
 	"type": "module",
 	"license": "MIT",
 	"packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
@@ -19,8 +19,7 @@
 		"jf-overrides-check": "./scripts/overrides-check.ts",
 		"jf-security-audit": "./scripts/security-audit.ts",
 		"jf-prevent-main-commit": "./scripts/prevent-main-commit.ts",
-		"jf-check-commit-message": "./scripts/check-commit-message.ts",
-		"jf-check-upstream": "./scripts/check-upstream-drift.ts"
+		"jf-check-commit-message": "./scripts/check-commit-message.ts"
 	},
 	"scripts": {
 		"preinstall": "pnpm dlx @aikidosec/safe-chain setup-ci",
@@ -45,7 +44,6 @@
 		"check-commit-message": "tsx scripts/check-commit-message.ts",
 		"audit:security": "tsx scripts/security-audit.ts",
 		"overrides:check": "tsx scripts/overrides-check.ts",
-		"check:upstream": "tsx scripts/check-upstream-drift.ts",
 		"version:minor": "tsx scripts/bump-version.ts minor",
 		"version:major": "tsx scripts/bump-version.ts major",
 		"version:patch": "tsx scripts/bump-version.ts patch",

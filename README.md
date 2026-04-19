@@ -92,7 +92,6 @@ All scripts are distributed as `jf-*` bin commands available in `node_modules/.b
 | `jf-security-audit`       | Run security audit                       |
 | `jf-prevent-main-commit`  | Git hook: block direct commits to main   |
 | `jf-check-commit-message` | Git hook: validate commit message format |
-| `jf-check-upstream`       | Check for drift against upstream SHA     |
 
 ## Package exports
 
