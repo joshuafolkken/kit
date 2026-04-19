@@ -28,7 +28,7 @@ GitHub Packages requires authentication even for public packages. Set up auth be
 
 ## Install
 
-Add the registry to `.npmrc` first (or let `jf-init` do it):
+Add the registry to `.npmrc` first (or let `josh init` do it):
 
 ```
 @joshuafolkken:registry=https://npm.pkg.github.com
@@ -45,7 +45,7 @@ pnpm add -D @joshuafolkken/config
 Run once after installing:
 
 ```bash
-pnpm exec jf-init
+pnpm exec josh init
 ```
 
 Auto-detects SvelteKit vs vanilla. Creates or merges:
@@ -71,27 +71,28 @@ Runs `lefthook install` at the end.
 To overwrite AI files with the latest version from the package:
 
 ```bash
-pnpm exec jf-sync
+pnpm exec josh sync
 ```
 
 ## CLI commands
 
-All scripts are distributed as `jf-*` bin commands available in `node_modules/.bin/` after installation:
+A single `josh` command is available in `node_modules/.bin/` after installation. Run `pnpm exec josh help` to list all subcommands:
 
-| Command                   | Description                              |
-| ------------------------- | ---------------------------------------- |
-| `jf-init`                 | Initialize config files in a new project |
-| `jf-sync`                 | Sync AI files from the package           |
-| `jf-git`                  | AI-assisted git workflow                 |
-| `jf-git-followup`         | AI-assisted PR follow-up workflow        |
-| `jf-telegram-test`        | Send a test Telegram notification        |
-| `jf-prep`                 | Pre-implementation preparation           |
-| `jf-issue-prep`           | Fetch GitHub issue details               |
-| `jf-bump-version`         | Bump package version                     |
-| `jf-overrides-check`      | Check pnpm overrides for drift           |
-| `jf-security-audit`       | Run security audit                       |
-| `jf-prevent-main-commit`  | Git hook: block direct commits to main   |
-| `jf-check-commit-message` | Git hook: validate commit message format |
+| Subcommand                  | Description                              |
+| --------------------------- | ---------------------------------------- |
+| `josh init`                 | Initialize config files in a new project |
+| `josh sync`                 | Sync AI files from the package           |
+| `josh git`                  | AI-assisted git workflow                 |
+| `josh git-followup`         | AI-assisted PR follow-up workflow        |
+| `josh telegram-test`        | Send a test Telegram notification        |
+| `josh prep`                 | Pre-implementation preparation           |
+| `josh issue-prep`           | Fetch GitHub issue details               |
+| `josh bump-version`         | Bump package version                     |
+| `josh overrides-check`      | Check pnpm overrides for drift           |
+| `josh security-audit`       | Run security audit                       |
+| `josh prevent-main-commit`  | Git hook: block direct commits to main   |
+| `josh check-commit-message` | Git hook: validate commit message format |
+| `josh help`                 | Show all available commands              |
 
 ## Package exports
 

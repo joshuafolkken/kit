@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
+const JOSH_GIT = 'josh git'
+const JOSH_GIT_FOLLOWUP = 'josh git-followup'
+const JOSH_TELEGRAM_TEST = 'josh telegram-test'
+const SCRIPTS_GIT_KEY = 'scripts.git'
+
 describe('get_suggested_scripts common scripts', () => {
 	it('includes postinstall for both types', () => {
 		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('postinstall')
@@ -25,25 +30,25 @@ describe('get_suggested_scripts common scripts', () => {
 })
 
 describe('get_suggested_scripts bin commands', () => {
-	it('uses jf-git bin command for git script', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('git', 'jf-git')
+	it('uses josh subcommand for git script', () => {
+		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('git', 'josh git')
 	})
 
-	it('uses jf-bin commands for git:followup and telegram:test', () => {
+	it('uses josh subcommands for git:followup and telegram:test', () => {
 		const scripts = init_logic.get_suggested_scripts('vanilla')
 
-		expect(scripts).toHaveProperty('git:followup', 'jf-git-followup')
-		expect(scripts).toHaveProperty('telegram:test', 'jf-telegram-test')
+		expect(scripts).toHaveProperty('git:followup', JOSH_GIT_FOLLOWUP)
+		expect(scripts).toHaveProperty('telegram:test', JOSH_TELEGRAM_TEST)
 	})
 
-	it('uses jf-bin commands for prevent-main-commit and check-commit-message', () => {
+	it('uses josh subcommands for prevent-main-commit and check-commit-message', () => {
 		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
 			'prevent-main-commit',
-			'jf-prevent-main-commit',
+			'josh prevent-main-commit',
 		)
 		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
 			'check-commit-message',
-			'jf-check-commit-message',
+			'josh check-commit-message',
 		)
 	})
 })
@@ -74,5 +79,30 @@ describe('transform_prompt_paths', () => {
 		const input = 'see prompts/refactoring.md without backticks'
 
 		expect(init_logic.transform_prompt_paths(input)).toBe(input)
+	})
+})
+
+describe('merge_package_scripts jf-* migration', () => {
+	it('migrates existing jf-git value to josh git', () => {
+		const content = '{"scripts":{"git":"jf-git"}}'
+		const parsed: unknown = JSON.parse(init_logic.merge_package_scripts(content, {}))
+
+		expect(parsed).toHaveProperty(SCRIPTS_GIT_KEY, JOSH_GIT)
+	})
+
+	it('migrates multiple jf-* values in one pass', () => {
+		const content =
+			'{"scripts":{"git":"jf-git","git:followup":"jf-git-followup","telegram:test":"jf-telegram-test"}}'
+		const parsed: unknown = JSON.parse(init_logic.merge_package_scripts(content, {}))
+
+		expect(parsed).toHaveProperty(SCRIPTS_GIT_KEY, JOSH_GIT)
+		expect(parsed).toHaveProperty('scripts.git:followup', JOSH_GIT_FOLLOWUP)
+		expect(parsed).toHaveProperty('scripts.telegram:test', JOSH_TELEGRAM_TEST)
+	})
+
+	it('leaves non-jf-* script values unchanged', () => {
+		const content = '{"scripts":{"build":"tsc"}}'
+
+		expect(init_logic.merge_package_scripts(content, {})).toBe(content)
 	})
 })

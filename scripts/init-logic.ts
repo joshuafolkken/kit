@@ -1,4 +1,5 @@
 import strip_json_comments from 'strip-json-comments'
+import { apply_jf_migrations } from './init-logic-migrate'
 
 const SONAR_PROJECT_KEY_PLACEHOLDER = '{{PROJECT_KEY}}'
 const SONAR_ORGANIZATION_PLACEHOLDER = '{{ORGANIZATION}}'
@@ -73,20 +74,20 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	cspell: 'cspell lint --no-must-find-files --no-progress "**/*.{ts,js,md,yaml,yml,json}"',
 	'cspell:dot': 'pnpm cspell . --dot',
 	'test:unit': 'vitest run',
-	'prevent-main-commit': 'jf-prevent-main-commit',
-	'check-commit-message': 'jf-check-commit-message',
-	'audit:security': 'jf-security-audit',
+	'prevent-main-commit': 'josh prevent-main-commit',
+	'check-commit-message': 'josh check-commit-message',
+	'audit:security': 'josh security-audit',
 	'lefthook:install': LEFTHOOK_INSTALL_CMD,
 	'lefthook:uninstall': 'lefthook uninstall',
 	'lefthook:commit': 'lefthook run pre-commit',
 	'lefthook:push': 'lefthook run pre-push',
 	'main:sync': 'git checkout main && git pull',
 	'main:merge': 'git pull origin main',
-	git: 'jf-git',
-	'git:followup': 'jf-git-followup',
-	'telegram:test': 'jf-telegram-test',
-	'issue:prep': 'jf-issue-prep',
-	prep: 'jf-prep',
+	git: 'josh git',
+	'git:followup': 'josh git-followup',
+	'telegram:test': 'josh telegram-test',
+	'issue:prep': 'josh issue-prep',
+	prep: 'josh prep',
 }
 
 const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
@@ -331,11 +332,13 @@ function transform_prompt_paths(content: string): string {
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
 	const parsed = parse_jsonc(content) as WithScripts
 	const existing = parsed.scripts ?? {}
-	const to_add = Object.entries(scripts).filter(([key]) => !(key in existing))
+	const migrated = apply_jf_migrations(existing)
+	const to_add = Object.entries(scripts).filter(([key]) => !(key in migrated))
+	const did_migrate = JSON.stringify(migrated) !== JSON.stringify(existing)
 
-	if (to_add.length === 0) return content
+	if (!did_migrate && to_add.length === 0) return content
 
-	parsed.scripts = { ...existing, ...Object.fromEntries(to_add) }
+	parsed.scripts = { ...migrated, ...Object.fromEntries(to_add) }
 
 	return `${JSON.stringify(parsed, undefined, '\t')}\n`
 }
