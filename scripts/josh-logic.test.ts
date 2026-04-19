@@ -3,22 +3,17 @@ import { COMMAND_MAP, josh_logic } from './josh-logic'
 
 const ENV_FILE_FLAG = '--env-file=.env'
 
-const EXPECTED_COMMANDS = [
-	'init',
-	'sync',
-	'git',
-	'followup',
-	'notify',
-	'prep',
-	'issue',
-	'bump',
-	'overrides',
-	'audit',
-	'prevent-main-commit',
-	'check-commit-message',
-	'version',
-	'install',
-]
+const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
+	['Project', ['init', 'sync', 'install']],
+	['Workflow', ['git', 'followup', 'notify']],
+	['Versioning', ['bump', 'version']],
+	['Maintenance', ['overrides', 'audit']],
+	['Git hooks', ['prevent-main-commit', 'check-commit-message']],
+	['AI tools', ['prep', 'issue']],
+])
+
+const EXPECTED_CATEGORY_ORDER = [...EXPECTED_COMMANDS_BY_CATEGORY.keys()]
+const EXPECTED_COMMANDS = [...EXPECTED_COMMANDS_BY_CATEGORY.values()].flat()
 
 describe('COMMAND_MAP', () => {
 	it('contains all expected commands', () => {
@@ -31,6 +26,14 @@ describe('COMMAND_MAP', () => {
 		for (const entry of Object.values(COMMAND_MAP)) {
 			expect(entry.script).toBeTruthy()
 			expect(entry.description).toBeTruthy()
+		}
+	})
+})
+
+describe('COMMAND_MAP category', () => {
+	it('each entry has a valid category', () => {
+		for (const entry of Object.values(COMMAND_MAP)) {
+			expect(EXPECTED_CATEGORY_ORDER).toContain(entry.category)
 		}
 	})
 })
@@ -50,6 +53,31 @@ describe('josh_logic.format_help', () => {
 
 	it('includes usage line', () => {
 		expect(josh_logic.format_help()).toContain('Usage: josh <command>')
+	})
+
+	it('includes all category headers in correct order', () => {
+		const help = josh_logic.format_help()
+		const positions = EXPECTED_CATEGORY_ORDER.map((cat) => help.indexOf(cat))
+
+		for (let index = 1; index < positions.length; index++) {
+			const previous = positions[index - 1] ?? -1
+
+			expect(positions[index]).toBeGreaterThan(previous)
+		}
+	})
+
+	it('lists commands within each category in expected order', () => {
+		const help = josh_logic.format_help()
+
+		for (const cmds of EXPECTED_COMMANDS_BY_CATEGORY.values()) {
+			const positions = cmds.map((cmd) => help.indexOf(`  ${cmd}`))
+
+			for (let index = 1; index < positions.length; index++) {
+				const previous = positions[index - 1] ?? -1
+
+				expect(positions[index]).toBeGreaterThan(previous)
+			}
+		}
 	})
 })
 
