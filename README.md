@@ -85,23 +85,34 @@ pnpm exec josh sync
 
 A single `josh` command is available in `node_modules/.bin/` after installation. Run `pnpm exec josh help` to list all subcommands. See [docs/josh-commands.md](./docs/josh-commands.md) for the full reference.
 
-| Subcommand                  | Description                              |
-| --------------------------- | ---------------------------------------- |
-| `josh init`                 | Initialize config files in a new project |
-| `josh sync`                 | Sync managed files from the package      |
-| `josh install`              | Install josh to ~/.local/bin             |
-| `josh git`                  | AI-assisted git workflow                 |
-| `josh followup`             | AI-assisted PR follow-up workflow        |
-| `josh notify`               | Send a Telegram notification             |
-| `josh bump`                 | Bump package version                     |
-| `josh version`              | Show current and latest package version  |
-| `josh overrides`            | Check pnpm overrides for drift           |
-| `josh audit`                | Run security audit                       |
-| `josh prep`                 | Pre-implementation preparation           |
-| `josh issue`                | Fetch GitHub issue details               |
-| `josh prevent-main-commit`  | Git hook: block direct commits to main   |
-| `josh check-commit-message` | Git hook: validate commit message format |
-| `josh help`                 | Show all available commands              |
+| Subcommand                  | Description                                       |
+| --------------------------- | ------------------------------------------------- |
+| `josh lint`                 | Check code with prettier and eslint               |
+| `josh format`               | Format code with prettier and eslint              |
+| `josh cspell`               | Run spell check                                   |
+| `josh test:unit`            | Run unit tests                                    |
+| `josh check`                | Type-check SvelteKit project                      |
+| `josh check:ci`             | Type-check SvelteKit project (CI strict mode)     |
+| `josh init`                 | Initialize config files in a new project          |
+| `josh sync`                 | Sync managed files from the package               |
+| `josh install`              | Install josh to ~/.local/bin                      |
+| `josh git`                  | AI-assisted git workflow                          |
+| `josh followup`             | AI-assisted PR follow-up workflow                 |
+| `josh notify`               | Send a Telegram notification                      |
+| `josh main:sync`            | Checkout main and pull latest                     |
+| `josh main:merge`           | Pull latest from origin main                      |
+| `josh bump`                 | Bump package version                              |
+| `josh version`              | Show current and latest package version           |
+| `josh overrides`            | Check pnpm overrides for drift                    |
+| `josh audit`                | Run security audit                                |
+| `josh latest`               | Update pnpm, dependencies, and run security audit |
+| `josh prep`                 | Pre-implementation preparation                    |
+| `josh issue`                | Fetch GitHub issue details                        |
+| `josh prevent-main-commit`  | Git hook: block direct commits to main            |
+| `josh check-commit-message` | Git hook: validate commit message format          |
+| `josh hook:install`         | Install git hooks                                 |
+| `josh hook:uninstall`       | Uninstall git hooks                               |
+| `josh help`                 | Show all available commands                       |
 
 ## Package exports
 

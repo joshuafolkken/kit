@@ -9,20 +9,16 @@ describe('get_suggested_scripts common scripts', () => {
 		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('postinstall')
 	})
 
-	it('includes lint for both types', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('lint')
-		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('lint')
-	})
+	it('does not include commands replaced by josh subcommands', () => {
+		const vanilla = init_logic.get_suggested_scripts('vanilla')
+		const sveltekit = init_logic.get_suggested_scripts('sveltekit')
 
-	it('includes sveltekit check scripts for sveltekit', () => {
-		const result = init_logic.get_suggested_scripts('sveltekit')
-
-		expect(result).toHaveProperty('check')
-		expect(result).toHaveProperty('check:ci')
-	})
-
-	it('does not include check for vanilla', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).not.toHaveProperty('check')
+		for (const scripts of [vanilla, sveltekit]) {
+			expect(scripts).not.toHaveProperty('lint')
+			expect(scripts).not.toHaveProperty('check')
+			expect(scripts).not.toHaveProperty('check:ci')
+			expect(scripts).not.toHaveProperty('test:unit')
+		}
 	})
 })
 
@@ -115,7 +111,7 @@ describe('merge_package_scripts jf-* migration', () => {
 		expect(result.scripts['git']).toBeUndefined()
 		expect(result.scripts['git:followup']).toBeUndefined()
 		expect(result.scripts['telegram:test']).toBeUndefined()
-		expect(result.scripts['test:unit']).toBe('vitest run')
+		expect(result.scripts['test:unit']).toBeUndefined()
 	})
 	/* eslint-enable dot-notation */
 })

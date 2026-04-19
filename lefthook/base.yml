@@ -22,16 +22,16 @@ pre-commit:
 
     type-check:
       glob: '*.{ts,js,mjs,cjs}'
-      run: pnpm check
+      run: pnpm exec tsc --noEmit
 
   fail_text: |
     🚫 Commit blocked due to quality checks failure
     Please fix the issues above and try again.
 
     Quick fixes:
-    • Run `pnpm run format` to auto-format code
-    • Run `pnpm run lint` to check and fix linting issues
-    • Run `pnpm run check` to verify TypeScript types
+    • Run `josh format` to auto-format code
+    • Run `josh lint` to check and fix linting issues
+    • Run `josh check` to verify TypeScript types
 
 commit-msg:
   commands:
@@ -42,11 +42,11 @@ pre-push:
   parallel: false
   commands:
     test-unit:
-      run: pnpm test:unit --run
+      run: pnpm exec vitest run
 
   fail_text: |
     🚫 Push blocked due to test failures
     Please resolve the issues above before pushing.
 
     Troubleshooting:
-    • Run tests locally: `pnpm run test:unit`
+    • Run tests locally: `josh test:unit`

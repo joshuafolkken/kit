@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
 const GITIGNORE_DEST = '.gitignore'
+const CI_YML_DEST = '.github/workflows/ci.yml'
 
 describe('generate_eslint_config', () => {
 	it('returns sveltekit config for sveltekit type', () => {
@@ -88,10 +89,10 @@ describe('get_ai_copy_files', () => {
 		expect(result).toContain('GEMINI.md')
 	})
 
-	it('includes GitHub workflow and template files', () => {
+	it('includes GitHub workflow and template files (except ci.yml which uses file mapping)', () => {
 		const result = init_logic.get_ai_copy_files()
 
-		expect(result).toContain('.github/workflows/ci.yml')
+		expect(result).not.toContain(CI_YML_DEST)
 		expect(result).toContain('.github/workflows/auto-tag.yml')
 		expect(result).toContain('.github/workflows/production.yml')
 		expect(result).toContain('.github/workflows/sonar-cube.yml')
@@ -128,8 +129,91 @@ describe('get_ai_copy_file_mappings', () => {
 		expect(result).toContainEqual({ src: 'templates/gitignore', dest: GITIGNORE_DEST })
 	})
 
+	it('includes ci.yml template mapping to .github/workflows/ci.yml', () => {
+		const result = init_logic.get_ai_copy_file_mappings()
+
+		expect(result).toContainEqual({
+			src: 'templates/workflows/ci.yml',
+			dest: CI_YML_DEST,
+		})
+	})
+
 	it('does not duplicate gitignore in ai_copy_files', () => {
 		expect(init_logic.get_ai_copy_files()).not.toContain(GITIGNORE_DEST)
+	})
+})
+
+const RETIRED_SCRIPTS = [
+	'lint',
+	'lint:prettier',
+	'lint:eslint',
+	'format',
+	'format:prettier',
+	'format:eslint',
+	'cspell',
+	'cspell:dot',
+	'test:unit',
+	'lefthook:install',
+	'lefthook:uninstall',
+	'lefthook:commit',
+	'lefthook:push',
+	'main:sync',
+	'main:merge',
+	'check',
+	'check:ci',
+]
+
+describe('get_suggested_scripts', () => {
+	it('vanilla returns only postinstall and josh', () => {
+		const result = init_logic.get_suggested_scripts('vanilla')
+
+		expect(Object.keys(result)).toHaveLength(2)
+		expect(result).toHaveProperty('postinstall')
+		expect(result).toHaveProperty('josh')
+	})
+
+	it('sveltekit returns only postinstall and josh', () => {
+		const result = init_logic.get_suggested_scripts('sveltekit')
+
+		expect(Object.keys(result)).toHaveLength(2)
+		expect(result).toHaveProperty('postinstall')
+		expect(result).toHaveProperty('josh')
+	})
+
+	it('does not include retired script keys', () => {
+		const vanilla = init_logic.get_suggested_scripts('vanilla')
+		const sveltekit = init_logic.get_suggested_scripts('sveltekit')
+
+		for (const key of RETIRED_SCRIPTS) {
+			expect(vanilla).not.toHaveProperty(key)
+			expect(sveltekit).not.toHaveProperty(key)
+		}
+	})
+})
+
+describe('merge_package_scripts retired scripts', () => {
+	it('removes retired script keys from existing package.json content', () => {
+		const content = JSON.stringify({
+			scripts: { lint: 'pnpm lint:prettier && pnpm lint:eslint', josh: 'josh' },
+		})
+		const result = init_logic.merge_package_scripts(content, {})
+
+		expect(result).not.toContain('"lint"')
+		expect(result).toContain('"josh"')
+	})
+
+	it('removes all retired managed scripts', () => {
+		const existing = Object.fromEntries(RETIRED_SCRIPTS.map((k) => [k, 'some-value']))
+		const content = JSON.stringify({ scripts: { ...existing, josh: 'josh' } })
+		const result = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
+			scripts: Record<string, string>
+		}
+
+		for (const key of RETIRED_SCRIPTS) {
+			expect(result.scripts).not.toHaveProperty(key)
+		}
+
+		expect(result.scripts).toHaveProperty('josh')
 	})
 })
 
@@ -251,8 +335,8 @@ describe('merge_json_array_field', () => {
 })
 
 describe('merge_package_scripts', () => {
-	const SCRIPT_KEY = 'test:unit'
-	const SCRIPT_VAL = 'vitest run'
+	const SCRIPT_KEY = 'build'
+	const SCRIPT_VAL = 'tsc --noEmit'
 
 	it('adds missing scripts', () => {
 		const result = JSON.parse(

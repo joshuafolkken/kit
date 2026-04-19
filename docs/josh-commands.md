@@ -2,6 +2,58 @@
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal.
 
+## Development
+
+These commands replace the corresponding `package.json` scripts. Consumer projects no longer need to add them manually.
+
+### `josh lint`
+
+Check code with prettier and eslint.
+
+```bash
+pnpm josh lint
+pnpm josh lint:prettier   # prettier only
+pnpm josh lint:eslint     # eslint only
+```
+
+### `josh format`
+
+Format code with prettier and eslint.
+
+```bash
+pnpm josh format
+pnpm josh format:prettier  # prettier only
+pnpm josh format:eslint    # eslint only
+```
+
+### `josh cspell`
+
+Run spell check.
+
+```bash
+pnpm josh cspell          # *.{ts,js,md,yaml,yml,json}
+pnpm josh cspell:dot      # includes dotfiles
+```
+
+### `josh test:unit`
+
+Run unit tests with vitest.
+
+```bash
+pnpm josh test:unit
+```
+
+### `josh check`
+
+Type-check a SvelteKit project. Requires `@sveltejs/kit` in dependencies.
+
+```bash
+pnpm josh check        # development mode
+pnpm josh check:ci     # strict mode (--threshold error), used in CI
+```
+
+---
+
 ## Project
 
 Commands for setting up and maintaining a project.
@@ -78,6 +130,22 @@ Task types: `planning` 📋 · `completion` ✅ · `failure` ❌ · `kickoff_ret
 
 Note: do not use `--task-type completion` manually — always use `josh followup` instead, which automatically includes the PR URL.
 
+### `josh main:sync`
+
+Checkout `main` and pull the latest changes.
+
+```bash
+pnpm josh main:sync
+```
+
+### `josh main:merge`
+
+Pull the latest changes from `origin main` into the current branch.
+
+```bash
+pnpm josh main:merge
+```
+
 ---
 
 ## Versioning
@@ -114,7 +182,7 @@ Check that `pnpm.overrides` in `package.json` has not drifted after a dependency
 pnpm josh overrides
 ```
 
-Run after `pnpm update` or `pnpm latest` to confirm no override was silently removed.
+Run after `pnpm update` or `josh latest` to confirm no override was silently removed.
 
 ### `josh audit`
 
@@ -124,11 +192,19 @@ Run a security audit against the lockfile.
 pnpm josh audit
 ```
 
+### `josh latest`
+
+Update pnpm via corepack, update all dependencies to latest, and run a security audit.
+
+```bash
+pnpm josh latest            # full update (corepack + update + audit)
+pnpm josh latest:corepack   # update pnpm only
+pnpm josh latest:update     # update dependencies only
+```
+
 ---
 
 ## Git hooks
-
-These commands are invoked automatically by Lefthook. You do not need to call them manually.
 
 ### `josh prevent-main-commit`
 
@@ -137,6 +213,31 @@ Blocks direct commits to `main`. Installed as a pre-commit hook by `josh init`.
 ### `josh check-commit-message`
 
 Validates commit message format. Installed as a commit-msg hook by `josh init`.
+
+### `josh hook:install`
+
+Install git hooks via lefthook.
+
+```bash
+pnpm josh hook:install
+```
+
+### `josh hook:uninstall`
+
+Uninstall git hooks.
+
+```bash
+pnpm josh hook:uninstall
+```
+
+### `josh hook:commit` / `josh hook:push`
+
+Run pre-commit or pre-push hooks manually (useful for debugging).
+
+```bash
+pnpm josh hook:commit
+pnpm josh hook:push
+```
 
 ---
 

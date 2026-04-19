@@ -2,123 +2,49 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+	CATEGORY_ORDER,
+	COMMAND_MAP,
+	type CommandCategory,
+	type CommandEntry,
+} from './josh-command-map'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const COLUMN_WIDTH = 24
 const TSX_BIN = 'tsx'
+const SVELTE_KIT_DEP = '@sveltejs/kit'
+const NODE_MODULES = 'node_modules'
+const PACKAGE_JSON = 'package.json'
 
 function resolve_tsx_executable(): string {
 	const candidates = [
-		path.join(PACKAGE_DIR, 'node_modules', '.bin', TSX_BIN),
-		path.join(process.cwd(), 'node_modules', '.bin', TSX_BIN),
+		path.join(PACKAGE_DIR, NODE_MODULES, '.bin', TSX_BIN),
+		path.join(process.cwd(), NODE_MODULES, '.bin', TSX_BIN),
 	]
 
 	return candidates.find(existsSync) ?? TSX_BIN
 }
 
 function read_package_version(): string {
-	const parsed = JSON.parse(readFileSync(path.join(PACKAGE_DIR, 'package.json'), 'utf8')) as {
+	const parsed = JSON.parse(readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')) as {
 		version: string
 	}
 
 	return parsed.version
 }
 
-const ENV_FILE_FLAGS: ReadonlyArray<string> = ['--env-file=.env']
+function is_sveltekit_project(): boolean {
+	try {
+		const parsed = JSON.parse(
+			readFileSync(path.join(process.cwd(), PACKAGE_JSON), 'utf8'),
+		) as Record<string, Record<string, string> | undefined>
+		// eslint-disable-next-line dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature
+		const all_deps = { ...parsed['dependencies'], ...parsed['devDependencies'] }
 
-type CommandCategory =
-	| 'Project'
-	| 'Workflow'
-	| 'Versioning'
-	| 'Maintenance'
-	| 'Git hooks'
-	| 'AI tools'
-
-interface CommandEntry {
-	script: string
-	description: string
-	category: CommandCategory
-	tsx_arguments?: ReadonlyArray<string>
-}
-
-const CATEGORY_ORDER: ReadonlyArray<CommandCategory> = [
-	'Project',
-	'Workflow',
-	'Versioning',
-	'Maintenance',
-	'Git hooks',
-	'AI tools',
-]
-
-const COMMAND_MAP: Record<string, CommandEntry> = {
-	init: {
-		script: 'scripts/init.ts',
-		description: 'Initialize config in a new project',
-		category: 'Project',
-	},
-	sync: { script: 'scripts/sync.ts', description: 'Sync config files', category: 'Project' },
-	install: {
-		script: 'scripts/install-bin.ts',
-		description: 'Install josh to ~/.local/bin',
-		category: 'Project',
-	},
-	git: {
-		script: 'scripts-ai/git-workflow.ts',
-		description: 'Git workflow helper',
-		category: 'Workflow',
-	},
-	followup: {
-		script: 'scripts-ai/git-followup-workflow.ts',
-		description: 'Follow-up git workflow',
-		category: 'Workflow',
-		tsx_arguments: ENV_FILE_FLAGS,
-	},
-	notify: {
-		script: 'scripts-ai/telegram-test.ts',
-		description: 'Send Telegram notification',
-		category: 'Workflow',
-		tsx_arguments: ENV_FILE_FLAGS,
-	},
-	bump: {
-		script: 'scripts/bump-version.ts',
-		description: 'Bump package version',
-		category: 'Versioning',
-	},
-	version: {
-		script: 'scripts/version-check.ts',
-		description: 'Show current and latest @joshuafolkken/kit version',
-		category: 'Versioning',
-	},
-	overrides: {
-		script: 'scripts/overrides-check.ts',
-		description: 'Check pnpm overrides for drift',
-		category: 'Maintenance',
-	},
-	audit: {
-		script: 'scripts/security-audit.ts',
-		description: 'Run security audit',
-		category: 'Maintenance',
-	},
-	'prevent-main-commit': {
-		script: 'scripts/prevent-main-commit.ts',
-		description: 'Git hook: block commits to main',
-		category: 'Git hooks',
-	},
-	'check-commit-message': {
-		script: 'scripts/check-commit-message.ts',
-		description: 'Git hook: validate commit message',
-		category: 'Git hooks',
-	},
-	prep: {
-		script: 'scripts-ai/prep.ts',
-		description: 'Pre-implementation preparation',
-		category: 'AI tools',
-	},
-	issue: {
-		script: 'scripts-ai/issue-prep.ts',
-		description: 'Fetch GitHub issue details',
-		category: 'AI tools',
-	},
+		return SVELTE_KIT_DEP in all_deps
+	} catch {
+		return false
+	}
 }
 
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`
@@ -161,22 +87,49 @@ function spawn_script(tsx_executable: string, script_arguments: Array<string>): 
 	return result.status ?? 1
 }
 
-function run_command(cmd: string, subcommand_arguments: Array<string>): number {
-	const entry = Object.hasOwn(COMMAND_MAP, cmd) ? COMMAND_MAP[cmd] : undefined
+function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): number {
+	const [executable = '', ...rest_arguments] = shell
+	const result = spawnSync(executable, [...rest_arguments, ...extra], { stdio: 'inherit' })
 
-	if (!entry) return -1
+	if (result.error) console.error(`Failed to execute ${executable}: ${result.error.message}`)
 
+	return result.status ?? 1
+}
+
+function is_sveltekit_guard_failed(cmd: string, entry: CommandEntry): boolean {
+	if (!entry.requires_sveltekit) return false
+	if (is_sveltekit_project()) return false
+
+	console.error(
+		`josh ${cmd}: requires a SvelteKit project (@sveltejs/kit not found in dependencies)`,
+	)
+
+	return true
+}
+
+function run_script_entry(entry: CommandEntry, subcommand_arguments: Array<string>): number {
 	const tsx_executable = resolve_tsx_executable()
 	const script_arguments = [
 		...(entry.tsx_arguments ?? []),
-		path.join(PACKAGE_DIR, entry.script),
+		path.join(PACKAGE_DIR, entry.script ?? ''),
 		...subcommand_arguments,
 	]
 
 	return spawn_script(tsx_executable, script_arguments)
 }
 
+function run_command(cmd: string, subcommand_arguments: Array<string>): number {
+	const entry = Object.hasOwn(COMMAND_MAP, cmd) ? COMMAND_MAP[cmd] : undefined
+
+	if (!entry) return -1
+	if (is_sveltekit_guard_failed(cmd, entry)) return 1
+	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
+
+	return run_script_entry(entry, subcommand_arguments)
+}
+
 const josh_logic = { format_help, run_command }
 
-export type { CommandEntry }
-export { COMMAND_MAP, josh_logic, resolve_tsx_executable }
+export type { CommandEntry } from './josh-command-map'
+export { COMMAND_MAP } from './josh-command-map'
+export { josh_logic, resolve_tsx_executable }

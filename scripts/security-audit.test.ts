@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { COMMAND_MAP } from './josh-logic'
 import { security_audit_logic } from './security-audit-logic'
 
 const OSV_SCANNER = 'osv-scanner'
@@ -61,22 +62,25 @@ describe('security_audit_logic.format_missing_binary_error', () => {
 	})
 })
 
-describe('package.json audit wiring', () => {
+describe('josh latest command audit wiring', () => {
 	const manifest = JSON.parse(load_file('package.json')) as { scripts?: Record<string, string> }
 	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature forbids dot access on Record values
-	const latest_script = manifest.scripts?.['latest'] ?? ''
+	const latest_command = (COMMAND_MAP['latest']?.shell ?? []).join(' ')
 
-	it('does not register audit:security as a standalone script', () => {
+	it('does not register audit:security or latest as standalone package.json scripts', () => {
+		/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
 		expect(manifest.scripts?.['audit:security']).toBeUndefined()
+		expect(manifest.scripts?.['latest']).toBeUndefined()
+		/* eslint-enable dot-notation */
 	})
 
-	it('delegates security audit to pnpm josh in the latest script', () => {
-		expect(latest_script).toContain('pnpm josh audit')
+	it('delegates security audit to josh audit in the COMMAND_MAP latest shell', () => {
+		expect(latest_command).toContain('josh audit')
 	})
 
-	it('no longer leaves the retired pnpm audit at the tail of the latest script', () => {
-		expect(latest_script.trim().endsWith(RETIRED_AUDIT)).toBe(false)
-		expect(latest_script).not.toContain(RETIRED_AUDIT_FRAGMENT)
+	it('no longer calls the retired pnpm audit command', () => {
+		expect(latest_command.trim().endsWith(RETIRED_AUDIT)).toBe(false)
+		expect(latest_command).not.toContain(RETIRED_AUDIT_FRAGMENT)
 	})
 })
 

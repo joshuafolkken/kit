@@ -1,6 +1,7 @@
 import strip_json_comments from 'strip-json-comments'
-import { apply_jf_migrations } from './init-logic-migrate'
+import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { init_logic_sonar } from './init-logic-sonar'
+import { init_logic_templates } from './init-logic-templates'
 
 type ProjectType = 'sveltekit' | 'vanilla'
 
@@ -13,22 +14,6 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 const CSPELL_IMPORT = '"@joshuafolkken/kit/cspell"'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
-
-const RETIRED_MANAGED_SCRIPTS = new Set<string>([
-	'git',
-	'git:followup',
-	'telegram:test',
-	'audit:security',
-	'prep',
-	'issue:prep',
-	'prevent-main-commit',
-	'check-commit-message',
-	'version:major',
-	'version:minor',
-	'version:patch',
-	'version:current',
-	'overrides:check',
-])
 
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
@@ -44,7 +29,6 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'pnpm-workspace.yaml',
 	'tsconfig.sonar.json',
 	'wrangler.jsonc',
-	'.github/workflows/ci.yml',
 	'.github/workflows/auto-tag.yml',
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-cube.yml',
@@ -58,6 +42,7 @@ interface FileCopyMapping {
 
 const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	{ src: 'templates/gitignore', dest: '.gitignore' },
+	{ src: 'templates/workflows/ci.yml', dest: '.github/workflows/ci.yml' },
 ]
 
 const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
@@ -74,65 +59,12 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 	vanilla: './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
 }
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	postinstall: LEFTHOOK_INSTALL_CMD,
 	josh: 'josh',
-	lint: 'pnpm lint:prettier && pnpm lint:eslint',
-	'lint:prettier': 'prettier --check .',
-	'lint:eslint': 'eslint . --cache --cache-strategy content',
-	format: 'pnpm format:prettier && pnpm format:eslint',
-	'format:prettier': 'prettier --write .',
-	'format:eslint': 'eslint . --fix --cache --cache-strategy content',
-	cspell: 'cspell lint --no-must-find-files --no-progress "**/*.{ts,js,md,yaml,yml,json}"',
-	'cspell:dot': 'pnpm cspell . --dot',
-	'test:unit': 'vitest run',
-	'lefthook:install': LEFTHOOK_INSTALL_CMD,
-	'lefthook:uninstall': 'lefthook uninstall',
-	'lefthook:commit': 'lefthook run pre-commit',
-	'lefthook:push': 'lefthook run pre-push',
-	'main:sync': 'git checkout main && git pull',
-	'main:merge': 'git pull origin main',
 }
 
-const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
-	check: 'svelte-kit sync && svelte-check --tsconfig ./tsconfig.json',
-	'check:ci': 'svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error',
-}
-/* eslint-enable @typescript-eslint/naming-convention */
-
-const ESLINT_SVELTEKIT = `import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
-import svelteConfig from './svelte.config.js'
-
-export default create_sveltekit_config({
-\tgitignore_path: new URL('./.gitignore', import.meta.url),
-\ttsconfig_root_dir: import.meta.dirname,
-\tsvelte_config: svelteConfig,
-})
-`
-
-const ESLINT_VANILLA = `import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
-
-export default create_vanilla_config({
-\tgitignore_path: new URL('./.gitignore', import.meta.url),
-\ttsconfig_root_dir: import.meta.dirname,
-})
-`
-
-const PRETTIER_CONFIG = `import { config } from '@joshuafolkken/kit/prettier'
-
-export default {
-\t...config,
-}
-`
-
-function generate_eslint_config(type: ProjectType): string {
-	return type === 'sveltekit' ? ESLINT_SVELTEKIT : ESLINT_VANILLA
-}
-
-function generate_prettier_config(): string {
-	return PRETTIER_CONFIG
-}
+const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {}
 
 function generate_tsconfig(type: ProjectType): string {
 	const value =
@@ -145,18 +77,6 @@ function generate_tsconfig(type: ProjectType): string {
 
 function generate_lefthook_config(type: ProjectType): string {
 	return `extends:\n  - ${LEFTHOOK_EXTENDS[type]}\n`
-}
-
-const PLAYWRIGHT_CONFIG = `import { create_playwright_config } from '@joshuafolkken/kit/playwright/base'
-
-export default create_playwright_config({
-\tdev_port: 5173,
-\tpreview_port: 4173,
-})
-`
-
-function generate_playwright_config(): string {
-	return PLAYWRIGHT_CONFIG
 }
 
 function generate_cspell_config(): string {
@@ -302,12 +222,6 @@ function transform_prompt_paths(content: string): string {
 	return content.replaceAll(/`prompts\/([^`]+)`/gu, `\`${PROMPTS_PACKAGE_PREFIX}$1\``)
 }
 
-function remove_retired_scripts(scripts: Record<string, string>): Record<string, string> {
-	return Object.fromEntries(
-		Object.entries(scripts).filter(([key]) => !RETIRED_MANAGED_SCRIPTS.has(key)),
-	)
-}
-
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
 	const parsed = parse_jsonc(content) as WithScripts
 	const existing = parsed.scripts ?? {}
@@ -323,12 +237,10 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 }
 
 const init_logic = {
-	generate_eslint_config,
-	generate_prettier_config,
+	...init_logic_templates,
 	generate_tsconfig,
 	generate_lefthook_config,
 	generate_cspell_config,
-	generate_playwright_config,
 	generate_npmrc,
 	merge_npmrc,
 	merge_json_extends,

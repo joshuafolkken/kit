@@ -49,7 +49,7 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 ### Dependency overrides (package.json)
 
 - **NEVER** remove or modify entries in `pnpm.overrides` without explicit user approval.
-- After running `pnpm update`, `pnpm latest`, or any dependency-update command, verify that `pnpm.overrides` is unchanged **and** that `devDependencies` versions still respect the overrides. If any entry was removed, modified, or bumped past an override, restore it immediately.
+- After running `pnpm update`, `josh latest`, or any dependency-update command, verify that `pnpm.overrides` is unchanged **and** that `devDependencies` versions still respect the overrides. If any entry was removed, modified, or bumped past an override, restore it immediately.
 
 ## Code Change Rules
 
@@ -78,8 +78,8 @@ For every code modification, follow this order exactly:
 1. **Refactor first** _(mandatory before lint or tests)_: apply high/medium-priority refactoring to all new/modified code — see `prompts/refactoring.md`. Do not proceed until no high/medium items remain.
 2. **Tests**: implement the tests declared in Step 0. See `prompts/testing-guide.md`.
    - **E2E cleanup / leaked data**: When fixing issues where E2E leaves database or UI artifacts, follow the **Regression fix workflow** in `prompts/testing-guide.md` (add a failing guard → fix → confirm green). Prefer stable selectors (`data-testid`) over locale-dependent strings for teardown.
-3. **Lint**: run `pnpm run lint` then `pnpm run check:ci`; fix all errors before reporting done. `pnpm run check:ci` matches CI's strict type-check — a green local run implies a green CI type-check. Do not substitute `pnpm run check` (incremental / fast) at gate time.
-4. **Spell check**: `pnpm cspell:dot`; add legitimate project terms to `cspell.config.yaml`
+3. **Lint**: run `pnpm josh lint` then `pnpm exec tsc --noEmit`; fix all errors before reporting done.
+4. **Spell check**: `pnpm josh cspell:dot`; add legitimate project terms to `cspell.config.yaml`
 5. **IDE feedback**: check IDE lint output — often more current than terminal
 6. Never say "it should pass" without running commands. Never finish while errors exist.
 7. Do not modify `eslint.config.js` unless explicitly asked; fix issues in application/test code instead.
@@ -94,10 +94,10 @@ Run the full verification set **in order**. **Do not** skip or reorder steps. **
 
 0. **Test gate** — Count (a) code changes made and (b) tests added/updated. If b = 0, allow the run to continue **only** when every change falls under the pre-approved non-runtime exception (see Code Change Rules Step 0) or the user has explicitly approved the infeasibility. Otherwise **stop** — go back to Code Change Rules Step 0 and add tests before continuing.
 1. **Refactor** — read and execute `prompts/refactoring.md` on all changed files. Converge until no high/medium items remain. **Do not proceed to step 2 until complete.**
-2. `pnpm run lint`
-3. `pnpm run check:ci` — strict type-check matching CI (uses `svelte-check`, not the incremental fast variant). A green local run must imply a green CI type-check; do not substitute `pnpm run check`.
-4. `pnpm cspell:dot`
-5. `pnpm test:unit --run`
+2. `pnpm josh lint`
+3. `pnpm exec tsc --noEmit`
+4. `pnpm josh cspell:dot`
+5. `pnpm josh test:unit`
 6. **Self-review** — follow `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean.
 7. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
 8. **E2E**: Ask the user to run `pnpm test` and share the output. Fix any failures, then ask again.
@@ -145,8 +145,8 @@ Before every `git commit` — including follow-up commits on the same branch —
 
 #### `fullrun` — Full execution (plan → implement → PR → completion notify)
 
-- `fullrun #<N>`: Read Issue #N → **normalize the title**: if the title is not in English or can be phrased more clearly/conventionally, derive a better English title and run `gh issue edit <N> --title "<title>"` → post the agreed plan (if the Issue body is blank, use `gh issue edit <N> --body "<plan>"` to fill the body; otherwise use `gh issue comment <N> --body "<plan>"`) → implement → `pnpm josh bump minor` → `pnpm josh git -y` → `pnpm josh followup --merge` (full run from Step 3 onward in `prompts/collaboration-workflow.md`). Issue plan comments MUST be written in English. Before implementing, run `git switch main && git pull`, then `pnpm latest` (includes `pnpm audit`; fix with `overrides` in `package.json` if vulnerabilities found). **After `pnpm latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, investigate why it existed and restore it before proceeding (do NOT remove intentional overrides without user approval).** When running `pnpm josh followup --merge`, compose an implementation summary in English and pass it via `--notify-message`. Format: `"Implemented <title>:\n- <change1>\n- <change2>\n..."` (one bullet per meaningful change — what was added, changed, or fixed). **`pnpm josh followup --merge` waits for CI, verifies AI review findings, sends the completion notification, then merges — all in one step. If AI review blockers are found, followup exits non-zero; fix the findings and re-run `pnpm josh followup --merge`.**
-- `fullrun new` or `fullrun new "<title>"`: Shortcut that combines `kickoff new` + `fullrun #<N>` into a single run. Steps: (1) Derive an English title from the conversation, or use the provided title. (2) Create Issue: `gh issue create --title "<title>" --body "<body>"`. Capture the new Issue number `<N>`. (3) Post the agreed plan in English. (4) Run `git switch main && git pull`. (5) Run `pnpm latest`. **After `pnpm latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, restore it before proceeding.** (6) Implement. (7) `pnpm josh bump minor`. (8) `pnpm josh git -y "<title> #<N>"`. (9) `pnpm josh followup "<title> #<N>" --merge --notify-message "Implemented <title>:\n- <change1>\n- <change2>\n..."`.
+- `fullrun #<N>`: Read Issue #N → **normalize the title**: if the title is not in English or can be phrased more clearly/conventionally, derive a better English title and run `gh issue edit <N> --title "<title>"` → post the agreed plan (if the Issue body is blank, use `gh issue edit <N> --body "<plan>"` to fill the body; otherwise use `gh issue comment <N> --body "<plan>"`) → implement → `pnpm josh bump minor` → `pnpm josh git -y` → `pnpm josh followup --merge` (full run from Step 3 onward in `prompts/collaboration-workflow.md`). Issue plan comments MUST be written in English. Before implementing, run `git switch main && git pull`, then `josh latest` (includes `pnpm audit`; fix with `overrides` in `package.json` if vulnerabilities found). **After `josh latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, investigate why it existed and restore it before proceeding (do NOT remove intentional overrides without user approval).** When running `pnpm josh followup --merge`, compose an implementation summary in English and pass it via `--notify-message`. Format: `"Implemented <title>:\n- <change1>\n- <change2>\n..."` (one bullet per meaningful change — what was added, changed, or fixed). **`pnpm josh followup --merge` waits for CI, verifies AI review findings, sends the completion notification, then merges — all in one step. If AI review blockers are found, followup exits non-zero; fix the findings and re-run `pnpm josh followup --merge`.**
+- `fullrun new` or `fullrun new "<title>"`: Shortcut that combines `kickoff new` + `fullrun #<N>` into a single run. Steps: (1) Derive an English title from the conversation, or use the provided title. (2) Create Issue: `gh issue create --title "<title>" --body "<body>"`. Capture the new Issue number `<N>`. (3) Post the agreed plan in English. (4) Run `git switch main && git pull`. (5) Run `josh latest`. **After `josh latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, restore it before proceeding.** (6) Implement. (7) `pnpm josh bump minor`. (8) `pnpm josh git -y "<title> #<N>"`. (9) `pnpm josh followup "<title> #<N>" --merge --notify-message "Implemented <title>:\n- <change1>\n- <change2>\n..."`.
 
 #### AI reviewer comment scan (automatic in `pnpm josh followup`)
 

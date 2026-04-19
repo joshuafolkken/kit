@@ -17,7 +17,7 @@ pre-commit:
 
     type-check:
       glob: '*.{svelte,ts,js,mjs,cjs}'
-      run: pnpm check
+      run: pnpm exec svelte-kit sync && pnpm exec svelte-check --tsconfig ./tsconfig.json
 
 pre-push:
   commands:

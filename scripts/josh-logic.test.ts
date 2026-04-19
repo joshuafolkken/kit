@@ -12,11 +12,37 @@ const PACKAGE_VERSION = (
 const ENV_FILE_FLAG = '--env-file=.env'
 
 const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
+	[
+		'Development',
+		[
+			'lint',
+			'lint:prettier',
+			'lint:eslint',
+			'format',
+			'format:prettier',
+			'format:eslint',
+			'cspell',
+			'cspell:dot',
+			'test:unit',
+			'check',
+			'check:ci',
+		],
+	],
 	['Project', ['init', 'sync', 'install']],
-	['Workflow', ['git', 'followup', 'notify']],
+	['Workflow', ['git', 'followup', 'notify', 'main:sync', 'main:merge']],
 	['Versioning', ['bump', 'version']],
-	['Maintenance', ['overrides', 'audit']],
-	['Git hooks', ['prevent-main-commit', 'check-commit-message']],
+	['Maintenance', ['overrides', 'audit', 'latest', 'latest:corepack', 'latest:update']],
+	[
+		'Git hooks',
+		[
+			'prevent-main-commit',
+			'check-commit-message',
+			'hook:install',
+			'hook:uninstall',
+			'hook:commit',
+			'hook:push',
+		],
+	],
 	['AI tools', ['prep', 'issue']],
 ])
 
@@ -30,9 +56,12 @@ describe('COMMAND_MAP', () => {
 		}
 	})
 
-	it('each entry has a script path and description', () => {
+	it('each entry has a script path or shell command, and a description', () => {
 		for (const entry of Object.values(COMMAND_MAP)) {
-			expect(entry.script).toBeTruthy()
+			const has_impl =
+				Boolean(entry.script) || (Array.isArray(entry.shell) && entry.shell.length > 0)
+
+			expect(has_impl).toBe(true)
 			expect(entry.description).toBeTruthy()
 		}
 	})
@@ -113,6 +142,48 @@ describe('josh_logic.run_command', () => {
 	it('returns -1 for inherited prototype keys like constructor', () => {
 		expect(josh_logic.run_command('constructor', [])).toBe(-1)
 	})
+
+	it('returns 1 for check in a non-SvelteKit project directory', () => {
+		expect(josh_logic.run_command('check', [])).toBe(1)
+	})
+
+	it('returns 1 for check:ci in a non-SvelteKit project directory', () => {
+		expect(josh_logic.run_command('check:ci', [])).toBe(1)
+	})
+})
+
+describe('COMMAND_MAP shell commands', () => {
+	/* eslint-disable dot-notation */
+	it('lint uses sh -c for chaining', () => {
+		expect(COMMAND_MAP['lint']?.shell?.[0]).toBe('sh')
+	})
+
+	it('lint:prettier delegates to pnpm exec prettier', () => {
+		const shell = COMMAND_MAP['lint:prettier']?.shell ?? []
+
+		expect(shell).toContain('prettier')
+		expect(shell).toContain('pnpm')
+	})
+
+	it('check has requires_sveltekit flag', () => {
+		expect(COMMAND_MAP['check']?.requires_sveltekit).toBe(true)
+	})
+
+	it('check:ci has requires_sveltekit flag', () => {
+		expect(COMMAND_MAP['check:ci']?.requires_sveltekit).toBe(true)
+	})
+
+	it('hook:install delegates to lefthook install', () => {
+		const shell = COMMAND_MAP['hook:install']?.shell ?? []
+
+		expect(shell).toContain('lefthook')
+		expect(shell).toContain('install')
+	})
+
+	it('latest uses sh -c for chaining', () => {
+		expect(COMMAND_MAP['latest']?.shell?.[0]).toBe('sh')
+	})
+	/* eslint-enable dot-notation */
 })
 
 describe('resolve_tsx_executable', () => {
