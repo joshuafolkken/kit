@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { COMMAND_MAP, josh_logic } from './josh-logic'
+import { COMMAND_MAP, josh_logic, resolve_tsx_executable } from './josh-logic'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PACKAGE_VERSION = (
@@ -112,5 +112,17 @@ describe('josh_logic.run_command', () => {
 
 	it('returns -1 for inherited prototype keys like constructor', () => {
 		expect(josh_logic.run_command('constructor', [])).toBe(-1)
+	})
+})
+
+describe('resolve_tsx_executable', () => {
+	it('returns a non-empty string', () => {
+		expect(resolve_tsx_executable().length).toBeGreaterThan(0)
+	})
+
+	it('returns an absolute path when tsx exists in PACKAGE_DIR node_modules', () => {
+		const result = resolve_tsx_executable()
+
+		expect(path.isAbsolute(result)).toBe(true)
 	})
 })

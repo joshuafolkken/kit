@@ -1,10 +1,20 @@
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const COLUMN_WIDTH = 24
+const TSX_BIN = 'tsx'
+
+function resolve_tsx_executable(): string {
+	const candidates = [
+		path.join(PACKAGE_DIR, 'node_modules', '.bin', TSX_BIN),
+		path.join(process.cwd(), 'node_modules', '.bin', TSX_BIN),
+	]
+
+	return candidates.find(existsSync) ?? TSX_BIN
+}
 
 function read_package_version(): string {
 	const parsed = JSON.parse(readFileSync(path.join(PACKAGE_DIR, 'package.json'), 'utf8')) as {
@@ -143,23 +153,30 @@ function format_help(): string {
 	return [HEADER, '', sections.join('\n\n'), '', USAGE].join('\n')
 }
 
+function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
+	const result = spawnSync(tsx_executable, script_arguments, { stdio: 'inherit' })
+
+	if (result.error) console.error(`Failed to execute ${tsx_executable}: ${result.error.message}`)
+
+	return result.status ?? 1
+}
+
 function run_command(cmd: string, subcommand_arguments: Array<string>): number {
 	const entry = Object.hasOwn(COMMAND_MAP, cmd) ? COMMAND_MAP[cmd] : undefined
 
 	if (!entry) return -1
 
-	/* eslint-disable sonarjs/no-os-command-from-path */
-	const result = spawnSync(
-		'tsx',
-		[...(entry.tsx_arguments ?? []), path.join(PACKAGE_DIR, entry.script), ...subcommand_arguments],
-		{ stdio: 'inherit' },
-	)
-	/* eslint-enable sonarjs/no-os-command-from-path */
+	const tsx_executable = resolve_tsx_executable()
+	const script_arguments = [
+		...(entry.tsx_arguments ?? []),
+		path.join(PACKAGE_DIR, entry.script),
+		...subcommand_arguments,
+	]
 
-	return result.status ?? 1
+	return spawn_script(tsx_executable, script_arguments)
 }
 
 const josh_logic = { format_help, run_command }
 
 export type { CommandEntry }
-export { COMMAND_MAP, josh_logic }
+export { COMMAND_MAP, josh_logic, resolve_tsx_executable }
