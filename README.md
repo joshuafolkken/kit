@@ -4,6 +4,13 @@ Shared toolchain config for TypeScript / SvelteKit projects.
 
 Covers: ESLint · Prettier · TypeScript · Lefthook · cspell · VS Code · AI files (CLAUDE.md, AGENTS.md, GEMINI.md)
 
+## Documentation
+
+- [Overview](./docs/overview.md) — what this package provides and how it works
+- [josh commands](./docs/josh-commands.md) — full CLI reference
+- [josh init](./docs/init.md) — detailed init behavior
+- [josh sync](./docs/sync.md) — detailed sync behavior
+
 ## Authentication
 
 GitHub Packages requires authentication even for public packages. Set up auth before installing:
@@ -76,20 +83,22 @@ pnpm exec josh sync
 
 ## CLI commands
 
-A single `josh` command is available in `node_modules/.bin/` after installation. Run `pnpm exec josh help` to list all subcommands:
+A single `josh` command is available in `node_modules/.bin/` after installation. Run `pnpm exec josh help` to list all subcommands. See [docs/josh-commands.md](./docs/josh-commands.md) for the full reference.
 
 | Subcommand                  | Description                              |
 | --------------------------- | ---------------------------------------- |
 | `josh init`                 | Initialize config files in a new project |
-| `josh sync`                 | Sync AI files from the package           |
+| `josh sync`                 | Sync managed files from the package      |
+| `josh install`              | Install josh to ~/.local/bin             |
 | `josh git`                  | AI-assisted git workflow                 |
-| `josh git-followup`         | AI-assisted PR follow-up workflow        |
-| `josh telegram-test`        | Send a test Telegram notification        |
+| `josh followup`             | AI-assisted PR follow-up workflow        |
+| `josh notify`               | Send a Telegram notification             |
+| `josh bump`                 | Bump package version                     |
+| `josh version`              | Show current and latest package version  |
+| `josh overrides`            | Check pnpm overrides for drift           |
+| `josh audit`                | Run security audit                       |
 | `josh prep`                 | Pre-implementation preparation           |
-| `josh issue-prep`           | Fetch GitHub issue details               |
-| `josh bump-version`         | Bump package version                     |
-| `josh overrides-check`      | Check pnpm overrides for drift           |
-| `josh security-audit`       | Run security audit                       |
+| `josh issue`                | Fetch GitHub issue details               |
 | `josh prevent-main-commit`  | Git hook: block direct commits to main   |
 | `josh check-commit-message` | Git hook: validate commit message format |
 | `josh help`                 | Show all available commands              |
