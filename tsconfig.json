@@ -7,5 +7,11 @@
 		"types": ["node"],
 		"allowJs": true
 	},
-	"include": ["eslint/**/*.ts", "scripts/**/*.ts", "scripts-ai/**/*.ts", "templates/**/*.ts"]
+	"include": [
+		"eslint/**/*.ts",
+		"prettier/**/*.d.ts",
+		"scripts/**/*.ts",
+		"scripts-ai/**/*.ts",
+		"templates/**/*.ts"
+	]
 }
