@@ -90,7 +90,7 @@ Run the full verification set **in order**. **Do not** skip or reorder steps. **
 
 **STOP — Refactor before lint.** For any code change, you MUST complete refactoring (`prompts/refactoring.md`) **before** running lint or check. Do not run step 2 or later until refactoring is done. For a **refactor-only** request, follow `refactoring.md`'s own **convergence** (high/medium items until none remain).
 
-**E2E:** The user runs `pnpm test` and shares the full output. Do **not** claim completion until the user confirms E2E passed or explicitly scopes it out.
+**E2E:** The user runs `pnpm josh test` and shares the full output. Do **not** claim completion until the user confirms E2E passed or explicitly scopes it out.
 
 0. **Test gate** — Count (a) code changes made and (b) tests added/updated. If b = 0, allow the run to continue **only** when every change falls under the pre-approved non-runtime exception (see Code Change Rules Step 0) or the user has explicitly approved the infeasibility. Otherwise **stop** — go back to Code Change Rules Step 0 and add tests before continuing.
 1. **Refactor** — read and execute `prompts/refactoring.md` on all changed files. Converge until no high/medium items remain. **Do not proceed to step 2 until complete.**
@@ -100,7 +100,7 @@ Run the full verification set **in order**. **Do not** skip or reorder steps. **
 5. `pnpm josh test:unit`
 6. **Self-review** — follow `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean.
 7. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
-8. **E2E**: Ask the user to run `pnpm test` and share the output. Fix any failures, then ask again.
+8. **E2E**: Ask the user to run `pnpm josh test` and share the output. Fix any failures, then ask again.
 
 If you changed **only** docs or config that does not affect tests, still run lint + check + cspell; run unit tests when there is any chance of impact.
 
