@@ -360,7 +360,7 @@ function run_ai_copies(): void {
 async function main(): Promise<void> {
 	const type = await resolve_project_type()
 
-	console.info(`\n🚀 Initializing @joshuafolkken/config (${type})\n`)
+	console.info(`\n🚀 Initializing @joshuafolkken/kit (${type})\n`)
 	console.info('Config files:')
 	for (const action of build_file_actions(type)) execute_file_action(action)
 

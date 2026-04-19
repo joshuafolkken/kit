@@ -107,7 +107,7 @@ describe('sync_ai_file', () => {
 		sync.sync_ai_file(SRC_PATH, DEST_PATH)
 
 		expect(readFileSync(DEST_PATH, 'utf8')).toBe(
-			'see `node_modules/@joshuafolkken/config/prompts/refactoring.md`\n',
+			'see `node_modules/@joshuafolkken/kit/prompts/refactoring.md`\n',
 		)
 	})
 

@@ -19,7 +19,7 @@ describe('generate_eslint_config', () => {
 
 describe('generate_prettier_config', () => {
 	it('imports config from the package', () => {
-		expect(init_logic.generate_prettier_config()).toContain("from '@joshuafolkken/config/prettier'")
+		expect(init_logic.generate_prettier_config()).toContain("from '@joshuafolkken/kit/prettier'")
 	})
 
 	it('spreads config into export', () => {
@@ -32,13 +32,13 @@ describe('generate_tsconfig', () => {
 		const result = init_logic.generate_tsconfig('sveltekit')
 
 		expect(result).toContain('.svelte-kit/tsconfig.json')
-		expect(result).toContain('node_modules/@joshuafolkken/config/tsconfig/sveltekit.jsonc')
+		expect(result).toContain('node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc')
 	})
 
 	it('vanilla includes only our config as direct jsonc path', () => {
 		const result = init_logic.generate_tsconfig('vanilla')
 
-		expect(result).toContain('node_modules/@joshuafolkken/config/tsconfig/base.jsonc')
+		expect(result).toContain('node_modules/@joshuafolkken/kit/tsconfig/base.jsonc')
 		expect(result).not.toContain('.svelte-kit')
 	})
 })
@@ -46,10 +46,10 @@ describe('generate_tsconfig', () => {
 describe('get_tsconfig_extends_entry', () => {
 	it('returns direct node_modules jsonc path for each project type', () => {
 		expect(init_logic.get_tsconfig_extends_entry('sveltekit')).toBe(
-			'./node_modules/@joshuafolkken/config/tsconfig/sveltekit.jsonc',
+			'./node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc',
 		)
 		expect(init_logic.get_tsconfig_extends_entry('vanilla')).toBe(
-			'./node_modules/@joshuafolkken/config/tsconfig/base.jsonc',
+			'./node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
 		)
 	})
 })
@@ -67,7 +67,7 @@ describe('generate_lefthook_config', () => {
 describe('generate_playwright_config', () => {
 	it('imports create_playwright_config from the package', () => {
 		expect(init_logic.generate_playwright_config()).toContain(
-			"from '@joshuafolkken/config/playwright/base'",
+			"from '@joshuafolkken/kit/playwright/base'",
 		)
 	})
 

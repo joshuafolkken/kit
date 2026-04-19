@@ -50,15 +50,15 @@ describe('transform_prompt_paths', () => {
 	it('replaces prompts/ with node_modules package path', () => {
 		const result = init_logic.transform_prompt_paths('see `prompts/refactoring.md`')
 
-		expect(result).toBe('see `node_modules/@joshuafolkken/config/prompts/refactoring.md`')
+		expect(result).toBe('see `node_modules/@joshuafolkken/kit/prompts/refactoring.md`')
 	})
 
 	it('replaces all occurrences in content', () => {
 		const input = 'see `prompts/review.md` and `prompts/testing-guide.md`'
 		const result = init_logic.transform_prompt_paths(input)
 
-		expect(result).toContain('node_modules/@joshuafolkken/config/prompts/review.md')
-		expect(result).toContain('node_modules/@joshuafolkken/config/prompts/testing-guide.md')
+		expect(result).toContain('node_modules/@joshuafolkken/kit/prompts/review.md')
+		expect(result).toContain('node_modules/@joshuafolkken/kit/prompts/testing-guide.md')
 		expect(result).not.toContain('`prompts/')
 	})
 
