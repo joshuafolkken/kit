@@ -17,6 +17,7 @@ const EXPECTED_COMMANDS = [
 	'prevent-main-commit',
 	'check-commit-message',
 	'version-check',
+	'install',
 ]
 
 describe('COMMAND_MAP', () => {

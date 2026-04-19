@@ -5,6 +5,7 @@ import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { init_logic, type ProjectType } from './init-logic'
+import { install_josh_bin_section } from './install-bin'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PROJECT_ROOT = process.cwd()
@@ -271,6 +272,11 @@ function install_lefthook(): void {
 	}
 }
 
+function run_tool_installs(): void {
+	install_lefthook()
+	install_josh_bin_section()
+}
+
 function get_repo_name_with_owner(): string | undefined {
 	/* eslint-disable sonarjs/no-os-command-from-path */
 	const result = spawnSync(
@@ -364,7 +370,7 @@ async function main(): Promise<void> {
 	console.info('\nAI files:')
 	run_ai_copies()
 
-	install_lefthook()
+	run_tool_installs()
 
 	console.info('\n✅ Done.\n')
 }

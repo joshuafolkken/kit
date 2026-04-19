@@ -3,6 +3,7 @@ import:
   - ./cspell/index.yaml
 words:
   - docstrings
+  - testuser
   - inlang
   - languagetool
   - myorg
