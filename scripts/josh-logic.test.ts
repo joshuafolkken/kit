@@ -16,6 +16,7 @@ const EXPECTED_COMMANDS = [
 	'security-audit',
 	'prevent-main-commit',
 	'check-commit-message',
+	'version-check',
 ]
 
 describe('COMMAND_MAP', () => {

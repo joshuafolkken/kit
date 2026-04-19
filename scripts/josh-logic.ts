@@ -42,6 +42,10 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 		script: 'scripts/check-commit-message.ts',
 		description: 'Git hook: validate commit message',
 	},
+	'version-check': {
+		script: 'scripts/version-check.ts',
+		description: 'Show current and latest @joshuafolkken/config version',
+	},
 }
 
 const HEADER = "josh — Joshua Folkken's dev toolkit"
