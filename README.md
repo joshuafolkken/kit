@@ -4,78 +4,45 @@ Shared toolchain config for TypeScript / SvelteKit projects.
 
 Covers: ESLint · Prettier · TypeScript · Lefthook · cspell · VS Code · AI files (CLAUDE.md, AGENTS.md, GEMINI.md)
 
-## Documentation
+See [docs/overview.md](./docs/overview.md) for a full description of what this package provides and how it works.
 
-- [Overview](./docs/overview.md) — what this package provides and how it works
-- [josh commands](./docs/josh-commands.md) — full CLI reference
-- [josh init](./docs/init.md) — detailed init behavior
-- [josh sync](./docs/sync.md) — detailed sync behavior
+## Quick start
 
-## Authentication
+**1. Authenticate** — GitHub Packages requires auth even for public packages:
 
-GitHub Packages requires authentication even for public packages. Set up auth before installing:
+```bash
+# Add to .npmrc
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 
-1. Add the auth token to `.npmrc`:
+# Export your token (uses your existing gh CLI session)
+export NODE_AUTH_TOKEN=$(gh auth token)
+```
 
-   ```
-   //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-   ```
+If `gh auth token` fails or you get a 401, re-authenticate with the `read:packages` scope:
 
-2. Export the token in your shell (uses your existing `gh` CLI session):
+```bash
+gh auth login --scopes read:packages
+```
 
-   ```bash
-   export NODE_AUTH_TOKEN=$(gh auth token)
-   ```
-
-   If `gh auth token` fails or installation returns a 401, your token may be missing the `read:packages` scope. Re-authenticate with:
-
-   ```bash
-   gh auth login --scopes read:packages
-   ```
-
-## Install
-
-Add the registry to `.npmrc` first (or let `josh init` do it):
+**2. Install** — add the registry to `.npmrc`, then install:
 
 ```
 @joshuafolkken:registry=https://npm.pkg.github.com
 ```
 
-Then install:
-
 ```bash
 pnpm add -D @joshuafolkken/kit
 ```
 
-## Setup
-
-Run once after installing:
+**3. Initialize** — run once after installing:
 
 ```bash
 pnpm exec josh init
 ```
 
-Auto-detects SvelteKit vs vanilla. Creates or merges:
+Auto-detects SvelteKit vs vanilla and creates or merges all config files. See [docs/init.md](./docs/init.md) for the full list of managed files.
 
-| File                                  | Behavior                   |
-| ------------------------------------- | -------------------------- |
-| `.npmrc`                              | Adds registry line         |
-| `eslint.config.js`                    | Created (shown if exists)  |
-| `prettier.config.js`                  | Created (shown if exists)  |
-| `playwright.config.ts`                | Created (shown if exists)  |
-| `tsconfig.json`                       | Merges `extends`           |
-| `cspell.config.yaml`                  | Merges `import`            |
-| `lefthook.yml`                        | Merges `extends`           |
-| `.vscode/extensions.json`             | Merges `recommendations`   |
-| `.vscode/settings.json`               | Merges missing keys        |
-| `package.json`                        | Merges missing scripts     |
-| `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` | Copied (skipped if exists) |
-
-Runs `lefthook install` at the end.
-
-## Update AI files
-
-To overwrite AI files with the latest version from the package:
+To sync AI files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) with the latest version from the package:
 
 ```bash
 pnpm exec josh sync
@@ -114,15 +81,14 @@ A single `josh` command is available in `node_modules/.bin/` after installation.
 | `josh hook:uninstall`       | Uninstall git hooks                               |
 | `josh help`                 | Show all available commands                       |
 
-## Package exports
+## Manual config
 
-Use individual configs directly if you prefer manual setup:
+Use individual configs directly if you prefer not to use `josh init`:
 
 ```js
 // eslint.config.js
-
-// or
 import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
+// or
 import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 ```
 
