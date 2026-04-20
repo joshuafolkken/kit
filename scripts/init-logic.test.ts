@@ -170,6 +170,8 @@ const RETIRED_SCRIPTS = [
 	'check:svelte:ci',
 ]
 
+const SIZE_LIMIT_SCRIPT = 'size-limit'
+
 describe('get_suggested_scripts', () => {
 	it('vanilla returns only postinstall and josh', () => {
 		const result = init_logic.get_suggested_scripts('vanilla')
@@ -179,12 +181,13 @@ describe('get_suggested_scripts', () => {
 		expect(result).toHaveProperty('josh')
 	})
 
-	it('sveltekit returns only postinstall and josh', () => {
+	it('sveltekit returns postinstall, josh, and size-limit', () => {
 		const result = init_logic.get_suggested_scripts('sveltekit')
 
-		expect(Object.keys(result)).toHaveLength(2)
+		expect(Object.keys(result)).toHaveLength(3)
 		expect(result).toHaveProperty('postinstall')
 		expect(result).toHaveProperty('josh')
+		expect(result).toHaveProperty(SIZE_LIMIT_SCRIPT, SIZE_LIMIT_SCRIPT)
 	})
 
 	it('does not include retired script keys', () => {

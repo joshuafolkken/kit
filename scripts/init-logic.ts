@@ -2,6 +2,7 @@ import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { init_logic_sonar } from './init-logic-sonar'
 import { init_logic_templates } from './init-logic-templates'
+import { init_logic_workspace } from './init-logic-workspace'
 
 type ProjectType = 'sveltekit' | 'vanilla'
 
@@ -68,7 +69,15 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	josh: 'josh',
 }
 
-const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {}
+const SIZE_LIMIT_VERSION = '^12.1.0'
+
+const SIZE_LIMIT_CONFIG = [
+	{ path: '.svelte-kit/output/client/_app/immutable/**/*.js', limit: '500 kB' },
+] as const satisfies ReadonlyArray<{ path: string; limit: string }>
+
+const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
+	'size-limit': 'size-limit',
+}
 
 function generate_tsconfig(type: ProjectType): string {
 	const value =
@@ -188,40 +197,6 @@ function merge_cspell_import(content: string, value: string): string {
 	return `${content.slice(0, version_line_end + 1)}${block}${content.slice(version_line_end + 1)}`
 }
 
-function extract_yaml_top_level_keys(content: string): Array<string> {
-	return content.split('\n').flatMap((line) => {
-		const key = /^([a-zA-Z][a-zA-Z0-9_-]*):/u.exec(line)?.[1]
-
-		return key ? [key] : []
-	})
-}
-
-function extract_yaml_block(content: string, key: string): string {
-	const pattern = new RegExp(String.raw`(^${key}:[^\n]*\n(?:(?:[ \t][^\n]*|)\n)*)`, 'mu')
-
-	return pattern.exec(content)?.[1]?.trimEnd() ?? ''
-}
-
-function append_user_blocks(base: string, user_keys: Array<string>, existing: string): string {
-	const user_blocks = user_keys
-		.map((k) => extract_yaml_block(existing, k))
-		.filter(Boolean)
-		.join('\n')
-	const normalized = base.endsWith('\n') ? base : `${base}\n`
-
-	return `${normalized}\n${user_blocks}\n`
-}
-
-function merge_workspace_yaml(existing: string, template: string): string {
-	if (!existing.trim()) return template
-	const normalized = existing.endsWith('\n') ? existing : `${existing}\n`
-	const template_keys = new Set(extract_yaml_top_level_keys(template))
-	const user_keys = extract_yaml_top_level_keys(normalized).filter((k) => !template_keys.has(k))
-	if (user_keys.length === 0) return template
-
-	return append_user_blocks(template, user_keys, normalized)
-}
-
 function get_tsconfig_extends_entry(type: ProjectType): string {
 	return TSCONFIG_EXTENDS[type]
 }
@@ -274,8 +249,32 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	return `${JSON.stringify(parsed, undefined, '\t')}\n`
 }
 
+function merge_development_dependencies(
+	content: string,
+	additions: Record<string, string>,
+): string {
+	const parsed = parse_jsonc(content) as Record<string, unknown>
+	// eslint-disable-next-line dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature
+	const existing = (parsed['devDependencies'] as Record<string, string> | undefined) ?? {}
+	const to_add = Object.entries(additions).filter(([key]) => !(key in existing))
+	if (to_add.length === 0) return content
+	// eslint-disable-next-line dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature
+	parsed['devDependencies'] = { ...existing, ...Object.fromEntries(to_add) }
+
+	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+}
+
+function merge_sveltekit_package_json(content: string): string {
+	const with_scripts = merge_package_scripts(content, get_suggested_scripts('sveltekit'))
+	const with_config = merge_json_object(with_scripts, { 'size-limit': SIZE_LIMIT_CONFIG })
+
+	return merge_development_dependencies(with_config, { 'size-limit': SIZE_LIMIT_VERSION })
+}
+
 const init_logic = {
 	...init_logic_templates,
+	...init_logic_workspace,
+	...init_logic_sonar,
 	generate_tsconfig,
 	generate_lefthook_config,
 	generate_cspell_config,
@@ -286,7 +285,8 @@ const init_logic = {
 	merge_json_object,
 	merge_yaml_list_entry,
 	merge_cspell_import,
-	merge_workspace_yaml,
+	merge_development_dependencies,
+	merge_sveltekit_package_json,
 	get_tsconfig_extends_entry,
 	get_lefthook_extends_value,
 	get_cspell_import_value,
@@ -297,7 +297,6 @@ const init_logic = {
 	get_suggested_scripts,
 	merge_package_scripts,
 	transform_prompt_paths,
-	...init_logic_sonar,
 }
 
 export { init_logic }

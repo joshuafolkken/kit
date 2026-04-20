@@ -77,6 +77,91 @@ describe('merge_json_array_field', () => {
 	})
 })
 
+const SIZE_LIMIT_KEY = 'size-limit'
+const SIZE_LIMIT_VERSION = '^12.1.0'
+const DEV_DEPS_KEY = 'devDependencies'
+
+/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
+describe('merge_development_dependencies', () => {
+	it('adds missing devDependency', () => {
+		const result = JSON.parse(
+			init_logic.merge_development_dependencies(`{"${DEV_DEPS_KEY}":{}}`, {
+				[SIZE_LIMIT_KEY]: SIZE_LIMIT_VERSION,
+			}),
+		) as Record<string, Record<string, string>>
+
+		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_KEY]).toBe(SIZE_LIMIT_VERSION)
+	})
+
+	it('does not overwrite existing devDependency', () => {
+		const result = JSON.parse(
+			init_logic.merge_development_dependencies(
+				`{"${DEV_DEPS_KEY}":{"${SIZE_LIMIT_KEY}":"^11.0.0"}}`,
+				{ [SIZE_LIMIT_KEY]: SIZE_LIMIT_VERSION },
+			),
+		) as Record<string, Record<string, string>>
+
+		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_KEY]).toBe('^11.0.0')
+	})
+
+	it('returns content unchanged when all additions already present', () => {
+		const content = `{"${DEV_DEPS_KEY}":{"${SIZE_LIMIT_KEY}":"${SIZE_LIMIT_VERSION}"}}`
+
+		expect(
+			init_logic.merge_development_dependencies(content, { [SIZE_LIMIT_KEY]: SIZE_LIMIT_VERSION }),
+		).toBe(content)
+	})
+
+	it('creates devDependencies key when missing from package json', () => {
+		const result = JSON.parse(
+			init_logic.merge_development_dependencies('{}', { [SIZE_LIMIT_KEY]: SIZE_LIMIT_VERSION }),
+		) as Record<string, Record<string, string>>
+
+		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_KEY]).toBe(SIZE_LIMIT_VERSION)
+	})
+})
+
+describe('merge_sveltekit_package_json', () => {
+	it('adds size-limit script', () => {
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json('{}')) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result['scripts']?.[SIZE_LIMIT_KEY]).toBe(SIZE_LIMIT_KEY)
+	})
+
+	it('adds size-limit devDependency', () => {
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json('{}')) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_KEY]).toBe(SIZE_LIMIT_VERSION)
+	})
+
+	it('adds size-limit config array', () => {
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json('{}')) as Record<
+			string,
+			Array<Record<string, string>>
+		>
+
+		expect(result[SIZE_LIMIT_KEY]).toHaveLength(1)
+		expect(result[SIZE_LIMIT_KEY]?.[0]?.['limit']).toBe('500 kB')
+	})
+
+	it('does not overwrite existing size-limit devDependency', () => {
+		const existing = `{"${DEV_DEPS_KEY}":{"${SIZE_LIMIT_KEY}":"^11.0.0"}}`
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json(existing)) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_KEY]).toBe('^11.0.0')
+	})
+})
+/* eslint-enable dot-notation */
+
 describe('merge_package_scripts', () => {
 	const SCRIPT_KEY = 'build'
 	const SCRIPT_VAL = 'tsc --noEmit'

@@ -60,17 +60,26 @@ jobs:
       - name: Run spell check
         run: pnpm exec cspell . --dot
 
+      - name: Prepare
+        run: pnpm prepare
+
+      - name: Run type check
+        run: pnpm svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
       - name: Run prettier check
         run: pnpm exec prettier --check .
 
       - name: Run eslint check
         run: pnpm exec eslint . --cache --cache-strategy content
 
-      - name: Run type check
-        run: pnpm exec svelte-kit sync && pnpm exec svelte-check --tsconfig ./tsconfig.json --threshold error
-
       - name: Run unit tests
         run: pnpm exec vitest run
+
+      - name: Build for size check
+        run: pnpm build
+
+      - name: Check bundle size
+        run: pnpm size-limit
 
   e2e-detect:
     name: Detect E2E
@@ -159,7 +168,7 @@ jobs:
         run: pnpm build
 
       - name: Run E2E tests
-        run: pnpm test:e2e
+        run: pnpm exec playwright test
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

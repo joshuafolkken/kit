@@ -244,13 +244,18 @@ async function resolve_project_type(): Promise<ProjectType> {
 	return await prompt_project_type()
 }
 
-function merge_project_scripts(type: ProjectType): void {
-	const package_json_path = path.join(PROJECT_ROOT, 'package.json')
+function apply_package_json_merges(content: string, type: ProjectType): string {
+	if (type === 'sveltekit') return init_logic.merge_sveltekit_package_json(content)
 
+	return init_logic.merge_package_scripts(content, init_logic.get_suggested_scripts(type))
+}
+
+function merge_project_package_json(type: ProjectType): void {
+	const package_json_path = path.join(PROJECT_ROOT, 'package.json')
 	if (!existsSync(package_json_path)) return
 
 	const existing = readFileSync(package_json_path, 'utf8')
-	const merged = init_logic.merge_package_scripts(existing, init_logic.get_suggested_scripts(type))
+	const merged = apply_package_json_merges(existing, type)
 
 	if (merged === existing) {
 		console.info('  ✔ unchanged package.json')
@@ -365,7 +370,7 @@ async function main(): Promise<void> {
 	for (const action of build_file_actions(type)) execute_file_action(action)
 
 	console.info('\nPackage scripts:')
-	merge_project_scripts(type)
+	merge_project_package_json(type)
 
 	console.info('\nAI files:')
 	run_ai_copies()
