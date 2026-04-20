@@ -24,10 +24,11 @@ If `gh auth token` fails or you get a 401, re-authenticate with the `read:packag
 gh auth login --scopes read:packages
 ```
 
-**2. Install** — add the registry to `.npmrc`, then install:
+**2. Install** — add both lines to `.npmrc`, then install (after `josh init` these are managed automatically):
 
 ```
 @joshuafolkken:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
 
 ```bash

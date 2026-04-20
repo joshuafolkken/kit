@@ -7,6 +7,7 @@ type ProjectType = 'sveltekit' | 'vanilla'
 
 const NPMRC_LINES: ReadonlyArray<string> = [
 	'@joshuafolkken:registry=https://npm.pkg.github.com',
+	'//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}',
 	'engine-strict=true',
 	'minimum-release-age=1440',
 ]
