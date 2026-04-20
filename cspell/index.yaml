@@ -6,6 +6,8 @@ ignorePaths:
   - '**/.gitignore'
   - '**/pnpm-lock.yaml'
   - '**/.vscode/**'
+  - '.wrangler/**'
+  - '.coderabbit.yaml'
   #   - '**/*.d.ts'
   #   - '**/*.map'
   #   - '**/*.min.js'

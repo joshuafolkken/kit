@@ -12,7 +12,10 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 	'minimum-release-age=1440',
 ]
 
-const CSPELL_IMPORT = '"@joshuafolkken/kit/cspell"'
+const CSPELL_IMPORT: Record<ProjectType, string> = {
+	sveltekit: '"@joshuafolkken/kit/cspell/sveltekit"',
+	vanilla: '"@joshuafolkken/kit/cspell"',
+}
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
 
@@ -80,8 +83,8 @@ function generate_lefthook_config(type: ProjectType): string {
 	return `extends:\n  - ${LEFTHOOK_EXTENDS[type]}\n`
 }
 
-function generate_cspell_config(): string {
-	return `version: '0.2'\nimport:\n  - ${CSPELL_IMPORT}\nwords: []\nignorePaths: []\n`
+function generate_cspell_config(type: ProjectType): string {
+	return `version: '0.2'\nimport:\n  - ${CSPELL_IMPORT[type]}\nwords: []\nignorePaths: []\n`
 }
 
 function generate_npmrc(): string {
@@ -193,8 +196,8 @@ function get_lefthook_extends_value(type: ProjectType): string {
 	return LEFTHOOK_EXTENDS[type]
 }
 
-function get_cspell_import_value(): string {
-	return CSPELL_IMPORT
+function get_cspell_import_value(type: ProjectType): string {
+	return CSPELL_IMPORT[type]
 }
 
 function get_npmrc_lines(): ReadonlyArray<string> {
