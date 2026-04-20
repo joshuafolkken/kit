@@ -54,12 +54,12 @@ function build_tsconfig_action(type: ProjectType): FileAction {
 	}
 }
 
-function build_cspell_action(): FileAction {
+function build_cspell_action(type: ProjectType): FileAction {
 	return {
 		dest: 'cspell.config.yaml',
-		create: () => init_logic.generate_cspell_config(),
+		create: () => init_logic.generate_cspell_config(type),
 		merge: (existing) =>
-			init_logic.merge_cspell_import(existing, init_logic.get_cspell_import_value()),
+			init_logic.merge_cspell_import(existing, init_logic.get_cspell_import_value(type)),
 	}
 }
 
@@ -109,7 +109,7 @@ function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
 		{ dest: 'prettier.config.js', create: () => init_logic.generate_prettier_config() },
 		{ dest: 'playwright.config.ts', create: () => init_logic.generate_playwright_config() },
 		build_tsconfig_action(type),
-		build_cspell_action(),
+		build_cspell_action(type),
 		build_lefthook_action(type),
 		...build_vscode_actions(type),
 	]
