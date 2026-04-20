@@ -17,6 +17,8 @@ describe('get_suggested_scripts common scripts', () => {
 			expect(scripts).not.toHaveProperty('lint')
 			expect(scripts).not.toHaveProperty('check')
 			expect(scripts).not.toHaveProperty('check:ci')
+			expect(scripts).not.toHaveProperty('check:svelte')
+			expect(scripts).not.toHaveProperty('check:svelte:ci')
 			expect(scripts).not.toHaveProperty('test:unit')
 		}
 	})

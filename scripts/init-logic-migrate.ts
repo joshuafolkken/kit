@@ -37,6 +37,8 @@ const RETIRED_MANAGED_SCRIPTS = new Set<string>([
 	'latest:update',
 	'check',
 	'check:ci',
+	'check:svelte',
+	'check:svelte:ci',
 ])
 
 function migrate_jf_value(value: string): string {

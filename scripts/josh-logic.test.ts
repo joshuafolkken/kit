@@ -10,6 +10,8 @@ const PACKAGE_VERSION = (
 ).version
 
 const ENV_FILE_FLAG = '--env-file=.env'
+const CHECK_SVELTE_CMD = 'check:svelte'
+const CHECK_SVELTE_CI_CMD = 'check:svelte:ci'
 
 const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 	[
@@ -27,7 +29,8 @@ const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 			'test:e2e',
 			'test',
 			'check',
-			'check:ci',
+			CHECK_SVELTE_CMD,
+			CHECK_SVELTE_CI_CMD,
 		],
 	],
 	['Project', ['init', 'sync', 'install']],
@@ -145,12 +148,12 @@ describe('josh_logic.run_command', () => {
 		expect(josh_logic.run_command('constructor', [])).toBe(-1)
 	})
 
-	it('returns 1 for check in a non-SvelteKit project directory', () => {
-		expect(josh_logic.run_command('check', [])).toBe(1)
+	it('returns 1 for check:svelte in a non-SvelteKit project directory', () => {
+		expect(josh_logic.run_command(CHECK_SVELTE_CMD, [])).toBe(1)
 	})
 
-	it('returns 1 for check:ci in a non-SvelteKit project directory', () => {
-		expect(josh_logic.run_command('check:ci', [])).toBe(1)
+	it('returns 1 for check:svelte:ci in a non-SvelteKit project directory', () => {
+		expect(josh_logic.run_command(CHECK_SVELTE_CI_CMD, [])).toBe(1)
 	})
 })
 
@@ -165,14 +168,6 @@ describe('COMMAND_MAP shell commands', () => {
 
 		expect(shell).toContain('prettier')
 		expect(shell).toContain('pnpm')
-	})
-
-	it('check has requires_sveltekit flag', () => {
-		expect(COMMAND_MAP['check']?.requires_sveltekit).toBe(true)
-	})
-
-	it('check:ci has requires_sveltekit flag', () => {
-		expect(COMMAND_MAP['check:ci']?.requires_sveltekit).toBe(true)
 	})
 
 	it('hook:install delegates to lefthook install', () => {
@@ -201,6 +196,21 @@ describe('COMMAND_MAP shell commands', () => {
 		expect(shell[2]).toContain('test:e2e')
 	})
 	/* eslint-enable dot-notation */
+})
+
+describe('COMMAND_MAP check commands', () => {
+	it('check does not require sveltekit', () => {
+		/* eslint-disable-next-line dot-notation */
+		expect(COMMAND_MAP['check']?.requires_sveltekit).toBeUndefined()
+	})
+
+	it('check:svelte has requires_sveltekit flag', () => {
+		expect(COMMAND_MAP[CHECK_SVELTE_CMD]?.requires_sveltekit).toBe(true)
+	})
+
+	it('check:svelte:ci has requires_sveltekit flag', () => {
+		expect(COMMAND_MAP[CHECK_SVELTE_CI_CMD]?.requires_sveltekit).toBe(true)
+	})
 })
 
 describe('resolve_tsx_executable', () => {

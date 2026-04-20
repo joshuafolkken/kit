@@ -166,6 +166,8 @@ const RETIRED_SCRIPTS = [
 	'latest:update',
 	'check',
 	'check:ci',
+	'check:svelte',
+	'check:svelte:ci',
 ]
 
 describe('get_suggested_scripts', () => {

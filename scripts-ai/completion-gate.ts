@@ -1,5 +1,5 @@
 const GATE_LINT = 'pnpm run lint'
-const GATE_CHECK_CI = 'pnpm run check:ci'
+const GATE_CHECK_CI = 'pnpm run check:svelte:ci'
 const GATE_CSPELL = 'pnpm cspell:dot'
 const GATE_TEST_UNIT = 'pnpm test:unit --run'
 

@@ -8,15 +8,15 @@ import {
 } from './completion-gate'
 
 describe('completion gate steps', () => {
-	it('includes the strict CI type-check (check:ci) command', () => {
+	it('includes the CI type-check (check:svelte:ci) command', () => {
 		expect(COMPLETION_GATE_STEPS).toContain(GATE_CHECK_CI)
 	})
 
-	it('uses check:ci (svelte-check), not the incremental fast variant', () => {
-		const check_step = COMPLETION_GATE_STEPS.find((step) => step.includes('check'))
+	it('uses check:svelte:ci (svelte-check), not the incremental fast variant', () => {
+		const check_step = COMPLETION_GATE_STEPS.find((step) => step.includes('check:svelte:ci'))
 
 		expect(check_step).toBe(GATE_CHECK_CI)
-		expect(COMPLETION_GATE_STEPS).not.toContain('pnpm run check')
+		expect(COMPLETION_GATE_STEPS).not.toContain('pnpm run check:svelte')
 	})
 
 	it('runs lint before the type-check', () => {

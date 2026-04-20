@@ -73,15 +73,16 @@ Scripts added for all project types:
 | `lefthook:push`      | `lefthook run pre-push`                           |
 | `main:sync`          | `git checkout main && git pull`                   |
 | `main:merge`         | `git pull origin main`                            |
+| `check`              | `pnpm exec tsc --noEmit`                          |
 
 Additional scripts added for SvelteKit projects:
 
-| Script     | Command                                                                        |
-| ---------- | ------------------------------------------------------------------------------ |
-| `check`    | `svelte-kit sync && svelte-check --tsconfig ./tsconfig.json`                   |
-| `check:ci` | `svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error` |
+| Script            | Command                                                      |
+| ----------------- | ------------------------------------------------------------ |
+| `check:svelte`    | `svelte-kit sync && svelte-fast-check --incremental`         |
+| `check:svelte:ci` | `svelte-kit sync && svelte-check --tsconfig ./tsconfig.json` |
 
-Retired scripts (previously managed, now removed): `git`, `git:followup`, `telegram:test`, `audit:security`, `prep`, `issue:prep`, `prevent-main-commit`, `check-commit-message`, `version:*`, `overrides:check`.
+Retired scripts (previously managed, now removed): `git`, `git:followup`, `telegram:test`, `audit:security`, `prep`, `issue:prep`, `prevent-main-commit`, `check-commit-message`, `version:*`, `overrides:check`, `check:ci`.
 
 ## AI files
 

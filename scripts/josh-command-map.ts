@@ -104,22 +104,23 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 		category: 'Development',
 	},
 	check: {
+		shell: [...PE, 'tsc', '--noEmit'],
+		description: 'Type-check TypeScript project',
+		category: 'Development',
+	},
+	'check:svelte': {
+		shell: ['sh', '-c', 'pnpm exec svelte-kit sync && pnpm exec svelte-fast-check --incremental'],
+		description: 'Type-check SvelteKit project (fast incremental)',
+		category: 'Development',
+		requires_sveltekit: true,
+	},
+	'check:svelte:ci': {
 		shell: [
 			'sh',
 			'-c',
 			'pnpm exec svelte-kit sync && pnpm exec svelte-check --tsconfig ./tsconfig.json',
 		],
-		description: 'Type-check SvelteKit project',
-		category: 'Development',
-		requires_sveltekit: true,
-	},
-	'check:ci': {
-		shell: [
-			'sh',
-			'-c',
-			'pnpm exec svelte-kit sync && pnpm exec svelte-check --tsconfig ./tsconfig.json --threshold error',
-		],
-		description: 'Type-check SvelteKit project (CI strict mode)',
+		description: 'Type-check SvelteKit project (CI)',
 		category: 'Development',
 		requires_sveltekit: true,
 	},
