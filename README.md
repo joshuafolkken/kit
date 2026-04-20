@@ -26,7 +26,7 @@ gh auth login --scopes read:packages
 
 **2. Install** — add both lines to `.npmrc`, then install (after `josh init` these are managed automatically):
 
-```
+```ini
 @joshuafolkken:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```

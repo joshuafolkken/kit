@@ -48,6 +48,8 @@ jobs:
         run: pnpm dlx @aikidosec/safe-chain setup-ci
 
       - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run security audit
@@ -140,6 +142,8 @@ jobs:
         run: pnpm dlx @aikidosec/safe-chain setup-ci
 
       - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Install Playwright system dependencies
