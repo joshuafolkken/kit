@@ -127,7 +127,7 @@ Before every `git commit` — including follow-up commits on the same branch —
 ## Git Rules
 
 - **No commits** unless explicitly requested by the user
-- **No PR merges, branch deletions, force pushes, or other shared-state mutations** unless explicitly requested in the current turn. `pnpm josh followup` completing with the PR still OPEN is the expected end state — do not run `gh pr merge` on your own. See `prompts/collaboration-workflow.md` → "指示されていない行動は取らない" for the full rule.
+- **No PR merges, branch deletions, force pushes, or other shared-state mutations** unless explicitly requested in the current turn. The default end state is PR still OPEN — do not run `gh pr merge` on your own. **Exception**: invoking `fullrun` or `fullrun new` is explicit authorization to merge; use `pnpm josh followup --merge` in that flow. See `prompts/collaboration-workflow.md` → "指示されていない行動は取らない" for the full rule.
 - For git operations: use `pnpm josh git`
 - **Start-of-conversation git status is a stale snapshot.** The `gitStatus` block in the environment preamble is captured once at session start and never refreshes. Before acting on any assumption about working-tree / index / stash / branch state (including "there are uncommitted changes", "staged files remain", "branch is behind"), run `git status` (and `git stash list` if relevant) live first. Never report state, propose a stash/checkout/reset plan, or ask the user to confirm cleanup based on the snapshot alone.
 
