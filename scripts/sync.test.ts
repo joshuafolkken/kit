@@ -92,6 +92,56 @@ describe('sync_file_mapping', () => {
 	})
 })
 
+const WORKSPACE_YAML_NAME = 'pnpm-workspace.yaml'
+const WORKSPACE_SRC = path.join(TEST_DIR, 'src', WORKSPACE_YAML_NAME)
+const WORKSPACE_DEST = path.join(TEST_DIR, 'dest', WORKSPACE_YAML_NAME)
+const TEMPLATE_CONTENT =
+	'onlyBuiltDependencies:\n  - esbuild\n\nminimumReleaseAgeExclude:\n  - vite\n'
+
+describe('sync_workspace_yaml', () => {
+	it('writes template content when dest does not exist', () => {
+		writeFileSync(WORKSPACE_SRC, TEMPLATE_CONTENT)
+		sync.sync_workspace_yaml(WORKSPACE_SRC, WORKSPACE_DEST)
+
+		expect(readFileSync(WORKSPACE_DEST, 'utf8')).toBe(TEMPLATE_CONTENT)
+	})
+
+	it('preserves user-defined keys when dest already exists', () => {
+		const existing = 'packages:\n  - "@joshuafolkken/kit"\nonlyBuiltDependencies:\n  - esbuild\n'
+
+		writeFileSync(WORKSPACE_SRC, TEMPLATE_CONTENT)
+		writeFileSync(WORKSPACE_DEST, existing)
+		sync.sync_workspace_yaml(WORKSPACE_SRC, WORKSPACE_DEST)
+
+		const result = readFileSync(WORKSPACE_DEST, 'utf8')
+
+		expect(result).toContain('packages:')
+		expect(result).toContain('onlyBuiltDependencies:')
+	})
+
+	it('creates destination directory when workspace dest path does not exist', () => {
+		const nested = path.join(TEST_DIR, 'nested', 'dir', WORKSPACE_YAML_NAME)
+
+		writeFileSync(WORKSPACE_SRC, TEMPLATE_CONTENT)
+		sync.sync_workspace_yaml(WORKSPACE_SRC, nested)
+
+		expect(existsSync(nested)).toBe(true)
+	})
+
+	it('overwrites kit-managed keys with template values', () => {
+		const existing = 'onlyBuiltDependencies:\n  - old-value\n'
+
+		writeFileSync(WORKSPACE_SRC, TEMPLATE_CONTENT)
+		writeFileSync(WORKSPACE_DEST, existing)
+		sync.sync_workspace_yaml(WORKSPACE_SRC, WORKSPACE_DEST)
+
+		const result = readFileSync(WORKSPACE_DEST, 'utf8')
+
+		expect(result).toContain('  - esbuild')
+		expect(result).not.toContain('old-value')
+	})
+})
+
 const NO_REFERENCES_CONTENT = 'no references here\n'
 
 describe('sync_ai_file', () => {

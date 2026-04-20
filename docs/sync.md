@@ -6,11 +6,11 @@
 pnpm josh sync
 ```
 
-Unlike `josh init` (which skips existing files), `josh sync` **always overwrites** — it is designed for keeping managed files up to date.
+Unlike `josh init` (which skips existing files), `josh sync` is designed for keeping managed files up to date. Most managed files are overwritten; `pnpm-workspace.yaml` is merged (see below).
 
 ## What gets synced
 
-### AI files (always overwritten)
+### AI files (overwritten)
 
 These files are copied verbatim from the package, with one path transformation applied (see below):
 
@@ -18,14 +18,17 @@ These files are copied verbatim from the package, with one path transformation a
 CLAUDE.md           AGENTS.md           GEMINI.md
 .cursorrules        .coderabbit.yaml    .gitattributes
 .mcp.json           .ncurc.json         .prettierignore
-SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
-wrangler.jsonc
+SECURITY.md         tsconfig.sonar.json wrangler.jsonc
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/production.yml
 .github/workflows/sonar-cube.yml
 .github/pull_request_template.md
 ```
+
+### `pnpm-workspace.yaml` (merged)
+
+`pnpm-workspace.yaml` is **merged**, not overwritten. Kit-managed keys (`onlyBuiltDependencies`, `minimumReleaseAgeExclude`) are updated from the package template; all other top-level keys (e.g. `packages:`) you have added are preserved and appended after the kit-managed content.
 
 ### File mappings (overwritten if source exists)
 

@@ -7,6 +7,7 @@ import { init_logic } from './init-logic'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PROJECT_ROOT = process.cwd()
+const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -30,6 +31,29 @@ function sync_file_mapping(source_path: string, destination_path: string): void 
 	mkdirSync(path.dirname(destination_path), { recursive: true })
 	cpSync(source_path, destination_path)
 	console.info(`  ✔ synced    ${path.basename(destination_path)}`)
+}
+
+function sync_workspace_yaml(template_path: string, destination_path: string): void {
+	const template = readFileSync(template_path, 'utf8')
+	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
+	const merged = init_logic.merge_workspace_yaml(existing, template)
+
+	mkdirSync(path.dirname(destination_path), { recursive: true })
+	writeFileSync(destination_path, merged)
+}
+
+function sync_ai_copy_file(filename: string): void {
+	if (filename === WORKSPACE_YAML) {
+		sync_workspace_yaml(
+			path.join(PACKAGE_DIR, WORKSPACE_YAML),
+			path.join(PROJECT_ROOT, WORKSPACE_YAML),
+		)
+		console.info(`  ✔ synced    ${WORKSPACE_YAML}`)
+
+		return
+	}
+
+	sync_file(filename)
 }
 
 function sync_directory(directory_name: string): void {
@@ -95,7 +119,7 @@ function main(): void {
 	console.info('AI files:')
 
 	for (const filename of init_logic.get_ai_copy_files()) {
-		sync_file(filename)
+		sync_ai_copy_file(filename)
 	}
 
 	for (const { src, dest } of init_logic.get_ai_copy_file_mappings()) {
@@ -113,6 +137,6 @@ function main(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const sync = { sync_file_mapping, sync_sonar_file_write, sync_ai_file }
+const sync = { sync_file_mapping, sync_sonar_file_write, sync_ai_file, sync_workspace_yaml }
 
 export { sync }
