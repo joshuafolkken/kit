@@ -97,6 +97,7 @@ The following files are **copied from the package** on first run. If a file alre
 
 ```text
 CLAUDE.md           AGENTS.md           GEMINI.md
+CODE_OF_CONDUCT.md
 .cursorrules        .coderabbit.yaml    .gitattributes
 .mcp.json           .ncurc.json         .prettierignore
 SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
@@ -106,6 +107,7 @@ wrangler.jsonc
 .github/workflows/production.yml
 .github/workflows/sonar-cube.yml
 .github/pull_request_template.md
+.github/release.yml
 .gitignore          (from templates/gitignore)
 sonar-project.properties  (generated from GitHub repo name)
 ```
