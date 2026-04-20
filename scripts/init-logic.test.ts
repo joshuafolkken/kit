@@ -80,13 +80,14 @@ describe('generate_playwright_config', () => {
 	})
 })
 
-describe('get_ai_copy_files', () => {
-	it('includes all AI markdown files', () => {
+describe('get_ai_copy_files - AI and community files', () => {
+	it('includes all AI markdown and community files', () => {
 		const result = init_logic.get_ai_copy_files()
 
 		expect(result).toContain('CLAUDE.md')
 		expect(result).toContain('AGENTS.md')
 		expect(result).toContain('GEMINI.md')
+		expect(result).toContain('CODE_OF_CONDUCT.md')
 	})
 
 	it('includes GitHub workflow and template files (except ci.yml which uses file mapping)', () => {
@@ -97,8 +98,11 @@ describe('get_ai_copy_files', () => {
 		expect(result).toContain('.github/workflows/production.yml')
 		expect(result).toContain('.github/workflows/sonar-cube.yml')
 		expect(result).toContain('.github/pull_request_template.md')
+		expect(result).toContain('.github/release.yml')
 	})
+})
 
+describe('get_ai_copy_files - dotfiles and config', () => {
 	it('includes dotfiles and markdown files', () => {
 		const result = init_logic.get_ai_copy_files()
 

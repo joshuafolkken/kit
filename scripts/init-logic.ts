@@ -24,6 +24,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
 	'AGENTS.md',
 	'GEMINI.md',
+	'CODE_OF_CONDUCT.md',
 	'.cursorrules',
 	'.coderabbit.yaml',
 	'.gitattributes',
@@ -38,6 +39,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-cube.yml',
 	'.github/pull_request_template.md',
+	'.github/release.yml',
 ]
 
 interface FileCopyMapping {
