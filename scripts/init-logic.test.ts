@@ -85,10 +85,28 @@ describe('generate_vite_config', () => {
 		expect(init_logic.generate_vite_config()).toContain("from 'rollup-plugin-visualizer'")
 	})
 
-	it('contains visualizer plugin call', () => {
+	it('contains UserConfig and ConfigEnv type import', () => {
 		expect(init_logic.generate_vite_config()).toContain(
-			"visualizer({ open: true, filename: 'stats.html' })",
+			"import type { UserConfig, ConfigEnv } from 'vite'",
 		)
+	})
+
+	it('contains client visualizer entry with apply and stats-client.html', () => {
+		const result = init_logic.generate_vite_config()
+
+		expect(result).toContain("filename: 'stats-client.html'")
+		expect(result).toContain("command === 'build' && !config.build?.ssr")
+	})
+
+	it('contains server visualizer entry with apply and stats-server.html', () => {
+		const result = init_logic.generate_vite_config()
+
+		expect(result).toContain("filename: 'stats-server.html'")
+		expect(result).toContain("command === 'build' && !!config.build?.ssr")
+	})
+
+	it('uses CI-aware open flag', () => {
+		expect(init_logic.generate_vite_config()).toContain("open: !process.env['CI']")
 	})
 })
 

@@ -192,7 +192,8 @@ export default defineConfig({
 \tplugins: [sveltekit()]
 })
 `
-const VISUALIZER_CALL = "visualizer({ open: true, filename: 'stats.html' })"
+const STATS_CLIENT = 'stats-client.html'
+const STATS_SERVER = 'stats-server.html'
 
 describe('merge_vite_config', () => {
 	it('adds visualizer import', () => {
@@ -201,10 +202,24 @@ describe('merge_vite_config', () => {
 		expect(result).toContain("import { visualizer } from 'rollup-plugin-visualizer'")
 	})
 
-	it('adds visualizer plugin call to plugins array', () => {
+	it('adds UserConfig and ConfigEnv type import', () => {
 		const result = init_logic.merge_vite_config(STANDARD_VITE_CONFIG)
 
-		expect(result).toContain(VISUALIZER_CALL)
+		expect(result).toContain("import type { UserConfig, ConfigEnv } from 'vite'")
+	})
+
+	it('adds client visualizer entry with stats-client.html', () => {
+		const result = init_logic.merge_vite_config(STANDARD_VITE_CONFIG)
+
+		expect(result).toContain(`filename: '${STATS_CLIENT}'`)
+		expect(result).toContain("command === 'build' && !config.build?.ssr")
+	})
+
+	it('adds server visualizer entry with stats-server.html', () => {
+		const result = init_logic.merge_vite_config(STANDARD_VITE_CONFIG)
+
+		expect(result).toContain(`filename: '${STATS_SERVER}'`)
+		expect(result).toContain("command === 'build' && !!config.build?.ssr")
 	})
 
 	it('is idempotent when visualizer already present', () => {
@@ -218,19 +233,22 @@ describe('merge_vite_config', () => {
 
 		expect(init_logic.merge_vite_config(content)).toBe(content)
 	})
+})
 
+describe('merge_vite_config edge cases', () => {
 	it('adds visualizer to empty plugins array', () => {
 		const content = `import { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [] })\n`
 		const result = init_logic.merge_vite_config(content)
 
-		expect(result).toContain("plugins: [visualizer({ open: true, filename: 'stats.html' })]")
+		expect(result).toContain(STATS_CLIENT)
+		expect(result).toContain(STATS_SERVER)
 	})
 
 	it('handles plugins array with nested brackets', () => {
 		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [sveltekit(), tailwindcss({ content: ['./src/**/*'] })] })\n`
 		const result = init_logic.merge_vite_config(content)
 
-		expect(result).toContain(VISUALIZER_CALL)
+		expect(result).toContain(STATS_CLIENT)
 		expect(result).toContain("tailwindcss({ content: ['./src/**/*'] })")
 	})
 
@@ -239,6 +257,22 @@ describe('merge_vite_config', () => {
 		const result = init_logic.merge_vite_config(content)
 
 		expect(result).toBe(content)
+	})
+
+	it('does not produce double comma when last plugin has inline trailing comma', () => {
+		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [sveltekit(),] })\n`
+		const result = init_logic.merge_vite_config(content)
+
+		expect(result).not.toContain(',,')
+		expect(result).toContain(STATS_CLIENT)
+	})
+
+	it('does not produce double comma when multiline plugins array has trailing comma', () => {
+		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({\n\tplugins: [\n\t\tsveltekit(),\n\t]\n})\n`
+		const result = init_logic.merge_vite_config(content)
+
+		expect(result).not.toContain(',,')
+		expect(result).toContain(STATS_CLIENT)
 	})
 })
 /* eslint-enable dot-notation */
