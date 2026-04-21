@@ -46,7 +46,8 @@ storybook-static
 .eslintcache
 
 # Bundle analysis
-stats.html
+stats-client.html
+stats-server.html
 
 # Playwright
 playwright-report
