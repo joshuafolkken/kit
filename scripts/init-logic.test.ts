@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
+
+const PACKAGE_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 const GITIGNORE_DEST = '.gitignore'
 const CI_YML_DEST = '.github/workflows/ci.yml'
@@ -272,6 +277,23 @@ describe('get_npmrc_lines', () => {
 		expect(init_logic.get_npmrc_lines()).toContain(
 			'//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}',
 		)
+	})
+})
+
+describe('gitignore template content', () => {
+	const GITIGNORE_TEMPLATE_PATH = path.join(PACKAGE_ROOT, 'templates', 'gitignore')
+	const GITIGNORE_CONTENT = readFileSync(GITIGNORE_TEMPLATE_PATH, 'utf8')
+
+	it('contains stats-client.html for client bundle analysis', () => {
+		expect(GITIGNORE_CONTENT).toContain('stats-client.html')
+	})
+
+	it('contains stats-server.html for server bundle analysis', () => {
+		expect(GITIGNORE_CONTENT).toContain('stats-server.html')
+	})
+
+	it('does not contain bare stats.html', () => {
+		expect(GITIGNORE_CONTENT).not.toContain('\nstats.html\n')
 	})
 })
 
