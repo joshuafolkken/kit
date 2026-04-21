@@ -16,6 +16,7 @@ const PACKAGE_VERSION = (
 ).version
 
 const ENV_FILE_FLAG = '--env-file=.env'
+const ALIAS_PAD_WIDTH = 2
 const CHECK_SVELTE_CMD = 'check:svelte'
 const CHECK_SVELTE_CI_CMD = 'check:svelte:ci'
 const CHECK_COMMIT_MESSAGE_CMD = 'check-commit-message'
@@ -58,6 +59,14 @@ const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 	],
 	['AI tools', ['prep', 'issue']],
 ])
+
+function assert_positions_in_order(positions: ReadonlyArray<number>): void {
+	for (const pos of positions) expect(pos).toBeGreaterThanOrEqual(0)
+
+	for (let index = 1; index < positions.length; index++) {
+		expect(positions[index]).toBeGreaterThan(positions[index - 1] ?? -1)
+	}
+}
 
 const EXPECTED_CATEGORY_ORDER = [...EXPECTED_COMMANDS_BY_CATEGORY.keys()]
 const EXPECTED_COMMANDS = [...EXPECTED_COMMANDS_BY_CATEGORY.values()].flat()
@@ -112,7 +121,7 @@ describe('josh_logic.format_help', () => {
 	it('shows alias before full name for aliased commands', () => {
 		const help = josh_logic.format_help()
 
-		expect(help).toContain('l, lint')
+		expect(help).toContain('l,  lint')
 		expect(help).toContain('tu, test:unit')
 		expect(help).toContain(`cm, ${CHECK_COMMIT_MESSAGE_CMD}`)
 	})
@@ -137,15 +146,12 @@ describe('josh_logic.format_help order', () => {
 		for (const cmds of EXPECTED_COMMANDS_BY_CATEGORY.values()) {
 			const positions = cmds.map((cmd) => {
 				const alias = cmd_to_alias.get(cmd)
+				const prefix = alias ? `${alias}, `.padEnd(ALIAS_PAD_WIDTH + ALIAS_PAD_WIDTH) : ''
 
-				return alias ? help.indexOf(`\n  ${alias}, ${cmd}`) : help.indexOf(`\n  ${cmd}`)
+				return help.indexOf(`\n  ${prefix}${cmd}`)
 			})
 
-			for (let index = 1; index < positions.length; index++) {
-				const previous = positions[index - 1] ?? -1
-
-				expect(positions[index]).toBeGreaterThan(previous)
-			}
+			assert_positions_in_order(positions)
 		}
 	})
 })

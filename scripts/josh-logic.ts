@@ -12,6 +12,7 @@ import {
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const COLUMN_WIDTH = 26
+const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
 const SVELTE_KIT_DEP = '@sveltejs/kit'
 const NODE_MODULES = 'node_modules'
@@ -63,9 +64,9 @@ function resolve_alias(cmd: string): string {
 }
 
 function format_command_line(cmd: string, entry: CommandEntry, alias?: string): string {
-	const label = alias ? `${alias}, ${cmd}` : cmd
+	const prefix = alias ? `${alias}, `.padEnd(ALIAS_PAD_WIDTH + ALIAS_PAD_WIDTH) : ''
 
-	return `  ${label.padEnd(COLUMN_WIDTH)}${entry.description}`
+	return `  ${(prefix + cmd).padEnd(COLUMN_WIDTH)}${entry.description}`
 }
 
 function format_category_section(
