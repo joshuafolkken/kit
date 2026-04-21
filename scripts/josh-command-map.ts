@@ -240,5 +240,45 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
+const ALIASES: Record<string, string> = {
+	l: 'lint',
+	lp: 'lint:prettier',
+	le: 'lint:eslint',
+	f: 'format',
+	fp: 'format:prettier',
+	fe: 'format:eslint',
+	sp: 'cspell',
+	sd: 'cspell:dot',
+	t: 'test',
+	tu: 'test:unit',
+	te: 'test:e2e',
+	c: 'check',
+	sv: 'check:svelte',
+	sc: 'check:svelte:ci',
+	i: 'init',
+	sy: 'sync',
+	il: 'install',
+	g: 'git',
+	fu: 'followup',
+	nf: 'notify',
+	ms: 'main:sync',
+	mm: 'main:merge',
+	bp: 'bump',
+	v: 'version',
+	ov: 'overrides',
+	a: 'audit',
+	u: 'latest',
+	lc: 'latest:corepack',
+	lu: 'latest:update',
+	pm: 'prevent-main-commit',
+	cm: 'check-commit-message',
+	hi: 'hook:install',
+	hu: 'hook:uninstall',
+	hc: 'hook:commit',
+	hp: 'hook:push',
+	pp: 'prep',
+	is: 'issue',
+}
+
 export type { CommandCategory, CommandEntry }
-export { CATEGORY_ORDER, COMMAND_MAP }
+export { ALIASES, CATEGORY_ORDER, COMMAND_MAP }

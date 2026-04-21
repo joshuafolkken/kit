@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { COMMAND_MAP, josh_logic, resolve_tsx_executable } from './josh-logic'
+import {
+	ALIASES,
+	COMMAND_MAP,
+	josh_logic,
+	resolve_alias,
+	resolve_tsx_executable,
+} from './josh-logic'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PACKAGE_VERSION = (
@@ -10,8 +16,11 @@ const PACKAGE_VERSION = (
 ).version
 
 const ENV_FILE_FLAG = '--env-file=.env'
+const ALIAS_PAD_WIDTH = 2
 const CHECK_SVELTE_CMD = 'check:svelte'
 const CHECK_SVELTE_CI_CMD = 'check:svelte:ci'
+const CHECK_COMMIT_MESSAGE_CMD = 'check-commit-message'
+const UNKNOWN_CMD = 'not-a-command'
 
 const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 	[
@@ -41,7 +50,7 @@ const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 		'Git hooks',
 		[
 			'prevent-main-commit',
-			'check-commit-message',
+			CHECK_COMMIT_MESSAGE_CMD,
 			'hook:install',
 			'hook:uninstall',
 			'hook:commit',
@@ -50,6 +59,14 @@ const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 	],
 	['AI tools', ['prep', 'issue']],
 ])
+
+function assert_positions_in_order(positions: ReadonlyArray<number>): void {
+	for (const pos of positions) expect(pos).toBeGreaterThanOrEqual(0)
+
+	for (let index = 1; index < positions.length; index++) {
+		expect(positions[index]).toBeGreaterThan(positions[index - 1] ?? -1)
+	}
+}
 
 const EXPECTED_CATEGORY_ORDER = [...EXPECTED_COMMANDS_BY_CATEGORY.keys()]
 const EXPECTED_COMMANDS = [...EXPECTED_COMMANDS_BY_CATEGORY.values()].flat()
@@ -101,6 +118,16 @@ describe('josh_logic.format_help', () => {
 		expect(josh_logic.format_help()).toContain('Usage: josh <command>')
 	})
 
+	it('shows alias before full name for aliased commands', () => {
+		const help = josh_logic.format_help()
+
+		expect(help).toContain('l,  lint')
+		expect(help).toContain('tu, test:unit')
+		expect(help).toContain(`cm, ${CHECK_COMMIT_MESSAGE_CMD}`)
+	})
+})
+
+describe('josh_logic.format_help order', () => {
 	it('includes all category headers in correct order', () => {
 		const help = josh_logic.format_help()
 		const positions = EXPECTED_CATEGORY_ORDER.map((cat) => help.indexOf(cat))
@@ -114,16 +141,63 @@ describe('josh_logic.format_help', () => {
 
 	it('lists commands within each category in expected order', () => {
 		const help = josh_logic.format_help()
+		const cmd_to_alias = new Map(Object.entries(ALIASES).map(([alias, cmd]) => [cmd, alias]))
 
 		for (const cmds of EXPECTED_COMMANDS_BY_CATEGORY.values()) {
-			const positions = cmds.map((cmd) => help.indexOf(`\n  ${cmd} `))
+			const positions = cmds.map((cmd) => {
+				const alias = cmd_to_alias.get(cmd)
+				const prefix = alias ? `${alias}, `.padEnd(ALIAS_PAD_WIDTH + ALIAS_PAD_WIDTH) : ''
 
-			for (let index = 1; index < positions.length; index++) {
-				const previous = positions[index - 1] ?? -1
+				return help.indexOf(`\n  ${prefix}${cmd}`)
+			})
 
-				expect(positions[index]).toBeGreaterThan(previous)
-			}
+			assert_positions_in_order(positions)
 		}
+	})
+})
+
+describe('ALIASES', () => {
+	it('every alias target exists in COMMAND_MAP', () => {
+		for (const cmd of Object.values(ALIASES)) {
+			expect(COMMAND_MAP).toHaveProperty(cmd)
+		}
+	})
+
+	it('has no duplicate alias keys', () => {
+		const keys = Object.keys(ALIASES)
+
+		expect(new Set(keys).size).toBe(keys.length)
+	})
+
+	it('every command in COMMAND_MAP has an alias', () => {
+		const aliased_commands = new Set(Object.values(ALIASES))
+
+		for (const cmd of Object.keys(COMMAND_MAP)) {
+			expect(aliased_commands.has(cmd)).toBe(true)
+		}
+	})
+})
+
+describe('resolve_alias', () => {
+	it('resolves 1-char alias to full command name', () => {
+		expect(resolve_alias('l')).toBe('lint')
+		expect(resolve_alias('t')).toBe('test')
+		expect(resolve_alias('g')).toBe('git')
+	})
+
+	it('resolves 2-char alias to full command name', () => {
+		expect(resolve_alias('tu')).toBe('test:unit')
+		expect(resolve_alias('sv')).toBe(CHECK_SVELTE_CMD)
+		expect(resolve_alias('cm')).toBe(CHECK_COMMIT_MESSAGE_CMD)
+	})
+
+	it('returns input unchanged for full command names', () => {
+		expect(resolve_alias('lint')).toBe('lint')
+		expect(resolve_alias('test:unit')).toBe('test:unit')
+	})
+
+	it('returns input unchanged for unknown strings', () => {
+		expect(resolve_alias(UNKNOWN_CMD)).toBe(UNKNOWN_CMD)
 	})
 })
 
@@ -154,6 +228,10 @@ describe('josh_logic.run_command', () => {
 
 	it('returns 1 for check:svelte:ci in a non-SvelteKit project directory', () => {
 		expect(josh_logic.run_command(CHECK_SVELTE_CI_CMD, [])).toBe(1)
+	})
+
+	it('resolves alias and does not return -1 for valid alias', () => {
+		expect(josh_logic.run_command('sc', [])).toBe(1)
 	})
 })
 

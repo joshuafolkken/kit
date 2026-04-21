@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+	ALIASES,
 	CATEGORY_ORDER,
 	COMMAND_MAP,
 	type CommandCategory,
@@ -10,7 +11,8 @@ import {
 } from './josh-command-map'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const COLUMN_WIDTH = 24
+const COLUMN_WIDTH = 26
+const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
 const SVELTE_KIT_DEP = '@sveltejs/kit'
 const NODE_MODULES = 'node_modules'
@@ -50,15 +52,31 @@ function is_sveltekit_project(): boolean {
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`
 const USAGE = 'Usage: josh <command> [options]'
 
-function format_command_line(cmd: string, entry: CommandEntry): string {
-	return `  ${cmd.padEnd(COLUMN_WIDTH)}${entry.description}`
+function build_alias_lookup(): Map<string, string> {
+	const lookup = new Map<string, string>()
+	for (const [alias, cmd] of Object.entries(ALIASES)) lookup.set(cmd, alias)
+
+	return lookup
+}
+
+function resolve_alias(cmd: string): string {
+	return Object.hasOwn(ALIASES, cmd) ? (ALIASES[cmd] ?? cmd) : cmd
+}
+
+function format_command_line(cmd: string, entry: CommandEntry, alias?: string): string {
+	const prefix = alias ? `${alias}, `.padEnd(ALIAS_PAD_WIDTH + ALIAS_PAD_WIDTH) : ''
+
+	return `  ${(prefix + cmd).padEnd(COLUMN_WIDTH)}${entry.description}`
 }
 
 function format_category_section(
 	category: CommandCategory,
 	entries: Array<[string, CommandEntry]>,
+	alias_lookup: Map<string, string>,
 ): string {
-	const lines = entries.map(([cmd, entry]) => format_command_line(cmd, entry))
+	const lines = entries.map(([cmd, entry]) =>
+		format_command_line(cmd, entry, alias_lookup.get(cmd)),
+	)
 
 	return [`${category}:`, ...lines].join('\n')
 }
@@ -72,8 +90,9 @@ function format_help(): string {
 		by_category.get(entry.category)?.push([cmd, entry])
 	}
 
+	const alias_lookup = build_alias_lookup()
 	const sections = CATEGORY_ORDER.map((cat) =>
-		format_category_section(cat, by_category.get(cat) ?? []),
+		format_category_section(cat, by_category.get(cat) ?? [], alias_lookup),
 	)
 
 	return [HEADER, '', sections.join('\n\n'), '', USAGE].join('\n')
@@ -119,10 +138,11 @@ function run_script_entry(entry: CommandEntry, subcommand_arguments: Array<strin
 }
 
 function run_command(cmd: string, subcommand_arguments: Array<string>): number {
-	const entry = Object.hasOwn(COMMAND_MAP, cmd) ? COMMAND_MAP[cmd] : undefined
+	const resolved = resolve_alias(cmd)
+	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
 
 	if (!entry) return -1
-	if (is_sveltekit_guard_failed(cmd, entry)) return 1
+	if (is_sveltekit_guard_failed(resolved, entry)) return 1
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
 	return run_script_entry(entry, subcommand_arguments)
@@ -131,5 +151,5 @@ function run_command(cmd: string, subcommand_arguments: Array<string>): number {
 const josh_logic = { format_help, run_command }
 
 export type { CommandEntry } from './josh-command-map'
-export { COMMAND_MAP } from './josh-command-map'
-export { josh_logic, resolve_tsx_executable }
+export { ALIASES, COMMAND_MAP } from './josh-command-map'
+export { josh_logic, resolve_alias, resolve_tsx_executable }
