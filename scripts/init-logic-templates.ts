@@ -33,6 +33,15 @@ export default create_playwright_config({
 })
 `
 
+const VITE_CONFIG_SVELTEKIT = `import { visualizer } from 'rollup-plugin-visualizer'
+import { sveltekit } from '@sveltejs/kit/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+\tplugins: [sveltekit(), visualizer({ open: true, filename: 'stats.html' })],
+})
+`
+
 function generate_eslint_config(type: ProjectType): string {
 	return type === 'sveltekit' ? ESLINT_SVELTEKIT : ESLINT_VANILLA
 }
@@ -45,10 +54,15 @@ function generate_playwright_config(): string {
 	return PLAYWRIGHT_CONFIG
 }
 
+function generate_vite_config(): string {
+	return VITE_CONFIG_SVELTEKIT
+}
+
 const init_logic_templates = {
 	generate_eslint_config,
 	generate_prettier_config,
 	generate_playwright_config,
+	generate_vite_config,
 }
 
 export { init_logic_templates }
