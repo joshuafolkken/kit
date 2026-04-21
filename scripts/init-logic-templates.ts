@@ -33,12 +33,25 @@ export default create_playwright_config({
 })
 `
 
-const VITE_CONFIG_SVELTEKIT = `import { visualizer } from 'rollup-plugin-visualizer'
+const VITE_CONFIG_SVELTEKIT = `import type { UserConfig, ConfigEnv } from 'vite'
+import { visualizer } from 'rollup-plugin-visualizer'
 import { sveltekit } from '@sveltejs/kit/vite'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-\tplugins: [sveltekit(), visualizer({ open: true, filename: 'stats.html' })],
+\tplugins: [
+\t\tsveltekit(),
+\t\t{
+\t\t\t...visualizer({ open: !process.env['CI'], filename: 'stats-client.html' }),
+\t\t\tapply: (config: UserConfig, { command }: ConfigEnv) =>
+\t\t\t\tcommand === 'build' && !config.build?.ssr,
+\t\t},
+\t\t{
+\t\t\t...visualizer({ open: !process.env['CI'], filename: 'stats-server.html' }),
+\t\t\tapply: (config: UserConfig, { command }: ConfigEnv) =>
+\t\t\t\tcommand === 'build' && !!config.build?.ssr,
+\t\t},
+\t],
 })
 `
 

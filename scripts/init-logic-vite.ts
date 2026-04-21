@@ -1,5 +1,10 @@
 const VISUALIZER_IMPORT = "import { visualizer } from 'rollup-plugin-visualizer'"
-const VISUALIZER_CALL = "visualizer({ open: true, filename: 'stats.html' })"
+const VISUALIZER_TYPE_IMPORT = "import type { UserConfig, ConfigEnv } from 'vite'"
+const VISUALIZER_CLIENT =
+	"{\n\t\t...visualizer({ open: !process.env['CI'], filename: 'stats-client.html' }),\n\t\tapply: (config: UserConfig, { command }: ConfigEnv) =>\n\t\t\tcommand === 'build' && !config.build?.ssr,\n\t}"
+const VISUALIZER_SERVER =
+	"{\n\t\t...visualizer({ open: !process.env['CI'], filename: 'stats-server.html' }),\n\t\tapply: (config: UserConfig, { command }: ConfigEnv) =>\n\t\t\tcommand === 'build' && !!config.build?.ssr,\n\t}"
+const VISUALIZER_PLUGINS = `${VISUALIZER_CLIENT},\n\t${VISUALIZER_SERVER}`
 const VISUALIZER_IMPORT_RE = /from ['"]rollup-plugin-visualizer['"]/u
 
 function find_last_import_pos(content: string): number {
@@ -30,7 +35,7 @@ function find_plugins_bracket_close(content: string, open_pos: number): number {
 function inject_visualizer_import(content: string): string {
 	const pos = find_last_import_pos(content)
 
-	return `${content.slice(0, pos)}${VISUALIZER_IMPORT}\n${content.slice(pos)}`
+	return `${content.slice(0, pos)}${VISUALIZER_TYPE_IMPORT}\n${VISUALIZER_IMPORT}\n${content.slice(pos)}`
 }
 
 function inject_visualizer_plugin(content: string): string {
@@ -41,9 +46,10 @@ function inject_visualizer_plugin(content: string): string {
 	if (close === -1) return content
 	const inner = content.slice(open + 1, close)
 	const trimmed = inner.trimEnd()
-	const suffix = trimmed.trimStart() === '' ? VISUALIZER_CALL : `, ${VISUALIZER_CALL}`
+	const stripped = trimmed.replace(/,$/u, '')
+	const suffix = stripped.trimStart() === '' ? VISUALIZER_PLUGINS : `, ${VISUALIZER_PLUGINS}`
 
-	return `${content.slice(0, open + 1)}${trimmed}${suffix}${inner.slice(trimmed.length)}${content.slice(close)}`
+	return `${content.slice(0, open + 1)}${stripped}${suffix}${inner.slice(trimmed.length)}${content.slice(close)}`
 }
 
 function merge_vite_config(content: string): string {
