@@ -80,6 +80,18 @@ describe('generate_playwright_config', () => {
 	})
 })
 
+describe('generate_vite_config', () => {
+	it('contains visualizer import', () => {
+		expect(init_logic.generate_vite_config()).toContain("from 'rollup-plugin-visualizer'")
+	})
+
+	it('contains visualizer plugin call', () => {
+		expect(init_logic.generate_vite_config()).toContain(
+			"visualizer({ open: true, filename: 'stats.html' })",
+		)
+	})
+})
+
 describe('get_ai_copy_files - AI and community files', () => {
 	it('includes all AI markdown and community files', () => {
 		const result = init_logic.get_ai_copy_files()

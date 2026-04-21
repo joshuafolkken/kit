@@ -121,6 +121,9 @@ describe('merge_development_dependencies', () => {
 	})
 })
 
+const VISUALIZER_KEY = 'rollup-plugin-visualizer'
+const VISUALIZER_VERSION = '^7.0.1'
+
 describe('merge_sveltekit_package_json', () => {
 	it('adds size-limit script', () => {
 		const result = JSON.parse(init_logic.merge_sveltekit_package_json('{}')) as Record<
@@ -158,6 +161,84 @@ describe('merge_sveltekit_package_json', () => {
 		>
 
 		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_KEY]).toBe('^11.0.0')
+	})
+})
+
+describe('merge_sveltekit_package_json visualizer', () => {
+	it('adds rollup-plugin-visualizer devDependency', () => {
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json('{}')) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[VISUALIZER_KEY]).toBe(VISUALIZER_VERSION)
+	})
+
+	it('does not overwrite existing rollup-plugin-visualizer devDependency', () => {
+		const existing = `{"${DEV_DEPS_KEY}":{"${VISUALIZER_KEY}":"^6.0.0"}}`
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json(existing)) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[VISUALIZER_KEY]).toBe('^6.0.0')
+	})
+})
+
+const STANDARD_VITE_CONFIG = `import { sveltekit } from '@sveltejs/kit/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+\tplugins: [sveltekit()]
+})
+`
+const VISUALIZER_CALL = "visualizer({ open: true, filename: 'stats.html' })"
+
+describe('merge_vite_config', () => {
+	it('adds visualizer import', () => {
+		const result = init_logic.merge_vite_config(STANDARD_VITE_CONFIG)
+
+		expect(result).toContain("import { visualizer } from 'rollup-plugin-visualizer'")
+	})
+
+	it('adds visualizer plugin call to plugins array', () => {
+		const result = init_logic.merge_vite_config(STANDARD_VITE_CONFIG)
+
+		expect(result).toContain(VISUALIZER_CALL)
+	})
+
+	it('is idempotent when visualizer already present', () => {
+		const already_merged = init_logic.merge_vite_config(STANDARD_VITE_CONFIG)
+
+		expect(init_logic.merge_vite_config(already_merged)).toBe(already_merged)
+	})
+
+	it('returns content unchanged when rollup-plugin-visualizer already imported', () => {
+		const content = `import { visualizer } from 'rollup-plugin-visualizer'\n${STANDARD_VITE_CONFIG}`
+
+		expect(init_logic.merge_vite_config(content)).toBe(content)
+	})
+
+	it('adds visualizer to empty plugins array', () => {
+		const content = `import { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [] })\n`
+		const result = init_logic.merge_vite_config(content)
+
+		expect(result).toContain("plugins: [visualizer({ open: true, filename: 'stats.html' })]")
+	})
+
+	it('handles plugins array with nested brackets', () => {
+		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [sveltekit(), tailwindcss({ content: ['./src/**/*'] })] })\n`
+		const result = init_logic.merge_vite_config(content)
+
+		expect(result).toContain(VISUALIZER_CALL)
+		expect(result).toContain("tailwindcss({ content: ['./src/**/*'] })")
+	})
+
+	it('does not inject import when no plugins array found', () => {
+		const content = `import { defineConfig } from 'vite'\nexport default defineConfig({})\n`
+		const result = init_logic.merge_vite_config(content)
+
+		expect(result).toBe(content)
 	})
 })
 /* eslint-enable dot-notation */

@@ -37,43 +37,10 @@ function read_package_json(relative_path: string): unknown {
 	return JSON.parse(read_package_file(relative_path))
 }
 
-function build_npmrc_action(): FileAction {
-	return {
-		dest: '.npmrc',
-		create: () => init_logic.generate_npmrc(),
-		merge: (existing) => init_logic.merge_npmrc(existing),
-	}
-}
+type MergeFunction = (existing: string) => string
 
-function build_tsconfig_action(type: ProjectType): FileAction {
-	return {
-		dest: 'tsconfig.json',
-		create: () => init_logic.generate_tsconfig(type),
-		merge: (existing) =>
-			init_logic.merge_json_extends(existing, init_logic.get_tsconfig_extends_entry(type)),
-	}
-}
-
-function build_cspell_action(type: ProjectType): FileAction {
-	return {
-		dest: 'cspell.config.yaml',
-		create: () => init_logic.generate_cspell_config(type),
-		merge: (existing) =>
-			init_logic.merge_cspell_import(existing, init_logic.get_cspell_import_value(type)),
-	}
-}
-
-function build_lefthook_action(type: ProjectType): FileAction {
-	return {
-		dest: 'lefthook.yml',
-		create: () => init_logic.generate_lefthook_config(type),
-		merge: (existing) =>
-			init_logic.merge_yaml_list_entry(
-				existing,
-				'extends',
-				init_logic.get_lefthook_extends_value(type),
-			),
-	}
+function build_action(destination: string, create: () => string, merge: MergeFunction): FileAction {
+	return { dest: destination, create, merge }
 }
 
 function build_vscode_actions(type: ProjectType): ReadonlyArray<FileAction> {
@@ -102,16 +69,49 @@ function build_vscode_actions(type: ProjectType): ReadonlyArray<FileAction> {
 	]
 }
 
-function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
+function build_config_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
+	const lefthook_extends = init_logic.get_lefthook_extends_value(type)
+
 	return [
-		build_npmrc_action(),
+		build_action(
+			'tsconfig.json',
+			() => init_logic.generate_tsconfig(type),
+			(existing) =>
+				init_logic.merge_json_extends(existing, init_logic.get_tsconfig_extends_entry(type)),
+		),
+		build_action(
+			'cspell.config.yaml',
+			() => init_logic.generate_cspell_config(type),
+			(existing) =>
+				init_logic.merge_cspell_import(existing, init_logic.get_cspell_import_value(type)),
+		),
+		build_action(
+			'lefthook.yml',
+			() => init_logic.generate_lefthook_config(type),
+			(existing) => init_logic.merge_yaml_list_entry(existing, 'extends', lefthook_extends),
+		),
+		...build_vscode_actions(type),
+	]
+}
+
+function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
+	const vite = build_action(
+		'vite.config.ts',
+		() => init_logic.generate_vite_config(),
+		(existing) => init_logic.merge_vite_config(existing),
+	)
+
+	return [
+		build_action(
+			'.npmrc',
+			() => init_logic.generate_npmrc(),
+			(existing) => init_logic.merge_npmrc(existing),
+		),
 		{ dest: 'eslint.config.js', create: () => init_logic.generate_eslint_config(type) },
 		{ dest: 'prettier.config.js', create: () => init_logic.generate_prettier_config() },
 		{ dest: 'playwright.config.ts', create: () => init_logic.generate_playwright_config() },
-		build_tsconfig_action(type),
-		build_cspell_action(type),
-		build_lefthook_action(type),
-		...build_vscode_actions(type),
+		...(type === 'sveltekit' ? [vite] : []),
+		...build_config_file_actions(type),
 	]
 }
 

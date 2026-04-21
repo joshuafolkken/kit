@@ -2,6 +2,7 @@ import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { init_logic_sonar } from './init-logic-sonar'
 import { init_logic_templates } from './init-logic-templates'
+import { init_logic_vite } from './init-logic-vite'
 import { init_logic_workspace } from './init-logic-workspace'
 
 type ProjectType = 'sveltekit' | 'vanilla'
@@ -72,6 +73,7 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 }
 
 const SIZE_LIMIT_VERSION = '^12.1.0'
+const VISUALIZER_VERSION = '^7.0.1'
 
 const SIZE_LIMIT_CONFIG = [
 	{ path: '.svelte-kit/output/client/_app/immutable/**/*.js', limit: '500 kB' },
@@ -270,13 +272,17 @@ function merge_sveltekit_package_json(content: string): string {
 	const with_scripts = merge_package_scripts(content, get_suggested_scripts('sveltekit'))
 	const with_config = merge_json_object(with_scripts, { 'size-limit': SIZE_LIMIT_CONFIG })
 
-	return merge_development_dependencies(with_config, { 'size-limit': SIZE_LIMIT_VERSION })
+	return merge_development_dependencies(with_config, {
+		'size-limit': SIZE_LIMIT_VERSION,
+		'rollup-plugin-visualizer': VISUALIZER_VERSION,
+	})
 }
 
 const init_logic = {
 	...init_logic_templates,
 	...init_logic_workspace,
 	...init_logic_sonar,
+	...init_logic_vite,
 	generate_tsconfig,
 	generate_lefthook_config,
 	generate_cspell_config,
