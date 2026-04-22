@@ -147,6 +147,25 @@ Before every `git commit` — including follow-up commits on the same branch —
 - `fullrun #<N>`: Read Issue #N → **normalize the title**: if the title is not in English or can be phrased more clearly/conventionally, derive a better English title and run `gh issue edit <N> --title "<title>"` → post the agreed plan (if the Issue body is blank, use `gh issue edit <N> --body "<plan>"` to fill the body; otherwise use `gh issue comment <N> --body "<plan>"`) → implement → `pnpm josh bump minor` → `pnpm josh git -y` → `pnpm josh followup --merge`. Issue plan comments MUST be written in English. Before implementing, run `git switch main && git pull`, then `josh latest` (includes `pnpm audit`; fix with `overrides` in `package.json` if vulnerabilities found). **After `josh latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, investigate why it existed and restore it before proceeding (do NOT remove intentional overrides without user approval).** When running `pnpm josh followup --merge`, compose an implementation summary in English and pass it via `--notify-message`. Format: `"Implemented <title>:\n- <change1>\n- <change2>\n..."`. **`pnpm josh followup --merge` waits for CI, verifies AI review findings, sends the completion notification, then merges — all in one step. If AI review blockers are found, followup exits non-zero; fix the findings and re-run `pnpm josh followup --merge`.**
 - `fullrun new` or `fullrun new "<title>"`: Shortcut that combines `kickoff new` + `fullrun #<N>` into a single run. Steps: (1) Derive an English title from the conversation, or use the provided title. (2) Create Issue: `gh issue create --title "<title>" --body "<body>"`. Capture the new Issue number `<N>`. (3) Post the agreed plan in English. (4) Run `git switch main && git pull`. (5) Run `josh latest`. **After `josh latest`: verify `pnpm.overrides` was not modified — if any override was auto-removed or changed, restore it before proceeding.** (6) Implement. (7) `pnpm josh bump minor`. (8) `pnpm josh git -y "<title> #<N>"`. (9) `pnpm josh followup "<title> #<N>" --merge --notify-message "Implemented <title>:\n- <change1>\n- <change2>\n..."`.
 
+#### `queue` — Sequential multi-issue fullrun
+
+`queue #N1 #N2 #N3 ...` runs `fullrun` for each issue in order. All issues must already exist (no `new` variant).
+
+**Steps:**
+
+1. Run `git switch main && git pull`, then `josh latest` once (before the first issue). Verify `pnpm.overrides` is unchanged after `josh latest`.
+2. For each issue `#<N>` in the supplied order:
+   a. From the 2nd issue onward: run `git switch main && git pull` to incorporate the previous PR's merge.
+   b. Execute the full `fullrun #<N>` flow: normalize title → post plan → implement → `pnpm josh bump minor` → `pnpm josh git -y "<title> #<N>"` → `pnpm josh followup "<title> #<N>" --merge --notify-message "Implemented <title>:\n- ..."` (sends per-issue completion notification and merges, exactly as `fullrun` does).
+   c. On failure: send a `failure` Telegram notification via `pnpm josh notify --task-type failure --issue-url "<issue-url>" --body="<reason>"` and **stop immediately** (do not proceed to the next issue).
+3. No extra batch summary notification — each issue's `pnpm josh followup --merge` already sends the per-issue completion notification as usual.
+
+**Key rules:**
+
+- Invoking `queue` is explicit authorization to merge each PR (same as `fullrun`).
+- `josh latest` runs only once, before the first issue.
+- All `kickoff`/`fullrun` mid-workflow stop rules (confirmation notification, AI review blocker handling, etc.) apply within each issue's execution.
+
 #### AI reviewer comment scan (automatic in `pnpm josh followup`)
 
 `pnpm josh followup` scans top-level PR comments from AI reviewers (Claude Review, CodeRabbit summary comments) **independently of CI status**.
