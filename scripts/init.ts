@@ -1,14 +1,14 @@
 #!/usr/bin/env tsx
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
+import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
+import { package_path, PROJECT_ROOT } from './init-paths'
+import { init_sonar } from './init-sonar'
 import { install_josh_bin_section } from './install-bin'
-
-const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const PROJECT_ROOT = process.cwd()
 
 const VSCODE_FILENAMES: Record<ProjectType, { extensions: string; settings: string }> = {
 	sveltekit: { extensions: 'extensions.sveltekit.json', settings: 'settings.sveltekit.json' },
@@ -23,10 +23,6 @@ interface FileAction {
 
 interface VscodeExtensionsJson {
 	recommendations?: Array<string>
-}
-
-function package_path(relative_path: string): string {
-	return path.join(PACKAGE_DIR, relative_path)
 }
 
 function read_package_file(relative_path: string): string {
@@ -164,43 +160,6 @@ function execute_file_action(action: FileAction): void {
 	merge_existing_file(action.merge, destination_path, action.dest)
 }
 
-function copy_ai_file(source_path: string, destination_path: string): void {
-	const content = readFileSync(source_path, 'utf8')
-
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, init_logic.transform_prompt_paths(content))
-}
-
-function execute_ai_file_copy(filename: string): boolean {
-	const destination_path = path.join(PROJECT_ROOT, filename)
-
-	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${filename} (already exists — run josh sync to update)`)
-
-		return true
-	}
-
-	copy_ai_file(package_path(filename), destination_path)
-	console.info(`  ✔ created   ${filename}`)
-
-	return false
-}
-
-function execute_ai_directory_copy(directory_name: string): boolean {
-	const destination_path = path.join(PROJECT_ROOT, directory_name)
-
-	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${directory_name}/ (already exists — run josh sync to update)`)
-
-		return true
-	}
-
-	cpSync(package_path(directory_name), destination_path, { recursive: true })
-	console.info(`  ✔ created   ${directory_name}/`)
-
-	return false
-}
-
 function detect_project_type(): ProjectType | undefined {
 	const has_svelte_config =
 		existsSync(path.join(PROJECT_ROOT, 'svelte.config.js')) ||
@@ -282,86 +241,6 @@ function run_tool_installs(): void {
 	install_josh_bin_section()
 }
 
-function get_repo_name_with_owner(): string | undefined {
-	/* eslint-disable sonarjs/no-os-command-from-path */
-	const result = spawnSync(
-		'gh',
-		['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-		{ encoding: 'utf8', cwd: PROJECT_ROOT },
-	)
-	/* eslint-enable sonarjs/no-os-command-from-path */
-	if (result.status !== 0 || !result.stdout) return undefined
-
-	return result.stdout.trim() || undefined
-}
-
-function copy_sonar_file_write(
-	template_source: string,
-	destination_path: string,
-	project_key: string,
-	organization: string,
-): void {
-	const content = init_logic.apply_sonar_template(
-		readFileSync(template_source, 'utf8'),
-		project_key,
-		organization,
-	)
-
-	writeFileSync(destination_path, content)
-}
-
-function copy_sonar_if_missing(
-	destination: string,
-	identifiers: ReturnType<typeof init_logic.derive_sonar_identifiers>,
-): void {
-	const destination_path = path.join(PROJECT_ROOT, destination)
-
-	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${destination} (already exists — run josh sync to update)`)
-
-		return
-	}
-
-	const template_source = path.join(PACKAGE_DIR, init_logic.get_sonar_template_source())
-
-	copy_sonar_file_write(
-		template_source,
-		destination_path,
-		identifiers.project_key,
-		identifiers.organization,
-	)
-	console.info(`  ✔ created   ${destination}`)
-}
-
-function copy_sonar_with_template(): void {
-	const destination = init_logic.get_sonar_template_destination()
-	const name_with_owner = get_repo_name_with_owner()
-
-	if (name_with_owner === undefined) {
-		console.warn(`  ⚠ skipped   ${destination} (gh repo view failed)`)
-
-		return
-	}
-
-	copy_sonar_if_missing(destination, init_logic.derive_sonar_identifiers(name_with_owner))
-}
-
-function run_ai_copies(): void {
-	const file_skips = init_logic
-		.get_ai_copy_files()
-		.map((filename) => execute_ai_file_copy(filename))
-	const directory_skips = init_logic
-		.get_ai_copy_directories()
-		.map((directory_name) => execute_ai_directory_copy(directory_name))
-	const has_skips = [...file_skips, ...directory_skips].some(Boolean)
-
-	copy_sonar_with_template()
-
-	if (has_skips) {
-		console.info('\n  💡 Run `josh sync` to overwrite skipped AI files with the latest version.')
-	}
-}
-
 async function main(): Promise<void> {
 	const type = await resolve_project_type()
 
@@ -373,7 +252,7 @@ async function main(): Promise<void> {
 	merge_project_package_json(type)
 
 	console.info('\nAI files:')
-	run_ai_copies()
+	init_ai_copy.run_ai_copies()
 
 	run_tool_installs()
 
@@ -382,6 +261,9 @@ async function main(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-const init = { copy_sonar_file_write, copy_ai_file }
+const init = {
+	copy_sonar_file_write: init_sonar.copy_sonar_file_write,
+	copy_ai_file: init_ai_copy.copy_ai_file,
+}
 
 export { init }
