@@ -6,10 +6,7 @@ const exec_async = promisify(exec)
 
 async function exec_git_command(command: string): Promise<string> {
 	const git_command: string = git_utilities.get_git_command()
-	const { stdout } = (await exec_async(`${git_command} ${command}`)) as {
-		stdout: string
-		stderr: string
-	}
+	const { stdout } = await exec_async(`${git_command} ${command}`)
 
 	return stdout.trimEnd()
 }
