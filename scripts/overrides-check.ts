@@ -9,6 +9,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { overrides_check } from './overrides/overrides-logic'
+import { overrides_snapshot_schema } from './schemas'
 
 const { values } = parseArgs({
 	options: { save: { type: 'boolean', default: false } },
@@ -29,7 +30,9 @@ function is_file_not_found(error: unknown): boolean {
 
 function load_snapshot(): Record<string, string> {
 	try {
-		return JSON.parse(readFileSync(overrides_check.SNAPSHOT_PATH, 'utf8')) as Record<string, string>
+		return overrides_snapshot_schema.parse(
+			JSON.parse(readFileSync(overrides_check.SNAPSHOT_PATH, 'utf8')),
+		)
 	} catch (error) {
 		if (is_file_not_found(error)) {
 			console.error(`✖ Snapshot not found: ${overrides_check.SNAPSHOT_PATH}`)

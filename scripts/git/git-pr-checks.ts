@@ -1,4 +1,5 @@
 import { git_gh_command } from './git-gh-command'
+import { package_name_schema, pr_raw_schema, type RollupItemData } from './schemas'
 
 // cspell:words coderabbit
 
@@ -11,17 +12,15 @@ const CHECK_MAX_ATTEMPTS = 18
 const DEFAULT_STABLE_READS = 2
 const MERGE_STATE_CLEAN = 'CLEAN'
 const REVIEW_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
-const KEY_MERGE_STATE_STATUS = 'mergeStateStatus'
-const KEY_REVIEW_DECISION = 'reviewDecision'
 
 function parse_repo_name_from_package(package_json_content: string): string {
-	const { name } = JSON.parse(package_json_content) as { name?: unknown }
+	const result = package_name_schema.safeParse(JSON.parse(package_json_content))
 
-	if (typeof name !== 'string' || name.length === 0) {
+	if (!result.success) {
 		throw new Error('package.json name field is missing or not a non-empty string')
 	}
 
-	return name
+	return result.data.name
 }
 
 const REQUIRED_CHECKS = ['CodeRabbit', 'SonarQube']
@@ -32,7 +31,6 @@ const KEY_STATUS = 'status'
 const KEY_CONCLUSION = 'conclusion'
 const KEY_NAME = 'name'
 const KEY_CONTEXT = 'context'
-const KEY_STATUS_ROLLUP = 'statusCheckRollup'
 
 interface RollupCheck {
 	name: string
@@ -47,7 +45,7 @@ function read_string(value: unknown): string | undefined {
 	return trimmed
 }
 
-function parse_status_context(item: Record<string, unknown>): string {
+function parse_status_context(item: RollupItemData): string {
 	const state = read_string(item[KEY_STATE])?.toLowerCase()
 	if (state === 'success') return CHECK_STATUS_PASS
 	if (state === 'pending') return CHECK_STATUS_PENDING
@@ -55,7 +53,7 @@ function parse_status_context(item: Record<string, unknown>): string {
 	return CHECK_STATUS_FAIL
 }
 
-function parse_check_run(item: Record<string, unknown>): string {
+function parse_check_run(item: RollupItemData): string {
 	const status = read_string(item[KEY_STATUS])?.toLowerCase()
 	if (status !== 'completed') return CHECK_STATUS_PENDING
 	const conclusion = read_string(item[KEY_CONCLUSION])?.toLowerCase()
@@ -63,33 +61,29 @@ function parse_check_run(item: Record<string, unknown>): string {
 	return conclusion === 'success' ? CHECK_STATUS_PASS : CHECK_STATUS_FAIL
 }
 
-function parse_rollup_status(item: Record<string, unknown>): string {
+function parse_rollup_status(item: RollupItemData): string {
 	const type_name = read_string(item[KEY_TYPE_NAME])
 	if (type_name === 'StatusContext') return parse_status_context(item)
 
 	return parse_check_run(item)
 }
 
-function read_rollup_array(parsed: unknown): Array<Record<string, unknown>> {
-	if (typeof parsed !== 'object' || parsed === null) return []
-	const parsed_record = parsed as Record<string, unknown>
-	const rollup = parsed_record[KEY_STATUS_ROLLUP]
-	if (!Array.isArray(rollup)) return []
+function read_rollup_array(parsed: unknown): Array<RollupItemData> {
+	const result = pr_raw_schema.safeParse(parsed)
+	if (!result.success) return []
 
-	return rollup.filter((item): item is Record<string, unknown> => {
-		return typeof item === 'object' && item !== null
-	})
+	return result.data.statusCheckRollup ?? []
 }
 
 function parse_json_safe(raw_json: string): unknown {
 	try {
-		return JSON.parse(raw_json) as unknown
+		return JSON.parse(raw_json)
 	} catch {
 		return undefined
 	}
 }
 
-function parse_rollup_item(item: Record<string, unknown>): RollupCheck | undefined {
+function parse_rollup_item(item: RollupItemData): RollupCheck | undefined {
 	const name = read_string(item[KEY_NAME]) ?? read_string(item[KEY_CONTEXT])
 	if (name === undefined) return undefined
 
@@ -179,23 +173,15 @@ function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 	return 'pending'
 }
 
-function read_merge_state(parsed: Record<string, unknown>): string | undefined {
-	return read_string(parsed[KEY_MERGE_STATE_STATUS])
-}
-
-function read_review_decision(parsed: Record<string, unknown>): string | undefined {
-	return read_string(parsed[KEY_REVIEW_DECISION])
-}
-
 function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
 	const parsed = parse_json_safe(raw_json)
-	const parsed_record =
-		typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
+	const result = pr_raw_schema.safeParse(parsed)
+	const data = result.success ? result.data : undefined
 
 	return {
 		rollup: parse_rollup_checks(raw_json),
-		merge_state_status: read_merge_state(parsed_record),
-		review_decision: read_review_decision(parsed_record),
+		merge_state_status: read_string(data?.mergeStateStatus),
+		review_decision: read_string(data?.reviewDecision),
 	}
 }
 

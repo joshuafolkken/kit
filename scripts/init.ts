@@ -9,6 +9,7 @@ import { init_logic, type ProjectType } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { init_sonar } from './init-sonar'
 import { install_josh_bin_section } from './install-bin'
+import { string_array_schema, vscode_settings_schema } from './schemas'
 
 const VSCODE_FILENAMES: Record<ProjectType, { extensions: string; settings: string }> = {
 	sveltekit: { extensions: 'extensions.sveltekit.json', settings: 'settings.sveltekit.json' },
@@ -19,10 +20,6 @@ interface FileAction {
 	dest: string
 	create: () => string
 	merge?: (existing: string) => string
-}
-
-interface VscodeExtensionsJson {
-	recommendations?: Array<string>
 }
 
 function read_package_file(relative_path: string): string {
@@ -41,14 +38,15 @@ function build_action(destination: string, create: () => string, merge: MergeFun
 
 function build_vscode_actions(type: ProjectType): ReadonlyArray<FileAction> {
 	const filenames = VSCODE_FILENAMES[type]
-	const extensions_data = read_package_json(
-		path.join('.vscode', filenames.extensions),
-	) as VscodeExtensionsJson
-	const settings_data = read_package_json(path.join('.vscode', filenames.settings)) as Record<
-		string,
-		unknown
-	>
-	const recommendations = extensions_data.recommendations ?? []
+	const extensions_raw = vscode_settings_schema.parse(
+		read_package_json(path.join('.vscode', filenames.extensions)),
+	)
+	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
+	const raw_recommendations = extensions_raw['recommendations']
+	const recommendations = string_array_schema.safeParse(raw_recommendations).data ?? []
+	const settings_data = vscode_settings_schema.parse(
+		read_package_json(path.join('.vscode', filenames.settings)),
+	)
 
 	return [
 		{

@@ -5,6 +5,7 @@ import {
 	type ReviewComment,
 } from './git-ai-review-scan'
 import { git_gh_command } from './git-gh-command'
+import { ai_review_pull_comment_schema } from './schemas'
 import { telegram_notify, type TelegramSendInput } from './telegram-notify'
 
 interface TelegramContext {
@@ -15,19 +16,16 @@ interface TelegramContext {
 }
 
 interface AiReviewPullComment {
-	body?: string
-	url?: string
-	author?: {
-		login?: string
-	}
+	body?: string | undefined
+	url?: string | undefined
+	author?: { login?: string | undefined } | undefined
 }
 
 function parse_ai_review_comments(raw_json: string): Array<AiReviewPullComment> {
 	try {
-		const parsed: unknown = JSON.parse(raw_json)
-		if (!Array.isArray(parsed)) return []
+		const result = ai_review_pull_comment_schema.array().safeParse(JSON.parse(raw_json))
 
-		return parsed as Array<AiReviewPullComment>
+		return result.success ? result.data : []
 	} catch {
 		return []
 	}

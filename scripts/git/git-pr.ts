@@ -6,6 +6,7 @@ import type { IssueInfo } from './git-issue'
 import type { WatchResult } from './git-pr-checks-watch'
 import { git_pr_error } from './git-pr-error'
 import { git_pr_messages } from './git-pr-messages'
+import { pr_info_schema } from './schemas'
 
 const WAIT_AFTER_PR_SECONDS = 5
 
@@ -114,10 +115,9 @@ async function create_and_check_status(
 
 function parse_pr_state(pr_info_json: string): string | undefined {
 	try {
-		const pr_info = JSON.parse(pr_info_json) as Record<string, unknown>
+		const result = pr_info_schema.safeParse(JSON.parse(pr_info_json))
 
-		// eslint-disable-next-line dot-notation
-		return (pr_info['state'] as string | undefined) ?? undefined
+		return result.success ? result.data.state : undefined
 	} catch {
 		return undefined
 	}
