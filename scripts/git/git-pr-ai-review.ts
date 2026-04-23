@@ -23,11 +23,10 @@ interface AiReviewPullComment {
 
 function parse_ai_review_comments(raw_json: string): Array<AiReviewPullComment> {
 	try {
-		const result = ai_review_pull_comment_schema.array().safeParse(JSON.parse(raw_json))
-
-		return result.success ? result.data : []
-	} catch {
-		return []
+		return ai_review_pull_comment_schema.array().parse(JSON.parse(raw_json))
+	} catch (error) {
+		if (error instanceof SyntaxError) return []
+		throw error
 	}
 }
 

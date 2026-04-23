@@ -33,8 +33,7 @@ function merge_json_array_field(
 	values: ReadonlyArray<string>,
 ): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
-	const existing_result = string_array_schema.safeParse(parsed[key])
-	const existing = existing_result.success ? existing_result.data : []
+	const existing = key in parsed ? string_array_schema.parse(parsed[key]) : []
 	const to_add = values.filter((value) => !existing.includes(value))
 	if (to_add.length === 0) return content
 

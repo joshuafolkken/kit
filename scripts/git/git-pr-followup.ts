@@ -64,11 +64,10 @@ interface FollowupInput {
 
 function parse_pull_comments(raw_json: string): Array<PullComment> {
 	try {
-		const result = pull_comment_schema.array().safeParse(JSON.parse(raw_json))
-
-		return result.success ? result.data : []
-	} catch {
-		return []
+		return pull_comment_schema.array().parse(JSON.parse(raw_json))
+	} catch (error) {
+		if (error instanceof SyntaxError) return []
+		throw error
 	}
 }
 
