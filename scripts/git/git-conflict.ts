@@ -1,4 +1,5 @@
 import { git_gh_command } from './git-gh-command'
+import { pr_info_schema } from './schemas'
 
 const MERGE_STATE_DIRTY = 'dirty'
 const MERGE_STATE_BLOCKED = 'blocked'
@@ -26,24 +27,17 @@ function is_merge_state_blocked(merge_state_status: string | null | undefined): 
 	return normalized === MERGE_STATE_DIRTY || normalized === MERGE_STATE_BLOCKED
 }
 
-function parse_pr_info(pr_info_json: string): Record<string, unknown> | undefined {
+function parse_pr_info(
+	pr_info_json: string,
+): { is_mergeable: MergeableValue; merge_state_status: string | null | undefined } | undefined {
 	try {
-		return JSON.parse(pr_info_json) as Record<string, unknown>
+		const result = pr_info_schema.safeParse(JSON.parse(pr_info_json))
+		if (!result.success) return undefined
+
+		return { is_mergeable: result.data.mergeable, merge_state_status: result.data.mergeStateStatus }
 	} catch {
 		return undefined
 	}
-}
-
-function get_pr_properties(pr_info: Record<string, unknown>): {
-	is_mergeable: MergeableValue
-	merge_state_status: string | null | undefined
-} {
-	// eslint-disable-next-line dot-notation
-	const is_mergeable = (pr_info['mergeable'] as MergeableValue) ?? undefined
-	// eslint-disable-next-line dot-notation
-	const merge_state_status = (pr_info['mergeStateStatus'] as string | null | undefined) ?? undefined
-
-	return { is_mergeable, merge_state_status }
 }
 
 function check_conflict_conditions(
@@ -64,9 +58,7 @@ function has_conflicts(pr_info_json: string): boolean {
 		return false
 	}
 
-	const { is_mergeable, merge_state_status } = get_pr_properties(pr_info)
-
-	return check_conflict_conditions(is_mergeable, merge_state_status)
+	return check_conflict_conditions(pr_info.is_mergeable, pr_info.merge_state_status)
 }
 
 function display_conflict_warning(): void {

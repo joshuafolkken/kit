@@ -2,6 +2,7 @@ import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
 import { git_pr_checks } from './git-pr-checks'
+import { pull_comment_schema } from './schemas'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
 
 // cspell:words coderabbit coderabbitai
@@ -46,11 +47,9 @@ function build_issue_url(
 }
 
 interface PullComment {
-	body?: string
-	html_url?: string
-	user?: {
-		login?: string
-	}
+	body?: string | undefined
+	html_url?: string | undefined
+	user?: { login?: string | undefined } | undefined
 }
 
 interface FollowupInput {
@@ -65,12 +64,10 @@ interface FollowupInput {
 
 function parse_pull_comments(raw_json: string): Array<PullComment> {
 	try {
-		const parsed: unknown = JSON.parse(raw_json)
-		if (!Array.isArray(parsed)) return []
-
-		return parsed as Array<PullComment>
-	} catch {
-		return []
+		return pull_comment_schema.array().parse(JSON.parse(raw_json))
+	} catch (error) {
+		if (error instanceof SyntaxError) return []
+		throw error
 	}
 }
 

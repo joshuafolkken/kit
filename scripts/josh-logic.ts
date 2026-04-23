@@ -9,6 +9,7 @@ import {
 	type CommandCategory,
 	type CommandEntry,
 } from './josh-command-map'
+import { package_version_schema, package_with_deps_schema } from './schemas'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const COLUMN_WIDTH = 26
@@ -28,20 +29,17 @@ function resolve_tsx_executable(): string {
 }
 
 function read_package_version(): string {
-	const parsed = JSON.parse(readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')) as {
-		version: string
-	}
-
-	return parsed.version
+	return package_version_schema.parse(
+		JSON.parse(readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')),
+	).version
 }
 
 function is_sveltekit_project(): boolean {
 	try {
-		const parsed = JSON.parse(
-			readFileSync(path.join(process.cwd(), PACKAGE_JSON), 'utf8'),
-		) as Record<string, Record<string, string> | undefined>
-		// eslint-disable-next-line dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature
-		const all_deps = { ...parsed['dependencies'], ...parsed['devDependencies'] }
+		const parsed = package_with_deps_schema.parse(
+			JSON.parse(readFileSync(path.join(process.cwd(), PACKAGE_JSON), 'utf8')),
+		)
+		const all_deps = { ...parsed.dependencies, ...parsed.devDependencies }
 
 		return SVELTE_KIT_DEP in all_deps
 	} catch {

@@ -1,13 +1,12 @@
 import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
-
-interface WithExtends {
-	extends?: string | Array<string>
-}
-
-interface WithScripts extends Record<string, unknown> {
-	scripts?: Record<string, string>
-}
+import {
+	json_object_schema,
+	string_array_schema,
+	with_development_deps_schema,
+	with_extends_schema,
+	with_scripts_schema,
+} from './schemas'
 
 function parse_jsonc(content: string): unknown {
 	return JSON.parse(strip_json_comments(content, { trailingCommas: true }))
@@ -21,12 +20,11 @@ function normalize_extends(value: string | Array<string> | undefined): Array<str
 }
 
 function merge_json_extends(content: string, entry: string): string {
-	const parsed = parse_jsonc(content) as WithExtends & Record<string, unknown>
+	const parsed = with_extends_schema.parse(parse_jsonc(content))
 	const existing = normalize_extends(parsed.extends)
 	if (existing.includes(entry)) return content
-	parsed.extends = [entry, ...existing]
 
-	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+	return `${JSON.stringify({ ...parsed, extends: [entry, ...existing] }, undefined, '\t')}\n`
 }
 
 function merge_json_array_field(
@@ -34,17 +32,16 @@ function merge_json_array_field(
 	key: string,
 	values: ReadonlyArray<string>,
 ): string {
-	const parsed = parse_jsonc(content) as Record<string, unknown>
-	const existing = (parsed[key] as Array<string> | undefined) ?? []
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const existing = key in parsed ? string_array_schema.parse(parsed[key]) : []
 	const to_add = values.filter((value) => !existing.includes(value))
 	if (to_add.length === 0) return content
-	parsed[key] = [...existing, ...to_add]
 
-	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+	return `${JSON.stringify({ ...parsed, [key]: [...existing, ...to_add] }, undefined, '\t')}\n`
 }
 
 function merge_json_object(content: string, updates: Record<string, unknown>): string {
-	const parsed = parse_jsonc(content) as Record<string, unknown>
+	const parsed = json_object_schema.parse(parse_jsonc(content))
 	let has_changes = false
 
 	for (const [key, value] of Object.entries(updates)) {
@@ -91,7 +88,7 @@ function merge_cspell_import(content: string, value: string): string {
 }
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
-	const parsed = parse_jsonc(content) as WithScripts
+	const parsed = with_scripts_schema.parse(parse_jsonc(content))
 	const existing = parsed.scripts ?? {}
 	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
 	const to_add = Object.entries(scripts).filter(([key]) => !(key in migrated))
@@ -99,24 +96,19 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 
 	if (!did_migrate && to_add.length === 0) return content
 
-	parsed.scripts = { ...migrated, ...Object.fromEntries(to_add) }
-
-	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+	return `${JSON.stringify({ ...parsed, scripts: { ...migrated, ...Object.fromEntries(to_add) } }, undefined, '\t')}\n`
 }
 
 function merge_development_dependencies(
 	content: string,
 	additions: Record<string, string>,
 ): string {
-	const parsed = parse_jsonc(content) as Record<string, unknown>
-	// eslint-disable-next-line dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature
-	const existing = (parsed['devDependencies'] as Record<string, string> | undefined) ?? {}
+	const parsed = with_development_deps_schema.parse(parse_jsonc(content))
+	const existing = parsed.devDependencies ?? {}
 	const to_add = Object.entries(additions).filter(([key]) => !(key in existing))
 	if (to_add.length === 0) return content
-	// eslint-disable-next-line dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature
-	parsed['devDependencies'] = { ...existing, ...Object.fromEntries(to_add) }
 
-	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+	return `${JSON.stringify({ ...parsed, devDependencies: { ...existing, ...Object.fromEntries(to_add) } }, undefined, '\t')}\n`
 }
 
 const init_logic_json_merge = {
