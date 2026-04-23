@@ -15,16 +15,21 @@ const PROMPT_MESSAGES = {
 
 type PromptCallback<T> = (prompt: Interface) => Promise<T>
 
+interface AskOptions {
+	show_separators: boolean
+	is_first_call: boolean
+}
+
 function is_valid_yes_no_answer(answer: string): boolean {
 	return answer === 'y' || answer === 'n'
 }
 
-async function ask_yes_no_internal(
+async function ask_yes_no_unified(
 	prompt: Interface,
 	question: string,
-	is_first_call: boolean,
+	options: AskOptions,
 ): Promise<boolean> {
-	if (is_first_call) {
+	if (options.show_separators && options.is_first_call) {
 		git_prompt_display.display_start_separator()
 	}
 
@@ -34,29 +39,22 @@ async function ask_yes_no_internal(
 	if (!is_valid_yes_no_answer(answer)) {
 		git_prompt_display.display_invalid_answer_message()
 
-		return await ask_yes_no_internal(prompt, question, false)
+		return await ask_yes_no_unified(prompt, question, { ...options, is_first_call: false })
 	}
 
-	git_prompt_display.display_end_separator()
+	if (options.show_separators) {
+		git_prompt_display.display_end_separator()
+	}
 
 	return answer === 'y'
 }
 
 async function ask_yes_no(prompt: Interface, question: string): Promise<boolean> {
-	return await ask_yes_no_internal(prompt, question, true)
+	return await ask_yes_no_unified(prompt, question, { show_separators: true, is_first_call: true })
 }
 
 async function ask_yes_no_simple(prompt: Interface, question: string): Promise<boolean> {
-	const raw_answer: unknown = await prompt.question(question)
-	const answer = String(raw_answer).trim().toLowerCase()
-
-	if (!is_valid_yes_no_answer(answer)) {
-		git_prompt_display.display_invalid_answer_message()
-
-		return await ask_yes_no_simple(prompt, question)
-	}
-
-	return answer === 'y'
+	return await ask_yes_no_unified(prompt, question, { show_separators: false, is_first_call: true })
 }
 
 function create_prompt(): Interface | undefined {
@@ -202,4 +200,4 @@ const git_prompt = {
 }
 
 export type { WorkflowConfirmations }
-export { git_prompt }
+export { git_prompt, ask_yes_no, ask_yes_no_simple }
