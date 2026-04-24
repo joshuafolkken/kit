@@ -6,6 +6,17 @@
 
 Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS · Drizzle · better-auth · Paraglide · MCP
 
+## Environment Variables
+
+The following variables are required for `scripts-ai/` functionality. Store them in a `.env` file at the project root (loaded automatically by the AI scripts).
+
+| Variable             | Purpose                                               |
+| -------------------- | ----------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN` | Bot token for Telegram notifications (from BotFather) |
+| `TELEGRAM_CHAT_ID`   | Target chat or user ID for Telegram messages          |
+
+GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no additional env var is needed unless running in CI (set `GH_TOKEN` there).
+
 ## Critical Conventions (non-standard — always apply)
 
 ### Naming
