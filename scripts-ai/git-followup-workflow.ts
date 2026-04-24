@@ -124,3 +124,7 @@ try {
 } catch (error) {
 	git_error.handle(error)
 }
+
+const git_followup_workflow = { parse_issue_number_from_text, resolve_branch_name }
+
+export { git_followup_workflow }
