@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { package_version_schema } from './schemas'
 import { version_check_logic } from './version-check-logic'
 
 const CONFIG_PKG_PATH = path.join(
@@ -15,9 +16,8 @@ const GH_API_PATH = '/users/joshuafolkken/packages/npm/kit/versions?per_page=1'
 
 function read_current_version(): string {
 	const raw = readFileSync(CONFIG_PKG_PATH, 'utf8')
-	const parsed = JSON.parse(raw) as { version: string }
 
-	return parsed.version
+	return package_version_schema.parse(JSON.parse(raw)).version
 }
 
 function fetch_latest_version(): string {

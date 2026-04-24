@@ -264,3 +264,23 @@ describe('overrides_check.read_dep_names', () => {
 		expect(overrides_check.read_dep_names(content)).toEqual([])
 	})
 })
+
+const SCHEMA_REJECTS_NON_OBJECTS = 'throws on non-object JSON (schema rejects non-objects)'
+
+describe('overrides_check.read_overrides_from_package — schema validation', () => {
+	it('returns empty object when pnpm field is absent', () => {
+		expect(overrides_check.read_overrides_from_package(JSON.stringify({ name: 'test' }))).toEqual(
+			{},
+		)
+	})
+
+	it(SCHEMA_REJECTS_NON_OBJECTS, () => {
+		expect(() => overrides_check.read_overrides_from_package(JSON.stringify([1, 2]))).toThrow()
+	})
+})
+
+describe('overrides_check.read_dep_names — schema validation', () => {
+	it(SCHEMA_REJECTS_NON_OBJECTS, () => {
+		expect(() => overrides_check.read_dep_names(JSON.stringify('not-an-object'))).toThrow()
+	})
+})

@@ -13,10 +13,13 @@ interface GhSpawnResult {
 	exit_code: number | null
 }
 
+function has_stderr_field(error: unknown): error is Error & { stderr: string } {
+	return error instanceof Error && 'stderr' in error && typeof error.stderr === 'string'
+}
+
 function build_error_message(error: unknown): string {
-	const exec_error = error as { stderr?: string; stdout?: string; message?: string }
-	const error_message = exec_error.message ?? String(error)
-	const stderr = exec_error.stderr ?? ''
+	const error_message = error instanceof Error ? error.message : String(error)
+	const stderr = has_stderr_field(error) ? error.stderr : ''
 
 	return stderr.length > 0 ? `${error_message}\n${stderr}` : error_message
 }
@@ -103,5 +106,5 @@ const git_gh_exec = {
 	exec_gh_command_with_stdin,
 }
 
-export { git_gh_exec, BODY_FILE_FLAG, BODY_FROM_STDIN }
+export { git_gh_exec, has_stderr_field, BODY_FILE_FLAG, BODY_FROM_STDIN }
 export type { GhSpawnResult }
