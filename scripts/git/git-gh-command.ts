@@ -99,18 +99,6 @@ function parse_number_output(result: string): number | undefined {
 	return parsed
 }
 
-async function pr_get_state(branch_name: string): Promise<string | undefined> {
-	try {
-		const result: string = await git_gh_exec.exec_gh_command(
-			`pr view ${branch_name} --json state --jq .state`,
-		)
-
-		return parse_pr_state_string(result)
-	} catch {
-		return undefined
-	}
-}
-
 async function pr_get_number(branch_name: string): Promise<number | undefined> {
 	try {
 		const result: string = await git_gh_exec.exec_gh_command(
@@ -220,7 +208,6 @@ const git_gh_command = {
 	pr_checks_watch: git_pr_checks_watch.pr_checks_watch,
 	pr_exists,
 	pr_view,
-	pr_get_state,
 	pr_get_url,
 	pr_get_number,
 	pr_get_state_snapshot,

@@ -1,8 +1,13 @@
 #!/usr/bin/env tsx
-import { execute_check, get_current_branch, type CheckResult } from './common'
+import { git_command } from './git/git-command'
 
-function check_main_branch(): CheckResult {
-	const current_branch = get_current_branch()
+interface CheckResult {
+	success: boolean
+	message: string
+}
+
+async function check_main_branch(): Promise<CheckResult> {
+	const current_branch = await git_command.branch()
 
 	if (current_branch === 'main') {
 		return {
@@ -14,14 +19,14 @@ function check_main_branch(): CheckResult {
 		}
 	}
 
-	return {
-		success: true,
-		message: `✅ Branch check passed: '${current_branch}'`,
-	}
+	return { success: true, message: `✅ Branch check passed: '${current_branch}'` }
 }
 
-function main(): void {
-	execute_check(check_main_branch)
-}
+const result = await check_main_branch()
 
-main()
+console.info(result.message)
+
+if (!result.success) process.exit(1)
+
+export { check_main_branch }
+export type { CheckResult }
