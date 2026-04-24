@@ -67,14 +67,8 @@ async function handle_watch_error(branch_name: string, error: unknown): Promise<
 }
 
 async function check_and_display_status(branch_name: string): Promise<void> {
-	const has_errors = await git_conflict.check_pr_status_for_errors(branch_name)
-
-	if (has_errors) {
-		git_pr_messages.display_error_message()
-	} else {
-		git_pr_messages.display_success_message()
-	}
-
+	await git_conflict.check_pr_status_for_errors(branch_name)
+	git_pr_messages.display_success_message()
 	await display_pr_url_if_available(branch_name)
 }
 
