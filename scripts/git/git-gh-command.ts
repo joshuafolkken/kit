@@ -1,4 +1,4 @@
-import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec } from './git-gh-exec'
+import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec, has_stderr_field } from './git-gh-exec'
 import { git_pr_checks_watch } from './git-pr-checks-watch'
 
 function is_pr_already_exists_message(error_message: string): boolean {
@@ -6,17 +6,11 @@ function is_pr_already_exists_message(error_message: string): boolean {
 }
 
 function get_error_message_with_stderr(error: unknown): string {
-	if (error instanceof Error) {
-		const exec_error = error as { stderr?: string }
+	if (!(error instanceof Error)) return String(error)
 
-		if (exec_error.stderr !== undefined && exec_error.stderr.length > 0) {
-			return `${error.message}\n${exec_error.stderr}`
-		}
+	if (has_stderr_field(error) && error.stderr.length > 0) return `${error.message}\n${error.stderr}`
 
-		return error.message
-	}
-
-	return String(error)
+	return error.message
 }
 
 function handle_pr_create_error(error: unknown): never {
@@ -46,10 +40,8 @@ async function pr_checks(branch_name: string): Promise<string> {
 	try {
 		return await git_gh_exec.exec_gh_command(`pr checks ${branch_name}`)
 	} catch (error) {
-		const exec_error = error as { stderr?: string; stdout?: string }
-
-		if (exec_error.stderr !== undefined && exec_error.stderr.length > 0) {
-			throw new Error(exec_error.stderr, { cause: error })
+		if (has_stderr_field(error) && error.stderr.length > 0) {
+			throw new Error(error.stderr, { cause: error })
 		}
 
 		throw error

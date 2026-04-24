@@ -75,14 +75,17 @@ async function commit(message: string): Promise<void> {
 	await exec_git_command_with_output('commit', ['-m', message])
 }
 
+function is_exit_code_128(cause: unknown): boolean {
+	return (
+		typeof cause === 'object' && cause !== null && 'exit_code' in cause && cause.exit_code === '128'
+	)
+}
+
 function is_upstream_not_set_error(error: unknown): boolean {
-	if (!(error instanceof Error) || error.cause === undefined) {
-		return false
-	}
+	if (!(error instanceof Error)) return false
+	const { cause } = error
 
-	const cause = error.cause as { exit_code?: string }
-
-	return cause.exit_code === '128'
+	return cause !== undefined && is_exit_code_128(cause)
 }
 
 async function push_with_upstream(branch_name: string): Promise<void> {
@@ -140,6 +143,7 @@ const git_command = {
 	branch_exists,
 	add_tracked,
 	add_path,
+	is_upstream_not_set_error,
 }
 
 export { git_command }

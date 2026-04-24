@@ -60,3 +60,38 @@ describe('git_command.diff_main', () => {
 		await expect(git_command.diff_main(PACKAGE_JSON)).rejects.toThrow()
 	})
 })
+
+describe('git_command.is_upstream_not_set_error', () => {
+	const RETURNS_FALSE = 'returns false'
+	const PUSH_FAILED = 'push failed'
+
+	it('returns true for an Error with cause.exit_code of 128', async () => {
+		const { git_command } = await import('./git-command')
+		const error = new Error(PUSH_FAILED)
+
+		error.cause = { exit_code: '128' }
+
+		expect(git_command.is_upstream_not_set_error(error)).toBe(true)
+	})
+
+	it(`${RETURNS_FALSE} when cause.exit_code is not 128`, async () => {
+		const { git_command } = await import('./git-command')
+		const error = new Error(PUSH_FAILED)
+
+		error.cause = { exit_code: '1' }
+
+		expect(git_command.is_upstream_not_set_error(error)).toBe(false)
+	})
+
+	it(`${RETURNS_FALSE} for a plain Error without cause`, async () => {
+		const { git_command } = await import('./git-command')
+
+		expect(git_command.is_upstream_not_set_error(new Error('fail'))).toBe(false)
+	})
+
+	it(`${RETURNS_FALSE} for a non-Error value`, async () => {
+		const { git_command } = await import('./git-command')
+
+		expect(git_command.is_upstream_not_set_error('not an error')).toBe(false)
+	})
+})
