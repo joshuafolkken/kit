@@ -14,8 +14,8 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 ]
 
 const CSPELL_IMPORT: Record<ProjectType, string> = {
-	sveltekit: '"@joshuafolkken/kit/cspell/sveltekit"',
-	vanilla: '"@joshuafolkken/kit/cspell"',
+	sveltekit: '@joshuafolkken/kit/cspell/sveltekit',
+	vanilla: '@joshuafolkken/kit/cspell',
 }
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
@@ -96,7 +96,7 @@ function generate_lefthook_config(type: ProjectType): string {
 }
 
 function generate_cspell_config(type: ProjectType): string {
-	return `version: '0.2'\nimport:\n  - ${CSPELL_IMPORT[type]}\nwords: []\nignorePaths: []\n`
+	return `version: '0.2'\nimport:\n  - '${CSPELL_IMPORT[type]}'\nwords: []\nignorePaths: []\n`
 }
 
 function generate_npmrc(): string {
