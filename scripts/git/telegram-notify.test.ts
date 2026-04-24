@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { build_text, type TelegramSendInput } from './telegram-notify'
+import { build_text, telegram_environment_schema, type TelegramSendInput } from './telegram-notify'
 
 const ISSUE_URL = 'https://github.com/owner/repo/issues/1'
+const BOT_TOKEN = 'bot-token-123'
+const CHAT_ID = 'chat-456'
 const PR_URL = 'https://github.com/owner/repo/pull/2'
 const REPO_NAME = 'joshuafolkken-com'
 const ISSUE_TITLE = 'Fix something important'
@@ -102,5 +104,36 @@ describe('build_text — header fallback when context missing', () => {
 		const result = build_text(make_base({ task_type: 'completion', issue_title: undefined }))
 
 		expect(result).toBe(`✅ ${REPO_NAME}: Completion`)
+	})
+})
+
+describe('telegram_environment_schema', () => {
+	it('validates successfully when both tokens are non-empty', () => {
+		const result = telegram_environment_schema.safeParse({
+			telegram_bot_token: BOT_TOKEN,
+			telegram_chat_id: CHAT_ID,
+		})
+
+		expect(result.success).toBe(true)
+	})
+
+	it('fails with TELEGRAM_BOT_TOKEN message when bot token is empty', () => {
+		const result = telegram_environment_schema.safeParse({
+			telegram_bot_token: '',
+			telegram_chat_id: CHAT_ID,
+		})
+
+		expect(result.success).toBe(false)
+		expect(result.error?.issues.at(0)?.message).toContain('TELEGRAM_BOT_TOKEN')
+	})
+
+	it('fails with TELEGRAM_CHAT_ID message when chat id is empty', () => {
+		const result = telegram_environment_schema.safeParse({
+			telegram_bot_token: BOT_TOKEN,
+			telegram_chat_id: '',
+		})
+
+		expect(result.success).toBe(false)
+		expect(result.error?.issues.at(0)?.message).toContain('TELEGRAM_CHAT_ID')
 	})
 })
