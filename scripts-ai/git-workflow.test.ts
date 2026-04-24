@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ISSUE_INPUT = vi.hoisted(() => 'feat: add login #42')
+const FAKE_BRANCH_NAME = vi.hoisted(() => '42-fake-title')
+const FAKE_ISSUE_COMMIT = vi.hoisted(() => 'fake title #42')
+const ALT_BRANCH_NAME = '42-short-name'
 
 vi.mock('node:util', () => ({
 	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
@@ -13,7 +16,7 @@ vi.mock('../scripts/git/git-staging', () => ({
 vi.mock('../scripts/git/git-branch', () => ({
 	git_branch: {
 		current: vi.fn().mockResolvedValue('feature-branch'),
-		check_and_create_branch: vi.fn<() => Promise<void>>().mockResolvedValue(),
+		check_and_create_branch: vi.fn<() => Promise<string>>().mockResolvedValue(FAKE_BRANCH_NAME),
 	},
 }))
 
@@ -22,8 +25,8 @@ vi.mock('../scripts/git/git-issue', () => ({
 		get_and_display: vi.fn().mockResolvedValue({
 			title: 'fake title',
 			number: '42',
-			branch_name: '42-fake-title',
-			commit_message: 'fake title #42',
+			branch_name: FAKE_BRANCH_NAME,
+			commit_message: FAKE_ISSUE_COMMIT,
 		}),
 	},
 }))
@@ -119,5 +122,27 @@ describe('get_workflow_confirmations — interactive mode', () => {
 		await git_workflow.get_workflow_confirmations(false, {})
 
 		expect(vi.mocked(git_prompt.confirm_workflow_steps)).toHaveBeenCalledOnce()
+	})
+})
+
+describe('prepare_issue_info — branch name override', () => {
+	it('returns issue_info with branch_name from check_and_create_branch', async () => {
+		const { git_branch } = await import('../scripts/git/git-branch')
+
+		vi.mocked(git_branch.check_and_create_branch).mockResolvedValue(FAKE_BRANCH_NAME)
+
+		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT)
+
+		expect(result.branch_name).toBe(FAKE_BRANCH_NAME)
+	})
+
+	it('overrides generated branch_name when check_and_create_branch returns different value', async () => {
+		const { git_branch } = await import('../scripts/git/git-branch')
+
+		vi.mocked(git_branch.check_and_create_branch).mockResolvedValue(ALT_BRANCH_NAME)
+
+		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT)
+
+		expect(result.branch_name).toBe(ALT_BRANCH_NAME)
 	})
 })
