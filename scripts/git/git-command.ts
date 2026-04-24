@@ -56,19 +56,11 @@ async function status(): Promise<string> {
 }
 
 async function diff_cached(file_path: string): Promise<string> {
-	try {
-		return await exec_git_command(`diff --cached ${file_path}`)
-	} catch {
-		return ''
-	}
+	return await exec_git_command(`diff --cached ${file_path}`)
 }
 
 async function diff_main(file_path: string): Promise<string> {
-	try {
-		return await exec_git_command(`diff main -- ${file_path}`)
-	} catch {
-		return ''
-	}
+	return await exec_git_command(`diff main -- ${file_path}`)
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
