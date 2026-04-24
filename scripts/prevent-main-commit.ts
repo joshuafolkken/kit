@@ -8,8 +8,9 @@ interface CheckResult {
 
 async function check_main_branch(): Promise<CheckResult> {
 	const current_branch = await git_command.branch()
+	const default_branch = await git_command.get_default_branch()
 
-	if (current_branch === 'main') {
+	if (current_branch === default_branch) {
 		return {
 			success: false,
 			message:

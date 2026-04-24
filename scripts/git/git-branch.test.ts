@@ -19,6 +19,7 @@ vi.mock('./git-command', () => ({
 		checkout: vi.fn(),
 		branch_exists: vi.fn(),
 		pull: vi.fn(),
+		get_default_branch: vi.fn(),
 	},
 }))
 
@@ -34,6 +35,7 @@ const mocked_branch_exists = vi.mocked(git_command.branch_exists)
 const mocked_checkout = vi.mocked(git_command.checkout)
 const mocked_checkout_b = vi.mocked(git_command.checkout_b)
 const mocked_pull = vi.mocked(git_command.pull)
+const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
 const mocked_display_error = vi.mocked(git_error.display_branch_mismatch_error)
 
 const TARGET_BRANCH = 'feature-branch'
@@ -41,6 +43,7 @@ const WRONG_BRANCH = 'wrong-branch'
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	mocked_get_default_branch.mockResolvedValue('main')
 })
 
 describe('git_branch.check_and_create_branch — from main', () => {
@@ -86,5 +89,16 @@ describe('git_branch.check_and_create_branch — from wrong branch', () => {
 		await git_branch.check_and_create_branch(WRONG_BRANCH, TARGET_BRANCH)
 
 		expect(mocked_display_error).toHaveBeenCalledWith(WRONG_BRANCH, TARGET_BRANCH)
+	})
+})
+
+describe('git_branch.check_and_create_branch — from non-main default branch', () => {
+	it('creates branch when on non-main default branch', async () => {
+		mocked_get_default_branch.mockResolvedValue('develop')
+		mocked_branch_exists.mockResolvedValue(false)
+		mocked_checkout_b.mockResolvedValue('')
+		await git_branch.check_and_create_branch('develop', TARGET_BRANCH)
+
+		expect(mocked_checkout_b).toHaveBeenCalledWith(TARGET_BRANCH)
 	})
 })

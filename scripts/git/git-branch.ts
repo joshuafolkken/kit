@@ -79,7 +79,7 @@ async function pull_latest(): Promise<void> {
 	)
 }
 
-async function handle_main_branch(target_branch_name: string): Promise<void> {
+async function handle_default_branch(target_branch_name: string): Promise<void> {
 	await pull_latest()
 	const is_branch_exists: boolean = await exists(target_branch_name)
 
@@ -90,8 +90,10 @@ async function check_and_create_branch(
 	current_branch: string,
 	target_branch_name: string,
 ): Promise<void> {
-	if (current_branch === 'main') {
-		await handle_main_branch(target_branch_name)
+	const default_branch = await git_command.get_default_branch()
+
+	if (current_branch === default_branch) {
+		await handle_default_branch(target_branch_name)
 
 		return
 	}

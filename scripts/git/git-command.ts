@@ -59,8 +59,28 @@ async function diff_cached(file_path: string): Promise<string> {
 	return await exec_git_command(`diff --cached ${file_path}`)
 }
 
+const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
+const DEFAULT_BRANCH_FALLBACK = 'main'
+
+async function get_default_branch(): Promise<string> {
+	try {
+		const output = await exec_git_command('symbolic-ref refs/remotes/origin/HEAD')
+		const trimmed = output.trim()
+
+		if (trimmed.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) {
+			return trimmed.slice(REFS_REMOTES_ORIGIN_PREFIX.length)
+		}
+	} catch {
+		// fall through to default
+	}
+
+	return DEFAULT_BRANCH_FALLBACK
+}
+
 async function diff_main(file_path: string): Promise<string> {
-	return await exec_git_command(`diff main -- ${file_path}`)
+	const default_branch = await get_default_branch()
+
+	return await exec_git_command(`diff ${default_branch} -- ${file_path}`)
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
@@ -135,6 +155,7 @@ const git_command = {
 	status,
 	diff_cached,
 	diff_main,
+	get_default_branch,
 	checkout_b,
 	checkout,
 	commit,

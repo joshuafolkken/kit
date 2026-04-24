@@ -61,6 +61,40 @@ describe('git_command.diff_main', () => {
 	})
 })
 
+const SYMBOLIC_REF_MAIN = 'refs/remotes/origin/main'
+const NON_PREFIX_OUTPUT = 'something-else'
+
+describe('git_command.get_default_branch', () => {
+	it('returns branch name parsed from symbolic ref output', async () => {
+		exec_mock.state.should_fail = false
+		exec_mock.state.stdout = SYMBOLIC_REF_MAIN
+
+		const { git_command } = await import('./git-command')
+		const result = await git_command.get_default_branch()
+
+		expect(result).toBe('main')
+	})
+
+	it('returns main when symbolic ref command fails', async () => {
+		exec_mock.state.should_fail = true
+
+		const { git_command } = await import('./git-command')
+		const result = await git_command.get_default_branch()
+
+		expect(result).toBe('main')
+	})
+
+	it('returns main when output does not start with expected prefix', async () => {
+		exec_mock.state.should_fail = false
+		exec_mock.state.stdout = NON_PREFIX_OUTPUT
+
+		const { git_command } = await import('./git-command')
+		const result = await git_command.get_default_branch()
+
+		expect(result).toBe('main')
+	})
+})
+
 describe('git_command.is_upstream_not_set_error', () => {
 	const RETURNS_FALSE = 'returns false'
 	const PUSH_FAILED = 'push failed'

@@ -20,13 +20,21 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		tsx_arguments: ENV_FILE_FLAGS,
 	},
 	'main:sync': {
-		shell: ['sh', '-c', 'git checkout main && git pull'],
-		description: 'Checkout main and pull latest',
+		shell: [
+			'sh',
+			'-c',
+			'DEFAULT=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed "s|refs/remotes/origin/||"); git checkout "${DEFAULT:-main}" && git pull',
+		],
+		description: 'Checkout default branch and pull latest',
 		category: 'Workflow',
 	},
 	'main:merge': {
-		shell: ['git', 'pull', 'origin', 'main'],
-		description: 'Pull latest from origin main',
+		shell: [
+			'sh',
+			'-c',
+			'DEFAULT=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed "s|refs/remotes/origin/||"); git pull origin "${DEFAULT:-main}"',
+		],
+		description: 'Pull latest from origin default branch',
 		category: 'Workflow',
 	},
 }
