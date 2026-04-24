@@ -178,3 +178,8 @@ try {
 } catch (error) {
 	git_error.handle(error)
 }
+
+const git_workflow = { parse_positionals, get_workflow_confirmations }
+
+export type { CliArguments }
+export { git_workflow }

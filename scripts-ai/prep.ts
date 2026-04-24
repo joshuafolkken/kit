@@ -71,33 +71,54 @@ function build_update_command(overrides: Record<string, string>): string | undef
 	return overrides_check.build_update_command(overrides, read_package_json())
 }
 
-// Step 1: switch to main and pull
-run('git switch main')
-run('git pull')
+function prepare_repository(): Record<string, string> {
+	// Step 1: switch to main and pull
+	run('git switch main')
+	run('git pull')
 
-// Step 2: save overrides snapshot
-const snapshot = read_overrides()
+	// Step 2: save overrides snapshot
+	const snapshot = read_overrides()
 
-save_snapshot(snapshot)
-console.info('\n✔ Overrides snapshot saved.')
+	save_snapshot(snapshot)
+	console.info('\n✔ Overrides snapshot saved.')
 
-// Step 3: run corepack update, filtered dep update, and audit
-run('pnpm latest:corepack')
-
-const update_command = build_update_command(snapshot)
-
-if (update_command !== undefined) {
-	run(update_command)
+	return snapshot
 }
 
-run('pnpm audit')
+function update_dependencies(snapshot: Record<string, string>): void {
+	// Step 3: run corepack update, filtered dep update, and audit
+	run('pnpm latest:corepack')
 
-// Step 4: compare overrides
-const diff = overrides_check.compare(snapshot, read_overrides())
+	const update_command = build_update_command(snapshot)
 
-if (diff.is_changed) {
-	report_diff(diff)
-	handle_overrides_change(snapshot)
-} else {
-	console.info('\n✔ pnpm.overrides unchanged. Ready to implement.')
+	if (update_command !== undefined) {
+		run(update_command)
+	}
+
+	run('pnpm audit')
 }
+
+function verify_overrides(snapshot: Record<string, string>): void {
+	// Step 4: compare overrides
+	const diff = overrides_check.compare(snapshot, read_overrides())
+
+	if (diff.is_changed) {
+		report_diff(diff)
+		handle_overrides_change(snapshot)
+	} else {
+		console.info('\n✔ pnpm.overrides unchanged. Ready to implement.')
+	}
+}
+
+function main(): void {
+	const snapshot = prepare_repository()
+
+	update_dependencies(snapshot)
+	verify_overrides(snapshot)
+}
+
+main()
+
+const prep = { report_diff }
+
+export { prep }

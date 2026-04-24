@@ -8,15 +8,10 @@ import { execSync } from 'node:child_process'
 import { issue_logic } from '../scripts/issue/issue-logic'
 
 const ARGV_INDEX = 2
-const issue_number_argument = process.argv[ARGV_INDEX]
 
-if (issue_number_argument === undefined || !/^[1-9]\d*$/u.test(issue_number_argument)) {
-	console.error('Usage: tsx scripts-ai/issue-prep.ts <issue-number>')
-	process.exit(1)
+function display_language_status(is_cjk: boolean): string {
+	return is_cjk ? '⚠ Contains CJK — needs English translation' : '✔ English'
 }
-
-const issue_number = Number(issue_number_argument)
-const issue_number_string = String(issue_number)
 
 function fetch_issue_title(number_string: string): string {
 	const command = `gh issue view ${number_string} --json title --jq .title`
@@ -24,25 +19,56 @@ function fetch_issue_title(number_string: string): string {
 	return execSync(command, { encoding: 'utf8' }).trim() // eslint-disable-line sonarjs/os-command
 }
 
-let title = ''
+function parse_issue_number(): string {
+	const argument = process.argv[ARGV_INDEX]
 
-try {
-	title = fetch_issue_title(issue_number_string)
-} catch (error) {
-	console.error(`✖ Failed to fetch issue #${issue_number_string}`)
-	console.error(error instanceof Error ? error.message : String(error))
-	process.exit(1)
+	if (argument === undefined || !/^[1-9]\d*$/u.test(argument)) {
+		console.error('Usage: tsx scripts-ai/issue-prep.ts <issue-number>')
+		process.exit(1)
+	}
+
+	return argument
 }
 
-const result = issue_logic.prepare(issue_number, title)
+function fetch_title_for_issue(issue_number_string: string): string {
+	let title = ''
 
-function display_language_status(is_cjk: boolean): string {
-	return is_cjk ? '⚠ Contains CJK — needs English translation' : '✔ English'
+	try {
+		title = fetch_issue_title(issue_number_string)
+	} catch (error) {
+		console.error(`✖ Failed to fetch issue #${issue_number_string}`)
+		console.error(error instanceof Error ? error.message : String(error))
+		process.exit(1)
+	}
+
+	return title
 }
 
-console.info('')
-console.info(`📋 Issue #${issue_number_string}`)
-console.info(`  Title:    ${result.title}`)
-console.info(`  Language: ${display_language_status(result.is_cjk)}`)
-console.info(`  Branch:   ${result.suggested_branch}`)
-console.info('')
+function display_issue_info(
+	issue_number: number,
+	issue_number_string: string,
+	title: string,
+): void {
+	const result = issue_logic.prepare(issue_number, title)
+
+	console.info('')
+	console.info(`📋 Issue #${issue_number_string}`)
+	console.info(`  Title:    ${result.title}`)
+	console.info(`  Language: ${display_language_status(result.is_cjk)}`)
+	console.info(`  Branch:   ${result.suggested_branch}`)
+	console.info('')
+}
+
+function main(): void {
+	const issue_number_string = parse_issue_number()
+	const issue_number = Number(issue_number_string)
+	const title = fetch_title_for_issue(issue_number_string)
+
+	display_issue_info(issue_number, issue_number_string, title)
+}
+
+main()
+
+const issue_prep = { display_language_status }
+
+export { issue_prep }
