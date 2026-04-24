@@ -1,6 +1,7 @@
 import { exec, spawn, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import { promisify } from 'node:util'
+import { check_gh_installed } from './git-gh-check'
 
 const exec_async = promisify(exec)
 
@@ -25,6 +26,8 @@ function build_error_message(error: unknown): string {
 }
 
 async function exec_gh_command(command: string): Promise<string> {
+	await check_gh_installed()
+
 	try {
 		const { stdout } = await exec_async(`gh ${command}`)
 
@@ -79,6 +82,7 @@ async function run_gh_with_stdin(input: {
 	args: Array<string>
 	stdin_body: string
 }): Promise<GhSpawnResult> {
+	await check_gh_installed()
 	const child = create_gh_spawn(input.args)
 	const result_promise = collect_gh_spawn_result(child)
 
