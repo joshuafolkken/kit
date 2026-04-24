@@ -42,7 +42,7 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 ### Content rules
 
 - i18n: all user-visible strings (labels, buttons, toasts, validation errors, page titles) must use message keys — never hardcode. Add to all locale message files.
-- Comments / test titles (`describe` / `it` / `test` / `expect` messages): English only
+- Comments / test titles (`describe` / `it` / `test` / `expect` messages): English only. Exception: `eslint/rules/` files may use Japanese comments to explain rule rationale.
 - No code duplication: extract to shared functions/modules immediately
 - `/* @refactor-ignore */` at file top excludes a file from refactoring
 
