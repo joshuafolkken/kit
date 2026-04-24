@@ -1,3 +1,4 @@
+import { dump, load } from 'js-yaml'
 import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import {
@@ -56,35 +57,66 @@ function merge_json_object(content: string, updates: Record<string, unknown>): s
 	return `${JSON.stringify(parsed, undefined, '\t')}\n`
 }
 
-function get_trailing_newline(content: string): string {
-	return content.endsWith('\n') ? '' : '\n'
+function parse_yaml(content: string): Record<string, unknown> {
+	const raw = load(content)
+	if (raw === null || raw === undefined) return {}
+
+	return json_object_schema.parse(raw)
 }
 
 function merge_yaml_list_entry(content: string, key: string, value: string): string {
-	if (content.includes(value)) return content
-	const entry = `  - ${value}`
-	if (content.includes(`${key}:`)) return content.replace(`${key}:`, `${key}:\n${entry}`)
+	const parsed = parse_yaml(content)
+	const existing_raw = parsed[key]
+	const existing = Array.isArray(existing_raw) ? string_array_schema.parse(existing_raw) : []
+	if (existing.includes(value)) return content
+	if (!(key in parsed)) return dump({ [key]: [value], ...parsed })
 
-	const separator = content.trim() ? '\n' : ''
-
-	return `${key}:\n${entry}\n${separator}${content}`
+	return dump(
+		Object.fromEntries(
+			Object.entries(parsed).map(([k, entry_value]) => [
+				k,
+				k === key ? [value, ...existing] : entry_value,
+			]),
+		),
+	)
 }
 
-function find_version_line_end(content: string): number {
-	const start = content.search(/^version:/mu)
-	if (start === -1) return -1
+function insert_import_after_version(
+	parsed: Record<string, unknown>,
+	list: Array<string>,
+): Record<string, unknown> {
+	const entries = Object.entries(parsed)
+	const version_index = entries.findIndex(([k]) => k === 'version')
+	if (version_index === -1) return { ...parsed, import: list }
 
-	return content.indexOf('\n', start)
+	return Object.fromEntries([
+		...entries.slice(0, version_index + 1),
+		['import', list],
+		...entries.slice(version_index + 1),
+	])
 }
 
 function merge_cspell_import(content: string, value: string): string {
-	if (content.includes(value)) return content
-	if (content.includes('import:')) return merge_yaml_list_entry(content, 'import', value)
-	const block = `import:\n  - ${value}\n`
-	const version_line_end = find_version_line_end(content)
-	if (version_line_end === -1) return `${content}${get_trailing_newline(content)}${block}`
+	const parsed = parse_yaml(content)
+	// eslint-disable-next-line dot-notation -- 'import' from index signature requires bracket notation per noPropertyAccessFromIndexSignature
+	const existing_raw = parsed['import']
+	const existing = Array.isArray(existing_raw) ? string_array_schema.parse(existing_raw) : []
+	if (existing.includes(value)) return content
 
-	return `${content.slice(0, version_line_end + 1)}${block}${content.slice(version_line_end + 1)}`
+	const updated_list = [value, ...existing]
+
+	if ('import' in parsed) {
+		return dump(
+			Object.fromEntries(
+				Object.entries(parsed).map(([k, entry_value]) => [
+					k,
+					k === 'import' ? updated_list : entry_value,
+				]),
+			),
+		)
+	}
+
+	return dump(insert_import_after_version(parsed, updated_list))
 }
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {

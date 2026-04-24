@@ -1,6 +1,6 @@
 {
 	"name": "@joshuafolkken/kit",
-	"version": "0.69.0",
+	"version": "0.70.0",
 	"type": "module",
 	"license": "MIT",
 	"packageManager": "pnpm@10.33.1+sha512.05ba3c1d5d1c18f68df06470d74055e62d41fc110a0c660db1b2dfb2785327f04cf0f68345d4609bc52089e7fa0343c31593b2f9594e2c5d5da426230acc9820",
@@ -93,6 +93,7 @@
 		"@eslint/js": "^10.0.1",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@stylistic/eslint-plugin": "^5.10.0",
+		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^25.6.0",
 		"cspell": "^10.0.0",
 		"eslint": "^10.2.1",
@@ -113,6 +114,7 @@
 		"vitest": "^4.1.5"
 	},
 	"dependencies": {
+		"js-yaml": "^4.1.1",
 		"strip-json-comments": "^5.0.3",
 		"tsx": "^4.21.0",
 		"zod": "^4.3.6"
