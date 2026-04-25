@@ -19,36 +19,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-const SONAR_TEMPLATE = 'sonar.projectKey={{PROJECT_KEY}}\nsonar.organization={{ORGANIZATION}}\n'
-
-describe('sync_sonar_file_write', () => {
-	it('writes substituted content to destination', () => {
-		writeFileSync(SRC_PATH, SONAR_TEMPLATE)
-		sync.sync_sonar_file_write(SRC_PATH, DEST_PATH, 'myorg_myrepo', 'myorg')
-		const result = readFileSync(DEST_PATH, 'utf8')
-
-		expect(result).toBe('sonar.projectKey=myorg_myrepo\nsonar.organization=myorg\n')
-	})
-
-	it('creates destination directory when it does not exist', () => {
-		const nested_destination = path.join(TEST_DIR, 'nested', 'dir', 'sonar-project.properties')
-
-		writeFileSync(SRC_PATH, SONAR_TEMPLATE)
-		sync.sync_sonar_file_write(SRC_PATH, nested_destination, 'org_repo', 'org')
-
-		expect(existsSync(nested_destination)).toBe(true)
-	})
-
-	it('overwrites existing destination file', () => {
-		writeFileSync(DEST_PATH, 'old content\n')
-		writeFileSync(SRC_PATH, SONAR_TEMPLATE)
-		sync.sync_sonar_file_write(SRC_PATH, DEST_PATH, 'new_repo', 'new')
-		const result = readFileSync(DEST_PATH, 'utf8')
-
-		expect(result).toContain('sonar.projectKey=new_repo')
-	})
-})
-
 describe('sync_file_mapping', () => {
 	it('copies src to dest when src exists', () => {
 		writeFileSync(SRC_PATH, 'node_modules\n')

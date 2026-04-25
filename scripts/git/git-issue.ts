@@ -42,9 +42,7 @@ function normalize_title_for_branch(title: string): string {
 }
 
 function create_branch_name(issue_number: string, title: string): string {
-	const kebab_title = normalize_title_for_branch(title)
-
-	return `${issue_number}-${kebab_title}`
+	return `${issue_number}-${normalize_title_for_branch(title)}`
 }
 
 function parse_issue_input(input: string): IssueInfo {

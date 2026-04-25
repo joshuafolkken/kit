@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { animation_helpers } from './animation-helpers'
+import { animation_helpers, create_git_operation_config } from './animation-helpers'
 
 const LOADING_MESSAGE = 'loading'
 const ORIGINAL_ERROR_MESSAGE = 'original error'
 const CUSTOM_ERROR_MESSAGE = 'Custom failure'
+const PUSH_ERROR_MESSAGE = 'Failed to push'
+const PUSH_COMPLETED_MESSAGE = 'Push completed.'
 
 const { stop_spy, pause_spy } = vi.hoisted(() => ({
 	stop_spy: vi.fn(),
@@ -22,6 +24,26 @@ vi.mock('./git-animation', () => ({
 beforeEach(() => {
 	stop_spy.mockReset()
 	pause_spy.mockReset()
+})
+
+describe('create_git_operation_config', () => {
+	it('returns config with provided error_message', () => {
+		const config = create_git_operation_config(PUSH_ERROR_MESSAGE)
+
+		expect(config.error_message).toBe(PUSH_ERROR_MESSAGE)
+	})
+
+	it('returns config with icon_selector that always returns ✅', () => {
+		const config = create_git_operation_config('')
+
+		expect(config.icon_selector?.('any result')).toBe('✅')
+	})
+
+	it('returns config with result_formatter that returns the message unchanged', () => {
+		const config = create_git_operation_config('')
+
+		expect(config.result_formatter?.(PUSH_COMPLETED_MESSAGE)).toBe(PUSH_COMPLETED_MESSAGE)
+	})
 })
 
 describe('animation_helpers.execute_with_animation — success', () => {

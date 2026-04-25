@@ -11,6 +11,7 @@ vi.mock('./animation-helpers', () => ({
 					await action(),
 			),
 	},
+	create_git_operation_config: vi.fn().mockReturnValue({}),
 }))
 
 vi.mock('./git-command', () => ({

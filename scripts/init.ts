@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
-import { init_sonar } from './init-sonar'
 import { install_josh_bin_section } from './install-bin'
 import { string_array_schema, vscode_settings_schema } from './schemas'
 
@@ -260,7 +259,6 @@ async function main(): Promise<void> {
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 const init = {
-	copy_sonar_file_write: init_sonar.copy_sonar_file_write,
 	copy_ai_file: init_ai_copy.copy_ai_file,
 }
 

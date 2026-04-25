@@ -4,12 +4,9 @@ import { git_branch } from '../scripts/git/git-branch'
 import { git_error } from '../scripts/git/git-error'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
+import { load_optional_environment } from './environment-loader'
 
-try {
-	process.loadEnvFile('.env')
-} catch {
-	// .env is optional
-}
+load_optional_environment()
 
 // cspell:words coderabbit
 

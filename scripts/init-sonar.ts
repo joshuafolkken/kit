@@ -1,36 +1,9 @@
-import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { gh_spawn } from './gh-spawn'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
-
-function get_repo_name_with_owner(): string | undefined {
-	/* eslint-disable sonarjs/no-os-command-from-path */
-	const result = spawnSync(
-		'gh',
-		['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-		{ encoding: 'utf8', cwd: PROJECT_ROOT },
-	)
-	/* eslint-enable sonarjs/no-os-command-from-path */
-	if (result.status !== 0 || !result.stdout) return undefined
-
-	return result.stdout.trim() || undefined
-}
-
-function copy_sonar_file_write(
-	template_source: string,
-	destination_path: string,
-	project_key: string,
-	organization: string,
-): void {
-	const content = init_logic.apply_sonar_template(
-		readFileSync(template_source, 'utf8'),
-		project_key,
-		organization,
-	)
-
-	writeFileSync(destination_path, content)
-}
+import { sonar_file } from './sonar-file'
 
 function copy_sonar_if_missing(
 	destination: string,
@@ -46,18 +19,13 @@ function copy_sonar_if_missing(
 
 	const template_source = path.join(PACKAGE_DIR, init_logic.get_sonar_template_source())
 
-	copy_sonar_file_write(
-		template_source,
-		destination_path,
-		identifiers.project_key,
-		identifiers.organization,
-	)
+	sonar_file.write_sonar_file(template_source, destination_path, identifiers)
 	console.info(`  ✔ created   ${destination}`)
 }
 
 function copy_sonar_with_template(): void {
 	const destination = init_logic.get_sonar_template_destination()
-	const name_with_owner = get_repo_name_with_owner()
+	const name_with_owner = gh_spawn.get_repo_name_with_owner()
 
 	if (name_with_owner === undefined) {
 		console.warn(`  ⚠ skipped   ${destination} (gh repo view failed)`)
@@ -69,7 +37,6 @@ function copy_sonar_with_template(): void {
 }
 
 const init_sonar = {
-	copy_sonar_file_write,
 	copy_sonar_with_template,
 }
 

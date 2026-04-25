@@ -1,13 +1,5 @@
-import { animation_helpers, type AnimationOptions } from './animation-helpers'
+import { animation_helpers, create_git_operation_config } from './animation-helpers'
 import { git_command } from './git-command'
-
-function create_git_operation_config(error_message: string): AnimationOptions<string> {
-	return {
-		error_message,
-		icon_selector: () => '✅',
-		result_formatter: (message) => message,
-	}
-}
 
 async function push(): Promise<void> {
 	const config = create_git_operation_config('')

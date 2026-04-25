@@ -2,13 +2,10 @@
 import { execFile } from 'node:child_process'
 import { parseArgs, promisify } from 'node:util'
 import { telegram_notify } from '../scripts/git/telegram-notify'
+import { load_optional_environment } from './environment-loader'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
 
-try {
-	process.loadEnvFile('.env')
-} catch {
-	// .env is optional
-}
+load_optional_environment()
 
 const exec_file_async = promisify(execFile)
 

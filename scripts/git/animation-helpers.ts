@@ -65,9 +65,17 @@ async function execute_with_animation<T>(
 	}
 }
 
+function create_git_operation_config(error_message: string): AnimationOptions<string> {
+	return {
+		error_message,
+		icon_selector: () => '✅',
+		result_formatter: (message) => message,
+	}
+}
+
 const animation_helpers = {
 	execute_with_animation,
 }
 
 export type { AnimationOptions }
-export { animation_helpers }
+export { animation_helpers, create_git_operation_config }

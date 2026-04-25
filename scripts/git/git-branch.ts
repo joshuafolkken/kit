@@ -1,14 +1,10 @@
-import { animation_helpers, type AnimationOptions } from './animation-helpers'
+import {
+	animation_helpers,
+	create_git_operation_config,
+	type AnimationOptions,
+} from './animation-helpers'
 import { git_command } from './git-command'
 import { git_error } from './git-error'
-
-function create_branch_operation_config(error_message: string): AnimationOptions<string> {
-	return {
-		error_message,
-		icon_selector: () => '✅',
-		result_formatter: (message) => message,
-	}
-}
 
 async function current(): Promise<string> {
 	const config: AnimationOptions<string> = {
@@ -23,7 +19,7 @@ async function current(): Promise<string> {
 }
 
 async function create(branch_name: string): Promise<void> {
-	const config = create_branch_operation_config('Failed to create branch')
+	const config = create_git_operation_config('Failed to create branch')
 
 	await animation_helpers.execute_with_animation(
 		`Creating branch: ${branch_name}...`,
@@ -37,7 +33,7 @@ async function create(branch_name: string): Promise<void> {
 }
 
 async function switch_to(branch_name: string): Promise<void> {
-	const config = create_branch_operation_config('Failed to switch branch')
+	const config = create_git_operation_config('Failed to switch branch')
 
 	await animation_helpers.execute_with_animation(
 		`Switching to branch: ${branch_name}...`,
@@ -66,7 +62,7 @@ async function exists(branch_name: string): Promise<boolean> {
 }
 
 async function pull_latest(): Promise<void> {
-	const config = create_branch_operation_config('Failed to pull latest from remote')
+	const config = create_git_operation_config('Failed to pull latest from remote')
 
 	await animation_helpers.execute_with_animation(
 		'Pulling latest from remote...',
