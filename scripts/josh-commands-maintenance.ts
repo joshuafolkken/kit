@@ -13,7 +13,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Maintenance',
 	},
 	latest: {
-		shell: ['sh', '-c', 'corepack use pnpm@latest && pnpm update --latest && josh audit'],
+		shell: ['sh', '-c', 'corepack use pnpm@latest && pnpm josh latest:update && josh audit'],
 		description: 'Update pnpm, dependencies, and run security audit',
 		category: 'Maintenance',
 	},
@@ -23,7 +23,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Maintenance',
 	},
 	'latest:update': {
-		shell: ['pnpm', 'update', '--latest'],
+		script: 'scripts/latest-update.ts',
 		description: 'Update all dependencies to latest',
 		category: 'Maintenance',
 	},

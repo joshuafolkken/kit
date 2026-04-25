@@ -19,9 +19,18 @@ vi.mock('./git-pr-checks-watch', () => ({
 	PR_CHECKS_WATCH_TIMEOUT_MS: 120_000,
 }))
 
+vi.mock('./git-command', () => ({
+	git_command: {
+		get_default_branch: vi.fn(),
+	},
+}))
+
 const { git_gh_exec } = await import('./git-gh-exec')
 const mocked_exec = vi.mocked(git_gh_exec.exec_gh_command)
+const { git_command } = await import('./git-command')
+const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
 
+const DEFAULT_BRANCH = 'main'
 const FEATURE_BRANCH = 'feature-branch'
 const NETWORK_ERROR = 'network error'
 const PR_TITLE = 'title'
@@ -30,6 +39,7 @@ const GITHUB_PR_URL = 'https://github.com/owner/repo/pull/1'
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	mocked_get_default_branch.mockResolvedValue(DEFAULT_BRANCH)
 })
 
 describe('git_gh_command', () => {
@@ -105,6 +115,25 @@ describe('git_gh_command.pr_create — PR_ALREADY_EXISTS error handling', () => 
 		mocked_exec.mockRejectedValue(new Error(NETWORK_ERROR))
 
 		await expect(git_gh_command.pr_create(PR_TITLE, PR_BODY)).rejects.toThrow(NETWORK_ERROR)
+	})
+})
+
+describe('git_gh_command.pr_create — base branch and label', () => {
+	it('uses the value from get_default_branch for --base', async () => {
+		mocked_get_default_branch.mockResolvedValue('develop')
+		mocked_exec.mockResolvedValue(GITHUB_PR_URL)
+
+		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
+
+		expect(mocked_exec).toHaveBeenCalledWith(expect.stringContaining('--base develop'))
+	})
+
+	it('does not include --label in the pr create command', async () => {
+		mocked_exec.mockResolvedValue(GITHUB_PR_URL)
+
+		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
+
+		expect(mocked_exec).toHaveBeenCalledWith(expect.not.stringContaining('--label'))
 	})
 })
 
