@@ -118,15 +118,6 @@ describe('package.json files field', () => {
 	})
 })
 
-describe('package.json pnpm.overrides', () => {
-	const manifest = load_manifest()
-	const overrides = manifest.pnpm?.overrides ?? {}
-
-	it('pins eslint-plugin-promise to a safe floor', () => {
-		expect(overrides['eslint-plugin-promise']).toBe('^7.2.1')
-	})
-})
-
 describe('package.json pnpm built-dependency lists', () => {
 	const manifest = load_manifest()
 	const only_built = manifest.pnpm?.onlyBuiltDependencies ?? []

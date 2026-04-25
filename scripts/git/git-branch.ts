@@ -79,7 +79,16 @@ async function pull_latest(): Promise<void> {
 	)
 }
 
-async function handle_main_branch(target_branch_name: string): Promise<void> {
+const ISSUE_PREFIX_PATTERN = /^\d+-/u
+
+function has_same_issue_prefix(branch_a: string, branch_b: string): boolean {
+	const prefix_a = ISSUE_PREFIX_PATTERN.exec(branch_a)?.[0]
+	const prefix_b = ISSUE_PREFIX_PATTERN.exec(branch_b)?.[0]
+
+	return prefix_a !== undefined && prefix_a === prefix_b
+}
+
+async function handle_default_branch(target_branch_name: string): Promise<void> {
 	await pull_latest()
 	const is_branch_exists: boolean = await exists(target_branch_name)
 
@@ -89,16 +98,22 @@ async function handle_main_branch(target_branch_name: string): Promise<void> {
 async function check_and_create_branch(
 	current_branch: string,
 	target_branch_name: string,
-): Promise<void> {
-	if (current_branch === 'main') {
-		await handle_main_branch(target_branch_name)
+): Promise<string> {
+	const default_branch = await git_command.get_default_branch()
 
-		return
+	if (current_branch === default_branch) {
+		await handle_default_branch(target_branch_name)
+
+		return target_branch_name
 	}
 
 	if (current_branch !== target_branch_name) {
+		if (has_same_issue_prefix(current_branch, target_branch_name)) return current_branch
+
 		git_error.display_branch_mismatch_error(current_branch, target_branch_name)
 	}
+
+	return current_branch
 }
 
 const git_branch = {

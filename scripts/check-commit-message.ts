@@ -1,13 +1,15 @@
 #!/usr/bin/env tsx
 import { readFileSync } from 'node:fs'
-import { execute_check, get_current_branch, type CheckResult } from './common'
+import { git_command } from './git/git-command'
+
+interface CheckResult {
+	success: boolean
+	message: string
+}
 
 function get_commit_message(): string {
-	// 引数からコミットメッセージファイルのパスを取得
 	const FILE_INDEX = 2
 	const commit_message_file = process.argv.at(FILE_INDEX)
-
-	// 引数がない場合は、デフォルトのパスを試す
 	const default_path = commit_message_file ?? '.git/COMMIT_EDITMSG'
 
 	try {
@@ -33,8 +35,8 @@ function create_error_message(issue_number: string, branch: string, message: str
 	)
 }
 
-function check_commit_message(): CheckResult {
-	const current_branch = get_current_branch()
+async function check_commit_message(): Promise<CheckResult> {
+	const current_branch = await git_command.branch()
 	const issue_number = extract_issue_number(current_branch)
 
 	if (issue_number === undefined) {
@@ -59,8 +61,12 @@ function check_commit_message(): CheckResult {
 	}
 }
 
-function main(): void {
-	execute_check(check_commit_message)
-}
+const result = await check_commit_message()
 
-main()
+console.info(result.message)
+
+if (!result.success) process.exit(1)
+
+export { check_commit_message, extract_issue_number }
+
+export type { CheckResult }

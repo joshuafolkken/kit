@@ -59,8 +59,28 @@ async function diff_cached(file_path: string): Promise<string> {
 	return await exec_git_command(`diff --cached ${file_path}`)
 }
 
+const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
+const DEFAULT_BRANCH_FALLBACK = 'main'
+
+async function get_default_branch(): Promise<string> {
+	try {
+		const output = await exec_git_command('symbolic-ref refs/remotes/origin/HEAD')
+		const trimmed = output.trim()
+
+		if (trimmed.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) {
+			return trimmed.slice(REFS_REMOTES_ORIGIN_PREFIX.length)
+		}
+	} catch {
+		// fall through to default
+	}
+
+	return DEFAULT_BRANCH_FALLBACK
+}
+
 async function diff_main(file_path: string): Promise<string> {
-	return await exec_git_command(`diff main -- ${file_path}`)
+	const default_branch = await get_default_branch()
+
+	return await exec_git_command(`diff ${default_branch} -- ${file_path}`)
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
@@ -75,14 +95,17 @@ async function commit(message: string): Promise<void> {
 	await exec_git_command_with_output('commit', ['-m', message])
 }
 
+function is_exit_code_128(cause: unknown): boolean {
+	return (
+		typeof cause === 'object' && cause !== null && 'exit_code' in cause && cause.exit_code === '128'
+	)
+}
+
 function is_upstream_not_set_error(error: unknown): boolean {
-	if (!(error instanceof Error) || error.cause === undefined) {
-		return false
-	}
+	if (!(error instanceof Error)) return false
+	const { cause } = error
 
-	const cause = error.cause as { exit_code?: string }
-
-	return cause.exit_code === '128'
+	return cause !== undefined && is_exit_code_128(cause)
 }
 
 async function push_with_upstream(branch_name: string): Promise<void> {
@@ -132,6 +155,7 @@ const git_command = {
 	status,
 	diff_cached,
 	diff_main,
+	get_default_branch,
 	checkout_b,
 	checkout,
 	commit,
@@ -140,6 +164,7 @@ const git_command = {
 	branch_exists,
 	add_tracked,
 	add_path,
+	is_upstream_not_set_error,
 }
 
 export { git_command }

@@ -1,4 +1,11 @@
+import { z } from 'zod'
+
 const TELEGRAM_API_BASE = 'https://api.telegram.org'
+
+const telegram_environment_schema = z.object({
+	telegram_bot_token: z.string().min(1, { message: 'TELEGRAM_BOT_TOKEN is required' }),
+	telegram_chat_id: z.string().min(1, { message: 'TELEGRAM_CHAT_ID is required' }),
+})
 
 type TelegramTaskType = 'planning' | 'completion' | 'failure' | 'kickoff_retry' | 'confirmation'
 
@@ -29,17 +36,25 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	confirmation: { icon: '⏸️', label: 'Confirmation required' },
 }
 
-function get_environment(name: string): string | undefined {
-	return process.env[name]
+function parse_environment_string(value: string | undefined): string {
+	return value?.trim() ?? ''
 }
 
 function load_config(): TelegramConfig | undefined {
-	const bot_token = get_environment('TELEGRAM_BOT_TOKEN')?.trim()
-	const chat_id = get_environment('TELEGRAM_CHAT_ID')?.trim()
+	const result = telegram_environment_schema.safeParse({
+		telegram_bot_token: parse_environment_string(process.env['TELEGRAM_BOT_TOKEN']),
+		telegram_chat_id: parse_environment_string(process.env['TELEGRAM_CHAT_ID']),
+	})
 
-	if (!bot_token || !chat_id) return undefined
+	if (!result.success) {
+		const error_list = result.error.issues.map((issue) => issue.message).join(', ')
 
-	return { bot_token, chat_id }
+		console.warn(`⚠️  Telegram not configured: ${error_list}. Skipping.`)
+
+		return undefined
+	}
+
+	return { bot_token: result.data.telegram_bot_token, chat_id: result.data.telegram_chat_id }
 }
 
 function build_header(task_type: TelegramTaskType, repo_name: string | undefined): string {
@@ -100,17 +115,9 @@ async function post_message(config: TelegramConfig, text: string): Promise<void>
 	}
 }
 
-const SKIP_WARNING =
-	'⚠️  Telegram not configured: TELEGRAM_BOT_TOKEN and/or TELEGRAM_CHAT_ID not set. Skipping.'
-
 async function send(input: TelegramSendInput): Promise<void> {
 	const config = load_config()
-
-	if (config === undefined) {
-		console.warn(SKIP_WARNING)
-
-		return
-	}
+	if (config === undefined) return
 
 	const text = build_text(input)
 
@@ -129,5 +136,5 @@ const telegram_notify = {
 	send,
 }
 
-export { telegram_notify, build_text, TASK_DEFINITIONS }
+export { telegram_notify, build_text, TASK_DEFINITIONS, telegram_environment_schema }
 export type { TelegramSendInput, TelegramTaskType }

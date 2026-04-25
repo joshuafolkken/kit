@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  eslint-plugin-promise: ^7.2.1
-
 importers:
 
   .:
