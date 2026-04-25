@@ -15,23 +15,19 @@ function is_unstaged_file(line: string): boolean {
 	return line.length >= REQUIRED_STATUS_LENGTH && line[STAGED_STATUS_INDEX] !== ' '
 }
 
-function has_unstaged_files(status_output: string): boolean {
-	const lines = status_output
-		.split(/\r?\n/u)
-		.map((line) => line.trimEnd())
-		.filter((line) => line.length > 0)
-
-	const has_untracked = lines.some((line) => is_untracked_file(line))
-	const has_unstaged = lines.some((line) => is_unstaged_file(line))
-
-	return has_untracked || has_unstaged
-}
-
 function parse_status_lines(status_output: string): Array<string> {
 	return status_output
 		.split(/\r?\n/u)
 		.map((line) => line.trimEnd())
 		.filter((line) => line.length > 0)
+}
+
+function has_unstaged_files(status_output: string): boolean {
+	const lines = parse_status_lines(status_output)
+	const has_untracked = lines.some((line) => is_untracked_file(line))
+	const has_unstaged = lines.some((line) => is_unstaged_file(line))
+
+	return has_untracked || has_unstaged
 }
 
 function is_staged_file(line: string): boolean {

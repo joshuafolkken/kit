@@ -3,8 +3,25 @@ import { evaluate_pr_state, type PrEvaluation } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot, type PrStateSnapshot } from './git-pr-checks-parse'
 import { package_name_schema } from './schemas'
 
+const SECONDS_TO_MS = 1000
 const CHECK_WAIT_INTERVAL_MS = 10_000
-const CHECK_MAX_ATTEMPTS = 18
+const DEFAULT_TIMEOUT_SECONDS = 180
+
+function compute_max_attempts(timeout_seconds: number, interval_ms: number): number {
+	return Math.ceil(timeout_seconds / (interval_ms / SECONDS_TO_MS))
+}
+
+const DEFAULT_MAX_ATTEMPTS = compute_max_attempts(DEFAULT_TIMEOUT_SECONDS, CHECK_WAIT_INTERVAL_MS)
+
+function get_configured_max_attempts(): number {
+	const environment_seconds = Number(process.env['JOSH_CI_TIMEOUT_SECONDS'])
+
+	return Number.isFinite(environment_seconds) && environment_seconds > 0
+		? compute_max_attempts(environment_seconds, CHECK_WAIT_INTERVAL_MS)
+		: DEFAULT_MAX_ATTEMPTS
+}
+
+const CHECK_MAX_ATTEMPTS = get_configured_max_attempts()
 const DEFAULT_STABLE_READS = 2
 
 type PrStateFetcher = (branch_name: string) => Promise<PrStateSnapshot>
@@ -110,7 +127,15 @@ const git_pr_checks = {
 	wait_for_pr_success: wait_for_pr_success_default,
 }
 
-export { git_pr_checks, parse_repo_name_from_package, wait_for_pr_success, DEFAULT_STABLE_READS }
+export {
+	git_pr_checks,
+	parse_repo_name_from_package,
+	wait_for_pr_success,
+	compute_max_attempts,
+	get_configured_max_attempts,
+	DEFAULT_STABLE_READS,
+	DEFAULT_MAX_ATTEMPTS,
+}
 export type { PrStateFetcher }
 export { evaluate_pr_state } from './git-pr-checks-eval'
 export type { PrEvaluation } from './git-pr-checks-eval'

@@ -9,4 +9,5 @@ words:
   - myrepo
   - ncurc
   - shellcheck
+  - unstub
   - vercel
