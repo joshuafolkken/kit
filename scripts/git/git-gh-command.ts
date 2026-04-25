@@ -1,3 +1,4 @@
+import { git_command } from './git-command'
 import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec, has_stderr_field } from './git-gh-exec'
 import { git_pr_checks_watch } from './git-pr-checks-watch'
 
@@ -26,10 +27,11 @@ function handle_pr_create_error(error: unknown): never {
 async function pr_create(title: string, body: string): Promise<string> {
 	const safe_title = JSON.stringify(title)
 	const safe_body = JSON.stringify(body)
+	const base = await git_command.get_default_branch()
 
 	try {
 		return await git_gh_exec.exec_gh_command(
-			`pr create --title ${safe_title} --body ${safe_body} --label enhancement --base main`,
+			`pr create --title ${safe_title} --body ${safe_body} --base ${base}`,
 		)
 	} catch (error) {
 		return handle_pr_create_error(error)

@@ -36,4 +36,12 @@ describe('completion gate steps', () => {
 		expect(cspell_index).toBeGreaterThan(check_index)
 		expect(unit_index).toBeGreaterThan(cspell_index)
 	})
+
+	it('uses pnpm josh for the cspell command', () => {
+		expect(GATE_CSPELL).toBe('pnpm josh cspell:dot')
+	})
+
+	it('uses pnpm josh for the unit test command', () => {
+		expect(GATE_TEST_UNIT).toBe('pnpm josh test:unit')
+	})
 })
