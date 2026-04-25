@@ -10,6 +10,8 @@ vi.mock('node:fs', () => ({
 const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
 const { bump_version } = await import('./bump-version')
 
+const import_time_write_calls = vi.mocked(write_file_sync).mock.calls.length
+
 const MOCK_PKG = JSON.stringify({ name: 'kit', version: '1.2.3' }, undefined, '\t')
 
 beforeEach(() => {
@@ -71,7 +73,7 @@ describe('bump_version — JSON-safe write', () => {
 
 describe('bump-version — side-effect-free import', () => {
 	it('does not call writeFileSync on import', () => {
-		expect(vi.mocked(write_file_sync)).not.toHaveBeenCalled()
+		expect(import_time_write_calls).toBe(0)
 	})
 })
 

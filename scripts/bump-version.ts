@@ -16,9 +16,7 @@ function compute_new_version(version: string, bump_type: BumpType): string {
 	const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(version)
 
 	if (!match) {
-		console.error('Invalid or pre-release version format (not supported):', version)
-
-		return process.exit(1)
+		throw new Error(`Invalid or pre-release version format (not supported): ${version}`)
 	}
 
 	const major = Number(match[MAJOR_INDEX])
@@ -54,7 +52,12 @@ function main(): void {
 		process.exit(1)
 	}
 
-	bump_version(bump_type as BumpType)
+	try {
+		bump_version(bump_type as BumpType)
+	} catch (error) {
+		console.error(error instanceof Error ? error.message : String(error))
+		process.exit(1)
+	}
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
