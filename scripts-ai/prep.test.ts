@@ -1,13 +1,24 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { OverridesDiff } from '../scripts/overrides/overrides-logic'
 
+const { checkout_mock, pull_mock } = vi.hoisted(() => ({
+	checkout_mock: vi.fn().mockResolvedValue({}),
+	pull_mock: vi.fn().mockResolvedValue({}),
+}))
+
+vi.mock('../scripts/git/git-command', () => ({
+	git_command: { checkout: checkout_mock, pull: pull_mock },
+}))
+
 vi.mock('node:child_process', () => ({
 	execSync: vi.fn(),
 }))
 
+const write_file_spy = vi.hoisted(() => vi.fn())
+
 vi.mock('node:fs', () => ({
-	readFileSync: vi.fn().mockReturnValue('{"pnpm":{"overrides":{}}}'),
-	writeFileSync: vi.fn(),
+	readFileSync: vi.fn().mockReturnValue('{"name":"kit","pnpm":{"overrides":{}}}'),
+	writeFileSync: write_file_spy,
 }))
 
 const { prep } = await import('./prep')
@@ -74,5 +85,51 @@ describe('report_diff — call count', () => {
 
 		expect(spy).toHaveBeenCalledTimes(4)
 		vi.restoreAllMocks()
+	})
+})
+
+describe('prepare_repository — git operations', () => {
+	it('checks out main branch via git_command', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		await prep.prepare_repository()
+
+		expect(checkout_mock).toHaveBeenCalledWith('main')
+		vi.restoreAllMocks()
+	})
+
+	it('pulls latest changes via git_command', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		await prep.prepare_repository()
+
+		expect(pull_mock).toHaveBeenCalled()
+		vi.restoreAllMocks()
+	})
+})
+
+describe('restore_overrides — schema-validated write', () => {
+	it('writes JSON containing the provided snapshot overrides', () => {
+		const snapshot = { react: '^18.0.0' }
+
+		prep.restore_overrides(snapshot)
+
+		const written = JSON.parse(write_file_spy.mock.calls.at(-1)?.[1] as string) as {
+			pnpm?: { overrides?: Record<string, string> }
+		}
+
+		expect(written.pnpm?.overrides).toEqual(snapshot)
+	})
+
+	it('preserves top-level package.json fields outside pnpm', () => {
+		prep.restore_overrides({})
+
+		const written = JSON.parse(write_file_spy.mock.calls.at(-1)?.[1] as string) as {
+			name?: string
+		}
+
+		expect(written.name).toBe('kit')
 	})
 })
