@@ -62,16 +62,19 @@ const FAKE_ISSUE_INFO = {
 	commit_message: FAKE_ISSUE_COMMIT,
 }
 
+beforeEach(() => {
+	vi.clearAllMocks()
+	vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
+	vi.mocked(animation_helpers.execute_with_animation).mockImplementation(
+		async (_label: string, action: () => Promise<unknown>) => await action(),
+	)
+	vi.mocked(git_gh_command.pr_create).mockResolvedValue('')
+	vi.mocked(git_countdown.wait_for_seconds).mockResolvedValue()
+	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(FAKE_PR_URL)
+})
+
 describe('git_pr.create_with_issue_info — build_body behavior', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
-		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
-		vi.mocked(animation_helpers.execute_with_animation).mockImplementation(
-			async (_label: string, action: () => Promise<unknown>) => await action(),
-		)
-		vi.mocked(git_gh_command.pr_create).mockResolvedValue('')
-		vi.mocked(git_countdown.wait_for_seconds).mockResolvedValue()
-		vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(FAKE_PR_URL)
 		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: true })
 	})
 
@@ -95,17 +98,6 @@ describe('git_pr.create_with_issue_info — build_body behavior', () => {
 })
 
 describe('git_pr.create — post-watch conflict check behavior', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
-		vi.mocked(animation_helpers.execute_with_animation).mockImplementation(
-			async (_label: string, action: () => Promise<unknown>) => await action(),
-		)
-		vi.mocked(git_gh_command.pr_create).mockResolvedValue('')
-		vi.mocked(git_countdown.wait_for_seconds).mockResolvedValue()
-		vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(FAKE_PR_URL)
-	})
-
 	it('skips conflict check when watch times out', async () => {
 		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: true })
 
