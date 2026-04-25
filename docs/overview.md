@@ -28,4 +28,5 @@
 - [josh commands](./josh-commands.md) — full CLI reference
 - [josh init](./init.md) — what `josh init` creates and merges
 - [josh sync](./sync.md) — what `josh sync` overwrites and why
+- [scripts-ai](./scripts-ai.md) — Telegram env vars and AI workflow commands
 - [README](../README.md) — authentication, installation, and package exports
