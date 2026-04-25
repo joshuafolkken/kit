@@ -7,7 +7,21 @@ import {
 } from './git-pr-checks-parse'
 
 // cspell:words coderabbit
-const REQUIRED_CHECKS = ['CodeRabbit', 'SonarQube']
+const DEFAULT_REQUIRED_CHECKS = ['CodeRabbit', 'SonarQube']
+const REQUIRED_CHECKS_ENV_VAR = 'JOSH_REQUIRED_CHECKS'
+
+function parse_required_checks(): ReadonlyArray<string> {
+	const raw = process.env[REQUIRED_CHECKS_ENV_VAR]
+
+	if (!raw) return DEFAULT_REQUIRED_CHECKS
+
+	return raw
+		.split(',')
+		.map((check) => check.trim())
+		.filter((check) => check.length > 0)
+}
+
+const REQUIRED_CHECKS = parse_required_checks()
 const MERGE_STATE_CLEAN = 'CLEAN'
 const REVIEW_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
 

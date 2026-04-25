@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
 		"strict": true,
+		// tsx uses bundler-like resolution; "bundler" is the correct pairing for module:ESNext
 		"moduleResolution": "bundler",
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,

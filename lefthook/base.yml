@@ -5,9 +5,6 @@ pre-commit:
       skip: git diff --cached --quiet
       run: pnpm josh prevent-main-commit
 
-    audit:
-      run: pnpm josh audit
-
     cspell:
       glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json}'
       run: pnpm exec cspell lint --no-must-find-files --no-progress {staged_files}
@@ -41,12 +38,16 @@ commit-msg:
 pre-push:
   parallel: false
   commands:
+    audit:
+      run: pnpm josh audit
+
     test-unit:
       run: pnpm exec vitest run
 
   fail_text: |
-    🚫 Push blocked due to test failures
+    🚫 Push blocked due to test failures or audit issues
     Please resolve the issues above before pushing.
 
     Troubleshooting:
     • Run tests locally: `josh test:unit`
+    • Run audit locally: `josh audit`

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { evaluate_pr_state, read_required_statuses, REQUIRED_CHECKS } from './git-pr-checks-eval'
 import type { PrStateSnapshot, RollupCheck } from './git-pr-checks-parse'
 
@@ -117,5 +117,40 @@ describe('evaluate_pr_state — pending', () => {
 		})
 
 		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+})
+
+const JOSH_REQUIRED_CHECKS = 'JOSH_REQUIRED_CHECKS'
+const CUSTOM_CHECKS = 'Lighthouse,DeployCheck'
+
+describe('REQUIRED_CHECKS — JOSH_REQUIRED_CHECKS env var override', () => {
+	beforeEach(() => {
+		vi.resetModules()
+		vi.stubEnv(JOSH_REQUIRED_CHECKS, CUSTOM_CHECKS)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('uses env var checks instead of defaults', async () => {
+		const { REQUIRED_CHECKS: checks } = await import('./git-pr-checks-eval')
+
+		expect(checks).toContain('Lighthouse')
+		expect(checks).toContain('DeployCheck')
+		expect(checks).not.toContain(CODE_RABBIT)
+	})
+})
+
+describe('REQUIRED_CHECKS — JOSH_REQUIRED_CHECKS env var not set', () => {
+	beforeEach(() => {
+		vi.resetModules()
+	})
+
+	it('falls back to defaults when env var is absent', async () => {
+		const { REQUIRED_CHECKS: checks } = await import('./git-pr-checks-eval')
+
+		expect(checks).toContain(CODE_RABBIT)
+		expect(checks).toContain(SONAR_QUBE)
 	})
 })
