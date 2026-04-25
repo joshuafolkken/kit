@@ -7,7 +7,7 @@ vi.mock('node:fs', () => ({
 	writeFileSync: vi.fn(),
 }))
 
-const MOCK_PKG = JSON.stringify({ name: 'kit', version: '1.2.3' })
+const MOCK_PKG = JSON.stringify({ name: 'kit', version: '1.2.3' }, undefined, '\t')
 const ORIGINAL_ARGV = process.argv[2] ?? ''
 
 afterEach(() => {
@@ -61,6 +61,27 @@ describe('bump-version.ts — version increment', () => {
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
 			expect.stringContaining('"version": "2.0.0"'),
+		)
+	})
+})
+
+describe('bump-version.ts — key order preservation', () => {
+	beforeEach(() => {
+		vi.resetModules()
+	})
+
+	it('preserves original key order after version bump', async () => {
+		process.argv[2] = 'patch'
+
+		const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
+
+		vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
+
+		await import('./bump-version')
+
+		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.stringMatching(/"name"[\s\S]*"version"/u),
 		)
 	})
 })

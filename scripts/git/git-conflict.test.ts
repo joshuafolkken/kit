@@ -27,30 +27,30 @@ afterEach(() => {
 })
 
 describe('git_conflict.check_pr_status_for_errors — no conflicts', () => {
-	it('returns false when pr_view returns empty string', async () => {
+	it('resolves without error when pr_view returns empty string', async () => {
 		mocked_pr_view.mockResolvedValue('')
 
-		expect(await git_conflict.check_pr_status_for_errors(BRANCH_NAME)).toBe(false)
+		await expect(git_conflict.check_pr_status_for_errors(BRANCH_NAME)).resolves.toBeUndefined()
 	})
 
-	it('returns false when pr_view throws', async () => {
+	it('resolves without error when pr_view throws', async () => {
 		mocked_pr_view.mockRejectedValue(new Error('not found'))
 
-		expect(await git_conflict.check_pr_status_for_errors(BRANCH_NAME)).toBe(false)
+		await expect(git_conflict.check_pr_status_for_errors(BRANCH_NAME)).resolves.toBeUndefined()
 	})
 
-	it('returns false when PR JSON is invalid', async () => {
+	it('resolves without error when PR JSON is invalid', async () => {
 		mocked_pr_view.mockResolvedValue('not-valid-json')
 
-		expect(await git_conflict.check_pr_status_for_errors(BRANCH_NAME)).toBe(false)
+		await expect(git_conflict.check_pr_status_for_errors(BRANCH_NAME)).resolves.toBeUndefined()
 	})
 
-	it('returns false when PR is mergeable with clean state', async () => {
+	it('resolves without error when PR is mergeable with clean state', async () => {
 		const pr_info = JSON.stringify({ mergeable: true, mergeStateStatus: MERGE_STATE_CLEAN })
 
 		mocked_pr_view.mockResolvedValue(pr_info)
 
-		expect(await git_conflict.check_pr_status_for_errors(BRANCH_NAME)).toBe(false)
+		await expect(git_conflict.check_pr_status_for_errors(BRANCH_NAME)).resolves.toBeUndefined()
 	})
 })
 

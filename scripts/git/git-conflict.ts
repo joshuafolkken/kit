@@ -68,7 +68,6 @@ function display_conflict_warning(): void {
 	console.error(CONFLICT_MESSAGE)
 	console.error('Please resolve the conflicts and update the PR.')
 	console.error('')
-	process.exit(1)
 }
 
 async function get_pr_info_safe(branch_name: string): Promise<string | undefined> {
@@ -81,20 +80,14 @@ async function get_pr_info_safe(branch_name: string): Promise<string | undefined
 	}
 }
 
-async function check_pr_status_for_errors(branch_name: string): Promise<boolean> {
+async function check_pr_status_for_errors(branch_name: string): Promise<void> {
 	const pr_info_json = await get_pr_info_safe(branch_name)
-
-	if (pr_info_json === undefined) {
-		return false
-	}
+	if (pr_info_json === undefined) return
 
 	if (has_conflicts(pr_info_json)) {
 		display_conflict_warning()
-
-		return true
+		process.exit(1)
 	}
-
-	return false
 }
 
 const git_conflict = {

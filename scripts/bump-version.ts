@@ -1,8 +1,4 @@
 #!/usr/bin/env tsx
-/**
- * Bump package.json version without invoking npm.
- * Usage: tsx scripts/bump-version.ts [major|minor|patch]
- */
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_with_version_schema } from './schemas'
@@ -20,8 +16,8 @@ const MINOR_INDEX = 2
 const PATCH_INDEX = 3
 
 const package_path = path.join(process.cwd(), 'package.json')
-const raw = package_with_version_schema.parse(JSON.parse(readFileSync(package_path, 'utf8')))
-const { version } = raw
+const file_content = readFileSync(package_path, 'utf8')
+const { version } = package_with_version_schema.parse(JSON.parse(file_content))
 const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(version)
 
 if (!match) {
@@ -59,6 +55,7 @@ switch (bump) {
 	}
 }
 
-raw.version = new_version
-writeFileSync(package_path, `${JSON.stringify(raw, undefined, '\t')}\n`)
+const updated_content = file_content.replace(/("version"\s*:\s*)"[^"]*"/u, `$1"${new_version}"`)
+
+writeFileSync(package_path, updated_content)
 console.info(new_version)

@@ -76,7 +76,7 @@ describe('git_pr.create — post-watch conflict check behavior', () => {
 
 	it('calls conflict check when watch completes without timeout', async () => {
 		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: false })
-		vi.mocked(git_conflict.check_pr_status_for_errors).mockResolvedValue(false)
+		vi.mocked(git_conflict.check_pr_status_for_errors).mockResolvedValue()
 
 		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
 

@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+	compute_max_attempts,
+	DEFAULT_MAX_ATTEMPTS,
 	DEFAULT_STABLE_READS,
 	evaluate_pr_state,
+	get_configured_max_attempts,
 	parse_pr_state_snapshot,
 	parse_repo_name_from_package,
 	wait_for_pr_success,
@@ -259,5 +262,49 @@ describe('wait_for_pr_success — failure and timeout', () => {
 				required_stable_reads: DEFAULT_STABLE_READS,
 			}),
 		).rejects.toThrow(/Timed out/u)
+	})
+})
+
+describe('compute_max_attempts', () => {
+	it('returns 18 for 180s timeout and 10s interval', () => {
+		expect(compute_max_attempts(180, 10_000)).toBe(18)
+	})
+
+	it('rounds up when timeout does not divide evenly', () => {
+		expect(compute_max_attempts(181, 10_000)).toBe(19)
+	})
+
+	it('returns 3 for 30s timeout and 10s interval', () => {
+		expect(compute_max_attempts(30, 10_000)).toBe(3)
+	})
+})
+
+describe('get_configured_max_attempts', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	it('returns DEFAULT_MAX_ATTEMPTS when env var is not set', () => {
+		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
+	})
+
+	it('returns computed value when env var is a valid positive number', () => {
+		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '60')
+		expect(get_configured_max_attempts()).toBe(6)
+	})
+
+	it('returns DEFAULT_MAX_ATTEMPTS when env var is zero', () => {
+		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '0')
+		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
+	})
+
+	it('returns DEFAULT_MAX_ATTEMPTS when env var is negative', () => {
+		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '-30')
+		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
+	})
+
+	it('returns DEFAULT_MAX_ATTEMPTS when env var is not a number', () => {
+		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', 'abc')
+		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
 	})
 })

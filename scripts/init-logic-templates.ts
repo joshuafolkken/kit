@@ -1,5 +1,6 @@
 import type { ProjectType } from './init-logic'
 
+// Template strings below contain `export default` as generated file content, not as module exports
 const ESLINT_SVELTEKIT = `import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
 import svelteConfig from './svelte.config.js'
 

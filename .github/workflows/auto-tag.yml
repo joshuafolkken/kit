@@ -36,9 +36,8 @@ jobs:
         run: |
           CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
 
-          # 前のコミットのpackage.jsonを取得
           if git show HEAD~1:package.json > /dev/null 2>&1; then
-            PREV_VERSION=$(git show HEAD~1:package.json | node -p "require('fs').readFileSync('/dev/stdin', 'utf8')" | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version")
+            PREV_VERSION=$(git show HEAD~1:package.json | jq -r '.version')
             echo "Previous version: $PREV_VERSION"
             echo "Current version: $CURRENT_VERSION"
 
@@ -50,7 +49,7 @@ jobs:
               echo "ℹ️ Version unchanged: $CURRENT_VERSION"
             fi
           else
-            # 初回コミットの場合
+            # first commit
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "ℹ️ First commit, creating tag"
           fi
@@ -88,6 +87,6 @@ jobs:
 
       - name: Trigger next workflow
         if: steps.create_tag.outputs.completed == 'true'
-        uses: peter-evans/repository-dispatch@bf47d102fdb849e755b0b0023ea3e81a44b6f570 # v2
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           event-type: new-tag-created

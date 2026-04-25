@@ -142,10 +142,12 @@ function parse_positionals(positionals: Array<string>): {
 async function prepare_issue_info(cli_issue_input?: string): Promise<IssueInfo> {
 	const current_branch = await git_branch.current()
 	const issue_info = await git_issue.get_and_display(cli_issue_input)
+	const actual_branch = await git_branch.check_and_create_branch(
+		current_branch,
+		issue_info.branch_name,
+	)
 
-	await git_branch.check_and_create_branch(current_branch, issue_info.branch_name)
-
-	return issue_info
+	return { ...issue_info, branch_name: actual_branch }
 }
 
 async function main(): Promise<void> {
@@ -179,7 +181,7 @@ try {
 	git_error.handle(error)
 }
 
-const git_workflow = { parse_positionals, get_workflow_confirmations }
+const git_workflow = { parse_positionals, get_workflow_confirmations, prepare_issue_info }
 
 export type { CliArguments }
 export { git_workflow }

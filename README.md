@@ -60,7 +60,7 @@ A single `josh` command is available in `node_modules/.bin/` after installation.
 | `josh cspell`               | Run spell check                                   |
 | `josh test:unit`            | Run unit tests                                    |
 | `josh check`                | Type-check SvelteKit project                      |
-| `josh check:ci`             | Type-check SvelteKit project (CI strict mode)     |
+| `josh check:svelte:ci`      | Type-check SvelteKit project (CI strict mode)     |
 | `josh init`                 | Initialize config files in a new project          |
 | `josh sync`                 | Sync managed files from the package               |
 | `josh install`              | Install josh to ~/.local/bin                      |

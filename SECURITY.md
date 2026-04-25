@@ -9,7 +9,11 @@
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability, please do not report it publicly.
-Please open a draft security advisory on GitHub or contact the maintainers directly.
+
+- **Preferred**: Open a [draft security advisory](https://github.com/joshuafolkken/kit/security/advisories/new) on GitHub.
+- **Alternative**: Email [joshuafolkken@gmail.com](mailto:joshuafolkken@gmail.com) directly.
+
+We aim to acknowledge reports within **48 hours** and provide a resolution or mitigation plan within **7 days** for confirmed vulnerabilities.
 
 ## Published Package Contents
 

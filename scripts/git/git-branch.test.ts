@@ -40,6 +40,10 @@ const mocked_display_error = vi.mocked(git_error.display_branch_mismatch_error)
 
 const TARGET_BRANCH = 'feature-branch'
 const WRONG_BRANCH = 'wrong-branch'
+const SAME_PREFIX_CURRENT = '42-short-name'
+const ISSUE_42_BRANCH = '42-some-feature'
+const ISSUE_99_BRANCH = '99-other-feature'
+const NO_PREFIX_BRANCH = 'feature-no-number'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -50,19 +54,21 @@ describe('git_branch.check_and_create_branch — from main', () => {
 	it('switches to existing branch when on main and target branch exists', async () => {
 		mocked_branch_exists.mockResolvedValue(true)
 		mocked_checkout.mockResolvedValue('')
-		await git_branch.check_and_create_branch('main', TARGET_BRANCH)
+		const result = await git_branch.check_and_create_branch('main', TARGET_BRANCH)
 
 		expect(mocked_checkout).toHaveBeenCalledWith(TARGET_BRANCH)
 		expect(mocked_checkout_b).not.toHaveBeenCalled()
+		expect(result).toBe(TARGET_BRANCH)
 	})
 
 	it('creates new branch when on main and target branch does not exist', async () => {
 		mocked_branch_exists.mockResolvedValue(false)
 		mocked_checkout_b.mockResolvedValue('')
-		await git_branch.check_and_create_branch('main', TARGET_BRANCH)
+		const result = await git_branch.check_and_create_branch('main', TARGET_BRANCH)
 
 		expect(mocked_checkout_b).toHaveBeenCalledWith(TARGET_BRANCH)
 		expect(mocked_checkout).not.toHaveBeenCalled()
+		expect(result).toBe(TARGET_BRANCH)
 	})
 
 	it('always pulls latest when on main', async () => {
@@ -75,12 +81,13 @@ describe('git_branch.check_and_create_branch — from main', () => {
 })
 
 describe('git_branch.check_and_create_branch — from correct branch', () => {
-	it('does nothing when already on the target branch', async () => {
-		await git_branch.check_and_create_branch(TARGET_BRANCH, TARGET_BRANCH)
+	it('returns target branch name when already on it', async () => {
+		const result = await git_branch.check_and_create_branch(TARGET_BRANCH, TARGET_BRANCH)
 
 		expect(mocked_display_error).not.toHaveBeenCalled()
 		expect(mocked_checkout).not.toHaveBeenCalled()
 		expect(mocked_checkout_b).not.toHaveBeenCalled()
+		expect(result).toBe(TARGET_BRANCH)
 	})
 })
 
@@ -89,6 +96,30 @@ describe('git_branch.check_and_create_branch — from wrong branch', () => {
 		await git_branch.check_and_create_branch(WRONG_BRANCH, TARGET_BRANCH)
 
 		expect(mocked_display_error).toHaveBeenCalledWith(WRONG_BRANCH, TARGET_BRANCH)
+	})
+})
+
+describe('git_branch.check_and_create_branch — same issue prefix', () => {
+	it('returns current branch without error when prefix matches', async () => {
+		const result = await git_branch.check_and_create_branch(
+			SAME_PREFIX_CURRENT,
+			'42-very-long-name-from-full-title',
+		)
+
+		expect(mocked_display_error).not.toHaveBeenCalled()
+		expect(result).toBe(SAME_PREFIX_CURRENT)
+	})
+
+	it('calls display_branch_mismatch_error when issue numbers differ', async () => {
+		await git_branch.check_and_create_branch(ISSUE_42_BRANCH, ISSUE_99_BRANCH)
+
+		expect(mocked_display_error).toHaveBeenCalledWith(ISSUE_42_BRANCH, ISSUE_99_BRANCH)
+	})
+
+	it('calls display_branch_mismatch_error when current branch has no issue prefix', async () => {
+		await git_branch.check_and_create_branch(NO_PREFIX_BRANCH, ISSUE_42_BRANCH)
+
+		expect(mocked_display_error).toHaveBeenCalledWith(NO_PREFIX_BRANCH, ISSUE_42_BRANCH)
 	})
 })
 
