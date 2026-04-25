@@ -98,6 +98,7 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 	let stable_count = 0
 
 	for (let attempt = 0; attempt < options.max_attempts; attempt += 1) {
+		console.info(`Checking PR status… (${String(attempt + 1)}/${String(options.max_attempts)})`)
 		const result = await attempt_pr_success_poll({ options, stable_count, attempt })
 
 		if (result.snapshot !== undefined) return result.snapshot

@@ -279,6 +279,48 @@ describe('compute_max_attempts', () => {
 	})
 })
 
+describe('wait_for_pr_success — heartbeat logging', () => {
+	it('logs once per poll attempt', async () => {
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		const sequence = make_sequence_fetcher([
+			pending_rollup_snapshot(),
+			make_snapshot(),
+			make_snapshot(),
+		])
+
+		await wait_for_pr_success({
+			branch_name: 'feature/x',
+			fetcher: sequence.fetch,
+			interval_ms: 0,
+			max_attempts: 10,
+			required_stable_reads: DEFAULT_STABLE_READS,
+		})
+
+		expect(info_spy).toHaveBeenCalledTimes(3)
+		vi.restoreAllMocks()
+	})
+
+	it('includes the attempt number and max in the log message', async () => {
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		const sequence = make_sequence_fetcher([make_snapshot(), make_snapshot()])
+
+		await wait_for_pr_success({
+			branch_name: 'feature/x',
+			fetcher: sequence.fetch,
+			interval_ms: 0,
+			max_attempts: 5,
+			required_stable_reads: DEFAULT_STABLE_READS,
+		})
+
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('1/5'))
+		vi.restoreAllMocks()
+	})
+})
+
 describe('get_configured_max_attempts', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs()
