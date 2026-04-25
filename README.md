@@ -15,12 +15,24 @@ See [docs/overview.md](./docs/overview.md) for a full description of what this p
 
 **1. Authenticate** — GitHub Packages requires auth even for public packages:
 
+**bash / zsh (macOS, Linux):**
+
 ```bash
 # Add to .npmrc
 //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 
 # Export your token (uses your existing gh CLI session)
 export NODE_AUTH_TOKEN=$(gh auth token)
+```
+
+**PowerShell (Windows):**
+
+```powershell
+# Add to .npmrc
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+
+# Set your token for the current session
+$env:NODE_AUTH_TOKEN = (gh auth token)
 ```
 
 If `gh auth token` fails or you get a 401, re-authenticate with the `read:packages` scope:
