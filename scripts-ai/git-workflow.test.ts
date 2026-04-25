@@ -125,6 +125,14 @@ describe('get_workflow_confirmations — interactive mode', () => {
 	})
 })
 
+describe('get_workflow_confirmations — body flag is separate from confirmations', () => {
+	it('does not affect confirmations when body is provided', async () => {
+		const result = await git_workflow.get_workflow_confirmations(true, { body: 'my pr body' })
+
+		expect(result).toStrictEqual({ commit: true, push: true, pr: true })
+	})
+})
+
 describe('prepare_issue_info — branch name override', () => {
 	it('returns issue_info with branch_name from check_and_create_branch', async () => {
 		const { git_branch } = await import('../scripts/git/git-branch')

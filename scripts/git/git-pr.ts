@@ -174,13 +174,17 @@ function build_title(issue_info: IssueInfo): string {
 	return `${issue_info.title} #${issue_info.number}`
 }
 
-function build_body(issue_info: IssueInfo): string {
-	return `closes #${issue_info.number}`
+function build_body(issue_info: IssueInfo, extra_body?: string): string {
+	const closes = `closes #${issue_info.number}`
+
+	if (extra_body === undefined) return closes
+
+	return `${closes}\n\n${extra_body}`
 }
 
-async function create_with_issue_info(issue_info: IssueInfo): Promise<void> {
+async function create_with_issue_info(issue_info: IssueInfo, extra_body?: string): Promise<void> {
 	const title = build_title(issue_info)
-	const body = build_body(issue_info)
+	const body = build_body(issue_info, extra_body)
 
 	await create(title, body, issue_info.branch_name)
 }

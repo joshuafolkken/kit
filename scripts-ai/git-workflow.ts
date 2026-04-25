@@ -32,6 +32,7 @@ Options:
   --skip-commit     Skip the commit step.
   --skip-push       Skip the push step.
   --skip-pr         Skip the PR creation step.
+  --body <text>     Extra text appended after "closes #N" in the PR body.
   -y, --yes         Skip safety confirmations (unstaged files, etc.).
   -h, --help        Display this help message.
 
@@ -64,9 +65,10 @@ async function execute_push_step(confirmations: WorkflowConfirmations): Promise<
 async function execute_pr_step(
 	issue_info: IssueInfo,
 	confirmations: WorkflowConfirmations,
+	extra_body?: string,
 ): Promise<void> {
 	if (confirmations.pr) {
-		await git_pr.create_with_issue_info(issue_info)
+		await git_pr.create_with_issue_info(issue_info, extra_body)
 	} else {
 		console.info(SKIP_MESSAGES.pr)
 	}
@@ -76,12 +78,13 @@ async function run_workflow_steps(
 	issue_info: IssueInfo,
 	confirmations: WorkflowConfirmations,
 	commit_message_override?: string,
+	extra_body?: string,
 ): Promise<void> {
 	const commit_message = commit_message_override ?? issue_info.commit_message
 
 	await execute_commit_step(commit_message, confirmations)
 	await execute_push_step(confirmations)
-	await execute_pr_step(issue_info, confirmations)
+	await execute_pr_step(issue_info, confirmations, extra_body)
 }
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -92,6 +95,7 @@ interface CliArguments {
 		'skip-pr'?: boolean
 		yes?: boolean
 		help?: boolean
+		body?: string
 	}
 	positionals: Array<string>
 }
@@ -105,6 +109,7 @@ function parse_cli_arguments(): CliArguments {
 			'skip-pr': { type: 'boolean' },
 			yes: { type: 'boolean', short: 'y' },
 			help: { type: 'boolean', short: 'h' },
+			body: { type: 'string' },
 		},
 		allowPositionals: true,
 	})
@@ -171,7 +176,7 @@ async function main(): Promise<void> {
 			? `${issue_info.commit_message} ${commit_suffix}`
 			: undefined
 
-	await run_workflow_steps(issue_info, confirmations, commit_message)
+	await run_workflow_steps(issue_info, confirmations, commit_message, values.body)
 }
 
 try {
