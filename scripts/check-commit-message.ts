@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { git_command } from './git/git-command'
 
 interface CheckResult {
@@ -61,11 +62,15 @@ async function check_commit_message(): Promise<CheckResult> {
 	}
 }
 
-const result = await check_commit_message()
+async function main(): Promise<void> {
+	const result = await check_commit_message()
 
-console.info(result.message)
+	console.info(result.message)
 
-if (!result.success) process.exit(1)
+	if (!result.success) process.exit(1)
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 export { check_commit_message, extract_issue_number }
 

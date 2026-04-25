@@ -37,12 +37,9 @@ vi.mock('node:fs', () => ({
 	writeFileSync: vi.fn(),
 }))
 
-vi.mock('node:util', () => ({
-	parseArgs: () => ({ values: { save: false } }),
-}))
+const { run_overrides_check } = await import('./overrides-check')
 
 beforeEach(() => {
-	vi.resetModules()
 	vi.spyOn(process, 'exit').mockImplementation(() => {
 		throw new Error(PROCESS_EXIT_CALLED)
 	})
@@ -54,33 +51,41 @@ beforeEach(() => {
 })
 
 describe('overrides-check — snapshot not found (ENOENT)', () => {
-	it('throws when snapshot file does not exist', async () => {
-		await expect(import('./overrides-check')).rejects.toThrow()
+	it('throws when snapshot file does not exist', () => {
+		expect(() => {
+			run_overrides_check(false)
+		}).toThrow()
 	})
 })
 
 describe('overrides-check — invalid snapshot JSON', () => {
-	it('throws when snapshot file contains invalid JSON', async () => {
+	it('throws when snapshot file contains invalid JSON', () => {
 		fs_mock.state.snapshot_content = 'not valid json'
 
-		await expect(import('./overrides-check')).rejects.toThrow()
+		expect(() => {
+			run_overrides_check(false)
+		}).toThrow()
 	})
 })
 
 describe('overrides-check — valid snapshot matches current', () => {
-	it('does not call process.exit when overrides match snapshot', async () => {
+	it('does not call process.exit when overrides match snapshot', () => {
 		fs_mock.state.snapshot_content = REACT_18_SNAPSHOT
 		fs_mock.state.package_json = '{"pnpm":{"overrides":{"react":"^18.0.0"}}}'
 
-		await expect(import('./overrides-check')).resolves.not.toThrow()
+		expect(() => {
+			run_overrides_check(false)
+		}).not.toThrow()
 	})
 })
 
 describe('overrides-check — snapshot differs from current', () => {
-	it('calls process.exit(1) when overrides do not match snapshot', async () => {
+	it('calls process.exit(1) when overrides do not match snapshot', () => {
 		fs_mock.state.snapshot_content = REACT_18_SNAPSHOT
 		fs_mock.state.package_json = '{"pnpm":{"overrides":{"react":"^19.0.0"}}}'
 
-		await expect(import('./overrides-check')).rejects.toThrow(PROCESS_EXIT_CALLED)
+		expect(() => {
+			run_overrides_check(false)
+		}).toThrow(PROCESS_EXIT_CALLED)
 	})
 })

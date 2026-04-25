@@ -7,22 +7,10 @@
  *   tsx scripts/overrides-check.ts              # compare current overrides against snapshot
  */
 import { readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { overrides_check } from './overrides/overrides-logic'
+import { overrides_check, type OverridesDiff } from './overrides/overrides-logic'
 import { overrides_snapshot_schema } from './schemas'
-
-const { values } = parseArgs({
-	options: { save: { type: 'boolean', default: false } },
-	strict: true,
-})
-
-const current = overrides_check.read_overrides_from_package(readFileSync('package.json', 'utf8'))
-
-if (values.save) {
-	writeFileSync(overrides_check.SNAPSHOT_PATH, `${JSON.stringify(current, undefined, '\t')}\n`)
-	console.info(`✔ Overrides snapshot saved to ${overrides_check.SNAPSHOT_PATH}`)
-	process.exit(0)
-}
 
 function is_file_not_found(error: unknown): boolean {
 	return error instanceof Error && 'code' in error && error.code === 'ENOENT'
@@ -45,10 +33,7 @@ function load_snapshot(): Record<string, string> {
 	}
 }
 
-const snapshot = load_snapshot()
-const diff = overrides_check.compare(snapshot, current)
-
-if (diff.is_changed) {
+function print_diff(diff: OverridesDiff): never {
 	console.error('✖ pnpm.overrides changed unexpectedly:')
 
 	for (const entry of diff.added) {
@@ -63,7 +48,35 @@ if (diff.is_changed) {
 		console.error(`  ~ changed: ${entry.key}: ${entry.old_value} → ${entry.new_value}`)
 	}
 
-	process.exit(1)
+	return process.exit(1)
 }
 
-console.info('✔ pnpm.overrides unchanged.')
+function run_overrides_check(save: boolean): void {
+	const current = overrides_check.read_overrides_from_package(readFileSync('package.json', 'utf8'))
+
+	if (save) {
+		writeFileSync(overrides_check.SNAPSHOT_PATH, `${JSON.stringify(current, undefined, '\t')}\n`)
+		console.info(`✔ Overrides snapshot saved to ${overrides_check.SNAPSHOT_PATH}`)
+		process.exit(0)
+	}
+
+	const snapshot = load_snapshot()
+	const diff = overrides_check.compare(snapshot, current)
+
+	if (diff.is_changed) print_diff(diff)
+
+	console.info('✔ pnpm.overrides unchanged.')
+}
+
+function main(): void {
+	const { values } = parseArgs({
+		options: { save: { type: 'boolean', default: false } },
+		strict: true,
+	})
+
+	run_overrides_check(values.save)
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+
+export { run_overrides_check }
