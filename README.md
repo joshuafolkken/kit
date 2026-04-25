@@ -49,6 +49,17 @@ To sync AI files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) with the latest version
 pnpm exec josh sync
 ```
 
+## Telegram notifications
+
+`josh followup`, `josh notify`, and `josh git` can send Telegram notifications at key workflow steps. To enable them, add a `.env` file to your project root:
+
+```ini
+TELEGRAM_BOT_TOKEN=<your-bot-token>
+TELEGRAM_CHAT_ID=<your-chat-id>
+```
+
+When these variables are absent, notifications are silently skipped and the rest of the workflow runs normally. See [docs/scripts-ai.md](./docs/scripts-ai.md) for setup instructions.
+
 ## CLI commands
 
 A single `josh` command is available in `node_modules/.bin/` after installation. Run `pnpm exec josh help` to list all subcommands. See [docs/josh-commands.md](./docs/josh-commands.md) for the full reference.

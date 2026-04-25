@@ -8,7 +8,7 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 
 ## Environment Variables
 
-The following variables are required for `scripts-ai/` functionality. Store them in a `.env` file at the project root (loaded automatically by the AI scripts).
+The following variables are required for `scripts-ai/` functionality. Store them in a `.env` file at the project root (loaded automatically by the AI scripts). See [docs/scripts-ai.md](./docs/scripts-ai.md) for setup instructions including how to obtain these values.
 
 | Variable             | Purpose                                               |
 | -------------------- | ----------------------------------------------------- |
