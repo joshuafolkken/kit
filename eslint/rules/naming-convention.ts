@@ -1,3 +1,5 @@
+const SVELTEKIT_HTTP_METHODS_PATTERN = '^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)$'
+
 export const naming_convention_rules = {
 	'@typescript-eslint/naming-convention': [
 		'error',
@@ -69,6 +71,13 @@ export const naming_convention_rules = {
 			selector: 'classMethod',
 			format: ['snake_case'],
 			leadingUnderscore: 'allow',
+		},
+		// SvelteKit ルートハンドラーの HTTP メソッドエクスポートは UPPER_CASE を許可
+		{
+			selector: 'function',
+			modifiers: ['exported'],
+			filter: { regex: SVELTEKIT_HTTP_METHODS_PATTERN, match: true },
+			format: ['UPPER_CASE'],
 		},
 		// オブジェクトリテラルのプロパティは snake_case（外部APIとの互換性のため例外を許可）
 		{
