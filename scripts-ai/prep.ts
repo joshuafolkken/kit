@@ -7,13 +7,12 @@
 import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { git_command } from '../scripts/git/git-command'
 import { overrides_check, type OverridesDiff } from '../scripts/overrides/overrides-logic'
+import { package_pnpm_schema } from '../scripts/overrides/schemas'
+import { json_object_schema } from '../scripts/schemas'
 
 const PACKAGE_JSON_PATH = 'package.json'
-
-interface PackageJson {
-	pnpm?: { overrides?: Record<string, string> }
-}
 
 function run(command: string): void {
 	console.info(`\n▶ ${command}`)
@@ -33,11 +32,13 @@ function save_snapshot(overrides: Record<string, string>): void {
 }
 
 function restore_overrides(snapshot: Record<string, string>): void {
-	const package_json = JSON.parse(read_package_json()) as PackageJson
+	const raw = json_object_schema.parse(JSON.parse(read_package_json()))
+	const { pnpm } = package_pnpm_schema.parse(raw)
 
-	package_json.pnpm ??= {}
-	package_json.pnpm.overrides = snapshot
-	writeFileSync(PACKAGE_JSON_PATH, `${JSON.stringify(package_json, undefined, '\t')}\n`)
+	writeFileSync(
+		PACKAGE_JSON_PATH,
+		`${JSON.stringify({ ...raw, pnpm: { ...pnpm, overrides: snapshot } }, undefined, '\t')}\n`,
+	)
 }
 
 function report_diff(diff: OverridesDiff): void {
@@ -72,12 +73,10 @@ function build_update_argv(overrides: Record<string, string>): Array<string> | u
 	return overrides_check.build_update_command(overrides, read_package_json())
 }
 
-function prepare_repository(): Record<string, string> {
-	// Step 1: switch to main and pull
-	run('git switch main')
-	run('git pull')
+async function prepare_repository(): Promise<Record<string, string>> {
+	await git_command.checkout('main')
+	await git_command.pull()
 
-	// Step 2: save overrides snapshot
 	const snapshot = read_overrides()
 
 	save_snapshot(snapshot)
@@ -87,7 +86,6 @@ function prepare_repository(): Record<string, string> {
 }
 
 function update_dependencies(snapshot: Record<string, string>): void {
-	// Step 3: run corepack update, filtered dep update, and audit
 	run('pnpm latest:corepack')
 
 	const update_argv = build_update_argv(snapshot)
@@ -100,7 +98,6 @@ function update_dependencies(snapshot: Record<string, string>): void {
 }
 
 function verify_overrides(snapshot: Record<string, string>): void {
-	// Step 4: compare overrides
 	const diff = overrides_check.compare(snapshot, read_overrides())
 
 	if (diff.is_changed) {
@@ -111,15 +108,15 @@ function verify_overrides(snapshot: Record<string, string>): void {
 	}
 }
 
-function main(): void {
-	const snapshot = prepare_repository()
+async function main(): Promise<void> {
+	const snapshot = await prepare_repository()
 
 	update_dependencies(snapshot)
 	verify_overrides(snapshot)
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-const prep = { report_diff }
+const prep = { report_diff, prepare_repository, restore_overrides }
 
 export { prep }
