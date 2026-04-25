@@ -38,7 +38,7 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no a
 
 ### Quality limits
 
-- Function complexity ≤4 · nesting ≤1 · function ≤25 lines · file ≤300 lines · params ≤3
+- Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4
 - Magic numbers: extract all literals except `0`, `1`, `-1` to named `UPPER_CASE` constants
 - No `any` · no unused vars · no floating promises · type assertions (`as`) are restricted
 - All function params and return types must be explicitly typed
