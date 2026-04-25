@@ -22,16 +22,6 @@ beforeEach(() => {
 	vi.clearAllMocks()
 })
 
-describe('check-commit-message — side-effect-free import', () => {
-	it('does not call console.info or process.exit on import', () => {
-		const console_spy = vi.spyOn(console, 'info').mockImplementation(vi.fn())
-		const exit_spy = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
-
-		expect(console_spy).not.toHaveBeenCalled()
-		expect(exit_spy).not.toHaveBeenCalled()
-	})
-})
-
 describe('extract_issue_number', () => {
 	it('returns the issue number from a valid branch name', () => {
 		expect(extract_issue_number('123-fix-bug')).toBe('123')

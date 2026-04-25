@@ -18,16 +18,6 @@ beforeEach(() => {
 	mocked_get_default_branch.mockResolvedValue('main')
 })
 
-describe('prevent-main-commit — side-effect-free import', () => {
-	it('does not call console.info or process.exit on import', () => {
-		const console_spy = vi.spyOn(console, 'info').mockImplementation(vi.fn())
-		const exit_spy = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
-
-		expect(console_spy).not.toHaveBeenCalled()
-		expect(exit_spy).not.toHaveBeenCalled()
-	})
-})
-
 describe('check_main_branch', () => {
 	const FEATURE_BRANCH = '123-some-feature'
 	const NOT_ALLOWED_MSG = 'not allowed'
