@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ZodError } from 'zod'
 import { package_version_schema } from './schemas'
 
@@ -7,26 +7,21 @@ vi.mock('node:fs', () => ({
 	writeFileSync: vi.fn(),
 }))
 
-const MOCK_PKG = JSON.stringify({ name: 'kit', version: '1.2.3' }, undefined, '\t')
-const ORIGINAL_ARGV = process.argv[2] ?? ''
+const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
+const { bump_version } = await import('./bump-version')
 
-afterEach(() => {
-	process.argv[2] = ORIGINAL_ARGV
+const import_time_write_calls = vi.mocked(write_file_sync).mock.calls.length
+
+const MOCK_PKG = JSON.stringify({ name: 'kit', version: '1.2.3' }, undefined, '\t')
+
+beforeEach(() => {
+	vi.clearAllMocks()
+	vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
 })
 
-describe('bump-version.ts — version increment', () => {
-	beforeEach(() => {
-		vi.resetModules()
-	})
-
-	it('increments patch version', async () => {
-		process.argv[2] = 'patch'
-
-		const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
-
-		vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
-
-		await import('./bump-version')
+describe('bump_version — version increment', () => {
+	it('increments patch version', () => {
+		bump_version('patch')
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -34,14 +29,8 @@ describe('bump-version.ts — version increment', () => {
 		)
 	})
 
-	it('increments minor version and resets patch', async () => {
-		process.argv[2] = 'minor'
-
-		const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
-
-		vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
-
-		await import('./bump-version')
+	it('increments minor version and resets patch', () => {
+		bump_version('minor')
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -49,14 +38,8 @@ describe('bump-version.ts — version increment', () => {
 		)
 	})
 
-	it('increments major version and resets minor and patch', async () => {
-		process.argv[2] = 'major'
-
-		const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
-
-		vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
-
-		await import('./bump-version')
+	it('increments major version and resets minor and patch', () => {
+		bump_version('major')
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -65,19 +48,9 @@ describe('bump-version.ts — version increment', () => {
 	})
 })
 
-describe('bump-version.ts — key order preservation', () => {
-	beforeEach(() => {
-		vi.resetModules()
-	})
-
-	it('preserves original key order after version bump', async () => {
-		process.argv[2] = 'patch'
-
-		const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
-
-		vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
-
-		await import('./bump-version')
+describe('bump_version — key order preservation', () => {
+	it('preserves original key order after version bump', () => {
+		bump_version('patch')
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -86,25 +59,21 @@ describe('bump-version.ts — key order preservation', () => {
 	})
 })
 
-describe('bump-version.ts — JSON-safe write', () => {
-	beforeEach(() => {
-		vi.resetModules()
-	})
-
-	it('writes valid parseable JSON after version bump', async () => {
-		process.argv[2] = 'patch'
-
-		const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
-
-		vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
-
-		await import('./bump-version')
+describe('bump_version — JSON-safe write', () => {
+	it('writes valid parseable JSON after version bump', () => {
+		bump_version('patch')
 
 		const [, written_content] = vi.mocked(write_file_sync).mock.calls[0] ?? []
 
 		if (typeof written_content !== 'string') throw new Error('Expected string content')
 
 		expect(JSON.parse(written_content)).toMatchObject({ version: '1.2.4' })
+	})
+})
+
+describe('bump-version — side-effect-free import', () => {
+	it('does not call writeFileSync on import', () => {
+		expect(import_time_write_calls).toBe(0)
 	})
 })
 
