@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { package_with_version_schema } from './schemas'
+import { json_object_schema, package_with_version_schema } from './schemas'
 
 const ARGV_INDEX = 2
 const bump = process.argv[ARGV_INDEX] ?? 'minor'
@@ -55,7 +55,11 @@ switch (bump) {
 	}
 }
 
-const updated_content = file_content.replace(/("version"\s*:\s*)"[^"]*"/u, `$1"${new_version}"`)
+const PACKAGE_JSON_INDENT = '\t'
+const package_json = json_object_schema.parse(JSON.parse(file_content))
 
-writeFileSync(package_path, updated_content)
+writeFileSync(
+	package_path,
+	`${JSON.stringify({ ...package_json, version: new_version }, undefined, PACKAGE_JSON_INDENT)}\n`,
+)
 console.info(new_version)

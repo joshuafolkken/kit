@@ -3,6 +3,7 @@ import { git_error } from './git-error'
 
 const PROCESS_EXIT_CALLED = 'process.exit called'
 const ERROR_PREFIX = '❌ Error:'
+const DETAILS_PREFIX = '💡 Details:'
 const TEST_ERROR_MSG = 'test error'
 const STRING_ERROR_MSG = 'string error'
 const INNER_CAUSE_MSG = 'inner cause'
@@ -44,7 +45,20 @@ describe('git_error.handle', () => {
 			git_error.handle(error)
 		}).toThrow(PROCESS_EXIT_CALLED)
 
-		expect(vi.mocked(console.error)).toHaveBeenCalledWith('💡 Details:', INNER_CAUSE_MSG)
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(DETAILS_PREFIX, INNER_CAUSE_MSG)
+	})
+
+	it('logs stderr from cause when cause message is empty and stderr is set', () => {
+		const STDERR_OUTPUT = 'stderr output'
+		const error = new Error('outer')
+
+		error.cause = Object.assign(new Error('   '), { stderr: STDERR_OUTPUT })
+
+		expect(() => {
+			git_error.handle(error)
+		}).toThrow(PROCESS_EXIT_CALLED)
+
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(DETAILS_PREFIX, STDERR_OUTPUT)
 	})
 })
 
