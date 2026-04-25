@@ -1,11 +1,10 @@
 #!/usr/bin/env tsx
 import { execFile } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { telegram_notify } from '../scripts/git/telegram-notify'
 import { load_optional_environment } from './environment-loader'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
-
-load_optional_environment()
 
 const exec_file_async = promisify(execFile)
 
@@ -68,6 +67,7 @@ async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 }
 
 async function main(): Promise<void> {
+	load_optional_environment()
 	const values = parse_cli_arguments()
 	const context = await resolve_context(values)
 	const input = telegram_test_logic.build_input({ values, context })
@@ -75,4 +75,8 @@ async function main(): Promise<void> {
 	await telegram_notify.send(input)
 }
 
-await main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+
+const telegram_test = { fetch_repo_name, fetch_issue_title }
+
+export { telegram_test }
