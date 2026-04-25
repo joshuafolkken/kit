@@ -44,10 +44,11 @@ describe('telegram_test.fetch_repo_name — failure', () => {
 })
 
 describe('telegram_test.fetch_issue_title — undefined input', () => {
-	it('returns undefined without calling gh when issue_number is omitted', async () => {
+	it('returns undefined without calling gh when issue_number is undefined', async () => {
 		exec_file_mock.mockClear()
+		const no_issue: string | undefined = undefined
 
-		const result = await telegram_test.fetch_issue_title()
+		const result = await telegram_test.fetch_issue_title(no_issue)
 
 		expect(result).toBeUndefined()
 		expect(exec_file_mock).not.toHaveBeenCalled()

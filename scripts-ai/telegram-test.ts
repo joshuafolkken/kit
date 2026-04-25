@@ -52,7 +52,7 @@ async function fetch_repo_name(): Promise<string | undefined> {
 	return parts.at(-1)
 }
 
-async function fetch_issue_title(issue_number?: string): Promise<string | undefined> {
+async function fetch_issue_title(issue_number: string | undefined): Promise<string | undefined> {
 	if (issue_number === undefined) return undefined
 
 	return await exec_gh(['issue', 'view', issue_number, '--json', 'title', '-q', '.title'])
