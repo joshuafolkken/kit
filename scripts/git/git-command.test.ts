@@ -3,17 +3,20 @@ import { describe, expect, it, vi } from 'vitest'
 const exec_mock = vi.hoisted(() => {
 	const state = { should_fail: false as boolean, stdout: '' }
 
-	async function mock_exec_async(_command: string): Promise<{ stdout: string; stderr: string }> {
+	async function mock_exec_file_async(
+		_cmd: string,
+		_arguments: Array<string>,
+	): Promise<{ stdout: string; stderr: string }> {
 		if (state.should_fail) throw new Error('Command failed')
 
 		return await Promise.resolve({ stdout: state.stdout, stderr: '' })
 	}
 
-	return { state, mock_exec_async }
+	return { state, mock_exec_file_async }
 })
 
 vi.mock('node:util', () => ({
-	promisify: () => exec_mock.mock_exec_async,
+	promisify: () => exec_mock.mock_exec_file_async,
 }))
 
 const PACKAGE_JSON = 'package.json'

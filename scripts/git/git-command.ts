@@ -1,12 +1,12 @@
-import { exec, spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { git_utilities } from './constants'
 
-const exec_async = promisify(exec)
+const exec_file_async = promisify(execFile)
 
-async function exec_git_command(command: string): Promise<string> {
-	const git_command: string = git_utilities.get_git_command()
-	const { stdout } = await exec_async(`${git_command} ${command}`)
+async function exec_git_command_read(arguments_: Array<string>): Promise<string> {
+	const git_cmd = git_utilities.get_git_command_for_spawn()
+	const { stdout } = await exec_file_async(git_cmd, arguments_)
 
 	return stdout.trimEnd()
 }
@@ -48,15 +48,15 @@ async function exec_git_command_with_output(
 }
 
 async function branch(): Promise<string> {
-	return await exec_git_command('rev-parse --abbrev-ref HEAD')
+	return await exec_git_command_read(['rev-parse', '--abbrev-ref', 'HEAD'])
 }
 
 async function status(): Promise<string> {
-	return await exec_git_command('status --porcelain')
+	return await exec_git_command_read(['status', '--porcelain'])
 }
 
 async function diff_cached(file_path: string): Promise<string> {
-	return await exec_git_command(`diff --cached ${file_path}`)
+	return await exec_git_command_read(['diff', '--cached', file_path])
 }
 
 const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
@@ -64,7 +64,7 @@ const DEFAULT_BRANCH_FALLBACK = 'main'
 
 async function get_default_branch(): Promise<string> {
 	try {
-		const output = await exec_git_command('symbolic-ref refs/remotes/origin/HEAD')
+		const output = await exec_git_command_read(['symbolic-ref', 'refs/remotes/origin/HEAD'])
 		const trimmed = output.trim()
 
 		if (trimmed.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) {
@@ -80,15 +80,15 @@ async function get_default_branch(): Promise<string> {
 async function diff_main(file_path: string): Promise<string> {
 	const default_branch = await get_default_branch()
 
-	return await exec_git_command(`diff ${default_branch} -- ${file_path}`)
+	return await exec_git_command_read(['diff', default_branch, '--', file_path])
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
-	return await exec_git_command(`checkout -b ${branch_name}`)
+	return await exec_git_command_read(['checkout', '-b', branch_name])
 }
 
 async function checkout(branch_name: string): Promise<string> {
-	return await exec_git_command(`checkout ${branch_name}`)
+	return await exec_git_command_read(['checkout', branch_name])
 }
 
 async function commit(message: string): Promise<void> {
@@ -134,7 +134,7 @@ async function pull(): Promise<void> {
 
 async function branch_exists(branch_name: string): Promise<boolean> {
 	try {
-		const output: string = await exec_git_command(`branch --list ${branch_name}`)
+		const output: string = await exec_git_command_read(['branch', '--list', branch_name])
 
 		return output.trim().length > 0
 	} catch {
@@ -143,7 +143,7 @@ async function branch_exists(branch_name: string): Promise<boolean> {
 }
 
 async function add_tracked(): Promise<void> {
-	await exec_git_command('add -u')
+	await exec_git_command_read(['add', '-u'])
 }
 
 async function add_path(file_path: string): Promise<void> {

@@ -1,9 +1,6 @@
-import { exec, spawn, type ChildProcessByStdio } from 'node:child_process'
+import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
-import { promisify } from 'node:util'
 import { check_gh_installed } from './git-gh-check'
-
-const exec_async = promisify(exec)
 
 const BODY_FILE_FLAG = '--body-file'
 const BODY_FROM_STDIN = '-'
@@ -23,18 +20,6 @@ function build_error_message(error: unknown): string {
 	const stderr = has_stderr_field(error) ? error.stderr : ''
 
 	return stderr.length > 0 ? `${error_message}\n${stderr}` : error_message
-}
-
-async function exec_gh_command(command: string): Promise<string> {
-	await check_gh_installed()
-
-	try {
-		const { stdout } = await exec_async(`gh ${command}`)
-
-		return stdout.trimEnd()
-	} catch (error) {
-		throw new Error(build_error_message(error), { cause: error })
-	}
 }
 
 function parse_buffer_to_string(chunk: string | Buffer): string {
@@ -78,6 +63,31 @@ async function collect_gh_spawn_result(
 	})
 }
 
+function extract_spawn_output(result: GhSpawnResult): string {
+	if (result.exit_code === 0) return result.stdout.trimEnd()
+
+	const stderr = result.stderr.trim()
+	if (stderr.length > 0) throw new Error(stderr)
+
+	throw new Error(`gh command failed: ${resolve_exit_code(result.exit_code)}`)
+}
+
+async function run_gh_spawn_read(arguments_: Array<string>): Promise<GhSpawnResult> {
+	await check_gh_installed()
+	const child = create_gh_spawn(arguments_)
+	const result_promise = collect_gh_spawn_result(child)
+
+	child.stdin.end()
+
+	return await result_promise
+}
+
+async function exec_gh_command(arguments_: Array<string>): Promise<string> {
+	const result = await run_gh_spawn_read(arguments_)
+
+	return extract_spawn_output(result)
+}
+
 async function run_gh_with_stdin(input: {
 	args: Array<string>
 	stdin_body: string
@@ -97,12 +107,8 @@ async function exec_gh_command_with_stdin(input: {
 	stdin_body: string
 }): Promise<string> {
 	const result = await run_gh_with_stdin(input)
-	if (result.exit_code === 0) return result.stdout.trimEnd()
-	const stderr = result.stderr.trim()
-	if (stderr.length > 0) throw new Error(stderr)
-	const exit_code = resolve_exit_code(result.exit_code)
 
-	throw new Error(`gh command failed: ${exit_code}`)
+	return extract_spawn_output(result)
 }
 
 const git_gh_exec = {

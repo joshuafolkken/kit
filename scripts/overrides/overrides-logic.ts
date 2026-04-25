@@ -110,13 +110,15 @@ function read_dep_names(package_json_content: string): Array<string> {
 	return [...Object.keys(parsed.dependencies ?? {}), ...Object.keys(parsed.devDependencies ?? {})]
 }
 
+const PNPM_UPDATE_LATEST_ARGS = ['pnpm', 'update', '--latest']
+
 function build_update_command(
 	overrides: Record<string, string>,
 	package_json_content: string,
-): string | undefined {
+): Array<string> | undefined {
 	const capped = extract_capped_package_names(overrides)
 
-	if (capped.length === 0) return 'pnpm update --latest'
+	if (capped.length === 0) return PNPM_UPDATE_LATEST_ARGS
 
 	const all_names = read_dep_names(package_json_content)
 	const capped_set = new Set(capped)
@@ -124,7 +126,7 @@ function build_update_command(
 
 	if (targets.length === 0) return undefined
 
-	return `pnpm update --latest ${targets.join(' ')}`
+	return [...PNPM_UPDATE_LATEST_ARGS, ...targets]
 }
 
 const overrides_check = {

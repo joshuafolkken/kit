@@ -39,7 +39,7 @@ describe('exec_gh_command — gh check integration', () => {
 	it('propagates gh-not-installed error from check_gh_installed', async () => {
 		mocked_check.mockRejectedValueOnce(new Error(GH_NOT_INSTALLED_MSG))
 
-		await expect(git_gh_exec.exec_gh_command('version')).rejects.toThrow(GH_NOT_INSTALLED_MSG)
+		await expect(git_gh_exec.exec_gh_command(['version'])).rejects.toThrow(GH_NOT_INSTALLED_MSG)
 	})
 })
 

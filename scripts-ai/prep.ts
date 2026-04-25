@@ -62,7 +62,7 @@ function handle_overrides_change(snapshot: Record<string, string>): void {
 	console.info('\n✔ Overrides restored from snapshot. Please review before proceeding.')
 }
 
-function build_update_command(overrides: Record<string, string>): string | undefined {
+function build_update_argv(overrides: Record<string, string>): Array<string> | undefined {
 	const capped = overrides_check.extract_capped_package_names(overrides)
 
 	if (capped.length > 0) {
@@ -90,10 +90,10 @@ function update_dependencies(snapshot: Record<string, string>): void {
 	// Step 3: run corepack update, filtered dep update, and audit
 	run('pnpm latest:corepack')
 
-	const update_command = build_update_command(snapshot)
+	const update_argv = build_update_argv(snapshot)
 
-	if (update_command !== undefined) {
-		run(update_command)
+	if (update_argv !== undefined) {
+		run(update_argv.join(' '))
 	}
 
 	run('pnpm audit')

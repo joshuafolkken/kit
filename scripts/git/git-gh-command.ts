@@ -25,14 +25,19 @@ function handle_pr_create_error(error: unknown): never {
 }
 
 async function pr_create(title: string, body: string): Promise<string> {
-	const safe_title = JSON.stringify(title)
-	const safe_body = JSON.stringify(body)
 	const base = await git_command.get_default_branch()
 
 	try {
-		return await git_gh_exec.exec_gh_command(
-			`pr create --title ${safe_title} --body ${safe_body} --base ${base}`,
-		)
+		return await git_gh_exec.exec_gh_command([
+			'pr',
+			'create',
+			'--title',
+			title,
+			'--body',
+			body,
+			'--base',
+			base,
+		])
 	} catch (error) {
 		return handle_pr_create_error(error)
 	}
@@ -40,7 +45,7 @@ async function pr_create(title: string, body: string): Promise<string> {
 
 async function pr_checks(branch_name: string): Promise<string> {
 	try {
-		return await git_gh_exec.exec_gh_command(`pr checks ${branch_name}`)
+		return await git_gh_exec.exec_gh_command(['pr', 'checks', branch_name])
 	} catch (error) {
 		if (has_stderr_field(error) && error.stderr.length > 0) {
 			throw new Error(error.stderr, { cause: error })
@@ -52,7 +57,7 @@ async function pr_checks(branch_name: string): Promise<string> {
 
 async function pr_exists(branch_name: string): Promise<boolean> {
 	try {
-		await git_gh_exec.exec_gh_command(`pr view ${branch_name}`)
+		await git_gh_exec.exec_gh_command(['pr', 'view', branch_name])
 
 		return true
 	} catch {
@@ -62,9 +67,15 @@ async function pr_exists(branch_name: string): Promise<boolean> {
 
 async function pr_view(branch_name: string): Promise<string> {
 	try {
-		return await git_gh_exec.exec_gh_command(
-			`pr view ${branch_name} --json mergeable,mergeStateStatus,state --jq .`,
-		)
+		return await git_gh_exec.exec_gh_command([
+			'pr',
+			'view',
+			branch_name,
+			'--json',
+			'mergeable,mergeStateStatus,state',
+			'--jq',
+			'.',
+		])
 	} catch {
 		return ''
 	}
@@ -84,9 +95,15 @@ function parse_pr_state_string(result: string): string | undefined {
 
 async function pr_get_url(branch_name: string): Promise<string | undefined> {
 	try {
-		const result: string = await git_gh_exec.exec_gh_command(
-			`pr view ${branch_name} --json url --jq .url`,
-		)
+		const result: string = await git_gh_exec.exec_gh_command([
+			'pr',
+			'view',
+			branch_name,
+			'--json',
+			'url',
+			'--jq',
+			'.url',
+		])
 
 		return parse_pr_state_string(result)
 	} catch {
@@ -103,9 +120,15 @@ function parse_number_output(result: string): number | undefined {
 
 async function pr_get_number(branch_name: string): Promise<number | undefined> {
 	try {
-		const result: string = await git_gh_exec.exec_gh_command(
-			`pr view ${branch_name} --json number --jq .number`,
-		)
+		const result: string = await git_gh_exec.exec_gh_command([
+			'pr',
+			'view',
+			branch_name,
+			'--json',
+			'number',
+			'--jq',
+			'.number',
+		])
 
 		return parse_number_output(result)
 	} catch {
@@ -114,16 +137,26 @@ async function pr_get_number(branch_name: string): Promise<number | undefined> {
 }
 
 async function pr_get_state_snapshot(branch_name: string): Promise<string> {
-	return await git_gh_exec.exec_gh_command(
-		`pr view ${branch_name} --json mergeStateStatus,reviewDecision,statusCheckRollup`,
-	)
+	return await git_gh_exec.exec_gh_command([
+		'pr',
+		'view',
+		branch_name,
+		'--json',
+		'mergeStateStatus,reviewDecision,statusCheckRollup',
+	])
 }
 
 async function issue_get_title(issue_number: string): Promise<string | undefined> {
 	try {
-		const result: string = await git_gh_exec.exec_gh_command(
-			`issue view ${issue_number} --json title --jq .title`,
-		)
+		const result: string = await git_gh_exec.exec_gh_command([
+			'issue',
+			'view',
+			issue_number,
+			'--json',
+			'title',
+			'--jq',
+			'.title',
+		])
 
 		return parse_pr_state_string(result)
 	} catch {
@@ -133,9 +166,14 @@ async function issue_get_title(issue_number: string): Promise<string | undefined
 
 async function repo_get_name_with_owner(): Promise<string | undefined> {
 	try {
-		const result: string = await git_gh_exec.exec_gh_command(
-			'repo view --json nameWithOwner --jq .nameWithOwner',
-		)
+		const result: string = await git_gh_exec.exec_gh_command([
+			'repo',
+			'view',
+			'--json',
+			'nameWithOwner',
+			'--jq',
+			'.nameWithOwner',
+		])
 
 		return parse_pr_state_string(result)
 	} catch {
@@ -149,9 +187,10 @@ async function pr_get_review_comments(branch_name: string): Promise<string> {
 	if (repo_name === undefined || pr_number === undefined) return '[]'
 
 	try {
-		return await git_gh_exec.exec_gh_command(
-			`api repos/${repo_name}/pulls/${String(pr_number)}/comments`,
-		)
+		return await git_gh_exec.exec_gh_command([
+			'api',
+			`repos/${repo_name}/pulls/${String(pr_number)}/comments`,
+		])
 	} catch {
 		return '[]'
 	}
@@ -159,9 +198,15 @@ async function pr_get_review_comments(branch_name: string): Promise<string> {
 
 async function pr_get_comments(branch_name: string): Promise<string> {
 	try {
-		return await git_gh_exec.exec_gh_command(
-			`pr view ${branch_name} --json comments --jq .comments`,
-		)
+		return await git_gh_exec.exec_gh_command([
+			'pr',
+			'view',
+			branch_name,
+			'--json',
+			'comments',
+			'--jq',
+			'.comments',
+		])
 	} catch {
 		return '[]'
 	}
@@ -175,14 +220,20 @@ async function pr_comment(branch_name: string, body: string): Promise<string> {
 }
 
 async function pr_merge(branch_name: string): Promise<void> {
-	await git_gh_exec.exec_gh_command(`pr merge ${branch_name} --merge`)
+	await git_gh_exec.exec_gh_command(['pr', 'merge', branch_name, '--merge'])
 }
 
 async function issue_get_body(issue_number: string): Promise<string | undefined> {
 	try {
-		const result: string = await git_gh_exec.exec_gh_command(
-			`issue view ${issue_number} --json body --jq .body`,
-		)
+		const result: string = await git_gh_exec.exec_gh_command([
+			'issue',
+			'view',
+			issue_number,
+			'--json',
+			'body',
+			'--jq',
+			'.body',
+		])
 
 		return result
 	} catch {

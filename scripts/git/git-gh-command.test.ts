@@ -36,6 +36,8 @@ const NETWORK_ERROR = 'network error'
 const PR_TITLE = 'title'
 const PR_BODY = 'body'
 const GITHUB_PR_URL = 'https://github.com/owner/repo/pull/1'
+const TITLE_WITH_SPACES = 'title with spaces'
+const BODY_WITH_SPECIAL = 'body with $special chars'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -125,7 +127,7 @@ describe('git_gh_command.pr_create — base branch and label', () => {
 
 		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
 
-		expect(mocked_exec).toHaveBeenCalledWith(expect.stringContaining('--base develop'))
+		expect(mocked_exec).toHaveBeenCalledWith(expect.arrayContaining(['--base', 'develop']))
 	})
 
 	it('does not include --label in the pr create command', async () => {
@@ -133,7 +135,17 @@ describe('git_gh_command.pr_create — base branch and label', () => {
 
 		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
 
-		expect(mocked_exec).toHaveBeenCalledWith(expect.not.stringContaining('--label'))
+		expect(mocked_exec).toHaveBeenCalledWith(expect.not.arrayContaining(['--label']))
+	})
+
+	it('passes title and body as separate array elements without shell escaping', async () => {
+		mocked_exec.mockResolvedValue(GITHUB_PR_URL)
+
+		await git_gh_command.pr_create(TITLE_WITH_SPACES, BODY_WITH_SPECIAL)
+
+		expect(mocked_exec).toHaveBeenCalledWith(
+			expect.arrayContaining(['--title', TITLE_WITH_SPACES, '--body', BODY_WITH_SPECIAL]),
+		)
 	})
 })
 
