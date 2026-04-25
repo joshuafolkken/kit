@@ -6,6 +6,11 @@ Covers: ESLint · Prettier · TypeScript · Lefthook · cspell · VS Code · AI 
 
 See [docs/overview.md](./docs/overview.md) for a full description of what this package provides and how it works.
 
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) with [pnpm](https://pnpm.io/)
+- [gh CLI](https://cli.github.com/) — required for GitHub Packages authentication. Install via `brew install gh` (macOS), `winget install GitHub.cli` (Windows), or see the [gh installation docs](https://github.com/cli/cli#installation).
+
 ## Quick start
 
 **1. Authenticate** — GitHub Packages requires auth even for public packages:
