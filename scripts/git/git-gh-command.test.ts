@@ -9,6 +9,7 @@ vi.mock('./git-gh-exec', () => ({
 	},
 	BODY_FILE_FLAG: '--body-file',
 	BODY_FROM_STDIN: '-',
+	has_stderr_field: vi.fn(),
 }))
 
 vi.mock('./git-pr-checks-watch', () => ({

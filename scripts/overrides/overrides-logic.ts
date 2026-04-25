@@ -1,3 +1,5 @@
+import { package_pnpm_schema, package_with_deps_schema } from './schemas'
+
 interface AddedEntry {
 	key: string
 	value: string
@@ -63,9 +65,7 @@ function compare(snapshot: Record<string, string>, current: Record<string, strin
 const SNAPSHOT_PATH = '.overrides-snapshot.json'
 
 function read_overrides_from_package(package_json_content: string): Record<string, string> {
-	const parsed = JSON.parse(package_json_content) as {
-		pnpm?: { overrides?: Record<string, string> }
-	}
+	const parsed = package_pnpm_schema.parse(JSON.parse(package_json_content))
 
 	return parsed.pnpm?.overrides ?? {}
 }
@@ -105,11 +105,7 @@ function extract_capped_package_names(overrides: Record<string, string>): Array<
 }
 
 function read_dep_names(package_json_content: string): Array<string> {
-	const parsed = JSON.parse(package_json_content) as {
-		dependencies?: Record<string, string>
-		// eslint-disable-next-line @typescript-eslint/naming-convention
-		devDependencies?: Record<string, string>
-	}
+	const parsed = package_with_deps_schema.parse(JSON.parse(package_json_content))
 
 	return [...Object.keys(parsed.dependencies ?? {}), ...Object.keys(parsed.devDependencies ?? {})]
 }

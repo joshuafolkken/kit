@@ -60,3 +60,72 @@ describe('git_command.diff_main', () => {
 		await expect(git_command.diff_main(PACKAGE_JSON)).rejects.toThrow()
 	})
 })
+
+const SYMBOLIC_REF_MAIN = 'refs/remotes/origin/main'
+const NON_PREFIX_OUTPUT = 'something-else'
+
+describe('git_command.get_default_branch', () => {
+	it('returns branch name parsed from symbolic ref output', async () => {
+		exec_mock.state.should_fail = false
+		exec_mock.state.stdout = SYMBOLIC_REF_MAIN
+
+		const { git_command } = await import('./git-command')
+		const result = await git_command.get_default_branch()
+
+		expect(result).toBe('main')
+	})
+
+	it('returns main when symbolic ref command fails', async () => {
+		exec_mock.state.should_fail = true
+
+		const { git_command } = await import('./git-command')
+		const result = await git_command.get_default_branch()
+
+		expect(result).toBe('main')
+	})
+
+	it('returns main when output does not start with expected prefix', async () => {
+		exec_mock.state.should_fail = false
+		exec_mock.state.stdout = NON_PREFIX_OUTPUT
+
+		const { git_command } = await import('./git-command')
+		const result = await git_command.get_default_branch()
+
+		expect(result).toBe('main')
+	})
+})
+
+describe('git_command.is_upstream_not_set_error', () => {
+	const RETURNS_FALSE = 'returns false'
+	const PUSH_FAILED = 'push failed'
+
+	it('returns true for an Error with cause.exit_code of 128', async () => {
+		const { git_command } = await import('./git-command')
+		const error = new Error(PUSH_FAILED)
+
+		error.cause = { exit_code: '128' }
+
+		expect(git_command.is_upstream_not_set_error(error)).toBe(true)
+	})
+
+	it(`${RETURNS_FALSE} when cause.exit_code is not 128`, async () => {
+		const { git_command } = await import('./git-command')
+		const error = new Error(PUSH_FAILED)
+
+		error.cause = { exit_code: '1' }
+
+		expect(git_command.is_upstream_not_set_error(error)).toBe(false)
+	})
+
+	it(`${RETURNS_FALSE} for a plain Error without cause`, async () => {
+		const { git_command } = await import('./git-command')
+
+		expect(git_command.is_upstream_not_set_error(new Error('fail'))).toBe(false)
+	})
+
+	it(`${RETURNS_FALSE} for a non-Error value`, async () => {
+		const { git_command } = await import('./git-command')
+
+		expect(git_command.is_upstream_not_set_error('not an error')).toBe(false)
+	})
+})

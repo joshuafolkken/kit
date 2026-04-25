@@ -1,5 +1,7 @@
 onlyBuiltDependencies:
   - esbuild
+  - lefthook
+  - unrs-resolver
 
 # Security fixes often require same-day vite releases; minimum-release-age in .npmrc would block them.
 minimumReleaseAgeExclude:

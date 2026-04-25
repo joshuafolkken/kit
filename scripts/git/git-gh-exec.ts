@@ -1,6 +1,7 @@
 import { exec, spawn, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable, Writable } from 'node:stream'
 import { promisify } from 'node:util'
+import { check_gh_installed } from './git-gh-check'
 
 const exec_async = promisify(exec)
 
@@ -13,15 +14,20 @@ interface GhSpawnResult {
 	exit_code: number | null
 }
 
+function has_stderr_field(error: unknown): error is Error & { stderr: string } {
+	return error instanceof Error && 'stderr' in error && typeof error.stderr === 'string'
+}
+
 function build_error_message(error: unknown): string {
-	const exec_error = error as { stderr?: string; stdout?: string; message?: string }
-	const error_message = exec_error.message ?? String(error)
-	const stderr = exec_error.stderr ?? ''
+	const error_message = error instanceof Error ? error.message : String(error)
+	const stderr = has_stderr_field(error) ? error.stderr : ''
 
 	return stderr.length > 0 ? `${error_message}\n${stderr}` : error_message
 }
 
 async function exec_gh_command(command: string): Promise<string> {
+	await check_gh_installed()
+
 	try {
 		const { stdout } = await exec_async(`gh ${command}`)
 
@@ -76,6 +82,7 @@ async function run_gh_with_stdin(input: {
 	args: Array<string>
 	stdin_body: string
 }): Promise<GhSpawnResult> {
+	await check_gh_installed()
 	const child = create_gh_spawn(input.args)
 	const result_promise = collect_gh_spawn_result(child)
 
@@ -103,5 +110,5 @@ const git_gh_exec = {
 	exec_gh_command_with_stdin,
 }
 
-export { git_gh_exec, BODY_FILE_FLAG, BODY_FROM_STDIN }
+export { git_gh_exec, has_stderr_field, BODY_FILE_FLAG, BODY_FROM_STDIN }
 export type { GhSpawnResult }
