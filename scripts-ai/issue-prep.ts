@@ -4,7 +4,7 @@
  *
  * Usage: tsx scripts-ai/issue-prep.ts <issue-number>
  */
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { issue_logic } from '../scripts/issue/issue-logic'
 
@@ -15,9 +15,10 @@ function display_language_status(is_cjk: boolean): string {
 }
 
 function fetch_issue_title(number_string: string): string {
-	const command = `gh issue view ${number_string} --json title --jq .title`
-
-	return execSync(command, { encoding: 'utf8' }).trim() // eslint-disable-line sonarjs/os-command
+	/* eslint-disable-next-line sonarjs/no-os-command-from-path */
+	return execFileSync('gh', ['issue', 'view', number_string, '--json', 'title', '--jq', '.title'], {
+		encoding: 'utf8',
+	}).trim()
 }
 
 function parse_issue_number(): string {
@@ -70,6 +71,6 @@ function main(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const issue_prep = { display_language_status }
+const issue_prep = { display_language_status, fetch_issue_title }
 
 export { issue_prep }
