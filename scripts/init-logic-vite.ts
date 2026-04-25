@@ -1,5 +1,6 @@
 const VISUALIZER_IMPORT = "import { visualizer } from 'rollup-plugin-visualizer'"
 const VISUALIZER_TYPE_IMPORT = "import type { UserConfig, ConfigEnv } from 'vite'"
+const VISUALIZER_ANCHOR = '// @kit:visualizer-plugins'
 const VISUALIZER_CLIENT =
 	"{\n\t\t...visualizer({ open: !process.env['CI'], filename: 'stats-client.html' }),\n\t\tapply: (config: UserConfig, { command }: ConfigEnv) =>\n\t\t\tcommand === 'build' && !config.build?.ssr,\n\t}"
 const VISUALIZER_SERVER =
@@ -14,24 +15,6 @@ function find_last_import_pos(content: string): number {
 	return last_match.index + last_match[0].length
 }
 
-function update_bracket_depth(depth: number, char: string): number {
-	if (char === '[') return depth + 1
-	if (char === ']') return depth - 1
-
-	return depth
-}
-
-function find_plugins_bracket_close(content: string, open_pos: number): number {
-	let depth = 0
-
-	for (let index = open_pos; index < content.length; index += 1) {
-		depth = update_bracket_depth(depth, content.charAt(index))
-		if (depth === 0) return index
-	}
-
-	return -1
-}
-
 function inject_visualizer_import(content: string): string {
 	const pos = find_last_import_pos(content)
 
@@ -39,17 +22,9 @@ function inject_visualizer_import(content: string): string {
 }
 
 function inject_visualizer_plugin(content: string): string {
-	const plugins_index = content.indexOf('plugins: [')
-	if (plugins_index === -1) return content
-	const open = content.indexOf('[', plugins_index)
-	const close = find_plugins_bracket_close(content, open)
-	if (close === -1) return content
-	const inner = content.slice(open + 1, close)
-	const trimmed = inner.trimEnd()
-	const stripped = trimmed.replace(/,$/u, '')
-	const suffix = stripped.trimStart() === '' ? VISUALIZER_PLUGINS : `, ${VISUALIZER_PLUGINS}`
+	if (!content.includes(VISUALIZER_ANCHOR)) return content
 
-	return `${content.slice(0, open + 1)}${stripped}${suffix}${inner.slice(trimmed.length)}${content.slice(close)}`
+	return content.replace(VISUALIZER_ANCHOR, VISUALIZER_PLUGINS)
 }
 
 function merge_vite_config(content: string): string {

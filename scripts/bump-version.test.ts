@@ -86,6 +86,28 @@ describe('bump-version.ts — key order preservation', () => {
 	})
 })
 
+describe('bump-version.ts — JSON-safe write', () => {
+	beforeEach(() => {
+		vi.resetModules()
+	})
+
+	it('writes valid parseable JSON after version bump', async () => {
+		process.argv[2] = 'patch'
+
+		const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
+
+		vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
+
+		await import('./bump-version')
+
+		const [, written_content] = vi.mocked(write_file_sync).mock.calls[0] ?? []
+
+		if (typeof written_content !== 'string') throw new Error('Expected string content')
+
+		expect(JSON.parse(written_content)).toMatchObject({ version: '1.2.4' })
+	})
+})
+
 describe('package_version_schema — valid input', () => {
 	it('parses a semver version string', () => {
 		const result = package_version_schema.parse({ version: '1.2.3' })
