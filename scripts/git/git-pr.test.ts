@@ -53,19 +53,51 @@ const { git_countdown } = await import('./git-countdown')
 const BRANCH = 'test-branch'
 const PR_TITLE = 'Test title'
 const PR_BODY = 'Test body'
+const FAKE_ISSUE_COMMIT = 'My feature #42'
+const FAKE_PR_URL = 'https://github.com/owner/repo/pull/1'
+const FAKE_ISSUE_INFO = {
+	title: 'My feature',
+	number: '42',
+	branch_name: BRANCH,
+	commit_message: FAKE_ISSUE_COMMIT,
+}
 
-describe('git_pr.create — post-watch conflict check behavior', () => {
+beforeEach(() => {
+	vi.clearAllMocks()
+	vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
+	vi.mocked(animation_helpers.execute_with_animation).mockImplementation(
+		async (_label: string, action: () => Promise<unknown>) => await action(),
+	)
+	vi.mocked(git_gh_command.pr_create).mockResolvedValue('')
+	vi.mocked(git_countdown.wait_for_seconds).mockResolvedValue()
+	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(FAKE_PR_URL)
+})
+
+describe('git_pr.create_with_issue_info — build_body behavior', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
-		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(false)
-		vi.mocked(animation_helpers.execute_with_animation).mockImplementation(
-			async (_label: string, action: () => Promise<unknown>) => await action(),
-		)
-		vi.mocked(git_gh_command.pr_create).mockResolvedValue('')
-		vi.mocked(git_countdown.wait_for_seconds).mockResolvedValue()
-		vi.mocked(git_gh_command.pr_get_url).mockResolvedValue('https://github.com/owner/repo/pull/1')
+		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: true })
 	})
 
+	it('passes only closes #N when no extra_body supplied', async () => {
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO)
+
+		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(
+			FAKE_ISSUE_COMMIT,
+			'closes #42',
+		)
+	})
+
+	it('prepends closes #N to extra_body when extra_body is supplied', async () => {
+		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO, 'Some description')
+
+		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(
+			FAKE_ISSUE_COMMIT,
+			'closes #42\n\nSome description',
+		)
+	})
+})
+
+describe('git_pr.create — post-watch conflict check behavior', () => {
 	it('skips conflict check when watch times out', async () => {
 		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: true })
 
