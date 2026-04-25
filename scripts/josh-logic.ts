@@ -15,15 +15,17 @@ const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
+const TSX_CMD = 'tsx.cmd'
 const SVELTE_KIT_DEP = '@sveltejs/kit'
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
 const SPAWN_ERROR_EXIT_CODE = 2
 
 function resolve_tsx_executable(): string {
+	const bin_name = process.platform === 'win32' ? TSX_CMD : TSX_BIN
 	const candidates = [
-		path.join(PACKAGE_DIR, NODE_MODULES, '.bin', TSX_BIN),
-		path.join(process.cwd(), NODE_MODULES, '.bin', TSX_BIN),
+		path.join(PACKAGE_DIR, NODE_MODULES, '.bin', bin_name),
+		path.join(process.cwd(), NODE_MODULES, '.bin', bin_name),
 	]
 
 	return candidates.find(existsSync) ?? TSX_BIN
@@ -98,7 +100,10 @@ function format_help(): string {
 }
 
 function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
-	const result = spawnSync(tsx_executable, script_arguments, { stdio: 'inherit' })
+	const result = spawnSync(tsx_executable, script_arguments, {
+		stdio: 'inherit',
+		shell: process.platform === 'win32',
+	})
 
 	if (result.error) {
 		console.error(`Failed to execute ${tsx_executable}: ${result.error.message}`)
