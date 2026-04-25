@@ -185,11 +185,12 @@ describe('merge_sveltekit_package_json visualizer', () => {
 	})
 })
 
+const VISUALIZER_ANCHOR = '// @kit:visualizer-plugins'
 const STANDARD_VITE_CONFIG = `import { sveltekit } from '@sveltejs/kit/vite'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-\tplugins: [sveltekit()]
+\tplugins: [sveltekit(), ${VISUALIZER_ANCHOR}],
 })
 `
 const STATS_CLIENT = 'stats-client.html'
@@ -236,43 +237,25 @@ describe('merge_vite_config', () => {
 })
 
 describe('merge_vite_config edge cases', () => {
-	it('adds visualizer to empty plugins array', () => {
-		const content = `import { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [] })\n`
+	it('injects visualizer when anchor is present with other plugins', () => {
+		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [sveltekit(), ${VISUALIZER_ANCHOR}] })\n`
 		const result = init_logic.merge_vite_config(content)
 
 		expect(result).toContain(STATS_CLIENT)
 		expect(result).toContain(STATS_SERVER)
 	})
 
-	it('handles plugins array with nested brackets', () => {
-		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [sveltekit(), tailwindcss({ content: ['./src/**/*'] })] })\n`
-		const result = init_logic.merge_vite_config(content)
-
-		expect(result).toContain(STATS_CLIENT)
-		expect(result).toContain("tailwindcss({ content: ['./src/**/*'] })")
-	})
-
-	it('does not inject import when no plugins array found', () => {
+	it('does not inject when anchor is absent', () => {
 		const content = `import { defineConfig } from 'vite'\nexport default defineConfig({})\n`
 		const result = init_logic.merge_vite_config(content)
 
 		expect(result).toBe(content)
 	})
 
-	it('does not produce double comma when last plugin has inline trailing comma', () => {
-		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({ plugins: [sveltekit(),] })\n`
-		const result = init_logic.merge_vite_config(content)
+	it('removes anchor from output after injection', () => {
+		const result = init_logic.merge_vite_config(STANDARD_VITE_CONFIG)
 
-		expect(result).not.toContain(',,')
-		expect(result).toContain(STATS_CLIENT)
-	})
-
-	it('does not produce double comma when multiline plugins array has trailing comma', () => {
-		const content = `import { sveltekit } from '@sveltejs/kit/vite'\nimport { defineConfig } from 'vite'\nexport default defineConfig({\n\tplugins: [\n\t\tsveltekit(),\n\t]\n})\n`
-		const result = init_logic.merge_vite_config(content)
-
-		expect(result).not.toContain(',,')
-		expect(result).toContain(STATS_CLIENT)
+		expect(result).not.toContain(VISUALIZER_ANCHOR)
 	})
 })
 /* eslint-enable dot-notation */

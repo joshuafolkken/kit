@@ -1,15 +1,13 @@
+import { has_stderr_field } from './git-gh-exec'
+
 function get_error_message(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
 }
 
 function get_stderr_from_error(cause: Error): string | undefined {
-	const exec_error = cause as { stderr?: string }
+	if (!has_stderr_field(cause)) return undefined
 
-	if (exec_error.stderr === undefined) {
-		return undefined
-	}
-
-	const stderr = exec_error.stderr.trim()
+	const stderr = cause.stderr.trim()
 
 	return stderr.length > 0 ? stderr : undefined
 }
