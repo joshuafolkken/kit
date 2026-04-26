@@ -144,6 +144,7 @@ function merge_development_dependencies(
 }
 
 function merge_package_manager(content: string, value: string): string {
+	if (value.length === 0) return content
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	if ('packageManager' in parsed) return content
 
