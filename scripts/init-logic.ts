@@ -71,7 +71,10 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	josh: 'josh',
 }
 
+const CSPELL_VERSION = '^10.0.0'
 const SIZE_LIMIT_VERSION = '^12.1.0'
+const SIZE_LIMIT_FILE_KEY = '@size-limit/file'
+const SIZE_LIMIT_FILE_VERSION = '^12.1.0'
 const VISUALIZER_VERSION = '^7.0.1'
 
 const SIZE_LIMIT_CONFIG = [
@@ -159,7 +162,9 @@ function merge_sveltekit_package_json(content: string): string {
 	})
 
 	return init_logic_json_merge.merge_development_dependencies(with_config, {
+		cspell: CSPELL_VERSION,
 		'size-limit': SIZE_LIMIT_VERSION,
+		[SIZE_LIMIT_FILE_KEY]: SIZE_LIMIT_FILE_VERSION,
 		'rollup-plugin-visualizer': VISUALIZER_VERSION,
 	})
 }

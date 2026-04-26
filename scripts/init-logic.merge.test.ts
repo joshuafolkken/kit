@@ -185,6 +185,96 @@ describe('merge_sveltekit_package_json visualizer', () => {
 	})
 })
 
+const CSPELL_KEY = 'cspell'
+const CSPELL_VERSION = '^10.0.0'
+const SIZE_LIMIT_FILE_KEY = '@size-limit/file'
+const SIZE_LIMIT_FILE_VERSION = '^12.1.0'
+
+describe('merge_sveltekit_package_json cspell', () => {
+	it('adds cspell devDependency', () => {
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json('{}')) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[CSPELL_KEY]).toBe(CSPELL_VERSION)
+	})
+
+	it('does not overwrite existing cspell devDependency', () => {
+		const existing = `{"${DEV_DEPS_KEY}":{"${CSPELL_KEY}":"^9.0.0"}}`
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json(existing)) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[CSPELL_KEY]).toBe('^9.0.0')
+	})
+})
+
+describe('merge_sveltekit_package_json size-limit/file', () => {
+	it('adds @size-limit/file devDependency', () => {
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json('{}')) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_FILE_KEY]).toBe(SIZE_LIMIT_FILE_VERSION)
+	})
+
+	it('does not overwrite existing @size-limit/file devDependency', () => {
+		const existing = `{"${DEV_DEPS_KEY}":{"${SIZE_LIMIT_FILE_KEY}":"^11.0.0"}}`
+		const result = JSON.parse(init_logic.merge_sveltekit_package_json(existing)) as Record<
+			string,
+			Record<string, string>
+		>
+
+		expect(result[DEV_DEPS_KEY]?.[SIZE_LIMIT_FILE_KEY]).toBe('^11.0.0')
+	})
+})
+
+const PACKAGE_MANAGER_VALUE = 'pnpm@10.0.0'
+const PKG_WITH_NAME = '{"name":"my-app"}'
+
+describe('merge_package_manager', () => {
+	it('adds packageManager field when missing', () => {
+		const result = JSON.parse(
+			init_logic.merge_package_manager('{}', PACKAGE_MANAGER_VALUE),
+		) as Record<string, string>
+
+		expect(result['packageManager']).toBe(PACKAGE_MANAGER_VALUE)
+	})
+
+	it('returns content unchanged when packageManager already set', () => {
+		const content = `{"packageManager":"${PACKAGE_MANAGER_VALUE}"}`
+
+		expect(init_logic.merge_package_manager(content, 'pnpm@99.0.0')).toBe(content)
+	})
+
+	it('does not overwrite different existing packageManager value', () => {
+		const existing = `{"packageManager":"pnpm@9.0.0"}`
+		const result = JSON.parse(
+			init_logic.merge_package_manager(existing, PACKAGE_MANAGER_VALUE),
+		) as Record<string, string>
+
+		expect(result['packageManager']).toBe('pnpm@9.0.0')
+	})
+
+	it('preserves other fields when adding packageManager', () => {
+		const result = JSON.parse(
+			init_logic.merge_package_manager(PKG_WITH_NAME, PACKAGE_MANAGER_VALUE),
+		) as Record<string, string>
+
+		expect(result['name']).toBe('my-app')
+		expect(result['packageManager']).toBe(PACKAGE_MANAGER_VALUE)
+	})
+
+	it('returns content unchanged when value is empty string', () => {
+		const content = PKG_WITH_NAME
+
+		expect(init_logic.merge_package_manager(content, '')).toBe(content)
+	})
+})
+
 const VISUALIZER_ANCHOR = '// @kit:visualizer-plugins'
 const STANDARD_VITE_CONFIG = `import { sveltekit } from '@sveltejs/kit/vite'
 import { defineConfig } from 'vite'

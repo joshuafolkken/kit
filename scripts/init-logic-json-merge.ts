@@ -143,6 +143,14 @@ function merge_development_dependencies(
 	return `${JSON.stringify({ ...parsed, devDependencies: { ...existing, ...Object.fromEntries(to_add) } }, undefined, '\t')}\n`
 }
 
+function merge_package_manager(content: string, value: string): string {
+	if (value.length === 0) return content
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	if ('packageManager' in parsed) return content
+
+	return `${JSON.stringify({ ...parsed, packageManager: value }, undefined, '\t')}\n`
+}
+
 const init_logic_json_merge = {
 	merge_json_extends,
 	merge_json_array_field,
@@ -151,6 +159,7 @@ const init_logic_json_merge = {
 	merge_cspell_import,
 	merge_package_scripts,
 	merge_development_dependencies,
+	merge_package_manager,
 }
 
 export { init_logic_json_merge }
