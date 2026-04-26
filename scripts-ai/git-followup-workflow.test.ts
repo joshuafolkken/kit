@@ -55,6 +55,26 @@ describe('parse_issue_number_from_text', () => {
 	})
 })
 
+describe('resolve_should_merge', () => {
+	it('returns true when no flags are set', () => {
+		expect(git_followup_workflow.resolve_should_merge({})).toBe(true)
+	})
+
+	it('returns false when --no-merge is set', () => {
+		expect(git_followup_workflow.resolve_should_merge({ 'no-merge': true })).toBe(false)
+	})
+
+	it('returns true when --merge is set without --no-merge (backward compat)', () => {
+		expect(git_followup_workflow.resolve_should_merge({ merge: true })).toBe(true)
+	})
+
+	it('returns false when both --merge and --no-merge are set (--no-merge wins)', () => {
+		expect(git_followup_workflow.resolve_should_merge({ merge: true, 'no-merge': true })).toBe(
+			false,
+		)
+	})
+})
+
 describe('resolve_branch_name', () => {
 	it('returns the provided branch name trimmed', async () => {
 		const result = await git_followup_workflow.resolve_branch_name('my-branch')
