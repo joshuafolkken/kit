@@ -280,6 +280,40 @@ describe('get_npmrc_lines', () => {
 	})
 })
 
+describe('cspell sveltekit.yaml content', () => {
+	const CSPELL_SVELTEKIT_PATH = path.join(PACKAGE_ROOT, 'cspell', 'sveltekit.yaml')
+	const CSPELL_SVELTEKIT_CONTENT = readFileSync(CSPELL_SVELTEKIT_PATH, 'utf8')
+
+	it('contains sveltekit word', () => {
+		expect(CSPELL_SVELTEKIT_CONTENT).toContain('sveltekit')
+	})
+
+	it('contains Stylesheet word', () => {
+		expect(CSPELL_SVELTEKIT_CONTENT).toContain('Stylesheet')
+	})
+})
+
+describe('ci.yml template NOSONAR', () => {
+	const CI_YML_PATH = path.join(PACKAGE_ROOT, 'templates', 'workflows', 'ci.yml')
+	const CI_YML_CONTENT = readFileSync(CI_YML_PATH, 'utf8')
+
+	it('has NOSONAR on playwright install-deps line', () => {
+		const install_deps_line = CI_YML_CONTENT.split('\n').find((ci_line) =>
+			ci_line.includes('playwright install-deps'),
+		)
+
+		expect(install_deps_line).toContain('NOSONAR')
+	})
+
+	it('has NOSONAR on playwright install chromium line', () => {
+		const install_line = CI_YML_CONTENT.split('\n').find((ci_line) =>
+			ci_line.includes('playwright install chromium'),
+		)
+
+		expect(install_line).toContain('NOSONAR')
+	})
+})
+
 describe('gitignore template content', () => {
 	const GITIGNORE_TEMPLATE_PATH = path.join(PACKAGE_ROOT, 'templates', 'gitignore')
 	const GITIGNORE_CONTENT = readFileSync(GITIGNORE_TEMPLATE_PATH, 'utf8')

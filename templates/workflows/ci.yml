@@ -155,11 +155,11 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Install Playwright system dependencies
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium # NOSONAR - installing browsers, not running lifecycle scripts
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
+        run: pnpm exec playwright install chromium # NOSONAR - installing browsers, not running lifecycle scripts
 
       - name: Build application
         env:

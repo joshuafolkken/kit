@@ -8,7 +8,9 @@ import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { install_josh_bin_section } from './install-bin'
-import { string_array_schema, vscode_settings_schema } from './schemas'
+import { string_array_schema, vscode_settings_schema, with_package_manager_schema } from './schemas'
+
+const PACKAGE_JSON = 'package.json'
 
 const VSCODE_FILENAMES: Record<ProjectType, { extensions: string; settings: string }> = {
 	sveltekit: { extensions: 'extensions.sveltekit.json', settings: 'settings.sveltekit.json' },
@@ -200,14 +202,27 @@ async function resolve_project_type(): Promise<ProjectType> {
 	return await prompt_project_type()
 }
 
-function apply_package_json_merges(content: string, type: ProjectType): string {
-	if (type === 'sveltekit') return init_logic.merge_sveltekit_package_json(content)
+function get_kit_package_manager(): string | undefined {
+	const { packageManager: package_manager } = with_package_manager_schema.parse(
+		read_package_json(PACKAGE_JSON),
+	)
 
-	return init_logic.merge_package_scripts(content, init_logic.get_suggested_scripts(type))
+	return package_manager !== undefined && package_manager.length > 0 ? package_manager : undefined
+}
+
+function apply_package_json_merges(content: string, type: ProjectType): string {
+	const merged =
+		type === 'sveltekit'
+			? init_logic.merge_sveltekit_package_json(content)
+			: init_logic.merge_package_scripts(content, init_logic.get_suggested_scripts(type))
+	const kit_pm = get_kit_package_manager()
+	if (kit_pm === undefined) return merged
+
+	return init_logic.merge_package_manager(merged, kit_pm)
 }
 
 function merge_project_package_json(type: ProjectType): void {
-	const package_json_path = path.join(PROJECT_ROOT, 'package.json')
+	const package_json_path = path.join(PROJECT_ROOT, PACKAGE_JSON)
 	if (!existsSync(package_json_path)) return
 
 	const existing = readFileSync(package_json_path, 'utf8')

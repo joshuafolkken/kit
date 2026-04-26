@@ -25,6 +25,10 @@ const with_development_deps_schema = z.looseObject({
 	devDependencies: z.record(z.string(), z.string()).optional(),
 })
 
+const with_package_manager_schema = z.looseObject({
+	packageManager: z.string().optional(),
+})
+
 const json_object_schema = z.record(z.string(), z.unknown())
 
 const string_array_schema = z.array(z.string())
@@ -38,6 +42,7 @@ export {
 	with_extends_schema,
 	with_scripts_schema,
 	with_development_deps_schema,
+	with_package_manager_schema,
 	json_object_schema,
 	string_array_schema,
 }
