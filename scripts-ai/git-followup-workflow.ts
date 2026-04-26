@@ -21,6 +21,7 @@ interface CliArguments {
 		'coderabbit-ignore-reason'?: string
 		'ai-review-ignore-reason'?: string
 		'skip-watch'?: boolean
+		'no-merge'?: boolean
 		merge?: boolean
 		help?: boolean
 	}
@@ -45,7 +46,8 @@ Options:
   --ai-review-ignore-reason    Reason text when keeping AI reviewer (Claude Review / CodeRabbit
                                summary) findings unresolved
   --skip-watch                 Skip "gh pr checks --watch" and only evaluate latest status
-  --merge                      Merge the PR right after sending the completion notification
+  --no-merge                   Skip merging the PR (merge is on by default)
+  --merge                      (Deprecated — merge is now the default; kept for backward compatibility)
   -h, --help                   Show this help
 	`)
 }
@@ -61,6 +63,7 @@ function parse_cli_arguments(): CliArguments {
 			'coderabbit-ignore-reason': { type: 'string' },
 			'ai-review-ignore-reason': { type: 'string' },
 			'skip-watch': { type: 'boolean' },
+			'no-merge': { type: 'boolean' },
 			merge: { type: 'boolean' },
 			help: { type: 'boolean', short: 'h' },
 		},
@@ -92,6 +95,10 @@ function build_notify_config(values: CliArguments['values']): GitNotifyConfig | 
 	})
 }
 
+function resolve_should_merge(values: CliArguments['values']): boolean {
+	return values['no-merge'] !== true
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -109,7 +116,7 @@ async function main(): Promise<void> {
 		coderabbit_ignore_reason: cli.values['coderabbit-ignore-reason'],
 		ai_review_ignore_reason: cli.values['ai-review-ignore-reason'],
 		is_skip_watch: cli.values['skip-watch'] === true,
-		should_merge: cli.values.merge === true,
+		should_merge: resolve_should_merge(cli.values),
 	})
 	console.info('')
 	console.info('✅ PR followup completed.')
@@ -122,6 +129,10 @@ try {
 	git_error.handle(error)
 }
 
-const git_followup_workflow = { parse_issue_number_from_text, resolve_branch_name }
+const git_followup_workflow = {
+	parse_issue_number_from_text,
+	resolve_branch_name,
+	resolve_should_merge,
+}
 
 export { git_followup_workflow }

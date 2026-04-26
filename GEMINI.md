@@ -196,6 +196,7 @@ Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup --merge`, wh
 - **CodeRabbit rate-limit is not a finding.** Treat it as "no findings" and proceed.
 - Do **not** pass `--delete-branch` unless the user asks.
 - If the merge fails, report the reason and stop — do not retry with different flags or bypass protections.
+- **If the user wants to skip the merge step**, use `kickoff` (plan-only) or say "do not merge" in the same turn. In that case, pass `--no-merge` to `pnpm josh followup`. Outside a `fullrun` invocation, never run `gh pr merge` on your own.
 
 #### Completion notifications: always via `pnpm josh followup`
 
