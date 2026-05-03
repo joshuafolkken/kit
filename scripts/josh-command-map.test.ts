@@ -147,6 +147,15 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 	})
 })
 
+describe('COMMAND_MAP — latest command authentication', () => {
+	it('latest command shell exports NODE_AUTH_TOKEN from gh auth token', () => {
+		const entry = get_command('latest')
+		const shell_string = entry?.shell?.join(' ') ?? ''
+
+		expect(shell_string).toContain('export NODE_AUTH_TOKEN=$(gh auth token)')
+	})
+})
+
 describe('CATEGORY_ORDER — covers all command categories', () => {
 	it('includes every category used in COMMAND_MAP', () => {
 		const used_categories = new Set(Object.values(COMMAND_MAP).map((entry) => entry.category))
