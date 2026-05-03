@@ -216,9 +216,9 @@ function apply_package_json_merges(content: string, type: ProjectType): string {
 			? init_logic.merge_sveltekit_package_json(content)
 			: init_logic.merge_package_scripts(content, init_logic.get_suggested_scripts(type))
 	const kit_pm = get_kit_package_manager()
-	if (kit_pm === undefined) return merged
+	const with_pm = kit_pm === undefined ? merged : init_logic.merge_package_manager(merged, kit_pm)
 
-	return init_logic.merge_package_manager(merged, kit_pm)
+	return init_logic.sort_package_json_keys(with_pm)
 }
 
 function merge_project_package_json(type: ProjectType): void {
