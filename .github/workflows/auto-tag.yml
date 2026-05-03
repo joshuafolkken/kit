@@ -6,13 +6,13 @@ on:
     paths:
       - 'package.json'
 
-permissions:
-  contents: write
-
 jobs:
   create-tag:
     name: Create Git Tag if Version Changed
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -33,9 +33,9 @@ jobs:
 
       - name: Check if version changed
         id: version_check
+        env:
+          CURRENT_VERSION: ${{ steps.current_version.outputs.version }}
         run: |
-          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
-
           if git show HEAD~1:package.json > /dev/null 2>&1; then
             PREV_VERSION=$(git show HEAD~1:package.json | jq -r '.version')
             echo "Previous version: $PREV_VERSION"
@@ -54,11 +54,41 @@ jobs:
             echo "ℹ️ First commit, creating tag"
           fi
 
+      - name: Wait for CI to pass on this commit
+        id: ci_gate
+        if: steps.version_check.outputs.changed == 'true'
+        env:
+          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for attempt in $(seq 1 18); do
+            result=$(gh run list --workflow ci.yml --repo "$GITHUB_REPOSITORY" \
+              --json headSha,conclusion,status \
+              --jq "[.[] | select(.headSha == \"$SHA\")] | .[0] | .conclusion // .status // \"none\"" 2>/dev/null || echo "none")
+            case "$result" in
+              success)
+                echo "passed=true" >> $GITHUB_OUTPUT
+                echo "✅ CI passed, proceeding with tag creation"
+                exit 0
+                ;;
+              failure | cancelled | timed_out)
+                echo "passed=false" >> $GITHUB_OUTPUT
+                echo "⚠️ CI $result on this commit, skipping tag creation"
+                exit 0
+                ;;
+            esac
+            echo "CI status: $result (attempt $attempt/18)"
+            sleep 10
+          done
+          echo "passed=false" >> $GITHUB_OUTPUT
+          echo "⏱️ Timed out waiting for CI"
+
       - name: Check if tag already exists
         id: tag_check
-        if: steps.version_check.outputs.changed == 'true'
+        if: steps.version_check.outputs.changed == 'true' && steps.ci_gate.outputs.passed == 'true'
+        env:
+          VERSION: ${{ steps.current_version.outputs.version }}
         run: |
-          VERSION="${{ steps.current_version.outputs.version }}"
           TAG="v$VERSION"
 
           if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -71,9 +101,10 @@ jobs:
 
       - name: Create and push tag
         id: create_tag
-        if: steps.version_check.outputs.changed == 'true' && steps.tag_check.outputs.exists == 'false'
+        if: steps.version_check.outputs.changed == 'true' && steps.ci_gate.outputs.passed == 'true' && steps.tag_check.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.current_version.outputs.version }}
         run: |
-          VERSION="${{ steps.current_version.outputs.version }}"
           TAG="v$VERSION"
 
           git config user.name "github-actions[bot]"

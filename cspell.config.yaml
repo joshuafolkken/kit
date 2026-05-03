@@ -8,6 +8,7 @@ words:
   - myorg
   - myrepo
   - ncurc
+  - esac
   - shellcheck
   - unstub
   - vercel
