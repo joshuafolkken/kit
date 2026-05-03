@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { readFileSync } from 'node:fs'
+import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { git_command } from './git/git-command'
 
@@ -8,10 +9,22 @@ interface CheckResult {
 	message: string
 }
 
+const GIT_DIR_PREFIX = '.git/'
+
+function is_safe_commit_message_path(file_path: string): boolean {
+	return file_path.startsWith(GIT_DIR_PREFIX) || file_path.startsWith(os.tmpdir())
+}
+
 function get_commit_message(): string {
 	const FILE_INDEX = 2
 	const commit_message_file = process.argv.at(FILE_INDEX)
 	const default_path = commit_message_file ?? '.git/COMMIT_EDITMSG'
+
+	if (commit_message_file !== undefined && !is_safe_commit_message_path(commit_message_file)) {
+		throw new Error(
+			`Commit message file must be in .git/ or system temp dir: ${commit_message_file}`,
+		)
+	}
 
 	try {
 		return readFileSync(default_path, 'utf8').trim()
@@ -72,6 +85,6 @@ async function main(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-export { check_commit_message, extract_issue_number }
+export { check_commit_message, extract_issue_number, is_safe_commit_message_path }
 
 export type { CheckResult }

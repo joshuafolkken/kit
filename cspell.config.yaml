@@ -11,5 +11,6 @@ words:
   - esac
   - shellcheck
   - unstub
+  - sandboxed
   - vercel
   - winget

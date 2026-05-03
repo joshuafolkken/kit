@@ -33,6 +33,8 @@ describe('install_bin_logic.resolve_josh_script_path', () => {
 	})
 })
 
+const DOUBLE_QUOTE_ERROR = 'double-quotes'
+
 describe('install_bin_logic.generate_wrapper_script', () => {
 	it('includes shebang, tsx path, and josh script path', () => {
 		const script = install_bin_logic.generate_wrapper_script(TSX_PATH, JOSH_SCRIPT_PATH)
@@ -40,6 +42,18 @@ describe('install_bin_logic.generate_wrapper_script', () => {
 		expect(script).toContain('#!/bin/sh')
 		expect(script).toContain(TSX_PATH)
 		expect(script).toContain(JOSH_SCRIPT_PATH)
+	})
+
+	it('throws when tsx_path contains a double-quote', () => {
+		expect(() => install_bin_logic.generate_wrapper_script('path/"tsx', JOSH_SCRIPT_PATH)).toThrow(
+			DOUBLE_QUOTE_ERROR,
+		)
+	})
+
+	it('throws when josh_script_path contains a double-quote', () => {
+		expect(() => install_bin_logic.generate_wrapper_script(TSX_PATH, 'path/"josh.ts')).toThrow(
+			DOUBLE_QUOTE_ERROR,
+		)
 	})
 })
 

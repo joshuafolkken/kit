@@ -29,8 +29,8 @@ describe(SONAR_PROPERTIES_FILE, () => {
 		expect(exclusions).toContain('.claude/**')
 	})
 
-	it('excludes scripts-ai/ AI automation from analysis', () => {
-		expect(exclusions).toContain('scripts-ai/**')
+	it('does not exclude scripts-ai/ from analysis', () => {
+		expect(exclusions).not.toContain('scripts-ai/**')
 	})
 
 	it('does not exclude scripts/ core package code from analysis', () => {

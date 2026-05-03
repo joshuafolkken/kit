@@ -19,7 +19,17 @@ function resolve_josh_script_path(package_directory: string): string {
 	return path.join(package_directory, 'scripts', 'josh.ts')
 }
 
+const DOUBLE_QUOTE = '"'
+
+function has_embedded_quote(file_path: string): boolean {
+	return file_path.includes(DOUBLE_QUOTE)
+}
+
 function generate_wrapper_script(tsx_path: string, josh_script_path: string): string {
+	if (has_embedded_quote(tsx_path) || has_embedded_quote(josh_script_path)) {
+		throw new Error('Wrapper path must not contain embedded double-quotes')
+	}
+
 	return `#!/bin/sh\nexec "${tsx_path}" "${josh_script_path}" "$@"\n`
 }
 
