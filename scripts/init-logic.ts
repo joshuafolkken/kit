@@ -19,6 +19,7 @@ const CSPELL_IMPORT: Record<ProjectType, string> = {
 }
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
+const SAFE_CHAIN_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
 
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
@@ -68,6 +69,7 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 }
 
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
+	preinstall: SAFE_CHAIN_CMD,
 	postinstall: LEFTHOOK_INSTALL_CMD,
 	josh: 'josh',
 }
