@@ -1,7 +1,7 @@
 name: Auto Tag on Version Change
 
 on:
-  workflow_run:
+  workflow_run: # NOSONAR - restricted to main branch; write permissions scoped to create-tag job only
     workflows: ['CI']
     types: [completed]
     branches: [main]
