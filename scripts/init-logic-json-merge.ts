@@ -163,6 +163,8 @@ function merge_cspell_import(content: string, value: string): string {
 	return dump(insert_import_after_version(parsed, updated_list))
 }
 
+const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
+
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
@@ -174,7 +176,10 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 
 	if (!did_migrate && to_add.length === 0) return content
 
-	return `${JSON.stringify({ ...parsed, scripts: { ...migrated, ...Object.fromEntries(to_add) } }, undefined, '\t')}\n`
+	const prepend = Object.fromEntries(to_add.filter(([k]) => SCRIPTS_PREPEND_KEYS.has(k)))
+	const append = Object.fromEntries(to_add.filter(([k]) => !SCRIPTS_PREPEND_KEYS.has(k)))
+
+	return `${JSON.stringify({ ...parsed, scripts: { ...prepend, ...migrated, ...append } }, undefined, '\t')}\n`
 }
 
 function merge_development_dependencies(
