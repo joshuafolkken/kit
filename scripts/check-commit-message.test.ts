@@ -1,3 +1,4 @@
+import os from 'node:os'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./git/git-command', () => ({
@@ -16,10 +17,31 @@ const mocked_read = vi.mocked(read_file_sync)
 
 mocked_branch.mockResolvedValue('main')
 
-const { check_commit_message, extract_issue_number } = await import('./check-commit-message')
+const { check_commit_message, extract_issue_number, is_safe_commit_message_path } =
+	await import('./check-commit-message')
 
 beforeEach(() => {
 	vi.clearAllMocks()
+})
+
+describe('is_safe_commit_message_path', () => {
+	it('accepts a .git/ prefixed path', () => {
+		expect(is_safe_commit_message_path('.git/COMMIT_EDITMSG')).toBe(true)
+	})
+
+	it('accepts an OS temp dir path', () => {
+		const temporary_path = `${os.tmpdir()}/commit-msg`
+
+		expect(is_safe_commit_message_path(temporary_path)).toBe(true)
+	})
+
+	it('rejects a system file path', () => {
+		expect(is_safe_commit_message_path('/etc/passwd')).toBe(false)
+	})
+
+	it('rejects a bare filename', () => {
+		expect(is_safe_commit_message_path('commit-msg')).toBe(false)
+	})
 })
 
 describe('extract_issue_number', () => {

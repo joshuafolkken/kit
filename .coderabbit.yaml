@@ -43,7 +43,7 @@ tools:
   biome:
     enabled: false
   gitleaks:
-    enabled: false
+    enabled: true
   hadolint:
     enabled: false
   yamllint:

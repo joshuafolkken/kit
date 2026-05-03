@@ -24,3 +24,11 @@ The following files are intentionally included in the published npm package and 
 - `templates/`, `prompts/` — Markdown and config templates. No credentials.
 
 Sensitive runtime secrets (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) are stored only in a local `.env` file which is gitignored and never committed to the repository.
+
+## MCP External Endpoints
+
+This project ships `.mcp.json` which connects to external MCP servers at runtime (e.g. `https://mcp.svelte.dev/mcp`). These servers are treated as trusted third-party services. Consumers should be aware that:
+
+- MCP tool responses from external servers are not sandboxed — treat them as you would any external API call.
+- If the external endpoint is compromised or returns malicious content, the AI agent executing the tool may act on it.
+- Review and pin the MCP server URL before deploying in sensitive environments.
