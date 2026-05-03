@@ -33,6 +33,8 @@ const json_object_schema = z.record(z.string(), z.unknown())
 
 const string_array_schema = z.array(z.string())
 
+const string_record_schema = z.record(z.string(), z.string())
+
 export {
 	overrides_snapshot_schema,
 	package_version_schema,
@@ -45,4 +47,5 @@ export {
 	with_package_manager_schema,
 	json_object_schema,
 	string_array_schema,
+	string_record_schema,
 }

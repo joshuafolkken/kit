@@ -144,6 +144,17 @@ describe('init_logic_json_merge.merge_package_scripts', () => {
 
 		expect(result.scripts[SCRIPT_BUILD]).toBe('josh build')
 	})
+
+	it('preserves scripts key position when other keys precede it', () => {
+		const input = JSON.stringify({ name: 'app', version: '1.0.0', scripts: { existing: 'cmd' } })
+		const result = JSON.parse(
+			init_logic_json_merge.merge_package_scripts(input, { [SCRIPT_DEV]: SCRIPT_DEV_VALUE }),
+		) as object
+		const keys = Object.keys(result)
+
+		expect(keys.indexOf('name')).toBeLessThan(keys.indexOf('scripts'))
+		expect(keys.indexOf('version')).toBeLessThan(keys.indexOf('scripts'))
+	})
 })
 
 describe('init_logic_json_merge.merge_development_dependencies', () => {
@@ -163,5 +174,75 @@ describe('init_logic_json_merge.merge_development_dependencies', () => {
 		expect(
 			init_logic_json_merge.merge_development_dependencies(content, { [DEV_DEP_KEY]: '^0.2.0' }),
 		).toBe(content)
+	})
+
+	it('preserves devDependencies key position when other keys precede it', () => {
+		const input = JSON.stringify({
+			name: 'app',
+			version: '1.0.0',
+			devDependencies: { existing: '^1.0.0' },
+		})
+		const result = JSON.parse(
+			init_logic_json_merge.merge_development_dependencies(input, {
+				[DEV_DEP_KEY]: DEV_DEP_VERSION,
+			}),
+		) as object
+		const keys = Object.keys(result)
+
+		expect(keys.indexOf('name')).toBeLessThan(keys.indexOf(DEV_DEPS_KEY))
+		expect(keys.indexOf('version')).toBeLessThan(keys.indexOf(DEV_DEPS_KEY))
+	})
+})
+
+const NORMALIZE_NAME = 'my-app'
+const NORMALIZE_VERSION = '1.0.0'
+
+describe('init_logic_json_merge.sort_package_json_keys', () => {
+	it('places name before devDependencies when devDependencies was first', () => {
+		const input = JSON.stringify({
+			devDependencies: { foo: '^1.0.0' },
+			name: NORMALIZE_NAME,
+			version: NORMALIZE_VERSION,
+		})
+		const result = JSON.parse(init_logic_json_merge.sort_package_json_keys(input)) as object
+		const keys = Object.keys(result)
+
+		expect(keys.indexOf('name')).toBeLessThan(keys.indexOf('devDependencies'))
+		expect(keys.indexOf('version')).toBeLessThan(keys.indexOf('devDependencies'))
+	})
+
+	it('places scripts before devDependencies', () => {
+		const input = JSON.stringify({ devDependencies: {}, scripts: {}, name: NORMALIZE_NAME })
+		const keys = Object.keys(
+			JSON.parse(init_logic_json_merge.sort_package_json_keys(input)) as object,
+		)
+
+		expect(keys.indexOf('scripts')).toBeLessThan(keys.indexOf('devDependencies'))
+	})
+
+	it('places dependencies before devDependencies', () => {
+		const input = JSON.stringify({ devDependencies: {}, dependencies: {}, name: NORMALIZE_NAME })
+		const keys = Object.keys(
+			JSON.parse(init_logic_json_merge.sort_package_json_keys(input)) as object,
+		)
+
+		expect(keys.indexOf('dependencies')).toBeLessThan(keys.indexOf('devDependencies'))
+	})
+})
+
+describe('init_logic_json_merge.sort_package_json_keys (edge cases)', () => {
+	it('places unknown keys after all known keys', () => {
+		const input = JSON.stringify({ 'custom-field': 'value', name: NORMALIZE_NAME })
+		const result = JSON.parse(init_logic_json_merge.sort_package_json_keys(input)) as object
+		const keys = Object.keys(result)
+
+		expect(keys[0]).toBe('name')
+		expect(keys.at(-1)).toBe('custom-field')
+	})
+
+	it('returns original content when order is already correct', () => {
+		const ordered = `${JSON.stringify({ name: NORMALIZE_NAME, devDependencies: {} }, undefined, '\t')}\n`
+
+		expect(init_logic_json_merge.sort_package_json_keys(ordered)).toBe(ordered)
 	})
 })

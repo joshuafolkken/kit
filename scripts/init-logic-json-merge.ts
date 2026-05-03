@@ -4,10 +4,54 @@ import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrat
 import {
 	json_object_schema,
 	string_array_schema,
-	with_development_deps_schema,
+	string_record_schema,
 	with_extends_schema,
-	with_scripts_schema,
 } from './schemas'
+
+const PACKAGE_JSON_KEY_ORDER: ReadonlyArray<string> = [
+	'name',
+	'version',
+	'description',
+	'keywords',
+	'homepage',
+	'bugs',
+	'license',
+	'author',
+	'contributors',
+	'funding',
+	'files',
+	'main',
+	'browser',
+	'exports',
+	'imports',
+	'bin',
+	'man',
+	'directories',
+	'repository',
+	'type',
+	'types',
+	'typings',
+	'typesVersions',
+	'publishConfig',
+	'private',
+	'scripts',
+	'config',
+	'dependencies',
+	'devDependencies',
+	'peerDependencies',
+	'peerDependenciesMeta',
+	'bundleDependencies',
+	'bundledDependencies',
+	'optionalDependencies',
+	'overrides',
+	'resolutions',
+	'packageManager',
+	'engines',
+	'os',
+	'cpu',
+	'size-limit',
+	'pnpm',
+]
 
 function parse_jsonc(content: string): unknown {
 	return JSON.parse(strip_json_comments(content, { trailingCommas: true }))
@@ -120,8 +164,10 @@ function merge_cspell_import(content: string, value: string): string {
 }
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
-	const parsed = with_scripts_schema.parse(parse_jsonc(content))
-	const existing = parsed.scripts ?? {}
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['scripts']
+	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
 	const to_add = Object.entries(scripts).filter(([key]) => !(key in migrated))
 	const did_migrate = JSON.stringify(migrated) !== JSON.stringify(existing)
@@ -135,8 +181,10 @@ function merge_development_dependencies(
 	content: string,
 	additions: Record<string, string>,
 ): string {
-	const parsed = with_development_deps_schema.parse(parse_jsonc(content))
-	const existing = parsed.devDependencies ?? {}
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['devDependencies']
+	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const to_add = Object.entries(additions).filter(([key]) => !(key in existing))
 	if (to_add.length === 0) return content
 
@@ -151,6 +199,19 @@ function merge_package_manager(content: string, value: string): string {
 	return `${JSON.stringify({ ...parsed, packageManager: value }, undefined, '\t')}\n`
 }
 
+function sort_package_json_keys(content: string): string {
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const all_keys = Object.keys(parsed)
+	const known = PACKAGE_JSON_KEY_ORDER.filter((k) => k in parsed)
+	const unknown = all_keys.filter((k) => !PACKAGE_JSON_KEY_ORDER.includes(k))
+	const ordered = Object.fromEntries([...known, ...unknown].map((k) => [k, parsed[k]]))
+	const serialized = `${JSON.stringify(ordered, undefined, '\t')}\n`
+	const current = `${JSON.stringify(parsed, undefined, '\t')}\n`
+	if (serialized === current) return content
+
+	return serialized
+}
+
 const init_logic_json_merge = {
 	merge_json_extends,
 	merge_json_array_field,
@@ -160,6 +221,7 @@ const init_logic_json_merge = {
 	merge_package_scripts,
 	merge_development_dependencies,
 	merge_package_manager,
+	sort_package_json_keys,
 }
 
 export { init_logic_json_merge }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ALIASES, CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-map'
 
 const ALL_COMMAND_NAMES = Object.keys(COMMAND_MAP)
+const VERSION_UPGRADE_COMMAND = 'version:upgrade'
 const ALL_ALIAS_KEYS = Object.keys(ALIASES)
 
 function get_command(name: string): CommandEntry | undefined {
@@ -66,6 +67,13 @@ describe('COMMAND_MAP — command lookup by name', () => {
 		expect(entry?.script).toBeDefined()
 		expect(entry?.category).toBe('Versioning')
 	})
+
+	it('resolves version:upgrade command with shell and Versioning category', () => {
+		const entry = get_command(VERSION_UPGRADE_COMMAND)
+
+		expect(entry?.shell).toBeDefined()
+		expect(entry?.category).toBe('Versioning')
+	})
 })
 
 describe('COMMAND_MAP — tsx_arguments', () => {
@@ -124,6 +132,10 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 
 	it('resolves fu alias to followup', () => {
 		expect(get_alias('fu')).toBe('followup')
+	})
+
+	it('resolves vu alias to version:upgrade', () => {
+		expect(get_alias('vu')).toBe(VERSION_UPGRADE_COMMAND)
 	})
 
 	it('resolves tu alias to test:unit', () => {
