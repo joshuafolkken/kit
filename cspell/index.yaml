@@ -73,3 +73,8 @@ words:
   - webp
   - workerd
   - zstd
+  - docstrings
+  - esac
+  - languagetool
+  - sandboxed
+  - shellcheck

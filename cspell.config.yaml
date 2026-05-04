@@ -2,15 +2,10 @@ version: '0.2'
 import:
   - ./cspell/index.yaml
 words:
-  - docstrings
   - testuser
-  - languagetool
   - myorg
   - myrepo
   - ncurc
-  - esac
-  - shellcheck
   - unstub
-  - sandboxed
   - vercel
   - winget
