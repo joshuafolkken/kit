@@ -113,8 +113,48 @@ describe('sync_workspace_yaml', () => {
 })
 
 const PRETTIER_DEST = path.join(TEST_DIR, 'dest', 'prettier.config.js')
+const PRETTIERRC_PATH = path.join(TEST_DIR, 'dest', '.prettierrc')
 const OLD_PRETTIER_CONTENT = `{\n\t"useTabs": true,\n\t"tailwindStylesheet": "./src/app.css"\n}`
 const NEW_PRETTIER_CONTENT = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n\ttailwindStylesheet: './src/app.css',\n}\n`
+const KIT_PRETTIER_IMPORT = "from '@joshuafolkken/kit/prettier'"
+const APP_CSS_STYLESHEET = "tailwindStylesheet: './src/app.css'"
+
+describe('migrate_prettierrc', () => {
+	it('returns false and does nothing when .prettierrc does not exist', () => {
+		const is_migrated = sync.migrate_prettierrc(PRETTIER_DEST)
+
+		expect(is_migrated).toBe(false)
+		expect(existsSync(PRETTIER_DEST)).toBe(false)
+	})
+
+	it('returns true, writes prettier.config.js, and deletes .prettierrc', () => {
+		writeFileSync(PRETTIERRC_PATH, OLD_PRETTIER_CONTENT)
+		const is_migrated = sync.migrate_prettierrc(PRETTIER_DEST)
+
+		expect(is_migrated).toBe(true)
+		expect(existsSync(PRETTIERRC_PATH)).toBe(false)
+		expect(existsSync(PRETTIER_DEST)).toBe(true)
+	})
+
+	it('preserves tailwindStylesheet from .prettierrc during migration', () => {
+		writeFileSync(PRETTIERRC_PATH, OLD_PRETTIER_CONTENT)
+		sync.migrate_prettierrc(PRETTIER_DEST)
+
+		const migrated_content = readFileSync(PRETTIER_DEST, 'utf8')
+
+		expect(migrated_content).toContain(KIT_PRETTIER_IMPORT)
+		expect(migrated_content).toContain(APP_CSS_STYLESHEET)
+	})
+
+	it('uses default tailwindStylesheet when .prettierrc has no tailwindStylesheet', () => {
+		writeFileSync(PRETTIERRC_PATH, `{\n\t"useTabs": true\n}`)
+		sync.migrate_prettierrc(PRETTIER_DEST)
+
+		expect(readFileSync(PRETTIER_DEST, 'utf8')).toContain(
+			"tailwindStylesheet: './src/routes/layout.css'",
+		)
+	})
+})
 
 describe('sync_prettier_config', () => {
 	it('does nothing when file does not exist', () => {
@@ -122,14 +162,27 @@ describe('sync_prettier_config', () => {
 		expect(existsSync(PRETTIER_DEST)).toBe(false)
 	})
 
+	it('migrates .prettierrc when it exists and logs migrated', () => {
+		writeFileSync(PRETTIERRC_PATH, OLD_PRETTIER_CONTENT)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+
+		sync.sync_prettier_config(PRETTIER_DEST)
+
+		expect(existsSync(PRETTIERRC_PATH)).toBe(false)
+		expect(existsSync(PRETTIER_DEST)).toBe(true)
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('migrated'))
+	})
+
 	it('rewrites old JSON format to kit template, preserving tailwindStylesheet', () => {
 		writeFileSync(PRETTIER_DEST, OLD_PRETTIER_CONTENT)
 		sync.sync_prettier_config(PRETTIER_DEST)
 
-		const result = readFileSync(PRETTIER_DEST, 'utf8')
+		const synced_content = readFileSync(PRETTIER_DEST, 'utf8')
 
-		expect(result).toContain("from '@joshuafolkken/kit/prettier'")
-		expect(result).toContain("tailwindStylesheet: './src/app.css'")
+		expect(synced_content).toContain(KIT_PRETTIER_IMPORT)
+		expect(synced_content).toContain(APP_CSS_STYLESHEET)
 	})
 
 	it('does not rewrite file that already matches merged output', () => {
