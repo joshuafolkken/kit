@@ -9,8 +9,10 @@ import { init_logic, type ProjectType } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { install_josh_bin_section } from './install-bin'
 import { string_array_schema, vscode_settings_schema, with_package_manager_schema } from './schemas'
+import { sync } from './sync'
 
 const PACKAGE_JSON = 'package.json'
+const PRETTIER_CONFIG_JS = 'prettier.config.js'
 
 const VSCODE_FILENAMES: Record<ProjectType, { extensions: string; settings: string }> = {
 	sveltekit: { extensions: 'extensions.sveltekit.json', settings: 'settings.sveltekit.json' },
@@ -104,7 +106,7 @@ function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
 		),
 		{ dest: 'eslint.config.js', create: () => init_logic.generate_eslint_config(type) },
 		build_action(
-			'prettier.config.js',
+			PRETTIER_CONFIG_JS,
 			() => init_logic.generate_prettier_config(),
 			(existing) => init_logic.merge_prettier_config(existing),
 		),
@@ -257,12 +259,21 @@ function run_tool_installs(): void {
 	install_josh_bin_section()
 }
 
+function run_config_file_actions(type: ProjectType): void {
+	console.info('Config files:')
+
+	if (sync.migrate_prettierrc(path.join(PROJECT_ROOT, PRETTIER_CONFIG_JS))) {
+		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
+	}
+
+	for (const action of build_file_actions(type)) execute_file_action(action)
+}
+
 async function main(): Promise<void> {
 	const type = await resolve_project_type()
 
 	console.info(`\n🚀 Initializing @joshuafolkken/kit (${type})\n`)
-	console.info('Config files:')
-	for (const action of build_file_actions(type)) execute_file_action(action)
+	run_config_file_actions(type)
 
 	console.info('\nPackage scripts:')
 	merge_project_package_json(type)

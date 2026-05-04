@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gh_spawn } from './gh-spawn'
@@ -63,9 +63,19 @@ function sync_directory(directory_name: string): void {
 	console.info(`  ✔ synced    ${directory_name}/`)
 }
 
-function sync_prettier_config(destination_path: string): void {
-	if (!existsSync(destination_path)) return
+function migrate_prettierrc(destination_path: string): boolean {
+	const legacy_path = path.join(path.dirname(destination_path), '.prettierrc')
+	if (!existsSync(legacy_path)) return false
 
+	const existing = readFileSync(legacy_path, 'utf8')
+
+	writeFileSync(destination_path, init_logic.merge_prettier_config(existing))
+	rmSync(legacy_path)
+
+	return true
+}
+
+function write_merged_prettier_config(destination_path: string): void {
 	const existing = readFileSync(destination_path, 'utf8')
 	const merged = init_logic.merge_prettier_config(existing)
 
@@ -77,6 +87,18 @@ function sync_prettier_config(destination_path: string): void {
 
 	writeFileSync(destination_path, merged)
 	console.info('  ✔ synced    prettier.config.js')
+}
+
+function sync_prettier_config(destination_path: string): void {
+	if (migrate_prettierrc(destination_path)) {
+		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
+
+		return
+	}
+
+	if (!existsSync(destination_path)) return
+
+	write_merged_prettier_config(destination_path)
 }
 
 function sync_sonar_with_template(): void {
@@ -122,6 +144,12 @@ function main(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const sync = { sync_file_mapping, sync_ai_file, sync_workspace_yaml, sync_prettier_config }
+const sync = {
+	sync_file_mapping,
+	sync_ai_file,
+	sync_workspace_yaml,
+	sync_prettier_config,
+	migrate_prettierrc,
+}
 
 export { sync }
