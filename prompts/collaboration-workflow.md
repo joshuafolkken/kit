@@ -116,6 +116,8 @@ pnpm josh git -y "<issue-title> #<issue-number>"
 > 日本語で書かれている場合は英語に変換する。すでに英語で書かれている場合でも、文法・明確さ・簡潔さの観点で改善できるなら書き換えて良い（AI ツールは実装前にタイトル品質を判断する）。
 > いずれの場合も `gh issue edit <number> --title "<english-title>"` で GitHub Issue タイトルを合わせて更新する。
 
+`fullrun` フローでは、コミット後かつ `pnpm josh followup --merge` 実行前に `/review` スキルを実行する。高・中優先度の指摘が見つかった場合は修正を行い、クリーンになるまで再度 `/review` を実行してから次のステップへ進む。
+
 ## Step 5: PR結果確認 + 完了通知（別スクリプト）
 
 `pnpm josh git` の後に、別スクリプト `pnpm josh followup` を実行する。
