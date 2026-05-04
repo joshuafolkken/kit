@@ -19,12 +19,8 @@ export default create_vanilla_config({
 })
 `
 
-const PRETTIER_CONFIG = `import { config } from '@joshuafolkken/kit/prettier'
-
-export default {
-\t...config,
-}
-`
+const DEFAULT_TAILWIND_STYLESHEET = './src/routes/layout.css'
+const TAILWIND_STYLESHEET_PATTERN = /tailwindStylesheet"?:\s*['"]([^'"]+)['"]/u
 
 const PLAYWRIGHT_CONFIG = `import { create_playwright_config } from '@joshuafolkken/kit/playwright/base'
 
@@ -60,8 +56,20 @@ function generate_eslint_config(type: ProjectType): string {
 	return type === 'sveltekit' ? ESLINT_SVELTEKIT : ESLINT_VANILLA
 }
 
-function generate_prettier_config(): string {
-	return PRETTIER_CONFIG
+function generate_prettier_config(stylesheet: string = DEFAULT_TAILWIND_STYLESHEET): string {
+	return `import { config } from '@joshuafolkken/kit/prettier'
+
+export default {
+\t...config,
+\ttailwindStylesheet: '${stylesheet}',
+}
+`
+}
+
+function merge_prettier_config(existing: string): string {
+	const match = TAILWIND_STYLESHEET_PATTERN.exec(existing)
+
+	return generate_prettier_config(match?.[1] ?? DEFAULT_TAILWIND_STYLESHEET)
 }
 
 function generate_playwright_config(): string {
@@ -75,6 +83,7 @@ function generate_vite_config(): string {
 const init_logic_templates = {
 	generate_eslint_config,
 	generate_prettier_config,
+	merge_prettier_config,
 	generate_playwright_config,
 	generate_vite_config,
 }

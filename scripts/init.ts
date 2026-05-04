@@ -103,7 +103,11 @@ function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
 			(existing) => init_logic.merge_npmrc(existing),
 		),
 		{ dest: 'eslint.config.js', create: () => init_logic.generate_eslint_config(type) },
-		{ dest: 'prettier.config.js', create: () => init_logic.generate_prettier_config() },
+		build_action(
+			'prettier.config.js',
+			() => init_logic.generate_prettier_config(),
+			(existing) => init_logic.merge_prettier_config(existing),
+		),
 		{ dest: 'playwright.config.ts', create: () => init_logic.generate_playwright_config() },
 		...(type === 'sveltekit' ? [vite] : []),
 		...build_config_file_actions(type),
