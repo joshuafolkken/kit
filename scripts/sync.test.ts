@@ -112,6 +112,39 @@ describe('sync_workspace_yaml', () => {
 	})
 })
 
+const PRETTIER_DEST = path.join(TEST_DIR, 'dest', 'prettier.config.js')
+const OLD_PRETTIER_CONTENT = `{\n\t"useTabs": true,\n\t"tailwindStylesheet": "./src/app.css"\n}`
+const NEW_PRETTIER_CONTENT = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n\ttailwindStylesheet: './src/app.css',\n}\n`
+
+describe('sync_prettier_config', () => {
+	it('does nothing when file does not exist', () => {
+		sync.sync_prettier_config(PRETTIER_DEST)
+		expect(existsSync(PRETTIER_DEST)).toBe(false)
+	})
+
+	it('rewrites old JSON format to kit template, preserving tailwindStylesheet', () => {
+		writeFileSync(PRETTIER_DEST, OLD_PRETTIER_CONTENT)
+		sync.sync_prettier_config(PRETTIER_DEST)
+
+		const result = readFileSync(PRETTIER_DEST, 'utf8')
+
+		expect(result).toContain("from '@joshuafolkken/kit/prettier'")
+		expect(result).toContain("tailwindStylesheet: './src/app.css'")
+	})
+
+	it('does not rewrite file that already matches merged output', () => {
+		writeFileSync(PRETTIER_DEST, NEW_PRETTIER_CONTENT)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+
+		sync.sync_prettier_config(PRETTIER_DEST)
+
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('unchanged'))
+		expect(readFileSync(PRETTIER_DEST, 'utf8')).toBe(NEW_PRETTIER_CONTENT)
+	})
+})
+
 const NO_REFERENCES_CONTENT = 'no references here\n'
 
 describe('sync_ai_file', () => {

@@ -63,6 +63,22 @@ function sync_directory(directory_name: string): void {
 	console.info(`  ✔ synced    ${directory_name}/`)
 }
 
+function sync_prettier_config(destination_path: string): void {
+	if (!existsSync(destination_path)) return
+
+	const existing = readFileSync(destination_path, 'utf8')
+	const merged = init_logic.merge_prettier_config(existing)
+
+	if (merged === existing) {
+		console.info('  ✔ unchanged prettier.config.js')
+
+		return
+	}
+
+	writeFileSync(destination_path, merged)
+	console.info('  ✔ synced    prettier.config.js')
+}
+
 function sync_sonar_with_template(): void {
 	const destination = init_logic.get_sonar_template_destination()
 	const name_with_owner = gh_spawn.get_repo_name_with_owner()
@@ -80,8 +96,7 @@ function sync_sonar_with_template(): void {
 	console.info(`  ✔ synced    ${destination}`)
 }
 
-function main(): void {
-	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
+function sync_ai_copy_all(): void {
 	console.info('AI files:')
 
 	for (const filename of init_logic.get_ai_copy_files()) {
@@ -95,14 +110,18 @@ function main(): void {
 	for (const directory_name of init_logic.get_ai_copy_directories()) {
 		sync_directory(directory_name)
 	}
+}
 
+function main(): void {
+	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
+	sync_ai_copy_all()
+	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
 	sync_sonar_with_template()
-
 	console.info('\n✅ Done.\n')
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const sync = { sync_file_mapping, sync_ai_file, sync_workspace_yaml }
+const sync = { sync_file_mapping, sync_ai_file, sync_workspace_yaml, sync_prettier_config }
 
 export { sync }
