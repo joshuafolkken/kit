@@ -17,7 +17,7 @@ interface PackageJson {
 
 interface WorkspaceYaml {
 	// eslint-disable-next-line @typescript-eslint/naming-convention
-	onlyBuiltDependencies?: Array<string>
+	allowBuilds?: Record<string, boolean>
 }
 
 function load_manifest(): PackageJson {
@@ -134,10 +134,10 @@ describe('package.json files field', () => {
 
 describe('pnpm-workspace.yaml built-dependency lists', () => {
 	const workspace = load_workspace()
-	const only_built = workspace.onlyBuiltDependencies ?? []
+	const allow_builds = workspace.allowBuilds ?? {}
 
-	it('keeps native builds required by this project', () => {
-		expect(only_built).toEqual(expect.arrayContaining(['esbuild', 'lefthook', 'unrs-resolver']))
+	it('allows native builds required by this project', () => {
+		expect(allow_builds).toMatchObject({ esbuild: true, lefthook: true, 'unrs-resolver': true })
 	})
 
 	it('package.json does not duplicate onlyBuiltDependencies', () => {
