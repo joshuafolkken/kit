@@ -101,6 +101,22 @@ function sync_prettier_config(destination_path: string): void {
 	write_merged_prettier_config(destination_path)
 }
 
+function sync_playwright_config(destination_path: string): void {
+	if (!existsSync(destination_path)) return
+
+	const existing = readFileSync(destination_path, 'utf8')
+	const merged = init_logic.merge_playwright_config(existing)
+
+	if (merged === existing) {
+		console.info('  ✔ unchanged playwright.config.ts')
+
+		return
+	}
+
+	writeFileSync(destination_path, merged)
+	console.info('  ✔ synced    playwright.config.ts')
+}
+
 function sync_sonar_with_template(): void {
 	const destination = init_logic.get_sonar_template_destination()
 	const name_with_owner = gh_spawn.get_repo_name_with_owner()
@@ -138,6 +154,7 @@ function main(): void {
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	sync_ai_copy_all()
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
+	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_sonar_with_template()
 	console.info('\n✅ Done.\n')
 }
@@ -149,6 +166,7 @@ const sync = {
 	sync_ai_file,
 	sync_workspace_yaml,
 	sync_prettier_config,
+	sync_playwright_config,
 	migrate_prettierrc,
 }
 
