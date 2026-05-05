@@ -198,6 +198,61 @@ describe('sync_prettier_config', () => {
 	})
 })
 
+const PLAYWRIGHT_DEST = path.join(TEST_DIR, 'dest', 'playwright.config.ts')
+const DEFAULT_PLAYWRIGHT_CONTENT = `import { create_playwright_config } from '@joshuafolkken/kit/playwright/base'
+
+export default create_playwright_config({
+\tdev_port: 5173,
+\tpreview_port: 4173,
+})
+`
+const CUSTOM_PORT_PLAYWRIGHT_CONTENT = `import { create_playwright_config } from '@joshuafolkken/kit/playwright/base'
+
+export default create_playwright_config({
+\tdev_port: 3000,
+\tpreview_port: 8080,
+})
+`
+
+describe('sync_playwright_config', () => {
+	it('does nothing when playwright.config.ts does not exist', () => {
+		sync.sync_playwright_config(PLAYWRIGHT_DEST)
+
+		expect(existsSync(PLAYWRIGHT_DEST)).toBe(false)
+	})
+
+	it('rewrites file to current template when import is outdated', () => {
+		const legacy = `import { defineConfig } from '@playwright/test'\nexport default defineConfig({})\n`
+
+		writeFileSync(PLAYWRIGHT_DEST, legacy)
+		sync.sync_playwright_config(PLAYWRIGHT_DEST)
+
+		expect(readFileSync(PLAYWRIGHT_DEST, 'utf8')).toContain('create_playwright_config')
+	})
+
+	it('preserves custom ports when syncing', () => {
+		writeFileSync(PLAYWRIGHT_DEST, CUSTOM_PORT_PLAYWRIGHT_CONTENT)
+		sync.sync_playwright_config(PLAYWRIGHT_DEST)
+
+		const result = readFileSync(PLAYWRIGHT_DEST, 'utf8')
+
+		expect(result).toContain('dev_port: 3000')
+		expect(result).toContain('preview_port: 8080')
+	})
+
+	it('logs unchanged when file already matches', () => {
+		writeFileSync(PLAYWRIGHT_DEST, DEFAULT_PLAYWRIGHT_CONTENT)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+
+		sync.sync_playwright_config(PLAYWRIGHT_DEST)
+
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('unchanged'))
+		expect(readFileSync(PLAYWRIGHT_DEST, 'utf8')).toBe(DEFAULT_PLAYWRIGHT_CONTENT)
+	})
+})
+
 const NO_REFERENCES_CONTENT = 'no references here\n'
 
 describe('sync_ai_file', () => {

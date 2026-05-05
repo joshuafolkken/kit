@@ -91,6 +91,14 @@ function build_config_file_actions(type: ProjectType): ReadonlyArray<FileAction>
 	]
 }
 
+function build_playwright_action(): FileAction {
+	return build_action(
+		'playwright.config.ts',
+		() => init_logic.generate_playwright_config(),
+		(existing) => init_logic.merge_playwright_config(existing),
+	)
+}
+
 function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
 	const vite = build_action(
 		'vite.config.ts',
@@ -110,7 +118,7 @@ function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
 			() => init_logic.generate_prettier_config(),
 			(existing) => init_logic.merge_prettier_config(existing),
 		),
-		{ dest: 'playwright.config.ts', create: () => init_logic.generate_playwright_config() },
+		build_playwright_action(),
 		...(type === 'sveltekit' ? [vite] : []),
 		...build_config_file_actions(type),
 	]
