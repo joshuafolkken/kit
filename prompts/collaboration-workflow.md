@@ -141,7 +141,53 @@ pnpm josh pr
 
 `fullrun` フローでは、コミット後かつ `pnpm josh followup --merge` 実行前に `/review` スキルを実行する。高・中優先度の指摘が見つかった場合は修正を行い、クリーンになるまで再度 `/review` を実行してから次のステップへ進む。
 
-**`/review` → `followup --merge` Chain rule**: `/review` の出力（"Approve for merge" 等の Markdown レビュー本文）は turn boundary ではなく中間ステップ。**指摘が高・中ともになければ、同じターン内で即座に `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` を呼び出す**（ユーザーの追加入力を待たない）。ワークフローが終わるのは (a) PR がマージされて Telegram 完了通知が届いたとき、または (b) ユーザー判断が必要な真のブロッカー（自動検証できない AI レビュー指摘、`josh sync` 管理対象の設定ファイル変更ゲート、ユーザー判断を要する CI 失敗）が出たとき。アンチパターン: `/review` の "Approve for merge" を提示してユーザーに引き継いで停止すること — ユーザーは `fullrun` を呼んだのであり、マージまで含めて承認している。モデル（Claude / Gemini / Cursor）・アカウント・実行環境を跨いでこのルールが保たれる必要がある。
+### `fullrun` STOPPING CONDITIONS — read this before you stop
+
+**`fullrun` / `fullrun new` / `queue` may stop in exactly 2 situations. If neither applies, the chain MUST continue without user input.**
+
+1. **PR is merged AND the `completion` Telegram notification has been sent.** This is the normal end state. The agent reports the PR URL and stops.
+2. **A genuine blocker requires user judgment.** Exactly these three count as blockers:
+   - A CodeRabbit / Claude Review substantive finding that the agent cannot auto-verify as a false positive (see "Verify CodeRabbit findings before bypassing").
+   - The managed config-file confirmation gate (`josh sync`-distributed files in the diff).
+   - A CI failure that requires user input to resolve.
+
+   When a blocker fires, the agent MUST send a `confirmation` Telegram **before** stopping (per "Mid-workflow stop notification").
+
+**Everything else — including a `/review` skill returning a polished "Approve for merge" recommendation — is NOT a stopping condition.** The agent continues straight to `pnpm josh followup --merge` in the same turn.
+
+### Chain rule: `/review` → `followup --merge` decision table
+
+The `/review` skill output is a Markdown review with sections, severity-tagged findings, and a final recommendation. **It is an intermediate step, not a turn boundary.** Map the result mechanically:
+
+| `/review` result                        | Severity of findings | Next action (same turn, no user input)                                                                                                                         |
+| --------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clean — every category says `No issues` | None                 | Immediately run `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`                                                                             |
+| Findings, but all are Low               | Low only             | Immediately run `pnpm josh followup --merge` (Low findings may be skipped with a one-line reason per Pre-commit Self-Review)                                   |
+| One or more High / Medium findings      | High and/or Medium   | Fix in place, re-stage, commit, push, re-run `/review`, loop. Do NOT report the findings narratively to the user and wait. Do NOT call `followup --merge` yet. |
+| `/review` itself errors / can't run     | n/a                  | Report the error and stop with a `confirmation` Telegram (treat as a CI-level blocker)                                                                         |
+
+The recommendation line at the bottom of the `/review` output ("Approve for merge", "Request changes", etc.) is **informational, not authoritative**. The severity of findings drives the decision, not the recommendation sentence.
+
+### Anti-pattern catalog (concrete violation phrases — self-recognize these)
+
+If the agent is about to emit text that resembles any of the following, it is violating the chain rule. Cancel the message, run `pnpm josh followup --merge` instead.
+
+- "The `/review` is clean — ready to merge. Shall I proceed with `followup --merge`?"
+- "`/review` found no high/medium findings. Approve for merge after you confirm."
+- "Recommendation: Approve for merge. Let me know if you'd like me to continue."
+- "All green. Awaiting your go-ahead to merge."
+- "The review is complete. Should I run `pnpm josh followup --merge` now?"
+- Posting the `/review` Markdown output and then stopping the turn without a tool call.
+- Listing low-severity findings narratively and asking whether they should block merge (Low findings are auto-skipped with a one-line reason; do not escalate).
+- Treating CodeRabbit rate-limit warnings as findings (they are not — proceed).
+
+These all share the same shape: presenting the `/review` outcome to the user and waiting. The user invoked `fullrun`; merging is part of that invocation. **The chain ends at a stopping condition above, never at `/review` output.**
+
+This rule applies regardless of model (Claude / Gemini / Cursor) or account; the workflow is portable and the chain must hold across environments.
+
+### Tooling enforcement (investigated, not implemented)
+
+A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part of this rule. **It is not feasible at the tooling layer**: `/review` is an interactive AI skill that returns Markdown for the agent to interpret — a shell command cannot host the skill, parse its severity verdicts, or decide "no high/medium" on the agent's behalf. The strongest available enforcement is the decision table and anti-pattern catalog above, sitting in always-loaded context (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`).
 
 ## Step 5: PR結果確認 + 完了通知（別スクリプト）
 
