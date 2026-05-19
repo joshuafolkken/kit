@@ -220,12 +220,43 @@ Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup --merge`, wh
 
 #### Chain rule: `/review` → `followup --merge` is a single atomic step
 
-Within `fullrun` / `fullrun new` / `queue`, the `/review` skill output is **not** a turn boundary. The skill returns a polished Markdown review with sections and a final recommendation — but this is an intermediate step, not a finished deliverable.
+Within `fullrun` / `fullrun new` / `queue`, the `/review` skill output is **not** a turn boundary — it is an intermediate step, not a finished deliverable.
 
-- **`/review` returns with no high/medium findings** (low findings only or none): immediately run `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` in the same response, without pausing for user input.
-- **`/review` finds high/medium issues**: fix them, re-run `/review`, then continue. Low findings may be skipped with a one-line reason per the Pre-commit Self-Review rule.
-- **The workflow ends only when** (a) the PR is merged and the Telegram completion notification has been sent, or (b) a genuine blocker requires user input (a CodeRabbit / Claude Review substantive finding that cannot be auto-verified, the managed config-file confirmation gate, or a CI failure that needs user judgement).
-- **Anti-pattern**: presenting `/review`'s "Approve for merge" recommendation to the user and stopping. The user invoked `fullrun`; merging is part of that invocation. Continue to `followup --merge`.
+**`fullrun` STOPPING CONDITIONS** (the chain ends only here):
+
+1. **PR is merged AND the `completion` Telegram notification has been sent** — normal end state.
+2. **A genuine blocker requires user judgment** — exactly three count:
+   - A CodeRabbit / Claude Review substantive finding that cannot be auto-verified as a false positive.
+   - The managed config-file confirmation gate (`josh sync`-distributed files in the diff).
+   - A CI failure that requires user input to resolve.
+
+   Send a `confirmation` Telegram **before** stopping.
+
+**Everything else — including `/review` producing a polished "Approve for merge" recommendation — is NOT a stopping condition.** Continue straight to `pnpm josh followup --merge` in the same turn.
+
+**Decision table** (map `/review` result → next action mechanically):
+
+| `/review` result                        | Findings severity  | Next action (same turn, no user input)                                                                              |
+| --------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Clean — every category says `No issues` | None               | Immediately run `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`                                  |
+| Low findings only                       | Low                | Immediately run `pnpm josh followup --merge` (Low may be skipped with a one-line reason)                            |
+| One or more High / Medium findings      | High and/or Medium | Fix in place, re-stage, commit, push, re-run `/review`, loop. Do NOT report narratively and wait. Do NOT merge yet. |
+| `/review` itself errors / can't run     | n/a                | Report the error and stop with a `confirmation` Telegram                                                            |
+
+The recommendation line at the bottom of `/review` ("Approve for merge", etc.) is informational, not authoritative. **Severity of findings drives the decision, not the recommendation sentence.**
+
+**Anti-pattern catalog** — if you are about to emit text resembling any of the following, you are violating the chain rule. Cancel the message; run `pnpm josh followup --merge` instead.
+
+- "The `/review` is clean — ready to merge. Shall I proceed with `followup --merge`?"
+- "`/review` found no high/medium findings. Approve for merge after you confirm."
+- "Recommendation: Approve for merge. Let me know if you'd like me to continue."
+- "All green. Awaiting your go-ahead to merge."
+- "The review is complete. Should I run `pnpm josh followup --merge` now?"
+- Posting the `/review` Markdown output and then stopping the turn without a tool call.
+- Listing low-severity findings narratively and asking whether they should block merge.
+- Treating CodeRabbit rate-limit warnings as findings.
+
+All share one shape: presenting `/review` output to the user and waiting. **The user invoked `fullrun`; merging is part of that invocation. The chain ends at a stopping condition above, never at `/review` output.**
 
 This rule applies regardless of model (Claude / Gemini / Cursor) or account; the workflow is portable and the chain must hold across environments.
 
