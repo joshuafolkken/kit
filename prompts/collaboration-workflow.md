@@ -145,7 +145,7 @@ pnpm josh pr
 
 **`fullrun` / `fullrun new` / `queue` may stop in exactly 2 situations. If neither applies, the chain MUST continue without user input.**
 
-1. **PR is merged AND the `completion` Telegram notification has been sent.** This is the normal end state. The agent reports the PR URL and stops.
+1. **PR is merged, the `completion` Telegram notification has been sent, AND `pnpm josh ms` has returned the working tree to the default branch.** This is the normal end state. The agent reports the PR URL and stops.
 2. **A genuine blocker requires user judgment.** Exactly these three count as blockers:
    - A CodeRabbit / Claude Review substantive finding that the agent cannot auto-verify as a false positive (see "Verify CodeRabbit findings before bypassing").
    - The managed config-file confirmation gate (`josh sync`-distributed files in the diff).
@@ -288,12 +288,14 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
 
 ### Auto-merge（default for `fullrun`）
 
-`fullrun` / `fullrun new` の既定動作として、`pnpm josh followup --merge` が CI 待機・AI レビュー確認・完了通知・マージをまとめて行う。ユーザーが `fullrun` を実行した時点で、マージまで含めて承認されたものとみなす（追加キーワードは不要）。
+`fullrun` / `fullrun new` の既定動作として、`pnpm josh followup --merge` が CI 待機・AI レビュー確認・完了通知・マージをまとめて行う。ユーザーが `fullrun` を実行した時点で、マージまで含めて承認されたものとみなす（追加キーワードは不要）。**マージ成功後は必ず `pnpm josh ms`（= デフォルトブランチへ checkout + `git pull`）を実行して、作業ツリーをデフォルトブランチ + 取り込み済みのマージコミットに戻す。`fullrun` / `fullrun new` / `queue` は常にデフォルトブランチ上で終了する。**
 
 ```bash
 pnpm josh followup "<title> #<N>" --merge --notify-message "..."
+pnpm josh ms
 ```
 
+- **マージ完了後の `pnpm josh ms` は必須**: `pnpm josh followup --merge` は作業ツリーをマージ済みフィーチャーブランチに残したまま終了する。`pnpm josh ms` を続けて実行することでデフォルトブランチに戻り、マージコミットを取り込んだ最新状態になる。マージ自体が失敗した場合（ワークフローが既に停止している場合）はスキップしてよい
 - **AI レビュー指摘は自動チェック**: `pnpm josh followup --merge` は CI グリーン後に AI レビュアーの指摘をスキャンする。ブロッカーが残っていれば `confirmation` 通知を送って非ゼロで終了する（マージされない）。指摘を修正して `pnpm josh followup --merge` を再実行する。**CI がオールグリーンでも、未対応の AI レビュー指摘があるならマージしない**
 - **CodeRabbit のレート制限はマージを止めない**: CodeRabbit のコメントが rate limit 警告のみ（本文に `rate limited by coderabbit.ai` または `Rate limit exceeded` を含む）で実体のあるレビューが無い場合、または最新 commit に対して CodeRabbit のコメントが一切無い場合は、**レート制限切れとみなしてマージへ進む**
 - **CodeRabbit 指摘は反射的にバイパスしない**: CodeRabbit が実体ある指摘を出した場合、まず指摘内容が正しいかを検証する。例: `pnpm/action-setup@<sha> # v6.0.8` のような GitHub Actions の SHA pin について「タグと一致しない」と指摘された場合、CodeRabbit は `gh api repos/<owner>/<repo>/git/ref/tags/v6.0.8` を実行している可能性が高い。これは **annotated tag-object SHA** を返すが、GitHub Actions の pin に使うのは **commit SHA**。`gh api repos/<owner>/<repo>/commits/<tag> --jq '.sha'` で確認し、これが pin と一致するなら偽陽性。その場合は検証根拠を `--coderabbit-ignore-reason "<検証コマンドと出力>"` に明記してバイパスする
