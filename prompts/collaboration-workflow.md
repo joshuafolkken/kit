@@ -185,9 +185,21 @@ These all share the same shape: presenting the `/review` outcome to the user and
 
 This rule applies regardless of model (Claude / Gemini / Cursor) or account; the workflow is portable and the chain must hold across environments.
 
+### Turn-end self-check (fullrun-conditional) — run BEFORE sending any response that contains `/review` output
+
+The chain rule above has been violated repeatedly even with the decision table and anti-pattern catalog in place (PR #387 on 2026-05-15, PR #398 on 2026-05-20). The rule needs to be visible at the **exact moment of violation** — when the response is about to be sent. Run this check, in order, before sending any response containing `/review` output:
+
+1. **Mode check** — Is this `/review` part of a `fullrun` / `fullrun new` / `queue` invocation? Decide by both signals: (a) the user's recent prompt contained one of those commands, AND (b) `pnpm josh git -y` has already been run in this session and a PR exists for the current branch (verifiable with `gh pr view <branch>`). If either is false → **standalone mode**; stop after the review markdown, do NOT call `followup --merge`. This conditional prevents auto-merging when the user runs `/review <PR>` standalone for a code-review-only purpose.
+2. **Severity check** — Count high/medium findings across all categories. If ≥1 → fix in place, re-stage, commit, push, re-run `/review`. Loop until none remain. Do NOT call `followup --merge` yet.
+3. **Append check** — If in fullrun mode AND 0 high/medium findings (Low-only or fully clean) → the same response that contains the `/review` markdown MUST also contain a `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` tool call **after** the review markdown. **A response whose final assistant text is `/review` Markdown with no follow-on tool call is a violation.** Cancel and append the tool call before sending.
+
+The check fires at the moment your response would end with review markdown and no follow-on tool call. That is the violation point. Treat the `/review` skill's output as an intermediate tool result, not a deliverable.
+
+This self-check is mirrored at the end of the `/review` skill prompt (`prompts/review.md`) so it is visible inside the skill's own execution context — not just in the always-loaded project docs.
+
 ### Tooling enforcement (investigated, not implemented)
 
-A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part of this rule. **It is not feasible at the tooling layer**: `/review` is an interactive AI skill that returns Markdown for the agent to interpret — a shell command cannot host the skill, parse its severity verdicts, or decide "no high/medium" on the agent's behalf. The strongest available enforcement is the decision table and anti-pattern catalog above, sitting in always-loaded context (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`).
+A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part of this rule. **It is not feasible at the tooling layer**: `/review` is an interactive AI skill that returns Markdown for the agent to interpret — a shell command cannot host the skill, parse its severity verdicts, or decide "no high/medium" on the agent's behalf. The strongest available enforcement is the decision table, anti-pattern catalog, and turn-end self-check above, sitting in always-loaded context (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) plus the skill prompt (`prompts/review.md`).
 
 ## Step 5: PR結果確認 + 完了通知（別スクリプト）
 

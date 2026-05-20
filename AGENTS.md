@@ -249,6 +249,16 @@ All share one shape: presenting `/review` output to the user and waiting. **The 
 
 This rule applies regardless of model (Claude / Gemini / Cursor) or account; the workflow is portable and the chain must hold across environments.
 
+**Turn-end self-check (fullrun-conditional) — run BEFORE sending any response that contains `/review` output**
+
+The chain rule above has been violated repeatedly even with the decision table and anti-pattern catalog. Run this check, in order, before sending any response that contains `/review` output:
+
+1. **Mode check** — Is this `/review` part of a `fullrun` / `fullrun new` / `queue` invocation? Decide by both signals: (a) the user's recent prompt contained one of those commands, AND (b) `pnpm josh git -y` has already been run in this session and a PR exists. If either is false → **standalone mode**; stop after the review, do NOT call `followup --merge`.
+2. **Severity check** — Count high/medium findings. If ≥1 → fix, re-stage, commit, push, re-run `/review`. Do NOT call `followup --merge` yet.
+3. **Append check** — In fullrun mode AND 0 high/medium findings: the same response that contains the `/review` markdown MUST also contain a `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` tool call. **A response whose final assistant text is `/review` Markdown with no follow-on tool call is a violation.** Cancel and append the tool call.
+
+Treat the `/review` skill's output as an intermediate tool result, not a deliverable.
+
 See `prompts/collaboration-workflow.md` → "Chain rule: `/review` → `followup --merge` decision table" for the canonical extended reference.
 
 #### `auto-merge` — Default `fullrun` behavior
