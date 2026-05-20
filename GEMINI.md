@@ -208,18 +208,7 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
 - Do not make any follow-up commit, fix, or proceed to merge until the user explicitly confirms
 - This check runs independently of AI reviewer comment scanning — both may trigger in the same workflow run
 
-#### `auto-merge` — Default `fullrun` behavior
-
-Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup --merge`, which handles the full sequence internally: wait for CI → verify AI review findings → send completion notification → merge. Invoking `fullrun` is itself the explicit authorization to merge.
-
-- **AI review findings are checked automatically.** If blockers are found, it sends a `confirmation` Telegram and exits non-zero — fix the findings and re-run.
-- **CodeRabbit rate-limit is not a finding.** Treat it as "no findings" and proceed.
-- **Verify CodeRabbit findings before bypassing.** When CodeRabbit posts a substantive finding, do not pass `--coderabbit-ignore-reason` reflexively — first verify whether the finding is correct. Concrete example: CodeRabbit may flag a GitHub Actions SHA pin like `pnpm/action-setup@<sha> # v6.0.8` as "not matching the tag", because it queried `gh api repos/<owner>/<repo>/git/ref/tags/v6.0.8` which returns the **annotated-tag-object SHA**, not the **commit SHA** that the tag points to. GitHub Actions pins use the commit SHA. Confirm with `gh api repos/<owner>/<repo>/commits/<tag> --jq '.sha'` — if that matches the pinned SHA, the finding is a false positive. Only then bypass with `--coderabbit-ignore-reason "<verification-based-reason>"`, citing the verification command and its output.
-- Do **not** pass `--delete-branch` unless the user asks.
-- If the merge fails, report the reason and stop — do not retry with different flags or bypass protections.
-- **If the user wants to skip the merge step**, use `kickoff` (plan-only) or say "do not merge" in the same turn. In that case, pass `--no-merge` to `pnpm josh followup`. Outside a `fullrun` invocation, never run `gh pr merge` on your own.
-
-#### Chain rule: `/review` → `followup --merge` is a single atomic step
+#### `/review` → `followup --merge` chain rule (MANDATORY)
 
 Within `fullrun` / `fullrun new` / `queue`, the `/review` skill output is **not** a turn boundary — it is an intermediate step, not a finished deliverable.
 
@@ -260,6 +249,19 @@ The recommendation line at the bottom of `/review` ("Approve for merge", etc.) i
 All share one shape: presenting `/review` output to the user and waiting. **The user invoked `fullrun`; merging is part of that invocation. The chain ends at a stopping condition above, never at `/review` output.**
 
 This rule applies regardless of model (Claude / Gemini / Cursor) or account; the workflow is portable and the chain must hold across environments.
+
+See `prompts/collaboration-workflow.md` → "Chain rule: `/review` → `followup --merge` decision table" for the canonical extended reference.
+
+#### `auto-merge` — Default `fullrun` behavior
+
+Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup --merge`, which handles the full sequence internally: wait for CI → verify AI review findings → send completion notification → merge. Invoking `fullrun` is itself the explicit authorization to merge.
+
+- **AI review findings are checked automatically.** If blockers are found, it sends a `confirmation` Telegram and exits non-zero — fix the findings and re-run.
+- **CodeRabbit rate-limit is not a finding.** Treat it as "no findings" and proceed.
+- **Verify CodeRabbit findings before bypassing.** When CodeRabbit posts a substantive finding, do not pass `--coderabbit-ignore-reason` reflexively — first verify whether the finding is correct. Concrete example: CodeRabbit may flag a GitHub Actions SHA pin like `pnpm/action-setup@<sha> # v6.0.8` as "not matching the tag", because it queried `gh api repos/<owner>/<repo>/git/ref/tags/v6.0.8` which returns the **annotated-tag-object SHA**, not the **commit SHA** that the tag points to. GitHub Actions pins use the commit SHA. Confirm with `gh api repos/<owner>/<repo>/commits/<tag> --jq '.sha'` — if that matches the pinned SHA, the finding is a false positive. Only then bypass with `--coderabbit-ignore-reason "<verification-based-reason>"`, citing the verification command and its output.
+- Do **not** pass `--delete-branch` unless the user asks.
+- If the merge fails, report the reason and stop — do not retry with different flags or bypass protections.
+- **If the user wants to skip the merge step**, use `kickoff` (plan-only) or say "do not merge" in the same turn. In that case, pass `--no-merge` to `pnpm josh followup`. Outside a `fullrun` invocation, never run `gh pr merge` on your own.
 
 #### Completion notifications: always via `pnpm josh followup`
 
