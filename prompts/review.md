@@ -153,3 +153,32 @@ State the **one concrete thing** in this change you are least confident about, a
 - **Low** findings → document in the PR body if skipped
 
 If the diff is empty or trivial (e.g. whitespace only), state that explicitly and skip the review.
+
+---
+
+## Auto-continue rule (fullrun-conditional) — read this BEFORE sending the review
+
+**This rule fires only when `/review` was invoked inside a `fullrun` / `fullrun new` / `queue` workflow.** Standalone `/review <PR>` invocations are exempt — for those, stop after the review markdown as normal.
+
+### How to tell which mode you are in
+
+You are in **fullrun mode** if BOTH of the following hold:
+
+1. The user's recent message (within the current conversation) contained `fullrun`, `fullrun new`, or `queue` as a command — OR the conversation has been executing the fullrun pipeline (issue normalized, `josh latest` run, branch created, `pnpm josh git -y` invoked).
+2. `pnpm josh git -y` has already been run in this session and a PR exists for the current branch (verifiable with `gh pr view <branch>`).
+
+If either condition is false, you are in **standalone mode** — stop after the review and do not call `followup --merge`.
+
+### What to do in fullrun mode
+
+Before your response (the one containing the review markdown) is sent, run this self-check:
+
+1. Count high/medium-severity findings across all categories.
+2. If **any** high/medium findings exist → fix them in place, re-stage, commit, push, re-run `/review`. Loop until none remain. **Do NOT call `followup --merge` yet.**
+3. If **no** high/medium findings exist (Low-only or completely clean) → your response MUST include a `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` tool call **after** the review markdown, in the same response. **Do NOT end the turn with review markdown as the final assistant text.**
+
+### Concrete failure pattern to self-recognize
+
+If you are about to send a response whose final text is the `/review` Markdown — with sections, severity-tagged findings, and a recommendation line — and **no tool call follows**, that response is a chain-rule violation. Cancel it. Add the `pnpm josh followup --merge` tool call to the same response before sending.
+
+This rule mirrors the chain-rule decision table in `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `prompts/collaboration-workflow.md`. It is repeated here because the violation point is at the moment the review skill finishes producing markdown — the rule must be visible in the skill's own context, not just in the always-loaded project docs.
