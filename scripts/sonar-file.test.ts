@@ -9,6 +9,9 @@ const SRC_PATH = path.join(TEST_DIR, 'src', 'template.properties')
 const SONAR_DEST_NAME = 'sonar-project.properties'
 const DEST_PATH = path.join(TEST_DIR, 'dest', SONAR_DEST_NAME)
 const SONAR_TEMPLATE = 'sonar.projectKey={{PROJECT_KEY}}\nsonar.organization={{ORGANIZATION}}\n'
+const SONAR_EXISTING = 'sonar.projectKey=myorg_myrepo\nsonar.organization=myorg\n'
+const SONAR_EXCLUSIONS_LINE = 'sonar.exclusions=.claude/**'
+const SONAR_PROJECT_KEY_MYORG = 'sonar.projectKey=myorg_myrepo'
 const IDENTIFIERS_A = { project_key: 'myorg_myrepo', organization: 'myorg' }
 const IDENTIFIERS_B = { project_key: 'a_b', organization: 'a' }
 const IDENTIFIERS_C = { project_key: 'new_repo', organization: 'new' }
@@ -28,9 +31,7 @@ describe('sonar_file.write_sonar_file — substitution', () => {
 		writeFileSync(SRC_PATH, SONAR_TEMPLATE)
 		sonar_file.write_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_A)
 
-		expect(readFileSync(DEST_PATH, 'utf8')).toBe(
-			'sonar.projectKey=myorg_myrepo\nsonar.organization=myorg\n',
-		)
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(SONAR_EXISTING)
 	})
 
 	it('replaces only PROJECT_KEY and ORGANIZATION placeholders', () => {
@@ -39,7 +40,7 @@ describe('sonar_file.write_sonar_file — substitution', () => {
 		writeFileSync(SRC_PATH, template)
 		sonar_file.write_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_B)
 
-		expect(readFileSync(DEST_PATH, 'utf8')).toContain('sonar.exclusions=.claude/**')
+		expect(readFileSync(DEST_PATH, 'utf8')).toContain(SONAR_EXCLUSIONS_LINE)
 	})
 
 	it('overwrites existing destination file', () => {
@@ -66,5 +67,54 @@ describe('sonar_file.write_sonar_file — directory creation', () => {
 		sonar_file.write_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_D)
 
 		expect(existsSync(DEST_PATH)).toBe(true)
+	})
+})
+
+const SONAR_TEMPLATE_WITH_NEW_KEY =
+	'sonar.projectKey={{PROJECT_KEY}}\nsonar.organization={{ORGANIZATION}}\nsonar.exclusions=.claude/**\n'
+const IDENTIFIERS_MERGE = { project_key: 'myorg_myrepo', organization: 'myorg' }
+
+describe('sonar_file.merge_sonar_file — creates when absent', () => {
+	it('creates file from template when destination does not exist', () => {
+		writeFileSync(SRC_PATH, SONAR_TEMPLATE)
+		sonar_file.merge_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_MERGE)
+
+		expect(existsSync(DEST_PATH)).toBe(true)
+	})
+
+	it('writes substituted content when destination does not exist', () => {
+		writeFileSync(SRC_PATH, SONAR_TEMPLATE)
+		sonar_file.merge_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_MERGE)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toContain(SONAR_PROJECT_KEY_MYORG)
+	})
+})
+
+describe('sonar_file.merge_sonar_file — merges when existing', () => {
+	it('adds missing key from template to existing file', () => {
+		writeFileSync(DEST_PATH, SONAR_EXISTING)
+		writeFileSync(SRC_PATH, SONAR_TEMPLATE_WITH_NEW_KEY)
+		sonar_file.merge_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_MERGE)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toContain(SONAR_EXCLUSIONS_LINE)
+	})
+
+	it('preserves existing key values when merging', () => {
+		writeFileSync(DEST_PATH, SONAR_EXISTING)
+		writeFileSync(SRC_PATH, SONAR_TEMPLATE_WITH_NEW_KEY)
+		sonar_file.merge_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_MERGE)
+
+		const result = readFileSync(DEST_PATH, 'utf8')
+
+		expect(result).toContain(SONAR_PROJECT_KEY_MYORG)
+		expect(result).toContain('sonar.organization=myorg')
+	})
+
+	it('returns existing unchanged when all template keys already present', () => {
+		writeFileSync(DEST_PATH, SONAR_EXISTING)
+		writeFileSync(SRC_PATH, SONAR_TEMPLATE)
+		sonar_file.merge_sonar_file(SRC_PATH, DEST_PATH, IDENTIFIERS_MERGE)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(SONAR_EXISTING)
 	})
 })

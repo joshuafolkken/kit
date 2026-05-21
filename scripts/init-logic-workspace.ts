@@ -24,15 +24,34 @@ function append_user_blocks(base: string, user_keys: Array<string>, existing: st
 
 const DEPRECATED_KEYS = new Set(['onlyBuiltDependencies'])
 
+function remove_deprecated_yaml_key(content: string, key: string): string {
+	const block = extract_yaml_block(content, key)
+	if (block.length === 0) return content
+	const removed = content.replaceAll(`${block}\n`, '')
+
+	return removed.replaceAll(/\n{3,}/gu, '\n\n')
+}
+
+function remove_deprecated_yaml_keys(content: string): string {
+	let result = content
+
+	for (const key of DEPRECATED_KEYS) {
+		result = remove_deprecated_yaml_key(result, key)
+	}
+
+	return `${result.trimEnd()}\n`
+}
+
 function merge_workspace_yaml(existing: string, template: string): string {
 	if (!existing.trim()) return template
 	const normalized = existing.endsWith('\n') ? existing : `${existing}\n`
-	const template_keys = new Set(extract_yaml_top_level_keys(template))
-	const managed_keys = new Set([...template_keys, ...DEPRECATED_KEYS])
-	const user_keys = extract_yaml_top_level_keys(normalized).filter((k) => !managed_keys.has(k))
-	if (user_keys.length === 0) return template
+	const without_deprecated = remove_deprecated_yaml_keys(normalized)
+	if (!without_deprecated.trim()) return template
+	const existing_keys = new Set(extract_yaml_top_level_keys(without_deprecated))
+	const new_keys = extract_yaml_top_level_keys(template).filter((k) => !existing_keys.has(k))
+	if (new_keys.length === 0) return without_deprecated
 
-	return append_user_blocks(template, user_keys, normalized)
+	return append_user_blocks(without_deprecated, new_keys, template)
 }
 
 const init_logic_workspace = { merge_workspace_yaml }
