@@ -3,11 +3,7 @@ import { ESLINT_CACHE_FLAGS, PE, type CommandEntry } from './josh-command-types'
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
 	lint: {
-		shell: [
-			'sh',
-			'-c',
-			'pnpm exec prettier --check . && pnpm exec eslint . --cache --cache-strategy content',
-		],
+		script: 'scripts/lint-parallel.ts',
 		description: 'Check code with prettier and eslint',
 		category: 'Development',
 	},
@@ -62,6 +58,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run unit tests',
 		category: 'Development',
 	},
+	'test:watch': {
+		shell: [...PE, 'vitest', 'watch'],
+		description: 'Run unit tests in watch mode',
+		category: 'Development',
+	},
+	'test:ui': {
+		shell: [...PE, 'vitest', '--ui'],
+		description: 'Run unit tests with browser UI',
+		category: 'Development',
+	},
 	'test:e2e': {
 		shell: [...PE, 'playwright', 'test'],
 		description: 'Run E2E tests with Playwright',
@@ -92,6 +98,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Type-check SvelteKit project (CI)',
 		category: 'Development',
 		requires_sveltekit: true,
+	},
+	health: {
+		script: 'scripts/health-check.ts',
+		description: 'Show project health status',
+		category: 'Development',
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
