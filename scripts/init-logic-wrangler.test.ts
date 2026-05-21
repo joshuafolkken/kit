@@ -49,4 +49,12 @@ describe('init_logic_wrangler.merge_wrangler_jsonc', () => {
 
 		expect(result).toBe(same_date_existing)
 	})
+
+	it('returns existing unchanged when existing has no compatibility_date field', () => {
+		const existing_no_date = '{\n\t"name": "myapp"\n}\n'
+
+		expect(init_logic_wrangler.merge_wrangler_jsonc(existing_no_date, TEMPLATE)).toBe(
+			existing_no_date,
+		)
+	})
 })
