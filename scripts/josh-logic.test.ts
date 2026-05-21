@@ -281,8 +281,9 @@ describe('josh_logic.run_command', () => {
 
 describe('COMMAND_MAP shell commands', () => {
 	/* eslint-disable dot-notation */
-	it('lint uses sh -c for chaining', () => {
-		expect(COMMAND_MAP['lint']?.shell?.[0]).toBe('sh')
+	it('lint uses a script for parallel execution', () => {
+		expect(COMMAND_MAP['lint']?.script).toBeDefined()
+		expect(COMMAND_MAP['lint']?.shell).toBeUndefined()
 	})
 
 	it('lint:prettier delegates to pnpm exec prettier', () => {

@@ -3,7 +3,11 @@ import { ALIASES, CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-
 
 const ALL_COMMAND_NAMES = Object.keys(COMMAND_MAP)
 const VERSION_UPGRADE_COMMAND = 'version:upgrade'
+const TEST_WATCH_COMMAND = 'test:watch'
+const TEST_UI_COMMAND = 'test:ui'
+const HEALTH_COMMAND = 'health'
 const ALL_ALIAS_KEYS = Object.keys(ALIASES)
+const DEVELOPMENT_CATEGORY = 'Development'
 
 function get_command(name: string): CommandEntry | undefined {
 	return COMMAND_MAP[name]
@@ -45,12 +49,12 @@ describe('COMMAND_MAP — required fields', () => {
 })
 
 describe('COMMAND_MAP — command lookup by name', () => {
-	it('resolves lint command with shell and Development category', () => {
+	it('resolves lint command with script and Development category', () => {
 		const entry = get_command('lint')
 
 		expect(entry).toBeDefined()
-		expect(entry?.shell).toBeDefined()
-		expect(entry?.category).toBe('Development')
+		expect(entry?.script).toBeDefined()
+		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})
 
 	it('resolves git command with script and Workflow category', () => {
@@ -73,6 +77,32 @@ describe('COMMAND_MAP — command lookup by name', () => {
 
 		expect(entry?.shell).toBeDefined()
 		expect(entry?.category).toBe('Versioning')
+	})
+})
+
+describe('COMMAND_MAP — new dev commands', () => {
+	it('resolves test:watch command with shell and Development category', () => {
+		const entry = get_command(TEST_WATCH_COMMAND)
+
+		expect(entry).toBeDefined()
+		expect(entry?.shell).toBeDefined()
+		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
+	})
+
+	it('resolves test:ui command with shell and Development category', () => {
+		const entry = get_command(TEST_UI_COMMAND)
+
+		expect(entry).toBeDefined()
+		expect(entry?.shell).toBeDefined()
+		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
+	})
+
+	it('resolves health command with script and Development category', () => {
+		const entry = get_command(HEALTH_COMMAND)
+
+		expect(entry).toBeDefined()
+		expect(entry?.script).toBeDefined()
+		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})
 })
 
@@ -147,6 +177,20 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 	})
 })
 
+describe('ALIASES — new command aliases', () => {
+	it('resolves tw alias to test:watch', () => {
+		expect(get_alias('tw')).toBe(TEST_WATCH_COMMAND)
+	})
+
+	it('resolves tui alias to test:ui', () => {
+		expect(get_alias('tui')).toBe(TEST_UI_COMMAND)
+	})
+
+	it('resolves he alias to health', () => {
+		expect(get_alias('he')).toBe(HEALTH_COMMAND)
+	})
+})
+
 describe('COMMAND_MAP — latest command authentication', () => {
 	it('latest command shell exports NODE_AUTH_TOKEN from gh auth token', () => {
 		const entry = get_command('latest')
@@ -170,7 +214,7 @@ describe('CATEGORY_ORDER — covers all command categories', () => {
 	})
 
 	it('starts with Development and ends with AI tools', () => {
-		expect(CATEGORY_ORDER[0]).toBe('Development')
+		expect(CATEGORY_ORDER[0]).toBe(DEVELOPMENT_CATEGORY)
 		expect(CATEGORY_ORDER.at(-1)).toBe('AI tools')
 	})
 })
