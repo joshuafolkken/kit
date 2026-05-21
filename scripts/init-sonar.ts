@@ -5,24 +5,6 @@ import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { sonar_file } from './sonar-file'
 
-function copy_sonar_if_missing(
-	destination: string,
-	identifiers: ReturnType<typeof init_logic.derive_sonar_identifiers>,
-): void {
-	const destination_path = path.join(PROJECT_ROOT, destination)
-
-	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${destination} (already exists — run josh sync to update)`)
-
-		return
-	}
-
-	const template_source = path.join(PACKAGE_DIR, init_logic.get_sonar_template_source())
-
-	sonar_file.write_sonar_file(template_source, destination_path, identifiers)
-	console.info(`  ✔ created   ${destination}`)
-}
-
 function copy_sonar_with_template(): void {
 	const destination = init_logic.get_sonar_template_destination()
 	const name_with_owner = gh_spawn.get_repo_name_with_owner()
@@ -33,7 +15,16 @@ function copy_sonar_with_template(): void {
 		return
 	}
 
-	copy_sonar_if_missing(destination, init_logic.derive_sonar_identifiers(name_with_owner))
+	const destination_path = path.join(PROJECT_ROOT, destination)
+	const is_existing = existsSync(destination_path)
+	const identifiers = init_logic.derive_sonar_identifiers(name_with_owner)
+
+	sonar_file.merge_sonar_file(
+		path.join(PACKAGE_DIR, init_logic.get_sonar_template_source()),
+		destination_path,
+		identifiers,
+	)
+	console.info(`  ✔ ${is_existing ? 'updated' : 'created'}   ${destination}`)
 }
 
 const init_sonar = {

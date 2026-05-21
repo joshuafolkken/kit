@@ -4,6 +4,7 @@ import { init_logic_sonar } from './init-logic-sonar'
 import { init_logic_templates } from './init-logic-templates'
 import { init_logic_vite } from './init-logic-vite'
 import { init_logic_workspace } from './init-logic-workspace'
+import { init_logic_wrangler } from './init-logic-wrangler'
 
 type ProjectType = 'sveltekit' | 'vanilla'
 
@@ -198,6 +199,7 @@ const init_logic = {
 	...init_logic_vite,
 	...init_logic_json_merge,
 	...init_logic_deploy_vps,
+	...init_logic_wrangler,
 	generate_tsconfig,
 	generate_lefthook_config,
 	generate_cspell_config,

@@ -6,6 +6,13 @@ const write_file_mock = vi.hoisted(() => vi.fn())
 const exists_sync_mock = vi.hoisted(() => vi.fn())
 const cp_sync_mock = vi.hoisted(() => vi.fn())
 const copy_sonar_mock = vi.hoisted(() => vi.fn())
+const get_ai_copy_files_mock = vi.hoisted(() => vi.fn().mockReturnValue(['CLAUDE.md']))
+const merge_wrangler_mock = vi.hoisted(() =>
+	vi.fn().mockImplementation((existing: string) => existing),
+)
+const merge_workspace_mock = vi.hoisted(() =>
+	vi.fn().mockImplementation((existing: string) => existing),
+)
 
 vi.mock('node:fs', () => ({
 	cpSync: cp_sync_mock,
@@ -23,11 +30,13 @@ vi.mock('node:path', () => ({
 vi.mock('./init-logic', () => ({
 	init_logic: {
 		transform_prompt_paths: vi.fn().mockImplementation((content: string) => content),
-		get_ai_copy_files: vi.fn().mockReturnValue(['CLAUDE.md']),
+		get_ai_copy_files: get_ai_copy_files_mock,
 		get_ai_copy_file_mappings: vi
 			.fn()
 			.mockReturnValue([{ src: 'templates/workflows/ci.yml', dest: '.github/workflows/ci.yml' }]),
 		get_ai_copy_directories: vi.fn().mockReturnValue(['prompts']),
+		merge_wrangler_jsonc: merge_wrangler_mock,
+		merge_workspace_yaml: merge_workspace_mock,
 	},
 }))
 vi.mock('./init-paths', () => ({
@@ -44,6 +53,8 @@ const SRC_PATH = '/pkg/CLAUDE.md'
 const DEST_PATH = '/project/CLAUDE.md'
 const RAW_CONTENT = 'raw content'
 const MAPPING_DEST_PATH = '/project/.github/workflows/ci.yml'
+const WRANGLER_JSONC = 'wrangler.jsonc'
+const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 
 describe('init_ai_copy.copy_ai_file — write behavior', () => {
 	it('writes transformed content to destination path', () => {
@@ -127,6 +138,66 @@ describe('init_ai_copy.run_ai_copies — copy behavior', () => {
 		init_ai_copy.run_ai_copies()
 
 		expect(copy_sonar_mock).toHaveBeenCalled()
+		vi.restoreAllMocks()
+	})
+})
+
+describe('init_ai_copy.run_ai_copies — wrangler.jsonc merge when exists', () => {
+	it('calls merge_wrangler_jsonc when wrangler.jsonc exists', () => {
+		get_ai_copy_files_mock.mockReturnValueOnce([WRANGLER_JSONC])
+		exists_sync_mock.mockReturnValue(true)
+		vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		merge_wrangler_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(merge_wrangler_mock).toHaveBeenCalled()
+		vi.restoreAllMocks()
+	})
+
+	it('creates wrangler.jsonc when file does not exist', () => {
+		get_ai_copy_files_mock.mockReturnValueOnce([WRANGLER_JSONC])
+		exists_sync_mock.mockReturnValue(false)
+		vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		write_file_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(write_file_mock).toHaveBeenCalled()
+		vi.restoreAllMocks()
+	})
+})
+
+describe('init_ai_copy.run_ai_copies — pnpm-workspace.yaml merge when exists', () => {
+	it('calls merge_workspace_yaml when pnpm-workspace.yaml exists', () => {
+		get_ai_copy_files_mock.mockReturnValueOnce([WORKSPACE_YAML])
+		exists_sync_mock.mockReturnValue(true)
+		vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		merge_workspace_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(merge_workspace_mock).toHaveBeenCalled()
+		vi.restoreAllMocks()
+	})
+
+	it('creates pnpm-workspace.yaml when file does not exist', () => {
+		get_ai_copy_files_mock.mockReturnValueOnce([WORKSPACE_YAML])
+		exists_sync_mock.mockReturnValue(false)
+		vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+		write_file_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(write_file_mock).toHaveBeenCalled()
 		vi.restoreAllMocks()
 	})
 })

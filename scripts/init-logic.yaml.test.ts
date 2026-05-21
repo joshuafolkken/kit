@@ -93,10 +93,10 @@ describe('merge_workspace_yaml - empty and kit-only cases', () => {
 		expect(init_logic.merge_workspace_yaml('', WORKSPACE_TEMPLATE)).toBe(WORKSPACE_TEMPLATE)
 	})
 
-	it('returns template when existing has only kit-managed keys', () => {
+	it('preserves existing when it has only kit-managed keys', () => {
 		const existing = `${ALLOW_BUILDS_KEY}\n  esbuild: true\nminimumReleaseAgeExclude:\n  - vite\n`
 
-		expect(init_logic.merge_workspace_yaml(existing, WORKSPACE_TEMPLATE)).toBe(WORKSPACE_TEMPLATE)
+		expect(init_logic.merge_workspace_yaml(existing, WORKSPACE_TEMPLATE)).toBe(existing)
 	})
 
 	it('drops deprecated onlyBuiltDependencies and outputs allowBuilds from template', () => {
