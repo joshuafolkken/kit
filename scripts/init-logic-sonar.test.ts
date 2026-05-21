@@ -5,6 +5,7 @@ const SONAR_TEMPLATE = 'sonar.projectKey={{PROJECT_KEY}}\nsonar.organization={{O
 const REPO_NAME = 'joshuafolkken/myapp'
 const PROJECT_KEY = 'joshuafolkken_myapp'
 const ORGANIZATION = 'joshuafolkken'
+const SONAR_EXCLUSIONS_LINE = 'sonar.exclusions=.claude/**'
 
 describe('apply_sonar_template', () => {
 	it('replaces PROJECT_KEY placeholder with given project key', () => {
@@ -22,9 +23,7 @@ describe('apply_sonar_template', () => {
 	it('leaves unrelated lines unchanged', () => {
 		const template = `${SONAR_TEMPLATE}sonar.exclusions=.claude/**\n`
 
-		expect(init_logic.apply_sonar_template(template, 'a_b', 'a')).toContain(
-			'sonar.exclusions=.claude/**',
-		)
+		expect(init_logic.apply_sonar_template(template, 'a_b', 'a')).toContain(SONAR_EXCLUSIONS_LINE)
 	})
 })
 
@@ -55,5 +54,43 @@ describe('get_sonar_template_source', () => {
 describe('get_sonar_template_destination', () => {
 	it('returns sonar-project.properties', () => {
 		expect(init_logic.get_sonar_template_destination()).toBe('sonar-project.properties')
+	})
+})
+
+describe('merge_sonar_properties', () => {
+	const EXISTING = 'sonar.projectKey=org_repo\nsonar.organization=org\n'
+	const TEMPLATE_CONTENT =
+		'sonar.projectKey=org_repo\nsonar.organization=org\nsonar.exclusions=.claude/**\n'
+
+	it('returns existing unchanged when all template keys already present', () => {
+		expect(init_logic.merge_sonar_properties(EXISTING, EXISTING)).toBe(EXISTING)
+	})
+
+	it('appends missing key from template to existing content', () => {
+		const result = init_logic.merge_sonar_properties(EXISTING, TEMPLATE_CONTENT)
+
+		expect(result).toContain(SONAR_EXCLUSIONS_LINE)
+	})
+
+	it('preserves existing key values when merging', () => {
+		const result = init_logic.merge_sonar_properties(EXISTING, TEMPLATE_CONTENT)
+
+		expect(result).toContain('sonar.projectKey=org_repo')
+		expect(result).toContain('sonar.organization=org')
+	})
+
+	it('does not duplicate keys already in existing', () => {
+		const result = init_logic.merge_sonar_properties(EXISTING, TEMPLATE_CONTENT)
+		const count = (result.match(/sonar\.projectKey=/gu) ?? []).length
+
+		expect(count).toBe(1)
+	})
+
+	it('skips comment lines when determining keys to add', () => {
+		const template_with_comment = `${EXISTING}# a comment\nsonar.newKey=val\n`
+		const result = init_logic.merge_sonar_properties(EXISTING, template_with_comment)
+
+		expect(result).toContain('sonar.newKey=val')
+		expect(result).not.toContain('# a comment\n# a comment')
 	})
 })

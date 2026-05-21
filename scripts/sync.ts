@@ -8,6 +8,7 @@ import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { sonar_file } from './sonar-file'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
+const WRANGLER_JSONC = 'wrangler.jsonc'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -33,22 +34,51 @@ function sync_file_mapping(source_path: string, destination_path: string): void 
 	console.info(`  ✔ synced    ${path.basename(destination_path)}`)
 }
 
-function sync_workspace_yaml(template_path: string, destination_path: string): void {
+function sync_workspace_yaml(
+	template_path: string,
+	destination_path: string,
+	is_force = false,
+): void {
 	const template = readFileSync(template_path, 'utf8')
-	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
+	const existing =
+		!is_force && existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
 	const merged = init_logic.merge_workspace_yaml(existing, template)
 
 	mkdirSync(path.dirname(destination_path), { recursive: true })
 	writeFileSync(destination_path, merged)
 }
 
-function sync_ai_copy_file(filename: string): void {
+function sync_wrangler_jsonc_merge(source_path: string, destination_path: string): void {
+	if (!existsSync(destination_path)) {
+		sync_ai_file(source_path, destination_path)
+
+		return
+	}
+
+	const template = init_logic.transform_prompt_paths(readFileSync(source_path, 'utf8'))
+	const existing = readFileSync(destination_path, 'utf8')
+
+	writeFileSync(destination_path, init_logic.merge_wrangler_jsonc(existing, template))
+}
+
+function sync_ai_copy_file(filename: string, is_force: boolean): void {
 	if (filename === WORKSPACE_YAML) {
 		sync_workspace_yaml(
 			path.join(PACKAGE_DIR, WORKSPACE_YAML),
 			path.join(PROJECT_ROOT, WORKSPACE_YAML),
+			is_force,
 		)
 		console.info(`  ✔ synced    ${WORKSPACE_YAML}`)
+
+		return
+	}
+
+	if (filename === WRANGLER_JSONC && !is_force) {
+		sync_wrangler_jsonc_merge(
+			path.join(PACKAGE_DIR, WRANGLER_JSONC),
+			path.join(PROJECT_ROOT, WRANGLER_JSONC),
+		)
+		console.info(`  ✔ synced    ${WRANGLER_JSONC}`)
 
 		return
 	}
@@ -133,7 +163,7 @@ function sync_deploy_vps(destination_path: string): void {
 	console.info('  ✔ synced    deploy-vps.yml')
 }
 
-function sync_sonar_with_template(): void {
+function sync_sonar_with_template(is_force = false): void {
 	const destination = init_logic.get_sonar_template_destination()
 	const name_with_owner = gh_spawn.get_repo_name_with_owner()
 
@@ -143,18 +173,19 @@ function sync_sonar_with_template(): void {
 		return
 	}
 
-	const identifiers = init_logic.derive_sonar_identifiers(name_with_owner)
 	const template_source = path.join(PACKAGE_DIR, init_logic.get_sonar_template_source())
+	const identifiers = init_logic.derive_sonar_identifiers(name_with_owner)
+	const write_function = is_force ? sonar_file.write_sonar_file : sonar_file.merge_sonar_file
 
-	sonar_file.write_sonar_file(template_source, path.join(PROJECT_ROOT, destination), identifiers)
+	write_function(template_source, path.join(PROJECT_ROOT, destination), identifiers)
 	console.info(`  ✔ synced    ${destination}`)
 }
 
-function sync_ai_copy_all(): void {
+function sync_ai_copy_all(is_force: boolean): void {
 	console.info('AI files:')
 
 	for (const filename of init_logic.get_ai_copy_files()) {
-		sync_ai_copy_file(filename)
+		sync_ai_copy_file(filename, is_force)
 	}
 
 	for (const { src, dest } of init_logic.get_ai_copy_file_mappings()) {
@@ -167,12 +198,14 @@ function sync_ai_copy_all(): void {
 }
 
 function main(): void {
+	const is_force = process.argv.includes('--force')
+
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
-	sync_ai_copy_all()
+	sync_ai_copy_all(is_force)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
 	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
-	sync_sonar_with_template()
+	sync_sonar_with_template(is_force)
 	console.info('\n✅ Done.\n')
 }
 
@@ -182,6 +215,7 @@ const sync = {
 	sync_file_mapping,
 	sync_ai_file,
 	sync_workspace_yaml,
+	sync_wrangler_jsonc_merge,
 	sync_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,

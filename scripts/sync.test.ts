@@ -235,6 +235,40 @@ describe('sync_playwright_config', () => {
 	})
 })
 
+const WRANGLER_JSONC_NAME = 'wrangler.jsonc'
+const WRANGLER_SRC = path.join(TEST_DIR, 'src', WRANGLER_JSONC_NAME)
+const WRANGLER_DEST = path.join(TEST_DIR, 'dest', WRANGLER_JSONC_NAME)
+const OLD_DATE = '2025-01-01'
+const NEW_DATE = '2026-05-12'
+const WRANGLER_TEMPLATE = `{\n\t"compatibility_date": "${NEW_DATE}"\n}\n`
+const WRANGLER_EXISTING = `{\n\t"compatibility_date": "${OLD_DATE}",\n\t"name": "myapp"\n}\n`
+
+describe('sync_wrangler_jsonc_merge', () => {
+	it('updates compatibility_date in existing wrangler.jsonc', () => {
+		writeFileSync(WRANGLER_SRC, WRANGLER_TEMPLATE)
+		writeFileSync(WRANGLER_DEST, WRANGLER_EXISTING)
+		sync.sync_wrangler_jsonc_merge(WRANGLER_SRC, WRANGLER_DEST)
+
+		expect(readFileSync(WRANGLER_DEST, 'utf8')).toContain(`"compatibility_date": "${NEW_DATE}"`)
+	})
+
+	it('preserves other fields when updating compatibility_date', () => {
+		writeFileSync(WRANGLER_SRC, WRANGLER_TEMPLATE)
+		writeFileSync(WRANGLER_DEST, WRANGLER_EXISTING)
+		sync.sync_wrangler_jsonc_merge(WRANGLER_SRC, WRANGLER_DEST)
+
+		expect(readFileSync(WRANGLER_DEST, 'utf8')).toContain('"name": "myapp"')
+	})
+
+	it('creates file from template when destination does not exist', () => {
+		writeFileSync(WRANGLER_SRC, WRANGLER_TEMPLATE)
+		sync.sync_wrangler_jsonc_merge(WRANGLER_SRC, WRANGLER_DEST)
+
+		expect(existsSync(WRANGLER_DEST)).toBe(true)
+		expect(readFileSync(WRANGLER_DEST, 'utf8')).toContain(`"compatibility_date": "${NEW_DATE}"`)
+	})
+})
+
 const NO_REFERENCES_CONTENT = 'no references here\n'
 
 describe('sync_ai_file', () => {
