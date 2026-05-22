@@ -49,6 +49,23 @@ The project key and organization are derived from the `owner/repo` slug:
 - `project_key` → `owner_repo` (slash replaced with underscore, lowercased)
 - `organization` → `owner` (lowercased)
 
+### Config files (merged, only when already present)
+
+These files are created by `josh init`. `josh sync` refreshes them in place by reusing the same merge functions `init` uses — never created on first run, so projects that opted out stay opted out. Each handler is idempotent: when the file is already current, it logs `unchanged` and skips the write.
+
+| File                      | Merge strategy                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `.npmrc`                  | Append any missing lines from the kit's required-lines list                     |
+| `eslint.config.js`        | Overwrite with the current kit template (no merge — same model as Playwright)   |
+| `tsconfig.json`           | Prepend the kit preset to the `extends` array if not already present            |
+| `cspell.config.yaml`      | Prepend the kit import to the `import:` list if not already present             |
+| `lefthook.yml`            | Prepend the kit preset to the `extends:` list if not already present            |
+| `.vscode/extensions.json` | Append missing kit recommendations to `recommendations`                         |
+| `.vscode/settings.json`   | Add missing top-level keys (existing keys are never overwritten)                |
+| `vite.config.ts`          | Inject the `rollup-plugin-visualizer` import + plugin (SvelteKit projects only) |
+
+Project type (`sveltekit` vs `vanilla`) is auto-detected from the presence of `svelte.config.{js,ts}`; `vite.config.ts` is only synced for SvelteKit projects.
+
 ## Path transformation
 
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`:
@@ -61,19 +78,7 @@ This transformation is applied to backtick-quoted paths matching the pattern `` 
 
 ## What does NOT get synced
 
-Config files that were created by `josh init` and may have been customized by the project are **not** touched by `josh sync`:
-
-- `eslint.config.js`
-- `prettier.config.js`
-- `playwright.config.ts`
-- `tsconfig.json`
-- `cspell.config.yaml`
-- `lefthook.yml`
-- `.vscode/extensions.json`
-- `.vscode/settings.json`
-- `package.json`
-
-To update these, re-run `josh init` (it will merge safely) or edit them manually.
+- `package.json` — intentionally init-only to avoid clobbering project version / dependencies. To refresh kit-managed scripts or dev-dependency pins, re-run `josh init`.
 
 ## When to run
 
