@@ -6,7 +6,7 @@ import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
-import { package_path, PROJECT_ROOT } from './init-paths'
+import { is_sveltekit_project, package_path, PROJECT_ROOT } from './init-paths'
 import { install_josh_bin_section } from './install-bin'
 import { string_array_schema, vscode_settings_schema, with_package_manager_schema } from './schemas'
 import { sync } from './sync'
@@ -170,11 +170,7 @@ function execute_file_action(action: FileAction): void {
 }
 
 function detect_project_type(): ProjectType | undefined {
-	const has_svelte_config =
-		existsSync(path.join(PROJECT_ROOT, 'svelte.config.js')) ||
-		existsSync(path.join(PROJECT_ROOT, 'svelte.config.ts'))
-
-	return has_svelte_config ? 'sveltekit' : undefined
+	return is_sveltekit_project(PROJECT_ROOT) ? 'sveltekit' : undefined
 }
 
 function parse_cli_type(): ProjectType | undefined {

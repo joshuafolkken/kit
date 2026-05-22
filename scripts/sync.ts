@@ -3,9 +3,10 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gh_spawn } from './gh-spawn'
-import { init_logic } from './init-logic'
-import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
+import { init_logic, type ProjectType } from './init-logic'
+import { is_sveltekit_project, PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 import { sonar_file } from './sonar-file'
+import { sync_configs } from './sync-configs'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const WRANGLER_JSONC = 'wrangler.jsonc'
@@ -197,8 +198,27 @@ function sync_ai_copy_all(is_force: boolean): void {
 	}
 }
 
+function sync_config_files(type: ProjectType): void {
+	sync_configs.sync_npmrc(path.join(PROJECT_ROOT, '.npmrc'))
+	sync_configs.sync_eslint_config(path.join(PROJECT_ROOT, 'eslint.config.js'), type)
+	sync_configs.sync_tsconfig(path.join(PROJECT_ROOT, 'tsconfig.json'), type)
+	sync_configs.sync_cspell_config(path.join(PROJECT_ROOT, 'cspell.config.yaml'), type)
+	sync_configs.sync_lefthook_config(path.join(PROJECT_ROOT, 'lefthook.yml'), type)
+	sync_configs.sync_vscode_extensions_json(path.join(PROJECT_ROOT, '.vscode/extensions.json'), type)
+	sync_configs.sync_vscode_settings_json(path.join(PROJECT_ROOT, '.vscode/settings.json'), type)
+
+	if (type === 'sveltekit') {
+		sync_configs.sync_vite_config(path.join(PROJECT_ROOT, 'vite.config.ts'))
+	}
+}
+
+function resolve_project_type(): ProjectType {
+	return is_sveltekit_project(PROJECT_ROOT) ? 'sveltekit' : 'vanilla'
+}
+
 function main(): void {
 	const is_force = process.argv.includes('--force')
+	const type = resolve_project_type()
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
 	sync_ai_copy_all(is_force)
@@ -206,6 +226,7 @@ function main(): void {
 	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
 	sync_sonar_with_template(is_force)
+	sync_config_files(type)
 	console.info('\n✅ Done.\n')
 }
 
