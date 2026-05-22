@@ -2,7 +2,7 @@ import svelte from 'eslint-plugin-svelte'
 import { defineConfig } from 'eslint/config'
 import ts from 'typescript-eslint'
 import { create_base_config } from './base.js'
-import { ROUTE_NO_RESTRICTED_SYNTAX, svelte_rules } from './rules/svelte.ts'
+import { ROUTE_NO_RESTRICTED_SYNTAX, svelte_rules } from './rules/svelte.js'
 
 const SVELTE_FILE_PATTERNS = {
 	svelte: ['**/*.svelte', '**/*.svelte.ts'],
