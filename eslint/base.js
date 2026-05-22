@@ -10,14 +10,14 @@ import unicorn from 'eslint-plugin-unicorn'
 import { defineConfig } from 'eslint/config'
 import globals from 'globals'
 import ts from 'typescript-eslint'
-import { code_quality_rules } from './rules/code-quality.ts'
-import { formatting_rules } from './rules/formatting.ts'
-import { import_rules } from './rules/import.ts'
-import { naming_convention_rules } from './rules/naming-convention.ts'
-import { promise_rules } from './rules/promise.ts'
-import { sonarjs_rules } from './rules/sonarjs.ts'
-import { typescript_rules } from './rules/typescript.ts'
-import { unicorn_rules } from './rules/unicorn.ts'
+import { code_quality_rules } from './rules/code-quality.js'
+import { formatting_rules } from './rules/formatting.js'
+import { import_rules } from './rules/import.js'
+import { naming_convention_rules } from './rules/naming-convention.js'
+import { promise_rules } from './rules/promise.js'
+import { sonarjs_rules } from './rules/sonarjs.js'
+import { typescript_rules } from './rules/typescript.js'
+import { unicorn_rules } from './rules/unicorn.js'
 
 const FILE_PATTERNS = {
 	d_ts: ['**/*.d.ts'],
@@ -27,7 +27,7 @@ const FILE_PATTERNS = {
 		return ['scripts/**/*.ts', 'scripts/**/*.js', ...this.scripts_ai]
 	},
 	tests: ['**/*.test.ts', '**/*.spec.ts'],
-	eslint_rules: ['eslint/**/*.ts'],
+	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
 }
 
 export function create_base_config({ gitignore_path, tsconfig_root_dir }) {

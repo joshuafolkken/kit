@@ -24,7 +24,7 @@ export const ROUTE_NO_RESTRICTED_SYNTAX = [
 		message:
 			'SvelteKit route handlers must use function syntax: `export function GET(event) {}` not `export const GET = () => {}`.',
 	},
-] as const
+]
 
 export const svelte_rules = {
 	// a11y（アクセシビリティ）ルールを厳格に
