@@ -211,49 +211,18 @@ importers:
 
   .:
     dependencies:
-      '@playwright/test':
-        specifier: '>=1.0.0'
-        version: 1.59.1
-      js-yaml:
-        specifier: ^4.1.1
-        version: 4.1.1
-      strip-json-comments:
-        specifier: ^5.0.3
-        version: 5.0.3
-      svelte:
-        specifier: ^5.55.7
-        version: 5.55.7(@typescript-eslint/types@8.59.4)
-      tsx:
-        specifier: ^4.22.3
-        version: 4.22.3
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
       '@eslint/compat':
         specifier: ^2.1.0
         version: 2.1.0(eslint@10.4.0)
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.0)
-      '@ianvs/prettier-plugin-sort-imports':
-        specifier: ^4.7.1
-        version: 4.7.1(prettier@3.8.3)
+      '@playwright/test':
+        specifier: '>=1.0.0'
+        version: 1.59.1
       '@stylistic/eslint-plugin':
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.4.0)
-      '@types/js-yaml':
-        specifier: ^4.0.9
-        version: 4.0.9
-      '@types/node':
-        specifier: ^25.9.1
-        version: 25.9.1
-      cspell:
-        specifier: ^10.0.0
-        version: 10.0.0
-      eslint:
-        specifier: ^10.4.0
-        version: 10.4.0
       eslint-config-prettier:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.4.0)
@@ -278,6 +247,40 @@ importers:
       globals:
         specifier: ^17.6.0
         version: 17.6.0
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
+      strip-json-comments:
+        specifier: ^5.0.3
+        version: 5.0.3
+      svelte:
+        specifier: ^5.55.7
+        version: 5.55.7(@typescript-eslint/types@8.59.4)
+      tsx:
+        specifier: ^4.22.3
+        version: 4.22.3
+      typescript-eslint:
+        specifier: ^8.59.4
+        version: 8.59.4(eslint@10.4.0)(typescript@6.0.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@ianvs/prettier-plugin-sort-imports':
+        specifier: ^4.7.1
+        version: 4.7.1(prettier@3.8.3)
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      cspell:
+        specifier: ^10.0.0
+        version: 10.0.0
+      eslint:
+        specifier: ^10.4.0
+        version: 10.4.0
       lefthook:
         specifier: ^2.1.8
         version: 2.1.8
@@ -293,9 +296,6 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
-      typescript-eslint:
-        specifier: ^8.59.4
-        version: 8.59.4(eslint@10.4.0)(typescript@6.0.3)
       vitest:
         specifier: ^4.1.7
         version: 4.1.7(@types/node@25.9.1)(vite@8.0.8(@types/node@25.9.1)(esbuild@0.28.0)(tsx@4.22.3)(yaml@2.9.0))
