@@ -38,6 +38,83 @@ describe('init_logic_templates.generate_prettier_config', () => {
 	})
 })
 
+const VANILLA_SVELTEKIT_CONFIG = `import js from '@eslint/js'
+import svelte from 'eslint-plugin-svelte'
+import globals from 'globals'
+import ts from 'typescript-eslint'
+import svelteConfig from './svelte.config.js'
+
+export default ts.config(
+\tjs.configs.recommended,
+\t...ts.configs.recommended,
+\t...svelte.configs.recommended,
+\t{
+\t\tlanguageOptions: { globals: { ...globals.browser, ...globals.node } },
+\t},
+)
+`
+
+const VANILLA_SVELTEKIT_WITH_RULES = `import js from '@eslint/js'
+import svelte from 'eslint-plugin-svelte'
+import ts from 'typescript-eslint'
+import svelteConfig from './svelte.config.js'
+
+export default ts.config(
+\tjs.configs.recommended,
+\t...ts.configs.recommended,
+\t...svelte.configs.recommended,
+\t{
+\t\trules: {
+\t\t\t'no-console': 'warn',
+\t\t\t'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+\t\t},
+\t},
+)
+`
+
+const STRICT_SVELTEKIT_CONFIG = init_logic_templates.generate_eslint_config('sveltekit')
+
+describe('init_logic_templates.merge_eslint_config', () => {
+	it('rewrites vanilla sveltekit config to strict create_sveltekit_config shape', () => {
+		const result = init_logic_templates.merge_eslint_config(VANILLA_SVELTEKIT_CONFIG, 'sveltekit')
+
+		expect(result).toContain('@joshuafolkken/kit/eslint/sveltekit')
+		expect(result).toContain('create_sveltekit_config')
+		expect(result).not.toContain('js.configs.recommended')
+	})
+
+	it('preserves user-added rules when migrating vanilla config', () => {
+		const result = init_logic_templates.merge_eslint_config(
+			VANILLA_SVELTEKIT_WITH_RULES,
+			'sveltekit',
+		)
+
+		expect(result).toContain("'no-console': 'warn'")
+		expect(result).toContain("'no-unused-vars': ['error', { argsIgnorePattern: '^_' }]")
+		expect(result).toContain('create_sveltekit_config')
+	})
+
+	it('returns identical content for already-strict config (no-op)', () => {
+		expect(init_logic_templates.merge_eslint_config(STRICT_SVELTEKIT_CONFIG, 'sveltekit')).toBe(
+			STRICT_SVELTEKIT_CONFIG,
+		)
+	})
+
+	it('returns identical content for hand-rolled non-vanilla config (safe fallback)', () => {
+		const hand_rolled = `import { custom_config } from './my-config.js'\n\nexport default custom_config()\n`
+
+		expect(init_logic_templates.merge_eslint_config(hand_rolled, 'sveltekit')).toBe(hand_rolled)
+	})
+
+	it('rewrites vanilla project config to create_vanilla_config shape', () => {
+		const vanilla_project_config = `import js from '@eslint/js'\nimport ts from 'typescript-eslint'\n\nexport default ts.config(\n\tjs.configs.recommended,\n\t...ts.configs.recommended,\n)\n`
+		const result = init_logic_templates.merge_eslint_config(vanilla_project_config, 'vanilla')
+
+		expect(result).toContain('create_vanilla_config')
+		expect(result).toContain('@joshuafolkken/kit/eslint/vanilla')
+	})
+})
+
 describe('init_logic_templates.merge_prettier_config', () => {
 	it('preserves tailwindStylesheet from new template format', () => {
 		const existing = `import { config } from '@joshuafolkken/kit/prettier'\n\nexport default {\n\t...config,\n\ttailwindStylesheet: './src/app.css',\n}\n`
