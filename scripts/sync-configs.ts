@@ -31,25 +31,6 @@ function sync_with_merge(
 	console.info(`  ✔ synced    ${destination_name}`)
 }
 
-function sync_with_template(
-	destination_path: string,
-	destination_name: string,
-	template: string,
-): void {
-	if (!existsSync(destination_path)) return
-
-	const existing = readFileSync(destination_path, 'utf8')
-
-	if (template === existing) {
-		console.info(`  ✔ unchanged ${destination_name}`)
-
-		return
-	}
-
-	writeFileSync(destination_path, template)
-	console.info(`  ✔ synced    ${destination_name}`)
-}
-
 function sync_vite_config(destination_path: string): void {
 	sync_with_merge(destination_path, 'vite.config.ts', init_logic.merge_vite_config)
 }
@@ -59,7 +40,9 @@ function sync_npmrc(destination_path: string): void {
 }
 
 function sync_eslint_config(destination_path: string, type: ProjectType): void {
-	sync_with_template(destination_path, 'eslint.config.js', init_logic.generate_eslint_config(type))
+	sync_with_merge(destination_path, 'eslint.config.js', (existing) =>
+		init_logic.merge_eslint_config(existing, type),
+	)
 }
 
 function sync_tsconfig(destination_path: string, type: ProjectType): void {
