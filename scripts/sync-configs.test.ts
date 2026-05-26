@@ -108,7 +108,10 @@ describe('sync_configs.sync_npmrc', () => {
 const ESLINT_DEST = path.join(TEST_DIR, 'eslint.config.js')
 const ESLINT_VANILLA_UP_TO_DATE = init_logic.generate_eslint_config('vanilla')
 
-describe('sync_configs.sync_eslint_config', () => {
+const VANILLA_ESLINT_OUTDATED = `import js from '@eslint/js'\nimport ts from 'typescript-eslint'\n\nexport default ts.config(\n\tjs.configs.recommended,\n\t...ts.configs.recommended,\n)\n`
+const VANILLA_ESLINT_WITH_USER_RULES = `import js from '@eslint/js'\nimport ts from 'typescript-eslint'\n\nexport default ts.config(\n\tjs.configs.recommended,\n\t...ts.configs.recommended,\n\t{\n\t\trules: {\n\t\t\t'no-console': 'warn',\n\t\t},\n\t},\n)\n`
+
+describe('sync_configs.sync_eslint_config — baseline', () => {
 	it('does nothing when eslint.config.js does not exist', () => {
 		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
 		expect(existsSync(ESLINT_DEST)).toBe(false)
@@ -124,12 +127,39 @@ describe('sync_configs.sync_eslint_config', () => {
 			},
 		)
 	})
+})
 
-	it('overwrites outdated file with current template', () => {
-		writeFileSync(ESLINT_DEST, 'export default {}\n')
+describe('sync_configs.sync_eslint_config — migration', () => {
+	it('migrates vanilla outdated config to strict create_vanilla_config shape', () => {
+		writeFileSync(ESLINT_DEST, VANILLA_ESLINT_OUTDATED)
 		silence_console_info()
 		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
 		expect(readFileSync(ESLINT_DEST, 'utf8')).toBe(ESLINT_VANILLA_UP_TO_DATE)
+	})
+
+	it('preserves user-added rules when migrating vanilla outdated config', () => {
+		writeFileSync(ESLINT_DEST, VANILLA_ESLINT_WITH_USER_RULES)
+		silence_console_info()
+		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
+
+		const result = readFileSync(ESLINT_DEST, 'utf8')
+
+		expect(result).toContain('create_vanilla_config')
+		expect(result).toContain("'no-console': 'warn'")
+	})
+
+	it('leaves hand-rolled non-vanilla config unchanged (safe fallback)', () => {
+		const hand_rolled = `import { custom } from './my-config.js'\n\nexport default custom()\n`
+
+		assert_logs_unchanged(
+			() => {
+				writeFileSync(ESLINT_DEST, hand_rolled)
+			},
+			() => {
+				sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
+			},
+		)
+		expect(readFileSync(ESLINT_DEST, 'utf8')).toBe(hand_rolled)
 	})
 })
 

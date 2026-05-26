@@ -95,27 +95,37 @@ function build_playwright_action(): FileAction {
 	return { dest: 'playwright.config.ts', create: () => init_logic.generate_playwright_config() }
 }
 
-function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
-	const vite = build_action(
+function build_eslint_action(type: ProjectType): FileAction {
+	return build_action(
+		'eslint.config.js',
+		() => init_logic.generate_eslint_config(type),
+		(existing) => init_logic.merge_eslint_config(existing, type),
+	)
+}
+
+function build_vite_action(): FileAction {
+	return build_action(
 		'vite.config.ts',
 		() => init_logic.generate_vite_config(),
 		(existing) => init_logic.merge_vite_config(existing),
 	)
+}
 
+function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
 	return [
 		build_action(
 			'.npmrc',
 			() => init_logic.generate_npmrc(),
 			(existing) => init_logic.merge_npmrc(existing),
 		),
-		{ dest: 'eslint.config.js', create: () => init_logic.generate_eslint_config(type) },
+		build_eslint_action(type),
 		build_action(
 			PRETTIER_CONFIG_JS,
 			() => init_logic.generate_prettier_config(),
 			(existing) => init_logic.merge_prettier_config(existing),
 		),
 		build_playwright_action(),
-		...(type === 'sveltekit' ? [vite] : []),
+		...(type === 'sveltekit' ? [build_vite_action()] : []),
 		...build_config_file_actions(type),
 	]
 }
