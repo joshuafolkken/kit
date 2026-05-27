@@ -23,6 +23,20 @@ const SVELTEKIT_ROUTE_PATTERNS = [
 	String.raw`\+server\.ts$`,
 ]
 
+// Allow universally understood short identifiers — the rule should catch
+// unfamiliar abbreviations like `req` / `res` / `usr` / `cnt`, not these.
+const PREVENT_ABBR_ALLOW_LIST = {
+	Props: true,
+	e: true, // event handler parameter
+	el: true, // DOM element
+	ctx: true, // canvas/Three.js/Svelte context
+	btn: true, // button element
+	idx: true, // loop index
+	opts: true, // options object
+	params: true, // SvelteKit +page.ts params
+	args: true, // function arguments
+}
+
 export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, svelte_config }) {
 	return defineConfig(
 		...create_base_config({ gitignore_path, tsconfig_root_dir }),
@@ -43,7 +57,7 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 					'error',
 					{ case: 'pascalCase', ignore: SVELTEKIT_ROUTE_PATTERNS },
 				],
-				'unicorn/prevent-abbreviations': ['error', { allowList: { Props: true } }],
+				'unicorn/prevent-abbreviations': ['error', { allowList: PREVENT_ABBR_ALLOW_LIST }],
 				'sonarjs/no-unused-collection': 'off',
 				...svelte_rules,
 			},
