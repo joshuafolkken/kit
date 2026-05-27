@@ -23,8 +23,8 @@ const SVELTEKIT_ROUTE_PATTERNS = [
 	String.raw`\+server\.ts$`,
 ]
 
-// 普遍的に理解されている短縮名は許可する
-// (rule の目的は `req`/`res`/`usr`/`cnt` 等の慣れない略語を弾くこと)
+// Allow universally understood short identifiers — the rule should catch
+// unfamiliar abbreviations like `req` / `res` / `usr` / `cnt`, not these.
 const PREVENT_ABBR_ALLOW_LIST = {
 	Props: true,
 	e: true, // event handler parameter
