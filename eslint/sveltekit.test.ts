@@ -44,6 +44,17 @@ function find_block_with_rule(
 	})
 }
 
+function find_svelte_files_block(
+	config: ReturnType<typeof create_sveltekit_config>,
+): (typeof config)[number] | undefined {
+	return config.find(
+		(block) =>
+			Array.isArray(block.files) &&
+			block.files.includes(EXPECTED_SVELTE_FILE_PATTERNS[0]) &&
+			block.files.includes(EXPECTED_SVELTE_FILE_PATTERNS[1]),
+	)
+}
+
 describe('create_sveltekit_config — routes block', () => {
 	it('applies ROUTE_NO_RESTRICTED_SYNTAX to route files', () => {
 		const config = build_config()
@@ -78,12 +89,7 @@ describe('create_sveltekit_config — svelte file patterns', () => {
 	it('applies rules to svelte component and test files', () => {
 		const config = build_config()
 
-		const svelte_block = config.find(
-			(block) =>
-				Array.isArray(block.files) &&
-				block.files.includes(EXPECTED_SVELTE_FILE_PATTERNS[0]) &&
-				block.files.includes(EXPECTED_SVELTE_FILE_PATTERNS[1]),
-		)
+		const svelte_block = find_svelte_files_block(config)
 
 		expect(svelte_block).toBeDefined()
 		expect(svelte_block?.files).toEqual(EXPECTED_SVELTE_FILE_PATTERNS)
@@ -94,5 +100,31 @@ describe('create_sveltekit_config — svelte file patterns', () => {
 			'error',
 			{ case: 'pascalCase', ignore: expect.any(Array) },
 		])
+	})
+})
+
+describe('create_sveltekit_config — unicorn/prevent-abbreviations allowList', () => {
+	it('allows idiomatic short identifiers (e, el, ctx, btn, idx, opts, params, args) plus Props', () => {
+		const config = build_config()
+
+		const svelte_block = find_svelte_files_block(config)
+		const rules = svelte_block?.rules as Record<string, unknown>
+		const rule_value = rules['unicorn/prevent-abbreviations'] as [
+			string,
+			{ allowList: Record<string, boolean> },
+		]
+		const [, { allowList: allow_list }] = rule_value
+
+		expect(allow_list).toMatchObject({
+			Props: true,
+			e: true,
+			el: true,
+			ctx: true,
+			btn: true,
+			idx: true,
+			opts: true,
+			params: true,
+			args: true,
+		})
 	})
 })
