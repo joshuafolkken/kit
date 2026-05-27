@@ -59,6 +59,9 @@ export const unicorn_rules = {
 	'unicorn/no-useless-undefined': 'error',
 	// 数値セパレータのスタイルを統一
 	'unicorn/numeric-separators-style': 'error',
+	// 16進リテラルを lowercase に統一（prettier の hex 正規化と整合させ
+	// eslint↔prettier の無限 fix ループを防ぐ）
+	'unicorn/number-literal-case': ['error', { hexadecimalValue: 'lowercase' }],
 	// flatMapを優先
 	'unicorn/prefer-array-flat-map': 'error',
 	// Date.now()を優先
