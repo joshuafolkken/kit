@@ -37,7 +37,9 @@ function find_block_with_rule(
 	config: ReturnType<typeof create_sveltekit_config>,
 	rule_name: string,
 ): (typeof config)[number] | undefined {
-	return config.find((block) => {
+	// findLast: flat config applies later-wins, so the rightmost block
+	// with the rule is what actually takes effect.
+	return config.findLast((block) => {
 		const rules = block.rules as Record<string, unknown> | undefined
 
 		return rules !== undefined && rule_name in rules
@@ -100,6 +102,22 @@ describe('create_sveltekit_config — svelte file patterns', () => {
 			'error',
 			{ case: 'pascalCase', ignore: expect.any(Array) },
 		])
+	})
+})
+
+describe('create_sveltekit_config — unicorn/number-literal-case', () => {
+	it('aligns hex literal case with prettier (lowercase) to avoid eslint↔prettier fix loop', () => {
+		const config = build_config()
+
+		const block = find_block_with_rule(config, 'unicorn/number-literal-case')
+		const rules = block?.rules as Record<string, unknown>
+		const rule_value = rules['unicorn/number-literal-case'] as [
+			string,
+			{ hexadecimalValue: string },
+		]
+		const [, { hexadecimalValue: hexadecimal_value }] = rule_value
+
+		expect(hexadecimal_value).toBe('lowercase')
 	})
 })
 
