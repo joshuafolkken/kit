@@ -145,6 +145,7 @@ describe('create_sveltekit_config — parser options scoping (regression #424)',
 		const rules_block = find_svelte_files_block(config)
 		const language_options = rules_block?.languageOptions as LanguageOptionsShape | undefined
 
+		expect(rules_block).toBeDefined()
 		expect(language_options?.parserOptions?.extraFileExtensions).toBeUndefined()
 	})
 })
