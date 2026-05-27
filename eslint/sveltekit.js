@@ -4,8 +4,22 @@ import ts from 'typescript-eslint'
 import { create_base_config } from './base.js'
 import { ROUTE_NO_RESTRICTED_SYNTAX, svelte_rules } from './rules/svelte.js'
 
+const SVELTE_COMPONENT_PATTERN = '**/*.svelte'
+const SVELTE_TS_PATTERN = '**/*.svelte.ts'
+
 const SVELTE_FILE_PATTERNS = {
-	svelte: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.test.ts', '**/*.svelte.spec.ts'],
+	// Real Svelte source modules — get the Svelte parser config.
+	// Test files are excluded: they are plain TS and would otherwise hit
+	// `Parsing error: Enabling "project" does nothing when "projectService" is enabled`.
+	svelte_source: [SVELTE_COMPONENT_PATTERN, SVELTE_TS_PATTERN],
+	// All Svelte-paired files including tests — get the filename / rule conventions
+	// (PascalCase filename, allowList for props, etc.).
+	svelte_named: [
+		SVELTE_COMPONENT_PATTERN,
+		SVELTE_TS_PATTERN,
+		'**/*.svelte.test.ts',
+		'**/*.svelte.spec.ts',
+	],
 	svelte_js: ['**/*.svelte.js'],
 	hooks: ['**/hooks/**/*.svelte.ts', '**/*State.svelte.ts'],
 	routes: ['src/routes/**/+*.ts', 'src/routes/**/+*.js'],
@@ -43,7 +57,7 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 		...svelte.configs.recommended,
 		...svelte.configs.prettier,
 		{
-			files: SVELTE_FILE_PATTERNS.svelte,
+			files: SVELTE_FILE_PATTERNS.svelte_source,
 			languageOptions: {
 				parserOptions: {
 					projectService: true,
@@ -52,6 +66,9 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 					svelteConfig: svelte_config,
 				},
 			},
+		},
+		{
+			files: SVELTE_FILE_PATTERNS.svelte_named,
 			rules: {
 				'unicorn/filename-case': [
 					'error',
