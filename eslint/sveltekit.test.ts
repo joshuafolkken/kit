@@ -7,9 +7,12 @@ const GITIGNORE_PATH = new URL('../.gitignore', import.meta.url)
 const TSCONFIG_ROOT_DIR = fileURLToPath(new URL('..', import.meta.url))
 const MOCK_SVELTE_CONFIG = {}
 
+const SVELTE_COMPONENT_GLOB = '**/*.svelte'
+const SVELTE_TS_GLOB = '**/*.svelte.ts'
+
 const EXPECTED_SVELTE_FILE_PATTERNS = [
-	'**/*.svelte',
-	'**/*.svelte.ts',
+	SVELTE_COMPONENT_GLOB,
+	SVELTE_TS_GLOB,
 	'**/*.svelte.test.ts',
 	'**/*.svelte.spec.ts',
 ] as const
@@ -46,15 +49,31 @@ function find_block_with_rule(
 	})
 }
 
+function matches_patterns(
+	files: unknown,
+	expected: ReadonlyArray<string>,
+): files is ReadonlyArray<string> {
+	return (
+		Array.isArray(files) &&
+		files.length === expected.length &&
+		expected.every((pattern) => files.includes(pattern))
+	)
+}
+
 function find_svelte_files_block(
 	config: ReturnType<typeof create_sveltekit_config>,
 ): (typeof config)[number] | undefined {
-	return config.find(
-		(block) =>
-			Array.isArray(block.files) &&
-			block.files.includes(EXPECTED_SVELTE_FILE_PATTERNS[0]) &&
-			block.files.includes(EXPECTED_SVELTE_FILE_PATTERNS[1]),
-	)
+	// Match the rules block (4 patterns including .svelte.test.ts / .svelte.spec.ts),
+	// not the parser-options block (2 patterns) which now lives in a separate flat-config entry.
+	return config.find((block) => matches_patterns(block.files, EXPECTED_SVELTE_FILE_PATTERNS))
+}
+
+const EXPECTED_SVELTE_SRC_PATTERNS = [SVELTE_COMPONENT_GLOB, SVELTE_TS_GLOB] as const
+
+function find_svelte_source_block(
+	config: ReturnType<typeof create_sveltekit_config>,
+): (typeof config)[number] | undefined {
+	return config.find((block) => matches_patterns(block.files, EXPECTED_SVELTE_SRC_PATTERNS))
 }
 
 describe('create_sveltekit_config — routes block', () => {
@@ -102,6 +121,32 @@ describe('create_sveltekit_config — svelte file patterns', () => {
 			'error',
 			{ case: 'pascalCase', ignore: expect.any(Array) },
 		])
+	})
+})
+
+interface LanguageOptionsShape {
+	parserOptions?: { extraFileExtensions?: ReadonlyArray<string> }
+}
+
+describe('create_sveltekit_config — parser options scoping (regression #424)', () => {
+	it('applies Svelte parserOptions only to .svelte / .svelte.ts source files', () => {
+		const config = build_config()
+
+		const source_block = find_svelte_source_block(config)
+		const language_options = source_block?.languageOptions as LanguageOptionsShape | undefined
+
+		expect(source_block?.files).toEqual(EXPECTED_SVELTE_SRC_PATTERNS)
+		expect(language_options?.parserOptions?.extraFileExtensions).toEqual(['.svelte'])
+	})
+
+	it('does not apply Svelte parserOptions to the rules block (which covers .svelte.test.ts / .svelte.spec.ts)', () => {
+		const config = build_config()
+
+		const rules_block = find_svelte_files_block(config)
+		const language_options = rules_block?.languageOptions as LanguageOptionsShape | undefined
+
+		expect(rules_block).toBeDefined()
+		expect(language_options?.parserOptions?.extraFileExtensions).toBeUndefined()
 	})
 })
 
