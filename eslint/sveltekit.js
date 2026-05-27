@@ -5,7 +5,7 @@ import { create_base_config } from './base.js'
 import { ROUTE_NO_RESTRICTED_SYNTAX, svelte_rules } from './rules/svelte.js'
 
 const SVELTE_FILE_PATTERNS = {
-	svelte: ['**/*.svelte', '**/*.svelte.ts'],
+	svelte: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.test.ts', '**/*.svelte.spec.ts'],
 	svelte_js: ['**/*.svelte.js'],
 	hooks: ['**/hooks/**/*.svelte.ts', '**/*State.svelte.ts'],
 	routes: ['src/routes/**/+*.ts', 'src/routes/**/+*.js'],
