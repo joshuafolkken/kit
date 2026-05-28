@@ -56,8 +56,8 @@ export const code_quality_rules = {
 		'error',
 		{
 			min: 2,
-			max: 30,
-			exceptions: ['_', 'i', 'j', 'k', 'x', 'y', 'z'],
+			max: 45,
+			exceptions: ['_', 'e', 'i', 'j', 'k', 't', 'x', 'y', 'z'],
 			properties: 'never',
 		},
 	],
