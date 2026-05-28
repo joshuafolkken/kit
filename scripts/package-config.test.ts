@@ -9,14 +9,12 @@ interface PackageJson {
 	exports?: Record<string, unknown>
 	pnpm?: {
 		overrides?: Record<string, string>
-		// eslint-disable-next-line @typescript-eslint/naming-convention
 		onlyBuiltDependencies?: Array<string>
 	}
 	scripts?: Record<string, string>
 }
 
 interface WorkspaceYaml {
-	// eslint-disable-next-line @typescript-eslint/naming-convention
 	allowBuilds?: Record<string, boolean>
 }
 
