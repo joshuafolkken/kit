@@ -8,7 +8,6 @@ const ESLINT_DIR = path.join(PACKAGE_ROOT, 'eslint')
 
 interface PackageJson {
 	dependencies?: Record<string, string>
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- package.json field name is fixed by npm
 	peerDependencies?: Record<string, string>
 }
 

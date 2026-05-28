@@ -5,13 +5,11 @@ import { describe, expect, it } from 'vitest'
 const SETTINGS_PATH = fileURLToPath(new URL('../.claude/settings.json', import.meta.url))
 const GITIGNORE_PATH = fileURLToPath(new URL('../.gitignore', import.meta.url))
 
-/* eslint-disable @typescript-eslint/naming-convention */
 interface PermissionsBlock {
 	defaultMode: string
 	allow: ReadonlyArray<string>
 	deny: ReadonlyArray<string>
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 interface SettingsShape {
 	permissions: PermissionsBlock
