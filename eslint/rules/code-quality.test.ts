@@ -85,6 +85,28 @@ describe('code_quality_rules — id-length exceptions (issue #428 Gap 1)', () =>
 	})
 })
 
+interface PreferArrowCallbackOptions {
+	allowNamedFunctions: boolean
+}
+
+function get_prefer_arrow_callback_rule(): [string, PreferArrowCallbackOptions] {
+	return code_quality_rules['prefer-arrow-callback'] as [string, PreferArrowCallbackOptions]
+}
+
+describe('code_quality_rules — prefer-arrow-callback allowNamedFunctions (issue #432)', () => {
+	it('permits named function expressions via allowNamedFunctions', () => {
+		const [, options] = get_prefer_arrow_callback_rule()
+
+		expect(options.allowNamedFunctions).toBe(true)
+	})
+
+	it('still enforces the rule at error severity for anonymous callbacks', () => {
+		const [severity] = get_prefer_arrow_callback_rule()
+
+		expect(severity).toBe('error')
+	})
+})
+
 describe('code_quality_rules — id-length max (issue #428 Gap 2)', () => {
 	it('raises max to 45 so descriptive constant/function names are not penalized', () => {
 		const { max } = get_id_length_options()
