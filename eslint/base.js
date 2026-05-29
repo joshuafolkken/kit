@@ -26,7 +26,7 @@ const FILE_PATTERNS = {
 	get scripts() {
 		return ['scripts/**/*.ts', 'scripts/**/*.js', ...this.scripts_ai]
 	},
-	tests: ['**/*.test.ts', '**/*.spec.ts'],
+	tests: ['**/*.test.ts', '**/*.spec.ts', '**/*.e2e.ts'],
 	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
 }
 
