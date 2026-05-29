@@ -177,12 +177,14 @@ describe('create_sveltekit_config — sonarjs/no-use-of-empty-return-value (issu
 	})
 })
 
-describe('create_sveltekit_config — unicorn/prevent-abbreviations allowList', () => {
-	it('allows idiomatic short identifiers (e, el, ctx, btn, idx, opts, params, args) plus Props', () => {
+describe('create_sveltekit_config — unicorn/prevent-abbreviations allowList (issue #435)', () => {
+	it('applies the idiomatic-name allowList project-wide, including e2e for Playwright specs', () => {
 		const config = build_config()
 
-		const svelte_block = find_svelte_files_block(config)
-		const rules = svelte_block?.rules as Record<string, unknown>
+		// The allowList now lives in the project-wide unicorn rules block (eslint/rules/unicorn.js),
+		// not the svelte override, so consumers get it for plain .ts files too.
+		const block = find_block_with_rule(config, 'unicorn/prevent-abbreviations')
+		const rules = block?.rules as Record<string, unknown>
 		const rule_value = rules['unicorn/prevent-abbreviations'] as [
 			string,
 			{ allowList: Record<string, boolean> },
@@ -192,6 +194,7 @@ describe('create_sveltekit_config — unicorn/prevent-abbreviations allowList', 
 		expect(allow_list).toMatchObject({
 			Props: true,
 			e: true,
+			e2e: true,
 			el: true,
 			ctx: true,
 			btn: true,
