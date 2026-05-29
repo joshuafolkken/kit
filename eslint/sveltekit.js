@@ -55,13 +55,13 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 		},
 		{
 			files: SVELTE_FILE_PATTERNS.svelte_named,
+			// Note: unicorn/prevent-abbreviations is configured project-wide (including .svelte)
+			// in eslint/rules/unicorn.js, so this override intentionally does not re-specify it.
 			rules: {
 				'unicorn/filename-case': [
 					'error',
 					{ case: 'pascalCase', ignore: SVELTEKIT_ROUTE_PATTERNS },
 				],
-				// unicorn/prevent-abbreviations の allowList は eslint/rules/unicorn.js で
-				// プロジェクト全体に適用済み（.svelte も含む）ため、ここでの再指定は不要。
 				'sonarjs/no-unused-collection': 'off',
 				// {@render snippet()} is a Svelte template directive, not a value-consuming
 				// expression; the rule misreads the void snippet call as a useless return value.
