@@ -9,8 +9,8 @@ export const code_quality_rules = {
 	'no-var': 'error',
 	// const を優先
 	'prefer-const': 'error',
-	// アロー関数を優先
-	'prefer-arrow-callback': 'error',
+	// アロー関数を優先（名前付き関数式はスタックトレース可読性のため許可）
+	'prefer-arrow-callback': ['error', { allowNamedFunctions: true }],
 	// テンプレートリテラルを優先
 	'prefer-template': 'error',
 	// 等価演算子は厳密等価を使用
