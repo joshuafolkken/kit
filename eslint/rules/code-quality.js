@@ -190,7 +190,7 @@ export const code_quality_rules = {
 		},
 		{
 			selector:
-				'ExportNamedDeclaration > VariableDeclaration[declarations.length=1] > VariableDeclarator[id.type="Identifier"]:not([id.name=/^[A-Z_]+$/]):not([init.type="ObjectExpression"]):not([init.type="ArrayExpression"]):not([init.type="ArrowFunctionExpression"])',
+				'ExportNamedDeclaration > VariableDeclaration[declarations.length=1] > VariableDeclarator[id.type="Identifier"]:not([id.name=/^[A-Z_][A-Z_0-9]*$/]):not([init.type="ObjectExpression"]):not([init.type="ArrayExpression"]):not([init.type="ArrowFunctionExpression"])',
 			message:
 				'Individual named exports (constants) are not allowed (except UPPER_CASE). Use object export instead. Example: export const module_name = { constant_name }',
 		},
