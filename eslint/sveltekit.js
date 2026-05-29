@@ -37,20 +37,6 @@ const SVELTEKIT_ROUTE_PATTERNS = [
 	String.raw`\+server\.ts$`,
 ]
 
-// Allow universally understood short identifiers — the rule should catch
-// unfamiliar abbreviations like `req` / `res` / `usr` / `cnt`, not these.
-const PREVENT_ABBR_ALLOW_LIST = {
-	Props: true,
-	e: true, // event handler parameter
-	el: true, // DOM element
-	ctx: true, // canvas/Three.js/Svelte context
-	btn: true, // button element
-	idx: true, // loop index
-	opts: true, // options object
-	params: true, // SvelteKit +page.ts params
-	args: true, // function arguments
-}
-
 export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, svelte_config }) {
 	return defineConfig(
 		...create_base_config({ gitignore_path, tsconfig_root_dir }),
@@ -74,7 +60,8 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 					'error',
 					{ case: 'pascalCase', ignore: SVELTEKIT_ROUTE_PATTERNS },
 				],
-				'unicorn/prevent-abbreviations': ['error', { allowList: PREVENT_ABBR_ALLOW_LIST }],
+				// unicorn/prevent-abbreviations の allowList は eslint/rules/unicorn.js で
+				// プロジェクト全体に適用済み（.svelte も含む）ため、ここでの再指定は不要。
 				'sonarjs/no-unused-collection': 'off',
 				// {@render snippet()} is a Svelte template directive, not a value-consuming
 				// expression; the rule misreads the void snippet call as a useless return value.
