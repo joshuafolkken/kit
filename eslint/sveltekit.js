@@ -37,20 +37,6 @@ const SVELTEKIT_ROUTE_PATTERNS = [
 	String.raw`\+server\.ts$`,
 ]
 
-// Allow universally understood short identifiers — the rule should catch
-// unfamiliar abbreviations like `req` / `res` / `usr` / `cnt`, not these.
-const PREVENT_ABBR_ALLOW_LIST = {
-	Props: true,
-	e: true, // event handler parameter
-	el: true, // DOM element
-	ctx: true, // canvas/Three.js/Svelte context
-	btn: true, // button element
-	idx: true, // loop index
-	opts: true, // options object
-	params: true, // SvelteKit +page.ts params
-	args: true, // function arguments
-}
-
 export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, svelte_config }) {
 	return defineConfig(
 		...create_base_config({ gitignore_path, tsconfig_root_dir }),
@@ -69,12 +55,13 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 		},
 		{
 			files: SVELTE_FILE_PATTERNS.svelte_named,
+			// Note: unicorn/prevent-abbreviations is configured project-wide (including .svelte)
+			// in eslint/rules/unicorn.js, so this override intentionally does not re-specify it.
 			rules: {
 				'unicorn/filename-case': [
 					'error',
 					{ case: 'pascalCase', ignore: SVELTEKIT_ROUTE_PATTERNS },
 				],
-				'unicorn/prevent-abbreviations': ['error', { allowList: PREVENT_ABBR_ALLOW_LIST }],
 				'sonarjs/no-unused-collection': 'off',
 				// {@render snippet()} is a Svelte template directive, not a value-consuming
 				// expression; the rule misreads the void snippet call as a useless return value.
