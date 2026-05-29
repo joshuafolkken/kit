@@ -166,6 +166,17 @@ describe('create_sveltekit_config — unicorn/number-literal-case', () => {
 	})
 })
 
+describe('create_sveltekit_config — sonarjs/no-use-of-empty-return-value (issue #434)', () => {
+	it('disables the rule in the svelte override for {@render snippet()} false positives', () => {
+		const config = build_config()
+
+		const svelte_block = find_svelte_files_block(config)
+		const rules = svelte_block?.rules as Record<string, unknown>
+
+		expect(rules['sonarjs/no-use-of-empty-return-value']).toBe('off')
+	})
+})
+
 describe('create_sveltekit_config — unicorn/prevent-abbreviations allowList', () => {
 	it('allows idiomatic short identifiers (e, el, ctx, btn, idx, opts, params, args) plus Props', () => {
 		const config = build_config()
