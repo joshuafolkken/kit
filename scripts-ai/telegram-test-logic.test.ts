@@ -17,7 +17,6 @@ const OVERRIDE_PR_URL = 'https://github.com/o/r/pull/8'
 
 describe('telegram_test_logic.parse_task_type', () => {
 	it('returns the default (planning) when undefined', () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- explicitly testing default fallback
 		expect(telegram_test_logic.parse_task_type(undefined)).toBe('planning')
 	})
 
@@ -49,7 +48,6 @@ describe('telegram_test_logic.parse_issue_number', () => {
 	})
 
 	it('returns undefined when the URL is undefined', () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- explicitly testing undefined input
 		expect(telegram_test_logic.parse_issue_number(undefined)).toBeUndefined()
 	})
 })

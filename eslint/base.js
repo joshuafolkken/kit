@@ -97,6 +97,8 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'@typescript-eslint/no-magic-numbers': 'off',
 				'max-lines-per-function': ['error', { max: 35, skipBlankLines: true, skipComments: true }],
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
+				// vi mock/stub patterns require explicit undefined (mockResolvedValue/stubGlobal)
+				'unicorn/no-useless-undefined': 'off',
 			},
 		},
 		{

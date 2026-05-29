@@ -31,7 +31,6 @@ describe('read_string', () => {
 	})
 
 	it('returns undefined for undefined', () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- explicitly testing undefined input
 		expect(read_string(undefined)).toBeUndefined()
 	})
 })
