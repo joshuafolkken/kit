@@ -76,6 +76,9 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 				],
 				'unicorn/prevent-abbreviations': ['error', { allowList: PREVENT_ABBR_ALLOW_LIST }],
 				'sonarjs/no-unused-collection': 'off',
+				// {@render snippet()} is a Svelte template directive, not a value-consuming
+				// expression; the rule misreads the void snippet call as a useless return value.
+				'sonarjs/no-use-of-empty-return-value': 'off',
 				...svelte_rules,
 			},
 		},
