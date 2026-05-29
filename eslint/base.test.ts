@@ -60,6 +60,22 @@ describe('create_base_config — tests block (issue #433)', () => {
 
 		expect(rules['unicorn/no-useless-undefined']).toBe('off')
 	})
+
+	it('includes **/*.e2e.ts so Playwright e2e specs inherit the test rules (issue #440)', () => {
+		const config = create_base_config({
+			gitignore_path: GITIGNORE_PATH,
+			tsconfig_root_dir: TSCONFIG_ROOT_DIR,
+		})
+
+		const tests_block = config.find(
+			(block) =>
+				Array.isArray(block.files) &&
+				block.files.some((pattern) => String(pattern).includes('*.test.ts')),
+		)
+
+		expect(tests_block).toBeDefined()
+		expect(tests_block?.files).toContain('**/*.e2e.ts')
+	})
 })
 
 describe('create_base_config — typescript block', () => {
