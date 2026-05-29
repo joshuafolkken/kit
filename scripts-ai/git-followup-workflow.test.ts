@@ -26,7 +26,6 @@ const { git_followup_workflow } = await import('./git-followup-workflow')
 
 describe('parse_issue_number_from_text', () => {
 	it('returns undefined for undefined input', () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- explicitly testing undefined input
 		expect(git_followup_workflow.parse_issue_number_from_text(undefined)).toBeUndefined()
 	})
 
@@ -93,7 +92,6 @@ describe('resolve_branch_name', () => {
 
 		vi.mocked(git_branch.current).mockResolvedValue(RESOLVED_BRANCH)
 
-		// eslint-disable-next-line unicorn/no-useless-undefined -- explicitly testing undefined input
 		const result = await git_followup_workflow.resolve_branch_name(undefined)
 
 		expect(result).toBe(RESOLVED_BRANCH)
