@@ -83,6 +83,11 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			rules: {
 				'unicorn/no-process-exit': 'off',
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
+				// CLI tooling under scripts/ invokes pnpm/git/node via PATH by design
+				'sonarjs/no-os-command-from-path': 'off',
+				// kit's export { module } namespace pattern means functions never use this,
+				// so referencing them unbound (e.g. test spies) is safe
+				'@typescript-eslint/unbound-method': 'off',
 			},
 		},
 		{

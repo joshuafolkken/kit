@@ -57,7 +57,6 @@ function handle_watch_close(input: {
 
 async function pr_checks_watch(branch_name: string): Promise<WatchResult> {
 	return await new Promise<WatchResult>((resolve, reject) => {
-		// eslint-disable-next-line sonarjs/no-os-command-from-path -- gh is a well-known CLI tool and safe to execute
 		const child = spawn('gh', ['pr', 'checks', branch_name, '--watch'], {
 			stdio: 'inherit',
 			shell: false,
