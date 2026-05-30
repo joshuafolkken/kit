@@ -16,14 +16,14 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		shell: [
 			'sh',
 			'-c',
-			'export NODE_AUTH_TOKEN=$(gh auth token) && corepack use pnpm@latest && pnpm josh latest:update && josh audit',
+			'export NODE_AUTH_TOKEN=$(gh auth token) && pnpm josh latest:corepack && pnpm josh latest:update && josh audit',
 		],
 		description: 'Update pnpm, dependencies, and run security audit',
 		category: 'Maintenance',
 	},
 	'latest:corepack': {
-		shell: ['corepack', 'use', 'pnpm@latest'],
-		description: 'Update pnpm via corepack',
+		script: 'scripts/latest-corepack.ts',
+		description: 'Update pnpm via corepack to the latest release on the current major',
 		category: 'Maintenance',
 	},
 	'latest:update': {
