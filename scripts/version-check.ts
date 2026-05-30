@@ -21,9 +21,7 @@ function read_current_version(): string {
 }
 
 function fetch_latest_version(): string {
-	/* eslint-disable sonarjs/no-os-command-from-path */
 	const output = execFileSync('gh', ['api', GH_API_PATH, '--jq', '.[0].name'])
-	/* eslint-enable sonarjs/no-os-command-from-path */
 
 	return output.toString().trim()
 }

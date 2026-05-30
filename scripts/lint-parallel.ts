@@ -16,7 +16,6 @@ interface LintCheckResult {
 async function run_process(arguments_: ReadonlyArray<string>): Promise<LintCheckResult> {
 	return await new Promise((resolve) => {
 		let output = ''
-		// eslint-disable-next-line sonarjs/no-os-command-from-path -- pnpm is a trusted developer CLI
 		const proc = spawn(PNPM, [...arguments_], {
 			stdio: 'pipe',
 			env: { ...process.env, FORCE_COLOR },

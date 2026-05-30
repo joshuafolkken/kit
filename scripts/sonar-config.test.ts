@@ -36,4 +36,17 @@ describe(SONAR_PROPERTIES_FILE, () => {
 	it('does not exclude scripts/ core package code from analysis', () => {
 		expect(exclusions).not.toContain('scripts/**')
 	})
+
+	it('suppresses the S4036 OS-command hotspot on scripts/ and scripts-ai/ via issue.ignore', () => {
+		const rule_keys = Object.entries(properties)
+			.filter(([key]) => key.endsWith('.ruleKey'))
+			.map(([, value]) => value)
+		const resource_keys = Object.entries(properties)
+			.filter(([key]) => key.endsWith('.resourceKey'))
+			.map(([, value]) => value)
+
+		expect(rule_keys).toContain('typescript:S4036')
+		expect(resource_keys).toContain('scripts/**/*')
+		expect(resource_keys).toContain('scripts-ai/**/*')
+	})
 })
