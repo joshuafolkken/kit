@@ -41,6 +41,29 @@ describe('create_base_config — scripts block', () => {
 	})
 })
 
+describe('create_base_config — scripts block (issue #442)', () => {
+	it('turns off no-os-command-from-path and unbound-method for scripts', () => {
+		const config = create_base_config({
+			gitignore_path: GITIGNORE_PATH,
+			tsconfig_root_dir: TSCONFIG_ROOT_DIR,
+		})
+
+		const scripts_block = config.find(
+			(block) =>
+				Array.isArray(block.files) &&
+				block.files.some((pattern) => String(pattern).startsWith('scripts/')) &&
+				typeof block.rules?.['unicorn/no-process-exit'] === 'string',
+		)
+
+		expect(scripts_block).toBeDefined()
+
+		const rules = scripts_block?.rules as Record<string, unknown>
+
+		expect(rules['sonarjs/no-os-command-from-path']).toBe('off')
+		expect(rules['@typescript-eslint/unbound-method']).toBe('off')
+	})
+})
+
 describe('create_base_config — tests block (issue #433)', () => {
 	it('disables unicorn/no-useless-undefined for vi mock/stub patterns', () => {
 		const config = create_base_config({

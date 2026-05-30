@@ -15,7 +15,6 @@ function extract_pinned_version(preinstall: string): string | undefined {
 }
 
 function fetch_latest_version(): string | undefined {
-	// eslint-disable-next-line sonarjs/no-os-command-from-path -- npm is a well-known CLI tool
 	const result = spawnSync('npm', ['view', SAFE_CHAIN_PKG, 'version'], {
 		encoding: 'utf8',
 		shell: false,
