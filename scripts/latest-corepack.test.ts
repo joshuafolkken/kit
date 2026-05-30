@@ -3,12 +3,17 @@ import { latest_corepack } from './latest-corepack'
 
 const PACKAGE_JSON_V11 = '{"packageManager":"pnpm@11.4.0+sha512.abc"}'
 const PACKAGE_JSON_V10 = '{"packageManager":"pnpm@10.34.1+sha512.def"}'
+const PACKAGE_JSON_V11_SHORT = '{"packageManager":"pnpm@11"}'
 const PACKAGE_JSON_NO_PM = '{"name":"kit"}'
 const TARGET_V11 = 'pnpm@latest-11'
 
 describe('latest_corepack.extract_pnpm_major', () => {
 	it('extracts the major from a packageManager pnpm pin', () => {
 		expect(latest_corepack.extract_pnpm_major(PACKAGE_JSON_V11)).toBe('11')
+	})
+
+	it('extracts the major from a bare pnpm@<major> shorthand pin', () => {
+		expect(latest_corepack.extract_pnpm_major(PACKAGE_JSON_V11_SHORT)).toBe('11')
 	})
 
 	it('returns undefined when packageManager is absent', () => {

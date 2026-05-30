@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const PACKAGE_JSON_PATH = 'package.json'
-const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)\./u
+const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)(?:[^\d]|$)/u
 const FALLBACK_TARGET = 'pnpm@latest'
 
 function extract_pnpm_major(package_json_content: string): string | undefined {
