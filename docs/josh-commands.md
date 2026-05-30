@@ -218,6 +218,8 @@ pnpm josh latest:corepack   # update pnpm only
 pnpm josh latest:update     # update dependencies only
 ```
 
+`latest:corepack` pins pnpm to the newest release on the project's **current major** (`latest-<major>`), so it never selects a version below `devEngines`. If that release is still inside the registry's minimum-release-age window, the pnpm bump is skipped with a notice instead of failing — so `latest:update` and `audit` still run.
+
 ---
 
 ## Git hooks
