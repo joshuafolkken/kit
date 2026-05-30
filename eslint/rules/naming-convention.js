@@ -1,4 +1,5 @@
 const SVELTEKIT_HTTP_METHODS_PATTERN = '^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)$'
+const SVELTEKIT_PAGE_OPTIONS_PATTERN = '^(ssr|csr|prerender|trailingSlash)$'
 
 export const naming_convention_rules = {
 	'@typescript-eslint/naming-convention': [
@@ -22,6 +23,14 @@ export const naming_convention_rules = {
 			modifiers: ['const', 'exported'],
 			types: ['boolean', 'string', 'number', 'array'],
 			format: ['UPPER_CASE'],
+		},
+		// SvelteKit のページオプション予約語エクスポート（ssr/csr/prerender/trailingSlash）は
+		// 名前が SvelteKit 側で固定されているため camelCase を許可（HTTP メソッドの filter と同じ方式）
+		{
+			selector: 'variable',
+			modifiers: ['const', 'exported'],
+			filter: { regex: SVELTEKIT_PAGE_OPTIONS_PATTERN, match: true },
+			format: ['camelCase'],
 		},
 		// ローカルの定数（const）は UPPER_CASE または snake_case を許容
 		{
@@ -82,7 +91,7 @@ export const naming_convention_rules = {
 		// オブジェクトリテラルのプロパティは snake_case（外部APIとの互換性のため例外を許可）
 		{
 			selector: 'objectLiteralProperty',
-			format: ['snake_case', 'UPPER_CASE', 'camelCase'],
+			format: ['snake_case', 'UPPER_CASE', 'camelCase', 'PascalCase'],
 			leadingUnderscore: 'allow',
 			filter: {
 				// 一般的な HTTP ヘッダー名のパターンのみ許可
@@ -91,10 +100,10 @@ export const naming_convention_rules = {
 				match: false,
 			},
 		},
-		// 型プロパティは snake_case
+		// 型プロパティは snake_case（外部 DOM/API オブジェクトをモデル化する camelCase も許可）
 		{
 			selector: 'typeProperty',
-			format: ['snake_case'],
+			format: ['snake_case', 'camelCase'],
 		},
 	],
 }

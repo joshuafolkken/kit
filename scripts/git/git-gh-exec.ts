@@ -33,7 +33,6 @@ function resolve_exit_code(code: number | null): string {
 function create_gh_spawn(
 	arguments_: Array<string>,
 ): ChildProcessByStdio<Writable, Readable, Readable> {
-	// eslint-disable-next-line sonarjs/no-os-command-from-path -- gh is a well-known CLI tool and safe to execute
 	return spawn('gh', arguments_, {
 		stdio: ['pipe', 'pipe', 'pipe'],
 		shell: false,

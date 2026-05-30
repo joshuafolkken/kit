@@ -57,7 +57,6 @@ const mocked_pr_get_body = vi.mocked(git_gh_command.pr_get_body)
 
 describe('is_blank_issue_body', () => {
 	it('returns true for undefined', () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- explicitly testing undefined input
 		expect(is_blank_issue_body(undefined)).toBe(true)
 	})
 
@@ -107,7 +106,6 @@ describe('post_notify_issue — blank body uses edit, non-blank uses comment', (
 	})
 
 	it('falls back to issue_comment when body fetch fails (undefined)', async () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- simulating API failure returning undefined
 		mocked_get_body.mockResolvedValue(undefined)
 		mocked_comment.mockResolvedValue('')
 
@@ -176,7 +174,6 @@ const BASE_INPUT: FollowupInput = {
 
 describe('has_closes_keyword', () => {
 	it('returns false for undefined', () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- explicitly testing undefined input
 		expect(has_closes_keyword(undefined)).toBe(false)
 	})
 
@@ -224,7 +221,6 @@ describe('warn_if_missing_closes', () => {
 	})
 
 	it('prints a warning when PR body is undefined (fetch failed)', async () => {
-		// eslint-disable-next-line unicorn/no-useless-undefined -- simulating fetch failure
 		mocked_pr_get_body.mockResolvedValue(undefined)
 
 		await warn_if_missing_closes(BRANCH)

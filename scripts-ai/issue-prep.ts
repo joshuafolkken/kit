@@ -18,7 +18,6 @@ function display_language_status(is_cjk: boolean): string {
 }
 
 function fetch_issue_title(number_string: string): string {
-	/* eslint-disable-next-line sonarjs/no-os-command-from-path */
 	return execFileSync('gh', ['issue', 'view', number_string, '--json', 'title', '--jq', '.title'], {
 		encoding: 'utf8',
 	}).trim()
@@ -67,7 +66,6 @@ function display_issue_info(
 function ensure_in_progress_label(): void {
 	try {
 		execFileSync(
-			/* eslint-disable-next-line sonarjs/no-os-command-from-path */
 			'gh',
 			[
 				'label',
@@ -86,7 +84,6 @@ function ensure_in_progress_label(): void {
 }
 
 function assign_in_progress_label(issue_number_string: string): void {
-	/* eslint-disable-next-line sonarjs/no-os-command-from-path */
 	execFileSync('gh', ['issue', 'edit', issue_number_string, '--add-label', IN_PROGRESS_LABEL], {
 		encoding: 'utf8',
 	})

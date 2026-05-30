@@ -37,7 +37,6 @@ function read_file(file_path: string): string {
 
 function get_gh_cli_token(): string | undefined {
 	try {
-		// eslint-disable-next-line sonarjs/no-os-command-from-path -- trusted developer CLI; PATH is controlled by the developer
 		const token = execSync('gh auth token', { encoding: 'utf8', timeout: GH_CLI_TIMEOUT_MS }).trim()
 
 		return token.length > 0 ? token : undefined

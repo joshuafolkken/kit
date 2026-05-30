@@ -9,8 +9,8 @@ export const code_quality_rules = {
 	'no-var': 'error',
 	// const を優先
 	'prefer-const': 'error',
-	// アロー関数を優先
-	'prefer-arrow-callback': 'error',
+	// アロー関数を優先（名前付き関数式はスタックトレース可読性のため許可）
+	'prefer-arrow-callback': ['error', { allowNamedFunctions: true }],
 	// テンプレートリテラルを優先
 	'prefer-template': 'error',
 	// 等価演算子は厳密等価を使用
@@ -56,8 +56,8 @@ export const code_quality_rules = {
 		'error',
 		{
 			min: 2,
-			max: 30,
-			exceptions: ['_', 'i', 'j', 'k', 'x', 'y', 'z'],
+			max: 45,
+			exceptions: ['_', 'e', 'i', 'j', 'k', 't', 'x', 'y', 'z'],
 			properties: 'never',
 		},
 	],
@@ -190,7 +190,7 @@ export const code_quality_rules = {
 		},
 		{
 			selector:
-				'ExportNamedDeclaration > VariableDeclaration[declarations.length=1] > VariableDeclarator[id.type="Identifier"]:not([id.name=/^[A-Z_]+$/]):not([init.type="ObjectExpression"]):not([init.type="ArrayExpression"]):not([init.type="ArrowFunctionExpression"])',
+				'ExportNamedDeclaration > VariableDeclaration[declarations.length=1] > VariableDeclarator[id.type="Identifier"]:not([id.name=/^[A-Z_][A-Z_0-9]*$/]):not([init.type="ObjectExpression"]):not([init.type="ArrayExpression"]):not([init.type="ArrowFunctionExpression"])',
 			message:
 				'Individual named exports (constants) are not allowed (except UPPER_CASE). Use object export instead. Example: export const module_name = { constant_name }',
 		},

@@ -46,16 +46,21 @@ export const import_rules = {
 	// 匿名デフォルトエクスポートを禁止
 	'import/no-anonymous-default-export': 'error',
 	// インポートの際に拡張子を必須化/禁止
+	// `.js` / `.json` / `.svelte` は解決に必須なので always を強制する
+	// (Three.js deep imports / JSON modules / Svelte components — ドロップすると resolver が壊れる)
+	// `.opus` 等の game-asset 拡張子も Vite が URL に変換するため always
 	'import/extensions': [
 		'error',
 		{
 			pattern: {
-				js: 'never',
+				js: 'always',
+				json: 'always',
 				ts: 'never',
 				svelte: 'always',
 				svg: 'always',
 				png: 'always',
 				webp: 'always',
+				opus: 'always',
 			},
 			ignorePackages: true,
 		},

@@ -1,10 +1,26 @@
+// 普遍的に理解される短い識別子は許可する（プロジェクト全体に適用）。
+// req / res / usr / cnt のような馴染みのない略語のみを検出させる。
+// e2e は Playwright の page.e2e.ts 命名規約で error2error に展開されるのを防ぐ。
+export const PREVENT_ABBR_ALLOW_LIST = {
+	Props: true,
+	e: true, // event handler parameter
+	e2e: true, // Playwright end-to-end spec filename convention
+	el: true, // DOM element
+	ctx: true, // canvas/Three.js/Svelte context
+	btn: true, // button element
+	idx: true, // loop index
+	opts: true, // options object
+	params: true, // SvelteKit +page.ts params
+	args: true, // function arguments
+}
+
 export const unicorn_rules = {
 	// null よりも undefined を優先
 	'unicorn/no-null': 'error',
 	// reduce の過度な使用を禁止
 	'unicorn/no-array-reduce': 'error',
-	// abbreviation を禁止（明確な命名を強制）
-	'unicorn/prevent-abbreviations': 'error',
+	// abbreviation を禁止（明確な命名を強制、idiomatic な短縮名は許可）
+	'unicorn/prevent-abbreviations': ['error', { allowList: PREVENT_ABBR_ALLOW_LIST }],
 	// より良いエラーメッセージ
 	'unicorn/error-message': 'error',
 	// ファイル名のケース統一
@@ -59,6 +75,9 @@ export const unicorn_rules = {
 	'unicorn/no-useless-undefined': 'error',
 	// 数値セパレータのスタイルを統一
 	'unicorn/numeric-separators-style': 'error',
+	// 16進リテラルを lowercase に統一（prettier の hex 正規化と整合させ
+	// eslint↔prettier の無限 fix ループを防ぐ）
+	'unicorn/number-literal-case': ['error', { hexadecimalValue: 'lowercase' }],
 	// flatMapを優先
 	'unicorn/prefer-array-flat-map': 'error',
 	// Date.now()を優先
