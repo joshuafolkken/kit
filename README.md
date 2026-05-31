@@ -1,130 +1,40 @@
 # @joshuafolkken/kit
 
-Shared toolchain config for TypeScript / SvelteKit projects.
+Shared toolchain config and CLI for TypeScript / SvelteKit projects — ESLint, Prettier, TypeScript, Lefthook, cspell, VS Code, and AI assistant files (CLAUDE.md, AGENTS.md, GEMINI.md), wired together.
 
-Covers: ESLint · Prettier · TypeScript · Lefthook · cspell · VS Code · AI files (CLAUDE.md, AGENTS.md, GEMINI.md)
-
-See [docs/overview.md](./docs/overview.md) for a full description of what this package provides and how it works.
-
-`@joshuafolkken/kit` is **dual-purpose**:
-
-- **A — Global CLI** — install once and run `josh` from any directory, independent of any project's `node_modules`.
-- **B — Project package** — add as a devDependency to consume ESLint / Prettier / tsconfig configs, prompts, and scripts.
-
-The two are independent. Most projects want both: the global `josh` CLI for day-to-day commands, and the local devDependency so config imports (`@joshuafolkken/kit/eslint/sveltekit`, etc.) resolve.
+- **`josh` CLI** — lint, format, type-check, git workflow, versioning, and security auditing from any directory.
+- **Project config package** — ESLint / Prettier / tsconfig presets, prompts, and scripts consumed as a devDependency.
 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) with [pnpm](https://pnpm.io/)
 - [gh CLI](https://cli.github.com/) — required for GitHub Packages authentication. Install via `brew install gh` (macOS), `winget install GitHub.cli` (Windows), or see the [gh installation docs](https://github.com/cli/cli#installation).
 
-## Authentication (required for both install modes)
-
-GitHub Packages requires auth even for public packages.
-
-**bash / zsh (macOS, Linux):**
+## Quick start
 
 ```bash
-export NODE_AUTH_TOKEN=$(gh auth token)
-```
-
-**PowerShell (Windows):**
-
-```powershell
-$env:NODE_AUTH_TOKEN = (gh auth token)
-```
-
-If `gh auth token` fails or you get a 401, re-authenticate: `gh auth login --scopes read:packages`
-
-Point the `@joshuafolkken` scope at GitHub Packages. For a **global** install add these to your user-level `~/.npmrc`; for a **project** install add them to the repo's `.npmrc` (after `josh init` the project copy is managed automatically):
-
-```ini
-@joshuafolkken:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-```
-
-## A — Install as a global CLI
-
-Install the package globally to get a project-independent `josh` command:
-
-```bash
-pnpm add -g @joshuafolkken/kit
-```
-
-`josh` now works from any directory:
-
-```bash
+gh auth login --scopes read:packages   # see docs/authentication.md for the full setup
+pnpm add -g @joshuafolkken/kit          # install the josh CLI globally
 josh help
-josh lint
-josh git
 ```
 
-The global bin is a compiled, self-contained executable (`dist/josh.js`) — it is **not** tied to any project's `node_modules`, so reinstalling or removing a project's dependencies never breaks it.
+Using the kit inside a project? See [docs/package.md](./docs/package.md).
 
-If your shell can't find `josh` after installing, add pnpm's global bin directory to your `PATH` (run `pnpm bin -g` to print it), e.g.:
+## Documentation
 
-```bash
-export PATH="$(pnpm bin -g):$PATH"
-```
+| Guide                                           | What it covers                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| [authentication.md](./docs/authentication.md)   | One-time GitHub Packages auth — `gh` token, `NODE_AUTH_TOKEN`, `.npmrc`          |
+| [cli.md](./docs/cli.md)                         | Install and use the global `josh` CLI                                            |
+| [package.md](./docs/package.md)                 | Use the kit as a project devDependency — configs, prompts, scripts, `josh init`  |
+| [josh-commands.md](./docs/josh-commands.md)     | Full `josh` CLI command reference                                                |
+| [overview.md](./docs/overview.md)               | What the kit provides and how it works                                           |
+| [troubleshooting.md](./docs/troubleshooting.md) | `401`/`404` auth errors, `josh: command not found`, stale shim, version mismatch |
 
-### Migrating from older versions
+## Contributing
 
-Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/josh` via `postinstall`. That shim is no longer created and can break when its origin project's `node_modules` is removed. If you have a stale shim, delete it and use the global install instead:
+Community standards live in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md); security reports go through [SECURITY.md](./SECURITY.md). Development conventions are documented in `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md`.
 
-```bash
-rm -f ~/.local/bin/josh
-pnpm add -g @joshuafolkken/kit
-```
+## License
 
-## B — Use as a project package
-
-Add the kit as a devDependency so the project can consume its configs, prompts, and scripts:
-
-```bash
-pnpm add -D @joshuafolkken/kit
-```
-
-**Initialize** — run once after installing (auto-detects SvelteKit vs vanilla and creates or merges all config files):
-
-```bash
-pnpm exec josh init
-```
-
-See [docs/init.md](./docs/init.md) for the full list of managed files.
-
-To sync AI files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) with the latest version from the package:
-
-```bash
-pnpm exec josh sync
-```
-
-A project-local `josh` is also available in `node_modules/.bin/` after installation (`pnpm exec josh …` or `pnpm josh …`), so the CLI works even without the global install. The package additionally exposes config entry points for direct import:
-
-| Use           | Reference                                                        |
-| ------------- | ---------------------------------------------------------------- |
-| ESLint config | `@joshuafolkken/kit/eslint/sveltekit`                            |
-| Prettier      | `@joshuafolkken/kit/prettier`                                    |
-| tsconfig      | `./node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc`     |
-| Scripts       | `tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts` |
-| Prompts       | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
-
-## Key commands
-
-See [docs/josh-commands.md](./docs/josh-commands.md) for the full reference.
-
-| Subcommand      | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `josh init`     | Initialize config files in a new project          |
-| `josh sync`     | Sync managed files from the package               |
-| `josh lint`     | Check code with prettier and eslint               |
-| `josh git`      | AI-assisted git workflow                          |
-| `josh followup` | AI-assisted PR follow-up workflow                 |
-| `josh latest`   | Update pnpm, dependencies, and run security audit |
-
-## Telegram notifications
-
-`josh followup`, `josh notify`, and `josh git` support optional Telegram notifications. See [docs/scripts-ai.md](./docs/scripts-ai.md) for setup instructions.
-
-## Manual config
-
-Prefer wiring up individual configs without `josh init`? See [docs/manual-config.md](./docs/manual-config.md).
+MIT

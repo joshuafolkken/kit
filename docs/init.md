@@ -122,4 +122,4 @@ After all files are processed, `josh init` runs:
 
 1. **`lefthook install`** — installs git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
 
-To make `josh` available system-wide, install the kit globally with `pnpm add -g @joshuafolkken/kit` (see the [README](../README.md#a--install-as-a-global-cli)). `josh init` no longer writes a `~/.local/bin/josh` shim.
+To make `josh` available system-wide, install the kit globally with `pnpm add -g @joshuafolkken/kit` (see [cli.md](./cli.md)). `josh init` no longer writes a `~/.local/bin/josh` shim.
