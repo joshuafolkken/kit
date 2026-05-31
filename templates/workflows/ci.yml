@@ -86,14 +86,17 @@ jobs:
       - name: Run prettier check
         run: pnpm exec prettier --check .
 
+      # Build before eslint so dist/ (incl. dist/index.d.ts) exists for consumers
+      # that type-aware-lint templates which self-import the package. The same
+      # build output is reused by the size check below.
+      - name: Build
+        run: pnpm build
+
       - name: Run eslint check
         run: pnpm exec eslint . --cache --cache-strategy content
 
       - name: Run unit tests
         run: pnpm exec vitest run
-
-      - name: Build for size check
-        run: pnpm build
 
       - name: Check bundle size
         run: pnpm size-limit
