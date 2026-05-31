@@ -2,9 +2,8 @@ import { execSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { load } from 'js-yaml'
 import { z } from 'zod'
-import { fix_gh_packages_logic } from './fix-gh-packages-logic'
+import { fix_gh_packages_logic, type LockfilePackage } from './fix-gh-packages-logic'
 
 const LOCKFILE = 'pnpm-lock.yaml'
 const NPMRC = '.npmrc'
@@ -18,18 +17,7 @@ const npm_packument_schema = z.looseObject({
 	versions: z.record(z.string(), npm_version_schema).optional(),
 })
 
-const lockfile_resolution_schema = z.looseObject({
-	integrity: z.string().optional(),
-	tarball: z.string().optional(),
-})
-const lockfile_package_schema = z.looseObject({
-	resolution: lockfile_resolution_schema.optional(),
-})
-const lockfile_schema = z.looseObject({
-	packages: z.record(z.string(), lockfile_package_schema).optional(),
-})
-
-type ParsedPackages = NonNullable<z.infer<typeof lockfile_schema>['packages']>
+type ParsedPackages = Record<string, LockfilePackage>
 
 function read_file(file_path: string): string {
 	return existsSync(file_path) ? readFileSync(file_path, 'utf8') : ''
@@ -76,7 +64,7 @@ async function fetch_tarball_url(
 
 async function process_package_entry(
 	key: string,
-	entry: z.infer<typeof lockfile_package_schema>,
+	entry: LockfilePackage,
 	scopes: Set<string>,
 	token: string,
 ): Promise<[string, string] | undefined> {
@@ -109,8 +97,8 @@ async function apply_fixes(cwd: string, scopes: Set<string>, token: string): Pro
 	const lockfile_path = path.join(cwd, LOCKFILE)
 	if (!existsSync(lockfile_path)) return
 	const raw = readFileSync(lockfile_path, 'utf8')
-	const { packages } = lockfile_schema.parse(load(raw))
-	if (packages === undefined) return
+	const packages = fix_gh_packages_logic.parse_lockfile_packages(raw)
+	if (Object.keys(packages).length === 0) return
 	const fixes = await collect_fixes(packages, scopes, token)
 	if (fixes.size === 0) return
 	writeFileSync(lockfile_path, fix_gh_packages_logic.patch_lockfile(raw, fixes))
