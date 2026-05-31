@@ -1,16 +1,16 @@
 #!/usr/bin/env tsx
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { package_version_schema } from './schemas'
 import { version_check_logic } from './version-check-logic'
 
-const CONFIG_PKG_PATH = path.join(
+const SELF_DIR = path.dirname(fileURLToPath(import.meta.url))
+const CONFIG_PKG_PATH = version_check_logic.resolve_package_path(
 	process.cwd(),
-	'node_modules',
-	'@joshuafolkken',
-	'kit',
-	'package.json',
+	SELF_DIR,
+	existsSync,
 )
 const GH_API_PATH = '/users/joshuafolkken/packages/npm/kit/versions?per_page=1'
 
