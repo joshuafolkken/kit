@@ -29,4 +29,7 @@
 - [josh init](./init.md) — what `josh init` creates and merges
 - [josh sync](./sync.md) — what `josh sync` overwrites and why
 - [scripts-ai](./scripts-ai.md) — Telegram env vars and AI workflow commands
-- [README](../README.md) — authentication, installation, and package exports
+- [authentication](./authentication.md) — one-time GitHub Packages auth setup
+- [cli](./cli.md) — install and use the global `josh` CLI
+- [package](./package.md) — use the kit as a project devDependency
+- [troubleshooting](./troubleshooting.md) — common install and usage errors
