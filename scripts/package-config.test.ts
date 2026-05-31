@@ -175,7 +175,7 @@ describe('package.json scripts', () => {
 
 	it('does not install a project-pinned bin shim on postinstall', () => {
 		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
-		expect(scripts['postinstall']).not.toContain('install-bin')
+		expect(scripts['postinstall'] ?? '').not.toContain('install-bin')
 	})
 })
 
