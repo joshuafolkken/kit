@@ -97,13 +97,7 @@ pnpm josh sync
 
 Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, GitHub workflow templates, and other managed files. See [sync.md](./sync.md) for the full list.
 
-### `josh install`
-
-Install the `josh` binary to `~/.local/bin` so it is available system-wide without `pnpm exec`.
-
-```bash
-pnpm josh install
-```
+> To make `josh` available system-wide, install the kit globally (`pnpm add -g @joshuafolkken/kit`) instead of running an install subcommand. See the [README](../README.md#a--install-as-a-global-cli) for details.
 
 ---
 

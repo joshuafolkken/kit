@@ -47,7 +47,6 @@ const ALIASES: Record<string, string> = {
 	sc: 'check:svelte:ci',
 	i: 'init',
 	sy: 'sync',
-	il: 'install',
 	g: 'git',
 	gp: 'pr',
 	fu: 'followup',

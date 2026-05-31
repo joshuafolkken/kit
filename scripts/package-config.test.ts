@@ -167,4 +167,23 @@ describe('package.json scripts', () => {
 
 		expect(has_pnpm_run).toBe(false)
 	})
+
+	it('builds the compiled bin before packing', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['prepack']).toContain('build-bin')
+	})
+
+	it('does not install a project-pinned bin shim on postinstall', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['postinstall'] ?? '').not.toContain('install-bin')
+	})
+})
+
+describe('package.json bin', () => {
+	const manifest = load_manifest()
+
+	it('points josh at the compiled, project-independent bin', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(manifest.bin?.['josh']).toBe('dist/josh.js')
+	})
 })
