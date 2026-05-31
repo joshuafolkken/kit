@@ -233,7 +233,10 @@ function apply_package_json_merges(content: string, type: ProjectType): string {
 	const merged =
 		type === 'sveltekit'
 			? init_logic.merge_sveltekit_package_json(content)
-			: init_logic.merge_package_scripts(content, init_logic.get_suggested_scripts(type))
+			: init_logic.merge_package_scripts(
+					content,
+					init_logic.get_suggested_scripts_for_content(type, content),
+				)
 	const with_fix = init_logic.merge_postinstall_fix_cmd(merged)
 	const kit_pm = get_kit_package_manager()
 	const with_pm =

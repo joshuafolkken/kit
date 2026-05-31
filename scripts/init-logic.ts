@@ -28,6 +28,15 @@ const CSPELL_IMPORT: Record<ProjectType, string> = {
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
 const SAFE_CHAIN_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
 const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
+// Marker identifying a consumer script that already runs the fix-gh-packages command.
+const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
+const POSTINSTALL_KEY = 'postinstall'
+// Guard each command so a missing binary (production / CI installs without dev deps,
+// global installs outside a git repo) does not abort `pnpm install`. The trailing
+// `true` keeps the hook's exit code zero even when both guards skip.
+const GUARDED_LEFTHOOK_CMD = `command -v lefthook >/dev/null 2>&1 && ${LEFTHOOK_INSTALL_CMD}`
+const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}`
+const POSTINSTALL_CMD = `${GUARDED_LEFTHOOK_CMD}; ${GUARDED_FIX_GH_PACKAGES_CMD}; true`
 
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
@@ -78,7 +87,7 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	preinstall: SAFE_CHAIN_CMD,
-	postinstall: `${LEFTHOOK_INSTALL_CMD} && ${FIX_GH_PACKAGES_CMD}`,
+	postinstall: POSTINSTALL_CMD,
 	josh: 'josh',
 }
 
@@ -163,10 +172,27 @@ function get_suggested_scripts(type: ProjectType): Record<string, string> {
 	return SUGGESTED_SCRIPTS_COMMON
 }
 
+// Drop the suggested `postinstall` when the consumer already runs fix-gh-packages in
+// any script (e.g. a gated `prepare`), so re-running `josh init` does not re-inject a
+// duplicate hook that fights the consumer's intentional consolidation.
+function get_suggested_scripts_for_content(
+	type: ProjectType,
+	content: string,
+): Record<string, string> {
+	const scripts = get_suggested_scripts(type)
+	const has_fix = init_logic_json_merge.package_scripts_include(content, FIX_GH_PACKAGES_MARKER)
+	if (!has_fix) return scripts
+
+	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== POSTINSTALL_KEY))
+}
+
 function merge_postinstall_fix_cmd(content: string): string {
+	const has_fix = init_logic_json_merge.package_scripts_include(content, FIX_GH_PACKAGES_MARKER)
+	if (has_fix) return content
+
 	return init_logic_json_merge.merge_package_script_suffix(
 		content,
-		'postinstall',
+		POSTINSTALL_KEY,
 		FIX_GH_PACKAGES_CMD,
 	)
 }
@@ -178,7 +204,7 @@ function transform_prompt_paths(content: string): string {
 function merge_sveltekit_package_json(content: string): string {
 	const with_scripts = init_logic_json_merge.merge_package_scripts(
 		content,
-		get_suggested_scripts('sveltekit'),
+		get_suggested_scripts_for_content('sveltekit', content),
 	)
 	const with_config = init_logic_json_merge.merge_json_object(with_scripts, {
 		'size-limit': SIZE_LIMIT_CONFIG,
@@ -215,6 +241,7 @@ const init_logic = {
 	get_ai_copy_file_mappings,
 	get_ai_copy_directories,
 	get_suggested_scripts,
+	get_suggested_scripts_for_content,
 	merge_postinstall_fix_cmd,
 	transform_prompt_paths,
 }
