@@ -177,8 +177,25 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 Show the currently installed version and the latest published version.
 
 ```bash
-pnpm josh version
+pnpm josh version   # alias: josh v
 ```
+
+`version` (and `version:upgrade`) follow the **running binary**, mirroring `init`/`sync`:
+
+- `pnpm josh v` (project-local binary) reports and upgrades the project devDependency (`pnpm add -D`).
+- `josh v` (global binary) reports and upgrades the global install (`pnpm add -g`).
+
+This keeps the reported version consistent with the binary that actually executes `sync`/`init`.
+
+### `josh version:upgrade`
+
+Upgrade `@joshuafolkken/kit` to the latest published version.
+
+```bash
+pnpm josh version:upgrade   # alias: josh vu
+```
+
+The update scope is chosen automatically from how `josh` was invoked: a project-local invocation upgrades the devDependency (`-D`) and then re-runs `fix-gh-packages`; a global invocation upgrades the global CLI (`-g`).
 
 ---
 

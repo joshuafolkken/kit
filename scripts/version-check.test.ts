@@ -5,9 +5,11 @@ const CURRENT_VERSION = '1.0.0'
 const LATEST_VERSION = '1.2.3'
 const SHOWS_CURRENT_VERSION = 'shows current version'
 const SHOWS_LATEST_VERSION = 'shows latest version'
+const is_local = true
+const is_global = false
 
 describe('version_check_logic.format_version_output — up to date', () => {
-	const output = version_check_logic.format_version_output(LATEST_VERSION, LATEST_VERSION)
+	const output = version_check_logic.format_version_output(LATEST_VERSION, LATEST_VERSION, is_local)
 
 	it(SHOWS_CURRENT_VERSION, () => {
 		expect(output).toContain(`Current: ${LATEST_VERSION}`)
@@ -27,7 +29,11 @@ describe('version_check_logic.format_version_output — up to date', () => {
 })
 
 describe('version_check_logic.format_version_output — update available', () => {
-	const output = version_check_logic.format_version_output(CURRENT_VERSION, LATEST_VERSION)
+	const output = version_check_logic.format_version_output(
+		CURRENT_VERSION,
+		LATEST_VERSION,
+		is_local,
+	)
 
 	it(SHOWS_CURRENT_VERSION, () => {
 		expect(output).toContain(`Current: ${CURRENT_VERSION}`)
@@ -41,15 +47,31 @@ describe('version_check_logic.format_version_output — update available', () =>
 		expect(output).toContain(`⚠ Update available: ${CURRENT_VERSION} → ${LATEST_VERSION}`)
 	})
 
-	it('shows pnpm add command with latest version', () => {
+	it('shows local pnpm add -D command for a project-local invocation', () => {
 		expect(output).toContain(`pnpm add -D @joshuafolkken/kit@${LATEST_VERSION}`)
+	})
+
+	it('shows global pnpm add -g command for a global invocation', () => {
+		const global_output = version_check_logic.format_version_output(
+			CURRENT_VERSION,
+			LATEST_VERSION,
+			is_global,
+		)
+
+		expect(global_output).toContain(`pnpm add -g @joshuafolkken/kit@${LATEST_VERSION}`)
 	})
 })
 
 describe('version_check_logic.format_update_command', () => {
-	it('includes the package name with version pinned', () => {
-		expect(version_check_logic.format_update_command('2.0.0')).toBe(
+	it('uses -D for a project-local invocation', () => {
+		expect(version_check_logic.format_update_command('2.0.0', is_local)).toBe(
 			'pnpm add -D @joshuafolkken/kit@2.0.0',
+		)
+	})
+
+	it('uses -g for a global invocation', () => {
+		expect(version_check_logic.format_update_command('2.0.0', is_global)).toBe(
+			'pnpm add -g @joshuafolkken/kit@2.0.0',
 		)
 	})
 })
@@ -61,20 +83,18 @@ describe('version_check_logic.PACKAGE_NAME', () => {
 })
 
 describe('version_check_logic.resolve_package_path', () => {
-	const CWD = '/project'
-	const SELF_DIRECTORY = '/global/store/@joshuafolkken/kit/scripts'
-
-	it('prefers the consumer project node_modules copy when it exists', () => {
-		const result = version_check_logic.resolve_package_path(CWD, SELF_DIRECTORY, () => true)
-
-		expect(result).toBe('/project/node_modules/@joshuafolkken/kit/package.json')
-	})
-
-	it('falls back to the running script package.json when no local copy exists', () => {
-		// Regression: a global `josh v` run outside a consumer project crashed with
-		// ENOENT because it only looked in cwd/node_modules.
-		const result = version_check_logic.resolve_package_path(CWD, SELF_DIRECTORY, () => false)
+	it('reports the running binary own package.json regardless of cwd', () => {
+		const result = version_check_logic.resolve_package_path(
+			'/global/store/@joshuafolkken/kit/scripts',
+		)
 
 		expect(result).toBe('/global/store/@joshuafolkken/kit/package.json')
+	})
+
+	it('resolves a project-local running binary to its own package.json', () => {
+		const self_directory = '/project/node_modules/@joshuafolkken/kit/dist'
+		const result = version_check_logic.resolve_package_path(self_directory)
+
+		expect(result).toBe('/project/node_modules/@joshuafolkken/kit/package.json')
 	})
 })

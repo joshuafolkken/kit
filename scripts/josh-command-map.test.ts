@@ -72,10 +72,10 @@ describe('COMMAND_MAP — command lookup by name', () => {
 		expect(entry?.category).toBe('Versioning')
 	})
 
-	it('resolves version:upgrade command with shell and Versioning category', () => {
+	it('resolves version:upgrade command with script and Versioning category', () => {
 		const entry = get_command(VERSION_UPGRADE_COMMAND)
 
-		expect(entry?.shell).toBeDefined()
+		expect(entry?.script).toBeDefined()
 		expect(entry?.category).toBe('Versioning')
 	})
 })
