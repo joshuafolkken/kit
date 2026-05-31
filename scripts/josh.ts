@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import { josh_logic } from './josh-logic'
 
 const ARGV_OFFSET = 2

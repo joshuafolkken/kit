@@ -121,4 +121,5 @@ sonar-project.properties  (generated from GitHub repo name)
 After all files are processed, `josh init` runs:
 
 1. **`lefthook install`** — installs git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
-2. **`josh install`** — installs the `josh` binary to `~/.local/bin` for system-wide access.
+
+To make `josh` available system-wide, install the kit globally with `pnpm add -g @joshuafolkken/kit` (see [cli.md](./cli.md)). `josh init` no longer writes a `~/.local/bin/josh` shim.

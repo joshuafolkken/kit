@@ -1,10 +1,9 @@
 # @joshuafolkken/kit
 
-Shared toolchain config for TypeScript / SvelteKit projects.
+Shared toolchain config and CLI for TypeScript / SvelteKit projects — ESLint, Prettier, TypeScript, Lefthook, cspell, VS Code, and AI assistant files (CLAUDE.md, AGENTS.md, GEMINI.md), wired together.
 
-Covers: ESLint · Prettier · TypeScript · Lefthook · cspell · VS Code · AI files (CLAUDE.md, AGENTS.md, GEMINI.md)
-
-See [docs/overview.md](./docs/overview.md) for a full description of what this package provides and how it works.
+- **`josh` CLI** — lint, format, type-check, git workflow, versioning, and security auditing from any directory.
+- **Project config package** — ESLint / Prettier / tsconfig presets, prompts, and scripts consumed as a devDependency.
 
 ## Prerequisites
 
@@ -13,64 +12,29 @@ See [docs/overview.md](./docs/overview.md) for a full description of what this p
 
 ## Quick start
 
-**1. Authenticate** — GitHub Packages requires auth even for public packages:
-
-**bash / zsh (macOS, Linux):**
-
 ```bash
-export NODE_AUTH_TOKEN=$(gh auth token)
+gh auth login --scopes read:packages   # see docs/authentication.md for the full setup
+pnpm add -g @joshuafolkken/kit          # install the josh CLI globally
+josh help
 ```
 
-**PowerShell (Windows):**
+Using the kit inside a project? See [docs/package.md](./docs/package.md).
 
-```powershell
-$env:NODE_AUTH_TOKEN = (gh auth token)
-```
+## Documentation
 
-If `gh auth token` fails or you get a 401, re-authenticate: `gh auth login --scopes read:packages`
+| Guide                                           | What it covers                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| [authentication.md](./docs/authentication.md)   | One-time GitHub Packages auth — `gh` token, `NODE_AUTH_TOKEN`, `.npmrc`          |
+| [cli.md](./docs/cli.md)                         | Install and use the global `josh` CLI                                            |
+| [package.md](./docs/package.md)                 | Use the kit as a project devDependency — configs, prompts, scripts, `josh init`  |
+| [josh-commands.md](./docs/josh-commands.md)     | Full `josh` CLI command reference                                                |
+| [overview.md](./docs/overview.md)               | What the kit provides and how it works                                           |
+| [troubleshooting.md](./docs/troubleshooting.md) | `401`/`404` auth errors, `josh: command not found`, stale shim, version mismatch |
 
-**2. Install** — add both lines to `.npmrc`, then install (after `josh init` these are managed automatically):
+## Contributing
 
-```ini
-@joshuafolkken:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
-```
+Community standards live in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md); security reports go through [SECURITY.md](./SECURITY.md). Development conventions are documented in `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md`.
 
-```bash
-pnpm add -D @joshuafolkken/kit
-```
+## License
 
-**3. Initialize** — run once after installing:
-
-```bash
-pnpm exec josh init
-```
-
-Auto-detects SvelteKit vs vanilla and creates or merges all config files. See [docs/init.md](./docs/init.md) for the full list of managed files.
-
-To sync AI files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) with the latest version from the package:
-
-```bash
-pnpm exec josh sync
-```
-
-## Key commands
-
-A `josh` binary is available in `node_modules/.bin/` after installation. See [docs/josh-commands.md](./docs/josh-commands.md) for the full reference.
-
-| Subcommand      | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `josh init`     | Initialize config files in a new project          |
-| `josh sync`     | Sync managed files from the package               |
-| `josh lint`     | Check code with prettier and eslint               |
-| `josh git`      | AI-assisted git workflow                          |
-| `josh followup` | AI-assisted PR follow-up workflow                 |
-| `josh latest`   | Update pnpm, dependencies, and run security audit |
-
-## Telegram notifications
-
-`josh followup`, `josh notify`, and `josh git` support optional Telegram notifications. See [docs/scripts-ai.md](./docs/scripts-ai.md) for setup instructions.
-
-## Manual config
-
-Prefer wiring up individual configs without `josh init`? See [docs/manual-config.md](./docs/manual-config.md).
+MIT

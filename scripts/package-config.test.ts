@@ -167,4 +167,35 @@ describe('package.json scripts', () => {
 
 		expect(has_pnpm_run).toBe(false)
 	})
+
+	it('builds the compiled bin before packing', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['prepack']).toContain('build-bin')
+	})
+
+	it('does not install a project-pinned bin shim on postinstall', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['postinstall'] ?? '').not.toContain('install-bin')
+	})
+
+	it('installs lefthook git hooks via prepare for contributors', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['prepare']).toContain('lefthook install')
+	})
+
+	it('does not run lefthook on postinstall so global and consumer installs do not abort', () => {
+		// lefthook requires a git repo; running it on postinstall fails (exit 128)
+		// during `pnpm add -g` and consumer installs, which run outside any git repo.
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(scripts['postinstall'] ?? '').not.toContain('lefthook')
+	})
+})
+
+describe('package.json bin', () => {
+	const manifest = load_manifest()
+
+	it('points josh at the compiled, project-independent bin', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		expect(manifest.bin?.['josh']).toBe('dist/josh.js')
+	})
 })
