@@ -59,3 +59,22 @@ describe('version_check_logic.PACKAGE_NAME', () => {
 		expect(version_check_logic.PACKAGE_NAME).toBe('@joshuafolkken/kit')
 	})
 })
+
+describe('version_check_logic.resolve_package_path', () => {
+	const CWD = '/project'
+	const SELF_DIRECTORY = '/global/store/@joshuafolkken/kit/scripts'
+
+	it('prefers the consumer project node_modules copy when it exists', () => {
+		const result = version_check_logic.resolve_package_path(CWD, SELF_DIRECTORY, () => true)
+
+		expect(result).toBe('/project/node_modules/@joshuafolkken/kit/package.json')
+	})
+
+	it('falls back to the running script package.json when no local copy exists', () => {
+		// Regression: a global `josh v` run outside a consumer project crashed with
+		// ENOENT because it only looked in cwd/node_modules.
+		const result = version_check_logic.resolve_package_path(CWD, SELF_DIRECTORY, () => false)
+
+		expect(result).toBe('/global/store/@joshuafolkken/kit/package.json')
+	})
+})
