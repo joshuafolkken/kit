@@ -212,6 +212,16 @@ function merge_development_engines(content: string, value: Record<string, unknow
 	return `${JSON.stringify({ ...parsed, devEngines: value }, undefined, '\t')}\n`
 }
 
+function package_scripts_include(content: string, marker: string): boolean {
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['scripts']
+	if (raw === undefined) return false
+	const scripts = string_record_schema.parse(raw)
+
+	return Object.values(scripts).some((cmd) => cmd.includes(marker))
+}
+
 function merge_package_script_suffix(content: string, key: string, cmd: string): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
@@ -246,6 +256,7 @@ const init_logic_json_merge = {
 	merge_cspell_import,
 	merge_package_scripts,
 	merge_package_script_suffix,
+	package_scripts_include,
 	merge_development_dependencies,
 	merge_package_manager,
 	merge_development_engines,
