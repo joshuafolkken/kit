@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
 import { is_sveltekit_project, package_path, PROJECT_ROOT } from './init-paths'
-import { install_josh_bin_section } from './install-bin'
 import { string_array_schema, vscode_settings_schema, with_package_manager_schema } from './schemas'
 import { sync } from './sync'
 
@@ -271,11 +270,6 @@ function install_lefthook(): void {
 	}
 }
 
-function run_tool_installs(): void {
-	install_lefthook()
-	install_josh_bin_section()
-}
-
 function run_config_file_actions(type: ProjectType): void {
 	console.info('Config files:')
 
@@ -298,7 +292,7 @@ async function main(): Promise<void> {
 	console.info('\nAI files:')
 	init_ai_copy.run_ai_copies()
 
-	run_tool_installs()
+	install_lefthook()
 
 	console.info('\n✅ Done.\n')
 }

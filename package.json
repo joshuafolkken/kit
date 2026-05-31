@@ -1,21 +1,24 @@
 {
-	"version": "0.199.0",
+	"version": "0.200.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
-	"packageManager": "pnpm@11.4.0+sha512.f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f",
+	"packageManager": "pnpm@11.5.0+sha512.dbfcc4f81cf48597afd4bc391ffdf12c11f1a9fb83a395bfa6b0a2d9cc2fd8ffebafdb1ccbd529632153f793904c2615b7f09fe1a345473fd1c35845172a8eb1",
 	"engines": {
 		"node": ">=22.19.0"
 	},
 	"bin": {
-		"josh": "./scripts/josh.ts"
+		"josh": "dist/josh.js"
 	},
 	"scripts": {
 		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci",
-		"postinstall": "lefthook install && tsx scripts/install-bin.ts",
+		"postinstall": "lefthook install",
+		"build": "tsx scripts/build-bin.ts",
+		"prepack": "tsx scripts/build-bin.ts",
 		"josh": "tsx scripts/josh.ts"
 	},
 	"files": [
+		"dist",
 		"scripts",
 		"scripts-ai",
 		"prompts",
@@ -85,6 +88,7 @@
 		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^25.9.1",
 		"cspell": "^10.0.0",
+		"esbuild": "^0.28.0",
 		"eslint": "^10.4.0",
 		"lefthook": "^2.1.9",
 		"prettier": "^3.8.3",
