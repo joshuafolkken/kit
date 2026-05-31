@@ -42,7 +42,7 @@ const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 			CHECK_SVELTE_CI_CMD,
 		],
 	],
-	['Project', ['init', 'sync', 'install']],
+	['Project', ['init', 'sync']],
 	['Workflow', ['git', 'pr', 'followup', 'notify', 'main:sync', 'main:merge']],
 	['Versioning', ['bump', 'version']],
 	['Maintenance', ['overrides', 'audit', 'latest', 'latest:corepack', 'latest:update']],

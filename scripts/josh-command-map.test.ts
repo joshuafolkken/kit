@@ -191,6 +191,16 @@ describe('ALIASES — new command aliases', () => {
 	})
 })
 
+describe('COMMAND_MAP — project-pinned shim removal', () => {
+	it('no longer exposes the install command', () => {
+		expect(COMMAND_MAP).not.toHaveProperty('install')
+	})
+
+	it('no longer exposes the il alias', () => {
+		expect(ALIASES).not.toHaveProperty('il')
+	})
+})
+
 describe('COMMAND_MAP — latest command authentication', () => {
 	it('latest command shell exports NODE_AUTH_TOKEN from gh auth token', () => {
 		const entry = get_command('latest')
