@@ -1,3 +1,6 @@
+import { loadAll } from 'js-yaml'
+import { z } from 'zod'
+
 const GH_PACKAGES_HOST = 'npm.pkg.github.com'
 const RESOLUTION_BLOCK = '\n    resolution:\n'
 const INTEGRITY_PREFIX = '      integrity: '
@@ -14,6 +17,31 @@ interface PackageResolution {
 
 interface LockfilePackage {
 	resolution?: PackageResolution | undefined
+}
+
+const lockfile_resolution_schema = z.looseObject({
+	integrity: z.string().optional(),
+	tarball: z.string().optional(),
+})
+const lockfile_package_schema = z.looseObject({
+	resolution: lockfile_resolution_schema.optional(),
+})
+const lockfile_document_schema = z.looseObject({
+	packages: z.record(z.string(), lockfile_package_schema).optional(),
+})
+
+// pnpm 11 writes pnpm-lock.yaml as a multi-document YAML stream (the @pnpm/exe
+// self-management document precedes the project document). load() only accepts a
+// single document and throws, so parse every document and merge their packages.
+function parse_lockfile_packages(raw: string): Record<string, LockfilePackage> {
+	const merged: Record<string, LockfilePackage> = {}
+
+	for (const document of loadAll(raw)) {
+		const { packages } = lockfile_document_schema.parse(document)
+		if (packages !== undefined) Object.assign(merged, packages)
+	}
+
+	return merged
 }
 
 function is_gh_registry_line(line: string): string | undefined {
@@ -191,6 +219,7 @@ function resolve_token(
 const fix_gh_packages_logic = {
 	parse_gh_scopes,
 	parse_npmrc_auth_token,
+	parse_lockfile_packages,
 	package_path_from_key,
 	package_version_from_key,
 	needs_tarball_fix,
