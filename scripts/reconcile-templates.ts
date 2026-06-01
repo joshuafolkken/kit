@@ -1,36 +1,40 @@
 #!/usr/bin/env tsx
 /**
- * Reconcile (or check) the template source manifest.
+ * Reconcile (or check) distributed templates against their root sources.
  *
  * Usage:
- *   tsx scripts/reconcile-templates.ts            # record current source hashes (acknowledge review)
- *   tsx scripts/reconcile-templates.ts --check    # verify manifest matches sources; non-zero on drift
+ *   tsx scripts/reconcile-templates.ts            # regenerate copy templates + record tripwire hashes
+ *   tsx scripts/reconcile-templates.ts --check    # verify templates are in sync; non-zero on drift
  *
- * A root source edit (sonar-project.properties / .gitignore) trips --check until
- * the paired template is reviewed and the manifest is reconciled. Whether the
- * change propagates to the template is a human decision; only the review is enforced.
+ * Copy pairs (e.g. .gitignore → templates/gitignore) are byte-for-byte copies,
+ * regenerated automatically. Tripwire pairs (e.g. sonar-project.properties)
+ * intentionally diverge: a source edit trips --check until the paired template
+ * is reviewed and reconciled. Only the review is enforced for tripwire pairs.
  */
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { template_source_logic } from './template-source-logic'
 
 function check_drift(): never {
-	const recorded = template_source_logic.read_recorded_manifest()
-	const current = template_source_logic.compute_current_manifest()
-	const drifted = template_source_logic.find_drifted_pairs(recorded, current)
+	const copy_drift = template_source_logic.find_copy_drift()
+	const tripwire_drift = template_source_logic.find_tripwire_drift(
+		template_source_logic.read_recorded_manifest(),
+	)
 
-	if (drifted.length > 0) {
-		console.error(template_source_logic.format_drift_message(drifted))
+	if (copy_drift.length + tripwire_drift.length > 0) {
+		console.error(template_source_logic.format_drift_message(copy_drift, tripwire_drift))
 		process.exit(1)
 	}
 
-	console.info('✔ Template sources unchanged since last reconciled.')
+	console.info('✔ Templates are in sync with their sources.')
 	process.exit(0)
 }
 
 function reconcile(): never {
-	template_source_logic.write_recorded_manifest(template_source_logic.compute_current_manifest())
-	console.info(`✔ Template source manifest reconciled (${template_source_logic.MANIFEST_PATH}).`)
+	template_source_logic.reconcile()
+	console.info(
+		`✔ Templates reconciled (copies regenerated; ${template_source_logic.MANIFEST_PATH} updated).`,
+	)
 	process.exit(0)
 }
 

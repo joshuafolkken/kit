@@ -1,32 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import {
-	template_source_logic,
-	type SourceManifest,
-	type TemplateSourcePair,
-} from './template-source-logic'
+import { template_source_logic } from './template-source-logic'
 
-const { hash_text, build_manifest, find_drifted_pairs, format_drift_message } =
-	template_source_logic
-const TRACKED_PAIRS: ReadonlyArray<TemplateSourcePair> = template_source_logic.TEMPLATE_SOURCE_PAIRS
+const { hash_text, format_drift_message, COPY_PAIRS, TRIPWIRE_PAIRS } = template_source_logic
 
-// Build a manifest keyed by the real tracked sources, one hash per source, so
-// tests never need dotted object-literal keys (which violate naming-convention).
-function manifest_from(hashes: ReadonlyArray<string>): SourceManifest {
-	const manifest: SourceManifest = {}
-
-	for (const [index, pair] of TRACKED_PAIRS.entries()) {
-		manifest[pair.source] = hashes[index] ?? ''
-	}
-
-	return manifest
-}
-
-function first_pair(): TemplateSourcePair {
-	const [pair] = TRACKED_PAIRS
-	if (!pair) throw new Error('TEMPLATE_SOURCE_PAIRS must not be empty')
-
-	return pair
-}
+const GITIGNORE_SOURCE = '.gitignore'
+const GITIGNORE_TEMPLATE = 'templates/gitignore'
+const SONAR_SOURCE = 'sonar-project.properties'
+const SONAR_TEMPLATE = 'templates/sonar-project.properties'
 
 describe('template_source_logic.hash_text', () => {
 	it('is deterministic for the same input', () => {
@@ -38,42 +18,36 @@ describe('template_source_logic.hash_text', () => {
 	})
 })
 
-describe('template_source_logic.build_manifest', () => {
-	it('maps each source to the hash of its content', () => {
-		const manifest = build_manifest(manifest_from(['node_modules\n']))
+describe('template_source_logic pair classification', () => {
+	it('models .gitignore as a byte-copy pair, not a tripwire', () => {
+		const copy_sources = COPY_PAIRS.map((pair) => pair.source)
+		const tripwire_sources = TRIPWIRE_PAIRS.map((pair) => pair.source)
 
-		expect(manifest[first_pair().source]).toBe(hash_text('node_modules\n'))
-	})
-})
-
-describe('template_source_logic.find_drifted_pairs', () => {
-	it('returns nothing when recorded and current hashes match', () => {
-		const current = manifest_from(['x', 'y'])
-
-		expect(find_drifted_pairs(current, current)).toEqual([])
+		expect(copy_sources).toContain(GITIGNORE_SOURCE)
+		expect(tripwire_sources).not.toContain(GITIGNORE_SOURCE)
 	})
 
-	it('returns only the pair whose source hash diverged', () => {
-		const recorded = manifest_from(['x', 'y'])
-		const current = manifest_from(['CHANGED', 'y'])
-		const drifted = find_drifted_pairs(recorded, current)
+	it('keeps sonar-project.properties as a tripwire pair', () => {
+		const tripwire_sources = TRIPWIRE_PAIRS.map((pair) => pair.source)
 
-		expect(drifted.map((pair) => pair.source)).toEqual([first_pair().source])
-	})
-
-	it('treats a source missing from the recorded manifest as drift', () => {
-		const current = manifest_from(['x', 'y'])
-
-		expect(find_drifted_pairs({}, current)).toHaveLength(TRACKED_PAIRS.length)
+		expect(tripwire_sources).toContain(SONAR_SOURCE)
 	})
 })
 
 describe('template_source_logic.format_drift_message', () => {
-	it('names each drifted source and its paired template', () => {
-		const pair = first_pair()
-		const message = format_drift_message([pair])
+	it('describes a copy pair as out of date with its source', () => {
+		const message = format_drift_message(
+			[{ template: GITIGNORE_TEMPLATE, source: GITIGNORE_SOURCE }],
+			[],
+		)
 
-		expect(message).toContain(`${pair.source} changed → review ${pair.template}`)
+		expect(message).toContain(`${GITIGNORE_TEMPLATE} is out of date with ${GITIGNORE_SOURCE}`)
 		expect(message).toContain('pnpm josh reconcile-templates')
+	})
+
+	it('describes a tripwire pair as needing review', () => {
+		const message = format_drift_message([], [{ template: SONAR_TEMPLATE, source: SONAR_SOURCE }])
+
+		expect(message).toContain(`${SONAR_SOURCE} changed → review ${SONAR_TEMPLATE}`)
 	})
 })
