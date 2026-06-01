@@ -12,6 +12,11 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run security audit',
 		category: 'Maintenance',
 	},
+	'reconcile-templates': {
+		script: 'scripts/reconcile-templates.ts',
+		description: 'Record template source hashes (--check to verify drift)',
+		category: 'Maintenance',
+	},
 	latest: {
 		shell: [
 			'sh',
