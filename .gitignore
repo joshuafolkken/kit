@@ -1,5 +1,5 @@
-test-results
 node_modules
+test-results
 
 # Output
 .output
@@ -38,6 +38,7 @@ project.inlang/cache/
 # SQLite
 *.db
 
+# Storybook
 *storybook.log
 storybook-static
 
@@ -45,7 +46,8 @@ storybook-static
 .eslintcache
 
 # Bundle analysis
-stats.html
+stats-client.html
+stats-server.html
 
 # Playwright
 playwright-report
