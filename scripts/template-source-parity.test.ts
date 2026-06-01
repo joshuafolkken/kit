@@ -1,23 +1,37 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { package_path } from './init-paths'
 import { template_source_logic } from './template-source-logic'
 
-// Co-change tripwire: if a root source (sonar-project.properties / .gitignore)
-// is edited without reconciling the manifest, this test fails and points at the
-// paired template that must be reviewed. Run `pnpm josh reconcile-templates`
-// after reviewing to acknowledge.
+// CI guard. Copy pairs must be byte-for-byte identical to their source; tripwire
+// pairs must match the reconciled hash. A drift here means a source was edited
+// without `pnpm josh reconcile-templates`.
 describe('template source parity', () => {
-	it('every recorded source hash matches the current source file', () => {
-		const recorded = template_source_logic.read_recorded_manifest()
-		const current = template_source_logic.compute_current_manifest()
-		const drifted = template_source_logic.find_drifted_pairs(recorded, current)
+	it('every copy template is byte-for-byte identical to its source', () => {
+		const drift = template_source_logic.find_copy_drift()
 
-		expect(drifted, template_source_logic.format_drift_message(drifted)).toEqual([])
+		expect(drift, template_source_logic.format_drift_message(drift, [])).toEqual([])
 	})
 
-	it('records a hash for every tracked template source', () => {
-		const recorded = template_source_logic.read_recorded_manifest()
-		const tracked_sources = template_source_logic.TEMPLATE_SOURCE_PAIRS.map((pair) => pair.source)
+	it('templates/gitignore matches root .gitignore exactly', () => {
+		const template = readFileSync(package_path('templates/gitignore'), 'utf8')
+		const source = readFileSync(package_path('.gitignore'), 'utf8')
 
-		for (const source of tracked_sources) expect(recorded, source).toHaveProperty([source])
+		expect(template).toBe(source)
+	})
+
+	it('every tripwire source matches its reconciled hash', () => {
+		const recorded = template_source_logic.read_recorded_manifest()
+		const drift = template_source_logic.find_tripwire_drift(recorded)
+
+		expect(drift, template_source_logic.format_drift_message([], drift)).toEqual([])
+	})
+
+	it('records a hash for every tripwire source', () => {
+		const recorded = template_source_logic.read_recorded_manifest()
+
+		for (const pair of template_source_logic.TRIPWIRE_PAIRS) {
+			expect(recorded, pair.source).toHaveProperty([pair.source])
+		}
 	})
 })

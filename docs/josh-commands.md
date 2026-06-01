@@ -221,14 +221,17 @@ pnpm josh audit
 
 ### `josh reconcile-templates`
 
-Record the current hashes of the root files that the distributed templates are derived from (`sonar-project.properties` → `templates/sonar-project.properties`, `.gitignore` → `templates/gitignore`). These templates are hand-maintained and intentionally diverge from kit's own root files, so they cannot be generated automatically.
+Keep the distributed templates in sync with the root files they come from. There are two kinds of pair:
+
+- **Copy pairs** — the template is a byte-for-byte copy of its root source. `.gitignore` → `templates/gitignore` is a copy pair: edit root `.gitignore`, and the template is regenerated automatically. (The dotless `templates/gitignore` exists because npm strips a literal `.gitignore` from the published package; it is renamed back to `.gitignore` when copied into a consumer.)
+- **Tripwire pairs** — the template intentionally diverges from its root source. `sonar-project.properties` → `templates/sonar-project.properties` is a tripwire pair: a source edit is recorded as a hash and only forces a conscious review, never automatic propagation.
 
 ```bash
-pnpm josh reconcile-templates           # record current source hashes (acknowledge review)
-pnpm josh reconcile-templates --check    # verify no source drifted; non-zero on drift
+pnpm josh reconcile-templates           # regenerate copy templates + record tripwire hashes
+pnpm josh reconcile-templates --check    # verify templates are in sync; non-zero on drift
 ```
 
-The recorded hashes live in `.template-source-manifest.json` at the repo root (kit-internal; not distributed). A pre-commit hook runs `--check` whenever a tracked source is staged: if a source changed without being reconciled, the commit is blocked with a message pointing at the paired template to review. Whether the change should propagate to the template is a human decision — once reviewed, run `pnpm josh reconcile-templates` to acknowledge, then commit both the source and the updated manifest.
+Tripwire hashes live in `.template-source-manifest.json` at the repo root (kit-internal; not distributed). A pre-commit hook runs `--check` whenever a tracked source or copy template is staged: a copy pair that is out of date, or a tripwire source that changed without being reconciled, blocks the commit. Run `pnpm josh reconcile-templates` (reviewing any tripwire template first), then commit the regenerated copies and updated manifest alongside the source.
 
 ### `josh latest`
 
