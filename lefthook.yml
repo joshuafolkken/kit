@@ -1,2 +1,12 @@
 extends:
   - ./lefthook/base.yml
+
+# Kit-internal only (this file is not distributed to consumers). Fires when a
+# tracked template source is staged, so a root edit cannot be committed without
+# the paired template being reviewed and the manifest reconciled.
+# Keep the glob in sync with TEMPLATE_SOURCE_PAIRS in scripts/template-source-logic.ts.
+pre-commit:
+  commands:
+    template-source-parity:
+      glob: '{sonar-project.properties,.gitignore}'
+      run: pnpm josh reconcile-templates --check
