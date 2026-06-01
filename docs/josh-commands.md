@@ -219,6 +219,17 @@ Run a security audit against the lockfile.
 pnpm josh audit
 ```
 
+### `josh reconcile-templates`
+
+Record the current hashes of the root files that the distributed templates are derived from (`sonar-project.properties` → `templates/sonar-project.properties`, `.gitignore` → `templates/gitignore`). These templates are hand-maintained and intentionally diverge from kit's own root files, so they cannot be generated automatically.
+
+```bash
+pnpm josh reconcile-templates           # record current source hashes (acknowledge review)
+pnpm josh reconcile-templates --check    # verify no source drifted; non-zero on drift
+```
+
+The recorded hashes live in `.template-source-manifest.json` at the repo root (kit-internal; not distributed). A pre-commit hook runs `--check` whenever a tracked source is staged: if a source changed without being reconciled, the commit is blocked with a message pointing at the paired template to review. Whether the change should propagate to the template is a human decision — once reviewed, run `pnpm josh reconcile-templates` to acknowledge, then commit both the source and the updated manifest.
+
 ### `josh latest`
 
 Update pnpm via corepack, update all dependencies to latest, and run a security audit.

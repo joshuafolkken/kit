@@ -58,6 +58,7 @@ const ALIASES: Record<string, string> = {
 	vu: 'version:upgrade',
 	ov: 'overrides',
 	a: 'audit',
+	rt: 'reconcile-templates',
 	u: 'latest',
 	lc: 'latest:corepack',
 	lu: 'latest:update',
