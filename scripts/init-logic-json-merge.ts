@@ -235,6 +235,18 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: updated_value } }, undefined, '\t')}\n`
 }
 
+function remove_script_with_marker(content: string, key: string, marker: string): string {
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['scripts']
+	if (raw === undefined) return content
+	const scripts = string_record_schema.parse(raw)
+	if (!scripts[key]?.includes(marker)) return content
+	const rest = Object.fromEntries(Object.entries(scripts).filter(([k]) => k !== key))
+
+	return `${JSON.stringify({ ...parsed, scripts: rest }, undefined, '\t')}\n`
+}
+
 function sort_package_json_keys(content: string): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	const all_keys = Object.keys(parsed)
@@ -256,6 +268,7 @@ const init_logic_json_merge = {
 	merge_cspell_import,
 	merge_package_scripts,
 	merge_package_script_suffix,
+	remove_script_with_marker,
 	package_scripts_include,
 	merge_development_dependencies,
 	merge_package_manager,

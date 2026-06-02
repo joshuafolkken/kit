@@ -30,13 +30,18 @@ const SAFE_CHAIN_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
 const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
 // Marker identifying a consumer script that already runs the fix-gh-packages command.
 const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
-const POSTINSTALL_KEY = 'postinstall'
+const PREPARE_KEY = 'prepare'
+// Legacy key: earlier `josh init` runs injected the lifecycle commands here. We now
+// migrate a kit-managed `postinstall` (one containing fix-gh-packages) to `prepare`.
+const LEGACY_POSTINSTALL_KEY = 'postinstall'
 // Guard each command so a missing binary (production / CI installs without dev deps,
 // global installs outside a git repo) does not abort `pnpm install`. The trailing
-// `true` keeps the hook's exit code zero even when both guards skip.
+// `true` keeps the hook's exit code zero even when both guards skip. These are
+// developer-only hooks, so they live in `prepare` (local install + pack/publish)
+// rather than `postinstall`, which also runs when the package is a consumer dependency.
 const GUARDED_LEFTHOOK_CMD = `command -v lefthook >/dev/null 2>&1 && ${LEFTHOOK_INSTALL_CMD}`
 const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}`
-const POSTINSTALL_CMD = `${GUARDED_LEFTHOOK_CMD}; ${GUARDED_FIX_GH_PACKAGES_CMD}; true`
+const PREPARE_CMD = `${GUARDED_LEFTHOOK_CMD}; ${GUARDED_FIX_GH_PACKAGES_CMD}; true`
 
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
@@ -87,7 +92,7 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	preinstall: SAFE_CHAIN_CMD,
-	postinstall: POSTINSTALL_CMD,
+	prepare: PREPARE_CMD,
 	josh: 'josh',
 }
 
@@ -172,9 +177,9 @@ function get_suggested_scripts(type: ProjectType): Record<string, string> {
 	return SUGGESTED_SCRIPTS_COMMON
 }
 
-// Drop the suggested `postinstall` when the consumer already runs fix-gh-packages in
-// any script (e.g. a gated `prepare`), so re-running `josh init` does not re-inject a
-// duplicate hook that fights the consumer's intentional consolidation.
+// Drop the suggested `prepare` when the consumer already runs fix-gh-packages in
+// any script, so re-running `josh init` does not re-inject a duplicate hook that
+// fights the consumer's intentional consolidation.
 function get_suggested_scripts_for_content(
 	type: ProjectType,
 	content: string,
@@ -183,17 +188,28 @@ function get_suggested_scripts_for_content(
 	const has_fix = init_logic_json_merge.package_scripts_include(content, FIX_GH_PACKAGES_MARKER)
 	if (!has_fix) return scripts
 
-	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== POSTINSTALL_KEY))
+	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== PREPARE_KEY))
 }
 
-function merge_postinstall_fix_cmd(content: string): string {
+// Append the guarded lifecycle commands to an existing `prepare` (e.g. a SvelteKit
+// `svelte-kit sync`) when no script yet runs fix-gh-packages, so the dev-only hooks
+// land in `prepare` instead of being lost when the suggested-scripts merge skips the
+// already-present `prepare` key.
+function merge_prepare_lifecycle_cmd(content: string): string {
 	const has_fix = init_logic_json_merge.package_scripts_include(content, FIX_GH_PACKAGES_MARKER)
 	if (has_fix) return content
 
-	return init_logic_json_merge.merge_package_script_suffix(
+	return init_logic_json_merge.merge_package_script_suffix(content, PREPARE_KEY, PREPARE_CMD)
+}
+
+// Migration: remove a kit-managed `postinstall` (one running fix-gh-packages) so the
+// lifecycle can be re-added to `prepare`. A consumer's custom postinstall lacks the
+// marker and is left untouched.
+function strip_managed_postinstall(content: string): string {
+	return init_logic_json_merge.remove_script_with_marker(
 		content,
-		POSTINSTALL_KEY,
-		FIX_GH_PACKAGES_CMD,
+		LEGACY_POSTINSTALL_KEY,
+		FIX_GH_PACKAGES_MARKER,
 	)
 }
 
@@ -242,7 +258,8 @@ const init_logic = {
 	get_ai_copy_directories,
 	get_suggested_scripts,
 	get_suggested_scripts_for_content,
-	merge_postinstall_fix_cmd,
+	merge_prepare_lifecycle_cmd,
+	strip_managed_postinstall,
 	transform_prompt_paths,
 }
 

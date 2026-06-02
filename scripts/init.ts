@@ -230,17 +230,18 @@ function get_kit_development_engines(): Record<string, unknown> {
 }
 
 function apply_package_json_merges(content: string, type: ProjectType): string {
+	const migrated = init_logic.strip_managed_postinstall(content)
 	const merged =
 		type === 'sveltekit'
-			? init_logic.merge_sveltekit_package_json(content)
+			? init_logic.merge_sveltekit_package_json(migrated)
 			: init_logic.merge_package_scripts(
-					content,
-					init_logic.get_suggested_scripts_for_content(type, content),
+					migrated,
+					init_logic.get_suggested_scripts_for_content(type, migrated),
 				)
-	const with_fix = init_logic.merge_postinstall_fix_cmd(merged)
+	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(merged)
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
-		kit_pm === undefined ? with_fix : init_logic.merge_package_manager(with_fix, kit_pm)
+		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
 	const with_de = init_logic.merge_development_engines(with_pm, get_kit_development_engines())
 
 	return init_logic.sort_package_json_keys(with_de)
