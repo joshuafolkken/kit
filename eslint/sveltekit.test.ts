@@ -1,7 +1,20 @@
 import { fileURLToPath } from 'node:url'
+import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import { ROUTE_NO_RESTRICTED_SYNTAX } from './rules/svelte.js'
 import { create_sveltekit_config } from './sveltekit.js'
+
+const ECMA_VERSION = 2024
+
+function count_route_restricted_messages(source: string): number {
+	const linter = new Linter()
+	const messages = linter.verify(source, {
+		languageOptions: { ecmaVersion: ECMA_VERSION, sourceType: 'module' },
+		rules: { 'no-restricted-syntax': ROUTE_NO_RESTRICTED_SYNTAX as Linter.RuleEntry },
+	})
+
+	return messages.filter((message) => message.ruleId === 'no-restricted-syntax').length
+}
 
 const GITIGNORE_PATH = new URL('../.gitignore', import.meta.url)
 const TSCONFIG_ROOT_DIR = fileURLToPath(new URL('..', import.meta.url))
@@ -84,6 +97,44 @@ describe('create_sveltekit_config — routes block', () => {
 		const rules = routes_block?.rules as Record<string, unknown>
 
 		expect(rules['no-restricted-syntax']).toBe(ROUTE_NO_RESTRICTED_SYNTAX)
+	})
+})
+
+describe('ROUTE_NO_RESTRICTED_SYNTAX — arrow exports in route files (issue #474)', () => {
+	it('allows the typed-const arrow form for route handler names', () => {
+		expect(count_route_restricted_messages('export const load = () => {}')).toBe(0)
+		expect(count_route_restricted_messages('export const GET = () => {}')).toBe(0)
+		expect(count_route_restricted_messages('export const actions = () => {}')).toBe(0)
+	})
+
+	it('flags a non-handler arrow const export', () => {
+		expect(count_route_restricted_messages('export const my_helper = () => {}')).toBe(1)
+	})
+
+	it('leaves function declarations and non-arrow exports unaffected', () => {
+		expect(count_route_restricted_messages('export function GET() {}')).toBe(0)
+		expect(count_route_restricted_messages('export function my_helper() {}')).toBe(0)
+		expect(count_route_restricted_messages('export const prerender = true')).toBe(0)
+	})
+
+	it('keeps the for-in and labeled-statement guards', () => {
+		expect(count_route_restricted_messages('for (const k in obj) {}')).toBe(1)
+		expect(count_route_restricted_messages('outer: for (;;) {}')).toBe(1)
+	})
+})
+
+describe('create_sveltekit_config — app.d.ts ignore (issue #474)', () => {
+	it('ignores src/app.d.ts by default', () => {
+		const config = build_config()
+
+		const has_ignore_block = config.some(
+			(block) =>
+				Array.isArray(block.ignores) &&
+				block.ignores.includes('src/app.d.ts') &&
+				block.files === undefined,
+		)
+
+		expect(has_ignore_block).toBe(true)
 	})
 })
 

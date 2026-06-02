@@ -40,6 +40,11 @@ const SVELTEKIT_ROUTE_PATTERNS = [
 export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, svelte_config }) {
 	return defineConfig(
 		...create_base_config({ gitignore_path, tsconfig_root_dir }),
+		// SvelteKit's ambient declarations file uses external-contract binding names
+		// (RATE_LIMITER, APP_VERSION) and the `export {}` module marker, which never
+		// follow the kit's strict naming/export rules. Linting it only yields false
+		// positives, so ignore it by default. See issue #474.
+		{ ignores: ['src/app.d.ts'] },
 		...svelte.configs.recommended,
 		...svelte.configs.prettier,
 		{
