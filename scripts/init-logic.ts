@@ -202,14 +202,15 @@ function merge_prepare_lifecycle_cmd(content: string): string {
 	return init_logic_json_merge.merge_package_script_suffix(content, PREPARE_KEY, PREPARE_CMD)
 }
 
-// Migration: remove a kit-managed `postinstall` (one running fix-gh-packages) so the
-// lifecycle can be re-added to `prepare`. A consumer's custom postinstall lacks the
-// marker and is left untouched.
+// Migration: remove a kit-managed `postinstall` (one running the fix-gh-packages
+// command) so the lifecycle can be re-added to `prepare`. Matching the full command
+// rather than the bare marker avoids stripping a consumer's unrelated postinstall that
+// merely mentions `fix-gh-packages` (e.g. `npm run my-fix-gh-packages-helper`).
 function strip_managed_postinstall(content: string): string {
 	return init_logic_json_merge.remove_script_with_marker(
 		content,
 		LEGACY_POSTINSTALL_KEY,
-		FIX_GH_PACKAGES_MARKER,
+		FIX_GH_PACKAGES_CMD,
 	)
 }
 

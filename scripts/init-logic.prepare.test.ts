@@ -133,4 +133,71 @@ describe('strip_managed_postinstall', () => {
 
 		expect(init_logic.strip_managed_postinstall(content)).toBe(content)
 	})
+
+	it('leaves a postinstall that only mentions the marker but not the kit command', () => {
+		const content = JSON.stringify({
+			scripts: { postinstall: 'npm run my-fix-gh-packages-helper' },
+		})
+
+		expect(init_logic.strip_managed_postinstall(content)).toBe(content)
+	})
+})
+
+// Mirrors scripts/init.ts apply_package_json_merges so the composed ordering
+// (migrate → suggested-scripts merge → lifecycle append) is regression-protected.
+function run_pipeline(content: string, type: 'sveltekit' | 'vanilla'): Record<string, string> {
+	const migrated = init_logic.strip_managed_postinstall(content)
+	const merged =
+		type === 'sveltekit'
+			? init_logic.merge_sveltekit_package_json(migrated)
+			: init_logic.merge_package_scripts(
+					migrated,
+					init_logic.get_suggested_scripts_for_content(type, migrated),
+				)
+	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(merged)
+
+	return (JSON.parse(with_lifecycle) as { scripts: Record<string, string> }).scripts
+}
+
+describe('apply_package_json_merges pipeline composition', () => {
+	it('vanilla fresh project gets lifecycle in prepare and no postinstall', () => {
+		const scripts = run_pipeline('{"name":"app"}', 'vanilla')
+
+		expect(scripts[PREPARE]).toContain(LEFTHOOK_INSTALL)
+		expect(scripts[PREPARE]).toContain(FIX_GH_PACKAGES_MARKER)
+		expect(scripts).not.toHaveProperty(POSTINSTALL)
+	})
+
+	it('sveltekit preserves an existing prepare and appends the lifecycle', () => {
+		const scripts = run_pipeline(
+			JSON.stringify({ name: 'app', scripts: { prepare: SVELTE_KIT_SYNC } }),
+			'sveltekit',
+		)
+
+		expect(scripts[PREPARE]).toContain(SVELTE_KIT_SYNC)
+		expect(scripts[PREPARE]).toContain(LEFTHOOK_INSTALL)
+		expect(scripts[PREPARE]).toContain(FIX_GH_PACKAGES_MARKER)
+		expect(scripts).not.toHaveProperty(POSTINSTALL)
+	})
+
+	it('migrates a legacy kit-managed postinstall to prepare', () => {
+		const legacy = `command -v lefthook >/dev/null 2>&1 && ${LEFTHOOK_INSTALL}; command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}; true`
+		const scripts = run_pipeline(
+			JSON.stringify({ name: 'app', scripts: { postinstall: legacy } }),
+			'vanilla',
+		)
+
+		expect(scripts).not.toHaveProperty(POSTINSTALL)
+		expect(scripts[PREPARE]).toContain(FIX_GH_PACKAGES_MARKER)
+	})
+
+	it('is idempotent on a second run', () => {
+		const first = run_pipeline(
+			JSON.stringify({ name: 'app', scripts: { prepare: SVELTE_KIT_SYNC } }),
+			'sveltekit',
+		)
+		const second = run_pipeline(JSON.stringify({ name: 'app', scripts: first }), 'sveltekit')
+
+		expect(second[PREPARE]).toBe(first[PREPARE])
+	})
 })
