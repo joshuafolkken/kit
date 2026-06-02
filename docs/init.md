@@ -52,13 +52,15 @@ These files have no merge strategy. If they already exist, `josh init` prints th
 
 `josh init` adds these scripts to your `package.json`:
 
-| Script        | Command                                                                                                  |
-| ------------- | -------------------------------------------------------------------------------------------------------- |
-| `preinstall`  | `pnpm dlx @aikidosec/safe-chain setup-ci`                                                                |
-| `postinstall` | `command -v lefthook >/dev/null 2>&1 && lefthook install; command -v tsx >/dev/null 2>&1 && tsx …; true` |
-| `josh`        | `josh`                                                                                                   |
+| Script       | Command                                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------------------- |
+| `preinstall` | `pnpm dlx @aikidosec/safe-chain setup-ci`                                                                |
+| `prepare`    | `command -v lefthook >/dev/null 2>&1 && lefthook install; command -v tsx >/dev/null 2>&1 && tsx …; true` |
+| `josh`       | `josh`                                                                                                   |
 
-The `postinstall` command is **guarded**: each step runs only when its binary is on `PATH`, and the trailing `true` keeps the hook's exit code zero. This prevents a missing `lefthook`/`tsx` from aborting `pnpm install` in production or CI installs that omit dev dependencies. If a script already runs `fix-gh-packages` (for example a consolidated, gated `prepare`), `josh init` skips adding `postinstall` so re-running it never duplicates the hook.
+The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`**, not `postinstall`. `prepare` runs on a local `pnpm install` and during `pack`/`publish`, but **not** when your package is installed as a dependency by a consumer — which is the correct scope for these developer-only hooks. The command is **guarded**: each step runs only when its binary is on `PATH`, and the trailing `true` keeps the hook's exit code zero. This prevents a missing `lefthook`/`tsx` from aborting `pnpm install` in production or CI installs that omit dev dependencies.
+
+When a `prepare` already exists (for example a SvelteKit `svelte-kit sync`), `josh init` appends the lifecycle to it rather than replacing it. If a script already runs `fix-gh-packages`, `josh init` skips re-adding the hook so re-running it never duplicates. A kit-managed `postinstall` from an earlier version (one that runs `fix-gh-packages`) is migrated to `prepare`; a custom `postinstall` of your own is left untouched.
 
 All other toolchain tasks are available as `pnpm josh <command>` subcommands — they are **not** added as separate package scripts. Existing scripts are never overwritten.
 
