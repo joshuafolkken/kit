@@ -8,6 +8,7 @@ export default defineConfig({
 			'scripts/**/*.test.ts',
 			'scripts-ai/**/*.test.ts',
 			'eslint/**/*.test.ts',
+			'prettier/**/*.test.ts',
 			'templates/**/*.test.ts',
 		],
 		testTimeout: TEST_TIMEOUT_MS,

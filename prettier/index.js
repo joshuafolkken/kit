@@ -17,7 +17,6 @@ export const config = {
 			files: '*.svelte',
 			options: {
 				parser: 'svelte',
-				svelteStrictMode: true,
 				svelteIndentScriptAndStyle: true,
 				svelteSortOrder: 'options-scripts-markup-styles',
 			},
