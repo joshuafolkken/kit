@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const PACKAGE_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const PNPM_VERSION_REGEX = /^pnpm@(\d+\.\d+\.\d+)/u
+// Capture the full version (including any prerelease identifier) up to the
+// optional `+<hash>` suffix, so prerelease pins like `pnpm@11.6.0-rc.1+...` are
+// compared faithfully rather than truncated to `11.6.0`.
+const PNPM_VERSION_REGEX = /^pnpm@([^+]+)/u
 
 interface PackageJson {
 	packageManager: string
