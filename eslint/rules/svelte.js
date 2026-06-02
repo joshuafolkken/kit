@@ -1,6 +1,9 @@
 const ROUTE_HANDLER_NAMES = '/^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|load|actions|fallback)$/u'
 
-const ROUTE_HANDLER_ARROW_SELECTOR = `ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.name=${ROUTE_HANDLER_NAMES}][init.type="ArrowFunctionExpression"]`
+// Route handlers (GET/POST/.../load/actions/fallback) may use SvelteKit's idiomatic
+// typed-const arrow form; any other named arrow const export is banned.
+// `id.type="Identifier"` prevents misfiring on destructured exports.
+const NON_HANDLER_ARROW_EXPORT_SELECTOR = `ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.type="Identifier"][init.type="ArrowFunctionExpression"]:not([id.name=${ROUTE_HANDLER_NAMES}])`
 
 export const ROUTE_NO_RESTRICTED_SYNTAX = [
 	'error',
@@ -20,9 +23,9 @@ export const ROUTE_NO_RESTRICTED_SYNTAX = [
 			'`with` is disallowed in strict mode because it makes code impossible to predict and optimize.',
 	},
 	{
-		selector: ROUTE_HANDLER_ARROW_SELECTOR,
+		selector: NON_HANDLER_ARROW_EXPORT_SELECTOR,
 		message:
-			'SvelteKit route handlers must use function syntax: `export function GET(event) {}` not `export const GET = () => {}`.',
+			'Only SvelteKit route handlers (GET/POST/PUT/DELETE/PATCH/OPTIONS/HEAD/load/actions/fallback) may use the typed-const arrow form. Other exports must use function syntax: `export function name() {}`.',
 	},
 ]
 

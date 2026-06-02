@@ -28,7 +28,7 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no a
 
 ### Functions & exports
 
-- Use `function` syntax, not arrow functions
+- Use `function` syntax, not arrow functions. Exception: in SvelteKit route files, the named route handlers (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`/`OPTIONS`/`HEAD`/`load`/`actions`/`fallback`) may use the typed-const arrow idiom (`export const load: PageLoad = async () => {}`) — it preserves generated `PageData` / `LayoutData` type inference. Any other exported arrow const in a route file is still flagged.
 - Multiple functions in a file: group into a namespace object `export { my_module }` (constants exempt)
 - No `export default`
 
