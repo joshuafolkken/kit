@@ -231,21 +231,21 @@ const RETIRED_SCRIPTS = [
 const SIZE_LIMIT_SCRIPT = 'size-limit'
 
 describe('get_suggested_scripts', () => {
-	it('vanilla returns only preinstall, postinstall, and josh', () => {
+	it('vanilla returns only preinstall, prepare, and josh', () => {
 		const result = init_logic.get_suggested_scripts('vanilla')
 
 		expect(Object.keys(result)).toHaveLength(3)
 		expect(result).toHaveProperty('preinstall')
-		expect(result).toHaveProperty('postinstall')
+		expect(result).toHaveProperty('prepare')
 		expect(result).toHaveProperty('josh')
 	})
 
-	it('sveltekit returns preinstall, postinstall, josh, and size-limit', () => {
+	it('sveltekit returns preinstall, prepare, josh, and size-limit', () => {
 		const result = init_logic.get_suggested_scripts('sveltekit')
 
 		expect(Object.keys(result)).toHaveLength(4)
 		expect(result).toHaveProperty('preinstall')
-		expect(result).toHaveProperty('postinstall')
+		expect(result).toHaveProperty('prepare')
 		expect(result).toHaveProperty('josh')
 		expect(result).toHaveProperty(SIZE_LIMIT_SCRIPT, SIZE_LIMIT_SCRIPT)
 	})

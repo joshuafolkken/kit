@@ -17,9 +17,9 @@ describe('get_suggested_scripts common scripts', () => {
 		)
 	})
 
-	it('includes postinstall for both types', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('postinstall')
-		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('postinstall')
+	it('includes prepare for both types', () => {
+		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('prepare')
+		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('prepare')
 	})
 
 	it('does not include commands replaced by josh subcommands', () => {
