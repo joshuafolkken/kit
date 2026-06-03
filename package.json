@@ -1,5 +1,5 @@
 {
-	"version": "0.217.0",
+	"version": "0.218.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -92,10 +92,10 @@
 		"eslint": "^10.4.1",
 		"lefthook": "^2.1.9",
 		"prettier": "^3.8.3",
-		"prettier-plugin-svelte": "^4.0.1",
+		"prettier-plugin-svelte": "^4.1.0",
 		"prettier-plugin-tailwindcss": "^0.8.0",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.7"
+		"vitest": "^4.1.8"
 	},
 	"dependencies": {
 		"@eslint/compat": "^2.1.0",
@@ -112,7 +112,7 @@
 		"js-yaml": "^4.2.0",
 		"strip-json-comments": "^5.0.3",
 		"tsx": "^4.22.4",
-		"typescript-eslint": "^8.60.0",
+		"typescript-eslint": "^8.60.1",
 		"zod": "^4.4.3"
 	},
 	"devEngines": {

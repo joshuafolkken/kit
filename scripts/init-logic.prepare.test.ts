@@ -1,5 +1,22 @@
+import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
+
+function get_prepare_after_merge(existing_prepare: string): string {
+	const content = JSON.stringify({ scripts: { prepare: existing_prepare } })
+	const merged = JSON.parse(init_logic.merge_prepare_lifecycle_cmd(content)) as {
+		scripts: Record<string, string>
+	}
+
+	// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
+	return merged.scripts['prepare'] ?? ''
+}
+
+function run_prepare(prepare: string, path: string): number {
+	const result = spawnSync('/bin/sh', ['-c', prepare], { env: { PATH: path } })
+
+	return result.status ?? -1
+}
 
 const FIX_GH_PACKAGES_CMD = 'tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
 const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
@@ -34,10 +51,19 @@ describe('get_suggested_scripts prepare value', () => {
 		expect(result[PREPARE]).toContain('command -v tsx >/dev/null 2>&1')
 	})
 
-	it('ends with a true fallback so the hook exits zero when both guards skip', () => {
+	it('does not end with a blanket "; true" that would mask preceding failures', () => {
 		const result = init_logic.get_suggested_scripts(VANILLA)
 
-		expect(result[PREPARE]?.endsWith('; true')).toBe(true)
+		expect(result[PREPARE]?.endsWith('; true')).toBe(false)
+	})
+
+	it('tolerates each optional hook individually with "|| true"', () => {
+		const result = init_logic.get_suggested_scripts(VANILLA)
+
+		expect(result[PREPARE]).toContain(
+			'command -v lefthook >/dev/null 2>&1 && lefthook install || true',
+		)
+		expect(result[PREPARE]).toContain('|| true) && (')
 	})
 
 	it('does not suggest a postinstall script', () => {
@@ -102,6 +128,32 @@ describe('merge_prepare_lifecycle_cmd', () => {
 		})
 
 		expect(init_logic.merge_prepare_lifecycle_cmd(content)).toBe(content)
+	})
+})
+
+describe('prepare exit-code behavior', () => {
+	const EMPTY_PATH = ''
+
+	it('propagates a non-zero exit when a core step fails', () => {
+		// `false` stands in for a failing core step (e.g. `pnpm gen`); the appended
+		// optional hooks must not mask its failure.
+		const prepare = get_prepare_after_merge('false')
+
+		expect(run_prepare(prepare, EMPTY_PATH)).not.toBe(0)
+	})
+
+	it('exits zero when a core step succeeds but the optional tools are missing', () => {
+		// `true` stands in for a passing core step; with an empty PATH neither
+		// `lefthook` nor `tsx` is found, yet the guarded+tolerated hooks exit zero.
+		const prepare = get_prepare_after_merge('true')
+
+		expect(run_prepare(prepare, EMPTY_PATH)).toBe(0)
+	})
+
+	it('exits zero for a fresh-project prepare when the optional tools are missing', () => {
+		const prepare = init_logic.get_suggested_scripts(VANILLA)[PREPARE] ?? ''
+
+		expect(run_prepare(prepare, EMPTY_PATH)).toBe(0)
 	})
 })
 
