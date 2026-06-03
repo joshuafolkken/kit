@@ -95,7 +95,7 @@ Overwrite managed files with the latest versions from the package.
 pnpm josh sync
 ```
 
-Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, GitHub workflow templates, and other managed files. See [sync.md](./sync.md) for the full list.
+Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, GitHub workflow templates, and other managed files. See [sync.md](./sync.md) for the full list. `sync` also realigns `devEngines.packageManager.version` in `package.json` with the `packageManager` pin so the two never drift apart (a mismatch reintroduces the pnpm `Cannot use both "packageManager" and "devEngines.packageManager"` warning).
 
 > To make `josh` available system-wide, install the kit globally (`pnpm add -g @joshuafolkken/kit`) instead of running an install subcommand. See [cli.md](./cli.md) for details.
 
@@ -243,7 +243,7 @@ pnpm josh latest:corepack   # update pnpm only
 pnpm josh latest:update     # update dependencies only
 ```
 
-`latest:corepack` pins pnpm to the newest release on the project's **current major** (`latest-<major>`, derived from `packageManager`; it falls back to `pnpm@latest` only if that major can't be parsed), so on the normal path it stays within `devEngines`. If the selected release is still inside the registry's minimum-release-age window, the pnpm bump is skipped with a notice instead of failing — so `latest:update` and `audit` still run.
+`latest:corepack` pins pnpm to the newest release on the project's **current major** (`latest-<major>`, derived from `packageManager`; it falls back to `pnpm@latest` only if that major can't be parsed), so on the normal path it stays within `devEngines`. If the selected release is still inside the registry's minimum-release-age window, the pnpm bump is skipped with a notice instead of failing — so `latest:update` and `audit` still run. When the bump does succeed, `devEngines.packageManager.version` is realigned to the new `packageManager` pin so the two stay in exact match (avoiding the pnpm dual-declaration warning).
 
 ---
 

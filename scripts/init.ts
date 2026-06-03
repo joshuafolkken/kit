@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
 import { is_sveltekit_project, package_path, PROJECT_ROOT } from './init-paths'
+import { package_manager_version } from './package-manager-version'
 import { string_array_schema, vscode_settings_schema, with_package_manager_schema } from './schemas'
 import { sync } from './sync'
 
@@ -243,8 +244,12 @@ function apply_package_json_merges(content: string, type: ProjectType): string {
 	const with_pm =
 		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
 	const with_de = init_logic.merge_development_engines(with_pm, get_kit_development_engines())
+	const sorted = init_logic.sort_package_json_keys(with_de)
 
-	return init_logic.sort_package_json_keys(with_de)
+	// Pin devEngines.packageManager.version to the packageManager just written so a
+	// freshly scaffolded (or re-initialized) consumer never trips the pnpm
+	// dual-declaration warning.
+	return package_manager_version.align_development_engines_version(sorted)
 }
 
 function merge_project_package_json(type: ProjectType): void {
@@ -305,6 +310,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 const init = {
 	copy_ai_file: init_ai_copy.copy_ai_file,
+	apply_package_json_merges,
 }
 
 export { init }
