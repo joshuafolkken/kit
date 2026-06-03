@@ -22,8 +22,9 @@
  * Usage: tsx scripts/latest-corepack.ts
  */
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { package_manager_version } from './package-manager-version'
 
 const PACKAGE_JSON_PATH = 'package.json'
 const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)(?:[^\d]|$)/u
@@ -61,10 +62,22 @@ function warn_if_skipped(status: number): boolean {
 	return true
 }
 
+// After corepack bumps the `packageManager` pin, realign
+// `devEngines.packageManager.version` to the new version so the two fields keep
+// matching (pnpm suppresses the dual-declaration warning only on an exact match).
+function sync_development_engines_after_bump(package_json_path: string = PACKAGE_JSON_PATH): void {
+	const content = readFileSync(package_json_path, 'utf8')
+	const aligned = package_manager_version.align_development_engines_version(content)
+	if (aligned === content) return
+
+	writeFileSync(package_json_path, aligned)
+	console.info('✔ Synced devEngines.packageManager.version to the packageManager pin')
+}
+
 function main(): void {
 	const target = resolve_corepack_target(readFileSync(PACKAGE_JSON_PATH, 'utf8'))
-
-	warn_if_skipped(run_corepack(target))
+	const is_skipped = warn_if_skipped(run_corepack(target))
+	if (!is_skipped) sync_development_engines_after_bump()
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
@@ -75,6 +88,7 @@ const latest_corepack = {
 	resolve_corepack_target,
 	run_corepack,
 	warn_if_skipped,
+	sync_development_engines_after_bump,
 	main,
 }
 

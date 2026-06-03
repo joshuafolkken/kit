@@ -2128,8 +2128,8 @@ packages:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
 
-  svelte-eslint-parser@1.7.0:
-    resolution: {integrity: sha512-TU3DQx7IjUrrxKbET/U639xofp044xLXGGvFaLH9PKQOY5g5iRtmYy2rZB7gOeGRRTP7255AE8fUtIwsp/yOjQ==}
+  svelte-eslint-parser@1.7.1:
+    resolution: {integrity: sha512-mmwwKL9L/MB0QyBKdfyWxGjDuQfEyzxWy5S9Kkd0O/V5XD57MQ33KQtXrO6vKLuP6PIt8CRozvOX1mxpcRTqUg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0, pnpm: 10.34.1}
     peerDependencies:
       svelte: ^5.55.7
@@ -3420,7 +3420,7 @@ snapshots:
       postcss-load-config: 3.1.4(postcss@8.5.15)
       postcss-safe-parser: 7.0.1(postcss@8.5.15)
       semver: 7.8.1
-      svelte-eslint-parser: 1.7.0(svelte@5.55.7(@typescript-eslint/types@8.60.0))
+      svelte-eslint-parser: 1.7.1(svelte@5.55.7(@typescript-eslint/types@8.60.0))
     optionalDependencies:
       svelte: 5.55.7(@typescript-eslint/types@8.60.0)
     transitivePeerDependencies:
@@ -3931,7 +3931,7 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
-  svelte-eslint-parser@1.7.0(svelte@5.55.7(@typescript-eslint/types@8.60.0)):
+  svelte-eslint-parser@1.7.1(svelte@5.55.7(@typescript-eslint/types@8.60.0)):
     dependencies:
       eslint-scope: 8.4.0
       eslint-visitor-keys: 4.2.1

@@ -5,11 +5,13 @@ import { fileURLToPath } from 'node:url'
 import { gh_spawn } from './gh-spawn'
 import { init_logic, type ProjectType } from './init-logic'
 import { is_sveltekit_project, PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
+import { package_manager_version } from './package-manager-version'
 import { sonar_file } from './sonar-file'
 import { sync_configs } from './sync-configs'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const WRANGLER_JSONC = 'wrangler.jsonc'
+const PACKAGE_JSON = 'package.json'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -212,8 +214,37 @@ function sync_config_files(type: ProjectType): void {
 	}
 }
 
+// Repair an existing consumer manifest whose devEngines.packageManager.version
+// has drifted from its packageManager pin, so the pnpm dual-declaration warning
+// stays suppressed.
+function sync_package_manager_version(destination_path: string): void {
+	if (!existsSync(destination_path)) return
+
+	const existing = readFileSync(destination_path, 'utf8')
+	const aligned = package_manager_version.align_development_engines_version(existing)
+
+	if (aligned === existing) {
+		console.info('  ✔ unchanged package.json')
+
+		return
+	}
+
+	writeFileSync(destination_path, aligned)
+	console.info('  ✔ synced    devEngines.packageManager.version')
+}
+
 function resolve_project_type(): ProjectType {
 	return is_sveltekit_project(PROJECT_ROOT) ? 'sveltekit' : 'vanilla'
+}
+
+function sync_project_artifacts(type: ProjectType, is_force: boolean): void {
+	sync_ai_copy_all(is_force)
+	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
+	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
+	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
+	sync_sonar_with_template(is_force)
+	sync_config_files(type)
+	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
 }
 
 function main(): void {
@@ -221,12 +252,7 @@ function main(): void {
 	const type = resolve_project_type()
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
-	sync_ai_copy_all(is_force)
-	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
-	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
-	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
-	sync_sonar_with_template(is_force)
-	sync_config_files(type)
+	sync_project_artifacts(type, is_force)
 	console.info('\n✅ Done.\n')
 }
 
@@ -240,6 +266,7 @@ const sync = {
 	sync_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,
+	sync_package_manager_version,
 	migrate_prettierrc,
 }
 

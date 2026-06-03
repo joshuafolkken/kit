@@ -2,12 +2,9 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { package_manager_version } from './package-manager-version'
 
 const PACKAGE_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-// Capture the full version (including any prerelease identifier) up to the
-// optional `+<hash>` suffix, so prerelease pins like `pnpm@11.6.0-rc.1+...` are
-// compared faithfully rather than truncated to `11.6.0`.
-const PNPM_VERSION_REGEX = /^pnpm@([^+]+)/u
 
 interface PackageJson {
 	packageManager: string
@@ -24,9 +21,11 @@ const PACKAGE_JSON = JSON.parse(
 // If a future bump drifts one field, this fails before the warning reappears.
 describe('package.json packageManager / devEngines version consistency', () => {
 	it('pins devEngines.packageManager.version to the exact packageManager version', () => {
-		const package_manager_version = PNPM_VERSION_REGEX.exec(PACKAGE_JSON.packageManager)?.[1]
+		const package_manager_pin = package_manager_version.extract_pnpm_version(
+			PACKAGE_JSON.packageManager,
+		)
 
-		expect(package_manager_version).toBeDefined()
-		expect(PACKAGE_JSON.devEngines.packageManager.version).toBe(package_manager_version)
+		expect(package_manager_pin).toBeDefined()
+		expect(PACKAGE_JSON.devEngines.packageManager.version).toBe(package_manager_pin)
 	})
 })
