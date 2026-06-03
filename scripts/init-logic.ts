@@ -35,13 +35,18 @@ const PREPARE_KEY = 'prepare'
 // migrate a kit-managed `postinstall` (one containing fix-gh-packages) to `prepare`.
 const LEGACY_POSTINSTALL_KEY = 'postinstall'
 // Guard each command so a missing binary (production / CI installs without dev deps,
-// global installs outside a git repo) does not abort `pnpm install`. The trailing
-// `true` keeps the hook's exit code zero even when both guards skip. These are
+// global installs outside a git repo) does not abort `pnpm install`. These are
 // developer-only hooks, so they live in `prepare` (local install + pack/publish)
 // rather than `postinstall`, which also runs when the package is a consumer dependency.
 const GUARDED_LEFTHOOK_CMD = `command -v lefthook >/dev/null 2>&1 && ${LEFTHOOK_INSTALL_CMD}`
 const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}`
-const PREPARE_CMD = `${GUARDED_LEFTHOOK_CMD}; ${GUARDED_FIX_GH_PACKAGES_CMD}; true`
+// Tolerate each optional hook individually with `|| true` and chain them with `&&`,
+// rather than a blanket trailing `; true`. A blanket `; true` is reached
+// unconditionally, so it masks failures of the core steps this command is appended
+// to (e.g. `pnpm gen && svelte-kit sync`). Per-command tolerance keeps those core
+// steps fail-fast while a missing `lefthook`/`tsx` (or a failing optional hook) still
+// exits zero.
+const PREPARE_CMD = `(${GUARDED_LEFTHOOK_CMD} || true) && (${GUARDED_FIX_GH_PACKAGES_CMD} || true)`
 
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
