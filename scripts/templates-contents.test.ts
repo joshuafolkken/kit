@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { package_path } from './init-paths'
+import { package_path } from './init/init-paths'
 
 // Files removed because no distribution code path reads them:
 // - templates/.npmrc: .npmrc is generated from NPMRC_LINES, never copied from this file.

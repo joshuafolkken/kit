@@ -155,7 +155,7 @@ describe('package.json scripts', () => {
 
 	it('exposes josh as the unified CLI entry point', () => {
 		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
-		expect(scripts['josh']).toBe('tsx scripts/josh.ts')
+		expect(scripts['josh']).toBe('tsx scripts/josh/josh.ts')
 	})
 
 	it('does not expose audit:security as a standalone script', () => {
