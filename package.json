@@ -1,5 +1,5 @@
 {
-	"version": "0.220.0",
+	"version": "0.221.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -15,7 +15,7 @@
 		"prepare": "lefthook install",
 		"build": "tsx scripts/build-bin.ts",
 		"prepack": "tsx scripts/build-bin.ts",
-		"josh": "tsx scripts/josh.ts"
+		"josh": "tsx scripts/josh/josh.ts"
 	},
 	"files": [
 		"dist",
@@ -49,6 +49,9 @@
 		"!**/*.test.ts",
 		"!**/*.spec.ts"
 	],
+	"imports": {
+		"#scripts/*": "./scripts/*.ts"
+	},
 	"exports": {
 		"./eslint/base": "./eslint/base.js",
 		"./eslint/vanilla": "./eslint/vanilla.js",

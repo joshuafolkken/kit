@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { init_logic } from './init-logic'
-import type { SonarIdentifiers } from './init-logic-sonar'
+import { init_logic } from './init/init-logic'
+import type { SonarIdentifiers } from './init/init-logic-sonar'
 
 function write_sonar_file(
 	template_source: string,
