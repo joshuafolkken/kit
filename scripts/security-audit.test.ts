@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { COMMAND_MAP } from './josh-logic'
+import { COMMAND_MAP } from './josh/josh-logic'
 import { security_audit_logic } from './security-audit-logic'
 
 const OSV_SCANNER = 'osv-scanner'

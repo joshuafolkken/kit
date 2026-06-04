@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const ENTRY_POINT = path.join(PACKAGE_DIR, 'scripts', 'josh.ts')
+const ENTRY_POINT = path.join(PACKAGE_DIR, 'scripts', 'josh', 'josh.ts')
 const OUTFILE = path.join(PACKAGE_DIR, 'dist', 'josh.js')
 const NODE_BANNER = '#!/usr/bin/env node'
 

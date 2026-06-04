@@ -4,7 +4,7 @@ const spawn_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('node:child_process', () => ({ spawnSync: spawn_mock }))
 
-vi.mock('./init-paths', () => ({ PROJECT_ROOT: '/fake/root' }))
+vi.mock('./init/init-paths', () => ({ PROJECT_ROOT: '/fake/root' }))
 
 const REPO_NAME = 'owner/repo'
 

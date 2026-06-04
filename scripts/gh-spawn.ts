@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { PROJECT_ROOT } from './init-paths'
+import { PROJECT_ROOT } from './init/init-paths'
 
 function get_repo_name_with_owner(): string | undefined {
 	const result = spawnSync(
