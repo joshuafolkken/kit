@@ -4,131 +4,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
+import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
-import { is_sveltekit_project, package_path, PROJECT_ROOT } from './init-paths'
+import { is_sveltekit_project, PROJECT_ROOT } from './init-paths'
 import { package_manager_version } from './package-manager-version'
-import { string_array_schema, vscode_settings_schema, with_package_manager_schema } from './schemas'
+import { with_package_manager_schema } from './schemas'
 import { sync } from './sync'
 
 const PACKAGE_JSON = 'package.json'
-const PRETTIER_CONFIG_JS = 'prettier.config.js'
-
-const VSCODE_FILENAMES: Record<ProjectType, { extensions: string; settings: string }> = {
-	sveltekit: { extensions: 'extensions.sveltekit.json', settings: 'settings.sveltekit.json' },
-	vanilla: { extensions: 'extensions.json', settings: 'settings.json' },
-}
-
-interface FileAction {
-	dest: string
-	create: () => string
-	merge?: (existing: string) => string
-}
-
-function read_package_file(relative_path: string): string {
-	return readFileSync(package_path(relative_path), 'utf8')
-}
-
-function read_package_json(relative_path: string): unknown {
-	return JSON.parse(read_package_file(relative_path))
-}
-
-type MergeFunction = (existing: string) => string
-
-function build_action(destination: string, create: () => string, merge: MergeFunction): FileAction {
-	return { dest: destination, create, merge }
-}
-
-function build_vscode_actions(type: ProjectType): ReadonlyArray<FileAction> {
-	const filenames = VSCODE_FILENAMES[type]
-	const extensions_raw = vscode_settings_schema.parse(
-		read_package_json(path.join('.vscode', filenames.extensions)),
-	)
-	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
-	const raw_recommendations = extensions_raw['recommendations']
-	const recommendations = string_array_schema.parse(raw_recommendations)
-	const settings_data = vscode_settings_schema.parse(
-		read_package_json(path.join('.vscode', filenames.settings)),
-	)
-
-	return [
-		{
-			dest: '.vscode/extensions.json',
-			create: () => read_package_file(path.join('.vscode', filenames.extensions)),
-			merge: (existing) =>
-				init_logic.merge_json_array_field(existing, 'recommendations', recommendations),
-		},
-		{
-			dest: '.vscode/settings.json',
-			create: () => read_package_file(path.join('.vscode', filenames.settings)),
-			merge: (existing) => init_logic.merge_json_object(existing, settings_data),
-		},
-	]
-}
-
-function build_config_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
-	const lefthook_extends = init_logic.get_lefthook_extends_value(type)
-
-	return [
-		build_action(
-			'tsconfig.json',
-			() => init_logic.generate_tsconfig(type),
-			(existing) =>
-				init_logic.merge_json_extends(existing, init_logic.get_tsconfig_extends_entry(type)),
-		),
-		build_action(
-			'cspell.config.yaml',
-			() => init_logic.generate_cspell_config(type),
-			(existing) =>
-				init_logic.merge_cspell_import(existing, init_logic.get_cspell_import_value(type)),
-		),
-		build_action(
-			'lefthook.yml',
-			() => init_logic.generate_lefthook_config(type),
-			(existing) => init_logic.merge_yaml_list_entry(existing, 'extends', lefthook_extends),
-		),
-		...build_vscode_actions(type),
-	]
-}
-
-function build_playwright_action(): FileAction {
-	return { dest: 'playwright.config.ts', create: () => init_logic.generate_playwright_config() }
-}
-
-function build_eslint_action(type: ProjectType): FileAction {
-	return build_action(
-		'eslint.config.js',
-		() => init_logic.generate_eslint_config(type),
-		(existing) => init_logic.merge_eslint_config(existing, type),
-	)
-}
-
-function build_vite_action(): FileAction {
-	return build_action(
-		'vite.config.ts',
-		() => init_logic.generate_vite_config(),
-		(existing) => init_logic.merge_vite_config(existing),
-	)
-}
-
-function build_file_actions(type: ProjectType): ReadonlyArray<FileAction> {
-	return [
-		build_action(
-			'.npmrc',
-			() => init_logic.generate_npmrc(),
-			(existing) => init_logic.merge_npmrc(existing),
-		),
-		build_eslint_action(type),
-		build_action(
-			PRETTIER_CONFIG_JS,
-			() => init_logic.generate_prettier_config(),
-			(existing) => init_logic.merge_prettier_config(existing),
-		),
-		build_playwright_action(),
-		...(type === 'sveltekit' ? [build_vite_action()] : []),
-		...build_config_file_actions(type),
-	]
-}
 
 function write_new_file(action: FileAction, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -220,7 +104,7 @@ async function resolve_project_type(): Promise<ProjectType> {
 
 function get_kit_package_manager(): string | undefined {
 	const { packageManager: package_manager } = with_package_manager_schema.parse(
-		read_package_json(PACKAGE_JSON),
+		init_actions.read_package_json(PACKAGE_JSON),
 	)
 
 	return package_manager !== undefined && package_manager.length > 0 ? package_manager : undefined
@@ -286,7 +170,7 @@ function run_config_file_actions(type: ProjectType): void {
 		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
 	}
 
-	for (const action of build_file_actions(type)) execute_file_action(action)
+	for (const action of init_actions.build_file_actions(type)) execute_file_action(action)
 }
 
 async function main(): Promise<void> {
