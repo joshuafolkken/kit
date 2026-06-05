@@ -1,42 +1,86 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_animation } from './git-animation'
 
-describe('git_animation constants', () => {
-	it('exports ANIMATION_INTERVAL_MS as 100', () => {
-		expect(git_animation.ANIMATION_INTERVAL_MS).toBe(100)
+const { spinner_spy } = vi.hoisted(() => {
+	const spy = {
+		start: vi.fn(),
+		stop: vi.fn(),
+		stopAndPersist: vi.fn(),
+	}
+
+	spy.start.mockReturnValue(spy)
+
+	return { spinner_spy: spy }
+})
+
+vi.mock('ora', () => ({
+	default: vi.fn(() => spinner_spy),
+}))
+
+const LOADING = 'loading'
+const DONE = 'done'
+const ROCKET = '🚀'
+const PERSISTED_TEXT = `${LOADING} ${DONE}`
+
+beforeEach(() => {
+	vi.clearAllMocks()
+	spinner_spy.start.mockReturnValue(spinner_spy)
+})
+
+describe('git_animation.create_animation', () => {
+	it('starts an ora spinner with the message', () => {
+		git_animation.create_animation(LOADING)
+
+		expect(spinner_spy.start).toHaveBeenCalledOnce()
 	})
 
-	it('exports ICON_DISPLAY_WIDTH as 4', () => {
-		expect(git_animation.ICON_DISPLAY_WIDTH).toBe(4)
+	it('returns a controller exposing stop and pause', () => {
+		const controller = git_animation.create_animation(LOADING)
+
+		expect(typeof controller.stop).toBe('function')
+		expect(typeof controller.pause).toBe('function')
 	})
 })
 
-describe('git_animation.create_animation — non-TTY', () => {
-	let is_original_tty = process.stdout.isTTY
+describe('git_animation controller.stop', () => {
+	it('persists the result line with the success icon by default', () => {
+		const controller = git_animation.create_animation(LOADING)
 
-	beforeEach(() => {
-		is_original_tty = process.stdout.isTTY
-		Object.defineProperty(process.stdout, 'isTTY', { value: false, writable: true })
+		controller.stop(DONE)
+
+		expect(spinner_spy.stopAndPersist).toHaveBeenCalledWith({
+			symbol: '✅',
+			text: PERSISTED_TEXT,
+		})
 	})
 
-	afterEach(() => {
-		vi.restoreAllMocks()
-		Object.defineProperty(process.stdout, 'isTTY', { value: is_original_tty, writable: true })
+	it('persists the result line with a custom icon when provided', () => {
+		const controller = git_animation.create_animation(LOADING)
+
+		controller.stop(DONE, ROCKET)
+
+		expect(spinner_spy.stopAndPersist).toHaveBeenCalledWith({
+			symbol: ROCKET,
+			text: PERSISTED_TEXT,
+		})
 	})
 
-	it('returns controller with no-op stop', () => {
-		const controller = git_animation.create_animation('loading')
+	it('stops without persisting when no result is given', () => {
+		const controller = git_animation.create_animation(LOADING)
 
-		expect(() => {
-			controller.stop('done')
-		}).not.toThrow()
+		controller.stop()
+
+		expect(spinner_spy.stop).toHaveBeenCalledOnce()
+		expect(spinner_spy.stopAndPersist).not.toHaveBeenCalled()
 	})
+})
 
-	it('returns controller with no-op pause', () => {
-		const controller = git_animation.create_animation('loading')
+describe('git_animation controller.pause', () => {
+	it('stops the spinner so subsequent output is not interleaved', () => {
+		const controller = git_animation.create_animation(LOADING)
 
-		expect(() => {
-			controller.pause()
-		}).not.toThrow()
+		controller.pause()
+
+		expect(spinner_spy.stop).toHaveBeenCalledOnce()
 	})
 })
