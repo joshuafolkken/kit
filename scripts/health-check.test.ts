@@ -1,30 +1,22 @@
+import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CheckStatus } from './health-check'
 
-vi.mock('node:child_process', () => ({
-	spawn: vi.fn(),
+vi.mock('execa', () => ({
+	execa: vi.fn(),
 }))
-
-type CloseListener = (code: number) => void
-
-interface FakeProcess {
-	on: (event: 'close', listener: CloseListener) => void
-}
-
-function make_fake_process(exit_code: number): FakeProcess {
-	return {
-		on(_event: 'close', listener: CloseListener) {
-			setTimeout(() => {
-				listener(exit_code)
-			}, 0)
-		},
-	}
-}
 
 const { health_check } = await import('./health-check')
 const { classify_exit, run_health_check, status_icon } = health_check
-const child_process_module = await import('node:child_process')
-const mocked_spawn = vi.mocked(child_process_module.spawn)
+const mocked_execa = vi.mocked(execa)
+
+type ExecaResult = Awaited<ReturnType<typeof execa>>
+
+function fake_exit(exit_code: number): ExecaResult {
+	const result = { exitCode: exit_code }
+
+	return result as unknown as ExecaResult
+}
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -64,9 +56,7 @@ describe('classify_exit', () => {
 
 describe('run_health_check — exit 0', () => {
 	it('returns pass status when process exits with 0', async () => {
-		mocked_spawn.mockReturnValueOnce(
-			make_fake_process(0) as ReturnType<typeof child_process_module.spawn>,
-		)
+		mocked_execa.mockResolvedValueOnce(fake_exit(0))
 
 		const result = await run_health_check({
 			label: 'prettier',
@@ -80,9 +70,7 @@ describe('run_health_check — exit 0', () => {
 
 describe('run_health_check — exit non-zero', () => {
 	it('returns fail status when process exits non-zero without warn_on_fail', async () => {
-		mocked_spawn.mockReturnValueOnce(
-			make_fake_process(1) as ReturnType<typeof child_process_module.spawn>,
-		)
+		mocked_execa.mockResolvedValueOnce(fake_exit(1))
 
 		const result = await run_health_check({
 			label: 'eslint',
@@ -94,9 +82,7 @@ describe('run_health_check — exit non-zero', () => {
 	})
 
 	it('returns warn status when process exits non-zero with warn_on_fail', async () => {
-		mocked_spawn.mockReturnValueOnce(
-			make_fake_process(1) as ReturnType<typeof child_process_module.spawn>,
-		)
+		mocked_execa.mockResolvedValueOnce(fake_exit(1))
 
 		const result = await run_health_check({
 			label: 'security',

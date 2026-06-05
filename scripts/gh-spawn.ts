@@ -1,13 +1,13 @@
-import { spawnSync } from 'node:child_process'
+import { execaSync } from 'execa'
 import { PROJECT_ROOT } from './init/init-paths'
 
 function get_repo_name_with_owner(): string | undefined {
-	const result = spawnSync(
+	const result = execaSync(
 		'gh',
 		['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-		{ encoding: 'utf8', cwd: PROJECT_ROOT },
+		{ cwd: PROJECT_ROOT, reject: false },
 	)
-	if (result.status !== 0 || !result.stdout) return undefined
+	if (result.exitCode !== 0 || !result.stdout) return undefined
 
 	return result.stdout.trim() || undefined
 }

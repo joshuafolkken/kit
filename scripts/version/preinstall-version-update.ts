@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { execaSync } from 'execa'
 
 const SAFE_CHAIN_PKG = '@aikidosec/safe-chain'
 const VERSION_RE = /@aikidosec\/safe-chain@([^\s"']+)/u
@@ -15,12 +15,11 @@ function extract_pinned_version(preinstall: string): string | undefined {
 }
 
 function fetch_latest_version(): string | undefined {
-	const result = spawnSync('npm', ['view', SAFE_CHAIN_PKG, 'version'], {
-		encoding: 'utf8',
-		shell: false,
+	const result = execaSync('npm', ['view', SAFE_CHAIN_PKG, 'version'], {
+		reject: false,
 		timeout: NPM_TIMEOUT_MS,
 	})
-	if (result.status !== 0 || !result.stdout) return undefined
+	if (result.exitCode !== 0 || !result.stdout) return undefined
 
 	return result.stdout.trim()
 }

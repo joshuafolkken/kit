@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
-import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { execa } from 'execa'
 
 const PNPM = 'pnpm'
 const LABEL_WIDTH = 12
@@ -44,13 +44,9 @@ function classify_exit(exit_code: number, warn_on_fail: boolean | undefined): Ch
 }
 
 async function run_silent(cmd: string, cmd_arguments: ReadonlyArray<string>): Promise<number> {
-	return await new Promise((resolve) => {
-		const proc = spawn(cmd, [...cmd_arguments], { stdio: 'ignore' })
+	const result = await execa(cmd, [...cmd_arguments], { stdio: 'ignore', reject: false })
 
-		proc.on('close', (code) => {
-			resolve(code ?? FAIL_EXIT_CODE)
-		})
-	})
+	return result.exitCode ?? FAIL_EXIT_CODE
 }
 
 async function run_health_check(check: HealthCheckDefinition): Promise<CheckResult> {
