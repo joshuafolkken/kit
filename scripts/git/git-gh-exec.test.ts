@@ -1,6 +1,11 @@
+import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_gh_installed, GH_NOT_INSTALLED_MSG } from './git-gh-check'
 import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec, has_stderr_field } from './git-gh-exec'
+
+vi.mock('execa', () => ({
+	execa: vi.fn(),
+}))
 
 vi.mock('./git-gh-check', () => ({
 	check_gh_installed: vi.fn(),
@@ -8,6 +13,17 @@ vi.mock('./git-gh-check', () => ({
 }))
 
 const mocked_check = vi.mocked(check_gh_installed)
+const mocked_execa = vi.mocked(execa)
+
+type ExecaResult = Awaited<ReturnType<typeof execa>>
+
+// execa's resolved Result is a large interface; these helpers only need
+// `stdout`, so a minimal stub is bridged through `unknown`.
+function fake_stdout_result(stdout: string): ExecaResult {
+	const result = { stdout }
+
+	return result as unknown as ExecaResult
+}
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -40,6 +56,40 @@ describe('exec_gh_command — gh check integration', () => {
 		mocked_check.mockRejectedValueOnce(new Error(GH_NOT_INSTALLED_MSG))
 
 		await expect(git_gh_exec.exec_gh_command(['version'])).rejects.toThrow(GH_NOT_INSTALLED_MSG)
+	})
+})
+
+const PR_VIEW_ARGS = ['pr', 'view']
+
+describe('exec_gh_command — output handling', () => {
+	it('returns trimmed stdout on success', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result('pr-url\n'))
+
+		await expect(git_gh_exec.exec_gh_command(PR_VIEW_ARGS)).resolves.toBe('pr-url')
+	})
+
+	it('throws with the stderr text when gh fails', async () => {
+		const stderr_text = 'no such pr'
+
+		mocked_execa.mockRejectedValueOnce(
+			Object.assign(new Error('failed'), { stderr: `${stderr_text}\n` }),
+		)
+
+		await expect(git_gh_exec.exec_gh_command(PR_VIEW_ARGS)).rejects.toThrow(stderr_text)
+	})
+})
+
+describe('exec_gh_command_with_stdin', () => {
+	it('passes stdin_body to execa and returns trimmed stdout', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result('done\n'))
+
+		const result = await git_gh_exec.exec_gh_command_with_stdin({
+			args: ['pr', 'create', BODY_FILE_FLAG, BODY_FROM_STDIN],
+			stdin_body: 'body text',
+		})
+
+		expect(result).toBe('done')
+		expect(mocked_execa).toHaveBeenCalledWith('gh', expect.any(Array), { input: 'body text' })
 	})
 })
 

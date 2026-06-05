@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
-import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { execa } from 'execa'
 
 const PNPM = 'pnpm'
 const FORCE_COLOR = '1'
@@ -10,27 +10,19 @@ const ESLINT_ARGS = ['exec', 'eslint', '.', '--cache', '--cache-strategy', 'cont
 
 interface LintCheckResult {
 	output: string
-	exit_code: number
+	// execa reports `undefined` when a process is terminated by a signal; treat
+	// that as a failure (it is never strictly equal to 0).
+	exit_code: number | undefined
 }
 
 async function run_process(arguments_: ReadonlyArray<string>): Promise<LintCheckResult> {
-	return await new Promise((resolve) => {
-		let output = ''
-		const proc = spawn(PNPM, [...arguments_], {
-			stdio: 'pipe',
-			env: { ...process.env, FORCE_COLOR },
-		})
-
-		proc.stdout.on('data', (data: Buffer) => {
-			output += data.toString()
-		})
-		proc.stderr.on('data', (data: Buffer) => {
-			output += data.toString()
-		})
-		proc.on('close', (code) => {
-			resolve({ output, exit_code: code ?? FAIL_EXIT_CODE })
-		})
+	const result = await execa(PNPM, [...arguments_], {
+		env: { ...process.env, FORCE_COLOR },
+		all: true,
+		reject: false,
 	})
+
+	return { output: result.all, exit_code: result.exitCode }
 }
 
 async function run_lint_parallel_checks(): Promise<number> {
