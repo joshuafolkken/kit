@@ -1,5 +1,6 @@
 import { execa } from 'execa'
 import { git_utilities } from './constants'
+import { get_exit_code } from './git-execa-error'
 
 async function exec_git_command_read(arguments_: Array<string>): Promise<string> {
 	const git_cmd = git_utilities.get_git_command_for_spawn()
@@ -16,15 +17,6 @@ function create_spawn_error(command: string, exit_code: number | undefined): Err
 	error.cause = { exit_code: exit_code_string }
 
 	return error
-}
-
-function get_exit_code(error: unknown): number | undefined {
-	if (typeof error !== 'object' || error === null) return undefined
-	if (!('exitCode' in error)) return undefined
-
-	const { exitCode: exit_code } = error
-
-	return typeof exit_code === 'number' ? exit_code : undefined
 }
 
 async function exec_git_command_with_output(

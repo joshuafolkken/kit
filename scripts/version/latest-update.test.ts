@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const spawn_mock = vi.hoisted(() => vi.fn().mockReturnValue({ status: 0 }))
+const execa_sync_mock = vi.hoisted(() => vi.fn().mockReturnValue({ exitCode: 0 }))
 const sync_mock = vi.hoisted(() => vi.fn())
 const write_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('node:child_process', () => ({ spawnSync: spawn_mock }))
+vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 vi.mock('node:fs', () => ({
 	readFileSync: vi.fn().mockReturnValue('{"pnpm":{"overrides":{}},"packageManager":"pnpm@11.0.9"}'),
 	writeFileSync: write_mock,
@@ -25,42 +25,42 @@ const { latest_update } = await import('./latest-update')
 const PNPM = 'pnpm'
 const UPDATE_ARGS = ['update', '--latest']
 
-describe('latest_update.run — spawnSync dispatch', () => {
-	it('calls spawnSync with the first argument as the command', () => {
+describe('latest_update.run — execaSync dispatch', () => {
+	it('calls execaSync with the first argument as the command', () => {
 		latest_update.run([PNPM, ...UPDATE_ARGS])
 
-		expect(spawn_mock).toHaveBeenCalledWith(
+		expect(execa_sync_mock).toHaveBeenCalledWith(
 			PNPM,
 			UPDATE_ARGS,
-			expect.objectContaining({ shell: false }),
+			expect.objectContaining({ reject: false }),
 		)
 	})
 
 	it('does nothing when arguments array is empty', () => {
-		spawn_mock.mockClear()
+		execa_sync_mock.mockClear()
 		latest_update.run([])
 
-		expect(spawn_mock).not.toHaveBeenCalled()
+		expect(execa_sync_mock).not.toHaveBeenCalled()
 	})
 
-	it('passes stdio inherit option to spawnSync', () => {
+	it('passes stdio inherit option to execaSync', () => {
 		latest_update.run([PNPM, ...UPDATE_ARGS])
 
-		expect(spawn_mock).toHaveBeenCalledWith(
+		expect(execa_sync_mock).toHaveBeenCalledWith(
 			expect.any(String),
 			expect.any(Array),
 			expect.objectContaining({ stdio: 'inherit' }),
 		)
 	})
 
-	it('returns the exit code from spawnSync', () => {
-		spawn_mock.mockReturnValueOnce({ status: 42 })
+	it('returns the exit code from execaSync', () => {
+		execa_sync_mock.mockReturnValueOnce({ exitCode: 42 })
 
 		expect(latest_update.run([PNPM, ...UPDATE_ARGS])).toBe(42)
 	})
 
-	it('returns 1 when spawnSync status is absent', () => {
-		spawn_mock.mockReturnValueOnce({})
+	it('returns 1 when execaSync exitCode is absent', () => {
+		execa_sync_mock.mockReturnValueOnce({})
 
 		expect(latest_update.run([PNPM, ...UPDATE_ARGS])).toBe(1)
 	})
@@ -69,7 +69,7 @@ describe('latest_update.run — spawnSync dispatch', () => {
 describe('latest_update.main — preinstall sync guard', () => {
 	beforeEach(() => {
 		sync_mock.mockReset()
-		spawn_mock.mockReturnValue({ status: 0 })
+		execa_sync_mock.mockReturnValue({ exitCode: 0 })
 	})
 
 	it('calls preinstall sync when update succeeds', () => {
@@ -79,7 +79,7 @@ describe('latest_update.main — preinstall sync guard', () => {
 	})
 
 	it('skips preinstall sync when update fails', () => {
-		spawn_mock.mockReturnValue({ status: 1 })
+		execa_sync_mock.mockReturnValue({ exitCode: 1 })
 		latest_update.main()
 
 		expect(sync_mock).not.toHaveBeenCalled()
@@ -89,7 +89,7 @@ describe('latest_update.main — preinstall sync guard', () => {
 describe('latest_update.main — packageManager preservation', () => {
 	beforeEach(() => {
 		write_mock.mockReset()
-		spawn_mock.mockReturnValue({ status: 0 })
+		execa_sync_mock.mockReturnValue({ exitCode: 0 })
 	})
 
 	it('does not write package.json to strip packageManager field', () => {

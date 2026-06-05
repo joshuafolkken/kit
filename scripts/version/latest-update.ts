@@ -4,10 +4,10 @@
  *
  * Usage: tsx scripts/version/latest-update.ts
  */
-import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { overrides_check } from '#scripts/overrides/overrides-logic'
+import { execaSync } from 'execa'
 import { preinstall_version_update } from './preinstall-version-update'
 
 const PACKAGE_JSON_PATH = 'package.json'
@@ -16,9 +16,9 @@ function run(arguments_: Array<string>): number {
 	const [cmd, ...rest] = arguments_
 	if (cmd === undefined) return 0
 	console.info(`\n▶ ${arguments_.join(' ')}`)
-	const result = spawnSync(cmd, rest, { stdio: 'inherit', shell: false })
+	const result = execaSync(cmd, rest, { stdio: 'inherit', reject: false })
 
-	return result.status ?? 1
+	return result.exitCode ?? 1
 }
 
 function run_update(update_arguments: Array<string> | undefined): number {

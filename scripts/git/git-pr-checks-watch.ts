@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process'
+import { execa } from 'execa'
+import { get_exit_code } from './git-execa-error'
 
 const PR_CHECKS_WATCH_TIMEOUT_MS = 120_000
 
@@ -6,87 +7,44 @@ interface WatchResult {
 	timed_out: boolean
 }
 
-function resolve_exit_code(code: number | null): string {
-	return code === null ? 'unknown' : String(code)
+// execa sets `timedOut: true` on the thrown error when its `timeout` option kills
+// the process — the replacement for the previous manual setTimeout + child.kill().
+function is_timeout_error(error: unknown): boolean {
+	return (
+		typeof error === 'object' && error !== null && 'timedOut' in error && error.timedOut === true
+	)
 }
 
-function create_watch_settle_guard(): {
-	is_settled: () => boolean
-	settle: () => void
-} {
-	let is_settled = false
+function to_watch_failure(error: unknown): Error {
+	const exit_code = get_exit_code(error)
 
-	return {
-		is_settled: () => is_settled,
-		settle: () => {
-			is_settled = true
-		},
+	if (exit_code !== undefined) {
+		return new Error(`gh pr checks --watch exited with code ${String(exit_code)}`)
 	}
-}
 
-function handle_watch_timeout(
-	guard: ReturnType<typeof create_watch_settle_guard>,
-	child: ReturnType<typeof spawn>,
-	resolve: (result: WatchResult) => void,
-): void {
-	if (guard.is_settled()) return
-	guard.settle()
-	child.kill()
-	console.info('⏱️ pr checks --watch timed out.')
-	resolve({ timed_out: true })
-}
-
-function handle_watch_close(input: {
-	guard: ReturnType<typeof create_watch_settle_guard>
-	timeout_id: NodeJS.Timeout
-	code: number | null
-	callbacks: { resolve: (result: WatchResult) => void; reject: (error: Error) => void }
-}): void {
-	if (input.guard.is_settled()) return
-	input.guard.settle()
-	clearTimeout(input.timeout_id)
-
-	if (input.code === 0) {
-		input.callbacks.resolve({ timed_out: false })
-	} else {
-		input.callbacks.reject(
-			new Error(`gh pr checks --watch exited with code ${resolve_exit_code(input.code)}`),
-		)
-	}
+	return error instanceof Error ? error : new Error(String(error))
 }
 
 async function pr_checks_watch(branch_name: string): Promise<WatchResult> {
-	return await new Promise<WatchResult>((resolve, reject) => {
-		const child = spawn('gh', ['pr', 'checks', branch_name, '--watch'], {
+	try {
+		await execa('gh', ['pr', 'checks', branch_name, '--watch'], {
 			stdio: 'inherit',
-			shell: false,
-		})
-		const guard = create_watch_settle_guard()
-
-		const timeout_id = setTimeout(() => {
-			handle_watch_timeout(guard, child, resolve)
-		}, PR_CHECKS_WATCH_TIMEOUT_MS)
-
-		child.on('error', (error) => {
-			if (guard.is_settled()) return
-			guard.settle()
-			clearTimeout(timeout_id)
-			reject(error)
+			timeout: PR_CHECKS_WATCH_TIMEOUT_MS,
 		})
 
-		child.on('close', (code) => {
-			handle_watch_close({ guard, timeout_id, code, callbacks: { resolve, reject } })
-		})
-	})
+		return { timed_out: false }
+	} catch (error) {
+		if (is_timeout_error(error)) {
+			console.info('⏱️ pr checks --watch timed out.')
+
+			return { timed_out: true }
+		}
+
+		throw to_watch_failure(error)
+	}
 }
 
 const git_pr_checks_watch = { pr_checks_watch }
 
-export {
-	git_pr_checks_watch,
-	PR_CHECKS_WATCH_TIMEOUT_MS,
-	create_watch_settle_guard,
-	handle_watch_timeout,
-	handle_watch_close,
-}
+export { git_pr_checks_watch, PR_CHECKS_WATCH_TIMEOUT_MS, is_timeout_error }
 export type { WatchResult }

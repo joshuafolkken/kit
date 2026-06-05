@@ -1,99 +1,71 @@
-import type { ChildProcess } from 'node:child_process'
-import { describe, expect, it, vi } from 'vitest'
-import {
-	create_watch_settle_guard,
-	handle_watch_close,
-	handle_watch_timeout,
-	type WatchResult,
-} from './git-pr-checks-watch'
+import { execa } from 'execa'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_pr_checks_watch, is_timeout_error } from './git-pr-checks-watch'
 
-function make_child_with_kill_spy(): { child: ChildProcess; kill_spy: ReturnType<typeof vi.fn> } {
-	const kill_spy = vi.fn()
+vi.mock('execa', () => ({
+	execa: vi.fn(),
+}))
 
-	return { child: { kill: kill_spy } as unknown as ChildProcess, kill_spy }
+const mocked_execa = vi.mocked(execa)
+
+type ExecaResult = Awaited<ReturnType<typeof execa>>
+
+function fake_success(): ExecaResult {
+	const result = { exitCode: 0 }
+
+	return result as unknown as ExecaResult
 }
 
-describe('create_watch_settle_guard', () => {
-	it('starts unsettled', () => {
-		const guard = create_watch_settle_guard()
+beforeEach(() => {
+	vi.clearAllMocks()
+})
 
-		expect(guard.is_settled()).toBe(false)
+const BRANCH = 'feature'
+
+describe('is_timeout_error', () => {
+	it('returns true for an error with timedOut: true', () => {
+		expect(is_timeout_error(Object.assign(new Error('x'), { timedOut: true }))).toBe(true)
 	})
 
-	it('becomes settled after settle() is called', () => {
-		const guard = create_watch_settle_guard()
+	it('returns false for a non-timeout error', () => {
+		expect(is_timeout_error(Object.assign(new Error('x'), { exitCode: 1 }))).toBe(false)
+	})
 
-		guard.settle()
-
-		expect(guard.is_settled()).toBe(true)
+	it('returns false for a non-object value', () => {
+		expect(is_timeout_error('nope')).toBe(false)
 	})
 })
 
-describe('handle_watch_timeout', () => {
-	it('resolves with timed_out: true and settles the guard when guard is unsettled', () => {
-		const guard = create_watch_settle_guard()
-		const { child, kill_spy } = make_child_with_kill_spy()
-		const resolve = vi.fn<(result: WatchResult) => void>()
+describe('git_pr_checks_watch.pr_checks_watch', () => {
+	it('resolves with timed_out: false when the watch succeeds', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_success())
 
-		handle_watch_timeout(guard, child, resolve)
-
-		expect(resolve).toHaveBeenCalledWith({ timed_out: true })
-		expect(guard.is_settled()).toBe(true)
-		expect(kill_spy).toHaveBeenCalled()
+		await expect(git_pr_checks_watch.pr_checks_watch(BRANCH)).resolves.toStrictEqual({
+			timed_out: false,
+		})
 	})
 
-	it('does nothing when guard is already settled', () => {
-		const guard = create_watch_settle_guard()
+	it('resolves with timed_out: true when execa reports a timeout', async () => {
+		mocked_execa.mockRejectedValueOnce(Object.assign(new Error('timed out'), { timedOut: true }))
 
-		guard.settle()
-
-		const { child, kill_spy } = make_child_with_kill_spy()
-		const resolve = vi.fn<(result: WatchResult) => void>()
-
-		handle_watch_timeout(guard, child, resolve)
-
-		expect(resolve).not.toHaveBeenCalled()
-		expect(kill_spy).not.toHaveBeenCalled()
-	})
-})
-
-describe('handle_watch_close', () => {
-	it('resolves with timed_out: false when code is 0 and guard is unsettled', () => {
-		const guard = create_watch_settle_guard()
-		const timeout_id = setTimeout(vi.fn(), 10_000)
-		const resolve = vi.fn<(result: WatchResult) => void>()
-		const reject = vi.fn<(error: Error) => void>()
-
-		handle_watch_close({ guard, timeout_id, code: 0, callbacks: { resolve, reject } })
-
-		expect(resolve).toHaveBeenCalledWith({ timed_out: false })
-		expect(reject).not.toHaveBeenCalled()
+		await expect(git_pr_checks_watch.pr_checks_watch(BRANCH)).resolves.toStrictEqual({
+			timed_out: true,
+		})
 	})
 
-	it('rejects with an error when code is non-zero', () => {
-		const guard = create_watch_settle_guard()
-		const timeout_id = setTimeout(vi.fn(), 10_000)
-		const resolve = vi.fn<(result: WatchResult) => void>()
-		const reject = vi.fn<(error: Error) => void>()
+	it('throws with the exit code when the watch exits non-zero', async () => {
+		mocked_execa.mockRejectedValueOnce(Object.assign(new Error('failed'), { exitCode: 1 }))
 
-		handle_watch_close({ guard, timeout_id, code: 1, callbacks: { resolve, reject } })
-
-		expect(reject).toHaveBeenCalledWith(expect.any(Error))
-		expect(resolve).not.toHaveBeenCalled()
+		await expect(git_pr_checks_watch.pr_checks_watch(BRANCH)).rejects.toThrow('exited with code 1')
 	})
 
-	it('is a no-op when guard is already settled', () => {
-		const guard = create_watch_settle_guard()
+	it('rethrows a spawn error that has no exit code', async () => {
+		const spawn_error_message = 'spawn ENOENT'
 
-		guard.settle()
+		mocked_execa.mockRejectedValueOnce(
+			Object.assign(new Error(spawn_error_message), { code: 'ENOENT' }),
+		)
 
-		const timeout_id = setTimeout(vi.fn(), 10_000)
-		const resolve = vi.fn<(result: WatchResult) => void>()
-		const reject = vi.fn<(error: Error) => void>()
-
-		handle_watch_close({ guard, timeout_id, code: 0, callbacks: { resolve, reject } })
-
-		expect(resolve).not.toHaveBeenCalled()
-		clearTimeout(timeout_id)
+		await expect(git_pr_checks_watch.pr_checks_watch(BRANCH)).rejects.toThrow(spawn_error_message)
 	})
 })

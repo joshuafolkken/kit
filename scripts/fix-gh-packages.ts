@@ -1,7 +1,7 @@
-import { execSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execaSync } from 'execa'
 import { z } from 'zod'
 import { fix_gh_packages_logic, type LockfilePackage } from './fix-gh-packages-logic'
 
@@ -25,7 +25,8 @@ function read_file(file_path: string): string {
 
 function get_gh_cli_token(): string | undefined {
 	try {
-		const token = execSync('gh auth token', { encoding: 'utf8', timeout: GH_CLI_TIMEOUT_MS }).trim()
+		const { stdout } = execaSync('gh', ['auth', 'token'], { timeout: GH_CLI_TIMEOUT_MS })
+		const token = stdout.trim()
 
 		return token.length > 0 ? token : undefined
 	} catch {
@@ -132,3 +133,5 @@ async function main(): Promise<void> {
 
 const [, argv1] = process.argv
 if (argv1 !== undefined && realpathSync(argv1) === fileURLToPath(import.meta.url)) await main()
+
+export { get_gh_cli_token }
