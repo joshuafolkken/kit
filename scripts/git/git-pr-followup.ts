@@ -2,6 +2,7 @@ import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
 import { git_pr_checks } from './git-pr-checks'
+import { parse_json_array_safe } from './parse-json-array'
 import { pull_comment_schema } from './schemas'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
 
@@ -64,12 +65,7 @@ interface FollowupInput {
 }
 
 function parse_pull_comments(raw_json: string): Array<PullComment> {
-	try {
-		return pull_comment_schema.array().parse(JSON.parse(raw_json))
-	} catch (error) {
-		if (error instanceof SyntaxError) return []
-		throw error
-	}
+	return parse_json_array_safe(raw_json, pull_comment_schema)
 }
 
 function read_unresolved_cr_urls(comments: ReadonlyArray<PullComment>): Array<string> {
