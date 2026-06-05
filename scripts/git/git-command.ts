@@ -1,18 +1,15 @@
-import { execFile, spawn } from 'node:child_process'
-import { promisify } from 'node:util'
+import { execa } from 'execa'
 import { git_utilities } from './constants'
-
-const exec_file_async = promisify(execFile)
 
 async function exec_git_command_read(arguments_: Array<string>): Promise<string> {
 	const git_cmd = git_utilities.get_git_command_for_spawn()
-	const { stdout } = await exec_file_async(git_cmd, arguments_)
+	const { stdout } = await execa(git_cmd, arguments_)
 
 	return stdout.trimEnd()
 }
 
-function create_spawn_error(command: string, exit_code: number | null): Error {
-	const exit_code_string = exit_code === null ? 'unknown' : String(exit_code)
+function create_spawn_error(command: string, exit_code: number | undefined): Error {
+	const exit_code_string = exit_code === undefined ? 'unknown' : String(exit_code)
 	const error_message = `git ${command} exited with code ${exit_code_string}`
 	const error = new Error(error_message)
 
@@ -21,30 +18,26 @@ function create_spawn_error(command: string, exit_code: number | null): Error {
 	return error
 }
 
+function get_exit_code(error: unknown): number | undefined {
+	if (typeof error !== 'object' || error === null) return undefined
+	if (!('exitCode' in error)) return undefined
+
+	const { exitCode: exit_code } = error
+
+	return typeof exit_code === 'number' ? exit_code : undefined
+}
+
 async function exec_git_command_with_output(
 	command: string,
 	arguments_list: Array<string>,
 ): Promise<void> {
-	const git_command: string = git_utilities.get_git_command_for_spawn()
+	const git_command_bin = git_utilities.get_git_command_for_spawn()
 
-	await new Promise<void>((resolve, reject) => {
-		const child = spawn(git_command, [command, ...arguments_list], {
-			stdio: 'inherit',
-			shell: false,
-		})
-
-		child.on('error', (error) => {
-			reject(error)
-		})
-
-		child.on('close', (code) => {
-			if (code === 0) {
-				resolve()
-			} else {
-				reject(create_spawn_error(command, code))
-			}
-		})
-	})
+	try {
+		await execa(git_command_bin, [command, ...arguments_list], { stdio: 'inherit' })
+	} catch (error) {
+		throw create_spawn_error(command, get_exit_code(error))
+	}
 }
 
 async function branch(): Promise<string> {
