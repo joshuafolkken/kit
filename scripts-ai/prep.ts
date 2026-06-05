@@ -4,9 +4,9 @@
  *
  * Usage: tsx scripts-ai/prep.ts
  */
-import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { execaSync } from 'execa'
 import { git_command } from '../scripts/git/git-command'
 import { overrides_check, type OverridesDiff } from '../scripts/overrides/overrides-logic'
 import { package_pnpm_schema } from '../scripts/overrides/schemas'
@@ -16,7 +16,7 @@ const PACKAGE_JSON_PATH = 'package.json'
 
 function run(command: string): void {
 	console.info(`\n▶ ${command}`)
-	execSync(command, { stdio: 'inherit' }) // eslint-disable-line sonarjs/os-command
+	execaSync(command, { stdio: 'inherit', shell: true })
 }
 
 function read_package_json(): string {

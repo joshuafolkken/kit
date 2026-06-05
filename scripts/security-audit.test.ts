@@ -1,8 +1,26 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { execaSync } from 'execa'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMMAND_MAP } from './josh/josh-logic'
+import { security_audit } from './security-audit'
 import { security_audit_logic } from './security-audit-logic'
+
+vi.mock('execa', () => ({ execaSync: vi.fn() }))
+
+const mocked_execa_sync = vi.mocked(execaSync)
+
+type ExecaSyncResult = ReturnType<typeof execaSync>
+
+function fake_sync_result(exit_code: number | undefined): ExecaSyncResult {
+	const result = { exitCode: exit_code }
+
+	return result as unknown as ExecaSyncResult
+}
+
+beforeEach(() => {
+	vi.clearAllMocks()
+})
 
 const OSV_SCANNER = 'osv-scanner'
 const PNPM_LOCKFILE = 'pnpm-lock.yaml'
@@ -13,6 +31,40 @@ const RETIRED_AUDIT_FRAGMENT = `${RETIRED_AUDIT} `
 function load_file(relative_path: string): string {
 	return readFileSync(path.resolve(process.cwd(), relative_path), 'utf8')
 }
+
+describe('security_audit.is_binary_available', () => {
+	it('returns true when the binary spawns (exitCode is a number)', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+
+		expect(security_audit.is_binary_available(OSV_SCANNER)).toBe(true)
+	})
+
+	it('returns true even when --version exits non-zero (binary still exists)', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(1))
+
+		expect(security_audit.is_binary_available(OSV_SCANNER)).toBe(true)
+	})
+
+	it('returns false when the binary cannot be spawned (exitCode undefined)', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
+
+		expect(security_audit.is_binary_available('missing-bin')).toBe(false)
+	})
+})
+
+describe('security_audit.run_scanner', () => {
+	it('returns the scanner exit code', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+
+		expect(security_audit.run_scanner()).toBe(0)
+	})
+
+	it('falls back to the failure code when exitCode is undefined', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
+
+		expect(security_audit.run_scanner()).toBe(1)
+	})
+})
 
 describe('security_audit_logic constants', () => {
 	it('targets the osv-scanner binary', () => {

@@ -21,9 +21,9 @@
  *
  * Usage: tsx scripts/version/latest-corepack.ts
  */
-import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { execaSync } from 'execa'
 import { package_manager_version } from './package-manager-version'
 
 const PACKAGE_JSON_PATH = 'package.json'
@@ -46,9 +46,9 @@ function resolve_corepack_target(package_json_content: string): string {
 
 function run_corepack(target: string): number {
 	console.info(`\n▶ corepack use ${target}`)
-	const result = spawnSync('corepack', ['use', target], { stdio: 'inherit', shell: false })
+	const result = execaSync('corepack', ['use', target], { stdio: 'inherit', reject: false })
 
-	return result.status ?? 1
+	return result.exitCode ?? 1
 }
 
 // Non-fatal: keep the josh latest chain (latest:update, audit) running. A non-zero

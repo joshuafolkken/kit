@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
@@ -7,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { with_package_manager_schema } from '#scripts/schemas'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
+import { execaSync } from 'execa'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
@@ -156,9 +156,9 @@ function merge_project_package_json(type: ProjectType): void {
 function install_lefthook(): void {
 	console.info('\nLefthook:')
 	const bin = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'lefthook')
-	const result = spawnSync(bin, ['install'], { cwd: PROJECT_ROOT, stdio: 'inherit' })
+	const result = execaSync(bin, ['install'], { cwd: PROJECT_ROOT, stdio: 'inherit', reject: false })
 
-	if (result.error !== undefined) {
+	if (result.exitCode === undefined) {
 		console.warn('  ⚠ lefthook install failed — run it manually: lefthook install')
 	}
 }
@@ -195,6 +195,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 const init = {
 	copy_ai_file: init_ai_copy.copy_ai_file,
 	apply_package_json_merges,
+	install_lefthook,
 }
 
 export { init }

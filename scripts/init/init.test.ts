@@ -2,8 +2,19 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { execaSync } from 'execa'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init } from './init'
+
+vi.mock('execa', () => ({ execaSync: vi.fn() }))
+
+const mocked_execa_sync = vi.mocked(execaSync)
+
+function fake_lefthook_result(exit_code: number | undefined): ReturnType<typeof execaSync> {
+	const result = { exitCode: exit_code }
+
+	return result as unknown as ReturnType<typeof execaSync>
+}
 
 const TEST_DIR = path.join(tmpdir(), 'init-test')
 const TEMPLATE_PATH = path.join(TEST_DIR, 'template.properties')
@@ -37,6 +48,28 @@ describe('skip messages', () => {
 })
 
 const NO_REFERENCES_CONTENT = 'no references here\n'
+
+describe('install_lefthook', () => {
+	it('does not warn when lefthook installs successfully', () => {
+		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		mocked_execa_sync.mockReturnValue(fake_lefthook_result(0))
+		init.install_lefthook()
+
+		expect(warn_spy).not.toHaveBeenCalled()
+		warn_spy.mockRestore()
+	})
+
+	it('warns when the lefthook binary cannot be spawned (exitCode undefined)', () => {
+		const warn_spy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		mocked_execa_sync.mockReturnValue(fake_lefthook_result(undefined))
+		init.install_lefthook()
+
+		expect(warn_spy).toHaveBeenCalled()
+		warn_spy.mockRestore()
+	})
+})
 
 describe('copy_ai_file', () => {
 	it('writes file content to destination', () => {

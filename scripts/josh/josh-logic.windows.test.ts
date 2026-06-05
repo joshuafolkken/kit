@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const spawn_mock = vi.hoisted(() => vi.fn())
+const execa_sync_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('node:child_process', () => ({ spawnSync: spawn_mock }))
+vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 vi.mock('node:fs', () => ({
 	existsSync: vi.fn().mockReturnValue(false),
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
@@ -11,7 +11,8 @@ vi.mock('node:fs', () => ({
 const { josh_logic, resolve_tsx_executable } = await import('./josh-logic')
 
 const ORIGINAL_PLATFORM = process.platform
-const SPAWN_SUCCESS = { error: undefined, status: 0, signal: undefined }
+const SPAWN_SUCCESS = { exitCode: 0 }
+const SCRIPT_FILE_ARGS = ['script.ts']
 
 afterEach(() => {
 	Object.defineProperty(process, 'platform', { value: ORIGINAL_PLATFORM, configurable: true })
@@ -54,28 +55,28 @@ describe('resolve_tsx_executable on non-win32', () => {
 })
 
 describe('josh_logic.spawn_script shell option', () => {
-	it('passes shell: true to spawnSync on win32', () => {
-		spawn_mock.mockReturnValue(SPAWN_SUCCESS)
+	it('passes shell: true to execaSync on win32', () => {
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
 		Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
 
-		josh_logic.spawn_script('tsx.cmd', ['script.ts'])
+		josh_logic.spawn_script('tsx.cmd', SCRIPT_FILE_ARGS)
 
-		expect(spawn_mock).toHaveBeenCalledWith(
+		expect(execa_sync_mock).toHaveBeenCalledWith(
 			'tsx.cmd',
-			['script.ts'],
+			SCRIPT_FILE_ARGS,
 			expect.objectContaining({ shell: true }),
 		)
 	})
 
-	it('passes shell: false to spawnSync on darwin', () => {
-		spawn_mock.mockReturnValue(SPAWN_SUCCESS)
+	it('passes shell: false to execaSync on darwin', () => {
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
 		Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
 
-		josh_logic.spawn_script('tsx', ['script.ts'])
+		josh_logic.spawn_script('tsx', SCRIPT_FILE_ARGS)
 
-		expect(spawn_mock).toHaveBeenCalledWith(
+		expect(execa_sync_mock).toHaveBeenCalledWith(
 			'tsx',
-			['script.ts'],
+			SCRIPT_FILE_ARGS,
 			expect.objectContaining({ shell: false }),
 		)
 	})

@@ -4,8 +4,8 @@
  *
  * Usage: tsx scripts-ai/issue-prep.ts <issue-number>
  */
-import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { execaSync } from 'execa'
 import { issue_logic } from '../scripts/issue/issue-logic'
 
 const ARGV_INDEX = 2
@@ -18,9 +18,15 @@ function display_language_status(is_cjk: boolean): string {
 }
 
 function fetch_issue_title(number_string: string): string {
-	return execFileSync('gh', ['issue', 'view', number_string, '--json', 'title', '--jq', '.title'], {
-		encoding: 'utf8',
-	}).trim()
+	return execaSync('gh', [
+		'issue',
+		'view',
+		number_string,
+		'--json',
+		'title',
+		'--jq',
+		'.title',
+	]).stdout.trim()
 }
 
 function parse_issue_number(): string {
@@ -65,28 +71,22 @@ function display_issue_info(
 
 function ensure_in_progress_label(): void {
 	try {
-		execFileSync(
-			'gh',
-			[
-				'label',
-				'create',
-				IN_PROGRESS_LABEL,
-				'--color',
-				IN_PROGRESS_COLOR,
-				'--description',
-				IN_PROGRESS_DESCRIPTION,
-			],
-			{ encoding: 'utf8', stdio: 'pipe' },
-		)
+		execaSync('gh', [
+			'label',
+			'create',
+			IN_PROGRESS_LABEL,
+			'--color',
+			IN_PROGRESS_COLOR,
+			'--description',
+			IN_PROGRESS_DESCRIPTION,
+		])
 	} catch {
 		// Label already exists
 	}
 }
 
 function assign_in_progress_label(issue_number_string: string): void {
-	execFileSync('gh', ['issue', 'edit', issue_number_string, '--add-label', IN_PROGRESS_LABEL], {
-		encoding: 'utf8',
-	})
+	execaSync('gh', ['issue', 'edit', issue_number_string, '--add-label', IN_PROGRESS_LABEL])
 	console.info(`  Label:    ${IN_PROGRESS_LABEL} ✔`)
 }
 
