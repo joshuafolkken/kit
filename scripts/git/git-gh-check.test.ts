@@ -1,24 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const exec_mock = vi.hoisted(() => {
+const execa_mock = vi.hoisted(() => {
 	const state = { should_fail: false as boolean }
 
-	async function mock_exec_async(_command: string): Promise<{ stdout: string; stderr: string }> {
+	async function mock_execa(_cmd: string, _arguments: Array<string>): Promise<{ stdout: string }> {
 		if (state.should_fail) throw new Error('spawn gh ENOENT')
 
-		return await Promise.resolve({ stdout: 'gh version 2.0.0', stderr: '' })
+		return await Promise.resolve({ stdout: 'gh version 2.0.0' })
 	}
 
-	return { state, mock_exec_async }
+	return { state, mock_execa }
 })
 
-vi.mock('node:util', () => ({
-	promisify: () => exec_mock.mock_exec_async,
+vi.mock('execa', () => ({
+	execa: execa_mock.mock_execa,
 }))
 
 beforeEach(() => {
 	vi.resetModules()
-	exec_mock.state.should_fail = false
+	execa_mock.state.should_fail = false
 })
 
 describe('check_gh_installed', () => {
@@ -29,7 +29,7 @@ describe('check_gh_installed', () => {
 	})
 
 	it('throws GH_NOT_INSTALLED_MSG when exec fails', async () => {
-		exec_mock.state.should_fail = true
+		execa_mock.state.should_fail = true
 
 		const { check_gh_installed, GH_NOT_INSTALLED_MSG } = await import('./git-gh-check')
 
@@ -40,7 +40,7 @@ describe('check_gh_installed', () => {
 		const { check_gh_installed } = await import('./git-gh-check')
 
 		await check_gh_installed()
-		exec_mock.state.should_fail = true
+		execa_mock.state.should_fail = true
 
 		await expect(check_gh_installed()).resolves.toBeUndefined()
 	})

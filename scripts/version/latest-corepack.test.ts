@@ -1,5 +1,22 @@
-import { describe, expect, it, vi } from 'vitest'
+import { execaSync } from 'execa'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_corepack } from './latest-corepack'
+
+vi.mock('execa', () => ({ execaSync: vi.fn() }))
+
+const mocked_execa_sync = vi.mocked(execaSync)
+
+type ExecaSyncResult = ReturnType<typeof execaSync>
+
+function fake_sync_result(exit_code: number | undefined): ExecaSyncResult {
+	const result = { exitCode: exit_code }
+
+	return result as unknown as ExecaSyncResult
+}
+
+beforeEach(() => {
+	vi.clearAllMocks()
+})
 
 const PACKAGE_JSON_V11 = '{"packageManager":"pnpm@11.4.0+sha512.abc"}'
 const PACKAGE_JSON_V10 = '{"packageManager":"pnpm@10.34.1+sha512.def"}'
@@ -38,6 +55,26 @@ describe('latest_corepack.resolve_corepack_target', () => {
 
 	it('resolves a v10 pin to latest-10, not the volatile latest tag', () => {
 		expect(latest_corepack.resolve_corepack_target(PACKAGE_JSON_V10)).toBe('pnpm@latest-10')
+	})
+})
+
+describe('latest_corepack.run_corepack', () => {
+	it('returns 0 when corepack succeeds', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+
+		expect(latest_corepack.run_corepack(TARGET_V11)).toBe(0)
+	})
+
+	it('returns the non-zero exit code from corepack', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(1))
+
+		expect(latest_corepack.run_corepack(TARGET_V11)).toBe(1)
+	})
+
+	it('falls back to 1 when exitCode is undefined', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
+
+		expect(latest_corepack.run_corepack(TARGET_V11)).toBe(1)
 	})
 })
 

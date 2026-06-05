@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const spawn_mock = vi.hoisted(() => vi.fn())
+const execa_sync_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('node:child_process', () => ({ spawnSync: spawn_mock }))
+vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 
 vi.mock('./init/init-paths', () => ({ PROJECT_ROOT: '/fake/root' }))
 
@@ -11,32 +11,32 @@ const REPO_NAME = 'owner/repo'
 const { gh_spawn } = await import('./gh-spawn')
 
 beforeEach(() => {
-	spawn_mock.mockReset()
+	execa_sync_mock.mockReset()
 })
 
 describe('gh_spawn.get_repo_name_with_owner — success', () => {
-	it('returns trimmed stdout when status is 0 and stdout is non-empty', () => {
-		spawn_mock.mockReturnValue({ status: 0, stdout: `  ${REPO_NAME}\n` })
+	it('returns trimmed stdout when exitCode is 0 and stdout is non-empty', () => {
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: `  ${REPO_NAME}\n` })
 
 		expect(gh_spawn.get_repo_name_with_owner()).toBe(REPO_NAME)
 	})
 })
 
 describe('gh_spawn.get_repo_name_with_owner — failure', () => {
-	it('returns undefined when status is non-zero', () => {
-		spawn_mock.mockReturnValue({ status: 1, stdout: '' })
+	it('returns undefined when exitCode is non-zero', () => {
+		execa_sync_mock.mockReturnValue({ exitCode: 1, stdout: '' })
 
 		expect(gh_spawn.get_repo_name_with_owner()).toBeUndefined()
 	})
 
 	it('returns undefined when stdout is empty', () => {
-		spawn_mock.mockReturnValue({ status: 0, stdout: '' })
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '' })
 
 		expect(gh_spawn.get_repo_name_with_owner()).toBeUndefined()
 	})
 
 	it('returns undefined when stdout is only whitespace', () => {
-		spawn_mock.mockReturnValue({ status: 0, stdout: '   ' })
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '   ' })
 
 		expect(gh_spawn.get_repo_name_with_owner()).toBeUndefined()
 	})

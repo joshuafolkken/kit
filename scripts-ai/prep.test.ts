@@ -10,8 +10,8 @@ vi.mock('../scripts/git/git-command', () => ({
 	git_command: { checkout: checkout_mock, pull: pull_mock },
 }))
 
-vi.mock('node:child_process', () => ({
-	execSync: vi.fn(),
+vi.mock('execa', () => ({
+	execaSync: vi.fn(),
 }))
 
 const write_file_spy = vi.hoisted(() => vi.fn())

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const spawn_mock = vi.hoisted(() => vi.fn())
+const execa_sync_mock = vi.hoisted(() => vi.fn())
 const read_mock = vi.hoisted(() => vi.fn())
 const write_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('node:child_process', () => ({ spawnSync: spawn_mock }))
+vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 vi.mock('node:fs', () => ({ readFileSync: read_mock, writeFileSync: write_mock }))
 
 const { preinstall_version_update } = await import('./preinstall-version-update')
@@ -19,7 +19,7 @@ const PKG_WITHOUT_SAFE_CHAIN = JSON.stringify({
 const PACKAGE_JSON_PATH = 'package.json'
 
 beforeEach(() => {
-	spawn_mock.mockReset()
+	execa_sync_mock.mockReset()
 	read_mock.mockReset()
 	write_mock.mockReset()
 })
@@ -37,15 +37,15 @@ describe('preinstall_version_update.extract_pinned_version', () => {
 })
 
 describe('preinstall_version_update.fetch_latest_version', () => {
-	it('passes a timeout option to spawnSync', () => {
-		spawn_mock.mockReturnValue({ status: 0, stdout: '1.5.1\n' })
+	it('passes a timeout option to execaSync', () => {
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '1.5.1\n' })
 		preinstall_version_update.fetch_latest_version()
 
-		expect(spawn_mock).toHaveBeenCalledWith('npm', ['view', '@aikidosec/safe-chain', 'version'], {
-			encoding: 'utf8',
-			shell: false,
-			timeout: 30_000,
-		})
+		expect(execa_sync_mock).toHaveBeenCalledWith(
+			'npm',
+			['view', '@aikidosec/safe-chain', 'version'],
+			{ reject: false, timeout: 30_000 },
+		)
 	})
 })
 
@@ -72,7 +72,7 @@ describe('preinstall_version_update.sync — no-op cases', () => {
 
 	it('warns and skips when npm view fails', () => {
 		read_mock.mockReturnValue(PKG_WITH_SAFE_CHAIN)
-		spawn_mock.mockReturnValue({ status: 1, stdout: '' })
+		execa_sync_mock.mockReturnValue({ exitCode: 1, stdout: '' })
 		const warn_spy = vi.spyOn(console, 'warn')
 
 		preinstall_version_update.sync(PACKAGE_JSON_PATH)
@@ -84,7 +84,7 @@ describe('preinstall_version_update.sync — no-op cases', () => {
 
 	it('does not write when version is already current', () => {
 		read_mock.mockReturnValue(PKG_WITH_SAFE_CHAIN)
-		spawn_mock.mockReturnValue({ status: 0, stdout: '1.5.1\n' })
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '1.5.1\n' })
 		preinstall_version_update.sync(PACKAGE_JSON_PATH)
 		expect(write_mock).not.toHaveBeenCalled()
 	})
@@ -93,7 +93,7 @@ describe('preinstall_version_update.sync — no-op cases', () => {
 describe('preinstall_version_update.sync — write case', () => {
 	it('writes updated content when a newer version is available', () => {
 		read_mock.mockReturnValue(PKG_WITH_SAFE_CHAIN)
-		spawn_mock.mockReturnValue({ status: 0, stdout: '2.0.0\n' })
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '2.0.0\n' })
 		preinstall_version_update.sync(PACKAGE_JSON_PATH)
 		expect(write_mock).toHaveBeenCalledWith(
 			PACKAGE_JSON_PATH,

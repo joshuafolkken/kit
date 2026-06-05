@@ -1,8 +1,8 @@
-import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { package_version_schema, package_with_deps_schema } from '#scripts/schemas'
+import { execaSync } from 'execa'
 import {
 	ALIASES,
 	CATEGORY_ORDER,
@@ -115,32 +115,45 @@ function format_help(): string {
 	return [HEADER, '', sections.join('\n\n'), '', USAGE].join('\n')
 }
 
+// A numeric exit code — zero or not — means the command ran; return it verbatim.
+// `exitCode: undefined` means it never produced one: either a true spawn failure
+// (the replacement for spawnSync's `result.error`) or a signal kill. Only the
+// former is reported as a spawn error; a signal kill falls back to 1, matching the
+// previous `result.status ?? 1`.
+function resolve_spawn_exit(
+	executable: string,
+	result: {
+		exitCode?: number | undefined
+		isTerminated?: boolean
+		shortMessage?: string | undefined
+	},
+): number {
+	if (result.exitCode !== undefined) return result.exitCode
+	if (result.isTerminated === true) return 1
+
+	console.error(`Failed to execute ${executable}: ${result.shortMessage ?? 'spawn failed'}`)
+
+	return SPAWN_ERROR_EXIT_CODE
+}
+
 function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
-	const result = spawnSync(tsx_executable, script_arguments, {
+	const result = execaSync(tsx_executable, script_arguments, {
 		stdio: 'inherit',
 		shell: process.platform === 'win32',
+		reject: false,
 	})
 
-	if (result.error) {
-		console.error(`Failed to execute ${tsx_executable}: ${result.error.message}`)
-
-		return SPAWN_ERROR_EXIT_CODE
-	}
-
-	return result.status ?? 1
+	return resolve_spawn_exit(tsx_executable, result)
 }
 
 function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): number {
 	const [executable = '', ...rest_arguments] = shell
-	const result = spawnSync(executable, [...rest_arguments, ...extra], { stdio: 'inherit' })
+	const result = execaSync(executable, [...rest_arguments, ...extra], {
+		stdio: 'inherit',
+		reject: false,
+	})
 
-	if (result.error) {
-		console.error(`Failed to execute ${executable}: ${result.error.message}`)
-
-		return SPAWN_ERROR_EXIT_CODE
-	}
-
-	return result.status ?? 1
+	return resolve_spawn_exit(executable, result)
 }
 
 function is_sveltekit_guard_failed(cmd: string, entry: CommandEntry): boolean {

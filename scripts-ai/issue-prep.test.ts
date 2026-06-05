@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 const MOCK_ISSUE_TITLE = vi.hoisted(() => 'Fix login bug')
 const IN_PROGRESS_LABEL = 'in-progress'
-const exec_file_spy = vi.hoisted(() => vi.fn().mockReturnValue(`${MOCK_ISSUE_TITLE}\n`))
+const execa_sync_spy = vi.hoisted(() =>
+	vi.fn().mockReturnValue({ stdout: `${MOCK_ISSUE_TITLE}\n` }),
+)
 
-vi.mock('node:child_process', () => ({
-	execFileSync: exec_file_spy,
+vi.mock('execa', () => ({
+	execaSync: execa_sync_spy,
 }))
 
 vi.mock('../scripts/issue/issue-logic', () => ({
@@ -34,44 +36,44 @@ describe('display_language_status', () => {
 	})
 })
 
-describe('fetch_issue_title — safe execFileSync usage', () => {
-	it('calls execFileSync with gh and issue view arguments', () => {
+describe('fetch_issue_title — safe execaSync usage', () => {
+	it('calls execaSync with gh and issue view arguments', () => {
 		issue_prep.fetch_issue_title('42')
 
-		expect(exec_file_spy).toHaveBeenCalledWith(
-			'gh',
-			['issue', 'view', '42', '--json', 'title', '--jq', '.title'],
-			{ encoding: 'utf8' },
-		)
+		expect(execa_sync_spy).toHaveBeenCalledWith('gh', [
+			'issue',
+			'view',
+			'42',
+			'--json',
+			'title',
+			'--jq',
+			'.title',
+		])
 	})
 
-	it('returns trimmed title from execFileSync output', () => {
+	it('returns trimmed title from execaSync output', () => {
 		expect(issue_prep.fetch_issue_title('42')).toBe(MOCK_ISSUE_TITLE)
 	})
 })
 
 describe('ensure_in_progress_label', () => {
-	it('calls execFileSync with gh label create arguments', () => {
-		exec_file_spy.mockClear()
+	it('calls execaSync with gh label create arguments', () => {
+		execa_sync_spy.mockClear()
 		issue_prep.ensure_in_progress_label()
 
-		expect(exec_file_spy).toHaveBeenCalledWith(
-			'gh',
-			[
-				'label',
-				'create',
-				IN_PROGRESS_LABEL,
-				'--color',
-				'#0075ca',
-				'--description',
-				'Work is actively in progress',
-			],
-			{ encoding: 'utf8', stdio: 'pipe' },
-		)
+		expect(execa_sync_spy).toHaveBeenCalledWith('gh', [
+			'label',
+			'create',
+			IN_PROGRESS_LABEL,
+			'--color',
+			'#0075ca',
+			'--description',
+			'Work is actively in progress',
+		])
 	})
 
-	it('does not throw when execFileSync throws', () => {
-		exec_file_spy.mockImplementationOnce(() => {
+	it('does not throw when execaSync throws', () => {
+		execa_sync_spy.mockImplementationOnce(() => {
 			throw new Error('already exists')
 		})
 
@@ -82,14 +84,16 @@ describe('ensure_in_progress_label', () => {
 })
 
 describe('assign_in_progress_label', () => {
-	it('calls execFileSync with gh issue edit and add-label in-progress', () => {
-		exec_file_spy.mockClear()
+	it('calls execaSync with gh issue edit and add-label in-progress', () => {
+		execa_sync_spy.mockClear()
 		issue_prep.assign_in_progress_label('42')
 
-		expect(exec_file_spy).toHaveBeenCalledWith(
-			'gh',
-			['issue', 'edit', '42', '--add-label', IN_PROGRESS_LABEL],
-			{ encoding: 'utf8' },
-		)
+		expect(execa_sync_spy).toHaveBeenCalledWith('gh', [
+			'issue',
+			'edit',
+			'42',
+			'--add-label',
+			IN_PROGRESS_LABEL,
+		])
 	})
 })
