@@ -233,6 +233,17 @@ pnpm josh reconcile-templates --check    # verify templates are in sync; non-zer
 
 Tripwire hashes live in `.template-source-manifest.json` at the repo root (kit-internal; not distributed). A pre-commit hook runs `--check` whenever a tracked source or copy template is staged: a copy pair that is out of date, or a tripwire source that changed without being reconciled, blocks the commit. Run `pnpm josh reconcile-templates` (reviewing any tripwire template first), then commit the regenerated copies and updated manifest alongside the source.
 
+### `josh sync-workflow-pins`
+
+Keep the action SHA pins in `templates/workflows/*` in sync with `.github/workflows/*`. The runtime workflows are the single source of truth for pins; the distributed templates intentionally diverge in structure (steps, commands, comment language), so only the `uses:` SHA pins are propagated.
+
+```bash
+pnpm josh sync-workflow-pins           # rewrite template pins to match the runtime workflows
+pnpm josh sync-workflow-pins --check    # verify pins are in sync; non-zero on drift
+```
+
+Dependabot bumps the runtime workflows under `.github/workflows/` only, so an action bump leaves the templates behind and trips the SHA-parity unit test. After such a bump (e.g. on a Dependabot PR), run `pnpm josh sync-workflow-pins` and commit the synced templates. The command errors if a single action is pinned to conflicting SHAs across the runtime workflows.
+
 ### `josh latest`
 
 Update pnpm via corepack, update all dependencies to latest, and run a security audit.
