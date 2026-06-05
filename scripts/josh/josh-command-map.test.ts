@@ -189,6 +189,10 @@ describe('ALIASES — new command aliases', () => {
 	it('resolves he alias to health', () => {
 		expect(get_alias('he')).toBe(HEALTH_COMMAND)
 	})
+
+	it('resolves swp alias to sync-workflow-pins', () => {
+		expect(get_alias('swp')).toBe('sync-workflow-pins')
+	})
 })
 
 describe('COMMAND_MAP — project-pinned shim removal', () => {
