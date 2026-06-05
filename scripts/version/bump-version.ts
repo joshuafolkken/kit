@@ -3,30 +3,19 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { json_object_schema, package_with_version_schema } from '#scripts/schemas'
+import semver from 'semver'
 
 const VALID_BUMP_TYPES = ['major', 'minor', 'patch'] as const
 type BumpType = (typeof VALID_BUMP_TYPES)[number]
 
-const MAJOR_INDEX = 1
-const MINOR_INDEX = 2
-const PATCH_INDEX = 3
 const PACKAGE_JSON_INDENT = '\t'
 
 function compute_new_version(version: string, bump_type: BumpType): string {
-	const match = /^(\d+)\.(\d+)\.(\d+)$/u.exec(version)
+	const new_version = semver.inc(version, bump_type)
 
-	if (!match) {
-		throw new Error(`Invalid or pre-release version format (not supported): ${version}`)
-	}
+	if (new_version === null) throw new Error(`Invalid version format: ${version}`)
 
-	const major = Number(match[MAJOR_INDEX])
-	const minor = Number(match[MINOR_INDEX])
-	const patch = Number(match[PATCH_INDEX])
-
-	if (bump_type === 'major') return `${String(major + 1)}.0.0`
-	if (bump_type === 'minor') return `${String(major)}.${String(minor + 1)}.0`
-
-	return `${String(major)}.${String(minor)}.${String(patch + 1)}`
+	return new_version
 }
 
 function bump_version(bump_type: BumpType): void {

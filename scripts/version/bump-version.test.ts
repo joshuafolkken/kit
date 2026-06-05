@@ -8,20 +8,42 @@ vi.mock('node:fs', () => ({
 }))
 
 const { readFileSync: read_file_sync, writeFileSync: write_file_sync } = await import('node:fs')
-const { bump_version } = await import('./bump-version')
+const { bump_version, compute_new_version } = await import('./bump-version')
 
 const import_time_write_calls = vi.mocked(write_file_sync).mock.calls.length
 
-const MOCK_PKG = JSON.stringify({ name: 'kit', version: '1.2.3' }, undefined, '\t')
+const BASE_VERSION = '1.2.3'
+const PATCH = 'patch'
+const MINOR = 'minor'
+const MAJOR = 'major'
+const MOCK_PKG = JSON.stringify({ name: 'kit', version: BASE_VERSION }, undefined, '\t')
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.mocked(read_file_sync).mockReturnValue(MOCK_PKG)
 })
 
+describe('compute_new_version — semver increment', () => {
+	it('returns the next patch version', () => {
+		expect(compute_new_version(BASE_VERSION, PATCH)).toBe('1.2.4')
+	})
+
+	it('returns the next minor version', () => {
+		expect(compute_new_version(BASE_VERSION, MINOR)).toBe('1.3.0')
+	})
+
+	it('returns the next major version', () => {
+		expect(compute_new_version(BASE_VERSION, MAJOR)).toBe('2.0.0')
+	})
+
+	it('throws for an invalid version string', () => {
+		expect(() => compute_new_version('not-a-version', PATCH)).toThrow('Invalid version format')
+	})
+})
+
 describe('bump_version — version increment', () => {
 	it('increments patch version', () => {
-		bump_version('patch')
+		bump_version(PATCH)
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -30,7 +52,7 @@ describe('bump_version — version increment', () => {
 	})
 
 	it('increments minor version and resets patch', () => {
-		bump_version('minor')
+		bump_version(MINOR)
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -39,7 +61,7 @@ describe('bump_version — version increment', () => {
 	})
 
 	it('increments major version and resets minor and patch', () => {
-		bump_version('major')
+		bump_version(MAJOR)
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -50,7 +72,7 @@ describe('bump_version — version increment', () => {
 
 describe('bump_version — key order preservation', () => {
 	it('preserves original key order after version bump', () => {
-		bump_version('patch')
+		bump_version(PATCH)
 
 		expect(vi.mocked(write_file_sync)).toHaveBeenCalledWith(
 			expect.any(String),
@@ -61,7 +83,7 @@ describe('bump_version — key order preservation', () => {
 
 describe('bump_version — JSON-safe write', () => {
 	it('writes valid parseable JSON after version bump', () => {
-		bump_version('patch')
+		bump_version(PATCH)
 
 		const [, written_content] = vi.mocked(write_file_sync).mock.calls[0] ?? []
 

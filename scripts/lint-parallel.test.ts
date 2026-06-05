@@ -1,39 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('node:child_process', () => ({
-	spawn: vi.fn(),
+vi.mock('execa', () => ({
+	execa: vi.fn(),
 }))
 
-type CloseListener = (code: number) => void
-type DataListener = (data: Buffer) => void
-
-interface FakeStream {
-	on: (event: string, listener: DataListener) => void
-}
-
-interface FakeProcess {
-	stdout: FakeStream
-	stderr: FakeStream
-	on: (event: 'close', listener: CloseListener) => void
-}
-
-function make_fake_process(exit_code: number): FakeProcess {
-	const noop_stream: FakeStream = { on: vi.fn() }
-
-	return {
-		stdout: noop_stream,
-		stderr: noop_stream,
-		on(_event: 'close', listener: CloseListener) {
-			setTimeout(() => {
-				listener(exit_code)
-			}, 0)
-		},
-	}
-}
-
 const { run_lint_parallel_checks } = await import('./lint-parallel')
-const child_process_module = await import('node:child_process')
-const mocked_spawn = vi.mocked(child_process_module.spawn)
+const execa_module = await import('execa')
+const mocked_execa = vi.mocked(execa_module.execa)
+
+type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
+
+// execa's resolved Result is a large interface; the lint check only reads
+// `all` and `exitCode`, so a minimal stub is bridged through `unknown`.
+function fake_result(exit_code: number): ExecaResult {
+	const result = { all: '', exitCode: exit_code }
+
+	return result as unknown as ExecaResult
+}
+
+function mock_exit_codes(prettier_code: number, eslint_code: number): void {
+	mocked_execa
+		.mockResolvedValueOnce(fake_result(prettier_code))
+		.mockResolvedValueOnce(fake_result(eslint_code))
+}
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -41,9 +30,7 @@ beforeEach(() => {
 
 describe('run_lint_parallel_checks', () => {
 	it('returns 0 when both prettier and eslint pass', async () => {
-		mocked_spawn
-			.mockReturnValueOnce(make_fake_process(0) as ReturnType<typeof child_process_module.spawn>)
-			.mockReturnValueOnce(make_fake_process(0) as ReturnType<typeof child_process_module.spawn>)
+		mock_exit_codes(0, 0)
 
 		const code = await run_lint_parallel_checks()
 
@@ -51,9 +38,7 @@ describe('run_lint_parallel_checks', () => {
 	})
 
 	it('returns 1 when prettier fails', async () => {
-		mocked_spawn
-			.mockReturnValueOnce(make_fake_process(1) as ReturnType<typeof child_process_module.spawn>)
-			.mockReturnValueOnce(make_fake_process(0) as ReturnType<typeof child_process_module.spawn>)
+		mock_exit_codes(1, 0)
 
 		const code = await run_lint_parallel_checks()
 
@@ -61,9 +46,7 @@ describe('run_lint_parallel_checks', () => {
 	})
 
 	it('returns 1 when eslint fails', async () => {
-		mocked_spawn
-			.mockReturnValueOnce(make_fake_process(0) as ReturnType<typeof child_process_module.spawn>)
-			.mockReturnValueOnce(make_fake_process(1) as ReturnType<typeof child_process_module.spawn>)
+		mock_exit_codes(0, 1)
 
 		const code = await run_lint_parallel_checks()
 
@@ -71,9 +54,7 @@ describe('run_lint_parallel_checks', () => {
 	})
 
 	it('returns 1 when both fail', async () => {
-		mocked_spawn
-			.mockReturnValueOnce(make_fake_process(1) as ReturnType<typeof child_process_module.spawn>)
-			.mockReturnValueOnce(make_fake_process(1) as ReturnType<typeof child_process_module.spawn>)
+		mock_exit_codes(1, 1)
 
 		const code = await run_lint_parallel_checks()
 

@@ -1,113 +1,50 @@
-import { spawn, type ChildProcessByStdio } from 'node:child_process'
-import type { Readable, Writable } from 'node:stream'
+import { execa } from 'execa'
 import { check_gh_installed } from './git-gh-check'
 
 const BODY_FILE_FLAG = '--body-file'
 const BODY_FROM_STDIN = '-'
 
-interface GhSpawnResult {
-	stdout: string
-	stderr: string
-	exit_code: number | null
-}
-
 function has_stderr_field(error: unknown): error is Error & { stderr: string } {
 	return error instanceof Error && 'stderr' in error && typeof error.stderr === 'string'
 }
 
-function build_error_message(error: unknown): string {
-	const error_message = error instanceof Error ? error.message : String(error)
-	const stderr = has_stderr_field(error) ? error.stderr : ''
+// Surface the gh CLI's stderr as the thrown message when present (matching the
+// previous spawn behavior), otherwise fall back to execa's own message.
+function to_gh_error(error: unknown): Error {
+	const stderr = has_stderr_field(error) ? error.stderr.trim() : ''
 
-	return stderr.length > 0 ? `${error_message}\n${stderr}` : error_message
-}
+	if (stderr.length > 0) return new Error(stderr, { cause: error })
 
-function parse_buffer_to_string(chunk: string | Buffer): string {
-	return typeof chunk === 'string' ? chunk : chunk.toString('utf8')
-}
+	const message = error instanceof Error ? error.message : String(error)
 
-function resolve_exit_code(code: number | null): string {
-	return code === null ? 'unknown' : String(code)
-}
-
-function create_gh_spawn(
-	arguments_: Array<string>,
-): ChildProcessByStdio<Writable, Readable, Readable> {
-	return spawn('gh', arguments_, {
-		stdio: ['pipe', 'pipe', 'pipe'],
-		shell: false,
-	})
-}
-
-async function collect_gh_spawn_result(
-	child: ReturnType<typeof create_gh_spawn>,
-): Promise<GhSpawnResult> {
-	return await new Promise<GhSpawnResult>((resolve, reject) => {
-		let stdout = ''
-		let stderr = ''
-
-		child.stdout.on('data', (chunk: string | Buffer) => {
-			stdout += parse_buffer_to_string(chunk)
-		})
-
-		child.stderr.on('data', (chunk: string | Buffer) => {
-			stderr += parse_buffer_to_string(chunk)
-		})
-		child.on('error', (error) => {
-			reject(new Error(build_error_message(error), { cause: error }))
-		})
-		child.on('close', (code) => {
-			resolve({ stdout, stderr, exit_code: code })
-		})
-	})
-}
-
-function extract_spawn_output(result: GhSpawnResult): string {
-	if (result.exit_code === 0) return result.stdout.trimEnd()
-
-	const stderr = result.stderr.trim()
-	if (stderr.length > 0) throw new Error(stderr)
-
-	throw new Error(`gh command failed: ${resolve_exit_code(result.exit_code)}`)
-}
-
-async function run_gh_spawn_read(arguments_: Array<string>): Promise<GhSpawnResult> {
-	await check_gh_installed()
-	const child = create_gh_spawn(arguments_)
-	const result_promise = collect_gh_spawn_result(child)
-
-	child.stdin.end()
-
-	return await result_promise
+	return new Error(message, { cause: error })
 }
 
 async function exec_gh_command(arguments_: Array<string>): Promise<string> {
-	const result = await run_gh_spawn_read(arguments_)
-
-	return extract_spawn_output(result)
-}
-
-async function run_gh_with_stdin(input: {
-	args: Array<string>
-	stdin_body: string
-}): Promise<GhSpawnResult> {
 	await check_gh_installed()
-	const child = create_gh_spawn(input.args)
-	const result_promise = collect_gh_spawn_result(child)
 
-	child.stdin.write(input.stdin_body)
-	child.stdin.end()
+	try {
+		const { stdout } = await execa('gh', arguments_)
 
-	return await result_promise
+		return stdout.trimEnd()
+	} catch (error) {
+		throw to_gh_error(error)
+	}
 }
 
 async function exec_gh_command_with_stdin(input: {
 	args: Array<string>
 	stdin_body: string
 }): Promise<string> {
-	const result = await run_gh_with_stdin(input)
+	await check_gh_installed()
 
-	return extract_spawn_output(result)
+	try {
+		const { stdout } = await execa('gh', input.args, { input: input.stdin_body })
+
+		return stdout.trimEnd()
+	} catch (error) {
+		throw to_gh_error(error)
+	}
 }
 
 const git_gh_exec = {
@@ -116,4 +53,3 @@ const git_gh_exec = {
 }
 
 export { git_gh_exec, has_stderr_field, BODY_FILE_FLAG, BODY_FROM_STDIN }
-export type { GhSpawnResult }
