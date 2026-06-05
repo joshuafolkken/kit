@@ -64,6 +64,12 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no a
 - After running `pnpm update`, `josh latest`, or any dependency-update command, verify that `pnpm.overrides` is unchanged **and** that `devDependencies` versions still respect the overrides. If any entry was removed, modified, or bumped past an override, restore it immediately.
 - **NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation. `devEngines` pins the required development toolchain (e.g. pnpm version); silently changing it can break CI or other contributors' environments. After any dependency-update command, verify `devEngines` is unchanged. If it was modified, restore it immediately and ask the user before making any change.
 
+## Package-First Development
+
+- Before building any system or feature, do NOT write original code first — check whether a well-maintained existing package already solves the problem.
+- Prefer modern, actively-maintained packages. Present about three recommended options ranked by recommendation in a comparison table (maintenance/activity, popularity, bundle size, TypeScript support, license, fit), then let the user choose.
+- For existing code as well, proactively propose replacing hand-rolled implementations with a suitable package when it improves maintainability.
+
 ## Code Change Rules
 
 For every code modification, follow this order exactly:
