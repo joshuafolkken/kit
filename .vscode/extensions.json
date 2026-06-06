@@ -3,7 +3,6 @@
 		"esbenp.prettier-vscode",
 		"dbaeumer.vscode-eslint",
 		"streetsidesoftware.code-spell-checker",
-		"github.vscode-pull-request-github",
 		"github.vscode-github-actions",
 		"pkief.material-icon-theme",
 		"mhutchie.git-graph",
@@ -11,6 +10,13 @@
 		"yoavbls.pretty-ts-errors",
 		"eamodio.gitlens",
 		"sonarsource.sonarlint-vscode",
-		"vitest.explorer"
+		"vitest.explorer",
+		"anthropic.claude-code",
+		"github.github-vscode-theme",
+		"ms-playwright.playwright",
+		"svelte.svelte-vscode",
+		"bradlc.vscode-tailwindcss",
+		"coderabbit.coderabbit-vscode",
+		"inlang.vs-code-extension"
 	]
 }

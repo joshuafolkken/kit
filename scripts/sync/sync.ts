@@ -206,7 +206,7 @@ function sync_config_files(type: ProjectType): void {
 	sync_configs.sync_tsconfig(path.join(PROJECT_ROOT, 'tsconfig.json'), type)
 	sync_configs.sync_cspell_config(path.join(PROJECT_ROOT, 'cspell.config.yaml'), type)
 	sync_configs.sync_lefthook_config(path.join(PROJECT_ROOT, 'lefthook.yml'), type)
-	sync_configs.sync_vscode_extensions_json(path.join(PROJECT_ROOT, '.vscode/extensions.json'), type)
+	sync_configs.sync_vscode_extensions_json(path.join(PROJECT_ROOT, '.vscode/extensions.json'))
 	sync_configs.sync_vscode_settings_json(path.join(PROJECT_ROOT, '.vscode/settings.json'), type)
 
 	if (type === 'sveltekit') {
