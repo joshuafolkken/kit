@@ -6,11 +6,6 @@ import { package_path } from './init-paths'
 
 const PRETTIER_CONFIG_JS = 'prettier.config.js'
 
-const VSCODE_FILENAMES: Record<ProjectType, { extensions: string; settings: string }> = {
-	sveltekit: { extensions: 'extensions.sveltekit.json', settings: 'settings.sveltekit.json' },
-	vanilla: { extensions: 'extensions.json', settings: 'settings.json' },
-}
-
 interface FileAction {
 	dest: string
 	create: () => string
@@ -32,27 +27,24 @@ function build_action(destination: string, create: () => string, merge: MergeFun
 }
 
 function build_vscode_actions(type: ProjectType): ReadonlyArray<FileAction> {
-	const filenames = VSCODE_FILENAMES[type]
-	const extensions_raw = vscode_settings_schema.parse(
-		read_package_json(path.join('.vscode', filenames.extensions)),
-	)
+	const extensions_path = path.join('.vscode', init_logic.VSCODE_EXTENSIONS_FILENAME)
+	const settings_path = path.join('.vscode', init_logic.get_vscode_settings_filename(type))
+	const extensions_raw = vscode_settings_schema.parse(read_package_json(extensions_path))
 	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 	const raw_recommendations = extensions_raw['recommendations']
 	const recommendations = string_array_schema.parse(raw_recommendations)
-	const settings_data = vscode_settings_schema.parse(
-		read_package_json(path.join('.vscode', filenames.settings)),
-	)
+	const settings_data = vscode_settings_schema.parse(read_package_json(settings_path))
 
 	return [
 		{
 			dest: '.vscode/extensions.json',
-			create: () => read_package_file(path.join('.vscode', filenames.extensions)),
+			create: () => read_package_file(extensions_path),
 			merge: (existing) =>
 				init_logic.merge_json_array_field(existing, 'recommendations', recommendations),
 		},
 		{
 			dest: '.vscode/settings.json',
-			create: () => read_package_file(path.join('.vscode', filenames.settings)),
+			create: () => read_package_file(settings_path),
 			merge: (existing) => init_logic.merge_json_object(existing, settings_data),
 		},
 	]

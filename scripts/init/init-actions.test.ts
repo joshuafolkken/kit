@@ -52,4 +52,18 @@ describe('init_actions.build_file_actions', () => {
 			expect(action.create().length).toBeGreaterThan(0)
 		}
 	})
+
+	it('distributes the common extensions.json regardless of project style', () => {
+		const extensions_create = (type: 'vanilla' | 'sveltekit'): string => {
+			const action = init_actions
+				.build_file_actions(type)
+				.find((candidate) => candidate.dest === VSCODE_EXTENSIONS)
+
+			expect(action).toBeDefined()
+
+			return action?.create() ?? ''
+		}
+
+		expect(extensions_create('sveltekit')).toBe(extensions_create('vanilla'))
+	})
 })

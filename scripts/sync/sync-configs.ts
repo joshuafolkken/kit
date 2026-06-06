@@ -4,11 +4,6 @@ import { init_logic, type ProjectType } from '#scripts/init/init-logic'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
 
-const VSCODE_FILENAMES: Record<ProjectType, { extensions: string; settings: string }> = {
-	sveltekit: { extensions: 'extensions.sveltekit.json', settings: 'settings.sveltekit.json' },
-	vanilla: { extensions: 'extensions.json', settings: 'settings.json' },
-}
-
 type MergeFunction = (existing: string) => string
 
 function sync_with_merge(
@@ -73,9 +68,9 @@ function read_kit_vscode_json(filename: string): unknown {
 	return JSON.parse(readFileSync(path.join(PACKAGE_DIR, '.vscode', filename), 'utf8'))
 }
 
-function read_vscode_recommendations(type: ProjectType): ReadonlyArray<string> {
+function read_vscode_recommendations(): ReadonlyArray<string> {
 	const parsed = vscode_settings_schema.parse(
-		read_kit_vscode_json(VSCODE_FILENAMES[type].extensions),
+		read_kit_vscode_json(init_logic.VSCODE_EXTENSIONS_FILENAME),
 	)
 	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 	const raw = parsed['recommendations']
@@ -83,8 +78,8 @@ function read_vscode_recommendations(type: ProjectType): ReadonlyArray<string> {
 	return string_array_schema.parse(raw)
 }
 
-function sync_vscode_extensions_json(destination_path: string, type: ProjectType): void {
-	const recommendations = read_vscode_recommendations(type)
+function sync_vscode_extensions_json(destination_path: string): void {
+	const recommendations = read_vscode_recommendations()
 
 	sync_with_merge(destination_path, '.vscode/extensions.json', (existing) =>
 		init_logic.merge_json_array_field(existing, 'recommendations', recommendations),
@@ -93,7 +88,7 @@ function sync_vscode_extensions_json(destination_path: string, type: ProjectType
 
 function sync_vscode_settings_json(destination_path: string, type: ProjectType): void {
 	const settings_data = vscode_settings_schema.parse(
-		read_kit_vscode_json(VSCODE_FILENAMES[type].settings),
+		read_kit_vscode_json(init_logic.get_vscode_settings_filename(type)),
 	)
 
 	sync_with_merge(destination_path, '.vscode/settings.json', (existing) =>
