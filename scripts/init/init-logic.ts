@@ -95,6 +95,14 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 	vanilla: './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
 }
 
+// extensions.json is distributed in common across project styles, so it is not keyed by ProjectType.
+const VSCODE_EXTENSIONS_FILENAME = 'extensions.json'
+
+const VSCODE_SETTINGS_FILENAMES: Record<ProjectType, string> = {
+	sveltekit: 'settings.sveltekit.json',
+	vanilla: 'settings.json',
+}
+
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	preinstall: SAFE_CHAIN_CMD,
 	prepare: PREPARE_CMD,
@@ -154,6 +162,10 @@ function get_lefthook_extends_value(type: ProjectType): string {
 
 function get_cspell_import_value(type: ProjectType): string {
 	return CSPELL_IMPORT[type]
+}
+
+function get_vscode_settings_filename(type: ProjectType): string {
+	return VSCODE_SETTINGS_FILENAMES[type]
 }
 
 function get_npmrc_lines(): ReadonlyArray<string> {
@@ -257,6 +269,8 @@ const init_logic = {
 	get_tsconfig_extends_entry,
 	get_lefthook_extends_value,
 	get_cspell_import_value,
+	get_vscode_settings_filename,
+	VSCODE_EXTENSIONS_FILENAME,
 	get_npmrc_lines,
 	get_development_engines_value,
 	get_ai_copy_files,

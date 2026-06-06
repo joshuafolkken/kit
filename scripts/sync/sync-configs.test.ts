@@ -271,7 +271,7 @@ function populate_via_sync<T extends ProjectType>(
 
 describe('sync_configs.sync_vscode_extensions_json', () => {
 	it('does nothing when .vscode/extensions.json does not exist', () => {
-		sync_configs.sync_vscode_extensions_json(VSCODE_EXTENSIONS_DEST, 'vanilla')
+		sync_configs.sync_vscode_extensions_json(VSCODE_EXTENSIONS_DEST)
 		expect(existsSync(VSCODE_EXTENSIONS_DEST)).toBe(false)
 	})
 
@@ -288,7 +288,7 @@ describe('sync_configs.sync_vscode_extensions_json', () => {
 				writeFileSync(VSCODE_EXTENSIONS_DEST, populated)
 			},
 			() => {
-				sync_configs.sync_vscode_extensions_json(VSCODE_EXTENSIONS_DEST, 'vanilla')
+				sync_configs.sync_vscode_extensions_json(VSCODE_EXTENSIONS_DEST)
 			},
 		)
 	})
@@ -296,7 +296,7 @@ describe('sync_configs.sync_vscode_extensions_json', () => {
 	it('adds missing recommendations when outdated', () => {
 		writeFileSync(VSCODE_EXTENSIONS_DEST, '{"recommendations": ["custom.extension"]}')
 		silence_console_info()
-		sync_configs.sync_vscode_extensions_json(VSCODE_EXTENSIONS_DEST, 'vanilla')
+		sync_configs.sync_vscode_extensions_json(VSCODE_EXTENSIONS_DEST)
 
 		const result = readFileSync(VSCODE_EXTENSIONS_DEST, 'utf8')
 
