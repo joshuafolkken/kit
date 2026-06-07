@@ -87,8 +87,10 @@ function sync_vscode_extensions_json(destination_path: string): void {
 }
 
 function sync_vscode_settings_json(destination_path: string, type: ProjectType): void {
-	const settings_data = vscode_settings_schema.parse(
-		read_kit_vscode_json(init_logic.get_vscode_settings_filename(type)),
+	const settings_data = init_logic.strip_kit_only_vscode_settings(
+		vscode_settings_schema.parse(
+			read_kit_vscode_json(init_logic.get_vscode_settings_filename(type)),
+		),
 	)
 
 	sync_with_merge(destination_path, '.vscode/settings.json', (existing) =>

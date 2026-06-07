@@ -66,6 +66,8 @@ These files are created by `josh init`. `josh sync` refreshes them in place by r
 
 Project type (`sveltekit` vs `vanilla`) is auto-detected from the presence of `svelte.config.{js,ts}`; `vite.config.ts` is only synced for SvelteKit projects.
 
+Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
+
 ## Path transformation
 
 `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`:
