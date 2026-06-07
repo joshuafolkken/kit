@@ -53,16 +53,16 @@ The project key and organization are derived from the `owner/repo` slug:
 
 These files are created by `josh init`. `josh sync` refreshes them in place by reusing the same merge functions `init` uses — never created on first run, so projects that opted out stay opted out. Each handler is idempotent: when the file is already current, it logs `unchanged` and skips the write.
 
-| File                      | Merge strategy                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| `.npmrc`                  | Append any missing lines from the kit's required-lines list                     |
-| `eslint.config.js`        | Overwrite with the current kit template (no merge — same model as Playwright)   |
-| `tsconfig.json`           | Prepend the kit preset to the `extends` array if not already present            |
-| `cspell.config.yaml`      | Prepend the kit import to the `import:` list if not already present             |
-| `lefthook.yml`            | Prepend the kit preset to the `extends:` list if not already present            |
-| `.vscode/extensions.json` | Append missing kit recommendations to `recommendations`                         |
-| `.vscode/settings.json`   | Add missing top-level keys (existing keys are never overwritten)                |
-| `vite.config.ts`          | Inject the `rollup-plugin-visualizer` import + plugin (SvelteKit projects only) |
+| File                      | Merge strategy                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `.npmrc`                  | Append any missing lines from the kit's required-lines list                                                                          |
+| `eslint.config.js`        | Overwrite with the current kit template (no merge — same model as Playwright)                                                        |
+| `tsconfig.json`           | Prepend the kit preset to the `extends` array if not already present                                                                 |
+| `cspell.config.yaml`      | Prepend the kit import to the `import:` list, unless already present or superseded by a transitive import (e.g. the game-kit import) |
+| `lefthook.yml`            | Prepend the kit preset to the `extends:` list if not already present                                                                 |
+| `.vscode/extensions.json` | Append missing kit recommendations to `recommendations`                                                                              |
+| `.vscode/settings.json`   | Add missing top-level keys (existing keys are never overwritten)                                                                     |
+| `vite.config.ts`          | Inject the `rollup-plugin-visualizer` import + plugin (SvelteKit projects only)                                                      |
 
 Project type (`sveltekit` vs `vanilla`) is auto-detected from the presence of `svelte.config.{js,ts}`; `vite.config.ts` is only synced for SvelteKit projects.
 
