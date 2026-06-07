@@ -3,6 +3,7 @@ import { init_logic } from './init-logic'
 
 const CSPELL_VALUE_VANILLA = '@joshuafolkken/kit/cspell'
 const CSPELL_VALUE_SVELTEKIT = '@joshuafolkken/kit/cspell/sveltekit'
+const CSPELL_VALUE_GAME = '@joshuafolkken/game-kit/cspell/game'
 const VERSION_LINE = "version: '0.2'\n"
 
 describe('generate_cspell_config', () => {
@@ -71,5 +72,26 @@ describe('merge_cspell_import', () => {
 		)
 
 		expect(result).toContain(CSPELL_VALUE_SVELTEKIT)
+	})
+})
+
+describe('merge_cspell_import superseding', () => {
+	it('skips base sveltekit import when superseding game import already present', () => {
+		const content = `${VERSION_LINE}import:\n  - '${CSPELL_VALUE_GAME}'\nwords: []\n`
+
+		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE_SVELTEKIT)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(CSPELL_VALUE_SVELTEKIT)
+	})
+
+	it('still adds base sveltekit import when no superseding import is present', () => {
+		const result = init_logic.merge_cspell_import(
+			`${VERSION_LINE}import:\n  - other\n`,
+			CSPELL_VALUE_SVELTEKIT,
+		)
+
+		expect(result).toContain(CSPELL_VALUE_SVELTEKIT)
+		expect(result).toContain('other')
 	})
 })
