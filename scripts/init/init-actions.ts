@@ -33,7 +33,9 @@ function build_vscode_actions(type: ProjectType): ReadonlyArray<FileAction> {
 	// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
 	const raw_recommendations = extensions_raw['recommendations']
 	const recommendations = string_array_schema.parse(raw_recommendations)
-	const settings_data = vscode_settings_schema.parse(read_package_json(settings_path))
+	const settings_data = init_logic.strip_kit_only_vscode_settings(
+		vscode_settings_schema.parse(read_package_json(settings_path)),
+	)
 
 	return [
 		{
@@ -44,7 +46,8 @@ function build_vscode_actions(type: ProjectType): ReadonlyArray<FileAction> {
 		},
 		{
 			dest: '.vscode/settings.json',
-			create: () => read_package_file(settings_path),
+			create: () =>
+				init_logic.strip_kit_only_vscode_settings_content(read_package_file(settings_path)),
 			merge: (existing) => init_logic.merge_json_object(existing, settings_data),
 		},
 	]

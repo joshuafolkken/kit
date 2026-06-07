@@ -1,3 +1,4 @@
+import { vscode_settings_schema } from '#scripts/schemas'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
 import { init_logic_sonar } from './init-logic-sonar'
@@ -103,6 +104,13 @@ const VSCODE_SETTINGS_FILENAMES: Record<ProjectType, string> = {
 	vanilla: 'settings.json',
 }
 
+// Keys that exist in the kit's own .vscode/settings.json for kit development but must
+// never be distributed to consumer projects (e.g. SonarLint connected-mode points at the
+// kit's own SonarQube project under the kit author's connection id).
+const KIT_ONLY_VSCODE_SETTINGS_KEYS: ReadonlySet<string> = new Set([
+	'sonarlint.connectedMode.project',
+])
+
 const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	preinstall: SAFE_CHAIN_CMD,
 	prepare: PREPARE_CMD,
@@ -166,6 +174,24 @@ function get_cspell_import_value(type: ProjectType): string {
 
 function get_vscode_settings_filename(type: ProjectType): string {
 	return VSCODE_SETTINGS_FILENAMES[type]
+}
+
+function strip_kit_only_vscode_settings(
+	settings: Record<string, unknown>,
+): Record<string, unknown> {
+	const entries = Object.entries(settings).filter(
+		([key]) => !KIT_ONLY_VSCODE_SETTINGS_KEYS.has(key),
+	)
+
+	return Object.fromEntries(entries)
+}
+
+function strip_kit_only_vscode_settings_content(raw: string): string {
+	const parsed = vscode_settings_schema.parse(JSON.parse(raw))
+	const stripped = strip_kit_only_vscode_settings(parsed)
+	if (Object.keys(stripped).length === Object.keys(parsed).length) return raw
+
+	return `${JSON.stringify(stripped, undefined, '\t')}\n`
 }
 
 function get_npmrc_lines(): ReadonlyArray<string> {
@@ -270,6 +296,8 @@ const init_logic = {
 	get_lefthook_extends_value,
 	get_cspell_import_value,
 	get_vscode_settings_filename,
+	strip_kit_only_vscode_settings,
+	strip_kit_only_vscode_settings_content,
 	VSCODE_EXTENSIONS_FILENAME,
 	get_npmrc_lines,
 	get_development_engines_value,

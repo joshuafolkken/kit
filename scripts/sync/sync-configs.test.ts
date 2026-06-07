@@ -255,6 +255,7 @@ describe('sync_configs.sync_lefthook_config', () => {
 
 const VSCODE_EXTENSIONS_DEST = path.join(VSCODE_DIR, 'extensions.json')
 const VSCODE_SETTINGS_DEST = path.join(VSCODE_DIR, 'settings.json')
+const EDITOR_FORMAT_ON_SAVE_KEY = 'editor.formatOnSave'
 
 function populate_via_sync<T extends ProjectType>(
 	initial_content: string,
@@ -337,6 +338,20 @@ describe('sync_configs.sync_vscode_settings_json', () => {
 		const result = readFileSync(VSCODE_SETTINGS_DEST, 'utf8')
 
 		expect(result).toContain('custom.key')
-		expect(result).toContain('editor.formatOnSave')
+		expect(result).toContain(EDITOR_FORMAT_ON_SAVE_KEY)
+	})
+})
+
+describe('sync_configs.sync_vscode_settings_json kit-only filtering', () => {
+	it('does not distribute kit-only SonarLint settings to consumers', () => {
+		const populated = populate_via_sync(
+			'{}',
+			sync_configs.sync_vscode_settings_json,
+			VSCODE_SETTINGS_DEST,
+			'vanilla',
+		)
+
+		expect(populated).not.toContain('sonarlint')
+		expect(populated).toContain(EDITOR_FORMAT_ON_SAVE_KEY)
 	})
 })

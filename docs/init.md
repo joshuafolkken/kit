@@ -32,6 +32,8 @@ Each file is either created (if missing) or merged (if it already exists). Files
 | `.vscode/extensions.json` | Created from package template                                     | Missing recommendations merged in                |
 | `.vscode/settings.json`   | Created from package template                                     | Missing keys merged in (existing keys untouched) |
 
+> Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
+
 ### tsconfig merge strategy
 
 The preset is **prepended** to the `extends` array so it does not override project-specific entries:
