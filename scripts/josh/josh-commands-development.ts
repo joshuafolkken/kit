@@ -69,8 +69,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 	},
 	'test:e2e': {
-		shell: [...PE, 'playwright', 'test'],
-		description: 'Run E2E tests with Playwright',
+		script: 'scripts/test-e2e-guard.ts',
+		description: 'Run E2E tests with Playwright (skips when absent or no e2e files)',
 		category: 'Development',
 	},
 	test: {
