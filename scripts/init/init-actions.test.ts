@@ -67,3 +67,18 @@ describe('init_actions.build_file_actions', () => {
 		expect(extensions_create('sveltekit')).toBe(extensions_create('vanilla'))
 	})
 })
+
+describe('init_actions vscode settings distribution', () => {
+	it('excludes kit-only SonarLint settings from the vanilla settings create output', () => {
+		const action = init_actions
+			.build_file_actions('vanilla')
+			.find((candidate) => candidate.dest === VSCODE_SETTINGS)
+
+		expect(action).toBeDefined()
+
+		const content = action?.create() ?? ''
+
+		expect(content).not.toContain('sonarlint')
+		expect(content).toContain('editor.formatOnSave')
+	})
+})
