@@ -69,6 +69,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'.github/workflows/sonar-qube.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',
+	'.github/dependabot.yml',
 	'.claude/settings.json',
 ]
 
