@@ -26,6 +26,7 @@ SECURITY.md         tsconfig.sonar.json wrangler.jsonc
 .github/workflows/sonar-qube.yml
 .github/pull_request_template.md
 .github/release.yml
+.github/dependabot.yml
 ```
 
 ### `pnpm-workspace.yaml` (merged)
