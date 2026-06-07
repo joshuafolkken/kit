@@ -26,4 +26,4 @@ pre-push:
       env:
         CI: '1'
         PLAYWRIGHT_HTML_OPEN: never
-      run: pnpm exec playwright test
+      run: pnpm josh test:e2e

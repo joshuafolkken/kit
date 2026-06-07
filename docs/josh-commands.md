@@ -45,7 +45,11 @@ pnpm josh test:unit
 
 ### `josh test:e2e`
 
-Run E2E tests with Playwright.
+Run E2E tests with Playwright. Because `@playwright/test` is an optional peer dependency
+and a fresh project may have no e2e suite yet, this command **skips gracefully (exit 0)**
+when `@playwright/test` is not installed or when no `*.e2e.{ts,js}` files exist — so the
+`pre-push` hook never blocks a project that has opted out of e2e. Once both the package and
+at least one e2e file are present, it runs `playwright test` as usual.
 
 ```bash
 pnpm josh test:e2e
