@@ -304,11 +304,9 @@ describe('COMMAND_MAP shell commands', () => {
 		expect(COMMAND_MAP['latest']?.shell?.[0]).toBe('sh')
 	})
 
-	it('test:e2e delegates to pnpm exec playwright test', () => {
-		const shell = COMMAND_MAP['test:e2e']?.shell ?? []
-
-		expect(shell).toContain('playwright')
-		expect(shell).toContain('pnpm')
+	it('test:e2e delegates to the guard script so it can skip when playwright is absent', () => {
+		expect(COMMAND_MAP['test:e2e']?.shell).toBeUndefined()
+		expect(COMMAND_MAP['test:e2e']?.script).toBe('scripts/test-e2e-guard.ts')
 	})
 
 	it('test uses sh -c for chaining test:unit and test:e2e', () => {
