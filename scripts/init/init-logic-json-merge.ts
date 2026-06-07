@@ -141,12 +141,33 @@ function insert_import_after_version(
 	])
 }
 
+// Maps a base cspell import to the imports that already provide it transitively. When
+// a superseding import is present, the base import is redundant and must not be added.
+// kit only string-matches the game import name here; it does not depend on game-kit.
+const CSPELL_SUPERSEDING_IMPORTS: ReadonlyArray<{
+	base: string
+	superseded_by: ReadonlyArray<string>
+}> = [
+	{
+		base: '@joshuafolkken/kit/cspell/sveltekit',
+		superseded_by: ['@joshuafolkken/game-kit/cspell/game'],
+	},
+]
+
+function is_cspell_import_superseded(value: string, existing: ReadonlyArray<string>): boolean {
+	const rule = CSPELL_SUPERSEDING_IMPORTS.find((entry) => entry.base === value)
+	if (rule === undefined) return false
+
+	return rule.superseded_by.some((entry) => existing.includes(entry))
+}
+
 function merge_cspell_import(content: string, value: string): string {
 	const parsed = parse_yaml(content)
 	// eslint-disable-next-line dot-notation -- 'import' from index signature requires bracket notation per noPropertyAccessFromIndexSignature
 	const existing_raw = parsed['import']
 	const existing = Array.isArray(existing_raw) ? string_array_schema.parse(existing_raw) : []
 	if (existing.includes(value)) return content
+	if (is_cspell_import_superseded(value, existing)) return content
 
 	const updated_list = [value, ...existing]
 
