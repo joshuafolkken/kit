@@ -32,10 +32,14 @@ function is_vitest_installed(project_directory: string): boolean {
 	return existsSync(path.join(project_directory, VITEST_PACKAGE))
 }
 
+function is_in_node_modules(entry: string): boolean {
+	return entry.split(/[/\\]/u).includes(NODE_MODULES)
+}
+
 function has_unit_tests(project_directory: string): boolean {
 	const matches = globSync(UNIT_GLOB, {
 		cwd: project_directory,
-		exclude: (entry) => entry.includes(NODE_MODULES),
+		exclude: is_in_node_modules,
 	})
 
 	return matches.length > 0

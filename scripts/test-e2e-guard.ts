@@ -32,10 +32,14 @@ function is_playwright_installed(project_directory: string): boolean {
 	return existsSync(path.join(project_directory, PLAYWRIGHT_PACKAGE))
 }
 
+function is_in_node_modules(entry: string): boolean {
+	return entry.split(/[/\\]/u).includes(NODE_MODULES)
+}
+
 function has_e2e_tests(project_directory: string): boolean {
 	const matches = globSync(E2E_GLOB, {
 		cwd: project_directory,
-		exclude: (entry) => entry.includes(NODE_MODULES),
+		exclude: is_in_node_modules,
 	})
 
 	return matches.length > 0

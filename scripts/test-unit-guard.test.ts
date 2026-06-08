@@ -92,6 +92,12 @@ describe('test_unit_guard.has_unit_tests', () => {
 
 		expect(test_unit_guard.has_unit_tests(project_directory)).toBe(false)
 	})
+
+	it('does not exclude directories whose name merely contains node_modules', () => {
+		add_unit_file(path.join('src', 'node_modules_utils', UNIT_TEST_BASENAME))
+
+		expect(test_unit_guard.has_unit_tests(project_directory)).toBe(true)
+	})
 })
 
 describe('test_unit_guard.run_guarded_unit — skip paths', () => {
