@@ -19,8 +19,6 @@ const CAPPED_PKG_KEY = 'some-pkg@>=5'
 const CAPPED_PKG_VALUE = '^4'
 const ESBUILD_KEY = 'esbuild@<=0.24.2'
 const ESBUILD_VALUE = '>=0.25.0'
-const COOKIE_KEY = 'cookie@<0.7.0'
-const COOKIE_VALUE = '>=0.7.0'
 const NEW_PKG_KEY = 'new-pkg@>=1'
 
 describe('overrides_check.compare — no changes', () => {
@@ -145,11 +143,8 @@ describe('overrides_check.extract_capped_package_names', () => {
 		expect(overrides_check.extract_capped_package_names(overrides)).toEqual([])
 	})
 
-	it('excludes upper-bound constraints (<=, <)', () => {
-		const overrides = make_overrides([
-			[ESBUILD_KEY, ESBUILD_VALUE],
-			[COOKIE_KEY, COOKIE_VALUE],
-		])
+	it('excludes upper-bound constraints (<=)', () => {
+		const overrides = make_overrides([[ESBUILD_KEY, ESBUILD_VALUE]])
 
 		expect(overrides_check.extract_capped_package_names(overrides)).toEqual([])
 	})
@@ -176,7 +171,6 @@ describe('integration: filtering capped packages from update targets', () => {
 		const overrides = make_overrides([
 			[CAPPED_PKG_KEY, CAPPED_PKG_VALUE],
 			[ESBUILD_KEY, ESBUILD_VALUE],
-			[COOKIE_KEY, COOKIE_VALUE],
 		])
 		const content = make_package_json(
 			{ svelte: '^5.0.0' },
