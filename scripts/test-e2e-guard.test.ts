@@ -11,7 +11,8 @@ const mocked_execa = vi.mocked(execa)
 
 type ExecaResult = Awaited<ReturnType<typeof execa>>
 
-const E2E_FILE = path.join('tests', 'home.e2e.ts')
+const E2E_BASENAME = 'home.e2e.ts'
+const E2E_FILE = path.join('tests', E2E_BASENAME)
 
 function fake_result(exit_code: number | undefined): ExecaResult {
 	return { exitCode: exit_code } as unknown as ExecaResult
@@ -83,6 +84,12 @@ describe('test_e2e_guard.has_e2e_tests', () => {
 		add_e2e_file(path.join('node_modules', 'dep', 'sample.e2e.ts'))
 
 		expect(test_e2e_guard.has_e2e_tests(project_directory)).toBe(false)
+	})
+
+	it('does not exclude directories whose name merely contains node_modules', () => {
+		add_e2e_file(path.join('tests', 'node_modules_utils', E2E_BASENAME))
+
+		expect(test_e2e_guard.has_e2e_tests(project_directory)).toBe(true)
 	})
 })
 

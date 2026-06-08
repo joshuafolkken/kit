@@ -96,7 +96,7 @@ jobs:
         run: pnpm exec eslint . --cache --cache-strategy content
 
       - name: Run unit tests
-        run: pnpm exec vitest run
+        run: pnpm josh test:unit
 
       - name: Check bundle size
         run: pnpm size-limit

@@ -309,6 +309,11 @@ describe('COMMAND_MAP shell commands', () => {
 		expect(COMMAND_MAP['test:e2e']?.script).toBe('scripts/test-e2e-guard.ts')
 	})
 
+	it('test:unit delegates to the guard script so it can skip when vitest is absent', () => {
+		expect(COMMAND_MAP['test:unit']?.shell).toBeUndefined()
+		expect(COMMAND_MAP['test:unit']?.script).toBe('scripts/test-unit-guard.ts')
+	})
+
 	it('test uses sh -c for chaining test:unit and test:e2e', () => {
 		const shell = COMMAND_MAP['test']?.shell ?? []
 
