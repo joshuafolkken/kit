@@ -6,6 +6,7 @@ const VERSION_UPGRADE_COMMAND = 'version:upgrade'
 const TEST_WATCH_COMMAND = 'test:watch'
 const TEST_UI_COMMAND = 'test:ui'
 const TEST_E2E_COMMAND = 'test:e2e'
+const TEST_UNIT_COMMAND = 'test:unit'
 const HEALTH_COMMAND = 'health'
 const ALL_ALIAS_KEYS = Object.keys(ALIASES)
 const DEVELOPMENT_CATEGORY = 'Development'
@@ -110,6 +111,14 @@ describe('COMMAND_MAP — new dev commands', () => {
 		const entry = get_command(TEST_E2E_COMMAND)
 
 		expect(entry?.script).toBe('scripts/test-e2e-guard.ts')
+		expect(entry?.shell).toBeUndefined()
+		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
+	})
+
+	it('routes test:unit through the guard script instead of a raw shell command', () => {
+		const entry = get_command(TEST_UNIT_COMMAND)
+
+		expect(entry?.script).toBe('scripts/test-unit-guard.ts')
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})
