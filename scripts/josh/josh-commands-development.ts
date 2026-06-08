@@ -54,8 +54,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 	},
 	'test:unit': {
-		shell: [...PE, 'vitest', 'run'],
-		description: 'Run unit tests',
+		script: 'scripts/test-unit-guard.ts',
+		description: 'Run unit tests with Vitest (skips when absent or no test files)',
 		category: 'Development',
 	},
 	'test:watch': {

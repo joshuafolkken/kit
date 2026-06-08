@@ -37,7 +37,11 @@ pnpm josh cspell:dot      # includes dotfiles
 
 ### `josh test:unit`
 
-Run unit tests with vitest.
+Run unit tests with vitest. Because a freshly-bootstrapped project may have no unit suite yet
+(and therefore no `vitest` installed), this command **skips gracefully (exit 0)** when `vitest`
+is not installed or when no `*.{test,spec}.{ts,js}` files exist — so CI and the local gate never
+block a project that has no unit tests yet. Once both `vitest` and at least one test file are
+present, it runs `vitest run` as usual.
 
 ```bash
 pnpm josh test:unit
