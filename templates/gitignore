@@ -6,7 +6,8 @@ test-results
 .vercel
 .netlify
 .wrangler
-/.svelte-kit
+# .svelte-kit is always machine-generated; ignore it at any depth (e.g. templates/.svelte-kit)
+.svelte-kit/
 /build
 /dist
 
