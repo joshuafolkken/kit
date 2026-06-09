@@ -65,7 +65,7 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 			rules: {
 				'unicorn/filename-case': [
 					'error',
-					{ case: 'pascalCase', ignore: SVELTEKIT_ROUTE_PATTERNS },
+					{ case: 'pascalCase', ignore: SVELTEKIT_ROUTE_PATTERNS, checkDirectories: false },
 				],
 				'sonarjs/no-unused-collection': 'off',
 				// {@render snippet()} is a Svelte template directive, not a value-consuming

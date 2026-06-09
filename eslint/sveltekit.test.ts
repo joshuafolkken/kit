@@ -170,8 +170,19 @@ describe('create_sveltekit_config — svelte file patterns', () => {
 
 		expect(rules['unicorn/filename-case']).toEqual([
 			'error',
-			{ case: 'pascalCase', ignore: expect.any(Array) },
+			{ case: 'pascalCase', ignore: expect.any(Array), checkDirectories: false },
 		])
+	})
+
+	it('disables checkDirectories on the Svelte filename-case override (regression #528)', () => {
+		const config = build_config()
+
+		const svelte_block = find_svelte_files_block(config)
+		const rules = svelte_block?.rules as Record<string, unknown>
+		const rule_value = rules['unicorn/filename-case'] as [string, { checkDirectories: boolean }]
+		const [, options] = rule_value
+
+		expect(options.checkDirectories).toBe(false)
 	})
 })
 
