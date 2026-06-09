@@ -52,7 +52,7 @@ describe('git_error.handle', () => {
 		const STDERR_OUTPUT = 'stderr output'
 		const error = new Error('outer')
 
-		error.cause = Object.assign(new Error('   '), { stderr: STDERR_OUTPUT })
+		error.cause = Object.assign(new Error(' '.repeat(3)), { stderr: STDERR_OUTPUT })
 
 		expect(() => {
 			git_error.handle(error)

@@ -36,7 +36,7 @@ describe('gh_spawn.get_repo_name_with_owner — failure', () => {
 	})
 
 	it('returns undefined when stdout is only whitespace', () => {
-		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: '   ' })
+		execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: ' '.repeat(3) })
 
 		expect(gh_spawn.get_repo_name_with_owner()).toBeUndefined()
 	})

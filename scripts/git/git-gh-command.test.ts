@@ -79,7 +79,7 @@ describe('parse_pr_state_string', () => {
 	})
 
 	it('returns undefined for whitespace-only string', () => {
-		expect(parse_pr_state_string('   ')).toBeUndefined()
+		expect(parse_pr_state_string(' '.repeat(3))).toBeUndefined()
 	})
 
 	it('strips surrounding double quotes', () => {

@@ -19,13 +19,13 @@ import { sonarjs_rules } from './rules/sonarjs.js'
 import { typescript_rules } from './rules/typescript.js'
 import { unicorn_rules } from './rules/unicorn.js'
 
+const SCRIPTS_AI_PATTERNS = ['scripts-ai/**/*.ts', 'scripts-ai/**/*.js']
+
 const FILE_PATTERNS = {
 	d_ts: ['**/*.d.ts'],
 	typescript: ['**/*.ts', '**/*.tsx'],
-	scripts_ai: ['scripts-ai/**/*.ts', 'scripts-ai/**/*.js'],
-	get scripts() {
-		return ['scripts/**/*.ts', 'scripts/**/*.js', ...this.scripts_ai]
-	},
+	scripts_ai: SCRIPTS_AI_PATTERNS,
+	scripts: ['scripts/**/*.ts', 'scripts/**/*.js', ...SCRIPTS_AI_PATTERNS],
 	tests: ['**/*.test.ts', '**/*.spec.ts', '**/*.e2e.ts'],
 	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
 }
@@ -82,6 +82,11 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			files: FILE_PATTERNS.scripts,
 			rules: {
 				'unicorn/no-process-exit': 'off',
+				// scripts under scripts/ and scripts-ai/ are dual-purpose: shebang-executable
+				// (run via tsx) AND importable namespace modules (consumed via #scripts/* and
+				// in tests). unicorn/no-exports-in-scripts flags exports in any shebang file,
+				// which conflicts with the kit export { module } convention, so disable it here.
+				'unicorn/no-exports-in-scripts': 'off',
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
 				// CLI tooling under scripts/ invokes pnpm/git/node via PATH by design
 				'sonarjs/no-os-command-from-path': 'off',
