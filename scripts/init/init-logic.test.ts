@@ -146,6 +146,7 @@ describe('get_ai_copy_files - AI and community files', () => {
 		expect(result).not.toContain(CI_YML_DEST)
 		expect(result).toContain('.github/workflows/auto-tag.yml')
 		expect(result).toContain('.github/workflows/production.yml')
+		expect(result).toContain('.github/workflows/publish.yml')
 		expect(result).toContain('.github/workflows/sonar-qube.yml')
 		expect(result).toContain('.github/pull_request_template.md')
 		expect(result).toContain('.github/release.yml')
