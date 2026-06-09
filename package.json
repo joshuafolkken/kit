@@ -1,5 +1,5 @@
 {
-	"version": "0.237.0",
+	"version": "0.238.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -111,7 +111,7 @@
 		"eslint-plugin-promise": "^7.3.0",
 		"eslint-plugin-sonarjs": "^4.0.3",
 		"eslint-plugin-svelte": "^3.19.0",
-		"eslint-plugin-unicorn": "^64.0.0",
+		"eslint-plugin-unicorn": "^65.0.0",
 		"execa": "^9.6.1",
 		"globals": "^17.6.0",
 		"js-yaml": "^4.2.0",

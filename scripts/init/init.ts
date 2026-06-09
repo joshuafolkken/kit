@@ -13,6 +13,8 @@ import { init_logic, type ProjectType } from './init-logic'
 import { is_sveltekit_project, PROJECT_ROOT } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
+const SAMPLE_INDENT_WIDTH = 4
+const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 
 function write_new_file(action: FileAction, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -23,7 +25,7 @@ function write_new_file(action: FileAction, destination_path: string): void {
 function show_sample(action: FileAction): void {
 	console.info(`  ⚠ exists    ${action.dest} — add manually:`)
 	console.info('')
-	console.info(action.create().replaceAll(/^/gmu, '    '))
+	console.info(action.create().replaceAll(/^/gmu, SAMPLE_INDENT))
 }
 
 function merge_existing_file(

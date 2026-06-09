@@ -23,7 +23,7 @@ describe('read_string', () => {
 	})
 
 	it('returns undefined for a whitespace-only string', () => {
-		expect(read_string('   ')).toBeUndefined()
+		expect(read_string(' '.repeat(3))).toBeUndefined()
 	})
 
 	it('returns undefined for a number', () => {
