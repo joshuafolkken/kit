@@ -66,7 +66,6 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'wrangler.jsonc',
 	'.github/workflows/auto-tag.yml',
 	'.github/workflows/production.yml',
-	'.github/workflows/publish.yml',
 	'.github/workflows/sonar-qube.yml',
 	'.github/pull_request_template.md',
 	'.github/release.yml',

@@ -140,13 +140,13 @@ describe('get_ai_copy_files - AI and community files', () => {
 		expect(result).toContain('CODE_OF_CONDUCT.md')
 	})
 
-	it('includes GitHub workflow and template files (except ci.yml which uses file mapping)', () => {
+	it('includes GitHub workflow and template files (except ci.yml mapping and non-distributed publish.yml)', () => {
 		const result = init_logic.get_ai_copy_files()
 
 		expect(result).not.toContain(CI_YML_DEST)
 		expect(result).toContain('.github/workflows/auto-tag.yml')
 		expect(result).toContain('.github/workflows/production.yml')
-		expect(result).toContain('.github/workflows/publish.yml')
+		expect(result).not.toContain('.github/workflows/publish.yml')
 		expect(result).toContain('.github/workflows/sonar-qube.yml')
 		expect(result).toContain('.github/pull_request_template.md')
 		expect(result).toContain('.github/release.yml')
