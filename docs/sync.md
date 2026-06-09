@@ -23,7 +23,6 @@ SECURITY.md         tsconfig.sonar.json wrangler.jsonc
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/production.yml
-.github/workflows/publish.yml
 .github/workflows/sonar-qube.yml
 .github/pull_request_template.md
 .github/release.yml
@@ -31,7 +30,7 @@ SECURITY.md         tsconfig.sonar.json wrangler.jsonc
 ```
 
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
-> (`ci.yml`, `auto-tag.yml`, `production.yml`, `publish.yml`, `sonar-qube.yml`) is overwritten on
+> (`ci.yml`, `auto-tag.yml`, `production.yml`, `sonar-qube.yml`) is overwritten on
 > each `josh sync`, so action SHA pins are bumped once in the kit and propagated to all consumers —
 > no per-consumer maintenance. The kit's own `github-actions` Dependabot is what bumps those pins at
 > the source; `josh sync` then distributes them. The `github-actions` entry in the distributed
