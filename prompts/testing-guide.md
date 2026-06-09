@@ -43,7 +43,7 @@ Req N: ...
 
 When ambiguous, ask the user.
 
-**Output paths:** E2E → `src/routes/**/*.e2e.ts` / Unit → `src/**/*.spec.ts`
+**Output paths:** E2E → `src/routes/**/*.e2e.ts` / Unit → `src/**/*.test.ts`
 
 ---
 
@@ -125,7 +125,7 @@ When fixing bugs where tests leave data behind (or similar persistent state):
 ## 4. Reference Files
 
 **E2E:** `src/routes/**/page.e2e.ts`, `src/routes/**/praise.e2e.ts`
-**Unit:** `src/lib/data/phrases/phrases.spec.ts`, `src/lib/data/praise-audio.spec.ts`
+**Unit:** `src/lib/data/phrases/phrases.test.ts`, `src/lib/data/praise-audio.test.ts`
 **ESLint:** `eslint.config.js`
 
 ---
