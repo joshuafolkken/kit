@@ -33,7 +33,7 @@ function load_workspace(): WorkspaceYaml {
 }
 
 function extract_top_directory(file_path: string): string {
-	return file_path.replace(/^\.\//u, '').split('/')[0] ?? ''
+	return file_path.replace(/^\.\//u, '').split('/', 1)[0] ?? ''
 }
 
 function extract_string_paths(value: unknown): Array<string> {

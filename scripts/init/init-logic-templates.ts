@@ -31,7 +31,8 @@ const VANILLA_ESLINT_MARKERS: ReadonlyArray<string> = [
 	'svelte.configs.recommended',
 ]
 const RULES_BLOCK_PATTERN = /rules\s*:\s*\{/gu
-const RULES_INDENT = '\t\t\t'
+const RULES_INDENT_DEPTH = 3
+const RULES_INDENT = '\t'.repeat(RULES_INDENT_DEPTH)
 
 const PLAYWRIGHT_TEMPLATE_PATH = package_path('playwright.config.ts')
 

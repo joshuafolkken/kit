@@ -88,7 +88,7 @@ function parse_npmrc_auth_token(npmrc: string): string | undefined {
 }
 
 function scope_from_key(key: string): string {
-	return key.startsWith('@') ? (key.split('/')[0] ?? '') : ''
+	return key.startsWith('@') ? (key.split('/', 1)[0] ?? '') : ''
 }
 
 function has_tarball(entry: LockfilePackage): boolean {
@@ -107,7 +107,7 @@ function package_version_from_key(key: string): string {
 	const at_index = key.indexOf('@', start)
 	if (at_index === -1) return ''
 
-	return key.slice(at_index + 1).split('(')[0] ?? ''
+	return key.slice(at_index + 1).split('(', 1)[0] ?? ''
 }
 
 function needs_tarball_fix(key: string, entry: LockfilePackage, scopes: Set<string>): boolean {

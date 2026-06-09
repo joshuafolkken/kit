@@ -64,6 +64,28 @@ describe('create_base_config — scripts block (issue #442)', () => {
 	})
 })
 
+describe('create_base_config — scripts block (issue #525)', () => {
+	it('turns off unicorn/no-exports-in-scripts for dual-purpose shebang modules', () => {
+		const config = create_base_config({
+			gitignore_path: GITIGNORE_PATH,
+			tsconfig_root_dir: TSCONFIG_ROOT_DIR,
+		})
+
+		const scripts_block = config.find(
+			(block) =>
+				Array.isArray(block.files) &&
+				block.files.some((pattern) => String(pattern).startsWith('scripts/')) &&
+				typeof block.rules?.['unicorn/no-process-exit'] === 'string',
+		)
+
+		expect(scripts_block).toBeDefined()
+
+		const rules = scripts_block?.rules as Record<string, unknown>
+
+		expect(rules['unicorn/no-exports-in-scripts']).toBe('off')
+	})
+})
+
 describe('create_base_config — tests block (issue #433)', () => {
 	it('disables unicorn/no-useless-undefined for vi mock/stub patterns', () => {
 		const config = create_base_config({

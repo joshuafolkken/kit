@@ -236,7 +236,7 @@ export const code_quality_rules = {
 	'dot-notation': [
 		'error',
 		{
-			allowPattern: String.raw`^[A-Z0-9_]+$`,
+			allowPattern: '^[A-Z0-9_]+$',
 		},
 	],
 	// 分割代入のデフォルト値を要求

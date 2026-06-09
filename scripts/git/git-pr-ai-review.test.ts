@@ -88,7 +88,7 @@ describe('handle_ai_review_findings — blocker without ignore reason', () => {
 		await expect(
 			handle_ai_review_findings({
 				branch_name: BRANCH,
-				ignore_reason: '   ',
+				ignore_reason: ' '.repeat(3),
 				context: CONTEXT,
 			}),
 		).rejects.toThrow(BLOCKER_MESSAGE_REGEX)
