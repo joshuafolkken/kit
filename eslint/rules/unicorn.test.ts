@@ -35,3 +35,17 @@ describe('unicorn_rules — prevent-abbreviations allowList (issue #435)', () =>
 		expect(PREVENT_ABBR_ALLOW_LIST.e2e).toBe(true)
 	})
 })
+
+describe('unicorn_rules — filename-case directory checking (regression #528)', () => {
+	it('disables checkDirectories so directory names are never enforced', () => {
+		const rule_value = unicorn_rules['unicorn/filename-case'] as [
+			string,
+			{ case: string; checkDirectories: boolean },
+		]
+		const [severity, options] = rule_value
+
+		expect(severity).toBe('error')
+		expect(options.case).toBe('kebabCase')
+		expect(options.checkDirectories).toBe(false)
+	})
+})

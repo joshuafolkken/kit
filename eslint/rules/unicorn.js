@@ -23,8 +23,9 @@ export const unicorn_rules = {
 	'unicorn/prevent-abbreviations': ['error', { allowList: PREVENT_ABBR_ALLOW_LIST }],
 	// より良いエラーメッセージ
 	'unicorn/error-message': 'error',
-	// ファイル名のケース統一
-	'unicorn/filename-case': ['error', { case: 'kebabCase' }],
+	// ファイル名のケース統一（unicorn 65 で既定 true になった checkDirectories を無効化し、
+	// ディレクトリ名は検査しない。ディレクトリ構造は SvelteKit とプロジェクト規約が決める）
+	'unicorn/filename-case': ['error', { case: 'kebabCase', checkDirectories: false }],
 	// for-loopよりarray methodsを優先
 	'unicorn/no-for-loop': 'error',
 	// Array.from()よりスプレッド演算子を優先
