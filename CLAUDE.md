@@ -10,6 +10,21 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 
 - **Answer opinion-seeking questions from a neutral standpoint.** When the user asks a leading or preference-shaped question — e.g. "how about X?" ("〜〜ではどうか？"), "wouldn't Y be better?" ("〜〜の方はどうか？"), "isn't Z the right call?" — do not reflexively agree or tailor the answer to the phrasing. Weigh the actual merits and respond impartially: state the trade-offs honestly, recommend the option you genuinely judge best (even when it differs from the one the user hinted at), and explain why. Agreement must be earned by the facts, not assumed from how the question is asked.
 
+### Decision autonomy (minimize confirmation stops)
+
+When you reach a decision point, classify it into one of three tiers and act accordingly. The goal is to stop and ask **only** when the choice genuinely needs the user's judgment — not at every fork.
+
+- **Tier A — reversible implementation / design choices** (a library pick where one option is clearly superior, naming, file layout, test approach, refactor shape). If one option is clearly better on the merits, **select it and proceed without asking.** When the point is one you would normally surface for confirmation, log the decision so the user can audit or override it later (see "Logging auto-decisions" below).
+- **Tier B — genuine toss-up.** The top two options are both sound and the margin is narrow. **This is the only tier that stops** — ask the user (use `AskUserQuestion` where available), presenting the close candidates and their trade-offs.
+- **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo-settings changes, anything outside the stated task scope, `devEngines` / `pnpm.overrides` edits). **Out of scope for this policy.** Always require explicit user instruction — never auto-decide, even when one option looks clearly better. The existing safety rules (`prompts/collaboration-workflow.md` → "指示されていない行動は取らない", the `devEngines` / `pnpm.overrides` protections above) take precedence.
+
+**Criterion for A vs B:** ask only when the margin is narrow **and** the decision is hard to reverse or has lasting architectural impact. "I'm in doubt" alone is not a reason to stop — a clearly-superior option is selected automatically even if some uncertainty remains, and a narrow-margin but cheaply-reversible choice is also made automatically (pick one, log it, move on).
+
+**Logging auto-decisions:** when you auto-decide a Tier A point that would normally warrant confirmation, record the candidates and rationale:
+
+- Inside an Issue-driven workflow (`kickoff` / `halfrun` / `fullrun` / `queue`): post an Issue comment — `gh issue comment <N> --body "..."` — listing the chosen option, the rejected alternatives, and why the chosen option is clearly superior.
+- Outside any Issue (a plain conversational task): surface the same as a one-line "Auto-decided: `<choice>` over `<alt>` because `<reason>`" note in your reply.
+
 ## Environment Variables
 
 The following variables are required for `scripts-ai/` functionality. Store them in a `.env` file at the project root (loaded automatically by the AI scripts). See [docs/scripts-ai.md](https://github.com/joshuafolkken/kit/blob/main/docs/scripts-ai.md) for setup instructions including how to obtain these values.
@@ -71,7 +86,7 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no a
 ## Package-First Development
 
 - Before building any system or feature, do NOT write original code first — check whether a well-maintained existing package already solves the problem.
-- Prefer modern, actively-maintained packages. Present about three recommended options ranked by recommendation in a comparison table (maintenance/activity, popularity, bundle size, TypeScript support, license, fit), then let the user choose.
+- Prefer modern, actively-maintained packages. Evaluate candidates on maintenance/activity, popularity, bundle size, TypeScript support, license, and fit. **If one package is clearly the best fit, select it and proceed** (Tier A — log the choice and rationale per "Decision autonomy"). **Only when two or more candidates are genuinely close**, present about three options ranked in a comparison table and let the user choose.
 - For existing code as well, proactively propose replacing hand-rolled implementations with a suitable package when it improves maintainability.
 
 ## Code Change Rules
