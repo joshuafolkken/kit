@@ -74,10 +74,43 @@ function sync_development_engines_after_bump(package_json_path: string = PACKAGE
 	console.info('✔ Synced devEngines.packageManager.version to the packageManager pin')
 }
 
+// `corepack use` validates the resolved version against `devEngines` BEFORE it
+// writes `packageManager`, so an exact pin (e.g. 11.5.0) rejects a newer patch
+// (11.5.2) and the bump can never advance. Temporarily widen the pin to the bare
+// major (a range the new patch satisfies) so corepack proceeds; the exact pin is
+// restored afterwards by sync_development_engines_after_bump (on success) or
+// restore_package_json (on skip). Returns whether the file was rewritten.
+function widen_development_engines(
+	content: string,
+	major: string | undefined,
+	package_json_path: string = PACKAGE_JSON_PATH,
+): boolean {
+	if (major === undefined) return false
+	const widened = package_manager_version.set_development_engines_version(content, major)
+	if (widened === content) return false
+
+	writeFileSync(package_json_path, widened)
+
+	return true
+}
+
+// Roll the temporary widening back when corepack skipped the bump, leaving
+// package.json byte-for-byte identical to its pre-run state.
+function restore_package_json(
+	content: string,
+	package_json_path: string = PACKAGE_JSON_PATH,
+): void {
+	writeFileSync(package_json_path, content)
+	console.info('✔ Restored package.json devEngines pin (pnpm bump skipped)')
+}
+
 function main(): void {
-	const target = resolve_corepack_target(readFileSync(PACKAGE_JSON_PATH, 'utf8'))
-	const is_skipped = warn_if_skipped(run_corepack(target))
-	if (!is_skipped) sync_development_engines_after_bump()
+	const original = readFileSync(PACKAGE_JSON_PATH, 'utf8')
+	const major = extract_pnpm_major(original)
+	const is_widened = widen_development_engines(original, major)
+	const is_skipped = warn_if_skipped(run_corepack(build_corepack_target(major)))
+	if (is_skipped && is_widened) restore_package_json(original)
+	else if (!is_skipped) sync_development_engines_after_bump()
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
@@ -89,6 +122,8 @@ const latest_corepack = {
 	run_corepack,
 	warn_if_skipped,
 	sync_development_engines_after_bump,
+	widen_development_engines,
+	restore_package_json,
 	main,
 }
 
