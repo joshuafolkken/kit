@@ -23,20 +23,29 @@ const NOT_KIT_SHIM_REASON =
 	'the shadowing binary is not a kit shim — remove it manually if it is unexpected'
 const RECLAIM_REASON = 'reclaimed the global josh by removing the stale kit shim'
 
+const WINDOWS_PLATFORM = 'win32'
+// Absolute path on any platform: POSIX `/…`, Windows drive-letter `C:\…` / `C:/…`, or UNC `\\…`.
+// Detecting absoluteness by shape (not `path.sep`) keeps parsing correct regardless of the host OS.
+const ABSOLUTE_PATH_PATTERN = /^(?:\/|[a-zA-Z]:[/\\]|\\\\)/u
+
 function normalize_path(target: string): string {
 	return path.resolve(target)
 }
 
+// The cross-platform PATH-lookup command: `where` on Windows, `which` elsewhere.
+function path_lookup_command(platform: string): string {
+	return platform === WINDOWS_PLATFORM ? 'where' : 'which'
+}
+
 // Extract an absolute path from possibly noisy command output: `pnpm bin -g` prepends a
-// `[WARN] Using --global …` line to stdout when run inside a project, so take the last line that
-// looks like an absolute POSIX path. Undefined when no such line is present.
-function last_path_line(stdout: string): string | undefined {
-	const candidates = stdout
+// `[WARN] Using --global …` line to stdout when run inside a project, and `where` may list several
+// matches. Take the first line that looks like an absolute path (the effective one), skipping
+// noise. Undefined when no such line is present.
+function first_path_line(stdout: string): string | undefined {
+	return stdout
 		.split('\n')
 		.map((line) => line.trim())
-		.filter((line) => line.startsWith(path.sep))
-
-	return candidates.at(-1)
+		.find((line) => ABSOLUTE_PATH_PATTERN.test(line))
 }
 
 // PATH shadowing: the `josh` first on PATH is not the pnpm-global install. Both paths must be known
@@ -83,7 +92,8 @@ const doctor_logic = {
 	NOT_KIT_SHIM_REASON,
 	RECLAIM_REASON,
 	normalize_path,
-	last_path_line,
+	path_lookup_command,
+	first_path_line,
 	is_shadowed,
 	is_kit_shim,
 	decide_reclaim,

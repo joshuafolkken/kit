@@ -13,8 +13,12 @@ const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(SCRIPTS_DIR, '..')
 const PACKAGE_JSON = path.join(REPO_ROOT, 'package.json')
 const LIFECYCLE_HOOKS: ReadonlyArray<string> = ['prepare', 'postinstall', 'preinstall', 'install']
-const SHARED_PATH_MARKER = '.local/bin'
 const INSTALL_BIN_MARKER = 'install-bin'
+// Markers for any code path that could write to a shared, user-level location. `.local/bin` is the
+// literal shim target; `homedir` is the escape hatch the removed shim used (`os.homedir()`), so
+// forbidding it catches an equivalent reconstruction such as `path.join(os.homedir(), '.local', …)`.
+// No kit script legitimately resolves the user's home directory, so this stays a clean tripwire.
+const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = ['.local/bin', 'homedir']
 
 function all_source_files(): Array<string> {
 	return readdirSync(SCRIPTS_DIR, { recursive: true })
@@ -38,10 +42,12 @@ describe('no global shim write', () => {
 		expect(offenders).toStrictEqual([])
 	})
 
-	it('has no source file that writes to a shared global PATH location', () => {
-		const offenders = all_source_files().filter((file) =>
-			readFileSync(file, 'utf8').includes(SHARED_PATH_MARKER),
-		)
+	it('has no source file that references a shared global PATH location or the home directory', () => {
+		const offenders = all_source_files().filter((file) => {
+			const content = readFileSync(file, 'utf8')
+
+			return FORBIDDEN_SOURCE_MARKERS.some((marker) => content.includes(marker))
+		})
 
 		expect(offenders).toStrictEqual([])
 	})

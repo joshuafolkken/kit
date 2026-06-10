@@ -31,24 +31,47 @@ describe('doctor_logic.is_shadowed', () => {
 	})
 })
 
-describe('doctor_logic.last_path_line', () => {
-	it('extracts the path when pnpm prepends a WARN line to stdout', () => {
+describe('doctor_logic.path_lookup_command', () => {
+	it('uses where on Windows', () => {
+		expect(doctor_logic.path_lookup_command('win32')).toBe('where')
+	})
+
+	it('uses which on POSIX platforms', () => {
+		expect(doctor_logic.path_lookup_command('darwin')).toBe('which')
+		expect(doctor_logic.path_lookup_command('linux')).toBe('which')
+	})
+})
+
+describe('doctor_logic.first_path_line', () => {
+	it('skips the WARN line pnpm prepends and returns the path', () => {
 		const noisy =
 			'[WARN] Using --global skips the package manager check\n/Users/me/Library/pnpm/bin'
 
-		expect(doctor_logic.last_path_line(noisy)).toBe('/Users/me/Library/pnpm/bin')
+		expect(doctor_logic.first_path_line(noisy)).toBe('/Users/me/Library/pnpm/bin')
+	})
+
+	it('returns the first match when a lookup lists several paths', () => {
+		const multiple = `${SHIM_JOSH}\n/Users/me/Library/pnpm/bin/josh`
+
+		expect(doctor_logic.first_path_line(multiple)).toBe(SHIM_JOSH)
+	})
+
+	it('recognizes a Windows drive-letter absolute path', () => {
+		const windows_path = String.raw`C:\Users\me\AppData\josh.cmd`
+
+		expect(doctor_logic.first_path_line(windows_path)).toBe(windows_path)
 	})
 
 	it('returns the single path line for clean output', () => {
-		expect(doctor_logic.last_path_line(`${SHIM_JOSH}\n`)).toBe(SHIM_JOSH)
+		expect(doctor_logic.first_path_line(`${SHIM_JOSH}\n`)).toBe(SHIM_JOSH)
 	})
 
 	it('returns undefined when no absolute path line is present', () => {
-		expect(doctor_logic.last_path_line('[WARN] something went wrong\n')).toBeUndefined()
+		expect(doctor_logic.first_path_line('[WARN] something went wrong\n')).toBeUndefined()
 	})
 
 	it('returns undefined for empty output', () => {
-		expect(doctor_logic.last_path_line('')).toBeUndefined()
+		expect(doctor_logic.first_path_line('')).toBeUndefined()
 	})
 })
 
