@@ -195,7 +195,22 @@ pnpm josh version   # alias: josh v
 - **Global**: queried via `pnpm ls -g @joshuafolkken/kit`.
 - **Project**: read from `node_modules/@joshuafolkken/kit/package.json` in the current directory.
 
+In addition, `version` reports the **running binary** — the version and package directory of the install that actually executed, resolved from `import.meta.url`. The running binary is the single source of truth: the `Running:` line tells you which `josh` produced this very report, independent of the global/project query. This restores the guarantee that a stale or shadowing binary self-reports rather than hiding behind the `pnpm ls -g` number.
+
 A target that is not installed is reported as `not installed`. A stale target gets a `Run:` hint with the exact upgrade command (`pnpm add -g` for global, `pnpm add -D … && fix-gh-packages` for the project). `josh v` and `pnpm josh v` produce the same report.
+
+#### PATH shadowing warning
+
+When the `josh` first on `PATH` is **not** the pnpm-global install — for example a stale `~/.local/bin/josh` shim left behind by a project pinned below `v0.200.0` (see [the design note below](#design-per-project-installs-must-not-touch-the-global-path)) — `version` appends a warning naming both paths and the recovery command:
+
+```text
+⚠ PATH shadowing: the 'josh' first on PATH is not the pnpm-global install.
+  On PATH:     /Users/you/.local/bin/josh
+  pnpm global: /Users/you/Library/pnpm/bin/josh
+  Recover:     josh doctor --fix
+```
+
+Run [`josh doctor --fix`](#josh-doctor) to reclaim the global CLI. The warning is silent when there is no shadowing.
 
 ### `josh version:upgrade`
 
@@ -210,6 +225,25 @@ Both `josh vu` and `pnpm josh vu` behave the same: the global install is upgrade
 ---
 
 ## Maintenance
+
+### `josh doctor`
+
+Diagnose — and optionally repair — PATH shadowing of the global `josh`.
+
+```bash
+pnpm josh doctor          # alias: josh dr — diagnose only
+pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
+```
+
+`doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`). When the PATH `josh` differs from the pnpm-global one, it prints the same shadowing warning as `josh version` plus the recovery command.
+
+`--fix` is your go-ahead to repair: it reads the shadowing binary and, **only if it is a kit shim** (its body references `@joshuafolkken/kit` or the removed `install-bin` script), removes it so the pnpm-global `josh` reclaims `PATH` precedence. Any other shadowing binary is left untouched and reported for manual review — `doctor` never deletes a file it cannot positively identify as a stale kit shim.
+
+#### Design: per-project installs must not touch the global PATH
+
+A per-project dependency's lifecycle hook (`postinstall` / `prepare`) must **never** write to a shared, user-level `PATH` location. Versions prior to `v0.200.0` shipped an `install-bin.ts` `postinstall` that wrote `~/.local/bin/josh` via `os.homedir()`; a single `pnpm install` in any such old project would silently clobber the global `josh` and point it at that project's stale kit. That shim write was removed in [#446](https://github.com/joshuafolkken/kit/pull/446) and must not return — the current kit installs its global CLI only via `pnpm add -g` (bin under `pnpm bin -g`), and a regression test (`scripts/no-global-shim-write.test.ts`) fails if any lifecycle hook or source file reintroduces a shared-PATH write.
+
+**Migration / cleanup.** Projects pinned `< v0.200.0` still carry the old `install-bin.ts` and will re-create the shim whenever they are reinstalled. Upgrade those projects to `>= v0.200.0` (`pnpm add -D @joshuafolkken/kit@latest`). For one-shot recovery when an old project has re-created the shim, run `josh doctor --fix`.
 
 ### `josh overrides`
 

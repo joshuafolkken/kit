@@ -20,7 +20,29 @@ const NOT_INSTALLED = 'not installed'
 const GLOBAL_LABEL = 'Global: '
 const PROJECT_LABEL = 'Project: '
 const LATEST_LABEL = 'Latest: '
+const RUNNING_LABEL = 'Running:'
 const STATUS_PAD_WIDTH = 12
+
+// The install that is actually executing (`import.meta.url` resolved): version plus the package
+// directory it was loaded from. This restores the running-binary-as-source-of-truth guarantee.
+interface RunningBinary {
+	version: string
+	path: string
+}
+
+// Optional extras layered onto the dual-version report: the running-binary line and a PATH
+// shadowing warning. Grouped into one object to keep the formatter within the parameter limit.
+interface VersionOutputExtras {
+	running?: RunningBinary
+	warning?: string
+}
+
+// Render the running-binary line, or nothing when the running binary is unknown.
+function format_running_line(running: RunningBinary | undefined): Array<string> {
+	if (running === undefined) return []
+
+	return [`  ${RUNNING_LABEL} ${running.version.padEnd(STATUS_PAD_WIDTH)}(${running.path})`]
+}
 
 // A target needs upgrading only when it is installed (defined) and behind the latest.
 function is_target_stale(version: string | undefined, latest: string): boolean {
@@ -62,17 +84,20 @@ function format_dual_version_output(
 	global_version: string | undefined,
 	project_version: string | undefined,
 	latest: string,
+	extras: VersionOutputExtras = {},
 ): string {
 	const lines = [
 		PACKAGE_NAME,
 		format_target_line(GLOBAL_LABEL, global_version, latest),
 		format_target_line(PROJECT_LABEL, project_version, latest),
 		`  ${LATEST_LABEL} ${latest}`,
+		...format_running_line(extras.running),
 	]
 	const hints = build_dual_upgrade_commands(global_version, project_version, latest).map(
 		(command) => `Run: ${command}`,
 	)
 	if (hints.length > 0) lines.push('', ...hints)
+	if (extras.warning !== undefined) lines.push('', extras.warning)
 
 	return lines.join('\n')
 }
@@ -80,9 +105,11 @@ function format_dual_version_output(
 const version_check_logic = {
 	PACKAGE_NAME,
 	format_dual_version_output,
+	format_running_line,
 	build_dual_upgrade_commands,
 	format_update_command,
 	build_upgrade_shell_command,
 }
 
+export type { RunningBinary, VersionOutputExtras }
 export { version_check_logic }
