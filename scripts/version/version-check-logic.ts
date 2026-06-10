@@ -18,7 +18,7 @@ function build_upgrade_shell_command(latest: string, is_local: boolean): string 
 
 const NOT_INSTALLED = 'not installed'
 const GLOBAL_LABEL = 'Global: '
-const PROJECT_LABEL = 'Project:'
+const PROJECT_LABEL = 'Project: '
 const LATEST_LABEL = 'Latest: '
 const STATUS_PAD_WIDTH = 12
 

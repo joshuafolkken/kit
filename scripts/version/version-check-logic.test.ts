@@ -72,6 +72,14 @@ describe('version_check_logic.format_dual_version_output display', () => {
 		expect(result).toContain(LATEST_VERSION)
 	})
 
+	it('aligns the three labels with consistent spacing after the colon', () => {
+		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION)
+
+		expect(result).toContain('Global:  ')
+		expect(result).toContain('Project:  ')
+		expect(result).toContain('Latest:  ')
+	})
+
 	it('marks an up-to-date target with a check and omits its run hint', () => {
 		const result = up_to_date_output()
 
