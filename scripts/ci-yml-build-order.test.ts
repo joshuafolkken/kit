@@ -15,7 +15,7 @@ function step_index(file_path: string, needle: string): number {
 }
 
 describe('ci.yml build order (templates/workflows/ci.yml)', () => {
-	it('builds dist/ before the eslint step so consumers can type-aware-lint against dist', () => {
+	it('builds before the eslint step so generated outputs exist for type-aware linting', () => {
 		const build_index = step_index(TEMPLATE_CI_YML, BUILD_STEP)
 		const eslint_index = step_index(TEMPLATE_CI_YML, ESLINT_STEP)
 
