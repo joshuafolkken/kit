@@ -134,6 +134,62 @@ describe('version_check_logic.format_dual_version_output run hints', () => {
 	})
 })
 
+const RUNNING_VERSION = '0.247.0'
+const RUNNING_PATH = '/Users/me/Library/pnpm/global/5/node_modules/@joshuafolkken/kit'
+const SHADOW_WARNING = '⚠ PATH shadowing: the josh on PATH is stale'
+
+describe('version_check_logic.format_running_line', () => {
+	it('renders the running binary version and path', () => {
+		const lines = version_check_logic.format_running_line({
+			version: RUNNING_VERSION,
+			path: RUNNING_PATH,
+		})
+
+		expect(lines).toHaveLength(1)
+		expect(lines[0]).toContain('Running:')
+		expect(lines[0]).toContain(RUNNING_VERSION)
+		expect(lines[0]).toContain(RUNNING_PATH)
+	})
+
+	it('renders nothing when the running binary is unknown', () => {
+		expect(version_check_logic.format_running_line(undefined)).toStrictEqual([])
+	})
+})
+
+describe('version_check_logic.format_dual_version_output running binary', () => {
+	it('includes a Running line reporting the binary that actually executed', () => {
+		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION, {
+			running: { version: RUNNING_VERSION, path: RUNNING_PATH },
+		})
+
+		expect(result).toContain('Running:')
+		expect(result).toContain(RUNNING_PATH)
+	})
+
+	it('omits the Running line when the running binary is unknown', () => {
+		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION)
+
+		expect(result).not.toContain('Running:')
+	})
+
+	it('appends a shadowing warning when one is provided', () => {
+		const result = version_check_logic.format_dual_version_output(
+			LATEST_VERSION,
+			LATEST_VERSION,
+			LATEST_VERSION,
+			{ running: { version: RUNNING_VERSION, path: RUNNING_PATH }, warning: SHADOW_WARNING },
+		)
+
+		expect(result).toContain(SHADOW_WARNING)
+	})
+
+	it('omits the warning block when no warning is provided', () => {
+		const result = up_to_date_output()
+
+		expect(result).not.toContain('PATH shadowing')
+	})
+})
+
 describe('version_check_logic.build_dual_upgrade_commands', () => {
 	it('builds both commands when both targets are stale', () => {
 		const result = version_check_logic.build_dual_upgrade_commands(GLOBAL, PROJECT, LATEST_VERSION)

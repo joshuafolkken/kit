@@ -2,6 +2,11 @@ import type { CommandEntry } from './josh-command-types'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
+	doctor: {
+		script: 'scripts/doctor/doctor.ts',
+		description: 'Diagnose PATH shadowing of the global josh (--fix reclaims a stale shim)',
+		category: 'Maintenance',
+	},
 	overrides: {
 		script: 'scripts/overrides-check.ts',
 		description: 'Check pnpm overrides for drift',

@@ -5,6 +5,18 @@ const LATEST_UPDATE_NOT_DEFINED = 'latest:update command not defined'
 const LATEST_NOT_DEFINED = 'latest command not defined'
 const LATEST_COREPACK_NOT_DEFINED = 'latest:corepack command not defined'
 const SYNC_WORKFLOW_PINS_NOT_DEFINED = 'sync-workflow-pins command not defined'
+const DOCTOR_NOT_DEFINED = 'doctor command not defined'
+
+describe('MAINTENANCE_COMMANDS doctor', () => {
+	it('uses the doctor script in the Maintenance category', () => {
+		const { doctor: cmd } = MAINTENANCE_COMMANDS
+		if (!cmd) throw new Error(DOCTOR_NOT_DEFINED)
+
+		expect(cmd.script).toBe('scripts/doctor/doctor.ts')
+		expect(cmd.shell).toBeUndefined()
+		expect(cmd.category).toBe('Maintenance')
+	})
+})
 
 describe('MAINTENANCE_COMMANDS sync-workflow-pins', () => {
 	it('uses the sync-workflow-pins script', () => {
