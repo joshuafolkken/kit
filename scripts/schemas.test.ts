@@ -4,6 +4,7 @@ import {
 	overrides_snapshot_schema,
 	package_version_schema,
 	package_with_deps_schema,
+	pnpm_ls_global_schema,
 	string_array_schema,
 	vscode_settings_schema,
 	with_development_deps_schema,
@@ -47,6 +48,34 @@ describe('package_version_schema', () => {
 
 	it('fails when version is not a string', () => {
 		expect(package_version_schema.safeParse({ version: 123 }).success).toBe(false)
+	})
+})
+
+describe('pnpm_ls_global_schema', () => {
+	const KIT = '@joshuafolkken/kit'
+
+	it('parses the matched dependency version from pnpm ls -g output', () => {
+		const result = pnpm_ls_global_schema.safeParse([
+			{ path: '/g', dependencies: { [KIT]: { from: KIT, version: '0.243.0' } } },
+		])
+
+		expect(result.success).toBe(true)
+		if (result.success) expect(result.data[0]?.dependencies?.[KIT]?.version).toBe('0.243.0')
+	})
+
+	it('parses an empty dependencies object (package not installed globally)', () => {
+		const result = pnpm_ls_global_schema.safeParse([{ path: '/g', dependencies: {} }])
+
+		expect(result.success).toBe(true)
+		if (result.success) expect(result.data[0]?.dependencies?.[KIT]).toBeUndefined()
+	})
+
+	it('parses an empty array', () => {
+		expect(pnpm_ls_global_schema.safeParse([]).success).toBe(true)
+	})
+
+	it('fails when the top level is not an array', () => {
+		expect(pnpm_ls_global_schema.safeParse({}).success).toBe(false)
 	})
 })
 
