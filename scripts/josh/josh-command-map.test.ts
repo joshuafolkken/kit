@@ -211,6 +211,10 @@ describe('ALIASES — new command aliases', () => {
 	it('resolves swp alias to sync-workflow-pins', () => {
 		expect(get_alias('swp')).toBe('sync-workflow-pins')
 	})
+
+	it('resolves dr alias to doctor', () => {
+		expect(get_alias('dr')).toBe('doctor')
+	})
 })
 
 describe('COMMAND_MAP — project-pinned shim removal', () => {

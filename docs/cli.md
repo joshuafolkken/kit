@@ -38,12 +38,20 @@ If `which josh` is still empty, open a new terminal so the updated `PATH` takes 
 
 ## 4. Migrating from older versions
 
-Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/josh` via `postinstall`. That shim is no longer created and can break when its origin project's `node_modules` is removed (e.g. `…/node_modules/.bin/tsx: No such file or directory`). If you have a stale shim, delete it and use the global install instead:
+Versions prior to `0.200.0` installed a project-pinned shim at `~/.local/bin/josh` via `postinstall`. That shim is no longer created and can break when its origin project's `node_modules` is removed (e.g. `…/node_modules/.bin/tsx: No such file or directory`), or it can shadow the pnpm-global `josh` on `PATH`. The fastest fix is the built-in self-healing command, which detects the stale shim and removes it for you:
+
+```bash
+josh doctor --fix
+```
+
+Equivalently, remove it by hand and rely on the global install:
 
 ```bash
 rm -f ~/.local/bin/josh
 pnpm add -g @joshuafolkken/kit
 ```
+
+If the shim keeps coming back, a project pinned `< 0.200.0` is regenerating it on every `pnpm install` — upgrade that project (`pnpm add -D @joshuafolkken/kit@latest`). See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor).
 
 ## Next
 

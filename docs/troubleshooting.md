@@ -44,14 +44,21 @@ which josh   # should now print a path
 
 ## Stale `~/.local/bin/josh` shim from an old version
 
-Versions prior to `0.200.0` wrote a project-pinned shim to `~/.local/bin/josh`. After that project's `node_modules` is removed, running `josh` fails with something like `…/node_modules/.bin/tsx: No such file or directory`, or the shim shadows the global bin. Remove it and rely on the global install:
+Versions prior to `0.200.0` wrote a project-pinned shim to `~/.local/bin/josh`. After that project's `node_modules` is removed, running `josh` fails with something like `…/node_modules/.bin/tsx: No such file or directory`, or the shim shadows the global bin. The quickest diagnosis and fix is the built-in command:
+
+```bash
+josh doctor          # shows the running binary, the PATH josh, and the pnpm-global josh
+josh doctor --fix    # removes the stale kit shim so the global josh takes over
+```
+
+`josh version` (alias `josh v`) also warns automatically whenever the `josh` on `PATH` is not the pnpm-global install. You can still remove the shim by hand if you prefer:
 
 ```bash
 rm -f ~/.local/bin/josh
 which josh   # should now resolve to the pnpm global bin
 ```
 
-See [cli.md §4](./cli.md#4-migrating-from-older-versions).
+If the shim reappears after every `pnpm install`, a project pinned `< 0.200.0` is regenerating it — upgrade that project to `>= 0.200.0`. See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor) and [cli.md §4](./cli.md#4-migrating-from-older-versions).
 
 ## Wrong Node or pnpm version
 
