@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { version_check_logic } from './version-check-logic'
 
-const CURRENT_VERSION = '0.5.0'
 const LATEST_VERSION = '0.6.0'
 const PACKAGE_NAME = '@joshuafolkken/kit'
 const PINNED_LATEST = `${PACKAGE_NAME}@${LATEST_VERSION}`
@@ -10,39 +9,20 @@ const ADD_GLOBAL = 'pnpm add -g'
 const is_local = true
 const is_global = false
 const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
+const GLOBAL = '0.243.0'
+const PROJECT = '0.241.0'
 
-function version_output(current: string, latest: string): string {
-	return version_check_logic.format_version_output(current, latest, is_local)
+function up_to_date_output(): string {
+	return version_check_logic.format_dual_version_output(
+		LATEST_VERSION,
+		LATEST_VERSION,
+		LATEST_VERSION,
+	)
 }
 
 describe('version_check_logic.PACKAGE_NAME', () => {
 	it('is the joshuafolkken/kit package', () => {
 		expect(version_check_logic.PACKAGE_NAME).toBe(PACKAGE_NAME)
-	})
-})
-
-describe('version_check_logic.format_version_output', () => {
-	it('shows up-to-date message when versions match', () => {
-		expect(version_output(CURRENT_VERSION, CURRENT_VERSION)).toContain('✓ Up to date')
-	})
-
-	it('shows update available message when versions differ', () => {
-		const result = version_output(CURRENT_VERSION, LATEST_VERSION)
-
-		expect(result).toContain('⚠ Update available')
-		expect(result).toContain(CURRENT_VERSION)
-		expect(result).toContain(LATEST_VERSION)
-	})
-
-	it('includes run command when update is available', () => {
-		const result = version_output(CURRENT_VERSION, LATEST_VERSION)
-
-		expect(result).toContain('Run:')
-		expect(result).toContain(LATEST_VERSION)
-	})
-
-	it('does not include run command when already up to date', () => {
-		expect(version_output(CURRENT_VERSION, CURRENT_VERSION)).not.toContain('Run:')
 	})
 })
 
@@ -59,36 +39,6 @@ describe('version_check_logic.format_update_command', () => {
 
 		expect(result).toContain(ADD_GLOBAL)
 		expect(result).toContain(PINNED_LATEST)
-	})
-})
-
-describe('version_check_logic.is_local_install', () => {
-	const CWD = '/project'
-
-	it('is local when the running binary lives under cwd/node_modules', () => {
-		const self_directory = '/project/node_modules/@joshuafolkken/kit/dist'
-
-		expect(version_check_logic.is_local_install(CWD, self_directory)).toBe(true)
-	})
-
-	it('is local when the running binary is a nested .pnpm store path under cwd', () => {
-		const self_directory =
-			'/project/node_modules/.pnpm/@joshuafolkken+kit@0.6.0/node_modules/@joshuafolkken/kit/dist'
-
-		expect(version_check_logic.is_local_install(CWD, self_directory)).toBe(true)
-	})
-
-	it('is global when the running binary lives in the global pnpm store', () => {
-		const self_directory =
-			'/home/user/.local/share/pnpm/global/5/node_modules/@joshuafolkken/kit/dist'
-
-		expect(version_check_logic.is_local_install(CWD, self_directory)).toBe(false)
-	})
-
-	it('is global when the path only shares a sibling prefix with cwd/node_modules', () => {
-		const self_directory = '/project/node_modules-other/@joshuafolkken/kit/dist'
-
-		expect(version_check_logic.is_local_install(CWD, self_directory)).toBe(false)
 	})
 })
 
@@ -110,12 +60,100 @@ describe('version_check_logic.build_upgrade_shell_command', () => {
 	})
 })
 
-describe('version_check_logic.resolve_package_path', () => {
-	it('reports the running binary own package.json', () => {
-		const result = version_check_logic.resolve_package_path(
-			'/global/store/@joshuafolkken/kit/scripts/version',
+describe('version_check_logic.format_dual_version_output display', () => {
+	it('lists global, project, and latest versions', () => {
+		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION)
+
+		expect(result).toContain('Global:')
+		expect(result).toContain('Project:')
+		expect(result).toContain('Latest:')
+		expect(result).toContain(GLOBAL)
+		expect(result).toContain(PROJECT)
+		expect(result).toContain(LATEST_VERSION)
+	})
+
+	it('marks an up-to-date target with a check and omits its run hint', () => {
+		const result = up_to_date_output()
+
+		expect(result).toContain('✓')
+		expect(result).not.toContain('Run:')
+	})
+
+	it('shows "not installed" for a missing target', () => {
+		const result = version_check_logic.format_dual_version_output(
+			undefined,
+			PROJECT,
+			LATEST_VERSION,
 		)
 
-		expect(result).toBe('/global/store/@joshuafolkken/kit/package.json')
+		expect(result).toContain('not installed')
+	})
+})
+
+describe('version_check_logic.format_dual_version_output run hints', () => {
+	it('emits a global run hint when only the global install is stale', () => {
+		const result = version_check_logic.format_dual_version_output(
+			GLOBAL,
+			LATEST_VERSION,
+			LATEST_VERSION,
+		)
+
+		expect(result).toContain('Run:')
+		expect(result).toContain(ADD_GLOBAL)
+		expect(result).not.toContain(ADD_LOCAL)
+	})
+
+	it('emits a project run hint when only the project install is stale', () => {
+		const result = version_check_logic.format_dual_version_output(
+			LATEST_VERSION,
+			PROJECT,
+			LATEST_VERSION,
+		)
+
+		expect(result).toContain(ADD_LOCAL)
+		expect(result).not.toContain(ADD_GLOBAL)
+	})
+
+	it('skips the hint for a target that is not installed', () => {
+		const result = version_check_logic.format_dual_version_output(
+			undefined,
+			PROJECT,
+			LATEST_VERSION,
+		)
+
+		expect(result).not.toContain(ADD_GLOBAL)
+		expect(result).toContain(ADD_LOCAL)
+	})
+})
+
+describe('version_check_logic.build_dual_upgrade_commands', () => {
+	it('builds both commands when both targets are stale', () => {
+		const result = version_check_logic.build_dual_upgrade_commands(GLOBAL, PROJECT, LATEST_VERSION)
+
+		expect(result).toHaveLength(2)
+		expect(result[0]).toContain(ADD_GLOBAL)
+		expect(result[1]).toContain(ADD_LOCAL)
+		expect(result[1]).toContain(FIX_GH_PACKAGES_MARKER)
+	})
+
+	it('returns an empty list when both targets are up to date', () => {
+		const result = version_check_logic.build_dual_upgrade_commands(
+			LATEST_VERSION,
+			LATEST_VERSION,
+			LATEST_VERSION,
+		)
+
+		expect(result).toStrictEqual([])
+	})
+
+	it('skips a target that is not installed', () => {
+		const result = version_check_logic.build_dual_upgrade_commands(
+			undefined,
+			PROJECT,
+			LATEST_VERSION,
+		)
+
+		expect(result).toHaveLength(1)
+		expect(result[0]).toContain(ADD_LOCAL)
 	})
 })

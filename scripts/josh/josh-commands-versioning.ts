@@ -9,12 +9,12 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 	},
 	version: {
 		script: 'scripts/version/version-check.ts',
-		description: 'Show current and latest @joshuafolkken/kit version',
+		description: 'Show global, project, and latest @joshuafolkken/kit versions',
 		category: 'Versioning',
 	},
 	'version:upgrade': {
 		script: 'scripts/version/version-update.ts',
-		description: 'Upgrade @joshuafolkken/kit to latest (global or project-local per invocation)',
+		description: 'Upgrade @joshuafolkken/kit to latest for both global and project',
 		category: 'Versioning',
 	},
 }
