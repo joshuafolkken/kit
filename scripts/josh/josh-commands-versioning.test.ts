@@ -4,7 +4,7 @@ import { VERSIONING_COMMANDS } from './josh-commands-versioning'
 const VERSION_UPGRADE_NOT_DEFINED = 'version:upgrade command not defined'
 
 describe('VERSIONING_COMMANDS version:upgrade', () => {
-	it('runs the version-update script that detects global vs local invocation', () => {
+	it('runs the version-update script that upgrades both global and project installs', () => {
 		const cmd = VERSIONING_COMMANDS['version:upgrade']
 		if (!cmd) throw new Error(VERSION_UPGRADE_NOT_DEFINED)
 

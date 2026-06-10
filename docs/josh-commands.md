@@ -182,28 +182,28 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 
 ### `josh version`
 
-Show the currently installed version and the latest published version.
+Show the global install version, the current project version, and the latest published version — all in one report, regardless of how `josh` was invoked.
 
 ```bash
 pnpm josh version   # alias: josh v
 ```
 
-`version` (and `version:upgrade`) follow the **running binary**, mirroring `init`/`sync`:
+`version` (and `version:upgrade`) always inspect **both targets**:
 
-- `pnpm josh v` (project-local binary) reports and upgrades the project devDependency (`pnpm add -D`).
-- `josh v` (global binary) reports and upgrades the global install (`pnpm add -g`).
+- **Global**: queried via `pnpm ls -g @joshuafolkken/kit`.
+- **Project**: read from `node_modules/@joshuafolkken/kit/package.json` in the current directory.
 
-This keeps the reported version consistent with the binary that actually executes `sync`/`init`.
+A target that is not installed is reported as `not installed`. A stale target gets a `Run:` hint with the exact upgrade command (`pnpm add -g` for global, `pnpm add -D … && fix-gh-packages` for the project). `josh v` and `pnpm josh v` produce the same report.
 
 ### `josh version:upgrade`
 
-Upgrade `@joshuafolkken/kit` to the latest published version.
+Upgrade `@joshuafolkken/kit` to the latest published version for **both** the global install and the current project.
 
 ```bash
 pnpm josh version:upgrade   # alias: josh vu
 ```
 
-The update scope is chosen automatically from how `josh` was invoked: a project-local invocation upgrades the devDependency (`-D`) and then re-runs `fix-gh-packages`; a global invocation upgrades the global CLI (`-g`).
+Both `josh vu` and `pnpm josh vu` behave the same: the global install is upgraded with `pnpm add -g`, and the project devDependency with `pnpm add -D` followed by a re-run of `fix-gh-packages`. A target that is not installed or already up to date is skipped. Inside the kit repo itself there is no `node_modules/@joshuafolkken/kit`, so the project target is naturally skipped — no accidental self-install.
 
 ---
 

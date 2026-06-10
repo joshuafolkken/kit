@@ -37,3 +37,26 @@ describe('version_update.run_upgrade', () => {
 		expect(version_update.run_upgrade('cmd')).toBe(1)
 	})
 })
+
+describe('version_update.run_all_upgrades', () => {
+	it('returns 0 and runs no command for an empty list', () => {
+		expect(version_update.run_all_upgrades([])).toBe(0)
+		expect(mocked_execa_sync).not.toHaveBeenCalled()
+	})
+
+	it('runs every command and returns 0 when all succeed', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+
+		expect(version_update.run_all_upgrades(['a', 'b'])).toBe(0)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
+	})
+
+	it('surfaces a non-zero exit code while still running every command', () => {
+		mocked_execa_sync
+			.mockReturnValueOnce(fake_sync_result(3))
+			.mockReturnValueOnce(fake_sync_result(0))
+
+		expect(version_update.run_all_upgrades(['a', 'b'])).toBe(3)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
+	})
+})
