@@ -43,7 +43,10 @@ function resolve_alignment_target(parsed: AlignmentManifest): string | undefined
 	return target
 }
 
-function replace_development_engines_version(content: string, target: string): string {
+// Surgically set `devEngines.packageManager.version` to `target`, preserving the
+// rest of the file byte-for-byte. Returns the content unchanged when there is no
+// `devEngines.packageManager` block to update.
+function set_development_engines_version(content: string, target: string): string {
 	if (DEV_ENGINES_NAME_FIRST_REGEX.test(content)) {
 		return content.replace(DEV_ENGINES_NAME_FIRST_REGEX, `$1${target}$2`)
 	}
@@ -63,12 +66,13 @@ function align_development_engines_version(content: string): string {
 	const target = resolve_alignment_target(parsed)
 	if (target === undefined) return content
 
-	return replace_development_engines_version(content, target)
+	return set_development_engines_version(content, target)
 }
 
 const package_manager_version = {
 	extract_pnpm_version,
 	align_development_engines_version,
+	set_development_engines_version,
 }
 
 export { package_manager_version }

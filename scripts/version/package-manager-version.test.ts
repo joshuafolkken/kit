@@ -6,6 +6,7 @@ const PM_PRERELEASE_PIN = 'pnpm@11.6.0-rc.1+sha512.def'
 const RANGE_VERSION = '>=11.0.0-0'
 const EXACT_VERSION = '11.5.0'
 const PRERELEASE_VERSION = '11.6.0-rc.1'
+const MAJOR_RANGE = '11'
 
 function build_manifest(
 	package_manager: string | undefined,
@@ -57,6 +58,29 @@ describe('package_manager_version.align_development_engines_version — rewrites
 		const expected = `{\n\t"packageManager": "${PM_PIN}",\n\t"devEngines": { "packageManager": { "version": "${EXACT_VERSION}", "name": "pnpm" } }\n}\n`
 
 		expect(align(version_first)).toBe(expected)
+	})
+})
+
+describe('package_manager_version.set_development_engines_version', () => {
+	const set = package_manager_version.set_development_engines_version
+
+	it('widens the devEngines version to a bare major range', () => {
+		expect(set(build_manifest(PM_PIN, EXACT_VERSION), MAJOR_RANGE)).toBe(
+			build_manifest(PM_PIN, MAJOR_RANGE),
+		)
+	})
+
+	it('sets the version when devEngines lists version before name', () => {
+		const version_first = `{\n\t"devEngines": { "packageManager": { "version": "${EXACT_VERSION}", "name": "pnpm" } }\n}\n`
+		const expected = `{\n\t"devEngines": { "packageManager": { "version": "${MAJOR_RANGE}", "name": "pnpm" } }\n}\n`
+
+		expect(set(version_first, MAJOR_RANGE)).toBe(expected)
+	})
+
+	it('returns the content unchanged when there is no devEngines block to widen', () => {
+		const without_development_engines = `{\n\t"name": "demo",\n\t"packageManager": "${PM_PIN}"\n}\n`
+
+		expect(set(without_development_engines, MAJOR_RANGE)).toBe(without_development_engines)
 	})
 })
 
