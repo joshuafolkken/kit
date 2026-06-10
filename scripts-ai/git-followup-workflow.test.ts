@@ -74,6 +74,21 @@ describe('resolve_should_merge', () => {
 	})
 })
 
+describe('print_project_version', () => {
+	it('logs the formatted project version line for the current project', () => {
+		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		try {
+			git_followup_workflow.print_project_version()
+			expect(spy).toHaveBeenCalledWith(
+				expect.stringMatching(/^📦 project version: \d+\.\d+\.\d+$/u),
+			)
+		} finally {
+			spy.mockRestore()
+		}
+	})
+})
+
 describe('resolve_branch_name', () => {
 	it('returns the provided branch name trimmed', async () => {
 		const result = await git_followup_workflow.resolve_branch_name('my-branch')

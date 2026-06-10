@@ -4,6 +4,7 @@ import { git_branch } from '../scripts/git/git-branch'
 import { git_error } from '../scripts/git/git-error'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
+import { version_targets } from '../scripts/version/version-targets'
 import { load_optional_environment } from './environment-loader'
 
 load_optional_environment()
@@ -99,6 +100,11 @@ function resolve_should_merge(values: CliArguments['values']): boolean {
 	return values['no-merge'] !== true
 }
 
+function print_project_version(): void {
+	const line = version_targets.project_version_line(process.cwd())
+	if (line !== undefined) console.info(line)
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -120,6 +126,7 @@ async function main(): Promise<void> {
 	})
 	console.info('')
 	console.info('✅ PR followup completed.')
+	print_project_version()
 }
 
 try {
@@ -133,6 +140,7 @@ const git_followup_workflow = {
 	parse_issue_number_from_text,
 	resolve_branch_name,
 	resolve_should_merge,
+	print_project_version,
 }
 
 export { git_followup_workflow }

@@ -326,6 +326,7 @@ Never send `completion` Telegram notifications manually with `pnpm josh notify -
 
 - Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh followup "<title> #<N>" --merge --notify-message "Implemented <title>:\n- <change1>\n- <change2>\n..."` each time you want to notify completion (notification is sent right before the merge).
 - `pnpm josh notify` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications (no automated alternative exists for those).
+- **Project version is surfaced at completion.** When `pnpm josh followup` finishes, it prints the consumer project's version as the final console line (`📦 project version: <v>`, read from the project's own `package.json` — the value `josh bump` increments, **not** the kit tool's version) and includes the same line in the `completion` Telegram body. The just-shipped version is therefore visible at the end of every completed `fullrun` / `queue`. Surface it as the closing line of your completion summary.
 
 #### Mid-workflow stop notification (`confirmation`)
 

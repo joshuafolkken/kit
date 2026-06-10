@@ -134,6 +134,8 @@ pnpm josh followup "PR title #N" --merge --notify-message "Implemented X:\n- cha
 pnpm josh followup "PR title #N" --merge --ai-review-ignore-reason "false positive"
 ```
 
+On completion, the project's own version (from `package.json`, the value `josh bump` increments) is printed as the final line (`📦 project version: <v>`) and included in the completion Telegram body, so the just-shipped version is visible at the end of the workflow.
+
 ### `josh notify`
 
 Send a Telegram notification. Used for planning, confirmation, failure, and kickoff-retry alerts.
