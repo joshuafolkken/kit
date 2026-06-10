@@ -1,3 +1,4 @@
+import { version_targets } from '#scripts/version/version-targets'
 import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
@@ -226,7 +227,11 @@ async function fetch_telegram_context(input: {
 
 async function notify_completion(context: TelegramContext): Promise<void> {
 	await telegram_notify.send(
-		build_telegram_input({ task_type: 'completion', context, body: undefined }),
+		build_telegram_input({
+			task_type: 'completion',
+			context,
+			body: version_targets.project_version_line(process.cwd()),
+		}),
 	)
 }
 
