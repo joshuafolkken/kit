@@ -7,6 +7,13 @@ allowBuilds:
   workerd: true
   '@joshuafolkken/kit': false # project postinstall handles lefthook install
 
+# Skip the install-time supply-chain re-verification of the already-committed, reviewed lockfile.
+# pnpm 11.5 pairs `minimum-release-age` with a pre-install metadata re-fetch; on clean CI boxes
+# (e.g. Cloudflare Workers Builds) it can't authenticate private @joshuafolkken/* GitHub Packages,
+# producing a false ERR_PNPM_TARBALL_URL_MISMATCH. minimum-release-age still applies at resolution
+# time, so age protection is preserved — only the per-install re-check of a trusted lockfile is skipped.
+trustLockfile: true
+
 # Security fixes often require same-day vite releases; minimum-release-age in .npmrc would block them.
 # `@types/node` and `tsx` are also excluded so routine Dependabot-style bumps are not
 # delayed by the minimum-release-age window.
