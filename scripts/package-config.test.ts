@@ -16,6 +16,7 @@ interface PackageJson {
 
 interface WorkspaceYaml {
 	allowBuilds?: Record<string, boolean>
+	trustLockfile?: boolean
 }
 
 function load_manifest(): PackageJson {
@@ -146,6 +147,12 @@ describe('pnpm-workspace.yaml built-dependency lists', () => {
 		const manifest = load_manifest()
 
 		expect(manifest.pnpm?.onlyBuiltDependencies).toBeUndefined()
+	})
+
+	it('trusts the committed lockfile so pnpm 11.5 supply-chain re-check does not break CI', () => {
+		// Synced to consumers; skips the install-time re-verification that fails on clean CI
+		// boxes lacking auth for private @joshuafolkken/* GitHub Packages (false URL mismatch).
+		expect(workspace.trustLockfile).toBe(true)
 	})
 })
 
