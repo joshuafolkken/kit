@@ -1,8 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ISSUE_INPUT = vi.hoisted(() => 'feat: add login #42')
 const FAKE_BRANCH_NAME = vi.hoisted(() => '42-fake-title')
 const FAKE_ISSUE_COMMIT = vi.hoisted(() => 'fake title #42')
+const FAKE_ISSUE_INFO = vi.hoisted(() => ({
+	title: 'fake title',
+	number: '42',
+	branch_name: FAKE_BRANCH_NAME,
+	commit_message: FAKE_ISSUE_COMMIT,
+}))
 const ALT_BRANCH_NAME = '42-short-name'
 
 vi.mock('node:util', () => ({
@@ -22,12 +28,8 @@ vi.mock('../scripts/git/git-branch', () => ({
 
 vi.mock('../scripts/git/git-issue', () => ({
 	git_issue: {
-		get_and_display: vi.fn().mockResolvedValue({
-			title: 'fake title',
-			number: '42',
-			branch_name: FAKE_BRANCH_NAME,
-			commit_message: FAKE_ISSUE_COMMIT,
-		}),
+		get_and_display: vi.fn().mockResolvedValue(FAKE_ISSUE_INFO),
+		resolve_and_display: vi.fn().mockResolvedValue(FAKE_ISSUE_INFO),
 	},
 }))
 
@@ -139,7 +141,7 @@ describe('prepare_issue_info — branch name override', () => {
 
 		vi.mocked(git_branch.check_and_create_branch).mockResolvedValue(FAKE_BRANCH_NAME)
 
-		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT)
+		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT, true)
 
 		expect(result.branch_name).toBe(FAKE_BRANCH_NAME)
 	})
@@ -149,8 +151,50 @@ describe('prepare_issue_info — branch name override', () => {
 
 		vi.mocked(git_branch.check_and_create_branch).mockResolvedValue(ALT_BRANCH_NAME)
 
-		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT)
+		const result = await git_workflow.prepare_issue_info(FAKE_ISSUE_COMMIT, true)
 
 		expect(result.branch_name).toBe(ALT_BRANCH_NAME)
+	})
+
+	it('routes resolution through resolve_and_display with the non-interactive flag', async () => {
+		const { git_issue } = await import('../scripts/git/git-issue')
+
+		await git_workflow.prepare_issue_info(undefined, true)
+
+		expect(vi.mocked(git_issue.resolve_and_display)).toHaveBeenCalledWith(
+			expect.objectContaining({ cli_input: undefined, is_non_interactive: true }),
+		)
+	})
+})
+
+describe('is_non_interactive_mode', () => {
+	const is_tty_original = process.stdin.isTTY
+
+	afterEach(() => {
+		process.stdin.isTTY = is_tty_original
+	})
+
+	it('is true when an issue argument was supplied', () => {
+		process.stdin.isTTY = true
+
+		expect(git_workflow.is_non_interactive_mode(true, {})).toBe(true)
+	})
+
+	it('is true when -y/--yes is set', () => {
+		process.stdin.isTTY = true
+
+		expect(git_workflow.is_non_interactive_mode(false, { yes: true })).toBe(true)
+	})
+
+	it('is true when there is no TTY', () => {
+		process.stdin.isTTY = false
+
+		expect(git_workflow.is_non_interactive_mode(false, {})).toBe(true)
+	})
+
+	it('is false for a plain interactive run (TTY, no issue arg, no -y)', () => {
+		process.stdin.isTTY = true
+
+		expect(git_workflow.is_non_interactive_mode(false, {})).toBe(false)
 	})
 })
