@@ -130,7 +130,7 @@ jobs:
       - name: Check for Playwright config
         id: check
         run: |
-          if [ -f playwright.config.ts ] && find src/routes -name "*.e2e.ts" | grep -q .; then
+          if [ -f playwright.config.ts ] && find tests src/routes \( -name "*.e2e.ts" -o -name "*.e2e.js" \) 2>/dev/null | grep -q .; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
