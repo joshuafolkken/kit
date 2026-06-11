@@ -70,6 +70,16 @@ describe('init_logic_workspace.merge_workspace_yaml — additive: new template k
 		expect(result).toContain('react: ^18')
 		expect(result).not.toContain(SVELTE_OVERRIDE)
 	})
+
+	it('appends trustLockfile scalar into an existing consumer config that lacks it', () => {
+		const template = 'packages:\n  - apps/*\ntrustLockfile: true\n'
+		const existing = EXISTING_WITH_APP
+
+		const result = init_logic_workspace.merge_workspace_yaml(existing, template)
+
+		expect(result).toContain('trustLockfile: true')
+		expect(result).toContain('- app')
+	})
 })
 
 describe('init_logic_workspace.merge_workspace_yaml — deprecated key removal', () => {
