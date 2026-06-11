@@ -119,9 +119,11 @@ Interactive AI-assisted git commit workflow: stages changes, generates a commit 
 
 ```bash
 pnpm josh git
-pnpm josh git -y          # skip confirmation prompts
+pnpm josh git -y          # run non-interactively (skip confirmation prompts)
 pnpm josh git -y "title"  # set commit message prefix
 ```
+
+`-y` / `--yes` runs the workflow unattended — it also works without a TTY (e.g. an AI agent or CI shell). When no issue argument is supplied, the issue number and title are derived from the current branch name (`<N>-<slug>`), so recovery commands such as `pnpm josh pr` and `pnpm josh git -y --skip-commit --skip-push` create the PR without prompting.
 
 ### `josh followup`
 

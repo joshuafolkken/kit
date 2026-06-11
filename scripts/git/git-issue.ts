@@ -60,6 +60,30 @@ function parse_issue_input(input: string): IssueInfo {
 	}
 }
 
+const BRANCH_NUMBER_PATTERN = /^(\d+)-(.+)$/u
+
+function derive_issue_input_from_branch(branch_name: string): string {
+	const match = BRANCH_NUMBER_PATTERN.exec(branch_name)
+
+	if (match === null) {
+		throw new Error(
+			`Cannot derive issue info from branch "${branch_name}" in non-interactive mode. Provide an issue argument like "title #42".`,
+		)
+	}
+
+	const [, number = '', slug = ''] = match
+	const title = slug.replaceAll('-', ' ').trim()
+
+	return `${title} #${number}`
+}
+
+function derive_from_branch(branch_name: string): IssueInfo {
+	const parsed = parse_issue_input(derive_issue_input_from_branch(branch_name))
+
+	// Pin to the actual branch so a non-round-tripping slug never triggers a branch switch.
+	return { ...parsed, branch_name }
+}
+
 function display_issue_info(issue_info: IssueInfo): void {
 	console.info('')
 	console.info('📋 Issue Information')
@@ -80,8 +104,32 @@ async function get_and_display(cli_input?: string): Promise<IssueInfo> {
 	return issue_info
 }
 
+interface ResolveIssueInput {
+	cli_input: string | undefined
+	current_branch: string
+	is_non_interactive: boolean
+}
+
+// In non-interactive mode (e.g. `josh pr` / `-y` with no issue arg, or no TTY) the issue
+// info is derived from the current branch instead of prompting, so headless runs never throw.
+async function resolve_and_display(input: ResolveIssueInput): Promise<IssueInfo> {
+	if (input.cli_input !== undefined) return await get_and_display(input.cli_input)
+
+	if (input.is_non_interactive) {
+		const issue_info = derive_from_branch(input.current_branch)
+
+		display_issue_info(issue_info)
+
+		return issue_info
+	}
+
+	return await get_and_display()
+}
+
 const git_issue = {
 	get_and_display,
+	resolve_and_display,
+	derive_from_branch,
 }
 
 export type { IssueInfo }

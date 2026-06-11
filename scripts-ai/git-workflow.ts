@@ -33,7 +33,8 @@ Options:
   --skip-push       Skip the push step.
   --skip-pr         Skip the PR creation step.
   --body <text>     Extra text appended after "closes #N" in the PR body.
-  -y, --yes         Skip safety confirmations (unstaged files, etc.).
+  -y, --yes         Run non-interactively: skip confirmations and, when no issue
+                    argument is given, derive the issue info from the current branch.
   -h, --help        Display this help message.
 
 Examples:
@@ -116,10 +117,10 @@ function parse_cli_arguments(): CliArguments {
 }
 
 async function get_workflow_confirmations(
-	is_auto_mode: boolean,
+	is_non_interactive: boolean,
 	values: CliArguments['values'],
 ): Promise<WorkflowConfirmations> {
-	if (is_auto_mode) {
+	if (is_non_interactive) {
 		return {
 			commit: values['skip-commit'] !== true,
 			push: values['skip-push'] !== true,
@@ -128,6 +129,15 @@ async function get_workflow_confirmations(
 	}
 
 	return await git_prompt.confirm_workflow_steps()
+}
+
+// `-y`/`--yes` (or an absent TTY) means run unattended: use the --skip-* flags instead of
+// prompting, and derive issue info from the branch when no issue argument was supplied.
+function is_non_interactive_mode(
+	has_issue_input: boolean,
+	values: CliArguments['values'],
+): boolean {
+	return has_issue_input || values.yes === true || !process.stdin.isTTY
 }
 
 function parse_positionals(positionals: Array<string>): {
@@ -144,15 +154,47 @@ function parse_positionals(positionals: Array<string>): {
 	}
 }
 
-async function prepare_issue_info(cli_issue_input?: string): Promise<IssueInfo> {
+async function prepare_issue_info(
+	cli_issue_input: string | undefined,
+	is_non_interactive: boolean,
+): Promise<IssueInfo> {
 	const current_branch = await git_branch.current()
-	const issue_info = await git_issue.get_and_display(cli_issue_input)
+	const issue_info = await git_issue.resolve_and_display({
+		cli_input: cli_issue_input,
+		current_branch,
+		is_non_interactive,
+	})
 	const actual_branch = await git_branch.check_and_create_branch(
 		current_branch,
 		issue_info.branch_name,
 	)
 
 	return { ...issue_info, branch_name: actual_branch }
+}
+
+function build_commit_message(
+	issue_info: IssueInfo,
+	commit_suffix: string | undefined,
+): string | undefined {
+	if (commit_suffix === undefined || commit_suffix.length === 0) return undefined
+
+	return `${issue_info.commit_message} ${commit_suffix}`
+}
+
+async function execute_workflow(
+	values: CliArguments['values'],
+	positionals: Array<string>,
+): Promise<void> {
+	const { cli_issue_input, is_auto_mode, commit_suffix } = parse_positionals(positionals)
+	const is_non_interactive = is_non_interactive_mode(is_auto_mode, values)
+
+	await git_staging.check_and_confirm_staging(values.yes === true)
+
+	const issue_info = await prepare_issue_info(cli_issue_input, is_non_interactive)
+	const confirmations = await get_workflow_confirmations(is_non_interactive, values)
+	const commit_message = build_commit_message(issue_info, commit_suffix)
+
+	await run_workflow_steps(issue_info, confirmations, commit_message, values.body)
 }
 
 async function main(): Promise<void> {
@@ -164,19 +206,7 @@ async function main(): Promise<void> {
 		return
 	}
 
-	const { cli_issue_input, is_auto_mode, commit_suffix } = parse_positionals(positionals)
-
-	await git_staging.check_and_confirm_staging(values.yes === true)
-
-	const issue_info = await prepare_issue_info(cli_issue_input)
-	const confirmations = await get_workflow_confirmations(is_auto_mode, values)
-
-	const commit_message =
-		commit_suffix !== undefined && commit_suffix.length > 0
-			? `${issue_info.commit_message} ${commit_suffix}`
-			: undefined
-
-	await run_workflow_steps(issue_info, confirmations, commit_message, values.body)
+	await execute_workflow(values, positionals)
 }
 
 try {
@@ -186,7 +216,12 @@ try {
 	git_error.handle(error)
 }
 
-const git_workflow = { parse_positionals, get_workflow_confirmations, prepare_issue_info }
+const git_workflow = {
+	parse_positionals,
+	get_workflow_confirmations,
+	prepare_issue_info,
+	is_non_interactive_mode,
+}
 
 export type { CliArguments }
 export { git_workflow }
