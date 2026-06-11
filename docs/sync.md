@@ -39,7 +39,7 @@ SECURITY.md         tsconfig.sonar.json wrangler.jsonc
 
 ### `pnpm-workspace.yaml` (merged)
 
-`pnpm-workspace.yaml` is **merged**, not overwritten. Kit-managed keys the template introduces (`minimumReleaseAgeExclude`, `allowBuilds`, `overrides`, `trustLockfile`) are added when missing; all other top-level keys (e.g. `packages:`) you have added — and any value you already set on a managed key — are preserved and appended after the kit-managed content.
+`pnpm-workspace.yaml` is **merged**, not overwritten. Your existing file is the base: all top-level keys it already has (user-added keys like `packages:`, and any value you already set on a managed key) are preserved as-is. Kit-managed keys the template introduces (`minimumReleaseAgeExclude`, `allowBuilds`, `overrides`, `trustLockfile`) are appended only when missing.
 
 `trustLockfile: true` skips pnpm 11.5's install-time supply-chain re-verification of the committed lockfile. Without it, clean CI environments (e.g. Cloudflare Workers Builds) that cannot authenticate private `@joshuafolkken/*` GitHub Packages hit a false `ERR_PNPM_TARBALL_URL_MISMATCH`. `minimum-release-age` still applies at resolution time, so age-based supply-chain protection is preserved.
 
