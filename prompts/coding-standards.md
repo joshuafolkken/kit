@@ -122,6 +122,7 @@ find src -name "*.ts" -o -name "*.svelte" | grep -i [関連キーワード]
 - **Svelteファイル**: `PascalCase.svelte`（例: `UserProfile.svelte`）
 - **`*.svelte.ts` ファイル**: Svelte のリアクティブな状態やロジックを格納するファイルも `PascalCase.svelte.ts` 形式とする（例: `ThemeStore.svelte.ts`, `LocaleStore.svelte.ts`）
 - **TypeScriptファイル**: `kebab-case.ts`（例: `user-service.ts`）
+- **テストファイル**: ユニット/統合テストは `*.test.ts`（`*.spec.ts` は禁止）、コンポーネント/ブラウザテストは `*.svelte.test.ts`（`.svelte.` の中置は必須・保持する）、E2E は `src/routes/**/*.e2e.ts`。テストは対象モジュールの隣に colocate し、トップレベルの `tests/` ディレクトリは使わない（詳細は `prompts/testing-guide.md` の「Test file naming & placement」を参照）
 - **ルートファイル**: `+page.svelte`, `+layout.svelte` などは例外
 - **関数定義**: `function` で表現できる処理はアロー関数ではなく通常の `function` 構文で記述する
 - **複数関数のエクスポート**: 複数の関数を公開する場合は名前空間オブジェクト（namespace object）にまとめてエクスポートする（定数のみのエクスポートは個別で問題ない）
