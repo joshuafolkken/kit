@@ -73,6 +73,70 @@ function merge_json_extends(content: string, entry: string): string {
 	return `${JSON.stringify({ ...parsed, extends: [entry, ...existing] }, undefined, '\t')}\n`
 }
 
+function extract_compiler_options(content: string): Record<string, unknown> {
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['compilerOptions']
+	if (raw === undefined) return {}
+
+	return json_object_schema.parse(raw)
+}
+
+// A consumer compilerOptions key is redundant only when its value deep-equals the kit base
+// preset's value. Such keys can be dropped without changing the effective config, because the
+// SvelteKit-generated tsconfig (the other extends layer) never sets these keys to a different
+// value. Value-divergent keys (e.g. a library's noEmitOnError:false) are intentional overrides
+// and are preserved — sync cannot tell a necessary override from an unnecessary one.
+function is_redundant_option(
+	value: unknown,
+	key: string,
+	base_options: Record<string, unknown>,
+): boolean {
+	return key in base_options && JSON.stringify(base_options[key]) === JSON.stringify(value)
+}
+
+function without_compiler_options(parsed: Record<string, unknown>): Record<string, unknown> {
+	return Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== 'compilerOptions'))
+}
+
+function serialize_stripped(
+	parsed: Record<string, unknown>,
+	kept: Record<string, unknown>,
+): string {
+	const next =
+		Object.keys(kept).length === 0
+			? without_compiler_options(parsed)
+			: { ...parsed, compilerOptions: kept }
+
+	return `${JSON.stringify(next, undefined, '\t')}\n`
+}
+
+function keep_divergent_options(
+	current: Record<string, unknown>,
+	base_options: Record<string, unknown>,
+): Record<string, unknown> {
+	return Object.fromEntries(
+		Object.entries(current).filter(
+			([key, value]) => !is_redundant_option(value, key, base_options),
+		),
+	)
+}
+
+function strip_redundant_compiler_options(
+	content: string,
+	base_options: Record<string, unknown>,
+): string {
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['compilerOptions']
+	if (raw === undefined) return content
+	const current = json_object_schema.parse(raw)
+	const kept = keep_divergent_options(current, base_options)
+	if (Object.keys(kept).length === Object.keys(current).length) return content
+
+	return serialize_stripped(parsed, kept)
+}
+
 function merge_json_array_field(
 	content: string,
 	key: string,
@@ -283,6 +347,8 @@ function sort_package_json_keys(content: string): string {
 
 const init_logic_json_merge = {
 	merge_json_extends,
+	extract_compiler_options,
+	strip_redundant_compiler_options,
 	merge_json_array_field,
 	merge_json_object,
 	merge_yaml_list_entry,
