@@ -97,6 +97,13 @@ const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
 	vanilla: './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
 }
 
+// Preset file basename within the package's tsconfig/ directory, used to read the base
+// compilerOptions when normalizing a consumer tsconfig.json during sync.
+const TSCONFIG_PRESET_FILENAME: Record<ProjectType, string> = {
+	sveltekit: 'sveltekit.jsonc',
+	vanilla: 'base.jsonc',
+}
+
 // extensions.json is distributed in common across project styles, so it is not keyed by ProjectType.
 const VSCODE_EXTENSIONS_FILENAME = 'extensions.json'
 
@@ -163,6 +170,10 @@ function merge_npmrc(content: string): string {
 
 function get_tsconfig_extends_entry(type: ProjectType): string {
 	return TSCONFIG_EXTENDS[type]
+}
+
+function get_tsconfig_preset_filename(type: ProjectType): string {
+	return TSCONFIG_PRESET_FILENAME[type]
 }
 
 function get_lefthook_extends_value(type: ProjectType): string {
@@ -294,6 +305,7 @@ const init_logic = {
 	merge_npmrc,
 	merge_sveltekit_package_json,
 	get_tsconfig_extends_entry,
+	get_tsconfig_preset_filename,
 	get_lefthook_extends_value,
 	get_cspell_import_value,
 	get_vscode_settings_filename,
