@@ -140,9 +140,11 @@ const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
 }
 
 function generate_tsconfig(type: ProjectType): string {
+	// kit preset first so the later `.svelte-kit/tsconfig.json` (and any project-specific
+	// entry) wins on conflicts — matching the order `josh sync` prepends to and all consumers.
 	const value =
 		type === 'sveltekit'
-			? { extends: ['./.svelte-kit/tsconfig.json', TSCONFIG_EXTENDS.sveltekit] }
+			? { extends: [TSCONFIG_EXTENDS.sveltekit, './.svelte-kit/tsconfig.json'] }
 			: { extends: TSCONFIG_EXTENDS.vanilla }
 
 	return `${JSON.stringify(value, undefined, '\t')}\n`
