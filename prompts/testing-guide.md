@@ -43,7 +43,21 @@ Req N: ...
 
 When ambiguous, ask the user.
 
-**Output paths:** E2E → `src/routes/**/*.e2e.ts` / Unit → `src/**/*.test.ts`
+### Test file naming & placement (one unambiguous rule)
+
+There is exactly **one** convention for every test file — never choose between two. The rules below are mandatory; a stray file that violates them either runs under the wrong vitest project or silently does not run at all.
+
+| Test kind           | Required filename        | Routed to                        |
+| ------------------- | ------------------------ | -------------------------------- |
+| Unit / integration  | `*.test.ts`              | node/unit vitest project         |
+| Component / browser | `*.svelte.test.ts`       | browser/component vitest project |
+| E2E                 | `src/routes/**/*.e2e.ts` | Playwright                       |
+
+- **Use `*.test.ts` — never `*.spec.ts`.** The `.spec.ts` suffix is forbidden for unit/integration tests. (The `vite.config.ts` matchers currently accept both `{test,spec}`, but `.spec.ts` is still prohibited by this rule; see the ESLint note below.)
+- **The `.svelte.` infix is required for component/browser tests and must be preserved.** `*.svelte.test.ts` routes the file to the **browser/component** vitest project (`include: src/**/*.svelte.{test,spec}.{js,ts}`); plain `*.test.ts` routes to the **node/unit** project (`include: src/**/*.{test,spec}.{js,ts}`). Renaming `Foo.svelte.test.ts` → `Foo.test.ts` silently moves it to the wrong project — do not drop the `.svelte.` infix.
+- **Colocate every test next to the code it exercises.** A top-level `tests/` directory is **not used** — place `foo.test.ts` beside `foo.ts`, and E2E specs under the relevant `src/routes/**` path.
+
+> **Future enforcement (note only):** the doc rule alone has already failed to prevent drift once (a consumer project drifted to `*.spec.ts` + a centralized `tests/` directory). A dedicated ESLint rule that flags `*.spec.ts` filenames and any top-level `tests/` directory is recommended — preferred over tightening the `vite.config.ts` matchers to `{test}` only, because matcher-tightening causes **silent non-execution** of stray `*.spec.ts` files whereas a lint rule fails loudly.
 
 ---
 
