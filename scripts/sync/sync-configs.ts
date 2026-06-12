@@ -6,6 +6,8 @@ import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
 
 type MergeFunction = (existing: string) => string
 
+const TSCONFIG_PRESET_DIR = 'tsconfig'
+
 function sync_with_merge(
 	destination_path: string,
 	destination_name: string,
@@ -40,11 +42,24 @@ function sync_eslint_config(destination_path: string, type: ProjectType): void {
 	)
 }
 
+function read_base_compiler_options(type: ProjectType): Record<string, unknown> {
+	const filename = init_logic.get_tsconfig_preset_filename(type)
+	const content = readFileSync(path.join(PACKAGE_DIR, TSCONFIG_PRESET_DIR, filename), 'utf8')
+
+	return init_logic.extract_compiler_options(content)
+}
+
+// Ensure the kit preset is in `extends`, then drop any compilerOptions key whose value already
+// equals that preset — removing per-project drift while preserving genuine overrides.
 function sync_tsconfig(destination_path: string, type: ProjectType): void {
 	const entry = init_logic.get_tsconfig_extends_entry(type)
+	const base_options = read_base_compiler_options(type)
 
 	sync_with_merge(destination_path, 'tsconfig.json', (existing) =>
-		init_logic.merge_json_extends(existing, entry),
+		init_logic.strip_redundant_compiler_options(
+			init_logic.merge_json_extends(existing, entry),
+			base_options,
+		),
 	)
 }
 
