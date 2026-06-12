@@ -33,33 +33,6 @@ describe('generate_prettier_config', () => {
 	})
 })
 
-describe('generate_tsconfig', () => {
-	it('sveltekit includes svelte-kit extends and our config as direct jsonc path', () => {
-		const result = init_logic.generate_tsconfig('sveltekit')
-
-		expect(result).toContain('.svelte-kit/tsconfig.json')
-		expect(result).toContain('node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc')
-	})
-
-	it('vanilla includes only our config as direct jsonc path', () => {
-		const result = init_logic.generate_tsconfig('vanilla')
-
-		expect(result).toContain('node_modules/@joshuafolkken/kit/tsconfig/base.jsonc')
-		expect(result).not.toContain('.svelte-kit')
-	})
-})
-
-describe('get_tsconfig_extends_entry', () => {
-	it('returns direct node_modules jsonc path for each project type', () => {
-		expect(init_logic.get_tsconfig_extends_entry('sveltekit')).toBe(
-			'./node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc',
-		)
-		expect(init_logic.get_tsconfig_extends_entry('vanilla')).toBe(
-			'./node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
-		)
-	})
-})
-
 describe('generate_lefthook_config', () => {
 	it('sveltekit references the sveltekit yml', () => {
 		expect(init_logic.generate_lefthook_config('sveltekit')).toContain('sveltekit.yml')

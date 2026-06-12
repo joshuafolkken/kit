@@ -17,8 +17,8 @@ import { config } from '@joshuafolkken/kit/prettier'
 ```jsonc
 // tsconfig.json
 { "extends": ["@joshuafolkken/kit/tsconfig/base"] }
-// or sveltekit:
-{ "extends": [".svelte-kit/tsconfig.json", "@joshuafolkken/kit/tsconfig/sveltekit"] }
+// or sveltekit (kit preset first so .svelte-kit/tsconfig.json wins on conflicts):
+{ "extends": ["@joshuafolkken/kit/tsconfig/sveltekit", ".svelte-kit/tsconfig.json"] }
 ```
 
 ```yaml
