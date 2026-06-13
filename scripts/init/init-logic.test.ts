@@ -278,6 +278,10 @@ describe('get_npmrc_lines', () => {
 	it('includes confirmModulesPurge=false', () => {
 		expect(init_logic.get_npmrc_lines()).toContain('confirmModulesPurge=false')
 	})
+
+	it('includes lockfile-include-tarball-url=true so pnpm >=11.5 frozen installs avoid 401', () => {
+		expect(init_logic.get_npmrc_lines()).toContain('lockfile-include-tarball-url=true')
+	})
 })
 
 describe('cspell sveltekit.yaml content', () => {
