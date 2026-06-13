@@ -19,6 +19,9 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 	'engine-strict=true',
 	'minimum-release-age=1440',
 	'confirmModulesPurge=false',
+	// Pin full GitHub Packages tarball URLs in the lockfile so pnpm >=11.5 frozen-lockfile
+	// installs hit the correct authenticated download path (avoids ERR_PNPM_FETCH_401 on CI).
+	'lockfile-include-tarball-url=true',
 ]
 
 const CSPELL_IMPORT: Record<ProjectType, string> = {
