@@ -31,6 +31,7 @@ Req N: ...
 - [ ] Count requirements in the user's request.
 - [ ] Count tests added/updated for those requirements.
 - [ ] The two counts match (or each gap is documented as infeasible with a comment).
+- [ ] **UI changes only:** a screenshot of the affected screen was captured and visually confirmed before reporting completion (passing tests are not proof the UI looks correct — see the **UI verification (screenshot)** rule in the completion gate). If a screenshot is impossible in this environment, that is stated and the user is asked to verify visually.
 
 ---
 

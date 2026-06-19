@@ -131,6 +131,8 @@ Run the full verification set **in order**. **Do not** skip or reorder steps. **
 
 **E2E:** The user runs `pnpm josh test` and shares the full output. Do **not** claim completion until the user confirms E2E passed or explicitly scopes it out.
 
+**UI verification (screenshot):** Any change that affects the rendered UI — new or modified components, layout, styling, user-visible copy, visible state, or interactions — is **not** done until you have actually looked at the rendered result. Capture a screenshot of the affected screen (in this project: the `/verify` or `/run` skill launches the app, or add a Playwright `page.screenshot()` to the relevant `*.e2e.ts`) and confirm it matches the intent before reporting completion. **Passing unit/E2E tests are not proof the UI looks correct** — tests routinely stay green while layout, spacing, or styling is visibly broken. If your environment cannot produce a screenshot, say so explicitly and ask the user to verify visually; never report a UI change as done on tests alone.
+
 0. **Test gate** — Count (a) code changes made and (b) tests added/updated. If b = 0, allow the run to continue **only** when every change falls under the pre-approved non-runtime exception (see Code Change Rules Step 0) or the user has explicitly approved the infeasibility. Otherwise **stop** — go back to Code Change Rules Step 0 and add tests before continuing.
 1. **Refactor** — read and execute `prompts/refactoring.md` on all changed files. Converge until no high/medium items remain. **Do not proceed to step 2 until complete.**
 2. `pnpm josh lint`
