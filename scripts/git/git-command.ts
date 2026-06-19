@@ -4,7 +4,10 @@ import { get_exit_code } from './git-execa-error'
 
 async function exec_git_command_read(arguments_: Array<string>): Promise<string> {
 	const git_cmd = git_utilities.get_git_command_for_spawn()
-	const { stdout } = await execa(git_cmd, arguments_)
+	// execa runs the binary directly with an argument array and no `shell` option, so CLI
+	// args cannot break out of a shell sandbox; the git command and args are internally
+	// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
+	const { stdout } = await execa(git_cmd, arguments_) // NOSONAR
 
 	return stdout.trimEnd()
 }
@@ -23,7 +26,10 @@ async function exec_git_command_with_output(
 	const git_command_bin = git_utilities.get_git_command_for_spawn()
 
 	try {
-		await execa(git_command_bin, [command, ...arguments_list], { stdio: 'inherit' })
+		// execa runs the binary directly with an argument array and no `shell` option, so CLI
+		// args cannot break out of a shell sandbox; the git command and args are internally
+		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
+		await execa(git_command_bin, [command, ...arguments_list], { stdio: 'inherit' }) // NOSONAR
 	} catch (error) {
 		throw create_spawn_error(command, get_exit_code(error))
 	}
