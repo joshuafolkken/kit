@@ -209,23 +209,23 @@ describe('init_logic_json_merge.merge_package_script_suffix - guards', () => {
 	})
 })
 
-describe('init_logic_json_merge.package_scripts_include', () => {
+describe('init_logic_json_merge.has_package_scripts_marker', () => {
 	const MARKER = 'fix-gh-packages'
 
 	it('returns true when a script value contains the marker', () => {
 		const content = JSON.stringify({ scripts: { prepare: `command -v tsx && ${FIX_GH_CMD}` } })
 
-		expect(init_logic_json_merge.package_scripts_include(content, MARKER)).toBe(true)
+		expect(init_logic_json_merge.has_package_scripts_marker(content, MARKER)).toBe(true)
 	})
 
 	it('returns false when no script value contains the marker', () => {
 		const content = JSON.stringify({ scripts: { [POSTINSTALL_KEY]: LEFTHOOK_CMD } })
 
-		expect(init_logic_json_merge.package_scripts_include(content, MARKER)).toBe(false)
+		expect(init_logic_json_merge.has_package_scripts_marker(content, MARKER)).toBe(false)
 	})
 
 	it('returns false when the scripts block is absent', () => {
-		expect(init_logic_json_merge.package_scripts_include('{}', MARKER)).toBe(false)
+		expect(init_logic_json_merge.has_package_scripts_marker('{}', MARKER)).toBe(false)
 	})
 })
 

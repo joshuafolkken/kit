@@ -253,7 +253,7 @@ describe('git_pr_followup.run — --merge flag', () => {
 		const [notify_order] = vi.mocked(telegram_notify.send).mock.invocationCallOrder
 		const [merge_order] = vi.mocked(git_gh_command.pr_merge).mock.invocationCallOrder
 
-		expect(notify_order).toBeLessThan(merge_order ?? Number.POSITIVE_INFINITY)
+		expect(notify_order).toBeLessThan(merge_order ?? Infinity)
 	})
 
 	it('calls pr_merge with the branch name when should_merge is true', async () => {

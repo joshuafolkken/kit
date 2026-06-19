@@ -27,7 +27,7 @@ function fetch_latest_version(): string | undefined {
 function rewrite_version(content: string, current_version: string, next_version: string): string {
 	return content.replace(
 		`${SAFE_CHAIN_PKG}@${current_version}`,
-		`${SAFE_CHAIN_PKG}@${next_version}`,
+		() => `${SAFE_CHAIN_PKG}@${next_version}`,
 	)
 }
 

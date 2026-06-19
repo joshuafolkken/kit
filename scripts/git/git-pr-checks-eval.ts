@@ -53,7 +53,7 @@ function is_merge_state_clean(merge_state_status: string | undefined): boolean {
 	return merge_state_status === MERGE_STATE_CLEAN
 }
 
-function are_required_all_passing(statuses: ReadonlyArray<string>): boolean {
+function is_every_required_passing(statuses: ReadonlyArray<string>): boolean {
 	return statuses.every((status) => status === CHECK_STATUS_PASS)
 }
 
@@ -66,7 +66,7 @@ function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 
 	if (failure !== undefined) return failure
 
-	if (is_merge_state_clean(snapshot.merge_state_status) && are_required_all_passing(statuses)) {
+	if (is_merge_state_clean(snapshot.merge_state_status) && is_every_required_passing(statuses)) {
 		return 'success'
 	}
 

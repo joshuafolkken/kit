@@ -2,11 +2,11 @@ import { git_command } from './git-command'
 import { git_prompt } from './git-prompt'
 import { git_status } from './git-status'
 
-async function confirm_package_json_staged(force = false): Promise<boolean> {
+async function confirm_package_json_staged(should_force = false): Promise<boolean> {
 	const is_package_json_staged = await git_status.check_package_json_staged()
 
 	if (!is_package_json_staged) {
-		if (force) {
+		if (should_force) {
 			console.info('💡 Skipping package.json staging check (force).')
 
 			return false
@@ -20,11 +20,11 @@ async function confirm_package_json_staged(force = false): Promise<boolean> {
 	return true
 }
 
-async function confirm_package_json_version(force = false): Promise<void> {
+async function confirm_package_json_version(should_force = false): Promise<void> {
 	const is_version_updated = await git_status.check_package_json_version()
 
 	if (!is_version_updated) {
-		if (force) {
+		if (should_force) {
 			console.info('💡 Skipping package.json version check (force).')
 
 			return
@@ -34,7 +34,7 @@ async function confirm_package_json_version(force = false): Promise<void> {
 	}
 }
 
-async function check_and_confirm_package_json(force = false): Promise<void> {
+async function check_and_confirm_package_json(should_force = false): Promise<void> {
 	const is_already_updated = await git_status.check_branch_version()
 
 	if (is_already_updated) {
@@ -43,10 +43,10 @@ async function check_and_confirm_package_json(force = false): Promise<void> {
 		return
 	}
 
-	const is_staged = await confirm_package_json_staged(force)
+	const is_staged = await confirm_package_json_staged(should_force)
 
 	if (is_staged) {
-		await confirm_package_json_version(force)
+		await confirm_package_json_version(should_force)
 	}
 }
 
@@ -70,14 +70,14 @@ async function stage_tracked_files(): Promise<void> {
 	await stage_untracked_files(untracked)
 }
 
-async function check_and_confirm_staging(force = false): Promise<void> {
+async function check_and_confirm_staging(should_force = false): Promise<void> {
 	const has_unstaged = await git_status.check_unstaged()
 
 	if (has_unstaged) {
-		await (force ? stage_tracked_files() : git_prompt.confirm_unstaged_files())
+		await (should_force ? stage_tracked_files() : git_prompt.confirm_unstaged_files())
 	}
 
-	await check_and_confirm_package_json(force)
+	await check_and_confirm_package_json(should_force)
 }
 
 const git_staging = {

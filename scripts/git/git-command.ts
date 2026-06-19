@@ -12,11 +12,8 @@ async function exec_git_command_read(arguments_: Array<string>): Promise<string>
 function create_spawn_error(command: string, exit_code: number | undefined): Error {
 	const exit_code_string = exit_code === undefined ? 'unknown' : String(exit_code)
 	const error_message = `git ${command} exited with code ${exit_code_string}`
-	const error = new Error(error_message)
 
-	error.cause = { exit_code: exit_code_string }
-
-	return error
+	return new Error(error_message, { cause: { exit_code: exit_code_string } })
 }
 
 async function exec_git_command_with_output(

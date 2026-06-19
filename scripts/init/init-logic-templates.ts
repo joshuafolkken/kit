@@ -151,7 +151,9 @@ function indent_block(text: string, indent: string): string {
 function apply_rules_template(type: ProjectType, rules_body: string): string {
 	const template = type === 'sveltekit' ? SVELTEKIT_WITH_RULES_TPL : VANILLA_WITH_RULES_TPL
 
-	return template.replace(RULES_PLACEHOLDER, indent_block(rules_body, RULES_INDENT))
+	const rules_block = indent_block(rules_body, RULES_INDENT)
+
+	return template.replace(RULES_PLACEHOLDER, () => rules_block)
 }
 
 function merge_eslint_config(existing: string, type: ProjectType): string {

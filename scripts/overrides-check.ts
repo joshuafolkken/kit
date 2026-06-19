@@ -51,10 +51,10 @@ function print_diff(diff: OverridesDiff): never {
 	return process.exit(1)
 }
 
-function run_overrides_check(save: boolean): void {
+function run_overrides_check(should_save: boolean): void {
 	const current = overrides_check.read_overrides_from_package(readFileSync('package.json', 'utf8'))
 
-	if (save) {
+	if (should_save) {
 		writeFileSync(overrides_check.SNAPSHOT_PATH, `${JSON.stringify(current, undefined, '\t')}\n`)
 		console.info(`✔ Overrides snapshot saved to ${overrides_check.SNAPSHOT_PATH}`)
 		process.exit(0)

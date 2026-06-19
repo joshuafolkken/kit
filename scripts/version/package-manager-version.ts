@@ -12,11 +12,13 @@ const PNPM_VERSION_REGEX = /^pnpm@([^+]+)/u
 const DEV_ENGINES_NAME_FIRST_REGEX = /("name":\s*"pnpm"\s*,\s*"version":\s*")[^"]+(")/u
 const DEV_ENGINES_VERSION_FIRST_REGEX = /("version":\s*")[^"]+("\s*,\s*"name":\s*"pnpm")/u
 
+const optional_version_schema = z.object({ version: z.string().optional() }).optional()
+
 const alignment_read_schema = z.object({
 	packageManager: z.string().optional(),
 	devEngines: z
 		.object({
-			packageManager: z.object({ version: z.string().optional() }).optional(),
+			packageManager: optional_version_schema,
 		})
 		.optional(),
 })
@@ -46,13 +48,22 @@ function resolve_alignment_target(parsed: AlignmentManifest): string | undefined
 // Surgically set `devEngines.packageManager.version` to `target`, preserving the
 // rest of the file byte-for-byte. Returns the content unchanged when there is no
 // `devEngines.packageManager` block to update.
+// Replacer used with `String#replace` so the captured prefix/suffix are re-emitted
+// around `target` literally — a `$` inside `target` is never read as a replacement
+// pattern.
 function set_development_engines_version(content: string, target: string): string {
 	if (DEV_ENGINES_NAME_FIRST_REGEX.test(content)) {
-		return content.replace(DEV_ENGINES_NAME_FIRST_REGEX, `$1${target}$2`)
+		return content.replace(
+			DEV_ENGINES_NAME_FIRST_REGEX,
+			(_match: string, prefix: string, suffix: string) => `${prefix}${target}${suffix}`,
+		)
 	}
 
 	if (DEV_ENGINES_VERSION_FIRST_REGEX.test(content)) {
-		return content.replace(DEV_ENGINES_VERSION_FIRST_REGEX, `$1${target}$2`)
+		return content.replace(
+			DEV_ENGINES_VERSION_FIRST_REGEX,
+			(_match: string, prefix: string, suffix: string) => `${prefix}${target}${suffix}`,
+		)
 	}
 
 	return content

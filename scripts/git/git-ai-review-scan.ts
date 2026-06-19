@@ -49,7 +49,7 @@ function is_coderabbit_author(login: string): boolean {
 	return CODERABBIT_AUTHORS.has(login)
 }
 
-function matches_claude_blocker(body: string): boolean {
+function is_claude_blocker(body: string): boolean {
 	return CLAUDE_BLOCKER_HEADINGS.some((pattern) => pattern.test(body))
 }
 
@@ -100,7 +100,7 @@ function claude_summary(body: string): string {
 }
 
 function classify_claude_comment(comment: ReviewComment): ClassifiedFinding {
-	if (!matches_claude_blocker(comment.body)) return build_none_finding(comment)
+	if (!is_claude_blocker(comment.body)) return build_none_finding(comment)
 
 	return {
 		author_login: comment.author_login,
