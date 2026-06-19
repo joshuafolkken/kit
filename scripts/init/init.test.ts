@@ -71,6 +71,36 @@ describe('install_lefthook', () => {
 	})
 })
 
+const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
+const KIT_PACKAGE_JSON_PATH = fileURLToPath(new URL('../../package.json', import.meta.url))
+const KIT_VERSION = (JSON.parse(readFileSync(KIT_PACKAGE_JSON_PATH, 'utf8')) as { version: string })
+	.version
+
+function merge_development_dependencies(
+	content: string,
+	type: 'sveltekit' | 'vanilla',
+): Record<string, string> {
+	const merged = init.apply_package_json_merges(content, type)
+
+	return (JSON.parse(merged) as { devDependencies: Record<string, string> }).devDependencies
+}
+
+describe('apply_package_json_merges', () => {
+	it('adds @joshuafolkken/kit at the kit version for a sveltekit project', () => {
+		expect(merge_development_dependencies('{}\n', 'sveltekit')[KIT_PACKAGE_NAME]).toBe(KIT_VERSION)
+	})
+
+	it('adds @joshuafolkken/kit at the kit version for a vanilla project', () => {
+		expect(merge_development_dependencies('{}\n', 'vanilla')[KIT_PACKAGE_NAME]).toBe(KIT_VERSION)
+	})
+
+	it('does not overwrite an existing @joshuafolkken/kit pin', () => {
+		const existing = `${JSON.stringify({ devDependencies: { [KIT_PACKAGE_NAME]: '0.1.0' } })}\n`
+
+		expect(merge_development_dependencies(existing, 'vanilla')[KIT_PACKAGE_NAME]).toBe('0.1.0')
+	})
+})
+
 describe('copy_ai_file', () => {
 	it('writes file content to destination', () => {
 		writeFileSync(TEMPLATE_PATH, NO_REFERENCES_CONTENT)

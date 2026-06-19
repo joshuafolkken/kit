@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { with_package_manager_schema } from '#scripts/schemas'
+import { package_version_schema, with_package_manager_schema } from '#scripts/schemas'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
@@ -13,6 +13,7 @@ import { init_logic, type ProjectType } from './init-logic'
 import { is_sveltekit_project, PROJECT_ROOT } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
+const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const SAMPLE_INDENT_WIDTH = 4
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 
@@ -116,6 +117,14 @@ function get_kit_development_engines(): Record<string, unknown> {
 	return init_logic.get_development_engines_value()
 }
 
+// Pin the kit to its own published version so the generated configs (which all import
+// `@joshuafolkken/kit/...`) resolve. Exact pin matches the consumer convention.
+function get_kit_self_dependency(): Record<string, string> {
+	const { version } = package_version_schema.parse(init_actions.read_package_json(PACKAGE_JSON))
+
+	return { [KIT_PACKAGE_NAME]: version }
+}
+
 function apply_package_json_merges(content: string, type: ProjectType): string {
 	const migrated = init_logic.strip_managed_postinstall(content)
 	const merged =
@@ -125,7 +134,8 @@ function apply_package_json_merges(content: string, type: ProjectType): string {
 					migrated,
 					init_logic.get_suggested_scripts_for_content(type, migrated),
 				)
-	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(merged)
+	const with_kit = init_logic.merge_development_dependencies(merged, get_kit_self_dependency())
+	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(with_kit)
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
 		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
