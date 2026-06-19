@@ -17,6 +17,7 @@ import { sync_configs } from './sync-configs'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 const WRANGLER_JSONC = 'wrangler.jsonc'
 const PACKAGE_JSON = 'package.json'
+const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
 
 function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
@@ -231,13 +232,33 @@ function sync_package_manager_version(destination_path: string): void {
 	const aligned = package_manager_version.align_development_engines_version(existing)
 
 	if (aligned === existing) {
-		console.info('  ✔ unchanged package.json')
+		console.info(PACKAGE_JSON_UNCHANGED_MSG)
 
 		return
 	}
 
 	writeFileSync(destination_path, aligned)
 	console.info('  ✔ synced    devEngines.packageManager.version')
+}
+
+// Migrate an existing wrangler consumer's package.json so worker types are generated in
+// `prepare` rather than `build` (see init_logic.migrate_wrangler_types_to_prepare). This
+// lets consumers that re-run `josh sync` pick up the fix without re-running `josh init`.
+// Gated on `is_wrangler` so non-Cloudflare projects are never touched.
+function sync_package_json_scripts(destination_path: string, is_wrangler: boolean): void {
+	if (!is_wrangler || !existsSync(destination_path)) return
+
+	const existing = readFileSync(destination_path, 'utf8')
+	const migrated = init_logic.migrate_wrangler_types_to_prepare(existing)
+
+	if (migrated === existing) {
+		console.info(PACKAGE_JSON_UNCHANGED_MSG)
+
+		return
+	}
+
+	writeFileSync(destination_path, migrated)
+	console.info('  ✔ migrated  wrangler types → prepare')
 }
 
 function resolve_project_type(): ProjectType {
@@ -251,6 +272,10 @@ function sync_project_artifacts(type: ProjectType, is_force: boolean): void {
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
 	sync_sonar_with_template(is_force)
 	sync_config_files(type)
+	sync_package_json_scripts(
+		path.join(PROJECT_ROOT, PACKAGE_JSON),
+		existsSync(path.join(PROJECT_ROOT, WRANGLER_JSONC)),
+	)
 	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
 }
 
@@ -273,6 +298,7 @@ const sync = {
 	sync_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,
+	sync_package_json_scripts,
 	sync_package_manager_version,
 	migrate_prettierrc: did_migrate_prettierrc,
 }

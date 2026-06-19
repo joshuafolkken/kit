@@ -7,52 +7,7 @@ import {
 import { dump, load } from 'js-yaml'
 import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
-
-const PACKAGE_JSON_KEY_ORDER: ReadonlyArray<string> = [
-	'name',
-	'version',
-	'description',
-	'keywords',
-	'homepage',
-	'bugs',
-	'license',
-	'author',
-	'contributors',
-	'funding',
-	'files',
-	'main',
-	'browser',
-	'exports',
-	'imports',
-	'bin',
-	'man',
-	'directories',
-	'repository',
-	'type',
-	'types',
-	'typings',
-	'typesVersions',
-	'publishConfig',
-	'private',
-	'scripts',
-	'config',
-	'dependencies',
-	'devDependencies',
-	'peerDependencies',
-	'peerDependenciesMeta',
-	'bundleDependencies',
-	'bundledDependencies',
-	'optionalDependencies',
-	'overrides',
-	'resolutions',
-	'packageManager',
-	'engines',
-	'devEngines',
-	'os',
-	'cpu',
-	'size-limit',
-	'pnpm',
-]
+import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
 
 function parse_jsonc(content: string): unknown {
 	return JSON.parse(strip_json_comments(content, { trailingCommas: true }))
@@ -322,6 +277,29 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: updated_value } }, undefined, '\t')}\n`
 }
 
+const SCRIPT_COMMAND_SEPARATOR = ' && '
+
+// Drop every ` && `-joined segment of a script whose trimmed command matches `pattern`,
+// then rejoin the survivors. Used to migrate a one-off command (e.g. `wrangler types`)
+// out of a `build` pipeline once another lifecycle hook owns it. Returns content
+// unchanged when the key is absent or no segment matches (idempotent re-runs).
+function remove_script_command_segment(content: string, key: string, pattern: RegExp): string {
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['scripts']
+	if (raw === undefined) return content
+	const scripts = string_record_schema.parse(raw)
+	const existing = scripts[key]
+	if (existing === undefined) return content
+	const kept = existing
+		.split(SCRIPT_COMMAND_SEPARATOR)
+		.filter((segment) => !pattern.test(segment.trim()))
+		.join(SCRIPT_COMMAND_SEPARATOR)
+	if (kept === existing) return content
+
+	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: kept } }, undefined, '\t')}\n`
+}
+
 function remove_script_with_marker(content: string, key: string, marker: string): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
@@ -357,6 +335,7 @@ const init_logic_json_merge = {
 	merge_cspell_import,
 	merge_package_scripts,
 	merge_package_script_suffix,
+	remove_script_command_segment,
 	remove_script_with_marker,
 	has_package_scripts_marker,
 	merge_development_dependencies,

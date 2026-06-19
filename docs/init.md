@@ -66,6 +66,10 @@ The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`
 
 When a `prepare` already exists (for example a SvelteKit `svelte-kit sync`), `josh init` appends the lifecycle to it rather than replacing it. If a script already runs `fix-gh-packages`, `josh init` skips re-adding the hook so re-running it never duplicates. A kit-managed `postinstall` from an earlier version (one that runs `fix-gh-packages`) is migrated to `prepare`; a custom `postinstall` of your own is left untouched.
 
+### Cloudflare worker types
+
+For wrangler projects (a `wrangler.jsonc` is present), `josh init` and `josh sync` generate the Cloudflare worker types in **`prepare`** rather than `build`. They append a guarded `[ -f wrangler.jsonc ] && command -v wrangler >/dev/null 2>&1 && wrangler types || true` to `prepare` and strip any `wrangler types` segment from `build`. Owning type generation in `prepare` lets `build` drop it, which avoids a second `wrangler` invocation during the E2E webServer's `pnpm run build` — that double invocation (alongside `prepack`'s `svelte-kit sync`) stalls webServer startup under the safe-chain proxy. The `prepare` command is idempotent and a no-op in non-Cloudflare checkouts or installs without the `wrangler` binary.
+
 All other toolchain tasks are available as `pnpm josh <command>` subcommands — they are **not** added as separate package scripts. Existing scripts are never overwritten.
 
 ## Dependencies

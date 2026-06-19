@@ -269,6 +269,53 @@ describe('sync_wrangler_jsonc_merge', () => {
 	})
 })
 
+const PACKAGE_JSON_DEST = path.join(TEST_DIR, 'dest', 'package.json')
+const WRANGLER_TYPES = 'wrangler types'
+const WRANGLER_PACKAGE_JSON = JSON.stringify({
+	scripts: { build: `${WRANGLER_TYPES} && vite build`, prepare: 'svelte-kit sync' },
+})
+
+describe('sync_package_json_scripts', () => {
+	it('migrates wrangler types from build to prepare for a wrangler project', () => {
+		writeFileSync(PACKAGE_JSON_DEST, WRANGLER_PACKAGE_JSON)
+		sync.sync_package_json_scripts(PACKAGE_JSON_DEST, true)
+
+		const result = readFileSync(PACKAGE_JSON_DEST, 'utf8')
+
+		expect(result).toContain('"build": "vite build"')
+		expect(result).toMatch(/"prepare":[^\n]*wrangler types/u)
+	})
+
+	it('does nothing when the project is not a wrangler project', () => {
+		writeFileSync(PACKAGE_JSON_DEST, WRANGLER_PACKAGE_JSON)
+		sync.sync_package_json_scripts(PACKAGE_JSON_DEST, false)
+
+		expect(readFileSync(PACKAGE_JSON_DEST, 'utf8')).toBe(WRANGLER_PACKAGE_JSON)
+	})
+
+	it('does nothing when package.json does not exist', () => {
+		sync.sync_package_json_scripts(PACKAGE_JSON_DEST, true)
+
+		expect(existsSync(PACKAGE_JSON_DEST)).toBe(false)
+	})
+
+	it('logs unchanged and is idempotent when already migrated', () => {
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
+			/* suppress */
+		})
+
+		writeFileSync(PACKAGE_JSON_DEST, WRANGLER_PACKAGE_JSON)
+		sync.sync_package_json_scripts(PACKAGE_JSON_DEST, true)
+
+		const after_first = readFileSync(PACKAGE_JSON_DEST, 'utf8')
+
+		sync.sync_package_json_scripts(PACKAGE_JSON_DEST, true)
+
+		expect(readFileSync(PACKAGE_JSON_DEST, 'utf8')).toBe(after_first)
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('unchanged'))
+	})
+})
+
 const NO_REFERENCES_CONTENT = 'no references here\n'
 
 describe('sync_ai_file', () => {

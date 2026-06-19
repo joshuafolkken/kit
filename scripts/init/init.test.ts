@@ -117,6 +117,42 @@ describe('apply_package_json_merges', () => {
 	})
 })
 
+const WRANGLER_TYPES = 'wrangler types'
+const SVELTE_KIT_SYNC = 'svelte-kit sync'
+
+function merge_scripts(content: string, is_wrangler: boolean): Record<string, string> {
+	const merged = init.apply_package_json_merges(content, 'sveltekit', is_wrangler)
+
+	return (JSON.parse(merged) as { scripts: Record<string, string> }).scripts
+}
+
+describe('apply_package_json_merges wrangler migration', () => {
+	const WRANGLER_PROJECT = JSON.stringify({
+		scripts: {
+			build: `${WRANGLER_TYPES} && vite build && pnpm run prepack`,
+			prepare: SVELTE_KIT_SYNC,
+		},
+	})
+
+	it('moves wrangler types from build to prepare when is_wrangler is true', () => {
+		const scripts = merge_scripts(WRANGLER_PROJECT, true)
+
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
+		expect(scripts['build']).toBe('vite build && pnpm run prepack')
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
+		expect(scripts['prepare']).toContain(WRANGLER_TYPES)
+	})
+
+	it('leaves build and prepare wrangler-free when is_wrangler is false', () => {
+		const scripts = merge_scripts(WRANGLER_PROJECT, false)
+
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
+		expect(scripts['build']).toContain(WRANGLER_TYPES)
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
+		expect(scripts['prepare']).not.toContain(WRANGLER_TYPES)
+	})
+})
+
 describe('copy_ai_file', () => {
 	it('writes file content to destination', () => {
 		writeFileSync(TEMPLATE_PATH, NO_REFERENCES_CONTENT)
