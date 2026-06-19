@@ -13,6 +13,7 @@ import { init_logic, type ProjectType } from './init-logic'
 import { is_sveltekit_project, PROJECT_ROOT, svelte_config_import } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
+const WRANGLER_CONFIG_FILE = 'wrangler.jsonc'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const SAMPLE_INDENT_WIDTH = 4
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
@@ -125,7 +126,7 @@ function get_kit_self_dependency(): Record<string, string> {
 	return { [KIT_PACKAGE_NAME]: version }
 }
 
-function apply_package_json_merges(content: string, type: ProjectType): string {
+function apply_dependency_merges(content: string, type: ProjectType): string {
 	const migrated = init_logic.strip_managed_postinstall(content)
 	const merged =
 		type === 'sveltekit'
@@ -135,14 +136,23 @@ function apply_package_json_merges(content: string, type: ProjectType): string {
 					init_logic.get_suggested_scripts_for_content(type, migrated),
 				)
 	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
-	const with_kit = init_logic.merge_development_dependencies(
-		with_prettier,
-		get_kit_self_dependency(),
-	)
+
+	return init_logic.merge_development_dependencies(with_prettier, get_kit_self_dependency())
+}
+
+function apply_package_json_merges(
+	content: string,
+	type: ProjectType,
+	is_wrangler = false,
+): string {
+	const with_kit = apply_dependency_merges(content, type)
 	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(with_kit)
+	const with_wrangler = is_wrangler
+		? init_logic.migrate_wrangler_types_to_prepare(with_lifecycle)
+		: with_lifecycle
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
-		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
+		kit_pm === undefined ? with_wrangler : init_logic.merge_package_manager(with_wrangler, kit_pm)
 	const with_de = init_logic.merge_development_engines(with_pm, get_kit_development_engines())
 	const sorted = init_logic.sort_package_json_keys(with_de)
 
@@ -157,7 +167,8 @@ function merge_project_package_json(type: ProjectType): void {
 	if (!existsSync(package_json_path)) return
 
 	const existing = readFileSync(package_json_path, 'utf8')
-	const merged = apply_package_json_merges(existing, type)
+	const is_wrangler = existsSync(path.join(PROJECT_ROOT, WRANGLER_CONFIG_FILE))
+	const merged = apply_package_json_merges(existing, type, is_wrangler)
 
 	if (merged === existing) {
 		console.info('  ✔ unchanged package.json')
