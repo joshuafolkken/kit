@@ -58,11 +58,11 @@ function find_block_with_rule(
 	return config.findLast((block) => {
 		const rules = block.rules as Record<string, unknown> | undefined
 
-		return rules !== undefined && rule_name in rules
+		return rules !== undefined && Object.hasOwn(rules, rule_name)
 	})
 }
 
-function matches_patterns(
+function is_pattern_match(
 	files: unknown,
 	expected: ReadonlyArray<string>,
 ): files is ReadonlyArray<string> {
@@ -78,7 +78,7 @@ function find_svelte_files_block(
 ): (typeof config)[number] | undefined {
 	// Match the rules block (4 patterns including .svelte.test.ts / .svelte.spec.ts),
 	// not the parser-options block (2 patterns) which now lives in a separate flat-config entry.
-	return config.find((block) => matches_patterns(block.files, EXPECTED_SVELTE_FILE_PATTERNS))
+	return config.find((block) => is_pattern_match(block.files, EXPECTED_SVELTE_FILE_PATTERNS))
 }
 
 const EXPECTED_SVELTE_SRC_PATTERNS = [SVELTE_COMPONENT_GLOB, SVELTE_TS_GLOB] as const
@@ -86,7 +86,7 @@ const EXPECTED_SVELTE_SRC_PATTERNS = [SVELTE_COMPONENT_GLOB, SVELTE_TS_GLOB] as 
 function find_svelte_source_block(
 	config: ReturnType<typeof create_sveltekit_config>,
 ): (typeof config)[number] | undefined {
-	return config.find((block) => matches_patterns(block.files, EXPECTED_SVELTE_SRC_PATTERNS))
+	return config.find((block) => is_pattern_match(block.files, EXPECTED_SVELTE_SRC_PATTERNS))
 }
 
 describe('create_sveltekit_config — routes block', () => {

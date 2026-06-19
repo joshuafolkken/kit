@@ -8,9 +8,11 @@ const package_with_version_schema = z.looseObject({ version: z.string() })
 
 // Shape of `pnpm ls -g --json <pkg>`: an array whose first entry lists the matched
 // global dependency under `dependencies[<pkg>].version`. Empty/absent when not installed.
+const ls_global_dependency_schema = z.looseObject({ version: z.string() })
+const ls_global_dependencies_schema = z.record(z.string(), ls_global_dependency_schema).optional()
 const pnpm_ls_global_schema = z.array(
 	z.looseObject({
-		dependencies: z.record(z.string(), z.looseObject({ version: z.string() })).optional(),
+		dependencies: ls_global_dependencies_schema,
 	}),
 )
 
@@ -21,8 +23,10 @@ const package_with_deps_schema = z.object({
 
 const vscode_settings_schema = z.record(z.string(), z.unknown())
 
+const extends_value_schema = z.union([z.string(), z.array(z.string())]).optional()
+
 const with_extends_schema = z.looseObject({
-	extends: z.union([z.string(), z.array(z.string())]).optional(),
+	extends: extends_value_schema,
 })
 
 const with_scripts_schema = z.looseObject({

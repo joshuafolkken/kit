@@ -14,7 +14,7 @@ function copy_ai_file(source_path: string, destination_path: string): void {
 	writeFileSync(destination_path, init_logic.transform_prompt_paths(content))
 }
 
-function execute_copy_if_absent(
+function did_skip_copy_if_absent(
 	source_path: string,
 	destination_path: string,
 	label: string,
@@ -31,7 +31,7 @@ function execute_copy_if_absent(
 	return false
 }
 
-function execute_wrangler_jsonc_copy(source_path: string, destination_path: string): boolean {
+function did_skip_wrangler_jsonc_copy(source_path: string, destination_path: string): boolean {
 	if (!existsSync(destination_path)) {
 		copy_ai_file(source_path, destination_path)
 		console.info(`  ✔ created   ${WRANGLER_JSONC}`)
@@ -49,7 +49,7 @@ function execute_wrangler_jsonc_copy(source_path: string, destination_path: stri
 	return false
 }
 
-function execute_workspace_yaml_copy(source_path: string, destination_path: string): boolean {
+function did_skip_workspace_yaml_copy(source_path: string, destination_path: string): boolean {
 	if (!existsSync(destination_path)) {
 		copy_ai_file(source_path, destination_path)
 		console.info(`  ✔ created   ${WORKSPACE_YAML}`)
@@ -67,25 +67,30 @@ function execute_workspace_yaml_copy(source_path: string, destination_path: stri
 	return false
 }
 
-function execute_ai_file_copy(filename: string): boolean {
+function did_skip_ai_file_copy(filename: string): boolean {
 	const source_path = package_path(filename)
 	const destination_path = path.join(PROJECT_ROOT, filename)
 
-	if (filename === WRANGLER_JSONC) return execute_wrangler_jsonc_copy(source_path, destination_path)
-	if (filename === WORKSPACE_YAML) return execute_workspace_yaml_copy(source_path, destination_path)
+	if (filename === WRANGLER_JSONC) {
+		return did_skip_wrangler_jsonc_copy(source_path, destination_path)
+	}
 
-	return execute_copy_if_absent(source_path, destination_path, filename)
+	if (filename === WORKSPACE_YAML) {
+		return did_skip_workspace_yaml_copy(source_path, destination_path)
+	}
+
+	return did_skip_copy_if_absent(source_path, destination_path, filename)
 }
 
-function execute_ai_file_mapping(source: string, destination: string): boolean {
-	return execute_copy_if_absent(
+function did_skip_ai_file_mapping(source: string, destination: string): boolean {
+	return did_skip_copy_if_absent(
 		package_path(source),
 		path.join(PROJECT_ROOT, destination),
 		destination,
 	)
 }
 
-function execute_ai_directory_copy(directory_name: string): boolean {
+function did_skip_ai_directory_copy(directory_name: string): boolean {
 	const destination_path = path.join(PROJECT_ROOT, directory_name)
 
 	if (existsSync(destination_path)) {
@@ -103,13 +108,13 @@ function execute_ai_directory_copy(directory_name: string): boolean {
 function run_ai_copies(): void {
 	const file_skips = init_logic
 		.get_ai_copy_files()
-		.map((filename) => execute_ai_file_copy(filename))
+		.map((filename) => did_skip_ai_file_copy(filename))
 	const mapping_skips = init_logic
 		.get_ai_copy_file_mappings()
-		.map(({ src: source, dest: destination }) => execute_ai_file_mapping(source, destination))
+		.map(({ src: source, dest: destination }) => did_skip_ai_file_mapping(source, destination))
 	const directory_skips = init_logic
 		.get_ai_copy_directories()
-		.map((directory_name) => execute_ai_directory_copy(directory_name))
+		.map((directory_name) => did_skip_ai_directory_copy(directory_name))
 	const has_skips = [...file_skips, ...mapping_skips, ...directory_skips].some(Boolean)
 
 	init_sonar.copy_sonar_with_template()

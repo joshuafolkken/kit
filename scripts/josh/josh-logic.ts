@@ -48,19 +48,18 @@ function resolve_tsx_executable(): string {
 }
 
 function read_package_version(): string {
-	return package_version_schema.parse(
-		JSON.parse(readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')),
-	).version
+	const raw = readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')
+
+	return package_version_schema.parse(JSON.parse(raw)).version
 }
 
 function is_sveltekit_project(): boolean {
 	try {
-		const parsed = package_with_deps_schema.parse(
-			JSON.parse(readFileSync(path.join(process.cwd(), PACKAGE_JSON), 'utf8')),
-		)
+		const raw = readFileSync(path.join(process.cwd(), PACKAGE_JSON), 'utf8')
+		const parsed = package_with_deps_schema.parse(JSON.parse(raw))
 		const all_deps = { ...parsed.dependencies, ...parsed.devDependencies }
 
-		return SVELTE_KIT_DEP in all_deps
+		return Object.hasOwn(all_deps, SVELTE_KIT_DEP)
 	} catch {
 		return false
 	}

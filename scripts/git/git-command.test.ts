@@ -140,18 +140,14 @@ describe('git_command.is_upstream_not_set_error', () => {
 
 	it('returns true for an Error with cause.exit_code of 128', async () => {
 		const { git_command } = await import('./git-command')
-		const error = new Error(PUSH_FAILED)
-
-		error.cause = { exit_code: '128' }
+		const error = new Error(PUSH_FAILED, { cause: { exit_code: '128' } })
 
 		expect(git_command.is_upstream_not_set_error(error)).toBe(true)
 	})
 
 	it(`${RETURNS_FALSE} when cause.exit_code is not 128`, async () => {
 		const { git_command } = await import('./git-command')
-		const error = new Error(PUSH_FAILED)
-
-		error.cause = { exit_code: '1' }
+		const error = new Error(PUSH_FAILED, { cause: { exit_code: '1' } })
 
 		expect(git_command.is_upstream_not_set_error(error)).toBe(false)
 	})

@@ -40,7 +40,7 @@ function parse_pr_info(
 	}
 }
 
-function check_conflict_conditions(
+function has_conflict_conditions(
 	is_mergeable: MergeableValue,
 	merge_state_status: string | null | undefined,
 ): boolean {
@@ -58,7 +58,7 @@ function has_conflicts(pr_info_json: string): boolean {
 		return false
 	}
 
-	return check_conflict_conditions(pr_info.is_mergeable, pr_info.merge_state_status)
+	return has_conflict_conditions(pr_info.is_mergeable, pr_info.merge_state_status)
 }
 
 function display_conflict_warning(): void {

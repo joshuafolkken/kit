@@ -88,16 +88,19 @@ const PACKAGE_JSON_WITH_ENGINES =
 const PACKAGE_JSON_WIDENED =
 	'{"packageManager":"pnpm@11.5.0+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11","onFail":"error"}}}'
 
-describe('latest_corepack.widen_development_engines', () => {
+describe('latest_corepack.did_widen_development_engines', () => {
 	it('widens the devEngines pin to the bare major before the bump', () => {
-		const is_widened = latest_corepack.widen_development_engines(PACKAGE_JSON_WITH_ENGINES, '11')
+		const is_widened = latest_corepack.did_widen_development_engines(
+			PACKAGE_JSON_WITH_ENGINES,
+			'11',
+		)
 
 		expect(is_widened).toBe(true)
 		expect(mocked_write_file_sync).toHaveBeenCalledWith(PACKAGE_JSON_PATH, PACKAGE_JSON_WIDENED)
 	})
 
 	it('does not touch the file when the major is undefined', () => {
-		const is_widened = latest_corepack.widen_development_engines(
+		const is_widened = latest_corepack.did_widen_development_engines(
 			PACKAGE_JSON_WITH_ENGINES,
 			undefined,
 		)
@@ -107,7 +110,7 @@ describe('latest_corepack.widen_development_engines', () => {
 	})
 
 	it('does not touch the file when devEngines.packageManager is absent', () => {
-		const is_widened = latest_corepack.widen_development_engines(PACKAGE_JSON_NO_PM, '11')
+		const is_widened = latest_corepack.did_widen_development_engines(PACKAGE_JSON_NO_PM, '11')
 
 		expect(is_widened).toBe(false)
 		expect(mocked_write_file_sync).not.toHaveBeenCalled()
@@ -175,11 +178,11 @@ describe('latest_corepack.main', () => {
 	})
 })
 
-describe('latest_corepack.warn_if_skipped', () => {
+describe('latest_corepack.did_warn_skip', () => {
 	it('warns and reports a skip when corepack exits non-zero', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		expect(latest_corepack.warn_if_skipped(1)).toBe(true)
+		expect(latest_corepack.did_warn_skip(1)).toBe(true)
 		expect(warn).toHaveBeenCalledOnce()
 
 		warn.mockRestore()
@@ -188,7 +191,7 @@ describe('latest_corepack.warn_if_skipped', () => {
 	it('stays silent and reports no skip when corepack succeeds', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		expect(latest_corepack.warn_if_skipped(0)).toBe(false)
+		expect(latest_corepack.did_warn_skip(0)).toBe(false)
 		expect(warn).not.toHaveBeenCalled()
 
 		warn.mockRestore()

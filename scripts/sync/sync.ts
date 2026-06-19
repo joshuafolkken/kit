@@ -96,7 +96,7 @@ function sync_directory(directory_name: string): void {
 	console.info(`  ✔ synced    ${directory_name}/`)
 }
 
-function migrate_prettierrc(destination_path: string): boolean {
+function did_migrate_prettierrc(destination_path: string): boolean {
 	const legacy_path = path.join(path.dirname(destination_path), '.prettierrc')
 	if (!existsSync(legacy_path)) return false
 
@@ -123,7 +123,7 @@ function write_merged_prettier_config(destination_path: string): void {
 }
 
 function sync_prettier_config(destination_path: string): void {
-	if (migrate_prettierrc(destination_path)) {
+	if (did_migrate_prettierrc(destination_path)) {
 		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
 
 		return
@@ -267,7 +267,7 @@ const sync = {
 	sync_playwright_config,
 	sync_deploy_vps,
 	sync_package_manager_version,
-	migrate_prettierrc,
+	migrate_prettierrc: did_migrate_prettierrc,
 }
 
 export { sync }

@@ -9,7 +9,9 @@ const VISUALIZER_PLUGINS = `${VISUALIZER_CLIENT},\n\t${VISUALIZER_SERVER}`
 const VISUALIZER_IMPORT_RE = /from ['"]rollup-plugin-visualizer['"]/u
 
 function find_last_import_pos(content: string): number {
-	const last_match = [...content.matchAll(/^import\s[^\n]+\n/gmu)].at(-1)
+	let last_match: RegExpExecArray | undefined = undefined
+
+	for (const match of content.matchAll(/^import\s[^\n]+\n/gmu)) last_match = match
 	if (last_match === undefined) return 0
 
 	return last_match.index + last_match[0].length
@@ -24,7 +26,7 @@ function inject_visualizer_import(content: string): string {
 function inject_visualizer_plugin(content: string): string {
 	if (!content.includes(VISUALIZER_ANCHOR)) return content
 
-	return content.replace(VISUALIZER_ANCHOR, VISUALIZER_PLUGINS)
+	return content.replace(VISUALIZER_ANCHOR, () => VISUALIZER_PLUGINS)
 }
 
 function merge_vite_config(content: string): string {

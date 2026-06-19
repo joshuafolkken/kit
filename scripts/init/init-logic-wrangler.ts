@@ -5,7 +5,7 @@ function extract_compatibility_date(content: string): string | undefined {
 }
 
 function update_compatibility_date(existing: string, new_date: string): string {
-	return existing.replace(COMPATIBILITY_DATE_PATTERN, `"compatibility_date": "${new_date}"`)
+	return existing.replace(COMPATIBILITY_DATE_PATTERN, () => `"compatibility_date": "${new_date}"`)
 }
 
 function merge_wrangler_jsonc(existing: string, template: string): string {

@@ -17,9 +17,9 @@ function get_selectors(): ReadonlyArray<NamingSelector> {
 }
 
 function find_selector(
-	predicate: (selector: NamingSelector) => boolean,
+	is_match: (selector: NamingSelector) => boolean,
 ): NamingSelector | undefined {
-	return get_selectors().find((selector) => predicate(selector))
+	return get_selectors().find((selector) => is_match(selector))
 }
 
 describe('naming_convention_rules — typeProperty (issue #426 Gap 1)', () => {

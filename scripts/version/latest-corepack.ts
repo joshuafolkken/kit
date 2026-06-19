@@ -54,7 +54,7 @@ function run_corepack(target: string): number {
 // Non-fatal: keep the josh latest chain (latest:update, audit) running. A non-zero
 // status here is usually the target version being newer than the registry
 // release-age window; it will bump on a later run. Returns whether a skip happened.
-function warn_if_skipped(status: number): boolean {
+function did_warn_skip(status: number): boolean {
 	if (status === 0) return false
 
 	console.warn(`⚠ Skipped pnpm bump (corepack exited ${String(status)}); the chain continues.`)
@@ -80,7 +80,7 @@ function sync_development_engines_after_bump(package_json_path: string = PACKAGE
 // major (a range the new patch satisfies) so corepack proceeds; the exact pin is
 // restored afterwards by sync_development_engines_after_bump (on success) or
 // restore_package_json (on skip). Returns whether the file was rewritten.
-function widen_development_engines(
+function did_widen_development_engines(
 	content: string,
 	major: string | undefined,
 	package_json_path: string = PACKAGE_JSON_PATH,
@@ -107,8 +107,8 @@ function restore_package_json(
 function main(): void {
 	const original = readFileSync(PACKAGE_JSON_PATH, 'utf8')
 	const major = extract_pnpm_major(original)
-	const is_widened = widen_development_engines(original, major)
-	const is_skipped = warn_if_skipped(run_corepack(build_corepack_target(major)))
+	const is_widened = did_widen_development_engines(original, major)
+	const is_skipped = did_warn_skip(run_corepack(build_corepack_target(major)))
 	if (is_skipped && is_widened) restore_package_json(original)
 	else if (!is_skipped) sync_development_engines_after_bump()
 }
@@ -120,9 +120,9 @@ const latest_corepack = {
 	build_corepack_target,
 	resolve_corepack_target,
 	run_corepack,
-	warn_if_skipped,
+	did_warn_skip,
 	sync_development_engines_after_bump,
-	widen_development_engines,
+	did_widen_development_engines,
 	restore_package_json,
 	main,
 }

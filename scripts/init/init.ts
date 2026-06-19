@@ -25,7 +25,7 @@ function write_new_file(action: FileAction, destination_path: string): void {
 function show_sample(action: FileAction): void {
 	console.info(`  ⚠ exists    ${action.dest} — add manually:`)
 	console.info('')
-	console.info(action.create().replaceAll(/^/gmu, SAMPLE_INDENT))
+	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
 }
 
 function merge_existing_file(

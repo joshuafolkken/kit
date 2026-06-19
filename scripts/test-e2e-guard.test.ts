@@ -18,26 +18,26 @@ function fake_result(exit_code: number | undefined): ExecaResult {
 	return { exitCode: exit_code } as unknown as ExecaResult
 }
 
-let project_directory = ''
+const ctx = { project_directory: '' }
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	project_directory = mkdtempSync(path.join(tmpdir(), 'e2e-guard-'))
+	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'e2e-guard-'))
 })
 
 afterEach(() => {
-	rmSync(project_directory, { recursive: true, force: true })
+	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
 
 function add_playwright_package(): void {
-	const package_directory = path.join(project_directory, 'node_modules', '@playwright', 'test')
+	const package_directory = path.join(ctx.project_directory, 'node_modules', '@playwright', 'test')
 
 	mkdirSync(package_directory, { recursive: true })
 	writeFileSync(path.join(package_directory, 'package.json'), '{}')
 }
 
 function add_e2e_file(relative_path: string): void {
-	const file_path = path.join(project_directory, relative_path)
+	const file_path = path.join(ctx.project_directory, relative_path)
 
 	mkdirSync(path.dirname(file_path), { recursive: true })
 	writeFileSync(file_path, '')
@@ -59,37 +59,37 @@ describe('test_e2e_guard.resolve_guard_action', () => {
 
 describe('test_e2e_guard.is_playwright_installed', () => {
 	it('returns false when @playwright/test is absent', () => {
-		expect(test_e2e_guard.is_playwright_installed(project_directory)).toBe(false)
+		expect(test_e2e_guard.is_playwright_installed(ctx.project_directory)).toBe(false)
 	})
 
 	it('returns true when @playwright/test is installed', () => {
 		add_playwright_package()
 
-		expect(test_e2e_guard.is_playwright_installed(project_directory)).toBe(true)
+		expect(test_e2e_guard.is_playwright_installed(ctx.project_directory)).toBe(true)
 	})
 })
 
 describe('test_e2e_guard.has_e2e_tests', () => {
 	it('returns false when no *.e2e files exist', () => {
-		expect(test_e2e_guard.has_e2e_tests(project_directory)).toBe(false)
+		expect(test_e2e_guard.has_e2e_tests(ctx.project_directory)).toBe(false)
 	})
 
 	it('returns true when an e2e test exists under tests/', () => {
 		add_e2e_file(E2E_FILE)
 
-		expect(test_e2e_guard.has_e2e_tests(project_directory)).toBe(true)
+		expect(test_e2e_guard.has_e2e_tests(ctx.project_directory)).toBe(true)
 	})
 
 	it('ignores e2e files inside node_modules', () => {
 		add_e2e_file(path.join('node_modules', 'dep', 'sample.e2e.ts'))
 
-		expect(test_e2e_guard.has_e2e_tests(project_directory)).toBe(false)
+		expect(test_e2e_guard.has_e2e_tests(ctx.project_directory)).toBe(false)
 	})
 
 	it('does not exclude directories whose name merely contains node_modules', () => {
 		add_e2e_file(path.join('tests', 'node_modules_utils', E2E_BASENAME))
 
-		expect(test_e2e_guard.has_e2e_tests(project_directory)).toBe(true)
+		expect(test_e2e_guard.has_e2e_tests(ctx.project_directory)).toBe(true)
 	})
 })
 
@@ -97,7 +97,7 @@ describe('test_e2e_guard.run_guarded_e2e — skip paths', () => {
 	it('skips and returns 0 when the package is missing', async () => {
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		const exit_code = await test_e2e_guard.run_guarded_e2e(project_directory, [])
+		const exit_code = await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
 
 		expect(exit_code).toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()
@@ -108,7 +108,7 @@ describe('test_e2e_guard.run_guarded_e2e — skip paths', () => {
 		add_playwright_package()
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		const exit_code = await test_e2e_guard.run_guarded_e2e(project_directory, [])
+		const exit_code = await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
 
 		expect(exit_code).toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()
@@ -125,7 +125,10 @@ describe('test_e2e_guard.run_guarded_e2e — run path', () => {
 	it('runs Playwright and returns its exit code when both are present', async () => {
 		mocked_execa.mockResolvedValue(fake_result(0))
 
-		const exit_code = await test_e2e_guard.run_guarded_e2e(project_directory, ['--grep', 'smoke'])
+		const exit_code = await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [
+			'--grep',
+			'smoke',
+		])
 
 		expect(exit_code).toBe(0)
 		expect(mocked_execa).toHaveBeenCalledWith(
@@ -138,7 +141,7 @@ describe('test_e2e_guard.run_guarded_e2e — run path', () => {
 	it('returns the fallback exit code when Playwright reports no exit code', async () => {
 		mocked_execa.mockResolvedValue(fake_result(undefined))
 
-		const exit_code = await test_e2e_guard.run_guarded_e2e(project_directory, [])
+		const exit_code = await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
 
 		expect(exit_code).toBe(1)
 	})

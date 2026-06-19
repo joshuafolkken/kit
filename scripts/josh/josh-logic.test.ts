@@ -22,7 +22,7 @@ const CHECK_SVELTE_CI_CMD = 'check:svelte:ci'
 const CHECK_COMMIT_MESSAGE_CMD = 'check-commit-message'
 const UNKNOWN_CMD = 'not-a-command'
 
-const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
+const EXPECTED_COMMAND_ENTRIES: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
 	[
 		'Development',
 		[
@@ -58,7 +58,11 @@ const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>([
 		],
 	],
 	['AI tools', ['prep', 'issue']],
-])
+]
+
+const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>(
+	EXPECTED_COMMAND_ENTRIES,
+)
 
 function assert_positions_in_order(positions: ReadonlyArray<number>): void {
 	for (const pos of positions) expect(pos).toBeGreaterThanOrEqual(0)
@@ -68,8 +72,8 @@ function assert_positions_in_order(positions: ReadonlyArray<number>): void {
 	}
 }
 
-const EXPECTED_CATEGORY_ORDER = [...EXPECTED_COMMANDS_BY_CATEGORY.keys()]
-const EXPECTED_COMMANDS = [...EXPECTED_COMMANDS_BY_CATEGORY.values()].flat()
+const EXPECTED_CATEGORY_ORDER = EXPECTED_COMMAND_ENTRIES.map(([category]) => category)
+const EXPECTED_COMMANDS = EXPECTED_COMMAND_ENTRIES.flatMap(([, commands]) => commands)
 
 describe('COMMAND_MAP', () => {
 	it('contains all expected commands', () => {

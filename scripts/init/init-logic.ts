@@ -245,7 +245,7 @@ function get_suggested_scripts_for_content(
 	content: string,
 ): Record<string, string> {
 	const scripts = get_suggested_scripts(type)
-	const has_fix = init_logic_json_merge.package_scripts_include(content, FIX_GH_PACKAGES_MARKER)
+	const has_fix = init_logic_json_merge.has_package_scripts_marker(content, FIX_GH_PACKAGES_MARKER)
 	if (!has_fix) return scripts
 
 	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== PREPARE_KEY))
@@ -256,7 +256,7 @@ function get_suggested_scripts_for_content(
 // land in `prepare` instead of being lost when the suggested-scripts merge skips the
 // already-present `prepare` key.
 function merge_prepare_lifecycle_cmd(content: string): string {
-	const has_fix = init_logic_json_merge.package_scripts_include(content, FIX_GH_PACKAGES_MARKER)
+	const has_fix = init_logic_json_merge.has_package_scripts_marker(content, FIX_GH_PACKAGES_MARKER)
 	if (has_fix) return content
 
 	return init_logic_json_merge.merge_package_script_suffix(content, PREPARE_KEY, PREPARE_CMD)
@@ -275,7 +275,10 @@ function strip_managed_postinstall(content: string): string {
 }
 
 function transform_prompt_paths(content: string): string {
-	return content.replaceAll(/`prompts\/([^`]+)`/gu, `\`${PROMPTS_PACKAGE_PREFIX}$1\``)
+	return content.replaceAll(
+		/`prompts\/([^`]+)`/gu,
+		(_match, prompt_path: string) => `\`${PROMPTS_PACKAGE_PREFIX}${prompt_path}\``,
+	)
 }
 
 function merge_sveltekit_package_json(content: string): string {

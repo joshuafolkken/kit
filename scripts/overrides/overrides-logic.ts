@@ -46,7 +46,7 @@ function find_modified(
 	current: Record<string, string>,
 ): Array<ModifiedEntry> {
 	return Object.entries(snapshot)
-		.filter(([key]) => key in current && snapshot[key] !== current[key])
+		.filter(([key]) => Object.hasOwn(current, key) && snapshot[key] !== current[key])
 		.map(([key, old_value]) => ({ key, old_value, new_value: current[key] ?? '' }))
 }
 

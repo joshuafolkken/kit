@@ -25,9 +25,7 @@ describe('git_pr_error.is_pr_already_exists_error', () => {
 	})
 
 	it('returns false when cause is not an Error', () => {
-		const error = new Error('outer') as Error & { cause: string }
-
-		error.cause = PR_ALREADY_EXISTS
+		const error = new Error('outer', { cause: PR_ALREADY_EXISTS })
 
 		expect(git_pr_error.is_pr_already_exists_error(error)).toBe(false)
 	})
