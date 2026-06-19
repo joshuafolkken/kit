@@ -99,6 +99,22 @@ describe('apply_package_json_merges', () => {
 
 		expect(merge_development_dependencies(existing, 'vanilla')[KIT_PACKAGE_NAME]).toBe('0.1.0')
 	})
+
+	it('adds the prettier preset plugins for a sveltekit project', () => {
+		const deps = merge_development_dependencies('{}\n', 'sveltekit')
+
+		expect(deps['@ianvs/prettier-plugin-sort-imports']).toBe('^4.7.1')
+		expect(deps['prettier-plugin-svelte']).toBe('^4.1.1')
+		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
+	})
+
+	it('adds the prettier preset plugins for a vanilla project', () => {
+		const deps = merge_development_dependencies('{}\n', 'vanilla')
+
+		expect(deps['@ianvs/prettier-plugin-sort-imports']).toBe('^4.7.1')
+		expect(deps['prettier-plugin-svelte']).toBe('^4.1.1')
+		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
+	})
 })
 
 describe('copy_ai_file', () => {

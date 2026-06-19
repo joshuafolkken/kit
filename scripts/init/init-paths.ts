@@ -32,12 +32,32 @@ function has_sveltekit_dependency(project_root: string): boolean {
 	return Object.hasOwn(deps, SVELTEKIT_PACKAGE)
 }
 
-function is_sveltekit_project(project_root: string): boolean {
-	return (
-		existsSync(path.join(project_root, 'svelte.config.js')) ||
-		existsSync(path.join(project_root, 'svelte.config.ts')) ||
-		has_sveltekit_dependency(project_root)
-	)
+const SVELTE_CONFIG_FILENAMES: ReadonlyArray<string> = ['svelte.config.js', 'svelte.config.ts']
+
+// The new `sv` library template configures sveltekit() in vite.config.ts and ships no
+// svelte.config.{js,ts}. The generated eslint.config.js must therefore only import the
+// svelte config when one exists — and import the extension that is actually present
+// (`.ts`-only projects must not import `./svelte.config.js`), otherwise the import throws.
+// Returns the import specifier (e.g. `./svelte.config.ts`) or undefined when none exists.
+function svelte_config_import(project_root: string): string | undefined {
+	const found = SVELTE_CONFIG_FILENAMES.find((name) => existsSync(path.join(project_root, name)))
+
+	return found === undefined ? undefined : `./${found}`
 }
 
-export { PACKAGE_DIR, PROJECT_ROOT, package_path, is_sveltekit_project }
+function has_svelte_config_file(project_root: string): boolean {
+	return svelte_config_import(project_root) !== undefined
+}
+
+function is_sveltekit_project(project_root: string): boolean {
+	return has_svelte_config_file(project_root) || has_sveltekit_dependency(project_root)
+}
+
+export {
+	PACKAGE_DIR,
+	PROJECT_ROOT,
+	package_path,
+	is_sveltekit_project,
+	has_svelte_config_file,
+	svelte_config_import,
+}

@@ -36,9 +36,13 @@ function sync_npmrc(destination_path: string): void {
 	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
 }
 
-function sync_eslint_config(destination_path: string, type: ProjectType): void {
+function sync_eslint_config(
+	destination_path: string,
+	type: ProjectType,
+	svelte_config_import: string | undefined,
+): void {
 	sync_with_merge(destination_path, 'eslint.config.js', (existing) =>
-		init_logic.merge_eslint_config(existing, type),
+		init_logic.merge_eslint_config(existing, type, svelte_config_import),
 	)
 }
 
