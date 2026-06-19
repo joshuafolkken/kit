@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 interface LefthookCommand {
 	run?: string
+	glob?: string
 }
 
 interface LefthookHook {
@@ -14,14 +15,24 @@ interface LefthookHook {
 type LefthookConfig = Record<string, LefthookHook>
 
 const SVELTEKIT_LEFTHOOK = path.join('lefthook', 'sveltekit.yml')
+const BASE_LEFTHOOK = path.join('lefthook', 'base.yml')
+const PRE_COMMIT = 'pre-commit'
 const PRE_PUSH = 'pre-push'
 const TEST_E2E = 'test-e2e'
+const CSPELL = 'cspell'
+
+function load_config(relative_path: string): LefthookConfig {
+	const content = readFileSync(path.resolve(process.cwd(), relative_path), 'utf8')
+
+	return yaml.load(content) as LefthookConfig
+}
 
 function load_test_e2e_command(relative_path: string): LefthookCommand | undefined {
-	const content = readFileSync(path.resolve(process.cwd(), relative_path), 'utf8')
-	const config = yaml.load(content) as LefthookConfig
+	return load_config(relative_path)[PRE_PUSH]?.commands?.[TEST_E2E]
+}
 
-	return config[PRE_PUSH]?.commands?.[TEST_E2E]
+function load_cspell_command(relative_path: string): LefthookCommand | undefined {
+	return load_config(relative_path)[PRE_COMMIT]?.commands?.[CSPELL]
 }
 
 describe('lefthook/sveltekit.yml pre-push e2e gate', () => {
@@ -37,5 +48,20 @@ describe('lefthook/sveltekit.yml pre-push e2e gate', () => {
 
 	it('does not invoke playwright directly so the optional peer stays optional', () => {
 		expect(test_e2e?.run).not.toContain('playwright test')
+	})
+})
+
+describe.each([
+	['lefthook/sveltekit.yml', SVELTEKIT_LEFTHOOK],
+	['lefthook/base.yml', BASE_LEFTHOOK],
+])('%s pre-commit cspell glob', (_label, relative_path) => {
+	const cspell = load_cspell_command(relative_path)
+
+	it('defines a cspell pre-commit command', () => {
+		expect(cspell).toBeDefined()
+	})
+
+	it('includes .properties so kit-generated sonar-project.properties is checked locally like CI', () => {
+		expect(cspell?.glob).toContain('properties')
 	})
 })
