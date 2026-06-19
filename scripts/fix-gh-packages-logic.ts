@@ -110,7 +110,7 @@ function package_version_from_key(key: string): string {
 	return key.slice(at_index + 1).split('(', 1)[0] ?? ''
 }
 
-function needs_tarball_fix(key: string, entry: LockfilePackage, scopes: Set<string>): boolean {
+function should_fix_tarball(key: string, entry: LockfilePackage, scopes: Set<string>): boolean {
 	if (has_tarball(entry)) return false
 	const scope = scope_from_key(key)
 
@@ -222,7 +222,7 @@ const fix_gh_packages_logic = {
 	parse_lockfile_packages,
 	package_path_from_key,
 	package_version_from_key,
-	needs_tarball_fix,
+	needs_tarball_fix: should_fix_tarball,
 	insert_tarball_for_key,
 	patch_lockfile,
 	resolve_token,

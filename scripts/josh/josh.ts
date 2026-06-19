@@ -14,7 +14,6 @@ function handle_unknown(cmd: string): never {
 
 function main(): void {
 	const cmd = process.argv[ARGV_OFFSET]
-	const subcommand_arguments = process.argv.slice(ARGV_OFFSET + 1)
 
 	if (!cmd || cmd === 'help') {
 		print_help()
@@ -22,6 +21,7 @@ function main(): void {
 		return
 	}
 
+	const subcommand_arguments = process.argv.slice(ARGV_OFFSET + 1)
 	const exit_code = josh_logic.run_command(cmd, subcommand_arguments)
 
 	if (exit_code === -1) handle_unknown(cmd)

@@ -11,8 +11,8 @@ interface SonarIdentifiers {
 
 function apply_sonar_template(content: string, project_key: string, organization: string): string {
 	return content
-		.replaceAll(SONAR_PROJECT_KEY_PLACEHOLDER, project_key)
-		.replaceAll(SONAR_ORGANIZATION_PLACEHOLDER, organization)
+		.replaceAll(SONAR_PROJECT_KEY_PLACEHOLDER, () => project_key)
+		.replaceAll(SONAR_ORGANIZATION_PLACEHOLDER, () => organization)
 }
 
 function derive_sonar_identifiers(name_with_owner: string): SonarIdentifiers {

@@ -92,7 +92,9 @@ function is_redundant_option(
 	key: string,
 	base_options: Record<string, unknown>,
 ): boolean {
-	return key in base_options && JSON.stringify(base_options[key]) === JSON.stringify(value)
+	if (!Object.hasOwn(base_options, key)) return false
+
+	return JSON.stringify(base_options[key]) === JSON.stringify(value)
 }
 
 function without_compiler_options(parsed: Record<string, unknown>): Record<string, unknown> {
@@ -143,7 +145,7 @@ function merge_json_array_field(
 	values: ReadonlyArray<string>,
 ): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
-	const existing = key in parsed ? string_array_schema.parse(parsed[key]) : []
+	const existing = Object.hasOwn(parsed, key) ? string_array_schema.parse(parsed[key]) : []
 	const to_add = values.filter((value) => !existing.includes(value))
 	if (to_add.length === 0) return content
 
@@ -155,7 +157,7 @@ function merge_json_object(content: string, updates: Record<string, unknown>): s
 	let has_changes = false
 
 	for (const [key, value] of Object.entries(updates)) {
-		if (!(key in parsed)) {
+		if (!Object.hasOwn(parsed, key)) {
 			parsed[key] = value
 			has_changes = true
 		}
@@ -178,7 +180,7 @@ function merge_yaml_list_entry(content: string, key: string, value: string): str
 	const existing_raw = parsed[key]
 	const existing = Array.isArray(existing_raw) ? string_array_schema.parse(existing_raw) : []
 	if (existing.includes(value)) return content
-	if (!(key in parsed)) return dump({ [key]: [value], ...parsed })
+	if (!Object.hasOwn(parsed, key)) return dump({ [key]: [value], ...parsed })
 
 	return dump(
 		Object.fromEntries(
@@ -257,7 +259,7 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	const raw = parsed['scripts']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
-	const to_add = Object.entries(scripts).filter(([key]) => !(key in migrated))
+	const to_add = Object.entries(scripts).filter(([key]) => !Object.hasOwn(migrated, key))
 	const did_migrate = JSON.stringify(migrated) !== JSON.stringify(existing)
 
 	if (!did_migrate && to_add.length === 0) return content
@@ -276,7 +278,7 @@ function merge_development_dependencies(
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['devDependencies']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
-	const to_add = Object.entries(additions).filter(([key]) => !(key in existing))
+	const to_add = Object.entries(additions).filter(([key]) => !Object.hasOwn(existing, key))
 	if (to_add.length === 0) return content
 
 	return `${JSON.stringify({ ...parsed, devDependencies: { ...existing, ...Object.fromEntries(to_add) } }, undefined, '\t')}\n`
@@ -297,7 +299,7 @@ function merge_development_engines(content: string, value: Record<string, unknow
 	return `${JSON.stringify({ ...parsed, devEngines: value }, undefined, '\t')}\n`
 }
 
-function package_scripts_include(content: string, marker: string): boolean {
+function has_package_scripts_marker(content: string, marker: string): boolean {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
@@ -335,7 +337,7 @@ function remove_script_with_marker(content: string, key: string, marker: string)
 function sort_package_json_keys(content: string): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	const all_keys = Object.keys(parsed)
-	const known = PACKAGE_JSON_KEY_ORDER.filter((k) => k in parsed)
+	const known = PACKAGE_JSON_KEY_ORDER.filter((k) => Object.hasOwn(parsed, k))
 	const unknown = all_keys.filter((k) => !PACKAGE_JSON_KEY_ORDER.includes(k))
 	const ordered = Object.fromEntries([...known, ...unknown].map((k) => [k, parsed[k]]))
 	const serialized = `${JSON.stringify(ordered, undefined, '\t')}\n`
@@ -356,7 +358,7 @@ const init_logic_json_merge = {
 	merge_package_scripts,
 	merge_package_script_suffix,
 	remove_script_with_marker,
-	package_scripts_include,
+	has_package_scripts_marker,
 	merge_development_dependencies,
 	merge_package_manager,
 	merge_development_engines,

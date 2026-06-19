@@ -44,8 +44,9 @@ describe('sync_deploy_vps', () => {
 	it('logs unchanged when file already uses pnpm@11 with version check', () => {
 		const already_patched = OLD_DEPLOY_VPS_CONTENT.replaceAll(
 			'if ! command -v pnpm &> /dev/null; then',
-			`PNPM_MAJOR=$(pnpm --version 2>/dev/null | cut -d. -f1 || echo "0")\n      if ! command -v pnpm &> /dev/null || ${VERSION_CHECK_MARKER}; then`,
-		).replaceAll('pnpm@10.24.0', 'pnpm@11.0.6')
+			() =>
+				`PNPM_MAJOR=$(pnpm --version 2>/dev/null | cut -d. -f1 || echo "0")\n      if ! command -v pnpm &> /dev/null || ${VERSION_CHECK_MARKER}; then`,
+		).replaceAll('pnpm@10.24.0', () => 'pnpm@11.0.6')
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})

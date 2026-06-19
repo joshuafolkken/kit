@@ -34,6 +34,7 @@ async function ask_yes_no_unified(
 	}
 
 	const raw_answer: unknown = await prompt.question(question)
+	// eslint-disable-next-line unicorn/no-useless-coercion -- raw_answer is unknown, String() coercion is required
 	const answer = String(raw_answer).trim().toLowerCase()
 
 	if (!is_valid_yes_no_answer(answer)) {
@@ -139,6 +140,7 @@ async function confirm_pr(): Promise<boolean> {
 async function ask_issue_info(prompt: Interface, question: string): Promise<string> {
 	git_prompt_display.display_start_separator()
 	const raw_answer: unknown = await prompt.question(question)
+	// eslint-disable-next-line unicorn/no-useless-coercion -- raw_answer is unknown, String() coercion is required
 	const answer = String(raw_answer)
 
 	git_prompt_display.display_end_separator()

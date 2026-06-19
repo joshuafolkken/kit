@@ -77,12 +77,12 @@ function is_package_json_staged(status_output: string): boolean {
 }
 
 function create_status_check_config(
-	has_warning: (result: boolean) => boolean,
+	has_warning: (is_check_passing: boolean) => boolean,
 	error_message: string,
-	result_formatter: (result: boolean) => string,
+	result_formatter: (is_check_passing: boolean) => string,
 ): AnimationOptions<boolean> {
 	return {
-		icon_selector: (result) => (has_warning(result) ? WARNING_ICON : undefined),
+		icon_selector: (is_check_passing) => (has_warning(is_check_passing) ? WARNING_ICON : undefined),
 		error_message,
 		result_formatter,
 	}

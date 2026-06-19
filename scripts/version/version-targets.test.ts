@@ -25,19 +25,19 @@ function global_ls_json(version: string): string {
 	return JSON.stringify([{ path: '/g', dependencies: { [KIT]: { from: KIT, version } } }])
 }
 
-let work_directory = ''
+const ctx = { work_directory: '' }
 
 function write_manifest(content: string): void {
-	writeFileSync(path.join(work_directory, 'package.json'), content)
+	writeFileSync(path.join(ctx.work_directory, 'package.json'), content)
 }
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	work_directory = mkdtempSync(path.join(tmpdir(), 'kit-workspace-'))
+	ctx.work_directory = mkdtempSync(path.join(tmpdir(), 'kit-workspace-'))
 })
 
 afterEach(() => {
-	rmSync(work_directory, { recursive: true, force: true })
+	rmSync(ctx.work_directory, { recursive: true, force: true })
 })
 
 describe('version_targets.parse_global_version', () => {
@@ -109,17 +109,17 @@ describe('version_targets.read_workspace_version', () => {
 	it('reads the version from <cwd>/package.json', () => {
 		write_manifest(JSON.stringify({ version: PROJECT_VERSION }))
 
-		expect(version_targets.read_workspace_version(work_directory)).toBe(PROJECT_VERSION)
+		expect(version_targets.read_workspace_version(ctx.work_directory)).toBe(PROJECT_VERSION)
 	})
 
 	it('returns undefined when package.json is missing', () => {
-		expect(version_targets.read_workspace_version(work_directory)).toBeUndefined()
+		expect(version_targets.read_workspace_version(ctx.work_directory)).toBeUndefined()
 	})
 
 	it('returns undefined when the workspace manifest is malformed', () => {
 		write_manifest('{ broken')
 
-		expect(version_targets.read_workspace_version(work_directory)).toBeUndefined()
+		expect(version_targets.read_workspace_version(ctx.work_directory)).toBeUndefined()
 	})
 })
 
@@ -139,12 +139,12 @@ describe('version_targets.project_version_line', () => {
 	it('reads and formats the project version line from <cwd>/package.json', () => {
 		write_manifest(JSON.stringify({ version: PROJECT_VERSION }))
 
-		expect(version_targets.project_version_line(work_directory)).toBe(
+		expect(version_targets.project_version_line(ctx.work_directory)).toBe(
 			`📦 project version: ${PROJECT_VERSION}`,
 		)
 	})
 
 	it('returns undefined when the manifest is absent', () => {
-		expect(version_targets.project_version_line(work_directory)).toBeUndefined()
+		expect(version_targets.project_version_line(ctx.work_directory)).toBeUndefined()
 	})
 })

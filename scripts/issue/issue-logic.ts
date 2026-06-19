@@ -2,7 +2,7 @@
  * CJK Unified Ideographs range + Hiragana + Katakana + CJK symbols.
  * Used to detect non-English issue titles that need translation.
  */
-const CJK_PATTERN = /[\u3000-\u9FFF\uF900-\uFAFF\uAC00-\uD7AF\u{20000}-\u{2FA1F}]/u
+const CJK_PATTERN = /[\u{3000}-\u{9FFF}\u{F900}-\u{FAFF}\u{AC00}-\u{D7AF}\u{20000}-\u{2FA1F}]/u
 
 const MAX_BRANCH_SLUG_LENGTH = 50
 

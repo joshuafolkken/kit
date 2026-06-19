@@ -54,23 +54,21 @@ describe('parse_issue_number_from_text', () => {
 	})
 })
 
-describe('resolve_should_merge', () => {
+describe('is_merge_resolved', () => {
 	it('returns true when no flags are set', () => {
-		expect(git_followup_workflow.resolve_should_merge({})).toBe(true)
+		expect(git_followup_workflow.is_merge_resolved({})).toBe(true)
 	})
 
 	it('returns false when --no-merge is set', () => {
-		expect(git_followup_workflow.resolve_should_merge({ 'no-merge': true })).toBe(false)
+		expect(git_followup_workflow.is_merge_resolved({ 'no-merge': true })).toBe(false)
 	})
 
 	it('returns true when --merge is set without --no-merge (backward compat)', () => {
-		expect(git_followup_workflow.resolve_should_merge({ merge: true })).toBe(true)
+		expect(git_followup_workflow.is_merge_resolved({ merge: true })).toBe(true)
 	})
 
 	it('returns false when both --merge and --no-merge are set (--no-merge wins)', () => {
-		expect(git_followup_workflow.resolve_should_merge({ merge: true, 'no-merge': true })).toBe(
-			false,
-		)
+		expect(git_followup_workflow.is_merge_resolved({ merge: true, 'no-merge': true })).toBe(false)
 	})
 })
 

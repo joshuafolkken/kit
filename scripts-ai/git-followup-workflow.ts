@@ -96,7 +96,7 @@ function build_notify_config(values: CliArguments['values']): GitNotifyConfig | 
 	})
 }
 
-function resolve_should_merge(values: CliArguments['values']): boolean {
+function is_merge_resolved(values: CliArguments['values']): boolean {
 	return values['no-merge'] !== true
 }
 
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
 		coderabbit_ignore_reason: cli.values['coderabbit-ignore-reason'],
 		ai_review_ignore_reason: cli.values['ai-review-ignore-reason'],
 		is_skip_watch: cli.values['skip-watch'] === true,
-		should_merge: resolve_should_merge(cli.values),
+		should_merge: is_merge_resolved(cli.values),
 	})
 	console.info('')
 	console.info('✅ PR followup completed.')
@@ -139,7 +139,7 @@ try {
 const git_followup_workflow = {
 	parse_issue_number_from_text,
 	resolve_branch_name,
-	resolve_should_merge,
+	is_merge_resolved,
 	print_project_version,
 }
 

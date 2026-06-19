@@ -37,9 +37,7 @@ describe('git_error.handle', () => {
 	})
 
 	it('logs cause message when error has an Error cause', () => {
-		const error = new Error('outer')
-
-		error.cause = new Error(INNER_CAUSE_MSG)
+		const error = new Error('outer', { cause: new Error(INNER_CAUSE_MSG) })
 
 		expect(() => {
 			git_error.handle(error)
@@ -50,9 +48,8 @@ describe('git_error.handle', () => {
 
 	it('logs stderr from cause when cause message is empty and stderr is set', () => {
 		const STDERR_OUTPUT = 'stderr output'
-		const error = new Error('outer')
-
-		error.cause = Object.assign(new Error(' '.repeat(3)), { stderr: STDERR_OUTPUT })
+		const cause = Object.assign(new Error(' '.repeat(3)), { stderr: STDERR_OUTPUT })
+		const error = new Error('outer', { cause })
 
 		expect(() => {
 			git_error.handle(error)

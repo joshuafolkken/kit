@@ -10,7 +10,7 @@ function build_version_check(indent: string, if_line: string): string {
 }
 
 function patch_deploy_vps_pnpm(content: string): string {
-	const with_pnpm11 = content.replaceAll(PNPM_INSTALL_PATTERN, PNPM11_INSTALL)
+	const with_pnpm11 = content.replaceAll(PNPM_INSTALL_PATTERN, () => PNPM11_INSTALL)
 	if (with_pnpm11.includes(VERSION_CHECK_MARKER)) return with_pnpm11
 
 	return with_pnpm11.replace(OLD_PNPM_CHECK_PATTERN, (_, indent: string, if_line: string) =>

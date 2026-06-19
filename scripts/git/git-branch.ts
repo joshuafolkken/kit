@@ -88,7 +88,7 @@ async function handle_default_branch(target_branch_name: string): Promise<void> 
 	await pull_latest()
 	const is_branch_exists: boolean = await exists(target_branch_name)
 
-	await (is_branch_exists ? switch_to(target_branch_name) : create(target_branch_name))
+	await (is_branch_exists ? switch_to : create)(target_branch_name)
 }
 
 async function check_and_create_branch(

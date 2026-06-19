@@ -24,11 +24,15 @@ const BRANCH = 'feature'
 
 describe('is_timeout_error', () => {
 	it('returns true for an error with timedOut: true', () => {
-		expect(is_timeout_error(Object.assign(new Error('x'), { timedOut: true }))).toBe(true)
+		const error = Object.assign(new Error('x'), { timedOut: true })
+
+		expect(is_timeout_error(error)).toBe(true)
 	})
 
 	it('returns false for a non-timeout error', () => {
-		expect(is_timeout_error(Object.assign(new Error('x'), { exitCode: 1 }))).toBe(false)
+		const error = Object.assign(new Error('x'), { exitCode: 1 })
+
+		expect(is_timeout_error(error)).toBe(false)
 	})
 
 	it('returns false for a non-object value', () => {

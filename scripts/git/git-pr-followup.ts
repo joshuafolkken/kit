@@ -226,11 +226,13 @@ async function fetch_telegram_context(input: {
 }
 
 async function notify_completion(context: TelegramContext): Promise<void> {
+	const body = version_targets.project_version_line(process.cwd())
+
 	await telegram_notify.send(
 		build_telegram_input({
 			task_type: 'completion',
 			context,
-			body: version_targets.project_version_line(process.cwd()),
+			body,
 		}),
 	)
 }
