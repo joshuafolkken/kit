@@ -52,6 +52,23 @@ const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_
 // exits zero.
 const PREPARE_CMD = `(${GUARDED_LEFTHOOK_CMD} || true) && (${GUARDED_FIX_GH_PACKAGES_CMD} || true)`
 
+const BUILD_KEY = 'build'
+const WRANGLER_CONFIG_FILE = 'wrangler.jsonc'
+const WRANGLER_TYPES_CMD = 'wrangler types'
+// Generate Cloudflare worker types in `prepare` instead of `build`. When `wrangler types`
+// lives at the head of `build`, the E2E webServer's `pnpm run build` invokes wrangler a
+// second time (alongside prepack's `svelte-kit sync`) under the safe-chain proxy, and the
+// double invocation stalls webServer startup. Owning type generation in `prepare` lets
+// `build` drop it. Guarded by `wrangler.jsonc` (no-op in non-Cloudflare checkouts) and by
+// `command -v wrangler` (no-op on CI/production installs without the dev binary); `|| true`
+// keeps a missing tool from aborting `pnpm install`, mirroring the lefthook/tsx hooks.
+const GUARDED_WRANGLER_TYPES_CMD = `[ -f ${WRANGLER_CONFIG_FILE} ] && command -v wrangler >/dev/null 2>&1 && ${WRANGLER_TYPES_CMD}`
+const PREPARE_WRANGLER_TYPES_CMD = `(${GUARDED_WRANGLER_TYPES_CMD} || true)`
+// Matches a `build` pipeline segment that runs `wrangler types` (bare or with flags), so
+// the migration drops it once `prepare` owns worker-type generation. Anchored to avoid
+// matching unrelated commands that merely mention the words.
+const WRANGLER_TYPES_SEGMENT_PATTERN = /^wrangler types(?:\s|$)/u
+
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
 	'AGENTS.md',
@@ -66,7 +83,7 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'SECURITY.md',
 	'pnpm-workspace.yaml',
 	'tsconfig.sonar.json',
-	'wrangler.jsonc',
+	WRANGLER_CONFIG_FILE,
 	'.github/workflows/auto-tag.yml',
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-qube.yml',
@@ -276,6 +293,35 @@ function merge_prepare_lifecycle_cmd(content: string): string {
 	return init_logic_json_merge.merge_package_script_suffix(content, PREPARE_KEY, PREPARE_CMD)
 }
 
+// Drop `wrangler types` from the consumer's `build` so the E2E webServer no longer runs
+// wrangler twice during `pnpm run build` (see GUARDED_WRANGLER_TYPES_CMD). No-op when
+// `build` is absent or already wrangler-free.
+function strip_wrangler_types_from_build(content: string): string {
+	return init_logic_json_merge.remove_script_command_segment(
+		content,
+		BUILD_KEY,
+		WRANGLER_TYPES_SEGMENT_PATTERN,
+	)
+}
+
+// Append the guarded `wrangler types` to `prepare` so worker types are generated at
+// install time. Idempotent — `merge_package_script_suffix` skips when the command is
+// already present, and is a no-op when no `prepare` script exists.
+function merge_prepare_wrangler_types(content: string): string {
+	return init_logic_json_merge.merge_package_script_suffix(
+		content,
+		PREPARE_KEY,
+		PREPARE_WRANGLER_TYPES_CMD,
+	)
+}
+
+// Move Cloudflare worker-type generation from `build` into `prepare` for wrangler
+// projects: strip `wrangler types` from `build` and append a guarded `wrangler types`
+// to `prepare`. Idempotent — re-running leaves an already-migrated manifest unchanged.
+function migrate_wrangler_types_to_prepare(content: string): string {
+	return merge_prepare_wrangler_types(strip_wrangler_types_from_build(content))
+}
+
 // Migration: remove a kit-managed `postinstall` (one running the fix-gh-packages
 // command) so the lifecycle can be re-added to `prepare`. Matching the full command
 // rather than the bare marker avoids stripping a consumer's unrelated postinstall that
@@ -347,6 +393,9 @@ const init_logic = {
 	get_suggested_scripts,
 	get_suggested_scripts_for_content,
 	merge_prepare_lifecycle_cmd,
+	strip_wrangler_types_from_build,
+	merge_prepare_wrangler_types,
+	migrate_wrangler_types_to_prepare,
 	strip_managed_postinstall,
 	transform_prompt_paths,
 }
