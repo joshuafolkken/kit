@@ -10,7 +10,7 @@ pnpm josh init
 
 `josh init` needs to know whether your project is SvelteKit or vanilla TypeScript.
 
-1. **Auto-detect** — if `svelte.config.js` or `svelte.config.ts` exists in the current directory, `sveltekit` is used automatically.
+1. **Auto-detect** — `sveltekit` is used automatically when either `svelte.config.js` / `svelte.config.ts` exists in the current directory **or** `@sveltejs/kit` is listed in the project's `dependencies` / `devDependencies`. The dependency check covers the newer `sv create --template library` scaffold, which ships no `svelte.config.*` and configures the `sveltekit()` plugin in `vite.config.ts` instead.
 2. **CLI flag** — pass `--type sveltekit` or `--type vanilla` to skip detection.
 3. **Interactive prompt** — if detection fails and no flag is given, you are prompted to choose.
 
@@ -65,6 +65,18 @@ The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`
 When a `prepare` already exists (for example a SvelteKit `svelte-kit sync`), `josh init` appends the lifecycle to it rather than replacing it. If a script already runs `fix-gh-packages`, `josh init` skips re-adding the hook so re-running it never duplicates. A kit-managed `postinstall` from an earlier version (one that runs `fix-gh-packages`) is migrated to `prepare`; a custom `postinstall` of your own is left untouched.
 
 All other toolchain tasks are available as `pnpm josh <command>` subcommands — they are **not** added as separate package scripts. Existing scripts are never overwritten.
+
+## Dependencies
+
+`josh init` adds the packages the generated config needs to `devDependencies`. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
+
+| Package                    | Added for          | Version                                                                                                   |
+| -------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `@joshuafolkken/kit`       | all project types  | pinned to the running kit version (the generated configs import from this package, so it must be present) |
+| `cspell`                   | SvelteKit projects | `^10.0.0`                                                                                                 |
+| `size-limit`               | SvelteKit projects | `^12.1.0`                                                                                                 |
+| `@size-limit/file`         | SvelteKit projects | `^12.1.0`                                                                                                 |
+| `rollup-plugin-visualizer` | SvelteKit projects | `^7.0.1`                                                                                                  |
 
 ### Available `pnpm josh` subcommands (all project types)
 

@@ -23,6 +23,16 @@ describe('package_path', () => {
 })
 
 const PROJECT_TYPE_TEST_DIR = path.join(tmpdir(), 'init-paths-project-type-test')
+const PACKAGE_JSON_FILE = 'package.json'
+const SVELTEKIT_PACKAGE = '@sveltejs/kit'
+
+function write_project_file(filename: string, content: string): void {
+	writeFileSync(path.join(PROJECT_TYPE_TEST_DIR, filename), content)
+}
+
+function write_project_package_json(value: Record<string, unknown>): void {
+	write_project_file(PACKAGE_JSON_FILE, JSON.stringify(value))
+}
 
 describe('is_sveltekit_project', () => {
 	beforeEach(() => {
@@ -34,13 +44,28 @@ describe('is_sveltekit_project', () => {
 	})
 
 	it('returns true when svelte.config.js exists', () => {
-		writeFileSync(path.join(PROJECT_TYPE_TEST_DIR, 'svelte.config.js'), '')
+		write_project_file('svelte.config.js', '')
 		expect(is_sveltekit_project(PROJECT_TYPE_TEST_DIR)).toBe(true)
 	})
 
 	it('returns true when svelte.config.ts exists', () => {
-		writeFileSync(path.join(PROJECT_TYPE_TEST_DIR, 'svelte.config.ts'), '')
+		write_project_file('svelte.config.ts', '')
 		expect(is_sveltekit_project(PROJECT_TYPE_TEST_DIR)).toBe(true)
+	})
+
+	it('returns true when @sveltejs/kit is a devDependency without svelte.config', () => {
+		write_project_package_json({ devDependencies: { [SVELTEKIT_PACKAGE]: '^2.0.0' } })
+		expect(is_sveltekit_project(PROJECT_TYPE_TEST_DIR)).toBe(true)
+	})
+
+	it('returns true when @sveltejs/kit is a dependency without svelte.config', () => {
+		write_project_package_json({ dependencies: { [SVELTEKIT_PACKAGE]: '^2.0.0' } })
+		expect(is_sveltekit_project(PROJECT_TYPE_TEST_DIR)).toBe(true)
+	})
+
+	it('returns false when package.json lacks @sveltejs/kit and no svelte.config', () => {
+		write_project_package_json({ devDependencies: { vite: '^5.0.0' } })
+		expect(is_sveltekit_project(PROJECT_TYPE_TEST_DIR)).toBe(false)
 	})
 
 	it('returns false when no svelte.config.{js,ts} exists', () => {
