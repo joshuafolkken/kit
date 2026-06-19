@@ -68,7 +68,7 @@ When a `prepare` already exists (for example a SvelteKit `svelte-kit sync`), `jo
 
 ### Cloudflare worker types
 
-For wrangler projects (a `wrangler.jsonc` is present), `josh init` and `josh sync` generate the Cloudflare worker types in **`prepare`** rather than `build`. They append a guarded `[ -f wrangler.jsonc ] && command -v wrangler >/dev/null 2>&1 && wrangler types || true` to `prepare` and strip any `wrangler types` segment from `build`. Owning type generation in `prepare` lets `build` drop it, which avoids a second `wrangler` invocation during the E2E webServer's `pnpm run build` — that double invocation (alongside `prepack`'s `svelte-kit sync`) stalls webServer startup under the safe-chain proxy. The `prepare` command is idempotent and a no-op in non-Cloudflare checkouts or installs without the `wrangler` binary.
+For wrangler projects (a `wrangler.jsonc` is present), `josh init` and `josh sync` generate the Cloudflare worker types in **`prepare`** rather than `build`. They append a guarded `([ -f wrangler.jsonc ] && command -v wrangler >/dev/null 2>&1 && wrangler types || true)` to `prepare` and strip any `wrangler types` segment from `build`. Owning type generation in `prepare` lets `build` drop it, which avoids a second `wrangler` invocation during the E2E webServer's `pnpm run build` — that double invocation (alongside `prepack`'s `svelte-kit sync`) stalls webServer startup under the safe-chain proxy. The `prepare` command is idempotent and a no-op in non-Cloudflare checkouts or installs without the `wrangler` binary.
 
 All other toolchain tasks are available as `pnpm josh <command>` subcommands — they are **not** added as separate package scripts. Existing scripts are never overwritten.
 

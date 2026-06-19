@@ -105,3 +105,19 @@ describe('init_logic_json_merge.remove_script_command_segment', () => {
 		expect(remove_segment('{}')).toBe('{}')
 	})
 })
+
+describe('remove_script_command_segment whitespace handling', () => {
+	it('removes a segment joined without surrounding spaces', () => {
+		expect(build_after_removal(`wrangler types&&${VITE_BUILD_ONLY}`)).toBe(VITE_BUILD_ONLY)
+	})
+
+	it('removes a segment joined with extra whitespace', () => {
+		expect(build_after_removal(`wrangler types   &&   ${VITE_BUILD_ONLY}`)).toBe(VITE_BUILD_ONLY)
+	})
+
+	it('preserves original spacing when no segment is removed', () => {
+		const content = build_content('vite build&&pnpm run prepack')
+
+		expect(remove_segment(content)).toBe(content)
+	})
+})

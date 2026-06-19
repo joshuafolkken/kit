@@ -278,11 +278,16 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 }
 
 const SCRIPT_COMMAND_SEPARATOR = ' && '
+// Bare `&&` operator. Splitting on the literal (then trimming each segment) matches a
+// command regardless of how the consumer spaced its pipeline (`a&&b`, `a  &&  b`) without
+// a `\s*…\s*` regex that static analysis flags as backtracking-prone.
+const SCRIPT_COMMAND_AND = '&&'
 
-// Drop every ` && `-joined segment of a script whose trimmed command matches `pattern`,
-// then rejoin the survivors. Used to migrate a one-off command (e.g. `wrangler types`)
-// out of a `build` pipeline once another lifecycle hook owns it. Returns content
-// unchanged when the key is absent or no segment matches (idempotent re-runs).
+// Drop every `&&`-joined segment of a script whose trimmed command matches `pattern`,
+// then rejoin the survivors with a normalized ` && `. Used to migrate a one-off command
+// (e.g. `wrangler types`) out of a `build` pipeline once another lifecycle hook owns it.
+// Returns content unchanged (original formatting preserved) when the key is absent or no
+// segment matches, so idempotent re-runs and non-target scripts are never rewritten.
 function remove_script_command_segment(content: string, key: string, pattern: RegExp): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
@@ -291,13 +296,11 @@ function remove_script_command_segment(content: string, key: string, pattern: Re
 	const scripts = string_record_schema.parse(raw)
 	const existing = scripts[key]
 	if (existing === undefined) return content
-	const kept = existing
-		.split(SCRIPT_COMMAND_SEPARATOR)
-		.filter((segment) => !pattern.test(segment.trim()))
-		.join(SCRIPT_COMMAND_SEPARATOR)
-	if (kept === existing) return content
+	const segments = existing.split(SCRIPT_COMMAND_AND).map((segment) => segment.trim())
+	const kept = segments.filter((segment) => segment.length > 0 && !pattern.test(segment))
+	if (kept.length === segments.length) return content
 
-	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: kept } }, undefined, '\t')}\n`
+	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: kept.join(SCRIPT_COMMAND_SEPARATOR) } }, undefined, '\t')}\n`
 }
 
 function remove_script_with_marker(content: string, key: string, marker: string): string {
