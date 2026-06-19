@@ -50,6 +50,8 @@ The preset is **prepended** to the `extends` array so it does not override proje
 
 These files have no merge strategy. If they already exist, `josh init` prints the generated content so you can copy the relevant parts manually.
 
+The generated SvelteKit `eslint.config.js` imports `./svelte.config.js` (and passes it as `svelte_config`) **only when that file exists**. The newer `sv create --template library` scaffold ships no `svelte.config.*`, so for those projects the import and the `svelte_config` field are omitted — `create_sveltekit_config` falls back to the eslint-plugin-svelte default. This avoids an `ERR_MODULE_NOT_FOUND` on a non-existent `svelte.config.js`.
+
 ## Package scripts
 
 `josh init` adds these scripts to your `package.json`:
@@ -70,13 +72,18 @@ All other toolchain tasks are available as `pnpm josh <command>` subcommands —
 
 `josh init` adds the packages the generated config needs to `devDependencies`. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
 
-| Package                    | Added for          | Version                                                                                                   |
-| -------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
-| `@joshuafolkken/kit`       | all project types  | pinned to the running kit version (the generated configs import from this package, so it must be present) |
-| `cspell`                   | SvelteKit projects | `^10.0.0`                                                                                                 |
-| `size-limit`               | SvelteKit projects | `^12.1.0`                                                                                                 |
-| `@size-limit/file`         | SvelteKit projects | `^12.1.0`                                                                                                 |
-| `rollup-plugin-visualizer` | SvelteKit projects | `^7.0.1`                                                                                                  |
+| Package                               | Added for          | Version                                                                                                   |
+| ------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `@joshuafolkken/kit`                  | all project types  | pinned to the running kit version (the generated configs import from this package, so it must be present) |
+| `@ianvs/prettier-plugin-sort-imports` | all project types  | `^4.7.1`                                                                                                  |
+| `prettier-plugin-svelte`              | all project types  | `^4.1.1`                                                                                                  |
+| `prettier-plugin-tailwindcss`         | all project types  | `^0.8.0`                                                                                                  |
+| `cspell`                              | SvelteKit projects | `^10.0.0`                                                                                                 |
+| `size-limit`                          | SvelteKit projects | `^12.1.0`                                                                                                 |
+| `@size-limit/file`                    | SvelteKit projects | `^12.1.0`                                                                                                 |
+| `rollup-plugin-visualizer`            | SvelteKit projects | `^7.0.1`                                                                                                  |
+
+The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries back the kit prettier preset (`@joshuafolkken/kit/prettier`), whose `plugins[]` references all three by name. prettier resolves plugins from the **consumer** project rather than transitively through the kit, so every project that uses the preset must declare them locally — otherwise `prettier`/`josh lint` fails with `Cannot find package`. They are added for all project types because the preset is shared.
 
 ### Available `pnpm josh` subcommands (all project types)
 

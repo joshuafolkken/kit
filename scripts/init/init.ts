@@ -10,7 +10,7 @@ import { execaSync } from 'execa'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
-import { is_sveltekit_project, PROJECT_ROOT } from './init-paths'
+import { has_svelte_config_file, is_sveltekit_project, PROJECT_ROOT } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -134,7 +134,11 @@ function apply_package_json_merges(content: string, type: ProjectType): string {
 					migrated,
 					init_logic.get_suggested_scripts_for_content(type, migrated),
 				)
-	const with_kit = init_logic.merge_development_dependencies(merged, get_kit_self_dependency())
+	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
+	const with_kit = init_logic.merge_development_dependencies(
+		with_prettier,
+		get_kit_self_dependency(),
+	)
 	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(with_kit)
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
@@ -182,7 +186,11 @@ function run_config_file_actions(type: ProjectType): void {
 		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
 	}
 
-	for (const action of init_actions.build_file_actions(type)) execute_file_action(action)
+	const has_svelte_config = has_svelte_config_file(PROJECT_ROOT)
+
+	for (const action of init_actions.build_file_actions(type, has_svelte_config)) {
+		execute_file_action(action)
+	}
 }
 
 async function main(): Promise<void> {

@@ -27,20 +27,24 @@ const SVELTEKIT_DESTINATIONS = [
 
 describe('init_actions.build_file_actions', () => {
 	it('returns the expected ordered destination list for vanilla projects', () => {
-		const destinations = init_actions.build_file_actions('vanilla').map((action) => action.dest)
+		const destinations = init_actions
+			.build_file_actions('vanilla', false)
+			.map((action) => action.dest)
 
 		expect(destinations).toEqual(VANILLA_DESTINATIONS)
 	})
 
 	it('inserts vite.config.ts only for sveltekit projects', () => {
-		const destinations = init_actions.build_file_actions('sveltekit').map((action) => action.dest)
+		const destinations = init_actions
+			.build_file_actions('sveltekit', true)
+			.map((action) => action.dest)
 
 		expect(destinations).toEqual(SVELTEKIT_DESTINATIONS)
 	})
 
 	it('omits a merge handler only for playwright.config.ts', () => {
 		const without_merge = init_actions
-			.build_file_actions('sveltekit')
+			.build_file_actions('sveltekit', true)
 			.filter((action) => action.merge === undefined)
 			.map((action) => action.dest)
 
@@ -48,15 +52,17 @@ describe('init_actions.build_file_actions', () => {
 	})
 
 	it('produces a non-empty create output for every action', () => {
-		for (const action of init_actions.build_file_actions('vanilla')) {
+		for (const action of init_actions.build_file_actions('vanilla', false)) {
 			expect(action.create().length).toBeGreaterThan(0)
 		}
 	})
+})
 
+describe('init_actions extensions.json distribution', () => {
 	it('distributes the common extensions.json regardless of project style', () => {
 		const extensions_create = (type: 'vanilla' | 'sveltekit'): string => {
 			const action = init_actions
-				.build_file_actions(type)
+				.build_file_actions(type, type === 'sveltekit')
 				.find((candidate) => candidate.dest === VSCODE_EXTENSIONS)
 
 			expect(action).toBeDefined()
@@ -71,7 +77,7 @@ describe('init_actions.build_file_actions', () => {
 describe('init_actions vscode settings distribution', () => {
 	it('excludes kit-only SonarLint settings from the vanilla settings create output', () => {
 		const action = init_actions
-			.build_file_actions('vanilla')
+			.build_file_actions('vanilla', false)
 			.find((candidate) => candidate.dest === VSCODE_SETTINGS)
 
 		expect(action).toBeDefined()

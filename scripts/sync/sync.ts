@@ -4,7 +4,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { init_logic, type ProjectType } from '#scripts/init/init-logic'
-import { is_sveltekit_project, PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
+import {
+	has_svelte_config_file,
+	is_sveltekit_project,
+	PACKAGE_DIR,
+	PROJECT_ROOT,
+} from '#scripts/init/init-paths'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { sync_configs } from './sync-configs'
@@ -201,8 +206,14 @@ function sync_ai_copy_all(is_force: boolean): void {
 }
 
 function sync_config_files(type: ProjectType): void {
+	const has_svelte_config = has_svelte_config_file(PROJECT_ROOT)
+
 	sync_configs.sync_npmrc(path.join(PROJECT_ROOT, '.npmrc'))
-	sync_configs.sync_eslint_config(path.join(PROJECT_ROOT, 'eslint.config.js'), type)
+	sync_configs.sync_eslint_config(
+		path.join(PROJECT_ROOT, 'eslint.config.js'),
+		type,
+		has_svelte_config,
+	)
 	sync_configs.sync_tsconfig(path.join(PROJECT_ROOT, 'tsconfig.json'), type)
 	sync_configs.sync_cspell_config(path.join(PROJECT_ROOT, 'cspell.config.yaml'), type)
 	sync_configs.sync_lefthook_config(path.join(PROJECT_ROOT, 'lefthook.yml'), type)

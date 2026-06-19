@@ -106,14 +106,14 @@ describe('sync_configs.sync_npmrc', () => {
 })
 
 const ESLINT_DEST = path.join(TEST_DIR, 'eslint.config.js')
-const ESLINT_VANILLA_UP_TO_DATE = init_logic.generate_eslint_config('vanilla')
+const ESLINT_VANILLA_UP_TO_DATE = init_logic.generate_eslint_config('vanilla', false)
 
 const VANILLA_ESLINT_OUTDATED = `import js from '@eslint/js'\nimport ts from 'typescript-eslint'\n\nexport default ts.config(\n\tjs.configs.recommended,\n\t...ts.configs.recommended,\n)\n`
 const VANILLA_ESLINT_WITH_USER_RULES = `import js from '@eslint/js'\nimport ts from 'typescript-eslint'\n\nexport default ts.config(\n\tjs.configs.recommended,\n\t...ts.configs.recommended,\n\t{\n\t\trules: {\n\t\t\t'no-console': 'warn',\n\t\t},\n\t},\n)\n`
 
 describe('sync_configs.sync_eslint_config — baseline', () => {
 	it('does nothing when eslint.config.js does not exist', () => {
-		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
+		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla', false)
 		expect(existsSync(ESLINT_DEST)).toBe(false)
 	})
 
@@ -123,7 +123,7 @@ describe('sync_configs.sync_eslint_config — baseline', () => {
 				writeFileSync(ESLINT_DEST, ESLINT_VANILLA_UP_TO_DATE)
 			},
 			() => {
-				sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
+				sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla', false)
 			},
 		)
 	})
@@ -133,14 +133,14 @@ describe('sync_configs.sync_eslint_config — migration', () => {
 	it('migrates vanilla outdated config to strict create_vanilla_config shape', () => {
 		writeFileSync(ESLINT_DEST, VANILLA_ESLINT_OUTDATED)
 		silence_console_info()
-		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
+		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla', false)
 		expect(readFileSync(ESLINT_DEST, 'utf8')).toBe(ESLINT_VANILLA_UP_TO_DATE)
 	})
 
 	it('preserves user-added rules when migrating vanilla outdated config', () => {
 		writeFileSync(ESLINT_DEST, VANILLA_ESLINT_WITH_USER_RULES)
 		silence_console_info()
-		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
+		sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla', false)
 
 		const result = readFileSync(ESLINT_DEST, 'utf8')
 
@@ -156,7 +156,7 @@ describe('sync_configs.sync_eslint_config — migration', () => {
 				writeFileSync(ESLINT_DEST, hand_rolled)
 			},
 			() => {
-				sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla')
+				sync_configs.sync_eslint_config(ESLINT_DEST, 'vanilla', false)
 			},
 		)
 		expect(readFileSync(ESLINT_DEST, 'utf8')).toBe(hand_rolled)

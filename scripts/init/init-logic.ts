@@ -142,6 +142,20 @@ const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
 	'size-limit': 'size-limit',
 }
 
+// prettier resolves its `plugins[]` from the consumer project, not transitively through the kit,
+// so every package that uses the kit prettier preset must declare these as devDependencies. The
+// preset references all three unconditionally (prettier/index.js → plugins), hence all three are
+// added regardless of project type — omitting any breaks `prettier`/`josh lint` with a
+// "Cannot find package" error. Versions mirror the kit's own devDependencies.
+const SORT_IMPORTS_PLUGIN_KEY = '@ianvs/prettier-plugin-sort-imports'
+const PRETTIER_SVELTE_PLUGIN_KEY = 'prettier-plugin-svelte'
+const PRETTIER_TAILWIND_PLUGIN_KEY = 'prettier-plugin-tailwindcss'
+const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
+	[SORT_IMPORTS_PLUGIN_KEY]: '^4.7.1',
+	[PRETTIER_SVELTE_PLUGIN_KEY]: '^4.1.1',
+	[PRETTIER_TAILWIND_PLUGIN_KEY]: '^0.8.0',
+}
+
 function generate_tsconfig(type: ProjectType): string {
 	// kit preset first so the later `.svelte-kit/tsconfig.json` (and any project-specific
 	// entry) wins on conflicts — matching the order `josh sync` prepends to and all consumers.
@@ -281,6 +295,10 @@ function transform_prompt_paths(content: string): string {
 	)
 }
 
+function merge_prettier_plugin_development_deps(content: string): string {
+	return init_logic_json_merge.merge_development_dependencies(content, PRETTIER_PLUGIN_DEV_DEPS)
+}
+
 function merge_sveltekit_package_json(content: string): string {
 	const with_scripts = init_logic_json_merge.merge_package_scripts(
 		content,
@@ -312,6 +330,7 @@ const init_logic = {
 	generate_npmrc,
 	merge_npmrc,
 	merge_sveltekit_package_json,
+	merge_prettier_plugin_development_deps,
 	get_tsconfig_extends_entry,
 	get_tsconfig_preset_filename,
 	get_lefthook_extends_value,
