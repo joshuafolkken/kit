@@ -4,7 +4,7 @@ extends:
 pre-commit:
   commands:
     cspell:
-      glob: '*.{svelte,ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json}'
+      glob: '*.{svelte,ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json,properties}'
       run: pnpm exec cspell lint --no-must-find-files --no-progress {staged_files}
 
     prettier:

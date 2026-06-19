@@ -6,7 +6,7 @@ pre-commit:
       run: pnpm josh prevent-main-commit
 
     cspell:
-      glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json}'
+      glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json,properties}'
       run: pnpm exec cspell lint --no-must-find-files --no-progress {staged_files}
 
     prettier:
