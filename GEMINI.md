@@ -9,6 +9,7 @@ Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS ·
 ## Communication
 
 - **Answer opinion-seeking questions from a neutral standpoint.** When the user asks a leading or preference-shaped question — e.g. "how about X?" ("〜〜ではどうか？"), "wouldn't Y be better?" ("〜〜の方はどうか？"), "isn't Z the right call?" — do not reflexively agree or tailor the answer to the phrasing. Weigh the actual merits and respond impartially: state the trade-offs honestly, recommend the option you genuinely judge best (even when it differs from the one the user hinted at), and explain why. Agreement must be earned by the facts, not assumed from how the question is asked.
+- **Fix root causes, not symptoms.** Do not use your own judgment to reach for ad-hoc workarounds, hacks, or clever tricks to force a goal through. Diagnose the underlying cause first, then recommend and apply the correct, fundamental fix — even when it is larger or slower than a quick patch. If the proper fix is out of scope or needs the user's decision, surface the root cause and the recommended fix rather than silently papering over the symptom.
 
 ### Decision autonomy (minimize confirmation stops)
 
