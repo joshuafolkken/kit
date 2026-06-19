@@ -10,7 +10,7 @@ import { execaSync } from 'execa'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic, type ProjectType } from './init-logic'
-import { has_svelte_config_file, is_sveltekit_project, PROJECT_ROOT } from './init-paths'
+import { is_sveltekit_project, PROJECT_ROOT, svelte_config_import } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -186,9 +186,9 @@ function run_config_file_actions(type: ProjectType): void {
 		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
 	}
 
-	const has_svelte_config = has_svelte_config_file(PROJECT_ROOT)
+	const svelte_import = svelte_config_import(PROJECT_ROOT)
 
-	for (const action of init_actions.build_file_actions(type, has_svelte_config)) {
+	for (const action of init_actions.build_file_actions(type, svelte_import)) {
 		execute_file_action(action)
 	}
 }

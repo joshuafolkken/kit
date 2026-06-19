@@ -8,6 +8,7 @@ import {
 	PACKAGE_DIR,
 	package_path,
 	PROJECT_ROOT,
+	svelte_config_import,
 } from './init-paths'
 
 describe('PACKAGE_DIR', () => {
@@ -107,5 +108,30 @@ describe('has_svelte_config_file', () => {
 	it('returns false when no svelte.config file exists even with @sveltejs/kit', () => {
 		write_project_package_json(SVELTEKIT_DEV_DEP)
 		expect(has_svelte_config_file(PROJECT_TYPE_TEST_DIR)).toBe(false)
+	})
+})
+
+describe('svelte_config_import', () => {
+	beforeEach(() => {
+		mkdirSync(PROJECT_TYPE_TEST_DIR, { recursive: true })
+	})
+
+	afterEach(() => {
+		rmSync(PROJECT_TYPE_TEST_DIR, { recursive: true, force: true })
+	})
+
+	it('returns the .js specifier when svelte.config.js exists', () => {
+		write_project_file(SVELTE_CONFIG_JS, EMPTY_CONTENT)
+		expect(svelte_config_import(PROJECT_TYPE_TEST_DIR)).toBe(`./${SVELTE_CONFIG_JS}`)
+	})
+
+	it('returns the .ts specifier when only svelte.config.ts exists', () => {
+		write_project_file(SVELTE_CONFIG_TS, EMPTY_CONTENT)
+		expect(svelte_config_import(PROJECT_TYPE_TEST_DIR)).toBe(`./${SVELTE_CONFIG_TS}`)
+	})
+
+	it('returns undefined when no svelte.config file exists', () => {
+		write_project_package_json(SVELTEKIT_DEV_DEP)
+		expect(svelte_config_import(PROJECT_TYPE_TEST_DIR)).toBeUndefined()
 	})
 })

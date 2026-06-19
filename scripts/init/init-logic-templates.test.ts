@@ -9,32 +9,44 @@ const APP_CSS_STYLESHEET = "tailwindStylesheet: './src/app.css'"
 const KIT_PRETTIER_IMPORT = "from '@joshuafolkken/kit/prettier'"
 
 const SVELTE_CONFIG_IMPORT = "import svelteConfig from './svelte.config.js'"
+const SVELTE_CONFIG_TS_IMPORT = "import svelteConfig from './svelte.config.ts'"
 const SVELTE_CONFIG_FIELD = 'svelte_config: svelteConfig'
 const CREATE_SVELTEKIT_CONFIG = 'create_sveltekit_config'
 const NO_CONSOLE_RULE = "'no-console': 'warn'"
+const SVELTE_CONFIG_JS_PATH = './svelte.config.js'
+const SVELTE_CONFIG_TS_PATH = './svelte.config.ts'
 
 describe('init_logic_templates.generate_eslint_config', () => {
 	it('returns sveltekit config for sveltekit project type', () => {
-		expect(init_logic_templates.generate_eslint_config('sveltekit', true)).toContain(
-			CREATE_SVELTEKIT_CONFIG,
-		)
+		expect(
+			init_logic_templates.generate_eslint_config('sveltekit', SVELTE_CONFIG_JS_PATH),
+		).toContain(CREATE_SVELTEKIT_CONFIG)
 	})
 
 	it('returns vanilla config for vanilla project type', () => {
-		expect(init_logic_templates.generate_eslint_config('vanilla', false)).toContain(
+		expect(init_logic_templates.generate_eslint_config('vanilla', undefined)).toContain(
 			'create_vanilla_config',
 		)
 	})
+})
 
+describe('init_logic_templates.generate_eslint_config svelte.config resolution', () => {
 	it('imports svelte.config.js and passes svelte_config when the file is present', () => {
-		const result = init_logic_templates.generate_eslint_config('sveltekit', true)
+		const result = init_logic_templates.generate_eslint_config('sveltekit', SVELTE_CONFIG_JS_PATH)
 
 		expect(result).toContain(SVELTE_CONFIG_IMPORT)
 		expect(result).toContain(SVELTE_CONFIG_FIELD)
 	})
 
+	it('imports the resolved .ts specifier when svelte.config.ts is the present file', () => {
+		const result = init_logic_templates.generate_eslint_config('sveltekit', SVELTE_CONFIG_TS_PATH)
+
+		expect(result).toContain(SVELTE_CONFIG_TS_IMPORT)
+		expect(result).not.toContain(SVELTE_CONFIG_IMPORT)
+	})
+
 	it('omits the svelte.config.js import and svelte_config when the file is absent', () => {
-		const result = init_logic_templates.generate_eslint_config('sveltekit', false)
+		const result = init_logic_templates.generate_eslint_config('sveltekit', undefined)
 
 		expect(result).not.toContain(SVELTE_CONFIG_IMPORT)
 		expect(result).not.toContain(SVELTE_CONFIG_FIELD)
@@ -92,14 +104,17 @@ export default ts.config(
 )
 `
 
-const STRICT_SVELTEKIT_CONFIG = init_logic_templates.generate_eslint_config('sveltekit', true)
+const STRICT_SVELTEKIT_CONFIG = init_logic_templates.generate_eslint_config(
+	'sveltekit',
+	SVELTE_CONFIG_JS_PATH,
+)
 
 describe('init_logic_templates.merge_eslint_config', () => {
 	it('rewrites vanilla sveltekit config to strict create_sveltekit_config shape', () => {
 		const result = init_logic_templates.merge_eslint_config(
 			VANILLA_SVELTEKIT_CONFIG,
 			'sveltekit',
-			true,
+			SVELTE_CONFIG_JS_PATH,
 		)
 
 		expect(result).toContain('@joshuafolkken/kit/eslint/sveltekit')
@@ -111,7 +126,7 @@ describe('init_logic_templates.merge_eslint_config', () => {
 		const result = init_logic_templates.merge_eslint_config(
 			VANILLA_SVELTEKIT_WITH_RULES,
 			'sveltekit',
-			true,
+			SVELTE_CONFIG_JS_PATH,
 		)
 
 		expect(result).toContain(NO_CONSOLE_RULE)
@@ -123,7 +138,7 @@ describe('init_logic_templates.merge_eslint_config', () => {
 		const result = init_logic_templates.merge_eslint_config(
 			VANILLA_SVELTEKIT_WITH_RULES,
 			'sveltekit',
-			false,
+			undefined,
 		)
 
 		expect(result).not.toContain(SVELTE_CONFIG_IMPORT)
@@ -136,16 +151,20 @@ describe('init_logic_templates.merge_eslint_config', () => {
 describe('init_logic_templates.merge_eslint_config fallbacks', () => {
 	it('returns identical content for already-strict config (no-op)', () => {
 		expect(
-			init_logic_templates.merge_eslint_config(STRICT_SVELTEKIT_CONFIG, 'sveltekit', true),
+			init_logic_templates.merge_eslint_config(
+				STRICT_SVELTEKIT_CONFIG,
+				'sveltekit',
+				SVELTE_CONFIG_JS_PATH,
+			),
 		).toBe(STRICT_SVELTEKIT_CONFIG)
 	})
 
 	it('returns identical content for hand-rolled non-vanilla config (safe fallback)', () => {
 		const hand_rolled = `import { custom_config } from './my-config.js'\n\nexport default custom_config()\n`
 
-		expect(init_logic_templates.merge_eslint_config(hand_rolled, 'sveltekit', true)).toBe(
-			hand_rolled,
-		)
+		expect(
+			init_logic_templates.merge_eslint_config(hand_rolled, 'sveltekit', SVELTE_CONFIG_JS_PATH),
+		).toBe(hand_rolled)
 	})
 
 	it('rewrites vanilla project config to create_vanilla_config shape', () => {
@@ -153,7 +172,7 @@ describe('init_logic_templates.merge_eslint_config fallbacks', () => {
 		const result = init_logic_templates.merge_eslint_config(
 			vanilla_project_config,
 			'vanilla',
-			false,
+			undefined,
 		)
 
 		expect(result).toContain('create_vanilla_config')

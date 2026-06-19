@@ -4,10 +4,11 @@ import { package_path } from './init-paths'
 
 // Tokens replaced (or removed) depending on whether the project still ships a
 // svelte.config file. The new `sv` library template drops it, so importing it
-// unconditionally throws ERR_MODULE_NOT_FOUND — see Fix B / make_sveltekit_template.
+// unconditionally throws ERR_MODULE_NOT_FOUND — see Fix B / fill_svelte_tokens.
+// The caller passes the resolved import specifier (e.g. `./svelte.config.ts`) so a
+// `.ts`-only project imports the extension that actually exists, not a hardcoded `.js`.
 const SVELTE_IMPORT_TOKEN = '$SVELTE_IMPORT'
 const SVELTE_FIELD_TOKEN = '$SVELTE_FIELD'
-const SVELTE_CONFIG_IMPORT = "import svelteConfig from './svelte.config.js'"
 
 // Template strings below contain `export default` as generated file content, not as module exports.
 // The import token sits flush before `export default` so the blank-line separator lives in the
@@ -101,25 +102,33 @@ const NOT_FOUND = -1
 const SVELTE_FIELD_INDENT_PLAIN = '\t'
 const SVELTE_FIELD_INDENT_RULES = '\t\t'
 
-// Replace the svelte.config tokens: emit the import line + field when the project still ships a
-// svelte.config file, otherwise strip both. Vanilla templates carry no tokens, so this no-ops them.
+// Replace the svelte.config tokens: emit the import line + field when the project ships a
+// svelte.config file (importing the resolved specifier so a `.ts`-only project gets the right
+// extension), otherwise strip both. Vanilla templates carry no tokens, so this no-ops them.
 function fill_svelte_tokens(
 	template: string,
-	has_svelte_config: boolean,
+	svelte_config_import: string | undefined,
 	field_indent: string,
 ): string {
-	const import_replacement = has_svelte_config ? `${SVELTE_CONFIG_IMPORT}\n\n` : '\n'
-	const field_replacement = has_svelte_config ? `\n${field_indent}svelte_config: svelteConfig,` : ''
+	const import_replacement =
+		svelte_config_import === undefined
+			? '\n'
+			: `import svelteConfig from '${svelte_config_import}'\n\n`
+	const field_replacement =
+		svelte_config_import === undefined ? '' : `\n${field_indent}svelte_config: svelteConfig,`
 
 	return template
 		.replace(SVELTE_IMPORT_TOKEN, () => import_replacement)
 		.replace(SVELTE_FIELD_TOKEN, () => field_replacement)
 }
 
-function generate_eslint_config(type: ProjectType, has_svelte_config: boolean): string {
+function generate_eslint_config(
+	type: ProjectType,
+	svelte_config_import: string | undefined,
+): string {
 	if (type !== 'sveltekit') return ESLINT_VANILLA
 
-	return fill_svelte_tokens(ESLINT_SVELTEKIT_TPL, has_svelte_config, SVELTE_FIELD_INDENT_PLAIN)
+	return fill_svelte_tokens(ESLINT_SVELTEKIT_TPL, svelte_config_import, SVELTE_FIELD_INDENT_PLAIN)
 }
 
 function is_vanilla_eslint_config(existing: string): boolean {
@@ -176,10 +185,10 @@ function indent_block(text: string, indent: string): string {
 function apply_rules_template(
 	type: ProjectType,
 	rules_body: string,
-	has_svelte_config: boolean,
+	svelte_config_import: string | undefined,
 ): string {
 	const template = type === 'sveltekit' ? SVELTEKIT_WITH_RULES_TPL : VANILLA_WITH_RULES_TPL
-	const filled = fill_svelte_tokens(template, has_svelte_config, SVELTE_FIELD_INDENT_RULES)
+	const filled = fill_svelte_tokens(template, svelte_config_import, SVELTE_FIELD_INDENT_RULES)
 	const rules_block = indent_block(rules_body, RULES_INDENT)
 
 	return filled.replace(RULES_PLACEHOLDER, () => rules_block)
@@ -188,13 +197,13 @@ function apply_rules_template(
 function merge_eslint_config(
 	existing: string,
 	type: ProjectType,
-	has_svelte_config: boolean,
+	svelte_config_import: string | undefined,
 ): string {
 	if (!is_vanilla_eslint_config(existing)) return existing
 	const rules_blocks = extract_rules_inner_blocks(existing)
-	if (rules_blocks.length === 0) return generate_eslint_config(type, has_svelte_config)
+	if (rules_blocks.length === 0) return generate_eslint_config(type, svelte_config_import)
 
-	return apply_rules_template(type, rules_blocks.join(',\n'), has_svelte_config)
+	return apply_rules_template(type, rules_blocks.join(',\n'), svelte_config_import)
 }
 
 function generate_prettier_config(stylesheet: string = DEFAULT_TAILWIND_STYLESHEET): string {

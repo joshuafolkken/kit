@@ -82,11 +82,14 @@ function build_playwright_action(): FileAction {
 	return { dest: 'playwright.config.ts', create: () => init_logic.generate_playwright_config() }
 }
 
-function build_eslint_action(type: ProjectType, has_svelte_config: boolean): FileAction {
+function build_eslint_action(
+	type: ProjectType,
+	svelte_config_import: string | undefined,
+): FileAction {
 	return build_action(
 		'eslint.config.js',
-		() => init_logic.generate_eslint_config(type, has_svelte_config),
-		(existing) => init_logic.merge_eslint_config(existing, type, has_svelte_config),
+		() => init_logic.generate_eslint_config(type, svelte_config_import),
+		(existing) => init_logic.merge_eslint_config(existing, type, svelte_config_import),
 	)
 }
 
@@ -100,7 +103,7 @@ function build_vite_action(): FileAction {
 
 function build_file_actions(
 	type: ProjectType,
-	has_svelte_config: boolean,
+	svelte_config_import: string | undefined,
 ): ReadonlyArray<FileAction> {
 	return [
 		build_action(
@@ -108,7 +111,7 @@ function build_file_actions(
 			() => init_logic.generate_npmrc(),
 			(existing) => init_logic.merge_npmrc(existing),
 		),
-		build_eslint_action(type, has_svelte_config),
+		build_eslint_action(type, svelte_config_import),
 		build_action(
 			PRETTIER_CONFIG_JS,
 			() => init_logic.generate_prettier_config(),

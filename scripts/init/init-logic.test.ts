@@ -13,23 +13,25 @@ const SVELTE_CONFIG_IMPORT_PATH = './svelte.config.js'
 
 describe('generate_eslint_config', () => {
 	it('returns sveltekit config for sveltekit type', () => {
-		expect(init_logic.generate_eslint_config('sveltekit', true)).toContain(
+		expect(init_logic.generate_eslint_config('sveltekit', SVELTE_CONFIG_IMPORT_PATH)).toContain(
 			'create_sveltekit_config',
 		)
 	})
 
 	it('returns vanilla config for vanilla type', () => {
-		expect(init_logic.generate_eslint_config('vanilla', false)).toContain('create_vanilla_config')
+		expect(init_logic.generate_eslint_config('vanilla', undefined)).toContain(
+			'create_vanilla_config',
+		)
 	})
 
 	it('sveltekit config imports svelte.config.js when present', () => {
-		expect(init_logic.generate_eslint_config('sveltekit', true)).toContain(
+		expect(init_logic.generate_eslint_config('sveltekit', SVELTE_CONFIG_IMPORT_PATH)).toContain(
 			SVELTE_CONFIG_IMPORT_PATH,
 		)
 	})
 
 	it('sveltekit config omits the svelte.config.js import when absent', () => {
-		expect(init_logic.generate_eslint_config('sveltekit', false)).not.toContain(
+		expect(init_logic.generate_eslint_config('sveltekit', undefined)).not.toContain(
 			SVELTE_CONFIG_IMPORT_PATH,
 		)
 	})
