@@ -9,17 +9,31 @@ const PACKAGE_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..
 const GITIGNORE_DEST = '.gitignore'
 const CI_YML_DEST = '.github/workflows/ci.yml'
 
+const SVELTE_CONFIG_IMPORT_PATH = './svelte.config.js'
+
 describe('generate_eslint_config', () => {
 	it('returns sveltekit config for sveltekit type', () => {
-		expect(init_logic.generate_eslint_config('sveltekit')).toContain('create_sveltekit_config')
+		expect(init_logic.generate_eslint_config('sveltekit', SVELTE_CONFIG_IMPORT_PATH)).toContain(
+			'create_sveltekit_config',
+		)
 	})
 
 	it('returns vanilla config for vanilla type', () => {
-		expect(init_logic.generate_eslint_config('vanilla')).toContain('create_vanilla_config')
+		expect(init_logic.generate_eslint_config('vanilla', undefined)).toContain(
+			'create_vanilla_config',
+		)
 	})
 
-	it('sveltekit config imports svelte.config.js', () => {
-		expect(init_logic.generate_eslint_config('sveltekit')).toContain('./svelte.config.js')
+	it('sveltekit config imports svelte.config.js when present', () => {
+		expect(init_logic.generate_eslint_config('sveltekit', SVELTE_CONFIG_IMPORT_PATH)).toContain(
+			SVELTE_CONFIG_IMPORT_PATH,
+		)
+	})
+
+	it('sveltekit config omits the svelte.config.js import when absent', () => {
+		expect(init_logic.generate_eslint_config('sveltekit', undefined)).not.toContain(
+			SVELTE_CONFIG_IMPORT_PATH,
+		)
 	})
 })
 
