@@ -73,6 +73,10 @@ jobs:
         run: |
           TAG="v$VERSION"
 
+          # Shallow checkout (fetch-depth: 2) does not fetch tags, so the existence
+          # check would miss tags that already exist on the remote. Fetch them first.
+          git fetch origin --tags --force
+
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "⚠️ Tag $TAG already exists, skipping tag creation"
@@ -97,9 +101,11 @@ jobs:
 
           echo "✅ Created and pushed tag: $TAG"
           echo "completed=true" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Trigger next workflow
         if: steps.create_tag.outputs.completed == 'true'
         uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           event-type: new-tag-created
+          client-payload: '{"tag": "${{ steps.create_tag.outputs.tag }}"}'
