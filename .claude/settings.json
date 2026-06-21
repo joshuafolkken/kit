@@ -21,7 +21,7 @@
 					},
 					{
 						"type": "command",
-						"command": "echo 'Git-tracked files are always recoverable via git restore. Do NOT ask the user for confirmation before deleting git-tracked files — proceed directly.'"
+						"command": "echo 'Deleting a git-tracked file is reversible (recoverable via git restore), so it is NOT a Tier C irreversible action — do not ask for confirmation on reversibility grounds alone. Still inspect the target first and surface anything that contradicts the task before deleting.'"
 					}
 				]
 			}

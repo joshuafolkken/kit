@@ -21,10 +21,27 @@ jobs:
 
       - name: Update production branch
         env:
-          REF_NAME: ${{ github.ref_name }}
+          # repository_dispatch always runs on the default branch, so the event ref
+          # resolves to that branch, not the released tag. Use the tag carried in the
+          # dispatch payload (set by auto-tag.yml) as the merge source instead.
+          REF_NAME: ${{ github.event.client_payload.tag }}
         run: |
-          git fetch origin
+          if [ -z "$REF_NAME" ]; then
+            echo "::error::new-tag-created dispatch carried no tag payload; aborting." >&2
+            exit 1
+          fi
+
+          if ! [[ "$REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid tag format: $REF_NAME" >&2
+            exit 1
+          fi
+
+          git fetch origin --tags
+          if ! git rev-parse -q --verify "refs/tags/$REF_NAME" >/dev/null; then
+            echo "::error::Tag not found: $REF_NAME" >&2
+            exit 1
+          fi
           git checkout production || git checkout -b production origin/production || git checkout -b production
 
-          git merge "$REF_NAME" --no-ff -m "Release $REF_NAME"
+          git merge "refs/tags/$REF_NAME" --no-ff -m "Release $REF_NAME"
           git push origin production

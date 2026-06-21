@@ -26,15 +26,15 @@ After completing the code, ask the user if they want a playground link. Only cal
 
 Whenever modifying, adding, or deleting any code:
 
-1. **Verify Type Safety**: Run `pnpm run check`.
-2. **Verify Style and Quality**: Run `pnpm run lint`.
-3. **Verify IDE Feedback**: ALWAYS run the **ReadLints** tool on every modified file (and any file that might be affected) before finishing. Fix all reported errors and warnings. IDE/ReadLints can report issues that terminal `pnpm run lint` does not (e.g. type resolution for generated or gitignored paths).
+1. **Verify Type Safety**: Run `pnpm josh check`.
+2. **Verify Style and Quality**: Run `pnpm josh lint`.
+3. **Verify IDE Feedback**: ALWAYS run the **ReadLints** tool on every modified file (and any file that might be affected) before finishing. Fix all reported errors and warnings. IDE/ReadLints can report issues that terminal `pnpm josh lint` does not (e.g. type resolution for generated or gitignored paths).
 4. **Fix Issues**: If any check fails (terminal or IDE feedback, or ReadLints), fix all reported issues immediately.
 5. **Repeat**: Repeat the checks until **all** pass and **ReadLints shows no errors** for the modified files.
 6. **Completion**: Only finish the task or response after ALL checks pass and ReadLints reports **zero errors** on modified files (warnings only are acceptable only when documented as a known exception, e.g. unused eslint-disable for Paraglide).
-7. **Full test gate (code or E2E-impacting work):** Also run `pnpm cspell:dot` and **`pnpm test`** (`pnpm test:unit` **and** Playwright). **Do not** claim completion using only `pnpm test:unit --run` when E2E applies. Run **`pnpm test` with `CI` unset** so Playwright uses **DEV** (`pnpm run dev`, port 5173 per `playwright.config.ts`), matching the VS Code Test extension. Details: **Completion gate** in `AGENTS.md`. If Playwright cannot finish in your environment, **do not** fall back to **`pnpm build`** or **`CI=true`** unless the user asked — say E2E did not run and ask them to run **`pnpm test`** locally (**Agent / sandbox** in `AGENTS.md`).
+7. **Full test gate (code or E2E-impacting work):** Also run `pnpm josh cspell:dot` and **`pnpm josh test`** (`pnpm josh test:unit` **and** Playwright). **Do not** claim completion using only `pnpm josh test:unit --run` when E2E applies. Run **`pnpm josh test` with `CI` unset** so Playwright uses **DEV** (`pnpm run dev`, port 5173 per `playwright.config.ts`), matching the VS Code Test extension. Details: **Completion gate** in `AGENTS.md`. If Playwright cannot finish in your environment, **do not** fall back to **`pnpm build`** or **`CI=true`** unless the user asked — say E2E did not run and ask them to run **`pnpm josh test`** locally (**Agent / sandbox** in `AGENTS.md`).
 
-**Constraint**: Never state "it should pass" without actually having run the commands and confirmed the output. Do not end a task while **errors** exist. Before completing, you MUST run **ReadLints** on every modified file and fix every **error** (not just rely on terminal check/lint). If verification commands fail (e.g., system error), you MUST rely on ReadLints to ensure correctness. If **`pnpm test`** cannot complete, follow **Agent / sandbox** in `AGENTS.md` instead of switching to build/CI without user request.
+**Constraint**: Never state "it should pass" without actually having run the commands and confirmed the output. Do not end a task while **errors** exist. Before completing, you MUST run **ReadLints** on every modified file and fix every **error** (not just rely on terminal check/lint). If verification commands fail (e.g., system error), you MUST rely on ReadLints to ensure correctness. If **`pnpm josh test`** cannot complete, follow **Agent / sandbox** in `AGENTS.md` instead of switching to build/CI without user request.
 
 ## Refactoring Rules
 

@@ -191,7 +191,7 @@ describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 	})
 
 	it('no duplicate alias keys', () => {
-		expect(ALL_ALIAS_KEYS.length).toBe(new Set(ALL_ALIAS_KEYS).size)
+		expect(ALL_ALIAS_KEYS).toHaveLength(new Set(ALL_ALIAS_KEYS).size)
 	})
 })
 
@@ -246,7 +246,7 @@ describe('CATEGORY_ORDER — covers all command categories', () => {
 	})
 
 	it('has no duplicates', () => {
-		expect(CATEGORY_ORDER.length).toBe(new Set(CATEGORY_ORDER).size)
+		expect(CATEGORY_ORDER).toHaveLength(new Set(CATEGORY_ORDER).size)
 	})
 
 	it('starts with Development and ends with AI tools', () => {

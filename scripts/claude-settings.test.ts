@@ -49,6 +49,23 @@ describe('.claude/settings.json — permissions', () => {
 	})
 })
 
+describe('.claude/settings.json — deletion-policy hook reconciliation', () => {
+	it('frames git-tracked deletion as reversible and not a Tier C action', () => {
+		const raw = readFileSync(SETTINGS_PATH, 'utf8')
+
+		expect(raw).toContain('git restore')
+		expect(raw).toMatch(/reversible/u)
+		expect(raw).toMatch(/Tier C/u)
+	})
+
+	it('still requires inspecting the target before deleting', () => {
+		const raw = readFileSync(SETTINGS_PATH, 'utf8')
+
+		expect(raw).toMatch(/inspect the target first/u)
+		expect(raw).not.toContain('proceed directly')
+	})
+})
+
 describe('.gitignore — Claude Code runtime artifacts', () => {
 	it('ignores .claude/scheduled_tasks.lock so it never lands in commits', () => {
 		const gitignore = readFileSync(GITIGNORE_PATH, 'utf8')
