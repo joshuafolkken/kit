@@ -22,6 +22,7 @@ const CANONICAL_COMMANDS: ReadonlyArray<string> = [
 const FORBIDDEN_COMMANDS: ReadonlyArray<string> = [
 	'pnpm run check',
 	'pnpm run lint',
+	'pnpm run test',
 	'pnpm cspell:dot',
 	'pnpm test:unit',
 ]

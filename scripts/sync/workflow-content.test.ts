@@ -39,6 +39,13 @@ describe('production.yml — release merge source', () => {
 	it('aborts the merge when the dispatch payload carries no tag', () => {
 		expect(read_workflow(PRODUCTION_PATH)).toContain('if [ -z "$REF_NAME" ]')
 	})
+
+	it('verifies the tag exists and merges the explicit tag ref', () => {
+		const content = read_workflow(PRODUCTION_PATH)
+
+		expect(content).toContain('git rev-parse -q --verify "refs/tags/$REF_NAME"')
+		expect(content).toContain('git merge "refs/tags/$REF_NAME"')
+	})
 })
 
 describe('templates/workflows/ci.yml — checkout credential hygiene', () => {
