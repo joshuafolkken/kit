@@ -1,7 +1,8 @@
-import { execa } from 'execa'
+import { execa, type Options } from 'execa'
 import { get_exit_code } from './git-execa-error'
 
 const PR_CHECKS_WATCH_TIMEOUT_MS = 120_000
+const WATCH_OPTIONS: Options = { stdio: 'inherit', timeout: PR_CHECKS_WATCH_TIMEOUT_MS }
 
 interface WatchResult {
 	timed_out: boolean
@@ -27,10 +28,7 @@ function to_watch_failure(error: unknown): Error {
 
 async function pr_checks_watch(branch_name: string): Promise<WatchResult> {
 	try {
-		await execa('gh', ['pr', 'checks', branch_name, '--watch'], {
-			stdio: 'inherit',
-			timeout: PR_CHECKS_WATCH_TIMEOUT_MS,
-		})
+		await execa('gh', ['pr', 'checks', branch_name, '--watch'], WATCH_OPTIONS) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return { timed_out: false }
 	} catch (error) {
