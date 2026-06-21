@@ -24,7 +24,7 @@ async function exec_gh_command(arguments_: Array<string>): Promise<string> {
 	await check_gh_installed()
 
 	try {
-		const { stdout } = await execa('gh', arguments_)
+		const { stdout } = await execa('gh', arguments_) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return stdout.trimEnd()
 	} catch (error) {
@@ -39,7 +39,7 @@ async function exec_gh_command_with_stdin(input: {
 	await check_gh_installed()
 
 	try {
-		const { stdout } = await execa('gh', input.args, { input: input.stdin_body })
+		const { stdout } = await execa('gh', input.args, { input: input.stdin_body }) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return stdout.trimEnd()
 	} catch (error) {
