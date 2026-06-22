@@ -55,6 +55,7 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no a
 ### Files
 
 - Svelte: `PascalCase.svelte` / `PascalCase.svelte.ts` · TypeScript: `kebab-case.ts` · Route files: exception
+- Test files: `*.test.ts` (node/unit) / `*.svelte.test.ts` (component/browser) — never `*.spec.ts`; colocate beside the code under test (no top-level `tests/`). Lint-enforced by `eslint/rules/test-filename.js`.
 - `scripts/` is grouped into subdirectories (`init/`, `josh/`, `version/`, `sync/`, `git/`, `issue/`, `overrides/`). Relative parent-directory imports (`../`) are banned by ESLint (`no-restricted-imports`). For cross-directory imports inside `scripts/`, use the `#scripts/*` subpath import (mapped via `package.json` `imports`), e.g. `import { schema } from '#scripts/schemas'`. Same-directory and into-subdirectory imports stay relative (`./sibling`, `./group/file`).
 
 ### Quality limits
