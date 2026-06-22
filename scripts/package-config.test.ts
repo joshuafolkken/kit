@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import yaml from 'js-yaml'
+import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 
 interface PackageJson {
@@ -30,7 +30,7 @@ const WORKSPACE_CONFIG = 'pnpm-workspace.yaml'
 function load_workspace(): WorkspaceYaml {
 	const content = readFileSync(path.resolve(process.cwd(), WORKSPACE_CONFIG), 'utf8')
 
-	return yaml.load(content) as WorkspaceYaml
+	return load(content) as WorkspaceYaml
 }
 
 function extract_top_directory(file_path: string): string {

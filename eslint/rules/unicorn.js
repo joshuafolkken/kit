@@ -1,7 +1,9 @@
 // 普遍的に理解される短い識別子は許可する（プロジェクト全体に適用）。
 // req / res / usr / cnt のような馴染みのない略語のみを検出させる。
 // e2e は Playwright の page.e2e.ts 命名規約で error2error に展開されるのを防ぐ。
-export const PREVENT_ABBR_ALLOW_LIST = {
+// unicorn 68 で prevent-abbreviations は name-replacements にリネームされたため、
+// allowList はそのまま name-replacements に渡す（オプション形状は同一）。
+export const NAME_REPLACEMENTS_ALLOW_LIST = {
 	Props: true,
 	e: true, // event handler parameter
 	e2e: true, // Playwright end-to-end spec filename convention
@@ -12,6 +14,10 @@ export const PREVENT_ABBR_ALLOW_LIST = {
 	opts: true, // options object
 	params: true, // SvelteKit +page.ts params
 	args: true, // function arguments
+	// unicorn 68 が既定で展開を要求するようになった慣用的な短縮名（67 では許可されていた）。
+	cmd: true, // command（git_cmd / cmd_arguments など普遍的に通じる短縮）
+	deps: true, // dependencies（package_with_deps_schema など）
+	repository: true, // unicorn 68 は repository→repo を勧めるが、明確さを優先し完全名を維持する
 }
 
 export const unicorn_rules = {
@@ -20,7 +26,8 @@ export const unicorn_rules = {
 	// reduce の過度な使用を禁止
 	'unicorn/no-array-reduce': 'error',
 	// abbreviation を禁止（明確な命名を強制、idiomatic な短縮名は許可）
-	'unicorn/prevent-abbreviations': ['error', { allowList: PREVENT_ABBR_ALLOW_LIST }],
+	// unicorn 68 で prevent-abbreviations から name-replacements にリネーム
+	'unicorn/name-replacements': ['error', { allowList: NAME_REPLACEMENTS_ALLOW_LIST }],
 	// より良いエラーメッセージ
 	'unicorn/error-message': 'error',
 	// ファイル名のケース統一（unicorn 65 で既定 true になった checkDirectories を無効化し、
@@ -52,14 +59,13 @@ export const unicorn_rules = {
 	'unicorn/no-unnecessary-await': 'error',
 	// 不要なspread演算子を禁止
 	'unicorn/no-useless-spread': 'error',
-	// より良い正規表現
-	'unicorn/better-regex': 'error',
 	// catch句でのエラー名を統一
 	'unicorn/catch-error-name': ['error', { name: 'error' }],
 	// switchケースでのブレークを強制
 	'unicorn/prefer-switch': ['error', { minimumCases: 2 }],
-	// Array.isArray()を優先
-	'unicorn/no-instanceof-array': 'error',
+	// instanceof による組み込みオブジェクト判定を禁止（Array.isArray() などを優先）。
+	// unicorn 68 で no-instanceof-array から no-instanceof-builtins にリネーム（対象が拡大）
+	'unicorn/no-instanceof-builtins': 'error',
 	// 単独のifを禁止（else内）
 	'unicorn/no-lonely-if': 'error',
 	// 否定条件を避ける

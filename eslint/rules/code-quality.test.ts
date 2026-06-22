@@ -120,3 +120,9 @@ describe('code_quality_rules — id-length max (issue #428 Gap 2)', () => {
 		expect(min).toBe(2)
 	})
 })
+
+describe('code_quality_rules — continue policy (issue #599)', () => {
+	it('allows continue so guard-clause loops can reduce nesting (aligns with unicorn/prefer-continue)', () => {
+		expect(code_quality_rules['no-continue']).toBe('off')
+	})
+})

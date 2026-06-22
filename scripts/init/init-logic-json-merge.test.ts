@@ -5,14 +5,12 @@ const TSCONFIG_BASE = '@joshuafolkken/kit/tsconfig/base.json'
 const EXCLUDE_KEY = 'exclude'
 const NODE_MODULES_VALUE = 'node_modules'
 const SVELTE_KIT_VALUE = '.svelte-kit'
-const CSPELL_PATH = '@joshuafolkken/kit/cspell'
 const DEV_DEP_KEY = '@joshuafolkken/kit'
 const DEV_DEP_VERSION = '^0.1.0'
 const SCRIPT_DEV = 'dev'
 const SCRIPT_DEV_VALUE = 'vite dev'
 const SCRIPT_BUILD = 'build'
 const DEV_DEPS_KEY = 'devDependencies'
-const EXCLUDE_YAML_CONTENT = `${EXCLUDE_KEY}:\n  - ${NODE_MODULES_VALUE}\n`
 
 describe('init_logic_json_merge.merge_json_extends', () => {
 	it('prepends entry to empty extends array', () => {
@@ -74,49 +72,6 @@ describe('init_logic_json_merge.merge_json_object', () => {
 		const content = '{"a":1}'
 
 		expect(init_logic_json_merge.merge_json_object(content, { a: 99 })).toBe(content)
-	})
-})
-
-describe('init_logic_json_merge.merge_yaml_list_entry', () => {
-	it('adds value to existing YAML list', () => {
-		const result = init_logic_json_merge.merge_yaml_list_entry(
-			EXCLUDE_YAML_CONTENT,
-			EXCLUDE_KEY,
-			SVELTE_KIT_VALUE,
-		)
-
-		expect(result).toContain(SVELTE_KIT_VALUE)
-	})
-
-	it('returns content unchanged when value already present', () => {
-		expect(
-			init_logic_json_merge.merge_yaml_list_entry(
-				EXCLUDE_YAML_CONTENT,
-				EXCLUDE_KEY,
-				NODE_MODULES_VALUE,
-			),
-		).toBe(EXCLUDE_YAML_CONTENT)
-	})
-
-	it('creates key with value when key is absent', () => {
-		const result = init_logic_json_merge.merge_yaml_list_entry('', EXCLUDE_KEY, NODE_MODULES_VALUE)
-
-		expect(result).toContain(EXCLUDE_KEY)
-		expect(result).toContain(NODE_MODULES_VALUE)
-	})
-})
-
-describe('init_logic_json_merge.merge_cspell_import', () => {
-	it('inserts import after version when key is absent', () => {
-		const result = init_logic_json_merge.merge_cspell_import("version: '0.2'\n", CSPELL_PATH)
-
-		expect(result).toContain(CSPELL_PATH)
-	})
-
-	it('returns content unchanged when import already present', () => {
-		const content = `import:\n  - '${CSPELL_PATH}'\n`
-
-		expect(init_logic_json_merge.merge_cspell_import(content, CSPELL_PATH)).toBe(content)
 	})
 })
 

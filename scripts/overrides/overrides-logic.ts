@@ -104,7 +104,7 @@ function extract_capped_package_names(overrides: Record<string, string>): Array<
 		.map((key) => extract_package_name(key))
 }
 
-function read_dep_names(package_json_content: string): Array<string> {
+function read_dependency_names(package_json_content: string): Array<string> {
 	const parsed = package_with_deps_schema.parse(JSON.parse(package_json_content))
 
 	return [...Object.keys(parsed.dependencies ?? {}), ...Object.keys(parsed.devDependencies ?? {})]
@@ -120,7 +120,7 @@ function build_update_command(
 
 	if (capped.length === 0) return PNPM_UPDATE_LATEST_ARGS
 
-	const all_names = read_dep_names(package_json_content)
+	const all_names = read_dependency_names(package_json_content)
 	const capped_set = new Set(capped)
 	const targets = all_names.filter((name) => !capped_set.has(name))
 
@@ -133,7 +133,7 @@ const overrides_check = {
 	compare,
 	read_overrides_from_package,
 	extract_capped_package_names,
-	read_dep_names,
+	read_dependency_names,
 	build_update_command,
 	SNAPSHOT_PATH,
 }

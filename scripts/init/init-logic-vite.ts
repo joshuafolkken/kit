@@ -9,12 +9,11 @@ const VISUALIZER_PLUGINS = `${VISUALIZER_CLIENT},\n\t${VISUALIZER_SERVER}`
 const VISUALIZER_IMPORT_RE = /from ['"]rollup-plugin-visualizer['"]/u
 
 function find_last_import_pos(content: string): number {
-	let last_match: RegExpExecArray | undefined = undefined
+	let pos = 0
 
-	for (const match of content.matchAll(/^import\s[^\n]+\n/gmu)) last_match = match
-	if (last_match === undefined) return 0
+	for (const match of content.matchAll(/^import\s[^\n]+\n/gmu)) pos = match.index + match[0].length
 
-	return last_match.index + last_match[0].length
+	return pos
 }
 
 function inject_visualizer_import(content: string): string {
