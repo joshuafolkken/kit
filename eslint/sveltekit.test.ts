@@ -2,6 +2,10 @@ import { fileURLToPath } from 'node:url'
 import { Linter } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import { ROUTE_NO_RESTRICTED_SYNTAX } from './rules/svelte.js'
+import {
+	CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
+	SPEC_FILENAME_PATTERNS,
+} from './rules/test-filename.js'
 import { create_sveltekit_config } from './sveltekit.js'
 
 const ECMA_VERSION = 2024
@@ -265,5 +269,28 @@ describe('create_sveltekit_config — unicorn/prevent-abbreviations allowList (i
 			params: true,
 			args: true,
 		})
+	})
+})
+
+function get_restricted_syntax(files: ReadonlyArray<string>): { message?: string } | undefined {
+	const config = build_config()
+	const block = config.findLast((entry) => is_pattern_match(entry.files, files))
+	const rules = block?.rules as Record<string, unknown> | undefined
+	const rule_value = rules?.['no-restricted-syntax'] as [string, { message?: string }] | undefined
+
+	return rule_value?.[1]
+}
+
+describe('create_sveltekit_config — test-filename enforcement (issue #593)', () => {
+	it('wires a trailing block forbidding *.spec.ts / *.spec.js', () => {
+		const option = get_restricted_syntax(SPEC_FILENAME_PATTERNS)
+
+		expect(option?.message).toContain('*.test.ts')
+	})
+
+	it('wires a trailing block forbidding a top-level tests/ directory', () => {
+		const option = get_restricted_syntax(CENTRALIZED_TESTS_DIRECTORY_PATTERNS)
+
+		expect(option?.message).toContain('Colocate')
 	})
 })
