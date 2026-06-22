@@ -178,7 +178,7 @@ describe('integration: filtering capped packages from update targets', () => {
 		)
 
 		const capped = overrides_check.extract_capped_package_names(overrides)
-		const all_names = overrides_check.read_dep_names(content)
+		const all_names = overrides_check.read_dependency_names(content)
 		const capped_set = new Set(capped)
 		const targets = all_names.filter((name) => !capped_set.has(name))
 
@@ -191,7 +191,7 @@ describe('integration: filtering capped packages from update targets', () => {
 		const content = make_package_json({}, { esbuild: '^0.25.0', vitest: '^3.0.0' })
 
 		const capped = overrides_check.extract_capped_package_names(overrides)
-		const all_names = overrides_check.read_dep_names(content)
+		const all_names = overrides_check.read_dependency_names(content)
 		const targets = all_names.filter((name) => !new Set(capped).has(name))
 
 		expect(targets).toEqual(['esbuild', 'vitest'])
@@ -229,14 +229,14 @@ describe('overrides_check.build_update_command', () => {
 	})
 })
 
-describe('overrides_check.read_dep_names', () => {
+describe('overrides_check.read_dependency_names', () => {
 	it('returns all dependency and devDependency names', () => {
 		const content = make_package_json(
 			{ svelte: '^5.0.0', drizzle: '^1.0.0' },
 			{ vitest: '^3.0.0', typescript: '^6.0.0' },
 		)
 
-		expect(overrides_check.read_dep_names(content)).toEqual([
+		expect(overrides_check.read_dependency_names(content)).toEqual([
 			'svelte',
 			'drizzle',
 			'vitest',
@@ -247,19 +247,19 @@ describe('overrides_check.read_dep_names', () => {
 	it('handles missing dependencies section', () => {
 		const content = JSON.stringify({ devDependencies: { vitest: '^3.0.0' } })
 
-		expect(overrides_check.read_dep_names(content)).toEqual(['vitest'])
+		expect(overrides_check.read_dependency_names(content)).toEqual(['vitest'])
 	})
 
 	it('handles missing devDependencies section', () => {
 		const content = JSON.stringify({ dependencies: { svelte: '^5.0.0' } })
 
-		expect(overrides_check.read_dep_names(content)).toEqual(['svelte'])
+		expect(overrides_check.read_dependency_names(content)).toEqual(['svelte'])
 	})
 
 	it('returns empty array for package.json with no deps', () => {
 		const content = JSON.stringify({ name: 'test' })
 
-		expect(overrides_check.read_dep_names(content)).toEqual([])
+		expect(overrides_check.read_dependency_names(content)).toEqual([])
 	})
 })
 
@@ -277,8 +277,8 @@ describe('overrides_check.read_overrides_from_package — schema validation', ()
 	})
 })
 
-describe('overrides_check.read_dep_names — schema validation', () => {
+describe('overrides_check.read_dependency_names — schema validation', () => {
 	it(SCHEMA_REJECTS_NON_OBJECTS, () => {
-		expect(() => overrides_check.read_dep_names(JSON.stringify('not-an-object'))).toThrow()
+		expect(() => overrides_check.read_dependency_names(JSON.stringify('not-an-object'))).toThrow()
 	})
 })

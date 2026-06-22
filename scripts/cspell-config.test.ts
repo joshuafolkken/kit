@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import yaml from 'js-yaml'
+import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 
 interface CspellConfig {
@@ -12,7 +12,7 @@ const KIT_CSPELL_CONFIG = 'cspell.config.yaml'
 
 function load_words(relative_path: string): Array<string> {
 	const content = readFileSync(path.resolve(process.cwd(), relative_path), 'utf8')
-	const config = yaml.load(content) as CspellConfig
+	const config = load(content) as CspellConfig
 
 	return config.words ?? []
 }

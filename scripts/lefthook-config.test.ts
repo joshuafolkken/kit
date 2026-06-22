@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import yaml from 'js-yaml'
+import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 
 interface LefthookCommand {
@@ -24,7 +24,7 @@ const CSPELL = 'cspell'
 function load_config(relative_path: string): LefthookConfig {
 	const content = readFileSync(path.resolve(process.cwd(), relative_path), 'utf8')
 
-	return yaml.load(content) as LefthookConfig
+	return load(content) as LefthookConfig
 }
 
 function load_test_e2e_command(relative_path: string): LefthookCommand | undefined {

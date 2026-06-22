@@ -147,8 +147,11 @@ export const code_quality_rules = {
 	'no-sequences': 'error',
 	// ビット演算子を禁止
 	'no-bitwise': 'error',
-	// continue文を禁止
-	'no-continue': 'error',
+	// continue は許可する（issue #599）。ループ先頭のガード節（if (skip) continue）は
+	// 早期 return と同じくネストを1段下げる手法で、本プロジェクトの早期 return 推奨・
+	// nesting≤2 の方針と整合する。unicorn 68 の recommended が有効化する
+	// unicorn/prefer-continue とも衝突しない。
+	'no-continue': 'off',
 	// インクリメント・デクリメント演算子を禁止
 	'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
 	// arguments.caller/calleeを禁止

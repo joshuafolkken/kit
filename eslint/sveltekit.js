@@ -66,7 +66,7 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 		},
 		{
 			files: SVELTE_FILE_PATTERNS.svelte_named,
-			// Note: unicorn/prevent-abbreviations is configured project-wide (including .svelte)
+			// Note: unicorn/name-replacements is configured project-wide (including .svelte)
 			// in eslint/rules/unicorn.js, so this override intentionally does not re-specify it.
 			rules: {
 				'unicorn/filename-case': [
