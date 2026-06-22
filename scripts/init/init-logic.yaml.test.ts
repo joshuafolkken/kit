@@ -41,6 +41,15 @@ describe('merge_yaml_list_entry — modification', () => {
 		expect(result).toContain(KIT_ESLINT_SVELTEKIT)
 	})
 
+	// js-yaml 5 throws on input with no document node (empty / whitespace / comment-only),
+	// where js-yaml 4 returned undefined. Guards the parse_yaml empty-document handling (#599).
+	it('treats comment-only content as empty and creates the key', () => {
+		const result = init_logic.merge_yaml_list_entry('# only a comment\n', EXTENDS_KEY, KIT_ESLINT)
+
+		expect(result).toContain(EXTENDS_KEY)
+		expect(result).toContain(KIT_ESLINT)
+	})
+
 	it('does not falsely match when value is a prefix of an existing entry', () => {
 		const content = `${EXTENDS_KEY}:\n  - '${KIT_ESLINT_SVELTEKIT}'\n`
 		const result = init_logic.merge_yaml_list_entry(content, EXTENDS_KEY, KIT_ESLINT)
