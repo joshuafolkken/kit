@@ -304,10 +304,20 @@ function strip_wrangler_types_from_build(content: string): string {
 	)
 }
 
-// Append the guarded `wrangler types` to `prepare` so worker types are generated at
-// install time. Idempotent — `merge_package_script_suffix` skips when the command is
-// already present, and is a no-op when no `prepare` script exists.
+// Append the guarded `wrangler types` to `prepare` so worker types are generated at install
+// time. Coverage-aware: a no-op when `prepare` already reaches `wrangler types` — directly or
+// transitively through a `pnpm <subscript>` chain (e.g. `prepare → pnpm prepare:gen → pnpm gen
+// → wrangler types`) — so the append never adds a redundant second invocation. Otherwise
+// appends the guarded command. Idempotent — re-running leaves an already-covered or
+// already-appended manifest unchanged; a no-op when no `prepare` script exists.
 function merge_prepare_wrangler_types(content: string): string {
+	const is_covered = init_logic_json_merge.has_script_marker_coverage(
+		content,
+		PREPARE_KEY,
+		WRANGLER_TYPES_CMD,
+	)
+	if (is_covered) return content
+
 	return init_logic_json_merge.merge_package_script_suffix(
 		content,
 		PREPARE_KEY,

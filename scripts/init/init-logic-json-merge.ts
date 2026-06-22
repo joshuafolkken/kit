@@ -277,6 +277,50 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: updated_value } }, undefined, '\t')}\n`
 }
 
+// Matches a `pnpm <name>` or `pnpm run <name>` delegation to a sibling package script,
+// capturing the referenced script name (e.g. `pnpm prepare:gen` → `prepare:gen`). Built-in
+// invocations (`pnpm dlx …`, `pnpm install`) capture a token that is not a script key, so the
+// resolver simply never follows them. Conservative by design: a reference it cannot parse is
+// treated as not-covered rather than guessed at.
+const PNPM_SCRIPT_REFERENCE_PATTERN = /\bpnpm\s+(?:run\s+)?([\w:-]+)/gu
+
+function collect_pnpm_script_references(cmd: string): Array<string> {
+	return Array.from(cmd.matchAll(PNPM_SCRIPT_REFERENCE_PATTERN), (match) => match[1] ?? '')
+}
+
+// Reports whether the script at `key` runs a command containing `marker`, directly or
+// transitively via `pnpm <name>` references to sibling scripts. The shared `visited` set
+// guards mutually-referential scripts (`a → b → a`) against infinite recursion.
+function has_marker_in_script_chain(
+	scripts: Record<string, string>,
+	key: string,
+	marker: string,
+	visited: Set<string>,
+): boolean {
+	if (visited.has(key)) return false
+	visited.add(key)
+	const cmd = scripts[key]
+	if (cmd === undefined) return false
+	if (cmd.includes(marker)) return true
+
+	return collect_pnpm_script_references(cmd).some((name) =>
+		has_marker_in_script_chain(scripts, name, marker, visited),
+	)
+}
+
+// True when the `key` script transitively runs `marker`, following `pnpm <name>` references
+// through the package's own scripts. Lets a caller skip appending a command the chain already
+// covers — e.g. a `prepare` that reaches `wrangler types` via a `pnpm <subscript>` chain.
+function has_script_marker_coverage(content: string, key: string, marker: string): boolean {
+	const parsed = json_object_schema.parse(parse_jsonc(content))
+	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
+	const raw = parsed['scripts']
+	if (raw === undefined) return false
+	const scripts = string_record_schema.parse(raw)
+
+	return has_marker_in_script_chain(scripts, key, marker, new Set())
+}
+
 const SCRIPT_COMMAND_SEPARATOR = ' && '
 // Bare `&&` operator. Splitting on the literal (then trimming each segment) matches a
 // command regardless of how the consumer spaced its pipeline (`a&&b`, `a  &&  b`) without
@@ -338,6 +382,7 @@ const init_logic_json_merge = {
 	merge_cspell_import,
 	merge_package_scripts,
 	merge_package_script_suffix,
+	has_script_marker_coverage,
 	remove_script_command_segment,
 	remove_script_with_marker,
 	has_package_scripts_marker,
