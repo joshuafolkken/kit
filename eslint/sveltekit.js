@@ -3,6 +3,12 @@ import { defineConfig } from 'eslint/config'
 import ts from 'typescript-eslint'
 import { create_base_config } from './base.js'
 import { ROUTE_NO_RESTRICTED_SYNTAX, svelte_rules } from './rules/svelte.js'
+import {
+	CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
+	centralized_tests_directory_rules,
+	SPEC_FILENAME_PATTERNS,
+	spec_filename_rules,
+} from './rules/test-filename.js'
 
 const SVELTE_COMPONENT_PATTERN = '**/*.svelte'
 const SVELTE_TS_PATTERN = '**/*.svelte.ts'
@@ -94,5 +100,10 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 			files: SVELTE_FILE_PATTERNS.phrases,
 			rules: { 'max-lines': 'off', 'sonarjs/no-duplicate-string': 'off' },
 		},
+		// Test-filename enforcement (Issue #593): forbid *.spec.ts / *.spec.js and a
+		// top-level tests/ directory. Placed last so flat-config's later-wins ordering
+		// makes these the effective no-restricted-syntax entry for the matched files.
+		{ files: SPEC_FILENAME_PATTERNS, rules: spec_filename_rules },
+		{ files: CENTRALIZED_TESTS_DIRECTORY_PATTERNS, rules: centralized_tests_directory_rules },
 	)
 }
