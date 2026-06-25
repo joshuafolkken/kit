@@ -42,7 +42,5 @@ function create_version_command_config(options: VersionCommandConfigOptions): Ve
 	return config
 }
 
-const version_command_config = { create_version_command_config, derive_fix_gh_packages_path }
-
 export type { VersionCommandConfig, VersionCommandConfigOptions }
-export { version_command_config, create_version_command_config }
+export { create_version_command_config }

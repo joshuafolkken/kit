@@ -1,21 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { create_version_command_config, version_command_config } from './version-command-config'
+import { create_version_command_config } from './version-command-config'
 
 const KIT = '@joshuafolkken/kit'
 const KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/kit/versions?per_page=1'
 const KIT_FIX_PATH = 'node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts'
-
-describe('version_command_config.derive_fix_gh_packages_path', () => {
-	it('points at the package fix-gh-packages script under node_modules', () => {
-		expect(version_command_config.derive_fix_gh_packages_path(KIT)).toBe(KIT_FIX_PATH)
-	})
-
-	it('derives the path for an arbitrary consumer package', () => {
-		expect(version_command_config.derive_fix_gh_packages_path('@joshuafolkken/game-kit')).toBe(
-			'node_modules/@joshuafolkken/game-kit/scripts/fix-gh-packages.ts',
-		)
-	})
-})
 
 describe('create_version_command_config required inputs', () => {
 	it('passes through the package name and versions endpoint', () => {
@@ -35,6 +23,17 @@ describe('create_version_command_config required inputs', () => {
 		})
 
 		expect(config.fix_gh_packages_path).toBe(KIT_FIX_PATH)
+	})
+
+	it('derives the fix-gh-packages path for an arbitrary consumer package', () => {
+		const config = create_version_command_config({
+			package_name: '@joshuafolkken/game-kit',
+			versions_endpoint: '/users/joshuafolkken/packages/npm/game-kit/versions?per_page=1',
+		})
+
+		expect(config.fix_gh_packages_path).toBe(
+			'node_modules/@joshuafolkken/game-kit/scripts/fix-gh-packages.ts',
+		)
 	})
 })
 

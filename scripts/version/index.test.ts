@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { create_version_command_config, version_command_config, version_commands } from './index'
+import { create_version_command_config, version_commands } from './index'
 
 const exports_schema = z.object({ exports: z.record(z.string(), z.unknown()) })
 
@@ -15,7 +15,6 @@ const VERSION_EXPORT_PATH = './scripts/version/index.ts'
 describe('version library barrel', () => {
 	it('re-exports the config builder', () => {
 		expect(typeof create_version_command_config).toBe('function')
-		expect(typeof version_command_config).toBe('object')
 	})
 
 	it('re-exports the version_commands run functions', () => {

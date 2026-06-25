@@ -4,5 +4,5 @@
 // package name + GitHub Packages versions endpoint.
 export type { VersionCommandConfig, VersionCommandConfigOptions } from './version-command-config'
 export type { VersionSnapshot, RunningBinary, VersionOutputExtras } from './version-check-logic'
-export { create_version_command_config, version_command_config } from './version-command-config'
+export { create_version_command_config } from './version-command-config'
 export { version_commands } from './version-commands'
