@@ -5,12 +5,14 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { create_version_command_config, version_commands } from './index'
 
+const version_export_schema = z.object({ types: z.string(), default: z.string() })
 const exports_schema = z.object({ exports: z.record(z.string(), z.unknown()) })
 
 const SELF_DIR = path.dirname(fileURLToPath(import.meta.url))
 const PACKAGE_ROOT = path.resolve(SELF_DIR, '..', '..')
 const VERSION_EXPORT_KEY = './version'
-const VERSION_EXPORT_PATH = './scripts/version/index.ts'
+const VERSION_EXPORT_TYPES = './dist/version/index.d.ts'
+const VERSION_EXPORT_DEFAULT = './dist/version/index.js'
 
 describe('version library barrel', () => {
 	it('re-exports the config builder', () => {
@@ -24,10 +26,12 @@ describe('version library barrel', () => {
 })
 
 describe('package.json version export', () => {
-	it('exposes ./version pointing at the library barrel', () => {
+	it('exposes ./version pointing at the compiled dist output', () => {
 		const raw = readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8')
 		const parsed = exports_schema.parse(JSON.parse(raw))
+		const version_export = version_export_schema.parse(parsed.exports[VERSION_EXPORT_KEY])
 
-		expect(parsed.exports[VERSION_EXPORT_KEY]).toBe(VERSION_EXPORT_PATH)
+		expect(version_export.types).toBe(VERSION_EXPORT_TYPES)
+		expect(version_export.default).toBe(VERSION_EXPORT_DEFAULT)
 	})
 })
