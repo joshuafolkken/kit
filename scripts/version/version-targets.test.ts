@@ -42,7 +42,7 @@ afterEach(() => {
 
 describe('version_targets.parse_global_version', () => {
 	it('extracts the matched dependency version', () => {
-		expect(version_targets.parse_global_version(global_ls_json(GLOBAL_VERSION))).toBe(
+		expect(version_targets.parse_global_version(global_ls_json(GLOBAL_VERSION), KIT)).toBe(
 			GLOBAL_VERSION,
 		)
 	})
@@ -50,16 +50,28 @@ describe('version_targets.parse_global_version', () => {
 	it('returns undefined when the package is absent from dependencies', () => {
 		const stdout = JSON.stringify([{ path: '/g', dependencies: {} }])
 
-		expect(version_targets.parse_global_version(stdout)).toBeUndefined()
+		expect(version_targets.parse_global_version(stdout, KIT)).toBeUndefined()
+	})
+
+	it('returns undefined when a different package name is queried', () => {
+		expect(
+			version_targets.parse_global_version(global_ls_json(GLOBAL_VERSION), '@joshuafolkken/other'),
+		).toBeUndefined()
 	})
 
 	it('returns undefined for an empty array', () => {
-		expect(version_targets.parse_global_version('[]')).toBeUndefined()
+		expect(version_targets.parse_global_version('[]', KIT)).toBeUndefined()
 	})
 
 	it('returns undefined for invalid JSON', () => {
-		expect(version_targets.parse_global_version('')).toBeUndefined()
-		expect(version_targets.parse_global_version('not json')).toBeUndefined()
+		expect(version_targets.parse_global_version('', KIT)).toBeUndefined()
+		expect(version_targets.parse_global_version('not json', KIT)).toBeUndefined()
+	})
+})
+
+describe('version_targets.build_pnpm_ls_arguments', () => {
+	it('builds the global ls query for the given package name', () => {
+		expect(version_targets.build_pnpm_ls_arguments(KIT)).toStrictEqual(['ls', '-g', '--json', KIT])
 	})
 })
 
@@ -84,7 +96,7 @@ describe('version_targets.read_global_version', () => {
 	it('queries pnpm ls -g and parses the version', () => {
 		mocked_execa_sync.mockReturnValue(fake_stdout(global_ls_json(GLOBAL_VERSION)))
 
-		expect(version_targets.read_global_version()).toBe(GLOBAL_VERSION)
+		expect(version_targets.read_global_version(KIT)).toBe(GLOBAL_VERSION)
 		expect(mocked_execa_sync).toHaveBeenCalledWith('pnpm', ['ls', '-g', '--json', KIT], {
 			reject: false,
 		})
@@ -93,13 +105,13 @@ describe('version_targets.read_global_version', () => {
 	it('returns undefined when pnpm produces no parsable output', () => {
 		mocked_execa_sync.mockReturnValue(fake_stdout(''))
 
-		expect(version_targets.read_global_version()).toBeUndefined()
+		expect(version_targets.read_global_version(KIT)).toBeUndefined()
 	})
 })
 
 describe('version_targets.project_package_path', () => {
-	it('points at the kit package.json under cwd node_modules', () => {
-		expect(version_targets.project_package_path('/project')).toBe(
+	it('points at the package.json under cwd node_modules for the given package', () => {
+		expect(version_targets.project_package_path('/project', KIT)).toBe(
 			`/project/node_modules/${KIT}/package.json`,
 		)
 	})

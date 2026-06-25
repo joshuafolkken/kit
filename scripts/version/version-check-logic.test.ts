@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { version_check_logic } from './version-check-logic'
+import { version_check_logic, type VersionSnapshot } from './version-check-logic'
+import { create_version_command_config } from './version-command-config'
 
 const LATEST_VERSION = '0.6.0'
 const PACKAGE_NAME = '@joshuafolkken/kit'
+const KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/kit/versions?per_page=1'
 const PINNED_LATEST = `${PACKAGE_NAME}@${LATEST_VERSION}`
 const ADD_LOCAL = 'pnpm add -D'
 const ADD_GLOBAL = 'pnpm add -g'
@@ -12,30 +14,36 @@ const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
 const GLOBAL = '0.243.0'
 const PROJECT = '0.241.0'
 
+const KIT_CONFIG = create_version_command_config({
+	package_name: PACKAGE_NAME,
+	versions_endpoint: KIT_ENDPOINT,
+})
+
+function snapshot(
+	global_version: string | undefined,
+	project_version: string | undefined,
+	latest: string,
+): VersionSnapshot {
+	return { global_version, project_version, latest }
+}
+
 function up_to_date_output(): string {
 	return version_check_logic.format_dual_version_output(
-		LATEST_VERSION,
-		LATEST_VERSION,
-		LATEST_VERSION,
+		snapshot(LATEST_VERSION, LATEST_VERSION, LATEST_VERSION),
+		KIT_CONFIG,
 	)
 }
 
-describe('version_check_logic.PACKAGE_NAME', () => {
-	it('is the joshuafolkken/kit package', () => {
-		expect(version_check_logic.PACKAGE_NAME).toBe(PACKAGE_NAME)
-	})
-})
-
 describe('version_check_logic.format_update_command', () => {
 	it('returns a local pnpm add -D command with package name and version', () => {
-		const result = version_check_logic.format_update_command(LATEST_VERSION, is_local)
+		const result = version_check_logic.format_update_command(LATEST_VERSION, is_local, KIT_CONFIG)
 
 		expect(result).toContain(ADD_LOCAL)
 		expect(result).toContain(PINNED_LATEST)
 	})
 
 	it('returns a global pnpm add -g command for a global invocation', () => {
-		const result = version_check_logic.format_update_command(LATEST_VERSION, is_global)
+		const result = version_check_logic.format_update_command(LATEST_VERSION, is_global, KIT_CONFIG)
 
 		expect(result).toContain(ADD_GLOBAL)
 		expect(result).toContain(PINNED_LATEST)
@@ -44,7 +52,11 @@ describe('version_check_logic.format_update_command', () => {
 
 describe('version_check_logic.build_upgrade_shell_command', () => {
 	it('uses -D and runs fix-gh-packages for a project-local upgrade', () => {
-		const result = version_check_logic.build_upgrade_shell_command(LATEST_VERSION, is_local)
+		const result = version_check_logic.build_upgrade_shell_command(
+			LATEST_VERSION,
+			is_local,
+			KIT_CONFIG,
+		)
 
 		expect(result).toContain(ADD_LOCAL)
 		expect(result).toContain(PINNED_LATEST)
@@ -52,7 +64,11 @@ describe('version_check_logic.build_upgrade_shell_command', () => {
 	})
 
 	it('uses -g and omits fix-gh-packages for a global upgrade', () => {
-		const result = version_check_logic.build_upgrade_shell_command(LATEST_VERSION, is_global)
+		const result = version_check_logic.build_upgrade_shell_command(
+			LATEST_VERSION,
+			is_global,
+			KIT_CONFIG,
+		)
 
 		expect(result).toContain(ADD_GLOBAL)
 		expect(result).toContain(PINNED_LATEST)
@@ -60,9 +76,46 @@ describe('version_check_logic.build_upgrade_shell_command', () => {
 	})
 })
 
+describe('version_check_logic parameterization by package name', () => {
+	const OTHER_PACKAGE = '@joshuafolkken/game-kit'
+	const OTHER_CONFIG = create_version_command_config({
+		package_name: OTHER_PACKAGE,
+		versions_endpoint: '/users/joshuafolkken/packages/npm/game-kit/versions?per_page=1',
+	})
+
+	it('headers the report with the configured package name', () => {
+		const result = version_check_logic.format_dual_version_output(
+			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			OTHER_CONFIG,
+		)
+
+		expect(result).toContain(OTHER_PACKAGE)
+		expect(result).not.toContain(PACKAGE_NAME)
+	})
+
+	it('builds upgrade commands for the configured package name', () => {
+		const result = version_check_logic.format_update_command(LATEST_VERSION, is_local, OTHER_CONFIG)
+
+		expect(result).toContain(`${OTHER_PACKAGE}@${LATEST_VERSION}`)
+	})
+
+	it('points the fix-gh-packages repair at the configured package path', () => {
+		const result = version_check_logic.build_upgrade_shell_command(
+			LATEST_VERSION,
+			is_local,
+			OTHER_CONFIG,
+		)
+
+		expect(result).toContain(`node_modules/${OTHER_PACKAGE}/scripts/fix-gh-packages.ts`)
+	})
+})
+
 describe('version_check_logic.format_dual_version_output display', () => {
 	it('lists global, project, and latest versions', () => {
-		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION)
+		const result = version_check_logic.format_dual_version_output(
+			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
+		)
 
 		expect(result).toContain('Global:')
 		expect(result).toContain('Project:')
@@ -73,7 +126,10 @@ describe('version_check_logic.format_dual_version_output display', () => {
 	})
 
 	it('aligns the three labels with consistent spacing after the colon', () => {
-		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION)
+		const result = version_check_logic.format_dual_version_output(
+			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
+		)
 
 		expect(result).toContain('Global:  ')
 		expect(result).toContain('Project:  ')
@@ -89,9 +145,8 @@ describe('version_check_logic.format_dual_version_output display', () => {
 
 	it('shows "not installed" for a missing target', () => {
 		const result = version_check_logic.format_dual_version_output(
-			undefined,
-			PROJECT,
-			LATEST_VERSION,
+			snapshot(undefined, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
 		)
 
 		expect(result).toContain('not installed')
@@ -101,9 +156,8 @@ describe('version_check_logic.format_dual_version_output display', () => {
 describe('version_check_logic.format_dual_version_output run hints', () => {
 	it('emits a global run hint when only the global install is stale', () => {
 		const result = version_check_logic.format_dual_version_output(
-			GLOBAL,
-			LATEST_VERSION,
-			LATEST_VERSION,
+			snapshot(GLOBAL, LATEST_VERSION, LATEST_VERSION),
+			KIT_CONFIG,
 		)
 
 		expect(result).toContain('Run:')
@@ -113,9 +167,8 @@ describe('version_check_logic.format_dual_version_output run hints', () => {
 
 	it('emits a project run hint when only the project install is stale', () => {
 		const result = version_check_logic.format_dual_version_output(
-			LATEST_VERSION,
-			PROJECT,
-			LATEST_VERSION,
+			snapshot(LATEST_VERSION, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
 		)
 
 		expect(result).toContain(ADD_LOCAL)
@@ -124,9 +177,8 @@ describe('version_check_logic.format_dual_version_output run hints', () => {
 
 	it('skips the hint for a target that is not installed', () => {
 		const result = version_check_logic.format_dual_version_output(
-			undefined,
-			PROJECT,
-			LATEST_VERSION,
+			snapshot(undefined, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
 		)
 
 		expect(result).not.toContain(ADD_GLOBAL)
@@ -158,25 +210,29 @@ describe('version_check_logic.format_running_line', () => {
 
 describe('version_check_logic.format_dual_version_output running binary', () => {
 	it('includes a Running line reporting the binary that actually executed', () => {
-		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION, {
-			running: { version: RUNNING_VERSION, path: RUNNING_PATH },
-		})
+		const result = version_check_logic.format_dual_version_output(
+			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
+			{ running: { version: RUNNING_VERSION, path: RUNNING_PATH } },
+		)
 
 		expect(result).toContain('Running:')
 		expect(result).toContain(RUNNING_PATH)
 	})
 
 	it('omits the Running line when the running binary is unknown', () => {
-		const result = version_check_logic.format_dual_version_output(GLOBAL, PROJECT, LATEST_VERSION)
+		const result = version_check_logic.format_dual_version_output(
+			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
+		)
 
 		expect(result).not.toContain('Running:')
 	})
 
 	it('appends a shadowing warning when one is provided', () => {
 		const result = version_check_logic.format_dual_version_output(
-			LATEST_VERSION,
-			LATEST_VERSION,
-			LATEST_VERSION,
+			snapshot(LATEST_VERSION, LATEST_VERSION, LATEST_VERSION),
+			KIT_CONFIG,
 			{ running: { version: RUNNING_VERSION, path: RUNNING_PATH }, warning: SHADOW_WARNING },
 		)
 
@@ -192,7 +248,10 @@ describe('version_check_logic.format_dual_version_output running binary', () => 
 
 describe('version_check_logic.build_dual_upgrade_commands', () => {
 	it('builds both commands when both targets are stale', () => {
-		const result = version_check_logic.build_dual_upgrade_commands(GLOBAL, PROJECT, LATEST_VERSION)
+		const result = version_check_logic.build_dual_upgrade_commands(
+			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
+		)
 
 		expect(result).toHaveLength(2)
 		expect(result[0]).toContain(ADD_GLOBAL)
@@ -202,9 +261,8 @@ describe('version_check_logic.build_dual_upgrade_commands', () => {
 
 	it('returns an empty list when both targets are up to date', () => {
 		const result = version_check_logic.build_dual_upgrade_commands(
-			LATEST_VERSION,
-			LATEST_VERSION,
-			LATEST_VERSION,
+			snapshot(LATEST_VERSION, LATEST_VERSION, LATEST_VERSION),
+			KIT_CONFIG,
 		)
 
 		expect(result).toStrictEqual([])
@@ -212,9 +270,8 @@ describe('version_check_logic.build_dual_upgrade_commands', () => {
 
 	it('skips a target that is not installed', () => {
 		const result = version_check_logic.build_dual_upgrade_commands(
-			undefined,
-			PROJECT,
-			LATEST_VERSION,
+			snapshot(undefined, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
 		)
 
 		expect(result).toHaveLength(1)

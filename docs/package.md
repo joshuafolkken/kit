@@ -34,15 +34,47 @@ See [sync.md](./sync.md) for what `sync` overwrites and why. A project-local `jo
 
 The package exposes config presets for direct import:
 
-| Use           | Reference                                                        |
-| ------------- | ---------------------------------------------------------------- |
-| ESLint config | `@joshuafolkken/kit/eslint/sveltekit`                            |
-| Prettier      | `@joshuafolkken/kit/prettier`                                    |
-| tsconfig      | `./node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc`     |
-| Scripts       | `tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts` |
-| Prompts       | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
+| Use             | Reference                                                        |
+| --------------- | ---------------------------------------------------------------- |
+| ESLint config   | `@joshuafolkken/kit/eslint/sveltekit`                            |
+| Prettier        | `@joshuafolkken/kit/prettier`                                    |
+| tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc`     |
+| Scripts         | `tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts` |
+| Prompts         | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
+| Version library | `@joshuafolkken/kit/version`                                     |
 
 Prefer wiring up individual configs without `josh init`? See [manual-config.md](./manual-config.md).
+
+### Version-command library (`@joshuafolkken/kit/version`)
+
+A package-name-parameterized implementation of the `version` (show) and `version:upgrade`
+commands, so a consuming package (e.g. `@joshuafolkken/game-kit`, `@joshuafolkken/app-kit`) drives
+both commands through kit instead of copying the scripts. Each consumer's thin CLI wrapper passes
+only its own package name + GitHub Packages versions endpoint:
+
+```ts
+// scripts/version/version-check.ts (consumer)
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { create_version_command_config, version_commands } from '@joshuafolkken/kit/version'
+
+const config = create_version_command_config({
+	package_name: '@joshuafolkken/game-kit',
+	versions_endpoint: '/users/joshuafolkken/packages/npm/game-kit/versions?per_page=1',
+	self_directory: path.dirname(fileURLToPath(import.meta.url)),
+})
+
+version_commands.run_check(config) // version (show)
+// process.exit(version_commands.run_upgrade(config)) // version:upgrade
+```
+
+`create_version_command_config` derives the lockfile-repair (`fix-gh-packages`) path from the
+package name. The optional `self_directory` enables the running-binary line; an optional
+`resolve_warning` hook supplies a package-specific PATH-shadowing warning. The export resolves a
+`.ts` entry, so
+consumers run their wrappers under `tsx` (as the existing per-package version scripts already do).
+kit's own `version` / `version:upgrade` consume this same library via
+[`scripts/version/kit-version-config.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/version/kit-version-config.ts).
 
 ## Next
 
