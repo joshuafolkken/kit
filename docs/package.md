@@ -70,10 +70,11 @@ version_commands.run_check(config) // version (show)
 
 `create_version_command_config` derives the lockfile-repair (`fix-gh-packages`) path from the
 package name. The optional `self_directory` enables the running-binary line; an optional
-`resolve_warning` hook supplies a package-specific PATH-shadowing warning. The export resolves a
-`.ts` entry, so
-consumers run their wrappers under `tsx` (as the existing per-package version scripts already do).
-kit's own `version` / `version:upgrade` consume this same library via
+`resolve_warning` hook supplies a package-specific PATH-shadowing warning. The export resolves
+compiled `.js` + `.d.ts` (built from `scripts/version/index.ts`), so consumers can keep
+`@joshuafolkken/kit/version` **external** — node loads the `.js` at runtime and resolves `execa` /
+`zod` from kit's own `node_modules` rather than bundling kit's transitive graph, while `tsc` reads
+the bundled `.d.ts`. kit's own `version` / `version:upgrade` consume this same library via
 [`scripts/version/kit-version-config.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/version/kit-version-config.ts).
 
 ## Next

@@ -16,3 +16,5 @@ words:
   - jgame
   - sonarlint
   - tssecurity
+  - inlines
+  - extensionless
