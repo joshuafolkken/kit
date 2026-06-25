@@ -3,11 +3,14 @@ import path from 'node:path'
 import { package_version_schema, pnpm_ls_global_schema } from '#scripts/schemas'
 import { execaSync } from 'execa'
 
-const PACKAGE_NAME = '@joshuafolkken/kit'
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
-const PNPM_LS_ARGUMENTS = ['ls', '-g', '--json', PACKAGE_NAME] as const
 const PROJECT_VERSION_ICON = '📦'
+
+// Build the `pnpm ls -g --json <package>` arguments for the package being checked.
+function build_pnpm_ls_arguments(package_name: string): Array<string> {
+	return ['ls', '-g', '--json', package_name]
+}
 
 function safe_json_parse(raw: string): unknown {
 	try {
@@ -19,11 +22,11 @@ function safe_json_parse(raw: string): unknown {
 
 // Read the globally installed version from `pnpm ls -g --json` output. Returns undefined when
 // the package is absent or the output cannot be parsed (e.g. pnpm missing, empty stdout).
-function parse_global_version(stdout: string): string | undefined {
+function parse_global_version(stdout: string, package_name: string): string | undefined {
 	const parsed = pnpm_ls_global_schema.safeParse(safe_json_parse(stdout))
 	if (!parsed.success) return undefined
 
-	return parsed.data[0]?.dependencies?.[PACKAGE_NAME]?.version
+	return parsed.data[0]?.dependencies?.[package_name]?.version
 }
 
 // Read the project-local version from a node_modules package.json string. Undefined when the
@@ -35,18 +38,18 @@ function parse_project_version(raw: string | undefined): string | undefined {
 	return parsed.success ? parsed.data.version : undefined
 }
 
-function read_global_version(): string | undefined {
-	const result = execaSync('pnpm', [...PNPM_LS_ARGUMENTS], { reject: false })
+function read_global_version(package_name: string): string | undefined {
+	const result = execaSync('pnpm', build_pnpm_ls_arguments(package_name), { reject: false })
 
-	return parse_global_version(result.stdout)
+	return parse_global_version(result.stdout, package_name)
 }
 
-function project_package_path(cwd: string): string {
-	return path.join(cwd, NODE_MODULES, PACKAGE_NAME, PACKAGE_JSON)
+function project_package_path(cwd: string, package_name: string): string {
+	return path.join(cwd, NODE_MODULES, package_name, PACKAGE_JSON)
 }
 
-function read_project_version(cwd: string): string | undefined {
-	const package_path = project_package_path(cwd)
+function read_project_version(cwd: string, package_name: string): string | undefined {
+	const package_path = project_package_path(cwd, package_name)
 	const raw = existsSync(package_path) ? readFileSync(package_path, 'utf8') : undefined
 
 	return parse_project_version(raw)
@@ -76,6 +79,7 @@ function project_version_line(cwd: string): string | undefined {
 }
 
 const version_targets = {
+	build_pnpm_ls_arguments,
 	parse_global_version,
 	parse_project_version,
 	read_global_version,
