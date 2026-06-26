@@ -1,9 +1,5 @@
-import {
-	json_object_schema,
-	string_array_schema,
-	string_record_schema,
-	with_extends_schema,
-} from '#scripts/schemas'
+import { config_merge } from '#scripts/config-merge/index'
+import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/schemas'
 import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
@@ -12,19 +8,11 @@ function parse_jsonc(content: string): unknown {
 	return JSON.parse(strip_json_comments(content, { trailingCommas: true }))
 }
 
-function normalize_extends(value: string | Array<string> | undefined): Array<string> {
-	if (value === undefined) return []
-	if (typeof value === 'string') return [value]
-
-	return [...value]
-}
-
+// Ensure `entry` is in the tsconfig `extends` list, preserving every other key. Thin wrapper over
+// the shared config-merge library, which normalizes a string-or-array `extends` and prepends the
+// new entry — so the ensure semantics are single-sourced with the cspell `import` patch.
 function merge_json_extends(content: string, entry: string): string {
-	const parsed = with_extends_schema.parse(parse_jsonc(content))
-	const existing = normalize_extends(parsed.extends)
-	if (existing.includes(entry)) return content
-
-	return `${JSON.stringify({ ...parsed, extends: [entry, ...existing] }, undefined, '\t')}\n`
+	return config_merge.patch_json_list_field(content, { field: 'extends', ensure: [entry] })
 }
 
 function extract_compiler_options(content: string): Record<string, unknown> {

@@ -1,5 +1,5 @@
 {
-	"version": "0.278.0",
+	"version": "0.279.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -13,8 +13,8 @@
 	"scripts": {
 		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci",
 		"prepare": "lefthook install",
-		"build": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts",
-		"prepack": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts",
+		"build": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts",
+		"prepack": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts",
 		"josh": "tsx scripts/josh/josh.ts"
 	},
 	"files": [
@@ -73,6 +73,10 @@
 		"./version": {
 			"types": "./dist/version/index.d.ts",
 			"default": "./dist/version/index.js"
+		},
+		"./config-merge": {
+			"types": "./dist/config-merge/index.d.ts",
+			"default": "./dist/config-merge/index.js"
 		}
 	},
 	"peerDependencies": {
