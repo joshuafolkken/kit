@@ -328,6 +328,21 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
 - **kit リポジトリ自身ではあなたが配布元**なので、ここでは編集してよい。その際は 3 つの対ドキュメントを「Doc Sync Rules」に従って同期する
 - このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Route distributed-doc / config changes upstream to kit」）のカノニカル参照
 
+## 最新優先・fix-forward（pin-back は最終手段）
+
+依存パッケージ・ツールチェーンは**既定で最新版を採用する**。バンプが lint クラッシュ・新規有効化ルール・型エラーなどの破壊を引き起こしても、古いバージョンへ留まる／戻すことを既定の「安全策」にしてはならない。破壊は**前向きに（fix-forward）速やかに**解消する。
+
+1. **最新優先（latest-first）**: 依存・ツールチェーンは新しいバージョンを既定で採用する。適応の手間を避けるためだけに古いバージョンに留まったり戻したりしない
+2. **破壊は fix-forward**: バンプで lint クラッシュ・新規ルール・型エラー等が出たら、前向きに解消する:
+   - 新ルール／エラーが正当なら **消費者コードを直す**
+   - ルール上書きが要るなら **正しいレイヤー**（kit / app-kit の共有設定）でスコープする。消費者リポジトリでの場当たり的な一回限りの disable にしない
+   - 破壊が first-party パッケージ（kit / app-kit）起因なら、**そこに Issue を立てて適切な altitude で直す**。消費者側の回避だけで済ませない（→「別パッケージ起因の問題は割り込み Issue で対応する」参照）
+3. **pin-back は最終手段**: fix-forward が本当に不可能／ブロックされている（例: 未リリースの上流修正待ち）ときだけ、古いバージョンへ固定する。固定するときは **理由を記録し、最新へ戻すためのトラッキング Issue を立てる**。pin-back を既定の推奨として提示してはならない
+4. **既存の保護を尊重する**: この方針は `pnpm.overrides` / `devEngines` の承認ゲートを上書きしない。fix-forward は _「最新を優先し破壊を直す」_ であって _「保護された pin を黙って書き換える」_ ではない。`pnpm.overrides` / `devEngines` の変更は従来どおりユーザーの明示承認を要する（→「`pnpm.overrides` の保護」、および CLAUDE.md の `devEngines` 保護ルール参照）
+5. **タイムリーに**: バンプ起因の破壊は、可能な限り同じ作業セッション内で速やかに対処し、pin の裏に先送りしない
+
+- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Latest-first, fix forward — pin back only as a last resort」）のカノニカル参照
+
 ## 運用ルール
 
 - 通知は CI チェック成功後に投稿する
