@@ -20,6 +20,19 @@ export const NAME_REPLACEMENTS_ALLOW_LIST = {
 	repository: true, // unicorn 68 は repository→repo を勧めるが、明確さを優先し完全名を維持する
 }
 
+// unicorn 68→69 のベースライン方針（Issue #610 / Problem 3）:
+// `unicorn.configs.recommended` で 65→68 にかけて新たに有効化されたルール
+// （prefer-url-href / consistent-class-member-order / prefer-number-coercion /
+//  prefer-global-number-constants / prefer-early-return / prefer-continue /
+//  no-useless-undefined / no-unsafe-string-replacement / no-declarations-before-early-exit /
+//  consistent-conditional-object-spread など）は、いずれも正当なクリーンアップなので
+// 既定のまま維持する（consumer 側がコードを移行する）。下記の unicorn_rules は
+// あくまで kit 独自に上書きが必要なルールだけを列挙する。
+// 例外: consistent-boolean-name は unicorn 68 で Svelte ファイルの lint を
+// クラッシュさせたが、unicorn 69 で上流修正済み（findParameter の {#each} ガード）。
+// プロジェクトの is_/has_ snake_case boolean と整合するため有効のまま維持する。
+// no-top-level-assignment-in-function だけは Svelte 5 の $state 再代入で誤検知するため、
+// eslint/sveltekit.js の Svelte 用 override で .svelte / .svelte.ts に限り無効化している。
 export const unicorn_rules = {
 	// null よりも undefined を優先
 	'unicorn/no-null': 'error',
