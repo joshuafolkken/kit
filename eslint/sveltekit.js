@@ -77,6 +77,14 @@ export function create_sveltekit_config({ gitignore_path, tsconfig_root_dir, sve
 				// {@render snippet()} is a Svelte template directive, not a value-consuming
 				// expression; the rule misreads the void snippet call as a useless return value.
 				'sonarjs/no-use-of-empty-return-value': 'off',
+				// Reassigning a top-level `let`/$state from an event handler or effect is the
+				// intended Svelte 5 reactivity model, but unicorn (69) has no rune awareness and
+				// flags it as a hidden module-singleton mutation. Disable for Svelte source so the
+				// canonical `is_x = $state(false); function f() { is_x = true }` pattern lints clean.
+				// (Issue #610: 21/35 consumer errors were this rule. consistent-boolean-name — the
+				// other #610 blocker — is NOT disabled: its ESLint crash was fixed upstream in
+				// unicorn 69, and it is compatible with the kit's is_/has_ snake_case booleans.)
+				'unicorn/no-top-level-assignment-in-function': 'off',
 				...svelte_rules,
 			},
 		},
