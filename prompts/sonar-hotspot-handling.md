@@ -6,6 +6,33 @@ This guide extends `prompts/collaboration-workflow.md` with a project-local proc
 
 AI tools cannot perform OAuth browser login to SonarCloud, so this guide assumes public-API and config-based actions as the primary path.
 
+## Quality Gate enforcement (CI blocks PRs)
+
+The distributed `.github/workflows/sonar-qube.yml` runs the SonarCloud scan with
+`-Dsonar.qualitygate.wait=true`. The scanner waits for SonarCloud to evaluate the project's
+Quality Gate and **fails the `SonarQube` job — a required PR check — when the gate is red**, so a
+PR that introduces a finding cannot be merged green. This is the single enforcement point:
+`josh followup` does **not** scan SonarCloud findings (it only scans CodeRabbit / Claude Review
+comments), but it **does** wait on the required `SonarQube` CI check, so a red gate also blocks the
+`followup` merge. Consumers pick the workflow up verbatim via `josh sync`; do not re-implement the
+gate per consumer.
+
+### New Code vs Overall Code semantics
+
+SonarCloud's default **Sonar way** Quality Gate evaluates **New Code only** — conditions
+(new bugs, new code smells above the Maintainability rating, new coverage/duplication) apply to
+lines changed in the PR's New Code period, not the whole codebase. Consequences:
+
+- A PR is blocked when it **introduces or modifies** code that trips a condition — this is what
+  catches the recurring Maintainability `0 -> 1` regression that motivated this gate.
+- Pre-existing Overall-Code findings on untouched files do **not** fail an unrelated PR. To make
+  the gate enforce Overall Code as well, add Overall conditions to the gate in the SonarCloud
+  project settings (Quality Gates UI) — that is a SonarCloud-side configuration, not a repo file.
+
+When triaging a red gate, confirm via the PR analysis whether the failing condition is a **New
+Code** condition (caused by this PR — fix it) or an **Overall** condition (pre-existing — handle
+per the table below, and do not let it silently block an unrelated change).
+
 ## Step A: fetch hotspot details via public API (no auth)
 
 ```bash

@@ -141,6 +141,17 @@ describe('get_ai_copy_files - AI and community files', () => {
 	})
 })
 
+describe('distributed sonar-qube.yml workflow', () => {
+	const SONAR_WORKFLOW_PATH = path.join(PACKAGE_ROOT, '.github', 'workflows', 'sonar-qube.yml')
+	const SONAR_WORKFLOW_CONTENT = readFileSync(SONAR_WORKFLOW_PATH, 'utf8')
+
+	// Regression guard: the scan must wait for the Quality Gate and fail a red gate. Without this
+	// the scan only uploads results and never blocks a PR, silently merging findings into main.
+	it('enforces the SonarCloud Quality Gate via sonar.qualitygate.wait', () => {
+		expect(SONAR_WORKFLOW_CONTENT).toContain('sonar.qualitygate.wait=true')
+	})
+})
+
 describe('get_ai_copy_files - dotfiles and config', () => {
 	it('includes dotfiles and markdown files', () => {
 		const result = init_logic.get_ai_copy_files()
