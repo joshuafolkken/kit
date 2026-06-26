@@ -1,62 +1,20 @@
-import { json_object_schema, string_array_schema } from '#scripts/schemas'
-import { dump, load, YAMLException, type DumpOptions } from 'js-yaml'
+import { config_merge } from '#scripts/config-merge/index'
 
-// Emit double-quoted scalars for cspell config so the serialized output matches what the
-// VSCode cspell extension writes, avoiding single/double quote churn when both tools touch
-// the file. Scoped to cspell only — lefthook merge keeps js-yaml's default quoting.
-const CSPELL_DUMP_OPTIONS: DumpOptions = { quoteStyle: 'double' }
+const CSPELL_IMPORT_FIELD = 'import'
+// cspell config places the `import` block right after the `version` line; emit double-quoted
+// scalars so the output matches what the VSCode cspell extension writes, avoiding quote churn.
+const CSPELL_IMPORT_POSITION = { after: 'version' } as const
+const CSPELL_QUOTE_STYLE = 'double' as const
 
-// js-yaml 5 throws "expected a document, but the input is empty" for input with no document
-// node (empty / whitespace / comment-only), whereas js-yaml 4 returned undefined. Restore the
-// v4 semantics so merging into an empty or comment-only file yields {} instead of throwing.
-const EMPTY_YAML_REASON = 'expected a document, but the input is empty'
-
-function load_yaml_or_empty(content: string): unknown {
-	try {
-		return load(content)
-	} catch (error) {
-		if (error instanceof YAMLException && error.reason === EMPTY_YAML_REASON) return {}
-		throw error
-	}
-}
-
-function parse_yaml(content: string): Record<string, unknown> {
-	const raw = load_yaml_or_empty(content)
-	if (raw === null || raw === undefined) return {}
-
-	return json_object_schema.parse(raw)
-}
-
+// Add `value` to a YAML list field (creating it at the front when absent), preserving the other
+// keys. Thin wrapper over the shared config-merge library so the ensure semantics are single-
+// sourced; kept for the lefthook `extends` caller whose new field goes to the front of the file.
 function merge_yaml_list_entry(content: string, key: string, value: string): string {
-	const parsed = parse_yaml(content)
-	const existing_raw = parsed[key]
-	const existing = Array.isArray(existing_raw) ? string_array_schema.parse(existing_raw) : []
-	if (existing.includes(value)) return content
-	if (!Object.hasOwn(parsed, key)) return dump({ [key]: [value], ...parsed })
-
-	return dump(
-		Object.fromEntries(
-			Object.entries(parsed).map(([k, entry_value]) => [
-				k,
-				k === key ? [value, ...existing] : entry_value,
-			]),
-		),
-	)
-}
-
-function insert_import_after_version(
-	parsed: Record<string, unknown>,
-	list: Array<string>,
-): Record<string, unknown> {
-	const entries = Object.entries(parsed)
-	const version_index = entries.findIndex(([k]) => k === 'version')
-	if (version_index === -1) return { ...parsed, import: list }
-
-	return Object.fromEntries([
-		...entries.slice(0, version_index + 1),
-		['import', list],
-		...entries.slice(version_index + 1),
-	])
+	return config_merge.patch_yaml_list_field(content, {
+		field: key,
+		ensure: [value],
+		position: 'front',
+	})
 }
 
 // Maps a base cspell import to the imports that already provide it transitively. When
@@ -79,29 +37,19 @@ function is_cspell_import_superseded(value: string, existing: ReadonlyArray<stri
 	return rule.superseded_by.some((entry) => existing.includes(entry))
 }
 
+// Ensure `value` is in the cspell `import` list, skipping it when a superseding import already
+// covers it. Delegates the structural patch to the shared config-merge library; the superseding
+// rule stays here because it is kit-specific business logic, not a generic list operation.
 function merge_cspell_import(content: string, value: string): string {
-	const parsed = parse_yaml(content)
-	// eslint-disable-next-line dot-notation -- 'import' from index signature requires bracket notation per noPropertyAccessFromIndexSignature
-	const existing_raw = parsed['import']
-	const existing = Array.isArray(existing_raw) ? string_array_schema.parse(existing_raw) : []
-	if (existing.includes(value)) return content
+	const existing = config_merge.read_yaml_list_field(content, CSPELL_IMPORT_FIELD)
 	if (is_cspell_import_superseded(value, existing)) return content
 
-	const updated_list = [value, ...existing]
-
-	if ('import' in parsed) {
-		return dump(
-			Object.fromEntries(
-				Object.entries(parsed).map(([k, entry_value]) => [
-					k,
-					k === 'import' ? updated_list : entry_value,
-				]),
-			),
-			CSPELL_DUMP_OPTIONS,
-		)
-	}
-
-	return dump(insert_import_after_version(parsed, updated_list), CSPELL_DUMP_OPTIONS)
+	return config_merge.patch_yaml_list_field(content, {
+		field: CSPELL_IMPORT_FIELD,
+		ensure: [value],
+		position: CSPELL_IMPORT_POSITION,
+		quote_style: CSPELL_QUOTE_STYLE,
+	})
 }
 
 const init_logic_yaml_merge = {
