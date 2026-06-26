@@ -42,6 +42,7 @@ The package exposes config presets for direct import:
 | Scripts         | `tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts` |
 | Prompts         | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
 | Version library | `@joshuafolkken/kit/version`                                     |
+| Config-merge    | `@joshuafolkken/kit/config-merge`                                |
 
 Prefer wiring up individual configs without `josh init`? See [manual-config.md](./manual-config.md).
 
@@ -76,6 +77,44 @@ compiled `.js` + `.d.ts` (built from `scripts/version/index.ts`), so consumers c
 `zod` from kit's own `node_modules` rather than bundling kit's transitive graph, while `tsc` reads
 the bundled `.d.ts`. kit's own `version` / `version:upgrade` consume this same library via
 [`scripts/version/kit-version-config.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/version/kit-version-config.ts).
+
+### Config-merge library (`@joshuafolkken/kit/config-merge`)
+
+A parameterized, idempotent patcher for one list field of a config file — the cspell `import`
+list (YAML) and the tsconfig `extends` list (JSON). It exposes first-class **ensure** + **remove**
+semantics so a consuming package (e.g. `@joshuafolkken/app-kit`) can own its own lines without
+copying kit's merge logic: ensure entries are prepended, remove entries are dropped by exact
+string or pattern match, and every other key, value, and ordering is preserved.
+
+```ts
+import { config_merge } from '@joshuafolkken/kit/config-merge'
+
+// cspell.config.yaml: drop any kit `*/sveltekit` import, ensure the app-kit one, keep `words`.
+const patched_yaml = config_merge.patch_yaml_list_field(existing_yaml, {
+	field: 'import',
+	ensure: ['@joshuafolkken/app-kit/cspell/sveltekit'],
+	remove: [/@joshuafolkken\/kit\/.*\/sveltekit$/u],
+	position: { after: 'version' },
+	quote_style: 'double',
+})
+
+// tsconfig.json: same ownership swap on the `extends` list.
+const patched_json = config_merge.patch_json_list_field(existing_json, {
+	field: 'extends',
+	ensure: ['@joshuafolkken/app-kit/tsconfig/sveltekit'],
+	remove: [/@joshuafolkken\/kit\/.*\/sveltekit$/u],
+})
+```
+
+`patch_yaml_list_field` / `patch_json_list_field` return the input unchanged when nothing is
+added or removed, so re-runs are no-ops. `read_yaml_list_field` reads a YAML list field for a
+caller's own pre-checks. **Comments are not preserved in this first cut** — the patch round-trips
+keys/values (the same value-only behavior `josh sync` already had); a comment-preserving migration
+is deferred. The export resolves compiled `.js` + `.d.ts` (built from `scripts/config-merge/index.ts`),
+so consumers keep `@joshuafolkken/kit/config-merge` **external** — `js-yaml` / `zod` resolve from
+kit's own `node_modules`. kit's own `josh sync` / `josh init` consume this same library via
+[`scripts/init/init-logic-yaml-merge.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/init/init-logic-yaml-merge.ts)
+and [`scripts/init/init-logic-json-merge.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/init/init-logic-json-merge.ts).
 
 ## Next
 
