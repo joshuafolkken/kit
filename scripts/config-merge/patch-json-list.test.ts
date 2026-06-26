@@ -38,6 +38,19 @@ describe('json_list.patch_json_list_field — ensure', () => {
 		expect(result.extends).toEqual([KIT_BASE])
 		expect(result.compilerOptions).toEqual({ strict: true })
 	})
+
+	it('preserves the existing key position of a present field (does not hoist to first)', () => {
+		const content = JSON.stringify({ compilerOptions: { strict: true }, extends: [KIT_BASE] })
+		const result = json_list.patch_json_list_field(content, {
+			field: EXTENDS_FIELD,
+			ensure: [KIT_SVELTEKIT],
+		})
+
+		expect(Object.keys(JSON.parse(result) as Record<string, unknown>)).toEqual([
+			'compilerOptions',
+			'extends',
+		])
+	})
 })
 
 describe('json_list.patch_json_list_field — remove', () => {

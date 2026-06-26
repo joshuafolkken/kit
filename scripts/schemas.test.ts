@@ -8,14 +8,12 @@ import {
 	string_array_schema,
 	vscode_settings_schema,
 	with_development_deps_schema,
-	with_extends_schema,
 	with_scripts_schema,
 } from './schemas'
 
 const REACT_VERSION = '^18.0.0'
 const VITEST_VERSION = '^4.0.0'
 const PKG_NAME = 'pkg'
-const BASE_JSON_EXTENDS = './base.json'
 
 describe('overrides_snapshot_schema', () => {
 	it('parses a valid overrides record', () => {
@@ -118,37 +116,6 @@ describe('vscode_settings_schema', () => {
 
 	it('fails for non-object', () => {
 		expect(vscode_settings_schema.safeParse('invalid').success).toBe(false)
-	})
-})
-
-describe('with_extends_schema', () => {
-	it('parses string extends', () => {
-		const result = with_extends_schema.safeParse({ extends: BASE_JSON_EXTENDS, other: 'preserved' })
-
-		expect(result.success).toBe(true)
-
-		if (result.success) {
-			expect(result.data.extends).toBe(BASE_JSON_EXTENDS)
-			expect(result.data).toMatchObject({ other: 'preserved' })
-		}
-	})
-
-	it('parses array extends', () => {
-		const result = with_extends_schema.safeParse({ extends: ['./a.json', './b.json'] })
-
-		expect(result.success).toBe(true)
-		if (result.success) expect(result.data.extends).toStrictEqual(['./a.json', './b.json'])
-	})
-
-	it('parses object without extends (optional)', () => {
-		expect(with_extends_schema.safeParse({}).success).toBe(true)
-	})
-
-	it('preserves unknown fields (loose)', () => {
-		const result = with_extends_schema.safeParse({ compilerOptions: { strict: true } })
-
-		expect(result.success).toBe(true)
-		if (result.success) expect(result.data).toMatchObject({ compilerOptions: { strict: true } })
 	})
 })
 

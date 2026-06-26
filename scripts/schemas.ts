@@ -23,12 +23,6 @@ const package_with_deps_schema = z.object({
 
 const vscode_settings_schema = z.record(z.string(), z.unknown())
 
-const extends_value_schema = z.union([z.string(), z.array(z.string())]).optional()
-
-const with_extends_schema = z.looseObject({
-	extends: extends_value_schema,
-})
-
 const with_scripts_schema = z.looseObject({
 	scripts: z.record(z.string(), z.string()).optional(),
 })
@@ -58,7 +52,6 @@ export {
 	pnpm_ls_global_schema,
 	package_with_deps_schema,
 	vscode_settings_schema,
-	with_extends_schema,
 	with_scripts_schema,
 	with_development_deps_schema,
 	with_package_manager_schema,
