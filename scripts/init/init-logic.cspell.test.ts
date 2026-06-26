@@ -4,7 +4,7 @@ import { init_logic } from './init-logic'
 const CSPELL_VALUE_VANILLA = '@joshuafolkken/kit/cspell'
 const CSPELL_VALUE_SVELTEKIT = '@joshuafolkken/kit/cspell/sveltekit'
 const CSPELL_VALUE_GAME = '@joshuafolkken/game-kit/cspell/game'
-const VERSION_LINE = "version: '0.2'\n"
+const VERSION_LINE = 'version: "0.2"\n'
 
 describe('generate_cspell_config', () => {
 	it('uses vanilla import path for vanilla projects', () => {
@@ -20,6 +20,14 @@ describe('generate_cspell_config', () => {
 
 		expect(result).toContain(CSPELL_VALUE_SVELTEKIT)
 		expect(result).not.toContain('node_modules')
+	})
+
+	it('emits double-quoted scalars to match the VSCode cspell extension format', () => {
+		const result = init_logic.generate_cspell_config('vanilla')
+
+		expect(result).toContain(VERSION_LINE)
+		expect(result).toContain(`- "${CSPELL_VALUE_VANILLA}"`)
+		expect(result).not.toContain("'")
 	})
 })
 
@@ -40,7 +48,7 @@ describe('merge_cspell_import', () => {
 			CSPELL_VALUE_VANILLA,
 		)
 
-		expect(result).toBe(`${VERSION_LINE}import:\n  - '${CSPELL_VALUE_VANILLA}'\nwords: []\n`)
+		expect(result).toBe(`${VERSION_LINE}import:\n  - "${CSPELL_VALUE_VANILLA}"\nwords: []\n`)
 	})
 
 	it('adds entry to existing import list when import key already exists', () => {
@@ -54,7 +62,7 @@ describe('merge_cspell_import', () => {
 	})
 
 	it('returns content unchanged when value already present', () => {
-		const content = `${VERSION_LINE}import:\n  - '${CSPELL_VALUE_VANILLA}'\n`
+		const content = `${VERSION_LINE}import:\n  - "${CSPELL_VALUE_VANILLA}"\n`
 
 		expect(init_logic.merge_cspell_import(content, CSPELL_VALUE_VANILLA)).toBe(content)
 	})
@@ -62,7 +70,7 @@ describe('merge_cspell_import', () => {
 	it('appends import block at end when no version key exists', () => {
 		const result = init_logic.merge_cspell_import('words: []\n', CSPELL_VALUE_VANILLA)
 
-		expect(result).toBe(`words: []\nimport:\n  - '${CSPELL_VALUE_VANILLA}'\n`)
+		expect(result).toBe(`words: []\nimport:\n  - "${CSPELL_VALUE_VANILLA}"\n`)
 	})
 
 	it('inserts sveltekit import path for sveltekit projects', () => {
@@ -77,7 +85,7 @@ describe('merge_cspell_import', () => {
 
 describe('merge_cspell_import superseding', () => {
 	it('skips base sveltekit import when superseding game import already present', () => {
-		const content = `${VERSION_LINE}import:\n  - '${CSPELL_VALUE_GAME}'\nwords: []\n`
+		const content = `${VERSION_LINE}import:\n  - "${CSPELL_VALUE_GAME}"\nwords: []\n`
 
 		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE_SVELTEKIT)
 

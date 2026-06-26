@@ -1,5 +1,10 @@
 import { json_object_schema, string_array_schema } from '#scripts/schemas'
-import { dump, load, YAMLException } from 'js-yaml'
+import { dump, load, YAMLException, type DumpOptions } from 'js-yaml'
+
+// Emit double-quoted scalars for cspell config so the serialized output matches what the
+// VSCode cspell extension writes, avoiding single/double quote churn when both tools touch
+// the file. Scoped to cspell only — lefthook merge keeps js-yaml's default quoting.
+const CSPELL_DUMP_OPTIONS: DumpOptions = { quoteStyle: 'double' }
 
 // js-yaml 5 throws "expected a document, but the input is empty" for input with no document
 // node (empty / whitespace / comment-only), whereas js-yaml 4 returned undefined. Restore the
@@ -92,10 +97,11 @@ function merge_cspell_import(content: string, value: string): string {
 					k === 'import' ? updated_list : entry_value,
 				]),
 			),
+			CSPELL_DUMP_OPTIONS,
 		)
 	}
 
-	return dump(insert_import_after_version(parsed, updated_list))
+	return dump(insert_import_after_version(parsed, updated_list), CSPELL_DUMP_OPTIONS)
 }
 
 const init_logic_yaml_merge = {
