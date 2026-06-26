@@ -243,6 +243,28 @@ describe('create_sveltekit_config — sonarjs/no-use-of-empty-return-value (issu
 	})
 })
 
+describe('create_sveltekit_config — unicorn/no-top-level-assignment-in-function (issue #610)', () => {
+	it('disables the rule for Svelte files so idiomatic $state reassignment is not flagged', () => {
+		const config = build_config()
+
+		const svelte_block = find_svelte_files_block(config)
+		const rules = svelte_block?.rules as Record<string, unknown>
+
+		expect(rules['unicorn/no-top-level-assignment-in-function']).toBe('off')
+	})
+
+	it('keeps consistent-boolean-name enabled (its #610 crash was fixed upstream in unicorn 69)', () => {
+		const config = build_config()
+
+		// The rule must NOT be force-disabled in the Svelte override — it is compatible with the
+		// kit's is_/has_ booleans and no longer crashes ESLint, so it stays at its recommended level.
+		const svelte_block = find_svelte_files_block(config)
+		const rules = svelte_block?.rules as Record<string, unknown>
+
+		expect(Object.hasOwn(rules, 'unicorn/consistent-boolean-name')).toBe(false)
+	})
+})
+
 describe('create_sveltekit_config — unicorn/name-replacements allowList (issue #435)', () => {
 	it('applies the idiomatic-name allowList project-wide, including e2e for Playwright specs', () => {
 		const config = build_config()
