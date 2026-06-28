@@ -121,6 +121,14 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 		{
 			files: ['**/*.js'],
 			...ts.configs.disableTypeChecked,
+			rules: {
+				...ts.configs.disableTypeChecked.rules,
+				// These two rules check for the *presence* of a TS type annotation, so they
+				// are not part of disableTypeChecked. A hand-authored .js file cannot express
+				// the annotation (JSDoc does not satisfy them), making them unsatisfiable there.
+				'@typescript-eslint/explicit-function-return-type': 'off',
+				'@typescript-eslint/explicit-module-boundary-types': 'off',
+			},
 		},
 	)
 }
