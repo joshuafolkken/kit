@@ -123,6 +123,52 @@ describe('create_base_config — tests block (issue #433)', () => {
 	})
 })
 
+const EXPLICIT_RETURN_TYPE_RULE = '@typescript-eslint/explicit-function-return-type'
+const EXPLICIT_BOUNDARY_RULE = '@typescript-eslint/explicit-module-boundary-types'
+
+describe('create_base_config — js block (issue #624)', () => {
+	it('disables the annotation-presence rules for **/*.js (unsatisfiable in plain JS)', () => {
+		const config = create_base_config({
+			gitignore_path: GITIGNORE_PATH,
+			tsconfig_root_dir: TSCONFIG_ROOT_DIR,
+		})
+
+		const js_block = config.find(
+			(block) =>
+				Array.isArray(block.files) && block.files.length === 1 && block.files[0] === '**/*.js',
+		)
+
+		expect(js_block).toBeDefined()
+
+		const rules = js_block?.rules as Record<string, unknown>
+
+		expect(rules[EXPLICIT_RETURN_TYPE_RULE]).toBe('off')
+		expect(rules[EXPLICIT_BOUNDARY_RULE]).toBe('off')
+	})
+
+	it('keeps the annotation-presence rules enabled on the typed surface (no .ts regression)', () => {
+		const config = create_base_config({
+			gitignore_path: GITIGNORE_PATH,
+			tsconfig_root_dir: TSCONFIG_ROOT_DIR,
+		})
+
+		// The project-wide rules block is uniquely identified by the @stylistic plugin
+		// registration; it carries the typescript_rules that the .js block overrides.
+		const global_block = config.find(
+			(block) =>
+				!('files' in block) &&
+				Boolean((block.plugins as Record<string, unknown> | undefined)?.['@stylistic']),
+		)
+
+		expect(global_block).toBeDefined()
+
+		const rules = global_block?.rules as Record<string, unknown>
+
+		expect(rules[EXPLICIT_RETURN_TYPE_RULE]).not.toBe('off')
+		expect(rules[EXPLICIT_BOUNDARY_RULE]).not.toBe('off')
+	})
+})
+
 describe('create_base_config — typescript block', () => {
 	it('excludes .svelte.ts files from the TypeScript parser block', () => {
 		const config = create_base_config({
