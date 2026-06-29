@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
@@ -153,6 +153,24 @@ describe('pnpm-workspace.yaml built-dependency lists', () => {
 		// Synced to consumers; skips the install-time re-verification that fails on clean CI
 		// boxes lacking auth for private @joshuafolkken/* GitHub Packages (false URL mismatch).
 		expect(workspace.trustLockfile).toBe(true)
+	})
+})
+
+const TEST_FILENAME_EXPORT_KEY = './eslint/test-filename'
+const TEST_FILENAME_EXPORT_TARGET = './eslint/rules/test-filename.js'
+
+describe('package.json exports', () => {
+	const manifest = load_manifest()
+	const exports_map = manifest.exports ?? {}
+
+	it('exposes the generic test-filename rule building blocks for consumers (issue #626)', () => {
+		expect(exports_map[TEST_FILENAME_EXPORT_KEY]).toBe(TEST_FILENAME_EXPORT_TARGET)
+	})
+
+	it('points the test-filename export at a file that exists on disk', () => {
+		const absolute_target = path.resolve(process.cwd(), TEST_FILENAME_EXPORT_TARGET)
+
+		expect(existsSync(absolute_target)).toBe(true)
 	})
 })
 
