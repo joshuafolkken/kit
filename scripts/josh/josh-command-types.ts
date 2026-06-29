@@ -1,13 +1,7 @@
 const ENV_FILE_FLAGS: ReadonlyArray<string> = ['--env-file=.env']
 
 type CommandCategory =
-	| 'Development'
-	| 'Project'
-	| 'Workflow'
-	| 'Versioning'
-	| 'Maintenance'
-	| 'Git hooks'
-	| 'AI tools'
+	'Development' | 'Project' | 'Workflow' | 'Versioning' | 'Maintenance' | 'Git hooks' | 'AI tools'
 
 interface CommandEntry {
 	script?: string

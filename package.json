@@ -1,5 +1,5 @@
 {
-	"version": "0.281.0",
+	"version": "0.282.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -56,6 +56,7 @@
 		"./eslint/base": "./eslint/base.js",
 		"./eslint/vanilla": "./eslint/vanilla.js",
 		"./eslint/sveltekit": "./eslint/sveltekit.js",
+		"./eslint/test-filename": "./eslint/rules/test-filename.js",
 		"./prettier": {
 			"types": "./prettier/index.d.ts",
 			"default": "./prettier/index.js"
@@ -100,9 +101,9 @@
 		"@types/semver": "^7.7.1",
 		"cspell": "^10.0.1",
 		"esbuild": "^0.28.1",
-		"eslint": "^10.5.0",
+		"eslint": "^10.6.0",
 		"lefthook": "^2.1.9",
-		"prettier": "^3.8.5",
+		"prettier": "^3.9.0",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.0",
 		"rollup": "^4.62.2",
