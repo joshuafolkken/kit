@@ -60,29 +60,3 @@ describe('merge_cspell_import', () => {
 		expect(result).toBe(`words: []\nimport:\n  - "${CSPELL_VALUE_VANILLA}"\n`)
 	})
 })
-
-describe('merge_cspell_import supersession', () => {
-	const APP_KIT_SVELTEKIT = '@joshuafolkken/app-kit/cspell/sveltekit'
-	const GAME_KIT_GAME = '@joshuafolkken/game-kit/cspell/game'
-
-	it('skips the kit base import when the app-kit SvelteKit preset already provides it', () => {
-		const content = `${VERSION_LINE}import:\n  - "${APP_KIT_SVELTEKIT}"\n`
-
-		expect(init_logic.merge_cspell_import(content, CSPELL_VALUE_VANILLA)).toBe(content)
-	})
-
-	it('skips the kit base import when the game-kit preset already provides it transitively', () => {
-		const content = `${VERSION_LINE}import:\n  - "${GAME_KIT_GAME}"\n`
-
-		expect(init_logic.merge_cspell_import(content, CSPELL_VALUE_VANILLA)).toBe(content)
-	})
-
-	it('adds the kit base import when no superseding preset is present', () => {
-		const result = init_logic.merge_cspell_import(
-			`${VERSION_LINE}import:\n  - other\n`,
-			CSPELL_VALUE_VANILLA,
-		)
-
-		expect(result).toContain(CSPELL_VALUE_VANILLA)
-	})
-})

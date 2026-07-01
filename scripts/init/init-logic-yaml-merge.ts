@@ -17,40 +17,12 @@ function merge_yaml_list_entry(content: string, key: string, value: string): str
 	})
 }
 
-// Maps a base cspell import to the imports that already provide it transitively. When
-// a superseding import is present, the base import is redundant and must not be added.
-// kit's base dictionary (`@joshuafolkken/kit/cspell`) is re-exported by the downstream
-// SvelteKit/game presets — `@joshuafolkken/app-kit/cspell/sveltekit` imports it directly
-// and `@joshuafolkken/game-kit/cspell/game` pulls it in through app-kit — so a consumer
-// that already imports either must not also get the bare kit base. kit only string-matches
-// the downstream import names here; it does not depend on app-kit or game-kit.
-const CSPELL_SUPERSEDING_IMPORTS: ReadonlyArray<{
-	base: string
-	superseded_by: ReadonlyArray<string>
-}> = [
-	{
-		base: '@joshuafolkken/kit/cspell',
-		superseded_by: [
-			'@joshuafolkken/app-kit/cspell/sveltekit',
-			'@joshuafolkken/game-kit/cspell/game',
-		],
-	},
-]
-
-function is_cspell_import_superseded(value: string, existing: ReadonlyArray<string>): boolean {
-	const rule = CSPELL_SUPERSEDING_IMPORTS.find((entry) => entry.base === value)
-	if (rule === undefined) return false
-
-	return rule.superseded_by.some((entry) => existing.includes(entry))
-}
-
-// Ensure `value` is in the cspell `import` list, skipping it when a superseding import already
-// covers it. Delegates the structural patch to the shared config-merge library; the superseding
-// rule stays here because it is kit-specific business logic, not a generic list operation.
+// Ensure `value` is in the cspell `import` list. Delegates the structural patch to the shared
+// config-merge library. kit is framework-agnostic: it only ever ensures its own generic base
+// dictionary (`@joshuafolkken/kit/cspell`) and knows nothing about downstream framework presets.
+// Deduplicating a redundant base import when a downstream preset already re-exports it is the
+// downstream init/sync overlay's responsibility (app-kit / game-kit), not kit's.
 function merge_cspell_import(content: string, value: string): string {
-	const existing = config_merge.read_yaml_list_field(content, CSPELL_IMPORT_FIELD)
-	if (is_cspell_import_superseded(value, existing)) return content
-
 	return config_merge.patch_yaml_list_field(content, {
 		field: CSPELL_IMPORT_FIELD,
 		ensure: [value],
