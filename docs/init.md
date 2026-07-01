@@ -6,31 +6,21 @@
 pnpm josh init
 ```
 
-## Project type detection
-
-`josh init` needs to know whether your project is SvelteKit or vanilla TypeScript.
-
-1. **Auto-detect** — `sveltekit` is used automatically when either `svelte.config.js` / `svelte.config.ts` exists in the current directory **or** `@sveltejs/kit` is listed in the project's `dependencies` / `devDependencies`. The dependency check covers the newer `sv create --template library` scaffold, which ships no `svelte.config.*` and configures the `sveltekit()` plugin in `vite.config.ts` instead.
-2. **CLI flag** — pass `--type sveltekit` or `--type vanilla` to skip detection.
-3. **Interactive prompt** — if detection fails and no flag is given, you are prompted to choose.
-
-The project type controls which ESLint config, tsconfig preset, and Lefthook config are generated.
-
 ## Config files
 
 Each file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
 
-| File                      | If missing                                                        | If exists                                                                                                         |
-| ------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `.npmrc`                  | Created with registry, engine-strict, minimum-release-age         | Missing lines appended                                                                                            |
-| `eslint.config.js`        | Created with `create_sveltekit_config` or `create_vanilla_config` | Sample shown — add manually                                                                                       |
-| `prettier.config.js`      | Created with shared config                                        | Sample shown — add manually                                                                                       |
-| `playwright.config.ts`    | Created with `create_playwright_config`                           | Sample shown — add manually                                                                                       |
-| `tsconfig.json`           | Created with `extends` pointing to the preset                     | Preset entry prepended to `extends` array                                                                         |
-| `cspell.config.yaml`      | Created with `import` pointing to the shared word list            | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import) |
-| `lefthook.yml`            | Created with `extends` pointing to the preset                     | Preset entry added under `extends:` key                                                                           |
-| `.vscode/extensions.json` | Created from package template                                     | Missing recommendations merged in                                                                                 |
-| `.vscode/settings.json`   | Created from package template                                     | Missing keys merged in (existing keys untouched)                                                                  |
+| File                      | If missing                                                | If exists                                                                                                         |
+| ------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `.npmrc`                  | Created with registry, engine-strict, minimum-release-age | Missing lines appended                                                                                            |
+| `eslint.config.js`        | Created with `create_vanilla_config`                      | Sample shown — add manually                                                                                       |
+| `prettier.config.js`      | Created with shared config                                | Sample shown — add manually                                                                                       |
+| `playwright.config.ts`    | Created with `create_playwright_config`                   | Sample shown — add manually                                                                                       |
+| `tsconfig.json`           | Created with `extends` pointing to the preset             | Preset entry prepended to `extends` array                                                                         |
+| `cspell.config.yaml`      | Created with `import` pointing to the shared word list    | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import) |
+| `lefthook.yml`            | Created with `extends` pointing to the preset             | Preset entry added under `extends:` key                                                                           |
+| `.vscode/extensions.json` | Created from package template                             | Missing recommendations merged in                                                                                 |
+| `.vscode/settings.json`   | Created from package template                             | Missing keys merged in (existing keys untouched)                                                                  |
 
 > Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
 
@@ -40,17 +30,15 @@ The preset is **prepended** to the `extends` array so it does not override proje
 
 ```jsonc
 // before
-{ "extends": ["./.svelte-kit/tsconfig.json"] }
+{ "extends": ["./tsconfig.options.json"] }
 
 // after
-{ "extends": ["@joshuafolkken/kit/tsconfig/sveltekit.jsonc", "./.svelte-kit/tsconfig.json"] }
+{ "extends": ["@joshuafolkken/kit/tsconfig/base.jsonc", "./tsconfig.options.json"] }
 ```
 
 ### eslint.config.js / prettier.config.js / playwright.config.ts
 
 These files have no merge strategy. If they already exist, `josh init` prints the generated content so you can copy the relevant parts manually.
-
-The generated SvelteKit `eslint.config.js` imports `./svelte.config.js` (and passes it as `svelte_config`) **only when that file exists**. The newer `sv create --template library` scaffold ships no `svelte.config.*`, so for those projects the import and the `svelte_config` field are omitted — `create_sveltekit_config` falls back to the eslint-plugin-svelte default. This avoids an `ERR_MODULE_NOT_FOUND` on a non-existent `svelte.config.js`.
 
 ## Package scripts
 
@@ -64,11 +52,7 @@ The generated SvelteKit `eslint.config.js` imports `./svelte.config.js` (and pas
 
 The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`**, not `postinstall`. `prepare` runs on a local `pnpm install` and during `pack`/`publish`, but **not** when your package is installed as a dependency by a consumer — which is the correct scope for these developer-only hooks. The command is **guarded**: each step runs only when its binary is on `PATH`, and each optional hook is individually tolerated with `|| true`, chained with `&&`. This prevents a missing `lefthook`/`tsx` (or a failing optional hook) from aborting `pnpm install` in production or CI installs that omit dev dependencies — **without** masking the core steps it is appended to. When `josh init` appends the lifecycle to an existing `prepare` (e.g. `pnpm gen && svelte-kit sync`), those core steps stay fail-fast: if they fail, `prepare` still exits non-zero.
 
-When a `prepare` already exists (for example a SvelteKit `svelte-kit sync`), `josh init` appends the lifecycle to it rather than replacing it. If a script already runs `fix-gh-packages`, `josh init` skips re-adding the hook so re-running it never duplicates. A kit-managed `postinstall` from an earlier version (one that runs `fix-gh-packages`) is migrated to `prepare`; a custom `postinstall` of your own is left untouched.
-
-### Cloudflare worker types
-
-For wrangler projects (a `wrangler.jsonc` is present), `josh init` and `josh sync` generate the Cloudflare worker types in **`prepare`** rather than `build`. They append a guarded `([ -f wrangler.jsonc ] && command -v wrangler >/dev/null 2>&1 && wrangler types || true)` to `prepare` and strip any `wrangler types` segment from `build`. Owning type generation in `prepare` lets `build` drop it, which avoids a second `wrangler` invocation during the E2E webServer's `pnpm run build` — that double invocation (alongside `prepack`'s `svelte-kit sync`) stalls webServer startup under the safe-chain proxy. The append is **coverage-aware**: when `prepare` already generates worker types — directly, or transitively through a `pnpm <subscript>` chain (e.g. `prepare → pnpm prepare:gen → pnpm gen → wrangler types`) — the guarded command is **not** appended, so an existing chain is never given a redundant second invocation. The `prepare` command is idempotent and a no-op in non-Cloudflare checkouts or installs without the `wrangler` binary.
+When a `prepare` already exists, `josh init` appends the lifecycle to it rather than replacing it. If a script already runs `fix-gh-packages`, `josh init` skips re-adding the hook so re-running it never duplicates. A kit-managed `postinstall` from an earlier version (one that runs `fix-gh-packages`) is migrated to `prepare`; a custom `postinstall` of your own is left untouched.
 
 All other toolchain tasks are available as `pnpm josh <command>` subcommands — they are **not** added as separate package scripts. Existing scripts are never overwritten.
 
@@ -76,20 +60,16 @@ All other toolchain tasks are available as `pnpm josh <command>` subcommands —
 
 `josh init` adds the packages the generated config needs to `devDependencies`. An entry is only added when it is missing — an existing version is never overwritten, so re-running `josh init` is idempotent.
 
-| Package                               | Added for          | Version                                                                                                   |
-| ------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
-| `@joshuafolkken/kit`                  | all project types  | pinned to the running kit version (the generated configs import from this package, so it must be present) |
-| `@ianvs/prettier-plugin-sort-imports` | all project types  | `^4.7.1`                                                                                                  |
-| `prettier-plugin-svelte`              | all project types  | `^4.1.1`                                                                                                  |
-| `prettier-plugin-tailwindcss`         | all project types  | `^0.8.0`                                                                                                  |
-| `cspell`                              | SvelteKit projects | `^10.0.0`                                                                                                 |
-| `size-limit`                          | SvelteKit projects | `^12.1.0`                                                                                                 |
-| `@size-limit/file`                    | SvelteKit projects | `^12.1.0`                                                                                                 |
-| `rollup-plugin-visualizer`            | SvelteKit projects | `^7.0.1`                                                                                                  |
+| Package                               | Version                                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `@joshuafolkken/kit`                  | pinned to the running kit version (the generated configs import from this package, so it must be present) |
+| `@ianvs/prettier-plugin-sort-imports` | `^4.7.1`                                                                                                  |
+| `prettier-plugin-svelte`              | `^4.1.1`                                                                                                  |
+| `prettier-plugin-tailwindcss`         | `^0.8.0`                                                                                                  |
 
-The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries back the kit prettier preset (`@joshuafolkken/kit/prettier`), whose `plugins[]` references all three by name. prettier resolves plugins from the **consumer** project rather than transitively through the kit, so every project that uses the preset must declare them locally — otherwise `prettier`/`josh lint` fails with `Cannot find package`. They are added for all project types because the preset is shared.
+The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries back the kit prettier preset (`@joshuafolkken/kit/prettier`), whose `plugins[]` references all three by name. prettier resolves plugins from the **consumer** project rather than transitively through the kit, so every project that uses the preset must declare them locally — otherwise `prettier`/`josh lint` fails with `Cannot find package`.
 
-### Available `pnpm josh` subcommands (all project types)
+### Available `pnpm josh` subcommands
 
 | Command              | Runs                                                  |
 | -------------------- | ----------------------------------------------------- |
@@ -131,7 +111,6 @@ CODE_OF_CONDUCT.md
 .cursorrules        .coderabbit.yaml    .gitattributes
 .mcp.json           .ncurc.json         .prettierignore
 SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
-wrangler.jsonc
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/production.yml

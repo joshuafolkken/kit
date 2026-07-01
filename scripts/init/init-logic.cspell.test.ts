@@ -2,28 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
 const CSPELL_VALUE_VANILLA = '@joshuafolkken/kit/cspell'
-const CSPELL_VALUE_SVELTEKIT = '@joshuafolkken/kit/cspell/sveltekit'
-const CSPELL_VALUE_GAME = '@joshuafolkken/game-kit/cspell/game'
 const VERSION_LINE = 'version: "0.2"\n'
 
 describe('generate_cspell_config', () => {
-	it('uses vanilla import path for vanilla projects', () => {
-		const result = init_logic.generate_cspell_config('vanilla')
+	it('uses the kit import path', () => {
+		const result = init_logic.generate_cspell_config()
 
 		expect(result).toContain(CSPELL_VALUE_VANILLA)
 		expect(result).not.toContain('node_modules')
 		expect(result).not.toContain('sveltekit')
 	})
 
-	it('uses sveltekit import path for sveltekit projects', () => {
-		const result = init_logic.generate_cspell_config('sveltekit')
-
-		expect(result).toContain(CSPELL_VALUE_SVELTEKIT)
-		expect(result).not.toContain('node_modules')
-	})
-
 	it('emits double-quoted scalars to match the VSCode cspell extension format', () => {
-		const result = init_logic.generate_cspell_config('vanilla')
+		const result = init_logic.generate_cspell_config()
 
 		expect(result).toContain(VERSION_LINE)
 		expect(result).toContain(`- "${CSPELL_VALUE_VANILLA}"`)
@@ -32,12 +23,8 @@ describe('generate_cspell_config', () => {
 })
 
 describe('get_cspell_import_value', () => {
-	it('returns the vanilla import path for vanilla projects', () => {
-		expect(init_logic.get_cspell_import_value('vanilla')).toBe(CSPELL_VALUE_VANILLA)
-	})
-
-	it('returns the sveltekit import path for sveltekit projects', () => {
-		expect(init_logic.get_cspell_import_value('sveltekit')).toBe(CSPELL_VALUE_SVELTEKIT)
+	it('returns the kit import path', () => {
+		expect(init_logic.get_cspell_import_value()).toBe(CSPELL_VALUE_VANILLA)
 	})
 })
 
@@ -72,34 +59,30 @@ describe('merge_cspell_import', () => {
 
 		expect(result).toBe(`words: []\nimport:\n  - "${CSPELL_VALUE_VANILLA}"\n`)
 	})
-
-	it('inserts sveltekit import path for sveltekit projects', () => {
-		const result = init_logic.merge_cspell_import(
-			`${VERSION_LINE}words: []\n`,
-			CSPELL_VALUE_SVELTEKIT,
-		)
-
-		expect(result).toContain(CSPELL_VALUE_SVELTEKIT)
-	})
 })
 
-describe('merge_cspell_import superseding', () => {
-	it('skips base sveltekit import when superseding game import already present', () => {
-		const content = `${VERSION_LINE}import:\n  - "${CSPELL_VALUE_GAME}"\nwords: []\n`
+describe('merge_cspell_import supersession', () => {
+	const APP_KIT_SVELTEKIT = '@joshuafolkken/app-kit/cspell/sveltekit'
+	const GAME_KIT_GAME = '@joshuafolkken/game-kit/cspell/game'
 
-		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE_SVELTEKIT)
+	it('skips the kit base import when the app-kit SvelteKit preset already provides it', () => {
+		const content = `${VERSION_LINE}import:\n  - "${APP_KIT_SVELTEKIT}"\n`
 
-		expect(result).toBe(content)
-		expect(result).not.toContain(CSPELL_VALUE_SVELTEKIT)
+		expect(init_logic.merge_cspell_import(content, CSPELL_VALUE_VANILLA)).toBe(content)
 	})
 
-	it('still adds base sveltekit import when no superseding import is present', () => {
+	it('skips the kit base import when the game-kit preset already provides it transitively', () => {
+		const content = `${VERSION_LINE}import:\n  - "${GAME_KIT_GAME}"\n`
+
+		expect(init_logic.merge_cspell_import(content, CSPELL_VALUE_VANILLA)).toBe(content)
+	})
+
+	it('adds the kit base import when no superseding preset is present', () => {
 		const result = init_logic.merge_cspell_import(
 			`${VERSION_LINE}import:\n  - other\n`,
-			CSPELL_VALUE_SVELTEKIT,
+			CSPELL_VALUE_VANILLA,
 		)
 
-		expect(result).toContain(CSPELL_VALUE_SVELTEKIT)
-		expect(result).toContain('other')
+		expect(result).toContain(CSPELL_VALUE_VANILLA)
 	})
 })

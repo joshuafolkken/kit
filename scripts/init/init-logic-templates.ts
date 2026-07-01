@@ -1,24 +1,5 @@
 import { readFileSync } from 'node:fs'
-import type { ProjectType } from './init-logic'
 import { package_path } from './init-paths'
-
-// Tokens replaced (or removed) depending on whether the project still ships a
-// svelte.config file. The new `sv` library template drops it, so importing it
-// unconditionally throws ERR_MODULE_NOT_FOUND — see Fix B / fill_svelte_tokens.
-// The caller passes the resolved import specifier (e.g. `./svelte.config.ts`) so a
-// `.ts`-only project imports the extension that actually exists, not a hardcoded `.js`.
-const SVELTE_IMPORT_TOKEN = '$SVELTE_IMPORT'
-const SVELTE_FIELD_TOKEN = '$SVELTE_FIELD'
-
-// Template strings below contain `export default` as generated file content, not as module exports.
-// The import token sits flush before `export default` so the blank-line separator lives in the
-// replacement; the field token sits flush after the trailing comma so the leading newline does too.
-const ESLINT_SVELTEKIT_TPL = `import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
-${SVELTE_IMPORT_TOKEN}export default create_sveltekit_config({
-\tgitignore_path: new URL('./.gitignore', import.meta.url),
-\ttsconfig_root_dir: import.meta.dirname,${SVELTE_FIELD_TOKEN}
-})
-`
 
 const ESLINT_VANILLA = `import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 
@@ -43,42 +24,6 @@ const RULES_INDENT = '\t'.repeat(RULES_INDENT_DEPTH)
 
 const PLAYWRIGHT_TEMPLATE_PATH = package_path('playwright.config.ts')
 
-const VITE_CONFIG_SVELTEKIT = `import type { UserConfig, ConfigEnv } from 'vite'
-import { visualizer } from 'rollup-plugin-visualizer'
-import { sveltekit } from '@sveltejs/kit/vite'
-import { defineConfig } from 'vite'
-
-export default defineConfig({
-\tplugins: [
-\t\tsveltekit(),
-\t\t{
-\t\t\t...visualizer({ open: !process.env['CI'], filename: 'stats-client.html' }),
-\t\t\tapply: (config: UserConfig, { command }: ConfigEnv) =>
-\t\t\t\tcommand === 'build' && !config.build?.ssr,
-\t\t},
-\t\t{
-\t\t\t...visualizer({ open: !process.env['CI'], filename: 'stats-server.html' }),
-\t\t\tapply: (config: UserConfig, { command }: ConfigEnv) =>
-\t\t\t\tcommand === 'build' && !!config.build?.ssr,
-\t\t},
-\t],
-})
-`
-
-const SVELTEKIT_WITH_RULES_TPL = `import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
-${SVELTE_IMPORT_TOKEN}export default [
-\t...create_sveltekit_config({
-\t\tgitignore_path: new URL('./.gitignore', import.meta.url),
-\t\ttsconfig_root_dir: import.meta.dirname,${SVELTE_FIELD_TOKEN}
-\t}),
-\t{
-\t\trules: {
-$RULES
-\t\t},
-\t},
-]
-`
-
 const VANILLA_WITH_RULES_TPL = `import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 
 export default [
@@ -97,38 +42,8 @@ $RULES
 const RULES_PLACEHOLDER = '$RULES'
 const NOT_FOUND = -1
 
-// The `svelte_config` field is indented one level in the bare template and two levels inside
-// the rules-array spread, so each template fills the token at its own depth.
-const SVELTE_FIELD_INDENT_PLAIN = '\t'
-const SVELTE_FIELD_INDENT_RULES = '\t\t'
-
-// Replace the svelte.config tokens: emit the import line + field when the project ships a
-// svelte.config file (importing the resolved specifier so a `.ts`-only project gets the right
-// extension), otherwise strip both. Vanilla templates carry no tokens, so this no-ops them.
-function fill_svelte_tokens(
-	template: string,
-	svelte_config_import: string | undefined,
-	field_indent: string,
-): string {
-	const import_replacement =
-		svelte_config_import === undefined
-			? '\n'
-			: `import svelteConfig from '${svelte_config_import}'\n\n`
-	const field_replacement =
-		svelte_config_import === undefined ? '' : `\n${field_indent}svelte_config: svelteConfig,`
-
-	return template
-		.replace(SVELTE_IMPORT_TOKEN, () => import_replacement)
-		.replace(SVELTE_FIELD_TOKEN, () => field_replacement)
-}
-
-function generate_eslint_config(
-	type: ProjectType,
-	svelte_config_import: string | undefined,
-): string {
-	if (type !== 'sveltekit') return ESLINT_VANILLA
-
-	return fill_svelte_tokens(ESLINT_SVELTEKIT_TPL, svelte_config_import, SVELTE_FIELD_INDENT_PLAIN)
+function generate_eslint_config(): string {
+	return ESLINT_VANILLA
 }
 
 function is_vanilla_eslint_config(existing: string): boolean {
@@ -182,28 +97,18 @@ function indent_block(text: string, indent: string): string {
 		.join('\n')
 }
 
-function apply_rules_template(
-	type: ProjectType,
-	rules_body: string,
-	svelte_config_import: string | undefined,
-): string {
-	const template = type === 'sveltekit' ? SVELTEKIT_WITH_RULES_TPL : VANILLA_WITH_RULES_TPL
-	const filled = fill_svelte_tokens(template, svelte_config_import, SVELTE_FIELD_INDENT_RULES)
+function apply_rules_template(rules_body: string): string {
 	const rules_block = indent_block(rules_body, RULES_INDENT)
 
-	return filled.replace(RULES_PLACEHOLDER, () => rules_block)
+	return VANILLA_WITH_RULES_TPL.replace(RULES_PLACEHOLDER, () => rules_block)
 }
 
-function merge_eslint_config(
-	existing: string,
-	type: ProjectType,
-	svelte_config_import: string | undefined,
-): string {
+function merge_eslint_config(existing: string): string {
 	if (!is_vanilla_eslint_config(existing)) return existing
 	const rules_blocks = extract_rules_inner_blocks(existing)
-	if (rules_blocks.length === 0) return generate_eslint_config(type, svelte_config_import)
+	if (rules_blocks.length === 0) return generate_eslint_config()
 
-	return apply_rules_template(type, rules_blocks.join(',\n'), svelte_config_import)
+	return apply_rules_template(rules_blocks.join(',\n'))
 }
 
 function generate_prettier_config(stylesheet: string = DEFAULT_TAILWIND_STYLESHEET): string {
@@ -226,17 +131,12 @@ function generate_playwright_config(): string {
 	return readFileSync(PLAYWRIGHT_TEMPLATE_PATH, 'utf8')
 }
 
-function generate_vite_config(): string {
-	return VITE_CONFIG_SVELTEKIT
-}
-
 const init_logic_templates = {
 	generate_eslint_config,
 	merge_eslint_config,
 	generate_prettier_config,
 	merge_prettier_config,
 	generate_playwright_config,
-	generate_vite_config,
 }
 
 export { init_logic_templates }

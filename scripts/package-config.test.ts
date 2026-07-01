@@ -85,7 +85,6 @@ const AI_COPY_ROOT_FILES = [
 	'.prettierignore',
 	WORKSPACE_CONFIG,
 	'tsconfig.sonar.json',
-	'wrangler.jsonc',
 ] as const
 
 describe('package.json files field', () => {

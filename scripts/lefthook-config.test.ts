@@ -14,12 +14,9 @@ interface LefthookHook {
 
 type LefthookConfig = Record<string, LefthookHook>
 
-const SVELTEKIT_LEFTHOOK = path.join('lefthook', 'sveltekit.yml')
 const BASE_LEFTHOOK = path.join('lefthook', 'base.yml')
 const VANILLA_LEFTHOOK = path.join('lefthook', 'vanilla.yml')
 const PRE_COMMIT = 'pre-commit'
-const PRE_PUSH = 'pre-push'
-const TEST_E2E = 'test-e2e'
 const CSPELL = 'cspell'
 // lefthook resolves a nested `extends` from the consumer git root, so kit presets must reference
 // base by this root-relative node_modules path — not the file-relative `./base.yml` that lefthook
@@ -40,35 +37,12 @@ function load_extends(relative_path: string): ReadonlyArray<string> {
 	return parsed.extends ?? []
 }
 
-function load_test_e2e_command(relative_path: string): LefthookCommand | undefined {
-	return load_config(relative_path)[PRE_PUSH]?.commands?.[TEST_E2E]
-}
-
 function load_cspell_command(relative_path: string): LefthookCommand | undefined {
 	return load_config(relative_path)[PRE_COMMIT]?.commands?.[CSPELL]
 }
 
-describe('lefthook/sveltekit.yml pre-push e2e gate', () => {
-	const test_e2e = load_test_e2e_command(SVELTEKIT_LEFTHOOK)
-
-	it('defines a test-e2e pre-push command', () => {
-		expect(test_e2e).toBeDefined()
-	})
-
-	it('routes through the guarded josh test:e2e command', () => {
-		expect(test_e2e?.run).toBe('pnpm josh test:e2e')
-	})
-
-	it('does not invoke playwright directly so the optional peer stays optional', () => {
-		expect(test_e2e?.run).not.toContain('playwright test')
-	})
-})
-
-describe.each([
-	['lefthook/sveltekit.yml', SVELTEKIT_LEFTHOOK],
-	['lefthook/base.yml', BASE_LEFTHOOK],
-])('%s pre-commit cspell glob', (_label, relative_path) => {
-	const cspell = load_cspell_command(relative_path)
+describe('lefthook/base.yml pre-commit cspell glob', () => {
+	const cspell = load_cspell_command(BASE_LEFTHOOK)
 
 	it('defines a cspell pre-commit command', () => {
 		expect(cspell).toBeDefined()

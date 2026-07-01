@@ -19,14 +19,21 @@ function merge_yaml_list_entry(content: string, key: string, value: string): str
 
 // Maps a base cspell import to the imports that already provide it transitively. When
 // a superseding import is present, the base import is redundant and must not be added.
-// kit only string-matches the game import name here; it does not depend on game-kit.
+// kit's base dictionary (`@joshuafolkken/kit/cspell`) is re-exported by the downstream
+// SvelteKit/game presets — `@joshuafolkken/app-kit/cspell/sveltekit` imports it directly
+// and `@joshuafolkken/game-kit/cspell/game` pulls it in through app-kit — so a consumer
+// that already imports either must not also get the bare kit base. kit only string-matches
+// the downstream import names here; it does not depend on app-kit or game-kit.
 const CSPELL_SUPERSEDING_IMPORTS: ReadonlyArray<{
 	base: string
 	superseded_by: ReadonlyArray<string>
 }> = [
 	{
-		base: '@joshuafolkken/kit/cspell/sveltekit',
-		superseded_by: ['@joshuafolkken/game-kit/cspell/game'],
+		base: '@joshuafolkken/kit/cspell',
+		superseded_by: [
+			'@joshuafolkken/app-kit/cspell/sveltekit',
+			'@joshuafolkken/game-kit/cspell/game',
+		],
 	},
 ]
 
