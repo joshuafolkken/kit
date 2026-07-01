@@ -18,7 +18,7 @@ const CONSUMER_WITH_DRIFT =
 
 describe('init.apply_package_json_merges devEngines alignment', () => {
 	it('aligns devEngines.packageManager.version with the consumer packageManager pin', () => {
-		const result = init.apply_package_json_merges(CONSUMER_WITH_DRIFT, 'vanilla')
+		const result = init.apply_package_json_merges(CONSUMER_WITH_DRIFT)
 		const parsed = JSON.parse(result) as PackageJson
 		const pin = package_manager_version.extract_pnpm_version(parsed.packageManager)
 

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { init_logic, type ProjectType } from '#scripts/init/init-logic'
+import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
 
@@ -28,26 +28,18 @@ function sync_with_merge(
 	console.info(`  ✔ synced    ${destination_name}`)
 }
 
-function sync_vite_config(destination_path: string): void {
-	sync_with_merge(destination_path, 'vite.config.ts', init_logic.merge_vite_config)
-}
-
 function sync_npmrc(destination_path: string): void {
 	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
 }
 
-function sync_eslint_config(
-	destination_path: string,
-	type: ProjectType,
-	svelte_config_import: string | undefined,
-): void {
+function sync_eslint_config(destination_path: string): void {
 	sync_with_merge(destination_path, 'eslint.config.js', (existing) =>
-		init_logic.merge_eslint_config(existing, type, svelte_config_import),
+		init_logic.merge_eslint_config(existing),
 	)
 }
 
-function read_base_compiler_options(type: ProjectType): Record<string, unknown> {
-	const filename = init_logic.get_tsconfig_preset_filename(type)
+function read_base_compiler_options(): Record<string, unknown> {
+	const filename = init_logic.get_tsconfig_preset_filename()
 	const content = readFileSync(path.join(PACKAGE_DIR, TSCONFIG_PRESET_DIR, filename), 'utf8')
 
 	return init_logic.extract_compiler_options(content)
@@ -55,9 +47,9 @@ function read_base_compiler_options(type: ProjectType): Record<string, unknown> 
 
 // Ensure the kit preset is in `extends`, then drop any compilerOptions key whose value already
 // equals that preset — removing per-project drift while preserving genuine overrides.
-function sync_tsconfig(destination_path: string, type: ProjectType): void {
-	const entry = init_logic.get_tsconfig_extends_entry(type)
-	const base_options = read_base_compiler_options(type)
+function sync_tsconfig(destination_path: string): void {
+	const entry = init_logic.get_tsconfig_extends_entry()
+	const base_options = read_base_compiler_options()
 
 	sync_with_merge(destination_path, 'tsconfig.json', (existing) =>
 		init_logic.strip_redundant_compiler_options(
@@ -67,16 +59,16 @@ function sync_tsconfig(destination_path: string, type: ProjectType): void {
 	)
 }
 
-function sync_cspell_config(destination_path: string, type: ProjectType): void {
-	const value = init_logic.get_cspell_import_value(type)
+function sync_cspell_config(destination_path: string): void {
+	const value = init_logic.get_cspell_import_value()
 
 	sync_with_merge(destination_path, 'cspell.config.yaml', (existing) =>
 		init_logic.merge_cspell_import(existing, value),
 	)
 }
 
-function sync_lefthook_config(destination_path: string, type: ProjectType): void {
-	const value = init_logic.get_lefthook_extends_value(type)
+function sync_lefthook_config(destination_path: string): void {
+	const value = init_logic.get_lefthook_extends_value()
 
 	sync_with_merge(destination_path, 'lefthook.yml', (existing) =>
 		init_logic.merge_yaml_list_entry(existing, 'extends', value),
@@ -105,8 +97,8 @@ function sync_vscode_extensions_json(destination_path: string): void {
 	)
 }
 
-function sync_vscode_settings_json(destination_path: string, type: ProjectType): void {
-	const raw_settings = read_kit_vscode_json(init_logic.get_vscode_settings_filename(type))
+function sync_vscode_settings_json(destination_path: string): void {
+	const raw_settings = read_kit_vscode_json(init_logic.get_vscode_settings_filename())
 	const settings_data = init_logic.strip_kit_only_vscode_settings(
 		vscode_settings_schema.parse(raw_settings),
 	)
@@ -117,7 +109,6 @@ function sync_vscode_settings_json(destination_path: string, type: ProjectType):
 }
 
 const sync_configs = {
-	sync_vite_config,
 	sync_npmrc,
 	sync_eslint_config,
 	sync_tsconfig,

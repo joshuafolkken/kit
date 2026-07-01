@@ -88,12 +88,9 @@ Initialize config files in a new project.
 
 ```bash
 pnpm josh init
-# or force a project type:
-pnpm josh init --type sveltekit
-pnpm josh init --type vanilla
 ```
 
-Auto-detects SvelteKit vs vanilla by looking for `svelte.config.js` / `svelte.config.ts`. Prompts if it cannot detect. See [init.md](./init.md) for the full list of files created and merged.
+Creates or merges all config files. See [init.md](./init.md) for the full list of files created and merged.
 
 ### `josh sync`
 

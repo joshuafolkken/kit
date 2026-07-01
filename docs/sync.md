@@ -19,7 +19,7 @@ CLAUDE.md           AGENTS.md           GEMINI.md
 CODE_OF_CONDUCT.md
 .cursorrules        .coderabbit.yaml    .gitattributes
 .mcp.json           .ncurc.json         .prettierignore
-SECURITY.md         tsconfig.sonar.json wrangler.jsonc
+SECURITY.md         tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
 .github/workflows/production.yml
@@ -73,15 +73,12 @@ These files are created by `josh init`. `josh sync` refreshes them in place by r
 | `lefthook.yml`            | Prepend the kit preset to the `extends:` list if not already present                                                                                                                                                                      |
 | `.vscode/extensions.json` | Append missing kit recommendations to `recommendations`                                                                                                                                                                                   |
 | `.vscode/settings.json`   | Add missing top-level keys (existing keys are never overwritten)                                                                                                                                                                          |
-| `vite.config.ts`          | Inject the `rollup-plugin-visualizer` import + plugin (SvelteKit projects only)                                                                                                                                                           |
-
-Project type (`sveltekit` vs `vanilla`) is auto-detected from the presence of `svelte.config.{js,ts}`; `vite.config.ts` is only synced for SvelteKit projects.
 
 Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
 
 ### tsconfig normalization
 
-`josh sync` keeps consumer `tsconfig.json` files minimal: any `compilerOptions` key whose value already equals the kit base preset (`sveltekit.jsonc` / `base.jsonc`) is redundant — the preset supplies it via `extends` — so sync removes it. This is safe because the SvelteKit-generated `tsconfig.json` (the other `extends` layer) never sets these keys to a different value, so dropping the duplicate leaves the effective config unchanged. A key whose value **differs** from the base (e.g. a library's `noEmitOnError: false`, required when running `svelte-package`) is an intentional override and is preserved — sync cannot tell a necessary override from an unnecessary one, so it conservatively keeps every value-divergent key. `include` / `exclude` and project-specific keys the base does not define (e.g. Cloudflare `types`) are also left untouched.
+`josh sync` keeps consumer `tsconfig.json` files minimal: any `compilerOptions` key whose value already equals the kit base preset (`base.jsonc`) is redundant — the preset supplies it via `extends` — so sync removes it. A key whose value **differs** from the base (e.g. a library's `noEmitOnError: false`) is an intentional override and is preserved — sync cannot tell a necessary override from an unnecessary one, so it conservatively keeps every value-divergent key. `include` / `exclude` and project-specific keys the base does not define are also left untouched.
 
 ## Path transformation
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import readline from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { package_version_schema, with_package_manager_schema } from '#scripts/schemas'
 import { sync } from '#scripts/sync/sync'
@@ -9,11 +8,10 @@ import { package_manager_version } from '#scripts/version/package-manager-versio
 import { execaSync } from 'execa'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
-import { init_logic, type ProjectType } from './init-logic'
-import { is_sveltekit_project, PROJECT_ROOT, svelte_config_import } from './init-paths'
+import { init_logic } from './init-logic'
+import { PROJECT_ROOT } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
-const WRANGLER_CONFIG_FILE = 'wrangler.jsonc'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
 const SAMPLE_INDENT_WIDTH = 4
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
@@ -67,45 +65,6 @@ function execute_file_action(action: FileAction): void {
 	merge_existing_file(action.merge, destination_path, action.dest)
 }
 
-function detect_project_type(): ProjectType | undefined {
-	return is_sveltekit_project(PROJECT_ROOT) ? 'sveltekit' : undefined
-}
-
-function parse_cli_type(): ProjectType | undefined {
-	const type_index = process.argv.indexOf('--type')
-	if (type_index === -1) return undefined
-	const raw = process.argv[type_index + 1]
-
-	return raw === 'sveltekit' || raw === 'vanilla' ? raw : undefined
-}
-
-async function prompt_project_type(): Promise<ProjectType> {
-	const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-
-	return await new Promise<ProjectType>((resolve) => {
-		rl.question('Project type — sveltekit or vanilla? ', (answer) => {
-			rl.close()
-			resolve(answer.trim() === 'sveltekit' ? 'sveltekit' : 'vanilla')
-		})
-	})
-}
-
-async function resolve_project_type(): Promise<ProjectType> {
-	const detected = detect_project_type()
-
-	if (detected !== undefined) {
-		console.info(`Detected ${detected} project`)
-
-		return detected
-	}
-
-	const from_cli = parse_cli_type()
-
-	if (from_cli !== undefined) return from_cli
-
-	return await prompt_project_type()
-}
-
 function get_kit_package_manager(): string | undefined {
 	const { packageManager: package_manager } = with_package_manager_schema.parse(
 		init_actions.read_package_json(PACKAGE_JSON),
@@ -126,33 +85,23 @@ function get_kit_self_dependency(): Record<string, string> {
 	return { [KIT_PACKAGE_NAME]: version }
 }
 
-function apply_dependency_merges(content: string, type: ProjectType): string {
+function apply_dependency_merges(content: string): string {
 	const migrated = init_logic.strip_managed_postinstall(content)
-	const merged =
-		type === 'sveltekit'
-			? init_logic.merge_sveltekit_package_json(migrated)
-			: init_logic.merge_package_scripts(
-					migrated,
-					init_logic.get_suggested_scripts_for_content(type, migrated),
-				)
+	const merged = init_logic.merge_package_scripts(
+		migrated,
+		init_logic.get_suggested_scripts_for_content(migrated),
+	)
 	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
 
 	return init_logic.merge_development_dependencies(with_prettier, get_kit_self_dependency())
 }
 
-function apply_package_json_merges(
-	content: string,
-	type: ProjectType,
-	is_wrangler = false,
-): string {
-	const with_kit = apply_dependency_merges(content, type)
+function apply_package_json_merges(content: string): string {
+	const with_kit = apply_dependency_merges(content)
 	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(with_kit)
-	const with_wrangler = is_wrangler
-		? init_logic.migrate_wrangler_types_to_prepare(with_lifecycle)
-		: with_lifecycle
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
-		kit_pm === undefined ? with_wrangler : init_logic.merge_package_manager(with_wrangler, kit_pm)
+		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
 	const with_de = init_logic.merge_development_engines(with_pm, get_kit_development_engines())
 	const sorted = init_logic.sort_package_json_keys(with_de)
 
@@ -162,13 +111,12 @@ function apply_package_json_merges(
 	return package_manager_version.align_development_engines_version(sorted)
 }
 
-function merge_project_package_json(type: ProjectType): void {
+function merge_project_package_json(): void {
 	const package_json_path = path.join(PROJECT_ROOT, PACKAGE_JSON)
 	if (!existsSync(package_json_path)) return
 
 	const existing = readFileSync(package_json_path, 'utf8')
-	const is_wrangler = existsSync(path.join(PROJECT_ROOT, WRANGLER_CONFIG_FILE))
-	const merged = apply_package_json_merges(existing, type, is_wrangler)
+	const merged = apply_package_json_merges(existing)
 
 	if (merged === existing) {
 		console.info('  ✔ unchanged package.json')
@@ -190,28 +138,24 @@ function install_lefthook(): void {
 	}
 }
 
-function run_config_file_actions(type: ProjectType): void {
+function run_config_file_actions(): void {
 	console.info('Config files:')
 
 	if (sync.migrate_prettierrc(path.join(PROJECT_ROOT, PRETTIER_CONFIG_JS))) {
 		console.info('  ✔ migrated  .prettierrc → prettier.config.js')
 	}
 
-	const svelte_import = svelte_config_import(PROJECT_ROOT)
-
-	for (const action of init_actions.build_file_actions(type, svelte_import)) {
+	for (const action of init_actions.build_file_actions()) {
 		execute_file_action(action)
 	}
 }
 
-async function main(): Promise<void> {
-	const type = await resolve_project_type()
-
-	console.info(`\n🚀 Initializing @joshuafolkken/kit (${type})\n`)
-	run_config_file_actions(type)
+function main(): void {
+	console.info('\n🚀 Initializing @joshuafolkken/kit\n')
+	run_config_file_actions()
 
 	console.info('\nPackage scripts:')
-	merge_project_package_json(type)
+	merge_project_package_json()
 
 	console.info('\nAI files:')
 	init_ai_copy.run_ai_copies()
@@ -221,7 +165,7 @@ async function main(): Promise<void> {
 	console.info('\n✅ Done.\n')
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const init = {
 	copy_ai_file: init_ai_copy.copy_ai_file,

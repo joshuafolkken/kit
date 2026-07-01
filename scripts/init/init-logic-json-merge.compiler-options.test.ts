@@ -96,7 +96,6 @@ describe('init_logic_json_merge.strip_redundant_compiler_options — preservatio
 
 describe('init_logic.get_tsconfig_preset_filename', () => {
 	it('returns the preset basename within the package tsconfig directory', () => {
-		expect(init_logic.get_tsconfig_preset_filename('sveltekit')).toBe('sveltekit.jsonc')
-		expect(init_logic.get_tsconfig_preset_filename('vanilla')).toBe('base.jsonc')
+		expect(init_logic.get_tsconfig_preset_filename()).toBe('base.jsonc')
 	})
 })

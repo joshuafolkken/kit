@@ -25,10 +25,10 @@ function extract_compiler_options(content: string): Record<string, unknown> {
 }
 
 // A consumer compilerOptions key is redundant only when its value deep-equals the kit base
-// preset's value. Such keys can be dropped without changing the effective config, because the
-// SvelteKit-generated tsconfig (the other extends layer) never sets these keys to a different
-// value. Value-divergent keys (e.g. a library's noEmitOnError:false) are intentional overrides
-// and are preserved — sync cannot tell a necessary override from an unnecessary one.
+// preset's value. Such keys can be dropped without changing the effective config, because any
+// other extends layer the consumer adds never sets these keys to a different value. Value-divergent
+// keys (e.g. a library's noEmitOnError:false) are intentional overrides and are preserved — sync
+// cannot tell a necessary override from an unnecessary one.
 function is_redundant_option(
 	value: unknown,
 	key: string,
@@ -180,76 +180,6 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: updated_value } }, undefined, '\t')}\n`
 }
 
-// Matches a `pnpm <name>` or `pnpm run <name>` delegation to a sibling package script,
-// capturing the referenced script name (e.g. `pnpm prepare:gen` → `prepare:gen`). Built-in
-// invocations (`pnpm dlx …`, `pnpm install`) capture a token that is not a script key, so the
-// resolver simply never follows them. Conservative by design: a reference it cannot parse is
-// treated as not-covered rather than guessed at.
-const PNPM_SCRIPT_REFERENCE_PATTERN = /\bpnpm\s+(?:run\s+)?([\w:-]+)/gu
-
-function collect_pnpm_script_references(cmd: string): Array<string> {
-	return Array.from(cmd.matchAll(PNPM_SCRIPT_REFERENCE_PATTERN), (match) => match[1] ?? '')
-}
-
-// Reports whether the script at `key` runs a command containing `marker`, directly or
-// transitively via `pnpm <name>` references to sibling scripts. The shared `visited` set
-// guards mutually-referential scripts (`a → b → a`) against infinite recursion.
-function has_marker_in_script_chain(
-	scripts: Record<string, string>,
-	key: string,
-	marker: string,
-	visited: Set<string>,
-): boolean {
-	if (visited.has(key)) return false
-	visited.add(key)
-	const cmd = scripts[key]
-	if (cmd === undefined) return false
-	if (cmd.includes(marker)) return true
-
-	return collect_pnpm_script_references(cmd).some((name) =>
-		has_marker_in_script_chain(scripts, name, marker, visited),
-	)
-}
-
-// True when the `key` script transitively runs `marker`, following `pnpm <name>` references
-// through the package's own scripts. Lets a caller skip appending a command the chain already
-// covers — e.g. a `prepare` that reaches `wrangler types` via a `pnpm <subscript>` chain.
-function has_script_marker_coverage(content: string, key: string, marker: string): boolean {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
-	const raw = parsed['scripts']
-	if (raw === undefined) return false
-	const scripts = string_record_schema.parse(raw)
-
-	return has_marker_in_script_chain(scripts, key, marker, new Set())
-}
-
-const SCRIPT_COMMAND_SEPARATOR = ' && '
-// Bare `&&` operator. Splitting on the literal (then trimming each segment) matches a
-// command regardless of how the consumer spaced its pipeline (`a&&b`, `a  &&  b`) without
-// a `\s*…\s*` regex that static analysis flags as backtracking-prone.
-const SCRIPT_COMMAND_AND = '&&'
-
-// Drop every `&&`-joined segment of a script whose trimmed command matches `pattern`,
-// then rejoin the survivors with a normalized ` && `. Used to migrate a one-off command
-// (e.g. `wrangler types`) out of a `build` pipeline once another lifecycle hook owns it.
-// Returns content unchanged (original formatting preserved) when the key is absent or no
-// segment matches, so idempotent re-runs and non-target scripts are never rewritten.
-function remove_script_command_segment(content: string, key: string, pattern: RegExp): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
-	const raw = parsed['scripts']
-	if (raw === undefined) return content
-	const scripts = string_record_schema.parse(raw)
-	const existing = scripts[key]
-	if (existing === undefined) return content
-	const segments = existing.split(SCRIPT_COMMAND_AND).map((segment) => segment.trim())
-	const kept = segments.filter((segment) => segment.length > 0 && !pattern.test(segment))
-	if (kept.length === segments.length) return content
-
-	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: kept.join(SCRIPT_COMMAND_SEPARATOR) } }, undefined, '\t')}\n`
-}
-
 function remove_script_with_marker(content: string, key: string, marker: string): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
@@ -283,8 +213,6 @@ const init_logic_json_merge = {
 	merge_json_object,
 	merge_package_scripts,
 	merge_package_script_suffix,
-	has_script_marker_coverage,
-	remove_script_command_segment,
 	remove_script_with_marker,
 	has_package_scripts_marker,
 	merge_development_dependencies,

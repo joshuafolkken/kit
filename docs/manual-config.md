@@ -4,8 +4,6 @@ Use individual configs directly if you prefer not to use `josh init`:
 
 ```js
 // eslint.config.js
-import { create_sveltekit_config } from '@joshuafolkken/kit/eslint/sveltekit'
-// or
 import { create_vanilla_config } from '@joshuafolkken/kit/eslint/vanilla'
 ```
 
@@ -17,8 +15,6 @@ import { config } from '@joshuafolkken/kit/prettier'
 ```jsonc
 // tsconfig.json
 { "extends": ["@joshuafolkken/kit/tsconfig/base"] }
-// or sveltekit (kit preset first so .svelte-kit/tsconfig.json wins on conflicts):
-{ "extends": ["@joshuafolkken/kit/tsconfig/sveltekit", ".svelte-kit/tsconfig.json"] }
 ```
 
 ```yaml
@@ -31,5 +27,4 @@ import:
 # lefthook.yml
 extends:
   - node_modules/@joshuafolkken/kit/lefthook/vanilla.yml
-  # or sveltekit.yml
 ```
