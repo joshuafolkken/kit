@@ -1,2 +1,7 @@
+# Reference kit's base preset by a ROOT-RELATIVE node_modules path, NOT `./base.yml`.
+# lefthook resolves a nested `extends` path from the CONSUMER's git root (cwd), not from this
+# file's directory — so `./base.yml` looks for `<consumer-root>/base.yml`, which does not exist,
+# and lefthook silently drops it (base hooks never register in the consumer). The root-relative
+# node_modules path resolves correctly in every consumer. See joshuafolkken/kit#629.
 extends:
-  - ./base.yml
+  - node_modules/@joshuafolkken/kit/lefthook/base.yml
