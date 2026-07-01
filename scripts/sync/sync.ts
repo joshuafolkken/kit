@@ -3,19 +3,13 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gh_spawn } from '#scripts/gh-spawn'
-import { init_logic, type ProjectType } from '#scripts/init/init-logic'
-import {
-	is_sveltekit_project,
-	PACKAGE_DIR,
-	PROJECT_ROOT,
-	svelte_config_import,
-} from '#scripts/init/init-paths'
+import { init_logic } from '#scripts/init/init-logic'
+import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { sync_configs } from './sync-configs'
 
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
-const WRANGLER_JSONC = 'wrangler.jsonc'
 const PACKAGE_JSON = 'package.json'
 const PACKAGE_JSON_UNCHANGED_MSG = '  ✔ unchanged package.json'
 
@@ -57,19 +51,6 @@ function sync_workspace_yaml(
 	writeFileSync(destination_path, merged)
 }
 
-function sync_wrangler_jsonc_merge(source_path: string, destination_path: string): void {
-	if (!existsSync(destination_path)) {
-		sync_ai_file(source_path, destination_path)
-
-		return
-	}
-
-	const template = init_logic.transform_prompt_paths(readFileSync(source_path, 'utf8'))
-	const existing = readFileSync(destination_path, 'utf8')
-
-	writeFileSync(destination_path, init_logic.merge_wrangler_jsonc(existing, template))
-}
-
 function sync_ai_copy_file(filename: string, is_force: boolean): void {
 	if (filename === WORKSPACE_YAML) {
 		sync_workspace_yaml(
@@ -78,16 +59,6 @@ function sync_ai_copy_file(filename: string, is_force: boolean): void {
 			is_force,
 		)
 		console.info(`  ✔ synced    ${WORKSPACE_YAML}`)
-
-		return
-	}
-
-	if (filename === WRANGLER_JSONC && !is_force) {
-		sync_wrangler_jsonc_merge(
-			path.join(PACKAGE_DIR, WRANGLER_JSONC),
-			path.join(PROJECT_ROOT, WRANGLER_JSONC),
-		)
-		console.info(`  ✔ synced    ${WRANGLER_JSONC}`)
 
 		return
 	}
@@ -206,20 +177,14 @@ function sync_ai_copy_all(is_force: boolean): void {
 	}
 }
 
-function sync_config_files(type: ProjectType): void {
-	const svelte_import = svelte_config_import(PROJECT_ROOT)
-
+function sync_config_files(): void {
 	sync_configs.sync_npmrc(path.join(PROJECT_ROOT, '.npmrc'))
-	sync_configs.sync_eslint_config(path.join(PROJECT_ROOT, 'eslint.config.js'), type, svelte_import)
-	sync_configs.sync_tsconfig(path.join(PROJECT_ROOT, 'tsconfig.json'), type)
-	sync_configs.sync_cspell_config(path.join(PROJECT_ROOT, 'cspell.config.yaml'), type)
-	sync_configs.sync_lefthook_config(path.join(PROJECT_ROOT, 'lefthook.yml'), type)
+	sync_configs.sync_eslint_config(path.join(PROJECT_ROOT, 'eslint.config.js'))
+	sync_configs.sync_tsconfig(path.join(PROJECT_ROOT, 'tsconfig.json'))
+	sync_configs.sync_cspell_config(path.join(PROJECT_ROOT, 'cspell.config.yaml'))
+	sync_configs.sync_lefthook_config(path.join(PROJECT_ROOT, 'lefthook.yml'))
 	sync_configs.sync_vscode_extensions_json(path.join(PROJECT_ROOT, '.vscode/extensions.json'))
-	sync_configs.sync_vscode_settings_json(path.join(PROJECT_ROOT, '.vscode/settings.json'), type)
-
-	if (type === 'sveltekit') {
-		sync_configs.sync_vite_config(path.join(PROJECT_ROOT, 'vite.config.ts'))
-	}
+	sync_configs.sync_vscode_settings_json(path.join(PROJECT_ROOT, '.vscode/settings.json'))
 }
 
 // Repair an existing consumer manifest whose devEngines.packageManager.version
@@ -241,50 +206,21 @@ function sync_package_manager_version(destination_path: string): void {
 	console.info('  ✔ synced    devEngines.packageManager.version')
 }
 
-// Migrate an existing wrangler consumer's package.json so worker types are generated in
-// `prepare` rather than `build` (see init_logic.migrate_wrangler_types_to_prepare). This
-// lets consumers that re-run `josh sync` pick up the fix without re-running `josh init`.
-// Gated on `is_wrangler` so non-Cloudflare projects are never touched.
-function sync_package_json_scripts(destination_path: string, is_wrangler: boolean): void {
-	if (!is_wrangler || !existsSync(destination_path)) return
-
-	const existing = readFileSync(destination_path, 'utf8')
-	const migrated = init_logic.migrate_wrangler_types_to_prepare(existing)
-
-	if (migrated === existing) {
-		console.info(PACKAGE_JSON_UNCHANGED_MSG)
-
-		return
-	}
-
-	writeFileSync(destination_path, migrated)
-	console.info('  ✔ migrated  wrangler types → prepare')
-}
-
-function resolve_project_type(): ProjectType {
-	return is_sveltekit_project(PROJECT_ROOT) ? 'sveltekit' : 'vanilla'
-}
-
-function sync_project_artifacts(type: ProjectType, is_force: boolean): void {
+function sync_project_artifacts(is_force: boolean): void {
 	sync_ai_copy_all(is_force)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
 	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
 	sync_sonar_with_template(is_force)
-	sync_config_files(type)
-	sync_package_json_scripts(
-		path.join(PROJECT_ROOT, PACKAGE_JSON),
-		existsSync(path.join(PROJECT_ROOT, WRANGLER_JSONC)),
-	)
+	sync_config_files()
 	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
 }
 
 function main(): void {
 	const is_force = process.argv.includes('--force')
-	const type = resolve_project_type()
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
-	sync_project_artifacts(type, is_force)
+	sync_project_artifacts(is_force)
 	console.info('\n✅ Done.\n')
 }
 
@@ -294,11 +230,9 @@ const sync = {
 	sync_file_mapping,
 	sync_ai_file,
 	sync_workspace_yaml,
-	sync_wrangler_jsonc_merge,
 	sync_prettier_config,
 	sync_playwright_config,
 	sync_deploy_vps,
-	sync_package_json_scripts,
 	sync_package_manager_version,
 	migrate_prettierrc: did_migrate_prettierrc,
 }

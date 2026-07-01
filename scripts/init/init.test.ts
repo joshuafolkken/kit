@@ -76,80 +76,29 @@ const KIT_PACKAGE_JSON_PATH = fileURLToPath(new URL('../../package.json', import
 const KIT_VERSION = (JSON.parse(readFileSync(KIT_PACKAGE_JSON_PATH, 'utf8')) as { version: string })
 	.version
 
-function merge_development_dependencies(
-	content: string,
-	type: 'sveltekit' | 'vanilla',
-): Record<string, string> {
-	const merged = init.apply_package_json_merges(content, type)
+function merge_development_dependencies(content: string): Record<string, string> {
+	const merged = init.apply_package_json_merges(content)
 
 	return (JSON.parse(merged) as { devDependencies: Record<string, string> }).devDependencies
 }
 
 describe('apply_package_json_merges', () => {
-	it('adds @joshuafolkken/kit at the kit version for a sveltekit project', () => {
-		expect(merge_development_dependencies('{}\n', 'sveltekit')[KIT_PACKAGE_NAME]).toBe(KIT_VERSION)
-	})
-
-	it('adds @joshuafolkken/kit at the kit version for a vanilla project', () => {
-		expect(merge_development_dependencies('{}\n', 'vanilla')[KIT_PACKAGE_NAME]).toBe(KIT_VERSION)
+	it('adds @joshuafolkken/kit at the kit version', () => {
+		expect(merge_development_dependencies('{}\n')[KIT_PACKAGE_NAME]).toBe(KIT_VERSION)
 	})
 
 	it('does not overwrite an existing @joshuafolkken/kit pin', () => {
 		const existing = `${JSON.stringify({ devDependencies: { [KIT_PACKAGE_NAME]: '0.1.0' } })}\n`
 
-		expect(merge_development_dependencies(existing, 'vanilla')[KIT_PACKAGE_NAME]).toBe('0.1.0')
+		expect(merge_development_dependencies(existing)[KIT_PACKAGE_NAME]).toBe('0.1.0')
 	})
 
-	it('adds the prettier preset plugins for a sveltekit project', () => {
-		const deps = merge_development_dependencies('{}\n', 'sveltekit')
+	it('adds the prettier preset plugins', () => {
+		const deps = merge_development_dependencies('{}\n')
 
 		expect(deps['@ianvs/prettier-plugin-sort-imports']).toBe('^4.7.1')
 		expect(deps['prettier-plugin-svelte']).toBe('^4.1.1')
 		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
-	})
-
-	it('adds the prettier preset plugins for a vanilla project', () => {
-		const deps = merge_development_dependencies('{}\n', 'vanilla')
-
-		expect(deps['@ianvs/prettier-plugin-sort-imports']).toBe('^4.7.1')
-		expect(deps['prettier-plugin-svelte']).toBe('^4.1.1')
-		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
-	})
-})
-
-const WRANGLER_TYPES = 'wrangler types'
-const SVELTE_KIT_SYNC = 'svelte-kit sync'
-
-function merge_scripts(content: string, is_wrangler: boolean): Record<string, string> {
-	const merged = init.apply_package_json_merges(content, 'sveltekit', is_wrangler)
-
-	return (JSON.parse(merged) as { scripts: Record<string, string> }).scripts
-}
-
-describe('apply_package_json_merges wrangler migration', () => {
-	const WRANGLER_PROJECT = JSON.stringify({
-		scripts: {
-			build: `${WRANGLER_TYPES} && vite build && pnpm run prepack`,
-			prepare: SVELTE_KIT_SYNC,
-		},
-	})
-
-	it('moves wrangler types from build to prepare when is_wrangler is true', () => {
-		const scripts = merge_scripts(WRANGLER_PROJECT, true)
-
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
-		expect(scripts['build']).toBe('vite build && pnpm run prepack')
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
-		expect(scripts['prepare']).toContain(WRANGLER_TYPES)
-	})
-
-	it('leaves build and prepare wrangler-free when is_wrangler is false', () => {
-		const scripts = merge_scripts(WRANGLER_PROJECT, false)
-
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
-		expect(scripts['build']).toContain(WRANGLER_TYPES)
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation per noPropertyAccessFromIndexSignature
-		expect(scripts['prepare']).not.toContain(WRANGLER_TYPES)
 	})
 })
 
