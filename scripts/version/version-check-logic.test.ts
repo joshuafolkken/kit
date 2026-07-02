@@ -84,8 +84,10 @@ describe('version_check_logic parameterization by package name', () => {
 	})
 
 	it('headers the report with the configured package name', () => {
+		// An up-to-date snapshot yields no upgrade hints, so the only package name in the output is the
+		// configured one — kit would otherwise appear via the shared fix-gh-packages repair path.
 		const result = version_check_logic.format_dual_version_output(
-			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			snapshot(LATEST_VERSION, LATEST_VERSION, LATEST_VERSION),
 			OTHER_CONFIG,
 		)
 
@@ -99,14 +101,18 @@ describe('version_check_logic parameterization by package name', () => {
 		expect(result).toContain(`${OTHER_PACKAGE}@${LATEST_VERSION}`)
 	})
 
-	it('points the fix-gh-packages repair at the configured package path', () => {
+	// Regression: a non-kit package (game-kit/app-kit) must repair with kit's single published
+	// fix-gh-packages.ts, since those packages never ship their own — pointing at the target
+	// package's path caused ERR_MODULE_NOT_FOUND during `jgame vu`.
+	it('points the fix-gh-packages repair at kit for a non-kit package', () => {
 		const result = version_check_logic.build_upgrade_shell_command(
 			LATEST_VERSION,
 			is_local,
 			OTHER_CONFIG,
 		)
 
-		expect(result).toContain(`node_modules/${OTHER_PACKAGE}/scripts/fix-gh-packages.ts`)
+		expect(result).toContain(`node_modules/${PACKAGE_NAME}/scripts/fix-gh-packages.ts`)
+		expect(result).not.toContain(`node_modules/${OTHER_PACKAGE}/scripts/fix-gh-packages.ts`)
 	})
 })
 
