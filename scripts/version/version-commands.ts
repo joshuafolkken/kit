@@ -20,7 +20,7 @@ function read_snapshot(config: VersionCommandConfig): VersionSnapshot {
 	return {
 		global_version: version_targets.read_global_version(config.package_name),
 		project_version: version_targets.read_project_version(process.cwd(), config.package_name),
-		latest: fetch_latest_version(config.versions_endpoint),
+		latest: fetch_latest_version(config.versions_endpoint, config.package_name),
 	}
 }
 
@@ -52,7 +52,7 @@ function read_upstream_report(upstream: PackageVersionConfig): UpstreamReport {
 	return {
 		config: upstream,
 		project_version: version_targets.read_project_version(process.cwd(), upstream.package_name),
-		latest: fetch_latest_version(upstream.versions_endpoint),
+		latest: fetch_latest_version(upstream.versions_endpoint, upstream.package_name),
 	}
 }
 
