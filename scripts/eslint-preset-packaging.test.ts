@@ -99,9 +99,7 @@ describe('eslint preset packaging — Bug 1 guard (runtime plugin imports)', () 
 	it.each(consumer_runtime_files())(
 		'every external import in %s is declared in dependencies or peerDependencies',
 		(file_path) => {
-			const missing = imported_packages(file_path).filter(
-				(name) => !declared.has(name) && name !== 'eslint',
-			)
+			const missing = imported_packages(file_path).filter((name) => !declared.has(name))
 
 			expect(missing).toEqual([])
 		},
