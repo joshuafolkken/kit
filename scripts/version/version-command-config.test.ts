@@ -42,15 +42,13 @@ describe('create_version_command_config required inputs', () => {
 		expect(config.fix_gh_packages_path).toBe(KIT_FIX_PATH)
 	})
 
-	it('derives the fix-gh-packages path for an arbitrary consumer package', () => {
+	it('points the fix-gh-packages path at kit for a non-kit consumer package', () => {
 		const config = create_version_command_config({
 			package_name: GAME_KIT,
 			versions_endpoint: '/users/joshuafolkken/packages/npm/game-kit/versions?per_page=1',
 		})
 
-		expect(config.fix_gh_packages_path).toBe(
-			'node_modules/@joshuafolkken/game-kit/scripts/fix-gh-packages.ts',
-		)
+		expect(config.fix_gh_packages_path).toBe(KIT_FIX_PATH)
 	})
 })
 
@@ -89,7 +87,7 @@ describe('create_version_command_config upstreams', () => {
 			{
 				package_name: APP_KIT,
 				versions_endpoint: APP_KIT_ENDPOINT,
-				fix_gh_packages_path: 'node_modules/@joshuafolkken/app-kit/scripts/fix-gh-packages.ts',
+				fix_gh_packages_path: KIT_FIX_PATH,
 			},
 			{
 				package_name: KIT,

@@ -9,6 +9,7 @@ import { create_version_command_config } from './version-command-config'
 const MAIN_PACKAGE = '@joshuafolkken/game-kit'
 const MAIN_LATEST = '2.0.0'
 const UPSTREAM_PACKAGE = '@joshuafolkken/app-kit'
+const KIT_PACKAGE = '@joshuafolkken/kit'
 const UPSTREAM_LATEST = '1.5.0'
 const UPSTREAM_STALE = '1.4.0'
 const ADD_LOCAL = 'pnpm add -D'
@@ -56,7 +57,8 @@ describe('version_check_logic.build_upstream_upgrade_commands', () => {
 
 		expect(result).toHaveLength(1)
 		expect(result[0]).toContain(`${ADD_LOCAL} ${UPSTREAM_PACKAGE}@${UPSTREAM_LATEST}`)
-		expect(result[0]).toContain(`node_modules/${UPSTREAM_PACKAGE}/scripts/fix-gh-packages.ts`)
+		// The repair always runs kit's single fix-gh-packages.ts, not the upstream's own copy.
+		expect(result[0]).toContain(`node_modules/${KIT_PACKAGE}/scripts/fix-gh-packages.ts`)
 	})
 
 	it('never builds a global command for upstreams', () => {
