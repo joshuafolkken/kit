@@ -103,8 +103,8 @@ function arrange_chain_versions(upstream_project: string | undefined): void {
 	mocked_read_project.mockImplementation((_cwd: string, package_name: string) =>
 		package_name === UPSTREAM_PACKAGE ? upstream_project : MAIN_LATEST,
 	)
-	mocked_fetch_latest.mockImplementation((endpoint: string) =>
-		endpoint.includes('/npm/app-kit/') ? MAIN_LATEST : UPSTREAM_LATEST,
+	mocked_fetch_latest.mockImplementation((endpoint: string | undefined) =>
+		endpoint?.includes('/npm/app-kit/') ? MAIN_LATEST : UPSTREAM_LATEST,
 	)
 }
 
