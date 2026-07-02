@@ -246,6 +246,24 @@ describe('version_check_logic.format_dual_version_output running binary', () => 
 	})
 })
 
+describe('version_check_logic.format_dual_version_output upstream default', () => {
+	it('produces the exact no-upstream output when the chain is empty', () => {
+		const with_empty_chain = version_check_logic.format_dual_version_output(
+			snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+			KIT_CONFIG,
+			{},
+			[],
+		)
+
+		expect(with_empty_chain).toBe(
+			version_check_logic.format_dual_version_output(
+				snapshot(GLOBAL, PROJECT, LATEST_VERSION),
+				KIT_CONFIG,
+			),
+		)
+	})
+})
+
 describe('version_check_logic.build_dual_upgrade_commands', () => {
 	it('builds both commands when both targets are stale', () => {
 		const result = version_check_logic.build_dual_upgrade_commands(

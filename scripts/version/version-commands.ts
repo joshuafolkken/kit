@@ -3,10 +3,11 @@ import { running_binary } from './running-binary'
 import {
 	version_check_logic,
 	type RunningBinary,
+	type UpstreamReport,
 	type VersionOutputExtras,
 	type VersionSnapshot,
 } from './version-check-logic'
-import type { VersionCommandConfig } from './version-command-config'
+import type { PackageVersionConfig, VersionCommandConfig } from './version-command-config'
 import { fetch_latest_version } from './version-remote'
 import { version_targets } from './version-targets'
 
@@ -45,13 +46,35 @@ function build_extras(config: VersionCommandConfig): VersionOutputExtras {
 	return extras
 }
 
+// Read one upstream's project-installed and latest versions. Upstreams are project
+// devDependencies of the consumer, so the global install path does not apply.
+function read_upstream_report(upstream: PackageVersionConfig): UpstreamReport {
+	return {
+		config: upstream,
+		project_version: version_targets.read_project_version(process.cwd(), upstream.package_name),
+		latest: fetch_latest_version(upstream.versions_endpoint),
+	}
+}
+
+// Read the reports for the configured upstream chain, preserving the configured (nearest-first)
+// order. Empty when the consumer declares no upstreams (e.g. kit itself).
+function read_upstream_reports(config: VersionCommandConfig): Array<UpstreamReport> {
+	return config.upstreams.map((upstream) => read_upstream_report(upstream))
+}
+
 // The `version` (show) command for any configured package: print the dual/offline report with
-// staleness markers, upgrade hints, and the optional running-binary/warning extras.
+// staleness markers, upstream sections, upgrade hints, and the running-binary/warning extras.
 function run_check(config: VersionCommandConfig): void {
 	const snapshot = read_snapshot(config)
+	const upstream_reports = read_upstream_reports(config)
 
 	console.info(
-		version_check_logic.format_dual_version_output(snapshot, config, build_extras(config)),
+		version_check_logic.format_dual_version_output(
+			snapshot,
+			config,
+			build_extras(config),
+			upstream_reports,
+		),
 	)
 }
 
@@ -75,10 +98,14 @@ function run_all_upgrade_commands(commands: ReadonlyArray<string>): number {
 }
 
 // The `version:upgrade` command for any configured package: upgrade whichever of global/project
-// are stale (respecting the fix-gh-packages lockfile repair). Returns the process exit code.
+// are stale, plus any stale upstream project dependencies (each respecting the fix-gh-packages
+// lockfile repair). Returns the process exit code.
 function run_upgrade(config: VersionCommandConfig): number {
 	const snapshot = read_snapshot(config)
-	const commands = version_check_logic.build_dual_upgrade_commands(snapshot, config)
+	const commands = [
+		...version_check_logic.build_dual_upgrade_commands(snapshot, config),
+		...version_check_logic.build_upstream_upgrade_commands(read_upstream_reports(config)),
+	]
 
 	if (commands.length === 0) console.info(ALREADY_UP_TO_DATE)
 
@@ -87,6 +114,7 @@ function run_upgrade(config: VersionCommandConfig): number {
 
 const version_commands = {
 	read_snapshot,
+	read_upstream_reports,
 	build_extras,
 	run_check,
 	run_upgrade,
