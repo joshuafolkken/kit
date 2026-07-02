@@ -1,6 +1,13 @@
+import { KIT_PACKAGE_NAME } from './kit-descriptor'
+
 const NODE_MODULES = 'node_modules'
 const FIX_GH_PACKAGES_SCRIPT = 'scripts/fix-gh-packages.ts'
 const SCOPED_PACKAGE_PATTERN = /^@(?<owner>[^/]+)\/(?<name>.+)$/u
+
+// fix-gh-packages.ts is published only by kit, so every consumer (kit, app-kit, game-kit) repairs
+// its lockfile with kit's single copy — kit is always present as a (transitive) dependency. Using
+// a per-package path here would point at a script app-kit/game-kit never ship (ERR_MODULE_NOT_FOUND).
+const FIX_GH_PACKAGES_PATH = `${NODE_MODULES}/${KIT_PACKAGE_NAME}/${FIX_GH_PACKAGES_SCRIPT}`
 
 // A scoped npm package name split into its scope (the GitHub owner) and unscoped remainder.
 interface ScopedPackageName {
@@ -63,19 +70,13 @@ function derive_versions_endpoint(package_name: string): string {
 	return `/users/${scoped.owner}/packages/npm/${scoped.name}/versions?per_page=1`
 }
 
-// The lockfile-repair script lives at the package root under node_modules, so the relative path is
-// `node_modules/<package_name>/scripts/fix-gh-packages.ts` for any consuming package.
-function derive_fix_gh_packages_path(package_name: string): string {
-	return `${NODE_MODULES}/${package_name}/${FIX_GH_PACKAGES_SCRIPT}`
-}
-
-// Resolve an upstream descriptor into a full per-package config. The upstream's own repair script
-// is used because every package in the chain ships `fix-gh-packages.ts` at the same location.
+// Resolve an upstream descriptor into a full per-package config. Every package in the chain repairs
+// its lockfile with kit's single `fix-gh-packages.ts` (see FIX_GH_PACKAGES_PATH).
 function resolve_upstream(descriptor: UpstreamDescriptor): PackageVersionConfig {
 	return {
 		package_name: descriptor.package_name,
 		versions_endpoint: derive_versions_endpoint(descriptor.package_name),
-		fix_gh_packages_path: derive_fix_gh_packages_path(descriptor.package_name),
+		fix_gh_packages_path: FIX_GH_PACKAGES_PATH,
 	}
 }
 
@@ -85,7 +86,7 @@ function create_version_command_config(options: VersionCommandConfigOptions): Ve
 	const config: VersionCommandConfig = {
 		package_name: options.package_name,
 		versions_endpoint: options.versions_endpoint ?? derive_versions_endpoint(options.package_name),
-		fix_gh_packages_path: derive_fix_gh_packages_path(options.package_name),
+		fix_gh_packages_path: FIX_GH_PACKAGES_PATH,
 		upstreams: (options.upstreams ?? []).map((descriptor) => resolve_upstream(descriptor)),
 	}
 	if (options.self_directory !== undefined) config.self_directory = options.self_directory
