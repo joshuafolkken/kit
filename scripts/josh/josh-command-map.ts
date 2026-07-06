@@ -43,8 +43,6 @@ const ALIASES: Record<string, string> = {
 	te: 'test:e2e',
 	he: 'health',
 	c: 'check',
-	sv: 'check:svelte',
-	sc: 'check:svelte:ci',
 	i: 'init',
 	sy: 'sync',
 	g: 'git',
