@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { package_version_schema, package_with_deps_schema } from '#scripts/schemas'
+import { package_version_schema } from '#scripts/schemas'
 import { execaSync } from 'execa'
 import {
 	ALIASES,
@@ -15,7 +15,6 @@ const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
 const TSX_CMD = 'tsx.cmd'
-const SVELTE_KIT_DEP = '@sveltejs/kit'
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
 const SPAWN_ERROR_EXIT_CODE = 2
@@ -51,18 +50,6 @@ function read_package_version(): string {
 	const raw = readFileSync(path.join(PACKAGE_DIR, PACKAGE_JSON), 'utf8')
 
 	return package_version_schema.parse(JSON.parse(raw)).version
-}
-
-function is_sveltekit_project(): boolean {
-	try {
-		const raw = readFileSync(path.join(process.cwd(), PACKAGE_JSON), 'utf8')
-		const parsed = package_with_deps_schema.parse(JSON.parse(raw))
-		const all_deps = { ...parsed.dependencies, ...parsed.devDependencies }
-
-		return Object.hasOwn(all_deps, SVELTE_KIT_DEP)
-	} catch {
-		return false
-	}
 }
 
 const HEADER = `josh v${read_package_version()} — Joshua Folkken's dev toolkit`
@@ -155,17 +142,6 @@ function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): 
 	return resolve_spawn_exit(executable, result)
 }
 
-function is_sveltekit_guard_failed(cmd: string, entry: CommandEntry): boolean {
-	if (!entry.requires_sveltekit) return false
-	if (is_sveltekit_project()) return false
-
-	console.error(
-		`josh ${cmd}: requires a SvelteKit project (@sveltejs/kit not found in dependencies)`,
-	)
-
-	return true
-}
-
 function run_script_entry(entry: CommandEntry, subcommand_arguments: Array<string>): number {
 	const tsx_executable = resolve_tsx_executable()
 	const script_arguments = [
@@ -183,7 +159,6 @@ function run_command(cmd: string, subcommand_arguments: Array<string>): number {
 	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
 
 	if (!entry) return -1
-	if (is_sveltekit_guard_failed(resolved, entry)) return 1
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
 	return run_script_entry(entry, subcommand_arguments)

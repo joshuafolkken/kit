@@ -10,7 +10,6 @@ interface CommandEntry {
 	category: CommandCategory
 	tsx_arguments?: ReadonlyArray<string>
 	default_script_arguments?: ReadonlyArray<string>
-	requires_sveltekit?: true
 }
 
 const PE = ['pnpm', 'exec'] as const
