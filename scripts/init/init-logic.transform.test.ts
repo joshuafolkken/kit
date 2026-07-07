@@ -6,47 +6,33 @@ const JOSH_SCRIPT_VALUE = 'josh'
 const SAFE_CHAIN_SCRIPT_VALUE = 'pnpm dlx @aikidosec/safe-chain setup-ci'
 
 describe('get_suggested_scripts common scripts', () => {
-	it('includes preinstall for both types', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
-			'preinstall',
-			SAFE_CHAIN_SCRIPT_VALUE,
-		)
-		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty(
-			'preinstall',
-			SAFE_CHAIN_SCRIPT_VALUE,
-		)
+	it('includes preinstall', () => {
+		expect(init_logic.get_suggested_scripts()).toHaveProperty('preinstall', SAFE_CHAIN_SCRIPT_VALUE)
 	})
 
-	it('includes prepare for both types', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty('prepare')
-		expect(init_logic.get_suggested_scripts('sveltekit')).toHaveProperty('prepare')
+	it('includes prepare', () => {
+		expect(init_logic.get_suggested_scripts()).toHaveProperty('prepare')
 	})
 
 	it('does not include commands replaced by josh subcommands', () => {
-		const vanilla = init_logic.get_suggested_scripts('vanilla')
-		const sveltekit = init_logic.get_suggested_scripts('sveltekit')
+		const scripts = init_logic.get_suggested_scripts()
 
-		for (const scripts of [vanilla, sveltekit]) {
-			expect(scripts).not.toHaveProperty('lint')
-			expect(scripts).not.toHaveProperty('check')
-			expect(scripts).not.toHaveProperty('check:ci')
-			expect(scripts).not.toHaveProperty('check:svelte')
-			expect(scripts).not.toHaveProperty('check:svelte:ci')
-			expect(scripts).not.toHaveProperty('test:unit')
-		}
+		expect(scripts).not.toHaveProperty('lint')
+		expect(scripts).not.toHaveProperty('check')
+		expect(scripts).not.toHaveProperty('check:ci')
+		expect(scripts).not.toHaveProperty('check:svelte')
+		expect(scripts).not.toHaveProperty('check:svelte:ci')
+		expect(scripts).not.toHaveProperty('test:unit')
 	})
 })
 
 describe('get_suggested_scripts bin commands', () => {
 	it('includes josh script pointing to josh binary', () => {
-		expect(init_logic.get_suggested_scripts('vanilla')).toHaveProperty(
-			JOSH_SCRIPT_VALUE,
-			JOSH_SCRIPT_VALUE,
-		)
+		expect(init_logic.get_suggested_scripts()).toHaveProperty(JOSH_SCRIPT_VALUE, JOSH_SCRIPT_VALUE)
 	})
 
 	it('does not include alias scripts replaced by pnpm josh', () => {
-		const scripts = init_logic.get_suggested_scripts('vanilla')
+		const scripts = init_logic.get_suggested_scripts()
 
 		expect(scripts).not.toHaveProperty('git')
 		expect(scripts).not.toHaveProperty('git:followup')

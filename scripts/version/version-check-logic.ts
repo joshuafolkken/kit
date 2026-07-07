@@ -1,4 +1,4 @@
-import type { VersionCommandConfig } from './version-command-config'
+import type { PackageVersionConfig } from './version-command-config'
 
 function update_scope_flag(is_local: boolean): string {
 	return is_local ? '-D' : '-g'
@@ -7,7 +7,7 @@ function update_scope_flag(is_local: boolean): string {
 function format_update_command(
 	latest: string,
 	is_local: boolean,
-	config: VersionCommandConfig,
+	config: PackageVersionConfig,
 ): string {
 	return `pnpm add ${update_scope_flag(is_local)} ${config.package_name}@${latest}`
 }
@@ -15,7 +15,7 @@ function format_update_command(
 function build_upgrade_shell_command(
 	latest: string,
 	is_local: boolean,
-	config: VersionCommandConfig,
+	config: PackageVersionConfig,
 ): string {
 	const add_command = format_update_command(latest, is_local, config)
 	if (!is_local) return add_command
@@ -53,6 +53,15 @@ interface VersionOutputExtras {
 	warning?: string
 }
 
+// One upstream package's check result: the resolved upstream config plus the two versions the
+// project-scope report compares. Upstreams are project devDependencies of the consumer, so the
+// global install path does not apply to them.
+interface UpstreamReport {
+	config: PackageVersionConfig
+	project_version: string | undefined
+	latest: string
+}
+
 // Render the running-binary line, or nothing when the running binary is unknown.
 function format_running_line(running: RunningBinary | undefined): Array<string> {
 	if (running === undefined) return []
@@ -76,11 +85,30 @@ function format_target_line(label: string, version: string | undefined, latest: 
 	return `  ${label} ${format_target_status(version, latest)}`
 }
 
+// Render one upstream's report section: package name header plus project/latest lines, reusing
+// the staleness markers of the main report. Prefixed with a blank line to separate sections.
+function format_upstream_lines(report: UpstreamReport): Array<string> {
+	return [
+		'',
+		report.config.package_name,
+		format_target_line(PROJECT_LABEL, report.project_version, report.latest),
+		`  ${LATEST_LABEL} ${report.latest}`,
+	]
+}
+
+// Build the project-scope upgrade command for every upstream that is installed and stale. The
+// global path never applies to upstreams, so every command is local (with lockfile repair).
+function build_upstream_upgrade_commands(reports: ReadonlyArray<UpstreamReport>): Array<string> {
+	return reports
+		.filter((report) => is_target_stale(report.project_version, report.latest))
+		.map((report) => build_upgrade_shell_command(report.latest, true, report.config))
+}
+
 // Build the shell upgrade commands for whichever of the two targets are installed and stale.
 // Order: global first, then project (mirrors the display order).
 function build_dual_upgrade_commands(
 	snapshot: VersionSnapshot,
-	config: VersionCommandConfig,
+	config: PackageVersionConfig,
 ): Array<string> {
 	const { global_version, project_version, latest } = snapshot
 	const commands: Array<string> = []
@@ -106,17 +134,24 @@ function format_target_lines(snapshot: VersionSnapshot): Array<string> {
 	]
 }
 
+// The full report: the main package's section, one section per upstream (nearest-first, in the
+// configured order), then the merged upgrade hints and the optional PATH warning.
 function format_dual_version_output(
 	snapshot: VersionSnapshot,
-	config: VersionCommandConfig,
+	config: PackageVersionConfig,
 	extras: VersionOutputExtras = {},
+	upstreams: ReadonlyArray<UpstreamReport> = [],
 ): string {
 	const lines = [
 		config.package_name,
 		...format_target_lines(snapshot),
 		...format_running_line(extras.running),
+		...upstreams.flatMap((report) => format_upstream_lines(report)),
 	]
-	const hints = build_dual_upgrade_commands(snapshot, config).map((command) => `Run: ${command}`)
+	const hints = [
+		...build_dual_upgrade_commands(snapshot, config),
+		...build_upstream_upgrade_commands(upstreams),
+	].map((command) => `Run: ${command}`)
 	if (hints.length > 0) lines.push('', ...hints)
 	if (extras.warning !== undefined) lines.push('', extras.warning)
 
@@ -126,10 +161,12 @@ function format_dual_version_output(
 const version_check_logic = {
 	format_dual_version_output,
 	format_running_line,
+	format_upstream_lines,
 	build_dual_upgrade_commands,
+	build_upstream_upgrade_commands,
 	format_update_command,
 	build_upgrade_shell_command,
 }
 
-export type { VersionSnapshot, RunningBinary, VersionOutputExtras }
+export type { VersionSnapshot, RunningBinary, VersionOutputExtras, UpstreamReport }
 export { version_check_logic }

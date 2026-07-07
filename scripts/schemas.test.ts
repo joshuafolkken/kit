@@ -3,7 +3,6 @@ import {
 	json_object_schema,
 	overrides_snapshot_schema,
 	package_version_schema,
-	package_with_deps_schema,
 	pnpm_ls_global_schema,
 	string_array_schema,
 	vscode_settings_schema,
@@ -11,7 +10,6 @@ import {
 	with_scripts_schema,
 } from './schemas'
 
-const REACT_VERSION = '^18.0.0'
 const VITEST_VERSION = '^4.0.0'
 const PKG_NAME = 'pkg'
 
@@ -74,30 +72,6 @@ describe('pnpm_ls_global_schema', () => {
 
 	it('fails when the top level is not an array', () => {
 		expect(pnpm_ls_global_schema.safeParse({}).success).toBe(false)
-	})
-})
-
-describe('package_with_deps_schema', () => {
-	it('parses dependencies and devDependencies', () => {
-		const result = package_with_deps_schema.safeParse({
-			dependencies: { react: REACT_VERSION },
-			devDependencies: { vitest: VITEST_VERSION },
-		})
-
-		expect(result.success).toBe(true)
-
-		if (result.success) {
-			expect(result.data.dependencies).toStrictEqual({ react: REACT_VERSION })
-			expect(result.data.devDependencies).toStrictEqual({ vitest: VITEST_VERSION })
-		}
-	})
-
-	it('parses empty object (both deps optional)', () => {
-		expect(package_with_deps_schema.safeParse({}).success).toBe(true)
-	})
-
-	it('fails when a dep value is not a string', () => {
-		expect(package_with_deps_schema.safeParse({ dependencies: { react: 18 } }).success).toBe(false)
 	})
 })
 

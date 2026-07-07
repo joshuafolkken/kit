@@ -9,31 +9,9 @@ const PACKAGE_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..
 const GITIGNORE_DEST = '.gitignore'
 const CI_YML_DEST = '.github/workflows/ci.yml'
 
-const SVELTE_CONFIG_IMPORT_PATH = './svelte.config.js'
-
 describe('generate_eslint_config', () => {
-	it('returns sveltekit config for sveltekit type', () => {
-		expect(init_logic.generate_eslint_config('sveltekit', SVELTE_CONFIG_IMPORT_PATH)).toContain(
-			'create_sveltekit_config',
-		)
-	})
-
-	it('returns vanilla config for vanilla type', () => {
-		expect(init_logic.generate_eslint_config('vanilla', undefined)).toContain(
-			'create_vanilla_config',
-		)
-	})
-
-	it('sveltekit config imports svelte.config.js when present', () => {
-		expect(init_logic.generate_eslint_config('sveltekit', SVELTE_CONFIG_IMPORT_PATH)).toContain(
-			SVELTE_CONFIG_IMPORT_PATH,
-		)
-	})
-
-	it('sveltekit config omits the svelte.config.js import when absent', () => {
-		expect(init_logic.generate_eslint_config('sveltekit', undefined)).not.toContain(
-			SVELTE_CONFIG_IMPORT_PATH,
-		)
+	it('returns the vanilla config', () => {
+		expect(init_logic.generate_eslint_config()).toContain('create_vanilla_config')
 	})
 })
 
@@ -48,12 +26,8 @@ describe('generate_prettier_config', () => {
 })
 
 describe('generate_lefthook_config', () => {
-	it('sveltekit references the sveltekit yml', () => {
-		expect(init_logic.generate_lefthook_config('sveltekit')).toContain('sveltekit.yml')
-	})
-
-	it('vanilla references the vanilla yml', () => {
-		expect(init_logic.generate_lefthook_config('vanilla')).toContain('vanilla.yml')
+	it('references the vanilla yml', () => {
+		expect(init_logic.generate_lefthook_config()).toContain('vanilla.yml')
 	})
 })
 
@@ -84,36 +58,6 @@ describe('generate_playwright_config', () => {
 		expect(init_logic.generate_playwright_config()).toContain(
 			"command: 'pnpm run build && pnpm run preview'",
 		)
-	})
-})
-
-describe('generate_vite_config', () => {
-	it('contains visualizer import', () => {
-		expect(init_logic.generate_vite_config()).toContain("from 'rollup-plugin-visualizer'")
-	})
-
-	it('contains UserConfig and ConfigEnv type import', () => {
-		expect(init_logic.generate_vite_config()).toContain(
-			"import type { UserConfig, ConfigEnv } from 'vite'",
-		)
-	})
-
-	it('contains client visualizer entry with apply and stats-client.html', () => {
-		const result = init_logic.generate_vite_config()
-
-		expect(result).toContain("filename: 'stats-client.html'")
-		expect(result).toContain("command === 'build' && !config.build?.ssr")
-	})
-
-	it('contains server visualizer entry with apply and stats-server.html', () => {
-		const result = init_logic.generate_vite_config()
-
-		expect(result).toContain("filename: 'stats-server.html'")
-		expect(result).toContain("command === 'build' && !!config.build?.ssr")
-	})
-
-	it('uses CI-aware open flag', () => {
-		expect(init_logic.generate_vite_config()).toContain("open: !process.env['CI']")
 	})
 })
 
@@ -171,7 +115,6 @@ describe('get_ai_copy_files - dotfiles and config', () => {
 
 		expect(result).toContain('pnpm-workspace.yaml')
 		expect(result).toContain('tsconfig.sonar.json')
-		expect(result).toContain('wrangler.jsonc')
 		expect(result).not.toContain('sonar-project.properties')
 	})
 
@@ -228,11 +171,9 @@ const RETIRED_SCRIPTS = [
 	'check:svelte:ci',
 ]
 
-const SIZE_LIMIT_SCRIPT = 'size-limit'
-
 describe('get_suggested_scripts', () => {
-	it('vanilla returns only preinstall, prepare, and josh', () => {
-		const result = init_logic.get_suggested_scripts('vanilla')
+	it('returns only preinstall, prepare, and josh', () => {
+		const result = init_logic.get_suggested_scripts()
 
 		expect(Object.keys(result)).toHaveLength(3)
 		expect(result).toHaveProperty('preinstall')
@@ -240,23 +181,11 @@ describe('get_suggested_scripts', () => {
 		expect(result).toHaveProperty('josh')
 	})
 
-	it('sveltekit returns preinstall, prepare, josh, and size-limit', () => {
-		const result = init_logic.get_suggested_scripts('sveltekit')
-
-		expect(Object.keys(result)).toHaveLength(4)
-		expect(result).toHaveProperty('preinstall')
-		expect(result).toHaveProperty('prepare')
-		expect(result).toHaveProperty('josh')
-		expect(result).toHaveProperty(SIZE_LIMIT_SCRIPT, SIZE_LIMIT_SCRIPT)
-	})
-
 	it('does not include retired script keys', () => {
-		const vanilla = init_logic.get_suggested_scripts('vanilla')
-		const sveltekit = init_logic.get_suggested_scripts('sveltekit')
+		const result = init_logic.get_suggested_scripts()
 
 		for (const key of RETIRED_SCRIPTS) {
-			expect(vanilla).not.toHaveProperty(key)
-			expect(sveltekit).not.toHaveProperty(key)
+			expect(result).not.toHaveProperty(key)
 		}
 	})
 })
@@ -306,19 +235,6 @@ describe('get_npmrc_lines', () => {
 
 	it('includes lockfile-include-tarball-url=true so pnpm >=11.5 frozen installs avoid 401', () => {
 		expect(init_logic.get_npmrc_lines()).toContain('lockfile-include-tarball-url=true')
-	})
-})
-
-describe('cspell sveltekit.yaml content', () => {
-	const CSPELL_SVELTEKIT_PATH = path.join(PACKAGE_ROOT, 'cspell', 'sveltekit.yaml')
-	const CSPELL_SVELTEKIT_CONTENT = readFileSync(CSPELL_SVELTEKIT_PATH, 'utf8')
-
-	it('contains sveltekit word', () => {
-		expect(CSPELL_SVELTEKIT_CONTENT).toContain('sveltekit')
-	})
-
-	it('contains Stylesheet word', () => {
-		expect(CSPELL_SVELTEKIT_CONTENT).toContain('Stylesheet')
 	})
 })
 

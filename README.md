@@ -1,6 +1,6 @@
 # @joshuafolkken/kit
 
-Shared toolchain config and CLI for TypeScript / SvelteKit projects — ESLint, Prettier, TypeScript, Lefthook, cspell, VS Code, and AI assistant files (CLAUDE.md, AGENTS.md, GEMINI.md), wired together.
+Shared toolchain config and CLI for TypeScript projects — ESLint, Prettier, TypeScript, Lefthook, cspell, VS Code, and AI assistant files (CLAUDE.md, AGENTS.md, GEMINI.md), wired together. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
 
 - **`josh` CLI** — lint, format, type-check, git workflow, versioning, and security auditing from any directory.
 - **Project config package** — ESLint / Prettier / tsconfig presets, prompts, and scripts consumed as a devDependency.

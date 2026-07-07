@@ -4,7 +4,6 @@ import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { init_sonar } from './init-sonar'
 
-const WRANGLER_JSONC = 'wrangler.jsonc'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
 
 function copy_ai_file(source_path: string, destination_path: string): void {
@@ -31,24 +30,6 @@ function did_skip_copy_if_absent(
 	return false
 }
 
-function did_skip_wrangler_jsonc_copy(source_path: string, destination_path: string): boolean {
-	if (!existsSync(destination_path)) {
-		copy_ai_file(source_path, destination_path)
-		console.info(`  ✔ created   ${WRANGLER_JSONC}`)
-
-		return false
-	}
-
-	const template = init_logic.transform_prompt_paths(readFileSync(source_path, 'utf8'))
-	const existing = readFileSync(destination_path, 'utf8')
-	const merged = init_logic.merge_wrangler_jsonc(existing, template)
-
-	if (merged !== existing) writeFileSync(destination_path, merged)
-	console.info(`  ✔ updated   ${WRANGLER_JSONC}`)
-
-	return false
-}
-
 function did_skip_workspace_yaml_copy(source_path: string, destination_path: string): boolean {
 	if (!existsSync(destination_path)) {
 		copy_ai_file(source_path, destination_path)
@@ -70,10 +51,6 @@ function did_skip_workspace_yaml_copy(source_path: string, destination_path: str
 function did_skip_ai_file_copy(filename: string): boolean {
 	const source_path = package_path(filename)
 	const destination_path = path.join(PROJECT_ROOT, filename)
-
-	if (filename === WRANGLER_JSONC) {
-		return did_skip_wrangler_jsonc_copy(source_path, destination_path)
-	}
 
 	if (filename === WORKSPACE_YAML) {
 		return did_skip_workspace_yaml_copy(source_path, destination_path)

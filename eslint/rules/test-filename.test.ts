@@ -10,7 +10,7 @@ import {
 const ECMA_VERSION = 2024
 const COLOCATED_TEST_FILE = 'src/lib/foo.test.ts'
 
-// Minimal flat config mirroring how create_sveltekit_config wires the fragments:
+// Minimal flat config mirroring how the kit eslint config wires the fragments:
 // each rule object is scoped to its filename patterns. Linting with a virtual
 // filename exercises the glob + rule combination without needing a real tsconfig.
 function lint_as(file_name: string, source = ''): Array<Linter.LintMessage> {

@@ -23,42 +23,41 @@ const FIX_GH_PACKAGES_MARKER = 'fix-gh-packages'
 const LEFTHOOK_INSTALL = 'lefthook install'
 const PREPARE = 'prepare'
 const POSTINSTALL = 'postinstall'
-const VANILLA = 'vanilla'
 const SVELTE_KIT_SYNC = 'svelte-kit sync'
 
 describe('get_suggested_scripts prepare value', () => {
 	it('includes fix-gh-packages command in prepare', () => {
-		const result = init_logic.get_suggested_scripts(VANILLA)
+		const result = init_logic.get_suggested_scripts()
 
 		expect(result[PREPARE]).toContain(FIX_GH_PACKAGES_MARKER)
 	})
 
 	it('includes lefthook install in prepare', () => {
-		const result = init_logic.get_suggested_scripts(VANILLA)
+		const result = init_logic.get_suggested_scripts()
 
 		expect(result[PREPARE]).toContain(LEFTHOOK_INSTALL)
 	})
 
 	it('guards lefthook so a missing binary does not abort install', () => {
-		const result = init_logic.get_suggested_scripts(VANILLA)
+		const result = init_logic.get_suggested_scripts()
 
 		expect(result[PREPARE]).toContain('command -v lefthook >/dev/null 2>&1 && lefthook install')
 	})
 
 	it('guards tsx so a missing binary does not abort install', () => {
-		const result = init_logic.get_suggested_scripts(VANILLA)
+		const result = init_logic.get_suggested_scripts()
 
 		expect(result[PREPARE]).toContain('command -v tsx >/dev/null 2>&1')
 	})
 
 	it('does not end with a blanket "; true" that would mask preceding failures', () => {
-		const result = init_logic.get_suggested_scripts(VANILLA)
+		const result = init_logic.get_suggested_scripts()
 
 		expect(result[PREPARE]?.endsWith('; true')).toBe(false)
 	})
 
 	it('tolerates each optional hook individually with "|| true"', () => {
-		const result = init_logic.get_suggested_scripts(VANILLA)
+		const result = init_logic.get_suggested_scripts()
 
 		expect(result[PREPARE]).toContain(
 			'command -v lefthook >/dev/null 2>&1 && lefthook install || true',
@@ -67,7 +66,7 @@ describe('get_suggested_scripts prepare value', () => {
 	})
 
 	it('does not suggest a postinstall script', () => {
-		const result = init_logic.get_suggested_scripts(VANILLA)
+		const result = init_logic.get_suggested_scripts()
 
 		expect(result).not.toHaveProperty(POSTINSTALL)
 	})
@@ -79,7 +78,7 @@ describe('get_suggested_scripts_for_content prepare skip', () => {
 			scripts: { prepare: `command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}; true` },
 		})
 
-		const result = init_logic.get_suggested_scripts_for_content(VANILLA, content)
+		const result = init_logic.get_suggested_scripts_for_content(content)
 
 		expect(result).not.toHaveProperty(PREPARE)
 	})
@@ -87,7 +86,7 @@ describe('get_suggested_scripts_for_content prepare skip', () => {
 	it('keeps prepare when no script runs fix-gh-packages', () => {
 		const content = JSON.stringify({ scripts: { build: 'tsc' } })
 
-		const result = init_logic.get_suggested_scripts_for_content(VANILLA, content)
+		const result = init_logic.get_suggested_scripts_for_content(content)
 
 		expect(result).toHaveProperty(PREPARE)
 	})
@@ -151,7 +150,7 @@ describe('prepare exit-code behavior', () => {
 	})
 
 	it('exits zero for a fresh-project prepare when the optional tools are missing', () => {
-		const prepare = init_logic.get_suggested_scripts(VANILLA)[PREPARE] ?? ''
+		const prepare = init_logic.get_suggested_scripts()[PREPARE] ?? ''
 
 		expect(run_prepare(prepare, EMPTY_PATH)).toBe(0)
 	})
@@ -197,33 +196,29 @@ describe('strip_managed_postinstall', () => {
 
 // Mirrors scripts/init/init.ts apply_package_json_merges so the composed ordering
 // (migrate → suggested-scripts merge → lifecycle append) is regression-protected.
-function run_pipeline(content: string, type: 'sveltekit' | 'vanilla'): Record<string, string> {
+function run_pipeline(content: string): Record<string, string> {
 	const migrated = init_logic.strip_managed_postinstall(content)
-	const merged =
-		type === 'sveltekit'
-			? init_logic.merge_sveltekit_package_json(migrated)
-			: init_logic.merge_package_scripts(
-					migrated,
-					init_logic.get_suggested_scripts_for_content(type, migrated),
-				)
+	const merged = init_logic.merge_package_scripts(
+		migrated,
+		init_logic.get_suggested_scripts_for_content(migrated),
+	)
 	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(merged)
 
 	return (JSON.parse(with_lifecycle) as { scripts: Record<string, string> }).scripts
 }
 
 describe('apply_package_json_merges pipeline composition', () => {
-	it('vanilla fresh project gets lifecycle in prepare and no postinstall', () => {
-		const scripts = run_pipeline('{"name":"app"}', 'vanilla')
+	it('fresh project gets lifecycle in prepare and no postinstall', () => {
+		const scripts = run_pipeline('{"name":"app"}')
 
 		expect(scripts[PREPARE]).toContain(LEFTHOOK_INSTALL)
 		expect(scripts[PREPARE]).toContain(FIX_GH_PACKAGES_MARKER)
 		expect(scripts).not.toHaveProperty(POSTINSTALL)
 	})
 
-	it('sveltekit preserves an existing prepare and appends the lifecycle', () => {
+	it('preserves an existing prepare and appends the lifecycle', () => {
 		const scripts = run_pipeline(
 			JSON.stringify({ name: 'app', scripts: { prepare: SVELTE_KIT_SYNC } }),
-			'sveltekit',
 		)
 
 		expect(scripts[PREPARE]).toContain(SVELTE_KIT_SYNC)
@@ -234,10 +229,7 @@ describe('apply_package_json_merges pipeline composition', () => {
 
 	it('migrates a legacy kit-managed postinstall to prepare', () => {
 		const legacy = `command -v lefthook >/dev/null 2>&1 && ${LEFTHOOK_INSTALL}; command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}; true`
-		const scripts = run_pipeline(
-			JSON.stringify({ name: 'app', scripts: { postinstall: legacy } }),
-			'vanilla',
-		)
+		const scripts = run_pipeline(JSON.stringify({ name: 'app', scripts: { postinstall: legacy } }))
 
 		expect(scripts).not.toHaveProperty(POSTINSTALL)
 		expect(scripts[PREPARE]).toContain(FIX_GH_PACKAGES_MARKER)
@@ -246,9 +238,8 @@ describe('apply_package_json_merges pipeline composition', () => {
 	it('is idempotent on a second run', () => {
 		const first = run_pipeline(
 			JSON.stringify({ name: 'app', scripts: { prepare: SVELTE_KIT_SYNC } }),
-			'sveltekit',
 		)
-		const second = run_pipeline(JSON.stringify({ name: 'app', scripts: first }), 'sveltekit')
+		const second = run_pipeline(JSON.stringify({ name: 'app', scripts: first }))
 
 		expect(second[PREPARE]).toBe(first[PREPARE])
 	})

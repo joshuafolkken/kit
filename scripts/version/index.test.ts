@@ -3,7 +3,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { create_version_command_config, version_commands } from './index'
+import {
+	create_version_command_config,
+	derive_versions_endpoint,
+	kit_package_descriptor,
+	version_commands,
+} from './index'
 
 const version_export_schema = z.object({ types: z.string(), default: z.string() })
 const exports_schema = z.object({ exports: z.record(z.string(), z.unknown()) })
@@ -22,6 +27,14 @@ describe('version library barrel', () => {
 	it('re-exports the version_commands run functions', () => {
 		expect(typeof version_commands.run_check).toBe('function')
 		expect(typeof version_commands.run_upgrade).toBe('function')
+	})
+
+	it('re-exports the endpoint derivation helper', () => {
+		expect(typeof derive_versions_endpoint).toBe('function')
+	})
+
+	it('re-exports kit package descriptor for downstream upstream chains', () => {
+		expect(kit_package_descriptor.package_name).toBe('@joshuafolkken/kit')
 	})
 })
 

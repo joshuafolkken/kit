@@ -1,14 +1,13 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { init_logic, type ProjectType } from '#scripts/init/init-logic'
+import { init_logic } from '#scripts/init/init-logic'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync_configs } from './sync-configs'
 
 const TEST_DIR = path.join(tmpdir(), 'sync-configs-tsconfig-test')
 const TSCONFIG_DEST = path.join(TEST_DIR, 'tsconfig.json')
-const TYPE: ProjectType = 'vanilla'
-const ENTRY = init_logic.get_tsconfig_extends_entry(TYPE)
+const ENTRY = init_logic.get_tsconfig_extends_entry()
 const NO_EMIT_ON_ERROR = 'noEmitOnError'
 
 beforeEach(() => {
@@ -25,7 +24,7 @@ function sync_and_read(content: string): Record<string, unknown> {
 	vi.spyOn(console, 'info').mockImplementation(() => {
 		/* suppress */
 	})
-	sync_configs.sync_tsconfig(TSCONFIG_DEST, TYPE)
+	sync_configs.sync_tsconfig(TSCONFIG_DEST)
 
 	return JSON.parse(readFileSync(TSCONFIG_DEST, 'utf8')) as Record<string, unknown>
 }
@@ -58,7 +57,7 @@ describe('sync_configs.sync_tsconfig — normalization', () => {
 			/* suppress */
 		})
 
-		sync_configs.sync_tsconfig(TSCONFIG_DEST, TYPE)
+		sync_configs.sync_tsconfig(TSCONFIG_DEST)
 
 		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('unchanged'))
 		expect(readFileSync(TSCONFIG_DEST, 'utf8')).toBe(content)

@@ -16,7 +16,7 @@ pnpm add -D @joshuafolkken/kit
 
 ## 3. Initialize
 
-Run once after installing — auto-detects SvelteKit vs. vanilla and creates or merges all config files:
+Run once after installing — creates or merges all config files:
 
 ```bash
 pnpm exec josh init
@@ -36,9 +36,9 @@ The package exposes config presets for direct import:
 
 | Use             | Reference                                                        |
 | --------------- | ---------------------------------------------------------------- |
-| ESLint config   | `@joshuafolkken/kit/eslint/sveltekit`                            |
+| ESLint config   | `@joshuafolkken/kit/eslint/vanilla`                              |
 | Prettier        | `@joshuafolkken/kit/prettier`                                    |
-| tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc`     |
+| tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/base.jsonc`          |
 | Scripts         | `tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts` |
 | Prompts         | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
 | Version library | `@joshuafolkken/kit/version`                                     |

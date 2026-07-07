@@ -3,12 +3,8 @@ import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
 import { init_logic_sonar } from './init-logic-sonar'
 import { init_logic_templates } from './init-logic-templates'
-import { init_logic_vite } from './init-logic-vite'
 import { init_logic_workspace } from './init-logic-workspace'
-import { init_logic_wrangler } from './init-logic-wrangler'
 import { init_logic_yaml_merge } from './init-logic-yaml-merge'
-
-type ProjectType = 'sveltekit' | 'vanilla'
 
 const DEV_ENGINES_VALUE = {
 	packageManager: { name: 'pnpm', version: '>=11.0.0-0', onFail: 'error' },
@@ -25,10 +21,7 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 	'lockfile-include-tarball-url=true',
 ]
 
-const CSPELL_IMPORT: Record<ProjectType, string> = {
-	sveltekit: '@joshuafolkken/kit/cspell/sveltekit',
-	vanilla: '@joshuafolkken/kit/cspell',
-}
+const CSPELL_IMPORT = '@joshuafolkken/kit/cspell'
 
 const LEFTHOOK_INSTALL_CMD = 'lefthook install'
 const SAFE_CHAIN_CMD = 'pnpm dlx @aikidosec/safe-chain setup-ci'
@@ -53,23 +46,6 @@ const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_
 // exits zero.
 const PREPARE_CMD = `(${GUARDED_LEFTHOOK_CMD} || true) && (${GUARDED_FIX_GH_PACKAGES_CMD} || true)`
 
-const BUILD_KEY = 'build'
-const WRANGLER_CONFIG_FILE = 'wrangler.jsonc'
-const WRANGLER_TYPES_CMD = 'wrangler types'
-// Generate Cloudflare worker types in `prepare` instead of `build`. When `wrangler types`
-// lives at the head of `build`, the E2E webServer's `pnpm run build` invokes wrangler a
-// second time (alongside prepack's `svelte-kit sync`) under the safe-chain proxy, and the
-// double invocation stalls webServer startup. Owning type generation in `prepare` lets
-// `build` drop it. Guarded by `wrangler.jsonc` (no-op in non-Cloudflare checkouts) and by
-// `command -v wrangler` (no-op on CI/production installs without the dev binary); `|| true`
-// keeps a missing tool from aborting `pnpm install`, mirroring the lefthook/tsx hooks.
-const GUARDED_WRANGLER_TYPES_CMD = `[ -f ${WRANGLER_CONFIG_FILE} ] && command -v wrangler >/dev/null 2>&1 && ${WRANGLER_TYPES_CMD}`
-const PREPARE_WRANGLER_TYPES_CMD = `(${GUARDED_WRANGLER_TYPES_CMD} || true)`
-// Matches a `build` pipeline segment that runs `wrangler types` (bare or with flags), so
-// the migration drops it once `prepare` owns worker-type generation. Anchored to avoid
-// matching unrelated commands that merely mention the words.
-const WRANGLER_TYPES_SEGMENT_PATTERN = /^wrangler types(?:\s|$)/u
-
 const AI_COPY_FILES: ReadonlyArray<string> = [
 	'CLAUDE.md',
 	'AGENTS.md',
@@ -84,7 +60,6 @@ const AI_COPY_FILES: ReadonlyArray<string> = [
 	'SECURITY.md',
 	'pnpm-workspace.yaml',
 	'tsconfig.sonar.json',
-	WRANGLER_CONFIG_FILE,
 	'.github/workflows/auto-tag.yml',
 	'.github/workflows/production.yml',
 	'.github/workflows/sonar-qube.yml',
@@ -108,30 +83,18 @@ const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
 
 const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
 
-const LEFTHOOK_EXTENDS: Record<ProjectType, string> = {
-	sveltekit: 'node_modules/@joshuafolkken/kit/lefthook/sveltekit.yml',
-	vanilla: 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml',
-}
+const LEFTHOOK_EXTENDS = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
 
-const TSCONFIG_EXTENDS: Record<ProjectType, string> = {
-	sveltekit: './node_modules/@joshuafolkken/kit/tsconfig/sveltekit.jsonc',
-	vanilla: './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
-}
+const TSCONFIG_EXTENDS = './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc'
 
 // Preset file basename within the package's tsconfig/ directory, used to read the base
 // compilerOptions when normalizing a consumer tsconfig.json during sync.
-const TSCONFIG_PRESET_FILENAME: Record<ProjectType, string> = {
-	sveltekit: 'sveltekit.jsonc',
-	vanilla: 'base.jsonc',
-}
+const TSCONFIG_PRESET_FILENAME = 'base.jsonc'
 
-// extensions.json is distributed in common across project styles, so it is not keyed by ProjectType.
+// extensions.json is distributed in common across project styles, so it is not keyed by type.
 const VSCODE_EXTENSIONS_FILENAME = 'extensions.json'
 
-const VSCODE_SETTINGS_FILENAMES: Record<ProjectType, string> = {
-	sveltekit: 'settings.sveltekit.json',
-	vanilla: 'settings.json',
-}
+const VSCODE_SETTINGS_FILENAME = 'settings.json'
 
 // Keys that exist in the kit's own .vscode/settings.json for kit development but must
 // never be distributed to consumer projects (e.g. SonarLint connected-mode points at the
@@ -146,24 +109,10 @@ const SUGGESTED_SCRIPTS_COMMON: Record<string, string> = {
 	josh: 'josh',
 }
 
-const CSPELL_VERSION = '^10.0.0'
-const SIZE_LIMIT_VERSION = '^12.1.0'
-const SIZE_LIMIT_FILE_KEY = '@size-limit/file'
-const SIZE_LIMIT_FILE_VERSION = '^12.1.0'
-const VISUALIZER_VERSION = '^7.0.1'
-
-const SIZE_LIMIT_CONFIG = [
-	{ path: '.svelte-kit/output/client/_app/immutable/**/*.js', limit: '500 kB' },
-] as const satisfies ReadonlyArray<{ path: string; limit: string }>
-
-const SUGGESTED_SCRIPTS_SVELTEKIT: Record<string, string> = {
-	'size-limit': 'size-limit',
-}
-
 // prettier resolves its `plugins[]` from the consumer project, not transitively through the kit,
 // so every package that uses the kit prettier preset must declare these as devDependencies. The
 // preset references all three unconditionally (prettier/index.js → plugins), hence all three are
-// added regardless of project type — omitting any breaks `prettier`/`josh lint` with a
+// added regardless of project — omitting any breaks `prettier`/`josh lint` with a
 // "Cannot find package" error. Versions mirror the kit's own devDependencies.
 const SORT_IMPORTS_PLUGIN_KEY = '@ianvs/prettier-plugin-sort-imports'
 const PRETTIER_SVELTE_PLUGIN_KEY = 'prettier-plugin-svelte'
@@ -174,23 +123,16 @@ const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
 	[PRETTIER_TAILWIND_PLUGIN_KEY]: '^0.8.0',
 }
 
-function generate_tsconfig(type: ProjectType): string {
-	// kit preset first so the later `.svelte-kit/tsconfig.json` (and any project-specific
-	// entry) wins on conflicts — matching the order `josh sync` prepends to and all consumers.
-	const value =
-		type === 'sveltekit'
-			? { extends: [TSCONFIG_EXTENDS.sveltekit, './.svelte-kit/tsconfig.json'] }
-			: { extends: TSCONFIG_EXTENDS.vanilla }
-
-	return `${JSON.stringify(value, undefined, '\t')}\n`
+function generate_tsconfig(): string {
+	return `${JSON.stringify({ extends: TSCONFIG_EXTENDS }, undefined, '\t')}\n`
 }
 
-function generate_lefthook_config(type: ProjectType): string {
-	return `extends:\n  - ${LEFTHOOK_EXTENDS[type]}\n`
+function generate_lefthook_config(): string {
+	return `extends:\n  - ${LEFTHOOK_EXTENDS}\n`
 }
 
-function generate_cspell_config(type: ProjectType): string {
-	return `version: "0.2"\nimport:\n  - "${CSPELL_IMPORT[type]}"\nwords: []\nignorePaths: []\n`
+function generate_cspell_config(): string {
+	return `version: "0.2"\nimport:\n  - "${CSPELL_IMPORT}"\nwords: []\nignorePaths: []\n`
 }
 
 function generate_npmrc(): string {
@@ -205,24 +147,24 @@ function merge_npmrc(content: string): string {
 	return `${prefix}${missing.join('\n')}\n`
 }
 
-function get_tsconfig_extends_entry(type: ProjectType): string {
-	return TSCONFIG_EXTENDS[type]
+function get_tsconfig_extends_entry(): string {
+	return TSCONFIG_EXTENDS
 }
 
-function get_tsconfig_preset_filename(type: ProjectType): string {
-	return TSCONFIG_PRESET_FILENAME[type]
+function get_tsconfig_preset_filename(): string {
+	return TSCONFIG_PRESET_FILENAME
 }
 
-function get_lefthook_extends_value(type: ProjectType): string {
-	return LEFTHOOK_EXTENDS[type]
+function get_lefthook_extends_value(): string {
+	return LEFTHOOK_EXTENDS
 }
 
-function get_cspell_import_value(type: ProjectType): string {
-	return CSPELL_IMPORT[type]
+function get_cspell_import_value(): string {
+	return CSPELL_IMPORT
 }
 
-function get_vscode_settings_filename(type: ProjectType): string {
-	return VSCODE_SETTINGS_FILENAMES[type]
+function get_vscode_settings_filename(): string {
+	return VSCODE_SETTINGS_FILENAME
 }
 
 function strip_kit_only_vscode_settings(
@@ -263,74 +205,29 @@ function get_ai_copy_directories(): ReadonlyArray<string> {
 	return AI_COPY_DIRECTORIES
 }
 
-function get_suggested_scripts(type: ProjectType): Record<string, string> {
-	if (type === 'sveltekit') return { ...SUGGESTED_SCRIPTS_COMMON, ...SUGGESTED_SCRIPTS_SVELTEKIT }
-
+function get_suggested_scripts(): Record<string, string> {
 	return SUGGESTED_SCRIPTS_COMMON
 }
 
 // Drop the suggested `prepare` when the consumer already runs fix-gh-packages in
 // any script, so re-running `josh init` does not re-inject a duplicate hook that
 // fights the consumer's intentional consolidation.
-function get_suggested_scripts_for_content(
-	type: ProjectType,
-	content: string,
-): Record<string, string> {
-	const scripts = get_suggested_scripts(type)
+function get_suggested_scripts_for_content(content: string): Record<string, string> {
+	const scripts = get_suggested_scripts()
 	const has_fix = init_logic_json_merge.has_package_scripts_marker(content, FIX_GH_PACKAGES_MARKER)
 	if (!has_fix) return scripts
 
 	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== PREPARE_KEY))
 }
 
-// Append the guarded lifecycle commands to an existing `prepare` (e.g. a SvelteKit
-// `svelte-kit sync`) when no script yet runs fix-gh-packages, so the dev-only hooks
-// land in `prepare` instead of being lost when the suggested-scripts merge skips the
-// already-present `prepare` key.
+// Append the guarded lifecycle commands to an existing `prepare` when no script yet runs
+// fix-gh-packages, so the dev-only hooks land in `prepare` instead of being lost when the
+// suggested-scripts merge skips the already-present `prepare` key.
 function merge_prepare_lifecycle_cmd(content: string): string {
 	const has_fix = init_logic_json_merge.has_package_scripts_marker(content, FIX_GH_PACKAGES_MARKER)
 	if (has_fix) return content
 
 	return init_logic_json_merge.merge_package_script_suffix(content, PREPARE_KEY, PREPARE_CMD)
-}
-
-// Drop `wrangler types` from the consumer's `build` so the E2E webServer no longer runs
-// wrangler twice during `pnpm run build` (see GUARDED_WRANGLER_TYPES_CMD). No-op when
-// `build` is absent or already wrangler-free.
-function strip_wrangler_types_from_build(content: string): string {
-	return init_logic_json_merge.remove_script_command_segment(
-		content,
-		BUILD_KEY,
-		WRANGLER_TYPES_SEGMENT_PATTERN,
-	)
-}
-
-// Append the guarded `wrangler types` to `prepare` so worker types are generated at install
-// time. Coverage-aware: a no-op when `prepare` already reaches `wrangler types` — directly or
-// transitively through a `pnpm <subscript>` chain (e.g. `prepare → pnpm prepare:gen → pnpm gen
-// → wrangler types`) — so the append never adds a redundant second invocation. Otherwise
-// appends the guarded command. Idempotent — re-running leaves an already-covered or
-// already-appended manifest unchanged; a no-op when no `prepare` script exists.
-function merge_prepare_wrangler_types(content: string): string {
-	const is_covered = init_logic_json_merge.has_script_marker_coverage(
-		content,
-		PREPARE_KEY,
-		WRANGLER_TYPES_CMD,
-	)
-	if (is_covered) return content
-
-	return init_logic_json_merge.merge_package_script_suffix(
-		content,
-		PREPARE_KEY,
-		PREPARE_WRANGLER_TYPES_CMD,
-	)
-}
-
-// Move Cloudflare worker-type generation from `build` into `prepare` for wrangler
-// projects: strip `wrangler types` from `build` and append a guarded `wrangler types`
-// to `prepare`. Idempotent — re-running leaves an already-migrated manifest unchanged.
-function migrate_wrangler_types_to_prepare(content: string): string {
-	return merge_prepare_wrangler_types(strip_wrangler_types_from_build(content))
 }
 
 // Migration: remove a kit-managed `postinstall` (one running the fix-gh-packages
@@ -356,38 +253,18 @@ function merge_prettier_plugin_development_deps(content: string): string {
 	return init_logic_json_merge.merge_development_dependencies(content, PRETTIER_PLUGIN_DEV_DEPS)
 }
 
-function merge_sveltekit_package_json(content: string): string {
-	const with_scripts = init_logic_json_merge.merge_package_scripts(
-		content,
-		get_suggested_scripts_for_content('sveltekit', content),
-	)
-	const with_config = init_logic_json_merge.merge_json_object(with_scripts, {
-		'size-limit': SIZE_LIMIT_CONFIG,
-	})
-
-	return init_logic_json_merge.merge_development_dependencies(with_config, {
-		cspell: CSPELL_VERSION,
-		'size-limit': SIZE_LIMIT_VERSION,
-		[SIZE_LIMIT_FILE_KEY]: SIZE_LIMIT_FILE_VERSION,
-		'rollup-plugin-visualizer': VISUALIZER_VERSION,
-	})
-}
-
 const init_logic = {
 	...init_logic_templates,
 	...init_logic_workspace,
 	...init_logic_sonar,
-	...init_logic_vite,
 	...init_logic_json_merge,
 	...init_logic_yaml_merge,
 	...init_logic_deploy_vps,
-	...init_logic_wrangler,
 	generate_tsconfig,
 	generate_lefthook_config,
 	generate_cspell_config,
 	generate_npmrc,
 	merge_npmrc,
-	merge_sveltekit_package_json,
 	merge_prettier_plugin_development_deps,
 	get_tsconfig_extends_entry,
 	get_tsconfig_preset_filename,
@@ -405,13 +282,10 @@ const init_logic = {
 	get_suggested_scripts,
 	get_suggested_scripts_for_content,
 	merge_prepare_lifecycle_cmd,
-	strip_wrangler_types_from_build,
-	merge_prepare_wrangler_types,
-	migrate_wrangler_types_to_prepare,
 	strip_managed_postinstall,
 	transform_prompt_paths,
 }
 
 export { init_logic }
-export type { FileCopyMapping, ProjectType }
+export type { FileCopyMapping }
 export type { SonarIdentifiers } from './init-logic-sonar'

@@ -32,7 +32,7 @@ export const NAME_REPLACEMENTS_ALLOW_LIST = {
 // クラッシュさせたが、unicorn 69 で上流修正済み（findParameter の {#each} ガード）。
 // プロジェクトの is_/has_ snake_case boolean と整合するため有効のまま維持する。
 // no-top-level-assignment-in-function だけは Svelte 5 の $state 再代入で誤検知するため、
-// eslint/sveltekit.js の Svelte 用 override で .svelte / .svelte.ts に限り無効化している。
+// app-kit の SvelteKit eslint preset の Svelte 用 override で .svelte / .svelte.ts に限り無効化している。
 export const unicorn_rules = {
 	// null よりも undefined を優先
 	'unicorn/no-null': 'error',
