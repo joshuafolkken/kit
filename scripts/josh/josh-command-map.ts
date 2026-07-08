@@ -59,6 +59,7 @@ const ALIASES: Record<string, string> = {
 	a: 'audit',
 	rt: 'reconcile-templates',
 	swp: 'sync-workflow-pins',
+	sdp: 'sync-dependabot-pins',
 	u: 'latest',
 	lc: 'latest:corepack',
 	lu: 'latest:update',
