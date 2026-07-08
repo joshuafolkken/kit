@@ -90,16 +90,9 @@ The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries ba
 | `main:merge`         | `git pull origin main`                                |
 | `check`              | `pnpm exec tsc --noEmit`                              |
 
-### Additional subcommands for SvelteKit projects
+SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
 
-These require `svelte-check` and `svelte-fast-check` to be installed in the project.
-
-| Command           | Runs                                                         |
-| ----------------- | ------------------------------------------------------------ |
-| `check:svelte`    | `svelte-kit sync && svelte-fast-check --incremental`         |
-| `check:svelte:ci` | `svelte-kit sync && svelte-check --tsconfig ./tsconfig.json` |
-
-Retired scripts (previously managed, now removed): `git`, `git:followup`, `telegram:test`, `audit:security`, `prep`, `issue:prep`, `prevent-main-commit`, `check-commit-message`, `version:*`, `overrides:check`, `check:ci`.
+Retired scripts (previously managed, now removed): `git`, `git:followup`, `telegram:test`, `audit:security`, `prep`, `issue:prep`, `prevent-main-commit`, `check-commit-message`, `version:*`, `overrides:check`, `check:ci`, `check:svelte`, `check:svelte:ci`.
 
 ## AI files
 

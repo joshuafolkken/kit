@@ -44,7 +44,7 @@ function parse_lockfile_packages(raw: string): Record<string, LockfilePackage> {
 	return merged
 }
 
-function is_gh_registry_line(line: string): string | undefined {
+function extract_gh_registry_scope(line: string): string | undefined {
 	const trimmed = line.trim()
 	if (!trimmed.startsWith('@')) return undefined
 	const eq_index = trimmed.indexOf(REGISTRY_KEY)
@@ -62,7 +62,7 @@ function parse_gh_scopes(npmrc: string): Set<string> {
 	const scopes = new Set<string>()
 
 	for (const line of npmrc.split('\n')) {
-		const scope = is_gh_registry_line(line)
+		const scope = extract_gh_registry_scope(line)
 		if (scope !== undefined) scopes.add(scope)
 	}
 

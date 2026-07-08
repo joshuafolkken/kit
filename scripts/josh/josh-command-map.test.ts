@@ -143,20 +143,6 @@ describe('COMMAND_MAP — tsx_arguments', () => {
 	})
 })
 
-describe('COMMAND_MAP — requires_sveltekit', () => {
-	it('check:svelte command requires sveltekit', () => {
-		expect(get_command('check:svelte')?.requires_sveltekit).toBe(true)
-	})
-
-	it('check:svelte:ci command requires sveltekit', () => {
-		expect(get_command('check:svelte:ci')?.requires_sveltekit).toBe(true)
-	})
-
-	it('lint command does not require sveltekit', () => {
-		expect(get_command('lint')?.requires_sveltekit).toBeUndefined()
-	})
-})
-
 describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
 	it('every alias points to an existing command', () => {
 		for (const [alias, command] of Object.entries(ALIASES)) {
@@ -210,6 +196,10 @@ describe('ALIASES — new command aliases', () => {
 
 	it('resolves swp alias to sync-workflow-pins', () => {
 		expect(get_alias('swp')).toBe('sync-workflow-pins')
+	})
+
+	it('resolves sdp alias to sync-dependabot-pins', () => {
+		expect(get_alias('sdp')).toBe('sync-dependabot-pins')
 	})
 
 	it('resolves dr alias to doctor', () => {

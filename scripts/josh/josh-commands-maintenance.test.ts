@@ -5,6 +5,7 @@ const LATEST_UPDATE_NOT_DEFINED = 'latest:update command not defined'
 const LATEST_NOT_DEFINED = 'latest command not defined'
 const LATEST_COREPACK_NOT_DEFINED = 'latest:corepack command not defined'
 const SYNC_WORKFLOW_PINS_NOT_DEFINED = 'sync-workflow-pins command not defined'
+const SYNC_DEPENDABOT_PINS_NOT_DEFINED = 'sync-dependabot-pins command not defined'
 const DOCTOR_NOT_DEFINED = 'doctor command not defined'
 
 describe('MAINTENANCE_COMMANDS doctor', () => {
@@ -25,6 +26,17 @@ describe('MAINTENANCE_COMMANDS sync-workflow-pins', () => {
 
 		expect(cmd.script).toBe('scripts/sync/sync-workflow-pins.ts')
 		expect(cmd.shell).toBeUndefined()
+	})
+})
+
+describe('MAINTENANCE_COMMANDS sync-dependabot-pins', () => {
+	it('uses the sync-dependabot-pins script in the Maintenance category', () => {
+		const cmd = MAINTENANCE_COMMANDS['sync-dependabot-pins']
+		if (!cmd) throw new Error(SYNC_DEPENDABOT_PINS_NOT_DEFINED)
+
+		expect(cmd.script).toBe('scripts/sync/sync-dependabot-pins.ts')
+		expect(cmd.shell).toBeUndefined()
+		expect(cmd.category).toBe('Maintenance')
 	})
 })
 

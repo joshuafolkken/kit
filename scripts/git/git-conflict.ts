@@ -29,22 +29,22 @@ function is_merge_state_blocked(merge_state_status: string | null | undefined): 
 
 function parse_pr_info(
 	pr_info_json: string,
-): { is_mergeable: MergeableValue; merge_state_status: string | null | undefined } | undefined {
+): { mergeable: MergeableValue; merge_state_status: string | null | undefined } | undefined {
 	try {
 		const result = pr_info_schema.safeParse(JSON.parse(pr_info_json))
 		if (!result.success) return undefined
 
-		return { is_mergeable: result.data.mergeable, merge_state_status: result.data.mergeStateStatus }
+		return { mergeable: result.data.mergeable, merge_state_status: result.data.mergeStateStatus }
 	} catch {
 		return undefined
 	}
 }
 
 function has_conflict_conditions(
-	is_mergeable: MergeableValue,
+	mergeable: MergeableValue,
 	merge_state_status: string | null | undefined,
 ): boolean {
-	if (is_mergeable_conflicting(is_mergeable)) {
+	if (is_mergeable_conflicting(mergeable)) {
 		return true
 	}
 
@@ -58,7 +58,7 @@ function has_conflicts(pr_info_json: string): boolean {
 		return false
 	}
 
-	return has_conflict_conditions(pr_info.is_mergeable, pr_info.merge_state_status)
+	return has_conflict_conditions(pr_info.mergeable, pr_info.merge_state_status)
 }
 
 function display_conflict_warning(): void {
