@@ -44,6 +44,22 @@ async function pr_exists(branch_name: string): Promise<boolean> {
 	}
 }
 
+async function pr_checkout(pr_number: number): Promise<void> {
+	await git_gh_exec.exec_gh_command(['pr', 'checkout', String(pr_number)])
+}
+
+async function pr_head_reference(pr_number: number): Promise<string> {
+	return await git_gh_exec.exec_gh_command([
+		'pr',
+		'view',
+		String(pr_number),
+		'--json',
+		'headRefName',
+		'--jq',
+		'.headRefName',
+	])
+}
+
 async function pr_view(branch_name: string): Promise<string> {
 	try {
 		return await git_gh_exec.exec_gh_command([
@@ -170,6 +186,8 @@ const git_gh_pr = {
 	pr_create,
 	pr_checks,
 	pr_exists,
+	pr_checkout,
+	pr_head_reference,
 	pr_view,
 	pr_get_url,
 	pr_get_body,
