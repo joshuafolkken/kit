@@ -7,6 +7,7 @@ import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
 type MergeFunction = (existing: string) => string
 
 const TSCONFIG_PRESET_DIR = 'tsconfig'
+const GITIGNORE_TEMPLATE_PATH = 'templates/gitignore'
 
 function sync_with_merge(
 	destination_path: string,
@@ -30,6 +31,16 @@ function sync_with_merge(
 
 function sync_npmrc(destination_path: string): void {
 	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
+}
+
+// Union-merge kit's .gitignore entries into the consumer file instead of overwriting it,
+// so project-local ignore lines (e.g. an app's output dir) survive a sync.
+function sync_gitignore(destination_path: string): void {
+	const template = readFileSync(path.join(PACKAGE_DIR, GITIGNORE_TEMPLATE_PATH), 'utf8')
+
+	sync_with_merge(destination_path, '.gitignore', (existing) =>
+		init_logic.merge_gitignore(existing, template),
+	)
 }
 
 function sync_eslint_config(destination_path: string): void {
@@ -110,6 +121,7 @@ function sync_vscode_settings_json(destination_path: string): void {
 
 const sync_configs = {
 	sync_npmrc,
+	sync_gitignore,
 	sync_eslint_config,
 	sync_tsconfig,
 	sync_cspell_config,

@@ -89,8 +89,21 @@ function build_eslint_action(): FileAction {
 	)
 }
 
+// Union-merge (not byte-copy) so an existing consumer .gitignore keeps its project-local
+// entries while gaining any missing kit patterns.
+function build_gitignore_action(): FileAction {
+	const template = read_package_file('templates/gitignore')
+
+	return build_action(
+		'.gitignore',
+		() => template,
+		(existing) => init_logic.merge_gitignore(existing, template),
+	)
+}
+
 function build_file_actions(): ReadonlyArray<FileAction> {
 	return [
+		build_gitignore_action(),
 		build_action(
 			'.npmrc',
 			() => init_logic.generate_npmrc(),
