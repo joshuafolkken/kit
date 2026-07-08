@@ -39,6 +39,8 @@ const PR_BODY = 'body'
 const GITHUB_PR_URL = 'https://github.com/owner/repo/pull/1'
 const TITLE_WITH_SPACES = 'title with spaces'
 const BODY_WITH_SPECIAL = 'body with $special chars'
+const PR_NUMBER = 578
+const DEPENDABOT_HEAD_REF = 'dependabot/github_actions/actions/checkout-7.0.0'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -104,6 +106,33 @@ describe('git_gh_command.pr_exists', () => {
 		const is_found = await git_gh_command.pr_exists(FEATURE_BRANCH)
 
 		expect(is_found).toBe(false)
+	})
+})
+
+describe('git_gh_command.pr_checkout', () => {
+	it('checks out the PR branch by number', async () => {
+		mocked_exec.mockResolvedValue('')
+		await git_gh_command.pr_checkout(PR_NUMBER)
+
+		expect(mocked_exec).toHaveBeenCalledWith(['pr', 'checkout', String(PR_NUMBER)])
+	})
+})
+
+describe('git_gh_command.pr_head_reference', () => {
+	it('returns the PR head ref name queried by number', async () => {
+		mocked_exec.mockResolvedValue(DEPENDABOT_HEAD_REF)
+		const head_reference = await git_gh_command.pr_head_reference(PR_NUMBER)
+
+		expect(mocked_exec).toHaveBeenCalledWith([
+			'pr',
+			'view',
+			String(PR_NUMBER),
+			'--json',
+			'headRefName',
+			'--jq',
+			'.headRefName',
+		])
+		expect(head_reference).toBe(DEPENDABOT_HEAD_REF)
 	})
 })
 
