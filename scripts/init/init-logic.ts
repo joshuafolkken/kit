@@ -142,12 +142,19 @@ function generate_npmrc(): string {
 	return `${NPMRC_LINES.join('\n')}\n`
 }
 
-function merge_npmrc(content: string): string {
-	const missing = NPMRC_LINES.filter((line) => !content.includes(line))
-	if (missing.length === 0) return content
-	const prefix = content.length > 0 && !content.endsWith('\n') ? `${content}\n` : content
+// Append `missing` lines to `existing`, inserting a separating newline when the base is
+// non-empty and lacks a trailing one. Returns `existing` untouched when nothing is missing.
+function append_missing_lines(existing: string, missing: ReadonlyArray<string>): string {
+	if (missing.length === 0) return existing
+	const prefix = existing.length > 0 && !existing.endsWith('\n') ? `${existing}\n` : existing
 
 	return `${prefix}${missing.join('\n')}\n`
+}
+
+function merge_npmrc(content: string): string {
+	const missing = NPMRC_LINES.filter((line) => !content.includes(line))
+
+	return append_missing_lines(content, missing)
 }
 
 // A gitignore line worth appending during a union merge: real ignore patterns only.
@@ -168,10 +175,8 @@ function merge_gitignore(existing: string, template: string): string {
 	const missing = template
 		.split('\n')
 		.filter((line) => is_gitignore_pattern(line) && !existing_lines.has(line))
-	if (missing.length === 0) return existing
-	const prefix = existing.length > 0 && !existing.endsWith('\n') ? `${existing}\n` : existing
 
-	return `${prefix}${missing.join('\n')}\n`
+	return append_missing_lines(existing, missing)
 }
 
 function get_tsconfig_extends_entry(): string {
