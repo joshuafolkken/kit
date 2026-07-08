@@ -223,6 +223,45 @@ function populate_via_sync(
 	return readFileSync(destination_path, 'utf8')
 }
 
+const GITIGNORE_DEST = path.join(TEST_DIR, '.gitignore')
+const CONSUMER_GITIGNORE = 'node_modules\n.audio/\n'
+
+describe('sync_configs.sync_gitignore', () => {
+	it('does nothing when .gitignore does not exist', () => {
+		sync_configs.sync_gitignore(GITIGNORE_DEST)
+		expect(existsSync(GITIGNORE_DEST)).toBe(false)
+	})
+
+	it('appends missing kit entries while preserving a consumer-local line', () => {
+		writeFileSync(GITIGNORE_DEST, CONSUMER_GITIGNORE)
+		silence_console_info()
+		sync_configs.sync_gitignore(GITIGNORE_DEST)
+
+		const result = readFileSync(GITIGNORE_DEST, 'utf8')
+
+		expect(result).toContain('.audio/')
+		expect(result).toContain('.DS_Store')
+	})
+
+	it('logs unchanged and keeps the consumer line once already synced', () => {
+		const populated = populate_via_sync(
+			CONSUMER_GITIGNORE,
+			sync_configs.sync_gitignore,
+			GITIGNORE_DEST,
+		)
+
+		expect(populated).toContain('.audio/')
+		assert_logs_unchanged(
+			() => {
+				writeFileSync(GITIGNORE_DEST, populated)
+			},
+			() => {
+				sync_configs.sync_gitignore(GITIGNORE_DEST)
+			},
+		)
+	})
+})
+
 describe('sync_configs.sync_vscode_extensions_json', () => {
 	it('does nothing when .vscode/extensions.json does not exist', () => {
 		sync_configs.sync_vscode_extensions_json(VSCODE_EXTENSIONS_DEST)

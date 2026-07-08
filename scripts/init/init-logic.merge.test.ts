@@ -43,6 +43,53 @@ describe('merge_json_extends', () => {
 	})
 })
 
+describe('merge_gitignore', () => {
+	const ENV_PATTERN = '.env'
+	const TEMPLATE = `node_modules\n\n# Env\n${ENV_PATTERN}\n.env.*\n`
+	const CONSUMER_EXISTING = 'node_modules\n.audio/\n'
+
+	it('preserves a consumer-only line while appending missing kit entries', () => {
+		const result = init_logic.merge_gitignore(CONSUMER_EXISTING, TEMPLATE)
+
+		expect(result).toContain('.audio/')
+		expect(result).toContain(ENV_PATTERN)
+		expect(result).toContain('.env.*')
+	})
+
+	it('returns existing unchanged when every template pattern already present', () => {
+		const existing = 'node_modules\n.env\n.env.*\n.audio/\n'
+
+		expect(init_logic.merge_gitignore(existing, TEMPLATE)).toBe(existing)
+	})
+
+	it('is idempotent — a second merge produces no further change', () => {
+		const once = init_logic.merge_gitignore(CONSUMER_EXISTING, TEMPLATE)
+
+		expect(init_logic.merge_gitignore(once, TEMPLATE)).toBe(once)
+	})
+
+	it('matches per-line, so .env is appended even when only .env.local exists', () => {
+		const existing = 'node_modules\n.env.local\n'
+		const result = init_logic.merge_gitignore(existing, TEMPLATE)
+
+		expect(result.split('\n')).toContain(ENV_PATTERN)
+	})
+
+	it('skips comment and blank template lines when appending', () => {
+		const existing = 'node_modules\n.env\n.env.*\n'
+		const result = init_logic.merge_gitignore(existing, TEMPLATE)
+
+		expect(result).toBe(existing)
+	})
+
+	it('creates content from an empty existing file', () => {
+		const result = init_logic.merge_gitignore('', `node_modules\n${ENV_PATTERN}\n`)
+
+		expect(result.split('\n')).toContain('node_modules')
+		expect(result.split('\n')).toContain(ENV_PATTERN)
+	})
+})
+
 describe('merge_json_array_field', () => {
 	it('adds values to an empty array', () => {
 		const result = JSON.parse(

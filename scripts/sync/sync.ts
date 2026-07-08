@@ -179,6 +179,7 @@ function sync_ai_copy_all(is_force: boolean): void {
 
 function sync_config_files(): void {
 	sync_configs.sync_npmrc(path.join(PROJECT_ROOT, '.npmrc'))
+	sync_configs.sync_gitignore(path.join(PROJECT_ROOT, '.gitignore'))
 	sync_configs.sync_eslint_config(path.join(PROJECT_ROOT, 'eslint.config.js'))
 	sync_configs.sync_tsconfig(path.join(PROJECT_ROOT, 'tsconfig.json'))
 	sync_configs.sync_cspell_config(path.join(PROJECT_ROOT, 'cspell.config.yaml'))

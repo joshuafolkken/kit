@@ -124,10 +124,10 @@ describe('get_ai_copy_files - dotfiles and config', () => {
 })
 
 describe('get_ai_copy_file_mappings', () => {
-	it('includes gitignore template mapping', () => {
+	it('excludes gitignore — it is union-merged, not byte-copied', () => {
 		const result = init_logic.get_ai_copy_file_mappings()
 
-		expect(result).toContainEqual({ src: 'templates/gitignore', dest: GITIGNORE_DEST })
+		expect(result).not.toContainEqual({ src: 'templates/gitignore', dest: GITIGNORE_DEST })
 	})
 
 	it('includes ci.yml template mapping to .github/workflows/ci.yml', () => {

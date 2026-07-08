@@ -12,6 +12,7 @@ Each file is either created (if missing) or merged (if it already exists). Files
 
 | File                      | If missing                                                | If exists                                                                                                         |
 | ------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `.gitignore`              | Created from `templates/gitignore`                        | Union-merged: missing kit patterns appended, consumer-local entries kept                                          |
 | `.npmrc`                  | Created with registry, engine-strict, minimum-release-age | Missing lines appended                                                                                            |
 | `eslint.config.js`        | Created with `create_vanilla_config`                      | Sample shown — add manually                                                                                       |
 | `prettier.config.js`      | Created with shared config                                | Sample shown — add manually                                                                                       |
@@ -111,7 +112,6 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/pull_request_template.md
 .github/release.yml
 .github/dependabot.yml
-.gitignore          (from templates/gitignore)
 sonar-project.properties  (generated from GitHub repo name)
 ```
 

@@ -74,8 +74,11 @@ interface FileCopyMapping {
 	dest: string
 }
 
+// `.gitignore` is intentionally NOT a byte-copy mapping — it is union-merged via
+// merge_gitignore (init-actions build_file_actions + sync_configs.sync_gitignore) so
+// consumer-local entries survive a sync. Only fully-managed files consumers never
+// hand-edit stay here.
 const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
-	{ src: 'templates/gitignore', dest: '.gitignore' },
 	{ src: 'templates/workflows/ci.yml', dest: '.github/workflows/ci.yml' },
 ]
 
@@ -139,12 +142,41 @@ function generate_npmrc(): string {
 	return `${NPMRC_LINES.join('\n')}\n`
 }
 
-function merge_npmrc(content: string): string {
-	const missing = NPMRC_LINES.filter((line) => !content.includes(line))
-	if (missing.length === 0) return content
-	const prefix = content.length > 0 && !content.endsWith('\n') ? `${content}\n` : content
+// Append `missing` lines to `existing`, inserting a separating newline when the base is
+// non-empty and lacks a trailing one. Returns `existing` untouched when nothing is missing.
+function append_missing_lines(existing: string, missing: ReadonlyArray<string>): string {
+	if (missing.length === 0) return existing
+	const prefix = existing.length > 0 && !existing.endsWith('\n') ? `${existing}\n` : existing
 
 	return `${prefix}${missing.join('\n')}\n`
+}
+
+function merge_npmrc(content: string): string {
+	const missing = NPMRC_LINES.filter((line) => !content.includes(line))
+
+	return append_missing_lines(content, missing)
+}
+
+// A gitignore line worth appending during a union merge: real ignore patterns only.
+// Comments and blank lines are skipped so re-syncing never accumulates orphaned section
+// headers detached from their entries.
+function is_gitignore_pattern(line: string): boolean {
+	const trimmed = line.trim()
+
+	return trimmed.length > 0 && !trimmed.startsWith('#')
+}
+
+// Union-merge the kit .gitignore template into an existing consumer file: keep every
+// consumer line verbatim and append only the template patterns not already present.
+// Matching is per-line (not substring) so `.env` is still appended when only `.env.local`
+// exists. Order-stable and idempotent — re-running on an already-merged file is a no-op.
+function merge_gitignore(existing: string, template: string): string {
+	const existing_lines = new Set(existing.split('\n'))
+	const missing = template
+		.split('\n')
+		.filter((line) => is_gitignore_pattern(line) && !existing_lines.has(line))
+
+	return append_missing_lines(existing, missing)
 }
 
 function get_tsconfig_extends_entry(): string {
@@ -265,6 +297,7 @@ const init_logic = {
 	generate_cspell_config,
 	generate_npmrc,
 	merge_npmrc,
+	merge_gitignore,
 	merge_prettier_plugin_development_deps,
 	get_tsconfig_extends_entry,
 	get_tsconfig_preset_filename,
