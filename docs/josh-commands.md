@@ -287,6 +287,18 @@ pnpm josh sync-workflow-pins --check    # verify pins are in sync; non-zero on d
 
 Dependabot bumps the runtime workflows under `.github/workflows/` only, so an action bump leaves the templates behind and trips the SHA-parity unit test. After such a bump (e.g. on a Dependabot PR), run `pnpm josh sync-workflow-pins` and commit the synced templates. The command errors if a single action is pinned to conflicting SHAs across the runtime workflows.
 
+### `josh sync-dependabot-pins`
+
+Automate the full template-pin fix over one or more Dependabot action-bump PRs. For each PR number it checks out the PR branch, runs the same sync as `sync-workflow-pins`, and — when pins drifted — commits the template update and pushes it back to the PR branch, then restores the branch you started on. This replaces the manual `gh pr checkout <N>` → `sync-workflow-pins` → commit → push loop.
+
+```bash
+pnpm josh sdp 578 641              # sync + push template pins for each Dependabot PR
+pnpm josh sync-dependabot-pins 578
+pnpm josh sdp --dry-run 578 641    # print the plan per PR; no checkout, commit or push
+```
+
+`--dry-run` performs no git side effects (no checkout, commit or push), so it is safe to run against an uncommitted working tree — for example while verifying the command itself before committing. Only template pins under `templates/workflows/` are staged, so unrelated working-tree changes are never committed to a Dependabot PR. As a safety guard the command only commits when the checked-out branch is a `dependabot/…` branch; a mistyped or non-Dependabot PR number is skipped without any commit.
+
 ### `josh latest`
 
 Update pnpm via corepack, update all dependencies to latest, and run a security audit.

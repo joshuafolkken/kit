@@ -198,6 +198,10 @@ describe('ALIASES — new command aliases', () => {
 		expect(get_alias('swp')).toBe('sync-workflow-pins')
 	})
 
+	it('resolves sdp alias to sync-dependabot-pins', () => {
+		expect(get_alias('sdp')).toBe('sync-dependabot-pins')
+	})
+
 	it('resolves dr alias to doctor', () => {
 		expect(get_alias('dr')).toBe('doctor')
 	})

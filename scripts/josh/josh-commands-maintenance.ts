@@ -27,6 +27,12 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Sync template workflow action pins from .github/workflows (--check to verify)',
 		category: 'Maintenance',
 	},
+	'sync-dependabot-pins': {
+		script: 'scripts/sync/sync-dependabot-pins.ts',
+		description:
+			'Sync template workflow pins for Dependabot action-bump PRs (--dry-run to preview)',
+		category: 'Maintenance',
+	},
 	latest: {
 		shell: [
 			'sh',
