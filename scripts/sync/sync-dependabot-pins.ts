@@ -15,27 +15,16 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { git_command } from '#scripts/git/git-command'
-import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_pr } from '#scripts/git/git-gh-pr'
 import { dependabot_pin_logic, type DependabotPinOps } from './dependabot-pin-logic'
 import { workflow_pin_logic } from './workflow-pin-logic'
-
-const TEMPLATE_WORKFLOWS_DIR = 'templates/workflows'
-const HEAD_REF_QUERY: ReadonlyArray<string> = ['--json', 'headRefName', '--jq', '.headRefName']
-
-async function fetch_pr_branch(pr: number): Promise<string> {
-	return await git_gh_exec.exec_gh_command(['pr', 'view', String(pr), ...HEAD_REF_QUERY])
-}
-
-async function checkout_pr(pr: number): Promise<void> {
-	await git_gh_exec.exec_gh_command(['pr', 'checkout', String(pr)])
-}
 
 async function checkout_branch(branch: string): Promise<void> {
 	await git_command.checkout(branch)
 }
 
 async function stage_templates(): Promise<void> {
-	await git_command.add_path(TEMPLATE_WORKFLOWS_DIR)
+	await git_command.add_path(workflow_pin_logic.TEMPLATE_WORKFLOWS_DIR)
 }
 
 function log_line(message: string): void {
@@ -44,8 +33,8 @@ function log_line(message: string): void {
 
 const real_ops: DependabotPinOps = {
 	get_current_branch: git_command.branch,
-	get_pr_branch: fetch_pr_branch,
-	checkout_pr,
+	get_pr_branch: git_gh_pr.pr_head_reference,
+	checkout_pr: git_gh_pr.pr_checkout,
 	checkout_branch,
 	sync_pins: workflow_pin_logic.sync_pins,
 	stage_templates,
@@ -76,5 +65,3 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
-
-export { real_ops }

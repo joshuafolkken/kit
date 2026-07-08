@@ -7,6 +7,7 @@ const PR_BRANCH = 'dependabot/github_actions/actions/checkout-7.0.0'
 const FIRST_PR = 578
 const SECOND_PR = 641
 const COMMIT_MESSAGE = 'Sync template workflow pins (Dependabot #578)'
+const PUSH_FAILED = 'push failed'
 
 function make_drift(): PinDrift {
 	return {
@@ -20,7 +21,10 @@ function make_drift(): PinDrift {
 
 function create_fake_ops(drifts: Array<PinDrift>): DependabotPinOps {
 	return {
-		get_current_branch: vi.fn<() => Promise<string>>().mockResolvedValue(START_BRANCH),
+		get_current_branch: vi
+			.fn<() => Promise<string>>()
+			.mockResolvedValueOnce(START_BRANCH)
+			.mockResolvedValue(PR_BRANCH),
 		get_pr_branch: vi.fn<(pr: number) => Promise<string>>().mockResolvedValue(PR_BRANCH),
 		checkout_pr: vi.fn<(pr: number) => Promise<void>>().mockResolvedValue(undefined),
 		checkout_branch: vi.fn<(branch: string) => Promise<void>>().mockResolvedValue(undefined),
@@ -52,6 +56,12 @@ describe('dependabot_pin_logic.parse_pr_numbers', () => {
 	it('throws on a non-integer or non-positive token', () => {
 		expect(() => dependabot_pin_logic.parse_pr_numbers(['abc'])).toThrow(/Invalid PR number/u)
 		expect(() => dependabot_pin_logic.parse_pr_numbers(['0'])).toThrow(/Invalid PR number/u)
+	})
+
+	it('rejects loose numeric forms that Number() would coerce', () => {
+		for (const token of ['1e3', '0x24', '5.0', ' 578 ', '007', '-5']) {
+			expect(() => dependabot_pin_logic.parse_pr_numbers([token])).toThrow(/Invalid PR number/u)
+		}
 	})
 })
 
@@ -98,6 +108,34 @@ describe('dependabot_pin_logic.run_sync (apply)', () => {
 
 		expect(ops.checkout_pr).toHaveBeenNthCalledWith(1, FIRST_PR)
 		expect(ops.checkout_pr).toHaveBeenNthCalledWith(2, SECOND_PR)
+	})
+})
+
+describe('dependabot_pin_logic.run_sync (safety)', () => {
+	it('does not sync or commit when the checked-out branch is not a Dependabot branch', async () => {
+		const ops = create_fake_ops([make_drift()])
+
+		vi.mocked(ops.get_current_branch)
+			.mockReset()
+			.mockResolvedValueOnce(START_BRANCH)
+			.mockResolvedValue('feature/manual')
+
+		const results = await dependabot_pin_logic.run_sync([FIRST_PR], { is_dry_run: false }, ops)
+
+		expect(ops.sync_pins).not.toHaveBeenCalled()
+		expect(ops.commit).not.toHaveBeenCalled()
+		expect(results).toEqual([{ pr: FIRST_PR, synced_count: 0, is_committed: false }])
+	})
+
+	it('restores the starting branch even when a PR fails mid-run', async () => {
+		const ops = create_fake_ops([make_drift()])
+
+		vi.mocked(ops.push).mockRejectedValue(new Error(PUSH_FAILED))
+
+		await expect(
+			dependabot_pin_logic.run_sync([FIRST_PR], { is_dry_run: false }, ops),
+		).rejects.toThrow(PUSH_FAILED)
+		expect(ops.checkout_branch).toHaveBeenCalledWith(START_BRANCH)
 	})
 })
 

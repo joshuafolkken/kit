@@ -6,6 +6,8 @@ import type { PinDrift } from './workflow-pin-logic'
 // (checkout order, drift-skip, dry-run no-op) is unit-testable without spawning.
 const NO_PR_MESSAGE = 'No PR numbers supplied (e.g. `josh sdp 578 641`)'
 const INVALID_PR_PREFIX = 'Invalid PR number: '
+const DEPENDABOT_BRANCH_PREFIX = 'dependabot/'
+const PR_NUMBER_PATTERN = /^[1-9]\d*$/u
 
 interface DependabotPinOps {
 	get_current_branch: () => Promise<string>
@@ -34,8 +36,10 @@ function build_commit_message(pr: number): string {
 }
 
 function parse_pr_number(token: string): number {
+	if (!PR_NUMBER_PATTERN.test(token)) throw new Error(`${INVALID_PR_PREFIX}${token}`)
+
 	const pr = Number(token)
-	if (!Number.isSafeInteger(pr) || pr <= 0) throw new Error(`${INVALID_PR_PREFIX}${token}`)
+	if (!Number.isSafeInteger(pr)) throw new Error(`${INVALID_PR_PREFIX}${token}`)
 
 	return pr
 }
@@ -52,14 +56,30 @@ async function commit_synced_pins(pr: number, ops: DependabotPinOps): Promise<vo
 	await ops.push()
 }
 
-async function apply_pr(pr: number, ops: DependabotPinOps): Promise<PrResult> {
+function skipped_result(pr: number): PrResult {
+	return { pr, synced_count: 0, is_committed: false }
+}
+
+async function checkout_dependabot_pr(pr: number, ops: DependabotPinOps): Promise<boolean> {
 	await ops.checkout_pr(pr)
+	const branch = await ops.get_current_branch()
+
+	if (branch.startsWith(DEPENDABOT_BRANCH_PREFIX)) return true
+
+	ops.log(`#${String(pr)}: ${branch} is not a Dependabot branch — skipped`)
+
+	return false
+}
+
+async function apply_pr(pr: number, ops: DependabotPinOps): Promise<PrResult> {
+	if (!(await checkout_dependabot_pr(pr, ops))) return skipped_result(pr)
+
 	const drifts = ops.sync_pins()
 
 	if (drifts.length === 0) {
 		ops.log(`#${String(pr)}: template pins already in sync — skipped`)
 
-		return { pr, synced_count: 0, is_committed: false }
+		return skipped_result(pr)
 	}
 
 	await commit_synced_pins(pr, ops)
@@ -73,7 +93,7 @@ async function plan_pr(pr: number, ops: DependabotPinOps): Promise<PrResult> {
 
 	ops.log(`#${String(pr)} (${branch}): would sync template pins and push if drifted [dry-run]`)
 
-	return { pr, synced_count: 0, is_committed: false }
+	return skipped_result(pr)
 }
 
 async function process_pr(
@@ -94,11 +114,13 @@ async function run_sync(
 	const start_branch = await ops.get_current_branch()
 	const results: Array<PrResult> = []
 
-	for (const pr of prs) {
-		results.push(await process_pr(pr, options, ops))
+	try {
+		for (const pr of prs) {
+			results.push(await process_pr(pr, options, ops))
+		}
+	} finally {
+		if (!options.is_dry_run) await ops.checkout_branch(start_branch)
 	}
-
-	if (!options.is_dry_run) await ops.checkout_branch(start_branch)
 
 	return results
 }
