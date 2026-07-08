@@ -45,11 +45,15 @@ SECURITY.md         tsconfig.sonar.json
 
 ### File mappings (overwritten if source exists)
 
-| Package source        | Destination  |
-| --------------------- | ------------ |
-| `templates/gitignore` | `.gitignore` |
+These are fully-managed files whose package source has a different name than the destination. They are byte-copied on every sync (consumers do not hand-edit them):
+
+| Package source               | Destination                |
+| ---------------------------- | -------------------------- |
+| `templates/workflows/ci.yml` | `.github/workflows/ci.yml` |
 
 If the source file does not exist in the installed package, the destination is skipped with a warning.
+
+> `.gitignore` used to be a byte-copy mapping here, which wiped project-local entries on every sync. It is now **union-merged** instead — see the merged-config table below.
 
 ### `sonar-project.properties` (regenerated)
 
@@ -66,6 +70,7 @@ These files are created by `josh init`. `josh sync` refreshes them in place by r
 
 | File                      | Merge strategy                                                                                                                                                                                                                            |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.gitignore`              | Append any missing kit ignore patterns; consumer-local entries are preserved. Matching is per-line and comments/blank lines are skipped, so re-running is a no-op                                                                         |
 | `.npmrc`                  | Append any missing lines from the kit's required-lines list                                                                                                                                                                               |
 | `eslint.config.js`        | Overwrite with the current kit template (no merge — same model as Playwright)                                                                                                                                                             |
 | `tsconfig.json`           | Prepend the kit preset to the `extends` array if not already present, then strip any `compilerOptions` key whose value equals the kit base preset (removing it as empty); value-divergent overrides and `include`/`exclude` are preserved |

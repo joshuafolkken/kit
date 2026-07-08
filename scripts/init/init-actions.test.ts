@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { init_actions } from './init-actions'
+import { init_actions, type FileAction } from './init-actions'
 
+const GITIGNORE = '.gitignore'
 const NPMRC = '.npmrc'
 const ESLINT = 'eslint.config.js'
 const PRETTIER = 'prettier.config.js'
@@ -13,7 +14,14 @@ const VSCODE_SETTINGS = '.vscode/settings.json'
 
 const COMMON_TAIL_DESTINATIONS = [TSCONFIG, CSPELL, LEFTHOOK, VSCODE_EXTENSIONS, VSCODE_SETTINGS]
 
-const VANILLA_DESTINATIONS = [NPMRC, ESLINT, PRETTIER, PLAYWRIGHT, ...COMMON_TAIL_DESTINATIONS]
+const VANILLA_DESTINATIONS = [
+	GITIGNORE,
+	NPMRC,
+	ESLINT,
+	PRETTIER,
+	PLAYWRIGHT,
+	...COMMON_TAIL_DESTINATIONS,
+]
 
 describe('init_actions.build_file_actions', () => {
 	it('returns the expected ordered destination list', () => {
@@ -35,6 +43,27 @@ describe('init_actions.build_file_actions', () => {
 		for (const action of init_actions.build_file_actions()) {
 			expect(action.create().length).toBeGreaterThan(0)
 		}
+	})
+})
+
+function find_gitignore_action(): FileAction | undefined {
+	return init_actions.build_file_actions().find((action) => action.dest === GITIGNORE)
+}
+
+describe('init_actions gitignore distribution', () => {
+	it('creates from the kit template with core patterns', () => {
+		const action = find_gitignore_action()
+
+		expect(action).toBeDefined()
+		expect(action?.create()).toContain('node_modules')
+	})
+
+	it('union-merges an existing file — consumer line kept, kit entry appended', () => {
+		const action = find_gitignore_action()
+		const merged = action?.merge?.('node_modules\n.audio/\n') ?? ''
+
+		expect(merged).toContain('.audio/')
+		expect(merged).toContain('.DS_Store')
 	})
 })
 
