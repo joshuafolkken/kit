@@ -23,18 +23,33 @@ interface PackageVersionConfig {
 	fix_gh_packages_path: string
 }
 
+// The opt-in hooks a consumer supplies to report and upgrade an upstream's effective (running-
+// relative) install. `resolve_effective_version` returns the upstream version actually executed
+// (e.g. the kit bundled in the running global app-kit, via createRequire); `resolve_global_upgrade_command`
+// returns the global command that bumps it (e.g. `pnpm add -g @joshuafolkken/app-kit@<latest>`).
+// Both are optional and only take effect together — kit itself supplies neither (it has no upstream).
+interface UpstreamEffectiveHooks {
+	resolve_effective_version?: () => string | undefined
+	resolve_global_upgrade_command?: () => string
+}
+
 // A consumer's declaration of one upstream package in its dependency chain (e.g. app-kit declares
-// kit). Only the package name is needed — the endpoint and repair path are derived from it.
-interface UpstreamDescriptor {
+// kit). Only the package name is required — the endpoint and repair path are derived from it; the
+// effective-install hooks are optional so upstreams without a global blind spot are unaffected.
+interface UpstreamDescriptor extends UpstreamEffectiveHooks {
 	package_name: string
 }
+
+// A fully resolved upstream: the per-package config plus the consumer's opt-in effective-install
+// hooks carried through from the descriptor.
+interface UpstreamVersionConfig extends PackageVersionConfig, UpstreamEffectiveHooks {}
 
 // The per-package inputs that turn the generic version-command library into a concrete `version`
 // / `version:upgrade` pair. `upstreams` lists the consumer's upstream chain nearest-first (their
 // order is preserved in the report); `self_directory` and `resolve_warning` are optional hooks the
 // consumer's thin wrapper supplies to reproduce kit's running-binary line and PATH warning.
 interface VersionCommandConfig extends PackageVersionConfig {
-	upstreams: ReadonlyArray<PackageVersionConfig>
+	upstreams: ReadonlyArray<UpstreamVersionConfig>
 	self_directory?: string
 	resolve_warning?: () => string | undefined
 }
@@ -70,13 +85,31 @@ function derive_versions_endpoint(package_name: string): string {
 	return `/users/${scoped.owner}/packages/npm/${scoped.name}/versions?per_page=1`
 }
 
-// Resolve an upstream descriptor into a full per-package config. Every package in the chain repairs
-// its lockfile with kit's single `fix-gh-packages.ts` (see FIX_GH_PACKAGES_PATH).
-function resolve_upstream(descriptor: UpstreamDescriptor): PackageVersionConfig {
+// Copy the consumer's opt-in effective-install hooks, keeping only the defined ones so the resolved
+// config stays compatible with `exactOptionalPropertyTypes`.
+function pick_effective_hooks(descriptor: UpstreamDescriptor): UpstreamEffectiveHooks {
+	const hooks: UpstreamEffectiveHooks = {}
+
+	if (descriptor.resolve_effective_version !== undefined) {
+		hooks.resolve_effective_version = descriptor.resolve_effective_version
+	}
+
+	if (descriptor.resolve_global_upgrade_command !== undefined) {
+		hooks.resolve_global_upgrade_command = descriptor.resolve_global_upgrade_command
+	}
+
+	return hooks
+}
+
+// Resolve an upstream descriptor into a full per-package config, carrying through the optional
+// effective-install hooks. Every package in the chain repairs its lockfile with kit's single
+// `fix-gh-packages.ts` (see FIX_GH_PACKAGES_PATH).
+function resolve_upstream(descriptor: UpstreamDescriptor): UpstreamVersionConfig {
 	return {
 		package_name: descriptor.package_name,
 		versions_endpoint: derive_versions_endpoint(descriptor.package_name),
 		fix_gh_packages_path: FIX_GH_PACKAGES_PATH,
+		...pick_effective_hooks(descriptor),
 	}
 }
 
@@ -98,6 +131,8 @@ function create_version_command_config(options: VersionCommandConfigOptions): Ve
 export type {
 	PackageVersionConfig,
 	UpstreamDescriptor,
+	UpstreamEffectiveHooks,
+	UpstreamVersionConfig,
 	VersionCommandConfig,
 	VersionCommandConfigOptions,
 }
