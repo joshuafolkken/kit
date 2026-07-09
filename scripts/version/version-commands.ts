@@ -3,11 +3,12 @@ import { running_binary } from './running-binary'
 import {
 	version_check_logic,
 	type RunningBinary,
+	type UpstreamEffective,
 	type UpstreamReport,
 	type VersionOutputExtras,
 	type VersionSnapshot,
 } from './version-check-logic'
-import type { PackageVersionConfig, VersionCommandConfig } from './version-command-config'
+import type { UpstreamVersionConfig, VersionCommandConfig } from './version-command-config'
 import { fetch_latest_version } from './version-remote'
 import { version_targets } from './version-targets'
 
@@ -46,14 +47,29 @@ function build_extras(config: VersionCommandConfig): VersionOutputExtras {
 	return extras
 }
 
-// Read one upstream's project-installed and latest versions. Upstreams are project
-// devDependencies of the consumer, so the global install path does not apply.
-function read_upstream_report(upstream: PackageVersionConfig): UpstreamReport {
-	return {
+// Resolve the upstream's effective (running-relative) install from the consumer's opt-in hooks, or
+// undefined when the consumer supplies neither (e.g. kit, which has no upstream). Both hooks are
+// required together: the effective version to display and the global command that upgrades it.
+function build_upstream_effective(upstream: UpstreamVersionConfig): UpstreamEffective | undefined {
+	const { resolve_effective_version, resolve_global_upgrade_command } = upstream
+	if (resolve_effective_version === undefined) return undefined
+	if (resolve_global_upgrade_command === undefined) return undefined
+
+	return { version: resolve_effective_version(), upgrade_command: resolve_global_upgrade_command() }
+}
+
+// Read one upstream's project-installed and latest versions, plus the optional effective/global
+// install when the consumer opts in. Absent the hooks, the report keeps its project/latest-only shape.
+function read_upstream_report(upstream: UpstreamVersionConfig): UpstreamReport {
+	const report: UpstreamReport = {
 		config: upstream,
 		project_version: version_targets.read_project_version(process.cwd(), upstream.package_name),
 		latest: fetch_latest_version(upstream.versions_endpoint, upstream.package_name),
 	}
+	const effective = build_upstream_effective(upstream)
+	if (effective !== undefined) report.effective = effective
+
+	return report
 }
 
 // Read the reports for the configured upstream chain, preserving the configured (nearest-first)

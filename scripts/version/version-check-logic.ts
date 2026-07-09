@@ -53,13 +53,25 @@ interface VersionOutputExtras {
 	warning?: string
 }
 
-// One upstream package's check result: the resolved upstream config plus the two versions the
-// project-scope report compares. Upstreams are project devDependencies of the consumer, so the
-// global install path does not apply to them.
+// An upstream's effective (running-relative) install, resolved by the consumer's opt-in hook — the
+// upstream version actually executed when the downstream CLI runs (e.g. the kit bundled inside the
+// running global app-kit, resolved via createRequire, NOT `pnpm ls -g`). `version` is undefined
+// when genuinely unresolved ("not installed"); `upgrade_command` is the consumer's global command
+// that bumps this effective install (e.g. `pnpm add -g @joshuafolkken/app-kit@<latest>` — routed
+// through the downstream CLI, since that is what upgrades the bundled upstream).
+interface UpstreamEffective {
+	version: string | undefined
+	upgrade_command: string
+}
+
+// One upstream package's check result: the resolved upstream config plus the project version the
+// project-scope report compares, and an optional effective/global install (present only when the
+// consumer opts in). Absent `effective` falls back to the original project/latest-only output.
 interface UpstreamReport {
 	config: PackageVersionConfig
 	project_version: string | undefined
 	latest: string
+	effective?: UpstreamEffective
 }
 
 // Render the running-binary line, or nothing when the running binary is unknown.
@@ -85,23 +97,53 @@ function format_target_line(label: string, version: string | undefined, latest: 
 	return `  ${label} ${format_target_status(version, latest)}`
 }
 
-// Render one upstream's report section: package name header plus project/latest lines, reusing
-// the staleness markers of the main report. Prefixed with a blank line to separate sections.
+// Render the upstream's effective/global line, or nothing when the consumer did not opt in. When
+// opted in, an unresolved effective install renders "not installed" (never silently omitted).
+function format_upstream_global_line(report: UpstreamReport): Array<string> {
+	if (report.effective === undefined) return []
+
+	return [format_target_line(GLOBAL_LABEL, report.effective.version, report.latest)]
+}
+
+// Render one upstream's report section: package name header, the optional effective/global line,
+// then the project/latest lines, reusing the staleness markers of the main report. Prefixed with a
+// blank line to separate sections. Global precedes project to mirror the main report's ordering.
 function format_upstream_lines(report: UpstreamReport): Array<string> {
 	return [
 		'',
 		report.config.package_name,
+		...format_upstream_global_line(report),
 		format_target_line(PROJECT_LABEL, report.project_version, report.latest),
 		`  ${LATEST_LABEL} ${report.latest}`,
 	]
 }
 
-// Build the project-scope upgrade command for every upstream that is installed and stale. The
-// global path never applies to upstreams, so every command is local (with lockfile repair).
+// The consumer-supplied global upgrade command for a stale effective upstream, or nothing. Skipped
+// when the consumer did not opt in or the effective install is up to date / unresolved.
+function build_effective_upgrade_commands(report: UpstreamReport): Array<string> {
+	const { effective, latest } = report
+	if (effective === undefined) return []
+	if (!is_target_stale(effective.version, latest)) return []
+
+	return [effective.upgrade_command]
+}
+
+// The project-scope upgrade command when the upstream's project dependency is installed and stale.
+// Always local (with lockfile repair), since the project path is the only scope kit resolves.
+function build_project_upgrade_commands(report: UpstreamReport): Array<string> {
+	if (!is_target_stale(report.project_version, report.latest)) return []
+
+	return [build_upgrade_shell_command(report.latest, true, report.config)]
+}
+
+// Build the upgrade commands for every upstream: the consumer's global command for a stale effective
+// install first, then the project-scope command, mirroring the main report's global-before-project
+// order. Upstreams without either stale target contribute nothing.
 function build_upstream_upgrade_commands(reports: ReadonlyArray<UpstreamReport>): Array<string> {
-	return reports
-		.filter((report) => is_target_stale(report.project_version, report.latest))
-		.map((report) => build_upgrade_shell_command(report.latest, true, report.config))
+	return reports.flatMap((report) => [
+		...build_effective_upgrade_commands(report),
+		...build_project_upgrade_commands(report),
+	])
 }
 
 // Build the shell upgrade commands for whichever of the two targets are installed and stale.
@@ -162,11 +204,20 @@ const version_check_logic = {
 	format_dual_version_output,
 	format_running_line,
 	format_upstream_lines,
+	format_upstream_global_line,
 	build_dual_upgrade_commands,
 	build_upstream_upgrade_commands,
+	build_effective_upgrade_commands,
+	build_project_upgrade_commands,
 	format_update_command,
 	build_upgrade_shell_command,
 }
 
-export type { VersionSnapshot, RunningBinary, VersionOutputExtras, UpstreamReport }
+export type {
+	VersionSnapshot,
+	RunningBinary,
+	VersionOutputExtras,
+	UpstreamReport,
+	UpstreamEffective,
+}
 export { version_check_logic }
