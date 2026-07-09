@@ -98,6 +98,38 @@ describe('create_version_command_config upstreams', () => {
 	})
 })
 
+describe('create_version_command_config upstream effective hooks', () => {
+	it('omits the effective-install hooks when the upstream descriptor supplies none', () => {
+		const config = create_version_command_config({
+			package_name: APP_KIT,
+			upstreams: [{ package_name: KIT }],
+		})
+		const [upstream] = config.upstreams
+
+		expect('resolve_effective_version' in (upstream ?? {})).toBe(false)
+		expect('resolve_global_upgrade_command' in (upstream ?? {})).toBe(false)
+	})
+
+	it('carries through the effective-install hooks when the upstream descriptor supplies them', () => {
+		const effective_version = '1.5.0'
+		const global_upgrade_command = 'pnpm add -g @joshuafolkken/app-kit@0.32.0'
+		const config = create_version_command_config({
+			package_name: APP_KIT,
+			upstreams: [
+				{
+					package_name: KIT,
+					resolve_effective_version: () => effective_version,
+					resolve_global_upgrade_command: () => global_upgrade_command,
+				},
+			],
+		})
+		const [upstream] = config.upstreams
+
+		expect(upstream?.resolve_effective_version?.()).toBe(effective_version)
+		expect(upstream?.resolve_global_upgrade_command?.()).toBe(global_upgrade_command)
+	})
+})
+
 describe('create_version_command_config optional hooks', () => {
 	it('omits the optional hooks when they are not supplied', () => {
 		const config = create_version_command_config({

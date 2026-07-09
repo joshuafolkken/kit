@@ -89,11 +89,26 @@ const UPSTREAM_PACKAGE = KIT_PACKAGE
 const MAIN_LATEST = '2.0.0'
 const UPSTREAM_LATEST = '1.5.0'
 const UPSTREAM_STALE = '1.4.0'
+const EFFECTIVE_STALE = '1.3.0'
 const UPSTREAM_UPGRADE_COMMAND = `pnpm add -D ${UPSTREAM_PACKAGE}@${UPSTREAM_LATEST}`
+// The consumer's global command upgrades the global downstream app-kit (which bundles the effective
+// kit) — not a bare `pnpm add -g @joshuafolkken/kit`, which app-kit resolution would shadow.
+const GLOBAL_UPGRADE_COMMAND = `pnpm add -g ${MAIN_PACKAGE}@${MAIN_LATEST}`
 
 const CHAINED_CONFIG = create_version_command_config({
 	package_name: MAIN_PACKAGE,
 	upstreams: [{ package_name: UPSTREAM_PACKAGE }],
+})
+
+const CHAINED_CONFIG_WITH_EFFECTIVE = create_version_command_config({
+	package_name: MAIN_PACKAGE,
+	upstreams: [
+		{
+			package_name: UPSTREAM_PACKAGE,
+			resolve_effective_version: () => EFFECTIVE_STALE,
+			resolve_global_upgrade_command: () => GLOBAL_UPGRADE_COMMAND,
+		},
+	],
 })
 
 // Arrange the mocked reads so the main package is fully up to date and the upstream project
@@ -124,6 +139,25 @@ describe('version_commands.read_upstream_reports', () => {
 		const config = create_version_command_config({ package_name: UPSTREAM_PACKAGE })
 
 		expect(version_commands.read_upstream_reports(config)).toStrictEqual([])
+	})
+
+	it('populates the effective install from the consumer hooks when supplied', () => {
+		arrange_chain_versions(UPSTREAM_LATEST)
+
+		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG_WITH_EFFECTIVE)
+
+		expect(reports[0]?.effective).toStrictEqual({
+			version: EFFECTIVE_STALE,
+			upgrade_command: GLOBAL_UPGRADE_COMMAND,
+		})
+	})
+
+	it('omits the effective install when the upstream declares no hooks', () => {
+		arrange_chain_versions(UPSTREAM_LATEST)
+
+		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG)
+
+		expect(reports[0]?.effective).toBeUndefined()
 	})
 })
 
@@ -173,6 +207,34 @@ describe('version_commands.run_upgrade with upstreams', () => {
 
 		expect(version_commands.run_upgrade(CHAINED_CONFIG)).toBe(0)
 		expect(mocked_execa_sync).not.toHaveBeenCalled()
+	})
+})
+
+describe('version_commands.run_upgrade with a stale effective upstream', () => {
+	it('runs the consumer global command when only the effective upstream is stale', () => {
+		arrange_chain_versions(UPSTREAM_LATEST)
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+
+		expect(version_commands.run_upgrade(CHAINED_CONFIG_WITH_EFFECTIVE)).toBe(0)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
+		expect(mocked_execa_sync).toHaveBeenCalledWith('sh', ['-c', GLOBAL_UPGRADE_COMMAND], {
+			stdio: 'inherit',
+			reject: false,
+		})
+	})
+})
+
+describe('version_commands.run_check with a stale effective upstream', () => {
+	it('renders the effective Global line and its upgrade hint', () => {
+		arrange_chain_versions(UPSTREAM_LATEST)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		version_commands.run_check(CHAINED_CONFIG_WITH_EFFECTIVE)
+		const output = String(info_spy.mock.calls[0]?.[0])
+
+		expect(output).toContain(`Global:  ${EFFECTIVE_STALE}`)
+		expect(output).toContain(`Run: ${GLOBAL_UPGRADE_COMMAND}`)
+		info_spy.mockRestore()
 	})
 })
 
