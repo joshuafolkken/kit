@@ -1,5 +1,5 @@
 {
-	"version": "1.8.0",
+	"version": "1.9.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -96,7 +96,7 @@
 		"cspell": "^10.0.1",
 		"esbuild": "^0.28.1",
 		"eslint": "^10.6.0",
-		"lefthook": "^2.1.9",
+		"lefthook": "^2.1.10",
 		"prettier": "^3.9.4",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.0",
