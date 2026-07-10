@@ -8,6 +8,7 @@ const APP_KIT = '@joshuafolkken/app-kit'
 const APP_KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/app-kit/versions?per_page=1'
 const GAME_KIT = '@joshuafolkken/game-kit'
 const HOOK_CONTEXT = { latest: '2.0.0' }
+const BLANK_SPACES = 3
 
 describe('derive_versions_endpoint', () => {
 	it('derives the GitHub Packages endpoint from a scoped package name', () => {
@@ -68,6 +69,20 @@ describe('create_version_command_config derived endpoint', () => {
 		})
 
 		expect(config.versions_endpoint).toBe(override_endpoint)
+	})
+
+	it('throws an actionable error when an empty versions endpoint is supplied', () => {
+		expect(() =>
+			create_version_command_config({ package_name: KIT, versions_endpoint: '' }),
+		).toThrow(/versions_endpoint for @joshuafolkken\/kit was set to an empty string/u)
+	})
+
+	it('throws for a whitespace-only versions endpoint instead of letting it reach the fetch layer', () => {
+		const blank_spaces = ' '.repeat(BLANK_SPACES)
+
+		expect(() =>
+			create_version_command_config({ package_name: GAME_KIT, versions_endpoint: blank_spaces }),
+		).toThrow(/versions_endpoint for @joshuafolkken\/game-kit was set to an empty string/u)
 	})
 })
 
