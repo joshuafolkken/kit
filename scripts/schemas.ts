@@ -4,6 +4,10 @@ const overrides_snapshot_schema = z.record(z.string(), z.string())
 
 const package_version_schema = z.object({ version: z.string() })
 
+// A package.json identified by both its `name` and `version` — used to confirm a walk-up landed on
+// the intended package root (matching by name) before trusting its version.
+const package_named_version_schema = z.looseObject({ name: z.string(), version: z.string() })
+
 const package_with_version_schema = z.looseObject({ version: z.string() })
 
 // Shape of `pnpm ls -g --json <pkg>`: an array whose first entry lists the matched
@@ -43,6 +47,7 @@ const string_record_schema = z.record(z.string(), z.string())
 export {
 	overrides_snapshot_schema,
 	package_version_schema,
+	package_named_version_schema,
 	package_with_version_schema,
 	pnpm_ls_global_schema,
 	vscode_settings_schema,
