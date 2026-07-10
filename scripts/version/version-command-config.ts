@@ -123,12 +123,26 @@ function resolve_upstream(descriptor: UpstreamDescriptor): UpstreamVersionConfig
 	}
 }
 
+// Resolve the config's versions endpoint: derive it from the package name when omitted, or reject an
+// explicitly-supplied blank endpoint up front. This fails fast at build time so a mis-built config
+// can never carry an empty endpoint down to `fetch_latest_version`, where it would surface as an
+// opaque `gh api` failure (see the game-kit#395 diagnosis behind this guard).
+function resolve_versions_endpoint(options: VersionCommandConfigOptions): string {
+	const { versions_endpoint, package_name } = options
+	if (versions_endpoint === undefined) return derive_versions_endpoint(package_name)
+	if (versions_endpoint.trim() !== '') return versions_endpoint
+
+	throw new Error(
+		`versions_endpoint for ${package_name} was set to an empty string; omit it to derive the endpoint or pass a non-empty value.`,
+	)
+}
+
 // Build a config from a consumer's inputs, assigning the optional hooks only when defined so the
 // object stays compatible with `exactOptionalPropertyTypes`.
 function create_version_command_config(options: VersionCommandConfigOptions): VersionCommandConfig {
 	const config: VersionCommandConfig = {
 		package_name: options.package_name,
-		versions_endpoint: options.versions_endpoint ?? derive_versions_endpoint(options.package_name),
+		versions_endpoint: resolve_versions_endpoint(options),
 		fix_gh_packages_path: FIX_GH_PACKAGES_PATH,
 		upstreams: (options.upstreams ?? []).map((descriptor) => resolve_upstream(descriptor)),
 	}
