@@ -62,6 +62,28 @@ describe('read_required_statuses', () => {
 	})
 })
 
+describe('read_required_statuses — check-suite prefix matching', () => {
+	it('matches a check-suite job nested under the required app name', () => {
+		const checks: Array<RollupCheck> = [
+			{ name: `${CODE_RABBIT} / Review`, status: 'pass' },
+			{ name: SONAR_QUBE, status: 'pass' },
+		]
+		const statuses = read_required_statuses(checks)
+
+		expect(statuses.every((status) => status === 'pass')).toBe(true)
+	})
+
+	it('does not match a context that merely starts with the required name', () => {
+		const checks: Array<RollupCheck> = [
+			{ name: `${CODE_RABBIT}Nightly`, status: 'pass' },
+			{ name: SONAR_QUBE, status: 'pass' },
+		]
+		const statuses = read_required_statuses(checks)
+
+		expect(statuses).toContain('missing')
+	})
+})
+
 describe('evaluate_pr_state — success', () => {
 	it('returns success when CLEAN and all required checks pass', () => {
 		expect(evaluate_pr_state(make_snapshot())).toBe('success')
@@ -70,6 +92,17 @@ describe('evaluate_pr_state — success', () => {
 	it('returns success when non-required check is pending', () => {
 		const snapshot = make_snapshot({
 			rollup: [...PASSING_ROLLUP, { name: 'Lighthouse', status: 'pending' }],
+		})
+
+		expect(evaluate_pr_state(snapshot)).toBe('success')
+	})
+
+	it('returns success when CodeRabbit is present only as its renamed suite job', () => {
+		const snapshot = make_snapshot({
+			rollup: [
+				{ name: `${CODE_RABBIT} / Review`, status: 'pass' },
+				{ name: SONAR_QUBE, status: 'pass' },
+			],
 		})
 
 		expect(evaluate_pr_state(snapshot)).toBe('success')
