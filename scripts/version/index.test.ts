@@ -7,6 +7,7 @@ import {
 	create_version_command_config,
 	derive_versions_endpoint,
 	kit_package_descriptor,
+	resolve_effective_upstream_version,
 	version_commands,
 } from './index'
 
@@ -35,6 +36,10 @@ describe('version library barrel', () => {
 
 	it('re-exports kit package descriptor for downstream upstream chains', () => {
 		expect(kit_package_descriptor.package_name).toBe('@joshuafolkken/kit')
+	})
+
+	it('re-exports the effective-upstream version resolver', () => {
+		expect(typeof resolve_effective_upstream_version).toBe('function')
 	})
 })
 

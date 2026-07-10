@@ -78,6 +78,16 @@ compiled `.js` + `.d.ts` (built from `scripts/version/index.ts`), so consumers c
 the bundled `.d.ts`. kit's own `version` / `version:upgrade` consume this same library via
 [`scripts/version/kit-version-config.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/version/kit-version-config.ts).
 
+The library also exports `resolve_effective_upstream_version(base_url, package_name, options?)`, the
+single-sourced primitive for the effective-install hooks: it resolves an upstream package relative to
+a base module URL via `createRequire`, walks up to that package's root (matching by `name`), and
+returns its declared `version` — or `undefined`, never throwing, when the package is absent. A
+downstream (e.g. app-kit resolving the kit bundled in the running global install) supplies its
+`resolve_effective_version` hook with `resolve_effective_upstream_version(import.meta.url, upstream)`
+instead of re-cloning the resolution walk. Pass `options.resolve_marker` (a subpath specifier) when
+the package root is not directly `require.resolve`-able because its `package.json` is not in
+`exports` — kit itself needs `{ resolve_marker: '@joshuafolkken/kit/config-merge' }`.
+
 ### Config-merge library (`@joshuafolkken/kit/config-merge`)
 
 A parameterized, idempotent patcher for one list field of a config file — the cspell `import`

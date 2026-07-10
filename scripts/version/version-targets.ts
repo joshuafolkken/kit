@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_version_schema, pnpm_ls_global_schema } from '#scripts/schemas'
 import { execaSync } from 'execa'
+import { safe_json_parse } from './parse-json'
 
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
@@ -10,14 +11,6 @@ const PROJECT_VERSION_ICON = '📦'
 // Build the `pnpm ls -g --json <package>` arguments for the package being checked.
 function build_pnpm_ls_arguments(package_name: string): Array<string> {
 	return ['ls', '-g', '--json', package_name]
-}
-
-function safe_json_parse(raw: string): unknown {
-	try {
-		return JSON.parse(raw)
-	} catch {
-		return undefined
-	}
 }
 
 // Read the globally installed version from `pnpm ls -g --json` output. Returns undefined when
