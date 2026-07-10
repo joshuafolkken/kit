@@ -1,6 +1,6 @@
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { create_version_command_config } from './version-command-config'
+import { create_version_command_config, type UpstreamHookContext } from './version-command-config'
 import { version_commands } from './version-commands'
 import { fetch_latest_version } from './version-remote'
 import { version_targets } from './version-targets'
@@ -127,7 +127,7 @@ describe('version_commands.read_upstream_reports', () => {
 	it('reads the project and latest versions for each configured upstream', () => {
 		arrange_chain_versions(UPSTREAM_STALE)
 
-		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG)
+		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG, MAIN_LATEST)
 
 		expect(reports).toHaveLength(1)
 		expect(reports[0]?.config.package_name).toBe(UPSTREAM_PACKAGE)
@@ -138,13 +138,16 @@ describe('version_commands.read_upstream_reports', () => {
 	it('returns an empty list when no upstreams are configured', () => {
 		const config = create_version_command_config({ package_name: UPSTREAM_PACKAGE })
 
-		expect(version_commands.read_upstream_reports(config)).toStrictEqual([])
+		expect(version_commands.read_upstream_reports(config, MAIN_LATEST)).toStrictEqual([])
 	})
 
 	it('populates the effective install from the consumer hooks when supplied', () => {
 		arrange_chain_versions(UPSTREAM_LATEST)
 
-		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG_WITH_EFFECTIVE)
+		const reports = version_commands.read_upstream_reports(
+			CHAINED_CONFIG_WITH_EFFECTIVE,
+			MAIN_LATEST,
+		)
 
 		expect(reports[0]?.effective).toStrictEqual({
 			version: EFFECTIVE_STALE,
@@ -155,9 +158,61 @@ describe('version_commands.read_upstream_reports', () => {
 	it('omits the effective install when the upstream declares no hooks', () => {
 		arrange_chain_versions(UPSTREAM_LATEST)
 
-		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG)
+		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG, MAIN_LATEST)
 
 		expect(reports[0]?.effective).toBeUndefined()
+	})
+})
+
+function config_with_context_hooks(hooks: {
+	resolve_effective_version: (context: UpstreamHookContext) => string | undefined
+	resolve_global_upgrade_command: (context: UpstreamHookContext) => string
+}): ReturnType<typeof create_version_command_config> {
+	return create_version_command_config({
+		package_name: MAIN_PACKAGE,
+		upstreams: [{ package_name: UPSTREAM_PACKAGE, ...hooks }],
+	})
+}
+
+describe('version_commands.read_upstream_reports hook context', () => {
+	it('passes the downstream latest to both effective-install hooks', () => {
+		arrange_chain_versions(UPSTREAM_LATEST)
+		const effective_spy = vi.fn(() => EFFECTIVE_STALE)
+		const upgrade_spy = vi.fn(
+			(context: UpstreamHookContext) => `pnpm add -g ${MAIN_PACKAGE}@${context.latest}`,
+		)
+		const config = config_with_context_hooks({
+			resolve_effective_version: effective_spy,
+			resolve_global_upgrade_command: upgrade_spy,
+		})
+
+		const reports = version_commands.read_upstream_reports(config, MAIN_LATEST)
+
+		expect(effective_spy).toHaveBeenCalledWith({ latest: MAIN_LATEST })
+		expect(upgrade_spy).toHaveBeenCalledWith({ latest: MAIN_LATEST })
+		expect(reports[0]?.effective?.upgrade_command).toBe(
+			`pnpm add -g ${MAIN_PACKAGE}@${MAIN_LATEST}`,
+		)
+	})
+})
+
+describe('version_commands.run_check threads the fetched latest without re-fetching', () => {
+	it('feeds read_snapshot latest into the hook and fetches latest only once per package', () => {
+		arrange_chain_versions(UPSTREAM_LATEST)
+		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const config = config_with_context_hooks({
+			resolve_effective_version: () => EFFECTIVE_STALE,
+			resolve_global_upgrade_command: (context) => `pnpm add -g ${MAIN_PACKAGE}@${context.latest}`,
+		})
+
+		version_commands.run_check(config)
+
+		// Two fetches only (main + upstream); the hook reuses the threaded latest, no third fetch.
+		expect(mocked_fetch_latest).toHaveBeenCalledTimes(2)
+		expect(String(info_spy.mock.calls[0]?.[0])).toContain(
+			`pnpm add -g ${MAIN_PACKAGE}@${MAIN_LATEST}`,
+		)
+		info_spy.mockRestore()
 	})
 })
 

@@ -7,6 +7,7 @@ export { KIT_PACKAGE_NAME, kit_package_descriptor } from './kit-descriptor'
 export type {
 	PackageVersionConfig,
 	UpstreamDescriptor,
+	UpstreamHookContext,
 	VersionCommandConfig,
 	VersionCommandConfigOptions,
 } from './version-command-config'
