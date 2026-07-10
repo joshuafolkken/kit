@@ -24,15 +24,33 @@ function parse_required_checks(): ReadonlyArray<string> {
 const REQUIRED_CHECKS = parse_required_checks()
 const MERGE_STATE_CLEAN = 'CLEAN'
 const REVIEW_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
+// GitHub reports a check-suite job as `<App> / <Job>` (e.g. `CodeRabbit / Review`). A required
+// check name matches that suite when it is the `<App>` segment, so the required-check list stays the
+// bare app name even after the provider renames its job.
+const CHECK_SUITE_SEPARATOR = ' / '
 
 type PrEvaluation = 'success' | 'pending' | 'failure'
 
-function read_required_statuses(checks: ReadonlyArray<RollupCheck>): Array<string> {
-	return REQUIRED_CHECKS.map((name) => {
-		const match = checks.find((check) => check.name === name)
+// A required check matches either its exact context name or a check-suite job nested under it
+// (`<required> / <job>`). The separator keeps the prefix anchored, so an unrelated context such as
+// `CodeRabbitNightly` does not satisfy a required `CodeRabbit`.
+function is_required_match(check_name: string, required_name: string): boolean {
+	if (check_name === required_name) return true
 
-		return match?.status ?? CHECK_STATUS_MISSING
-	})
+	return check_name.startsWith(`${required_name}${CHECK_SUITE_SEPARATOR}`)
+}
+
+function find_required_check(
+	checks: ReadonlyArray<RollupCheck>,
+	required_name: string,
+): RollupCheck | undefined {
+	return checks.find((check) => is_required_match(check.name, required_name))
+}
+
+function read_required_statuses(checks: ReadonlyArray<RollupCheck>): Array<string> {
+	return REQUIRED_CHECKS.map(
+		(name) => find_required_check(checks, name)?.status ?? CHECK_STATUS_MISSING,
+	)
 }
 
 function is_review_blocked(review_decision: string | undefined): boolean {
