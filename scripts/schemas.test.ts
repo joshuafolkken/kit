@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	json_object_schema,
 	overrides_snapshot_schema,
+	package_named_version_schema,
 	package_version_schema,
 	pnpm_ls_global_schema,
 	string_array_schema,
@@ -12,6 +13,7 @@ import {
 
 const VITEST_VERSION = '^4.0.0'
 const PKG_NAME = 'pkg'
+const SAMPLE_VERSION = '1.2.3'
 
 describe('overrides_snapshot_schema', () => {
 	it('parses a valid overrides record', () => {
@@ -32,10 +34,13 @@ describe('overrides_snapshot_schema', () => {
 
 describe('package_version_schema', () => {
 	it('parses a valid version field', () => {
-		const result = package_version_schema.safeParse({ version: '1.2.3', name: 'extra-field' })
+		const result = package_version_schema.safeParse({
+			version: SAMPLE_VERSION,
+			name: 'extra-field',
+		})
 
 		expect(result.success).toBe(true)
-		if (result.success) expect(result.data.version).toBe('1.2.3')
+		if (result.success) expect(result.data.version).toBe(SAMPLE_VERSION)
 	})
 
 	it('fails when version is missing', () => {
@@ -44,6 +49,25 @@ describe('package_version_schema', () => {
 
 	it('fails when version is not a string', () => {
 		expect(package_version_schema.safeParse({ version: 123 }).success).toBe(false)
+	})
+})
+
+describe('package_named_version_schema', () => {
+	const named = { name: PKG_NAME, version: SAMPLE_VERSION }
+
+	it('parses when both name and version are present', () => {
+		const result = package_named_version_schema.safeParse(named)
+
+		expect(result.success).toBe(true)
+		if (result.success) expect(result.data).toMatchObject(named)
+	})
+
+	it('fails when only the version is present', () => {
+		expect(package_named_version_schema.safeParse({ version: SAMPLE_VERSION }).success).toBe(false)
+	})
+
+	it('fails when only the name is present', () => {
+		expect(package_named_version_schema.safeParse({ name: PKG_NAME }).success).toBe(false)
 	})
 })
 

@@ -17,4 +17,6 @@ export type {
 	VersionOutputExtras,
 } from './version-check-logic'
 export { create_version_command_config, derive_versions_endpoint } from './version-command-config'
+export type { EffectiveUpstreamOptions } from './effective-upstream'
+export { resolve_effective_upstream_version } from './effective-upstream'
 export { version_commands } from './version-commands'

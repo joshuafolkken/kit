@@ -1,19 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_version_schema } from '#scripts/schemas'
+import { safe_json_parse } from './parse-json'
 
 const PACKAGE_JSON = 'package.json'
 // Scripts live two levels under the package root (scripts/<group>/<file>.ts), so the running
 // binary's own package.json is reached by walking up twice from the script directory.
 const SCRIPT_DEPTH_FROM_ROOT = ['..', '..'] as const
-
-function safe_json_parse(raw: string): unknown {
-	try {
-		return JSON.parse(raw)
-	} catch {
-		return undefined
-	}
-}
 
 // The running binary is the single source of truth: resolve the package.json of the install that
 // is actually executing (via import.meta.url's directory), mirroring how `init`/`sync` key off the
