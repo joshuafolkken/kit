@@ -88,6 +88,11 @@ instead of re-cloning the resolution walk. Pass `options.resolve_marker` (a subp
 the package root is not directly `require.resolve`-able because its `package.json` is not in
 `exports` — kit itself needs `{ resolve_marker: '@joshuafolkken/kit/config-merge' }`.
 
+Both effective-install hooks receive an `UpstreamHookContext` — `{ latest }`, the downstream
+package's own already-fetched latest — so a `resolve_global_upgrade_command` that emits
+`pnpm add -g @joshuafolkken/app-kit@<latest>` reuses kit's single `latest` fetch instead of resolving
+it a second time (`latest` here is the main package's latest, not the upstream's).
+
 ### Config-merge library (`@joshuafolkken/kit/config-merge`)
 
 A parameterized, idempotent patcher for one list field of a config file — the cspell `import`

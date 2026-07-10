@@ -7,6 +7,7 @@ const KIT_FIX_PATH = 'node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts
 const APP_KIT = '@joshuafolkken/app-kit'
 const APP_KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/app-kit/versions?per_page=1'
 const GAME_KIT = '@joshuafolkken/game-kit'
+const HOOK_CONTEXT = { latest: '2.0.0' }
 
 describe('derive_versions_endpoint', () => {
 	it('derives the GitHub Packages endpoint from a scoped package name', () => {
@@ -125,8 +126,28 @@ describe('create_version_command_config upstream effective hooks', () => {
 		})
 		const [upstream] = config.upstreams
 
-		expect(upstream?.resolve_effective_version?.()).toBe(effective_version)
-		expect(upstream?.resolve_global_upgrade_command?.()).toBe(global_upgrade_command)
+		expect(upstream?.resolve_effective_version?.(HOOK_CONTEXT)).toBe(effective_version)
+		expect(upstream?.resolve_global_upgrade_command?.(HOOK_CONTEXT)).toBe(global_upgrade_command)
+	})
+})
+
+describe('create_version_command_config upstream hook context', () => {
+	it('lets a hook build its global upgrade command from the context latest', () => {
+		const config = create_version_command_config({
+			package_name: APP_KIT,
+			upstreams: [
+				{
+					package_name: KIT,
+					resolve_effective_version: () => '1.5.0',
+					resolve_global_upgrade_command: (context) => `pnpm add -g ${APP_KIT}@${context.latest}`,
+				},
+			],
+		})
+		const [upstream] = config.upstreams
+
+		expect(upstream?.resolve_global_upgrade_command?.(HOOK_CONTEXT)).toBe(
+			`pnpm add -g ${APP_KIT}@${HOOK_CONTEXT.latest}`,
+		)
 	})
 })
 
