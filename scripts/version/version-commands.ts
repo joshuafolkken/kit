@@ -8,7 +8,11 @@ import {
 	type VersionOutputExtras,
 	type VersionSnapshot,
 } from './version-check-logic'
-import type { UpstreamVersionConfig, VersionCommandConfig } from './version-command-config'
+import type {
+	UpstreamHookContext,
+	UpstreamVersionConfig,
+	VersionCommandConfig,
+} from './version-command-config'
 import { fetch_latest_version } from './version-remote'
 import { version_targets } from './version-targets'
 
@@ -49,40 +53,57 @@ function build_extras(config: VersionCommandConfig): VersionOutputExtras {
 
 // Resolve the upstream's effective (running-relative) install from the consumer's opt-in hooks, or
 // undefined when the consumer supplies neither (e.g. kit, which has no upstream). Both hooks are
-// required together: the effective version to display and the global command that upgrades it.
-function build_upstream_effective(upstream: UpstreamVersionConfig): UpstreamEffective | undefined {
+// required together and receive `context` (the downstream package's already-fetched latest) so the
+// global upgrade command can reuse kit's single fetch instead of resolving `latest` a second time.
+function build_upstream_effective(
+	upstream: UpstreamVersionConfig,
+	context: UpstreamHookContext,
+): UpstreamEffective | undefined {
 	const { resolve_effective_version, resolve_global_upgrade_command } = upstream
 	if (resolve_effective_version === undefined) return undefined
 	if (resolve_global_upgrade_command === undefined) return undefined
 
-	return { version: resolve_effective_version(), upgrade_command: resolve_global_upgrade_command() }
+	return {
+		version: resolve_effective_version(context),
+		upgrade_command: resolve_global_upgrade_command(context),
+	}
 }
 
 // Read one upstream's project-installed and latest versions, plus the optional effective/global
 // install when the consumer opts in. Absent the hooks, the report keeps its project/latest-only shape.
-function read_upstream_report(upstream: UpstreamVersionConfig): UpstreamReport {
+function read_upstream_report(
+	upstream: UpstreamVersionConfig,
+	context: UpstreamHookContext,
+): UpstreamReport {
 	const report: UpstreamReport = {
 		config: upstream,
 		project_version: version_targets.read_project_version(process.cwd(), upstream.package_name),
 		latest: fetch_latest_version(upstream.versions_endpoint, upstream.package_name),
 	}
-	const effective = build_upstream_effective(upstream)
+	const effective = build_upstream_effective(upstream, context)
 	if (effective !== undefined) report.effective = effective
 
 	return report
 }
 
 // Read the reports for the configured upstream chain, preserving the configured (nearest-first)
-// order. Empty when the consumer declares no upstreams (e.g. kit itself).
-function read_upstream_reports(config: VersionCommandConfig): Array<UpstreamReport> {
-	return config.upstreams.map((upstream) => read_upstream_report(upstream))
+// order. Empty when the consumer declares no upstreams (e.g. kit itself). `primary_latest` is the
+// downstream package's already-fetched latest (from `read_snapshot`), threaded into each upstream's
+// hooks so a consumer never re-fetches it.
+function read_upstream_reports(
+	config: VersionCommandConfig,
+	primary_latest: string,
+): Array<UpstreamReport> {
+	const context: UpstreamHookContext = { latest: primary_latest }
+
+	return config.upstreams.map((upstream) => read_upstream_report(upstream, context))
 }
 
 // The `version` (show) command for any configured package: print the dual/offline report with
 // staleness markers, upstream sections, upgrade hints, and the running-binary/warning extras.
 function run_check(config: VersionCommandConfig): void {
 	const snapshot = read_snapshot(config)
-	const upstream_reports = read_upstream_reports(config)
+	const upstream_reports = read_upstream_reports(config, snapshot.latest)
 
 	console.info(
 		version_check_logic.format_dual_version_output(
@@ -120,7 +141,9 @@ function run_upgrade(config: VersionCommandConfig): number {
 	const snapshot = read_snapshot(config)
 	const commands = [
 		...version_check_logic.build_dual_upgrade_commands(snapshot, config),
-		...version_check_logic.build_upstream_upgrade_commands(read_upstream_reports(config)),
+		...version_check_logic.build_upstream_upgrade_commands(
+			read_upstream_reports(config, snapshot.latest),
+		),
 	]
 
 	if (commands.length === 0) console.info(ALREADY_UP_TO_DATE)

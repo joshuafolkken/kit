@@ -23,14 +23,24 @@ interface PackageVersionConfig {
 	fix_gh_packages_path: string
 }
 
+// The context kit passes to a consumer's effective-install hooks. `latest` is the downstream
+// (primary) package's already-fetched latest — the value kit resolved once for the main report — so
+// a hook that builds a global upgrade command (e.g. `pnpm add -g @joshuafolkken/app-kit@<latest>`)
+// reuses that single fetch instead of resolving `latest` a second time. It is the main package's
+// latest, not the upstream's (the upstream's own latest is the report's `latest`).
+interface UpstreamHookContext {
+	latest: string
+}
+
 // The opt-in hooks a consumer supplies to report and upgrade an upstream's effective (running-
 // relative) install. `resolve_effective_version` returns the upstream version actually executed
 // (e.g. the kit bundled in the running global app-kit, via createRequire); `resolve_global_upgrade_command`
 // returns the global command that bumps it (e.g. `pnpm add -g @joshuafolkken/app-kit@<latest>`).
-// Both are optional and only take effect together — kit itself supplies neither (it has no upstream).
+// Both receive the shared `UpstreamHookContext` so they can reuse kit's already-fetched downstream
+// latest. Both are optional and only take effect together — kit itself supplies neither (no upstream).
 interface UpstreamEffectiveHooks {
-	resolve_effective_version?: () => string | undefined
-	resolve_global_upgrade_command?: () => string
+	resolve_effective_version?: (context: UpstreamHookContext) => string | undefined
+	resolve_global_upgrade_command?: (context: UpstreamHookContext) => string
 }
 
 // A consumer's declaration of one upstream package in its dependency chain (e.g. app-kit declares
@@ -132,6 +142,7 @@ export type {
 	PackageVersionConfig,
 	UpstreamDescriptor,
 	UpstreamEffectiveHooks,
+	UpstreamHookContext,
 	UpstreamVersionConfig,
 	VersionCommandConfig,
 	VersionCommandConfigOptions,
