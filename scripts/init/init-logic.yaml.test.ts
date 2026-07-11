@@ -6,7 +6,6 @@ const EXTENDS_KEY = 'extends'
 const KIT_ESLINT_SVELTEKIT = '@joshuafolkken/kit/eslint/sveltekit'
 const KIT_ESLINT = '@joshuafolkken/kit/eslint'
 const CSPELL_VALUE = '@joshuafolkken/kit/cspell'
-const CSPELL_SVK_VALUE = '@joshuafolkken/kit/cspell/sveltekit'
 const WORKSPACE_TEMPLATE = 'allowBuilds:\n  esbuild: true\n\nminimumReleaseAgeExclude:\n  - vite\n'
 const PACKAGES_KEY = 'packages:'
 const ALLOW_BUILDS_KEY = 'allowBuilds:'
@@ -70,14 +69,12 @@ describe('merge_cspell_import — unchanged when present', () => {
 })
 
 describe('merge_cspell_import — modification', () => {
-	it('adds value to existing import list', () => {
-		const result = init_logic.merge_cspell_import(
-			`import:\n  - '${CSPELL_SVK_VALUE}'\n`,
-			CSPELL_VALUE,
-		)
+	// A non-ecosystem existing import must not trip the ecosystem-base dedup, so kit's base is added.
+	it('adds value to an existing non-ecosystem import list', () => {
+		const result = init_logic.merge_cspell_import(`import:\n  - 'some-other-dict'\n`, CSPELL_VALUE)
 
 		expect(result).toContain(CSPELL_VALUE)
-		expect(result).toContain(CSPELL_SVK_VALUE)
+		expect(result).toContain('some-other-dict')
 	})
 
 	it('creates import section when key absent', () => {
@@ -86,14 +83,59 @@ describe('merge_cspell_import — modification', () => {
 		expect(result).toContain('import')
 		expect(result).toContain(CSPELL_VALUE)
 	})
+})
 
-	it('does not falsely match when value is a prefix of an existing import', () => {
-		const content = `import:\n  - '${CSPELL_SVK_VALUE}'\n`
+const KIT_LEFTHOOK_VANILLA = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
+const APP_KIT_LEFTHOOK = 'node_modules/@joshuafolkken/app-kit/lefthook/sveltekit.yml'
+
+describe('merge_lefthook_extends — ecosystem base dedup', () => {
+	// Adding kit vanilla next to an app-kit preset would extend lefthook/base.yml twice — the
+	// hard "possible recursion in extends" crash this guard prevents (#660).
+	it('skips kit base when an app-kit lefthook preset is present', () => {
+		const content = `${EXTENDS_KEY}:\n  - ${APP_KIT_LEFTHOOK}\n`
+		const result = init_logic.merge_lefthook_extends(content, KIT_LEFTHOOK_VANILLA)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(KIT_LEFTHOOK_VANILLA)
+	})
+
+	it('adds kit base when no ecosystem lefthook preset is present', () => {
+		const result = init_logic.merge_lefthook_extends(`${EXTENDS_KEY}: []\n`, KIT_LEFTHOOK_VANILLA)
+
+		expect(result).toContain(KIT_LEFTHOOK_VANILLA)
+	})
+
+	// A scalar `extends:` is valid YAML; the dedup must detect the app-kit preset in that form too.
+	it('skips kit base when the app-kit lefthook preset is a bare scalar extends', () => {
+		const content = `${EXTENDS_KEY}: ${APP_KIT_LEFTHOOK}\n`
+		const result = init_logic.merge_lefthook_extends(content, KIT_LEFTHOOK_VANILLA)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(KIT_LEFTHOOK_VANILLA)
+	})
+})
+
+const APP_KIT_CSPELL = '@joshuafolkken/app-kit/cspell/sveltekit'
+
+describe('merge_cspell_import — ecosystem base dedup', () => {
+	// app-kit's cspell preset already imports kit's cspell base, so re-adding it is a redundant
+	// double import (#660).
+	it('skips kit base when an app-kit cspell preset is present', () => {
+		const content = `import:\n  - '${APP_KIT_CSPELL}'\n`
 		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE)
 
-		expect(result).toContain(CSPELL_SVK_VALUE)
-		expect(result).toContain(CSPELL_VALUE)
-		expect(result).not.toBe(content)
+		expect(result).toBe(content)
+		expect(result).not.toContain(`- '${CSPELL_VALUE}'`)
+	})
+
+	// A scalar (string) `import:` is valid cspell; the dedup must detect the preset in that form too
+	// and NOT clobber the consumer's import with kit base.
+	it('skips kit base when the app-kit cspell preset is a bare scalar import', () => {
+		const content = `import: "${APP_KIT_CSPELL}"\n`
+		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(CSPELL_VALUE)
 	})
 })
 

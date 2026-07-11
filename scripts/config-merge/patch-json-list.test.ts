@@ -90,12 +90,14 @@ describe('json_list.patch_json_list_field — idempotency', () => {
 		expect(second).toBe(first)
 	})
 
-	it('serializes with tab indentation and a trailing newline', () => {
+	// A short single-entry array is emitted inline (prettier-clean), still tab-indented with a
+	// trailing newline. See json-format (#660).
+	it('serializes with tab indentation, a prettier-inline short array, and a trailing newline', () => {
 		const result = json_list.patch_json_list_field(JSON.stringify({}), {
 			field: EXTENDS_FIELD,
 			ensure: [KIT_BASE],
 		})
 
-		expect(result).toBe(`{\n\t"extends": [\n\t\t"${KIT_BASE}"\n\t]\n}\n`)
+		expect(result).toBe(`{\n\t"extends": ["${KIT_BASE}"]\n}\n`)
 	})
 })

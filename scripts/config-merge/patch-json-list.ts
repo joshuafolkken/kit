@@ -1,5 +1,6 @@
 import { json_object_schema } from '#scripts/schemas'
 import strip_json_comments from 'strip-json-comments'
+import { json_format } from './json-format'
 import { list_patch, type ListEntryMatcher } from './list-patch'
 
 interface PatchJsonListOptions {
@@ -24,7 +25,7 @@ function normalize_list(value: unknown): ReadonlyArray<string> {
 }
 
 function serialize(parsed: Record<string, unknown>): string {
-	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+	return json_format.format_json(parsed)
 }
 
 // Ensure/remove the entries of one JSON list field, preserving every other key. A present field

@@ -61,7 +61,7 @@ function build_config_file_actions(): ReadonlyArray<FileAction> {
 			'tsconfig.json',
 			() => init_logic.generate_tsconfig(),
 			(existing) =>
-				init_logic.merge_json_extends(existing, init_logic.get_tsconfig_extends_entry()),
+				init_logic.merge_tsconfig_extends(existing, init_logic.get_tsconfig_extends_entry()),
 		),
 		build_action(
 			'cspell.config.yaml',
@@ -71,7 +71,7 @@ function build_config_file_actions(): ReadonlyArray<FileAction> {
 		build_action(
 			'lefthook.yml',
 			() => init_logic.generate_lefthook_config(),
-			(existing) => init_logic.merge_yaml_list_entry(existing, 'extends', lefthook_extends),
+			(existing) => init_logic.merge_lefthook_extends(existing, lefthook_extends),
 		),
 		...build_vscode_actions(),
 	]
