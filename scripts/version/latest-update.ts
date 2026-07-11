@@ -34,10 +34,10 @@ function run_update(update_arguments: Array<string> | undefined): number {
 function main(): void {
 	const package_json_content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
 	const overrides = overrides_check.read_overrides_from_package(package_json_content)
-	const capped = overrides_check.extract_capped_package_names(overrides)
+	const excluded = overrides_check.list_excluded_package_names(overrides)
 
-	if (capped.length > 0) {
-		console.info(`\n⏭ Skipping capped-override packages: ${capped.join(', ')}`)
+	if (excluded.length > 0) {
+		console.info(`\n⏭ Skipping held-back / capped packages: ${excluded.join(', ')}`)
 	}
 
 	const update_arguments = overrides_check.build_update_command(overrides, package_json_content)

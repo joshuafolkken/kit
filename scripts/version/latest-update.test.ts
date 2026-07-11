@@ -15,7 +15,7 @@ vi.mock('./preinstall-version-update', () => ({
 vi.mock('#scripts/overrides/overrides-logic', () => ({
 	overrides_check: {
 		read_overrides_from_package: vi.fn().mockReturnValue({}),
-		extract_capped_package_names: vi.fn().mockReturnValue([]),
+		list_excluded_package_names: vi.fn().mockReturnValue([]),
 		build_update_command: vi.fn().mockReturnValue(['pnpm', 'update', '--latest']),
 	},
 }))
