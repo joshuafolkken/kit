@@ -1,18 +1,42 @@
 import { config_merge } from '#scripts/config-merge/index'
+import { json_format } from '#scripts/config-merge/json-format'
 import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/schemas'
 import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
+import { kit_base_preset } from './kit-base-preset'
 
 function parse_jsonc(content: string): unknown {
 	return JSON.parse(strip_json_comments(content, { trailingCommas: true }))
 }
 
+const EXTENDS_FIELD = 'extends'
+
 // Ensure `entry` is in the tsconfig `extends` list, preserving every other key. Thin wrapper over
 // the shared config-merge library, which normalizes a string-or-array `extends` and prepends the
 // new entry — so the ensure semantics are single-sourced with the cspell `import` patch.
 function merge_json_extends(content: string, entry: string): string {
-	return config_merge.patch_json_list_field(content, { field: 'extends', ensure: [entry] })
+	return config_merge.patch_json_list_field(content, { field: EXTENDS_FIELD, ensure: [entry] })
+}
+
+// Normalize the tsconfig `extends` (a string, an array, or absent) to a plain string array so the
+// ecosystem-preset check reads the same shape regardless of how the consumer authored it.
+function read_extends_entries(content: string): ReadonlyArray<string> {
+	const raw = json_object_schema.parse(parse_jsonc(content))[EXTENDS_FIELD]
+	if (typeof raw === 'string') return [raw]
+	if (Array.isArray(raw)) return string_array_schema.parse(raw)
+
+	return []
+}
+
+// Ensure kit's tsconfig base preset is in `extends` — UNLESS an `@joshuafolkken/*` tsconfig preset
+// (kit's own base, or an app-kit / game-kit framework preset that already embeds kit base) is
+// present. Adding kit's base alongside such a preset is a redundant second extend. See
+// joshuafolkken/kit#660.
+function merge_tsconfig_extends(content: string, entry: string): string {
+	if (kit_base_preset.is_tsconfig_base_present(read_extends_entries(content))) return content
+
+	return merge_json_extends(content, entry)
 }
 
 function extract_compiler_options(content: string): Record<string, unknown> {
@@ -52,7 +76,7 @@ function serialize_stripped(
 			? without_compiler_options(parsed)
 			: { ...parsed, compilerOptions: kept }
 
-	return `${JSON.stringify(next, undefined, '\t')}\n`
+	return json_format.format_json(next)
 }
 
 function keep_divergent_options(
@@ -207,6 +231,7 @@ function sort_package_json_keys(content: string): string {
 
 const init_logic_json_merge = {
 	merge_json_extends,
+	merge_tsconfig_extends,
 	extract_compiler_options,
 	strip_redundant_compiler_options,
 	merge_json_array_field,

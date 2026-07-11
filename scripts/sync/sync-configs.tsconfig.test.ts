@@ -63,3 +63,21 @@ describe('sync_configs.sync_tsconfig — normalization', () => {
 		expect(readFileSync(TSCONFIG_DEST, 'utf8')).toBe(content)
 	})
 })
+
+describe('sync_configs.sync_tsconfig — prettier-clean serialization', () => {
+	// When strip rewrites the file, a short `exclude` must stay on one line so the emitted tsconfig
+	// is prettier-clean (#660) — JSON.stringify would otherwise expand it multi-line.
+	it('keeps a short exclude inline after stripping a redundant option', () => {
+		const content = `${JSON.stringify({
+			extends: [ENTRY],
+			compilerOptions: { strict: true },
+			exclude: ['node_modules', 'build', 'dist'],
+		})}\n`
+		const result = sync_and_read(content)
+
+		expect(result).toStrictEqual({ extends: [ENTRY], exclude: ['node_modules', 'build', 'dist'] })
+		expect(readFileSync(TSCONFIG_DEST, 'utf8')).toContain(
+			'"exclude": ["node_modules", "build", "dist"]',
+		)
+	})
+})

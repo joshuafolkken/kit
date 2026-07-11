@@ -64,7 +64,7 @@ function sync_tsconfig(destination_path: string): void {
 
 	sync_with_merge(destination_path, 'tsconfig.json', (existing) =>
 		init_logic.strip_redundant_compiler_options(
-			init_logic.merge_json_extends(existing, entry),
+			init_logic.merge_tsconfig_extends(existing, entry),
 			base_options,
 		),
 	)
@@ -82,7 +82,7 @@ function sync_lefthook_config(destination_path: string): void {
 	const value = init_logic.get_lefthook_extends_value()
 
 	sync_with_merge(destination_path, 'lefthook.yml', (existing) =>
-		init_logic.merge_yaml_list_entry(existing, 'extends', value),
+		init_logic.merge_lefthook_extends(existing, value),
 	)
 }
 

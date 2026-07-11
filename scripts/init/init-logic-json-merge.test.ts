@@ -36,6 +36,30 @@ describe('init_logic_json_merge.merge_json_extends', () => {
 	})
 })
 
+const KIT_TSCONFIG_BASE = './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc'
+const APP_KIT_TSCONFIG = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc'
+
+describe('init_logic_json_merge.merge_tsconfig_extends — ecosystem base dedup', () => {
+	// app-kit's sveltekit tsconfig already embeds kit base, so a separate kit-base extend is
+	// redundant (#660).
+	it('skips kit base when an app-kit tsconfig preset is present', () => {
+		const content = `{"extends":["${APP_KIT_TSCONFIG}","./.svelte-kit/tsconfig.json"]}`
+
+		expect(init_logic_json_merge.merge_tsconfig_extends(content, KIT_TSCONFIG_BASE)).toBe(content)
+	})
+
+	it('adds kit base when only an unrelated extends is present', () => {
+		const result = JSON.parse(
+			init_logic_json_merge.merge_tsconfig_extends(
+				'{"extends":"./.svelte-kit/tsconfig.json"}',
+				KIT_TSCONFIG_BASE,
+			),
+		) as { extends: Array<string> }
+
+		expect(result.extends).toStrictEqual([KIT_TSCONFIG_BASE, './.svelte-kit/tsconfig.json'])
+	})
+})
+
 describe('init_logic_json_merge.merge_json_array_field', () => {
 	it('appends missing values to existing array', () => {
 		const result = JSON.parse(
