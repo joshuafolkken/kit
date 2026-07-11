@@ -41,8 +41,13 @@ function parse_yaml(content: string): Record<string, unknown> {
 	return json_object_schema.parse(raw)
 }
 
+// A YAML list field may be authored as a bare scalar (cspell `import` and lefthook `extends` both
+// accept a string or a sequence); normalize a string to a single-element array — and an absent /
+// non-list field to [] — so callers (and the dedup guards) see one shape. Mirrors the JSON path's
+// normalize_list, and lets a patch merge into a scalar field instead of clobbering it.
 function read_yaml_list_field(content: string, field: string): ReadonlyArray<string> {
 	const raw = parse_yaml(content)[field]
+	if (typeof raw === 'string') return [raw]
 
 	return Array.isArray(raw) ? string_array_schema.parse(raw) : []
 }

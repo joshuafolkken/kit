@@ -5,6 +5,11 @@
 // stringify output, collapsing exactly those arrays back inline — reusing JSON.stringify for all
 // string escaping, number formatting, and key ordering so we never diverge on those. See
 // joshuafolkken/kit#660 (a synced tsconfig `exclude` was emitted multi-line and failed prettier).
+//
+// Scope note: an OVER-width array is left one-element-per-line, which matches prettier for string
+// arrays (the only kind these config files hold). prettier uses a packed "fill" layout only for
+// over-width NUMBER arrays — a shape none of the managed JSON configs (tsconfig, package.json,
+// .vscode/*) contain — so that one divergence is unreachable here and deliberately not replicated.
 
 // Mirror the kit prettier preset: printWidth 100, tabs measured as 2 columns for width.
 const PRINT_WIDTH = 100

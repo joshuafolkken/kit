@@ -104,6 +104,15 @@ describe('merge_lefthook_extends — ecosystem base dedup', () => {
 
 		expect(result).toContain(KIT_LEFTHOOK_VANILLA)
 	})
+
+	// A scalar `extends:` is valid YAML; the dedup must detect the app-kit preset in that form too.
+	it('skips kit base when the app-kit lefthook preset is a bare scalar extends', () => {
+		const content = `${EXTENDS_KEY}: ${APP_KIT_LEFTHOOK}\n`
+		const result = init_logic.merge_lefthook_extends(content, KIT_LEFTHOOK_VANILLA)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(KIT_LEFTHOOK_VANILLA)
+	})
 })
 
 const APP_KIT_CSPELL = '@joshuafolkken/app-kit/cspell/sveltekit'
@@ -117,6 +126,16 @@ describe('merge_cspell_import — ecosystem base dedup', () => {
 
 		expect(result).toBe(content)
 		expect(result).not.toContain(`- '${CSPELL_VALUE}'`)
+	})
+
+	// A scalar (string) `import:` is valid cspell; the dedup must detect the preset in that form too
+	// and NOT clobber the consumer's import with kit base.
+	it('skips kit base when the app-kit cspell preset is a bare scalar import', () => {
+		const content = `import: "${APP_KIT_CSPELL}"\n`
+		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(CSPELL_VALUE)
 	})
 })
 

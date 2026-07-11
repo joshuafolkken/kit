@@ -115,7 +115,7 @@ function merge_json_array_field(
 	const to_add = values.filter((value) => !existing.includes(value))
 	if (to_add.length === 0) return content
 
-	return `${JSON.stringify({ ...parsed, [key]: [...existing, ...to_add] }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, [key]: [...existing, ...to_add] })
 }
 
 function merge_json_object(content: string, updates: Record<string, unknown>): string {
@@ -130,7 +130,7 @@ function merge_json_object(content: string, updates: Record<string, unknown>): s
 
 	if (!has_changes) return content
 
-	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+	return json_format.format_json(parsed)
 }
 
 const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
@@ -149,7 +149,7 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	const prepend = Object.fromEntries(to_add.filter(([k]) => SCRIPTS_PREPEND_KEYS.has(k)))
 	const append = Object.fromEntries(to_add.filter(([k]) => !SCRIPTS_PREPEND_KEYS.has(k)))
 
-	return `${JSON.stringify({ ...parsed, scripts: { ...prepend, ...migrated, ...append } }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, scripts: { ...prepend, ...migrated, ...append } })
 }
 
 function merge_development_dependencies(
@@ -163,7 +163,10 @@ function merge_development_dependencies(
 	const to_add = Object.entries(additions).filter(([key]) => !Object.hasOwn(existing, key))
 	if (to_add.length === 0) return content
 
-	return `${JSON.stringify({ ...parsed, devDependencies: { ...existing, ...Object.fromEntries(to_add) } }, undefined, '\t')}\n`
+	return json_format.format_json({
+		...parsed,
+		devDependencies: { ...existing, ...Object.fromEntries(to_add) },
+	})
 }
 
 function merge_package_manager(content: string, value: string): string {
@@ -171,14 +174,14 @@ function merge_package_manager(content: string, value: string): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	if ('packageManager' in parsed) return content
 
-	return `${JSON.stringify({ ...parsed, packageManager: value }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, packageManager: value })
 }
 
 function merge_development_engines(content: string, value: Record<string, unknown>): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	if ('devEngines' in parsed) return content
 
-	return `${JSON.stringify({ ...parsed, devEngines: value }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, devEngines: value })
 }
 
 function has_package_scripts_marker(content: string, marker: string): boolean {
@@ -201,7 +204,7 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	if (existing === undefined || existing.includes(cmd)) return content
 	const updated_value = existing.trim().length === 0 ? cmd : `${existing} && ${cmd}`
 
-	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: updated_value } }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, scripts: { ...scripts, [key]: updated_value } })
 }
 
 function remove_script_with_marker(content: string, key: string, marker: string): string {
@@ -213,7 +216,7 @@ function remove_script_with_marker(content: string, key: string, marker: string)
 	if (!scripts[key]?.includes(marker)) return content
 	const rest = Object.fromEntries(Object.entries(scripts).filter(([k]) => k !== key))
 
-	return `${JSON.stringify({ ...parsed, scripts: rest }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, scripts: rest })
 }
 
 function sort_package_json_keys(content: string): string {
@@ -222,8 +225,8 @@ function sort_package_json_keys(content: string): string {
 	const known = PACKAGE_JSON_KEY_ORDER.filter((k) => Object.hasOwn(parsed, k))
 	const unknown = all_keys.filter((k) => !PACKAGE_JSON_KEY_ORDER.includes(k))
 	const ordered = Object.fromEntries([...known, ...unknown].map((k) => [k, parsed[k]]))
-	const serialized = `${JSON.stringify(ordered, undefined, '\t')}\n`
-	const current = `${JSON.stringify(parsed, undefined, '\t')}\n`
+	const serialized = json_format.format_json(ordered)
+	const current = json_format.format_json(parsed)
 	if (serialized === current) return content
 
 	return serialized

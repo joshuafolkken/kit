@@ -80,6 +80,19 @@ describe('init_logic_json_merge.merge_json_array_field', () => {
 			init_logic_json_merge.merge_json_array_field(content, EXCLUDE_KEY, [NODE_MODULES_VALUE]),
 		).toBe(content)
 	})
+
+	// The prettier-clean serializer is applied to every JSON writer, not just tsconfig (#660): a
+	// short array field (e.g. a `.vscode/extensions.json` recommendations list) is emitted inline.
+	it('emits a short array inline (prettier-clean) after appending', () => {
+		const result = init_logic_json_merge.merge_json_array_field('{}', EXCLUDE_KEY, [
+			NODE_MODULES_VALUE,
+			SVELTE_KIT_VALUE,
+		])
+
+		expect(result).toBe(
+			`{\n\t"${EXCLUDE_KEY}": ["${NODE_MODULES_VALUE}", "${SVELTE_KIT_VALUE}"]\n}\n`,
+		)
+	})
 })
 
 describe('init_logic_json_merge.merge_json_object', () => {
