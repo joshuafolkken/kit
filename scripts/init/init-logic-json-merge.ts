@@ -1,18 +1,42 @@
 import { config_merge } from '#scripts/config-merge/index'
+import { json_format } from '#scripts/config-merge/json-format'
 import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/schemas'
 import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
+import { kit_base_preset } from './kit-base-preset'
 
 function parse_jsonc(content: string): unknown {
 	return JSON.parse(strip_json_comments(content, { trailingCommas: true }))
 }
 
+const EXTENDS_FIELD = 'extends'
+
 // Ensure `entry` is in the tsconfig `extends` list, preserving every other key. Thin wrapper over
 // the shared config-merge library, which normalizes a string-or-array `extends` and prepends the
 // new entry — so the ensure semantics are single-sourced with the cspell `import` patch.
 function merge_json_extends(content: string, entry: string): string {
-	return config_merge.patch_json_list_field(content, { field: 'extends', ensure: [entry] })
+	return config_merge.patch_json_list_field(content, { field: EXTENDS_FIELD, ensure: [entry] })
+}
+
+// Normalize the tsconfig `extends` (a string, an array, or absent) to a plain string array so the
+// ecosystem-preset check reads the same shape regardless of how the consumer authored it.
+function read_extends_entries(content: string): ReadonlyArray<string> {
+	const raw = json_object_schema.parse(parse_jsonc(content))[EXTENDS_FIELD]
+	if (typeof raw === 'string') return [raw]
+	if (Array.isArray(raw)) return string_array_schema.parse(raw)
+
+	return []
+}
+
+// Ensure kit's tsconfig base preset is in `extends` — UNLESS an `@joshuafolkken/*` tsconfig preset
+// (kit's own base, or an app-kit / game-kit framework preset that already embeds kit base) is
+// present. Adding kit's base alongside such a preset is a redundant second extend. See
+// joshuafolkken/kit#660.
+function merge_tsconfig_extends(content: string, entry: string): string {
+	if (kit_base_preset.is_tsconfig_base_present(read_extends_entries(content))) return content
+
+	return merge_json_extends(content, entry)
 }
 
 function extract_compiler_options(content: string): Record<string, unknown> {
@@ -52,7 +76,7 @@ function serialize_stripped(
 			? without_compiler_options(parsed)
 			: { ...parsed, compilerOptions: kept }
 
-	return `${JSON.stringify(next, undefined, '\t')}\n`
+	return json_format.format_json(next)
 }
 
 function keep_divergent_options(
@@ -91,7 +115,7 @@ function merge_json_array_field(
 	const to_add = values.filter((value) => !existing.includes(value))
 	if (to_add.length === 0) return content
 
-	return `${JSON.stringify({ ...parsed, [key]: [...existing, ...to_add] }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, [key]: [...existing, ...to_add] })
 }
 
 function merge_json_object(content: string, updates: Record<string, unknown>): string {
@@ -106,7 +130,7 @@ function merge_json_object(content: string, updates: Record<string, unknown>): s
 
 	if (!has_changes) return content
 
-	return `${JSON.stringify(parsed, undefined, '\t')}\n`
+	return json_format.format_json(parsed)
 }
 
 const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
@@ -125,7 +149,7 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	const prepend = Object.fromEntries(to_add.filter(([k]) => SCRIPTS_PREPEND_KEYS.has(k)))
 	const append = Object.fromEntries(to_add.filter(([k]) => !SCRIPTS_PREPEND_KEYS.has(k)))
 
-	return `${JSON.stringify({ ...parsed, scripts: { ...prepend, ...migrated, ...append } }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, scripts: { ...prepend, ...migrated, ...append } })
 }
 
 function merge_development_dependencies(
@@ -139,7 +163,10 @@ function merge_development_dependencies(
 	const to_add = Object.entries(additions).filter(([key]) => !Object.hasOwn(existing, key))
 	if (to_add.length === 0) return content
 
-	return `${JSON.stringify({ ...parsed, devDependencies: { ...existing, ...Object.fromEntries(to_add) } }, undefined, '\t')}\n`
+	return json_format.format_json({
+		...parsed,
+		devDependencies: { ...existing, ...Object.fromEntries(to_add) },
+	})
 }
 
 function merge_package_manager(content: string, value: string): string {
@@ -147,14 +174,14 @@ function merge_package_manager(content: string, value: string): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	if ('packageManager' in parsed) return content
 
-	return `${JSON.stringify({ ...parsed, packageManager: value }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, packageManager: value })
 }
 
 function merge_development_engines(content: string, value: Record<string, unknown>): string {
 	const parsed = json_object_schema.parse(parse_jsonc(content))
 	if ('devEngines' in parsed) return content
 
-	return `${JSON.stringify({ ...parsed, devEngines: value }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, devEngines: value })
 }
 
 function has_package_scripts_marker(content: string, marker: string): boolean {
@@ -177,7 +204,7 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	if (existing === undefined || existing.includes(cmd)) return content
 	const updated_value = existing.trim().length === 0 ? cmd : `${existing} && ${cmd}`
 
-	return `${JSON.stringify({ ...parsed, scripts: { ...scripts, [key]: updated_value } }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, scripts: { ...scripts, [key]: updated_value } })
 }
 
 function remove_script_with_marker(content: string, key: string, marker: string): string {
@@ -189,7 +216,7 @@ function remove_script_with_marker(content: string, key: string, marker: string)
 	if (!scripts[key]?.includes(marker)) return content
 	const rest = Object.fromEntries(Object.entries(scripts).filter(([k]) => k !== key))
 
-	return `${JSON.stringify({ ...parsed, scripts: rest }, undefined, '\t')}\n`
+	return json_format.format_json({ ...parsed, scripts: rest })
 }
 
 function sort_package_json_keys(content: string): string {
@@ -198,8 +225,8 @@ function sort_package_json_keys(content: string): string {
 	const known = PACKAGE_JSON_KEY_ORDER.filter((k) => Object.hasOwn(parsed, k))
 	const unknown = all_keys.filter((k) => !PACKAGE_JSON_KEY_ORDER.includes(k))
 	const ordered = Object.fromEntries([...known, ...unknown].map((k) => [k, parsed[k]]))
-	const serialized = `${JSON.stringify(ordered, undefined, '\t')}\n`
-	const current = `${JSON.stringify(parsed, undefined, '\t')}\n`
+	const serialized = json_format.format_json(ordered)
+	const current = json_format.format_json(parsed)
 	if (serialized === current) return content
 
 	return serialized
@@ -207,6 +234,7 @@ function sort_package_json_keys(content: string): string {
 
 const init_logic_json_merge = {
 	merge_json_extends,
+	merge_tsconfig_extends,
 	extract_compiler_options,
 	strip_redundant_compiler_options,
 	merge_json_array_field,
