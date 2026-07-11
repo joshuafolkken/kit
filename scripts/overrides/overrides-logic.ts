@@ -104,6 +104,20 @@ function extract_capped_package_names(overrides: Record<string, string>): Array<
 		.map((key) => extract_package_name(key))
 }
 
+// Packages always held back from `pnpm update --latest`, regardless of overrides.
+// `typescript`: 7.x is the native (Go) port whose `require('typescript')` returns a stub with no
+// `SyntaxKind`, crashing the type-aware ESLint stack (typescript-eslint, eslint-plugin-sonarjs,
+// ts-api-utils) at rule-load time. Hold at 6.x until that stack supports the native API, then
+// remove this entry to fix forward (kit #658).
+const HELD_BACK_PACKAGE_NAMES: Array<string> = ['typescript']
+
+// The union of built-in held-back packages and override-derived capped packages — every dependency
+// name that `pnpm update --latest` must skip. Deduped so a package that is both held back and capped
+// is listed once (used both to build the update command and to log what was skipped).
+function list_excluded_package_names(overrides: Record<string, string>): Array<string> {
+	return [...new Set([...HELD_BACK_PACKAGE_NAMES, ...extract_capped_package_names(overrides)])]
+}
+
 function read_dependency_names(package_json_content: string): Array<string> {
 	const parsed = package_with_deps_schema.parse(JSON.parse(package_json_content))
 
@@ -116,13 +130,9 @@ function build_update_command(
 	overrides: Record<string, string>,
 	package_json_content: string,
 ): Array<string> | undefined {
-	const capped = extract_capped_package_names(overrides)
-
-	if (capped.length === 0) return PNPM_UPDATE_LATEST_ARGS
-
+	const excluded_set = new Set(list_excluded_package_names(overrides))
 	const all_names = read_dependency_names(package_json_content)
-	const capped_set = new Set(capped)
-	const targets = all_names.filter((name) => !capped_set.has(name))
+	const targets = all_names.filter((name) => !excluded_set.has(name))
 
 	if (targets.length === 0) return undefined
 
@@ -133,6 +143,7 @@ const overrides_check = {
 	compare,
 	read_overrides_from_package,
 	extract_capped_package_names,
+	list_excluded_package_names,
 	read_dependency_names,
 	build_update_command,
 	SNAPSHOT_PATH,
