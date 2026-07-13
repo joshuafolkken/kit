@@ -113,6 +113,16 @@ describe('merge_lefthook_extends — ecosystem base dedup', () => {
 		expect(result).toBe(content)
 		expect(result).not.toContain(KIT_LEFTHOOK_VANILLA)
 	})
+
+	// A self-hosting repo (app-kit's own repo) references its sveltekit preset by an in-repo
+	// relative path with no `@joshuafolkken/` prefix; kit base must still be skipped there (#664).
+	it('skips kit base when a self-hosted relative sveltekit lefthook preset is present', () => {
+		const content = `${EXTENDS_KEY}:\n  - lefthook/sveltekit.yml\n`
+		const result = init_logic.merge_lefthook_extends(content, KIT_LEFTHOOK_VANILLA)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(KIT_LEFTHOOK_VANILLA)
+	})
 })
 
 const APP_KIT_CSPELL = '@joshuafolkken/app-kit/cspell/sveltekit'
@@ -132,6 +142,16 @@ describe('merge_cspell_import — ecosystem base dedup', () => {
 	// and NOT clobber the consumer's import with kit base.
 	it('skips kit base when the app-kit cspell preset is a bare scalar import', () => {
 		const content = `import: "${APP_KIT_CSPELL}"\n`
+		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE)
+
+		expect(result).toBe(content)
+		expect(result).not.toContain(CSPELL_VALUE)
+	})
+
+	// A self-hosting repo (app-kit's own repo) references its sveltekit preset by an in-repo
+	// relative path with no `@joshuafolkken/` prefix; kit base must still be skipped there (#664).
+	it('skips kit base when a self-hosted relative sveltekit cspell preset is present', () => {
+		const content = `import:\n  - ./cspell/sveltekit.yaml\n`
 		const result = init_logic.merge_cspell_import(content, CSPELL_VALUE)
 
 		expect(result).toBe(content)

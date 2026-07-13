@@ -16,21 +16,38 @@ const KIT_CSPELL_PRESET = /@joshuafolkken\/[^/]+\/cspell(?:\/|$)/u
 // A tsconfig `extends` path such as `./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc`
 // or `./node_modules/@joshuafolkken/kit/tsconfig/base.jsonc`.
 const KIT_TSCONFIG_PRESET = /@joshuafolkken\/[^/]+\/tsconfig\//u
+// A `*/sveltekit` framework preset referenced by an in-repo RELATIVE path that carries no
+// `@joshuafolkken/` prefix — the shape a self-hosting repo (app-kit's own repo) uses, e.g.
+// `./tsconfig/sveltekit.jsonc`, `./cspell/sveltekit.yaml`, `lefthook/sveltekit.yml`. Such a preset
+// re-exports / inlines kit base by construction, so kit base must not be injected alongside it. The
+// KIT_*_PRESET regexes above only catch the installed-dependency form (`@joshuafolkken/…/sveltekit`);
+// this segment-anchored fallback covers the prefix-less relative form. The `(?<![\w-])` /
+// `(?![\w-])` boundaries anchor `sveltekit` to a complete path segment — mirroring app-kit's
+// config-patch anchoring — so a `sveltekit-*` / `*-sveltekit` sibling and hyphenated `svelte-kit`
+// are left untouched. See joshuafolkken/kit#664.
+const SVELTEKIT_PRESET = /(?<![\w-])sveltekit(?![\w-])/u
 
 function has_match(entries: ReadonlyArray<string>, pattern: RegExp): boolean {
 	return entries.some((entry) => pattern.test(entry))
 }
 
+// True when any entry references kit base for this subsystem (via a `@joshuafolkken/*` preset) or a
+// prefix-less `*/sveltekit` framework preset that re-exports it — either means kit base is already
+// layered exactly once, so `josh sync` must skip injecting a second base reference.
+function is_base_present(entries: ReadonlyArray<string>, subsystem_pattern: RegExp): boolean {
+	return has_match(entries, subsystem_pattern) || has_match(entries, SVELTEKIT_PRESET)
+}
+
 function is_lefthook_base_present(entries: ReadonlyArray<string>): boolean {
-	return has_match(entries, KIT_LEFTHOOK_PRESET)
+	return is_base_present(entries, KIT_LEFTHOOK_PRESET)
 }
 
 function is_cspell_base_present(entries: ReadonlyArray<string>): boolean {
-	return has_match(entries, KIT_CSPELL_PRESET)
+	return is_base_present(entries, KIT_CSPELL_PRESET)
 }
 
 function is_tsconfig_base_present(entries: ReadonlyArray<string>): boolean {
-	return has_match(entries, KIT_TSCONFIG_PRESET)
+	return is_base_present(entries, KIT_TSCONFIG_PRESET)
 }
 
 const kit_base_preset = {
