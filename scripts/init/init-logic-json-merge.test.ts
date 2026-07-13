@@ -58,6 +58,25 @@ describe('init_logic_json_merge.merge_tsconfig_extends — ecosystem base dedup'
 
 		expect(result.extends).toStrictEqual([KIT_TSCONFIG_BASE, './.svelte-kit/tsconfig.json'])
 	})
+
+	// A self-hosting repo (app-kit's own repo) references its sveltekit preset by an in-repo
+	// relative path with no `@joshuafolkken/` prefix; kit base must still be skipped there (#664).
+	it('skips kit base when a self-hosted relative sveltekit preset is present', () => {
+		const content = `{"extends":["./tsconfig/sveltekit.jsonc","./.svelte-kit/tsconfig.json"]}`
+
+		expect(init_logic_json_merge.merge_tsconfig_extends(content, KIT_TSCONFIG_BASE)).toBe(content)
+	})
+
+	// Re-running sync on an already-correct self-hosting config (sveltekit preset, no base line) is
+	// a no-op — no byte churn (#664).
+	it('is idempotent on an already-correct self-hosting config', () => {
+		const content = init_logic_json_merge.merge_tsconfig_extends(
+			`{"extends":["./tsconfig/sveltekit.jsonc"]}`,
+			KIT_TSCONFIG_BASE,
+		)
+
+		expect(init_logic_json_merge.merge_tsconfig_extends(content, KIT_TSCONFIG_BASE)).toBe(content)
+	})
 })
 
 describe('init_logic_json_merge.merge_json_array_field', () => {
