@@ -2,13 +2,18 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_corepack } from './latest-corepack'
+import { pnpm_release_age, type HoldDecision } from './pnpm-release-age'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
+vi.mock('./pnpm-release-age', () => ({
+	pnpm_release_age: { resolve_hold_decision: vi.fn() },
+}))
 
 const mocked_execa_sync = vi.mocked(execaSync)
 const mocked_read_file_sync = vi.mocked(readFileSync)
 const mocked_write_file_sync = vi.mocked(writeFileSync)
+const mocked_resolve_hold_decision = vi.mocked(pnpm_release_age.resolve_hold_decision)
 
 type ExecaSyncResult = ReturnType<typeof execaSync>
 
@@ -18,8 +23,13 @@ function fake_sync_result(exit_code: number | undefined): ExecaSyncResult {
 	return result as unknown as ExecaSyncResult
 }
 
+function stub_hold(decision: HoldDecision): void {
+	mocked_resolve_hold_decision.mockResolvedValue(decision)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
+	stub_hold({ is_held: false })
 })
 
 const PACKAGE_JSON_V11 = '{"packageManager":"pnpm@11.4.0+sha512.abc"}'
@@ -149,13 +159,13 @@ function assert_called_before(earlier: SyncSpy, later: SyncSpy): void {
 }
 
 describe('latest_corepack.main', () => {
-	it('widens the devEngines pin before invoking corepack (the regression guard)', () => {
+	it('widens the devEngines pin before invoking corepack (the regression guard)', async () => {
 		vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_WITH_ENGINES)
 		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_BUMPED)
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
 
-		latest_corepack.main()
+		await latest_corepack.main()
 
 		expect(mocked_write_file_sync.mock.calls[0]).toEqual(WIDEN_CALL)
 		assert_called_before(mocked_write_file_sync, mocked_execa_sync)
@@ -163,18 +173,55 @@ describe('latest_corepack.main', () => {
 		vi.restoreAllMocks()
 	})
 
-	it('restores the original package.json when corepack skips the bump', () => {
+	it('restores the original package.json when corepack skips the bump', async () => {
 		vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 		vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_WITH_ENGINES)
 		mocked_execa_sync.mockReturnValue(fake_sync_result(1))
 
-		latest_corepack.main()
+		await latest_corepack.main()
 
 		expect(mocked_write_file_sync.mock.calls[0]).toEqual(WIDEN_CALL)
 		expect(mocked_write_file_sync.mock.calls[1]).toEqual(RESTORE_CALL)
 
 		vi.restoreAllMocks()
+	})
+
+	it('holds the bump and leaves package.json untouched when the release is too new', async () => {
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_WITH_ENGINES)
+		stub_hold({ is_held: true, version: '11.12.0', window_minutes: 1440 })
+
+		await latest_corepack.main()
+
+		expect(mocked_write_file_sync).not.toHaveBeenCalled()
+		expect(mocked_execa_sync).not.toHaveBeenCalled()
+
+		vi.restoreAllMocks()
+	})
+})
+
+describe('latest_corepack.did_warn_hold', () => {
+	it('warns and reports a hold when the candidate release is inside the window', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		stub_hold({ is_held: true, version: '11.12.0', window_minutes: 1440 })
+
+		await expect(latest_corepack.did_warn_hold('11')).resolves.toBe(true)
+		expect(warn).toHaveBeenCalledOnce()
+
+		warn.mockRestore()
+	})
+
+	it('stays silent and reports no hold when the candidate release is old enough', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		stub_hold({ is_held: false })
+
+		await expect(latest_corepack.did_warn_hold('11')).resolves.toBe(false)
+		expect(warn).not.toHaveBeenCalled()
+
+		warn.mockRestore()
 	})
 })
 

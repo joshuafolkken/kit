@@ -19,12 +19,20 @@
  *    later run once the version ages past the window. So a corepack failure here is
  *    logged and swallowed (exit 0) instead of aborting the chain.
  *
+ * 3. When kit's own environment does NOT suppress a just-published pnpm, `corepack use`
+ *    SUCCEEDS and kit adopts it — but a consumer that syncs the pin then fails at CI's
+ *    `pnpm/action-setup` install step, which cannot self-install a pnpm still inside the
+ *    minimum-release-age window (issue #662). So before invoking corepack we gate on the
+ *    candidate version's release age (see `pnpm-release-age.ts`) and hold the bump when it
+ *    is still too new; the gate lifts automatically once the version ages past the window.
+ *
  * Usage: tsx scripts/version/latest-corepack.ts
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
 import { package_manager_version } from './package-manager-version'
+import { pnpm_release_age } from './pnpm-release-age'
 
 const PACKAGE_JSON_PATH = 'package.json'
 const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)(?:[^\d]|$)/u
@@ -104,16 +112,32 @@ function restore_package_json(
 	console.info('✔ Restored package.json devEngines pin (pnpm bump skipped)')
 }
 
-function main(): void {
+// Hold the bump when the candidate pnpm is still inside the minimum-release-age window
+// (issue #662). Returns whether the run should stop here, leaving package.json untouched.
+async function did_warn_hold(major: string | undefined): Promise<boolean> {
+	const decision = await pnpm_release_age.resolve_hold_decision(major, Date.now())
+	if (!decision.is_held) return false
+
+	console.warn(
+		`⚠ Held pnpm bump: ${decision.version ?? 'candidate'} is inside the ` +
+			`${String(decision.window_minutes)}-minute minimum-release-age window; ` +
+			'it will bump on a later run (#662).',
+	)
+
+	return true
+}
+
+async function main(): Promise<void> {
 	const original = readFileSync(PACKAGE_JSON_PATH, 'utf8')
 	const major = extract_pnpm_major(original)
+	if (await did_warn_hold(major)) return
 	const is_widened = did_widen_development_engines(original, major)
 	const is_skipped = did_warn_skip(run_corepack(build_corepack_target(major)))
 	if (is_skipped && is_widened) restore_package_json(original)
 	else if (!is_skipped) sync_development_engines_after_bump()
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main()
+if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 const latest_corepack = {
 	extract_pnpm_major,
@@ -124,6 +148,7 @@ const latest_corepack = {
 	sync_development_engines_after_bump,
 	did_widen_development_engines,
 	restore_package_json,
+	did_warn_hold,
 	main,
 }
 
