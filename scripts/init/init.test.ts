@@ -100,6 +100,16 @@ describe('apply_package_json_merges', () => {
 		expect(deps['prettier-plugin-svelte']).toBe('^4.1.1')
 		expect(deps['prettier-plugin-tailwindcss']).toBe('^0.8.0')
 	})
+
+	// The pre-commit secretlint rule shipped in lefthook/base.yml resolves both packages
+	// from the consumer, so init must provision them alongside the config file.
+	it('adds the secretlint CLI and rule preset', () => {
+		const deps = merge_development_dependencies('{}\n')
+
+		// eslint-disable-next-line dot-notation -- noPropertyAccessFromIndexSignature requires bracket notation for Record type
+		expect(deps['secretlint']).toBeDefined()
+		expect(deps['@secretlint/secretlint-rule-preset-recommend']).toBeDefined()
+	})
 })
 
 describe('copy_ai_file', () => {

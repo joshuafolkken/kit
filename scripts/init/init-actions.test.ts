@@ -9,10 +9,18 @@ const PLAYWRIGHT = 'playwright.config.ts'
 const TSCONFIG = 'tsconfig.json'
 const CSPELL = 'cspell.config.yaml'
 const LEFTHOOK = 'lefthook.yml'
+const SECRETLINT = '.secretlintrc.json'
 const VSCODE_EXTENSIONS = '.vscode/extensions.json'
 const VSCODE_SETTINGS = '.vscode/settings.json'
 
-const COMMON_TAIL_DESTINATIONS = [TSCONFIG, CSPELL, LEFTHOOK, VSCODE_EXTENSIONS, VSCODE_SETTINGS]
+const COMMON_TAIL_DESTINATIONS = [
+	TSCONFIG,
+	CSPELL,
+	LEFTHOOK,
+	SECRETLINT,
+	VSCODE_EXTENSIONS,
+	VSCODE_SETTINGS,
+]
 
 const VANILLA_DESTINATIONS = [
 	GITIGNORE,
@@ -30,13 +38,15 @@ describe('init_actions.build_file_actions', () => {
 		expect(destinations).toEqual(VANILLA_DESTINATIONS)
 	})
 
-	it('omits a merge handler only for playwright.config.ts', () => {
+	// .secretlintrc.json joins playwright.config.ts as create-only: its rule list is
+	// project-owned once written, so re-running init must not rewrite a customized one.
+	it('omits a merge handler only for the create-only configs', () => {
 		const without_merge = init_actions
 			.build_file_actions()
 			.filter((action) => action.merge === undefined)
 			.map((action) => action.dest)
 
-		expect(without_merge).toEqual([PLAYWRIGHT])
+		expect(without_merge).toEqual([PLAYWRIGHT, SECRETLINT])
 	})
 
 	it('produces a non-empty create output for every action', () => {

@@ -86,6 +86,20 @@ function sync_lefthook_config(destination_path: string): void {
 	)
 }
 
+// Create-only, unlike the merge-based syncs above: once `.secretlintrc.json` exists its rule
+// list is project-owned (custom patterns, deliberate exclusions), so syncing must not rewrite
+// it. Projects initialized before the secretlint rule existed still get the file here.
+function sync_secretlint_config(destination_path: string): void {
+	if (existsSync(destination_path)) {
+		console.info('  ✔ unchanged .secretlintrc.json')
+
+		return
+	}
+
+	writeFileSync(destination_path, init_logic.generate_secretlint_config())
+	console.info('  ✔ created   .secretlintrc.json')
+}
+
 function read_kit_vscode_json(filename: string): unknown {
 	return JSON.parse(readFileSync(path.join(PACKAGE_DIR, '.vscode', filename), 'utf8'))
 }
@@ -126,6 +140,7 @@ const sync_configs = {
 	sync_tsconfig,
 	sync_cspell_config,
 	sync_lefthook_config,
+	sync_secretlint_config,
 	sync_vscode_extensions_json,
 	sync_vscode_settings_json,
 }

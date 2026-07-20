@@ -1,6 +1,7 @@
 import { vscode_settings_schema } from '#scripts/schemas'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
+import { init_logic_secretlint } from './init-logic-secretlint'
 import { init_logic_sonar } from './init-logic-sonar'
 import { init_logic_templates } from './init-logic-templates'
 import { init_logic_workspace } from './init-logic-workspace'
@@ -290,6 +291,7 @@ const init_logic = {
 	...init_logic_workspace,
 	...init_logic_sonar,
 	...init_logic_json_merge,
+	...init_logic_secretlint,
 	...init_logic_yaml_merge,
 	...init_logic_deploy_vps,
 	generate_tsconfig,

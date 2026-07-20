@@ -92,8 +92,9 @@ function apply_dependency_merges(content: string): string {
 		init_logic.get_suggested_scripts_for_content(migrated),
 	)
 	const with_prettier = init_logic.merge_prettier_plugin_development_deps(merged)
+	const with_secretlint = init_logic.merge_secretlint_development_deps(with_prettier)
 
-	return init_logic.merge_development_dependencies(with_prettier, get_kit_self_dependency())
+	return init_logic.merge_development_dependencies(with_secretlint, get_kit_self_dependency())
 }
 
 function apply_package_json_merges(content: string): string {
