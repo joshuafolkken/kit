@@ -53,6 +53,15 @@ function build_vscode_actions(): ReadonlyArray<FileAction> {
 	]
 }
 
+// Create-only: the rule list is a project-owned allowlist once it exists, so a consumer
+// that added custom rules or disabled a noisy one must not have that overwritten.
+function build_secretlint_action(): FileAction {
+	return {
+		dest: init_logic.get_secretlint_config_filename(),
+		create: () => init_logic.generate_secretlint_config(),
+	}
+}
+
 function build_config_file_actions(): ReadonlyArray<FileAction> {
 	const lefthook_extends = init_logic.get_lefthook_extends_value()
 
@@ -73,6 +82,7 @@ function build_config_file_actions(): ReadonlyArray<FileAction> {
 			() => init_logic.generate_lefthook_config(),
 			(existing) => init_logic.merge_lefthook_extends(existing, lefthook_extends),
 		),
+		build_secretlint_action(),
 		...build_vscode_actions(),
 	]
 }

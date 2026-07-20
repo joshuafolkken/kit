@@ -20,6 +20,7 @@ Each file is either created (if missing) or merged (if it already exists). Files
 | `tsconfig.json`           | Created with `extends` pointing to the preset             | Preset entry prepended to `extends` array                                                                         |
 | `cspell.config.yaml`      | Created with `import` pointing to the shared word list    | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import) |
 | `lefthook.yml`            | Created with `extends` pointing to the preset             | Preset entry added under `extends:` key                                                                           |
+| `.secretlintrc.json`      | Created enabling the recommend rule preset                | Left untouched — the rule list is project-owned once it exists                                                    |
 | `.vscode/extensions.json` | Created from package template                             | Missing recommendations merged in                                                                                 |
 | `.vscode/settings.json`   | Created from package template                             | Missing keys merged in (existing keys untouched)                                                                  |
 
@@ -124,5 +125,19 @@ sonar-project.properties  (generated from GitHub repo name)
 After all files are processed, `josh init` runs:
 
 1. **`lefthook install`** — installs git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
+
+### Secret scanning (pre-commit)
+
+The kit pre-commit hook runs [secretlint](https://github.com/secretlint/secretlint) over the staged files, so a credential is caught before it enters git history. This sits ahead of GitHub push protection and PR-time scanners, which only fire once a commit exists — and push protection alone covers just the known provider patterns, not generic tokens.
+
+`josh init` provisions everything needed: `.secretlintrc.json` (recommend preset) plus the `secretlint` and `@secretlint/secretlint-rule-preset-recommend` devDependencies.
+
+> **Upgrading an existing project:** `josh sync` adds the same config and devDependencies, but the packages are not present until you run `pnpm install`. Commits are blocked until you do — run `pnpm install` immediately after syncing.
+
+To scan the whole tree rather than just staged files:
+
+```bash
+pnpm exec secretlint "**/*"
+```
 
 To make `josh` available system-wide, install the kit globally with `pnpm add -g @joshuafolkken/kit` (see [cli.md](./cli.md)). `josh init` no longer writes a `~/.local/bin/josh` shim.
