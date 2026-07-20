@@ -50,7 +50,7 @@ describe('animation_helpers.execute_with_animation — success', () => {
 	it('calls stop with formatted result when result_formatter is provided', async () => {
 		const result = await animation_helpers.execute_with_animation(
 			LOADING_MESSAGE,
-			async () => await Promise.resolve('hello'),
+			async () => 'hello',
 			{ result_formatter: (value) => value.toUpperCase() },
 		)
 
@@ -59,20 +59,15 @@ describe('animation_helpers.execute_with_animation — success', () => {
 	})
 
 	it('calls stop with String(result) when no formatter', async () => {
-		await animation_helpers.execute_with_animation(
-			LOADING_MESSAGE,
-			async () => await Promise.resolve(42),
-		)
+		await animation_helpers.execute_with_animation(LOADING_MESSAGE, async () => 42)
 
 		expect(stop_spy).toHaveBeenCalledWith('42', undefined)
 	})
 
 	it('calls stop with icon from icon_selector', async () => {
-		await animation_helpers.execute_with_animation(
-			LOADING_MESSAGE,
-			async () => await Promise.resolve('ok'),
-			{ icon_selector: () => '🚀' },
-		)
+		await animation_helpers.execute_with_animation(LOADING_MESSAGE, async () => 'ok', {
+			icon_selector: () => '🚀',
+		})
 
 		expect(stop_spy).toHaveBeenCalledWith('ok', '🚀')
 	})
@@ -83,10 +78,9 @@ describe('animation_helpers.execute_with_animation — error', () => {
 		const original = new Error(ORIGINAL_ERROR_MESSAGE)
 
 		await expect(
-			animation_helpers.execute_with_animation(
-				LOADING_MESSAGE,
-				async () => await Promise.reject(original),
-			),
+			animation_helpers.execute_with_animation(LOADING_MESSAGE, async () => {
+				throw original
+			}),
 		).rejects.toThrow(ORIGINAL_ERROR_MESSAGE)
 
 		expect(stop_spy).toHaveBeenCalledOnce()
@@ -96,7 +90,9 @@ describe('animation_helpers.execute_with_animation — error', () => {
 		await expect(
 			animation_helpers.execute_with_animation(
 				LOADING_MESSAGE,
-				async () => await Promise.reject(new Error('underlying')),
+				async () => {
+					throw new Error('underlying')
+				},
 				{ error_message: CUSTOM_ERROR_MESSAGE },
 			),
 		).rejects.toThrow(CUSTOM_ERROR_MESSAGE)

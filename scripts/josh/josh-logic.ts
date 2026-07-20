@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { package_version_schema } from '#scripts/schemas'
+import { package_bin_schema, package_version_schema } from '#scripts/schemas'
 import { execaSync } from 'execa'
 import {
 	ALIASES,
@@ -15,9 +16,15 @@ const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
 const TSX_CMD = 'tsx.cmd'
+const TSX_MANIFEST = 'tsx/package.json'
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
 const SPAWN_ERROR_EXIT_CODE = 2
+
+interface TsxRunner {
+	executable: string
+	leading_arguments: ReadonlyArray<string>
+}
 
 // Resolve the kit package root by ascending to the nearest package.json. This works both
 // from the bundled dist/josh.js (one level under the root) and from the tsx source at
@@ -44,6 +51,52 @@ function resolve_tsx_executable(): string {
 	]
 
 	return candidates.find(existsSync) ?? TSX_BIN
+}
+
+function read_tsx_bin_entry(manifest_path: string): string | undefined {
+	const { bin } = package_bin_schema.parse(JSON.parse(readFileSync(manifest_path, 'utf8')))
+
+	return typeof bin === 'string' ? bin : bin?.[TSX_BIN]
+}
+
+// pnpm's generated `node_modules/.bin/tsx` shim hardcodes the absolute store path of the tsx
+// version present when it was written. After a tsx bump the old store entry is pruned but the
+// nested shim is not regenerated, so spawning it dies with MODULE_NOT_FOUND. Locating the CLI
+// entry through tsx's own manifest at runtime never consults that stale artifact.
+function resolve_tsx_cli_from(base_directory: string): string | undefined {
+	try {
+		const resolve_from = createRequire(path.join(base_directory, PACKAGE_JSON))
+		const manifest_path = resolve_from.resolve(TSX_MANIFEST)
+		const bin_entry = read_tsx_bin_entry(manifest_path)
+		if (bin_entry === undefined) return undefined
+
+		const cli_entry = path.join(path.dirname(manifest_path), bin_entry)
+
+		return existsSync(cli_entry) ? cli_entry : undefined
+	} catch {
+		return undefined
+	}
+}
+
+function resolve_tsx_cli_entry(): string | undefined {
+	for (const base_directory of [PACKAGE_DIR, process.cwd()]) {
+		const cli_entry = resolve_tsx_cli_from(base_directory)
+		if (cli_entry !== undefined) return cli_entry
+	}
+
+	return undefined
+}
+
+// Preferred: run the resolved CLI entry with the current node binary. The `.bin` shim lookup
+// stays as a fallback for layouts where tsx is not resolvable from either manifest.
+function resolve_tsx_runner(): TsxRunner {
+	const cli_entry = resolve_tsx_cli_entry()
+
+	if (cli_entry !== undefined) {
+		return { executable: process.execPath, leading_arguments: [cli_entry] }
+	}
+
+	return { executable: resolve_tsx_executable(), leading_arguments: [] }
 }
 
 function read_package_version(): string {
@@ -122,10 +175,16 @@ function resolve_spawn_exit(
 	return SPAWN_ERROR_EXIT_CODE
 }
 
+// A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and
+// running it through the shell would break on the spaces in a typical Windows install path.
+function should_use_shell(executable: string): boolean {
+	return process.platform === 'win32' && executable !== process.execPath
+}
+
 function spawn_script(tsx_executable: string, script_arguments: Array<string>): number {
 	const result = execaSync(tsx_executable, script_arguments, {
 		stdio: 'inherit',
-		shell: process.platform === 'win32',
+		shell: should_use_shell(tsx_executable),
 		reject: false,
 	})
 
@@ -143,15 +202,16 @@ function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): 
 }
 
 function run_script_entry(entry: CommandEntry, subcommand_arguments: Array<string>): number {
-	const tsx_executable = resolve_tsx_executable()
+	const runner = resolve_tsx_runner()
 	const script_arguments = [
+		...runner.leading_arguments,
 		...(entry.tsx_arguments ?? []),
 		path.join(PACKAGE_DIR, entry.script ?? ''),
 		...(entry.default_script_arguments ?? []),
 		...subcommand_arguments,
 	]
 
-	return spawn_script(tsx_executable, script_arguments)
+	return spawn_script(runner.executable, script_arguments)
 }
 
 function run_command(cmd: string, subcommand_arguments: Array<string>): number {
@@ -168,4 +228,11 @@ const josh_logic = { format_help, run_command, spawn_script, run_shell_command }
 
 export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'
-export { josh_logic, resolve_alias, resolve_tsx_executable, SPAWN_ERROR_EXIT_CODE }
+export type { TsxRunner }
+export {
+	josh_logic,
+	resolve_alias,
+	resolve_tsx_executable,
+	resolve_tsx_runner,
+	SPAWN_ERROR_EXIT_CODE,
+}

@@ -60,6 +60,23 @@ which josh   # should now resolve to the pnpm global bin
 
 If the shim reappears after every `pnpm install`, a project pinned `< 0.200.0` is regenerating it — upgrade that project to `>= 0.200.0`. See [josh-commands.md → `josh doctor`](./josh-commands.md#josh-doctor) and [cli.md §4](./cli.md#4-migrating-from-older-versions).
 
+## `josh <command>` fails with `MODULE_NOT_FOUND` pointing at a pnpm store path
+
+```text
+Error: Cannot find module '/…/node_modules/.pnpm/tsx@<old>/node_modules/tsx/dist/cli.mjs'
+  code: 'MODULE_NOT_FOUND'
+```
+
+pnpm's generated `node_modules/@joshuafolkken/kit/node_modules/.bin/tsx` shim hardcodes the absolute store path of the tsx version present when it was written. After a tsx bump the old store entry is pruned, but the nested shim is not regenerated — so it points at a path that no longer exists. `pnpm install` (even `--force`) is a no-op here, because the lockfile is already satisfied.
+
+Kit `>= 1.17.0` no longer uses that shim: it resolves the tsx CLI entry from tsx's own manifest at runtime, so a stale shim cannot break the command. On older versions, delete the dead shim or reinstall from scratch:
+
+```bash
+rm node_modules/@joshuafolkken/kit/node_modules/.bin/tsx   # resolution falls back to the hoisted tsx
+# or
+rm -rf node_modules && pnpm install
+```
+
 ## Wrong Node or pnpm version
 
 The kit targets **pnpm ≥ 11** (see `devEngines` in `package.json`) and **Node ≥ 22.19** (see `engines`). Check:
