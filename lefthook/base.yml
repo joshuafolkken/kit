@@ -9,6 +9,15 @@ pre-commit:
       glob: '*.{ts,tsx,js,jsx,md,mdx,html,css,scss,yml,yaml,json,properties}'
       run: pnpm exec cspell lint --no-must-find-files --no-progress {staged_files}
 
+    # Scans only staged files, so a secret is caught before it ever enters history —
+    # GitHub push protection and the CodeRabbit gitleaks pass both fire after the fact,
+    # and push protection covers only known provider patterns.
+    # `--no-glob` because lefthook substitutes literal paths: SvelteKit route directories
+    # such as `(app)` / `[id]` are otherwise handed to the glob engine as patterns.
+    # Secret masking and .gitignore cascade are both on by default in secretlint v13.
+    secretlint:
+      run: pnpm exec secretlint --no-glob {staged_files}
+
     prettier:
       glob: '*.{js,jsx,ts,tsx,mjs,cjs,html,css,scss,md,mdx,json,jsonc,yaml,yml}'
       run: pnpm exec prettier --check --ignore-unknown {staged_files}

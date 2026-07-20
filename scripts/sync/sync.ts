@@ -184,27 +184,51 @@ function sync_config_files(): void {
 	sync_configs.sync_tsconfig(path.join(PROJECT_ROOT, 'tsconfig.json'))
 	sync_configs.sync_cspell_config(path.join(PROJECT_ROOT, 'cspell.config.yaml'))
 	sync_configs.sync_lefthook_config(path.join(PROJECT_ROOT, 'lefthook.yml'))
+	sync_configs.sync_secretlint_config(path.join(PROJECT_ROOT, '.secretlintrc.json'))
 	sync_configs.sync_vscode_extensions_json(path.join(PROJECT_ROOT, '.vscode/extensions.json'))
 	sync_configs.sync_vscode_settings_json(path.join(PROJECT_ROOT, '.vscode/settings.json'))
+}
+
+function sync_package_json_with(
+	destination_path: string,
+	transform: (existing: string) => string,
+	synced_message: string,
+): void {
+	if (!existsSync(destination_path)) return
+
+	const existing = readFileSync(destination_path, 'utf8')
+	const transformed = transform(existing)
+
+	if (transformed === existing) {
+		console.info(PACKAGE_JSON_UNCHANGED_MSG)
+
+		return
+	}
+
+	writeFileSync(destination_path, transformed)
+	console.info(synced_message)
 }
 
 // Repair an existing consumer manifest whose devEngines.packageManager.version
 // has drifted from its packageManager pin, so the pnpm dual-declaration warning
 // stays suppressed.
 function sync_package_manager_version(destination_path: string): void {
-	if (!existsSync(destination_path)) return
+	sync_package_json_with(
+		destination_path,
+		(existing) => package_manager_version.align_development_engines_version(existing),
+		'  ✔ synced    devEngines.packageManager.version',
+	)
+}
 
-	const existing = readFileSync(destination_path, 'utf8')
-	const aligned = package_manager_version.align_development_engines_version(existing)
-
-	if (aligned === existing) {
-		console.info(PACKAGE_JSON_UNCHANGED_MSG)
-
-		return
-	}
-
-	writeFileSync(destination_path, aligned)
-	console.info('  ✔ synced    devEngines.packageManager.version')
+// The pre-commit secretlint rule resolves secretlint from the consumer project, so a project
+// that predates the rule needs the devDependencies added here (then `pnpm install`) before the
+// hook can run. `josh init` covers fresh projects; this covers everyone already initialized.
+function sync_secretlint_development_deps(destination_path: string): void {
+	sync_package_json_with(
+		destination_path,
+		(existing) => init_logic.merge_secretlint_development_deps(existing),
+		'  ✔ synced    secretlint devDependencies (run `pnpm install`)',
+	)
 }
 
 function sync_project_artifacts(is_force: boolean): void {
@@ -215,6 +239,7 @@ function sync_project_artifacts(is_force: boolean): void {
 	sync_sonar_with_template(is_force)
 	sync_config_files()
 	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
+	sync_secretlint_development_deps(path.join(PROJECT_ROOT, PACKAGE_JSON))
 }
 
 function main(): void {
@@ -235,6 +260,7 @@ const sync = {
 	sync_playwright_config,
 	sync_deploy_vps,
 	sync_package_manager_version,
+	sync_secretlint_development_deps,
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 
