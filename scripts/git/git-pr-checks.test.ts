@@ -48,7 +48,7 @@ function make_sequence_fetcher(snapshots: ReadonlyArray<PrStateSnapshot>): {
 
 		if (snapshot === undefined) throw new Error(NO_SNAPSHOT_ERROR)
 
-		return await Promise.resolve(snapshot)
+		return snapshot
 	}
 
 	return { count: () => index, fetch }
@@ -335,18 +335,8 @@ describe('get_configured_max_attempts', () => {
 		expect(get_configured_max_attempts()).toBe(6)
 	})
 
-	it('returns DEFAULT_MAX_ATTEMPTS when env var is zero', () => {
-		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '0')
-		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
-	})
-
-	it('returns DEFAULT_MAX_ATTEMPTS when env var is negative', () => {
-		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '-30')
-		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
-	})
-
-	it('returns DEFAULT_MAX_ATTEMPTS when env var is not a number', () => {
-		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', 'abc')
+	it.each(['0', '-30', 'abc'])('returns DEFAULT_MAX_ATTEMPTS when env var is %s', (raw_timeout) => {
+		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', raw_timeout)
 		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
 	})
 })

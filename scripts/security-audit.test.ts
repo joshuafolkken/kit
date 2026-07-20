@@ -138,7 +138,7 @@ describe('josh latest command audit wiring', () => {
 	})
 
 	it('no longer calls the retired pnpm audit command', () => {
-		expect(latest_command.trim().endsWith(RETIRED_AUDIT)).toBe(false)
+		expect(latest_command.trimEnd().endsWith(RETIRED_AUDIT)).toBe(false)
 		expect(latest_command).not.toContain(RETIRED_AUDIT_FRAGMENT)
 	})
 })

@@ -37,24 +37,12 @@ describe('run_lint_parallel_checks', () => {
 		expect(code).toBe(0)
 	})
 
-	it('returns 1 when prettier fails', async () => {
-		mock_exit_codes(1, 0)
-
-		const code = await run_lint_parallel_checks()
-
-		expect(code).toBe(1)
-	})
-
-	it('returns 1 when eslint fails', async () => {
-		mock_exit_codes(0, 1)
-
-		const code = await run_lint_parallel_checks()
-
-		expect(code).toBe(1)
-	})
-
-	it('returns 1 when both fail', async () => {
-		mock_exit_codes(1, 1)
+	it.each([
+		['prettier fails', 1, 0],
+		['eslint fails', 0, 1],
+		['both fail', 1, 1],
+	])('returns 1 when %s', async (_label, prettier_code, eslint_code) => {
+		mock_exit_codes(prettier_code, eslint_code)
 
 		const code = await run_lint_parallel_checks()
 

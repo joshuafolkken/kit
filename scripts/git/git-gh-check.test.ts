@@ -6,7 +6,7 @@ const execa_mock = vi.hoisted(() => {
 	async function mock_execa(_cmd: string, _arguments: Array<string>): Promise<{ stdout: string }> {
 		if (state.should_fail) throw new Error('spawn gh ENOENT')
 
-		return await Promise.resolve({ stdout: 'gh version 2.0.0' })
+		return { stdout: 'gh version 2.0.0' }
 	}
 
 	return { state, mock_execa }

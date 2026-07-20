@@ -14,13 +14,15 @@ const execa_mock = vi.hoisted(() => {
 	async function mock_execa(_cmd: string, arguments_: Array<string>): Promise<{ stdout: string }> {
 		const is_bare_push = arguments_[0] === 'push' && !arguments_.includes('--set-upstream')
 
-		if (state.fail_plain_push && is_bare_push) {
-			throw Object.assign(new Error('bare push rejected'), { exitCode: state.plain_push_exit_code })
+		if (is_bare_push && state.fail_plain_push) {
+			throw Object.assign(new Error('bare push rejected'), {
+				exitCode: state.plain_push_exit_code,
+			})
 		}
 
 		if (state.should_fail) throw new Error('Command failed')
 
-		return await Promise.resolve({ stdout: state.stdout })
+		return { stdout: state.stdout }
 	}
 
 	return { state, mock_execa }
