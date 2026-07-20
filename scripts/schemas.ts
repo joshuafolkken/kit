@@ -38,6 +38,11 @@ const with_development_engine_schema = z.looseObject({
 	devEngines: z.record(z.string(), z.unknown()).optional(),
 })
 
+// `bin` in a package manifest is either a single path or a name→path record. Used to locate
+// tsx's CLI entry from its own manifest instead of trusting a generated `.bin` shim.
+const bin_entry_schema = z.union([z.string(), z.record(z.string(), z.string())]).optional()
+const package_bin_schema = z.looseObject({ bin: bin_entry_schema })
+
 const json_object_schema = z.record(z.string(), z.unknown())
 
 const string_array_schema = z.array(z.string())
@@ -49,6 +54,7 @@ export {
 	package_version_schema,
 	package_named_version_schema,
 	package_with_version_schema,
+	package_bin_schema,
 	pnpm_ls_global_schema,
 	vscode_settings_schema,
 	with_scripts_schema,

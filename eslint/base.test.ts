@@ -187,3 +187,27 @@ describe('create_base_config — typescript block', () => {
 		expect(typescript_block?.ignores).toContain('**/*.svelte.ts')
 	})
 })
+
+// `promise-function-async` guarantees that promise-returning functions are async, so
+// `require-await` only adds an unsatisfiable constraint for functions with no awaitable
+// work (async mocks). Both spellings must stay off for that pattern to lint cleanly.
+describe('create_base_config — require-await', () => {
+	it('turns off both spellings of require-await in the global block', () => {
+		const config = create_base_config({
+			gitignore_path: GITIGNORE_PATH,
+			tsconfig_root_dir: TSCONFIG_ROOT_DIR,
+		})
+
+		// Identify the global block by its `@stylistic` plugin: both typescript-eslint's preset
+		// blocks and eslint-plugin-promise's recommended block carry overlapping rule keys, so
+		// matching on a rule name alone would find one of those instead.
+		const global_block = config.find((block) =>
+			Boolean((block.plugins as Record<string, unknown> | undefined)?.['@stylistic']),
+		)
+
+		const rules = global_block?.rules as Record<string, unknown>
+
+		expect(rules['require-await']).toBe('off')
+		expect(rules['@typescript-eslint/require-await']).toBe('off')
+	})
+})
