@@ -45,6 +45,17 @@ commit-msg:
       run: pnpm josh check-commit-message {1}
 
 pre-push:
+  # Serial on purpose. Consumer pre-push commands (e.g. app-kit's test-e2e / dast)
+  # each own a preview server on a fixed port, so running them concurrently collides —
+  # the historical, previously-undocumented reason this is false (kit #672).
+  # Consumers cannot override this flag: on a lefthook section collision the extended
+  # base wins, so a consumer's `parallel: true` is silently dropped — the decision has
+  # to be made here.
+  # Measured decision: keep `false`. Flipping to `parallel: true` re-introduces the
+  # port collision until the downstream contention is removed (app-kit "share one build
+  # + preview server between pre-push E2E and DAST"). Enable only after that lands, then
+  # measure pre-push wall-clock on a real machine and keep `true` only if it improves and
+  # is stable; otherwise revert to `false`.
   parallel: false
   commands:
     audit:
