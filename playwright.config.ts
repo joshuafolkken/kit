@@ -23,12 +23,15 @@ type EnvConfig = {
 	reporter: ReporterDescription[]
 }
 
+// Set PLAYWRIGHT_REUSE_SERVER=1 when an orchestrator pre-builds and boots the preview so several
+// checks share one server: Playwright then reuses the running server and skips its webServer command
+// (no rebuild). Unset (default) keeps CI booting a fresh server and dev reusing, as before.
 const web_server_config = IS_CI
 	? {
 			command: 'pnpm run build && pnpm run preview',
 			port: PREVIEW_PORT,
 			timeout: CI_TIMEOUT,
-			reuseExistingServer: false,
+			reuseExistingServer: Boolean(process.env['PLAYWRIGHT_REUSE_SERVER']),
 		}
 	: { command: 'pnpm run dev', port: DEV_PORT, timeout: LOCAL_TIMEOUT, reuseExistingServer: true }
 
