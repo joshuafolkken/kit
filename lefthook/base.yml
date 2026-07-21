@@ -45,18 +45,21 @@ commit-msg:
       run: pnpm josh check-commit-message {1}
 
 pre-push:
-  # Serial on purpose. Consumer pre-push commands (e.g. app-kit's test-e2e / dast)
-  # each own a preview server on a fixed port, so running them concurrently collides —
-  # the historical, previously-undocumented reason this is false (kit #672).
-  # Consumers cannot override this flag: on a lefthook section collision the extended
-  # base wins, so a consumer's `parallel: true` is silently dropped — the decision has
-  # to be made here.
-  # Measured decision: keep `false`. Flipping to `parallel: true` re-introduces the
-  # port collision until the downstream contention is removed (app-kit "share one build
-  # + preview server between pre-push E2E and DAST"). Enable only after that lands, then
-  # measure pre-push wall-clock on a real machine and keep `true` only if it improves and
-  # is stable; otherwise revert to `false`.
-  parallel: false
+  # Parallel is SAFE as of kit #676. The old collision was two pre-push commands that each
+  # built + booted their own preview server on the same fixed port (4173) — historically
+  # app-kit's separate `test-e2e` + `dast` — running at once. That is gone: app-kit #97
+  # (v0.39.0) unified them into ONE `verify` command that owns the single server, and every
+  # older consumer runs only a single preview-owning command (`test-e2e`). `audit` and
+  # `test-unit` own no server, so with at most one server-owner per consumer nothing collides.
+  # This flag is a blanket, non-overridable distribution: on a lefthook section collision the
+  # extended base wins, so a consumer's own `parallel: true/false` is silently dropped — the
+  # decision has to be made here, for everyone at once. It is therefore only safe while NO
+  # consumer has 2+ preview-owning pre-push commands sharing a port. Audited at flip time
+  # (kit #676): app-kit, joshuafolkken-com, game-kit, mnemecha, waneccha — all ≤1 server-owner.
+  # Revert to `false` if a consumer reintroduces two colliding preview-owning pre-push
+  # commands and cannot unify them (the app-kit #97 pattern: one command owns build + preview,
+  # the others are HTTP clients), or if a consumer measures a regression / new flake.
+  parallel: true
   commands:
     audit:
       run: pnpm josh audit

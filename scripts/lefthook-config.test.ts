@@ -9,6 +9,7 @@ interface LefthookCommand {
 }
 
 interface LefthookHook {
+	parallel?: boolean
 	commands?: Record<string, LefthookCommand>
 }
 
@@ -17,6 +18,7 @@ type LefthookConfig = Record<string, LefthookHook>
 const BASE_LEFTHOOK = path.join('lefthook', 'base.yml')
 const VANILLA_LEFTHOOK = path.join('lefthook', 'vanilla.yml')
 const PRE_COMMIT = 'pre-commit'
+const PRE_PUSH = 'pre-push'
 const CSPELL = 'cspell'
 const SECRETLINT = 'secretlint'
 // lefthook resolves a nested `extends` from the consumer git root, so kit presets must reference
@@ -96,6 +98,19 @@ describe('lefthook/base.yml pre-commit secretlint command', () => {
 	// An unscoped glob would make secretlint scan files unrelated to the commit.
 	it('does not restrict the command with a glob filter', () => {
 		expect(secretlint?.glob).toBeUndefined()
+	})
+})
+
+describe('lefthook/base.yml pre-push parallel (kit#676)', () => {
+	const pre_push = load_config(BASE_LEFTHOOK)[PRE_PUSH]
+
+	// Enabled in kit#676 after auditing every active consumer: each has at most one
+	// preview-owning pre-push command (app-kit's unified `verify`, or a single `test-e2e`),
+	// so nothing collides on the fixed preview port. Revert to false only if a consumer
+	// reintroduces 2+ colliding preview-owning commands. This assertion guards that decision
+	// against an accidental flip back.
+	it('runs pre-push commands in parallel', () => {
+		expect(pre_push?.parallel).toBe(true)
 	})
 })
 
