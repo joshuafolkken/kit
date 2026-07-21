@@ -59,6 +59,13 @@ describe('generate_playwright_config', () => {
 			"command: 'pnpm run build && pnpm run preview'",
 		)
 	})
+
+	it('drives CI reuseExistingServer from the PLAYWRIGHT_REUSE_SERVER env var', () => {
+		const result = init_logic.generate_playwright_config()
+
+		expect(result).toContain("reuseExistingServer: Boolean(process.env['PLAYWRIGHT_REUSE_SERVER'])")
+		expect(result).not.toContain('reuseExistingServer: false')
+	})
 })
 
 describe('get_ai_copy_files - AI and community files', () => {
