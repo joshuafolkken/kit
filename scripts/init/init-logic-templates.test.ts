@@ -143,14 +143,14 @@ describe('ci.yml template content', () => {
 
 	it('includes playwright-image job that resolves the image dynamically', () => {
 		expect(CI_YML_CONTENT).toContain('playwright-image:')
-		expect(CI_YML_CONTENT).toContain('steps.resolve.outputs.image')
+		expect(CI_YML_CONTENT).toContain('steps.resolve.outputs.container')
 	})
 
 	it('has no hardcoded playwright docker image tag', () => {
 		expect(CI_YML_CONTENT).not.toMatch(/mcr\.microsoft\.com\/playwright:v\d+\.\d+\.\d+-noble/u)
 	})
 
-	it('checks and e2e jobs reference the dynamic playwright image output', () => {
-		expect(CI_YML_CONTENT).toContain('needs.playwright-image.outputs.image')
+	it('checks and e2e jobs reference the dynamic playwright container output', () => {
+		expect(CI_YML_CONTENT).toContain('needs.playwright-image.outputs.container')
 	})
 })
