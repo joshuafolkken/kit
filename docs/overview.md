@@ -8,7 +8,7 @@
 | -------------- | ------------------------ | ----------------------------------------------------- |
 | Linting        | ESLint                   | Vanilla config via `create_vanilla_config`            |
 | Formatting     | Prettier                 | Shared config with import sorting                     |
-| Type-checking  | TypeScript               | `base.jsonc` tsconfig preset                          |
+| Type-checking  | TypeScript               | `base.json` tsconfig preset                           |
 | Git hooks      | Lefthook                 | Pre-commit lint + pre-push checks                     |
 | Spell-checking | cspell                   | Shared word list and ignore rules                     |
 | Editor         | VS Code                  | Extension recommendations and workspace settings      |

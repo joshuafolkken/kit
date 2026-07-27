@@ -89,11 +89,16 @@ const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
 
 const LEFTHOOK_EXTENDS = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
 
-const TSCONFIG_EXTENDS = './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc'
+// The preset MUST keep a `.json` extension: Playwright (>= 1.62) appends `.json` to any tsconfig
+// `extends` entry that does not already end in it, then hard-throws when the resulting path is
+// missing — so a `.jsonc` preset resolves to `*.jsonc.json` and takes down the whole E2E suite
+// before a single test runs. A tsconfig is parsed as JSONC regardless of extension, so comments in
+// the preset still work. See joshuafolkken/kit#681.
+const TSCONFIG_EXTENDS = './node_modules/@joshuafolkken/kit/tsconfig/base.json'
 
 // Preset file basename within the package's tsconfig/ directory, used to read the base
 // compilerOptions when normalizing a consumer tsconfig.json during sync.
-const TSCONFIG_PRESET_FILENAME = 'base.jsonc'
+const TSCONFIG_PRESET_FILENAME = 'base.json'
 
 // extensions.json is distributed in common across project styles, so it is not keyed by type.
 const VSCODE_EXTENSIONS_FILENAME = 'extensions.json'

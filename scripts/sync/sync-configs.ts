@@ -62,9 +62,11 @@ function sync_tsconfig(destination_path: string): void {
 	const entry = init_logic.get_tsconfig_extends_entry()
 	const base_options = read_base_compiler_options()
 
+	const base_directory = path.dirname(destination_path)
+
 	sync_with_merge(destination_path, 'tsconfig.json', (existing) =>
 		init_logic.strip_redundant_compiler_options(
-			init_logic.merge_tsconfig_extends(existing, entry),
+			init_logic.merge_tsconfig_extends(existing, entry, base_directory),
 			base_options,
 		),
 	)

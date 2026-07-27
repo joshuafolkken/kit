@@ -18,7 +18,7 @@ const APP_KIT_CSPELL =
 	'version: "0.2"\nimport:\n  - "@joshuafolkken/app-kit/cspell/sveltekit"\nwords: []\n'
 // Authored the way prettier emits it (short exclude inline) — the no-op re-sync must preserve it.
 const APP_KIT_TSCONFIG =
-	'{\n\t"extends": ["./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc"],\n\t"exclude": ["node_modules", "build", "dist"]\n}\n'
+	'{\n\t"extends": ["./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json"],\n\t"exclude": ["node_modules", "build", "dist"]\n}\n'
 
 beforeEach(() => {
 	mkdirSync(TEST_DIR, { recursive: true })

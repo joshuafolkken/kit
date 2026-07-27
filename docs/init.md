@@ -35,7 +35,7 @@ The preset is **prepended** to the `extends` array so it does not override proje
 { "extends": ["./tsconfig.options.json"] }
 
 // after
-{ "extends": ["@joshuafolkken/kit/tsconfig/base.jsonc", "./tsconfig.options.json"] }
+{ "extends": ["./node_modules/@joshuafolkken/kit/tsconfig/base.json", "./tsconfig.options.json"] }
 ```
 
 ### eslint.config.js / prettier.config.js / playwright.config.ts

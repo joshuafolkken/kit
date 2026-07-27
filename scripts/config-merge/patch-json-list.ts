@@ -1,18 +1,11 @@
-import { json_object_schema } from '#scripts/schemas'
-import strip_json_comments from 'strip-json-comments'
 import { json_format } from './json-format'
 import { list_patch, type ListEntryMatcher } from './list-patch'
+import { parse_jsonc } from './parse-jsonc'
 
 interface PatchJsonListOptions {
 	field: string
 	ensure?: ReadonlyArray<string>
 	remove?: ReadonlyArray<ListEntryMatcher>
-}
-
-function parse_jsonc(content: string): Record<string, unknown> {
-	const stripped = strip_json_comments(content, { trailingCommas: true })
-
-	return json_object_schema.parse(JSON.parse(stripped))
 }
 
 // A JSON list field may be authored as a bare string (tsconfig `extends` accepts `string` or

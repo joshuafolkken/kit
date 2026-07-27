@@ -64,6 +64,44 @@ describe('sync_configs.sync_tsconfig — normalization', () => {
 	})
 })
 
+// A consumer upgrading from a kit that shipped `*.jsonc` presets cannot start Playwright at all
+// until its `extends` points at the `.json` path, and the ecosystem-preset check would otherwise
+// consider the stale entry "already present" and leave it alone. `josh sync` must repair it (#681).
+const KIT_LEGACY = './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc'
+const APP_KIT_LEGACY = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc'
+const APP_KIT_CURRENT = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json'
+
+function install_preset(relative_path: string): void {
+	const absolute = path.join(TEST_DIR, relative_path)
+
+	mkdirSync(path.dirname(absolute), { recursive: true })
+	writeFileSync(absolute, '{ "compilerOptions": {} }\n')
+}
+
+describe('sync_configs.sync_tsconfig — legacy .jsonc preset migration', () => {
+	it('rewrites a stale kit preset path to the shipped .json preset', () => {
+		install_preset(ENTRY)
+		const content = `${JSON.stringify({ extends: [KIT_LEGACY] })}\n`
+
+		expect(sync_and_read(content)).toStrictEqual({ extends: [ENTRY] })
+	})
+
+	it('rewrites a stale app-kit preset path without adding kit base', () => {
+		install_preset(APP_KIT_CURRENT)
+		const content = `${JSON.stringify({ extends: [APP_KIT_LEGACY] })}\n`
+
+		expect(sync_and_read(content)).toStrictEqual({ extends: [APP_KIT_CURRENT] })
+	})
+
+	// Until the package shipping the renamed preset is installed, rewriting would point tsc at a
+	// file that does not exist — strictly worse than leaving the stale entry in place (#681).
+	it('leaves a stale entry alone while the renamed preset is not installed', () => {
+		const content = `${JSON.stringify({ extends: [APP_KIT_LEGACY] })}\n`
+
+		expect(sync_and_read(content)).toStrictEqual({ extends: [APP_KIT_LEGACY] })
+	})
+})
+
 describe('sync_configs.sync_tsconfig — prettier-clean serialization', () => {
 	// When strip rewrites the file, a short `exclude` must stay on one line so the emitted tsconfig
 	// is prettier-clean (#660) — JSON.stringify would otherwise expand it multi-line.
