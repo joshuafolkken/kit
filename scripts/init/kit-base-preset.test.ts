@@ -5,12 +5,12 @@ const KIT_LEFTHOOK = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
 const APP_KIT_LEFTHOOK = 'node_modules/@joshuafolkken/app-kit/lefthook/sveltekit.yml'
 const KIT_CSPELL = '@joshuafolkken/kit/cspell'
 const APP_KIT_CSPELL = '@joshuafolkken/app-kit/cspell/sveltekit'
-const KIT_TSCONFIG = './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc'
-const APP_KIT_TSCONFIG = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc'
+const KIT_TSCONFIG = './node_modules/@joshuafolkken/kit/tsconfig/base.json'
+const APP_KIT_TSCONFIG = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json'
 const UNRELATED = './.svelte-kit/tsconfig.json'
 // In-repo relative preset paths a self-hosting repo (app-kit's own repo) uses — no
 // `@joshuafolkken/` prefix, so only the `*/sveltekit` segment match catches them (#664).
-const SELF_HOSTED_TSCONFIG = './tsconfig/sveltekit.jsonc'
+const SELF_HOSTED_TSCONFIG = './tsconfig/sveltekit.json'
 const SELF_HOSTED_CSPELL = './cspell/sveltekit.yaml'
 const SELF_HOSTED_LEFTHOOK = 'lefthook/sveltekit.yml'
 
@@ -72,9 +72,7 @@ describe('kit_base_preset.is_tsconfig_base_present', () => {
 	it('does not treat a segment-anchor sveltekit sibling as a preset', () => {
 		// `sveltekit-foo` / `base-sveltekit` are distinct siblings, not the `sveltekit` preset, so
 		// kit base must still be injected when only such an entry is present (#664).
-		expect(kit_base_preset.is_tsconfig_base_present(['./tsconfig/sveltekit-foo.jsonc'])).toBe(false)
-		expect(kit_base_preset.is_tsconfig_base_present(['./tsconfig/base-sveltekit.jsonc'])).toBe(
-			false,
-		)
+		expect(kit_base_preset.is_tsconfig_base_present(['./tsconfig/sveltekit-foo.json'])).toBe(false)
+		expect(kit_base_preset.is_tsconfig_base_present(['./tsconfig/base-sveltekit.json'])).toBe(false)
 	})
 })

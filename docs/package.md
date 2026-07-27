@@ -38,7 +38,7 @@ The package exposes config presets for direct import:
 | --------------- | ---------------------------------------------------------------- |
 | ESLint config   | `@joshuafolkken/kit/eslint/vanilla`                              |
 | Prettier        | `@joshuafolkken/kit/prettier`                                    |
-| tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/base.jsonc`          |
+| tsconfig        | `./node_modules/@joshuafolkken/kit/tsconfig/base.json`           |
 | Scripts         | `tsx node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts` |
 | Prompts         | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
 | Version library | `@joshuafolkken/kit/version`                                     |

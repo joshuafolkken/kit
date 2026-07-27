@@ -1,16 +1,11 @@
 import { config_merge } from '#scripts/config-merge/index'
 import { json_format } from '#scripts/config-merge/json-format'
+import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/schemas'
-import strip_json_comments from 'strip-json-comments'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
 import { kit_base_preset } from './kit-base-preset'
-
-function parse_jsonc(content: string): unknown {
-	return JSON.parse(strip_json_comments(content, { trailingCommas: true }))
-}
-
-const EXTENDS_FIELD = 'extends'
+import { EXTENDS_FIELD, tsconfig_preset_migration } from './tsconfig-preset-migration'
 
 // Ensure `entry` is in the tsconfig `extends` list, preserving every other key. Thin wrapper over
 // the shared config-merge library, which normalizes a string-or-array `extends` and prepends the
@@ -22,7 +17,7 @@ function merge_json_extends(content: string, entry: string): string {
 // Normalize the tsconfig `extends` (a string, an array, or absent) to a plain string array so the
 // ecosystem-preset check reads the same shape regardless of how the consumer authored it.
 function read_extends_entries(content: string): ReadonlyArray<string> {
-	const raw = json_object_schema.parse(parse_jsonc(content))[EXTENDS_FIELD]
+	const raw = parse_jsonc(content)[EXTENDS_FIELD]
 	if (typeof raw === 'string') return [raw]
 	if (Array.isArray(raw)) return string_array_schema.parse(raw)
 
@@ -32,15 +27,20 @@ function read_extends_entries(content: string): ReadonlyArray<string> {
 // Ensure kit's tsconfig base preset is in `extends` — UNLESS an `@joshuafolkken/*` tsconfig preset
 // (kit's own base, or an app-kit / game-kit framework preset that already embeds kit base) is
 // present. Adding kit's base alongside such a preset is a redundant second extend. See
-// joshuafolkken/kit#660.
-function merge_tsconfig_extends(content: string, entry: string): string {
-	if (kit_base_preset.is_tsconfig_base_present(read_extends_entries(content))) return content
+// joshuafolkken/kit#660. The legacy `.jsonc` preset extension is migrated first: the presence check
+// below matches it too, so without the rewrite a consumer stuck on the old path would be reported
+// "already present" and never repaired. `base_directory` is the project root the `extends` paths
+// resolve against, which the migration needs to confirm the renamed preset is installed. See
+// joshuafolkken/kit#681.
+function merge_tsconfig_extends(content: string, entry: string, base_directory: string): string {
+	const migrated = tsconfig_preset_migration.migrate_preset_paths(content, base_directory)
+	if (kit_base_preset.is_tsconfig_base_present(read_extends_entries(migrated))) return migrated
 
-	return merge_json_extends(content, entry)
+	return merge_json_extends(migrated, entry)
 }
 
 function extract_compiler_options(content: string): Record<string, unknown> {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['compilerOptions']
 	if (raw === undefined) return {}
@@ -94,7 +94,7 @@ function strip_redundant_compiler_options(
 	content: string,
 	base_options: Record<string, unknown>,
 ): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['compilerOptions']
 	if (raw === undefined) return content
@@ -110,7 +110,7 @@ function merge_json_array_field(
 	key: string,
 	values: ReadonlyArray<string>,
 ): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	const existing = Object.hasOwn(parsed, key) ? string_array_schema.parse(parsed[key]) : []
 	const to_add = values.filter((value) => !existing.includes(value))
 	if (to_add.length === 0) return content
@@ -119,7 +119,7 @@ function merge_json_array_field(
 }
 
 function merge_json_object(content: string, updates: Record<string, unknown>): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	let has_changes = false
 
 	for (const [key, value] of Object.entries(updates)) {
@@ -136,7 +136,7 @@ function merge_json_object(content: string, updates: Record<string, unknown>): s
 const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
@@ -156,7 +156,7 @@ function merge_development_dependencies(
 	content: string,
 	additions: Record<string, string>,
 ): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['devDependencies']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
@@ -171,21 +171,21 @@ function merge_development_dependencies(
 
 function merge_package_manager(content: string, value: string): string {
 	if (value.length === 0) return content
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	if ('packageManager' in parsed) return content
 
 	return json_format.format_json({ ...parsed, packageManager: value })
 }
 
 function merge_development_engines(content: string, value: Record<string, unknown>): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	if ('devEngines' in parsed) return content
 
 	return json_format.format_json({ ...parsed, devEngines: value })
 }
 
 function has_package_scripts_marker(content: string, marker: string): boolean {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return false
@@ -195,7 +195,7 @@ function has_package_scripts_marker(content: string, marker: string): boolean {
 }
 
 function merge_package_script_suffix(content: string, key: string, cmd: string): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return content
@@ -208,7 +208,7 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 }
 
 function remove_script_with_marker(content: string, key: string, marker: string): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['scripts']
 	if (raw === undefined) return content
@@ -220,7 +220,7 @@ function remove_script_with_marker(content: string, key: string, marker: string)
 }
 
 function sort_package_json_keys(content: string): string {
-	const parsed = json_object_schema.parse(parse_jsonc(content))
+	const parsed = parse_jsonc(content)
 	const all_keys = Object.keys(parsed)
 	const known = PACKAGE_JSON_KEY_ORDER.filter((k) => Object.hasOwn(parsed, k))
 	const unknown = all_keys.filter((k) => !PACKAGE_JSON_KEY_ORDER.includes(k))
