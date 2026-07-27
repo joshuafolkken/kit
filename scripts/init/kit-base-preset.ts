@@ -13,12 +13,13 @@ const KIT_LEFTHOOK_PRESET = /@joshuafolkken\/[^/]+\/lefthook\//u
 // A cspell `import` value such as `@joshuafolkken/app-kit/cspell/sveltekit` or the bare base
 // `@joshuafolkken/kit/cspell` (hence the trailing `/`-or-end alternation).
 const KIT_CSPELL_PRESET = /@joshuafolkken\/[^/]+\/cspell(?:\/|$)/u
-// A tsconfig `extends` path such as `./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc`
-// or `./node_modules/@joshuafolkken/kit/tsconfig/base.jsonc`.
+// A tsconfig `extends` path such as `./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json`
+// or `./node_modules/@joshuafolkken/kit/tsconfig/base.json`. Extension-agnostic on purpose, so the
+// retired `.jsonc` form still matches and gets migrated rather than double-extended (#681).
 const KIT_TSCONFIG_PRESET = /@joshuafolkken\/[^/]+\/tsconfig\//u
 // A `*/sveltekit` framework preset referenced by an in-repo RELATIVE path that carries no
 // `@joshuafolkken/` prefix — the shape a self-hosting repo (app-kit's own repo) uses, e.g.
-// `./tsconfig/sveltekit.jsonc`, `./cspell/sveltekit.yaml`, `lefthook/sveltekit.yml`. Such a preset
+// `./tsconfig/sveltekit.json`, `./cspell/sveltekit.yaml`, `lefthook/sveltekit.yml`. Such a preset
 // re-exports / inlines kit base by construction, so kit base must not be injected alongside it. The
 // KIT_*_PRESET regexes above only catch the installed-dependency form (`@joshuafolkken/…/sveltekit`);
 // this segment-anchored fallback covers the prefix-less relative form. The `(?<![\w-])` /

@@ -1,5 +1,5 @@
 {
-	"version": "1.22.0",
+	"version": "1.23.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -60,8 +60,8 @@
 			"default": "./prettier/index.js"
 		},
 		"./tsconfig/base": {
-			"types": "./tsconfig/base.jsonc",
-			"default": "./tsconfig/base.jsonc"
+			"types": "./tsconfig/base.json",
+			"default": "./tsconfig/base.json"
 		},
 		"./cspell": "./cspell/index.yaml",
 		"./version": {

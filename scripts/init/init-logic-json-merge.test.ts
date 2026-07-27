@@ -36,8 +36,15 @@ describe('init_logic_json_merge.merge_json_extends', () => {
 	})
 })
 
-const KIT_TSCONFIG_BASE = './node_modules/@joshuafolkken/kit/tsconfig/base.jsonc'
-const APP_KIT_TSCONFIG = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc'
+const KIT_TSCONFIG_BASE = './node_modules/@joshuafolkken/kit/tsconfig/base.json'
+const APP_KIT_TSCONFIG = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json'
+// No case below carries a legacy `.jsonc` entry, so the preset migration never touches the disk and
+// the base directory is inert here — the migration itself is covered in its own test file.
+const BASE_DIRECTORY = process.cwd()
+
+function merge_tsconfig(content: string): string {
+	return init_logic_json_merge.merge_tsconfig_extends(content, KIT_TSCONFIG_BASE, BASE_DIRECTORY)
+}
 
 describe('init_logic_json_merge.merge_tsconfig_extends — ecosystem base dedup', () => {
 	// app-kit's sveltekit tsconfig already embeds kit base, so a separate kit-base extend is
@@ -45,16 +52,13 @@ describe('init_logic_json_merge.merge_tsconfig_extends — ecosystem base dedup'
 	it('skips kit base when an app-kit tsconfig preset is present', () => {
 		const content = `{"extends":["${APP_KIT_TSCONFIG}","./.svelte-kit/tsconfig.json"]}`
 
-		expect(init_logic_json_merge.merge_tsconfig_extends(content, KIT_TSCONFIG_BASE)).toBe(content)
+		expect(merge_tsconfig(content)).toBe(content)
 	})
 
 	it('adds kit base when only an unrelated extends is present', () => {
-		const result = JSON.parse(
-			init_logic_json_merge.merge_tsconfig_extends(
-				'{"extends":"./.svelte-kit/tsconfig.json"}',
-				KIT_TSCONFIG_BASE,
-			),
-		) as { extends: Array<string> }
+		const result = JSON.parse(merge_tsconfig('{"extends":"./.svelte-kit/tsconfig.json"}')) as {
+			extends: Array<string>
+		}
 
 		expect(result.extends).toStrictEqual([KIT_TSCONFIG_BASE, './.svelte-kit/tsconfig.json'])
 	})
@@ -62,20 +66,17 @@ describe('init_logic_json_merge.merge_tsconfig_extends — ecosystem base dedup'
 	// A self-hosting repo (app-kit's own repo) references its sveltekit preset by an in-repo
 	// relative path with no `@joshuafolkken/` prefix; kit base must still be skipped there (#664).
 	it('skips kit base when a self-hosted relative sveltekit preset is present', () => {
-		const content = `{"extends":["./tsconfig/sveltekit.jsonc","./.svelte-kit/tsconfig.json"]}`
+		const content = `{"extends":["./tsconfig/sveltekit.json","./.svelte-kit/tsconfig.json"]}`
 
-		expect(init_logic_json_merge.merge_tsconfig_extends(content, KIT_TSCONFIG_BASE)).toBe(content)
+		expect(merge_tsconfig(content)).toBe(content)
 	})
 
 	// Re-running sync on an already-correct self-hosting config (sveltekit preset, no base line) is
 	// a no-op — no byte churn (#664).
 	it('is idempotent on an already-correct self-hosting config', () => {
-		const content = init_logic_json_merge.merge_tsconfig_extends(
-			`{"extends":["./tsconfig/sveltekit.jsonc"]}`,
-			KIT_TSCONFIG_BASE,
-		)
+		const content = merge_tsconfig(`{"extends":["./tsconfig/sveltekit.json"]}`)
 
-		expect(init_logic_json_merge.merge_tsconfig_extends(content, KIT_TSCONFIG_BASE)).toBe(content)
+		expect(merge_tsconfig(content)).toBe(content)
 	})
 })
 

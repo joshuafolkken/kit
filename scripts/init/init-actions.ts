@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { string_array_schema, vscode_settings_schema } from '#scripts/schemas'
 import { init_logic } from './init-logic'
-import { package_path } from './init-paths'
+import { package_path, PROJECT_ROOT } from './init-paths'
 
 const PRETTIER_CONFIG_JS = 'prettier.config.js'
 
@@ -62,16 +62,26 @@ function build_secretlint_action(): FileAction {
 	}
 }
 
+// PROJECT_ROOT is what the consumer's `extends` paths resolve against, which the merge needs to
+// migrate a retired `*.jsonc` preset path only once its renamed target is installed (#681).
+function build_tsconfig_action(): FileAction {
+	return build_action(
+		'tsconfig.json',
+		() => init_logic.generate_tsconfig(),
+		(existing) =>
+			init_logic.merge_tsconfig_extends(
+				existing,
+				init_logic.get_tsconfig_extends_entry(),
+				PROJECT_ROOT,
+			),
+	)
+}
+
 function build_config_file_actions(): ReadonlyArray<FileAction> {
 	const lefthook_extends = init_logic.get_lefthook_extends_value()
 
 	return [
-		build_action(
-			'tsconfig.json',
-			() => init_logic.generate_tsconfig(),
-			(existing) =>
-				init_logic.merge_tsconfig_extends(existing, init_logic.get_tsconfig_extends_entry()),
-		),
+		build_tsconfig_action(),
 		build_action(
 			'cspell.config.yaml',
 			() => init_logic.generate_cspell_config(),

@@ -13,6 +13,9 @@
 	"[json]": {
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
 	},
+	"files.associations": {
+		"**/tsconfig/*.json": "jsonc"
+	},
 	"[markdown]": {
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
 	},

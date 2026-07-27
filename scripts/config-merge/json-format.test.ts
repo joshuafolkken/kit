@@ -59,8 +59,8 @@ describe('json_format.format_json — matches real prettier', () => {
 	it('is a prettier fixed point across mixed array shapes', async () => {
 		const value = {
 			extends: [
-				'./node_modules/@joshuafolkken/kit/tsconfig/base.jsonc',
-				'./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc',
+				'./node_modules/@joshuafolkken/kit/tsconfig/base.json',
+				'./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json',
 				'./.svelte-kit/tsconfig.json',
 			],
 			include: ['./.svelte-kit/ambient.d.ts', './**/*.ts', './**/*.svelte', './**/*.js'],
