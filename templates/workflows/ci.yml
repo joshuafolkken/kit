@@ -19,18 +19,50 @@ jobs:
     permissions:
       contents: read
     outputs:
-      image: ${{ steps.resolve.outputs.image }}
+      # JSON consumed via fromJSON() as the job-level `container` value: an object
+      # when the image exists, the literal `null` when it does not (= no container).
+      container: ${{ steps.resolve.outputs.container }}
+      # 'true' only when Playwright is a dependency but its image is unavailable, i.e.
+      # exactly when a job must download browsers itself.
+      should_install_browsers: ${{ steps.resolve.outputs.should_install_browsers }}
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
+      # The MCR image lags the npm publish by days, so a version-derived tag is not
+      # guaranteed to exist. Probe it first and fall back to a plain runner instead of
+      # emitting a tag that 404s and kills every dependent job before it starts.
       - name: Resolve image
         id: resolve
         run: |
-          version=$(node -p "require('./package.json').devDependencies['@playwright/test']" | tr -d '^~')
-          echo "image=mcr.microsoft.com/playwright:v${version}-noble" >> $GITHUB_OUTPUT
+          # Whitelist the characters: the value lands in $GITHUB_OUTPUT as JSON, so a
+          # newline or quote smuggled into the manifest could forge an extra output line.
+          version=$(node -p "require('./package.json').devDependencies?.['@playwright/test'] ?? ''" | tr -cd 'A-Za-z0-9.-')
+
+          if [ -z "${version}" ]; then
+            echo 'container=null' >> "$GITHUB_OUTPUT"
+            echo 'should_install_browsers=false' >> "$GITHUB_OUTPUT"
+            echo 'Playwright is not a dependency; every job runs on the plain runner.'
+            exit 0
+          fi
+
+          tag="v${version}-noble"
+          image="mcr.microsoft.com/playwright:${tag}"
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 --retry 2 \
+            -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' \
+            "https://mcr.microsoft.com/v2/playwright/manifests/${tag}" || true)
+
+          if [ "${status}" = '200' ]; then
+            printf 'container={"image":"%s","options":"--user root"}\n' "${image}" >> "$GITHUB_OUTPUT"
+            echo 'should_install_browsers=false' >> "$GITHUB_OUTPUT"
+            echo "Resolved Playwright container image ${image}."
+          else
+            echo 'container=null' >> "$GITHUB_OUTPUT"
+            echo 'should_install_browsers=true' >> "$GITHUB_OUTPUT"
+            echo "::warning::Playwright image ${image} could not be resolved on MCR (HTTP ${status}). Running on the plain runner and installing browsers with 'playwright install --with-deps' instead."
+          fi
 
   checks:
     name: Checks
@@ -39,9 +71,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    container:
-      image: ${{ needs.playwright-image.outputs.image }}
-      options: --user root
+    container: ${{ fromJSON(needs.playwright-image.outputs.container) }}
     timeout-minutes: 8
     steps:
       - name: Checkout code
@@ -111,6 +141,12 @@ jobs:
       - name: Run eslint check
         run: pnpm exec eslint . --cache --cache-strategy content
 
+      # Vitest browser-mode projects (*.svelte.test.ts) drive a real Playwright browser,
+      # which the container image ships but a plain runner does not. Same guard as e2e.
+      - name: Install Playwright browsers
+        if: needs.playwright-image.outputs.should_install_browsers == 'true'
+        run: ./node_modules/.bin/playwright install --with-deps
+
       - name: Run unit tests
         run: pnpm josh test:unit
 
@@ -165,9 +201,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    container:
-      image: ${{ needs.playwright-image.outputs.image }}
-      options: --user root
+    container: ${{ fromJSON(needs.playwright-image.outputs.container) }}
     timeout-minutes: 10
     # Playwright preview は localhost:4173。ワークフロー共通の BETTER_AUTH_URL（本番）を
     # 引き継ぐと Better Auth が origin を拒否する（CI E2E では本番 URL は使わない）。
@@ -221,6 +255,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # Only needed on the fallback path: the container image already ships browsers
+      # matching its own Playwright version. Invoked through the local bin rather than
+      # `pnpm exec` because Sonar's S6505 misreads `pnpm ... install` as a package
+      # install missing --ignore-scripts (this downloads browser binaries, not packages).
+      - name: Install Playwright browsers
+        if: needs.playwright-image.outputs.should_install_browsers == 'true'
+        run: ./node_modules/.bin/playwright install --with-deps
 
       - name: Run E2E tests
         run: pnpm exec playwright test
