@@ -104,14 +104,18 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no a
 
 For every code modification, follow this order exactly:
 
-0. **Test declaration** _(mandatory before writing any implementation code)_: Declare every change and its test. Do not touch implementation files until this list exists.
+0. **Work summary + test declaration** _(mandatory before writing any implementation code)_: Present a short work summary, then declare every change and its test. Do not touch implementation files until both exist.
 
    ```text
+   <3–6 line work summary: target files/modules · approach and why · test plan · side effects / out of scope>
+
    Change 1: <what changes>
      → Test: <Unit|E2E> — <file path> — <what behavior it verifies>
    Change 2: ...
    ```
 
+   - **The work summary is mandatory and comes first.** Write it in the session language (`JOSH_SESSION_LANG`; match the user's language when unset) and keep it to 3–6 lines covering: the files/modules to be touched, the approach and a one-line rationale, the test plan, and any side effects or deliberately out-of-scope points. In `fullrun` / `halfrun` / `queue` present it once per Issue, immediately before implementation starts — including when the Issue body was already filled and no plan comment was posted. `kickoff` is exempt (it already posts a plan to the Issue).
+   - **The summary is presentation, not a confirmation stop.** Continue straight into implementation in the same turn; it never becomes a stopping condition and does not affect the `fullrun` chain rule. Keep it session-facing only — do not post it as an Issue comment, and artifact languages (Issue / PR / Telegram = English) are unchanged.
    - **Tests are required for ALL code changes** — including bug fixes, timing/animation fixes, and refactors. No exceptions without explicit user approval.
    - Bug fix → regression test that would have caught the bug
    - UI / animation / timing fix → E2E test for the observable behavior change
