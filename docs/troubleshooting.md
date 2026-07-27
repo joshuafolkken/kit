@@ -92,6 +92,19 @@ If pnpm is older than 11, upgrade via Corepack: `corepack prepare pnpm@latest --
 
 `josh sync` overwrites managed config files (e.g. `playwright.config.ts`, the CI workflow) with the latest published versions. If you intentionally customized one of these, your change will be reverted. Keep local-only config in files **not** managed by the kit, or re-apply the change after syncing. See [sync.md](./sync.md) for the managed-file list.
 
+## CI warns that the Playwright image could not be resolved
+
+The `checks` and `e2e` jobs normally run inside `mcr.microsoft.com/playwright:v<version>-noble`, derived from the `@playwright/test` version in your manifest. Microsoft publishes that image days after the npm release, so right after a Playwright bump the tag may not exist yet.
+
+When the tag is missing, the workflow does **not** fail. The `Resolve Playwright image` job logs a warning like:
+
+```text
+Playwright image mcr.microsoft.com/playwright:v1.62.0-noble could not be resolved on MCR (HTTP 404).
+Running on the plain runner and installing browsers with 'playwright install --with-deps' instead.
+```
+
+Both jobs then run on `ubuntu-latest` and download browsers themselves, which adds roughly two minutes but always matches the installed Playwright exactly. No action is required — the warning disappears on its own once the image is published. Do **not** pin `@playwright/test` back to make it go away.
+
 ## Still stuck?
 
 - Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `.npmrc`) matters.
