@@ -17,7 +17,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "echo 'MANDATORY: Before writing any implementation code, declare every change and its test (see Code Change Rules Step 0 in CLAUDE.md). Tests are required for ALL changes — including bug fixes, timing fixes, and refactors. Zero tests without explicit user approval is a policy violation.'"
+						"command": "echo 'MANDATORY: Before writing any implementation code, present a 3-6 line work summary (target files/modules, approach and why, test plan, side effects / out of scope) in the session language, then declare every change and its test (see Code Change Rules Step 0 in CLAUDE.md). The summary is required in fullrun/halfrun/queue even when the Issue body was already filled, and it is presentation only — never a confirmation stop. Tests are required for ALL changes — including bug fixes, timing fixes, and refactors. Zero tests without explicit user approval is a policy violation.'"
 					},
 					{
 						"type": "command",
