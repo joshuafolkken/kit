@@ -118,7 +118,16 @@ Issue: <issue-url>
    ```bash
    git stash pop
    ```
-7. 実装を開始する
+7. **作業サマリを提示してから**実装を開始する（`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` の Code Change Rules Step 0）。`JOSH_SESSION_LANG` の言語で 3〜6 行にまとめ、次を含める:
+   - 触るファイル / モジュール
+   - 採るアプローチと、その理由（一言）
+   - テスト方針（Step 0 のテスト宣言と同じブロックに続けて書く）
+   - 想定される副作用・意図的にスコープ外にした点
+
+   `fullrun` / `halfrun` / `queue` では Issue ごとに 1 回、実装に着手する直前に提示する。**Issue body が既に埋まっていて計画コメントを投稿しなかった場合も必ず提示する**（この場合ユーザーには他に作業内容が見えないため）。`kickoff` は既に計画を Issue に投稿するので対象外。
+
+   提示は説明のためであり、**確認待ちで停止する意味ではない**。同一ターンでそのまま実装へ進むこと（停止条件にはならず、`/review` → `followup --merge` のチェーン規則にも影響しない）。セッション向け出力のみに留め、Issue コメントとしては投稿しない（Issue / PR / Telegram の言語は英語のまま変更なし）。
+
 8. 実装完了後、**lint/test より前に** `prompts/refactoring.md` に従ってリファクタリングを適用する（高・中優先度項目が残らなくなるまで収束させる）
 9. 検証ゲート（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` の Completion gate）を実行する
 
