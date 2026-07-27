@@ -256,6 +256,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # --ignore-scripts suppresses the install-time `prepare`, so generated framework
+      # files never appear. Playwright >= 1.62 hard-throws when a tsconfig `extends`
+      # target is missing, and a SvelteKit tsconfig extends the generated
+      # .svelte-kit/tsconfig.json — without this step `playwright test` aborts before
+      # the first test (#689). The `checks` job already runs the same step.
+      - name: Prepare
+        run: pnpm prepare
+
       # Only needed on the fallback path: the container image already ships browsers
       # matching its own Playwright version. Invoked through the local bin rather than
       # `pnpm exec` because Sonar's S6505 misreads `pnpm ... install` as a package
