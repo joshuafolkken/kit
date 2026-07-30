@@ -10,19 +10,19 @@ pnpm josh init
 
 Each file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
 
-| File                      | If missing                                                | If exists                                                                                                         |
-| ------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `.gitignore`              | Created from `templates/gitignore`                        | Union-merged: missing kit patterns appended, consumer-local entries kept                                          |
-| `.npmrc`                  | Created with registry, engine-strict, minimum-release-age | Missing lines appended                                                                                            |
-| `eslint.config.js`        | Created with `create_vanilla_config`                      | Sample shown — add manually                                                                                       |
-| `prettier.config.js`      | Created with shared config                                | Sample shown — add manually                                                                                       |
-| `playwright.config.ts`    | Created with `create_playwright_config`                   | Sample shown — add manually                                                                                       |
-| `tsconfig.json`           | Created with `extends` pointing to the preset             | Preset entry prepended to `extends` array                                                                         |
-| `cspell.config.yaml`      | Created with `import` pointing to the shared word list    | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import) |
-| `lefthook.yml`            | Created with `extends` pointing to the preset             | Preset entry added under `extends:` key                                                                           |
-| `.secretlintrc.json`      | Created enabling the recommend rule preset                | Left untouched — the rule list is project-owned once it exists                                                    |
-| `.vscode/extensions.json` | Created from package template                             | Missing recommendations merged in                                                                                 |
-| `.vscode/settings.json`   | Created from package template                             | Missing keys merged in (existing keys untouched)                                                                  |
+| File                      | If missing                                                | If exists                                                                                                                             |
+| ------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `.gitignore`              | Created from `templates/gitignore`                        | Union-merged: missing kit patterns appended, consumer-local entries kept                                                              |
+| `.npmrc`                  | Created with registry, engine-strict, minimum-release-age | Missing lines appended                                                                                                                |
+| `eslint.config.js`        | Created with `create_vanilla_config`                      | Sample shown — add manually                                                                                                           |
+| `prettier.config.js`      | Created with shared config                                | Sample shown — add manually                                                                                                           |
+| `playwright.config.ts`    | Created with `create_playwright_config`                   | Sample shown — add manually                                                                                                           |
+| `tsconfig.json`           | Created with `extends` pointing to the preset             | Preset entry prepended to `extends` array                                                                                             |
+| `cspell.config.yaml`      | Created with `import` pointing to the shared word list    | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import)                     |
+| `lefthook.yml`            | Created with `extends` pointing to the preset             | Preset entry added under `extends:` key                                                                                               |
+| `.secretlintrc.json`      | Created enabling the recommend rule preset                | Left untouched — the rule list is project-owned once it exists                                                                        |
+| `.vscode/extensions.json` | Created from package template                             | Missing recommendations merged in                                                                                                     |
+| `.vscode/settings.json`   | Created from package template                             | Missing keys merged in; a key the project already owns gains kit's missing entries when both values are objects (project entries win) |
 
 > Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
 

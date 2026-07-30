@@ -118,19 +118,57 @@ function merge_json_array_field(
 	return json_format.format_json({ ...parsed, [key]: [...existing, ...to_add] })
 }
 
+// The entries of `additions` the `existing` record does not already own. Every merge in this module
+// is create-only at its own granularity — kit adds what is absent and never rewrites what the
+// consumer declared — so the "which keys are missing" question is asked once here rather than being
+// re-spelled at each call site.
+function missing_entries<T>(
+	existing: Record<string, unknown>,
+	additions: Record<string, T>,
+): Array<[string, T]> {
+	return Object.entries(additions).filter(([key]) => !Object.hasOwn(existing, key))
+}
+
+// Merge kit's value for a key the consumer already owns, returning `undefined` when the key must be
+// left exactly as authored. Object-valued settings are registries of independent entries (VSCode's
+// `files.associations` is the motivating one), so kit's missing entries are added while every entry
+// the consumer already has wins — the same ensure semantics config_merge applies to the cspell
+// `import` and tsconfig `extends` lists. Arrays and scalars stay untouched: combining a list such as
+// `eslint.validate` would be a guess about intent, and overwriting it would drop the consumer's own
+// entries. Without this, one customized key froze out every later kit addition inside it, silently.
+// See joshuafolkken/kit#691.
+function merge_owned_entries(current: unknown, update: unknown): unknown {
+	const current_object = json_object_schema.safeParse(current)
+	const update_object = json_object_schema.safeParse(update)
+	if (!current_object.success || !update_object.success) return undefined
+
+	const owned = current_object.data
+	const missing = missing_entries(owned, update_object.data)
+	if (missing.length === 0) return undefined
+
+	return { ...owned, ...Object.fromEntries(missing) }
+}
+
+// The subset of `updates` that actually changes the file: a key the consumer lacks is taken whole,
+// a key it owns goes through the entry merge, and `undefined` (leave as authored) is dropped.
+function collect_applicable_updates(
+	parsed: Record<string, unknown>,
+	updates: Record<string, unknown>,
+): Record<string, unknown> {
+	const resolved = Object.entries(updates).map(([key, value]): [string, unknown] => [
+		key,
+		Object.hasOwn(parsed, key) ? merge_owned_entries(parsed[key], value) : value,
+	])
+
+	return Object.fromEntries(resolved.filter(([, merged]) => merged !== undefined))
+}
+
 function merge_json_object(content: string, updates: Record<string, unknown>): string {
 	const parsed = parse_jsonc(content)
-	let has_changes = false
+	const applicable = collect_applicable_updates(parsed, updates)
+	if (Object.keys(applicable).length === 0) return content
 
-	for (const [key, value] of Object.entries(updates)) {
-		if (Object.hasOwn(parsed, key)) continue
-		parsed[key] = value
-		has_changes = true
-	}
-
-	if (!has_changes) return content
-
-	return json_format.format_json(parsed)
+	return json_format.format_json({ ...parsed, ...applicable })
 }
 
 const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
@@ -141,7 +179,7 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	const raw = parsed['scripts']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
 	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
-	const to_add = Object.entries(scripts).filter(([key]) => !Object.hasOwn(migrated, key))
+	const to_add = missing_entries(migrated, scripts)
 	const did_migrate = JSON.stringify(migrated) !== JSON.stringify(existing)
 
 	if (!did_migrate && to_add.length === 0) return content
@@ -160,7 +198,7 @@ function merge_development_dependencies(
 	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
 	const raw = parsed['devDependencies']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
-	const to_add = Object.entries(additions).filter(([key]) => !Object.hasOwn(existing, key))
+	const to_add = missing_entries(existing, additions)
 	if (to_add.length === 0) return content
 
 	return json_format.format_json({
