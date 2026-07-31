@@ -61,6 +61,43 @@ Issue には次の要素を必ず含める。
 - [ ] 条件2
 ```
 
+### 複数 Issue に分割するときの epic Issue
+
+`kickoff new` が 1 つの要望を複数 Issue に分割したとき、**3 件以上になり、かつ実行順序に意味がある**（後続 Issue が先行 Issue に依存する）場合**のみ**、それらを束ねる epic Issue を作成する。
+
+なぜ必要か: 分割の根拠と実行順序を「最初の Issue のコメント」に置くと、その Issue は `queue` が最初にマージしてクローズする対象でもあるため、残りの作業の設計図がクローズ済み Issue の中に埋もれる。子 Issue 側からも自分が何番目で何に依存しているかを辿れない。epic はその情報の**閉じない置き場**として機能する。
+
+- **2 件の分割**、または**順序が不問**の分割では epic を作らない。この場合は依存関係を各子 Issue の本文に直接書く（`Depends on #N`）。件数が少ないうちは epic の管理コストが情報整理の利益を上回る
+- epic には `epic` ラベルを付ける（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of ordered child issues" 2>/dev/null || true`）。放置された open epic を `gh issue list --label epic` で棚卸しできるようにするため
+- **epic を `queue` に渡してはならない。** `queue` には子 Issue のみを渡す。epic には成果物がなく、実装ランを走らせる対象ではない
+- epic は最後の子 Issue がマージされた後にクローズする。最終 PR に `closes #<epic>` を書く方法は、バッチが途中で失敗したときにも発火して未完了を完了扱いにするため採用しない
+
+epic 本文のテンプレート:
+
+```md
+## Split rationale
+
+<なぜこの分割にしたか>
+
+## Dependencies
+
+#101 -> #102 -> #103 (#102 depends on the API added in #101)
+
+## Execution
+
+queue #101 #102 #103
+
+## Progress
+
+- [ ] #101 <title>
+- [ ] #102 <title>
+- [ ] #103 <title>
+```
+
+`Progress` は**必ずタスクリスト記法**（`- [ ] #N`）で書く。GitHub は参照先 Issue がクローズされた時点でこの記法のチェックボックスのみを自動で埋めるため、素のリンク（`#N` の直書き）では進捗が追跡されない。ただし全項目が埋まっても GitHub が epic 自体をクローズすることはない。
+
+sub-issues（親子関係 API）は採用しない。理由は 3 点 — 順序・依存関係を表現できない、`gh` にネイティブのサブコマンドがなく database ID の解決を伴う API 直叩きが必要、親子関係は同一リポジトリオーナー内に限られる。
+
 ## Step 2: 提案依頼（AI 共通）
 
 Issue URL を渡して、次の観点で提案を依頼する。
