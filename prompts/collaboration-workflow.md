@@ -118,11 +118,7 @@ Issue: <issue-url>
    ```bash
    git stash pop
    ```
-7. **作業サマリを提示してから**実装を開始する（`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` の Code Change Rules Step 0）。`JOSH_SESSION_LANG` の言語で 3〜6 行にまとめ、次を含める:
-   - 触るファイル / モジュール
-   - 採るアプローチと、その理由（一言）
-   - テスト方針（Step 0 のテスト宣言と同じブロックに続けて書く）
-   - 想定される副作用・意図的にスコープ外にした点
+7. **作業サマリを提示してから**実装を開始する（`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` の Code Change Rules Step 0）。書式は下記「報告フォーマット（平易な概要 ＋ 技術詳細）」に従う — `JOSH_SESSION_LANG` の言語で、平易な概要 3 行を先頭に置き、技術詳細（触るファイル / モジュール、アプローチとその理由、副作用・スコープ外、テスト宣言）はその下に置く。
 
    `fullrun` / `halfrun` / `queue` では Issue ごとに 1 回、実装に着手する直前に提示する。**Issue body が既に埋まっていて計画コメントを投稿しなかった場合も必ず提示する**（この場合ユーザーには他に作業内容が見えないため）。`kickoff` は既に計画を Issue に投稿するので対象外。
 
@@ -219,6 +215,56 @@ This self-check is mirrored at the end of the `/review` skill prompt (`prompts/r
 
 A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part of this rule. **It is not feasible at the tooling layer**: `/review` is an interactive AI skill that returns Markdown for the agent to interpret — a shell command cannot host the skill, parse its severity verdicts, or decide "no high/medium" on the agent's behalf. The strongest available enforcement is the decision table, anti-pattern catalog, and turn-end self-check above, sitting in always-loaded context (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) plus the skill prompt (`prompts/review.md`).
 
+## 報告フォーマット（平易な概要 ＋ 技術詳細）
+
+作業前サマリ（Step 7）と完了報告（Step 5）は、**平易な概要を先頭に置き、技術詳細をその下に降格する 2 層構造**で書く。ここが横断ドキュメント（`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`）のカノニカル参照。
+
+理由: 報告の読み手は実装者とは限らない。ファイル名・型名・オプション名が並ぶ説明は「何が原因で、どう対応し、結果どうなったか」を伝えない。詳細を消すのではなく、**先に結論を平易な言葉で伝え、詳細は読み飛ばせる位置に置く**。
+
+### 作業前サマリ（セッション向け・`JOSH_SESSION_LANG` の言語）
+
+```text
+■ これからやること
+  今こうなっている: <1文 — 利用者から見て何が起きているか>
+  こう直す:         <1文 — 手段ではなく、直った後どうなるか>
+  確かめ方:         <1文 — どう確認するか>
+
+--- 技術詳細 ---
+<触るファイル / モジュール · アプローチとその理由 · 副作用 / 意図的にスコープ外にした点>
+
+Change 1: <変更内容>
+  → Test: <Unit|E2E> — <file path> — <検証する挙動>
+Change 2: ...
+```
+
+### 完了報告（セッション向け）
+
+```text
+■ 完了報告
+  原因: <1文 — なぜそうなっていたか>
+  対応: <1文 — 何をしたか>
+  結果: <1文 — 利用者から見て何が変わったか>（v<version>）
+
+--- 技術詳細 ---
+<変更ファイル · テスト結果 · 残課題>
+```
+
+### 概要 3 行の書き方（ここが本体）
+
+長さ制限だけでは平易にならない。**語彙と抽象度を制約する**:
+
+- 各行は 1 文・短く（日本語で 60 字程度、英語で 15 語程度）
+- 概要にファイルパス・関数名・型名・CLI オプション名を書かない（すべて技術詳細セクション側）
+- 専門用語は使わないか、`〜（＝…のこと）` の形でその場で言い換える
+- 変更点の羅列ではなく **原因 → 対応 → 効果の因果**で書く
+- 主語は利用者・システムの振る舞い。「利用者から見て何が違うか」が書けないなら、その行はまだ技術詳細のまま
+
+**送信前セルフチェック（`/review` チェーン規則の自己チェックと同じ位置づけ）**: 報告を送る直前に概要 3 行を読み返し、ファイル名・記号・英略語が混じっていないか、プログラマでない人が読んで意味が通るかを確認する。混じっていたらその語を技術詳細へ移してから送る。
+
+### 成果物（Issue / PR / Telegram）側
+
+言語ルールは変えない — 成果物は常に英語。**構造だけ**同じ 2 層にする。`--notify-message` は `Added ... / Changed ...` の羅列ではなく、`Cause / Fix / Result` の 3 行を先頭に置き、変更点の箇条書きを `Details:` 以下にまとめる（書式は Step 5 の例を参照）。
+
 ## Step 5: PR結果確認 + 完了通知（別スクリプト）
 
 `pnpm josh git` の後に、別スクリプト `pnpm josh followup` を実行する。
@@ -235,7 +281,7 @@ A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part 
 主なオプション:
 
 - `--notify-target`: `issue`（固定。PR への完了報告は行わない）
-- `--notify-message`: Issue への完了コメント本文。定型文ではなく実装内容のサマリーを英語で記載する（例: `"Implemented X:\n- Added ...\n- Changed ..."`）
+- `--notify-message`: Issue への完了コメント本文。英語で、「報告フォーマット」の 2 層構造に従う — 先頭に `Cause: / Fix: / Result:` の 3 行（各 1 文、専門用語・ファイル名なし）、続けて `Details:` 以下に変更点の箇条書き。`Added ... / Changed ...` だけの羅列にしない
 - `--coderabbit-ignore-reason`: 未対応を残す場合の理由コメント
 - `--ai-review-ignore-reason`: AI レビュー（Claude Review / CodeRabbit サマリ）の未対応ブロッカーを残す場合の理由コメント
 - `--issue-number`: Issue 番号（または位置引数に `"<title> #<number>"`）
@@ -245,7 +291,12 @@ A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part 
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
   --merge \
-  --notify-message "Implemented <title>:
+  --notify-message "Implemented <title>
+Cause: <why this was needed, in one plain sentence>
+Fix: <what was changed, in one plain sentence>
+Result: <what is different for the user now>
+
+Details:
 - Added ...
 - Changed ..."
 ```
@@ -255,7 +306,12 @@ pnpm josh followup "<issue-title> #<issue-number>" \
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
   --merge \
-  --notify-message "Implemented <title>:
+  --notify-message "Implemented <title>
+Cause: ...
+Fix: ...
+Result: ...
+
+Details:
 - Added ...
 - Fixed ..." \
   --coderabbit-ignore-reason "仕様上この指摘は該当しないため"
@@ -266,7 +322,12 @@ pnpm josh followup "<issue-title> #<issue-number>" \
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
   --merge \
-  --notify-message "Implemented <title>:
+  --notify-message "Implemented <title>
+Cause: ...
+Fix: ...
+Result: ...
+
+Details:
 - Added ...
 - Fixed ..." \
   --ai-review-ignore-reason "該当指摘は別 Issue #123 で追跡中のため"
@@ -276,7 +337,12 @@ pnpm josh followup "<issue-title> #<issue-number>" \
 
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
-  --notify-message "Implemented <title>:
+  --notify-message "Implemented <title>
+Cause: ...
+Fix: ...
+Result: ...
+
+Details:
 - Added ..."
 ```
 
@@ -476,7 +542,7 @@ AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎる�
 `task_type=completion`（✅）の Telegram 通知は `pnpm josh followup` が自動送信する経路のみを使う。`pnpm josh notify --task-type completion ...` を手動で実行してはならない。
 
 - 理由: 手動 CLI では `--pr-url` を明示しない限り PR URL が欠落する。`pnpm josh followup` は内部で `gh pr view <branch> --json url` から PR URL を取得して必ず付与するため、通知から PR リンクが消える事故を防げる
-- 初回 PR 作成時・フォローアップコミット（CodeRabbit 指摘対応や再レビュー対応）・ブランチ再 push のいずれでも、完了を通知したいときは `pnpm josh followup "<title> #<issue-number>" --merge --notify-message "Implemented <title>:\n- <change1>\n- <change2>\n..."` を再実行する（通知はマージ直前に送られる）
+- 初回 PR 作成時・フォローアップコミット（CodeRabbit 指摘対応や再レビュー対応）・ブランチ再 push のいずれでも、完了を通知したいときは `pnpm josh followup "<title> #<issue-number>" --merge --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` を再実行する（通知はマージ直前に送られる）
 - `pnpm josh notify` は `planning` / `confirmation` / `kickoff_retry` / `failure` の 4 タスクタイプ専用。`completion` には使わない
 
 ### 確認待ちで停止するときの Telegram 通知（`confirmation`）
