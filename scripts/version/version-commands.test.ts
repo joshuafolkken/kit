@@ -1,6 +1,6 @@
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { create_version_command_config, type UpstreamHookContext } from './version-command-config'
+import { create_version_command_config } from './version-command-config'
 import { version_commands } from './version-commands'
 import { fetch_latest_version } from './version-remote'
 import { version_targets } from './version-targets'
@@ -84,211 +84,49 @@ describe('version_commands.run_all_upgrade_commands', () => {
 	})
 })
 
-const MAIN_PACKAGE = '@joshuafolkken/app-kit'
-const UPSTREAM_PACKAGE = KIT_PACKAGE
-const MAIN_LATEST = '2.0.0'
-const UPSTREAM_LATEST = '1.5.0'
-const UPSTREAM_STALE = '1.4.0'
-const EFFECTIVE_STALE = '1.3.0'
-const UPSTREAM_UPGRADE_COMMAND = `pnpm add -D ${UPSTREAM_PACKAGE}@${UPSTREAM_LATEST}`
-// The consumer's global command upgrades the global downstream app-kit (which bundles the effective
-// kit) — not a bare `pnpm add -g @joshuafolkken/kit`, which app-kit resolution would shadow.
-const GLOBAL_UPGRADE_COMMAND = `pnpm add -g ${MAIN_PACKAGE}@${MAIN_LATEST}`
+const KIT_STALE = '1.0.0'
+const KIT_LATEST = '1.1.0'
+// `format_target_status` pads the version to a fixed column before the staleness marker.
+const STATUS_PAD_WIDTH = 12
+const STATUS_GAP = ' '.repeat(STATUS_PAD_WIDTH - KIT_STALE.length)
 
-const CHAINED_CONFIG = create_version_command_config({
-	package_name: MAIN_PACKAGE,
-	upstreams: [{ package_name: UPSTREAM_PACKAGE }],
-})
-
-const CHAINED_CONFIG_WITH_EFFECTIVE = create_version_command_config({
-	package_name: MAIN_PACKAGE,
-	upstreams: [
-		{
-			package_name: UPSTREAM_PACKAGE,
-			resolve_effective_version: () => EFFECTIVE_STALE,
-			resolve_global_upgrade_command: () => GLOBAL_UPGRADE_COMMAND,
-		},
-	],
-})
-
-// Arrange the mocked reads so the main package is fully up to date and the upstream project
-// dependency holds the given version (undefined = not installed).
-function arrange_chain_versions(upstream_project: string | undefined): void {
-	mocked_read_global.mockReturnValue(MAIN_LATEST)
-	mocked_read_project.mockImplementation((_cwd: string, package_name: string) =>
-		package_name === UPSTREAM_PACKAGE ? upstream_project : MAIN_LATEST,
-	)
-	mocked_fetch_latest.mockImplementation((endpoint: string | undefined) =>
-		endpoint?.includes('/npm/app-kit/') ? MAIN_LATEST : UPSTREAM_LATEST,
-	)
-}
-
-describe('version_commands.read_upstream_reports', () => {
-	it('reads the project and latest versions for each configured upstream', () => {
-		arrange_chain_versions(UPSTREAM_STALE)
-
-		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG, MAIN_LATEST)
-
-		expect(reports).toHaveLength(1)
-		expect(reports[0]?.config.package_name).toBe(UPSTREAM_PACKAGE)
-		expect(reports[0]?.project_version).toBe(UPSTREAM_STALE)
-		expect(reports[0]?.latest).toBe(UPSTREAM_LATEST)
-	})
-
-	it('returns an empty list when no upstreams are configured', () => {
-		const config = create_version_command_config({ package_name: UPSTREAM_PACKAGE })
-
-		expect(version_commands.read_upstream_reports(config, MAIN_LATEST)).toStrictEqual([])
-	})
-
-	it('populates the effective install from the consumer hooks when supplied', () => {
-		arrange_chain_versions(UPSTREAM_LATEST)
-
-		const reports = version_commands.read_upstream_reports(
-			CHAINED_CONFIG_WITH_EFFECTIVE,
-			MAIN_LATEST,
-		)
-
-		expect(reports[0]?.effective).toStrictEqual({
-			version: EFFECTIVE_STALE,
-			upgrade_command: GLOBAL_UPGRADE_COMMAND,
-		})
-	})
-
-	it('omits the effective install when the upstream declares no hooks', () => {
-		arrange_chain_versions(UPSTREAM_LATEST)
-
-		const reports = version_commands.read_upstream_reports(CHAINED_CONFIG, MAIN_LATEST)
-
-		expect(reports[0]?.effective).toBeUndefined()
-	})
-})
-
-function config_with_context_hooks(hooks: {
-	resolve_effective_version: (context: UpstreamHookContext) => string | undefined
-	resolve_global_upgrade_command: (context: UpstreamHookContext) => string
-}): ReturnType<typeof create_version_command_config> {
-	return create_version_command_config({
-		package_name: MAIN_PACKAGE,
-		upstreams: [{ package_name: UPSTREAM_PACKAGE, ...hooks }],
-	})
-}
-
-describe('version_commands.read_upstream_reports hook context', () => {
-	it('passes the downstream latest to both effective-install hooks', () => {
-		arrange_chain_versions(UPSTREAM_LATEST)
-		const effective_spy = vi.fn(() => EFFECTIVE_STALE)
-		const upgrade_spy = vi.fn(
-			(context: UpstreamHookContext) => `pnpm add -g ${MAIN_PACKAGE}@${context.latest}`,
-		)
-		const config = config_with_context_hooks({
-			resolve_effective_version: effective_spy,
-			resolve_global_upgrade_command: upgrade_spy,
-		})
-
-		const reports = version_commands.read_upstream_reports(config, MAIN_LATEST)
-
-		expect(effective_spy).toHaveBeenCalledWith({ latest: MAIN_LATEST })
-		expect(upgrade_spy).toHaveBeenCalledWith({ latest: MAIN_LATEST })
-		expect(reports[0]?.effective?.upgrade_command).toBe(
-			`pnpm add -g ${MAIN_PACKAGE}@${MAIN_LATEST}`,
-		)
-	})
-})
-
-describe('version_commands.run_check threads the fetched latest without re-fetching', () => {
-	it('feeds read_snapshot latest into the hook and fetches latest only once per package', () => {
-		arrange_chain_versions(UPSTREAM_LATEST)
-		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-		const config = config_with_context_hooks({
-			resolve_effective_version: () => EFFECTIVE_STALE,
-			resolve_global_upgrade_command: (context) => `pnpm add -g ${MAIN_PACKAGE}@${context.latest}`,
-		})
-
-		version_commands.run_check(config)
-
-		// Two fetches only (main + upstream); the hook reuses the threaded latest, no third fetch.
-		expect(mocked_fetch_latest).toHaveBeenCalledTimes(2)
-		expect(String(info_spy.mock.calls[0]?.[0])).toContain(
-			`pnpm add -g ${MAIN_PACKAGE}@${MAIN_LATEST}`,
-		)
-		info_spy.mockRestore()
-	})
-})
-
-describe('version_commands.run_check with upstreams', () => {
-	it('renders the upstream section and its upgrade hint after the main report', () => {
-		arrange_chain_versions(UPSTREAM_STALE)
+// kit declares no upstreams, so neither the no-op guard nor the post-upgrade outcome report may
+// touch its output — this pins the whole rendered report, not just a fragment of it.
+describe('version_commands.run_check for a package with no upstreams', () => {
+	it('renders the unchanged dual report with both upgrade hints', () => {
+		mocked_read_global.mockReturnValue(KIT_STALE)
+		mocked_read_project.mockReturnValue(KIT_STALE)
+		mocked_fetch_latest.mockReturnValue(KIT_LATEST)
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		version_commands.run_check(CHAINED_CONFIG)
-		const output = String(info_spy.mock.calls[0]?.[0])
+		version_commands.run_check(config_with({}))
 
-		expect(output.indexOf(UPSTREAM_PACKAGE)).toBeGreaterThan(output.indexOf(MAIN_PACKAGE))
-		expect(output).toContain(`Run: ${UPSTREAM_UPGRADE_COMMAND}`)
-		info_spy.mockRestore()
-	})
-})
-
-describe('version_commands.run_upgrade with upstreams', () => {
-	it('runs the project-scope upgrade command for a stale upstream', () => {
-		arrange_chain_versions(UPSTREAM_STALE)
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
-
-		expect(version_commands.run_upgrade(CHAINED_CONFIG)).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
-		expect(mocked_execa_sync).toHaveBeenCalledWith(
-			'sh',
+		expect(String(info_spy.mock.calls[0]?.[0])).toBe(
 			[
-				'-c',
-				`${UPSTREAM_UPGRADE_COMMAND} && node_modules/.bin/tsx node_modules/${UPSTREAM_PACKAGE}/scripts/fix-gh-packages.ts`,
-			],
-			{ stdio: 'inherit', reject: false },
+				KIT_PACKAGE,
+				`  Global:  ${KIT_STALE}${STATUS_GAP}⚠ → ${KIT_LATEST}`,
+				`  Project:  ${KIT_STALE}${STATUS_GAP}⚠ → ${KIT_LATEST}`,
+				`  Latest:  ${KIT_LATEST}`,
+				'',
+				`Run: pnpm add -g ${KIT_PACKAGE}@${KIT_LATEST}`,
+				`Run: pnpm add -D ${KIT_PACKAGE}@${KIT_LATEST} && node_modules/.bin/tsx node_modules/${KIT_PACKAGE}/scripts/fix-gh-packages.ts`,
+			].join('\n'),
 		)
-	})
-
-	it('reports already up to date when the upstream chain is current', () => {
-		arrange_chain_versions(UPSTREAM_LATEST)
-		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-
-		expect(version_commands.run_upgrade(CHAINED_CONFIG)).toBe(0)
-		expect(mocked_execa_sync).not.toHaveBeenCalled()
-		expect(info_spy).toHaveBeenCalledWith('Already up to date')
 		info_spy.mockRestore()
 	})
-
-	it('skips an upstream that is not installed in the project', () => {
-		arrange_chain_versions(undefined)
-
-		expect(version_commands.run_upgrade(CHAINED_CONFIG)).toBe(0)
-		expect(mocked_execa_sync).not.toHaveBeenCalled()
-	})
 })
 
-describe('version_commands.run_upgrade with a stale effective upstream', () => {
-	it('runs the consumer global command when only the effective upstream is stale', () => {
-		arrange_chain_versions(UPSTREAM_LATEST)
+describe('version_commands.run_upgrade for a package with no upstreams', () => {
+	it('runs both scope commands and reports no upstream outcome', () => {
+		mocked_read_global.mockReturnValue(KIT_STALE)
+		mocked_read_project.mockReturnValue(KIT_STALE)
+		mocked_fetch_latest.mockReturnValue(KIT_LATEST)
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
-
-		expect(version_commands.run_upgrade(CHAINED_CONFIG_WITH_EFFECTIVE)).toBe(0)
-		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
-		expect(mocked_execa_sync).toHaveBeenCalledWith('sh', ['-c', GLOBAL_UPGRADE_COMMAND], {
-			stdio: 'inherit',
-			reject: false,
-		})
-	})
-})
-
-describe('version_commands.run_check with a stale effective upstream', () => {
-	it('renders the effective Global line and its upgrade hint', () => {
-		arrange_chain_versions(UPSTREAM_LATEST)
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		version_commands.run_check(CHAINED_CONFIG_WITH_EFFECTIVE)
-		const output = String(info_spy.mock.calls[0]?.[0])
-
-		expect(output).toContain(`Global:  ${EFFECTIVE_STALE}`)
-		expect(output).toContain(`Run: ${GLOBAL_UPGRADE_COMMAND}`)
+		expect(version_commands.run_upgrade(config_with({}))).toBe(0)
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(2)
+		expect(info_spy).not.toHaveBeenCalled()
 		info_spy.mockRestore()
 	})
 })

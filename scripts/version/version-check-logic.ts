@@ -1,33 +1,13 @@
+import { is_no_op_upgrade_command, type InstalledVersions } from './upgrade-command-guard'
+import { build_upgrade_shell_command, format_update_command } from './upgrade-shell-command'
 import type { PackageVersionConfig } from './version-command-config'
-
-function update_scope_flag(is_local: boolean): string {
-	return is_local ? '-D' : '-g'
-}
-
-function format_update_command(
-	latest: string,
-	is_local: boolean,
-	config: PackageVersionConfig,
-): string {
-	return `pnpm add ${update_scope_flag(is_local)} ${config.package_name}@${latest}`
-}
-
-function build_upgrade_shell_command(
-	latest: string,
-	is_local: boolean,
-	config: PackageVersionConfig,
-): string {
-	const add_command = format_update_command(latest, is_local, config)
-	if (!is_local) return add_command
-
-	return `${add_command} && node_modules/.bin/tsx ${config.fix_gh_packages_path}`
-}
 
 const NOT_INSTALLED = 'not installed'
 const GLOBAL_LABEL = 'Global: '
 const PROJECT_LABEL = 'Project: '
 const LATEST_LABEL = 'Latest: '
 const RUNNING_LABEL = 'Running:'
+const NOTE_LABEL = 'Note:'
 const STATUS_PAD_WIDTH = 12
 
 // The three versions a single check reports: the globally installed, the project-local, and the
@@ -64,14 +44,27 @@ interface UpstreamEffective {
 	upgrade_command: string
 }
 
+// A stale effective upstream's global upgrade command plus whether running it would provably change
+// nothing — the classification that decides between a `Run:` hint and a `Note:` explanation.
+interface EffectiveUpgradeHint {
+	command: string
+	is_no_op: boolean
+}
+
 // One upstream package's check result: the resolved upstream config plus the project version the
 // project-scope report compares, and an optional effective/global install (present only when the
 // consumer opts in). Absent `effective` falls back to the original project/latest-only output.
+//
+// `installed_versions` is populated only when the consumer declared its global upgrade command
+// pin-only (`is_global_upgrade_command_pinned`). It lists the globally-resolved versions kit already
+// knows, so a command whose every pin is already installed can be proven dead and replaced with an
+// explanation instead of a `Run:` hint (#697). Absent, no command is ever suppressed.
 interface UpstreamReport {
 	config: PackageVersionConfig
 	project_version: string | undefined
 	latest: string
 	effective?: UpstreamEffective
+	installed_versions?: InstalledVersions
 }
 
 // Render the running-binary line, or nothing when the running binary is unknown.
@@ -105,27 +98,103 @@ function format_upstream_global_line(report: UpstreamReport): Array<string> {
 	return [format_target_line(GLOBAL_LABEL, report.effective.version, report.latest)]
 }
 
-// Render one upstream's report section: package name header, the optional effective/global line,
-// then the project/latest lines, reusing the staleness markers of the main report. Prefixed with a
-// blank line to separate sections. Global precedes project to mirror the main report's ordering.
+// Whether the report carries an effective install that is installed and behind the upstream's latest
+// — the single condition under which a global upgrade command applies at all.
+function is_effective_stale(report: UpstreamReport): boolean {
+	const { effective, latest } = report
+	if (effective === undefined) return false
+
+	return is_target_stale(effective.version, latest)
+}
+
+// The consumer's global command for a stale effective upstream, classified by whether it can still
+// change what kit measured. `is_no_op` is true only when the consumer declared the command pin-only
+// and every version it pins is already installed. Undefined when no command applies.
+function resolve_effective_upgrade_hint(report: UpstreamReport): EffectiveUpgradeHint | undefined {
+	const command = report.effective?.upgrade_command
+	if (command === undefined || !is_effective_stale(report)) return undefined
+
+	const installed = report.installed_versions
+
+	return {
+		command,
+		is_no_op: installed !== undefined && is_no_op_upgrade_command(command, installed),
+	}
+}
+
+// The consumer-supplied global upgrade command for a stale effective upstream, or nothing. Skipped
+// when the consumer did not opt in, the effective install is up to date / unresolved, or the command
+// provably cannot change the effective version it was meant to fix (see the note line instead).
+function build_effective_upgrade_commands(report: UpstreamReport): Array<string> {
+	const hint = resolve_effective_upgrade_hint(report)
+	if (hint === undefined || hint.is_no_op) return []
+
+	return [hint.command]
+}
+
+// The explanation that replaces a suppressed `Run:` hint, so a stale effective install is never left
+// with a bare warning and no account of why kit offers no command for it.
+function build_effective_upgrade_notes(report: UpstreamReport): Array<string> {
+	const hint = resolve_effective_upgrade_hint(report)
+	if (hint?.is_no_op !== true) return []
+
+	return [
+		`${NOTE_LABEL} \`${hint.command}\` is already satisfied; it cannot upgrade ${report.config.package_name} to ${report.latest}`,
+	]
+}
+
+// Every upstream's suppressed-hint explanation, in the configured order.
+function build_upstream_upgrade_notes(reports: ReadonlyArray<UpstreamReport>): Array<string> {
+	return reports.flatMap((report) => build_effective_upgrade_notes(report))
+}
+
+// Render one upstream's report section: package name header, the optional effective/global line and
+// its suppressed-hint explanation, then the project/latest lines, reusing the staleness markers of
+// the main report. Prefixed with a blank line to separate sections. Global precedes project to
+// mirror the main report's ordering.
 function format_upstream_lines(report: UpstreamReport): Array<string> {
 	return [
 		'',
 		report.config.package_name,
 		...format_upstream_global_line(report),
+		...build_effective_upgrade_notes(report).map((note) => `  ${note}`),
 		format_target_line(PROJECT_LABEL, report.project_version, report.latest),
 		`  ${LATEST_LABEL} ${report.latest}`,
 	]
 }
 
-// The consumer-supplied global upgrade command for a stale effective upstream, or nothing. Skipped
-// when the consumer did not opt in or the effective install is up to date / unresolved.
-function build_effective_upgrade_commands(report: UpstreamReport): Array<string> {
-	const { effective, latest } = report
-	if (effective === undefined) return []
-	if (!is_target_stale(effective.version, latest)) return []
+// Drop repeated commands while preserving first-seen order. A consumer with several upstreams can
+// return the same chain-pinning global command from each of them (game-kit returns one command for
+// both app-kit and kit), which would otherwise print an identical `Run:` line once per upstream.
+function unique_upgrade_commands(commands: ReadonlyArray<string>): Array<string> {
+	return [...new Set(commands)]
+}
 
-	return [effective.upgrade_command]
+// The outcome line for an effective install the upgrade command left exactly where it was.
+function format_unchanged_outcome(report: UpstreamReport, version: string): string {
+	const name = report.config.package_name
+
+	return `${name}: still ${version} — the global upgrade command did not change it (latest ${report.latest})`
+}
+
+// The outcome line for an effective install the upgrade moved forward without reaching the latest.
+function format_advanced_outcome(report: UpstreamReport, before: string, after: string): string {
+	const name = report.config.package_name
+
+	return `${name}: ${before} → ${after} — still behind latest ${report.latest}`
+}
+
+// Describe what an upgrade run actually did to an upstream's effective install, comparing the
+// re-read version against the one measured before the commands ran. A version that advanced but
+// still trails `latest` is a hold (e.g. a minimum-release-age policy withholding the newest
+// publish), not a failure — reporting the advance keeps `version:upgrade` honest instead of leaving
+// the next `version` to repeat the same warning with no explanation.
+function format_effective_outcome(report: UpstreamReport, after: string | undefined): string {
+	const previous = report.effective?.version
+	const before = previous ?? NOT_INSTALLED
+	if (after === previous) return format_unchanged_outcome(report, before)
+
+	return format_advanced_outcome(report, before, after ?? NOT_INSTALLED)
 }
 
 // The project-scope upgrade command when the upstream's project dependency is installed and stale.
@@ -190,10 +259,10 @@ function format_dual_version_output(
 		...format_running_line(extras.running),
 		...upstreams.flatMap((report) => format_upstream_lines(report)),
 	]
-	const hints = [
+	const hints = unique_upgrade_commands([
 		...build_dual_upgrade_commands(snapshot, config),
 		...build_upstream_upgrade_commands(upstreams),
-	].map((command) => `Run: ${command}`)
+	]).map((command) => `Run: ${command}`)
 	if (hints.length > 0) lines.push('', ...hints)
 	if (extras.warning !== undefined) lines.push('', extras.warning)
 
@@ -207,10 +276,14 @@ const version_check_logic = {
 	format_upstream_global_line,
 	build_dual_upgrade_commands,
 	build_upstream_upgrade_commands,
+	build_upstream_upgrade_notes,
 	build_effective_upgrade_commands,
+	build_effective_upgrade_notes,
 	build_project_upgrade_commands,
 	format_update_command,
+	format_effective_outcome,
 	build_upgrade_shell_command,
+	unique_upgrade_commands,
 }
 
 export type {
@@ -219,5 +292,6 @@ export type {
 	VersionOutputExtras,
 	UpstreamReport,
 	UpstreamEffective,
+	EffectiveUpgradeHint,
 }
 export { version_check_logic }

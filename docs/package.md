@@ -88,10 +88,21 @@ instead of re-cloning the resolution walk. Pass `options.resolve_marker` (a subp
 the package root is not directly `require.resolve`-able because its `package.json` is not in
 `exports` — kit itself needs `{ resolve_marker: '@joshuafolkken/kit/config-merge' }`.
 
-Both effective-install hooks receive an `UpstreamHookContext` — `{ latest }`, the downstream
-package's own already-fetched latest — so a `resolve_global_upgrade_command` that emits
-`pnpm add -g @joshuafolkken/app-kit@<latest>` reuses kit's single `latest` fetch instead of resolving
-it a second time (`latest` here is the main package's latest, not the upstream's).
+Both effective-install hooks receive an `UpstreamHookContext` — `{ latest, upstream_latest }` — so a
+hook never resolves a version kit already fetched. `latest` is the downstream (main) package's own
+latest, so a `resolve_global_upgrade_command` that emits `pnpm add -g @joshuafolkken/app-kit@<latest>`
+reuses kit's single fetch; `upstream_latest` is _that upstream's_ own latest, the version kit measures
+the effective install against, so a hook can name the version it was just reported stale for.
+
+A stale effective install whose global command provably cannot fix it is reported as an explanation
+rather than a dead `Run:` hint. Kit only makes that claim when the consumer declares the command
+pin-only via `is_global_upgrade_command_pinned: true` on the upstream descriptor: kit then treats the
+command as a no-op once every version it pins is already installed. Leave the flag unset for a command
+that forces a fresh resolve (e.g. `pnpm remove -g <pkg> && pnpm add -g <pkg>@<latest>`) — such a
+command changes the resolved graph even when its pin matches what is installed, and must never be
+suppressed. Identical upgrade commands returned by several upstreams are emitted once, and after
+`version:upgrade` runs, each stale effective install is re-read so an upgrade that advanced but still
+trails `latest` (a minimum-release-age hold, say) is reported as an advance rather than silence.
 
 ### Config-merge library (`@joshuafolkken/kit/config-merge`)
 
