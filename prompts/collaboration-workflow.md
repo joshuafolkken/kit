@@ -61,6 +61,53 @@ Issue には次の要素を必ず含める。
 - [ ] 条件2
 ```
 
+### 複数 Issue に分割するときの epic Issue
+
+`kickoff new` が 1 つの要望を複数 Issue に分割したとき、**3 件以上になり、かつ実行順序に意味がある**（後続 Issue が先行 Issue に依存する）場合**のみ**、それらを束ねる epic Issue を作成する。
+
+なぜ必要か: 分割の根拠と実行順序を「最初の Issue のコメント」に置くと、その Issue は `queue` が最初にマージしてクローズする対象でもあるため、残りの作業の設計図がクローズ済み Issue の中に埋もれる。子 Issue 側からも自分が何番目で何に依存しているかを辿れない。epic はその情報の**閉じない置き場**として機能する。
+
+- **2 件の分割**、または**順序が不問**の分割では epic を作らない。この場合は依存関係を各子 Issue の本文に直接書く（`Depends on #N`）。件数が少ないうちは epic の管理コストが情報整理の利益を上回る
+- epic には `epic` ラベルを付ける（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of ordered child issues" 2>/dev/null || true`）。放置された open epic を `gh issue list --label epic` で棚卸しできるようにするため
+- **epic を `queue` に渡してはならない。** `queue` には子 Issue のみを渡す。epic には成果物がなく、実装ランを走らせる対象ではない
+- epic は最後の子 Issue がマージされた後にクローズする。最終 PR に `closes #<epic>` を書く方法は、バッチが途中で失敗したときにも発火して未完了を完了扱いにするため採用しない
+
+作成手順:
+
+1. 子 Issue を全て作成し、番号 `<N1> <N2> ...` を控える
+2. `epic` ラベルを用意する（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of ordered child issues" 2>/dev/null || true`）
+3. epic を作成し、番号 `<E>` を控える: `gh issue create --title "<epic-title>" --label epic --body "<body>"`
+
+手順 2 の `|| true` はラベルが既に存在する場合を無視するためのもので、作成失敗を握り潰す危険はない。ラベルが存在しないまま手順 3 に進むと `--label epic` が解決できず `gh issue create` 自体が失敗するため、異常は必ずそこで顕在化する。
+
+epic 本文のテンプレート:
+
+```md
+## Split rationale
+
+<なぜこの分割にしたか>
+
+## Dependencies
+
+#101 -> #102 -> #103 (#102 depends on the API added in #101)
+
+## Execution
+
+queue #101 #102 #103
+
+## Progress
+
+- [ ] #101 <title>
+- [ ] #102 <title>
+- [ ] #103 <title>
+```
+
+`Progress` は**必ずタスクリスト記法**（`- [ ] #N`）で書く。GitHub は参照先 Issue がクローズされた時点でこの記法のチェックボックスのみを自動で埋めるため、素のリンク（`#N` の直書き）では進捗が追跡されない。ただし全項目が埋まっても GitHub が epic 自体をクローズすることはない。
+
+sub-issues（親子関係）は採用しない。理由は 2 点 — 親子関係は「包含」を表すだけで実行順序を表現できない、および親子関係は同一リポジトリオーナー内に限られる。
+
+「`gh` が対応していない」ことは**不採用の理由にならない**。`gh` 2.94.0 以降は `gh issue create --parent` / `gh issue edit --add-sub-issue` で親子関係を、`--blocked-by` / `--blocking` で依存関係をネイティブに扱える。とくに後者は実行順序をそのまま表現できるため、epic のタスクリストを補完・代替しうる。採用可否は別途判断する。
+
 ## Step 2: 提案依頼（AI 共通）
 
 Issue URL を渡して、次の観点で提案を依頼する。
