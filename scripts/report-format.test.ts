@@ -48,7 +48,7 @@ describe('report format — plain-language overview in the AI docs', () => {
 		const raw = read_repo_file(ai_document)
 
 		expect(raw).toContain(
-			'Never put file paths, function or type names, or CLI option names in the overview',
+			'Never put file paths, function or type names, or CLI option flags in the overview',
 		)
 	})
 
@@ -83,6 +83,25 @@ describe('report format — plain-language overview in the AI docs', () => {
 	})
 })
 
+// The prohibition alone produced subject-less prose ("it stays stale", "the suggestion"),
+// so it only holds paired with the requirement to name what the reader sees on screen.
+describe('report format — concrete subjects in the AI docs', () => {
+	it.each(AI_DOCS)('%s requires a concrete subject in every overview line', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		expect(raw).toContain('Name the concrete subject')
+		expect(raw).toContain('name the affected package, screen, or kind of output')
+		expect(raw).toContain('are allowed, and usually required')
+	})
+
+	it.each(AI_DOCS)('%s relaxes the overview length to fit a concrete subject', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		expect(raw).toContain('80–100 characters in Japanese, 20–25 words in English')
+		expect(raw).not.toContain('about 60 characters in Japanese, 15 words in English')
+	})
+})
+
 describe('report format — canonical reference in the workflow prompt', () => {
 	it('defines the canonical section the AI docs point at', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
@@ -93,7 +112,7 @@ describe('report format — canonical reference in the workflow prompt', () => {
 	it('constrains the overview to plain vocabulary and a pre-send self-check', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
-		expect(raw).toContain('概要にファイルパス・関数名・型名・CLI オプション名を書かない')
+		expect(raw).toContain('概要にファイルパス・関数名・型名・CLI のオプションフラグ')
 		expect(raw).toContain('送信前セルフチェック')
 	})
 
@@ -119,6 +138,28 @@ describe('report format — canonical reference in the workflow prompt', () => {
 	})
 })
 
+describe('report format — concrete subjects in the workflow prompt', () => {
+	it('pairs the prohibition with a concrete-subject requirement and a worked example', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('### 具体的な主語を必ず書く（禁止と対になる要求）')
+		expect(raw).toContain('**悪い例**')
+		expect(raw).toContain('**良い例**')
+		// The examples must model the unfenced markdown shape, not the retired aligned one.
+		expect(raw).toContain('- **今こうなっている**: バージョン確認が')
+		expect(raw).toContain('日本語で 80〜100 字、英語で 20〜25 語')
+		expect(raw).not.toContain('日本語で 60 字程度')
+	})
+
+	// The prohibition bullet is read on its own more often than the section below it,
+	// so it has to carry the pointer to the counter-requirement.
+	it('points from the prohibition bullet to the concrete-subject requirement', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('「具体的な主語を必ず書く」と必ずセットで読む')
+	})
+})
+
 describe('report format — UserPromptSubmit hook', () => {
 	it('asks for the plain-language overview before the technical details', () => {
 		const raw = read_repo_file(CLAUDE_SETTINGS)
@@ -132,6 +173,13 @@ describe('report format — UserPromptSubmit hook', () => {
 		const raw = read_repo_file(CLAUDE_SETTINGS)
 
 		expect(raw).toContain('never wrapped in a code fence')
+	})
+
+	it('tells the AI to name the concrete subject in every overview line', () => {
+		const raw = read_repo_file(CLAUDE_SETTINGS)
+
+		expect(raw).toContain('Name the concrete subject in each line')
+		expect(raw).toContain('subject-less prose')
 	})
 
 	it('drops the old four-axis instruction that reintroduced the technical summary', () => {
