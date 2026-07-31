@@ -106,21 +106,27 @@ For every code modification, follow this order exactly:
 
 0. **Work summary + test declaration** _(mandatory before writing any implementation code)_: Present a two-layer work summary — a plain-language overview first, technical detail demoted below it — then declare every change and its test. Do not touch implementation files until both exist.
 
-   ```text
-   ■ Overview (plain language — always first)
-     Now:    <one sentence — what is happening, as the reader experiences it>
-     Change: <one sentence — what will be different afterwards, not how>
-     Check:  <one sentence — how it will be confirmed>
+   ```md
+   **■ Overview (plain language — always first)**
 
-   --- Details ---
-   <target files/modules · approach and why · side effects / out of scope>
+   - **Now**: <one sentence — what is happening, as the reader experiences it>
+   - **Change**: <one sentence — what will be different afterwards, not how>
+   - **Check**: <one sentence — how it will be confirmed>
 
-   Change 1: <what changes>
-     → Test: <Unit|E2E> — <file path> — <what behavior it verifies>
-   Change 2: ...
+   **Details**
+
+   - Target: <files / modules>
+   - Approach: <approach and why>
+   - Side effects / out of scope: <omit when none>
+
+   **Changes and tests**
+
+   1. <what changes> — Test: <Unit|E2E> — `<file path>` — <what behavior it verifies>
+   2. ...
    ```
 
-   - **The plain-language overview comes first and is mandatory.** Write it in the session language (`JOSH_SESSION_LANG`; match the user's language when unset), translating the `Now / Change / Check` labels into that language. Three lines, one short sentence each (about 60 characters in Japanese, 15 words in English). **Never put file paths, function or type names, or CLI option names in the overview** — they belong in Details. Avoid jargon or gloss it inline. Write cause → fix → effect as a causal chain, not a list of changes. **Before sending, re-read the three lines**: if a non-programmer could not follow them, move the offending symbol or abbreviation down into Details and rewrite.
+   - **Never wrap the summary in a code fence.** Write only the contents of the template above, as ordinary markdown. The fence here delimits the template inside this document; in a session it paints the whole block with a background color and a monospace font, which defeats the purpose of the plain-language layer and is especially unreadable for Japanese prose. The template is written to survive unfenced: labels are bold rather than aligned with runs of spaces (markdown collapses consecutive spaces), and there is no bare `---` separator line (it would render as a horizontal rule).
+   - **The plain-language overview comes first and is mandatory.** Write it in the session language (`JOSH_SESSION_LANG`; match the user's language when unset), translating the `Now / Change / Check` labels into that language. Three lines, one short sentence each (about 60 characters in Japanese, 15 words in English). **Never put file paths, function or type names, or CLI option names in the overview** — they belong in Details. Avoid jargon or gloss it inline. Write cause → fix → effect as a causal chain, not a list of changes. **Before sending, re-read the three lines**: if a non-programmer could not follow them, move the offending symbol or abbreviation down into Details and rewrite. Re-read the block as a whole too: if it is wrapped in a code fence, unwrap it before sending.
    - **Details come second and stay technical.** They cover the files/modules to be touched, the approach and a one-line rationale, any side effects or deliberately out-of-scope points, and the per-change test declarations. In `fullrun` / `halfrun` / `queue` present the whole block once per Issue, immediately before implementation starts — including when the Issue body was already filled and no plan comment was posted. `kickoff` is exempt (it already posts a plan to the Issue).
    - **Completion reports use the same two layers.** When you report a finished run, lead with `Cause: / Fix: / Result:` — one plain sentence each, `Result` naming what is different for the user plus the shipped version — and keep changed files, test results, and leftovers below. This shape applies to the session-facing summary and to the `--notify-message` body alike; the artifact language stays English.
    - **The summary is presentation, not a confirmation stop.** Continue straight into implementation in the same turn; it never becomes a stopping condition and does not affect the `fullrun` chain rule. Keep it session-facing only — do not post it as an Issue comment, and artifact languages (Issue / PR / Telegram = English) are unchanged. Canonical format reference: `prompts/collaboration-workflow.md` → 「報告フォーマット（平易な概要 ＋ 技術詳細）」.
