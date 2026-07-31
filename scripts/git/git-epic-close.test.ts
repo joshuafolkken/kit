@@ -39,7 +39,7 @@ describe('close_completed_epics — completed batch', () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_close).toHaveBeenCalledTimes(1)
 
@@ -53,7 +53,7 @@ describe('close_completed_epics — completed batch', () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		const queried = mocked_get_child.mock.calls.map(([number]) => number)
 
@@ -69,7 +69,7 @@ describe('close_completed_epics — incomplete batch', () => {
 			child_json({ state: number === '101' ? 'OPEN' : 'CLOSED' }),
 		)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
@@ -78,7 +78,7 @@ describe('close_completed_epics — incomplete batch', () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(undefined)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
@@ -90,7 +90,7 @@ describe('close_completed_epics — cross-repository children', () => {
 
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body }]))
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_get_child).not.toHaveBeenCalled()
 		expect(mocked_close).not.toHaveBeenCalled()
@@ -102,7 +102,7 @@ describe('close_completed_epics — issue lookup', () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		const [label, limit] = mocked_list.mock.calls[0] ?? []
 
@@ -115,21 +115,21 @@ describe('close_completed_epics — no-op cases', () => {
 	it('does nothing when no epic references the merged issue', async () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: '- [ ] #900 unrelated\n' }]))
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_get_child).not.toHaveBeenCalled()
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
 
 	it('does nothing when there is no linked issue number', async () => {
-		await close_completed_epics({ issue_number: undefined })
+		await close_completed_epics({ issue_number: undefined, is_merged: true })
 
 		expect(mocked_list).not.toHaveBeenCalled()
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
 
 	it('does nothing when the issue number is not numeric', async () => {
-		await close_completed_epics({ issue_number: 'not-a-number' })
+		await close_completed_epics({ issue_number: 'not-a-number', is_merged: true })
 
 		expect(mocked_list).not.toHaveBeenCalled()
 	})
@@ -137,7 +137,7 @@ describe('close_completed_epics — no-op cases', () => {
 	it('does nothing when the epic label lookup is unavailable', async () => {
 		mocked_list.mockResolvedValue(undefined)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
@@ -145,7 +145,7 @@ describe('close_completed_epics — no-op cases', () => {
 	it('does nothing when the label lookup returns malformed json', async () => {
 		mocked_list.mockResolvedValue('{not json')
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
@@ -155,7 +155,9 @@ describe('close_completed_epics — failure handling', () => {
 	it('resolves without throwing when a gh call rejects', async () => {
 		mocked_list.mockRejectedValue(new Error('gh exploded'))
 
-		await expect(close_completed_epics({ issue_number: MERGED_ISSUE })).resolves.toBeUndefined()
+		await expect(
+			close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true }),
+		).resolves.toBeUndefined()
 	})
 
 	it('resolves without throwing when the close call reports failure', async () => {
@@ -163,7 +165,9 @@ describe('close_completed_epics — failure handling', () => {
 		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
 		mocked_close.mockResolvedValue(false)
 
-		await expect(close_completed_epics({ issue_number: MERGED_ISSUE })).resolves.toBeUndefined()
+		await expect(
+			close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true }),
+		).resolves.toBeUndefined()
 	})
 })
 
@@ -174,7 +178,7 @@ describe('close_completed_epics — unrecorded batch order', () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(console.info).toHaveBeenCalledWith(expect.stringMatching(NO_RELATION_REGEX))
 	})
@@ -185,7 +189,7 @@ describe('close_completed_epics — unrecorded batch order', () => {
 			number === '102' ? CLOSED_LINKED : CLOSED_UNLINKED,
 		)
 
-		await close_completed_epics({ issue_number: MERGED_ISSUE })
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(console.info).not.toHaveBeenCalledWith(expect.stringMatching(NO_RELATION_REGEX))
 	})
@@ -194,9 +198,21 @@ describe('close_completed_epics — unrecorded batch order', () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(child_json({ state: 'OPEN' }))
 
-		await close_completed_epics({ issue_number: '101' })
+		await close_completed_epics({ issue_number: '101', is_merged: true })
 
 		expect(console.info).toHaveBeenCalledWith(expect.stringMatching(NO_RELATION_REGEX))
+		expect(mocked_close).not.toHaveBeenCalled()
+	})
+})
+
+describe('close_completed_epics — unmerged run', () => {
+	it('does nothing when the PR was not merged', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
+		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: false })
+
+		expect(mocked_list).not.toHaveBeenCalled()
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
 })

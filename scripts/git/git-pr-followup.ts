@@ -273,7 +273,10 @@ async function run(input: FollowupInput): Promise<void> {
 		pr_url: context.pr_url,
 	})
 
-	await git_epic_close.close_completed_epics({ issue_number: input.issue_number })
+	await git_epic_close.close_completed_epics({
+		issue_number: input.issue_number,
+		is_merged: input.should_merge,
+	})
 }
 
 const git_pr_followup = {

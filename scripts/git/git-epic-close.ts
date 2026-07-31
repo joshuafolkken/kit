@@ -132,13 +132,14 @@ async function resolve_and_close(merged_number: number): Promise<void> {
 /**
  * Close every open epic whose task list is fully complete once `issue_number` closed.
  *
+ * Requires `is_merged`: the linked Issue is treated as closed without being queried, which only
+ * holds once the PR actually merged. On a `--no-merge` run that Issue is still open, so skipping
+ * this guard would close an epic whose batch is not finished.
+ *
  * Runs after the PR has already merged, so a failure here must never reject: it would make
  * `followup` exit non-zero on an otherwise successful run and read as a merge blocker.
  */
-async function close_completed_epics(input: { issue_number: string | undefined }): Promise<void> {
-	const merged_number = Number(input.issue_number)
-	if (!Number.isSafeInteger(merged_number)) return
-
+async function resolve_and_close_safely(merged_number: number): Promise<void> {
 	try {
 		await resolve_and_close(merged_number)
 	} catch (error) {
@@ -146,6 +147,18 @@ async function close_completed_epics(input: { issue_number: string | undefined }
 
 		console.info(`⚠️  Skipped the epic auto-close check: ${message}`)
 	}
+}
+
+async function close_completed_epics(input: {
+	issue_number: string | undefined
+	is_merged: boolean
+}): Promise<void> {
+	if (!input.is_merged) return
+
+	const merged_number = Number(input.issue_number)
+	if (!Number.isSafeInteger(merged_number)) return
+
+	await resolve_and_close_safely(merged_number)
 }
 
 const git_epic_close = {
