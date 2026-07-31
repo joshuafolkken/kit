@@ -17,7 +17,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "echo 'MANDATORY: Before writing any implementation code, present a 3-6 line work summary (target files/modules, approach and why, test plan, side effects / out of scope) in the session language, then declare every change and its test (see Code Change Rules Step 0 in CLAUDE.md). The summary is required in fullrun/halfrun/queue even when the Issue body was already filled, and it is presentation only — never a confirmation stop. Tests are required for ALL changes — including bug fixes, timing fixes, and refactors. Zero tests without explicit user approval is a policy violation.'"
+						"command": "echo 'MANDATORY: Before writing any implementation code, present a two-layer work summary in the session language. First a plain-language overview of exactly 3 short sentences (Now / Change / Check) that a non-programmer can follow — no file paths, function or type names, or CLI option names. Then a Details block (target files/modules, approach and why, side effects / out of scope) and every change with its test (see Code Change Rules Step 0 in CLAUDE.md). Completion reports use the same two layers: Cause / Fix / Result first, technical detail below. The summary is required in fullrun/halfrun/queue even when the Issue body was already filled, and it is presentation only — never a confirmation stop. Tests are required for ALL changes — including bug fixes, timing fixes, and refactors. Zero tests without explicit user approval is a policy violation.'"
 					},
 					{
 						"type": "command",
