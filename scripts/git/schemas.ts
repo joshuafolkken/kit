@@ -36,7 +36,18 @@ const pr_info_schema = z.object({
 	state: z.string().optional(),
 })
 
+const epic_issue_schema = z.object({
+	number: z.number(),
+	body: z.string().optional(),
+})
+
+const epic_child_schema = z.object({
+	state: z.string().optional(),
+	blockedBy: z.object({ totalCount: z.number().optional() }).optional(),
+})
+
 type RollupItemData = z.infer<typeof rollup_item_schema>
+type EpicChildData = z.infer<typeof epic_child_schema>
 
 export {
 	package_name_schema,
@@ -45,5 +56,7 @@ export {
 	pull_comment_schema,
 	ai_review_pull_comment_schema,
 	pr_info_schema,
+	epic_issue_schema,
+	epic_child_schema,
 }
-export type { RollupItemData }
+export type { RollupItemData, EpicChildData }
