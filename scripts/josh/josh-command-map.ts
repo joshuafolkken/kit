@@ -65,6 +65,7 @@ const ALIASES: Record<string, string> = {
 	lu: 'latest:update',
 	pm: 'prevent-main-commit',
 	cm: 'check-commit-message',
+	ss: 'secretlint-scan',
 	hi: 'hook:install',
 	hu: 'hook:uninstall',
 	hc: 'hook:commit',

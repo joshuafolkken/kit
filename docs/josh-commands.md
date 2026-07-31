@@ -325,6 +325,22 @@ Blocks direct commits to `main`. Installed as a pre-commit hook by `josh init`.
 
 Validates commit message format. Installed as a commit-msg hook by `josh init`.
 
+### `josh secretlint-scan`
+
+Runs [secretlint](https://github.com/secretlint/secretlint) over the paths passed as arguments. Wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`.
+
+It exists because secretlint resolves from the **consumer** project — `josh init` / `josh sync` add it to the consumer devDependencies, since pnpm's isolated `node_modules` never exposes a kit dependency's bin to the consumer's `pnpm exec`. Upgrading kit therefore activates the hook one `josh sync` + `pnpm install` ahead of the binary. A bare `pnpm exec secretlint` turns that window into a hard failure on every commit; this wrapper prints an actionable notice and exits `0` instead:
+
+```text
+⚠️  secretlint is not installed — skipping the staged-file secret scan.
+   The kit pre-commit hook ships ahead of the dependency it needs.
+   Run `pnpm josh sync && pnpm install` to provision it.
+```
+
+When secretlint **is** installed the scan runs as normal and its exit code is forwarded, so a detected secret still blocks the commit. Skipping is safe as a fallback because the scan is defense in depth ahead of GitHub push protection and PR-time scanners, not the only gate.
+
+The wrapper owns the CLI flags: `--no-glob` is always passed, because lefthook substitutes literal paths and a SvelteKit route directory such as `(app)` or `[id]` would otherwise reach secretlint's glob engine as a pattern. Secret masking and the `.gitignore` cascade are both on by default in secretlint v13, so no flag is needed for either.
+
 ### `josh hook:install`
 
 Install git hooks via lefthook.
