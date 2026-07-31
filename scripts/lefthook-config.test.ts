@@ -77,22 +77,16 @@ describe('lefthook/base.yml pre-commit secretlint command', () => {
 		expect(run).toContain('{staged_files}')
 	})
 
-	// lefthook substitutes literal paths. Without --no-glob, a SvelteKit route directory
-	// such as `(app)` or `[id]` reaches secretlint's glob engine as a pattern.
-	it('passes --no-glob so literal route paths are not treated as patterns', () => {
-		expect(run).toContain('--no-glob')
+	// secretlint resolves from the consumer project, so a kit upgrade activates this hook
+	// before `josh sync` + `pnpm install` provisions the binary. A bare `pnpm exec secretlint`
+	// hard-fails in that window and blocks every commit (kit#695); the wrapper skips instead.
+	// The CLI flags moved with it — they are asserted in scripts/secretlint-scan.test.ts.
+	it('delegates to the josh wrapper instead of invoking the binary directly', () => {
+		expect(run).toContain('josh secretlint-scan')
 	})
 
-	// Masking is on by default in v13 and --maskSecrets is not a real flag; the CLI parser
-	// swallows it silently, so an unmasked secret would reach the terminal unnoticed.
-	it('does not pass the non-existent --maskSecrets flag', () => {
-		expect(run).not.toContain('--maskSecrets')
-	})
-
-	// --secretlintignore expects a .secretlintignore file; pointing it at .gitignore quietly
-	// corrupts the ignore set, and v13 already respects the .gitignore cascade.
-	it('does not point --secretlintignore at .gitignore', () => {
-		expect(run).not.toContain('--secretlintignore')
+	it('does not invoke secretlint through a bare pnpm exec', () => {
+		expect(run).not.toContain('pnpm exec secretlint')
 	})
 
 	// An unscoped glob would make secretlint scan files unrelated to the commit.

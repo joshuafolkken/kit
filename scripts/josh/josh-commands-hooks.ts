@@ -12,6 +12,11 @@ const HOOKS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Git hook: validate commit message',
 		category: 'Git hooks',
 	},
+	'secretlint-scan': {
+		script: 'scripts/secretlint-scan.ts',
+		description: 'Git hook: scan staged files for secrets',
+		category: 'Git hooks',
+	},
 	'hook:install': {
 		shell: [...PE, 'lefthook', 'install'],
 		description: 'Install git hooks',
