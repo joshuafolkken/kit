@@ -135,6 +135,10 @@ pnpm josh followup "PR title #N" --merge --ai-review-ignore-reason "false positi
 
 On completion, the project's own version (from `package.json`, the value `josh bump` increments) is printed as the final line (`📦 project version: <v>`) and included in the completion Telegram body, so the just-shipped version is visible at the end of the workflow.
 
+While inspecting those children it also reports when **none** of them carries a `blocked-by` relation, meaning the batch order was never recorded natively. The check is deliberately weak — it never judges the shape of the dependency chain, only its total absence — and it runs on every child's merge rather than at epic close, so the omission surfaces while it can still be corrected.
+
+After the merge, `followup` also closes any completed epic. It looks for open issues labelled `epic` whose markdown task list references the issue this PR closed; when every other child in that list is already closed, the epic is closed with a comment naming its children. The just-closed issue is treated as closed without being queried, because GitHub applies the `closes #N` side effect asynchronously. An epic with a still-open child is left alone, and any failure in this step is reported as a warning rather than failing the run — the PR has already merged by then.
+
 ### `josh notify`
 
 Send a Telegram notification. Used for planning, confirmation, failure, and kickoff-retry alerts.
