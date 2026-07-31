@@ -77,8 +77,16 @@ Issue には次の要素を必ず含める。
 1. 子 Issue を全て作成し、番号 `<N1> <N2> ...` を控える
 2. `epic` ラベルを用意する（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of ordered child issues" 2>/dev/null || true`）
 3. epic を作成し、番号 `<E>` を控える: `gh issue create --title "<epic-title>" --label epic --body "<body>"`
+4. 子 Issue に依存関係を付与する（後述の理由により**作成後の独立ステップ**として行う）:
+
+   ```bash
+   gh issue edit <N2> --add-blocked-by <N1>
+   gh issue edit <N3> --add-blocked-by <N2>
+   ```
 
 手順 2 の `|| true` はラベルが既に存在する場合を無視するためのもので、作成失敗を握り潰す危険はない。ラベルが存在しないまま手順 3 に進むと `--label epic` が解決できず `gh issue create` 自体が失敗するため、異常は必ずそこで顕在化する。
+
+手順 4 は `gh` 2.94.0 以降が必要で、**失敗しても続行してよい**（付かないのは関係だけで、Issue とタスクリストは無傷）。作成時に `gh issue create --blocked-by` を使ってはならない — 古い `gh` は未知フラグを exit 1 で即座に拒否し、**Issue 自体が作られない**。作成と関係付与を分けることで、古い CLI での劣化が「Issue が消える」から「関係が付かない」に下がる。
 
 epic 本文のテンプレート:
 
@@ -104,9 +112,18 @@ queue #101 #102 #103
 
 `Progress` は**必ずタスクリスト記法**（`- [ ] #N`）で書く。GitHub は参照先 Issue がクローズされた時点でこの記法のチェックボックスのみを自動で埋めるため、素のリンク（`#N` の直書き）では進捗が追跡されない。ただし全項目が埋まっても GitHub が epic 自体をクローズすることはない。
 
-sub-issues（親子関係）は採用しない。理由は 2 点 — 親子関係は「包含」を表すだけで実行順序を表現できない、および親子関係は同一リポジトリオーナー内に限られる。
+#### ネイティブの依存関係と sub-issues
 
-「`gh` が対応していない」ことは**不採用の理由にならない**。`gh` 2.94.0 以降は `gh issue create --parent` / `gh issue edit --add-sub-issue` で親子関係を、`--blocked-by` / `--blocking` で依存関係をネイティブに扱える。とくに後者は実行順序をそのまま表現できるため、epic のタスクリストを補完・代替しうる。採用可否は別途判断する。
+`gh` は Issue 間の関係をネイティブに扱える。下表のフラグと JSON フィールドは **2.97.0 の実バイナリで存在を確認済み**。導入バージョンを 2.94.0 とするのは `cli/cli` のリリースノート記載によるもので、2.94.0 自体での動作確認は行っていない。GitHub Enterprise Server では依存関係に 3.19 以降が必要（github.com では制約なし）。
+
+| 種別     | 書き込み                                                                   | 読み取り                                                     |
+| -------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 依存関係 | `gh issue edit <N> --add-blocked-by <M>` / `--add-blocking` / `--remove-*` | `gh issue view <N> --json blockedBy,blocking`                |
+| 親子関係 | `gh issue edit <N> --parent <M>` / `--add-sub-issue`                       | `gh issue view <N> --json parent,subIssues,subIssuesSummary` |
+
+**依存関係は採用する**（上記の作成手順 4）。子 Issue 単体を見たときに何を待っているかが GitHub の UI と API の両方から分かるようになり、epic 本文の `Dependencies` 行が人間向けの散文でしかなかった問題が解消する。ただし依存関係は**表示するだけで着手を防がない**ため、順序を守る責任は引き続き `queue` の呼び出し順にある。epic 本文の `Dependencies` 行は、関係が付かなかった環境でも読める冗長な記録として残す。
+
+**sub-issues（親子関係）は採用しない。** 理由は 2 点 — 親子関係は「包含」を表すだけで実行順序を表現できない、および親子関係は同一リポジトリオーナー内に限られる。いずれも CLI の対応状況とは無関係で、2.94.0 以降でも変わらない。
 
 ## Step 2: 提案依頼（AI 共通）
 
