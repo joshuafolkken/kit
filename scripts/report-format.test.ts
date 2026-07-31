@@ -13,7 +13,17 @@ function read_repo_file(relative_path: string): string {
 // The report format lives in five places (three AI docs, the workflow prompt, the hook).
 // Updating only one of them leaves the AI with contradicting instructions, so assert per marker.
 const OVERVIEW_MARKERS: ReadonlyArray<string> = [
-	'■ Overview (plain language — always first)',
+	'**■ Overview (plain language — always first)**',
+	'**Details**',
+	'**Changes and tests**',
+	'- **Now**: <one sentence',
+	'- **Change**: <one sentence',
+	'- **Check**: <one sentence',
+]
+
+// The template must render as ordinary markdown in the session. A fenced block gets a
+// background color and a monospace font, and space-padded alignment collapses.
+const FENCED_TEMPLATE_MARKERS: ReadonlyArray<string> = [
 	'--- Details ---',
 	'Now:    <one sentence',
 	'Change: <one sentence',
@@ -58,6 +68,19 @@ describe('report format — plain-language overview in the AI docs', () => {
 		expect(raw).not.toContain('3–6 line work summary')
 		expect(raw).not.toContain('"Implemented <title>:')
 	})
+
+	it.each(AI_DOCS)('%s bans wrapping the summary in a code fence', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		expect(raw).toContain('Never wrap the summary in a code fence.')
+		expect(raw).toContain('if it is wrapped in a code fence, unwrap it before sending')
+	})
+
+	it.each(AI_DOCS)('%s no longer shows the space-aligned template', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		for (const marker of FENCED_TEMPLATE_MARKERS) expect(raw).not.toContain(marker)
+	})
 })
 
 describe('report format — canonical reference in the workflow prompt', () => {
@@ -72,6 +95,20 @@ describe('report format — canonical reference in the workflow prompt', () => {
 
 		expect(raw).toContain('概要にファイルパス・関数名・型名・CLI オプション名を書かない')
 		expect(raw).toContain('送信前セルフチェック')
+	})
+
+	it('requires the session summary to be written without a code fence', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('### 出力はコードフェンスで囲まない（必須）')
+		expect(raw).toContain('**出力には含めない**')
+	})
+
+	it('no longer shows the space-aligned template', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).not.toContain('--- 技術詳細 ---')
+		expect(raw).not.toContain('今こうなっている: <1文')
 	})
 
 	it('keeps artifacts in English while restructuring the completion body', () => {
@@ -89,6 +126,12 @@ describe('report format — UserPromptSubmit hook', () => {
 		expect(raw).toContain('two-layer work summary')
 		expect(raw).toContain('Now / Change / Check')
 		expect(raw).toContain('Cause / Fix / Result')
+	})
+
+	it('tells the AI not to wrap the summary in a code fence', () => {
+		const raw = read_repo_file(CLAUDE_SETTINGS)
+
+		expect(raw).toContain('never wrapped in a code fence')
 	})
 
 	it('drops the old four-axis instruction that reintroduced the technical summary', () => {
