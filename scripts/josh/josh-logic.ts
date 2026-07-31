@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { package_bin_schema, package_version_schema } from '#scripts/schemas'
+import { resolve_spawn_exit } from '#scripts/spawn-exit'
 import { execaSync } from 'execa'
 import {
 	ALIASES,
@@ -19,7 +20,6 @@ const TSX_CMD = 'tsx.cmd'
 const TSX_MANIFEST = 'tsx/package.json'
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
-const SPAWN_ERROR_EXIT_CODE = 2
 
 interface TsxRunner {
 	executable: string
@@ -154,27 +154,6 @@ function format_help(): string {
 	return [HEADER, '', sections.join('\n\n'), '', USAGE].join('\n')
 }
 
-// A numeric exit code — zero or not — means the command ran; return it verbatim.
-// `exitCode: undefined` means it never produced one: either a true spawn failure
-// (the replacement for spawnSync's `result.error`) or a signal kill. Only the
-// former is reported as a spawn error; a signal kill falls back to 1, matching the
-// previous `result.status ?? 1`.
-function resolve_spawn_exit(
-	executable: string,
-	result: {
-		exitCode?: number | undefined
-		isTerminated?: boolean
-		shortMessage?: string | undefined
-	},
-): number {
-	if (result.exitCode !== undefined) return result.exitCode
-	if (result.isTerminated === true) return 1
-
-	console.error(`Failed to execute ${executable}: ${result.shortMessage ?? 'spawn failed'}`)
-
-	return SPAWN_ERROR_EXIT_CODE
-}
-
 // A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and
 // running it through the shell would break on the spaces in a typical Windows install path.
 function should_use_shell(executable: string): boolean {
@@ -229,10 +208,5 @@ const josh_logic = { format_help, run_command, spawn_script, run_shell_command }
 export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'
 export type { TsxRunner }
-export {
-	josh_logic,
-	resolve_alias,
-	resolve_tsx_executable,
-	resolve_tsx_runner,
-	SPAWN_ERROR_EXIT_CODE,
-}
+export { SPAWN_ERROR_EXIT_CODE } from '#scripts/spawn-exit'
+export { josh_logic, resolve_alias, resolve_tsx_executable, resolve_tsx_runner }
