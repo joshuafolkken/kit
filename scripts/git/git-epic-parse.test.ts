@@ -38,6 +38,21 @@ const PARSE_CASES = [
 		expected: [],
 	},
 	{ label: 'returns nothing when the body is undefined', body: undefined, expected: [] },
+	{
+		label: 'ignores sample rows inside a fenced code block',
+		body: '## Template\n\n```md\n- [ ] #901 sample\n- [ ] #902 sample\n```\n\n- [ ] #101 real\n',
+		expected: [101],
+	},
+	{
+		label: 'ignores sample rows inside a tilde-fenced block',
+		body: '~~~\n- [ ] #901 sample\n~~~\n\n- [ ] #101 real\n',
+		expected: [101],
+	},
+	{
+		label: 'still reads entries that follow a closed fenced block',
+		body: '```ts\nconst a = 1\n```\n\n- [ ] #101 one\n- [x] #102 two\n',
+		expected: [101, 102],
+	},
 ] as const satisfies ReadonlyArray<{
 	label: string
 	body: string | undefined
@@ -72,6 +87,11 @@ const EXTERNAL_CASES = [
 		expected: false,
 	},
 	{ label: 'reports none when the body is undefined', body: undefined, expected: false },
+	{
+		label: 'ignores a repo-qualified sample inside a fenced code block',
+		body: '```md\n- [ ] owner/repo#7 sample\n```\n\n- [ ] #101 real\n',
+		expected: false,
+	},
 ] as const satisfies ReadonlyArray<{ label: string; body: string | undefined; expected: boolean }>
 
 describe('has_external_task_list_entry', () => {

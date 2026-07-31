@@ -120,25 +120,29 @@ async function close_epic_when_complete(epic: EpicIssue, merged_number: number):
 	await close_epic(epic)
 }
 
+// Each epic is isolated: one that cannot be read or closed must not stop the others from being
+// evaluated, since they are independent batches that merely share this child.
+async function close_epic_isolated(epic: EpicIssue, merged_number: number): Promise<void> {
+	try {
+		await close_epic_when_complete(epic, merged_number)
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error)
+
+		console.info(`⚠️  Skipped epic #${String(epic.number)}: ${message}`)
+	}
+}
+
 async function resolve_and_close(merged_number: number): Promise<void> {
 	const open_epics = await fetch_open_epics()
 	const epics = open_epics.filter((epic) => git_epic_parse.has_child(epic.children, merged_number))
 
 	for (const epic of epics) {
-		await close_epic_when_complete(epic, merged_number)
+		await close_epic_isolated(epic, merged_number)
 	}
 }
 
-/**
- * Close every open epic whose task list is fully complete once `issue_number` closed.
- *
- * Requires `is_merged`: the linked Issue is treated as closed without being queried, which only
- * holds once the PR actually merged. On a `--no-merge` run that Issue is still open, so skipping
- * this guard would close an epic whose batch is not finished.
- *
- * Runs after the PR has already merged, so a failure here must never reject: it would make
- * `followup` exit non-zero on an otherwise successful run and read as a merge blocker.
- */
+// Runs after the PR has already merged, so nothing here may reject: it would make `followup` exit
+// non-zero on an otherwise successful run and read as a merge blocker.
 async function resolve_and_close_safely(merged_number: number): Promise<void> {
 	try {
 		await resolve_and_close(merged_number)
@@ -149,6 +153,13 @@ async function resolve_and_close_safely(merged_number: number): Promise<void> {
 	}
 }
 
+/**
+ * Close every open epic whose task list is fully complete once `issue_number` closed.
+ *
+ * Requires `is_merged`: the linked Issue is treated as closed without being queried, which only
+ * holds once the PR actually merged. On a `--no-merge` run that Issue is still open, so skipping
+ * this guard would close an epic whose batch is not finished.
+ */
 async function close_completed_epics(input: {
 	issue_number: string | undefined
 	is_merged: boolean

@@ -14,6 +14,7 @@ const mocked_list = vi.mocked(git_gh_command.issue_list_by_label)
 const mocked_get_child = vi.mocked(git_gh_command.issue_get_state_and_relations)
 const mocked_close = vi.mocked(git_gh_command.issue_close)
 
+const GH_FAILURE = 'gh exploded'
 const EPIC_BODY = '## Progress\n\n- [ ] #101 one\n- [ ] #102 two\n- [ ] #103 three\n'
 const MERGED_ISSUE = '103'
 
@@ -153,7 +154,7 @@ describe('close_completed_epics — no-op cases', () => {
 
 describe('close_completed_epics — failure handling', () => {
 	it('resolves without throwing when a gh call rejects', async () => {
-		mocked_list.mockRejectedValue(new Error('gh exploded'))
+		mocked_list.mockRejectedValue(new Error(GH_FAILURE))
 
 		await expect(
 			close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true }),
@@ -214,5 +215,21 @@ describe('close_completed_epics — unmerged run', () => {
 
 		expect(mocked_list).not.toHaveBeenCalled()
 		expect(mocked_close).not.toHaveBeenCalled()
+	})
+})
+
+describe('close_completed_epics — per-epic isolation', () => {
+	const EPIC_A = { number: 200, body: EPIC_BODY }
+	const EPIC_B = { number: 201, body: EPIC_BODY }
+
+	it('evaluates the remaining epics when one of them fails', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([EPIC_A, EPIC_B]))
+		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+		mocked_close.mockRejectedValueOnce(new Error(GH_FAILURE)).mockResolvedValue(true)
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
+
+		expect(mocked_close).toHaveBeenCalledTimes(2)
+		expect(mocked_close.mock.calls.at(-1)?.[0]).toBe('201')
 	})
 })
