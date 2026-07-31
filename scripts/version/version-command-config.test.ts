@@ -7,7 +7,7 @@ const KIT_FIX_PATH = 'node_modules/@joshuafolkken/kit/scripts/fix-gh-packages.ts
 const APP_KIT = '@joshuafolkken/app-kit'
 const APP_KIT_ENDPOINT = '/users/joshuafolkken/packages/npm/app-kit/versions?per_page=1'
 const GAME_KIT = '@joshuafolkken/game-kit'
-const HOOK_CONTEXT = { latest: '2.0.0' }
+const HOOK_CONTEXT = { latest: '2.0.0', upstream_latest: '1.6.0' }
 const BLANK_SPACES = 3
 
 describe('derive_versions_endpoint', () => {
@@ -124,6 +124,7 @@ describe('create_version_command_config upstream effective hooks', () => {
 
 		expect('resolve_effective_version' in (upstream ?? {})).toBe(false)
 		expect('resolve_global_upgrade_command' in (upstream ?? {})).toBe(false)
+		expect('is_global_upgrade_command_pinned' in (upstream ?? {})).toBe(false)
 	})
 
 	it('carries through the effective-install hooks when the upstream descriptor supplies them', () => {
@@ -143,6 +144,18 @@ describe('create_version_command_config upstream effective hooks', () => {
 
 		expect(upstream?.resolve_effective_version?.(HOOK_CONTEXT)).toBe(effective_version)
 		expect(upstream?.resolve_global_upgrade_command?.(HOOK_CONTEXT)).toBe(global_upgrade_command)
+	})
+})
+
+describe('create_version_command_config pin-only declaration', () => {
+	it('carries through the pin-only declaration when the upstream descriptor supplies it', () => {
+		const config = create_version_command_config({
+			package_name: APP_KIT,
+			upstreams: [{ package_name: KIT, is_global_upgrade_command_pinned: true }],
+		})
+		const [upstream] = config.upstreams
+
+		expect(upstream?.is_global_upgrade_command_pinned).toBe(true)
 	})
 })
 
