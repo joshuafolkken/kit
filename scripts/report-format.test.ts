@@ -112,7 +112,7 @@ describe('report format — canonical reference in the workflow prompt', () => {
 	it('constrains the overview to plain vocabulary and a pre-send self-check', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
-		expect(raw).toContain('概要にファイルパス・関数名・型名・CLI オプション名を書かない')
+		expect(raw).toContain('概要にファイルパス・関数名・型名・CLI のオプションフラグ')
 		expect(raw).toContain('送信前セルフチェック')
 	})
 
@@ -130,21 +130,33 @@ describe('report format — canonical reference in the workflow prompt', () => {
 		expect(raw).not.toContain('今こうなっている: <1文')
 	})
 
+	it('keeps artifacts in English while restructuring the completion body', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('言語ルールは変えない — 成果物は常に英語')
+		for (const marker of COMPLETION_MARKERS) expect(raw).toContain(marker)
+	})
+})
+
+describe('report format — concrete subjects in the workflow prompt', () => {
 	it('pairs the prohibition with a concrete-subject requirement and a worked example', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
 		expect(raw).toContain('### 具体的な主語を必ず書く（禁止と対になる要求）')
 		expect(raw).toContain('**悪い例**')
 		expect(raw).toContain('**良い例**')
+		// The examples must model the unfenced markdown shape, not the retired aligned one.
+		expect(raw).toContain('- **今こうなっている**: バージョン確認が')
 		expect(raw).toContain('日本語で 80〜100 字、英語で 20〜25 語')
 		expect(raw).not.toContain('日本語で 60 字程度')
 	})
 
-	it('keeps artifacts in English while restructuring the completion body', () => {
+	// The prohibition bullet is read on its own more often than the section below it,
+	// so it has to carry the pointer to the counter-requirement.
+	it('points from the prohibition bullet to the concrete-subject requirement', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
-		expect(raw).toContain('言語ルールは変えない — 成果物は常に英語')
-		for (const marker of COMPLETION_MARKERS) expect(raw).toContain(marker)
+		expect(raw).toContain('「具体的な主語を必ず書く」と必ずセットで読む')
 	})
 })
 
