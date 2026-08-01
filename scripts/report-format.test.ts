@@ -13,7 +13,8 @@ function read_repo_file(relative_path: string): string {
 // The report format lives in five places (three AI docs, the workflow prompt, the hook).
 // Updating only one of them leaves the AI with contradicting instructions, so assert per marker.
 const OVERVIEW_MARKERS: ReadonlyArray<string> = [
-	'**■ Overview (plain language — always first)**',
+	// Anchored to the fence so the prose that quotes the heading cannot satisfy the assertion.
+	'```md\n   **■ Overview**\n',
 	'**Details**',
 	'**Changes and tests**',
 	'- **Now**: <one sentence',
@@ -83,6 +84,17 @@ describe('report format — plain-language overview in the AI docs', () => {
 	})
 })
 
+// An annotation inside the label ("plain language — always first") was read as part of the
+// label itself and reached the session as `■ 概要（平易な説明）`.
+describe('report format — heading shape in the AI docs', () => {
+	it.each(AI_DOCS)('%s keeps the overview heading free of annotations', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		expect(raw).toContain('Print the headings exactly as written — no annotations.')
+		expect(raw).not.toContain('**■ Overview (plain language — always first)**')
+	})
+})
+
 // The prohibition alone produced subject-less prose ("it stays stale", "the suggestion"),
 // so it only holds paired with the requirement to name what the reader sees on screen.
 describe('report format — concrete subjects in the AI docs', () => {
@@ -114,6 +126,14 @@ describe('report format — canonical reference in the workflow prompt', () => {
 
 		expect(raw).toContain('概要にファイルパス・関数名・型名・CLI のオプションフラグ')
 		expect(raw).toContain('送信前セルフチェック')
+	})
+
+	it('names the overview heading and forbids annotating it', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('### 見出しに注釈を付けない（必須）')
+		expect(raw).toContain('```md\n**■ 概要**\n')
+		expect(raw).not.toContain('■ これからやること')
 	})
 
 	it('requires the session summary to be written without a code fence', () => {
