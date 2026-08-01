@@ -85,13 +85,26 @@ describe('report format — plain-language overview in the AI docs', () => {
 })
 
 // An annotation inside the label ("plain language — always first") was read as part of the
-// label itself and reached the session as `■ 概要（平易な説明）`.
-describe('report format — heading shape in the AI docs', () => {
+// label itself and reached the session as `■ 概要（平易な説明）`. Stating the ban as "print the
+// heading exactly as written" then read as "keep the English label", so the two rules —
+// translate the label, do not annotate it — have to be asserted separately.
+const JAPANESE_LABELS: ReadonlyArray<string> = ['**■ 概要**', '**技術詳細**', '**変更とテスト**']
+
+describe('report format — label shape in the AI docs', () => {
 	it.each(AI_DOCS)('%s keeps the overview heading free of annotations', (ai_document) => {
 		const raw = read_repo_file(ai_document)
 
-		expect(raw).toContain('Print the headings exactly as written — no annotations.')
+		expect(raw).toContain('A label carries no annotation.')
 		expect(raw).not.toContain('**■ Overview (plain language — always first)**')
+		expect(raw).not.toContain('Print the headings exactly as written')
+	})
+
+	it.each(AI_DOCS)('%s writes the labels in the session language', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		expect(raw).toContain('Labels are translated, not copied.')
+		for (const label of JAPANESE_LABELS) expect(raw).toContain(label)
+		expect(raw).toContain('`原因 / 対応 / 結果`')
 	})
 })
 
@@ -128,14 +141,6 @@ describe('report format — canonical reference in the workflow prompt', () => {
 		expect(raw).toContain('送信前セルフチェック')
 	})
 
-	it('names the overview heading and forbids annotating it', () => {
-		const raw = read_repo_file(WORKFLOW_PROMPT)
-
-		expect(raw).toContain('### 見出しに注釈を付けない（必須）')
-		expect(raw).toContain('```md\n**■ 概要**\n')
-		expect(raw).not.toContain('■ これからやること')
-	})
-
 	it('requires the session summary to be written without a code fence', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
@@ -155,6 +160,27 @@ describe('report format — canonical reference in the workflow prompt', () => {
 
 		expect(raw).toContain('言語ルールは変えない — 成果物は常に英語')
 		for (const marker of COMPLETION_MARKERS) expect(raw).toContain(marker)
+	})
+})
+
+describe('report format — label rules in the workflow prompt', () => {
+	it('separates label translation from the annotation ban', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('### ラベルはセッション言語に訳し、注釈は付けない（必須）')
+		expect(raw).toContain('```md\n**■ 概要**\n')
+		expect(raw).not.toContain('■ これからやること')
+	})
+
+	// The mapping is what makes "translate the label" actionable — without it the rule is
+	// a sentence the reader has to invent the Japanese wording for.
+	it('maps every English label to its Japanese session wording', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('| `Details`')
+		expect(raw).toContain('`技術詳細`')
+		expect(raw).toContain('`変更とテスト`')
+		expect(raw).toContain('`原因` / `対応` / `結果`')
 	})
 })
 
