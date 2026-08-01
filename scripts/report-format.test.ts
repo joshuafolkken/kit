@@ -13,7 +13,8 @@ function read_repo_file(relative_path: string): string {
 // The report format lives in five places (three AI docs, the workflow prompt, the hook).
 // Updating only one of them leaves the AI with contradicting instructions, so assert per marker.
 const OVERVIEW_MARKERS: ReadonlyArray<string> = [
-	'**■ Overview**',
+	// Anchored to the fence so the prose that quotes the heading cannot satisfy the assertion.
+	'```md\n   **■ Overview**\n',
 	'**Details**',
 	'**Changes and tests**',
 	'- **Now**: <one sentence',
@@ -131,7 +132,7 @@ describe('report format — canonical reference in the workflow prompt', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
 		expect(raw).toContain('### 見出しに注釈を付けない（必須）')
-		expect(raw).toContain('**■ 概要**')
+		expect(raw).toContain('```md\n**■ 概要**\n')
 		expect(raw).not.toContain('■ これからやること')
 	})
 
