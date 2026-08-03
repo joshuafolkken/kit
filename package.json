@@ -1,5 +1,5 @@
 {
-	"version": "1.50.0",
+	"version": "1.51.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -14,7 +14,7 @@
 		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci",
 		"prepare": "lefthook install",
 		"build": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts",
-		"prepack": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts",
+		"prepack": "tsx scripts/version/publishable-range-check.ts && tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts",
 		"josh": "tsx scripts/josh/josh.ts"
 	},
 	"files": [
@@ -124,7 +124,7 @@
 		"ora": "^9.4.1",
 		"semver": "^7.8.5",
 		"strip-json-comments": "^5.0.3",
-		"tsx": "^4.23.5",
+		"tsx": "^4.23.4",
 		"typescript-eslint": "^8.65.0",
 		"zod": "^4.4.3"
 	},

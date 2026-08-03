@@ -18,3 +18,23 @@ describe('VERSIONING_COMMANDS version:upgrade', () => {
 		expect(cmd.shell).toBeUndefined()
 	})
 })
+
+const RANGES_NOT_DEFINED = 'ranges command not defined'
+
+describe('VERSIONING_COMMANDS ranges', () => {
+	it('runs the guard that checks every published dependency range', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		const cmd = VERSIONING_COMMANDS['ranges']
+		if (!cmd) throw new Error(RANGES_NOT_DEFINED)
+
+		expect(cmd.script).toBe('scripts/version/publishable-range-check.ts')
+	})
+
+	it('is listed under Versioning so it appears beside bump in the command help', () => {
+		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+		const cmd = VERSIONING_COMMANDS['ranges']
+		if (!cmd) throw new Error(RANGES_NOT_DEFINED)
+
+		expect(cmd.category).toBe('Versioning')
+	})
+})
