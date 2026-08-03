@@ -17,8 +17,9 @@ const APP_KIT_LEFTHOOK =
 const APP_KIT_CSPELL =
 	'version: "0.2"\nimport:\n  - "@joshuafolkken/app-kit/cspell/sveltekit"\nwords: []\n'
 // Authored the way prettier emits it (short exclude inline) — the no-op re-sync must preserve it.
-const APP_KIT_TSCONFIG =
-	'{\n\t"extends": ["./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json"],\n\t"exclude": ["node_modules", "build", "dist"]\n}\n'
+// Carries the generated-output exclude entries kit ships (#712), so a re-sync has nothing to add.
+const APP_KIT_EXCLUDE = '["node_modules", "build", "dist", "playwright-report", "test-results"]'
+const APP_KIT_TSCONFIG = `{\n\t"extends": ["./node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.json"],\n\t"exclude": ${APP_KIT_EXCLUDE}\n}\n`
 
 beforeEach(() => {
 	mkdirSync(TEST_DIR, { recursive: true })
@@ -60,6 +61,6 @@ describe('sync_configs — app-kit consumer leaves kit base un-doubled (#660)', 
 		const result = sync_and_read(TSCONFIG_DEST, APP_KIT_TSCONFIG, sync_configs.sync_tsconfig)
 
 		expect(result).toBe(APP_KIT_TSCONFIG)
-		expect(result).toContain('"exclude": ["node_modules", "build", "dist"]')
+		expect(result).toContain(`"exclude": ${APP_KIT_EXCLUDE}`)
 	})
 })

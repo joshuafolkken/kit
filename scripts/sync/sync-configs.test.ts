@@ -96,7 +96,11 @@ describe('sync_configs.sync_eslint_config — migration', () => {
 
 const TSCONFIG_DEST = path.join(TEST_DIR, 'tsconfig.json')
 const TSCONFIG_EXTENDS_ENTRY = init_logic.get_tsconfig_extends_entry()
-const TSCONFIG_UP_TO_DATE = `${JSON.stringify({ extends: [TSCONFIG_EXTENDS_ENTRY] }, undefined, '\t')}\n`
+const TSCONFIG_UP_TO_DATE = `${JSON.stringify(
+	{ extends: [TSCONFIG_EXTENDS_ENTRY], exclude: init_logic.get_tsconfig_exclude_entries() },
+	undefined,
+	'\t',
+)}\n`
 
 describe('sync_configs.sync_tsconfig', () => {
 	it('does nothing when tsconfig.json does not exist', () => {

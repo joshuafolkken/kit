@@ -77,6 +77,18 @@ describe('init_actions gitignore distribution', () => {
 	})
 })
 
+describe('init_actions tsconfig distribution', () => {
+	// A project that already has a tsconfig reaches the merge handler, not create — without the
+	// exclude merge there it would keep type-checking the generated Playwright report (#712).
+	it('adds the generated-output exclude entries when merging an existing tsconfig', () => {
+		const action = init_actions.build_file_actions().find((entry) => entry.dest === TSCONFIG)
+		const merged = action?.merge?.('{ "exclude": ["legacy-vendor"] }\n') ?? ''
+
+		expect(merged).toContain('legacy-vendor')
+		expect(merged).toContain('playwright-report')
+	})
+})
+
 describe('init_actions extensions.json distribution', () => {
 	it('distributes the common extensions.json', () => {
 		const action = init_actions
