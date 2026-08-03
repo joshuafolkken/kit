@@ -98,7 +98,27 @@ Issue には次の要素を必ず含める。
 - **分割そのものが別リポジトリのセッション発である場合**（消費者リポジトリでの `kickoff new` が上流に子 Issue を起票したなど）、各子 Issue の本文に `## Origin` を、epic 本文にも同じ起票元へのリンクを書く（→「起票元へのバックリンク」）。epic 側は `Split rationale` の直後に散文か素の箇条書きで置く。**チェックボックス行で書くと直前の項目に該当して自動クローズが止まる**ため、この 1 点だけは形式を守る。起票元 Issue 側にも `## Upstream issues` として起票した子 Issue と epic を列挙する
 - epic 本文の `Dependencies` に依存の連鎖（`#N -> #M`）が書かれているのに、手順 4 の依存関係が**一件も付いていない**場合、`pnpm josh followup` が子 Issue のマージごとに警告する。連鎖の形は検査しない（タスクリストの並び順を依存順と推測することになり誤検知を生むため）。判定の起点を本文の宣言に置くのは、epic の存在がもう順序ありを意味しないため — 順序不問のバッチにも epic を作る以上、依存関係ゼロ件は正常な状態でもありうる
 
-作成手順:
+作成手順（既定）: **`pnpm josh epic` を使う。**
+
+```bash
+# 順序不問のバッチ
+pnpm josh epic "<epic-title>" <N1> <N2> ...
+
+# 実行順序があるバッチ（引数の並び順＝依存順）
+pnpm josh epic "<epic-title>" <N1> <N2> ... --ordered
+
+# 分割理由の散文を渡す（`-` で標準入力）
+pnpm josh epic "<epic-title>" <N1> <N2> --rationale-file <path|->
+
+# 別リポジトリのセッション発である場合のバックリンク
+pnpm josh epic "<epic-title>" <N1> <N2> --origin <owner/repo#N>
+```
+
+このコマンドは上記 4 要件を**構成上**満たす。ラベルを用意してから付与し、子をタスクリスト記法で描画し、`Dependencies` を `--ordered` の有無で矢印連鎖／`None — ...` 固定文に振り分け、`queue` 行を子だけで組み立てる。`--ordered` のときは同じ入力から `gh issue edit --add-blocked-by` も適用するので、**本文の宣言と native な依存関係が食い違うことがない**（手順 4 の付け忘れが構造的に起きなくなる）。依存関係の付与が失敗しても件数を報告して続行する（`gh` 2.94.0 以降が必要で、失われるのは関係だけ）。
+
+作成済みの epic は `pnpm josh epic:check <E>` で 4 要件を点検できる。手書きした epic、コマンド導入以前の epic、本文を手で編集した後の確認に使う。全要件を満たせば exit 0、満たさなければ exit 1 なのでゲートとしても使える。判定は自動クローズが読むのと**同じパーサ**（`scripts/git/git-epic-parse.ts`）を使うため、「自動クローズが読める形式」と「点検が通る形式」は定義上一致する。
+
+作成手順（フォールバック）: **`josh` が使えない環境でのみ**、以下を手で行う。
 
 1. 子 Issue を全て作成し、番号 `<N1> <N2> ...` を控える
 2. `epic` ラベルを用意する（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of child issues from one split" 2>/dev/null || true`）

@@ -53,7 +53,7 @@ const EXPECTED_COMMAND_ENTRIES: ReadonlyArray<readonly [string, ReadonlyArray<st
 			'hook:push',
 		],
 	],
-	['AI tools', ['prep', 'issue']],
+	['AI tools', ['prep', 'issue', 'epic', 'epic:check']],
 ]
 
 const EXPECTED_COMMANDS_BY_CATEGORY = new Map<string, ReadonlyArray<string>>(

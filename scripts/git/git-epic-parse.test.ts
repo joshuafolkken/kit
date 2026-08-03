@@ -3,8 +3,10 @@ import {
 	has_child,
 	has_declared_dependency_chain,
 	has_external_task_list_entry,
+	has_unordered_declaration,
 	is_state_closed,
 	parse_task_list_issue_numbers,
+	UNORDERED_DEPENDENCIES,
 } from './git-epic-parse'
 
 const PARSE_CASES = [
@@ -192,6 +194,28 @@ const DEPENDENCY_CASES = [
 describe('has_declared_dependency_chain', () => {
 	it.each(DEPENDENCY_CASES)('$label', ({ body, expected }) => {
 		expect(has_declared_dependency_chain(body)).toBe(expected)
+	})
+})
+
+describe('has_unordered_declaration', () => {
+	it('detects the literal that declares a batch to have no order', () => {
+		expect(has_unordered_declaration(`## Dependencies\n\n${UNORDERED_DEPENDENCIES}\n`)).toBe(true)
+	})
+
+	it('rejects a body whose dependencies are prose', () => {
+		expect(has_unordered_declaration('## Dependencies\n\n#102 depends on #101\n')).toBe(false)
+	})
+
+	// Same reason every other predicate strips fences: an epic body may quote the template, and the
+	// declaration inside that quote is an illustration rather than this epic's own.
+	it('ignores the literal when it only appears inside a fenced block', () => {
+		const body = `## Dependencies\n\nsee below\n\n\`\`\`md\n${UNORDERED_DEPENDENCIES}\n\`\`\`\n`
+
+		expect(has_unordered_declaration(body)).toBe(false)
+	})
+
+	it('reports false for a missing body', () => {
+		expect(has_unordered_declaration(undefined)).toBe(false)
 	})
 })
 
