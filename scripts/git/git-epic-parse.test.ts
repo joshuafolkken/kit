@@ -54,6 +54,14 @@ const PARSE_CASES = [
 		body: '```ts\nconst a = 1\n```\n\n- [ ] #101 one\n- [x] #102 two\n',
 		expected: [101, 102],
 	},
+	{
+		// The workflow prompt tells an epic filed from another repository to carry an `## Origin`
+		// bullet. Auto-close needs both halves to hold: no external entry (asserted separately) and
+		// children that still parse past the backlink.
+		label: 'reads the children of an epic that carries an Origin backlink',
+		body: '## Split rationale\n\nSplit by deliverable.\n\n## Origin\n\n- joshuafolkken/joshuafolkken-com#805\n\n## Progress\n\n- [ ] #101 one\n- [x] #102 two\n',
+		expected: [101, 102],
+	},
 ] as const satisfies ReadonlyArray<{
 	label: string
 	body: string | undefined
