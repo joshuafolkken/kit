@@ -29,8 +29,18 @@ function sync_with_merge(
 	console.info(`  ✔ synced    ${destination_name}`)
 }
 
+// Point the credential somewhere pnpm still expands. A consumer on pnpm < 11.6 (the range
+// devEngines still allows) may have had the removed line working, so losing it silently would
+// surface later as an unexplained 401 during install.
+const NPMRC_CREDENTIAL_NOTICE =
+	'    ℹ removed the GitHub Packages auth line pnpm ignores in a project .npmrc — keep the credential in ~/.npmrc (docs/authentication.md)'
+
 function sync_npmrc(destination_path: string): void {
+	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
+	const did_have_obsolete_line = init_logic.has_obsolete_npmrc_line(existing)
+
 	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
+	if (did_have_obsolete_line) console.info(NPMRC_CREDENTIAL_NOTICE)
 }
 
 // Union-merge kit's .gitignore entries into the consumer file instead of overwriting it,
