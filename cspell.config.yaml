@@ -2,20 +2,17 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
-  - backlink
   - dedup
   - dotless
   - testuser
   - myorg
   - myrepo
-  - narratively
   - ncurc
   - unstub
   - appleboy
   - vercel
   - winget
   - packument
-  - jgame
   - sonarlint
   - tssecurity
   - inlines

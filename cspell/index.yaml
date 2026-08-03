@@ -14,6 +14,7 @@ ignorePaths:
   #   - '**/*.svg'
 words:
   - backgrounding
+  - backlink
   - bttf
   - COLLAB
   - cursorrules
@@ -48,6 +49,7 @@ words:
   - ianvs
   - imagetools
   - inlang
+  - jgame
   - joshuafolkken
   - newbot
   - userinfobot
