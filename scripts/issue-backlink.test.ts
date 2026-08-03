@@ -69,7 +69,7 @@ describe('issue backlink — canonical definition in the workflow prompt', () =>
 		// changes width, so asserting a full padded row makes the suite fail on reformatting alone.
 		expect(raw).toContain('| 上流 Issue → 起票元')
 		expect(raw).toContain('| 起票元 Issue → 上流')
-		expect(raw).toContain('`## Upstream issues` | そこから起票した上流 Issue を全件列挙する')
+		expect(raw).toMatch(/`## Upstream issues` +\| そこから起票した上流 Issue を全件列挙する/u)
 	})
 
 	it('bans the bare reference and the checkbox row', () => {
