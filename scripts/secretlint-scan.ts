@@ -1,14 +1,11 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
-import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
+import { resolve_local_bin } from './local-bin'
 import { resolve_spawn_exit } from './spawn-exit'
 
 const SECRETLINT_BIN = 'secretlint'
-const SECRETLINT_CMD = 'secretlint.cmd'
-const NODE_MODULES = 'node_modules'
-const BIN_DIR = '.bin'
 const NO_GLOB_FLAG = '--no-glob'
 const ARGV_OFFSET = 2
 
@@ -27,8 +24,7 @@ const MISSING_NOTICE =
 type ScanDecision = { kind: 'skip'; notice?: string } | { kind: 'scan'; binary: string }
 
 function resolve_secretlint_binary(project_root: string): string | undefined {
-	const bin_name = process.platform === 'win32' ? SECRETLINT_CMD : SECRETLINT_BIN
-	const candidate = path.join(project_root, NODE_MODULES, BIN_DIR, bin_name)
+	const candidate = resolve_local_bin(project_root, SECRETLINT_BIN)
 
 	return existsSync(candidate) ? candidate : undefined
 }
