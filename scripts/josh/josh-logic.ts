@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolve_local_bin } from '#scripts/local-bin'
 import { package_bin_schema, package_version_schema } from '#scripts/schemas'
 import { resolve_spawn_exit } from '#scripts/spawn-exit'
 import { execaSync } from 'execa'
@@ -16,9 +17,7 @@ import {
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
-const TSX_CMD = 'tsx.cmd'
 const TSX_MANIFEST = 'tsx/package.json'
-const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
 
 interface TsxRunner {
@@ -44,10 +43,9 @@ function find_package_directory(start_directory: string): string {
 const PACKAGE_DIR = find_package_directory(path.dirname(fileURLToPath(import.meta.url)))
 
 function resolve_tsx_executable(): string {
-	const bin_name = process.platform === 'win32' ? TSX_CMD : TSX_BIN
 	const candidates = [
-		path.join(PACKAGE_DIR, NODE_MODULES, '.bin', bin_name),
-		path.join(process.cwd(), NODE_MODULES, '.bin', bin_name),
+		resolve_local_bin(PACKAGE_DIR, TSX_BIN),
+		resolve_local_bin(process.cwd(), TSX_BIN),
 	]
 
 	return candidates.find(existsSync) ?? TSX_BIN
