@@ -15,7 +15,11 @@ const mocked_get_child = vi.mocked(git_gh_command.issue_get_state_and_relations)
 const mocked_close = vi.mocked(git_gh_command.issue_close)
 
 const GH_FAILURE = 'gh exploded'
-const EPIC_BODY = '## Progress\n\n- [ ] #101 one\n- [ ] #102 two\n- [ ] #103 three\n'
+const PROGRESS = '## Progress\n\n- [ ] #101 one\n- [ ] #102 two\n- [ ] #103 three\n'
+const ORDERED_DEPENDENCIES = '## Dependencies\n\n#101 -> #102 -> #103\n\n'
+const UNORDERED_DEPENDENCIES = '## Dependencies\n\nNone — the children are independent.\n\n'
+const EPIC_BODY = ORDERED_DEPENDENCIES + PROGRESS
+const UNORDERED_EPIC_BODY = UNORDERED_DEPENDENCIES + PROGRESS
 const MERGED_ISSUE = '103'
 
 function epic_list_json(entries: Array<{ number: number; body: string }>): string {
@@ -172,9 +176,9 @@ describe('close_completed_epics — failure handling', () => {
 	})
 })
 
-describe('close_completed_epics — unrecorded batch order', () => {
-	const NO_RELATION_REGEX = /no blocked-by relation on any child/u
+const NO_RELATION_REGEX = /no blocked-by relation on any child/u
 
+describe('close_completed_epics — unrecorded batch order', () => {
 	it('reports when no sibling carries a blocked-by relation', async () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
@@ -203,6 +207,26 @@ describe('close_completed_epics — unrecorded batch order', () => {
 
 		expect(console.info).toHaveBeenCalledWith(expect.stringMatching(NO_RELATION_REGEX))
 		expect(mocked_close).not.toHaveBeenCalled()
+	})
+})
+
+describe('close_completed_epics — unordered batch', () => {
+	it('stays silent when the epic body declares no dependency chain', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: UNORDERED_EPIC_BODY }]))
+		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
+
+		expect(console.info).not.toHaveBeenCalledWith(expect.stringMatching(NO_RELATION_REGEX))
+	})
+
+	it('still closes an unordered epic once every child is closed', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: UNORDERED_EPIC_BODY }]))
+		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
+
+		expect(mocked_close).toHaveBeenCalledTimes(1)
 	})
 })
 

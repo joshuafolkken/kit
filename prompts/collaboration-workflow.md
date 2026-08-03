@@ -63,29 +63,31 @@ Issue には次の要素を必ず含める。
 
 ### 複数 Issue に分割するときの epic Issue
 
-`kickoff new` が 1 つの要望を複数 Issue に分割したとき、**3 件以上になり、かつ実行順序に意味がある**（後続 Issue が先行 Issue に依存する）場合**のみ**、それらを束ねる epic Issue を作成する。
+`kickoff new` が 1 つの要望を **2 件以上**の Issue に分割したとき、**常に**それらを束ねる epic Issue を作成する。件数や実行順序の有無で分岐しない。
 
-なぜ必要か: 分割の根拠と実行順序を「最初の Issue のコメント」に置くと、その Issue は `queue` が最初にマージしてクローズする対象でもあるため、残りの作業の設計図がクローズ済み Issue の中に埋もれる。子 Issue 側からも自分が何番目で何に依存しているかを辿れない。epic はその情報の**閉じない置き場**として機能する。
+なぜ必要か: 分割の根拠を「最初の Issue のコメント」に置くと、その Issue は `queue` が最初にマージしてクローズする対象でもあるため、残りの作業の設計図がクローズ済み Issue の中に埋もれる。epic の役割は、その情報の**閉じない置き場**を用意することにある。実行順序は epic が載せられる情報の一つであって、epic が存在する理由ではない。埋没は順序の有無と無関係に、複数分割のたびに起きる。
 
-- **2 件の分割**、または**順序が不問**の分割では epic を作らない。この場合は依存関係を各子 Issue の本文に直接書く（`Depends on #N`）。件数が少ないうちは epic の管理コストが情報整理の利益を上回る
-- epic には `epic` ラベルを付ける（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of ordered child issues" 2>/dev/null || true`）。放置された open epic を `gh issue list --label epic` で棚卸しできるようにするため
+- **条件分岐を置かない。** 「件数が少ないうちは epic の管理コストが情報整理の利益を上回る」という以前の但し書きは、`scripts/git/git-epic-close.ts`（`pnpm josh followup` から駆動）が子 Issue の全クローズを検知して epic を自動クローズするようになった時点で根拠を失った。放置される epic という管理コストがもう存在しない以上、避けるべきは分岐の誤判定だけである。2 件・順序不問の分割に epic が付く冗長さは軽微で、分岐の見落としによる情報消失より常に安い
+- epic には `epic` ラベルを付ける（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of child issues from one split" 2>/dev/null || true`）。放置された open epic を `gh issue list --label epic` で棚卸しできるようにするため
 - **epic を `queue` に渡してはならない。** `queue` には子 Issue のみを渡す。epic には成果物がなく、実装ランを走らせる対象ではない
 - epic は最後の子 Issue がクローズされた時点で `pnpm josh followup` が自動クローズする。マージ後に `epic` ラベルの open な Issue を探し、タスクリストの子が全てクローズ済みなら子を列挙したコメント付きで閉じる。1 件でも open なら放置し、この処理の失敗は警告のみでランを止めない。最終 PR に `closes #<epic>` を書く方法は、バッチが途中で失敗したときにも発火して未完了を完了扱いにするため採用しない
 - 自動クローズは `epic` ラベルとタスクリスト記法の両方に依存する。どちらかを欠くと epic は open のまま残るので、手動でクローズする
 - タスクリストが**他リポジトリの子 Issue**（`owner/repo#N` や URL 形式）を含む場合、自動クローズは行われない。その子の状態は別リポジトリを指定しないと読めず、無視すると open のまま epic を閉じてしまうため。この場合も手動でクローズする
-- 手順 4 の依存関係が**一件も付いていない**場合、`pnpm josh followup` が子 Issue のマージごとに警告する。連鎖の形は検査しない（タスクリストの並び順を依存順と推測することになり誤検知を生むため）。epic があること自体が順序ありを意味するので、ゼロ件なら手順 4 の飛ばしが確定する
+- epic 本文の `Dependencies` に依存の連鎖（`#N -> #M`）が書かれているのに、手順 4 の依存関係が**一件も付いていない**場合、`pnpm josh followup` が子 Issue のマージごとに警告する。連鎖の形は検査しない（タスクリストの並び順を依存順と推測することになり誤検知を生むため）。判定の起点を本文の宣言に置くのは、epic の存在がもう順序ありを意味しないため — 順序不問のバッチにも epic を作る以上、依存関係ゼロ件は正常な状態でもありうる
 
 作成手順:
 
 1. 子 Issue を全て作成し、番号 `<N1> <N2> ...` を控える
-2. `epic` ラベルを用意する（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of ordered child issues" 2>/dev/null || true`）
+2. `epic` ラベルを用意する（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of child issues from one split" 2>/dev/null || true`）
 3. epic を作成し、番号 `<E>` を控える: `gh issue create --title "<epic-title>" --label epic --body "<body>"`
-4. 子 Issue に依存関係を付与する（後述の理由により**作成後の独立ステップ**として行う）:
+4. 実行順序が**ある場合のみ**、子 Issue に依存関係を付与する（後述の理由により**作成後の独立ステップ**として行う）:
 
    ```bash
    gh issue edit <N2> --add-blocked-by <N1>
    gh issue edit <N3> --add-blocked-by <N2>
    ```
+
+   順序が不問なら手順 4 は行わない。epic の作成は無条件だが、依存関係の記録は順序が実在するときだけで、両者は独立している。
 
 手順 2 の `|| true` はラベルが既に存在する場合を無視するためのもので、作成失敗を握り潰す危険はない。ラベルが存在しないまま手順 3 に進むと `--label epic` が解決できず `gh issue create` 自体が失敗するため、異常は必ずそこで顕在化する。
 
@@ -114,6 +116,8 @@ queue #101 #102 #103
 ```
 
 `Progress` は**必ずタスクリスト記法**（`- [ ] #N`）で書く。GitHub は参照先 Issue がクローズされた時点でこの記法のチェックボックスのみを自動で埋めるため、素のリンク（`#N` の直書き）では進捗が追跡されない。ただし全項目が埋まっても GitHub が epic 自体をクローズすることはない。
+
+`Dependencies` は順序があるなら**必ず矢印記法**（`#101 -> #102`、`->` または `→`）で書く。`pnpm josh followup` の順序未記録チェックはこの記法を検出して初めて発火するため、`#102 depends on #101` のような散文で書くと、手順 4 を飛ばしても警告されない。順序が不問なら節ごと省略せず `None — the children are independent; any execution order works.` と明示する。空欄や節の削除では「順序がない」のか「書き忘れた」のかが読み手にもチェックにも区別できない。
 
 #### ネイティブの依存関係と sub-issues
 
