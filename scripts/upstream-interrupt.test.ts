@@ -26,6 +26,30 @@ const GATE_MARKERS: ReadonlyArray<string> = [
 	'reporting the filtered result honestly does not make it compliant',
 ]
 
+// #732: the confirmation-free rule was written for repositories we own, but nothing in it said so,
+// and an agent filed sveltejs/kit#16623 on a third-party project. The owner comparison has to be
+// mechanical — a judgement call resolves toward "close enough to first-party" under run pressure.
+const THIRD_PARTY_MARKERS: ReadonlyArray<string> = [
+	'Third-party repositories are Tier C',
+	'Decide which side a target is on mechanically, never by judgement',
+	'`gh repo view --json owner --jq .owner.login`',
+	'everything else is third-party',
+	'First-party targets are unchanged',
+	'Third-party targets are Tier C for every kind of write',
+	"needs the user's explicit instruction **in the current turn**",
+]
+
+// A report aimed at maintainers who never agreed to triage it needs to survive without our
+// project's configuration, so the bar is checked before the draft is offered, not after approval.
+const THIRD_PARTY_EVIDENCE_MARKERS: ReadonlyArray<string> = [
+	'minimal reproduction outside our project',
+	'every claim verified',
+	'a search for an existing Issue',
+	'Withdrawal is outward-facing too',
+	'A correct diagnosis is not authorization to publish.',
+	'`## Upstream candidate`',
+]
+
 const SELF_CORRECTION_MARKERS: ReadonlyArray<string> = [
 	'Tier A also covers self-correction.',
 	'Fixing a factual error in an artifact you yourself published',
@@ -66,6 +90,29 @@ describe('upstream interrupt — unconditional rule in the AI docs', () => {
 		expect(raw).not.toContain(
 			"Cross-package problems → interrupt with a new Issue, don't patch locally.",
 		)
+	})
+})
+
+describe('upstream interrupt — third-party targets in the AI docs', () => {
+	it.each(AI_DOCS)('%s separates first-party from third-party by the owner test', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		for (const marker of THIRD_PARTY_MARKERS) expect(raw).toContain(marker)
+	})
+
+	it.each(AI_DOCS)('%s states the evidence bar before a draft is offered', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		for (const marker of THIRD_PARTY_EVIDENCE_MARKERS) expect(raw).toContain(marker)
+	})
+
+	it.each(AI_DOCS)('%s scopes the confirmation-free filing to first-party', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		expect(raw).toContain(
+			"when the target is first-party (its owner equals this session's repository owner), filing is Tier A",
+		)
+		expect(raw).toContain('when the target is third-party, filing is Tier C')
 	})
 })
 
@@ -130,6 +177,46 @@ describe('upstream interrupt — canonical section in the workflow prompt', () =
 		expect(raw).toContain(
 			'CLAUDE.md / AGENTS.md / GEMINI.md「Cross-package problems → file the upstream Issue, then always stop」',
 		)
+	})
+})
+
+describe('upstream interrupt — third-party targets in the workflow prompt', () => {
+	it('carries the canonical third-party section with the mechanical owner test', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('### 第三者リポジトリへの書き込みは Tier C（明示指示が必要）')
+		expect(raw).toContain('**判定は機械的に行い、判断に委ねない**')
+		expect(raw).toContain('**それ以外は全て third-party**')
+	})
+
+	it('keeps first-party filing confirmation-free and gates third-party writes', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('**ただし確認なしで起票してよいのは対象が first-party のときだけ**')
+		expect(raw).toContain('**third-party は書き込みの種別を問わず Tier C**')
+		expect(raw).toContain('**取り下げも外向きの行為**')
+	})
+
+	// The unconditional subsection and the Tier A caveat both asserted confirmation-free filing for
+	// any target; leaving either unqualified would contradict the new section from the same document.
+	it('qualifies every surrounding statement that reads as filing anywhere', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain('**ただしこれが成り立つのは対象が first-party のときだけ**')
+		expect(raw).toContain(
+			'**「可逆かつ低コスト」という前提が成り立つのは自分たちが所有するリポジトリに対してだけ**',
+		)
+	})
+
+	it('records a candidate that was not filed under its own backlink heading', () => {
+		const raw = read_repo_file(WORKFLOW_PROMPT)
+
+		expect(raw).toContain(
+			'**未起票の候補には `## Upstream candidate` を使い、`## Upstream issues` を使わない**',
+		)
+		// Prettier re-pads table cells when an adjacent row changes width, so the row is matched
+		// with the padding left free rather than pinned to today's column widths.
+		expect(raw).toMatch(/`## Upstream candidate` +\| 第三者リポジトリへ報告する候補/u)
 	})
 })
 
