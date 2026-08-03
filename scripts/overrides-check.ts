@@ -1,6 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * Check pnpm.overrides for unexpected changes.
+ * Check dependency overrides for unexpected changes.
+ *
+ * Reads both locations pnpm honours — `overrides:` in pnpm-workspace.yaml (pnpm 11) and
+ * `pnpm.overrides` in package.json (legacy) — so an empty one is never mistaken for "no overrides".
  *
  * Usage:
  *   tsx scripts/overrides-check.ts --save      # save current overrides as snapshot
@@ -9,6 +12,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { overrides_files } from './overrides/overrides-files'
 import { overrides_check, type OverridesDiff } from './overrides/overrides-logic'
 import { overrides_snapshot_schema } from './schemas'
 
@@ -33,39 +37,38 @@ function load_snapshot(): Record<string, string> {
 	}
 }
 
-function print_diff(diff: OverridesDiff): never {
-	console.error('✖ pnpm.overrides changed unexpectedly:')
+function print_diff(diff: OverridesDiff, sources_summary: string): never {
+	console.error(`✖ overrides changed unexpectedly (${sources_summary}):`)
 
-	for (const entry of diff.added) {
-		console.error(`  + added:   ${entry.key} → ${entry.value}`)
-	}
-
-	for (const entry of diff.removed) {
-		console.error(`  - removed: ${entry.key} (was ${entry.value})`)
-	}
-
-	for (const entry of diff.modified) {
-		console.error(`  ~ changed: ${entry.key}: ${entry.old_value} → ${entry.new_value}`)
+	for (const line of overrides_check.format_diff_lines(diff)) {
+		console.error(line)
 	}
 
 	return process.exit(1)
 }
 
-function run_overrides_check(should_save: boolean): void {
-	const current = overrides_check.read_overrides_from_package(readFileSync('package.json', 'utf8'))
+function save_snapshot(current: Record<string, string>, sources_summary: string): never {
+	writeFileSync(overrides_check.SNAPSHOT_PATH, `${JSON.stringify(current, undefined, '\t')}\n`)
+	console.info(
+		`✔ Overrides snapshot saved to ${overrides_check.SNAPSHOT_PATH} (${sources_summary})`,
+	)
 
-	if (should_save) {
-		writeFileSync(overrides_check.SNAPSHOT_PATH, `${JSON.stringify(current, undefined, '\t')}\n`)
-		console.info(`✔ Overrides snapshot saved to ${overrides_check.SNAPSHOT_PATH}`)
-		process.exit(0)
-	}
+	return process.exit(0)
+}
+
+function run_overrides_check(should_save: boolean): void {
+	const sources = overrides_files.read_current_sources()
+	const summary = overrides_check.describe_sources(sources)
+	const current = overrides_check.read_overrides(sources)
+
+	if (should_save) save_snapshot(current, summary)
 
 	const snapshot = load_snapshot()
 	const diff = overrides_check.compare(snapshot, current)
 
-	if (diff.is_changed) print_diff(diff)
+	if (diff.is_changed) print_diff(diff, summary)
 
-	console.info('✔ pnpm.overrides unchanged.')
+	console.info(`✔ overrides unchanged (${summary}).`)
 }
 
 function main(): void {

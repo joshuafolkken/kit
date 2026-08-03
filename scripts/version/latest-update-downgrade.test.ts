@@ -25,9 +25,17 @@ vi.mock('node:fs', () => ({ readFileSync: read_mock, writeFileSync: write_mock }
 vi.mock('./preinstall-version-update', () => ({
 	preinstall_version_update: { sync: sync_mock },
 }))
+vi.mock('#scripts/overrides/overrides-files', () => ({
+	overrides_files: {
+		read_current_sources: vi.fn().mockReturnValue({ package_json: '{}', workspace_yaml: '' }),
+		read_current_overrides: vi.fn().mockReturnValue({}),
+	},
+}))
 vi.mock('#scripts/overrides/overrides-logic', () => ({
 	overrides_check: {
-		read_overrides_from_package: vi.fn().mockReturnValue({}),
+		compare: vi.fn().mockReturnValue({ is_changed: false, added: [], removed: [], modified: [] }),
+		describe_sources: vi.fn().mockReturnValue('no overrides found'),
+		format_diff_lines: vi.fn().mockReturnValue([]),
 		list_excluded_package_names: vi.fn().mockReturnValue([]),
 		build_update_command: vi.fn().mockReturnValue(['pnpm', 'update', '--latest', 'tsx']),
 	},
