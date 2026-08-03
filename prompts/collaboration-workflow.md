@@ -641,7 +641,7 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
    - ルール上書きが要るなら **正しいレイヤー**（kit / app-kit の共有設定）でスコープする。消費者リポジトリでの場当たり的な一回限りの disable にしない
    - 破壊が first-party パッケージ（kit / app-kit）起因なら、**そこに Issue を立てて適切な altitude で直す**。消費者側の回避だけで済ませない（→「別パッケージ起因の問題は割り込み Issue で対応する」参照）
 3. **pin-back は最終手段**: fix-forward が本当に不可能／ブロックされている（例: 未リリースの上流修正待ち）ときだけ、古いバージョンへ固定する。固定するときは **理由を記録し、最新へ戻すためのトラッキング Issue を立てる**。pin-back を既定の推奨として提示してはならない
-4. **既存の保護を尊重する**: この方針は `pnpm.overrides` / `devEngines` の承認ゲートを上書きしない。fix-forward は _「最新を優先し破壊を直す」_ であって _「保護された pin を黙って書き換える」_ ではない。`pnpm.overrides` / `devEngines` の変更は従来どおりユーザーの明示承認を要する（→「`pnpm.overrides` の保護」、および CLAUDE.md の `devEngines` 保護ルール参照）
+4. **既存の保護を尊重する**: この方針は overrides / `devEngines` の承認ゲートを上書きしない。fix-forward は _「最新を優先し破壊を直す」_ であって _「保護された pin を黙って書き換える」_ ではない。overrides（`pnpm-workspace.yaml` / `package.json` のいずれも）と `devEngines` の変更は従来どおりユーザーの明示承認を要する（→「overrides の保護（`pnpm-workspace.yaml` / `package.json` の両方を見る）」、および CLAUDE.md の `devEngines` 保護ルール参照）
 5. **タイムリーに**: バンプ起因の破壊は、可能な限り同じ作業セッション内で速やかに対処し、pin の裏に先送りしない
 
 - このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Latest-first, fix forward — pin back only as a last resort」）のカノニカル参照
@@ -747,7 +747,7 @@ AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎる�
 
 - **Tier A — 可逆な実装・設計判断**（明確に優位な選択肢があるライブラリ選定、命名、ファイル構成、テスト手法、リファクタの形）。メリット比較で1案が明確に優位なら**確認せず自動で選んで進める**。本来ユーザー確認すべき分岐だった場合は、後から監査・差し戻せるよう判断を記録する（下記「自動判断の記録」）
 - **Tier B — 本当に甲乙つけがたい判断**。上位2案がどちらも妥当で差が僅差。**ここだけが停止する層** — ユーザーに確認する（`AskUserQuestion` が使えるなら使う）。拮抗する候補とトレードオフを提示する
-- **Tier C — 不可逆・共有状態・スコープ外の操作**（マージ、ブランチ削除、force push、破壊的操作、リポジトリ設定変更、タスク範囲外の変更、`devEngines` / `pnpm.overrides` の編集）。**このポリシーの対象外。** 1案が明確に優位に見えても、常にユーザーの明示指示を要する。既存の安全ルール（上記「指示されていない行動は取らない」、`devEngines` / `pnpm.overrides` 保護）が優先される
+- **Tier C — 不可逆・共有状態・スコープ外の操作**（マージ、ブランチ削除、force push、破壊的操作、リポジトリ設定変更、タスク範囲外の変更、`devEngines` / overrides の編集（`pnpm-workspace.yaml` `overrides:` と `package.json` `pnpm.overrides` のいずれも））。**このポリシーの対象外。** 1案が明確に優位に見えても、常にユーザーの明示指示を要する。既存の安全ルール（上記「指示されていない行動は取らない」、`devEngines` / overrides 保護）が優先される
 
 **A と B の判定基準**: 確認するのは「差が僅差 **かつ** 後戻りしにくい／アーキテクチャに長く影響する」ときだけ。「迷っている」だけでは停止理由にならない — 明確に優位な選択肢は多少の不確実性が残っても自動で選び、僅差でも安価に巻き戻せる選択は自動で決めて記録して進む。
 
@@ -787,10 +787,13 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<�
 - 同一の停止に対して通知は 1 回のみ。再評価のたびに送らない
 - ユーザー自身がそのターンで停止を指示した場合は通知しない（既に把握しているため）
 
-### `pnpm.overrides` の保護
+### overrides の保護（`pnpm-workspace.yaml` / `package.json` の両方を見る）
 
-`pnpm.overrides`（または `overrides`）に設定された制約は、**セキュリティ・互換性・動作保証のために意図的に追加されたもの**である。
+overrides に設定された制約は、**セキュリティ・互換性・動作保証のために意図的に追加されたもの**である。
 
-- `pnpm latest` や `pnpm update --latest` 実行後は必ず `pnpm.overrides` が変化していないか確認する
+**overrides は 2 箇所に置かれ、片方だけを見ても答えにならない。** pnpm 11 は `pnpm-workspace.yaml` の `overrides:` ブロックを読む（kit と app-kit の overrides は実際にここにある）。`package.json` の `pnpm.overrides` は旧来の置き場所である。**`pnpm.overrides` が空、あるいはそもそも `pnpm` フィールドが無いことは、そのプロジェクトに overrides が無いことの証拠にはならない** — app-kit の `package.json` には `pnpm` フィールドが一切無いが、`pnpm-workspace.yaml` には実際の override が存在する。`package.json` しか見ずに「保護すべき overrides は無い」と結論してはならない。それはルールが検出すべき状態そのもので合格を報告する振る舞いであり、しかも点検が空振りしたという信号を一切残さない（kit #740）。
+
+- **確認は「実行するコマンド」であって「到達する結論」ではない。** `josh latest` / `pnpm update --latest` などの依存更新コマンドの実行後は、`git diff -- pnpm-workspace.yaml package.json` を実行し、`overrides:` ブロックと `pnpm.overrides` の双方が無傷であることを確認する
+- `josh latest` は overrides の判定を自分で出力する（最後の overrides 行が `✔ overrides unchanged (<n> from <file>)`、変化していれば `⚠ overrides changed` 警告）。`pnpm josh overrides` は保存済みスナップショットと両ファイルを比較する。**実際に出力された行を引用して報告する**こと — 推測した判定を書いてはならない
 - overrides が自動的に変更・削除された場合は、**理由を調査してから**ユーザーに報告し、明示的な承認なしに変更してはならない
 - 例: `"esbuild@<=0.24.2": ">=0.25.0"` などのバージョン制約は、Workers ビルド互換性やパッケージの動作保証のために入れてある場合がある
