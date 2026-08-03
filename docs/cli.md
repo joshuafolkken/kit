@@ -4,7 +4,7 @@ Install `@joshuafolkken/kit` globally to run `josh` from any directory, independ
 
 ## 1. Authenticate
 
-One-time GitHub Packages setup — see [authentication.md](./authentication.md). For a global install, write the `.npmrc` lines to your home `~/.npmrc`.
+One-time GitHub Packages setup — see [authentication.md](./authentication.md). For a global install, write both the token line and the scoped registry mapping to your home `~/.npmrc`.
 
 ## 2. Install globally
 
