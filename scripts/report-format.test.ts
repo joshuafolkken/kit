@@ -1,14 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-
-const AI_DOCS: ReadonlyArray<string> = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']
-const WORKFLOW_PROMPT = 'prompts/collaboration-workflow.md'
-const CLAUDE_SETTINGS = '.claude/settings.json'
-
-function read_repo_file(relative_path: string): string {
-	return readFileSync(fileURLToPath(new URL(`../${relative_path}`, import.meta.url)), 'utf8')
-}
+import { AI_DOCS, CLAUDE_SETTINGS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
 
 // The report format lives in five places (three AI docs, the workflow prompt, the hook).
 // Updating only one of them leaves the AI with contradicting instructions, so assert per marker.
