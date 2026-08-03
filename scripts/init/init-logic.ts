@@ -1,3 +1,4 @@
+import { json_format } from '#scripts/config-merge/json-format'
 import { vscode_settings_schema } from '#scripts/schemas'
 import { init_logic_deploy_vps } from './init-logic-deploy-vps'
 import { init_logic_json_merge } from './init-logic-json-merge'
@@ -114,6 +115,24 @@ const TSCONFIG_EXTENDS = './node_modules/@joshuafolkken/kit/tsconfig/base.json'
 // compilerOptions when normalizing a consumer tsconfig.json during sync.
 const TSCONFIG_PRESET_FILENAME = 'base.json'
 
+const TSCONFIG_EXCLUDE_FIELD = 'exclude'
+
+// Directories the kit-distributed configs generate, plus the usual build outputs. `playwright.config.ts`
+// points the html reporter at `playwright-report/` and Playwright writes `test-results/` — the report
+// holds Playwright's own minified trace-viewer bundle, so a consumer with a broad `include` gets
+// thousands of tsc errors from third-party output right after running the E2E suite kit ships the
+// config for. The two directories must stay disjoint (Playwright refuses an html output folder nested
+// in the tests output folder, and vice versa), so both are excluded rather than consolidated. These
+// belong in the CONSUMER file: a consumer `exclude` overrides the extended preset's instead of merging
+// with it, so shipping them only in a preset would have no effect. See joshuafolkken/kit#712.
+const TSCONFIG_EXCLUDE: ReadonlyArray<string> = [
+	'node_modules',
+	'build',
+	'dist',
+	'playwright-report',
+	'test-results',
+]
+
 // extensions.json is distributed in common across project styles, so it is not keyed by type.
 const VSCODE_EXTENSIONS_FILENAME = 'extensions.json'
 
@@ -146,8 +165,23 @@ const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
 	[PRETTIER_TAILWIND_PLUGIN_KEY]: '^0.8.0',
 }
 
+// format_json rather than JSON.stringify: the `exclude` array fits on one line, and that is how
+// prettier emits it — a multi-line array would fail `prettier --check` in the consumer (#660).
 function generate_tsconfig(): string {
-	return `${JSON.stringify({ extends: TSCONFIG_EXTENDS }, undefined, '\t')}\n`
+	return json_format.format_json({
+		extends: TSCONFIG_EXTENDS,
+		[TSCONFIG_EXCLUDE_FIELD]: TSCONFIG_EXCLUDE,
+	})
+}
+
+// Union-merge kit's generated-output entries into an existing consumer `exclude`: entries the
+// consumer authored are kept verbatim and only the missing ones are appended, so an already-merged
+// file is a no-op. Insert-if-absent on the file as a whole would never repair the installed base,
+// which is the whole point here — every current consumer has a tsconfig already.
+function merge_tsconfig_exclude(content: string): string {
+	const field = TSCONFIG_EXCLUDE_FIELD
+
+	return init_logic_json_merge.merge_json_array_field(content, field, TSCONFIG_EXCLUDE)
 }
 
 function generate_lefthook_config(): string {
@@ -225,6 +259,10 @@ function get_tsconfig_extends_entry(): string {
 
 function get_tsconfig_preset_filename(): string {
 	return TSCONFIG_PRESET_FILENAME
+}
+
+function get_tsconfig_exclude_entries(): ReadonlyArray<string> {
+	return TSCONFIG_EXCLUDE
 }
 
 function get_lefthook_extends_value(): string {
@@ -334,6 +372,8 @@ const init_logic = {
 	...init_logic_yaml_merge,
 	...init_logic_deploy_vps,
 	generate_tsconfig,
+	merge_tsconfig_exclude,
+	get_tsconfig_exclude_entries,
 	generate_lefthook_config,
 	generate_cspell_config,
 	generate_npmrc,
