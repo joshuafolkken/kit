@@ -13,6 +13,7 @@ interface EpicIssue {
 	number: number
 	children: Array<number>
 	has_external_child: boolean
+	has_declared_order: boolean
 }
 
 interface SiblingState {
@@ -25,6 +26,7 @@ function to_epic_issue(raw: { number: number; body?: string | undefined }): Epic
 		number: raw.number,
 		children: git_epic_parse.parse_task_list_issue_numbers(raw.body),
 		has_external_child: git_epic_parse.has_external_task_list_entry(raw.body),
+		has_declared_order: git_epic_parse.has_declared_dependency_chain(raw.body),
 	}
 }
 
@@ -72,11 +74,13 @@ async function inspect_siblings(
 }
 
 // #702 made recording the batch order a manual step (`gh issue edit <N> --add-blocked-by <M>`), and
-// skipping it is otherwise symptomless. Only a total absence is reported: an epic exists only for an
-// ordered batch, so zero relations is unambiguous, whereas checking each dependent pair would mean
-// inferring the chain from task-list order, which is not guaranteed to match.
+// skipping it is otherwise symptomless. The epic body's declared chain is the trigger: since #713
+// every split gets an epic, so its existence no longer implies an order, and warning on that alone
+// would fire on every unordered batch. Only a total absence of relations is reported — checking each
+// dependent pair would mean inferring the chain from task-list order, which need not match.
 function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<SiblingState>): void {
 	if (states.length === 0) return
+	if (!epic.has_declared_order) return
 	if (states.some((state) => state.has_blocked_by)) return
 
 	console.info(
