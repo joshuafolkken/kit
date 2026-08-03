@@ -14,6 +14,12 @@ const EXTERNAL_TASK_LIST_PATTERN =
 // would attach a nonexistent Issue to the batch and keep the epic open forever.
 const FENCE_LINE_PATTERN = /^[ \t]*(?:`{3,}|~{3,})/u
 
+// An epic is created for every split, so its existence no longer implies an ordered batch. The
+// declaration in its body is what distinguishes "the order was never recorded" from "there is no
+// order": a chain between two Issue references (`#101 -> #102`, or the arrow written as `→`). The
+// shape of the chain is not validated — only that one was declared at all.
+const DEPENDENCY_CHAIN_PATTERN = /#\d+[ \t]*(?:->|→)[ \t]*#\d+/u
+
 const CLOSED_STATE = 'CLOSED'
 
 // Toggling on each fence line keeps this linear — a single regex spanning the block would backtrack.
@@ -53,10 +59,20 @@ function parse_task_list_issue_numbers(body: string | undefined): Array<number> 
 	return [...new Set(numbers)]
 }
 
-function has_external_task_list_entry(body: string | undefined): boolean {
+// Every body predicate must strip fenced blocks first, for the reason given on FENCE_LINE_PATTERN.
+// The patterns are non-global, so `test` keeps no `lastIndex` state between calls.
+function has_pattern_match(pattern: RegExp, body: string | undefined): boolean {
 	if (body === undefined) return false
 
-	return EXTERNAL_TASK_LIST_PATTERN.test(strip_fenced_blocks(body))
+	return pattern.test(strip_fenced_blocks(body))
+}
+
+function has_external_task_list_entry(body: string | undefined): boolean {
+	return has_pattern_match(EXTERNAL_TASK_LIST_PATTERN, body)
+}
+
+function has_declared_dependency_chain(body: string | undefined): boolean {
+	return has_pattern_match(DEPENDENCY_CHAIN_PATTERN, body)
 }
 
 function has_child(children: ReadonlyArray<number>, issue_number: number): boolean {
@@ -73,6 +89,7 @@ function is_state_closed(state: string | undefined): boolean {
 const git_epic_parse = {
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,
+	has_declared_dependency_chain,
 	has_child,
 	is_state_closed,
 }
@@ -81,6 +98,7 @@ export {
 	git_epic_parse,
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,
+	has_declared_dependency_chain,
 	has_child,
 	is_state_closed,
 }

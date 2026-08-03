@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
 	has_child,
+	has_declared_dependency_chain,
 	has_external_task_list_entry,
 	is_state_closed,
 	parse_task_list_issue_numbers,
@@ -65,6 +66,8 @@ describe('parse_task_list_issue_numbers', () => {
 	})
 })
 
+const UNDEFINED_BODY_LABEL = 'reports none when the body is undefined'
+
 const EXTERNAL_CASES = [
 	{
 		label: 'detects an owner/repo qualified task list entry',
@@ -86,7 +89,7 @@ const EXTERNAL_CASES = [
 		body: 'See joshuafolkken/app-kit#7 for context.\n\n- [ ] #101 one\n',
 		expected: false,
 	},
-	{ label: 'reports none when the body is undefined', body: undefined, expected: false },
+	{ label: UNDEFINED_BODY_LABEL, body: undefined, expected: false },
 	{
 		label: 'ignores a repo-qualified sample inside a fenced code block',
 		body: '```md\n- [ ] owner/repo#7 sample\n```\n\n- [ ] #101 real\n',
@@ -97,6 +100,50 @@ const EXTERNAL_CASES = [
 describe('has_external_task_list_entry', () => {
 	it.each(EXTERNAL_CASES)('$label', ({ body, expected }) => {
 		expect(has_external_task_list_entry(body)).toBe(expected)
+	})
+})
+
+function dependencies_body(declaration: string): string {
+	return `## Dependencies\n\n${declaration}\n`
+}
+
+const DEPENDENCY_CASES = [
+	{
+		label: 'detects an ascii arrow chain under Dependencies',
+		body: dependencies_body('#101 -> #102 -> #103 (#102 needs the API from #101)'),
+		expected: true,
+	},
+	{
+		label: 'detects a unicode arrow chain',
+		body: dependencies_body('#101 → #102'),
+		expected: true,
+	},
+	{
+		label: 'detects a chain written without surrounding spaces',
+		body: dependencies_body('#101->#102'),
+		expected: true,
+	},
+	{
+		label: 'reports none when the batch is declared unordered',
+		body: dependencies_body('None — the children are independent; any execution order works.'),
+		expected: false,
+	},
+	{
+		label: 'reports none for a bare list of children with no arrow',
+		body: dependencies_body('#101, #102, #103'),
+		expected: false,
+	},
+	{ label: UNDEFINED_BODY_LABEL, body: undefined, expected: false },
+	{
+		label: 'ignores a chain shown only inside a fenced template sample',
+		body: `\`\`\`md\n${dependencies_body('#101 -> #102')}\`\`\`\n\n${dependencies_body('None — independent.')}`,
+		expected: false,
+	},
+] as const satisfies ReadonlyArray<{ label: string; body: string | undefined; expected: boolean }>
+
+describe('has_declared_dependency_chain', () => {
+	it.each(DEPENDENCY_CASES)('$label', ({ body, expected }) => {
+		expect(has_declared_dependency_chain(body)).toBe(expected)
 	})
 })
 
