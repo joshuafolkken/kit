@@ -17,11 +17,12 @@ const PACKAGE_JSON = JSON.parse(
 
 // Guards the invariant required by pnpm 11.5.0 (pnpm/pnpm#11307): when both
 // `packageManager` and `devEngines.packageManager` are present, pnpm only
-// suppresses the "Cannot use both ..." warning if their versions match exactly.
-// If a future bump drifts one field, this fails before the warning reappears.
+// suppresses the "Cannot use both ..." warning if the two strings are identical
+// — the `+<hash>` integrity suffix `corepack use` writes included. If a future
+// bump drifts one field, this fails before the warning reappears.
 describe('package.json packageManager / devEngines version consistency', () => {
-	it('pins devEngines.packageManager.version to the exact packageManager version', () => {
-		const package_manager_pin = package_manager_version.extract_pnpm_version(
+	it('pins devEngines.packageManager.version to the whole packageManager pin', () => {
+		const package_manager_pin = package_manager_version.extract_pnpm_pin(
 			PACKAGE_JSON.packageManager,
 		)
 

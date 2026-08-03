@@ -1,61 +1,70 @@
 import { describe, expect, it } from 'vitest'
+import { build_package_manager_manifest } from './package-manager-manifest-fixture'
 import { package_manager_version } from './package-manager-version'
 
 const PM_PIN = 'pnpm@11.5.0+sha512.abc'
 const PM_PRERELEASE_PIN = 'pnpm@11.6.0-rc.1+sha512.def'
+const PM_BARE_PIN = 'pnpm@11.5.0'
 const RANGE_VERSION = '>=11.0.0-0'
-const EXACT_VERSION = '11.5.0'
-const PRERELEASE_VERSION = '11.6.0-rc.1'
+// The devEngines value that matches each pin byte-for-byte — integrity suffix
+// included, which is the only form pnpm accepts as an exact match.
+const HASHED_VERSION = '11.5.0+sha512.abc'
+const PRERELEASE_VERSION = '11.6.0-rc.1+sha512.def'
+const BARE_VERSION = '11.5.0'
 const MAJOR_RANGE = '11'
 
-function build_manifest(
-	package_manager: string | undefined,
-	development_engines_version: string,
-): string {
-	const package_manager_line =
-		package_manager === undefined ? '' : `\t"packageManager": "${package_manager}",\n`
-
-	return `{\n\t"name": "demo",\n${package_manager_line}\t"devEngines": {\n\t\t"packageManager": {\n\t\t\t"name": "pnpm",\n\t\t\t"version": "${development_engines_version}",\n\t\t\t"onFail": "error"\n\t\t}\n\t}\n}\n`
-}
+const build_manifest = build_package_manager_manifest
 
 const align = package_manager_version.align_development_engines_version
 
-describe('package_manager_version.extract_pnpm_version', () => {
-	it('extracts the version from a hash-suffixed pin', () => {
-		expect(package_manager_version.extract_pnpm_version(PM_PIN)).toBe(EXACT_VERSION)
+describe('package_manager_version.extract_pnpm_pin', () => {
+	it('keeps the integrity suffix of a hash-suffixed pin', () => {
+		expect(package_manager_version.extract_pnpm_pin(PM_PIN)).toBe(HASHED_VERSION)
 	})
 
-	it('preserves a prerelease identifier rather than truncating it', () => {
-		expect(package_manager_version.extract_pnpm_version(PM_PRERELEASE_PIN)).toBe(PRERELEASE_VERSION)
+	it('keeps both a prerelease identifier and the integrity suffix', () => {
+		expect(package_manager_version.extract_pnpm_pin(PM_PRERELEASE_PIN)).toBe(PRERELEASE_VERSION)
 	})
 
 	it('extracts the version from a bare pin without a hash', () => {
-		expect(package_manager_version.extract_pnpm_version('pnpm@11.5.0')).toBe(EXACT_VERSION)
+		expect(package_manager_version.extract_pnpm_pin(PM_BARE_PIN)).toBe(BARE_VERSION)
 	})
 
 	it('returns undefined for a non-pnpm package manager', () => {
-		expect(package_manager_version.extract_pnpm_version('yarn@4.0.0')).toBeUndefined()
+		expect(package_manager_version.extract_pnpm_pin('yarn@4.0.0')).toBeUndefined()
 	})
 
 	it('returns undefined for an empty value', () => {
-		expect(package_manager_version.extract_pnpm_version('')).toBeUndefined()
+		expect(package_manager_version.extract_pnpm_pin('')).toBeUndefined()
 	})
 })
 
 describe('package_manager_version.align_development_engines_version — rewrites', () => {
 	it('rewrites a drifted devEngines version to match the packageManager pin', () => {
-		expect(align(build_manifest(PM_PIN, RANGE_VERSION))).toBe(build_manifest(PM_PIN, EXACT_VERSION))
+		expect(align(build_manifest(PM_PIN, RANGE_VERSION))).toBe(
+			build_manifest(PM_PIN, HASHED_VERSION),
+		)
+	})
+
+	it('carries the integrity suffix into a devEngines version left bare', () => {
+		expect(align(build_manifest(PM_PIN, BARE_VERSION))).toBe(build_manifest(PM_PIN, HASHED_VERSION))
 	})
 
 	it('aligns to a prerelease version faithfully', () => {
-		expect(align(build_manifest(PM_PRERELEASE_PIN, EXACT_VERSION))).toBe(
+		expect(align(build_manifest(PM_PRERELEASE_PIN, BARE_VERSION))).toBe(
 			build_manifest(PM_PRERELEASE_PIN, PRERELEASE_VERSION),
+		)
+	})
+
+	it('aligns to a bare pin without inventing a suffix', () => {
+		expect(align(build_manifest(PM_BARE_PIN, RANGE_VERSION))).toBe(
+			build_manifest(PM_BARE_PIN, BARE_VERSION),
 		)
 	})
 
 	it('aligns when devEngines lists version before name', () => {
 		const version_first = `{\n\t"packageManager": "${PM_PIN}",\n\t"devEngines": { "packageManager": { "version": "${RANGE_VERSION}", "name": "pnpm" } }\n}\n`
-		const expected = `{\n\t"packageManager": "${PM_PIN}",\n\t"devEngines": { "packageManager": { "version": "${EXACT_VERSION}", "name": "pnpm" } }\n}\n`
+		const expected = `{\n\t"packageManager": "${PM_PIN}",\n\t"devEngines": { "packageManager": { "version": "${HASHED_VERSION}", "name": "pnpm" } }\n}\n`
 
 		expect(align(version_first)).toBe(expected)
 	})
@@ -65,13 +74,13 @@ describe('package_manager_version.set_development_engines_version', () => {
 	const set = package_manager_version.set_development_engines_version
 
 	it('widens the devEngines version to a bare major range', () => {
-		expect(set(build_manifest(PM_PIN, EXACT_VERSION), MAJOR_RANGE)).toBe(
+		expect(set(build_manifest(PM_PIN, HASHED_VERSION), MAJOR_RANGE)).toBe(
 			build_manifest(PM_PIN, MAJOR_RANGE),
 		)
 	})
 
 	it('sets the version when devEngines lists version before name', () => {
-		const version_first = `{\n\t"devEngines": { "packageManager": { "version": "${EXACT_VERSION}", "name": "pnpm" } }\n}\n`
+		const version_first = `{\n\t"devEngines": { "packageManager": { "version": "${HASHED_VERSION}", "name": "pnpm" } }\n}\n`
 		const expected = `{\n\t"devEngines": { "packageManager": { "version": "${MAJOR_RANGE}", "name": "pnpm" } }\n}\n`
 
 		expect(set(version_first, MAJOR_RANGE)).toBe(expected)
@@ -86,7 +95,7 @@ describe('package_manager_version.set_development_engines_version', () => {
 
 describe('package_manager_version.align_development_engines_version — no-ops', () => {
 	it('leaves the content untouched when the versions already match', () => {
-		const matched = build_manifest(PM_PIN, EXACT_VERSION)
+		const matched = build_manifest(PM_PIN, HASHED_VERSION)
 
 		expect(align(matched)).toBe(matched)
 	})
