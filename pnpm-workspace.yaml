@@ -17,6 +17,13 @@ trustLockfile: true
 # Security fixes often require same-day vite releases; minimum-release-age in .npmrc would block them.
 # `@types/node` and `tsx` are also excluded so routine Dependabot-style bumps are not
 # delayed by the minimum-release-age window.
+#
+# This list governs **pnpm's** `minimum-release-age` only. The `preinstall` hook installs
+# @aikidosec/safe-chain, which applies its own age policy and has no knowledge of these entries — a
+# package listed here is still hidden by safe-chain until it ages in. Pinning a dependency floor to
+# a release that safe-chain still withholds publishes a range no consumer can resolve (kit #742), so
+# `josh ranges` checks every published range against that filtered view — from `josh latest` right
+# after the ranges are rewritten, and again from `prepack` as the last gate before a publish.
 minimumReleaseAgeExclude:
   - vite
   - '@types/node'

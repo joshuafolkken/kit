@@ -54,6 +54,7 @@ const ALIASES: Record<string, string> = {
 	bp: 'bump',
 	v: 'version',
 	vu: 'version:upgrade',
+	r: 'ranges',
 	dr: 'doctor',
 	ov: 'overrides',
 	a: 'audit',
