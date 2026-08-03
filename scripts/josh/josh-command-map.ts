@@ -72,6 +72,8 @@ const ALIASES: Record<string, string> = {
 	hp: 'hook:push',
 	pp: 'prep',
 	is: 'issue',
+	ep: 'epic',
+	ec: 'epic:check',
 }
 
 export type { CommandCategory, CommandEntry } from './josh-command-types'

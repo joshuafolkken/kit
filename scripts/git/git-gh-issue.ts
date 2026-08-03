@@ -99,7 +99,83 @@ async function issue_close(issue_number: string, comment: string): Promise<boole
 	}
 }
 
+// `|| true` semantics: an existing label is not an error. Swallowing the failure is safe because a
+// genuinely missing label surfaces at creation time instead — `gh issue create --label epic` cannot
+// resolve it and fails there, so the anomaly is never lost.
+async function label_ensure(input: {
+	name: string
+	color: string
+	description: string
+}): Promise<void> {
+	try {
+		await git_gh_exec.exec_gh_command([
+			'label',
+			'create',
+			input.name,
+			'--color',
+			input.color,
+			'--description',
+			input.description,
+		])
+	} catch {
+		/* the label already exists */
+	}
+}
+
+// The body goes through stdin for the same reason the other writers use it: an epic body is
+// multi-line markdown, and passing it as an argv string would depend on shell quoting.
+async function issue_create_with_label(input: {
+	title: string
+	label: string
+	body: string
+}): Promise<string> {
+	return await git_gh_exec.exec_gh_command_with_stdin({
+		args: [
+			'issue',
+			'create',
+			'--title',
+			input.title,
+			'--label',
+			input.label,
+			BODY_FILE_FLAG,
+			BODY_FROM_STDIN,
+		],
+		stdin_body: input.body,
+	})
+}
+
+// Applied after creation, never as `gh issue create --blocked-by`: an older `gh` rejects the
+// unknown flag with exit 1 and the Issue is never created. Split this way, an outdated CLI costs
+// only the relation. Requires gh >= 2.94.0; the caller treats a failure as non-fatal.
+async function issue_add_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
+	try {
+		await git_gh_exec.exec_gh_command(['issue', 'edit', issue_number, '--add-blocked-by', blocker])
+
+		return true
+	} catch {
+		return false
+	}
+}
+
+async function issue_get_labels_and_body(issue_number: string): Promise<string | undefined> {
+	try {
+		return await git_gh_exec.exec_gh_command([
+			'issue',
+			'view',
+			issue_number,
+			'--json',
+			'number,labels,body',
+		])
+	} catch {
+		return undefined
+	}
+}
+
 const git_gh_issue = {
+	label_ensure,
+	issue_create_with_label,
+	issue_add_blocked_by,
+	issue_get_labels_and_body,
 	issue_get_title,
 	issue_get_body,
 	issue_edit_body,

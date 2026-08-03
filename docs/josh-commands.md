@@ -424,3 +424,48 @@ Fetch GitHub issue details for use in an AI-assisted workflow.
 ```bash
 pnpm josh issue 42
 ```
+
+### `josh epic`
+
+Create the epic issue that tracks a batch of child issues from one split, from the child issue numbers.
+
+```bash
+pnpm josh epic "Epic: split the parser work" 101 102 103
+pnpm josh epic "Epic: staged rollout" 101 102 --ordered
+pnpm josh epic "Epic: ..." 101 102 --rationale-file rationale.md
+git log -1 --format=%B | pnpm josh epic "Epic: ..." 101 102 --rationale-file -
+```
+
+An epic has four mechanical requirements, three of which fail **silently** when they are got wrong — the epic simply never auto-closes, or an unrecorded batch order is never reported. This command satisfies all four by construction:
+
+| Requirement           | How the command satisfies it                                                        |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `epic` label          | ensures the label exists, then creates the issue with it                            |
+| task-list child rows  | renders children as `- [ ] #N`, the only syntax the auto-close reads                |
+| `Dependencies` form   | the arrow chain with `--ordered`, otherwise the literal `None — the children are …` |
+| children-only `queue` | prints the `queue` command from the children; the epic is never included            |
+
+- `--ordered` declares that **the argument order is the dependency order**. The command then writes the arrow chain _and_ applies `gh issue edit <N2> --add-blocked-by <N1>` down the same chain, so the declared order and the native relations come from one input and cannot disagree. Recording the relation needs `gh` >= 2.94.0; when it fails the count is reported and the run still succeeds, because the epic and its task list are already correct.
+- `--rationale-file <path>` supplies the split rationale prose; `-` reads stdin, matching `gh issue create --body-file -`. Omitting it leaves a visible placeholder rather than a blank section.
+- `--origin <owner/repo#N>` adds the backlink used when the split itself originated in another repository. It is written as prose — a checkbox row referencing another repository disables the auto-close by design.
+
+The manual `gh` procedure remains documented in `prompts/collaboration-workflow.md` as the fallback for environments where `josh` is unavailable.
+
+### `josh epic:check`
+
+Check an existing epic against the same four requirements and report each as pass or fail.
+
+```bash
+pnpm josh epic:check 700
+```
+
+Exits `0` when every requirement is satisfied and `1` otherwise, so it works as a gate. Use it on epics created by hand, on epics that predate `josh epic`, and after editing an epic body. The checks reuse the very parser the auto-close runs on (`scripts/git/git-epic-parse.ts`), so "what the auto-close can read" and "what this command accepts" are one definition rather than two that can drift.
+
+```
+✔ epic label — the `epic` label is applied
+✔ child task list — 2 child issue(s) tracked: #101, #102
+✖ dependencies section — neither `#N -> #M` nor the `None — ...` literal found; prose order is not machine-readable
+✔ auto-close eligibility — every tracked child is in this repository
+
+❌ Epic #700 does not satisfy every requirement.
+```
