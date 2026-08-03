@@ -20,6 +20,12 @@ const FENCE_LINE_PATTERN = /^[ \t]*(?:`{3,}|~{3,})/u
 // shape of the chain is not validated — only that one was declared at all.
 const DEPENDENCY_CHAIN_PATTERN = /#\d+[ \t]*(?:->|→)[ \t]*#\d+/u
 
+// The other half of a machine-readable `Dependencies` section: the exact sentence that declares a
+// batch to have no order. It lives here, beside the chain pattern, because both are what a reader
+// of the body is allowed to rely on — the generator imports this rather than restating it, so the
+// text it writes and the text checked for are one string.
+const UNORDERED_DEPENDENCIES = 'None — the children are independent; any execution order works.'
+
 const CLOSED_STATE = 'CLOSED'
 
 // Toggling on each fence line keeps this linear — a single regex spanning the block would backtrack.
@@ -75,6 +81,14 @@ function has_declared_dependency_chain(body: string | undefined): boolean {
 	return has_pattern_match(DEPENDENCY_CHAIN_PATTERN, body)
 }
 
+// Fenced blocks are stripped here for the same reason they are everywhere else: an epic body may
+// quote the template, and a declaration inside that quote is an illustration, not a declaration.
+function has_unordered_declaration(body: string | undefined): boolean {
+	if (body === undefined) return false
+
+	return strip_fenced_blocks(body).includes(UNORDERED_DEPENDENCIES)
+}
+
 function has_child(children: ReadonlyArray<number>, issue_number: number): boolean {
 	return children.includes(issue_number)
 }
@@ -90,6 +104,7 @@ const git_epic_parse = {
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
+	has_unordered_declaration,
 	has_child,
 	is_state_closed,
 }
@@ -99,6 +114,8 @@ export {
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
+	has_unordered_declaration,
 	has_child,
 	is_state_closed,
+	UNORDERED_DEPENDENCIES,
 }
