@@ -54,6 +54,14 @@ const PARSE_CASES = [
 		body: '```ts\nconst a = 1\n```\n\n- [ ] #101 one\n- [x] #102 two\n',
 		expected: [101, 102],
 	},
+	{
+		// The workflow prompt tells an epic filed from another repository to carry an `## Origin`
+		// bullet. Auto-close needs both halves to hold: no external entry (asserted separately) and
+		// children that still parse past the backlink.
+		label: 'reads the children of an epic that carries an Origin backlink',
+		body: '## Split rationale\n\nSplit by deliverable.\n\n## Origin\n\n- joshuafolkken/joshuafolkken-com#805\n\n## Progress\n\n- [ ] #101 one\n- [x] #102 two\n',
+		expected: [101, 102],
+	},
 ] as const satisfies ReadonlyArray<{
 	label: string
 	body: string | undefined
@@ -99,6 +107,46 @@ const EXTERNAL_CASES = [
 
 describe('has_external_task_list_entry', () => {
 	it.each(EXTERNAL_CASES)('$label', ({ body, expected }) => {
+		expect(has_external_task_list_entry(body)).toBe(expected)
+	})
+})
+
+// The `## Origin` backlink documented in the workflow prompt points at another repository from an
+// epic body, which is exactly the shape that disables auto-close. It is safe only because the
+// predicate keys on the checkbox, so the prescribed prose and plain-bullet forms have to be pinned
+// against this function — a doc rule alone cannot prove the epic still closes.
+const ORIGIN_HEADING = '## Origin'
+const ORIGIN_REFERENCE = 'joshuafolkken/joshuafolkken-com#805'
+
+function origin_body(entry: string): string {
+	return `## Split rationale\n\nSplit by deliverable.\n\n${ORIGIN_HEADING}\n\n${entry}\n\n## Progress\n\n- [ ] #101 one\n`
+}
+
+const BACKLINK_CASES = [
+	{
+		label: 'keeps auto-close enabled for the documented prose backlink',
+		body: origin_body(`Filed from ${ORIGIN_REFERENCE}.`),
+		expected: false,
+	},
+	{
+		label: 'keeps auto-close enabled for the documented plain-bullet backlink',
+		body: origin_body(`- ${ORIGIN_REFERENCE}`),
+		expected: false,
+	},
+	{
+		label: 'keeps auto-close enabled for a plain-bullet backlink written as a full URL',
+		body: origin_body('- https://github.com/joshuafolkken/joshuafolkken-com/issues/805'),
+		expected: false,
+	},
+	{
+		label: 'disables auto-close for the prohibited checkbox backlink',
+		body: origin_body(`- [ ] ${ORIGIN_REFERENCE}`),
+		expected: true,
+	},
+] as const satisfies ReadonlyArray<{ label: string; body: string; expected: boolean }>
+
+describe('has_external_task_list_entry — Origin backlink shapes', () => {
+	it.each(BACKLINK_CASES)('$label', ({ body, expected }) => {
 		expect(has_external_task_list_entry(body)).toBe(expected)
 	})
 })
