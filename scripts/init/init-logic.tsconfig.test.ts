@@ -18,12 +18,64 @@ function read_tsconfig_base_export(): string | undefined {
 	return parsed.exports[TSCONFIG_BASE_SUBPATH]?.default
 }
 
+const NODE_MODULES_DIR = 'node_modules'
+const PLAYWRIGHT_REPORT_DIR = 'playwright-report'
+const TEST_RESULTS_DIR = 'test-results'
+const CONSUMER_ONLY_EXCLUDE = 'legacy-vendor'
+
 describe('generate_tsconfig', () => {
 	it('includes only our config as direct preset path', () => {
 		const result = init_logic.generate_tsconfig()
 
 		expect(result).toContain('node_modules/@joshuafolkken/kit/tsconfig/base.json')
 		expect(result).not.toContain('.svelte-kit')
+	})
+
+	// The html reporter writes playwright-report/ and Playwright writes test-results/; both hold
+	// generated output a consumer's broad `include` would otherwise type-check (#712).
+	it('excludes the directories the kit-distributed configs generate', () => {
+		const parsed = JSON.parse(init_logic.generate_tsconfig()) as { exclude: Array<string> }
+
+		expect(parsed.exclude).toContain(PLAYWRIGHT_REPORT_DIR)
+		expect(parsed.exclude).toContain(TEST_RESULTS_DIR)
+	})
+
+	it('keeps the exclude array on one line so the generated file is prettier-clean', () => {
+		expect(init_logic.generate_tsconfig()).toContain(`"exclude": ["${NODE_MODULES_DIR}"`)
+	})
+})
+
+function merge_exclude_entries(existing: unknown): Array<string> {
+	const merged = init_logic.merge_tsconfig_exclude(`${JSON.stringify(existing)}\n`)
+
+	return (JSON.parse(merged) as { exclude?: Array<string> }).exclude ?? []
+}
+
+describe('merge_tsconfig_exclude', () => {
+	it('adds the generated-output directories to a tsconfig that has no exclude', () => {
+		const result = merge_exclude_entries({ extends: [VANILLA_PRESET] })
+
+		expect(result).toStrictEqual([...init_logic.get_tsconfig_exclude_entries()])
+	})
+
+	it('appends only the missing entries to an existing exclude', () => {
+		const result = merge_exclude_entries({ exclude: [NODE_MODULES_DIR] })
+
+		expect(result[0]).toBe(NODE_MODULES_DIR)
+		expect(result).toContain(PLAYWRIGHT_REPORT_DIR)
+	})
+
+	it('preserves an entry kit does not own', () => {
+		const result = merge_exclude_entries({ exclude: [CONSUMER_ONLY_EXCLUDE] })
+
+		expect(result).toContain(CONSUMER_ONLY_EXCLUDE)
+		expect(result).toContain(TEST_RESULTS_DIR)
+	})
+
+	it('is a no-op on an already-merged file', () => {
+		const merged = init_logic.merge_tsconfig_exclude(init_logic.generate_tsconfig())
+
+		expect(merged).toBe(init_logic.generate_tsconfig())
 	})
 })
 

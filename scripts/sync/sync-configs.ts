@@ -66,8 +66,9 @@ function read_base_compiler_options(): Record<string, unknown> {
 	return init_logic.extract_compiler_options(content)
 }
 
-// Ensure the kit preset is in `extends`, then drop any compilerOptions key whose value already
-// equals that preset — removing per-project drift while preserving genuine overrides.
+// Ensure the kit preset is in `extends`, drop any compilerOptions key whose value already equals
+// that preset — removing per-project drift while preserving genuine overrides — and union-merge the
+// generated-output directories into `exclude` so an existing consumer is repaired, not just a new one.
 function sync_tsconfig(destination_path: string): void {
 	const entry = init_logic.get_tsconfig_extends_entry()
 	const base_options = read_base_compiler_options()
@@ -75,9 +76,11 @@ function sync_tsconfig(destination_path: string): void {
 	const base_directory = path.dirname(destination_path)
 
 	sync_with_merge(destination_path, 'tsconfig.json', (existing) =>
-		init_logic.strip_redundant_compiler_options(
-			init_logic.merge_tsconfig_extends(existing, entry, base_directory),
-			base_options,
+		init_logic.merge_tsconfig_exclude(
+			init_logic.strip_redundant_compiler_options(
+				init_logic.merge_tsconfig_extends(existing, entry, base_directory),
+				base_options,
+			),
 		),
 	)
 }
