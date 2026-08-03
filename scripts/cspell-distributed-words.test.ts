@@ -28,9 +28,16 @@ const CSPELL_FLAGS: ReadonlyArray<string> = [
 	'--dot',
 ]
 
-// `josh init` / `josh sync` copy exactly this list into the consumer tree, so reading it back
-// from init-logic keeps the guard covering any file added to the distribution later.
-const DISTRIBUTED_FILES = init_logic.get_ai_copy_files()
+// `josh init` / `josh sync` write all of these into the consumer tree — verbatim copies, renamed
+// copies, and the rendered sonar template — so reading the lists back from init-logic keeps the
+// guard covering anything added to the distribution later. The gitignore template is deliberately
+// absent: the distributed `ignorePaths` drops `**/.gitignore`, so a consumer never spell-checks
+// the file it becomes.
+const DISTRIBUTED_FILES: ReadonlyArray<string> = [
+	...init_logic.get_ai_copy_files(),
+	...init_logic.get_ai_copy_file_mappings().map((mapping) => mapping.src),
+	init_logic.get_sonar_template_source(),
+]
 
 function collect_unknown_words(files: ReadonlyArray<string>): Array<string> {
 	const result = execaSync(resolve_local_bin(REPO_ROOT, CSPELL_BIN), [...CSPELL_FLAGS, ...files], {
