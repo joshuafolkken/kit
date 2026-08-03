@@ -192,11 +192,6 @@ describe('package.json scripts', () => {
 		expect(has_pnpm_run).toBe(false)
 	})
 
-	it('builds the compiled bin before packing', () => {
-		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
-		expect(scripts['prepack']).toContain('build-bin')
-	})
-
 	it('does not install a project-pinned bin shim on postinstall', () => {
 		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		expect(scripts['postinstall'] ?? '').not.toContain('install-bin')
@@ -212,6 +207,28 @@ describe('package.json scripts', () => {
 		// during `pnpm add -g` and consumer installs, which run outside any git repo.
 		// eslint-disable-next-line dot-notation -- index signature requires bracket notation
 		expect(scripts['postinstall'] ?? '').not.toContain('lefthook')
+	})
+})
+
+const RANGE_GUARD_SCRIPT = 'publishable-range-check'
+const BIN_BUILD_SCRIPT = 'build-bin'
+
+describe('package.json prepack', () => {
+	// eslint-disable-next-line dot-notation -- index signature requires bracket notation
+	const prepack = load_manifest().scripts?.['prepack'] ?? ''
+
+	it('builds the compiled bin before packing', () => {
+		expect(prepack).toContain(BIN_BUILD_SCRIPT)
+	})
+
+	it('gates packing on every published dependency range still resolving', () => {
+		expect(prepack).toContain(RANGE_GUARD_SCRIPT)
+	})
+
+	// The guard has to run before the build steps: a range no consumer can resolve makes the
+	// published package uninstallable (#742), so there is nothing worth building past that point.
+	it('runs the range guard before the build steps', () => {
+		expect(prepack.indexOf(RANGE_GUARD_SCRIPT)).toBeLessThan(prepack.indexOf(BIN_BUILD_SCRIPT))
 	})
 })
 

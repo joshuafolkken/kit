@@ -17,6 +17,11 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Upgrade @joshuafolkken/kit to latest for both global and project',
 		category: 'Versioning',
 	},
+	ranges: {
+		script: 'scripts/version/publishable-range-check.ts',
+		description: 'Check that every published dependency range still resolves for a consumer',
+		category: 'Versioning',
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
