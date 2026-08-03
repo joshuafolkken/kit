@@ -283,13 +283,17 @@ A per-project dependency's lifecycle hook (`postinstall` / `prepare`) must **nev
 
 ### `josh overrides`
 
-Check that `pnpm.overrides` in `package.json` has not drifted after a dependency update.
+Check that the dependency overrides have not drifted after a dependency update.
 
 ```bash
 pnpm josh overrides
 ```
 
 Run after `pnpm update` or `josh latest` to confirm no override was silently removed.
+
+**Both locations are read.** pnpm 11 declares overrides in the `overrides:` block of `pnpm-workspace.yaml`; `pnpm.overrides` in `package.json` is the legacy location. The check merges the two (a workspace entry wins a key collision, matching pnpm's own precedence) and prints where they came from — `✔ overrides unchanged (2 from pnpm-workspace.yaml)`, or `no overrides found in pnpm-workspace.yaml or package.json` when there genuinely are none. Reading only `package.json` is what let a project whose overrides live in the YAML report a false all-clear ([#740](https://github.com/joshuafolkken/kit/issues/740)), so an empty `pnpm.overrides` is never treated as "no overrides".
+
+`--save` writes the current merged overrides to `.overrides-snapshot.json` (gitignored); later runs compare against it and exit non-zero on any add, removal, or change.
 
 ### `josh audit`
 
@@ -363,7 +367,9 @@ Three details worth knowing:
 - **The command still exits `0`.** The tree is left byte-identical to what it found, nothing is broken, and every workflow that runs `josh latest` in its preamble would otherwise stop for a condition that resolves itself.
 - **The condition is transient.** The newer release is normally still published and still tagged `latest`; only the age gate is hiding it. A later run picks the upgrade up with no intervention.
 
-`latest:update` skips **held-back** and **capped-override** packages instead of blindly bumping everything. `typescript` is currently held back at `6.x`: its `7.x` release is the native (Go) port that exposes no `SyntaxKind`, which crashes the type-aware ESLint stack (`typescript-eslint`, `eslint-plugin-sonarjs`, `ts-api-utils`) at rule-load time. The hold-back is removed to fix forward once that stack supports the native API. Any package whose `pnpm.overrides` key carries a lower-bound cap (e.g. `"some-pkg@>=5": "^4"`) is also skipped. Skipped packages are printed as `⏭ Skipping held-back / capped packages: …`.
+`latest:update` skips **held-back** and **capped-override** packages instead of blindly bumping everything. `typescript` is currently held back at `6.x`: its `7.x` release is the native (Go) port that exposes no `SyntaxKind`, which crashes the type-aware ESLint stack (`typescript-eslint`, `eslint-plugin-sonarjs`, `ts-api-utils`) at rule-load time. The hold-back is removed to fix forward once that stack supports the native API. Any package whose override key carries a lower-bound cap (e.g. `"some-pkg@>=5": "^4"`) is also skipped — read from **both** the `overrides:` block in `pnpm-workspace.yaml` and `pnpm.overrides` in `package.json`, so a cap declared in either place is honoured. Skipped packages are printed as `⏭ Skipping held-back / capped packages: …`.
+
+`latest:update` also reports the overrides verdict itself, so it does not depend on anyone remembering which file to open afterwards: `✔ overrides unchanged (<n> from <file>)` when nothing moved, or `⚠ overrides changed (…)` followed by the added / removed / changed entries.
 
 `latest:corepack` pins pnpm to the newest release on the project's **current major** (`latest-<major>`, derived from `packageManager`; it falls back to `pnpm@latest` only if that major can't be parsed), so on the normal path it stays within `devEngines`. Because `corepack use` validates the resolved version against `devEngines` **before** writing `packageManager`, an exact `devEngines.packageManager.version` pin (kept exact to avoid the pnpm dual-declaration warning) would otherwise reject any newer patch and block every bump. To avoid that, `latest:corepack` temporarily widens the pin to the bare major before invoking corepack. If the selected release is still inside the registry's minimum-release-age window, the pnpm bump is skipped with a notice instead of failing — the temporary widening is rolled back so `package.json` is left unchanged, and `latest:update` and `audit` still run. When the bump does succeed, `devEngines.packageManager.version` is realigned to the new `packageManager` pin so the two stay in exact match (avoiding the pnpm dual-declaration warning). "Exact" means byte-identical, **`+sha512…` Corepack integrity suffix included** — pnpm compares the two fields as raw strings, so a bare `11.18.0` alongside `pnpm@11.18.0+sha512…` still warns. The suffix is semver build metadata, which range checks ignore, so corepack and pnpm both keep resolving the pin as the plain version.
 

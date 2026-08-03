@@ -6,7 +6,9 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { overrides_files } from '#scripts/overrides/overrides-files'
 import { overrides_check } from '#scripts/overrides/overrides-logic'
+import { file_reader } from '#scripts/read-file'
 import { execaSync } from 'execa'
 import { latest_regression, type VersionRegression } from './latest-regression'
 import { preinstall_version_update } from './preinstall-version-update'
@@ -38,18 +40,10 @@ function run_update(update_arguments: Array<string> | undefined): number {
 	return run(update_arguments)
 }
 
-function read_file_or_empty(path: string): string {
-	try {
-		return readFileSync(path, 'utf8')
-	} catch {
-		return ''
-	}
-}
-
 function take_snapshot(): TreeSnapshot {
 	return {
 		package_json: readFileSync(PACKAGE_JSON_PATH, 'utf8'),
-		lockfile: read_file_or_empty(LOCKFILE_PATH),
+		lockfile: file_reader.read_file_or_empty(LOCKFILE_PATH),
 	}
 }
 
@@ -68,9 +62,8 @@ function report_kept_back(regressions: ReadonlyArray<VersionRegression>): void {
 
 function build_command(): Array<string> | undefined {
 	const content = readFileSync(PACKAGE_JSON_PATH, 'utf8')
-	const overrides = overrides_check.read_overrides_from_package(content)
 
-	return overrides_check.build_update_command(overrides, content)
+	return overrides_check.build_update_command(overrides_files.read_current_overrides(), content)
 }
 
 interface UpdateOutcome {
@@ -111,13 +104,35 @@ function report_excluded(excluded: ReadonlyArray<string>): void {
 	console.info(`\n⏭ Skipping held-back / capped packages: ${excluded.join(', ')}`)
 }
 
+// Printed unconditionally so the overrides verdict does not depend on an agent remembering which
+// file to open afterwards (kit #740). The summary names the files that were read, so a run with no
+// overrides anywhere is distinguishable from a run that looked in the wrong place.
+function report_overrides(before: Record<string, string>): void {
+	const summary = overrides_check.describe_sources(overrides_files.read_current_sources())
+	const diff = overrides_check.compare(before, overrides_files.read_current_overrides())
+
+	if (!diff.is_changed) {
+		console.info(`\n✔ overrides unchanged (${summary}).`)
+
+		return
+	}
+
+	console.warn(`\n⚠ overrides changed (${summary}) — restore them unless the change was intended:`)
+
+	for (const line of overrides_check.format_diff_lines(diff)) {
+		console.warn(line)
+	}
+}
+
 function main(): void {
 	const snapshot = take_snapshot()
-	const overrides = overrides_check.read_overrides_from_package(snapshot.package_json)
+	const overrides = overrides_files.read_current_overrides()
 
 	report_excluded(overrides_check.list_excluded_package_names(overrides))
 
 	const outcome = update_without_downgrading(snapshot)
+
+	report_overrides(overrides)
 
 	// Skipped after a rollback so the tree really is left exactly as it was found — this sync writes
 	// package.json to advance the pinned safe-chain version, which would contradict the notice that
