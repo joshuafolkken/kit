@@ -11,9 +11,11 @@ const DEV_ENGINES_VALUE = {
 	packageManager: { name: 'pnpm', version: '>=11.0.0-0', onFail: 'error' },
 }
 
+// The `@joshuafolkken:registry` mapping stays — it is a registry mapping, not a credential,
+// and pnpm still honors it from a project .npmrc. The matching `_authToken` line does NOT:
+// see OBSOLETE_NPMRC_LINES below.
 const NPMRC_LINES: ReadonlyArray<string> = [
 	'@joshuafolkken:registry=https://npm.pkg.github.com',
-	'//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}',
 	'engine-strict=true',
 	'minimum-release-age=1440',
 	'confirmModulesPurge=false',
@@ -21,6 +23,18 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 	// installs hit the correct authenticated download path (avoids ERR_PNPM_FETCH_401 on CI).
 	'lockfile-include-tarball-url=true',
 ]
+
+// pnpm >=11.6 refuses to expand environment variables in registry credentials read from a
+// project .npmrc (the file is committed, so expansion could leak the token to an
+// attacker-controlled registry). The line below is therefore inert noise — it warns on every
+// pnpm invocation while contributing no auth. The token has to come from a source pnpm still
+// expands: the user-level ~/.npmrc or `pnpm config set`. Every consumer already carries the
+// line, and an insert-if-absent merge cannot repair them, so sync strips it. Only the
+// env-var placeholder form is listed: a line holding a literal token is still honored by
+// pnpm, so removing it would break a working setup. See joshuafolkken/kit#711.
+const OBSOLETE_NPMRC_LINES: ReadonlySet<string> = new Set([
+	'//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}',
+])
 
 const CSPELL_IMPORT = '@joshuafolkken/kit/cspell'
 
@@ -157,10 +171,30 @@ function append_missing_lines(existing: string, missing: ReadonlyArray<string>):
 	return `${prefix}${missing.join('\n')}\n`
 }
 
-function merge_npmrc(content: string): string {
-	const missing = NPMRC_LINES.filter((line) => !content.includes(line))
+function is_obsolete_npmrc_line(line: string): boolean {
+	return OBSOLETE_NPMRC_LINES.has(line.trim())
+}
 
-	return append_missing_lines(content, missing)
+// Drop obsolete lines while leaving every other line — and the trailing newline — verbatim.
+// Returns `content` untouched when nothing matches, so sync reports "unchanged".
+function has_obsolete_npmrc_line(content: string): boolean {
+	return content.split('\n').some((line) => is_obsolete_npmrc_line(line))
+}
+
+function strip_obsolete_npmrc_lines(content: string): string {
+	if (!has_obsolete_npmrc_line(content)) return content
+
+	return content
+		.split('\n')
+		.filter((line) => !is_obsolete_npmrc_line(line))
+		.join('\n')
+}
+
+function merge_npmrc(content: string): string {
+	const stripped = strip_obsolete_npmrc_lines(content)
+	const missing = NPMRC_LINES.filter((line) => !stripped.includes(line))
+
+	return append_missing_lines(stripped, missing)
 }
 
 // A gitignore line worth appending during a union merge: real ignore patterns only.
@@ -304,6 +338,7 @@ const init_logic = {
 	generate_cspell_config,
 	generate_npmrc,
 	merge_npmrc,
+	has_obsolete_npmrc_line,
 	merge_gitignore,
 	merge_prettier_plugin_development_deps,
 	get_tsconfig_extends_entry,

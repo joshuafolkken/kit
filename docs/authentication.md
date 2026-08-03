@@ -22,27 +22,39 @@ Single quotes around `$LINE` keep `$(gh auth token)` literal, so the token is re
 
 > Using bash instead of zsh? Swap `~/.zshrc` for `~/.bashrc`.
 
-## 2. Configure `.npmrc`
+## 2. Put the credential in `~/.npmrc`
 
-Tell `pnpm` to resolve `@joshuafolkken/*` against GitHub Packages with the token from §1. The snippet is idempotent:
+The token line belongs in your **user-level** `~/.npmrc`, never in a project `.npmrc`. The snippet is idempotent:
+
+```bash
+TOKEN='//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
+grep -qxF "$TOKEN" ~/.npmrc 2>/dev/null || echo "$TOKEN" >> ~/.npmrc
+```
+
+`${NODE_AUTH_TOKEN}` is intentionally written as a literal placeholder — `pnpm` expands it from the env var at install time (which is why §1 must come first), so a rotated `gh` token is picked up automatically and no secret is ever written to disk.
+
+Prefer to store the token itself instead of the placeholder? `pnpm config set` writes to the same user-level file:
+
+```bash
+pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
+```
+
+That value is a real secret and does not refresh on rotation — re-run the command when the token expires.
+
+> **Why not the project `.npmrc`?** Since pnpm 11.6, environment variables are **not** expanded in registry credentials read from a project `.npmrc`, because that file is committed and the expansion could leak the token to an attacker-controlled registry. A token line there is ignored with an `Ignored project-level auth setting` warning on every command, so `josh init` / `josh sync` no longer write it — and `josh sync` removes it from projects that still carry it.
+
+**CI needs no extra step**: `actions/setup-node` with `registry-url: 'https://npm.pkg.github.com'` writes the same placeholder line into a user-level npmrc for the job, which pnpm does expand — supply `NODE_AUTH_TOKEN` to the install step and it works.
+
+## 3. Configure the project `.npmrc`
+
+A project that consumes the kit as a devDependency also needs the scoped **registry mapping** — a routing rule, not a credential, which pnpm still honors from a project file. `josh init` writes it for you; to add it by hand:
 
 ```bash
 REGISTRY='@joshuafolkken:registry=https://npm.pkg.github.com'
-TOKEN='//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
 grep -qxF "$REGISTRY" .npmrc 2>/dev/null || echo "$REGISTRY" >> .npmrc
-grep -qxF "$TOKEN"    .npmrc 2>/dev/null || echo "$TOKEN"    >> .npmrc
 ```
 
-`${NODE_AUTH_TOKEN}` is intentionally written as a literal placeholder — `pnpm` expands it from the env var at install time (which is why §1 must come first). Without this, `pnpm` tries the public npm registry for `@joshuafolkken/*` and fails.
-
-### Where to write `.npmrc` — project vs. global
-
-| Use case                                                       | Target     | Commit it?                                                                                                                                                                  |
-| -------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Project devDependency** (per [package.md](./package.md))     | `./.npmrc` | **Yes.** It contains only a literal placeholder, no secret — committing unlocks `pnpm install` for the whole team and CI, each of which supplies its own `NODE_AUTH_TOKEN`. |
-| **Global `josh` CLI** (per [cli.md](./cli.md)), machine-scoped | `~/.npmrc` | N/A (lives in your home dir)                                                                                                                                                |
-
-The command above writes to `./.npmrc`. To make it machine-global instead, swap `.npmrc` for `~/.npmrc` in both `grep`/`echo` lines.
+Commit that file — it holds no secret. Without the mapping, `pnpm` tries the public npm registry for `@joshuafolkken/*` and fails. Installing only the global `josh` CLI (per [cli.md](./cli.md))? Put the same line in `~/.npmrc` and skip this section.
 
 ## Next
 

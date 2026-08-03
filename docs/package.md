@@ -6,7 +6,7 @@ This is independent of the [global `josh` CLI](./cli.md) — most projects want 
 
 ## 1. Authenticate
 
-One-time GitHub Packages setup — see [authentication.md](./authentication.md). For a project dependency, write the `.npmrc` lines to the repo's `./.npmrc` (safe to commit — it holds only a literal placeholder).
+One-time GitHub Packages setup — see [authentication.md](./authentication.md). For a project dependency, the token line goes in your `~/.npmrc` and only the scoped registry mapping goes in the repo's `./.npmrc` (safe to commit — it holds no credential).
 
 ## 2. Install
 
