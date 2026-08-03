@@ -67,6 +67,16 @@ Run unit tests followed by E2E tests.
 pnpm josh test
 ```
 
+`josh test` is a **composite command** and takes no extra arguments. Pass runner flags to the stage that understands them — `--workers`, `--grep` and `--headed` are Playwright's, `-u` is Vitest's, and a composite cannot route one vocabulary to both stages:
+
+```bash
+pnpm josh test:e2e --workers=1   # ✅ reaches Playwright
+pnpm josh test:unit -u           # ✅ reaches Vitest
+pnpm josh test --workers=1       # ❌ exits 1, naming test:unit and test:e2e
+```
+
+See [Composite commands and extra arguments](#composite-commands-and-extra-arguments).
+
 ### `josh check`
 
 Type-check a SvelteKit project. Requires `@sveltejs/kit` in dependencies.
@@ -75,6 +85,29 @@ Type-check a SvelteKit project. Requires `@sveltejs/kit` in dependencies.
 pnpm josh check        # development mode
 pnpm josh check:ci     # strict mode (--threshold error), used in CI
 ```
+
+### Composite commands and extra arguments
+
+A few `josh` commands chain several steps behind one name. They are implemented as a fixed shell script (`sh -c '<step> && <step>'`), and a shell script does not expand arguments appended to it — so anything typed after the command name would land in the shell's positional parameters and be discarded without a word.
+
+**The convention: a composite command either forwards extra arguments deliberately, or refuses them. It never ignores them.** Today every composite refuses, exits `1`, and names the sub-commands that do accept arguments:
+
+```bash
+$ pnpm josh test --workers=1
+josh test takes no extra arguments — pass them to josh test:unit or josh test:e2e instead
+```
+
+| Composite    | Pass arguments to instead                        |
+| ------------ | ------------------------------------------------ |
+| `test`       | `test:unit`, `test:e2e`                          |
+| `format`     | `format:prettier`, `format:eslint`               |
+| `latest`     | `latest:corepack`, `latest:update`, `audit`      |
+| `main:sync`  | — (chains raw `git` calls; nothing is forwarded) |
+| `main:merge` | — (chains raw `git` calls; nothing is forwarded) |
+
+Every other command — the ones that invoke a single tool or script — forwards extra arguments exactly as before; `pnpm josh test:e2e --workers=1` reaches Playwright unchanged.
+
+The refusal is driven by the **shape** of the command rather than a per-command opt-in, so a composite added later cannot reintroduce the silent discard by forgetting to declare itself. A unit test audits the whole command map on every commit.
 
 ---
 
