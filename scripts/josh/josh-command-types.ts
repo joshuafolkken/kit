@@ -10,6 +10,9 @@ interface CommandEntry {
 	category: CommandCategory
 	tsx_arguments?: ReadonlyArray<string>
 	default_script_arguments?: ReadonlyArray<string>
+	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this
+	// names the sub-commands that do accept them, so the refusal points somewhere useful.
+	argument_targets?: ReadonlyArray<string>
 }
 
 const PE = ['pnpm', 'exec'] as const

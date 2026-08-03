@@ -13,6 +13,7 @@ import {
 	type CommandCategory,
 	type CommandEntry,
 } from './josh-command-map'
+import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
@@ -196,6 +197,19 @@ function run_command(cmd: string, subcommand_arguments: Array<string>): number {
 	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
 
 	if (!entry) return -1
+
+	const rejection = composite_arguments.reject_extra_arguments(
+		resolved,
+		entry,
+		subcommand_arguments,
+	)
+
+	if (rejection !== undefined) {
+		console.error(rejection)
+
+		return USAGE_ERROR_EXIT_CODE
+	}
+
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
 	return run_script_entry(entry, subcommand_arguments)
@@ -207,4 +221,5 @@ export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'
 export type { TsxRunner }
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/spawn-exit'
+export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export { josh_logic, resolve_alias, resolve_tsx_executable, resolve_tsx_runner }

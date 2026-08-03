@@ -41,6 +41,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		],
 		description: 'Update pnpm, dependencies, and run security audit',
 		category: 'Maintenance',
+		argument_targets: ['latest:corepack', 'latest:update', 'audit'],
 	},
 	'latest:corepack': {
 		script: 'scripts/version/latest-corepack.ts',

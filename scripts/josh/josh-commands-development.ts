@@ -25,6 +25,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		],
 		description: 'Format code with prettier and eslint',
 		category: 'Development',
+		argument_targets: ['format:prettier', 'format:eslint'],
 	},
 	'format:prettier': {
 		shell: [...PE, 'prettier', '--write', '.'],
@@ -77,6 +78,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		shell: ['sh', '-c', 'pnpm josh test:unit && pnpm josh test:e2e'],
 		description: 'Run unit and E2E tests',
 		category: 'Development',
+		argument_targets: ['test:unit', 'test:e2e'],
 	},
 	check: {
 		shell: [...PE, 'tsc', '--noEmit'],
