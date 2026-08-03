@@ -7,12 +7,11 @@ import semver from 'semver'
 // ERR_PNPM_NO_MATCHING_VERSION naming a version that demonstrably exists and is tagged latest (#742).
 //
 // The check asks the registry through that same filtered view instead of modelling the policy:
-// `pnpm view <name>@<range> version` prints nothing and exits non-zero (ERR_PNPM_PACKAGE_NOT_FOUND)
-// exactly when no visible version satisfies the range. Modelling would mean guessing safe-chain's
-// threshold, and
-// `minimumReleaseAgeExclude` cannot stand in for it — that list governs pnpm's own
-// `minimum-release-age` and safe-chain has no knowledge of it, which is precisely what made the
-// original failure surprising.
+// `pnpm view <name>@<range> version` prints no version and exits non-zero
+// (ERR_PNPM_PACKAGE_NOT_FOUND) exactly when nothing visible satisfies the range. Modelling would
+// mean guessing safe-chain's threshold, and `minimumReleaseAgeExclude` cannot stand in for it —
+// that list governs pnpm's own `minimum-release-age`, and safe-chain has no knowledge of it, which
+// is precisely what made the original failure surprising.
 
 interface PublishedRange {
 	name: string
@@ -48,10 +47,14 @@ function read_published_ranges(package_json_content: string): Array<PublishedRan
 }
 
 function partition_registry_ranges(ranges: ReadonlyArray<PublishedRange>): RangePartition {
-	return {
-		checked: ranges.filter((entry) => is_registry_range(entry.range)),
-		skipped: ranges.filter((entry) => !is_registry_range(entry.range)),
+	const partition: RangePartition = { checked: [], skipped: [] }
+
+	for (const entry of ranges) {
+		if (is_registry_range(entry.range)) partition.checked.push(entry)
+		else partition.skipped.push(entry)
 	}
+
+	return partition
 }
 
 // A satisfied range is proven by an actual version on stdout, not merely by output existing:
