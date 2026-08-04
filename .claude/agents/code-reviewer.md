@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Fresh-context code reviewer for the workflow review step. Launch it on a branch diff (git diff main...HEAD) before commit or before followup --merge, passing only the diff scope and the Issue goal — never the implementing session's reasoning. Returns the categorized review defined in `prompts/review.md`.
+description: Fresh-context code reviewer for the workflow review step. Launch it on the PR branch diff (git diff main...HEAD) after `pnpm josh git -y` has created the PR and before `followup --merge`, passing only the diff scope and the Issue goal — never the implementing session's reasoning. Returns the categorized review defined in `prompts/review.md`.
 tools: Read, Grep, Glob, Bash
 ---
 
