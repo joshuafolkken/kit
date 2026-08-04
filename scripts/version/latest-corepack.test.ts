@@ -19,7 +19,10 @@ function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSync
 }
 
 beforeEach(() => {
-	vi.clearAllMocks()
+	// resetAllMocks, not clearAllMocks: a test that arranges mockReturnValueOnce values a code
+	// path never consumes (e.g. the restore path skips the second read) would otherwise leak
+	// its queued values into the next test's calls.
+	vi.resetAllMocks()
 })
 
 const PACKAGE_JSON_V11 = '{"packageManager":"pnpm@11.4.0+sha512.abc"}'
@@ -40,6 +43,73 @@ describe('latest_corepack.extract_pnpm_major', () => {
 
 	it('returns undefined when packageManager is absent', () => {
 		expect(latest_corepack.extract_pnpm_major(PACKAGE_JSON_NO_PM)).toBeUndefined()
+	})
+})
+
+const PIN_V11_20 = '11.20.0'
+const TARGET_BELOW_PIN = 'pnpm@11.19.0'
+const TARGET_AT_PIN = 'pnpm@11.20.0'
+const FALLBACK_TARGET = 'pnpm@latest'
+
+describe('latest_corepack.extract_pinned_version', () => {
+	it('extracts the full version without the integrity suffix', () => {
+		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V11)).toBe('11.4.0')
+	})
+
+	it('returns undefined for a bare-major shorthand pin', () => {
+		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V11_SHORT)).toBeUndefined()
+	})
+
+	it('returns undefined when the packageManager pin is absent', () => {
+		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_NO_PM)).toBeUndefined()
+	})
+})
+
+describe('latest_corepack.is_target_not_newer_than_pin', () => {
+	it('flags a registry answer below the pin as not newer', () => {
+		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_BELOW_PIN, PIN_V11_20)).toBe(true)
+	})
+
+	it('flags an answer equal to the pin as not newer', () => {
+		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, PIN_V11_20)).toBe(true)
+	})
+
+	it('lets a genuinely newer answer through', () => {
+		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, REGISTRY_V11)).toBe(false)
+	})
+
+	it('does not apply without a comparable pin', () => {
+		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_BELOW_PIN, undefined)).toBe(false)
+	})
+
+	it('does not apply to the pnpm@latest fallback target', () => {
+		expect(latest_corepack.is_target_not_newer_than_pin(FALLBACK_TARGET, PIN_V11_20)).toBe(false)
+	})
+})
+
+describe('latest_corepack.notify_skipped_bump', () => {
+	it('logs the equal answer as steady-state success, not a warning', () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		latest_corepack.notify_skipped_bump(TARGET_AT_PIN, PIN_V11_20)
+
+		expect(info).toHaveBeenCalledOnce()
+		expect(warn).not.toHaveBeenCalled()
+
+		vi.restoreAllMocks()
+	})
+
+	it('warns when the answer sits below the pin', () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		latest_corepack.notify_skipped_bump(TARGET_BELOW_PIN, PIN_V11_20)
+
+		expect(warn).toHaveBeenCalledOnce()
+		expect(info).not.toHaveBeenCalled()
+
+		vi.restoreAllMocks()
 	})
 })
 
@@ -90,7 +160,7 @@ describe('latest_corepack.resolve_corepack_target', () => {
 	})
 
 	it('falls back to pnpm@latest without querying when the major is unknown', () => {
-		expect(latest_corepack.resolve_corepack_target(undefined)).toBe('pnpm@latest')
+		expect(latest_corepack.resolve_corepack_target(undefined)).toBe(FALLBACK_TARGET)
 		expect(mocked_execa_sync).not.toHaveBeenCalled()
 	})
 
@@ -243,7 +313,27 @@ describe('latest_corepack.main', () => {
 	})
 })
 
+const PACKAGE_JSON_AHEAD_OF_REGISTRY =
+	'{"packageManager":"pnpm@11.20.0+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11.20.0","onFail":"error"}}}'
+
 describe('latest_corepack.main skip handling', () => {
+	// The kit#766 regression: safe-chain's age filter hides a freshly adopted release, so the
+	// registry answers one release below the pin. The run must be a no-op, not a downgrade.
+	it('skips without invoking corepack when the registry answers below the pin', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_AHEAD_OF_REGISTRY)
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, `${REGISTRY_V11}\n`))
+
+		latest_corepack.main()
+
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
+		expect(mocked_write_file_sync).not.toHaveBeenCalled()
+		expect(warn).toHaveBeenCalledOnce()
+
+		warn.mockRestore()
+	})
+
 	it('skips without touching package.json when the registry cannot answer', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
