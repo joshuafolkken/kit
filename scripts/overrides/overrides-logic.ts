@@ -149,24 +149,14 @@ function extract_package_name(key: string): string {
 	return key.slice(0, separator)
 }
 
-function is_version_cap_override(key: string): boolean {
-	const separator = find_version_separator(key)
-
-	if (separator === -1) return false
-
-	const constraint = key.slice(separator + 1)
-
-	return (
-		(constraint.startsWith('>=') || constraint.startsWith('>')) &&
-		!constraint.includes('<=') &&
-		!constraint.includes('<')
-	)
-}
-
-function extract_capped_package_names(overrides: Record<string, string>): Array<string> {
-	return Object.keys(overrides)
-		.filter((key) => is_version_cap_override(key))
-		.map((key) => extract_package_name(key))
+// Every overridden package, whether the key carries a version selector (`pkg@>=5`) or not
+// (`pkg: ^5.55.7`). An override declares the resolution the project has chosen for that package, so
+// `pnpm update --latest` must not rewrite its declared range: past a cap the tree stops resolving,
+// and for a plain override pnpm writes the raw package.json range into the lockfile importer instead
+// of the override-applied one, producing a lockfile that fails CI's frozen-lockfile install
+// (kit #744). Both failures have the same cause, so both take the same exclusion.
+function extract_overridden_package_names(overrides: Record<string, string>): Array<string> {
+	return Object.keys(overrides).map((key) => extract_package_name(key))
 }
 
 // Packages always held back from `pnpm update --latest`, regardless of overrides.
@@ -176,11 +166,11 @@ function extract_capped_package_names(overrides: Record<string, string>): Array<
 // remove this entry to fix forward (kit #658).
 const HELD_BACK_PACKAGE_NAMES: Array<string> = ['typescript']
 
-// The union of built-in held-back packages and override-derived capped packages — every dependency
-// name that `pnpm update --latest` must skip. Deduped so a package that is both held back and capped
-// is listed once (used both to build the update command and to log what was skipped).
+// The union of built-in held-back packages and every overridden package — the dependency names
+// `pnpm update --latest` must skip. Deduped so a package that is both held back and overridden is
+// listed once (used both to build the update command and to log what was skipped).
 function list_excluded_package_names(overrides: Record<string, string>): Array<string> {
-	return [...new Set([...HELD_BACK_PACKAGE_NAMES, ...extract_capped_package_names(overrides)])]
+	return [...new Set([...HELD_BACK_PACKAGE_NAMES, ...extract_overridden_package_names(overrides)])]
 }
 
 function read_dependency_names(package_json_content: string): Array<string> {
@@ -211,7 +201,8 @@ const overrides_check = {
 	read_overrides,
 	describe_sources,
 	format_diff_lines,
-	extract_capped_package_names,
+	extract_package_name,
+	extract_overridden_package_names,
 	list_excluded_package_names,
 	read_dependency_names,
 	build_update_command,

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { logged_lines } from './logged-lines-fixture'
 
 // kit #740: `josh latest` derived its capped-package exclusions from `pnpm.overrides` in
 // package.json alone, so overrides declared in pnpm-workspace.yaml were invisible to it and the
@@ -50,31 +51,28 @@ beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(vi.fn())
 })
 
-function find_logged(spy: typeof console.info, fragment: string): string | undefined {
-	return vi
-		.mocked(spy)
-		.mock.calls.map(([first]) => (typeof first === 'string' ? first : ''))
-		.find((line) => line.includes(fragment))
-}
-
 describe('latest_update.main — overrides declared in pnpm-workspace.yaml', () => {
 	it('excludes a package capped by a workspace override from the update targets', () => {
 		latest_update.main()
 
-		expect(find_logged(console.info, 'Skipping held-back / capped packages')).toContain('svelte')
+		expect(
+			logged_lines.find_logged(console.info, 'Skipping held-back / overridden packages'),
+		).toContain('svelte')
 	})
 
 	it('reports the overrides verdict naming the file they were read from', () => {
 		latest_update.main()
 
-		expect(find_logged(console.info, UNCHANGED_NOTICE)).toContain('1 from pnpm-workspace.yaml')
+		expect(logged_lines.find_logged(console.info, UNCHANGED_NOTICE)).toContain(
+			'1 from pnpm-workspace.yaml',
+		)
 	})
 
 	it('names both files when no overrides exist anywhere', () => {
 		tree.workspace_yaml = ''
 		latest_update.main()
 
-		expect(find_logged(console.info, UNCHANGED_NOTICE)).toContain(
+		expect(logged_lines.find_logged(console.info, UNCHANGED_NOTICE)).toContain(
 			'no overrides found in pnpm-workspace.yaml or package.json',
 		)
 	})
@@ -87,7 +85,7 @@ describe('latest_update.main — overrides declared in pnpm-workspace.yaml', () 
 		})
 		latest_update.main()
 
-		expect(find_logged(console.warn, 'overrides changed')).toBeDefined()
-		expect(find_logged(console.warn, `removed: ${CAPPED_KEY}`)).toBeDefined()
+		expect(logged_lines.find_logged(console.warn, 'overrides changed')).toBeDefined()
+		expect(logged_lines.find_logged(console.warn, `removed: ${CAPPED_KEY}`)).toBeDefined()
 	})
 })
