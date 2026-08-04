@@ -35,10 +35,10 @@ function get_gh_cli_token(): string | undefined {
 }
 
 // Resolution order: NODE_AUTH_TOKEN → a literal token in the project .npmrc → `gh auth token`.
-// The kit no longer distributes the `_authToken=${NODE_AUTH_TOKEN}` line (pnpm ignores env-var
-// credentials from a project .npmrc), and parse_npmrc_auth_token already skipped that
-// placeholder form, so its removal changes nothing here. The user-level ~/.npmrc — where the
-// credential now lives — is deliberately NOT read: no kit script resolves the home directory
+// The kit does not distribute the `_authToken=${NODE_AUTH_TOKEN}` line, and a consumer that
+// keeps one (see docs/authentication.md §4(d)) is unaffected: parse_npmrc_auth_token skips the
+// placeholder form, and the env var it expands to is already first in the order above. The
+// user-level ~/.npmrc is deliberately NOT read: no kit script resolves the home directory
 // (see no-global-shim-write.test.ts), and the gh CLI fallback covers the same setups.
 function get_effective_auth_token(npmrc: string): string | undefined {
 	const environment_token = process.env['NODE_AUTH_TOKEN']?.trim()
