@@ -10,6 +10,9 @@ const get_ai_copy_files_mock = vi.hoisted(() => vi.fn().mockReturnValue(['CLAUDE
 const merge_workspace_mock = vi.hoisted(() =>
 	vi.fn().mockImplementation((existing: string) => existing),
 )
+const transform_copied_content_mock = vi.hoisted(() =>
+	vi.fn().mockImplementation((_destination: string, content: string) => content),
+)
 
 vi.mock('node:fs', () => ({
 	cpSync: cp_sync_mock,
@@ -23,6 +26,9 @@ vi.mock('node:path', () => ({
 		join: (...parts: Array<string>) => parts.join('/'),
 		dirname: (path_: string) => path_.split('/').slice(0, -1).join('/'),
 	},
+}))
+vi.mock('./init-copy-content', () => ({
+	transform_copied_content: transform_copied_content_mock,
 }))
 vi.mock('./init-logic', () => ({
 	init_logic: {
@@ -63,6 +69,15 @@ describe('init_ai_copy.copy_ai_file — write behavior', () => {
 		init_ai_copy.copy_ai_file(SRC_PATH, DEST_PATH)
 
 		expect(mkdir_mock).toHaveBeenCalledWith('/project', { recursive: true })
+	})
+
+	// The destination decides whether workflow action pins get resolved, so it has to reach
+	// the transform — a content-only call would ship the template refs verbatim.
+	it('passes the destination path to the content transform', () => {
+		read_file_mock.mockReturnValue(RAW_CONTENT)
+		init_ai_copy.copy_ai_file(SRC_PATH, DEST_PATH)
+
+		expect(transform_copied_content_mock).toHaveBeenCalledWith(DEST_PATH, RAW_CONTENT)
 	})
 })
 

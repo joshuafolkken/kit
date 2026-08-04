@@ -4,6 +4,7 @@ import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
+import { workflow_pin_logic } from './workflow-pin-logic'
 
 const TEST_DIR = path.join(tmpdir(), 'sync-test')
 const SRC_PATH = path.join(TEST_DIR, 'src', 'gitignore')
@@ -236,6 +237,8 @@ describe('sync_playwright_config', () => {
 })
 
 const NO_REFERENCES_CONTENT = 'no references here\n'
+const CHECKOUT_ACTION = 'actions/checkout'
+const STALE_CHECKOUT_REF = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
 
 describe('sync_ai_file', () => {
 	it('writes file content to destination', () => {
@@ -261,5 +264,28 @@ describe('sync_ai_file', () => {
 		sync.sync_ai_file(SRC_PATH, nested_destination)
 
 		expect(existsSync(nested_destination)).toBe(true)
+	})
+
+	// The end-to-end guarantee behind joshuafolkken/kit#747: Dependabot only ever bumps
+	// .github/workflows, so a consumer must get the current pin even from a stale template.
+	it('resolves workflow action pins from .github/workflows when the template is stale', () => {
+		const workflow_destination = path.join(TEST_DIR, 'dest', '.github', 'workflows', 'ci.yml')
+		const canonical = workflow_pin_logic.build_canonical_pins().get(CHECKOUT_ACTION)
+
+		writeFileSync(SRC_PATH, `        uses: ${CHECKOUT_ACTION}@${STALE_CHECKOUT_REF}\n`)
+		sync.sync_ai_file(SRC_PATH, workflow_destination)
+
+		expect(readFileSync(workflow_destination, 'utf8')).toBe(
+			`        uses: ${CHECKOUT_ACTION}@${String(canonical)}\n`,
+		)
+	})
+
+	it('leaves action pins untouched when the destination is not a workflow', () => {
+		const line = `        uses: ${CHECKOUT_ACTION}@${STALE_CHECKOUT_REF}\n`
+
+		writeFileSync(SRC_PATH, line)
+		sync.sync_ai_file(SRC_PATH, DEST_PATH)
+
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(line)
 	})
 })

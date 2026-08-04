@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gh_spawn } from '#scripts/gh-spawn'
+import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { sonar_file } from '#scripts/sonar-file'
@@ -17,7 +18,7 @@ function sync_ai_file(source_path: string, destination_path: string): void {
 	mkdirSync(path.dirname(destination_path), { recursive: true })
 	const content = readFileSync(source_path, 'utf8')
 
-	writeFileSync(destination_path, init_logic.transform_prompt_paths(content))
+	writeFileSync(destination_path, transform_copied_content(destination_path, content))
 }
 
 function sync_file(filename: string): void {
