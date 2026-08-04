@@ -126,7 +126,6 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
-.claude/agents/code-reviewer.md
 sonar-project.properties  (generated from GitHub repo name)
 ```
 

@@ -129,8 +129,11 @@ describe('get_ai_copy_files - dotfiles and config', () => {
 		expect(init_logic.get_ai_copy_files()).toContain('.claude/settings.json')
 	})
 
-	it('includes the code-reviewer subagent definition', () => {
-		expect(init_logic.get_ai_copy_files()).toContain('.claude/agents/code-reviewer.md')
+	// The subagent was withdrawn with the post-PR review model (joshuafolkken/kit#762): the
+	// review now runs inline in the implementing session, so shipping an agent definition
+	// nothing launches would leave consumers with a stale file that contradicts the docs.
+	it('no longer distributes the code-reviewer subagent definition', () => {
+		expect(init_logic.get_ai_copy_files()).not.toContain('.claude/agents/code-reviewer.md')
 	})
 })
 
