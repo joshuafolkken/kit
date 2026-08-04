@@ -2,8 +2,10 @@ import { version_targets } from '#scripts/version/version-targets'
 import { git_epic_close } from './git-epic-close'
 import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
-import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
+import { git_pr_ai_review, has_ignore_reason, type TelegramContext } from './git-pr-ai-review'
 import { git_pr_checks } from './git-pr-checks'
+import { is_coderabbit_check } from './git-pr-checks-eval'
+import { CHECK_STATUS_PASS, type PrStateSnapshot } from './git-pr-checks-parse'
 import { parse_json_array_safe } from './parse-json-array'
 import { pull_comment_schema } from './schemas'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
@@ -93,14 +95,6 @@ function build_ignore_reason_comment(reason: string, urls: ReadonlyArray<string>
 	return lines.join('\n')
 }
 
-function validate_ignore_reason(reason: string | undefined): string {
-	if (reason === undefined || reason.trim().length === 0) {
-		throw new Error('Fix findings or pass --coderabbit-ignore-reason.')
-	}
-
-	return reason
-}
-
 function has_closes_keyword(body: string | undefined): boolean {
 	if (body === undefined) return false
 
@@ -120,17 +114,34 @@ async function warn_if_missing_closes(branch_name: string): Promise<void> {
 	console.warn('')
 }
 
+function log_unresolved_coderabbit(urls: ReadonlyArray<string>): void {
+	console.warn('⚠ Unresolved CodeRabbit comments are non-blocking (temporary policy — kit#753):')
+
+	for (const url of urls) {
+		console.warn(`- ${url}`)
+	}
+}
+
+// Temporary (kit#753): unresolved CodeRabbit line comments no longer block the merge. They are
+// logged, returned as audit notes for the completion notification, and — when an ignore reason is
+// supplied — still documented on the PR. Revert together with kit#752.
 async function handle_coderabbit_findings(input: {
 	branch_name: string
 	ignore_reason: string | undefined
-}): Promise<void> {
+}): Promise<Array<string>> {
 	const comments_json = await git_gh_command.pr_get_review_comments(input.branch_name)
 	const unresolved_urls = read_unresolved_cr_urls(parse_pull_comments(comments_json))
-	if (unresolved_urls.length === 0) return
-	const ignore_reason = validate_ignore_reason(input.ignore_reason)
-	const reason_comment = build_ignore_reason_comment(ignore_reason, unresolved_urls)
+	if (unresolved_urls.length === 0) return []
 
-	await git_gh_command.pr_comment(input.branch_name, reason_comment)
+	if (has_ignore_reason(input.ignore_reason)) {
+		const reason_comment = build_ignore_reason_comment(input.ignore_reason, unresolved_urls)
+
+		await git_gh_command.pr_comment(input.branch_name, reason_comment)
+	} else {
+		log_unresolved_coderabbit(unresolved_urls)
+	}
+
+	return unresolved_urls.map((url) => `CodeRabbit unresolved comment skipped (kit#753): ${url}`)
 }
 
 function build_notify_body(input: {
@@ -200,14 +211,29 @@ async function post_completion_notification(input: {
 	}
 }
 
-async function run_checks(input: { branch_name: string; is_skip_watch: boolean }): Promise<void> {
+async function run_checks(input: {
+	branch_name: string
+	is_skip_watch: boolean
+}): Promise<PrStateSnapshot> {
 	if (!input.is_skip_watch) {
 		console.info('')
 		console.info('📊 Watching PR checks...')
 		await git_gh_command.pr_checks_watch(input.branch_name)
 	}
 
-	await git_pr_checks.wait_for_pr_success(input.branch_name)
+	return await git_pr_checks.wait_for_pr_success(input.branch_name)
+}
+
+// Temporary (kit#753): record every CodeRabbit check that was not passing when the merge gate
+// opened, so a merge shipped without CodeRabbit review stays auditable.
+function read_coderabbit_skip_notes(snapshot: PrStateSnapshot): Array<string> {
+	return snapshot.rollup
+		.filter((check) => is_coderabbit_check(check.name))
+		.filter((check) => check.status !== CHECK_STATUS_PASS)
+		.map(
+			(check) =>
+				`CodeRabbit check skipped (kit#753): ${check.name} was ${check.status} at merge time`,
+		)
 }
 
 async function fetch_telegram_context(input: {
@@ -226,8 +252,12 @@ async function fetch_telegram_context(input: {
 	return { repo_name, issue_title, issue_url, pr_url }
 }
 
-async function notify_completion(context: TelegramContext): Promise<void> {
-	const body = version_targets.project_version_line(process.cwd())
+async function notify_completion(
+	context: TelegramContext,
+	skip_notes: ReadonlyArray<string>,
+): Promise<void> {
+	const version_line = version_targets.project_version_line(process.cwd())
+	const body = [version_line, ...skip_notes].join('\n')
 
 	await telegram_notify.send(
 		build_telegram_input({
@@ -238,17 +268,26 @@ async function notify_completion(context: TelegramContext): Promise<void> {
 	)
 }
 
-async function run_review_checks(input: FollowupInput, context: TelegramContext): Promise<void> {
-	await run_checks({ branch_name: input.branch_name, is_skip_watch: input.is_skip_watch })
-	await handle_coderabbit_findings({
+async function run_review_checks(
+	input: FollowupInput,
+	context: TelegramContext,
+): Promise<Array<string>> {
+	const snapshot = await run_checks({
+		branch_name: input.branch_name,
+		is_skip_watch: input.is_skip_watch,
+	})
+	const check_notes = read_coderabbit_skip_notes(snapshot)
+	const comment_notes = await handle_coderabbit_findings({
 		branch_name: input.branch_name,
 		ignore_reason: input.coderabbit_ignore_reason,
 	})
-	await git_pr_ai_review.handle_ai_review_findings({
+	const ai_review_notes = await git_pr_ai_review.handle_ai_review_findings({
 		branch_name: input.branch_name,
 		ignore_reason: input.ai_review_ignore_reason,
 		context,
 	})
+
+	return [...check_notes, ...comment_notes, ...ai_review_notes]
 }
 
 async function run(input: FollowupInput): Promise<void> {
@@ -259,8 +298,9 @@ async function run(input: FollowupInput): Promise<void> {
 		issue_number: input.issue_number,
 	})
 
-	await run_review_checks(input, context)
-	await notify_completion(context)
+	const skip_notes = await run_review_checks(input, context)
+
+	await notify_completion(context, skip_notes)
 
 	if (input.should_merge) {
 		await git_gh_command.pr_merge(input.branch_name)

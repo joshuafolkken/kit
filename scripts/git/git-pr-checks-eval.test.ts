@@ -20,8 +20,8 @@ function make_snapshot(overrides: Partial<PrStateSnapshot> = {}): PrStateSnapsho
 }
 
 describe('REQUIRED_CHECKS', () => {
-	it('includes CodeRabbit', () => {
-		expect(REQUIRED_CHECKS).toContain(CODE_RABBIT)
+	it('excludes CodeRabbit while the temporary kit#753 policy is active', () => {
+		expect(REQUIRED_CHECKS).not.toContain(CODE_RABBIT)
 	})
 
 	it('includes SonarQube', () => {
@@ -45,13 +45,12 @@ describe('read_required_statuses', () => {
 
 	it('returns the actual status for a pending required check', () => {
 		const checks: Array<RollupCheck> = [
-			{ name: CODE_RABBIT, status: 'pending' },
-			{ name: SONAR_QUBE, status: 'pass' },
+			{ name: CODE_RABBIT, status: 'pass' },
+			{ name: SONAR_QUBE, status: 'pending' },
 		]
 		const statuses = read_required_statuses(checks)
 
 		expect(statuses).toContain('pending')
-		expect(statuses).toContain('pass')
 	})
 
 	it('ignores non-required checks', () => {
@@ -64,20 +63,14 @@ describe('read_required_statuses', () => {
 
 describe('read_required_statuses — check-suite prefix matching', () => {
 	it('matches a check-suite job nested under the required app name', () => {
-		const checks: Array<RollupCheck> = [
-			{ name: `${CODE_RABBIT} / Review`, status: 'pass' },
-			{ name: SONAR_QUBE, status: 'pass' },
-		]
+		const checks: Array<RollupCheck> = [{ name: `${SONAR_QUBE} / Gate`, status: 'pass' }]
 		const statuses = read_required_statuses(checks)
 
 		expect(statuses.every((status) => status === 'pass')).toBe(true)
 	})
 
 	it('does not match a context that merely starts with the required name', () => {
-		const checks: Array<RollupCheck> = [
-			{ name: `${CODE_RABBIT}Nightly`, status: 'pass' },
-			{ name: SONAR_QUBE, status: 'pass' },
-		]
+		const checks: Array<RollupCheck> = [{ name: `${SONAR_QUBE}Nightly`, status: 'pass' }]
 		const statuses = read_required_statuses(checks)
 
 		expect(statuses).toContain('missing')
@@ -97,10 +90,33 @@ describe('evaluate_pr_state — success', () => {
 		expect(evaluate_pr_state(snapshot)).toBe('success')
 	})
 
-	it('returns success when CodeRabbit is present only as its renamed suite job', () => {
+	it('returns success when SonarQube is present only as its renamed suite job', () => {
 		const snapshot = make_snapshot({
+			rollup: [{ name: `${SONAR_QUBE} / Gate`, status: 'pass' }],
+		})
+
+		expect(evaluate_pr_state(snapshot)).toBe('success')
+	})
+})
+
+describe('evaluate_pr_state — temporary CodeRabbit skip (kit#753)', () => {
+	it('returns success when UNSTABLE is caused only by a pending CodeRabbit check', () => {
+		const snapshot = make_snapshot({
+			merge_state_status: 'UNSTABLE',
 			rollup: [
-				{ name: `${CODE_RABBIT} / Review`, status: 'pass' },
+				{ name: CODE_RABBIT, status: 'pending' },
+				{ name: SONAR_QUBE, status: 'pass' },
+			],
+		})
+
+		expect(evaluate_pr_state(snapshot)).toBe('success')
+	})
+
+	it('returns success when UNSTABLE is caused only by a failing CodeRabbit suite job', () => {
+		const snapshot = make_snapshot({
+			merge_state_status: 'UNSTABLE',
+			rollup: [
+				{ name: `${CODE_RABBIT} / Review`, status: 'fail' },
 				{ name: SONAR_QUBE, status: 'pass' },
 			],
 		})
@@ -109,12 +125,33 @@ describe('evaluate_pr_state — success', () => {
 	})
 })
 
+describe('evaluate_pr_state — UNSTABLE not attributable to CodeRabbit', () => {
+	it('returns pending when UNSTABLE involves a non-CodeRabbit check', () => {
+		const snapshot = make_snapshot({
+			merge_state_status: 'UNSTABLE',
+			rollup: [
+				{ name: CODE_RABBIT, status: 'pending' },
+				{ name: 'Lighthouse', status: 'fail' },
+				{ name: SONAR_QUBE, status: 'pass' },
+			],
+		})
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+
+	it('returns pending when UNSTABLE has no non-passing checks to attribute', () => {
+		const snapshot = make_snapshot({ merge_state_status: 'UNSTABLE' })
+
+		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+})
+
 describe('evaluate_pr_state — failure', () => {
 	it('returns failure when a required check has failed', () => {
 		const snapshot = make_snapshot({
 			rollup: [
-				{ name: CODE_RABBIT, status: 'fail' },
-				{ name: SONAR_QUBE, status: 'pass' },
+				{ name: CODE_RABBIT, status: 'pass' },
+				{ name: SONAR_QUBE, status: 'fail' },
 			],
 		})
 
@@ -136,8 +173,8 @@ describe('evaluate_pr_state — pending', () => {
 	it('returns pending when a required check is still pending', () => {
 		const snapshot = make_snapshot({
 			rollup: [
-				{ name: CODE_RABBIT, status: 'pending' },
-				{ name: SONAR_QUBE, status: 'pass' },
+				{ name: CODE_RABBIT, status: 'pass' },
+				{ name: SONAR_QUBE, status: 'pending' },
 			],
 		})
 
@@ -183,7 +220,7 @@ describe('REQUIRED_CHECKS — JOSH_REQUIRED_CHECKS env var not set', () => {
 	it('falls back to defaults when env var is absent', async () => {
 		const { REQUIRED_CHECKS: checks } = await import('./git-pr-checks-eval')
 
-		expect(checks).toContain(CODE_RABBIT)
+		expect(checks).not.toContain(CODE_RABBIT)
 		expect(checks).toContain(SONAR_QUBE)
 	})
 })

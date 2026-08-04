@@ -86,8 +86,8 @@ describe('evaluate_pr_state — failure paths', () => {
 	it('failure when a required check has failed', () => {
 		const snapshot = make_snapshot({
 			rollup: [
-				{ name: CODE_RABBIT, status: 'fail' },
-				{ name: SONAR_QUBE, status: 'pass' },
+				{ name: CODE_RABBIT, status: 'pass' },
+				{ name: SONAR_QUBE, status: 'fail' },
 			],
 		})
 
@@ -105,8 +105,8 @@ describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () 
 	it('pending when a required rollup entry is still pending', () => {
 		const snapshot = make_snapshot({
 			rollup: [
-				{ name: CODE_RABBIT, status: 'pending' },
-				{ name: SONAR_QUBE, status: 'pass' },
+				{ name: CODE_RABBIT, status: 'pass' },
+				{ name: SONAR_QUBE, status: 'pending' },
 			],
 		})
 
