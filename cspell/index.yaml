@@ -85,3 +85,5 @@ words:
   - languagetool
   - sandboxed
   - shellcheck
+  - unawaited
+  - entrancy

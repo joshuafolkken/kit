@@ -128,6 +128,10 @@ describe('get_ai_copy_files - dotfiles and config', () => {
 	it('includes .claude/settings.json', () => {
 		expect(init_logic.get_ai_copy_files()).toContain('.claude/settings.json')
 	})
+
+	it('includes the code-reviewer subagent definition', () => {
+		expect(init_logic.get_ai_copy_files()).toContain('.claude/agents/code-reviewer.md')
+	})
 })
 
 describe('get_ai_copy_file_mappings', () => {
