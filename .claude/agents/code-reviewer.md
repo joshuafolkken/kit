@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Fresh-context code reviewer for the workflow review step. Launch it on a branch diff (git diff main...HEAD) before commit or before followup --merge, passing only the diff scope and the Issue goal — never the implementing session's reasoning. Returns the categorized review defined in prompts/review.md.
+description: Fresh-context code reviewer for the workflow review step. Launch it on a branch diff (git diff main...HEAD) before commit or before followup --merge, passing only the diff scope and the Issue goal — never the implementing session's reasoning. Returns the categorized review defined in `prompts/review.md`.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -17,7 +17,7 @@ If either is missing from your prompt, derive the diff yourself from the current
 
 ## Checklist
 
-Follow `prompts/review.md` in the repository root. If it does not exist (consumer repo without local prompts), read `node_modules/@joshuafolkken/kit/prompts/review.md` instead. Work through **every** category it defines and use its exact output template — categories, severities (`high` / `medium` / `low`), assumptions audit, confidence floor, and summary. Output in English.
+Follow the checklist in `prompts/review.md` (kit's distribution rewrites this path for consumer repos, so read it exactly as written here). Work through **every** category it defines and use its exact output template — categories, severities (`high` / `medium` / `low`), assumptions audit, confidence floor, and summary. Output in English.
 
 ## Rules
 
