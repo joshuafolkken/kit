@@ -24,7 +24,7 @@ Single quotes around `$LINE` keep `$(gh auth token)` literal, so the token is re
 
 ## 2. Put the credential in `~/.npmrc`
 
-The token line belongs in your **user-level** `~/.npmrc`, never in a project `.npmrc`. The snippet is idempotent:
+On a developer machine the token line belongs in your **user-level** `~/.npmrc`, not the project `.npmrc` — pnpm ignores it there unless the project opts in, which only a builder needs ([§4(d)](#4-build-platforms-with-no-user-level-npmrc)). The snippet is idempotent:
 
 ```bash
 TOKEN='//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
@@ -41,7 +41,7 @@ pnpm config set "//npm.pkg.github.com/:_authToken" "$(gh auth token)"
 
 That value is a real secret and does not refresh on rotation — re-run the command when the token expires.
 
-> **Why not the project `.npmrc`?** Since pnpm 11.6, environment variables are **not** expanded in registry credentials read from a project `.npmrc`, because that file is committed and the expansion could leak the token to an attacker-controlled registry. A token line there is ignored with an `Ignored project-level auth setting` warning on every command, so `josh init` / `josh sync` no longer write it — and `josh sync` removes it from projects that still carry it.
+> **Why not the project `.npmrc`?** Since pnpm 11.6, environment variables are **not** expanded in registry credentials read from a project `.npmrc` **by default**, because that file is committed and the expansion could leak the token to an attacker-controlled registry. A token line there is ignored with an `Ignored project-level auth setting` warning on every command, so `josh init` / `josh sync` do not write it. They do not remove one either: pnpm's `npmrcAuthFile` setting re-enables expansion for a file the project declares trusted, which is a supported arrangement on a builder with no user-level npmrc — see [§4(d)](#4-build-platforms-with-no-user-level-npmrc).
 
 **GitHub Actions needs no extra step**: `actions/setup-node` with `registry-url: 'https://npm.pkg.github.com'` writes the same placeholder line into a user-level npmrc for the job, which pnpm does expand — supply `NODE_AUTH_TOKEN` to the install step and it works. Any other build environment does need a step: see [§4](#4-build-platforms-with-no-user-level-npmrc).
 
@@ -60,7 +60,7 @@ Commit that file — it holds no secret. Without the mapping, `pnpm` tries the p
 
 A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no `actions/setup-node` to write one for the job, so the project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: every kit workflow job that installs dependencies calls setup-node with `registry-url` first, so Actions always has the credential restored for it — the one environment that can fail is the one no check exercises.
 
-Supply the credential from a source pnpm reads outside the project. Any one of the three below is enough — pick the one your platform allows. Each needs the token itself in the platform's secret store, never in a committed file.
+Supply the credential from a source pnpm reads. Any one of the four below is enough — pick the one your platform allows. Each needs the token itself in the platform's secret store, never in a committed file.
 
 **a. An environment variable alone.** pnpm reads `npm_config_`-prefixed variables as config, so this needs no file and no command change:
 
@@ -68,7 +68,7 @@ Supply the credential from a source pnpm reads outside the project. Any one of t
 npm_config_//npm.pkg.github.com/:_authToken=<token>
 ```
 
-Use it wherever variable names are unrestricted (a Dockerfile `ENV`, most CI runners). Some dashboards accept only letters, digits and `_` in a name — take (b) or (c) there.
+Use it wherever variable names are unrestricted (a Dockerfile `ENV`, most CI runners). Some dashboards accept only letters, digits and `_` in a name and reject this one — take (d) there, or (b)/(c) if you control a step that runs before the install.
 
 **b. `pnpm config set` before the install.** This writes to pnpm's global auth store, outside the repository:
 
@@ -86,7 +86,24 @@ printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
 
 Single quotes keep the placeholder literal, so `NODE_AUTH_TOKEN` is expanded by pnpm at install time. Same ordering constraint as (b).
 
-> **Why not just put the line back in the project `.npmrc`?** Since pnpm 11.6 it is ignored there (§2). Verified on pnpm 11.20.0: with the user config isolated, that line yields `Ignored project-level auth setting` and a `401`, while the same line in a user-level npmrc resolves. `josh sync` removes it for that reason and will keep removing it.
+**d. Declare the project `.npmrc` a trusted auth file.** pnpm's `npmrcAuthFile` setting names one file whose credentials it will still expand environment variables in, and the project `.npmrc` is allowed to be that file. Keep the placeholder line from §2 in the committed project file:
+
+```ini
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+and set both variables in the platform's dashboard:
+
+```
+PNPM_CONFIG_NPMRC_AUTH_FILE=.npmrc
+NODE_AUTH_TOKEN=<token>
+```
+
+Unlike (b) and (c), this needs no build step of your own, so it also works on a platform that installs dependencies before running any command you control — Cloudflare Workers Builds among them. The committed file still holds no secret, only the placeholder; the token stays in the dashboard. `josh sync` leaves the line alone from kit `1.60.0` on. **Earlier versions removed it on every run**, which broke exactly this arrangement — and invisibly, because the pnpm store keeps serving already-resolved versions until the next `@joshuafolkken/*` bump. If you are on an older kit, upgrade before relying on (d).
+
+> **Which of (a)–(d) should I use?** (a) whenever the platform allows arbitrary variable names — it is the least setup. (d) when it does not, since a dashboard that rejects `npm_config_//…` still accepts `PNPM_CONFIG_NPMRC_AUTH_FILE`. (b) and (c) only where you control a step that runs before dependency installation.
+
+> **Why is the plain project `.npmrc` not enough without (d)?** Since pnpm 11.6 the line is ignored there by default (§2). Verified on pnpm 11.20.0: with the user config isolated and `npmrcAuthFile` unset, that line yields `Ignored project-level auth setting` and a `401`, while the same line in a user-level npmrc resolves. Setting `npmrcAuthFile` to the project file is what flips it — that is the whole of (d).
 
 ## Next
 

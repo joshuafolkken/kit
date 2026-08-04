@@ -243,7 +243,7 @@ describe('get_npmrc_lines', () => {
 		)
 	})
 
-	it('omits the auth token line pnpm ignores in a project .npmrc', () => {
+	it('omits the auth token line, which pnpm ignores unless npmrcAuthFile opts the file in', () => {
 		expect(init_logic.get_npmrc_lines().join('\n')).not.toContain('_authToken')
 	})
 
@@ -309,49 +309,45 @@ describe('merge_npmrc', () => {
 	})
 })
 
-const OBSOLETE_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
+const PLACEHOLDER_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
 const LITERAL_AUTH_LINE = '//npm.pkg.github.com/:_authToken=ghp_literal123'
 
-describe('merge_npmrc — obsolete auth line removal', () => {
+// Regression guard for #759: the env-var placeholder form is the live credential wherever
+// `npmrcAuthFile` declares the project .npmrc trusted, and that opt-in can live in a deploy
+// platform's dashboard, invisible here. Merging must never delete it.
+describe('merge_npmrc — existing auth lines survive', () => {
 	const LINES = init_logic.get_npmrc_lines()
 	const ALL_LINES = LINES.join('\n')
 
-	it('removes the env-var auth line pnpm ignores in a project .npmrc', () => {
-		const existing = `${LINES[0] ?? ''}\n${OBSOLETE_AUTH_LINE}\n`
+	it('keeps the env-var auth line npmrcAuthFile makes live', () => {
+		const existing = `${ALL_LINES}\n${PLACEHOLDER_AUTH_LINE}\n`
 
-		expect(init_logic.merge_npmrc(existing)).not.toContain(OBSOLETE_AUTH_LINE)
+		expect(init_logic.merge_npmrc(existing)).toBe(existing)
 	})
 
-	it('keeps every other line when removing the obsolete auth line', () => {
-		const result = init_logic.merge_npmrc(`${OBSOLETE_AUTH_LINE}\n${OTHER_LINE}\n`)
+	it('keeps the env-var auth line while appending the missing required lines', () => {
+		const result = init_logic.merge_npmrc(`${PLACEHOLDER_AUTH_LINE}\n${OTHER_LINE}\n`)
 
+		expect(result).toContain(PLACEHOLDER_AUTH_LINE)
 		expect(result).toContain(OTHER_LINE)
 		for (const line of LINES) expect(result).toContain(line)
 	})
 
-	it('keeps a literal token line, which pnpm still honors', () => {
+	it('keeps a literal token line, which pnpm honors unconditionally', () => {
 		const existing = `${ALL_LINES}\n${LITERAL_AUTH_LINE}\n`
 
-		expect(init_logic.merge_npmrc(existing)).toContain(LITERAL_AUTH_LINE)
+		expect(init_logic.merge_npmrc(existing)).toBe(existing)
 	})
 
-	it('removes the obsolete line even without a trailing newline', () => {
-		const result = init_logic.merge_npmrc(`${OTHER_LINE}\n${OBSOLETE_AUTH_LINE}`)
+	it('keeps the auth line when the content lacks a trailing newline', () => {
+		const result = init_logic.merge_npmrc(`${OTHER_LINE}\n${PLACEHOLDER_AUTH_LINE}`)
 
-		expect(result).not.toContain('_authToken')
+		expect(result).toContain(PLACEHOLDER_AUTH_LINE)
 		expect(result).toContain(OTHER_LINE)
 	})
 
-	it('detects the obsolete line so sync can point at the new credential location', () => {
-		expect(init_logic.has_obsolete_npmrc_line(`${OTHER_LINE}\n${OBSOLETE_AUTH_LINE}\n`)).toBe(true)
-	})
-
-	it('reports no obsolete line for content holding only a literal token', () => {
-		expect(init_logic.has_obsolete_npmrc_line(`${LITERAL_AUTH_LINE}\n`)).toBe(false)
-	})
-
 	it('is idempotent — a second merge changes nothing', () => {
-		const once = init_logic.merge_npmrc(`${OBSOLETE_AUTH_LINE}\n`)
+		const once = init_logic.merge_npmrc(`${PLACEHOLDER_AUTH_LINE}\n`)
 
 		expect(init_logic.merge_npmrc(once)).toBe(once)
 	})
