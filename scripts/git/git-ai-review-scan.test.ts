@@ -113,8 +113,8 @@ describe('classify_ai_review_comments — Claude Review', () => {
 	})
 })
 
-describe('classify_ai_review_comments — CodeRabbit', () => {
-	it('flags "Actionable comments posted: N" (N > 0) as blocker', () => {
+describe('classify_ai_review_comments — CodeRabbit (temporary kit#753: info, not blocker)', () => {
+	it('classifies "Actionable comments posted: N" (N > 0) as info instead of blocker', () => {
 		const result = classify_ai_review_comments([
 			make_comment({
 				author_login: CODERABBIT,
@@ -122,8 +122,10 @@ describe('classify_ai_review_comments — CodeRabbit', () => {
 			}),
 		])
 
-		expect(result.blockers).toHaveLength(1)
-		expect(result.blockers[0]?.summary).toContain('2')
+		expect(result.blockers).toHaveLength(0)
+		expect(result.infos).toHaveLength(1)
+		expect(result.infos[0]?.kind).toBe('info')
+		expect(result.infos[0]?.summary).toContain('2')
 	})
 
 	it('does not flag "No actionable comments" summary', () => {
@@ -132,6 +134,7 @@ describe('classify_ai_review_comments — CodeRabbit', () => {
 		])
 
 		expect(result.blockers).toHaveLength(0)
+		expect(result.infos).toHaveLength(0)
 	})
 
 	it('does not flag rate-limit notice', () => {
@@ -143,6 +146,7 @@ describe('classify_ai_review_comments — CodeRabbit', () => {
 		])
 
 		expect(result.blockers).toHaveLength(0)
+		expect(result.infos).toHaveLength(0)
 	})
 })
 
@@ -155,13 +159,14 @@ describe('classify_ai_review_comments — general input', () => {
 		expect(result.blockers).toHaveLength(0)
 	})
 
-	it('returns empty blockers for empty input', () => {
+	it('returns empty blockers and infos for empty input', () => {
 		const result = classify_ai_review_comments([])
 
 		expect(result.blockers).toHaveLength(0)
+		expect(result.infos).toHaveLength(0)
 	})
 
-	it('collects blockers from a mixed batch', () => {
+	it('splits a mixed batch into Claude blockers and CodeRabbit infos', () => {
 		const result = classify_ai_review_comments([
 			make_comment({ author_login: CLAUDE, body: CLAUDE_ISSUES_BODY }),
 			make_comment({ author_login: CLAUDE, body: CLAUDE_ACK_BODY }),
@@ -171,11 +176,10 @@ describe('classify_ai_review_comments — general input', () => {
 			}),
 			make_comment({ author_login: CODERABBIT, body: CODERABBIT_CLEAN_BODY }),
 		])
-		const authors = result.blockers
-			.map((entry) => entry.author_login)
-			.toSorted((left, right) => left.localeCompare(right))
 
-		expect(result.blockers).toHaveLength(2)
-		expect(authors).toStrictEqual([CLAUDE, CODERABBIT])
+		expect(result.blockers).toHaveLength(1)
+		expect(result.blockers[0]?.author_login).toBe(CLAUDE)
+		expect(result.infos).toHaveLength(1)
+		expect(result.infos[0]?.author_login).toBe(CODERABBIT)
 	})
 })

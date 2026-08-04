@@ -536,6 +536,8 @@ Details:
 
 `pnpm josh followup` は CI 完了後、`gh pr view <branch> --json comments` で取得した PR のトップレベルコメントをスキャンし、AI レビュアーが残した未対応の指摘を検出する。**CI がオールグリーンでも、AI レビュアーのブロッカー指摘が残っていれば完了しない**。
 
+**一時措置（kit#753）**: CodeRabbit のレビューが遅い間、CodeRabbit は全経路で非ブロッキングになっている — 既定の必須チェックから除外（`JOSH_REQUIRED_CHECKS` で復元可）、`Actionable comments posted: N` は情報ログへ格下げ、未解決の行コメントも理由なしで通過する。スキップした事実はコンソールと完了 Telegram 本文に記録される。Claude Review のブロッカー動作は従来どおり。kit#752 と併せて元に戻す。
+
 - ブロッカー判定ヒューリスティック（保守的・構造ベース／NLP は使わない）:
   - **Claude Review**（`author.login = claude`）: 本文に `### Issues` / `### Problem` / `#### Logic bug` / `### 1. ...` などの番号付き指摘見出しを含む
   - **CodeRabbit**（`author.login = coderabbitai` / `coderabbitai[bot]`）: 本文に `Actionable comments posted: N` を含み `N > 0`。レート制限通知（`rate limited by coderabbit.ai` / `Rate limit exceeded`）や `No actionable comments` は無視する
