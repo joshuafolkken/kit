@@ -7,15 +7,13 @@ import { sync_configs } from './sync-configs'
 
 const UNCHANGED_LABEL = 'unchanged'
 const HOME_NPMRC = '~/.npmrc'
-// A builder outside GitHub Actions has no ~/.npmrc to fall back on, so the notice has to name
-// its destination too — its 401 lands at deploy time, where no CI check sees it (#746). The
-// section anchor is asserted, not the file: the docs link alone was already there.
-const BUILDER_PLATFORM = 'Cloudflare'
-const BUILDER_DESTINATION = 'docs/authentication.md §4'
 const NPMRC_UP_TO_DATE = init_logic.generate_npmrc()
-// The credential line the kit used to distribute: pnpm >= 11.6 ignores it in a project .npmrc,
-// so sync removes it instead of re-adding it (#711).
-const NPMRC_WITH_OBSOLETE_AUTH_LINE = `${NPMRC_UP_TO_DATE}//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}\n`
+const PURGE_LINE = 'confirmModulesPurge=false'
+// The kit does not distribute this line, but a consumer may keep it: with `npmrcAuthFile`
+// pointing at the project .npmrc, pnpm expands it and it is the only credential the deploy
+// build has. Sync removed it until #759, which took down a working Cloudflare deploy.
+const AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n'
+const NPMRC_WITH_AUTH_LINE = `${NPMRC_UP_TO_DATE}${AUTH_LINE}`
 
 const ctx = { work_directory: '', destination: '' }
 
@@ -55,41 +53,43 @@ describe('sync_configs.sync_npmrc', () => {
 		spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
-		expect(readFileSync(ctx.destination, 'utf8')).toContain('confirmModulesPurge=false')
+		expect(readFileSync(ctx.destination, 'utf8')).toContain(PURGE_LINE)
 	})
 })
 
-describe('sync_configs.sync_npmrc — obsolete auth line', () => {
-	it('removes the auth token line pnpm ignores in a project .npmrc', () => {
-		writeFileSync(ctx.destination, NPMRC_WITH_OBSOLETE_AUTH_LINE)
+describe('sync_configs.sync_npmrc — consumer auth line', () => {
+	it('leaves the auth token line in place', () => {
+		writeFileSync(ctx.destination, NPMRC_WITH_AUTH_LINE)
 		spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
-		expect(readFileSync(ctx.destination, 'utf8')).toBe(NPMRC_UP_TO_DATE)
+		expect(readFileSync(ctx.destination, 'utf8')).toBe(NPMRC_WITH_AUTH_LINE)
 	})
 
-	it('tells the user where the credential belongs after removing it', () => {
-		writeFileSync(ctx.destination, NPMRC_WITH_OBSOLETE_AUTH_LINE)
+	it('reports unchanged rather than rewriting the file', () => {
+		writeFileSync(ctx.destination, NPMRC_WITH_AUTH_LINE)
 		const info_spy = spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
-		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(HOME_NPMRC))
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(UNCHANGED_LABEL))
 	})
 
-	it('points builders with no user-level npmrc at the setup docs', () => {
-		writeFileSync(ctx.destination, NPMRC_WITH_OBSOLETE_AUTH_LINE)
-		const info_spy = spy_console_info()
-
-		sync_configs.sync_npmrc(ctx.destination)
-		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(BUILDER_PLATFORM))
-		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(BUILDER_DESTINATION))
-	})
-
-	it('stays quiet about the credential when no obsolete line was present', () => {
-		writeFileSync(ctx.destination, NPMRC_UP_TO_DATE)
+	it('never tells the user to move the credential elsewhere', () => {
+		writeFileSync(ctx.destination, NPMRC_WITH_AUTH_LINE)
 		const info_spy = spy_console_info()
 
 		sync_configs.sync_npmrc(ctx.destination)
 		expect(info_spy).not.toHaveBeenCalledWith(expect.stringContaining(HOME_NPMRC))
+	})
+
+	it('keeps the auth line while appending the missing required lines', () => {
+		writeFileSync(ctx.destination, AUTH_LINE)
+		spy_console_info()
+
+		sync_configs.sync_npmrc(ctx.destination)
+		const result = readFileSync(ctx.destination, 'utf8')
+
+		expect(result).toContain(AUTH_LINE)
+		expect(result).toContain(PURGE_LINE)
 	})
 })

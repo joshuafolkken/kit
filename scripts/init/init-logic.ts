@@ -13,8 +13,12 @@ const DEV_ENGINES_VALUE = {
 }
 
 // The `@joshuafolkken:registry` mapping stays — it is a registry mapping, not a credential,
-// and pnpm still honors it from a project .npmrc. The matching `_authToken` line does NOT:
-// see OBSOLETE_NPMRC_LINES below.
+// and pnpm honors it from a project .npmrc unconditionally. The matching `_authToken` line is
+// deliberately absent: by default pnpm >= 11.6 refuses to expand environment variables in
+// credentials read from a project .npmrc (the file is committed, so expansion could leak the
+// token to an attacker-controlled registry), so distributing the line would only add an
+// `Ignored project-level auth setting` warning on every command. Not distributing it is not the
+// same as removing it — see merge_npmrc.
 const NPMRC_LINES: ReadonlyArray<string> = [
 	'@joshuafolkken:registry=https://npm.pkg.github.com',
 	'engine-strict=true',
@@ -24,25 +28,6 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 	// installs hit the correct authenticated download path (avoids ERR_PNPM_FETCH_401 on CI).
 	'lockfile-include-tarball-url=true',
 ]
-
-// pnpm >=11.6 refuses to expand environment variables in registry credentials read from a
-// project .npmrc (the file is committed, so expansion could leak the token to an
-// attacker-controlled registry). The line below is therefore inert noise — it warns on every
-// pnpm invocation while contributing no auth. The token has to come from a source pnpm still
-// expands: the user-level ~/.npmrc or `pnpm config set`. Every consumer already carries the
-// line, and an insert-if-absent merge cannot repair them, so sync strips it. Only the
-// env-var placeholder form is listed: a line holding a literal token is still honored by
-// pnpm, so removing it would break a working setup. See joshuafolkken/kit#711.
-//
-// Re-verified on pnpm 11.20.0 for joshuafolkken/kit#746, which read the warning as a false
-// premise: with the user config isolated, the placeholder line in a project .npmrc still
-// yields `Ignored project-level auth setting` and a 401, while the same line in a user-level
-// npmrc — and a literal token in the project file — both resolve. Do not restore the entry
-// from the warning text alone; the deployment failure it was blamed for is a builder with no
-// credential source at all, answered by docs/authentication.md §4.
-const OBSOLETE_NPMRC_LINES: ReadonlySet<string> = new Set([
-	'//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}',
-])
 
 const CSPELL_IMPORT = '@joshuafolkken/kit/cspell'
 
@@ -212,30 +197,18 @@ function append_missing_lines(existing: string, missing: ReadonlyArray<string>):
 	return `${prefix}${missing.join('\n')}\n`
 }
 
-function is_obsolete_npmrc_line(line: string): boolean {
-	return OBSOLETE_NPMRC_LINES.has(line.trim())
-}
-
-// Drop obsolete lines while leaving every other line — and the trailing newline — verbatim.
-// Returns `content` untouched when nothing matches, so sync reports "unchanged".
-function has_obsolete_npmrc_line(content: string): boolean {
-	return content.split('\n').some((line) => is_obsolete_npmrc_line(line))
-}
-
-function strip_obsolete_npmrc_lines(content: string): string {
-	if (!has_obsolete_npmrc_line(content)) return content
-
-	return content
-		.split('\n')
-		.filter((line) => !is_obsolete_npmrc_line(line))
-		.join('\n')
-}
-
+// Insert-only: every existing line survives verbatim, including a `_authToken` line the consumer
+// added themselves. Kit removed the env-var form until #759, on the premise that pnpm always
+// ignores it in a project .npmrc — true only while `npmrcAuthFile` is unset. A consumer that
+// declares the project file its trusted auth file (Cloudflare Workers Builds via
+// `PNPM_CONFIG_NPMRC_AUTH_FILE`, for instance) gets the credential expanded, and that setting can
+// live in a deploy platform's dashboard — so no reading of the repository tells an inert line
+// apart from a live one. Deleting it took down a working production deploy; leaving it costs at
+// most the warning pnpm already prints. See docs/authentication.md §4(d).
 function merge_npmrc(content: string): string {
-	const stripped = strip_obsolete_npmrc_lines(content)
-	const missing = NPMRC_LINES.filter((line) => !stripped.includes(line))
+	const missing = NPMRC_LINES.filter((line) => !content.includes(line))
 
-	return append_missing_lines(stripped, missing)
+	return append_missing_lines(content, missing)
 }
 
 // A gitignore line worth appending during a union merge: real ignore patterns only.
@@ -385,7 +358,6 @@ const init_logic = {
 	generate_cspell_config,
 	generate_npmrc,
 	merge_npmrc,
-	has_obsolete_npmrc_line,
 	merge_gitignore,
 	merge_prettier_plugin_development_deps,
 	get_tsconfig_extends_entry,

@@ -6,7 +6,7 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 
 `pnpm` reached GitHub Packages but the token was missing or expired.
 
-1. Confirm the credential lives in your **user-level** `~/.npmrc`, not the project `.npmrc` — pnpm ignores a project-level one (see the warning below). `pnpm config get "//npm.pkg.github.com/:_authToken"` should print the token or the `${NODE_AUTH_TOKEN}` placeholder; if it is empty, run §2 of [authentication.md](./authentication.md).
+1. Confirm the credential lives in your **user-level** `~/.npmrc`, not the project `.npmrc` — pnpm ignores a project-level one unless `npmrcAuthFile` opts it in (see the warning below). `pnpm config get "//npm.pkg.github.com/:_authToken"` should print the token or the `${NODE_AUTH_TOKEN}` placeholder; if it is empty, run §2 of [authentication.md](./authentication.md).
 2. Using the placeholder form? Confirm the env var is set in the current shell:
    ```bash
    echo $NODE_AUTH_TOKEN
@@ -23,15 +23,16 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 
 The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no `actions/setup-node` step, so nothing supplies the credential once the project `.npmrc` carries only the registry mapping. CI cannot reproduce it — every workflow job that installs dependencies calls setup-node with `registry-url` first, which writes the credential for that job — so the failure surfaces first at deploy time.
 
-- Give the builder a credential from a source pnpm reads outside the project: see [§4 of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc).
-- Do **not** answer it by restoring `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` to the project `.npmrc`. pnpm ignores that line (next section), and `josh sync` removes it again on the next run.
+- Give the builder a credential from a source pnpm reads: see [§4 of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc).
+- Restoring `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` to the project `.npmrc` fixes nothing **on its own** — pnpm ignores that line by default (next section). It becomes the credential only together with `npmrcAuthFile`, which is option (d) of that section.
+- Did this start right after a kit upgrade, on a project that was using `npmrcAuthFile`? Kit before `1.60.0` stripped the line on every `josh sync`. Upgrade to `1.60.0` or later, restore the line, and it stays.
 
 ## `[WARN] Ignored project-level auth setting "//npm.pkg.github.com/:_authToken"`
 
-Since pnpm 11.6, environment variables are not expanded in registry credentials read from a project `.npmrc`, because that file is committed and could leak the token to an attacker-controlled registry. The line is inert — whatever auth currently works is coming from somewhere else — and it warns on every pnpm command.
+Since pnpm 11.6, environment variables are not expanded in registry credentials read from a project `.npmrc` **unless `npmrcAuthFile` declares that file trusted**, because the file is committed and could leak the token to an attacker-controlled registry. The warning means the opt-in is absent, so the line contributes no auth — whatever currently works is coming from somewhere else — and it repeats on every pnpm command.
 
-- Delete the `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` line from the project `.npmrc`, or run `josh sync`, which removes it. Versions of the kit before this change re-added it on every sync; upgrade first if the line keeps coming back.
-- Move the credential to a source pnpm still expands — see §2 of [authentication.md](./authentication.md).
+- Want the line to do nothing? Delete it from the project `.npmrc` and keep the credential in a source pnpm expands by default — see §2 of [authentication.md](./authentication.md). `josh sync` neither adds nor removes it, so the deletion sticks.
+- Want the line to be the credential (typically on a deploy builder with no user-level npmrc)? Set `npmrcAuthFile` to that file — see [§4(d) of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc). The warning disappears and the token is expanded.
 
 ## `ERR_PNPM_FETCH_404` — package not found
 
