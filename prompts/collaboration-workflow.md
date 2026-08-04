@@ -281,22 +281,24 @@ pnpm josh pr
 
    When a blocker fires, the agent MUST send a `confirmation` Telegram **before** stopping (per "Mid-workflow stop notification").
 
-**Everything else — including a `/review` skill returning a polished "Approve for merge" recommendation — is NOT a stopping condition.** The agent continues straight to `pnpm josh followup --merge` in the same turn.
+**Everything else — including a `/review` skill returning a polished "Approve for merge" recommendation — is NOT a stopping condition.** The agent continues straight through `pnpm josh bump minor` → `pnpm josh git -y` → `pnpm josh followup --merge` in the same turn.
 
-### レビュー工程はフレッシュコンテキストのサブエージェントで実行する
+### レビュー工程は実装セッションがコミット前に実行する
 
-ワークフロー内のレビュー工程（各フローの `/review`）は、**`pnpm josh git -y` で PR を作成した後にのみ**実行する — コミット前バリアントは存在せず、`fullrun` / `halfrun` / `queue` のすべてが同じ対象（PR ブランチの `git diff main...HEAD`）をレビューする。実行は kit が配布する `code-reviewer` サブエージェント（`.claude/agents/code-reviewer.md`）の起動による。実装したセッションとはコンテキストが分離されているため、実装時の思い込みがレビューに持ち込まれない。渡すのは diff の範囲と Issue のタイトル・目的だけであり、実装セッション側の説明や変更サマリは渡さない（作者のバイアスをレビューに再注入するため）。出力は `prompts/review.md` のテンプレートに従うので、下記のチェーンルール・決定表はそのまま適用される。**High/Medium がゼロになってレビューが確定したら、その全文を PR コメントとして投稿する**（`gh pr comment <branch> --body-file <path>`）— 1 レビューサイクルにつき確定版 1 コメントで、High/Medium の途中ラウンドは投稿しない。後続コミット後の再レビューは新しいコメントとして投稿する。コメントの投稿者は実行ユーザーの GitHub アカウントなので、`followup` の AI レビュアーブロッカー判定（`claude` / `coderabbitai` 著者）には該当しない。サブエージェント機構のない AI ツール（Gemini / Cursor）では、代わりに新しいセッション／コンテキストで `prompts/review.md` のチェックリストを実行する。
+ワークフロー内のレビュー工程（各フローの `/review`）は、**実装したセッション自身が、コミットの前に**インラインで実行する。対象は `git diff main`、実行時期は検証ゲートの最終段（refactor → lint → tsc → cspell → test:unit → `/review`）であり、`fullrun` / `halfrun` / `queue` のいずれも同じ時期・同じ対象でレビューする。High/Medium がなくなるまでその場で修正して再実行し、**指摘を潰し切ってから最初のコミットを作る**。したがって PR に貼るレビューコメントも、ラウンドごとのコミットや CI 再実行も発生しない。
+
+**フレッシュコンテキストのサブエージェントに委譲する方式（kit#752）と、PR 作成後に実行して結果を PR コメントとして投稿する方式（kit#758）は、これを置き換えるものではなく、これに置き換えられた。** 別コンテキストのレビュアーは実装者のバイアスを持ち込まない利点があったが、毎ラウンド変更を読み直し、指摘のたびに修正コミット・push・必須チェック 6 件の CI 再実行が走るため、PR 作成からレビュー確定まで 10 分を超えるのが常態だった（kit#758 の PR 自身が 3 ラウンドで 10 分 53 秒）。**レビュアーが実装者と同一コンテキストである点は、この方式が受け入れているトレードオフである** — 作者の思い込みが素通りする確率は上がるが、コミット前セルフレビュー（`prompts/review.md`）は従来どおり必須のゲートとして残る。
 
 ### Chain rule: `/review` → `followup --merge` decision table
 
 The `/review` skill output is a Markdown review with sections, severity-tagged findings, and a final recommendation. **It is an intermediate step, not a turn boundary.** Map the result mechanically:
 
-| `/review` result                        | Severity of findings | Next action (same turn, no user input)                                                                                                                         |
-| --------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Clean — every category says `No issues` | None                 | Immediately run `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`                                                                             |
-| Findings, but all are Low               | Low only             | Immediately run `pnpm josh followup --merge` (Low findings may be skipped with a one-line reason per Pre-commit Self-Review)                                   |
-| One or more High / Medium findings      | High and/or Medium   | Fix in place, re-stage, commit, push, re-run `/review`, loop. Do NOT report the findings narratively to the user and wait. Do NOT call `followup --merge` yet. |
-| `/review` itself errors / can't run     | n/a                  | Report the error and stop with a `confirmation` Telegram (treat as a CI-level blocker)                                                                         |
+| `/review` result                        | Severity of findings | Next action (same turn, no user input)                                                                                                                                                                         |
+| --------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clean — every category says `No issues` | None                 | Immediately continue: `pnpm josh bump minor` → `pnpm josh git -y "<title> #<N>"` → `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`                                                          |
+| Findings, but all are Low               | Low only             | Immediately continue: `bump minor` → `git -y` → `followup --merge` (Low findings may be skipped with a one-line reason per Pre-commit Self-Review)                                                             |
+| One or more High / Medium findings      | High and/or Medium   | Fix in place and re-run `/review` on `git diff main`, looping until clean. Nothing is committed yet, so a round costs no commit, push, or CI run. Do NOT report the findings narratively to the user and wait. |
+| `/review` itself errors / can't run     | n/a                  | Report the error and stop with a `confirmation` Telegram (treat as a CI-level blocker)                                                                                                                         |
 
 The recommendation line at the bottom of the `/review` output ("Approve for merge", "Request changes", etc.) is **informational, not authoritative**. The severity of findings drives the decision, not the recommendation sentence.
 
@@ -321,8 +323,8 @@ This rule applies regardless of model (Claude / Gemini / Cursor) or account; the
 
 The chain rule above has been violated repeatedly even with the decision table and anti-pattern catalog in place (PR #387 on 2026-05-15, PR #398 on 2026-05-20). The rule needs to be visible at the **exact moment of violation** — when the response is about to be sent. Run this check, in order, before sending any response containing `/review` output:
 
-1. **Mode check** — Is this `/review` part of a `fullrun` / `fullrun new` / `queue` invocation? Decide by both signals: (a) the user's recent prompt contained one of those commands, AND (b) `pnpm josh git -y` has already been run in this session and a PR exists for the current branch (verifiable with `gh pr view <branch>`). If either is false → **standalone mode**; stop after the review markdown, do NOT call `followup --merge`. This conditional prevents auto-merging when the user runs `/review <PR>` standalone for a code-review-only purpose.
-2. **Severity check** — Count high/medium findings across all categories. If ≥1 → fix in place, re-stage, commit, push, re-run `/review`. Loop until none remain. Do NOT call `followup --merge` yet.
+1. **Mode check** — Is this `/review` part of a `fullrun` / `fullrun new` / `queue` invocation? Decide by both signals: (a) the user's recent prompt contained one of those commands, AND (b) the implementation is finished and the verification gate has reached its review step. A `halfrun` invocation never satisfies (a): halfrun runs the same review inside its gate but ends at the confirmation stop without committing. If either is false → **standalone mode**; stop after the review markdown, do NOT call `followup --merge`. This conditional prevents auto-merging when the user runs `/review <PR>` standalone for a code-review-only purpose.
+2. **Severity check** — Count high/medium findings across all categories. If ≥1 → fix in place and re-run `/review`. Nothing is committed yet, so the loop costs no commit or CI run. Loop until none remain. Do NOT call `followup --merge` yet.
 3. **Append check** — If in fullrun mode AND 0 high/medium findings (Low-only or fully clean) → the same response that contains the `/review` markdown MUST also contain a `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` tool call **after** the review markdown. **A response whose final assistant text is `/review` Markdown with no follow-on tool call is a violation.** Cancel and append the tool call before sending.
 
 The check fires at the moment your response would end with review markdown and no follow-on tool call. That is the violation point. Treat the `/review` skill's output as an intermediate tool result, not a deliverable.
@@ -741,7 +743,7 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
   - **未追跡ファイルの中身**: `git diff --no-index /dev/null <new-file>`（staging 不要）。あるいは単にファイルを直接読む
 - **staging してよいのは次の 2 ケースだけ**:
   1. ユーザーが**そのターンで明示的に**ステージを指示した
-  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `halfrun` / `queue` の起動に含まれるコミット手順）
+  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `queue` の起動に含まれるコミット手順。`halfrun` はコミットしないので含まれない）
 - 上記以外で staging が必要だと考えたときは、**実行せずに先に確認する**
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
 - **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`queue` の手順 1、および「別パッケージ起因の問題は割り込み Issue で対応する」。いずれも直後に `git stash pop` で復元することが手順に含まれている。これら以外の場面で退避したくなったときは、実行せずに先に確認する

@@ -28,7 +28,6 @@ SECURITY.md         tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
-.claude/agents/code-reviewer.md
 ```
 
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
