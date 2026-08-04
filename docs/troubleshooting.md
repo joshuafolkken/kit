@@ -6,29 +6,37 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 
 `pnpm` reached GitHub Packages but the token was missing or expired.
 
-1. Confirm the env var is set in the current shell:
+1. Confirm the credential lives in your **user-level** `~/.npmrc`, not the project `.npmrc` — pnpm ignores a project-level one (see the warning below). `pnpm config get "//npm.pkg.github.com/:_authToken"` should print the token or the `${NODE_AUTH_TOKEN}` placeholder; if it is empty, run §2 of [authentication.md](./authentication.md).
+2. Using the placeholder form? Confirm the env var is set in the current shell:
    ```bash
    echo $NODE_AUTH_TOKEN
    ```
    If it is empty, your shell rc hasn't run §1 of [authentication.md](./authentication.md) yet — open a new shell or run `exec $SHELL`.
-2. The `gh` token may have expired or lost the `read:packages` scope. Refresh it:
+3. The `gh` token may have expired or lost the `read:packages` scope. Refresh it:
    ```bash
    gh auth refresh --scopes read:packages
    exec $SHELL   # re-evaluates export NODE_AUTH_TOKEN=$(gh auth token)
    ```
-3. Verify the token is live: `gh auth token` should print a non-empty value.
+4. Verify the token is live: `gh auth token` should print a non-empty value.
+
+## `[WARN] Ignored project-level auth setting "//npm.pkg.github.com/:_authToken"`
+
+Since pnpm 11.6, environment variables are not expanded in registry credentials read from a project `.npmrc`, because that file is committed and could leak the token to an attacker-controlled registry. The line is inert — whatever auth currently works is coming from somewhere else — and it warns on every pnpm command.
+
+- Delete the `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` line from the project `.npmrc`, or run `josh sync`, which removes it. Versions of the kit before this change re-added it on every sync; upgrade first if the line keeps coming back.
+- Move the credential to a source pnpm still expands — see §2 of [authentication.md](./authentication.md).
 
 ## `ERR_PNPM_FETCH_404` — package not found
 
 `pnpm` tried the **public npm registry** instead of GitHub Packages. The scoped registry line is missing from `.npmrc`.
 
-- Re-run §2 of [authentication.md](./authentication.md) in the right location (`~/.npmrc` for a global `josh` install, the project root for a devDependency).
-- Confirm the file contains both lines:
+- Re-run §3 of [authentication.md](./authentication.md) in the right location (`~/.npmrc` for a global `josh` install, the project root for a devDependency).
+- Confirm the file contains the registry mapping:
   ```ini
   @joshuafolkken:registry=https://npm.pkg.github.com
-  //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
   ```
 - A project `.npmrc` shadows `~/.npmrc`. If you have both, make sure the project one also carries the scoped registry line.
+- The credential is a separate concern and belongs in `~/.npmrc` — a `404` means routing, a `401`/`403` means auth.
 
 ## `josh: command not found` after `pnpm add -g`
 
@@ -107,6 +115,6 @@ Both jobs then run on `ubuntu-latest` and download browsers themselves, which ad
 
 ## Still stuck?
 
-- Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `.npmrc`) matters.
+- Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `~/.npmrc` credential → project registry mapping) matters.
 - Check installed vs. latest version: `josh version`.
 - Open an issue: <https://github.com/joshuafolkken/kit/issues>.

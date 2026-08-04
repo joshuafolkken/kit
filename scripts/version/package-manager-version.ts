@@ -1,9 +1,11 @@
 import { z } from 'zod'
 
-// Capture the full version (including any prerelease identifier) up to the
-// optional `+<hash>` suffix, so prerelease pins like `pnpm@11.6.0-rc.1+...` are
-// read faithfully rather than truncated to `11.6.0`.
-const PNPM_VERSION_REGEX = /^pnpm@([^+]+)/u
+// Capture everything after `pnpm@` verbatim — prerelease identifier AND the
+// `+<hash>` integrity suffix that `corepack use` always writes. pnpm compares
+// `packageManager` and `devEngines.packageManager.version` as raw strings, so
+// dropping the suffix here would make an exact match impossible and the
+// dual-declaration warning permanent (see the alignment comment below).
+const PNPM_PIN_REGEX = /^pnpm@(.+)$/u
 
 // Surgical replacements that touch only the `devEngines.packageManager.version`
 // value, preserving the rest of the file's formatting byte-for-byte. Two key
@@ -25,20 +27,20 @@ const alignment_read_schema = z.object({
 
 type AlignmentManifest = z.infer<typeof alignment_read_schema>
 
-function extract_pnpm_version(package_manager: string): string | undefined {
-	return PNPM_VERSION_REGEX.exec(package_manager)?.[1]
+function extract_pnpm_pin(package_manager: string): string | undefined {
+	return PNPM_PIN_REGEX.exec(package_manager)?.[1]
 }
 
 function read_current_version(parsed: AlignmentManifest): string | undefined {
 	return parsed.devEngines?.packageManager?.version
 }
 
-// Return the version that `devEngines.packageManager.version` should adopt, or
+// Return the value that `devEngines.packageManager.version` should adopt, or
 // undefined when there is nothing to align: no `packageManager`, no existing
 // `devEngines.packageManager`, or the two already match.
 function resolve_alignment_target(parsed: AlignmentManifest): string | undefined {
 	if (parsed.packageManager === undefined) return undefined
-	const target = extract_pnpm_version(parsed.packageManager)
+	const target = extract_pnpm_pin(parsed.packageManager)
 	const current = read_current_version(parsed)
 	if (current === undefined || current === target) return undefined
 
@@ -69,9 +71,13 @@ function set_development_engines_version(content: string, target: string): strin
 	return content
 }
 
-// Align `devEngines.packageManager.version` with the version pinned in the
-// `packageManager` field so pnpm 11.5.0+ (pnpm/pnpm#11307) suppresses the
-// "Cannot use both ..." warning.
+// Align `devEngines.packageManager.version` with the whole pin carried by the
+// `packageManager` field — integrity suffix included — so pnpm 11.5.0+
+// (pnpm/pnpm#11307) suppresses the "Cannot use both ..." warning. Only a
+// byte-identical value silences it: pnpm 11.18.0 still warns for
+// `pnpm@11.18.0+sha512...` paired with a bare `11.18.0`. The suffix is semver
+// build metadata, which range checks ignore, so corepack and pnpm both still
+// resolve the pin as `11.18.0`.
 function align_development_engines_version(content: string): string {
 	const parsed = alignment_read_schema.parse(JSON.parse(content))
 	const target = resolve_alignment_target(parsed)
@@ -81,7 +87,7 @@ function align_development_engines_version(content: string): string {
 }
 
 const package_manager_version = {
-	extract_pnpm_version,
+	extract_pnpm_pin,
 	align_development_engines_version,
 	set_development_engines_version,
 }

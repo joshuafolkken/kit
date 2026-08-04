@@ -17,6 +17,15 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Upgrade @joshuafolkken/kit to latest for both global and project',
 		category: 'Versioning',
 	},
+	// A `script` entry, not a shell one: script paths resolve against the kit package root, so this
+	// keeps working from a consumer repo where the file lives under node_modules. The registry
+	// probes need NODE_AUTH_TOKEN for any `@joshuafolkken/*` dependency; `josh latest` exports it
+	// before chaining here, exactly as it already does for `latest:update`.
+	ranges: {
+		script: 'scripts/version/publishable-range-check.ts',
+		description: 'Check that every published dependency range still resolves for a consumer',
+		category: 'Versioning',
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

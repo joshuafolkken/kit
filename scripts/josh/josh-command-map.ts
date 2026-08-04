@@ -54,6 +54,7 @@ const ALIASES: Record<string, string> = {
 	bp: 'bump',
 	v: 'version',
 	vu: 'version:upgrade',
+	r: 'ranges',
 	dr: 'doctor',
 	ov: 'overrides',
 	a: 'audit',
@@ -65,12 +66,15 @@ const ALIASES: Record<string, string> = {
 	lu: 'latest:update',
 	pm: 'prevent-main-commit',
 	cm: 'check-commit-message',
+	ss: 'secretlint-scan',
 	hi: 'hook:install',
 	hu: 'hook:uninstall',
 	hc: 'hook:commit',
 	hp: 'hook:push',
 	pp: 'prep',
 	is: 'issue',
+	ep: 'epic',
+	ec: 'epic:check',
 }
 
 export type { CommandCategory, CommandEntry } from './josh-command-types'

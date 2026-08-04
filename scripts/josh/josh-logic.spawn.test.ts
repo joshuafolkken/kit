@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const execa_sync_mock = vi.hoisted(() => vi.fn())
 
@@ -8,7 +8,7 @@ vi.mock('node:fs', () => ({
 	readFileSync: vi.fn().mockReturnValue('{"version":"0.0.0"}'),
 }))
 
-const { josh_logic, SPAWN_ERROR_EXIT_CODE } = await import('./josh-logic')
+const { josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } = await import('./josh-logic')
 
 const SPAWN_ERROR_MESSAGE = 'ENOENT: no such file or directory'
 const SCRIPT_ARGS = ['scripts/josh/josh.ts']
@@ -63,6 +63,52 @@ describe('josh_logic.spawn_script — spawn error', () => {
 		expect(code).toBe(1)
 		expect(error_spy).not.toHaveBeenCalled()
 		vi.restoreAllMocks()
+	})
+})
+
+const WORKERS_FLAG = '--workers=1'
+const TEST_CMD = 'test'
+
+describe('josh_logic.run_command — composite commands reject extra arguments', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockClear()
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+		vi.spyOn(console, 'error').mockImplementation(() => {
+			/* suppress */
+		})
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('refuses to run josh test when a flag was appended', () => {
+		expect(josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])).toBe(USAGE_ERROR_EXIT_CODE)
+	})
+
+	// The whole point is that the flag never silently reaches a run: nothing may be spawned.
+	it('spawns nothing when the arguments are refused', () => {
+		josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])
+
+		expect(execa_sync_mock).not.toHaveBeenCalled()
+	})
+
+	it('prints where the arguments belong', () => {
+		josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])
+
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(expect.stringContaining('josh test:unit'))
+		expect(vi.mocked(console.error)).toHaveBeenCalledWith(expect.stringContaining('josh test:e2e'))
+	})
+
+	it('still runs josh test unchanged when no arguments were appended', () => {
+		expect(josh_logic.run_command(TEST_CMD, [])).toBe(0)
+		expect(execa_sync_mock).toHaveBeenCalledOnce()
+	})
+
+	// `t` is the alias for `test`; the guard resolves it first, so the alias cannot slip past.
+	it('applies the refusal to the aliased form as well', () => {
+		expect(josh_logic.run_command('t', [WORKERS_FLAG])).toBe(USAGE_ERROR_EXIT_CODE)
+		expect(execa_sync_mock).not.toHaveBeenCalled()
 	})
 })
 

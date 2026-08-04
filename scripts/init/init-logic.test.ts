@@ -230,10 +230,14 @@ describe('get_ai_copy_directories', () => {
 })
 
 describe('get_npmrc_lines', () => {
-	it('includes the GitHub Packages auth token line', () => {
+	it('includes the GitHub Packages registry mapping', () => {
 		expect(init_logic.get_npmrc_lines()).toContain(
-			'//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}',
+			'@joshuafolkken:registry=https://npm.pkg.github.com',
 		)
+	})
+
+	it('omits the auth token line pnpm ignores in a project .npmrc', () => {
+		expect(init_logic.get_npmrc_lines().join('\n')).not.toContain('_authToken')
 	})
 
 	it('includes confirmModulesPurge=false', () => {
@@ -262,9 +266,10 @@ describe('gitignore template content', () => {
 	})
 })
 
+const OTHER_LINE = 'other=value'
+
 describe('merge_npmrc', () => {
 	const LINES = init_logic.get_npmrc_lines()
-	const OTHER_LINE = 'other=value'
 	const ALL_LINES = LINES.join('\n')
 
 	it('adds all lines to empty content', () => {
@@ -294,5 +299,53 @@ describe('merge_npmrc', () => {
 		const result = init_logic.merge_npmrc(partial)
 
 		for (const line of LINES) expect(result).toContain(line)
+	})
+})
+
+const OBSOLETE_AUTH_LINE = '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}'
+const LITERAL_AUTH_LINE = '//npm.pkg.github.com/:_authToken=ghp_literal123'
+
+describe('merge_npmrc — obsolete auth line removal', () => {
+	const LINES = init_logic.get_npmrc_lines()
+	const ALL_LINES = LINES.join('\n')
+
+	it('removes the env-var auth line pnpm ignores in a project .npmrc', () => {
+		const existing = `${LINES[0] ?? ''}\n${OBSOLETE_AUTH_LINE}\n`
+
+		expect(init_logic.merge_npmrc(existing)).not.toContain(OBSOLETE_AUTH_LINE)
+	})
+
+	it('keeps every other line when removing the obsolete auth line', () => {
+		const result = init_logic.merge_npmrc(`${OBSOLETE_AUTH_LINE}\n${OTHER_LINE}\n`)
+
+		expect(result).toContain(OTHER_LINE)
+		for (const line of LINES) expect(result).toContain(line)
+	})
+
+	it('keeps a literal token line, which pnpm still honors', () => {
+		const existing = `${ALL_LINES}\n${LITERAL_AUTH_LINE}\n`
+
+		expect(init_logic.merge_npmrc(existing)).toContain(LITERAL_AUTH_LINE)
+	})
+
+	it('removes the obsolete line even without a trailing newline', () => {
+		const result = init_logic.merge_npmrc(`${OTHER_LINE}\n${OBSOLETE_AUTH_LINE}`)
+
+		expect(result).not.toContain('_authToken')
+		expect(result).toContain(OTHER_LINE)
+	})
+
+	it('detects the obsolete line so sync can point at the new credential location', () => {
+		expect(init_logic.has_obsolete_npmrc_line(`${OTHER_LINE}\n${OBSOLETE_AUTH_LINE}\n`)).toBe(true)
+	})
+
+	it('reports no obsolete line for content holding only a literal token', () => {
+		expect(init_logic.has_obsolete_npmrc_line(`${LITERAL_AUTH_LINE}\n`)).toBe(false)
+	})
+
+	it('is idempotent — a second merge changes nothing', () => {
+		const once = init_logic.merge_npmrc(`${OBSOLETE_AUTH_LINE}\n`)
+
+		expect(init_logic.merge_npmrc(once)).toBe(once)
 	})
 })

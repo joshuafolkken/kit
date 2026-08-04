@@ -1,5 +1,6 @@
 import { execaSync } from 'execa'
 import { running_binary } from './running-binary'
+import type { InstalledVersions } from './upgrade-command-guard'
 import {
 	version_check_logic,
 	type RunningBinary,
@@ -69,41 +70,74 @@ function build_upstream_effective(
 	}
 }
 
+// The globally-resolved versions kit already knows for one upstream: the primary package's global
+// install (what a `pnpm add -g <primary>@<v>` command would target) and the upstream's own effective
+// install. Attached to the report only when the consumer declared its global upgrade command
+// pin-only, so the no-op guard can prove a command that pins these exact versions is dead (#697).
+function build_installed_versions(
+	report: UpstreamReport,
+	config: VersionCommandConfig,
+	snapshot: VersionSnapshot,
+): InstalledVersions {
+	return new Map([
+		[config.package_name, snapshot.global_version],
+		[report.config.package_name, report.effective?.version],
+	])
+}
+
+// Attach the effective install and, when the consumer declared its global command pin-only, the
+// installed versions the no-op guard needs. Mutates the report in place so the optional fields stay
+// absent for upstreams without hooks (`exactOptionalPropertyTypes`).
+function attach_upstream_effective(
+	report: UpstreamReport,
+	config: VersionCommandConfig,
+	snapshot: VersionSnapshot,
+	upstream: UpstreamVersionConfig,
+): void {
+	const context: UpstreamHookContext = { latest: snapshot.latest, upstream_latest: report.latest }
+	const effective = build_upstream_effective(upstream, context)
+	if (effective === undefined) return
+
+	report.effective = effective
+	if (upstream.is_global_upgrade_command_pinned !== true) return
+
+	report.installed_versions = build_installed_versions(report, config, snapshot)
+}
+
 // Read one upstream's project-installed and latest versions, plus the optional effective/global
 // install when the consumer opts in. Absent the hooks, the report keeps its project/latest-only shape.
 function read_upstream_report(
 	upstream: UpstreamVersionConfig,
-	context: UpstreamHookContext,
+	config: VersionCommandConfig,
+	snapshot: VersionSnapshot,
 ): UpstreamReport {
 	const report: UpstreamReport = {
 		config: upstream,
 		project_version: version_targets.read_project_version(process.cwd(), upstream.package_name),
 		latest: fetch_latest_version(upstream.versions_endpoint, upstream.package_name),
 	}
-	const effective = build_upstream_effective(upstream, context)
-	if (effective !== undefined) report.effective = effective
+
+	attach_upstream_effective(report, config, snapshot, upstream)
 
 	return report
 }
 
 // Read the reports for the configured upstream chain, preserving the configured (nearest-first)
-// order. Empty when the consumer declares no upstreams (e.g. kit itself). `primary_latest` is the
-// downstream package's already-fetched latest (from `read_snapshot`), threaded into each upstream's
-// hooks so a consumer never re-fetches it.
+// order. Empty when the consumer declares no upstreams (e.g. kit itself). `snapshot` is the primary
+// package's already-read state (from `read_snapshot`): its `latest` is threaded into each upstream's
+// hooks so a consumer never re-fetches it, and its `global_version` feeds the no-op guard.
 function read_upstream_reports(
 	config: VersionCommandConfig,
-	primary_latest: string,
+	snapshot: VersionSnapshot,
 ): Array<UpstreamReport> {
-	const context: UpstreamHookContext = { latest: primary_latest }
-
-	return config.upstreams.map((upstream) => read_upstream_report(upstream, context))
+	return config.upstreams.map((upstream) => read_upstream_report(upstream, config, snapshot))
 }
 
 // The `version` (show) command for any configured package: print the dual/offline report with
 // staleness markers, upstream sections, upgrade hints, and the running-binary/warning extras.
 function run_check(config: VersionCommandConfig): void {
 	const snapshot = read_snapshot(config)
-	const upstream_reports = read_upstream_reports(config, snapshot.latest)
+	const upstream_reports = read_upstream_reports(config, snapshot)
 
 	console.info(
 		version_check_logic.format_dual_version_output(
@@ -134,21 +168,74 @@ function run_all_upgrade_commands(commands: ReadonlyArray<string>): number {
 	return exit_code
 }
 
+// What to print when nothing can be upgraded: either everything is current, or a stale effective
+// upstream's global command provably cannot change it and the explanation says so (#697).
+function build_idle_message(reports: ReadonlyArray<UpstreamReport>): string {
+	const notes = version_check_logic.build_upstream_upgrade_notes(reports)
+	if (notes.length === 0) return ALREADY_UP_TO_DATE
+
+	return notes.join('\n')
+}
+
+// Re-read one upstream's effective install after the upgrade ran and describe what changed, or
+// nothing when it reached the latest (success needs no explanation). Gated on the global command
+// having actually been emitted: a suppressed no-op command never ran, so reporting that it "did not
+// change" the install would blame a command the user was never offered.
+function describe_effective_outcome(
+	upstream: UpstreamVersionConfig,
+	report: UpstreamReport | undefined,
+	snapshot: VersionSnapshot,
+): Array<string> {
+	const { resolve_effective_version } = upstream
+	if (resolve_effective_version === undefined || report === undefined) return []
+	if (version_check_logic.build_effective_upgrade_commands(report).length === 0) return []
+
+	const after = resolve_effective_version({
+		latest: snapshot.latest,
+		upstream_latest: report.latest,
+	})
+	if (after === report.latest) return []
+
+	return [version_check_logic.format_effective_outcome(report, after)]
+}
+
+// After the upgrade commands ran, report every effective upstream that did not reach its latest, so
+// `version:upgrade` states the outcome itself instead of leaving the next `version` to repeat the
+// same warning. Reports and configured upstreams share an index — `read_upstream_reports` maps over
+// `config.upstreams` in order — which is how each report is paired back with its hooks.
+function report_effective_outcomes(
+	config: VersionCommandConfig,
+	snapshot: VersionSnapshot,
+	reports: ReadonlyArray<UpstreamReport>,
+): void {
+	const lines = config.upstreams.flatMap((upstream, index) =>
+		describe_effective_outcome(upstream, reports[index], snapshot),
+	)
+	if (lines.length > 0) console.info(lines.join('\n'))
+}
+
 // The `version:upgrade` command for any configured package: upgrade whichever of global/project
 // are stale, plus any stale upstream project dependencies (each respecting the fix-gh-packages
 // lockfile repair). Returns the process exit code.
 function run_upgrade(config: VersionCommandConfig): number {
 	const snapshot = read_snapshot(config)
-	const commands = [
+	const reports = read_upstream_reports(config, snapshot)
+	const commands = version_check_logic.unique_upgrade_commands([
 		...version_check_logic.build_dual_upgrade_commands(snapshot, config),
-		...version_check_logic.build_upstream_upgrade_commands(
-			read_upstream_reports(config, snapshot.latest),
-		),
-	]
+		...version_check_logic.build_upstream_upgrade_commands(reports),
+	])
 
-	if (commands.length === 0) console.info(ALREADY_UP_TO_DATE)
+	if (commands.length === 0) {
+		console.info(build_idle_message(reports))
 
-	return run_all_upgrade_commands(commands)
+		return 0
+	}
+
+	const exit_code = run_all_upgrade_commands(commands)
+
+	report_effective_outcomes(config, snapshot, reports)
+
+	return exit_code
 }
 
 const version_commands = {

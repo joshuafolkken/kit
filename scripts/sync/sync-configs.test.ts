@@ -34,33 +34,7 @@ function assert_logs_unchanged(setup: () => void, run: () => void): void {
 	expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(UNCHANGED_LABEL))
 }
 
-const NPMRC_DEST = path.join(TEST_DIR, '.npmrc')
-const NPMRC_UP_TO_DATE = init_logic.generate_npmrc()
-
-describe('sync_configs.sync_npmrc', () => {
-	it('does nothing when .npmrc does not exist', () => {
-		sync_configs.sync_npmrc(NPMRC_DEST)
-		expect(existsSync(NPMRC_DEST)).toBe(false)
-	})
-
-	it('logs unchanged when all required lines present', () => {
-		assert_logs_unchanged(
-			() => {
-				writeFileSync(NPMRC_DEST, NPMRC_UP_TO_DATE)
-			},
-			() => {
-				sync_configs.sync_npmrc(NPMRC_DEST)
-			},
-		)
-	})
-
-	it('appends missing lines when outdated', () => {
-		writeFileSync(NPMRC_DEST, 'engine-strict=true\n')
-		silence_console_info()
-		sync_configs.sync_npmrc(NPMRC_DEST)
-		expect(readFileSync(NPMRC_DEST, 'utf8')).toContain('confirmModulesPurge=false')
-	})
-})
+// `.npmrc` coverage lives in sync-configs.npmrc.test.ts.
 
 const ESLINT_DEST = path.join(TEST_DIR, 'eslint.config.js')
 const ESLINT_VANILLA_UP_TO_DATE = init_logic.generate_eslint_config()
@@ -122,7 +96,11 @@ describe('sync_configs.sync_eslint_config — migration', () => {
 
 const TSCONFIG_DEST = path.join(TEST_DIR, 'tsconfig.json')
 const TSCONFIG_EXTENDS_ENTRY = init_logic.get_tsconfig_extends_entry()
-const TSCONFIG_UP_TO_DATE = `${JSON.stringify({ extends: [TSCONFIG_EXTENDS_ENTRY] }, undefined, '\t')}\n`
+const TSCONFIG_UP_TO_DATE = `${JSON.stringify(
+	{ extends: [TSCONFIG_EXTENDS_ENTRY], exclude: init_logic.get_tsconfig_exclude_entries() },
+	undefined,
+	'\t',
+)}\n`
 
 describe('sync_configs.sync_tsconfig', () => {
 	it('does nothing when tsconfig.json does not exist', () => {

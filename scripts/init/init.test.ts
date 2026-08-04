@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init } from './init'
+import { PROJECT_ROOT } from './init-paths'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 
@@ -58,6 +59,19 @@ describe('install_lefthook', () => {
 
 		expect(warn_spy).not.toHaveBeenCalled()
 		warn_spy.mockRestore()
+	})
+
+	// Only the `.cmd` shim is executable on Windows, so the spawned path has to come from the
+	// shared resolver rather than a hardcoded extensionless name.
+	it('spawns the platform-correct lefthook shim', () => {
+		const shim = process.platform === 'win32' ? 'lefthook.cmd' : 'lefthook'
+
+		mocked_execa_sync.mockReturnValue(fake_lefthook_result(0))
+		init.install_lefthook()
+
+		expect(mocked_execa_sync.mock.lastCall?.[0]).toBe(
+			path.join(PROJECT_ROOT, 'node_modules', '.bin', shim),
+		)
 	})
 
 	it('warns when the lefthook binary cannot be spawned (exitCode undefined)', () => {

@@ -1,4 +1,5 @@
 import { version_targets } from '#scripts/version/version-targets'
+import { git_epic_close } from './git-epic-close'
 import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
@@ -270,6 +271,11 @@ async function run(input: FollowupInput): Promise<void> {
 		issue_number: input.issue_number,
 		notify_config: input.notify_config,
 		pr_url: context.pr_url,
+	})
+
+	await git_epic_close.close_completed_epics({
+		issue_number: input.issue_number,
+		is_merged: input.should_merge,
 	})
 }
 
