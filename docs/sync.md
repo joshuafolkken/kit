@@ -36,6 +36,15 @@ SECURITY.md         tsconfig.sonar.json
 > the source; `josh sync` then distributes them. The `github-actions` entry in the distributed
 > `dependabot.yml` is intentionally kept as a backstop (it covers any non-kit workflow a consumer
 > adds, and finds nothing to bump for synced workflows since their pins are already current).
+>
+> **Pins are resolved when the file is written, not read from the template.** Every workflow the
+> kit writes into a consumer (`josh init` and `josh sync` alike) passes through
+> `workflow_pin_logic.apply_pins_for_destination`, which substitutes each `uses:` ref from the
+> kit's own `.github/workflows/*` — the single source of truth. Dependabot's `github-actions`
+> ecosystem can only scan `.github/workflows/**` and a root `action.yml`, so it can never update
+> `templates/workflows/*`; resolving at write time is what keeps that blind spot from reaching
+> consumers. A template ref that lags behind a bump is therefore harmless, and no longer fails the
+> kit's own CI. See joshuafolkken/kit#747.
 
 ### `pnpm-workspace.yaml` (merged)
 

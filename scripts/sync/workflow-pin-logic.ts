@@ -5,10 +5,19 @@ import { package_path } from '#scripts/init/init-paths'
 // .github/workflows is the single source of truth for action SHA pins. The
 // distributed templates/workflows/* intentionally diverge in structure (steps,
 // commands, comment language), so only the `uses:` pins are propagated.
+//
+// The refs committed in templates/workflows/* are NOT authoritative: every consumer
+// workflow is written through apply_pins_for_destination, which resolves the pins from
+// .github/workflows at write time. Dependabot only ever updates .github/workflows (its
+// github-actions ecosystem cannot scan templates/), so a stale template ref must not be
+// able to reach a consumer — and must not fail CI either. `josh sync-workflow-pins`
+// stays available to refresh the committed refs, but nothing depends on it having run.
 const RUNTIME_WORKFLOWS_DIR = '.github/workflows'
 const TEMPLATE_WORKFLOWS_DIR = 'templates/workflows'
 const USES_KEY = 'uses:'
 const YAML_PATTERN = /\.ya?ml$/u
+// Matches a consumer workflow destination, absolute or repo-relative, on either separator.
+const WORKFLOW_DESTINATION_PATTERN = /(?:^|[/\\])\.github[/\\]workflows[/\\][^/\\]+\.ya?ml$/u
 const SYNC_HINT = '  Run `pnpm josh sync-workflow-pins` to sync template workflow pins.'
 
 interface ActionPin {
@@ -27,6 +36,12 @@ interface PinDrift {
 interface WorkflowSource {
 	file: string
 	text: string
+}
+
+interface UnknownAction {
+	template: string
+	line: number
+	action: string
 }
 
 function parse_uses_line(line: string): ActionPin | undefined {
@@ -134,12 +149,51 @@ function build_canonical_pins(): Map<string, string> {
 	return collect_canonical(list_workflow_sources(RUNTIME_WORKFLOWS_DIR))
 }
 
-function find_pin_drift(): Array<PinDrift> {
+// An action the templates use but .github/workflows does not: write-time injection has no
+// ref to resolve, so the stale template ref would reach the consumer unnoticed.
+function unknown_actions_in_source(
+	source: WorkflowSource,
+	canonical: ReadonlyMap<string, string>,
+): Array<UnknownAction> {
+	const unknown: Array<UnknownAction> = []
+
+	for (const [index, line] of source.text.split('\n').entries()) {
+		const pin = parse_uses_line(line)
+
+		if (pin && !canonical.has(pin.name)) {
+			unknown.push({ template: source.file, line: index + 1, action: pin.name })
+		}
+	}
+
+	return unknown
+}
+
+function is_workflow_destination(destination: string): boolean {
+	return WORKFLOW_DESTINATION_PATTERN.test(destination)
+}
+
+function apply_pins_for_destination(destination: string, text: string): string {
+	if (!is_workflow_destination(destination)) return text
+
+	return apply_to_text(text, build_canonical_pins())
+}
+
+function scan_templates<T>(
+	scan: (source: WorkflowSource, canonical: ReadonlyMap<string, string>) => Array<T>,
+): Array<T> {
 	const canonical = build_canonical_pins()
 
-	return list_workflow_sources(TEMPLATE_WORKFLOWS_DIR).flatMap((source) =>
+	return list_workflow_sources(TEMPLATE_WORKFLOWS_DIR).flatMap((source) => scan(source, canonical))
+}
+
+function find_pin_drift(): Array<PinDrift> {
+	return scan_templates((source, canonical) =>
 		find_drift_in_text(source.file, source.text, canonical),
 	)
+}
+
+function find_unknown_template_actions(): Array<UnknownAction> {
+	return scan_templates(unknown_actions_in_source)
 }
 
 function write_synced(source: WorkflowSource, canonical: ReadonlyMap<string, string>): void {
@@ -178,11 +232,14 @@ const workflow_pin_logic = {
 	collect_canonical,
 	find_drift_in_text,
 	apply_to_text,
+	is_workflow_destination,
+	apply_pins_for_destination,
 	build_canonical_pins,
 	find_pin_drift,
+	find_unknown_template_actions,
 	sync_pins,
 	format_drift_message,
 }
 
 export { workflow_pin_logic }
-export type { ActionPin, PinDrift, WorkflowSource }
+export type { ActionPin, PinDrift, UnknownAction, WorkflowSource }
