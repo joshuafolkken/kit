@@ -285,7 +285,7 @@ pnpm josh pr
 
 ### レビュー工程はフレッシュコンテキストのサブエージェントで実行する
 
-ワークフロー内のレビュー工程（各フローの `/review`）は、kit が配布する `code-reviewer` サブエージェント（`.claude/agents/code-reviewer.md`）を `git diff main...HEAD` に対して起動して実行する。実装したセッションとはコンテキストが分離されているため、実装時の思い込みがレビューに持ち込まれない。渡すのは diff の範囲と Issue のタイトル・目的だけであり、実装セッション側の説明や変更サマリは渡さない（作者のバイアスをレビューに再注入するため）。出力は `prompts/review.md` のテンプレートに従うので、下記のチェーンルール・決定表はそのまま適用される。サブエージェント機構のない AI ツール（Gemini / Cursor）では、代わりに新しいセッション／コンテキストで `prompts/review.md` のチェックリストを実行する。
+ワークフロー内のレビュー工程（各フローの `/review`）は、**`pnpm josh git -y` で PR を作成した後にのみ**実行する — コミット前バリアントは存在せず、`fullrun` / `halfrun` / `queue` のすべてが同じ対象（PR ブランチの `git diff main...HEAD`）をレビューする。実行は kit が配布する `code-reviewer` サブエージェント（`.claude/agents/code-reviewer.md`）の起動による。実装したセッションとはコンテキストが分離されているため、実装時の思い込みがレビューに持ち込まれない。渡すのは diff の範囲と Issue のタイトル・目的だけであり、実装セッション側の説明や変更サマリは渡さない（作者のバイアスをレビューに再注入するため）。出力は `prompts/review.md` のテンプレートに従うので、下記のチェーンルール・決定表はそのまま適用される。**High/Medium がゼロになってレビューが確定したら、その全文を PR コメントとして投稿する**（`gh pr comment <branch> --body-file <path>`）— 1 レビューサイクルにつき確定版 1 コメントで、High/Medium の途中ラウンドは投稿しない。後続コミット後の再レビューは新しいコメントとして投稿する。コメントの投稿者は実行ユーザーの GitHub アカウントなので、`followup` の AI レビュアーブロッカー判定（`claude` / `coderabbitai` 著者）には該当しない。サブエージェント機構のない AI ツール（Gemini / Cursor）では、代わりに新しいセッション／コンテキストで `prompts/review.md` のチェックリストを実行する。
 
 ### Chain rule: `/review` → `followup --merge` decision table
 

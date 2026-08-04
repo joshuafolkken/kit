@@ -8,15 +8,16 @@ This document is the **single source of truth** for Claude Code when reviewing t
 
 ## Fresh-context execution (mandatory inside workflows)
 
-Inside `fullrun` / `halfrun` / `queue`, this review is executed by the kit-distributed `code-reviewer` subagent (`.claude/agents/code-reviewer.md`) launched on `git diff main...HEAD` — a fresh context that did not implement the change. The launcher passes **only** the diff scope and the Issue title/goal; never the implementing session's reasoning or a summary of the changes, which would re-inject the author's assumptions into the review. In AI tools without subagents (Gemini, Cursor), run this checklist in a new session/context instead. The output format below is unchanged, so the chain rule and the severity loop apply exactly as before.
+Inside `fullrun` / `halfrun` / `queue`, this review is executed by the kit-distributed `code-reviewer` subagent (`.claude/agents/code-reviewer.md`) — a fresh context that did not implement the change — and it runs **only after `pnpm josh git -y` has created the PR**, on the PR branch's `git diff main...HEAD`. There is no pre-commit variant of this subagent step; every workflow reviews the same target. The launcher passes **only** the diff scope and the Issue title/goal; never the implementing session's reasoning or a summary of the changes, which would re-inject the author's assumptions into the review. Once the loop settles with zero high/medium findings, the session posts the final review markdown as a PR comment — one authoritative comment per review cycle; a re-review after later commits posts a new comment. In AI tools without subagents (Gemini, Cursor), run this checklist in a new session/context instead. The output format below is unchanged, so the chain rule and the severity loop apply exactly as before.
+
+The **Pre-commit Self-Review** rule in `CLAUDE.md` is separate and unchanged: the implementing session still runs this checklist inline on the staged diff before every commit.
 
 ---
 
 ## When to run
 
-- Before every `git commit` on a feature branch
-- Before running `pnpm josh git` / `pnpm josh followup` to open a PR
-- Scope: the staged diff (`git diff --staged`) and the cumulative PR diff (`git diff main...HEAD`)
+- **Pre-commit self-review** (implementing session, inline): before every `git commit` on a feature branch — scope: the staged diff (`git diff --staged`)
+- **Workflow review step** (`code-reviewer` subagent, fresh context): after `pnpm josh git -y` has created the PR, before `pnpm josh followup --merge` — scope: the PR branch diff (`git diff main...HEAD`)
 
 Re-run after applying fixes until **no high or medium findings remain**. Low findings may be acknowledged and skipped with a reason.
 
