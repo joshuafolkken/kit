@@ -283,6 +283,10 @@ pnpm josh pr
 
 **Everything else — including a `/review` skill returning a polished "Approve for merge" recommendation — is NOT a stopping condition.** The agent continues straight to `pnpm josh followup --merge` in the same turn.
 
+### レビュー工程はフレッシュコンテキストのサブエージェントで実行する
+
+ワークフロー内のレビュー工程（各フローの `/review`）は、kit が配布する `code-reviewer` サブエージェント（`.claude/agents/code-reviewer.md`）を `git diff main...HEAD` に対して起動して実行する。実装したセッションとはコンテキストが分離されているため、実装時の思い込みがレビューに持ち込まれない。渡すのは diff の範囲と Issue のタイトル・目的だけであり、実装セッション側の説明や変更サマリは渡さない（作者のバイアスをレビューに再注入するため）。出力は `prompts/review.md` のテンプレートに従うので、下記のチェーンルール・決定表はそのまま適用される。サブエージェント機構のない AI ツール（Gemini / Cursor）では、代わりに新しいセッション／コンテキストで `prompts/review.md` のチェックリストを実行する。
+
 ### Chain rule: `/review` → `followup --merge` decision table
 
 The `/review` skill output is a Markdown review with sections, severity-tagged findings, and a final recommendation. **It is an intermediate step, not a turn boundary.** Map the result mechanically:

@@ -6,6 +6,12 @@ This document is the **single source of truth** for Claude Code when reviewing t
 
 ---
 
+## Fresh-context execution (mandatory inside workflows)
+
+Inside `fullrun` / `halfrun` / `queue`, this review is executed by the kit-distributed `code-reviewer` subagent (`.claude/agents/code-reviewer.md`) launched on `git diff main...HEAD` — a fresh context that did not implement the change. The launcher passes **only** the diff scope and the Issue title/goal; never the implementing session's reasoning or a summary of the changes, which would re-inject the author's assumptions into the review. In AI tools without subagents (Gemini, Cursor), run this checklist in a new session/context instead. The output format below is unchanged, so the chain rule and the severity loop apply exactly as before.
+
+---
+
 ## When to run
 
 - Before every `git commit` on a feature branch
@@ -83,6 +89,8 @@ Actively try to break the changed code before concluding it is correct.
 
 - **Off-by-one, nullability, promise handling, race conditions**: for every modified function that has branching logic, trace at least one non-happy-path scenario. Write the trace explicitly: `Traced [input/state] → [result] — confirmed/flagged because [reason]`.
 - **Broken invariants, wrong return types, mishandled edge cases**
+- **Boundary values and concurrency**: empty / zero / max inputs, unawaited promises, shared state, re-entrancy
+- **Impact outside the diff**: for every changed export or signature, open its callers and verify they still hold; flag duplication the change introduces
 - **Regressions**: does the change break any existing behavior covered elsewhere?
 
 `No issues` requires at least one explicit trace statement. Stating `No issues` without a trace is not allowed.
