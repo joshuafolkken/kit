@@ -33,6 +33,13 @@ const NPMRC_LINES: ReadonlyArray<string> = [
 // line, and an insert-if-absent merge cannot repair them, so sync strips it. Only the
 // env-var placeholder form is listed: a line holding a literal token is still honored by
 // pnpm, so removing it would break a working setup. See joshuafolkken/kit#711.
+//
+// Re-verified on pnpm 11.20.0 for joshuafolkken/kit#746, which read the warning as a false
+// premise: with the user config isolated, the placeholder line in a project .npmrc still
+// yields `Ignored project-level auth setting` and a 401, while the same line in a user-level
+// npmrc — and a literal token in the project file — both resolve. Do not restore the entry
+// from the warning text alone; the deployment failure it was blamed for is a builder with no
+// credential source at all, answered by docs/authentication.md §4.
 const OBSOLETE_NPMRC_LINES: ReadonlySet<string> = new Set([
 	'//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}',
 ])

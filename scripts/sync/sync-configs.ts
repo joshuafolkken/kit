@@ -31,9 +31,14 @@ function sync_with_merge(
 
 // Point the credential somewhere pnpm still expands. A consumer on pnpm < 11.6 (the range
 // devEngines still allows) may have had the removed line working, so losing it silently would
-// surface later as an unexplained 401 during install.
-const NPMRC_CREDENTIAL_NOTICE =
-	'    ℹ removed the GitHub Packages auth line pnpm ignores in a project .npmrc — keep the credential in ~/.npmrc (docs/authentication.md)'
+// surface later as an unexplained 401 during install. The second destination is not a detail:
+// a builder outside GitHub Actions has neither ~/.npmrc nor actions/setup-node, and its 401
+// lands at deploy time where no CI check can see it (joshuafolkken/kit#746).
+const NPMRC_CREDENTIAL_NOTICE = [
+	'    ℹ removed the GitHub Packages auth line pnpm ignores in a project .npmrc',
+	'      → developer machine: keep the credential in ~/.npmrc',
+	'      → builder with no ~/.npmrc (Cloudflare, Vercel, Docker): docs/authentication.md §4',
+].join('\n')
 
 function sync_npmrc(destination_path: string): void {
 	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''

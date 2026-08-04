@@ -7,6 +7,11 @@ import { sync_configs } from './sync-configs'
 
 const UNCHANGED_LABEL = 'unchanged'
 const HOME_NPMRC = '~/.npmrc'
+// A builder outside GitHub Actions has no ~/.npmrc to fall back on, so the notice has to name
+// its destination too — its 401 lands at deploy time, where no CI check sees it (#746). The
+// section anchor is asserted, not the file: the docs link alone was already there.
+const BUILDER_PLATFORM = 'Cloudflare'
+const BUILDER_DESTINATION = 'docs/authentication.md §4'
 const NPMRC_UP_TO_DATE = init_logic.generate_npmrc()
 // The credential line the kit used to distribute: pnpm >= 11.6 ignores it in a project .npmrc,
 // so sync removes it instead of re-adding it (#711).
@@ -69,6 +74,15 @@ describe('sync_configs.sync_npmrc — obsolete auth line', () => {
 
 		sync_configs.sync_npmrc(ctx.destination)
 		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(HOME_NPMRC))
+	})
+
+	it('points builders with no user-level npmrc at the setup docs', () => {
+		writeFileSync(ctx.destination, NPMRC_WITH_OBSOLETE_AUTH_LINE)
+		const info_spy = spy_console_info()
+
+		sync_configs.sync_npmrc(ctx.destination)
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(BUILDER_PLATFORM))
+		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining(BUILDER_DESTINATION))
 	})
 
 	it('stays quiet about the credential when no obsolete line was present', () => {
