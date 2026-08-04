@@ -741,7 +741,7 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
   - **未追跡ファイルの中身**: `git diff --no-index /dev/null <new-file>`（staging 不要）。あるいは単にファイルを直接読む
 - **staging してよいのは次の 2 ケースだけ**:
   1. ユーザーが**そのターンで明示的に**ステージを指示した
-  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `queue` の起動に含まれるコミット手順）
+  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `halfrun` / `queue` の起動に含まれるコミット手順）
 - 上記以外で staging が必要だと考えたときは、**実行せずに先に確認する**
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
 - **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`queue` の手順 1、および「別パッケージ起因の問題は割り込み Issue で対応する」。いずれも直後に `git stash pop` で復元することが手順に含まれている。これら以外の場面で退避したくなったときは、実行せずに先に確認する
