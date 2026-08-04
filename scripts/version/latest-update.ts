@@ -1,11 +1,12 @@
 #!/usr/bin/env tsx
 /**
- * Filtered `pnpm update --latest` that skips capped-override packages and never downgrades.
+ * Filtered `pnpm update --latest` that skips overridden packages and never downgrades.
  *
  * Usage: tsx scripts/version/latest-update.ts
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { lockfile_overrides } from '#scripts/overrides/lockfile-overrides'
 import { overrides_files } from '#scripts/overrides/overrides-files'
 import { overrides_check } from '#scripts/overrides/overrides-logic'
 import { file_reader } from '#scripts/read-file'
@@ -101,7 +102,7 @@ function update_without_downgrading(snapshot: TreeSnapshot): UpdateOutcome {
 function report_excluded(excluded: ReadonlyArray<string>): void {
 	if (excluded.length === 0) return
 
-	console.info(`\n⏭ Skipping held-back / capped packages: ${excluded.join(', ')}`)
+	console.info(`\n⏭ Skipping held-back / overridden packages: ${excluded.join(', ')}`)
 }
 
 // Printed unconditionally so the overrides verdict does not depend on an agent remembering which
@@ -124,6 +125,32 @@ function report_overrides(before: Record<string, string>): void {
 	}
 }
 
+// The overrides verdict above only says the overrides file is intact; it says nothing about whether
+// the lockfile still honours it. Verifying that here is what turns a push-time CI failure into a
+// local one: `trustLockfile: true` (distributed in pnpm-workspace.yaml) makes
+// `pnpm install --frozen-lockfile` pass locally on the very lockfile CI refuses to install, so no
+// existing local gate covers the case (kit #744). Exits non-zero — the tree as it stands cannot be
+// installed by CI, so continuing the chain would only build on a broken lockfile.
+//
+// Reads the overrides back off disk rather than reusing the pre-update snapshot: CI resolves against
+// the files as committed, so a run that also moved an override must be judged against the new value.
+function report_lockfile_overrides(): void {
+	const lockfile = file_reader.read_file_or_empty(LOCKFILE_PATH)
+	const overrides = overrides_files.read_current_overrides()
+	const mismatches = lockfile_overrides.find_specifier_mismatches(lockfile, overrides)
+
+	if (mismatches.length === 0) return
+
+	console.error(`\n✖ ${LOCKFILE_PATH} no longer honours the overrides — CI cannot install it:`)
+
+	for (const line of lockfile_overrides.format_mismatch_lines(mismatches)) {
+		console.error(line)
+	}
+
+	console.error(`\n  Restore it with: git checkout HEAD -- ${LOCKFILE_PATH} && pnpm install`)
+	process.exitCode = 1
+}
+
 function main(): void {
 	const snapshot = take_snapshot()
 	const overrides = overrides_files.read_current_overrides()
@@ -133,6 +160,7 @@ function main(): void {
 	const outcome = update_without_downgrading(snapshot)
 
 	report_overrides(overrides)
+	report_lockfile_overrides()
 
 	// Skipped after a rollback so the tree really is left exactly as it was found — this sync writes
 	// package.json to advance the pinned safe-chain version, which would contradict the notice that
@@ -144,7 +172,14 @@ function main(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const latest_update = { run, main, update_without_downgrading, take_snapshot, restore_snapshot }
+const latest_update = {
+	run,
+	main,
+	update_without_downgrading,
+	take_snapshot,
+	restore_snapshot,
+	report_lockfile_overrides,
+}
 
 export { latest_update }
 export type { TreeSnapshot }
