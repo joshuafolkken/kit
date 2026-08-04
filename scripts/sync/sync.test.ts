@@ -10,6 +10,25 @@ const TEST_DIR = path.join(tmpdir(), 'sync-test')
 const SRC_PATH = path.join(TEST_DIR, 'src', 'gitignore')
 const GITIGNORE_DEST_NAME = '.gitignore'
 const DEST_PATH = path.join(TEST_DIR, 'dest', GITIGNORE_DEST_NAME)
+const CHECKOUT_ACTION = 'actions/checkout'
+const STALE_CHECKOUT_REF = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
+
+function uses_line(reference: string): string {
+	return `        uses: ${CHECKOUT_ACTION}@${reference}\n`
+}
+
+function stale_uses_line(): string {
+	return uses_line(STALE_CHECKOUT_REF)
+}
+
+// Read from the repository: a literal SHA here would need updating on every Dependabot bump,
+// which is exactly the churn write-time pin resolution removes (joshuafolkken/kit#747).
+function canonical_uses_line(): string {
+	const reference = workflow_pin_logic.build_canonical_pins().get(CHECKOUT_ACTION)
+	if (reference === undefined) throw new Error(`No canonical pin for ${CHECKOUT_ACTION}`)
+
+	return uses_line(reference)
+}
 
 beforeEach(() => {
 	mkdirSync(path.join(TEST_DIR, 'src'), { recursive: true })
@@ -61,6 +80,19 @@ describe('sync_file_mapping', () => {
 		sync.sync_file_mapping(missing_source, DEST_PATH)
 
 		expect(existsSync(DEST_PATH)).toBe(false)
+	})
+})
+
+describe('sync_file_mapping — workflow pin resolution', () => {
+	// templates/workflows/ci.yml reaches a consumer through this function, not sync_ai_file.
+	// A byte copy here would hand over the template's own pins and silently undo #747.
+	it('resolves workflow action pins instead of byte-copying the template', () => {
+		const workflow_destination = path.join(TEST_DIR, 'dest', '.github', 'workflows', 'ci.yml')
+
+		writeFileSync(SRC_PATH, stale_uses_line())
+		sync.sync_file_mapping(SRC_PATH, workflow_destination)
+
+		expect(readFileSync(workflow_destination, 'utf8')).toBe(canonical_uses_line())
 	})
 })
 
@@ -237,8 +269,6 @@ describe('sync_playwright_config', () => {
 })
 
 const NO_REFERENCES_CONTENT = 'no references here\n'
-const CHECKOUT_ACTION = 'actions/checkout'
-const STALE_CHECKOUT_REF = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
 
 describe('sync_ai_file', () => {
 	it('writes file content to destination', () => {
@@ -270,22 +300,17 @@ describe('sync_ai_file', () => {
 	// .github/workflows, so a consumer must get the current pin even from a stale template.
 	it('resolves workflow action pins from .github/workflows when the template is stale', () => {
 		const workflow_destination = path.join(TEST_DIR, 'dest', '.github', 'workflows', 'ci.yml')
-		const canonical = workflow_pin_logic.build_canonical_pins().get(CHECKOUT_ACTION)
 
-		writeFileSync(SRC_PATH, `        uses: ${CHECKOUT_ACTION}@${STALE_CHECKOUT_REF}\n`)
+		writeFileSync(SRC_PATH, stale_uses_line())
 		sync.sync_ai_file(SRC_PATH, workflow_destination)
 
-		expect(readFileSync(workflow_destination, 'utf8')).toBe(
-			`        uses: ${CHECKOUT_ACTION}@${String(canonical)}\n`,
-		)
+		expect(readFileSync(workflow_destination, 'utf8')).toBe(canonical_uses_line())
 	})
 
 	it('leaves action pins untouched when the destination is not a workflow', () => {
-		const line = `        uses: ${CHECKOUT_ACTION}@${STALE_CHECKOUT_REF}\n`
-
-		writeFileSync(SRC_PATH, line)
+		writeFileSync(SRC_PATH, stale_uses_line())
 		sync.sync_ai_file(SRC_PATH, DEST_PATH)
 
-		expect(readFileSync(DEST_PATH, 'utf8')).toBe(line)
+		expect(readFileSync(DEST_PATH, 'utf8')).toBe(stale_uses_line())
 	})
 })

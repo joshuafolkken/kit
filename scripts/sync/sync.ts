@@ -33,8 +33,10 @@ function sync_file_mapping(source_path: string, destination_path: string): void 
 		return
 	}
 
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	cpSync(source_path, destination_path)
+	// Routed through sync_ai_file rather than cpSync: templates/workflows/ci.yml is a mapped
+	// file, so a byte copy would hand the consumer the template's own action pins. The pins
+	// have to be resolved from .github/workflows at write time (joshuafolkken/kit#747).
+	sync_ai_file(source_path, destination_path)
 	console.info(`  ✔ synced    ${path.basename(destination_path)}`)
 }
 
