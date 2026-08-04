@@ -16,7 +16,10 @@ const INLINE_MARKERS: ReadonlyArray<string> = [GATE_REVIEW]
 // review — the exact arrangement #762 removed — while the rest of the file describes the new one.
 const RETIRED_MARKERS: ReadonlyArray<string> = [
 	'code-reviewer',
-	'fresh-context subagent',
+	// Bare 'fresh-context' rather than 'fresh-context subagent': the halfrun intro named "the
+	// fresh-context review", which the longer marker did not match, so the withdrawn model survived
+	// in prose after the section describing the subagent was deleted (#765).
+	'fresh-context',
 	'the completed PR diff',
 	'post the final review markdown as a PR comment',
 	// review.md's auto-continue section carried the retired model in its own wording — it said
@@ -27,6 +30,16 @@ const RETIRED_MARKERS: ReadonlyArray<string> = [
 	// `git diff main...HEAD` is deliberately NOT listed: the pre-commit self-review scope and
 	// followup's managed-config check both use it legitimately, so it does not distinguish the
 	// retired model from the current one.
+]
+
+// The #758 halfrun contract, asserted absent in the AI docs. Each phrase claims halfrun reaches a
+// step it no longer runs. They are listed separately from RETIRED_MARKERS, which tracks where the
+// review runs, so a future change to either model does not have to reason about the other.
+const HALFRUN_RETIRED_MARKERS: ReadonlyArray<string> = [
+	'Implement + PR',
+	'including commit, push, PR creation',
+	'while the PR is still OPEN',
+	'stop before merge',
 ]
 
 describe('review timing — AI docs', () => {
@@ -49,6 +62,26 @@ describe('review timing — AI docs', () => {
 
 		expect(raw).toContain('**Invoking `halfrun` is _not_ authorization to commit, push, or merge**')
 		expect(raw).not.toContain('Invoking `halfrun` authorizes commit, push, and PR creation')
+	})
+
+	// The heading and intro are what an agent reads first when deciding what the keyword
+	// authorizes, and #762 reverted the operative bullets without them — leaving each file
+	// contradicting itself two lines apart (#765). An agent that trusts the heading commits and
+	// opens a PR before the user has verified anything, which is the failure halfrun prevents.
+	it.each(AI_DOCS)('%s heads the halfrun section with the pre-commit stop', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		expect(raw).toContain(
+			'#### `halfrun` — Implement + verify, stop before commit (for manual verification)',
+		)
+		expect(raw).toContain('**stops before commit**')
+		expect(raw).toContain("`halfrun`'s built-in stop before commit is a confirmation pause")
+	})
+
+	it.each(AI_DOCS)('%s never describes halfrun as creating a PR', (ai_document) => {
+		const raw = read_repo_file(ai_document)
+
+		for (const marker of HALFRUN_RETIRED_MARKERS) expect(raw).not.toContain(marker)
 	})
 
 	// The staging ban enumerates the flows whose commit step may touch the index. halfrun no
