@@ -21,7 +21,7 @@ Common errors when installing or using `@joshuafolkken/kit`, and how to fix them
 
 ## `401` on a deploy build (Cloudflare, Vercel, Docker) while CI is green
 
-The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no `actions/setup-node` step, so nothing supplies the credential once the project `.npmrc` carries only the registry mapping. CI cannot reproduce it — the kit's workflows call setup-node with `registry-url`, which writes the credential for the job — so the failure surfaces first at deploy time.
+The builder is not a GitHub Actions runner: it has no `~/.npmrc` and no `actions/setup-node` step, so nothing supplies the credential once the project `.npmrc` carries only the registry mapping. CI cannot reproduce it — every workflow job that installs dependencies calls setup-node with `registry-url` first, which writes the credential for that job — so the failure surfaces first at deploy time.
 
 - Give the builder a credential from a source pnpm reads outside the project: see [§4 of authentication.md](./authentication.md#4-build-platforms-with-no-user-level-npmrc).
 - Do **not** answer it by restoring `//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}` to the project `.npmrc`. pnpm ignores that line (next section), and `josh sync` removes it again on the next run.

@@ -58,7 +58,7 @@ Commit that file — it holds no secret. Without the mapping, `pnpm` tries the p
 
 ## 4. Build platforms with no user-level npmrc
 
-A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no `actions/setup-node` to write one for the job, so the project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: the kit's workflows call setup-node with `registry-url`, so every Actions job gets the credential restored for it and the one environment that can fail is the one no check exercises.
+A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no `actions/setup-node` to write one for the job, so the project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: every kit workflow job that installs dependencies calls setup-node with `registry-url` first, so Actions always has the credential restored for it — the one environment that can fail is the one no check exercises.
 
 Supply the credential from a source pnpm reads outside the project. Any one of the three below is enough — pick the one your platform allows. Each needs the token itself in the platform's secret store, never in a committed file.
 
