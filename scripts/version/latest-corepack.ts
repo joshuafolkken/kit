@@ -2,62 +2,96 @@
 /**
  * Bump pnpm via `corepack use` to the newest release on the project's CURRENT major.
  *
- * Two failure modes this guards against, both of which used to abort the whole
- * `josh latest` chain (taking `latest:update` and `audit` down with them):
+ * The target version is resolved from the registry (`pnpm view pnpm@<major> version`)
+ * instead of a dist-tag, because pnpm publishes its per-major tag `latest-<major>` only
+ * for SUPERSEDED majors — while <major> is the newest major, the only tag covering it is
+ * `latest` (kit#750). The former `latest-<major>` pin (kit#444) therefore failed on
+ * every run in the common case, and `latest` itself can momentarily point below the
+ * devEngines floor. Picking the newest registry version whose major equals the
+ * `packageManager` pin keeps both invariants: never below the adopted major, and
+ * advancing while that major is the current one.
  *
- * 1. `corepack use pnpm@latest` follows npm's `latest` dist-tag, which is
- *    independent of `devEngines` and can momentarily point to an OLDER major than
- *    the devEngines floor (e.g. a pnpm 10.x backport tagged `latest` while this
- *    repo runs 11.x). corepack then rejects the pin and exits non-zero. Pinning to
- *    pnpm's per-major dist-tag `latest-<major>` keeps updates within the adopted
- *    major and never drops below `devEngines`.
+ * The maintenance chain runs under safe-chain, which filters the registry view by
+ * `minimum-release-age`. The `pnpm view` query goes through that same filtered view, so
+ * the resolved version is always old enough to install — right after a pnpm release the
+ * answer is simply the previous release instead of a "Tag not found" failure.
  *
- * 2. The maintenance chain runs under safe-chain, which proxies the registry and
- *    suppresses package versions newer than `minimum-release-age`. Right after a
- *    pnpm release the target version is filtered out, so `corepack use` fails with
- *    "Tag not found". That is expected and transient — the bump simply happens on a
- *    later run once the version ages past the window. So a corepack failure here is
- *    logged and swallowed (exit 0) instead of aborting the chain.
+ * Registry and corepack failures stay non-fatal: they are logged and swallowed (exit 0)
+ * so the rest of the `josh latest` chain (`latest:update`, `audit`) keeps running.
  *
  * Usage: tsx scripts/version/latest-corepack.ts
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
+import semver from 'semver'
 import { package_manager_version } from './package-manager-version'
+import { publishable_range_check } from './publishable-range-check'
 
 const PACKAGE_JSON_PATH = 'package.json'
 const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)(?:[^\d]|$)/u
 const FALLBACK_TARGET = 'pnpm@latest'
+const FAILURE_EXIT_CODE = 1
 
 function extract_pnpm_major(package_json_content: string): string | undefined {
 	return PACKAGE_MANAGER_RE.exec(package_json_content)?.[1]
 }
 
-function build_corepack_target(major: string | undefined): string {
-	if (major === undefined) return FALLBACK_TARGET
-
-	return `pnpm@latest-${major}`
+// `pnpm view` shares stdout with non-version noise (the safe-chain age-filter notice
+// prints there, after the answer), so scan for the first line that is a plain version on
+// the requested major instead of parsing the whole output.
+function extract_version_line(stdout: string, major: string): string | undefined {
+	return stdout
+		.split('\n')
+		.map((line: string) => line.trim())
+		.find((line: string) => semver.valid(line) !== null && String(semver.major(line)) === major)
 }
 
-function resolve_corepack_target(package_json_content: string): string {
-	return build_corepack_target(extract_pnpm_major(package_json_content))
+// Ask the registry for the newest pnpm release on the pinned major, reusing the release
+// gate's probe so the safe-chain-filtered-view semantics stay single-sourced. Returns
+// undefined when the query fails or answers off-major.
+function query_major_latest_version(major: string): string | undefined {
+	const probe = publishable_range_check.probe_range('pnpm', major)
+	if (probe.exit_code !== 0) return undefined
+
+	return extract_version_line(probe.stdout, major)
+}
+
+// The value handed to `corepack use`: an exact registry-resolved version on the pinned
+// major, `pnpm@latest` when no major can be read from package.json, or undefined when
+// the registry could not answer (the caller skips non-fatally).
+function resolve_corepack_target(major: string | undefined): string | undefined {
+	if (major === undefined) return FALLBACK_TARGET
+	const version = query_major_latest_version(major)
+	if (version === undefined) return undefined
+
+	return `pnpm@${version}`
+}
+
+// Non-fatal skip message shared by both skip paths: keep the josh latest chain
+// (latest:update, audit) running instead of aborting on a bump failure.
+function warn_skip(reason: string): void {
+	console.warn(`⚠ Skipped pnpm bump (${reason}); the chain continues.`)
+}
+
+function warn_unresolved(major: string | undefined): void {
+	warn_skip(`no pnpm ${major ?? ''} release resolvable from the registry`)
 }
 
 function run_corepack(target: string): number {
 	console.info(`\n▶ corepack use ${target}`)
 	const result = execaSync('corepack', ['use', target], { stdio: 'inherit', reject: false })
 
-	return result.exitCode ?? 1
+	return result.exitCode ?? FAILURE_EXIT_CODE
 }
 
-// Non-fatal: keep the josh latest chain (latest:update, audit) running. A non-zero
-// status here is usually the target version being newer than the registry
-// release-age window; it will bump on a later run. Returns whether a skip happened.
+// The target is an already-resolved exact version, so a non-zero status here is a
+// genuine corepack or network failure; a later run retries. Returns whether a skip
+// happened.
 function did_warn_skip(status: number): boolean {
 	if (status === 0) return false
 
-	console.warn(`⚠ Skipped pnpm bump (corepack exited ${String(status)}); the chain continues.`)
+	warn_skip(`corepack exited ${String(status)}`)
 
 	return true
 }
@@ -107,8 +141,16 @@ function restore_package_json(
 function main(): void {
 	const original = readFileSync(PACKAGE_JSON_PATH, 'utf8')
 	const major = extract_pnpm_major(original)
+	const target = resolve_corepack_target(major)
+
+	if (target === undefined) {
+		warn_unresolved(major)
+
+		return
+	}
+
 	const is_widened = did_widen_development_engines(original, major)
-	const is_skipped = did_warn_skip(run_corepack(build_corepack_target(major)))
+	const is_skipped = did_warn_skip(run_corepack(target))
 	if (is_skipped && is_widened) restore_package_json(original)
 	else if (!is_skipped) sync_development_engines_after_bump()
 }
@@ -117,8 +159,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
 const latest_corepack = {
 	extract_pnpm_major,
-	build_corepack_target,
+	extract_version_line,
+	query_major_latest_version,
 	resolve_corepack_target,
+	warn_skip,
+	warn_unresolved,
 	run_corepack,
 	did_warn_skip,
 	sync_development_engines_after_bump,
