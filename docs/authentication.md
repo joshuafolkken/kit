@@ -43,7 +43,7 @@ That value is a real secret and does not refresh on rotation — re-run the comm
 
 > **Why not the project `.npmrc`?** Since pnpm 11.6, environment variables are **not** expanded in registry credentials read from a project `.npmrc`, because that file is committed and the expansion could leak the token to an attacker-controlled registry. A token line there is ignored with an `Ignored project-level auth setting` warning on every command, so `josh init` / `josh sync` no longer write it — and `josh sync` removes it from projects that still carry it.
 
-**CI needs no extra step**: `actions/setup-node` with `registry-url: 'https://npm.pkg.github.com'` writes the same placeholder line into a user-level npmrc for the job, which pnpm does expand — supply `NODE_AUTH_TOKEN` to the install step and it works.
+**GitHub Actions needs no extra step**: `actions/setup-node` with `registry-url: 'https://npm.pkg.github.com'` writes the same placeholder line into a user-level npmrc for the job, which pnpm does expand — supply `NODE_AUTH_TOKEN` to the install step and it works. Any other build environment does need a step: see [§4](#4-build-platforms-with-no-user-level-npmrc).
 
 ## 3. Configure the project `.npmrc`
 
@@ -55,6 +55,38 @@ grep -qxF "$REGISTRY" .npmrc 2>/dev/null || echo "$REGISTRY" >> .npmrc
 ```
 
 Commit that file — it holds no secret. Without the mapping, `pnpm` tries the public npm registry for `@joshuafolkken/*` and fails. Installing only the global `josh` CLI (per [cli.md](./cli.md))? Put the same line in `~/.npmrc` and skip this section.
+
+## 4. Build platforms with no user-level npmrc
+
+A hosted builder — Cloudflare Workers Builds, Vercel, Netlify, a Docker image — is neither your machine nor a GitHub Actions runner. There is no `~/.npmrc` from §2 and no `actions/setup-node` to write one for the job, so the project `.npmrc` from §3 routes `@joshuafolkken/*` to GitHub Packages with no credential behind it and the install fails with `401`. **A green CI run does not clear this**: the kit's workflows call setup-node with `registry-url`, so every Actions job gets the credential restored for it and the one environment that can fail is the one no check exercises.
+
+Supply the credential from a source pnpm reads outside the project. Any one of the three below is enough — pick the one your platform allows. Each needs the token itself in the platform's secret store, never in a committed file.
+
+**a. An environment variable alone.** pnpm reads `npm_config_`-prefixed variables as config, so this needs no file and no command change:
+
+```
+npm_config_//npm.pkg.github.com/:_authToken=<token>
+```
+
+Use it wherever variable names are unrestricted (a Dockerfile `ENV`, most CI runners). Some dashboards accept only letters, digits and `_` in a name — take (b) or (c) there.
+
+**b. `pnpm config set` before the install.** This writes to pnpm's global auth store, outside the repository:
+
+```bash
+pnpm config set "//npm.pkg.github.com/:_authToken" "$NODE_AUTH_TOKEN"
+```
+
+It only helps from a step that runs **before** dependency installation — a Dockerfile line, an explicit CI step. A platform that installs dependencies automatically and only then runs your build command runs this too late; use (a) there.
+
+**c. Write the user-level file at build time.** The §2 line, created by the build:
+
+```bash
+printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> "$HOME/.npmrc"
+```
+
+Single quotes keep the placeholder literal, so `NODE_AUTH_TOKEN` is expanded by pnpm at install time. Same ordering constraint as (b).
+
+> **Why not just put the line back in the project `.npmrc`?** Since pnpm 11.6 it is ignored there (§2). Verified on pnpm 11.20.0: with the user config isolated, that line yields `Ignored project-level auth setting` and a `401`, while the same line in a user-level npmrc resolves. `josh sync` removes it for that reason and will keep removing it.
 
 ## Next
 
