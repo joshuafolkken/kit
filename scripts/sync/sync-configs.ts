@@ -29,8 +29,18 @@ function sync_with_merge(
 	console.info(`  ✔ synced    ${destination_name}`)
 }
 
+// Point the credential somewhere pnpm still expands. A consumer on pnpm < 11.6 (the range
+// devEngines still allows) may have had the removed line working, so losing it silently would
+// surface later as an unexplained 401 during install.
+const NPMRC_CREDENTIAL_NOTICE =
+	'    ℹ removed the GitHub Packages auth line pnpm ignores in a project .npmrc — keep the credential in ~/.npmrc (docs/authentication.md)'
+
 function sync_npmrc(destination_path: string): void {
+	const existing = existsSync(destination_path) ? readFileSync(destination_path, 'utf8') : ''
+	const did_have_obsolete_line = init_logic.has_obsolete_npmrc_line(existing)
+
 	sync_with_merge(destination_path, '.npmrc', init_logic.merge_npmrc)
+	if (did_have_obsolete_line) console.info(NPMRC_CREDENTIAL_NOTICE)
 }
 
 // Union-merge kit's .gitignore entries into the consumer file instead of overwriting it,
@@ -56,8 +66,9 @@ function read_base_compiler_options(): Record<string, unknown> {
 	return init_logic.extract_compiler_options(content)
 }
 
-// Ensure the kit preset is in `extends`, then drop any compilerOptions key whose value already
-// equals that preset — removing per-project drift while preserving genuine overrides.
+// Ensure the kit preset is in `extends`, drop any compilerOptions key whose value already equals
+// that preset — removing per-project drift while preserving genuine overrides — and union-merge the
+// generated-output directories into `exclude` so an existing consumer is repaired, not just a new one.
 function sync_tsconfig(destination_path: string): void {
 	const entry = init_logic.get_tsconfig_extends_entry()
 	const base_options = read_base_compiler_options()
@@ -65,9 +76,11 @@ function sync_tsconfig(destination_path: string): void {
 	const base_directory = path.dirname(destination_path)
 
 	sync_with_merge(destination_path, 'tsconfig.json', (existing) =>
-		init_logic.strip_redundant_compiler_options(
-			init_logic.merge_tsconfig_extends(existing, entry, base_directory),
-			base_options,
+		init_logic.merge_tsconfig_exclude(
+			init_logic.strip_redundant_compiler_options(
+				init_logic.merge_tsconfig_extends(existing, entry, base_directory),
+				base_options,
+			),
 		),
 	)
 }

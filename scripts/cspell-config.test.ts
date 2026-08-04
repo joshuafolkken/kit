@@ -28,7 +28,12 @@ describe('cspell/index.yaml base dictionary', () => {
 describe('cspell.config.yaml local words', () => {
 	const local_words = load_words(KIT_CSPELL_CONFIG)
 
-	it('does not duplicate multicriteria now that the base dictionary owns it', () => {
-		expect(local_words).not.toContain('multicriteria')
+	// The root config imports the base dictionary, so anything listed in both is dead weight —
+	// and a stale local copy hides the fact that the base dictionary owns the word, which is how
+	// `backlink` and `jgame` ended up stranded on the non-distributed side (kit#730).
+	it('holds only words the base dictionary does not already own', () => {
+		const base_owned = new Set(load_words(BASE_DICTIONARY))
+
+		expect(local_words.filter((word) => base_owned.has(word))).toEqual([])
 	})
 })

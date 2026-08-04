@@ -23,24 +23,34 @@ interface PackageVersionConfig {
 	fix_gh_packages_path: string
 }
 
-// The context kit passes to a consumer's effective-install hooks. `latest` is the downstream
-// (primary) package's already-fetched latest — the value kit resolved once for the main report — so
-// a hook that builds a global upgrade command (e.g. `pnpm add -g @joshuafolkken/app-kit@<latest>`)
-// reuses that single fetch instead of resolving `latest` a second time. It is the main package's
-// latest, not the upstream's (the upstream's own latest is the report's `latest`).
+// The context kit passes to a consumer's effective-install hooks, carrying both already-fetched
+// latests so a hook never resolves either a second time. `latest` is the downstream (primary)
+// package's latest — the value kit resolved once for the main report — so a hook that builds a global
+// upgrade command (e.g. `pnpm add -g @joshuafolkken/app-kit@<latest>`) reuses that single fetch.
+// `upstream_latest` is *this* upstream's own latest: the version kit measures the effective install
+// against, so a hook can name the version it was just reported stale for.
 interface UpstreamHookContext {
 	latest: string
+	upstream_latest: string
 }
 
-// The opt-in hooks a consumer supplies to report and upgrade an upstream's effective (running-
-// relative) install. `resolve_effective_version` returns the upstream version actually executed
-// (e.g. the kit bundled in the running global app-kit, via createRequire); `resolve_global_upgrade_command`
-// returns the global command that bumps it (e.g. `pnpm add -g @joshuafolkken/app-kit@<latest>`).
-// Both receive the shared `UpstreamHookContext` so they can reuse kit's already-fetched downstream
-// latest. Both are optional and only take effect together — kit itself supplies neither (no upstream).
+// The opt-in hooks and options a consumer supplies to report and upgrade an upstream's effective
+// (running-relative) install. `resolve_effective_version` returns the upstream version actually
+// executed (e.g. the kit bundled in the running global app-kit, via createRequire);
+// `resolve_global_upgrade_command` returns the global command that bumps it (e.g.
+// `pnpm add -g @joshuafolkken/app-kit@<latest>`). Both receive the shared `UpstreamHookContext` so
+// they can reuse kit's already-fetched latests. Both are optional and only take effect together —
+// kit itself supplies neither (no upstream).
+//
+// `is_global_upgrade_command_pinned` declares that the command only pins versions and does not force
+// a fresh dependency resolve. Kit can then prove the command is a no-op once every version it pins is
+// already installed, and replaces the dead `Run:` hint with an explanation (#697). Leave it unset for
+// a command that re-resolves (e.g. `pnpm remove -g <pkg> && pnpm add -g <pkg>@<latest>`): such a
+// command changes the graph even when its pin is already installed, so it must never be suppressed.
 interface UpstreamEffectiveHooks {
 	resolve_effective_version?: (context: UpstreamHookContext) => string | undefined
 	resolve_global_upgrade_command?: (context: UpstreamHookContext) => string
+	is_global_upgrade_command_pinned?: boolean
 }
 
 // A consumer's declaration of one upstream package in its dependency chain (e.g. app-kit declares
@@ -95,8 +105,8 @@ function derive_versions_endpoint(package_name: string): string {
 	return `/users/${scoped.owner}/packages/npm/${scoped.name}/versions?per_page=1`
 }
 
-// Copy the consumer's opt-in effective-install hooks, keeping only the defined ones so the resolved
-// config stays compatible with `exactOptionalPropertyTypes`.
+// Copy the consumer's opt-in effective-install hooks and options, keeping only the defined ones so
+// the resolved config stays compatible with `exactOptionalPropertyTypes`.
 function pick_effective_hooks(descriptor: UpstreamDescriptor): UpstreamEffectiveHooks {
 	const hooks: UpstreamEffectiveHooks = {}
 
@@ -106,6 +116,10 @@ function pick_effective_hooks(descriptor: UpstreamDescriptor): UpstreamEffective
 
 	if (descriptor.resolve_global_upgrade_command !== undefined) {
 		hooks.resolve_global_upgrade_command = descriptor.resolve_global_upgrade_command
+	}
+
+	if (descriptor.is_global_upgrade_command_pinned !== undefined) {
+		hooks.is_global_upgrade_command_pinned = descriptor.is_global_upgrade_command_pinned
 	}
 
 	return hooks

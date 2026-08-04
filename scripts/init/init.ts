@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolve_local_bin } from '#scripts/local-bin'
 import { package_version_schema, with_package_manager_schema } from '#scripts/schemas'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
@@ -13,6 +14,7 @@ import { PROJECT_ROOT } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
+const LEFTHOOK_BIN = 'lefthook'
 const SAMPLE_INDENT_WIDTH = 4
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 
@@ -131,7 +133,7 @@ function merge_project_package_json(): void {
 
 function install_lefthook(): void {
 	console.info('\nLefthook:')
-	const bin = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'lefthook')
+	const bin = resolve_local_bin(PROJECT_ROOT, LEFTHOOK_BIN)
 	const result = execaSync(bin, ['install'], { cwd: PROJECT_ROOT, stdio: 'inherit', reject: false })
 
 	if (result.exitCode === undefined) {

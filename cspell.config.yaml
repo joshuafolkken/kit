@@ -3,18 +3,19 @@ import:
   - "./cspell/index.yaml"
 words:
   - dedup
+  - desync
+  - desynced
   - dotless
   - testuser
   - myorg
   - myrepo
-  - narratively
   - ncurc
   - unstub
   - appleboy
   - vercel
   - winget
   - packument
-  - jgame
+  - EBADDEVENGINES
   - sonarlint
   - tssecurity
   - inlines
