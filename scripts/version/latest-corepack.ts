@@ -2,19 +2,22 @@
 /**
  * Bump pnpm via `corepack use` to the newest release on the project's CURRENT major.
  *
- * The target version is resolved from the registry (`pnpm view pnpm@<major> version`)
- * instead of a dist-tag, because pnpm publishes its per-major tag `latest-<major>` only
- * for SUPERSEDED majors — while <major> is the newest major, the only tag covering it is
- * `latest` (kit#750). The former `latest-<major>` pin (kit#444) therefore failed on
- * every run in the common case, and `latest` itself can momentarily point below the
- * devEngines floor. Picking the newest registry version whose major equals the
- * `packageManager` pin keeps both invariants: never below the adopted major, and
- * advancing while that major is the current one.
+ * The target version is resolved from the registry's publish timestamps
+ * (`pnpm view pnpm time --json`) instead of a dist-tag, because pnpm publishes its
+ * per-major tag `latest-<major>` only for SUPERSEDED majors — while <major> is the newest
+ * major, the only tag covering it is `latest` (kit#750). The former `latest-<major>` pin
+ * (kit#444) therefore failed on every run in the common case, and `latest` itself can
+ * momentarily point below the devEngines floor. Picking the newest registry version whose
+ * major equals the `packageManager` pin keeps both invariants: never below the adopted
+ * major, and advancing while that major is the current one.
  *
- * The maintenance chain runs under safe-chain, which filters the registry view by
- * `minimum-release-age`. The `pnpm view` query goes through that same filtered view, so
- * the resolved version is always old enough to install — right after a pnpm release the
- * answer is simply the previous release instead of a "Tag not found" failure.
+ * The `minimum-release-age` quarantine is applied natively from `.npmrc` (kit#768).
+ * safe-chain filters the registry only when the process tree was launched through one of
+ * its wrapped shell commands, so `josh latest` and `pnpm josh latest` used to resolve
+ * different answers and the pin oscillated. Reading the window from the repo-managed
+ * `.npmrc` and filtering by publish timestamp makes the resolution identical in every
+ * invocation context; right after a pnpm release the answer is simply the previous
+ * release, exactly as the filtered view behaved.
  *
  * The resolved version is floored at the current `packageManager` pin: a filtered registry
  * view legitimately answers below a freshly adopted pin for the first 24 hours after every
@@ -30,15 +33,21 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
 import semver from 'semver'
+import { z } from 'zod'
 import { package_manager_version } from './package-manager-version'
-import { publishable_range_check } from './publishable-range-check'
+import { safe_json_parse } from './parse-json'
+import { release_age } from './release-age'
 
 const PACKAGE_JSON_PATH = 'package.json'
+const NPMRC_PATH = '.npmrc'
 const PACKAGE_MANAGER_RE = /"packageManager"\s*:\s*"pnpm@(\d+)(?:[^\d]|$)/u
 const PINNED_VERSION_RE = /"packageManager"\s*:\s*"pnpm@([^"+]+)/u
 const TARGET_PREFIX = 'pnpm@'
 const FALLBACK_TARGET = 'pnpm@latest'
 const FAILURE_EXIT_CODE = 1
+const VIEW_TIMEOUT_MS = 30_000
+const NO_QUARANTINE_FALLBACK = 0
+const release_times_schema = z.record(z.string(), z.string())
 
 function extract_pnpm_major(package_json_content: string): string | undefined {
 	return PACKAGE_MANAGER_RE.exec(package_json_content)?.[1]
@@ -65,24 +74,46 @@ function is_target_not_newer_than_pin(target: string, pinned_version: string | u
 	return semver.lte(target_version, pinned_version)
 }
 
-// `pnpm view` shares stdout with non-version noise (the safe-chain age-filter notice
-// prints there, after the answer), so scan for the first line that is a plain version on
-// the requested major instead of parsing the whole output.
-function extract_version_line(stdout: string, major: string): string | undefined {
-	return stdout
-		.split('\n')
-		.map((line: string) => line.trim())
-		.find((line: string) => semver.valid(line) !== null && String(semver.major(line)) === major)
+// `pnpm view` shares stdout with non-JSON noise (the safe-chain age-filter notice prints
+// there too), so cut the payload down to the outermost braces before parsing.
+function extract_times_json(stdout: string): Record<string, string> | undefined {
+	const start = stdout.indexOf('{')
+	const end = stdout.lastIndexOf('}')
+	if (start === -1 || end <= start) return undefined
+	const parsed = release_times_schema.safeParse(safe_json_parse(stdout.slice(start, end + 1)))
+
+	return parsed.success ? parsed.data : undefined
 }
 
-// Ask the registry for the newest pnpm release on the pinned major, reusing the release
-// gate's probe so the safe-chain-filtered-view semantics stay single-sourced. Returns
-// undefined when the query fails or answers off-major.
-function query_major_latest_version(major: string): string | undefined {
-	const probe = publishable_range_check.probe_range('pnpm', major)
-	if (probe.exit_code !== 0) return undefined
+// The registry's publish timestamps for every pnpm release (version → ISO date, plus the
+// created/modified bookkeeping keys the selector ignores).
+function query_release_times(): Record<string, string> | undefined {
+	const result = execaSync('pnpm', ['view', 'pnpm', 'time', '--json'], {
+		reject: false,
+		timeout: VIEW_TIMEOUT_MS,
+	})
+	if ((result.exitCode ?? FAILURE_EXIT_CODE) !== 0) return undefined
 
-	return extract_version_line(probe.stdout, major)
+	return extract_times_json(result.stdout)
+}
+
+// The quarantine window from the repo-managed `.npmrc`; an unreadable file means no
+// quarantine, same as a missing setting.
+function read_minimum_release_age(): number {
+	try {
+		return release_age.parse_minimum_release_age(readFileSync(NPMRC_PATH, 'utf8'))
+	} catch {
+		return NO_QUARANTINE_FALLBACK
+	}
+}
+
+// Ask the registry for the newest pnpm release on the pinned major that has aged past the
+// quarantine window. Returns undefined when the query fails or nothing qualifies yet.
+function query_major_latest_version(major: string): string | undefined {
+	const times = query_release_times()
+	if (times === undefined) return undefined
+
+	return release_age.select_aged_version(times, major, read_minimum_release_age(), Date.now())
 }
 
 // The value handed to `corepack use`: an exact registry-resolved version on the pinned
@@ -216,7 +247,9 @@ const latest_corepack = {
 	extract_pinned_version,
 	is_target_not_newer_than_pin,
 	notify_skipped_bump,
-	extract_version_line,
+	extract_times_json,
+	query_release_times,
+	read_minimum_release_age,
 	query_major_latest_version,
 	resolve_corepack_target,
 	warn_skip,
