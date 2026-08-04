@@ -34,17 +34,31 @@ function to_review_comment(raw: AiReviewPullComment): ReviewComment {
 	}
 }
 
-function format_ai_review_blocker(finding: ClassifiedFinding): string {
+function format_ai_review_finding(finding: ClassifiedFinding): string {
 	const suffix = finding.url === undefined ? '' : ` — ${finding.url}`
 
 	return `- ${finding.author_login}: ${finding.summary}${suffix}`
+}
+
+// Temporary (kit#753): CodeRabbit findings are surfaced as console info and audit notes for the
+// completion notification instead of blocking the merge. Revert together with kit#752.
+function log_info_findings(infos: ReadonlyArray<ClassifiedFinding>): Array<string> {
+	if (infos.length === 0) return []
+
+	console.warn('⚠ CodeRabbit review is non-blocking (temporary policy — kit#753):')
+
+	for (const info of infos) {
+		console.warn(format_ai_review_finding(info))
+	}
+
+	return infos.map((info) => `CodeRabbit skipped (kit#753): ${info.summary}`)
 }
 
 function build_ai_review_blocker_body(blockers: ReadonlyArray<ClassifiedFinding>): string {
 	const lines = ['AI reviewer findings remain unresolved.', '']
 
 	for (const blocker of blockers) {
-		lines.push(format_ai_review_blocker(blocker))
+		lines.push(format_ai_review_finding(blocker))
 	}
 
 	return lines.join('\n')
@@ -98,18 +112,16 @@ async function fetch_review_comments(branch_name: string): Promise<Array<ReviewC
 	return parse_ai_review_comments(raw_json).map((comment) => to_review_comment(comment))
 }
 
-async function handle_ai_review_findings(input: {
+async function handle_blockers(input: {
 	branch_name: string
 	ignore_reason: string | undefined
 	context: TelegramContext
+	blockers: ReadonlyArray<ClassifiedFinding>
 }): Promise<void> {
-	const review_comments = await fetch_review_comments(input.branch_name)
-	const { blockers } = classify_ai_review_comments(review_comments)
-	if (blockers.length === 0) return
-	const body = build_ai_review_blocker_body(blockers)
+	const body = build_ai_review_blocker_body(input.blockers)
 
 	if (has_ignore_reason(input.ignore_reason)) {
-		const ignore_comment = build_ai_review_ignore_comment(input.ignore_reason, blockers)
+		const ignore_comment = build_ai_review_ignore_comment(input.ignore_reason, input.blockers)
 
 		await git_gh_command.pr_comment(input.branch_name, ignore_comment)
 
@@ -121,11 +133,32 @@ async function handle_ai_review_findings(input: {
 	throw new Error(body)
 }
 
+async function handle_ai_review_findings(input: {
+	branch_name: string
+	ignore_reason: string | undefined
+	context: TelegramContext
+}): Promise<Array<string>> {
+	const review_comments = await fetch_review_comments(input.branch_name)
+	const { blockers, infos } = classify_ai_review_comments(review_comments)
+	const skip_notes = log_info_findings(infos)
+
+	if (blockers.length > 0) await handle_blockers({ ...input, blockers })
+
+	return skip_notes
+}
+
 const git_pr_ai_review = {
 	handle_ai_review_findings,
 	parse_ai_review_comments,
 	to_review_comment,
+	has_ignore_reason,
 }
 
-export { git_pr_ai_review, handle_ai_review_findings, parse_ai_review_comments, to_review_comment }
+export {
+	git_pr_ai_review,
+	handle_ai_review_findings,
+	parse_ai_review_comments,
+	to_review_comment,
+	has_ignore_reason,
+}
 export type { TelegramContext, AiReviewPullComment }

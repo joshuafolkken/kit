@@ -37,6 +37,9 @@ vi.mock('./git-pr-ai-review', () => ({
 	git_pr_ai_review: {
 		handle_ai_review_findings: vi.fn(),
 	},
+	has_ignore_reason(reason: string | undefined): reason is string {
+		return reason !== undefined && reason.trim().length > 0
+	},
 }))
 
 vi.mock('./telegram-notify', () => ({
@@ -229,22 +232,26 @@ describe('warn_if_missing_closes', () => {
 	})
 })
 
+function setup_run_mocks(): void {
+	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
+	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
+	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
+	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
+	vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
+		rollup: [],
+		merge_state_status: undefined,
+		review_decision: undefined,
+	})
+	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
+	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
+	vi.mocked(telegram_notify.send).mockResolvedValue()
+	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+}
+
 describe('git_pr_followup.run — --merge flag', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
-		vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
-		vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
-		vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
-		vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
-		vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
-			rollup: [],
-			merge_state_status: undefined,
-			review_decision: undefined,
-		})
-		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
-		vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue()
-		vi.mocked(telegram_notify.send).mockResolvedValue()
-		vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+		setup_run_mocks()
 	})
 
 	it('calls notify before pr_merge when should_merge is true', async () => {
@@ -266,5 +273,89 @@ describe('git_pr_followup.run — --merge flag', () => {
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
 
 		expect(vi.mocked(git_gh_command.pr_merge)).not.toHaveBeenCalled()
+	})
+})
+
+// cspell:words coderabbit coderabbitai
+const UNRESOLVED_CODERABBIT_COMMENT = {
+	body: '_⚠️ Potential issue_\n\nPossible null dereference in parser.',
+	html_url: 'https://github.com/owner/repo/pull/1#discussion_r1',
+	user: { login: 'coderabbitai[bot]' },
+}
+
+const IGNORE_REASON = 'Tracked in follow-up Issue #999'
+
+function setup_skip_policy_mocks(): void {
+	vi.clearAllMocks()
+	vi.spyOn(console, 'warn').mockImplementation(() => {
+		// suppress output during tests
+	})
+	setup_run_mocks()
+}
+
+describe('git_pr_followup.run — temporary CodeRabbit skip (kit#753)', () => {
+	beforeEach(setup_skip_policy_mocks)
+
+	it('does not throw on unresolved CodeRabbit comments without an ignore reason', async () => {
+		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue(
+			JSON.stringify([UNRESOLVED_CODERABBIT_COMMENT]),
+		)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+		expect(vi.mocked(git_gh_command.pr_comment)).not.toHaveBeenCalled()
+	})
+
+	it('includes a skip note in the completion notification for unresolved comments', async () => {
+		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue(
+			JSON.stringify([UNRESOLVED_CODERABBIT_COMMENT]),
+		)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
+
+		const [send_input] = vi.mocked(telegram_notify.send).mock.calls[0] ?? []
+
+		expect(send_input?.body).toContain('kit#753')
+		expect(send_input?.body).toContain(UNRESOLVED_CODERABBIT_COMMENT.html_url)
+	})
+})
+
+describe('git_pr_followup.run — CodeRabbit skip audit trail (kit#753)', () => {
+	beforeEach(setup_skip_policy_mocks)
+
+	it('includes a skip note when the CodeRabbit check was not passing at merge time', async () => {
+		vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
+			rollup: [
+				{ name: 'CodeRabbit', status: 'pending' },
+				{ name: 'SonarQube', status: 'pass' },
+			],
+			merge_state_status: 'UNSTABLE',
+			review_decision: undefined,
+		})
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
+
+		const [send_input] = vi.mocked(telegram_notify.send).mock.calls[0] ?? []
+
+		expect(send_input?.body).toContain('CodeRabbit check skipped (kit#753)')
+		expect(send_input?.body).toContain('pending')
+	})
+
+	it('still posts the audit comment when an ignore reason is supplied', async () => {
+		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue(
+			JSON.stringify([UNRESOLVED_CODERABBIT_COMMENT]),
+		)
+		vi.mocked(git_gh_command.pr_comment).mockResolvedValue('')
+
+		await git_pr_followup.run({
+			...BASE_INPUT,
+			coderabbit_ignore_reason: IGNORE_REASON,
+		})
+
+		const [, comment_body] = vi.mocked(git_gh_command.pr_comment).mock.calls[0] ?? []
+
+		expect(comment_body).toContain('intentionally left unresolved')
+		expect(comment_body).toContain(IGNORE_REASON)
 	})
 })

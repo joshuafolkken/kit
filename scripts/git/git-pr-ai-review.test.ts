@@ -42,6 +42,12 @@ const CLAUDE_CLEAN_COMMENT = {
 	url: 'https://github.com/owner/repo/pull/2#issuecomment-2',
 }
 
+const CODERABBIT_ACTIONABLE_COMMENT = {
+	author: { login: 'coderabbitai[bot]' },
+	body: '<!-- summary by coderabbit.ai -->\n\nActionable comments posted: 3\n\nReview details...',
+	url: 'https://github.com/owner/repo/pull/2#issuecomment-3',
+}
+
 const BLOCKER_MESSAGE_REGEX = /AI reviewer findings remain unresolved/u
 
 beforeEach(() => {
@@ -49,17 +55,51 @@ beforeEach(() => {
 })
 
 describe('handle_ai_review_findings — no blockers', () => {
-	it('returns without side effects when the classifier finds nothing', async () => {
+	it('returns no skip notes and no side effects when the classifier finds nothing', async () => {
 		mocked_pr_get_comments.mockResolvedValue(JSON.stringify([CLAUDE_CLEAN_COMMENT]))
 
-		await handle_ai_review_findings({
+		const skip_notes = await handle_ai_review_findings({
 			branch_name: BRANCH,
 			ignore_reason: undefined,
 			context: CONTEXT,
 		})
 
+		expect(skip_notes).toStrictEqual([])
 		expect(mocked_pr_comment).not.toHaveBeenCalled()
 		expect(mocked_telegram_send).not.toHaveBeenCalled()
+	})
+})
+
+describe('handle_ai_review_findings — CodeRabbit findings (temporary kit#753)', () => {
+	it('does not throw and returns audit notes for CodeRabbit actionable comments', async () => {
+		mocked_pr_get_comments.mockResolvedValue(JSON.stringify([CODERABBIT_ACTIONABLE_COMMENT]))
+
+		const skip_notes = await handle_ai_review_findings({
+			branch_name: BRANCH,
+			ignore_reason: undefined,
+			context: CONTEXT,
+		})
+
+		expect(skip_notes).toHaveLength(1)
+		expect(skip_notes[0]).toContain('kit#753')
+		expect(skip_notes[0]).toContain('3')
+		expect(mocked_pr_comment).not.toHaveBeenCalled()
+		expect(mocked_telegram_send).not.toHaveBeenCalled()
+	})
+
+	it('still throws on Claude blockers while returning CodeRabbit notes separately', async () => {
+		mocked_pr_get_comments.mockResolvedValue(
+			JSON.stringify([CODERABBIT_ACTIONABLE_COMMENT, CLAUDE_BLOCKER_COMMENT]),
+		)
+
+		await expect(
+			handle_ai_review_findings({
+				branch_name: BRANCH,
+				ignore_reason: undefined,
+				context: CONTEXT,
+			}),
+		).rejects.toThrow(BLOCKER_MESSAGE_REGEX)
+		expect(mocked_telegram_send).toHaveBeenCalledTimes(1)
 	})
 })
 

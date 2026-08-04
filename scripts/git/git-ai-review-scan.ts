@@ -1,6 +1,6 @@
 // cspell:words coderabbit coderabbitai
 
-type FindingKind = 'blocker' | 'none'
+type FindingKind = 'blocker' | 'info' | 'none'
 
 interface ReviewComment {
 	body: string
@@ -17,6 +17,7 @@ interface ClassifiedFinding {
 
 interface ClassifiedFindings {
 	blockers: ReadonlyArray<ClassifiedFinding>
+	infos: ReadonlyArray<ClassifiedFinding>
 }
 
 const CLAUDE_AUTHORS: ReadonlySet<string> = new Set(['claude', 'claude[bot]'])
@@ -110,11 +111,13 @@ function classify_claude_comment(comment: ReviewComment): ClassifiedFinding {
 	}
 }
 
-function build_coderabbit_blocker(comment: ReviewComment, count: number): ClassifiedFinding {
+// Temporary (kit#753): CodeRabbit actionable comments are informational, never blockers, so a
+// slow CodeRabbit review cannot stall the merge gate. Revert together with kit#752.
+function build_coderabbit_info(comment: ReviewComment, count: number): ClassifiedFinding {
 	return {
 		author_login: comment.author_login,
 		url: comment.url,
-		kind: 'blocker',
+		kind: 'info',
 		summary: `CodeRabbit actionable comments posted: ${String(count)}`,
 	}
 }
@@ -124,7 +127,7 @@ function classify_coderabbit_comment(comment: ReviewComment): ClassifiedFinding 
 	const count = parse_coderabbit_actionable(comment.body)
 	if (count === EMPTY_COUNT) return build_none_finding(comment)
 
-	return build_coderabbit_blocker(comment, count)
+	return build_coderabbit_info(comment, count)
 }
 
 function classify_comment(comment: ReviewComment): ClassifiedFinding {
@@ -137,7 +140,10 @@ function classify_comment(comment: ReviewComment): ClassifiedFinding {
 function classify_ai_review_comments(comments: ReadonlyArray<ReviewComment>): ClassifiedFindings {
 	const classified = comments.map((comment) => classify_comment(comment))
 
-	return { blockers: classified.filter((entry) => entry.kind === 'blocker') }
+	return {
+		blockers: classified.filter((entry) => entry.kind === 'blocker'),
+		infos: classified.filter((entry) => entry.kind === 'info'),
+	}
 }
 
 const git_ai_review_scan = {
