@@ -1,5 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
 import { init_sonar } from './init-sonar'
@@ -10,7 +11,7 @@ function copy_ai_file(source_path: string, destination_path: string): void {
 	const content = readFileSync(source_path, 'utf8')
 
 	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, init_logic.transform_prompt_paths(content))
+	writeFileSync(destination_path, transform_copied_content(destination_path, content))
 }
 
 function did_skip_copy_if_absent(
