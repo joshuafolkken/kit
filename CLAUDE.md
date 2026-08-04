@@ -288,6 +288,10 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
 - Do not make any follow-up commit, fix, or proceed to merge until the user explicitly confirms
 - This check runs independently of AI reviewer comment scanning — both may trigger in the same workflow run
 
+#### Review step execution (fresh-context subagent)
+
+The workflow review step (`/review` in the flows above) is executed by launching the kit-distributed `code-reviewer` subagent (`.claude/agents/code-reviewer.md`) on `git diff main...HEAD` — a fresh context that did not implement the change, so the author's assumptions are not carried into the review. Pass it only the diff scope and the Issue title/goal; never the implementing session's reasoning or a summary of the changes. Its output follows the `prompts/review.md` template, so the chain rule and decision table below apply unchanged. In AI tools without subagents (Gemini, Cursor), run the `prompts/review.md` checklist in a new session/context instead. See `prompts/collaboration-workflow.md` → 「レビュー工程はフレッシュコンテキストのサブエージェントで実行する」.
+
 #### `/review` → `followup --merge` chain rule (MANDATORY)
 
 Within `fullrun` / `fullrun new` / `queue`, the `/review` skill output is **not** a turn boundary. The skill returns a polished Markdown review with sections, severity-tagged findings, and a final recommendation — this is an intermediate step, not a finished deliverable.
