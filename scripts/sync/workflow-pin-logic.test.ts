@@ -6,9 +6,19 @@ const OLD_REF = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2'
 const NEW_REF = 'df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3'
 const TEMPLATE = 'templates/workflows/ci.yml'
 const SETUP_NODE = 'actions/setup-node'
+const WORKFLOW_DESTINATION = '.github/workflows/ci.yml'
 
 function uses_block(action: string, reference: string): string {
 	return `      - name: Checkout\n        uses: ${action}@${reference}`
+}
+
+// Resolved from the repository rather than hardcoded: a literal SHA here would have to be
+// updated on every Dependabot bump, recreating the churn write-time resolution removes.
+function canonical_reference(action: string): string {
+	const reference = workflow_pin_logic.build_canonical_pins().get(action)
+	if (reference === undefined) throw new Error(`No canonical pin for ${action}`)
+
+	return reference
 }
 
 describe('workflow_pin_logic.parse_uses_line', () => {
@@ -111,14 +121,61 @@ describe('workflow_pin_logic.format_drift_message', () => {
 	})
 })
 
+describe('workflow_pin_logic.is_workflow_destination', () => {
+	it.each([
+		[WORKFLOW_DESTINATION],
+		['/srv/project/.github/workflows/ci.yml'],
+		['.github/workflows/deploy-vps.yaml'],
+		[String.raw`C:\project\.github\workflows\ci.yml`],
+	])('accepts a consumer workflow destination: %s', (destination) => {
+		expect(workflow_pin_logic.is_workflow_destination(destination)).toBe(true)
+	})
+
+	it.each([
+		['.github/dependabot.yml'],
+		[TEMPLATE],
+		['CLAUDE.md'],
+		['.github/workflows/nested/ci.yml'],
+	])('rejects a destination that is not a consumer workflow: %s', (destination) => {
+		expect(workflow_pin_logic.is_workflow_destination(destination)).toBe(false)
+	})
+})
+
+describe('workflow_pin_logic.apply_pins_for_destination', () => {
+	it('resolves a stale template ref when the destination is a consumer workflow', () => {
+		const written = workflow_pin_logic.apply_pins_for_destination(
+			WORKFLOW_DESTINATION,
+			uses_block(CHECKOUT, OLD_REF),
+		)
+
+		expect(written).toBe(uses_block(CHECKOUT, canonical_reference(CHECKOUT)))
+	})
+
+	it('leaves a non-workflow destination untouched', () => {
+		const text = uses_block(CHECKOUT, OLD_REF)
+
+		expect(workflow_pin_logic.apply_pins_for_destination('CLAUDE.md', text)).toBe(text)
+	})
+
+	it('leaves an action absent from .github/workflows untouched', () => {
+		const text = uses_block('some-org/not-used-here', OLD_REF)
+
+		expect(workflow_pin_logic.apply_pins_for_destination(WORKFLOW_DESTINATION, text)).toBe(text)
+	})
+})
+
 describe('workflow_pin_logic repository guard', () => {
 	it('runtime workflows pin each action to a single ref', () => {
 		expect(() => workflow_pin_logic.build_canonical_pins()).not.toThrow()
 	})
 
-	it('templates/workflows is in sync with .github/workflows', () => {
-		const drift = workflow_pin_logic.find_pin_drift()
+	// Ref equality between the template and .github/workflows is deliberately NOT asserted:
+	// the refs are resolved at write time, so a stale template ref is harmless and must not
+	// fail CI on a Dependabot bump. What still has to hold is that every action the templates
+	// use is resolvable — otherwise injection has nothing to substitute and the stale ref ships.
+	it('every action used by templates/workflows resolves in .github/workflows', () => {
+		const unknown = workflow_pin_logic.find_unknown_template_actions()
 
-		expect(drift, workflow_pin_logic.format_drift_message(drift)).toEqual([])
+		expect(unknown, JSON.stringify(unknown)).toEqual([])
 	})
 })
