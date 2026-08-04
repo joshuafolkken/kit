@@ -375,11 +375,15 @@ pnpm josh sync-workflow-pins           # rewrite template pins to match the runt
 pnpm josh sync-workflow-pins --check    # verify pins are in sync; non-zero on drift
 ```
 
-Dependabot bumps the runtime workflows under `.github/workflows/` only, so an action bump leaves the templates behind and trips the SHA-parity unit test. After such a bump (e.g. on a Dependabot PR), run `pnpm josh sync-workflow-pins` and commit the synced templates. The command errors if a single action is pinned to conflicting SHAs across the runtime workflows.
+Dependabot bumps the runtime workflows under `.github/workflows/` only — its `github-actions` ecosystem cannot scan `templates/` — so an action bump always leaves the templates behind. **This is no longer something you have to fix.** Consumer workflows have their pins resolved from `.github/workflows/*` at the moment `josh init` / `josh sync` writes them, so a stale template ref never reaches a consumer and never fails CI. The command remains available for keeping the committed templates tidy; running it is optional housekeeping, not a step in any workflow. The command errors if a single action is pinned to conflicting SHAs across the runtime workflows.
+
+What _is_ still enforced is that every action used by `templates/workflows/*` also appears in `.github/workflows/*` — an action with no runtime counterpart has no canonical pin to resolve from, so its template ref would ship verbatim. See joshuafolkken/kit#747.
 
 ### `josh sync-dependabot-pins`
 
-Automate the full template-pin fix over one or more Dependabot action-bump PRs. For each PR number it checks out the PR branch, runs the same sync as `sync-workflow-pins`, and — when pins drifted — commits the template update and pushes it back to the PR branch, then restores the branch you started on. This replaces the manual `gh pr checkout <N>` → `sync-workflow-pins` → commit → push loop.
+Automate the template-pin refresh over one or more Dependabot action-bump PRs. For each PR number it checks out the PR branch, runs the same sync as `sync-workflow-pins`, and — when pins drifted — commits the template update and pushes it back to the PR branch, then restores the branch you started on.
+
+> **No longer required to unblock a Dependabot PR.** This command existed because template drift used to fail the kit's own CI, making every action bump a manual fix-up. Pins are now resolved when a consumer workflow is written, so a Dependabot PR that touches only `.github/workflows/**` is green on its own. Use this command when you want the committed templates to read as current — not because a PR is stuck. See joshuafolkken/kit#747.
 
 ```bash
 pnpm josh sdp 578 641              # sync + push template pins for each Dependabot PR
