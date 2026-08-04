@@ -285,7 +285,7 @@ pnpm josh pr
 
 ### レビュー工程はフレッシュコンテキストのサブエージェントで実行する
 
-ワークフロー内のレビュー工程（各フローの `/review`）は、kit が配布する `code-reviewer` サブエージェント（`.claude/agents/code-reviewer.md`）を `git diff main...HEAD` に対して起動して実行する。実装したセッションとはコンテキストが分離されているため、実装時の思い込みがレビューに持ち込まれない。渡すのは diff の範囲と Issue のタイトル・目的だけであり、実装セッション側の説明や変更サマリは渡さない（作者のバイアスをレビューに再注入するため）。出力は `prompts/review.md` のテンプレートに従うので、下記のチェーンルール・決定表はそのまま適用される。サブエージェント機構のない AI ツール（Gemini / Cursor）では、代わりに新しいセッション／コンテキストで `prompts/review.md` のチェックリストを実行する。
+ワークフロー内のレビュー工程（各フローの `/review`）は、**`pnpm josh git -y` で PR を作成した後にのみ**実行する — コミット前バリアントは存在せず、`fullrun` / `halfrun` / `queue` のすべてが同じ対象（PR ブランチの `git diff main...HEAD`）をレビューする。実行は kit が配布する `code-reviewer` サブエージェント（`.claude/agents/code-reviewer.md`）の起動による。実装したセッションとはコンテキストが分離されているため、実装時の思い込みがレビューに持ち込まれない。渡すのは diff の範囲と Issue のタイトル・目的だけであり、実装セッション側の説明や変更サマリは渡さない（作者のバイアスをレビューに再注入するため）。出力は `prompts/review.md` のテンプレートに従うので、下記のチェーンルール・決定表はそのまま適用される。**High/Medium がゼロになってレビューが確定したら、その全文を PR コメントとして投稿する**（`gh pr comment <branch> --body-file <path>`）— 1 レビューサイクルにつき確定版 1 コメントで、High/Medium の途中ラウンドは投稿しない。後続コミット後の再レビューは新しいコメントとして投稿する。コメントの投稿者は実行ユーザーの GitHub アカウントなので、`followup` の AI レビュアーブロッカー判定（`claude` / `coderabbitai` 著者）には該当しない。サブエージェント機構のない AI ツール（Gemini / Cursor）では、代わりに新しいセッション／コンテキストで `prompts/review.md` のチェックリストを実行する。
 
 ### Chain rule: `/review` → `followup --merge` decision table
 
@@ -741,7 +741,7 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
   - **未追跡ファイルの中身**: `git diff --no-index /dev/null <new-file>`（staging 不要）。あるいは単にファイルを直接読む
 - **staging してよいのは次の 2 ケースだけ**:
   1. ユーザーが**そのターンで明示的に**ステージを指示した
-  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `queue` の起動に含まれるコミット手順）
+  2. 承認済みのコミットフローの一部として実行される（`pnpm josh git`、および `fullrun` / `halfrun` / `queue` の起動に含まれるコミット手順）
 - 上記以外で staging が必要だと考えたときは、**実行せずに先に確認する**
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
 - **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`queue` の手順 1、および「別パッケージ起因の問題は割り込み Issue で対応する」。いずれも直後に `git stash pop` で復元することが手順に含まれている。これら以外の場面で退避したくなったときは、実行せずに先に確認する
