@@ -46,101 +46,47 @@ describe('latest_corepack.extract_pnpm_major', () => {
 	})
 })
 
-const PIN_V11_20 = '11.20.0'
-const TARGET_BELOW_PIN = 'pnpm@11.19.0'
-const TARGET_AT_PIN = 'pnpm@11.20.0'
+// The kit#766 floor's pure-comparison suites live in latest-corepack-floor.test.ts; this
+// file keeps the query, resolve, corepack, and main() arrangements.
+
+const OLD_PUBLISH = '2020-01-01T00:00:00.000Z'
+const NPMRC_AGE_1440 = 'minimum-release-age=1440\n'
 const FALLBACK_TARGET = 'pnpm@latest'
+const TIMES_JSON_V11_OLD = `{"created":"2019-01-01T00:00:00.000Z","${REGISTRY_V11}":"${OLD_PUBLISH}"}`
 
-describe('latest_corepack.extract_pinned_version', () => {
-	it('extracts the full version without the integrity suffix', () => {
-		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V11)).toBe('11.4.0')
+describe('latest_corepack.extract_times_json', () => {
+	it('parses the publish-timestamp object from clean output', () => {
+		expect(latest_corepack.extract_times_json(TIMES_JSON_V11_OLD)).toMatchObject({
+			[REGISTRY_V11]: OLD_PUBLISH,
+		})
 	})
 
-	it('returns undefined for a bare-major shorthand pin', () => {
-		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_V11_SHORT)).toBeUndefined()
+	it('ignores the safe-chain age-filter notice sharing stdout with the payload', () => {
+		const stdout = `${TIMES_JSON_V11_OLD}\n${SAFE_CHAIN_NOTICE}\n`
+
+		expect(latest_corepack.extract_times_json(stdout)).toMatchObject({
+			[REGISTRY_V11]: OLD_PUBLISH,
+		})
 	})
 
-	it('returns undefined when the packageManager pin is absent', () => {
-		expect(latest_corepack.extract_pinned_version(PACKAGE_JSON_NO_PM)).toBeUndefined()
-	})
-})
-
-describe('latest_corepack.is_target_not_newer_than_pin', () => {
-	it('flags a registry answer below the pin as not newer', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_BELOW_PIN, PIN_V11_20)).toBe(true)
+	it('returns undefined when stdout carries no JSON object', () => {
+		expect(latest_corepack.extract_times_json(`${SAFE_CHAIN_NOTICE}\n`)).toBeUndefined()
 	})
 
-	it('flags an answer equal to the pin as not newer', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, PIN_V11_20)).toBe(true)
-	})
-
-	it('lets a genuinely newer answer through', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_AT_PIN, REGISTRY_V11)).toBe(false)
-	})
-
-	it('does not apply without a comparable pin', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(TARGET_BELOW_PIN, undefined)).toBe(false)
-	})
-
-	it('does not apply to the pnpm@latest fallback target', () => {
-		expect(latest_corepack.is_target_not_newer_than_pin(FALLBACK_TARGET, PIN_V11_20)).toBe(false)
-	})
-})
-
-describe('latest_corepack.notify_skipped_bump', () => {
-	it('logs the equal answer as steady-state success, not a warning', () => {
-		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-
-		latest_corepack.notify_skipped_bump(TARGET_AT_PIN, PIN_V11_20)
-
-		expect(info).toHaveBeenCalledOnce()
-		expect(warn).not.toHaveBeenCalled()
-
-		vi.restoreAllMocks()
-	})
-
-	it('warns when the answer sits below the pin', () => {
-		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-
-		latest_corepack.notify_skipped_bump(TARGET_BELOW_PIN, PIN_V11_20)
-
-		expect(warn).toHaveBeenCalledOnce()
-		expect(info).not.toHaveBeenCalled()
-
-		vi.restoreAllMocks()
-	})
-})
-
-describe('latest_corepack.extract_version_line', () => {
-	it('extracts the version line from clean output', () => {
-		expect(latest_corepack.extract_version_line(`${REGISTRY_V11}\n`, '11')).toBe(REGISTRY_V11)
-	})
-
-	it('ignores the safe-chain age-filter notice sharing stdout with the answer', () => {
-		const stdout = `${REGISTRY_V11}\n${SAFE_CHAIN_NOTICE}\n`
-
-		expect(latest_corepack.extract_version_line(stdout, '11')).toBe(REGISTRY_V11)
-	})
-
-	it('rejects a version from a different major', () => {
-		expect(latest_corepack.extract_version_line('10.34.5\n', '11')).toBeUndefined()
-	})
-
-	it('returns undefined when no version line exists', () => {
-		expect(latest_corepack.extract_version_line(`${SAFE_CHAIN_NOTICE}\n`, '11')).toBeUndefined()
+	it('returns undefined when the object is not a string-to-string record', () => {
+		expect(latest_corepack.extract_times_json('{"11.19.0":42}')).toBeUndefined()
 	})
 })
 
 describe('latest_corepack.query_major_latest_version', () => {
-	it('asks the registry for the newest release on the pinned major', () => {
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0, `${REGISTRY_V11}\n`))
+	it('asks the registry for publish timestamps and selects on the pinned major', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
+		mocked_read_file_sync.mockReturnValue(NPMRC_AGE_1440)
 
 		expect(latest_corepack.query_major_latest_version('11')).toBe(REGISTRY_V11)
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'pnpm',
-			['view', 'pnpm@11', 'version'],
+			['view', 'pnpm', 'time', '--json'],
 			expect.objectContaining({ reject: false }),
 		)
 	})
@@ -150,11 +96,20 @@ describe('latest_corepack.query_major_latest_version', () => {
 
 		expect(latest_corepack.query_major_latest_version('11')).toBeUndefined()
 	})
+
+	it('treats an unreadable .npmrc as no quarantine instead of failing', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
+		mocked_read_file_sync.mockImplementation(() => {
+			throw new Error('ENOENT')
+		})
+
+		expect(latest_corepack.query_major_latest_version('11')).toBe(REGISTRY_V11)
+	})
 })
 
 describe('latest_corepack.resolve_corepack_target', () => {
 	it('resolves to the exact registry version, not the unpublished latest-<major> tag', () => {
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0, `${REGISTRY_V11}\n`))
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
 
 		expect(latest_corepack.resolve_corepack_target('11')).toBe(`pnpm@${REGISTRY_V11}`)
 	})
@@ -247,7 +202,9 @@ const PACKAGE_JSON_BUMPED =
 	'{"packageManager":"pnpm@11.5.2+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11","onFail":"error"}}}'
 const WIDEN_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WIDENED]
 const RESTORE_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WITH_ENGINES]
-const VIEW_STDOUT = '11.5.2\n'
+// 11.5.2 aged past any window; 11.6.0 published in the far future stays quarantined, so the
+// selection exercises the native age filter on the main path too.
+const VIEW_STDOUT = `{"11.5.2":"${OLD_PUBLISH}","11.6.0":"2999-01-01T00:00:00.000Z"}\n`
 
 interface SyncSpy {
 	mock: { invocationCallOrder: Array<number> }
@@ -263,8 +220,11 @@ function silence_console(): void {
 }
 
 // Arrange a resolved registry answer (11.5.2), then corepack exiting with the given code.
+// Reads arrive in main's order: package.json, then .npmrc (quarantine window), then the
+// post-bump package.json re-read.
 function arrange_resolved_registry(corepack_exit_code: number): void {
 	mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_WITH_ENGINES)
+	mocked_read_file_sync.mockReturnValueOnce(NPMRC_AGE_1440)
 	mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_BUMPED)
 	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, VIEW_STDOUT))
 	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(corepack_exit_code))
@@ -317,13 +277,33 @@ const PACKAGE_JSON_AHEAD_OF_REGISTRY =
 	'{"packageManager":"pnpm@11.20.0+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11.20.0","onFail":"error"}}}'
 
 describe('latest_corepack.main skip handling', () => {
-	// The kit#766 regression: safe-chain's age filter hides a freshly adopted release, so the
-	// registry answers one release below the pin. The run must be a no-op, not a downgrade.
+	// The kit#766 regression: an age-filtered registry view answers one release below the
+	// pin. The run must be a no-op, not a downgrade. The .npmrc read receives the
+	// package.json content and parses to no quarantine, which is exactly the point: the
+	// floor holds regardless of what the age filter did.
 	it('skips without invoking corepack when the registry answers below the pin', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
 		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_AHEAD_OF_REGISTRY)
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0, `${REGISTRY_V11}\n`))
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_V11_OLD))
+
+		latest_corepack.main()
+
+		expect(mocked_execa_sync).toHaveBeenCalledTimes(1)
+		expect(mocked_write_file_sync).not.toHaveBeenCalled()
+		expect(warn).toHaveBeenCalledOnce()
+
+		warn.mockRestore()
+	})
+
+	// The kit#768 acceptance case: every release on the major is still inside the quarantine
+	// window, so nothing qualifies and the bump is skipped with package.json untouched.
+	it('skips without touching package.json when every release is still quarantined', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_WITH_ENGINES)
+		mocked_read_file_sync.mockReturnValueOnce(NPMRC_AGE_1440)
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, '{"11.5.2":"2999-01-01T00:00:00.000Z"}'))
 
 		latest_corepack.main()
 
