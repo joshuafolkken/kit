@@ -64,10 +64,10 @@ function handle_overrides_change(snapshot: Record<string, string>): void {
 }
 
 function build_update_argv(overrides: Record<string, string>): Array<string> | undefined {
-	const capped = overrides_check.extract_capped_package_names(overrides)
+	const overridden = overrides_check.extract_overridden_package_names(overrides)
 
-	if (capped.length > 0) {
-		console.info(`\n⏭ Skipping capped-override packages: ${capped.join(', ')}`)
+	if (overridden.length > 0) {
+		console.info(`\n⏭ Skipping overridden packages: ${overridden.join(', ')}`)
 	}
 
 	return overrides_check.build_update_command(overrides, read_package_json())

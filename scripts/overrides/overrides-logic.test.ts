@@ -20,6 +20,7 @@ const CAPPED_PKG_VALUE = '^4'
 const ESBUILD_KEY = 'esbuild@<=0.24.2'
 const ESBUILD_VALUE = '>=0.25.0'
 const NEW_PKG_KEY = 'new-pkg@>=1'
+const SCOPED_PKG_NAME = '@scope/pkg'
 
 describe('overrides_check.compare — no changes', () => {
 	it('returns no changes for identical overrides', () => {
@@ -121,48 +122,53 @@ describe('overrides_check.read_overrides_from_package', () => {
 	})
 })
 
-describe('overrides_check.extract_capped_package_names', () => {
+describe('overrides_check.extract_overridden_package_names', () => {
 	it('extracts packages with >= lower-bound constraints', () => {
-		const overrides = make_overrides([
-			[CAPPED_PKG_KEY, CAPPED_PKG_VALUE],
-			[ESBUILD_KEY, ESBUILD_VALUE],
-		])
+		const overrides = make_overrides([[CAPPED_PKG_KEY, CAPPED_PKG_VALUE]])
 
-		expect(overrides_check.extract_capped_package_names(overrides)).toEqual(['some-pkg'])
+		expect(overrides_check.extract_overridden_package_names(overrides)).toEqual(['some-pkg'])
 	})
 
 	it('extracts packages with > lower-bound constraints', () => {
 		const overrides = make_overrides([['pkg@>5', '^4']])
 
-		expect(overrides_check.extract_capped_package_names(overrides)).toEqual(['pkg'])
+		expect(overrides_check.extract_overridden_package_names(overrides)).toEqual(['pkg'])
 	})
 
-	it('excludes range constraints with both >= and <=', () => {
+	it('extracts packages from compound range constraints', () => {
 		const overrides = make_overrides([['lodash@>=4.0.0 <=4.17.22', '>=4.17.23']])
 
-		expect(overrides_check.extract_capped_package_names(overrides)).toEqual([])
+		expect(overrides_check.extract_overridden_package_names(overrides)).toEqual(['lodash'])
 	})
 
-	it('excludes upper-bound constraints (<=)', () => {
+	it('extracts packages from upper-bound constraints (<=)', () => {
 		const overrides = make_overrides([[ESBUILD_KEY, ESBUILD_VALUE]])
 
-		expect(overrides_check.extract_capped_package_names(overrides)).toEqual([])
+		expect(overrides_check.extract_overridden_package_names(overrides)).toEqual(['esbuild'])
 	})
 
 	it('handles scoped packages correctly', () => {
-		const overrides = make_overrides([['@scope/pkg@>=2', '^1']])
+		const overrides = make_overrides([[`${SCOPED_PKG_NAME}@>=2`, '^1']])
 
-		expect(overrides_check.extract_capped_package_names(overrides)).toEqual(['@scope/pkg'])
+		expect(overrides_check.extract_overridden_package_names(overrides)).toEqual([SCOPED_PKG_NAME])
 	})
 
 	it('returns empty array when no overrides', () => {
-		expect(overrides_check.extract_capped_package_names({})).toEqual([])
+		expect(overrides_check.extract_overridden_package_names({})).toEqual([])
 	})
 
-	it('ignores keys without version constraint', () => {
+	// kit #744: a bare key is the common override shape and was previously left in the update
+	// targets, which is what desynced the lockfile importer specifier.
+	it('extracts keys without a version constraint', () => {
 		const overrides = make_overrides([['bare-pkg', '^1']])
 
-		expect(overrides_check.extract_capped_package_names(overrides)).toEqual([])
+		expect(overrides_check.extract_overridden_package_names(overrides)).toEqual(['bare-pkg'])
+	})
+
+	it('extracts bare scoped keys', () => {
+		const overrides = make_overrides([[SCOPED_PKG_NAME, '^1']])
+
+		expect(overrides_check.extract_overridden_package_names(overrides)).toEqual([SCOPED_PKG_NAME])
 	})
 })
 
@@ -180,6 +186,12 @@ describe('overrides_check.list_excluded_package_names', () => {
 		])
 	})
 
+	it('merges held-back packages with bare-override packages', () => {
+		const overrides = make_overrides([['svelte', '^5.55.7']])
+
+		expect(overrides_check.list_excluded_package_names(overrides)).toEqual(['typescript', 'svelte'])
+	})
+
 	it('deduplicates a package that is both held back and capped', () => {
 		const overrides = make_overrides([['typescript@>=7', '^6']])
 
@@ -187,8 +199,8 @@ describe('overrides_check.list_excluded_package_names', () => {
 	})
 })
 
-describe('integration: filtering capped packages from update targets', () => {
-	it('excludes capped-override packages from dependency list', () => {
+describe('integration: filtering overridden packages from update targets', () => {
+	it('excludes overridden packages from dependency list', () => {
 		const overrides = make_overrides([
 			[CAPPED_PKG_KEY, CAPPED_PKG_VALUE],
 			[ESBUILD_KEY, ESBUILD_VALUE],
@@ -198,33 +210,31 @@ describe('integration: filtering capped packages from update targets', () => {
 			{ 'some-pkg': '^4.0.0', esbuild: '^0.25.0', vitest: '^3.0.0' },
 		)
 
-		const capped = overrides_check.extract_capped_package_names(overrides)
+		const overridden = overrides_check.extract_overridden_package_names(overrides)
 		const all_names = overrides_check.read_dependency_names(content)
-		const capped_set = new Set(capped)
-		const targets = all_names.filter((name) => !capped_set.has(name))
+		const overridden_set = new Set(overridden)
+		const targets = all_names.filter((name) => !overridden_set.has(name))
 
-		expect(capped).toEqual(['some-pkg'])
-		expect(targets).toEqual(['svelte', 'esbuild', 'vitest'])
+		expect(overridden).toEqual(['some-pkg', 'esbuild'])
+		expect(targets).toEqual(['svelte', 'vitest'])
 	})
 
-	it('returns all deps when no capped overrides exist', () => {
-		const overrides = make_overrides([[ESBUILD_KEY, ESBUILD_VALUE]])
+	it('returns all deps when no overrides exist', () => {
 		const content = make_package_json({}, { esbuild: '^0.25.0', vitest: '^3.0.0' })
 
-		const capped = overrides_check.extract_capped_package_names(overrides)
+		const overridden = overrides_check.extract_overridden_package_names({})
 		const all_names = overrides_check.read_dependency_names(content)
-		const targets = all_names.filter((name) => !new Set(capped).has(name))
+		const targets = all_names.filter((name) => !new Set(overridden).has(name))
 
 		expect(targets).toEqual(['esbuild', 'vitest'])
 	})
 })
 
 describe('overrides_check.build_update_command', () => {
-	it('lists every dependency as an explicit target when no capped overrides exist', () => {
-		const overrides = make_overrides([[ESBUILD_KEY, ESBUILD_VALUE]])
+	it('lists every dependency as an explicit target when no overrides exist', () => {
 		const content = make_package_json({ svelte: '^5' }, { vitest: '^3' })
 
-		expect(overrides_check.build_update_command(overrides, content)).toEqual([
+		expect(overrides_check.build_update_command({}, content)).toEqual([
 			'pnpm',
 			'update',
 			'--latest',
@@ -244,7 +254,17 @@ describe('overrides_check.build_update_command', () => {
 		expect(result).toEqual(['pnpm', 'update', '--latest', 'svelte', 'vitest'])
 	})
 
-	it('returns undefined when all packages are capped', () => {
+	// kit #744: updating a bare-overridden direct dependency rewrites its package.json range past
+	// the override and leaves the raw range in the lockfile importer, which CI cannot install.
+	it('excludes bare-override packages from update targets', () => {
+		const overrides = make_overrides([['svelte', '^5.55.7']])
+		const content = make_package_json({ svelte: '^5.56.8' }, { vitest: '^3' })
+		const result = overrides_check.build_update_command(overrides, content)
+
+		expect(result).toEqual(['pnpm', 'update', '--latest', 'vitest'])
+	})
+
+	it('returns undefined when every dependency is overridden', () => {
 		const overrides = make_overrides([[CAPPED_PKG_KEY, CAPPED_PKG_VALUE]])
 		const content = make_package_json({}, { 'some-pkg': '^4' })
 
@@ -253,15 +273,14 @@ describe('overrides_check.build_update_command', () => {
 })
 
 describe('overrides_check.build_update_command — held-back packages', () => {
-	it('excludes the held-back typescript package even without any capped overrides', () => {
-		const overrides = make_overrides([[ESBUILD_KEY, ESBUILD_VALUE]])
+	it('excludes the held-back typescript package even without any overrides', () => {
 		const content = make_package_json({ svelte: '^5' }, { typescript: '^6', vitest: '^3' })
-		const result = overrides_check.build_update_command(overrides, content)
+		const result = overrides_check.build_update_command({}, content)
 
 		expect(result).toEqual(['pnpm', 'update', '--latest', 'svelte', 'vitest'])
 	})
 
-	it('excludes both held-back and capped packages together', () => {
+	it('excludes both held-back and overridden packages together', () => {
 		const overrides = make_overrides([[CAPPED_PKG_KEY, CAPPED_PKG_VALUE]])
 		const content = make_package_json(
 			{ svelte: '^5' },

@@ -1,5 +1,5 @@
 import { json_object_schema } from '#scripts/schemas'
-import { load, YAMLException } from 'js-yaml'
+import { load, loadAll, YAMLException } from 'js-yaml'
 
 // js-yaml 5 throws "expected a document, but the input is empty" for input with no document node
 // (empty / whitespace / comment-only), whereas js-yaml 4 returned undefined. Restore the v4
@@ -25,6 +25,26 @@ function parse_yaml(content: string): Record<string, unknown> {
 	return json_object_schema.parse(raw)
 }
 
-const yaml_document = { parse_yaml }
+function is_mapping_document(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+// pnpm 11 writes pnpm-lock.yaml as a multi-document stream (the package-manager document, then the
+// dependency graph), which `load` rejects outright. Non-mapping documents are dropped rather than
+// rejected: a reader only ever looks up keys, and a stream that legitimately carries a scalar
+// document should not make the whole file unreadable.
+function parse_yaml_documents(content: string): Array<Record<string, unknown>> {
+	if (content.trim().length === 0) return []
+
+	const documents: Array<unknown> = []
+
+	loadAll(content, (document) => {
+		documents.push(document)
+	})
+
+	return documents.filter(is_mapping_document)
+}
+
+const yaml_document = { parse_yaml, parse_yaml_documents }
 
 export { yaml_document }

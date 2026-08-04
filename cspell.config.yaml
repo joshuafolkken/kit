@@ -3,6 +3,8 @@ import:
   - "./cspell/index.yaml"
 words:
   - dedup
+  - desync
+  - desynced
   - dotless
   - testuser
   - myorg
