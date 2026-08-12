@@ -2,6 +2,14 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { latest_corepack } from './latest-corepack'
+import {
+	AGED_PUBLISH,
+	fake_sync_result,
+	NPMRC_AGE_1440,
+	PACKAGE_JSON_PATH,
+	QUARANTINED_PUBLISH,
+} from './latest-corepack-fixture'
+import { build_package_manager_manifest } from './package-manager-manifest-fixture'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
@@ -9,14 +17,6 @@ vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
 const mocked_execa_sync = vi.mocked(execaSync)
 const mocked_read_file_sync = vi.mocked(readFileSync)
 const mocked_write_file_sync = vi.mocked(writeFileSync)
-
-type ExecaSyncResult = ReturnType<typeof execaSync>
-
-function fake_sync_result(exit_code: number | undefined, stdout = ''): ExecaSyncResult {
-	const result = { exitCode: exit_code, stdout }
-
-	return result as unknown as ExecaSyncResult
-}
 
 beforeEach(() => {
 	// resetAllMocks, not clearAllMocks: a test that arranges mockReturnValueOnce values a code
@@ -49,15 +49,13 @@ describe('latest_corepack.extract_pnpm_major', () => {
 // The kit#766 floor's pure-comparison suites live in latest-corepack-floor.test.ts; this
 // file keeps the query, resolve, corepack, and main() arrangements.
 
-const OLD_PUBLISH = '2020-01-01T00:00:00.000Z'
-const NPMRC_AGE_1440 = 'minimum-release-age=1440\n'
 const FALLBACK_TARGET = 'pnpm@latest'
-const TIMES_JSON_V11_OLD = `{"created":"2019-01-01T00:00:00.000Z","${REGISTRY_V11}":"${OLD_PUBLISH}"}`
+const TIMES_JSON_V11_OLD = `{"created":"2019-01-01T00:00:00.000Z","${REGISTRY_V11}":"${AGED_PUBLISH}"}`
 
 describe('latest_corepack.extract_times_json', () => {
 	it('parses the publish-timestamp object from clean output', () => {
 		expect(latest_corepack.extract_times_json(TIMES_JSON_V11_OLD)).toMatchObject({
-			[REGISTRY_V11]: OLD_PUBLISH,
+			[REGISTRY_V11]: AGED_PUBLISH,
 		})
 	})
 
@@ -65,7 +63,7 @@ describe('latest_corepack.extract_times_json', () => {
 		const stdout = `${TIMES_JSON_V11_OLD}\n${SAFE_CHAIN_NOTICE}\n`
 
 		expect(latest_corepack.extract_times_json(stdout)).toMatchObject({
-			[REGISTRY_V11]: OLD_PUBLISH,
+			[REGISTRY_V11]: AGED_PUBLISH,
 		})
 	})
 
@@ -148,11 +146,13 @@ describe('latest_corepack.run_corepack', () => {
 	})
 })
 
-const PACKAGE_JSON_PATH = 'package.json'
-const PACKAGE_JSON_WITH_ENGINES =
-	'{"packageManager":"pnpm@11.5.0+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11.5.0","onFail":"error"}}}'
-const PACKAGE_JSON_WIDENED =
-	'{"packageManager":"pnpm@11.5.0+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11","onFail":"error"}}}'
+const PIN_V11_5_0 = '11.5.0+sha512.abc'
+const MAJOR_V11 = '11'
+const PACKAGE_JSON_WITH_ENGINES = build_package_manager_manifest(`pnpm@${PIN_V11_5_0}`, '11.5.0')
+const PACKAGE_JSON_WIDENED = build_package_manager_manifest(`pnpm@${PIN_V11_5_0}`, MAJOR_V11)
+// The same manifest with the two fields already byte-identical: the state the alignment
+// closing main() converges on, so a run over it must not write at all.
+const PACKAGE_JSON_ALIGNED = build_package_manager_manifest(`pnpm@${PIN_V11_5_0}`, PIN_V11_5_0)
 
 describe('latest_corepack.did_widen_development_engines', () => {
 	it('widens the devEngines pin to the bare major before the bump', () => {
@@ -198,13 +198,13 @@ describe('latest_corepack.restore_package_json', () => {
 	})
 })
 
-const PACKAGE_JSON_BUMPED =
-	'{"packageManager":"pnpm@11.5.2+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11","onFail":"error"}}}'
+const PACKAGE_JSON_BUMPED = build_package_manager_manifest('pnpm@11.5.2+sha512.abc', MAJOR_V11)
 const WIDEN_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WIDENED]
 const RESTORE_CALL = [PACKAGE_JSON_PATH, PACKAGE_JSON_WITH_ENGINES]
 // 11.5.2 aged past any window; 11.6.0 published in the far future stays quarantined, so the
 // selection exercises the native age filter on the main path too.
-const VIEW_STDOUT = `{"11.5.2":"${OLD_PUBLISH}","11.6.0":"2999-01-01T00:00:00.000Z"}\n`
+const VIEW_STDOUT = `{"11.5.2":"${AGED_PUBLISH}","11.6.0":"${QUARANTINED_PUBLISH}"}\n`
+const TIMES_JSON_ALL_QUARANTINED = `{"11.5.2":"${QUARANTINED_PUBLISH}"}`
 
 interface SyncSpy {
 	mock: { invocationCallOrder: Array<number> }
@@ -221,11 +221,12 @@ function silence_console(): void {
 
 // Arrange a resolved registry answer (11.5.2), then corepack exiting with the given code.
 // Reads arrive in main's order: package.json, then .npmrc (quarantine window), then the
-// post-bump package.json re-read.
-function arrange_resolved_registry(corepack_exit_code: number): void {
+// re-read taken by the alignment that closes main() — `on_disk` is what the file holds at
+// that point, the bumped manifest on success and the restored one on a skip.
+function arrange_resolved_registry(corepack_exit_code: number, on_disk: string): void {
 	mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_WITH_ENGINES)
 	mocked_read_file_sync.mockReturnValueOnce(NPMRC_AGE_1440)
-	mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_BUMPED)
+	mocked_read_file_sync.mockReturnValueOnce(on_disk)
 	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(0, VIEW_STDOUT))
 	mocked_execa_sync.mockReturnValueOnce(fake_sync_result(corepack_exit_code))
 }
@@ -233,7 +234,7 @@ function arrange_resolved_registry(corepack_exit_code: number): void {
 describe('latest_corepack.main', () => {
 	it('invokes corepack with the registry-resolved exact version, never a dist-tag', () => {
 		silence_console()
-		arrange_resolved_registry(0)
+		arrange_resolved_registry(0, PACKAGE_JSON_BUMPED)
 
 		latest_corepack.main()
 
@@ -248,7 +249,7 @@ describe('latest_corepack.main', () => {
 
 	it('widens the devEngines pin before invoking corepack (the regression guard)', () => {
 		silence_console()
-		arrange_resolved_registry(0)
+		arrange_resolved_registry(0, PACKAGE_JSON_BUMPED)
 
 		latest_corepack.main()
 
@@ -262,7 +263,7 @@ describe('latest_corepack.main', () => {
 
 	it('restores the original package.json when corepack skips the bump', () => {
 		silence_console()
-		arrange_resolved_registry(1)
+		arrange_resolved_registry(1, PACKAGE_JSON_WITH_ENGINES)
 
 		latest_corepack.main()
 
@@ -273,8 +274,29 @@ describe('latest_corepack.main', () => {
 	})
 })
 
-const PACKAGE_JSON_AHEAD_OF_REGISTRY =
-	'{"packageManager":"pnpm@11.20.0+sha512.abc","devEngines":{"packageManager":{"name":"pnpm","version":"11.20.0","onFail":"error"}}}'
+// kit#773: the restored state is the pre-run manifest, drift included, so the alignment
+// closing main() still has to repair it. The no-bump paths are covered in
+// latest-corepack-drift.test.ts.
+describe('latest_corepack.main alignment', () => {
+	it('aligns the restored manifest when the pre-run state carried a devEngines drift', () => {
+		silence_console()
+		arrange_resolved_registry(1, PACKAGE_JSON_WITH_ENGINES)
+
+		latest_corepack.main()
+
+		expect(mocked_write_file_sync.mock.calls[2]).toEqual([PACKAGE_JSON_PATH, PACKAGE_JSON_ALIGNED])
+
+		vi.restoreAllMocks()
+	})
+})
+
+// Aligned on purpose: these suites assert that a skipped bump writes nothing, which only
+// isolates the skip when there is no devEngines drift left for the alignment to repair.
+const PIN_V11_20_0 = '11.20.0+sha512.abc'
+const PACKAGE_JSON_AHEAD_OF_REGISTRY = build_package_manager_manifest(
+	`pnpm@${PIN_V11_20_0}`,
+	PIN_V11_20_0,
+)
 
 describe('latest_corepack.main skip handling', () => {
 	// The kit#766 regression: an age-filtered registry view answers one release below the
@@ -301,9 +323,10 @@ describe('latest_corepack.main skip handling', () => {
 	it('skips without touching package.json when every release is still quarantined', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_WITH_ENGINES)
+		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_ALIGNED)
 		mocked_read_file_sync.mockReturnValueOnce(NPMRC_AGE_1440)
-		mocked_execa_sync.mockReturnValue(fake_sync_result(0, '{"11.5.2":"2999-01-01T00:00:00.000Z"}'))
+		mocked_read_file_sync.mockReturnValueOnce(PACKAGE_JSON_ALIGNED)
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0, TIMES_JSON_ALL_QUARANTINED))
 
 		latest_corepack.main()
 
@@ -317,7 +340,7 @@ describe('latest_corepack.main skip handling', () => {
 	it('skips without touching package.json when the registry cannot answer', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_WITH_ENGINES)
+		mocked_read_file_sync.mockReturnValue(PACKAGE_JSON_ALIGNED)
 		mocked_execa_sync.mockReturnValue(fake_sync_result(1, ''))
 
 		latest_corepack.main()
