@@ -85,10 +85,10 @@ async function with_prompt<T>(callback: PromptCallback<T>, fallback_value?: T): 
 	}
 }
 
-async function confirm_with_exit_on_cancel(confirm_action: () => Promise<boolean>): Promise<void> {
-	const should_continue = await confirm_action()
+async function confirm_with_exit_on_cancel(should_continue: () => Promise<boolean>): Promise<void> {
+	const is_confirmed = await should_continue()
 
-	if (!should_continue) {
+	if (!is_confirmed) {
 		console.info(OPERATION_CANCELLED_MESSAGE)
 		console.info('')
 		process.exit(1)

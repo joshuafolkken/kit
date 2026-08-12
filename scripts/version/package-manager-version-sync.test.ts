@@ -67,24 +67,24 @@ describe('sync.sync_package_manager_version', () => {
 	})
 })
 
-describe('latest_corepack.sync_development_engines_after_bump', () => {
+describe('latest_corepack.sync_development_engines', () => {
 	it('rewrites a drifted devEngines version to the packageManager pin', () => {
 		writeFileSync(ctx.package_json_path, DRIFTED)
-		latest_corepack.sync_development_engines_after_bump(ctx.package_json_path)
+		latest_corepack.sync_development_engines(ctx.package_json_path)
 
 		expect(read_manifest()).toBe(ALIGNED)
 	})
 
 	it('restores the integrity suffix a previous bump left off', () => {
 		writeFileSync(ctx.package_json_path, BARE_DRIFTED)
-		latest_corepack.sync_development_engines_after_bump(ctx.package_json_path)
+		latest_corepack.sync_development_engines(ctx.package_json_path)
 
 		expect(read_manifest()).toBe(ALIGNED)
 	})
 
 	it('leaves an already-aligned manifest untouched after a bump', () => {
 		writeFileSync(ctx.package_json_path, ALIGNED)
-		latest_corepack.sync_development_engines_after_bump(ctx.package_json_path)
+		latest_corepack.sync_development_engines(ctx.package_json_path)
 
 		expect(read_manifest()).toBe(ALIGNED)
 	})
