@@ -24,6 +24,12 @@
  * pnpm release, and writing that answer would downgrade the protected toolchain pin
  * (kit#766). Not-newer answers skip the bump non-fatally instead.
  *
+ * `devEngines.packageManager.version` is realigned with the `packageManager` pin on every
+ * path — bumped, skipped, or unresolvable (kit#773). Alignment used to run only after a
+ * successful bump, which never fires in the steady state of an up-to-date repository, so a
+ * manifest that arrived with the two fields out of step kept the pnpm dual-declaration
+ * warning forever. The alignment is idempotent, so running it unconditionally is free.
+ *
  * Registry and corepack failures stay non-fatal: they are logged and swallowed (exit 0)
  * so the rest of the `josh latest` chain (`latest:update`, `audit`) keeps running.
  *
@@ -155,10 +161,12 @@ function did_warn_skip(status: number): boolean {
 	return true
 }
 
-// After corepack bumps the `packageManager` pin, realign
-// `devEngines.packageManager.version` to the new version so the two fields keep
-// matching (pnpm suppresses the dual-declaration warning only on an exact match).
-function sync_development_engines_after_bump(package_json_path: string = PACKAGE_JSON_PATH): void {
+// Realign `devEngines.packageManager.version` with the `packageManager` pin so the two
+// fields keep matching (pnpm suppresses the dual-declaration warning only on an exact
+// match). Runs on every path, not just after a successful bump: a repository that arrives
+// with the two fields already out of step sits in the no-bump steady state forever, so an
+// alignment gated on a bump would never repair it (kit#773).
+function sync_development_engines(package_json_path: string = PACKAGE_JSON_PATH): void {
 	const content = readFileSync(package_json_path, 'utf8')
 	const aligned = package_manager_version.align_development_engines_version(content)
 	if (aligned === content) return
@@ -171,8 +179,8 @@ function sync_development_engines_after_bump(package_json_path: string = PACKAGE
 // writes `packageManager`, so an exact pin (e.g. 11.5.0) rejects a newer patch
 // (11.5.2) and the bump can never advance. Temporarily widen the pin to the bare
 // major (a range the new patch satisfies) so corepack proceeds; the exact pin is
-// restored afterwards by sync_development_engines_after_bump (on success) or
-// restore_package_json (on skip). Returns whether the file was rewritten.
+// restored afterwards by restore_package_json (on skip) and by the unconditional
+// sync_development_engines that closes main(). Returns whether the file was rewritten.
 function did_widen_development_engines(
 	content: string,
 	major: string | undefined,
@@ -187,8 +195,9 @@ function did_widen_development_engines(
 	return true
 }
 
-// Roll the temporary widening back when corepack skipped the bump, leaving
-// package.json byte-for-byte identical to its pre-run state.
+// Roll the temporary widening back when corepack skipped the bump, restoring
+// package.json to its pre-run state; the alignment closing main() then repairs any
+// devEngines drift that state carried in.
 function restore_package_json(
 	content: string,
 	package_json_path: string = PACKAGE_JSON_PATH,
@@ -228,16 +237,21 @@ function resolve_floored_target(original: string, major: string | undefined): st
 	return undefined
 }
 
+// Widen the devEngines pin, hand the resolved target to corepack, and roll the widening
+// back when corepack skipped. Leaves the devEngines alignment to main().
+function bump_package_manager(original: string, major: string | undefined, target: string): void {
+	const is_widened = did_widen_development_engines(original, major)
+	const is_skipped = did_warn_skip(run_corepack(target))
+	if (is_skipped && is_widened) restore_package_json(original)
+}
+
 function main(): void {
 	const original = readFileSync(PACKAGE_JSON_PATH, 'utf8')
 	const major = extract_pnpm_major(original)
 	const target = resolve_floored_target(original, major)
-	if (target === undefined) return
+	if (target !== undefined) bump_package_manager(original, major, target)
 
-	const is_widened = did_widen_development_engines(original, major)
-	const is_skipped = did_warn_skip(run_corepack(target))
-	if (is_skipped && is_widened) restore_package_json(original)
-	else if (!is_skipped) sync_development_engines_after_bump()
+	sync_development_engines()
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
@@ -256,9 +270,10 @@ const latest_corepack = {
 	warn_unresolved,
 	run_corepack,
 	did_warn_skip,
-	sync_development_engines_after_bump,
+	sync_development_engines,
 	did_widen_development_engines,
 	restore_package_json,
+	bump_package_manager,
 	main,
 }
 

@@ -158,4 +158,16 @@ export const unicorn_rules = {
 	'unicorn/prefer-includes': 'error',
 	// .at()を優先
 	'unicorn/prefer-at': 'error',
+	// boolean 命名規約（is_/has_/should_/can_/will_/did_）は「値」に対する規約なので、
+	// 変数と引数だけを検査する。unicorn 73 で checkFunctions の既定が always になり、
+	// 動作を行って結果を返す関数（confirm_commit / check_unstaged / branch_exists など）が
+	// 一斉に違反となるが、これらは述語ではなくコマンドであり `did_confirm_commit` のような
+	// 改名は英語として不自然。関数名の検査だけを外し、変数・引数の強制は維持する。
+	'unicorn/consistent-boolean-name': ['error', { checkFunctions: 'never' }],
+	// 内容が1行のブロックコメントは1行のまま書く（unicorn 73 の既定 'multiline' を反転）。
+	// 73 で新設された single-line-block-comment-style は `/* suppress */` や1行 JSDoc を
+	// 3行へ展開させるが、kit と配布先の既存スタイルは1行が慣用で、展開は可読性の利得なく
+	// 差分ノイズだけを生む。無効化ではなく 'single-line' 側で一貫性を強制する
+	// （内容が複数行のコメントはこのルールの対象外なので、長い解説コメントは影響を受けない）。
+	'unicorn/single-line-block-comment-style': ['error', 'single-line'],
 }
