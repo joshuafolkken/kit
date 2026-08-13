@@ -1,24 +1,5 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-
-interface WorkflowStep {
-	name?: string
-	run?: string
-}
-
-interface WorkflowJob {
-	steps?: ReadonlyArray<WorkflowStep>
-}
-
-interface Workflow {
-	jobs: Record<string, WorkflowJob>
-}
-
-const PACKAGE_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const TEMPLATE_CI_YML = path.join(PACKAGE_ROOT, 'templates/workflows/ci.yml')
+import { ci_yml_fixture, type WorkflowJob } from './ci-yml-fixture'
 
 const E2E_JOB = 'e2e'
 const CHECKS_JOB = 'checks'
@@ -27,16 +8,12 @@ const INSTALL_RUN = 'pnpm install --frozen-lockfile --ignore-scripts'
 const PLAYWRIGHT_RUN = 'pnpm exec playwright test'
 const MISSING = -1
 
-function load_workflow(): Workflow {
-	return load(readFileSync(TEMPLATE_CI_YML, 'utf8')) as Workflow
-}
-
 function step_index(job: WorkflowJob | undefined, needle: string): number {
 	return job?.steps?.findIndex((step) => step.run?.includes(needle) === true) ?? MISSING
 }
 
 describe('ci.yml e2e prepare step (templates/workflows/ci.yml)', () => {
-	const workflow = load_workflow()
+	const workflow = ci_yml_fixture.load_workflow(ci_yml_fixture.TEMPLATE_CI_YML)
 	const e2e_job = workflow.jobs[E2E_JOB]
 
 	it('prepares the workspace so generated tsconfig extends targets exist for playwright', () => {

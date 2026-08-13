@@ -1,28 +1,10 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
-
-interface WorkflowStep {
-	id?: string
-	if?: string
-	run?: string
-}
-
-interface WorkflowJob {
-	container?: unknown
-	outputs?: Record<string, string>
-	steps?: ReadonlyArray<WorkflowStep>
-}
-
-interface Workflow {
-	jobs: Record<string, WorkflowJob>
-}
+import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
 
 // Both files carry the same resolution block: templates/ is the artifact josh sync
 // distributes to consumers, .github/ is kit's own runtime copy. Asserting on both
 // keeps them from drifting apart.
-const WORKFLOW_PATHS = ['templates/workflows/ci.yml', '.github/workflows/ci.yml'] as const
+const WORKFLOW_PATHS = [ci_yml_fixture.TEMPLATE_CI_YML, ci_yml_fixture.RUNTIME_CI_YML] as const
 
 const RESOLVE_JOB = 'playwright-image'
 const CHECKS_JOB = 'checks'
@@ -37,12 +19,6 @@ const VERSION_SANITIZER = "tr -cd 'A-Za-z0-9.-'"
 const NO_CONTAINER_OUTPUT = 'container=null'
 const FALLBACK_WARNING = '::warning::Playwright image'
 
-function load_workflow(relative_path: string): Workflow {
-	const absolute_path = path.resolve(process.cwd(), relative_path)
-
-	return load(readFileSync(absolute_path, 'utf8')) as Workflow
-}
-
 function find_step(
 	job: WorkflowJob | undefined,
 	should_match: (step: WorkflowStep) => boolean,
@@ -51,8 +27,7 @@ function find_step(
 }
 
 describe.each(WORKFLOW_PATHS)('%s — Playwright image resolution', (relative_path) => {
-	const workflow = load_workflow(relative_path)
-	const resolve_job = workflow.jobs[RESOLVE_JOB]
+	const resolve_job = ci_yml_fixture.find_job(relative_path, RESOLVE_JOB)
 	const resolve_run = find_step(resolve_job, (step) => step.id === RESOLVE_STEP_ID)?.run ?? ''
 
 	it('exposes a container object and an install flag instead of a bare image tag', () => {
@@ -89,7 +64,7 @@ describe.each(WORKFLOW_PATHS)('%s — Playwright image resolution', (relative_pa
 })
 
 describe.each(WORKFLOW_PATHS)('%s — e2e job container fallback', (relative_path) => {
-	const e2e_job = load_workflow(relative_path).jobs[E2E_JOB]
+	const e2e_job = ci_yml_fixture.find_job(relative_path, E2E_JOB)
 
 	it('resolves the e2e container through fromJSON so null means a plain runner', () => {
 		expect(e2e_job?.container).toBe(CONTAINER_EXPRESSION)
@@ -106,8 +81,7 @@ describe.each(WORKFLOW_PATHS)('%s — e2e job container fallback', (relative_pat
 // Only the distributed template containerizes `checks`; kit's own runtime workflow runs
 // it on a plain runner and has no browser-mode unit tests.
 describe('templates/workflows/ci.yml — containerized checks job', () => {
-	const workflow = load_workflow(WORKFLOW_PATHS[0])
-	const checks_job = workflow.jobs[CHECKS_JOB]
+	const checks_job = ci_yml_fixture.find_job(ci_yml_fixture.TEMPLATE_CI_YML, CHECKS_JOB)
 
 	it('resolves the checks container through the same fromJSON fallback', () => {
 		expect(checks_job?.container).toBe(CONTAINER_EXPRESSION)
