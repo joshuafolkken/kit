@@ -87,6 +87,22 @@ describe('generate_playwright_config - PLAYWRIGHT_REUSE_SERVER flag helper', () 
 	})
 })
 
+// Regression guard for #777: CI needs the inverse predicate — set and not an explicit negative —
+// so CI=woodpecker stays on the CI branch while CI=0 and CI=false do not.
+describe('generate_playwright_config - CI detection helper', () => {
+	it('drops the bare Boolean() read of the CI env var', () => {
+		expect(init_logic.generate_playwright_config()).not.toContain("Boolean(process.env['CI'])")
+	})
+
+	it('ships a self-contained helper that only explicit negatives disable', () => {
+		const result = init_logic.generate_playwright_config()
+
+		expect(result).toContain("FALSY_FLAG_VALUES = new Set(['0', 'false', 'no', 'off'])")
+		expect(result).toContain('function is_ci_enabled(value: string | undefined): boolean')
+		expect(result).toContain("const IS_CI = is_ci_enabled(process.env['CI'])")
+	})
+})
+
 describe('get_ai_copy_files - AI and community files', () => {
 	it('includes all AI markdown and community files', () => {
 		const result = init_logic.get_ai_copy_files()
