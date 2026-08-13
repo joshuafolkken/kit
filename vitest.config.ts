@@ -5,6 +5,7 @@ const TEST_TIMEOUT_MS = 10_000
 export default defineConfig({
 	test: {
 		include: [
+			'*.test.ts',
 			'scripts/**/*.test.ts',
 			'scripts-ai/**/*.test.ts',
 			'eslint/**/*.test.ts',

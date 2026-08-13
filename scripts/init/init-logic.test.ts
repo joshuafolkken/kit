@@ -63,8 +63,27 @@ describe('generate_playwright_config', () => {
 	it('drives CI reuseExistingServer from the PLAYWRIGHT_REUSE_SERVER env var', () => {
 		const result = init_logic.generate_playwright_config()
 
-		expect(result).toContain("reuseExistingServer: Boolean(process.env['PLAYWRIGHT_REUSE_SERVER'])")
+		expect(result).toContain(
+			"reuseExistingServer: is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])",
+		)
 		expect(result).not.toContain('reuseExistingServer: false')
+	})
+})
+
+// Regression guard for #775: a bare Boolean() read makes '0' and 'false' enable reuse. The helper
+// must ship inside the byte-copied template — consumers cannot resolve a kit import from there.
+describe('generate_playwright_config - PLAYWRIGHT_REUSE_SERVER flag helper', () => {
+	it('drops the bare Boolean() read of the env var', () => {
+		expect(init_logic.generate_playwright_config()).not.toContain(
+			"Boolean(process.env['PLAYWRIGHT_REUSE_SERVER'])",
+		)
+	})
+
+	it('ships a self-contained helper that only affirmative spellings enable', () => {
+		const result = init_logic.generate_playwright_config()
+
+		expect(result).toContain("TRUTHY_FLAG_VALUES = new Set(['1', 'true', 'yes', 'on'])")
+		expect(result).toContain('function is_flag_enabled(value: string | undefined): boolean')
 	})
 })
 
