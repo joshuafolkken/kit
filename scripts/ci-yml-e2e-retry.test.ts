@@ -26,6 +26,9 @@ const {
 	REPORT_ARTIFACT,
 	LOG_ARTIFACT,
 } = ci_yml_fixture
+// The pair every first-attempt guard iterates: naming it once keeps a guard from being written
+// against one artifact while the other quietly goes unchecked.
+const ATTEMPT_ARTIFACTS = [REPORT_ARTIFACT, LOG_ARTIFACT]
 
 // Setup, two attempts and the upload of the first attempt's evidence all have to fit the job
 // budget, and the retried step rebuilds the app before serving it, so the repeated portion is the
@@ -50,7 +53,14 @@ const first_attempt = steps.find((step) => step.id === FIRST_ATTEMPT_ID)
 const run_steps = steps.filter((step) => step.run === TEST_COMMAND)
 const retry_step = run_steps.find((step) => step.id !== FIRST_ATTEMPT_ID)
 const preserve_index = step_index((step) => (step.run ?? '').includes(ATTEMPT_SUFFIX))
+const preserve_step = steps[preserve_index]
 const retry_index = step_index((step) => step === retry_step)
+// Everything in the after-failure chain except the retry itself is there to save evidence, so the
+// group is derived from the shared condition rather than listed by step name: a step added to the
+// chain later joins it the day it is written and cannot omit the guard below unnoticed.
+const evidence_steps = steps.filter(
+	(step) => step.if === AFTER_FAILURE_CONDITION && step !== retry_step,
+)
 
 // Only the distributed template is asserted on: kit's own e2e job never runs (no E2E specs), so
 // this wiring exists for consumers alone — the same split as the web server log guard for #781.
@@ -101,25 +111,25 @@ describe('ci.yml e2e retry preserves the first attempt (templates/workflows/ci.y
 	// chain would let a pull request run keep its directories in place while the retry renamed
 	// them anyway — publishing the retry's output under the primary artifact names.
 	it('renames under the same condition as the retry it prepares for', () => {
-		expect(steps[preserve_index]?.if).toBe(AFTER_FAILURE_CONDITION)
+		expect(preserve_step?.if).toBe(AFTER_FAILURE_CONDITION)
 	})
 
 	it('derives the log directory from the env var instead of repeating its name', () => {
-		expect(steps[preserve_index]?.run).toContain(LOG_PATH_VARIABLE)
+		expect(preserve_step?.run).toContain(LOG_PATH_VARIABLE)
 	})
 
 	// Saving the evidence must never be what withholds the release: a move that fails is announced
 	// and the run continues, rather than failing the job before the retry that fixes it.
 	it('announces a failed move instead of failing the job over the diagnostics', () => {
-		expect(steps[preserve_index]?.run).toContain('! mv')
-		expect(steps[preserve_index]?.run).toContain(WARNING_ANNOTATION)
+		expect(preserve_step?.run).toContain('! mv')
+		expect(preserve_step?.run).toContain(WARNING_ANNOTATION)
 	})
 
 	// A retry that passes leaves a green job, so without an annotation a half-flaky test would
 	// ship release after release with nothing on the run to read. The notice has to say where to
 	// look, but naming one artifact would make it a lie whenever that attempt wrote no report.
 	it('annotates the swallowed failure and points at the preserved output', () => {
-		const [notice] = (steps[preserve_index]?.run ?? '').split('\n\n', 1)
+		const [notice] = (preserve_step?.run ?? '').split('\n\n', 1)
 
 		expect(notice).toContain(WARNING_ANNOTATION)
 		expect(notice).toContain(ATTEMPT_SUFFIX)
@@ -127,11 +137,33 @@ describe('ci.yml e2e retry preserves the first attempt (templates/workflows/ci.y
 	})
 
 	it('uploads both first attempt artifacts before the retry overwrites them', () => {
-		for (const artifact of [REPORT_ARTIFACT, LOG_ARTIFACT]) {
+		for (const artifact of ATTEMPT_ARTIFACTS) {
 			const index = step_index((step) => step.with?.[NAME_INPUT] === `${artifact}${ATTEMPT_SUFFIX}`)
 
 			expect(index).toBeGreaterThan(preserve_index)
 			expect(index).toBeLessThan(retry_index)
+		}
+	})
+})
+
+// The invariant the whole after-failure chain is written around, asserted on the group rather than
+// on the steps that happen to be in it today (#789). Every one of them saves evidence, and saving
+// evidence must not be what decides the release: a write error in the rename's annotations, or a
+// transient artifact-service error in either upload, would end the job red even after the retry
+// passed — withholding the tag exactly as the crash did.
+describe('ci.yml e2e evidence collection (templates/workflows/ci.yml)', () => {
+	it('never lets collecting the first attempt evidence withhold the release', () => {
+		// Guards the filter as much as the workflow: a drifted condition string would leave the
+		// group empty, and the loop below would then pass while asserting nothing.
+		const known_members = [
+			preserve_step,
+			...ATTEMPT_ARTIFACTS.map((artifact) => find_attempt_upload(artifact)),
+		]
+
+		expect(evidence_steps).toEqual(expect.arrayContaining(known_members))
+
+		for (const step of evidence_steps) {
+			expect(ci_yml_fixture.step_continue_on_error(step)).toBe(true)
 		}
 	})
 })
@@ -146,17 +178,8 @@ describe('ci.yml e2e first attempt artifacts (templates/workflows/ci.yml)', () =
 		)
 	})
 
-	// Collecting the evidence must not decide the release: a transient artifact-service error here
-	// would otherwise end the job red even after the retry passed, withholding the tag exactly as
-	// the crash did — the same invariant the non-fatal rename above keeps.
-	it('never lets a failed evidence upload withhold the release', () => {
-		for (const artifact of [REPORT_ARTIFACT, LOG_ARTIFACT]) {
-			expect(ci_yml_fixture.step_continue_on_error(find_attempt_upload(artifact))).toBe(true)
-		}
-	})
-
 	it('uploads the first attempt only when there was one, and tolerates a missing log', () => {
-		for (const artifact of [REPORT_ARTIFACT, LOG_ARTIFACT]) {
+		for (const artifact of ATTEMPT_ARTIFACTS) {
 			const step = find_attempt_upload(artifact)
 
 			expect(step?.if).toBe(AFTER_FAILURE_CONDITION)
@@ -174,7 +197,7 @@ describe('ci.yml e2e retry job shape (templates/workflows/ci.yml)', () => {
 		// the ordering guard would keep passing on a workflow that has no retry at all.
 		expect(retry_index).toBeGreaterThanOrEqual(0)
 
-		for (const artifact of [REPORT_ARTIFACT, LOG_ARTIFACT]) {
+		for (const artifact of ATTEMPT_ARTIFACTS) {
 			expect(step_index((step) => step.with?.[NAME_INPUT] === artifact)).toBeGreaterThan(
 				retry_index,
 			)

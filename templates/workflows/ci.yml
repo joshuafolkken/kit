@@ -323,8 +323,14 @@ jobs:
       #
       # This step never fails the job: it exists to save evidence, and a move that does not happen
       # is announced instead, because the retry below will overwrite what was left behind.
+      # continue-on-error is what makes that hold rather than merely intend it. The rename is
+      # already kept from tripping `-e` by the `if !` around it, but the annotations are not: a
+      # write error exits non-zero and ends the step, on a runner that has just filled its disk
+      # with the failed attempt's videos, traces and report. Failing here would withhold the
+      # release even when the retry passes — the outcome #783 was opened to prevent (#789).
       - name: Preserve first attempt output
         if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        continue-on-error: true
         run: |
           # Announced, not just archived: a retry that passes leaves a green job, and without an
           # annotation a test failing half the time would ship release after release with nothing
@@ -338,7 +344,7 @@ jobs:
             fi
           done
 
-      # continue-on-error for the same reason the move above never fails: collecting evidence must
+      # continue-on-error for the same reason the move above carries it: collecting evidence must
       # not be what decides the release. Without it a transient artifact-service error here would
       # end the job red even after the retry passed — withholding the tag exactly as the crash
       # did. if-no-files-found: ignore covers the directory the move could not rename, and the
