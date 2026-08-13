@@ -55,18 +55,29 @@ function is_ci_enabled(value: string | undefined): boolean {
 
 const IS_CI = is_ci_enabled(process.env['CI'])
 
-// Set PLAYWRIGHT_REUSE_SERVER=1 (or 'true' / 'yes' / 'on') when an orchestrator pre-builds and
-// boots the preview so several checks share one server: Playwright then reuses the running server
-// and skips its webServer command (no rebuild). Any other value — including '0', 'false', 'off',
-// empty and unset (default) — keeps CI booting a fresh server and dev reusing, as before.
+// Set PLAYWRIGHT_REUSE_SERVER=1 (or 'true' / 'yes' / 'on') when the server already listening on the
+// port below is known to be this project's: Playwright then reuses it and skips its webServer
+// command (no boot, no rebuild). Any other value — including '0', 'false', 'off', empty and unset
+// (default) — makes Playwright boot its own server on both branches, and abort if the port is taken.
+// The default matters most locally: DEV_PORT is vite's default, so every vite project lands on it
+// first and later ones drift to 5174, 5178, … With reuse on, Playwright would adopt whichever
+// foreign app got there first and — baseURL being derived from this port — run the whole suite
+// green against it. Failing on a busy port replaces a silent pass against the wrong application.
+const IS_REUSE_ENABLED = is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])
+
 const web_server_config = IS_CI
 	? {
 			command: 'pnpm run build && pnpm run preview',
 			port: PREVIEW_PORT,
 			timeout: CI_TIMEOUT,
-			reuseExistingServer: is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER']),
+			reuseExistingServer: IS_REUSE_ENABLED,
 		}
-	: { command: 'pnpm run dev', port: DEV_PORT, timeout: LOCAL_TIMEOUT, reuseExistingServer: true }
+	: {
+			command: 'pnpm run dev',
+			port: DEV_PORT,
+			timeout: LOCAL_TIMEOUT,
+			reuseExistingServer: IS_REUSE_ENABLED,
+		}
 
 const env_config: EnvConfig = IS_CI
 	? {

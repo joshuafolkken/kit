@@ -60,13 +60,17 @@ describe('generate_playwright_config', () => {
 		)
 	})
 
-	it('drives CI reuseExistingServer from the PLAYWRIGHT_REUSE_SERVER env var', () => {
+	// Regression guard for #784: the local branch shipped `reuseExistingServer: true`, so a consumer
+	// ran E2E against whatever already held vite's default port. Both branches now read one flag.
+	it('drives reuseExistingServer on both branches from the PLAYWRIGHT_REUSE_SERVER env var', () => {
 		const result = init_logic.generate_playwright_config()
 
 		expect(result).toContain(
-			"reuseExistingServer: is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])",
+			"const IS_REUSE_ENABLED = is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])",
 		)
+		expect(result).toContain('reuseExistingServer: IS_REUSE_ENABLED')
 		expect(result).not.toContain('reuseExistingServer: false')
+		expect(result).not.toContain('reuseExistingServer: true')
 	})
 })
 
