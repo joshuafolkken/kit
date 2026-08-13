@@ -1,7 +1,5 @@
 import { defineConfig, devices, type ReporterDescription } from '@playwright/test'
 
-const IS_CI = Boolean(process.env['CI'])
-
 const DEV_PORT = 5173
 const PREVIEW_PORT = 4173
 
@@ -24,12 +22,30 @@ type EnvConfig = {
 }
 
 const TRUTHY_FLAG_VALUES = new Set(['1', 'true', 'yes', 'on'])
+const FALSY_FLAG_VALUES = new Set(['0', 'false', 'no', 'off'])
+
+function normalize_flag_value(value: string): string {
+	return value.trim().toLowerCase()
+}
 
 // Env vars are always strings, so `Boolean(value)` would enable the flag for '0' and 'false' too —
 // the two spellings someone reaches for to turn it off. Only affirmative spellings enable.
 function is_flag_enabled(value: string | undefined): boolean {
-	return value !== undefined && TRUTHY_FLAG_VALUES.has(value.trim().toLowerCase())
+	return value !== undefined && TRUTHY_FLAG_VALUES.has(normalize_flag_value(value))
 }
+
+// `CI` is not an opt-in flag with a fixed vocabulary — Woodpecker exports `CI=woodpecker` — so the
+// affirmative allow-list above would drop such runs into dev mode. Invert the test instead: any
+// value counts as CI except an empty one and the explicit negatives. (`ci-info` opts out on the
+// exact string 'false' alone; the negative set here also covers '0', 'no' and 'off'.)
+function is_ci_enabled(value: string | undefined): boolean {
+	if (value === undefined) return false
+	const normalized = normalize_flag_value(value)
+
+	return normalized.length > 0 && !FALSY_FLAG_VALUES.has(normalized)
+}
+
+const IS_CI = is_ci_enabled(process.env['CI'])
 
 // Set PLAYWRIGHT_REUSE_SERVER=1 (or 'true' / 'yes' / 'on') when an orchestrator pre-builds and
 // boots the preview so several checks share one server: Playwright then reuses the running server
