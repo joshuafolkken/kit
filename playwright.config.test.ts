@@ -71,26 +71,35 @@ afterEach(() => {
 	vi.resetModules()
 })
 
-// Regression guard for #775: env vars are strings, so the previous `Boolean()` read turned
-// PLAYWRIGHT_REUSE_SERVER=0 and =false into reuse. A CI run that then binds to an already-running
+// Both branches read one flag, so both are held to one table — running it twice is what proves the
+// semantics are identical rather than merely similar.
+// Regression guard for #775 (CI branch): env vars are strings, so the original `Boolean()` read
+// turned PLAYWRIGHT_REUSE_SERVER=0 and =false into reuse, and a CI run binding to an already-running
 // dev server makes app-kit's security-header E2E skip itself and still report green.
-describe('playwright.config webServer reuseExistingServer', () => {
-	it.each(ENABLING_VALUES)('enables reuse in CI for %j', async (value) => {
-		expect(await load_reuse_existing_server(CI_ON, value)).toBe(true)
-	})
+// Regression guard for #784 (local branch): it reused unconditionally on DEV_PORT — vite's default,
+// hence the port every vite project takes first. Playwright then skipped its own dev server, derived
+// baseURL from that port and ran the whole suite green against whatever foreign app was listening.
+const REUSE_BRANCHES = [
+	{ label: 'in CI', ci: CI_ON },
+	{ label: 'outside CI', ci: undefined },
+]
 
-	it.each(DISABLING_VALUES)('disables reuse in CI for %j', async (value) => {
-		expect(await load_reuse_existing_server(CI_ON, value)).toBe(false)
-	})
+describe.each(REUSE_BRANCHES)(
+	'playwright.config webServer reuseExistingServer $label',
+	({ ci }) => {
+		it.each(ENABLING_VALUES)('enables reuse for %j', async (value) => {
+			expect(await load_reuse_existing_server(ci, value)).toBe(true)
+		})
 
-	it('disables reuse in CI when the flag is unset', async () => {
-		expect(await load_reuse_existing_server(CI_ON, undefined)).toBe(false)
-	})
+		it.each(DISABLING_VALUES)('disables reuse for %j', async (value) => {
+			expect(await load_reuse_existing_server(ci, value)).toBe(false)
+		})
 
-	it('keeps reusing the dev server outside CI regardless of the flag', async () => {
-		expect(await load_reuse_existing_server(undefined, '0')).toBe(true)
-	})
-})
+		it('disables reuse when the flag is unset', async () => {
+			expect(await load_reuse_existing_server(ci, undefined)).toBe(false)
+		})
+	},
+)
 
 // Regression guard for #777: the previous `Boolean(process.env['CI'])` read selected the CI branch
 // for CI=0 and CI=false, so a developer opting out locally got build && preview on port 4173.

@@ -121,6 +121,18 @@ Running on the plain runner and installing browsers with 'playwright install --w
 
 Both jobs then run on `ubuntu-latest` and download browsers themselves, which adds roughly two minutes but always matches the installed Playwright exactly. No action is required — the warning disappears on its own once the image is published. Do **not** pin `@playwright/test` back to make it go away.
 
+## Local E2E aborts with "http://localhost:5173 is already used"
+
+Something else is listening on the port `playwright.config.ts` runs the dev server on, and Playwright refuses to start rather than adopt it. This is deliberate: `5173` is vite's default, so it is the port _every_ vite project takes first, and later ones drift to `5174`, `5178`, and so on. Because the config sets no `use.baseURL`, Playwright derives the base URL from `webServer.port` — so a reused foreign server would send every relative navigation in every spec to a different application, and the suite would report green against it. The abort replaces a silent wrong-app pass.
+
+Free the port — usually by stopping the other project's dev server — and re-run. If the server on that port **is** this project's own and you want Playwright to skip booting a second one, opt in explicitly:
+
+```bash
+PLAYWRIGHT_REUSE_SERVER=1 pnpm josh test
+```
+
+The flag accepts `1`, `true`, `yes` or `on` (case- and whitespace-insensitive); every other value, including unset, boots a fresh server. It means the same thing in CI, where it exists for an orchestrator that pre-builds and boots the preview so several checks share one server. Do **not** edit `reuseExistingServer` in `playwright.config.ts` instead — that file is managed by `josh sync` and the change is overwritten on the next sync.
+
 ## Still stuck?
 
 - Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `~/.npmrc` credential → project registry mapping) matters.
