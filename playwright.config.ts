@@ -11,6 +11,14 @@ const NAV_TIMEOUT = 30_000
 const CI_WORKERS = 2
 const CI_RETRIES = 2
 
+// Playwright never restarts a `webServer` that exits mid-run, so once it dies every remaining test
+// fails with the identical net::ERR_CONNECTION_REFUSED — and is retried twice against the same
+// closed port. Uncapped, one such run burned six minutes producing 186 indistinguishable failures
+// in which the only meaningful event, the server's death, was invisible. A test counts toward this
+// cap only after its retries are exhausted, so 10 still reports a genuine multi-test regression in
+// full while ending a dead-server run in seconds. Do not raise or remove it without that tradeoff.
+const CI_MAX_FAILURES = 10
+
 type EnvConfig = {
 	retries: number
 	timeout: number
@@ -84,7 +92,7 @@ export default defineConfig({
 	webServer: web_server_config,
 	testMatch: '**/*.e2e.{ts,js}',
 	fullyParallel: true,
-	...(IS_CI ? { workers: CI_WORKERS } : {}),
+	...(IS_CI ? { workers: CI_WORKERS, maxFailures: CI_MAX_FAILURES } : {}),
 	retries: env_config.retries,
 	timeout: env_config.timeout,
 	projects: [

@@ -1,8 +1,15 @@
+import type { PlaywrightTestConfig } from '@playwright/test'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const CI_KEY = 'CI'
 const REUSE_KEY = 'PLAYWRIGHT_REUSE_SERVER'
 const CI_ON = '1'
+
+const EXPECTED_MAX_FAILURES = 10
+// A dead server must not be able to hide behind a cap so low that a real regression is truncated,
+// nor so high that the cascade it exists to stop runs on for minutes.
+const MIN_USEFUL_MAX_FAILURES = 5
+const MAX_USEFUL_MAX_FAILURES = 20
 
 const ENABLING_VALUES = ['1', 'true', 'yes', 'on', 'TRUE', 'Yes', 'ON', ' 1 ']
 const DISABLING_VALUES = ['0', 'false', '', 'off', 'no', 'FALSE', 'Off', ' 0 ', 'maybe']
@@ -22,18 +29,32 @@ interface WebServer {
 }
 
 // Re-imports the config so its module-level env reads run again with the values under test.
-async function load_web_server(
+async function import_config(
 	ci: string | undefined,
 	flag: string | undefined,
-): Promise<WebServer> {
+): Promise<PlaywrightTestConfig> {
 	vi.stubEnv(CI_KEY, ci)
 	vi.stubEnv(REUSE_KEY, flag)
 	vi.resetModules()
 	const { default: config } = await import('#playwright-config')
-	const { webServer: web_server } = config
+
+	return config
+}
+
+async function load_web_server(
+	ci: string | undefined,
+	flag: string | undefined,
+): Promise<WebServer> {
+	const { webServer: web_server } = await import_config(ci, flag)
 	if (web_server === undefined || Array.isArray(web_server)) return {}
 
 	return web_server
+}
+
+async function load_max_failures(ci: string | undefined): Promise<number | undefined> {
+	const { maxFailures: max_failures } = await import_config(ci, undefined)
+
+	return max_failures
 }
 
 async function load_reuse_existing_server(
@@ -94,5 +115,29 @@ describe('playwright.config CI branch selection', () => {
 
 		expect(web_server.command).toBe(DEV_COMMAND)
 		expect(web_server.port).toBe(DEV_PORT)
+	})
+})
+
+// Regression guard for #782: Playwright does not restart a webServer that exits mid-run, so an
+// uncapped CI run turns the server's death into hundreds of identical ERR_CONNECTION_REFUSED
+// failures — six minutes of runner time, and a failure list in which the real event is invisible.
+describe('playwright.config CI failure cap', () => {
+	it.each(CI_VALUES)('caps the failure count in CI for CI=%j', async (value) => {
+		expect(await load_max_failures(value)).toBe(EXPECTED_MAX_FAILURES)
+	})
+
+	it.each(NOT_CI_VALUES)('leaves the run uncapped for CI=%j', async (value) => {
+		expect(await load_max_failures(value)).toBeUndefined()
+	})
+
+	it('leaves the run uncapped when CI is unset', async () => {
+		expect(await load_max_failures(undefined)).toBeUndefined()
+	})
+
+	it('keeps the cap high enough to report a real multi-test regression in full', async () => {
+		const max_failures = await load_max_failures(CI_ON)
+
+		expect(max_failures).toBeGreaterThanOrEqual(MIN_USEFUL_MAX_FAILURES)
+		expect(max_failures).toBeLessThanOrEqual(MAX_USEFUL_MAX_FAILURES)
 	})
 })
