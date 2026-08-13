@@ -208,6 +208,19 @@ jobs:
     # ホスト/ポートは playwright.config.ts の PREVIEW_PORT（4173）と一致させること。
     env:
       BETTER_AUTH_URL: http://localhost:4173
+      # A crashing preview worker prints nothing but an empty `✘ [ERROR]` to the job log;
+      # the stack trace goes to wrangler's debug log file, which defaults to the global
+      # config dir (/github/home/.config/.wrangler/logs) and dies with the runner. Point it
+      # inside the workspace so the upload below can reach it. Kept relative on purpose:
+      # `${{ github.workspace }}` resolves to the host path in a container job, which is not
+      # where the workspace is mounted. The preview server inherits the workspace as its cwd
+      # and upload-artifact resolves a relative path against the same directory, so a
+      # relative path is the one spelling both sides agree on, container or plain runner.
+      WRANGLER_LOG_PATH: e2e-web-server-logs/
+      # No WRANGLER_LOG bump: that variable gates console output only — the debug file
+      # records every level unconditionally. Sanitization (wrangler's own default) is
+      # pinned here so a repository-level opt-out cannot leak tokens into the artifact.
+      WRANGLER_LOG_SANITIZE: 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -281,6 +294,22 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 30
+
+      # Separate from playwright-report: that artifact explains which tests failed, this one
+      # explains why the server they talk to went away. Consumers whose preview script is not
+      # wrangler write nothing here, so a missing directory is ignored rather than fatal.
+      # cancelled() is part of the condition because a preview server that hangs instead of
+      # crashing burns the job's timeout, and GitHub cancels a timed-out job rather than
+      # failing it — the one case where a `failure()`-only step would skip the log that
+      # explains the hang.
+      - name: Upload web server log
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure() || cancelled()
+        with:
+          name: e2e-web-server-log
+          path: e2e-web-server-logs/
+          if-no-files-found: ignore
           retention-days: 30
 
   notify-auto-tag:
