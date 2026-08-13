@@ -23,15 +23,24 @@ type EnvConfig = {
 	reporter: ReporterDescription[]
 }
 
-// Set PLAYWRIGHT_REUSE_SERVER=1 when an orchestrator pre-builds and boots the preview so several
-// checks share one server: Playwright then reuses the running server and skips its webServer command
-// (no rebuild). Unset (default) keeps CI booting a fresh server and dev reusing, as before.
+const TRUTHY_FLAG_VALUES = new Set(['1', 'true', 'yes', 'on'])
+
+// Env vars are always strings, so `Boolean(value)` would enable the flag for '0' and 'false' too —
+// the two spellings someone reaches for to turn it off. Only affirmative spellings enable.
+function is_flag_enabled(value: string | undefined): boolean {
+	return value !== undefined && TRUTHY_FLAG_VALUES.has(value.trim().toLowerCase())
+}
+
+// Set PLAYWRIGHT_REUSE_SERVER=1 (or 'true' / 'yes' / 'on') when an orchestrator pre-builds and
+// boots the preview so several checks share one server: Playwright then reuses the running server
+// and skips its webServer command (no rebuild). Any other value — including '0', 'false', 'off',
+// empty and unset (default) — keeps CI booting a fresh server and dev reusing, as before.
 const web_server_config = IS_CI
 	? {
 			command: 'pnpm run build && pnpm run preview',
 			port: PREVIEW_PORT,
 			timeout: CI_TIMEOUT,
-			reuseExistingServer: Boolean(process.env['PLAYWRIGHT_REUSE_SERVER']),
+			reuseExistingServer: is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER']),
 		}
 	: { command: 'pnpm run dev', port: DEV_PORT, timeout: LOCAL_TIMEOUT, reuseExistingServer: true }
 

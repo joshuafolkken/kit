@@ -8,6 +8,8 @@
 		"allowJs": true
 	},
 	"include": [
+		"playwright.config.ts",
+		"playwright.config.test.ts",
 		"eslint/**/*.ts",
 		"prettier/**/*.d.ts",
 		"scripts/**/*.ts",
