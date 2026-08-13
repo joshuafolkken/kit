@@ -202,7 +202,17 @@ jobs:
       contents: read
       packages: read
     container: ${{ fromJSON(needs.playwright-image.outputs.container) }}
-    timeout-minutes: 10
+    # Derived, not guessed: a retried run costs setup + two attempts + the upload of the first
+    # attempt's evidence. The retry repeats the whole `Run E2E tests` step — Playwright's CI
+    # webServer builds the app before serving it, so the second attempt pays for the build again,
+    # not just the specs — while checkout/install/prepare are shared. Any suite that fit the old
+    # 10-minute budget had setup + one attempt <= 10, which bounds a single attempt at 10; the
+    # extra attempt therefore adds at most 10, and the evidence upload (a failed run keeps videos
+    # and traces, so it is not instant) is allowed 5 on top. Running out mid-retry would end the
+    # job as `cancelled`, withholding the release exactly like the crash this retry absorbs and
+    # truncating the uploads that would explain it, so the headroom is the point. The cost is that
+    # a hung preview server holds a runner for 25 minutes rather than 10 before the job is killed.
+    timeout-minutes: 25
     # Playwright preview は localhost:4173。ワークフロー共通の BETTER_AUTH_URL（本番）を
     # 引き継ぐと Better Auth が origin を拒否する（CI E2E では本番 URL は使わない）。
     # ホスト/ポートは playwright.config.ts の PREVIEW_PORT（4173）と一致させること。
@@ -221,6 +231,11 @@ jobs:
       # records every level unconditionally. Sanitization (wrangler's own default) is
       # pinned here so a repository-level opt-out cannot leak tokens into the artifact.
       WRANGLER_LOG_SANITIZE: 'true'
+      # Single source for "this run is allowed to retry": a push to the default branch, the only
+      # run whose failure withholds a release. Every step of the retry chain below reads this one
+      # flag, so the rule that permits a failure to be survived and the rule that acts on it
+      # cannot drift apart — a pull request run never enters the chain at all.
+      E2E_RETRY_ENABLED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -285,7 +300,85 @@ jobs:
         if: needs.playwright-image.outputs.should_install_browsers == 'true'
         run: ./node_modules/.bin/playwright install --with-deps
 
+      # Only a run allowed to retry may continue past a failure: a push to the default branch gates
+      # the auto-tag dispatch below, so one transient crash there withholds the release until a
+      # human notices and re-runs the job by hand (#783). A pull request run keeps failing on the
+      # first attempt — a red check there costs nothing but the re-run button.
       - name: Run E2E tests
+        id: e2e_tests
+        continue-on-error: ${{ env.E2E_RETRY_ENABLED == 'true' }}
+        run: pnpm exec playwright test
+
+      # The retry overwrites both output directories, so the first attempt's evidence is moved
+      # aside before it starts and uploaded under its own -attempt-1 names. This is what keeps a
+      # green retry honest: the crash it papered over stays fully diagnosable, which is why this
+      # retry could only land after the web server log was being captured at all (#781).
+      # Every step from here to the retry carries the same condition, and each part of it is
+      # load-bearing. !cancelled() rather than the implicit success(): a bare outcome check is
+      # ANDed with success(), so a hiccup in one of these steps would skip the rest — including
+      # the retry, withholding the release over the diagnostics — while a superseded run being
+      # cancelled by the concurrency group above should not start a second suite. The retry flag
+      # keeps a pull request out of the chain entirely: nothing is renamed there, so the report
+      # and log the run publishes stay the ones its single attempt produced.
+      #
+      # This step never fails the job: it exists to save evidence, and a move that does not happen
+      # is announced instead, because the retry below will overwrite what was left behind.
+      - name: Preserve first attempt output
+        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        run: |
+          # Announced, not just archived: a retry that passes leaves a green job, and without an
+          # annotation a test failing half the time would ship release after release with nothing
+          # on the run to read. Worded so it stays true whether or not the attempt got as far as
+          # writing a report — it points at the naming convention, never at a specific artifact.
+          echo "::warning::The first E2E attempt failed and is being retried; whatever output it produced is attached to this run under the -attempt-1 artifact names."
+
+          for dir in playwright-report "${WRANGLER_LOG_PATH%/}"; do
+            if [ -d "${dir}" ] && ! mv "${dir}" "${dir}-attempt-1"; then
+              echo "::warning::Could not set ${dir} aside; the retry will overwrite the first attempt's copy."
+            fi
+          done
+
+      # continue-on-error for the same reason the move above never fails: collecting evidence must
+      # not be what decides the release. Without it a transient artifact-service error here would
+      # end the job red even after the retry passed — withholding the tag exactly as the crash
+      # did. if-no-files-found: ignore covers the directory the move could not rename, and the
+      # consumer whose preview script is not wrangler and writes no log at all.
+      - name: Upload first attempt test results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        continue-on-error: true
+        with:
+          name: playwright-report-attempt-1
+          path: playwright-report-attempt-1/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload first attempt web server log
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        continue-on-error: true
+        with:
+          name: e2e-web-server-log-attempt-1
+          path: e2e-web-server-logs-attempt-1/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # One retry, and only after a failure — a green run never starts this step and pays nothing.
+      # It is deliberately unconditional rather than keyed to a "whole suite is down" signature:
+      # any such rule has to be re-derived from reporter output whenever Playwright changes it and
+      # silently stops retrying the day it drifts, which is the failure mode that is hardest to
+      # notice. The price of the simpler rule is that a genuinely broken suite on the default
+      # branch costs one extra E2E run before it reports red, and that a real failure which
+      # happens to pass on the second attempt is reported green — the -attempt-1 artifacts above
+      # are what make that second case recoverable rather than invisible.
+      #
+      # Known limit: nothing frees the preview port between attempts. A first attempt whose server
+      # died releases it, which is the case this retry targets; a server that survived as an
+      # orphan holding the port makes the retry stop at "port already used" instead. That is a
+      # loud, diagnosable failure, and killing by port would need tooling the container image does
+      # not guarantee and a guess at which process a consumer's preview script actually started.
+      - name: Retry E2E tests
+        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
         run: pnpm exec playwright test
 
       - name: Upload test results

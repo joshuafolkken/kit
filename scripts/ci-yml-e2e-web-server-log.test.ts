@@ -1,29 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
+import { ci_yml_fixture } from './ci-yml-fixture'
 
-const E2E_JOB = 'e2e'
-const LOG_PATH_VARIABLE = 'WRANGLER_LOG_PATH'
 const SANITIZE_VARIABLE = 'WRANGLER_LOG_SANITIZE'
 const UPLOAD_CONDITION = 'failure() || cancelled()'
 const EXPRESSION_MARKER = '${{'
-const REPORT_ARTIFACT = 'playwright-report'
-const LOG_ARTIFACT = 'e2e-web-server-log'
 
-const NAME_INPUT = 'name'
-const PATH_INPUT = 'path'
-const MISSING_FILES_INPUT = 'if-no-files-found'
-const RETENTION_INPUT = 'retention-days'
+const {
+	upload_input,
+	find_upload,
+	UPLOAD_NAME_INPUT: NAME_INPUT,
+	UPLOAD_PATH_INPUT: PATH_INPUT,
+	UPLOAD_MISSING_FILES_INPUT: MISSING_FILES_INPUT,
+	UPLOAD_RETENTION_INPUT: RETENTION_INPUT,
+	REPORT_ARTIFACT,
+	LOG_ARTIFACT,
+} = ci_yml_fixture
 
-function upload_input(step: WorkflowStep | undefined, key: string): string | number | undefined {
-	return step?.with?.[key]
-}
-
-function find_upload(job: WorkflowJob | undefined, artifact: string): WorkflowStep | undefined {
-	return job?.steps?.find((step) => upload_input(step, NAME_INPUT) === artifact)
-}
-
-const e2e_job = ci_yml_fixture.find_job(ci_yml_fixture.TEMPLATE_CI_YML, E2E_JOB)
-const log_directory = e2e_job?.env?.[LOG_PATH_VARIABLE] ?? ''
+const e2e_job = ci_yml_fixture.e2e_template_job()
+const log_directory = ci_yml_fixture.e2e_log_directory(e2e_job)
 const upload_step = find_upload(e2e_job, LOG_ARTIFACT)
 const report_step = find_upload(e2e_job, REPORT_ARTIFACT)
 

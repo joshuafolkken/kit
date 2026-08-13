@@ -2,6 +2,10 @@ import { readFileSync } from 'node:fs'
 import { load } from 'js-yaml'
 import { package_path } from './init/init-paths'
 
+// GitHub spells some workflow keys in kebab-case. They are declared verbatim — with the naming
+// rule disabled on the line, as elsewhere for external field names — rather than reached through
+// an index signature, which would silently turn every misspelled key in these guards into
+// `undefined` and make a `toBeUndefined()` assertion pass without testing anything.
 interface WorkflowStep {
 	id?: string
 	name?: string
@@ -9,6 +13,8 @@ interface WorkflowStep {
 	run?: string
 	uses?: string
 	with?: Record<string, string | number>
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
+	'continue-on-error'?: string | boolean
 }
 
 interface WorkflowJob {
@@ -16,6 +22,8 @@ interface WorkflowJob {
 	env?: Record<string, string>
 	outputs?: Record<string, string>
 	steps?: ReadonlyArray<WorkflowStep>
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
+	'timeout-minutes'?: number
 }
 
 interface Workflow {
@@ -41,12 +49,64 @@ function find_job(relative_path: string, job_name: string): WorkflowJob | undefi
 	return load_workflow(relative_path).jobs[job_name]
 }
 
+// upload-artifact input keys. Shared because every guard that asserts on an artifact reaches for
+// the same four, and a step is identified by the artifact name it publishes rather than by index.
+const UPLOAD_NAME_INPUT = 'name'
+const UPLOAD_PATH_INPUT = 'path'
+const UPLOAD_MISSING_FILES_INPUT = 'if-no-files-found'
+const UPLOAD_RETENTION_INPUT = 'retention-days'
+
+function upload_input(step: WorkflowStep | undefined, key: string): string | number | undefined {
+	return step?.with?.[key]
+}
+
+function find_upload(job: WorkflowJob | undefined, artifact: string): WorkflowStep | undefined {
+	return job?.steps?.find((step) => upload_input(step, UPLOAD_NAME_INPUT) === artifact)
+}
+
+function job_timeout_minutes(job: WorkflowJob | undefined): number | undefined {
+	return job?.['timeout-minutes']
+}
+
+function step_continue_on_error(step: WorkflowStep | undefined): string | boolean | undefined {
+	return step?.['continue-on-error']
+}
+
+// The e2e job and the two artifacts it publishes. Named here rather than in each guard so the two
+// suites that assert on them cannot drift apart: a stale copy of a name silently turns every
+// lookup into `undefined`, and the assertions built on it keep passing while testing nothing.
+const E2E_JOB = 'e2e'
+const LOG_PATH_VARIABLE = 'WRANGLER_LOG_PATH'
+const REPORT_ARTIFACT = 'playwright-report'
+const LOG_ARTIFACT = 'e2e-web-server-log'
+
+function e2e_template_job(): WorkflowJob | undefined {
+	return find_job(TEMPLATE_CI_YML, E2E_JOB)
+}
+
+function e2e_log_directory(job: WorkflowJob | undefined): string {
+	return job?.env?.[LOG_PATH_VARIABLE] ?? ''
+}
+
 const ci_yml_fixture = {
 	TEMPLATE_CI_YML,
 	RUNTIME_CI_YML,
+	UPLOAD_NAME_INPUT,
+	UPLOAD_PATH_INPUT,
+	UPLOAD_MISSING_FILES_INPUT,
+	UPLOAD_RETENTION_INPUT,
+	LOG_PATH_VARIABLE,
+	REPORT_ARTIFACT,
+	LOG_ARTIFACT,
 	read_workflow,
 	load_workflow,
 	find_job,
+	upload_input,
+	find_upload,
+	job_timeout_minutes,
+	step_continue_on_error,
+	e2e_template_job,
+	e2e_log_directory,
 }
 
 export { ci_yml_fixture }
