@@ -10,19 +10,19 @@ pnpm josh init
 
 Each file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
 
-| File                      | If missing                                                                                            | If exists                                                                                                                             |
-| ------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `.gitignore`              | Created from `templates/gitignore`                                                                    | Union-merged: missing kit patterns appended, consumer-local entries kept                                                              |
-| `.npmrc`                  | Created with registry, engine-strict, minimum-release-age                                             | Missing lines appended; existing lines kept verbatim, including a GitHub Packages `_authToken` line                                   |
-| `eslint.config.js`        | Created with `create_vanilla_config`                                                                  | Sample shown — add manually                                                                                                           |
-| `prettier.config.js`      | Created with shared config                                                                            | Sample shown — add manually                                                                                                           |
-| `playwright.config.ts`    | Created with `create_playwright_config`                                                               | Sample shown — add manually                                                                                                           |
-| `tsconfig.json`           | Created with `extends` pointing to the preset and `exclude` covering the generated-output directories | Preset entry prepended to `extends` array; missing `exclude` entries appended                                                         |
-| `cspell.config.yaml`      | Created with `import` pointing to the shared word list                                                | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import)                     |
-| `lefthook.yml`            | Created with `extends` pointing to the preset                                                         | Preset entry added under `extends:` key                                                                                               |
-| `.secretlintrc.json`      | Created enabling the recommend rule preset                                                            | Left untouched — the rule list is project-owned once it exists                                                                        |
-| `.vscode/extensions.json` | Created from package template                                                                         | Missing recommendations merged in                                                                                                     |
-| `.vscode/settings.json`   | Created from package template                                                                         | Missing keys merged in; a key the project already owns gains kit's missing entries when both values are objects (project entries win) |
+| File                      | If missing                                                                                                                            | If exists                                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `.gitignore`              | Created from `templates/gitignore`                                                                                                    | Union-merged: missing kit patterns appended, consumer-local entries kept                                                              |
+| `.npmrc`                  | Created with registry, engine-strict, minimum-release-age                                                                             | Missing lines appended; existing lines kept verbatim, including a GitHub Packages `_authToken` line                                   |
+| `eslint.config.js`        | Created with `create_vanilla_config`                                                                                                  | Sample shown — add manually                                                                                                           |
+| `prettier.config.js`      | Created with shared config                                                                                                            | Sample shown — add manually                                                                                                           |
+| `playwright.config.ts`    | Created with `create_playwright_config`                                                                                               | Sample shown — add manually                                                                                                           |
+| `tsconfig.json`           | Created with `extends` pointing to the preset and `exclude` covering the generated-output directories plus SvelteKit's own exclusions | Preset entry prepended to `extends` array; missing `exclude` entries appended                                                         |
+| `cspell.config.yaml`      | Created with `import` pointing to the shared word list                                                                                | Import entry added under `import:` key (skipped when superseded by a transitive import, e.g. the game-kit import)                     |
+| `lefthook.yml`            | Created with `extends` pointing to the preset                                                                                         | Preset entry added under `extends:` key                                                                                               |
+| `.secretlintrc.json`      | Created enabling the recommend rule preset                                                                                            | Left untouched — the rule list is project-owned once it exists                                                                        |
+| `.vscode/extensions.json` | Created from package template                                                                                                         | Missing recommendations merged in                                                                                                     |
+| `.vscode/settings.json`   | Created from package template                                                                                                         | Missing keys merged in; a key the project already owns gains kit's missing entries when both values are objects (project entries win) |
 
 > Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
 
@@ -40,15 +40,35 @@ The preset is **prepended** to the `extends` array so it does not override proje
 
 ### tsconfig exclude
 
-The generated `tsconfig.json` also carries an `exclude` list covering the directories the kit-distributed configs generate:
+The generated `tsconfig.json` also carries an `exclude` list covering the directories the kit-distributed configs generate, plus the exclusions SvelteKit's own generated config contributes:
 
-```jsonc
-{ "exclude": ["node_modules", "build", "dist", "playwright-report", "test-results"] }
+```json
+{
+	"exclude": [
+		"node_modules",
+		"build",
+		"dist",
+		"playwright-report",
+		"test-results",
+		"src/service-worker.js",
+		"src/service-worker/**/*.js",
+		"src/service-worker.ts",
+		"src/service-worker/**/*.ts",
+		"src/service-worker.d.ts",
+		"src/service-worker/**/*.d.ts"
+	]
+}
 ```
 
 `playwright.config.ts` points the `html` reporter at `playwright-report/`, which holds Playwright's own minified trace-viewer bundle. Without the exclusion, a project whose `include` is broad (`"./**/*.ts"`, `"./**/*.js"` — the natural SvelteKit shape) type-checks that bundle and `tsc --noEmit` reports thousands of errors from third-party output, but only on a machine that has run the E2E suite. The two directories stay separate because Playwright refuses an HTML output folder nested inside the tests output folder (and vice versa), so both are listed.
 
 These entries have to live in the **consumer** file: a `tsconfig.json` `exclude` **overrides** the extended preset's rather than merging with it, so shipping them in `base.json` — or in app-kit's `tsconfig/sveltekit.json` — would have no effect on any project that declares its own. On an existing file the list is union-merged, so an entry you added is kept and re-running is a no-op. Note that declaring `exclude` also turns off TypeScript's implicit exclusion of `outDir`; a project with a custom `outDir` outside `build` / `dist` should add it to the list.
+
+The `src/service-worker*` globs are there because that same override rule cuts the other way. A SvelteKit project extends `./.svelte-kit/tsconfig.json`, which excludes those paths itself — SvelteKit keeps the service worker out of the app program deliberately, since it runs in a worker context with its own `lib` (`WebWorker`, not `DOM`) and its own generated `$service-worker` ambient types, so type-checking it under the app config produces errors with no correct fix from inside that config. The moment kit writes any `exclude` key, the generated config's array is replaced outright and all six are discarded. Repeating them makes kit's list additive rather than replacing. SvelteKit's remaining entry, `../node_modules/**`, is already covered by `node_modules`. See [kit#796](https://github.com/joshuafolkken/kit/issues/796).
+
+They are written unconditionally — kit does not detect SvelteKit, and at `josh init` time the generated config does not exist yet to be read. In a non-SvelteKit project the paths usually match nothing. If yours does keep its own `src/service-worker.ts`, note that it is a program root nothing imports, so excluding it drops it from `tsc --noEmit`, and a re-sync re-adds the globs if you delete them. Give that file its own `tsconfig` — worker code wants `lib: ["WebWorker"]` rather than the app's `DOM` in any case.
+
+They are also the **default** paths only. If you moved the worker with `kit.files.serviceWorker` in `svelte.config.js`, these globs match nothing and SvelteKit's real exclusion is still replaced — add your own path to `exclude` yourself. The merge only appends, so a hand-added entry survives every later sync.
 
 ### eslint.config.js / prettier.config.js / playwright.config.ts
 

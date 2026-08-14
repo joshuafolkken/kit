@@ -1,17 +1,6 @@
-import prettier from 'prettier'
 import { describe, expect, it } from 'vitest'
 import { json_format } from './json-format'
-
-// The kit prettier preset's JSON-relevant options (printWidth 100, tabs); declared inline to avoid
-// a restricted parent-directory import of the preset itself.
-const PRETTIER_JSON_OPTIONS = { parser: 'json', printWidth: 100, useTabs: true } as const
-
-// The one behavior that must match prettier: a short primitive array stays on one line, while a
-// long one (or one holding a nested structure) breaks. Rather than re-assert prettier's algorithm
-// by hand, the final case formats our output through real prettier and asserts it is a fixed point.
-async function prettier_json(content: string): Promise<string> {
-	return await prettier.format(content, PRETTIER_JSON_OPTIONS)
-}
+import { prettier_format_json } from './prettier-json-fixture'
 
 describe('json_format.format_json — prettier-compatible arrays', () => {
 	it('keeps a short primitive array inline', () => {
@@ -55,6 +44,9 @@ describe('json_format.format_json — prettier-compatible arrays', () => {
 	})
 })
 
+// The one behavior that must match prettier: a short primitive array stays on one line, while a
+// long one (or one holding a nested structure) breaks. Rather than re-assert prettier's algorithm
+// by hand, this case formats our output through real prettier and asserts it is a fixed point.
 describe('json_format.format_json — matches real prettier', () => {
 	it('is a prettier fixed point across mixed array shapes', async () => {
 		const value = {
@@ -69,6 +61,6 @@ describe('json_format.format_json — matches real prettier', () => {
 		}
 		const formatted = json_format.format_json(value)
 
-		expect(formatted).toBe(await prettier_json(formatted))
+		expect(await prettier_format_json(formatted)).toBe(formatted)
 	})
 })

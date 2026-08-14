@@ -117,12 +117,48 @@ const TSCONFIG_EXCLUDE_FIELD = 'exclude'
 // in the tests output folder, and vice versa), so both are excluded rather than consolidated. These
 // belong in the CONSUMER file: a consumer `exclude` overrides the extended preset's instead of merging
 // with it, so shipping them only in a preset would have no effect. See joshuafolkken/kit#712.
-const TSCONFIG_EXCLUDE: ReadonlyArray<string> = [
+const TSCONFIG_GENERATED_OUTPUT_EXCLUDE: ReadonlyArray<string> = [
 	'node_modules',
 	'build',
 	'dist',
 	'playwright-report',
 	'test-results',
+]
+
+// The service-worker globs `.svelte-kit/tsconfig.json` excludes, rewritten relative to the consumer
+// root (SvelteKit writes them `../`-prefixed from inside `.svelte-kit/`). They must be repeated here
+// for the same reason the entries above live in the consumer file, read in the other direction: a
+// consumer `exclude` REPLACES the extended config's array rather than merging with it, so the moment
+// kit writes any `exclude` key, every one of SvelteKit's own exclusions is discarded. SvelteKit keeps
+// the service worker out of the app program deliberately — it runs in a worker context with its own
+// `lib` (`WebWorker`, not `DOM`) and its own generated `$service-worker` ambient types, so
+// type-checking it under the app config produces errors with no correct fix from inside that config.
+// Carrying them forward makes kit's array additive. They are written unconditionally: these are pure
+// string transforms with no view of the project, kit has no SvelteKit detection anywhere, and at
+// `josh init` time the generated config does not exist yet to be read. The cost lands on a
+// NON-SvelteKit consumer that keeps its own `src/service-worker.ts` — a program root nothing imports,
+// so excluding it drops it from `tsc --noEmit`, and a re-sync re-adds the globs if they are deleted.
+// Such a project needs a separate tsconfig for that file regardless, since worker code wants
+// `lib: WebWorker` rather than the app's `DOM`. `../node_modules/**` is the one entry not repeated —
+// `node_modules` above already covers it.
+//
+// Limit: these are the DEFAULT paths. A project that moves the worker with `kit.files.serviceWorker`
+// in `svelte.config.js` gets globs that match nothing, and its real exclusion is still replaced — the
+// #796 failure, unfixed for that shape. Covering it means reading `svelte.config.js`, which is the
+// same project detection kit does not have; such a project should add its own path to `exclude`
+// (the merge appends, so a hand-added entry survives). See joshuafolkken/kit#796.
+const TSCONFIG_SVELTEKIT_EXCLUDE: ReadonlyArray<string> = [
+	'src/service-worker.js',
+	'src/service-worker/**/*.js',
+	'src/service-worker.ts',
+	'src/service-worker/**/*.ts',
+	'src/service-worker.d.ts',
+	'src/service-worker/**/*.d.ts',
+]
+
+const TSCONFIG_EXCLUDE: ReadonlyArray<string> = [
+	...TSCONFIG_GENERATED_OUTPUT_EXCLUDE,
+	...TSCONFIG_SVELTEKIT_EXCLUDE,
 ]
 
 // extensions.json is distributed in common across project styles, so it is not keyed by type.
@@ -157,8 +193,9 @@ const PRETTIER_PLUGIN_DEV_DEPS: Record<string, string> = {
 	[PRETTIER_TAILWIND_PLUGIN_KEY]: '^0.8.0',
 }
 
-// format_json rather than JSON.stringify: the `exclude` array fits on one line, and that is how
-// prettier emits it — a multi-line array would fail `prettier --check` in the consumer (#660).
+// format_json rather than JSON.stringify: it lays arrays out the way prettier does — inline while
+// they fit within printWidth, one element per line once they do not — so the file kit writes is
+// `prettier --check`-clean in the consumer whatever the entry count happens to be (#660).
 function generate_tsconfig(): string {
 	return json_format.format_json({
 		extends: TSCONFIG_EXTENDS,

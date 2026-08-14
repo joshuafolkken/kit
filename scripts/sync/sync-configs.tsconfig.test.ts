@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { prettier_format_json } from '#scripts/config-merge/prettier-json-fixture'
 import { init_logic } from '#scripts/init/init-logic'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync_configs } from './sync-configs'
@@ -114,18 +115,21 @@ const PLAYWRIGHT_REPORT_DIR = 'playwright-report'
 const CONSUMER_ONLY_EXCLUDE = 'legacy-vendor'
 
 describe('sync_configs.sync_tsconfig — prettier-clean serialization', () => {
-	// When sync rewrites the file, a short `exclude` must stay on one line so the emitted tsconfig
-	// is prettier-clean (#660) — JSON.stringify would otherwise expand it multi-line.
-	it('keeps a short exclude inline after stripping a redundant option', () => {
+	// A file sync rewrites must come back prettier-clean, or the consumer's own `prettier --check`
+	// fails on a file they never touched (#660). Assert that directly against real prettier rather
+	// than against the layout a particular entry count produces — the `exclude` array outgrew one
+	// line when the SvelteKit exclusions joined it (#796), and the intent did not change with it.
+	it('rewrites a file real prettier leaves unchanged after stripping a redundant option', async () => {
 		const content = `${JSON.stringify({
 			extends: [ENTRY],
 			compilerOptions: { strict: true },
 			exclude: KIT_EXCLUDE,
 		})}\n`
 		const result = sync_and_read(content)
+		const written = readFileSync(TSCONFIG_DEST, 'utf8')
 
 		expect(result).toStrictEqual({ extends: [ENTRY], exclude: KIT_EXCLUDE })
-		expect(readFileSync(TSCONFIG_DEST, 'utf8')).toContain(`"exclude": ["${KIT_EXCLUDE[0] ?? ''}",`)
+		expect(await prettier_format_json(written)).toBe(written)
 	})
 })
 
