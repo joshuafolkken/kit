@@ -10,6 +10,7 @@ interface WorkflowStep {
 	id?: string
 	name?: string
 	if?: string
+	env?: Record<string, string>
 	run?: string
 	uses?: string
 	with?: Record<string, string | number>
@@ -27,6 +28,7 @@ interface WorkflowJob {
 }
 
 interface Workflow {
+	env?: Record<string, string>
 	jobs: Record<string, WorkflowJob>
 }
 

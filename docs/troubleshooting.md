@@ -110,16 +110,30 @@ If pnpm is older than 11, upgrade via Corepack: `corepack prepare pnpm@latest --
 
 ## CI warns that the Playwright image could not be resolved
 
-The `checks` and `e2e` jobs normally run inside `mcr.microsoft.com/playwright:v<version>-noble`, derived from the `@playwright/test` version in your manifest. Microsoft publishes that image days after the npm release, so right after a Playwright bump the tag may not exist yet.
+The `checks` and `e2e` jobs normally run inside `mcr.microsoft.com/playwright:v<version>-noble`, derived from the `@playwright/test` version in your manifest — read from `devDependencies` or `dependencies`, whichever declares it. Microsoft publishes that image days after the npm release, so right after a Playwright bump the tag may not exist yet.
 
 When the tag is missing, the workflow does **not** fail. The `Resolve Playwright image` job logs a warning like:
 
 ```text
 Playwright image mcr.microsoft.com/playwright:v1.62.0-noble could not be resolved on MCR (HTTP 404).
-Running on the plain runner and installing browsers with 'playwright install --with-deps' instead.
+Running on the plain runner and installing chromium instead (set the JOSH_PLAYWRIGHT_BROWSERS repository variable to change the list).
 ```
 
 Both jobs then run on `ubuntu-latest` and download browsers themselves, which adds roughly two minutes but always matches the installed Playwright exactly. No action is required — the warning disappears on its own once the image is published. Do **not** pin `@playwright/test` back to make it go away.
+
+### Widening the fallback browser list
+
+The fallback downloads `chromium` only. A bare `playwright install` would fetch chromium, firefox and webkit plus ffmpeg — roughly 1 GB — and the `checks` job runs under an 8-minute timeout, so the download alone can turn a recoverable image lag into a red build. A single chromium project is what kit scaffolds, so that is the default.
+
+If your `playwright.config.ts` (or a Vitest browser-mode project) drives more than chromium, set a **repository variable** named `JOSH_PLAYWRIGHT_BROWSERS` to a space-separated list:
+
+```text
+JOSH_PLAYWRIGHT_BROWSERS = chromium firefox webkit
+```
+
+Set it under _Settings → Secrets and variables → Actions → Variables_. Use the variable rather than editing the workflow: the CI workflow is managed by `josh sync` and a local edit is overwritten on the next sync.
+
+Names are Playwright's own and are lowercase — `chromium`, `firefox`, `webkit`, `chromium-headless-shell`. Only letters, dashes and the spaces between them are passed through; anything else is stripped before the command runs, and a value left with no usable name falls back to `chromium`. A misspelled name is _not_ silently dropped: it reaches Playwright and the install step fails naming the value, so the mistake surfaces where it was made rather than later as a missing browser executable. The `Resolve Playwright image` job logs the list it settled on, so the run always says which browsers it installed. The container path ignores the variable entirely — the image already ships every browser it needs.
 
 ## Local E2E aborts with "http://localhost:5173 is already used"
 
