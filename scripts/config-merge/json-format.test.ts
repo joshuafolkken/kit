@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { json_format } from './json-format'
-import { prettier_format_json } from './prettier-json-fixture'
+import { prettier_format_json, prettier_format_package_json } from './prettier-json-fixture'
 
 describe('json_format.format_json — prettier-compatible arrays', () => {
 	it('keeps a short primitive array inline', () => {
@@ -62,5 +62,37 @@ describe('json_format.format_json — matches real prettier', () => {
 		const formatted = json_format.format_json(value)
 
 		expect(await prettier_format_json(formatted)).toBe(formatted)
+	})
+})
+
+// prettier picks `json-stringify` for package.json from the filename alone, and that printer never
+// inlines an array — so `format_json`'s inlining, correct for every other managed config, produced a
+// file the consumer's own `prettier --check` rejected (#797).
+describe('json_format.format_package_json — matches real prettier', () => {
+	const PACKAGE_VALUE = {
+		name: 'demo',
+		version: '1.0.0',
+		keywords: ['cli', 'tool'],
+		files: ['dist'],
+		scripts: { build: 'tsc' },
+	}
+
+	it('leaves a short array expanded rather than inlining it', () => {
+		const result = json_format.format_package_json(PACKAGE_VALUE)
+
+		expect(result).toContain('"keywords": [\n\t\t"cli",\n\t\t"tool"\n\t]')
+	})
+
+	it('is a prettier fixed point for a package.json', async () => {
+		const formatted = json_format.format_package_json(PACKAGE_VALUE)
+
+		expect(await prettier_format_package_json(formatted)).toBe(formatted)
+	})
+
+	// The regression this replaced: the same value through the general serializer is NOT clean.
+	it('differs from format_json, which prettier rejects for this filename', async () => {
+		const inlined = json_format.format_json(PACKAGE_VALUE)
+
+		expect(await prettier_format_package_json(inlined)).not.toBe(inlined)
 	})
 })
