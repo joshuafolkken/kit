@@ -12,8 +12,17 @@ const E2E_JOB = 'e2e'
 const RESOLVE_STEP_ID = 'resolve'
 const CONTAINER_EXPRESSION = '${{ fromJSON(needs.playwright-image.outputs.container) }}'
 const INSTALL_GUARD = "needs.playwright-image.outputs.should_install_browsers == 'true'"
-const BROWSER_INSTALL_RUN = './node_modules/.bin/playwright install --with-deps'
-const UNIT_TEST_RUN = 'pnpm josh test:unit'
+// The install step is identified by its name rather than by its `run` body: the body carries the
+// browser-list handling now, so matching on it would turn every future edit there into a silent
+// `undefined` step and let the assertions below pass without testing anything.
+const BROWSER_INSTALL_STEP = 'Install Playwright browsers'
+const BROWSER_LIST_VARIABLE = 'JOSH_PLAYWRIGHT_BROWSERS'
+const BROWSER_STEP_VARIABLE = 'PLAYWRIGHT_BROWSERS'
+const BROWSER_LIST_EXPRESSION = '${{ needs.playwright-image.outputs.browsers }}'
+const BROWSER_ARGUMENT = './node_modules/.bin/playwright install --with-deps ${PLAYWRIGHT_BROWSERS}'
+const BROWSER_SANITIZER = "tr -cd 'A-Za-z -'"
+const BROWSER_FALLBACK = '[ "$#" -gt 0 ] || set -- chromium'
+const UNIT_TEST_STEP = 'Run unit tests'
 const MANIFEST_PROBE_URL = 'https://mcr.microsoft.com/v2/playwright/manifests/'
 const VERSION_SANITIZER = "tr -cd 'A-Za-z0-9.-'"
 const NO_CONTAINER_OUTPUT = 'container=null'
@@ -26,14 +35,32 @@ function find_step(
 	return job?.steps?.find((step) => should_match(step))
 }
 
+function find_browser_install(job: WorkflowJob | undefined): WorkflowStep | undefined {
+	return find_step(job, (step) => step.name === BROWSER_INSTALL_STEP)
+}
+
+function resolve_run_of(relative_path: string): string {
+	const resolve_job = ci_yml_fixture.find_job(relative_path, RESOLVE_JOB)
+
+	return find_step(resolve_job, (step) => step.id === RESOLVE_STEP_ID)?.run ?? ''
+}
+
+// Shared by the checks and e2e guards: both jobs install browsers on the fallback path, and the
+// point of the fix is that neither may fall back to Playwright's install-everything default.
+function expect_named_browser_install(step: WorkflowStep | undefined): void {
+	expect(step?.env?.[BROWSER_STEP_VARIABLE]).toBe(BROWSER_LIST_EXPRESSION)
+	expect(step?.run).toContain(BROWSER_ARGUMENT)
+}
+
 describe.each(WORKFLOW_PATHS)('%s — Playwright image resolution', (relative_path) => {
 	const resolve_job = ci_yml_fixture.find_job(relative_path, RESOLVE_JOB)
-	const resolve_run = find_step(resolve_job, (step) => step.id === RESOLVE_STEP_ID)?.run ?? ''
+	const resolve_run = resolve_run_of(relative_path)
 
 	it('exposes a container object and an install flag instead of a bare image tag', () => {
 		expect(resolve_job?.outputs).toMatchObject({
 			container: '${{ steps.resolve.outputs.container }}',
 			should_install_browsers: '${{ steps.resolve.outputs.should_install_browsers }}',
+			browsers: '${{ steps.resolve.outputs.browsers }}',
 		})
 		expect(resolve_job?.outputs).not.toHaveProperty('image')
 	})
@@ -63,6 +90,29 @@ describe.each(WORKFLOW_PATHS)('%s — Playwright image resolution', (relative_pa
 	})
 })
 
+// The browser list is whitelisted in the resolve job rather than in each install step, so one
+// place decides both what gets downloaded and what may reach a command line.
+describe.each(WORKFLOW_PATHS)('%s — browser list sanitization', (relative_path) => {
+	const resolve_run = resolve_run_of(relative_path)
+
+	it('sanitizes the browser list before it can reach an install command line', () => {
+		expect(resolve_run).toContain(BROWSER_SANITIZER)
+		expect(resolve_run).toContain('echo "browsers=${browsers}" >> "$GITHUB_OUTPUT"')
+	})
+
+	it('never emits an empty browser list, which would install every browser', () => {
+		expect(resolve_run).toContain(BROWSER_FALLBACK)
+	})
+
+	it('lets a consumer widen the list without editing the distributed workflow', () => {
+		const workflow = ci_yml_fixture.load_workflow(relative_path)
+
+		expect(workflow.env?.[BROWSER_LIST_VARIABLE]).toBe(
+			`\${{ vars.${BROWSER_LIST_VARIABLE} || 'chromium' }}`,
+		)
+	})
+})
+
 describe.each(WORKFLOW_PATHS)('%s — e2e job container fallback', (relative_path) => {
 	const e2e_job = ci_yml_fixture.find_job(relative_path, E2E_JOB)
 
@@ -71,10 +121,26 @@ describe.each(WORKFLOW_PATHS)('%s — e2e job container fallback', (relative_pat
 	})
 
 	it('installs browsers only when the resolve job says the image was unavailable', () => {
-		const install_step = find_step(e2e_job, (step) => step.run === BROWSER_INSTALL_RUN)
+		const install_step = find_browser_install(e2e_job)
 
 		expect(install_step).toBeDefined()
 		expect(install_step?.if).toBe(INSTALL_GUARD)
+	})
+
+	it('names the browsers so the fallback never downloads all three plus ffmpeg', () => {
+		expect_named_browser_install(find_browser_install(e2e_job))
+	})
+})
+
+// The template resolves the version from package.json; kit's own runtime workflow reads the
+// lockfile, because @playwright/test reaches this repository transitively and is declared in
+// neither manifest block.
+describe('templates/workflows/ci.yml — Playwright dependency detection', () => {
+	const resolve_run = resolve_run_of(ci_yml_fixture.TEMPLATE_CI_YML)
+
+	it('reads both manifest blocks so a runtime dependency still gets browsers', () => {
+		expect(resolve_run).toContain("manifest.devDependencies?.['@playwright/test']")
+		expect(resolve_run).toContain("manifest.dependencies?.['@playwright/test']")
 	})
 })
 
@@ -88,13 +154,16 @@ describe('templates/workflows/ci.yml — containerized checks job', () => {
 	})
 
 	it('installs browsers before the unit tests so browser-mode projects still run', () => {
-		const step_names = checks_job?.steps?.map((step) => step.run) ?? []
-		const install_index = step_names.indexOf(BROWSER_INSTALL_RUN)
-		const unit_index = step_names.indexOf(UNIT_TEST_RUN)
-		const install_step = find_step(checks_job, (step) => step.run === BROWSER_INSTALL_RUN)
+		const step_names = checks_job?.steps?.map((step) => step.name) ?? []
+		const install_index = step_names.indexOf(BROWSER_INSTALL_STEP)
+		const unit_index = step_names.indexOf(UNIT_TEST_STEP)
 
-		expect(install_step?.if).toBe(INSTALL_GUARD)
+		expect(find_browser_install(checks_job)?.if).toBe(INSTALL_GUARD)
 		expect(install_index).toBeGreaterThanOrEqual(0)
 		expect(install_index).toBeLessThan(unit_index)
+	})
+
+	it('names the browsers so the 8-minute budget is not spent on unused ones', () => {
+		expect_named_browser_install(find_browser_install(checks_job))
 	})
 })

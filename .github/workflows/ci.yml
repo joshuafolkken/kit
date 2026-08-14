@@ -11,6 +11,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Which browsers the plain-runner fallback downloads when the MCR image could not be resolved.
+# chromium is the default because that is the single project this repository's config declares;
+# set the JOSH_PLAYWRIGHT_BROWSERS repository variable to a space-separated list to widen it.
+env:
+  JOSH_PLAYWRIGHT_BROWSERS: ${{ vars.JOSH_PLAYWRIGHT_BROWSERS || 'chromium' }}
+
 jobs:
   playwright-image:
     name: Resolve Playwright image
@@ -25,6 +31,9 @@ jobs:
       # 'true' only when Playwright is a dependency but its image is unavailable, i.e.
       # exactly when a job must download browsers itself.
       should_install_browsers: ${{ steps.resolve.outputs.should_install_browsers }}
+      # The browser names the e2e job passes to `playwright install`, sanitized here so one
+      # place decides both the list and what may reach a command line.
+      browsers: ${{ steps.resolve.outputs.browsers }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,6 +47,18 @@ jobs:
           # Whitelist the characters: the value lands in $GITHUB_OUTPUT as JSON, so a
           # newline or quote smuggled into the lockfile could forge an extra output line.
           version=$(grep -m1 "'@playwright/test@" pnpm-lock.yaml | sed "s/.*'@playwright\/test@//" | sed "s/':.*//" | tr -cd 'A-Za-z0-9.-')
+
+          # Sanitized once, here, for the install step below: the value comes from repository
+          # settings and is interpolated into its command line, so only letters, dashes and the
+          # spaces between them survive. Uppercase is kept on purpose — a mistyped `Chromium`
+          # then reaches Playwright as an unknown browser and fails at the install step, where
+          # the mistake is, rather than being silently narrowed to chromium.
+          set -- $(printf '%s' "${JOSH_PLAYWRIGHT_BROWSERS}" | tr -cd 'A-Za-z -')
+          # Never empty: `playwright install` with no browser named fetches chromium *and*
+          # firefox *and* webkit plus ffmpeg, roughly 1 GB, which is the download this avoids.
+          [ "$#" -gt 0 ] || set -- chromium
+          browsers="$*"
+          echo "browsers=${browsers}" >> "$GITHUB_OUTPUT"
 
           if [ -z "${version}" ]; then
             echo 'container=null' >> "$GITHUB_OUTPUT"
@@ -59,7 +80,7 @@ jobs:
           else
             echo 'container=null' >> "$GITHUB_OUTPUT"
             echo 'should_install_browsers=true' >> "$GITHUB_OUTPUT"
-            echo "::warning::Playwright image ${image} could not be resolved on MCR (HTTP ${status}). Running on the plain runner and installing browsers with 'playwright install --with-deps' instead."
+            echo "::warning::Playwright image ${image} could not be resolved on MCR (HTTP ${status}). Running on the plain runner and installing ${browsers} instead (set the JOSH_PLAYWRIGHT_BROWSERS repository variable to change the list)."
           fi
 
   checks:
@@ -230,9 +251,15 @@ jobs:
       # matching its own Playwright version. Invoked through the local bin rather than
       # `pnpm exec` because Sonar's S6505 misreads `pnpm ... install` as a package
       # install missing --ignore-scripts (this downloads browser binaries, not packages).
+      # Named rather than left to the default, which downloads every browser Playwright ships
+      # (~1 GB) where this config drives one of them. Left unquoted below so a multi-browser list
+      # splits into arguments; the resolve job already whitelisted it, so nothing but browser
+      # names can reach the command line.
       - name: Install Playwright browsers
         if: needs.playwright-image.outputs.should_install_browsers == 'true'
-        run: ./node_modules/.bin/playwright install --with-deps
+        env:
+          PLAYWRIGHT_BROWSERS: ${{ needs.playwright-image.outputs.browsers }}
+        run: ./node_modules/.bin/playwright install --with-deps ${PLAYWRIGHT_BROWSERS}
 
       - name: Build application
         env:

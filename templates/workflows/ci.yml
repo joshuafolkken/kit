@@ -11,6 +11,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Which browsers the plain-runner fallback downloads when the MCR image could not be resolved.
+# Declared once here because two jobs install them and the two lists must never disagree.
+# chromium is the default because that is the single project kit scaffolds; a consumer whose
+# config drives more sets the JOSH_PLAYWRIGHT_BROWSERS repository variable to a space-separated
+# list (e.g. `chromium firefox webkit`) instead of editing this file, which josh sync overwrites.
+env:
+  JOSH_PLAYWRIGHT_BROWSERS: ${{ vars.JOSH_PLAYWRIGHT_BROWSERS || 'chromium' }}
+
 jobs:
   playwright-image:
     name: Resolve Playwright image
@@ -25,6 +33,9 @@ jobs:
       # 'true' only when Playwright is a dependency but its image is unavailable, i.e.
       # exactly when a job must download browsers itself.
       should_install_browsers: ${{ steps.resolve.outputs.should_install_browsers }}
+      # The browser names the jobs below pass to `playwright install`, sanitized here so the
+      # two install steps share one list and one set of rules for what may reach a command line.
+      browsers: ${{ steps.resolve.outputs.browsers }}
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -37,9 +48,27 @@ jobs:
       - name: Resolve image
         id: resolve
         run: |
-          # Whitelist the characters: the value lands in $GITHUB_OUTPUT as JSON, so a
-          # newline or quote smuggled into the manifest could forge an extra output line.
-          version=$(node -p "require('./package.json').devDependencies?.['@playwright/test'] ?? ''" | tr -cd 'A-Za-z0-9.-')
+          # Both dependency blocks, because `e2e-detect` below enables the E2E job from file
+          # presence alone: a project that declares @playwright/test under `dependencies` would
+          # otherwise be told it has no Playwright, get no container *and* no browser install,
+          # and run its suite on a bare runner. Whitelist the characters too: the value lands in
+          # $GITHUB_OUTPUT as JSON, so a newline or quote smuggled into the manifest could forge
+          # an extra output line.
+          version=$(node -p "const manifest = require('./package.json'); manifest.devDependencies?.['@playwright/test'] ?? manifest.dependencies?.['@playwright/test'] ?? ''" | tr -cd 'A-Za-z0-9.-')
+
+          # Sanitized once, here, for both jobs that install browsers: the value comes from
+          # repository settings and is interpolated into their command line, so only letters,
+          # dashes and the spaces between them survive. Uppercase is kept on purpose — a mistyped
+          # `Chromium` then reaches Playwright as an unknown browser and fails at the install
+          # step, where the mistake is, rather than being silently narrowed to chromium and
+          # resurfacing much later as a missing executable.
+          set -- $(printf '%s' "${JOSH_PLAYWRIGHT_BROWSERS}" | tr -cd 'A-Za-z -')
+          # Never empty: `playwright install` with no browser named fetches chromium *and*
+          # firefox *and* webkit plus ffmpeg, roughly 1 GB, which is the download this knob
+          # exists to avoid and which the 8-minute `checks` budget does not survive.
+          [ "$#" -gt 0 ] || set -- chromium
+          browsers="$*"
+          echo "browsers=${browsers}" >> "$GITHUB_OUTPUT"
 
           if [ -z "${version}" ]; then
             echo 'container=null' >> "$GITHUB_OUTPUT"
@@ -61,7 +90,7 @@ jobs:
           else
             echo 'container=null' >> "$GITHUB_OUTPUT"
             echo 'should_install_browsers=true' >> "$GITHUB_OUTPUT"
-            echo "::warning::Playwright image ${image} could not be resolved on MCR (HTTP ${status}). Running on the plain runner and installing browsers with 'playwright install --with-deps' instead."
+            echo "::warning::Playwright image ${image} could not be resolved on MCR (HTTP ${status}). Running on the plain runner and installing ${browsers} instead (set the JOSH_PLAYWRIGHT_BROWSERS repository variable to change the list)."
           fi
 
   checks:
@@ -143,9 +172,15 @@ jobs:
 
       # Vitest browser-mode projects (*.svelte.test.ts) drive a real Playwright browser,
       # which the container image ships but a plain runner does not. Same guard as e2e.
+      # Named rather than left to the default, which downloads every browser Playwright ships
+      # (~1 GB) on the one path that has the least headroom to spare. Left unquoted below so a
+      # multi-browser list splits into arguments; the resolve job already whitelisted it, so
+      # nothing but browser names can reach the command line.
       - name: Install Playwright browsers
         if: needs.playwright-image.outputs.should_install_browsers == 'true'
-        run: ./node_modules/.bin/playwright install --with-deps
+        env:
+          PLAYWRIGHT_BROWSERS: ${{ needs.playwright-image.outputs.browsers }}
+        run: ./node_modules/.bin/playwright install --with-deps ${PLAYWRIGHT_BROWSERS}
 
       - name: Run unit tests
         run: pnpm josh test:unit
@@ -296,9 +331,12 @@ jobs:
       # matching its own Playwright version. Invoked through the local bin rather than
       # `pnpm exec` because Sonar's S6505 misreads `pnpm ... install` as a package
       # install missing --ignore-scripts (this downloads browser binaries, not packages).
+      # Same named-browsers list as the checks job above, for the same reason.
       - name: Install Playwright browsers
         if: needs.playwright-image.outputs.should_install_browsers == 'true'
-        run: ./node_modules/.bin/playwright install --with-deps
+        env:
+          PLAYWRIGHT_BROWSERS: ${{ needs.playwright-image.outputs.browsers }}
+        run: ./node_modules/.bin/playwright install --with-deps ${PLAYWRIGHT_BROWSERS}
 
       # Only a run allowed to retry may continue past a failure: a push to the default branch gates
       # the auto-tag dispatch below, so one transient crash there withholds the release until a
