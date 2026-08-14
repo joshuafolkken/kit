@@ -2,7 +2,8 @@
 // Both kit's own `josh sync` / `josh init` and downstream consumers (app-kit) drive their cspell
 // `import` and tsconfig `extends` patches through `config_merge`, which exposes ensure + remove
 // semantics for one YAML or JSON list field while preserving every other key, value, and ordering.
-// Comments are not preserved in this first cut — see the value-only decision recorded on the issue.
+// JSON patches rewrite only the targeted field's own value, so comments, trailing commas and the
+// consumer's hand-formatting elsewhere in the document survive (joshuafolkken/kit#798).
 import { json_list } from './patch-json-list'
 import { yaml_list } from './patch-yaml-list'
 

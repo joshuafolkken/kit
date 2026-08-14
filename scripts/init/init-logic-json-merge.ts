@@ -1,6 +1,7 @@
 import { config_merge } from '#scripts/config-merge/index'
 import { json_format } from '#scripts/config-merge/json-format'
 import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
+import { patch_json_key } from '#scripts/config-merge/patch-json-key'
 import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/schemas'
 import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
@@ -63,46 +64,55 @@ function is_redundant_option(
 	return JSON.stringify(base_options[key]) === JSON.stringify(value)
 }
 
-function without_compiler_options(parsed: Record<string, unknown>): Record<string, unknown> {
-	return Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== 'compilerOptions'))
+const COMPILER_OPTIONS_FIELD = 'compilerOptions'
+
+// Prune the redundant options one at a time, in place. Setting `compilerOptions` to the kept subset
+// would be one edit instead of several, but it replaces the whole block and takes any comment the
+// consumer wrote inside it along with the options being dropped (joshuafolkken/kit#798). Each
+// removal re-reads the document, so the shifting offsets take care of themselves.
+function drop_redundant_options(content: string, redundant: ReadonlyArray<string>): string {
+	let current = content
+
+	for (const key of redundant) {
+		current = patch_json_key.remove_json_path(current, [COMPILER_OPTIONS_FIELD, key])
+	}
+
+	return current
 }
 
 function serialize_stripped(
-	parsed: Record<string, unknown>,
+	content: string,
 	kept: Record<string, unknown>,
+	redundant: ReadonlyArray<string>,
 ): string {
-	const next =
-		Object.keys(kept).length === 0
-			? without_compiler_options(parsed)
-			: { ...parsed, compilerOptions: kept }
+	if (Object.keys(kept).length === 0) {
+		return patch_json_key.remove_json_key(content, COMPILER_OPTIONS_FIELD)
+	}
 
-	return json_format.format_json(next)
+	return drop_redundant_options(content, redundant)
 }
 
-function keep_divergent_options(
+function redundant_option_keys(
 	current: Record<string, unknown>,
 	base_options: Record<string, unknown>,
-): Record<string, unknown> {
-	return Object.fromEntries(
-		Object.entries(current).filter(
-			([key, value]) => !is_redundant_option(value, key, base_options),
-		),
-	)
+): Array<string> {
+	return Object.entries(current)
+		.filter(([key, value]) => is_redundant_option(value, key, base_options))
+		.map(([key]) => key)
 }
 
 function strip_redundant_compiler_options(
 	content: string,
 	base_options: Record<string, unknown>,
 ): string {
-	const parsed = parse_jsonc(content)
-	// eslint-disable-next-line dot-notation -- Record<string, unknown> requires bracket notation per noPropertyAccessFromIndexSignature
-	const raw = parsed['compilerOptions']
+	const raw = parse_jsonc(content)[COMPILER_OPTIONS_FIELD]
 	if (raw === undefined) return content
 	const current = json_object_schema.parse(raw)
-	const kept = keep_divergent_options(current, base_options)
-	if (Object.keys(kept).length === Object.keys(current).length) return content
+	const redundant = redundant_option_keys(current, base_options)
+	if (redundant.length === 0) return content
+	const kept = Object.entries(current).filter(([key]) => !redundant.includes(key))
 
-	return serialize_stripped(parsed, kept)
+	return serialize_stripped(content, Object.fromEntries(kept), redundant)
 }
 
 function merge_json_array_field(
@@ -115,7 +125,7 @@ function merge_json_array_field(
 	const to_add = values.filter((value) => !existing.includes(value))
 	if (to_add.length === 0) return content
 
-	return json_format.format_json({ ...parsed, [key]: [...existing, ...to_add] })
+	return patch_json_key.set_json_key(content, key, [...existing, ...to_add])
 }
 
 // The entries of `additions` the `existing` record does not already own. Every merge in this module
@@ -163,12 +173,20 @@ function collect_applicable_updates(
 	return Object.fromEntries(resolved.filter(([, merged]) => merged !== undefined))
 }
 
+// One key at a time rather than one whole-file rewrite: each `set_json_key` leaves every byte
+// outside its own value untouched, so a consumer's comments survive a merge that only adds keys.
 function merge_json_object(content: string, updates: Record<string, unknown>): string {
 	const parsed = parse_jsonc(content)
 	const applicable = collect_applicable_updates(parsed, updates)
 	if (Object.keys(applicable).length === 0) return content
 
-	return json_format.format_json({ ...parsed, ...applicable })
+	let current = content
+
+	for (const [key, value] of Object.entries(applicable)) {
+		current = patch_json_key.set_json_key(current, key, value)
+	}
+
+	return current
 }
 
 // Every writer below this line targets `package.json`, which prettier formats with the

@@ -1,3 +1,4 @@
+import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
@@ -33,13 +34,15 @@ describe('merge_json_extends', () => {
 		expect(result).toBe(content)
 	})
 
-	it('handles tsconfig.json with JSONC line comments', () => {
-		const content = '{\n\t// compiler options\n\t"extends": ["existing"]\n}'
-		const result = JSON.parse(init_logic.merge_json_extends(content, 'my-config')) as {
-			extends: unknown
-		}
+	// The comment used to be read tolerantly and then thrown away by the write-back (#798). It now
+	// survives, so the result is JSONC rather than JSON and has to be read as such.
+	it('keeps a tsconfig.json JSONC line comment while merging', () => {
+		const comment = '// compiler options'
+		const content = `{\n\t${comment}\n\t"extends": ["existing"]\n}`
+		const result = init_logic.merge_json_extends(content, 'my-config')
 
-		expect(result.extends).toStrictEqual(['my-config', 'existing'])
+		expect(result).toContain(comment)
+		expect(parse_jsonc(result)).toStrictEqual({ extends: ['my-config', 'existing'] })
 	})
 })
 
@@ -114,13 +117,13 @@ describe('merge_json_array_field', () => {
 		expect(result).toBe(content)
 	})
 
-	it('handles extensions.json with JSONC line comments', () => {
-		const content = '{\n\t// extensions\n\t"recommendations": ["a"]\n}'
-		const result = JSON.parse(
-			init_logic.merge_json_array_field(content, 'recommendations', ['b']),
-		) as { recommendations: unknown }
+	it('keeps an extensions.json JSONC line comment while merging', () => {
+		const comment = '// extensions'
+		const content = `{\n\t${comment}\n\t"recommendations": ["a"]\n}`
+		const result = init_logic.merge_json_array_field(content, 'recommendations', ['b'])
 
-		expect(result.recommendations).toStrictEqual(['a', 'b'])
+		expect(result).toContain(comment)
+		expect(parse_jsonc(result)).toStrictEqual({ recommendations: ['a', 'b'] })
 	})
 })
 

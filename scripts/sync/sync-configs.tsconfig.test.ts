@@ -20,14 +20,18 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-function sync_and_read(content: string): Record<string, unknown> {
+function sync_and_read_raw(content: string): string {
 	writeFileSync(TSCONFIG_DEST, content)
 	vi.spyOn(console, 'info').mockImplementation(() => {
 		/* suppress */
 	})
 	sync_configs.sync_tsconfig(TSCONFIG_DEST)
 
-	return JSON.parse(readFileSync(TSCONFIG_DEST, 'utf8')) as Record<string, unknown>
+	return readFileSync(TSCONFIG_DEST, 'utf8')
+}
+
+function sync_and_read(content: string): Record<string, unknown> {
+	return JSON.parse(sync_and_read_raw(content)) as Record<string, unknown>
 }
 
 // Every sync now also union-merges the generated-output directories into `exclude` (#712). The
@@ -114,22 +118,66 @@ const KIT_EXCLUDE = [...init_logic.get_tsconfig_exclude_entries()]
 const PLAYWRIGHT_REPORT_DIR = 'playwright-report'
 const CONSUMER_ONLY_EXCLUDE = 'legacy-vendor'
 
+// A prettier-clean consumer file — the state kit's own distributed pre-commit hook enforces, so the
+// state every managed project is actually in. Written out literally rather than generated from the
+// serializer under test; the precondition case below is what proves the literal is right.
+const PRETTIER_CLEAN_TSCONFIG = `{
+	"extends": ["./node_modules/@joshuafolkken/kit/tsconfig/base.json"],
+	"compilerOptions": {
+		"strict": true
+	},
+	"exclude": [
+		"node_modules",
+		"build",
+		"dist",
+		"playwright-report",
+		"test-results",
+		"src/service-worker.js",
+		"src/service-worker/**/*.js",
+		"src/service-worker.ts",
+		"src/service-worker/**/*.ts",
+		"src/service-worker.d.ts",
+		"src/service-worker/**/*.d.ts"
+	]
+}
+`
+
+const SV_CREATE_COMMENT = '// Path aliases are handled by svelte.config.js'
+const EXCLUDE_LINE_START = '\t"exclude"'
+
 describe('sync_configs.sync_tsconfig — prettier-clean serialization', () => {
+	// Without this the two cases below could pass on a fixture prettier would have reformatted, which
+	// would make "leaves prettier nothing to do" a statement about nothing.
+	it('starts from a fixture real prettier already leaves unchanged', async () => {
+		expect(await prettier_format_json(PRETTIER_CLEAN_TSCONFIG)).toBe(PRETTIER_CLEAN_TSCONFIG)
+	})
+
 	// A file sync rewrites must come back prettier-clean, or the consumer's own `prettier --check`
-	// fails on a file they never touched (#660). Assert that directly against real prettier rather
-	// than against the layout a particular entry count produces — the `exclude` array outgrew one
-	// line when the SvelteKit exclusions joined it (#796), and the intent did not change with it.
-	it('rewrites a file real prettier leaves unchanged after stripping a redundant option', async () => {
-		const content = `${JSON.stringify({
-			extends: [ENTRY],
-			compilerOptions: { strict: true },
-			exclude: KIT_EXCLUDE,
-		})}\n`
-		const result = sync_and_read(content)
+	// fails on a file they never touched (#660). Assert that against real prettier rather than the
+	// layout a particular entry count produces — the `exclude` array outgrew one line when the
+	// SvelteKit exclusions joined it (#796), and the intent did not change with it.
+	//
+	// The guarantee is conditional now, and the input above is why: since #798 a rewrite edits only
+	// the value it changes and passes every other byte through, so kit no longer reformats a document
+	// it did not author. A file that arrives prettier-clean leaves prettier-clean; one that arrives
+	// malformed keeps its own layout instead of being silently normalized — which is the same trade
+	// that lets a consumer's comments survive.
+	it('rewrites a prettier-clean file to one prettier still leaves unchanged', async () => {
+		const result = sync_and_read(PRETTIER_CLEAN_TSCONFIG)
 		const written = readFileSync(TSCONFIG_DEST, 'utf8')
 
 		expect(result).toStrictEqual({ extends: [ENTRY], exclude: KIT_EXCLUDE })
 		expect(await prettier_format_json(written)).toBe(written)
+	})
+
+	// The kit#798 regression, end to end through the real sync: `sv create` ships this comment, and
+	// the whole-file write-back used to delete it the first time sync had anything to add.
+	it('leaves a comment in the consumer file intact while stripping a redundant option', () => {
+		const content = PRETTIER_CLEAN_TSCONFIG.split(EXCLUDE_LINE_START).join(
+			`\t${SV_CREATE_COMMENT}\n${EXCLUDE_LINE_START}`,
+		)
+
+		expect(sync_and_read_raw(content)).toContain(SV_CREATE_COMMENT)
 	})
 })
 

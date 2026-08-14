@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { json_format } from '#scripts/config-merge/json-format'
 import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
+import { patch_json_key } from '#scripts/config-merge/patch-json-key'
 import { string_array_schema } from '#scripts/schemas'
 
 // kit-family tsconfig presets used to ship with a `.jsonc` extension. Playwright (>= 1.62) appends
@@ -57,7 +57,7 @@ function migrate_preset_paths(content: string, base_directory: string): string {
 	const migrated = migrate_extends_value(base_directory, raw)
 	if (JSON.stringify(migrated) === JSON.stringify(raw)) return content
 
-	return json_format.format_json({ ...parsed, [EXTENDS_FIELD]: migrated })
+	return patch_json_key.set_json_key(content, EXTENDS_FIELD, migrated)
 }
 
 const tsconfig_preset_migration = {

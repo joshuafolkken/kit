@@ -113,7 +113,12 @@ The entries must land in the **consumer** file: a `tsconfig.json` `exclude` **ov
 
 That same override rule is why the `src/service-worker*` globs are merged in as well. A SvelteKit project extends `./.svelte-kit/tsconfig.json`, which excludes those paths itself, and writing any `exclude` key into the consumer file replaces that array outright — so before [kit#796](https://github.com/joshuafolkken/kit/issues/796) all six were silently discarded, and a project that later added `src/service-worker.ts` got a type-check failure several layers away from the file it just wrote. Repeating them makes the merged list additive. They are merged unconditionally — kit has no SvelteKit detection — and in a non-SvelteKit project they usually match nothing; the exception, a project that keeps its own `src/service-worker.ts`, is covered in [init.md → tsconfig exclude](./init.md#tsconfig-exclude).
 
-Note that a merge which has something to append **rewrites the file**, and the rewrite goes through a JSONC parse and re-serialize — so comments in the consumer's `tsconfig.json` are dropped. This has always been true of every kit JSON merge, but the six entries added in kit#796 make it fire once on every already-synced consumer, including the `// Path aliases are handled by ...` comment `sv create` ships. It happens once: the following re-sync has nothing to append and is a no-op again.
+A merge which has something to append rewrites **only the value it changes**. Every other byte of the file — comments, key order, trailing commas, your own indentation — is passed through untouched, so the `// Path aliases are handled by ...` block `sv create` ships survives a sync. Until [kit#798](https://github.com/joshuafolkken/kit/issues/798) these merges parsed the document and wrote the whole thing back from the parsed object, which silently deleted every comment in it.
+
+Two consequences worth knowing:
+
+- **kit no longer reformats a file it did not author.** A `tsconfig.json` that arrives prettier-clean leaves prettier-clean, because the value kit splices in is rendered the way prettier would render it at that position. One that arrives badly formatted keeps its own layout rather than being quietly normalized — that is the same trade that lets your comments survive, and your own `prettier --write` is the tool for it. The one exception is a missing final newline, which is added back.
+- **A comment inside the value being replaced still goes.** Editing `exclude` rewrites the `exclude` array and nothing else, so a comment sitting inside that array is lost while comments around it survive. Redundant `compilerOptions` keys are pruned one at a time precisely so this does not take the whole block's comments with them.
 
 ### tsconfig preset extension migration
 

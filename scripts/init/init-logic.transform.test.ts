@@ -1,3 +1,4 @@
+import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { describe, expect, it } from 'vitest'
 import { init_logic } from './init-logic'
 
@@ -156,15 +157,13 @@ describe('merge_json_object', () => {
 		expect(result).toBe(content)
 	})
 
-	it('handles settings.json with JSONC line comments', () => {
-		const content = '{\n\t// settings\n\t"a": 1\n}'
-		const result = JSON.parse(init_logic.merge_json_object(content, { b: 2 })) as {
-			a: number
-			b: number
-		}
+	it('keeps a settings.json JSONC line comment while merging', () => {
+		const comment = '// settings'
+		const content = `{\n\t${comment}\n\t"a": 1\n}`
+		const result = init_logic.merge_json_object(content, { b: 2 })
 
-		expect(result.a).toBe(1)
-		expect(result.b).toBe(2)
+		expect(result).toContain(comment)
+		expect(parse_jsonc(result)).toStrictEqual({ a: 1, b: 2 })
 	})
 })
 
