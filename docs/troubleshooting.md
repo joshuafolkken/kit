@@ -147,6 +147,14 @@ PLAYWRIGHT_REUSE_SERVER=1 pnpm josh test
 
 The flag accepts `1`, `true`, `yes` or `on` (case- and whitespace-insensitive); every other value, including unset, boots a fresh server. It means the same thing in CI, where it exists for an orchestrator that pre-builds and boots the preview so several checks share one server. Do **not** edit `reuseExistingServer` in `playwright.config.ts` instead — that file is managed by `josh sync` and the change is overwritten on the next sync.
 
+## `CI=0` runs locally but the HTML report never opens
+
+`playwright.config.ts` treats every value of `CI` as CI **except** an empty one and the explicit negatives `0`, `false`, `no` and `off` (case- and whitespace-insensitive). The test is inverted rather than an allow-list because `CI` has no fixed vocabulary — Woodpecker exports `CI=woodpecker`, and an allow-list would drop such a run into dev mode. Exporting `CI=0` therefore selects the local branch: `pnpm run dev` on `5173`, no retries, the `list` reporter.
+
+Playwright's own modules read `CI` with plain truthiness, though, and `'0'` is a non-empty string. Left alone they would still classify the run as CI — most visibly in the HTML reporter, which then stays silent when the run ends: no auto-open after a failing run, and no `To open last HTML report run:` hint either, so the report is unreachable unless you already know `pnpm exec playwright show-report`. To keep every reader on one verdict, the config **removes `CI` from the environment** once it has judged the run local. Nothing is removed on the CI branch, and a provider value such as `CI=woodpecker` is never touched.
+
+One consequence is worth knowing: the `webServer` child process (`pnpm run dev`) inherits that environment, so it does not see `CI` either. That is deliberate — a dev server still reading `CI=0` as CI would reproduce the same bug one process down — but it means `CI=0` and `unset CI` are equivalent for anything in your dev pipeline that keys off the variable.
+
 ## Still stuck?
 
 - Re-read [authentication.md](./authentication.md) end to end — the ordering (token → env var → `~/.npmrc` credential → project registry mapping) matters.
