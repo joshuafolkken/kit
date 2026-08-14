@@ -127,6 +127,32 @@ describe('playwright.config CI branch selection', () => {
 	})
 })
 
+// Regression guard for #780: #777 fixed only what the config itself returns. Playwright's own
+// modules read `process.env['CI']` with the bare truthiness it replaced, so a `CI=0` run stayed CI
+// to them — the HTML reporter's `onExit` printed neither the failure auto-open nor the
+// "To open last HTML report run:" hint, leaving the local run's report unreachable. The config now
+// deletes the variable once it has judged the run local, and must still leave a real provider value
+// such as CI=woodpecker intact.
+describe('playwright.config CI env normalization', () => {
+	it.each(NOT_CI_VALUES)('clears CI=%j so Playwright agrees the run is local', async (value) => {
+		await import_config(value, undefined)
+
+		expect(process.env[CI_KEY]).toBeUndefined()
+	})
+
+	it.each(CI_VALUES)('leaves CI=%j intact', async (value) => {
+		await import_config(value, undefined)
+
+		expect(process.env[CI_KEY]).toBe(value)
+	})
+
+	it('leaves CI unset when it was already unset', async () => {
+		await import_config(undefined, undefined)
+
+		expect(process.env[CI_KEY]).toBeUndefined()
+	})
+})
+
 // Regression guard for #782: Playwright does not restart a webServer that exits mid-run, so an
 // uncapped CI run turns the server's death into hundreds of identical ERR_CONNECTION_REFUSED
 // failures — six minutes of runner time, and a failure list in which the real event is invisible.

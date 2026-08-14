@@ -55,6 +55,19 @@ function is_ci_enabled(value: string | undefined): boolean {
 
 const IS_CI = is_ci_enabled(process.env['CI'])
 
+// `is_ci_enabled` only decides what this config returns; Playwright's own modules read
+// `process.env['CI']` directly with the bare truthiness it replaces, so an explicit opt-out such as
+// `CI=0` still reads as CI to them. The visible casualty is the HTML reporter's `onExit`, which
+// suppresses both the auto-open on failure and the "To open last HTML report run:" hint — a local
+// run whose report is unreachable unless the developer already knows `playwright show-report`.
+// (`CI/1` in the Playwright user agent and the MCP headless force share the same root cause.)
+// Deleting the variable once this config has judged the run local is what makes every downstream
+// reader agree with that verdict, the `pnpm run dev` child process included: leaving `CI=0` set for
+// the child would only re-introduce the same bare-truthiness bug one process down. The guard is
+// what keeps this safe — a real provider value such as `CI=woodpecker` is never touched, and the
+// deletion cannot fire on the CI branch.
+if (!IS_CI) delete process.env['CI']
+
 // Set PLAYWRIGHT_REUSE_SERVER=1 (or 'true' / 'yes' / 'on') when the server already listening on the
 // port below is known to be this project's: Playwright then reuses it and skips its webServer
 // command (no boot, no rebuild). Any other value — including '0', 'false', 'off', empty and unset
