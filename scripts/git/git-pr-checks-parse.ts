@@ -5,6 +5,17 @@ const CHECK_STATUS_PENDING = 'pending'
 const CHECK_STATUS_FAIL = 'fail'
 const CHECK_STATUS_MISSING = 'missing'
 
+// GitHub reports a job whose `if:` condition was false as COMPLETED with conclusion `skipped`, and
+// counts it as satisfied for branch protection — PR #792 reached CLEAN while three such jobs sat in
+// its rollup. Recording them as `fail` therefore disagreed with GitHub itself, and it disabled the
+// kit#753 escape hatch: `is_unstable_only_from_coderabbit` opens the gate only when every
+// non-passing check is CodeRabbit's, so kit's own conditional jobs (`auto-merge`, `E2E`,
+// `Notify Auto Tag`) kept a slow review blocking the merge until the wait loop timed out. The bug
+// was invisible on fast reviews, where CLEAN short-circuits the predicate — it could only surface on
+// the exact path kit#753 exists to protect. `neutral` is deliberately absent: no kit check emits it,
+// and a false block costs one re-run while a false pass ships code the gate never cleared.
+const PASSING_CONCLUSIONS = new Set(['success', 'skipped'])
+
 const KEY_TYPE_NAME = '__typename'
 const KEY_STATE = 'state'
 const KEY_STATUS = 'status'
@@ -39,12 +50,17 @@ function parse_status_context(item: RollupItemData): string {
 	return CHECK_STATUS_FAIL
 }
 
+function is_passing_conclusion(item: RollupItemData): boolean {
+	const conclusion = read_string(item[KEY_CONCLUSION])?.toLowerCase()
+
+	return conclusion !== undefined && PASSING_CONCLUSIONS.has(conclusion)
+}
+
 function parse_check_run(item: RollupItemData): string {
 	const status = read_string(item[KEY_STATUS])?.toLowerCase()
 	if (status !== 'completed') return CHECK_STATUS_PENDING
-	const conclusion = read_string(item[KEY_CONCLUSION])?.toLowerCase()
 
-	return conclusion === 'success' ? CHECK_STATUS_PASS : CHECK_STATUS_FAIL
+	return is_passing_conclusion(item) ? CHECK_STATUS_PASS : CHECK_STATUS_FAIL
 }
 
 function parse_rollup_status(item: RollupItemData): string {
