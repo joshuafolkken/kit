@@ -11,6 +11,7 @@ import {
 
 const CODE_RABBIT = 'CodeRabbit'
 const SONAR_QUBE = 'SonarQube'
+const AUTO_MERGE = 'auto-merge'
 const NON_STRING_VALUE = 'not a string'
 
 describe('read_string', () => {
@@ -93,6 +94,38 @@ describe('parse_rollup_checks — CheckRun items', () => {
 	it('returns fail for a completed CheckRun with failure conclusion', () => {
 		const raw = JSON.stringify({
 			statusCheckRollup: [{ name: CODE_RABBIT, status: 'COMPLETED', conclusion: 'FAILURE' }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
+	})
+})
+
+describe('parse_rollup_checks — CheckRun conclusions', () => {
+	// Regression guard for #793: a job whose `if:` condition was false completes with conclusion
+	// SKIPPED, which GitHub counts as satisfied. Reading it as fail put a non-CodeRabbit entry into
+	// the non-passing set and disabled the kit#753 escape hatch on every PR with a conditional job.
+	it('returns pass for a completed CheckRun with skipped conclusion', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED', conclusion: 'SKIPPED' }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PASS)
+	})
+
+	it('returns fail for a completed CheckRun with no conclusion at all', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED' }] })
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
+	})
+
+	// `neutral` is deliberately not in the passing set: no kit check emits it, and a false block
+	// costs one re-run while a false pass would ship code the gate never actually cleared.
+	it('returns fail for a completed CheckRun with neutral conclusion', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED', conclusion: 'NEUTRAL' }],
 		})
 		const checks = parse_rollup_checks(raw)
 

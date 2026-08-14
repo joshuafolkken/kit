@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { evaluate_pr_state, read_required_statuses, REQUIRED_CHECKS } from './git-pr-checks-eval'
-import type { PrStateSnapshot, RollupCheck } from './git-pr-checks-parse'
+import {
+	parse_pr_state_snapshot,
+	type PrStateSnapshot,
+	type RollupCheck,
+} from './git-pr-checks-parse'
 
 const CODE_RABBIT = 'CodeRabbit'
 const SONAR_QUBE = 'SonarQube'
@@ -187,6 +191,43 @@ describe('evaluate_pr_state — pending', () => {
 		})
 
 		expect(evaluate_pr_state(snapshot)).toBe('pending')
+	})
+})
+
+function skipped_job(name: string): Record<string, string> {
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
+	return { __typename: 'CheckRun', name, status: 'COMPLETED', conclusion: 'SKIPPED' }
+}
+
+// Regression guard for #793, written against a raw payload rather than hand-built RollupChecks
+// because the defect lived in the seam between the two modules: the parser recorded GitHub's
+// SKIPPED conclusion as a failure, so the kit#753 escape hatch saw non-CodeRabbit entries in the
+// non-passing set and left the merge gate waiting until it timed out. This is the shape of PR #792,
+// whose only outstanding check was a slow CodeRabbit review.
+describe('evaluate_pr_state — parsed payload with skipped jobs (#793)', () => {
+	const raw = JSON.stringify({
+		mergeStateStatus: 'UNSTABLE',
+		reviewDecision: 'APPROVED',
+		statusCheckRollup: [
+			skipped_job('auto-merge'),
+			skipped_job('E2E'),
+			skipped_job('Notify Auto Tag'),
+			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
+			{ __typename: 'CheckRun', name: SONAR_QUBE, status: 'COMPLETED', conclusion: 'SUCCESS' },
+			// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub API field name
+			{ __typename: 'StatusContext', context: CODE_RABBIT, state: 'PENDING' },
+		],
+	})
+
+	it('reads every skipped job as passing', () => {
+		const snapshot = parse_pr_state_snapshot(raw)
+		const non_passing = snapshot.rollup.filter((check) => check.status !== 'pass')
+
+		expect(non_passing).toStrictEqual([{ name: CODE_RABBIT, status: 'pending' }])
+	})
+
+	it('opens the merge gate when the pending CodeRabbit review is all that remains', () => {
+		expect(evaluate_pr_state(parse_pr_state_snapshot(raw))).toBe('success')
 	})
 })
 
