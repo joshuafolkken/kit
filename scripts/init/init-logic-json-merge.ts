@@ -171,6 +171,16 @@ function merge_json_object(content: string, updates: Record<string, unknown>): s
 	return json_format.format_json({ ...parsed, ...applicable })
 }
 
+// Every writer below this line targets `package.json`, which prettier formats with the
+// `json-stringify` parser rather than `json` — arrays stay one element per line there, whatever
+// their width. Routing them through one named helper keeps that distinction visible at each call
+// site: a new package.json writer copied from a sibling inherits the right serializer, and one that
+// reaches for `json_format.format_json` instead is the mistake kit#797 was. Everything ABOVE writes
+// `tsconfig.json` / `.vscode/*.json`, where `format_json`'s array inlining is what prettier wants.
+function serialize_package_json(value: Record<string, unknown>): string {
+	return json_format.format_package_json(value)
+}
+
 const SCRIPTS_PREPEND_KEYS = new Set(['preinstall'])
 
 function merge_package_scripts(content: string, scripts: Record<string, string>): string {
@@ -187,7 +197,7 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	const prepend = Object.fromEntries(to_add.filter(([k]) => SCRIPTS_PREPEND_KEYS.has(k)))
 	const append = Object.fromEntries(to_add.filter(([k]) => !SCRIPTS_PREPEND_KEYS.has(k)))
 
-	return json_format.format_json({ ...parsed, scripts: { ...prepend, ...migrated, ...append } })
+	return serialize_package_json({ ...parsed, scripts: { ...prepend, ...migrated, ...append } })
 }
 
 function merge_development_dependencies(
@@ -201,7 +211,7 @@ function merge_development_dependencies(
 	const to_add = missing_entries(existing, additions)
 	if (to_add.length === 0) return content
 
-	return json_format.format_json({
+	return serialize_package_json({
 		...parsed,
 		devDependencies: { ...existing, ...Object.fromEntries(to_add) },
 	})
@@ -212,14 +222,14 @@ function merge_package_manager(content: string, value: string): string {
 	const parsed = parse_jsonc(content)
 	if ('packageManager' in parsed) return content
 
-	return json_format.format_json({ ...parsed, packageManager: value })
+	return serialize_package_json({ ...parsed, packageManager: value })
 }
 
 function merge_development_engines(content: string, value: Record<string, unknown>): string {
 	const parsed = parse_jsonc(content)
 	if ('devEngines' in parsed) return content
 
-	return json_format.format_json({ ...parsed, devEngines: value })
+	return serialize_package_json({ ...parsed, devEngines: value })
 }
 
 function has_package_scripts_marker(content: string, marker: string): boolean {
@@ -242,7 +252,7 @@ function merge_package_script_suffix(content: string, key: string, cmd: string):
 	if (existing === undefined || existing.includes(cmd)) return content
 	const updated_value = existing.trim().length === 0 ? cmd : `${existing} && ${cmd}`
 
-	return json_format.format_json({ ...parsed, scripts: { ...scripts, [key]: updated_value } })
+	return serialize_package_json({ ...parsed, scripts: { ...scripts, [key]: updated_value } })
 }
 
 function remove_script_with_marker(content: string, key: string, marker: string): string {
@@ -254,17 +264,24 @@ function remove_script_with_marker(content: string, key: string, marker: string)
 	if (!scripts[key]?.includes(marker)) return content
 	const rest = Object.fromEntries(Object.entries(scripts).filter(([k]) => k !== key))
 
-	return json_format.format_json({ ...parsed, scripts: rest })
+	return serialize_package_json({ ...parsed, scripts: rest })
 }
 
+// Deliberately compares two serializations of the same parsed object, so only a KEY ORDER change
+// rewrites the file. That makes the kit#797 fix forward-only: a package.json an older kit already
+// inlined is not healed, because formatting-only drift on disk is invisible here. Comparing
+// `serialized` against raw `content` instead would heal it, and would also rewrite any manifest
+// whose indentation merely differs from kit's tabs — a much wider claim over a file kit does not own.
+// No consumer was found in that damaged state when the fix landed, so the narrow behavior wins; a
+// project that does hit it is repaired by one `prettier --write package.json`.
 function sort_package_json_keys(content: string): string {
 	const parsed = parse_jsonc(content)
 	const all_keys = Object.keys(parsed)
 	const known = PACKAGE_JSON_KEY_ORDER.filter((k) => Object.hasOwn(parsed, k))
 	const unknown = all_keys.filter((k) => !PACKAGE_JSON_KEY_ORDER.includes(k))
 	const ordered = Object.fromEntries([...known, ...unknown].map((k) => [k, parsed[k]]))
-	const serialized = json_format.format_json(ordered)
-	const current = json_format.format_json(parsed)
+	const serialized = serialize_package_json(ordered)
+	const current = serialize_package_json(parsed)
 	if (serialized === current) return content
 
 	return serialized

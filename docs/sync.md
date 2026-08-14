@@ -95,6 +95,8 @@ These files are created by `josh init`. `josh sync` refreshes them in place by r
 
 Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`, which points at the kit's own SonarQube project) are stripped from the template before distribution, so they are never written into consumer projects.
 
+Every rewrite above is emitted the way prettier would format that particular file, so a file kit edits never fails the project's own `prettier --check`. This is per-filename, not one rule: prettier formats `package.json` with its `json-stringify` printer, which puts every array element on its own line no matter how short the array, while `tsconfig.json` and `.vscode/*.json` go through the `json` printer, which keeps a short array inline. kit writes each accordingly — see [kit#797](https://github.com/joshuafolkken/kit/issues/797), where the tsconfig rule was applied to `package.json` and inlined arrays like `keywords` that prettier then demanded back.
+
 Object-valued settings are registries of independent entries (`files.associations`, `editor.codeActionsOnSave`, the per-language `[typescript]` blocks), so sync merges them one entry at a time: kit's entries are added, and any entry the project already declares keeps its own value. Without this, a project that customized such a key for one reason would silently never receive any later kit addition inside it. Arrays stay create-only — combining a list like `eslint.validate` would be a guess about intent, and overwriting it would drop the project's own entries.
 
 ### tsconfig normalization
