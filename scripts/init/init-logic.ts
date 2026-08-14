@@ -309,7 +309,11 @@ function strip_kit_only_vscode_settings_content(raw: string): string {
 	const stripped = strip_kit_only_vscode_settings(parsed)
 	if (Object.keys(stripped).length === Object.keys(parsed).length) return raw
 
-	return `${JSON.stringify(stripped, undefined, '\t')}\n`
+	// format_json, not plain JSON.stringify: prettier reads `.vscode/settings.json` with the `json`
+	// parser, which keeps a short array such as `eslint.validate` inline. Expanding it here wrote a
+	// file the consumer's own `prettier --check` rejects — the same defect as kit#797, which was
+	// about the opposite direction on `package.json`.
+	return json_format.format_json(stripped)
 }
 
 function get_npmrc_lines(): ReadonlyArray<string> {

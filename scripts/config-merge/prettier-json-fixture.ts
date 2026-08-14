@@ -10,11 +10,19 @@ import prettier from 'prettier'
 // `prettier/index.js` sits outside `scripts/`, so reaching it would need the banned
 // parent-directory specifier, and its `plugins` entries have no bearing on the json parser.
 //
-// Scope: `parser: 'json'` only. Prettier infers `json-stringify` from the FILENAME `package.json`,
-// and that printer breaks every array one entry per line regardless of width — so this helper does
-// not describe how a `package.json` must be formatted, and asserting it against one would report a
-// green that prettier disagrees with. Use it for tsconfig-shaped files.
+// Scope: `parser: 'json'` — tsconfig.json and .vscode/*.json. Prettier infers `json-stringify` from
+// the FILENAME `package.json`, and that printer breaks every array one entry per line regardless of
+// width, so a package.json must be checked with the other helper below (kit#797).
 const PRETTIER_JSON_OPTIONS = { parser: 'json', printWidth: 100, useTabs: true } as const
+
+// `filepath` rather than an explicit parser: it routes through the same inference a consumer's own
+// `prettier --check` performs on the real file, so the guard cannot pass by naming a parser the
+// consumer would never have selected. That inference IS the defect in kit#797.
+const PRETTIER_PACKAGE_JSON_OPTIONS = {
+	filepath: 'package.json',
+	printWidth: 100,
+	useTabs: true,
+} as const
 
 // Run real prettier over `content`. Call sites assert `toBe(content)` — a fixed point means the file
 // is already formatted. Asserting that rather than a specific layout keeps the guard honest as
@@ -24,4 +32,9 @@ async function prettier_format_json(content: string): Promise<string> {
 	return await prettier.format(content, PRETTIER_JSON_OPTIONS)
 }
 
-export { prettier_format_json }
+// The same fixed-point guard for `package.json`, where prettier's chosen printer differs.
+async function prettier_format_package_json(content: string): Promise<string> {
+	return await prettier.format(content, PRETTIER_PACKAGE_JSON_OPTIONS)
+}
+
+export { prettier_format_json, prettier_format_package_json }

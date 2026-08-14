@@ -103,14 +103,26 @@ function inline_short_arrays(text: string): string {
 	return output.join('\n')
 }
 
-// Prettier-clean replacement for `${JSON.stringify(value, undefined, '\t')}\n`.
+// Prettier-clean replacement for `${JSON.stringify(value, undefined, '\t')}\n`. For every managed
+// JSON config EXCEPT package.json — see format_package_json for why that one is different.
 function format_json(value: unknown): string {
 	return `${inline_short_arrays(JSON.stringify(value, undefined, '\t'))}\n`
+}
+
+// Prettier-clean serialization for `package.json`, where prettier does NOT use the `json` parser.
+// It selects `json-stringify` from the FILENAME, and that printer puts every array element on its
+// own line regardless of printWidth — so the inlining above, correct everywhere else, produces a
+// file the consumer's own `prettier --check` rejects. Plain `JSON.stringify` with tab indent is
+// byte-for-byte what that printer emits, so the fix is to skip the inlining rather than model it.
+// See joshuafolkken/kit#797.
+function format_package_json(value: unknown): string {
+	return `${JSON.stringify(value, undefined, '\t')}\n`
 }
 
 const json_format = {
 	inline_short_arrays,
 	format_json,
+	format_package_json,
 }
 
 export { json_format }
