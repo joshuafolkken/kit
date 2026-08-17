@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
-import path from 'node:path'
-import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { package_path } from './init/init-paths'
+import { yaml_config_fixture } from './yaml-config-fixture'
 
 interface PackageJson {
 	files?: Array<string>
@@ -19,8 +19,10 @@ interface WorkspaceYaml {
 	trustLockfile?: boolean
 }
 
+// Resolved from the package root, like load_workspace below, so both readers keep reading the
+// files they name no matter which directory the runner was started in.
 function load_manifest(): PackageJson {
-	const content = readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')
+	const content = readFileSync(package_path('package.json'), 'utf8')
 
 	return JSON.parse(content) as PackageJson
 }
@@ -28,9 +30,7 @@ function load_manifest(): PackageJson {
 const WORKSPACE_CONFIG = 'pnpm-workspace.yaml'
 
 function load_workspace(): WorkspaceYaml {
-	const content = readFileSync(path.resolve(process.cwd(), WORKSPACE_CONFIG), 'utf8')
-
-	return load(content) as WorkspaceYaml
+	return yaml_config_fixture.load_yaml_config(WORKSPACE_CONFIG) as WorkspaceYaml
 }
 
 function extract_top_directory(file_path: string): string {
@@ -167,9 +167,7 @@ describe('package.json exports', () => {
 	})
 
 	it('points the test-filename export at a file that exists on disk', () => {
-		const absolute_target = path.resolve(process.cwd(), TEST_FILENAME_EXPORT_TARGET)
-
-		expect(existsSync(absolute_target)).toBe(true)
+		expect(existsSync(package_path(TEST_FILENAME_EXPORT_TARGET))).toBe(true)
 	})
 })
 

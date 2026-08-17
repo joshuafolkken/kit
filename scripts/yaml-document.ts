@@ -33,18 +33,14 @@ function is_mapping_document(value: unknown): value is Record<string, unknown> {
 // dependency graph), which `load` rejects outright. Non-mapping documents are dropped rather than
 // rejected: a reader only ever looks up keys, and a stream that legitimately carries a scalar
 // document should not make the whole file unreadable.
+// js-yaml 5.3 deprecated the iterator overload ("Iterator is not supported"); the plain
+// `loadAll(content)` form returns the documents as an array and is the supported replacement.
 function parse_yaml_documents(content: string): Array<Record<string, unknown>> {
 	if (content.trim().length === 0) return []
 
-	const documents: Array<unknown> = []
-
-	loadAll(content, (document) => {
-		documents.push(document)
-	})
-
-	return documents.filter(is_mapping_document)
+	return loadAll(content).filter(is_mapping_document)
 }
 
-const yaml_document = { parse_yaml, parse_yaml_documents }
+const yaml_document = { is_mapping_document, parse_yaml, parse_yaml_documents }
 
 export { yaml_document }
