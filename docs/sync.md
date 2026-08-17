@@ -38,6 +38,16 @@ SECURITY.md         tsconfig.sonar.json
 > `dependabot.yml` is intentionally kept as a backstop (it covers any non-kit workflow a consumer
 > adds, and finds nothing to bump for synced workflows since their pins are already current).
 >
+> **The `npm` entry, by contrast, no longer opens routine version-update PRs in any consumer.**
+> It sets `open-pull-requests-limit: 0`, which disables version updates only. `josh latest` runs
+> at the start of every `fullrun` / `halfrun` / `queue` and already bumps npm dependencies to
+> latest, so the weekly Dependabot PRs were duplicating it — in kit they were closed unmerged
+> after each had consumed a full CI run, and the same noise was replicated in every consumer that
+> synced the file. Security advisories are unaffected — GitHub's Dependabot options reference
+> states that security update pull requests "are not subject to this limit and do not count toward
+> it" — so an advisory still opens an npm PR, provided the consumer has Dependabot security updates
+> enabled. This reaches a consumer on its next `josh sync`. See joshuafolkken/kit#803.
+>
 > **Pins are resolved when the file is written, not read from the template.** Every workflow the
 > kit writes into a consumer (`josh init` and `josh sync` alike) passes through
 > `workflow_pin_logic.apply_pins_for_destination`, which substitutes each `uses:` ref from the

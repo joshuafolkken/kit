@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { yaml_config_fixture } from './yaml-config-fixture'
 
 interface LefthookCommand {
 	run?: string
@@ -14,6 +13,10 @@ interface LefthookHook {
 }
 
 type LefthookConfig = Record<string, LefthookHook>
+
+interface LefthookExtends {
+	extends?: ReadonlyArray<string>
+}
 
 const BASE_LEFTHOOK = path.join('lefthook', 'base.yml')
 const VANILLA_LEFTHOOK = path.join('lefthook', 'vanilla.yml')
@@ -28,14 +31,11 @@ const ROOT_RELATIVE_BASE = 'node_modules/@joshuafolkken/kit/lefthook/base.yml'
 const FILE_RELATIVE_BASE = './base.yml'
 
 function load_config(relative_path: string): LefthookConfig {
-	const content = readFileSync(path.resolve(process.cwd(), relative_path), 'utf8')
-
-	return load(content) as LefthookConfig
+	return yaml_config_fixture.load_yaml_config(relative_path) as LefthookConfig
 }
 
 function load_extends(relative_path: string): ReadonlyArray<string> {
-	const content = readFileSync(path.resolve(process.cwd(), relative_path), 'utf8')
-	const parsed = load(content) as { extends?: ReadonlyArray<string> }
+	const parsed = yaml_config_fixture.load_yaml_config(relative_path) as LefthookExtends
 
 	return parsed.extends ?? []
 }
