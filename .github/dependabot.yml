@@ -4,7 +4,16 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+  # Version updates are disabled: `josh latest` runs at the start of every fullrun / halfrun /
+  # queue and already bumps npm dependencies to latest, so Dependabot's weekly PRs only duplicate
+  # it and were being closed unmerged after consuming a full CI run. `open-pull-requests-limit: 0`
+  # disables version updates only — security update PRs "are not subject to this limit and do not
+  # count toward it" (GitHub's Dependabot options reference), so an advisory still opens a PR,
+  # which is the one case `josh latest` does not cover on its own. That fallback needs Dependabot
+  # security updates enabled on the repository (Settings > Advanced Security); without it this file
+  # leaves no npm Dependabot PRs at all. See joshuafolkken/kit#803.
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
       interval: 'weekly'
+    open-pull-requests-limit: 0

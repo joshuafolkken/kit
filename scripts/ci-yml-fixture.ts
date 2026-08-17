@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { load } from 'js-yaml'
 import { package_path } from './init/init-paths'
+import { yaml_config_fixture } from './yaml-config-fixture'
 
 // GitHub spells some workflow keys in kebab-case. They are declared verbatim — with the naming
 // rule disabled on the line, as elsewhere for external field names — rather than reached through
@@ -44,7 +44,7 @@ function read_workflow(relative_path: string): string {
 }
 
 function load_workflow(relative_path: string): Workflow {
-	return load(read_workflow(relative_path)) as Workflow
+	return yaml_config_fixture.load_yaml_config(relative_path) as Workflow
 }
 
 function find_job(relative_path: string, job_name: string): WorkflowJob | undefined {
