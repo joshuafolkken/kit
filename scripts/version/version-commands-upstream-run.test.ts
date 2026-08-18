@@ -20,7 +20,10 @@ import type { UpstreamHookContext } from './version-command-config'
 import { version_commands } from './version-commands'
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
-vi.mock('./version-remote', () => ({ fetch_latest_version: vi.fn() }))
+vi.mock('./version-remote', () => ({
+	fetch_latest_version: vi.fn(),
+	fetch_release_times: vi.fn(),
+}))
 vi.mock('./version-targets', () => ({
 	version_targets: { read_global_version: vi.fn(), read_project_version: vi.fn() },
 }))

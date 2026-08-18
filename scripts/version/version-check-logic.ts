@@ -1,3 +1,4 @@
+import { release_hold } from './release-hold'
 import { is_no_op_upgrade_command, type InstalledVersions } from './upgrade-command-guard'
 import { build_upgrade_shell_command, format_update_command } from './upgrade-shell-command'
 import type { PackageVersionConfig } from './version-command-config'
@@ -17,6 +18,16 @@ interface VersionSnapshot {
 	global_version: string | undefined
 	project_version: string | undefined
 	latest: string
+}
+
+// What the local minimum-release-age policy permits an unpinned resolve to reach. Carried only on an
+// upstream report, because only the effective install is peer-resolved — every other target is
+// upgraded by an explicitly pinned command the window does not block. Optional throughout: a package
+// whose publish timestamps could not be read keeps exactly the report it had before
+// (joshuafolkken/kit#808).
+interface ReleaseHold {
+	installable: string
+	minimum_age_minutes: number
 }
 
 // The install that is actually executing (`import.meta.url` resolved): version plus the package
@@ -65,6 +76,7 @@ interface UpstreamReport {
 	latest: string
 	effective?: UpstreamEffective
 	installed_versions?: InstalledVersions
+	hold?: ReleaseHold
 }
 
 // Render the running-binary line, or nothing when the running binary is unknown.
@@ -90,12 +102,36 @@ function format_target_line(label: string, version: string | undefined, latest: 
 	return `  ${label} ${format_target_status(version, latest)}`
 }
 
+// One target line, followed by the hold explanation when that target is the one the release-age
+// window is holding back. The note is derived from the target's own version, so a target flagged as
+// held always produces one — the flag and the sentence cannot disagree.
+function format_held_target_line(
+	label: string,
+	version: string | undefined,
+	latest: string,
+	hold: ReleaseHold | undefined,
+): Array<string> {
+	const notes =
+		hold === undefined
+			? []
+			: release_hold.build_release_hold_notes(
+					version,
+					latest,
+					hold.installable,
+					hold.minimum_age_minutes,
+				)
+
+	return [format_target_line(label, version, latest), ...notes.map((note) => `  ${note}`)]
+}
+
 // Render the upstream's effective/global line, or nothing when the consumer did not opt in. When
 // opted in, an unresolved effective install renders "not installed" (never silently omitted).
 function format_upstream_global_line(report: UpstreamReport): Array<string> {
 	if (report.effective === undefined) return []
 
-	return [format_target_line(GLOBAL_LABEL, report.effective.version, report.latest)]
+	// The effective install is the only peer-resolved target, so it is the only one the window can
+	// hold back and the only one that carries the explanation.
+	return format_held_target_line(GLOBAL_LABEL, report.effective.version, report.latest, report.hold)
 }
 
 // Whether the report carries an effective install that is installed and behind the upstream's latest
@@ -287,6 +323,7 @@ const version_check_logic = {
 }
 
 export type {
+	ReleaseHold,
 	VersionSnapshot,
 	RunningBinary,
 	VersionOutputExtras,
