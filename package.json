@@ -1,5 +1,5 @@
 {
-	"version": "1.78.0",
+	"version": "1.79.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -92,6 +92,7 @@
 		"registry": "https://npm.pkg.github.com"
 	},
 	"devDependencies": {
+		"@actions/expressions": "^0.3.61",
 		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.4",
 		"@types/node": "^26.2.0",
