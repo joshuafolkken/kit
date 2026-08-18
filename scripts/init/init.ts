@@ -2,8 +2,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { doctor_io } from '#scripts/doctor/doctor-io'
 import { resolve_local_bin } from '#scripts/local-bin'
 import { package_version_schema, with_package_manager_schema } from '#scripts/schemas'
+import { security_updates } from '#scripts/security-updates'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
@@ -161,9 +163,20 @@ function main(): void {
 	merge_project_package_json()
 
 	console.info('\nAI files:')
-	init_ai_copy.run_ai_copies()
+	// `init` writes the same npm-disabling `.github/dependabot.yml` that `sync` distributes, so a
+	// freshly scaffolded repository is exposed from its first commit — and a new private repository
+	// is exactly where the setting is off by default. The name is the one the Sonar config already
+	// resolved, so `gh repo view` runs once; the position is the pre-existing one.
+	const name_with_owner = init_ai_copy.run_ai_copies()
 
 	install_lefthook()
+
+	// Gated, unlike `sync`: `init` skips `.github/dependabot.yml` when the consumer already has one,
+	// so the npm-disable may never have landed and the report's claim would be false. `sync`
+	// overwrites unconditionally, which is why it needs no gate.
+	if (doctor_io.has_distributed_dependabot_config(PROJECT_ROOT, PROJECT_ROOT)) {
+		security_updates.report_security_updates_section(name_with_owner)
+	}
 
 	console.info('\n✅ Done.\n')
 }

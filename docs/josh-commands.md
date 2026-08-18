@@ -125,6 +125,8 @@ pnpm josh init
 
 Creates or merges all config files. See [init.md](./init.md) for the full list of files created and merged.
 
+`init` also reports the repository's **Dependabot security updates** setting as its last step, because it writes the same npm-disabling `.github/dependabot.yml` that `josh sync` distributes — a freshly scaffolded private repository has that setting off by default. The line is skipped when the project already had its own `.github/dependabot.yml`, since `init` does not overwrite it and the npm disable never landed. See [`josh doctor`](#josh-doctor) for the four results and [docs/sync.md](./sync.md) for why the setting matters.
+
 ### `josh sync`
 
 Overwrite managed files with the latest versions from the package.
@@ -321,6 +323,17 @@ pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
 ```
 
 `doctor` reports the running binary, the `josh` first on `PATH` (`which josh`), and the pnpm-global install (`pnpm bin -g`). When the PATH `josh` differs from the pnpm-global one, it prints the same shadowing warning as `josh version` plus the recovery command.
+
+`doctor` also reports the repository's **Dependabot security updates** setting, the prerequisite the distributed `.github/dependabot.yml` depends on once npm version updates are disabled ([#803](https://github.com/joshuafolkken/kit/issues/803)). `josh sync` prints the same line unconditionally, and `josh init` prints it when it actually wrote the config — see [docs/sync.md](./sync.md) for why it runs there too. Unlike those two, `doctor` reports only where the prerequisite exists: it skips the line outside a git work tree, and skips it in a repository that has no distributed `.github/dependabot.yml`. `doctor` diagnoses the global install and is routinely run from a home directory or from a clone of an unrelated project, where a Dependabot warning — and an enabling command aimed at someone else's repository — would be noise. Past that gate it always reports, including when the lookup fails, since a broken or unauthenticated `gh` must surface as `could not be read` rather than as silence. One of four results is printed:
+
+| Result              | Meaning                                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled`           | Security advisories can open npm pull requests.                                                                                                               |
+| `paused`            | The setting is on but paused, so no advisory PR is opened. Resume it from the repository's Security → Dependabot page; the enable API does not clear a pause. |
+| `disabled`          | Off — npm advisories open no pull request. The enabling command is printed, addressed at the resolved repository.                                             |
+| `could not be read` | The setting could not be queried (a 404, or a token without the scope). Reported as unchecked, **not** as off.                                                |
+
+The check never fails the command: an unreadable setting is GitHub-side state kit cannot verify, not a broken install. `doctor` does not enable the setting either — changing a repository setting is the maintainer's call.
 
 `--fix` is your go-ahead to repair: it reads the shadowing binary and, **only if it is a kit shim** (its body references `@joshuafolkken/kit` or the removed `install-bin` script), removes it so the pnpm-global `josh` reclaims `PATH` precedence. Any other shadowing binary is left untouched and reported for manual review — `doctor` never deletes a file it cannot positively identify as a stale kit shim.
 

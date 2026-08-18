@@ -1,5 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { gh_spawn } from '#scripts/gh-spawn'
 import { transform_copied_content } from './init-copy-content'
 import { init_logic } from './init-logic'
 import { package_path, PROJECT_ROOT } from './init-paths'
@@ -83,7 +84,10 @@ function did_skip_ai_directory_copy(directory_name: string): boolean {
 	return false
 }
 
-function run_ai_copies(): void {
+// Returns the repository name resolved for the Sonar config, so `josh init` can reuse it for the
+// security-updates report instead of spawning a second `gh repo view` (joshuafolkken/kit#805).
+// Resolving it here rather than in the caller keeps every AI-file write ahead of the network call.
+function run_ai_copies(): string | undefined {
 	const file_skips = init_logic
 		.get_ai_copy_files()
 		.map((filename) => did_skip_ai_file_copy(filename))
@@ -95,11 +99,15 @@ function run_ai_copies(): void {
 		.map((directory_name) => did_skip_ai_directory_copy(directory_name))
 	const has_skips = [...file_skips, ...mapping_skips, ...directory_skips].some(Boolean)
 
-	init_sonar.copy_sonar_with_template()
+	const name_with_owner = gh_spawn.get_repo_name_with_owner()
+
+	init_sonar.copy_sonar_with_template(name_with_owner)
 
 	if (has_skips) {
 		console.info('\n  💡 Run `josh sync` to overwrite skipped AI files with the latest version.')
 	}
+
+	return name_with_owner
 }
 
 const init_ai_copy = {
