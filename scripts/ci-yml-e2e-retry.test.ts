@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
-const ATTEMPT_SUFFIX = '-attempt-1'
 const TEST_COMMAND = 'pnpm exec playwright test'
 const WARNING_ANNOTATION = '::warning::'
 const FIRST_ATTEMPT_ID = 'e2e_tests'
@@ -16,6 +15,7 @@ const FIRST_ATTEMPT_FAILED = `steps.${FIRST_ATTEMPT_ID}.outcome == 'failure'`
 const AFTER_FAILURE_CONDITION = `\${{ !cancelled() && ${RETRY_ENABLED} && ${FIRST_ATTEMPT_FAILED} }}`
 const DEFAULT_BRANCH_PUSH = "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 const {
+	ATTEMPT_SUFFIX,
 	upload_input,
 	find_upload,
 	UPLOAD_NAME_INPUT: NAME_INPUT,

@@ -63,8 +63,23 @@ function upload_input(step: WorkflowStep | undefined, key: string): string | num
 	return step?.with?.[key]
 }
 
+// Every artifact-publishing step of a job, identified by the action it runs rather than by the
+// inputs it happens to set: a guard that has to hold for the whole group must derive the group
+// from something a new step cannot be written without. The ref is cut off rather than matched as
+// a prefix, so a step that names the action without pinning it still joins the group instead of
+// dropping out of every guard built on it.
+const UPLOAD_ACTION = 'actions/upload-artifact'
+
+function action_name(step: WorkflowStep): string {
+	return (step.uses ?? '').split('@', 1)[0] ?? ''
+}
+
+function upload_steps(job: WorkflowJob | undefined): ReadonlyArray<WorkflowStep> {
+	return job?.steps?.filter((step) => action_name(step) === UPLOAD_ACTION) ?? []
+}
+
 function find_upload(job: WorkflowJob | undefined, artifact: string): WorkflowStep | undefined {
-	return job?.steps?.find((step) => upload_input(step, UPLOAD_NAME_INPUT) === artifact)
+	return upload_steps(job).find((step) => upload_input(step, UPLOAD_NAME_INPUT) === artifact)
 }
 
 function job_timeout_minutes(job: WorkflowJob | undefined): number | undefined {
@@ -82,6 +97,9 @@ const E2E_JOB = 'e2e'
 const LOG_PATH_VARIABLE = 'WRANGLER_LOG_PATH'
 const REPORT_ARTIFACT = 'playwright-report'
 const LOG_ARTIFACT = 'e2e-web-server-log'
+// What the retry chain renames the first attempt's output to, and the suffix every guard on that
+// output composes artifact names with. Shared for the same reason as the names above.
+const ATTEMPT_SUFFIX = '-attempt-1'
 
 function e2e_template_job(): WorkflowJob | undefined {
 	return find_job(TEMPLATE_CI_YML, E2E_JOB)
@@ -101,10 +119,12 @@ const ci_yml_fixture = {
 	LOG_PATH_VARIABLE,
 	REPORT_ARTIFACT,
 	LOG_ARTIFACT,
+	ATTEMPT_SUFFIX,
 	read_workflow,
 	load_workflow,
 	find_job,
 	upload_input,
+	upload_steps,
 	find_upload,
 	job_timeout_minutes,
 	step_continue_on_error,
