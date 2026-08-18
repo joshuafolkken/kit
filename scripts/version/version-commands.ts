@@ -1,8 +1,11 @@
 import { execaSync } from 'execa'
+import { release_age } from './release-age'
+import { release_hold } from './release-hold'
 import { running_binary } from './running-binary'
 import type { InstalledVersions } from './upgrade-command-guard'
 import {
 	version_check_logic,
+	type ReleaseHold,
 	type RunningBinary,
 	type UpstreamEffective,
 	type UpstreamReport,
@@ -14,11 +17,45 @@ import type {
 	UpstreamVersionConfig,
 	VersionCommandConfig,
 } from './version-command-config'
-import { fetch_latest_version } from './version-remote'
+import { fetch_latest_version, fetch_release_times } from './version-remote'
 import { version_targets } from './version-targets'
 
 const FAILURE_EXIT_CODE = 1
 const ALREADY_UP_TO_DATE = 'Already up to date'
+const NO_QUARANTINE_MINUTES = 0
+
+// What the local minimum-release-age policy permits for one package. Resolved per package because
+// the newest installable release is a property of that package's own publish history. Returns a hold
+// whose `installable` is undefined when the timestamps cannot be read — the report then renders
+// exactly as it did before (joshuafolkken/kit#808).
+//
+// Skipped entirely unless some target is behind `latest`: the timestamps cost a second `gh api`
+// round trip per package, and a package with nothing stale has no gap for a hold to explain. On the
+// common all-current run the report costs exactly what it did before this feature.
+function read_release_hold(
+	versions_endpoint: string | undefined,
+	latest: string,
+	versions: ReadonlyArray<string | undefined>,
+): ReleaseHold | undefined {
+	if (versions.every((version) => version === undefined || version === latest)) return undefined
+	// Resolved by walking up from the working directory: `josh version` runs from subdirectories and
+	// from outside a project, where a fixed relative path would silently read "no quarantine".
+	const minimum_age_minutes = release_age.read_nearest_minimum_release_age(process.cwd())
+	// No window means nothing can be withheld, so there is no hold to explain and no reason to spend
+	// a registry round trip discovering that.
+	if (minimum_age_minutes <= NO_QUARANTINE_MINUTES) return undefined
+	const installable = release_hold.resolve_installable(
+		fetch_release_times(versions_endpoint),
+		latest,
+		minimum_age_minutes,
+		Date.now(),
+	)
+	// Absent rather than present-with-nothing: `ReleaseHold` is publicly exported, so the field's
+	// presence must mean a hold was actually resolved.
+	if (installable === undefined) return undefined
+
+	return { installable, minimum_age_minutes }
+}
 
 // Read the global, project, and latest versions for the configured package — the three values a
 // single `version` / `version:upgrade` invocation operates on.
@@ -110,14 +147,19 @@ function read_upstream_report(
 	upstream: UpstreamVersionConfig,
 	config: VersionCommandConfig,
 	snapshot: VersionSnapshot,
+	is_hold_wanted: boolean,
 ): UpstreamReport {
-	const report: UpstreamReport = {
-		config: upstream,
-		project_version: version_targets.read_project_version(process.cwd(), upstream.package_name),
-		latest: fetch_latest_version(upstream.versions_endpoint, upstream.package_name),
-	}
+	const latest = fetch_latest_version(upstream.versions_endpoint, upstream.package_name)
+	const project_version = version_targets.read_project_version(process.cwd(), upstream.package_name)
+	const report: UpstreamReport = { config: upstream, project_version, latest }
 
 	attach_upstream_effective(report, config, snapshot, upstream)
+	// After the effective install is attached, so its version counts toward the staleness gate.
+	// Only the effective install is peer-resolved, so it is the only target the window can hold back.
+	const hold = is_hold_wanted
+		? read_release_hold(upstream.versions_endpoint, latest, [report.effective?.version])
+		: undefined
+	if (hold !== undefined) report.hold = hold
 
 	return report
 }
@@ -129,15 +171,18 @@ function read_upstream_report(
 function read_upstream_reports(
 	config: VersionCommandConfig,
 	snapshot: VersionSnapshot,
+	is_hold_wanted = false,
 ): Array<UpstreamReport> {
-	return config.upstreams.map((upstream) => read_upstream_report(upstream, config, snapshot))
+	return config.upstreams.map((upstream) =>
+		read_upstream_report(upstream, config, snapshot, is_hold_wanted),
+	)
 }
 
 // The `version` (show) command for any configured package: print the dual/offline report with
 // staleness markers, upstream sections, upgrade hints, and the running-binary/warning extras.
 function run_check(config: VersionCommandConfig): void {
 	const snapshot = read_snapshot(config)
-	const upstream_reports = read_upstream_reports(config, snapshot)
+	const upstream_reports = read_upstream_reports(config, snapshot, true)
 
 	console.info(
 		version_check_logic.format_dual_version_output(

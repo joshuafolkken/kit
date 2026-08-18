@@ -12,6 +12,7 @@ export type {
 	VersionCommandConfigOptions,
 } from './version-command-config'
 export type {
+	ReleaseHold,
 	VersionSnapshot,
 	RunningBinary,
 	UpstreamReport,
