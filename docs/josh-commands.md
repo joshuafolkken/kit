@@ -237,6 +237,29 @@ In addition, `version` reports the **running binary** — the version and packag
 
 A target that is not installed is reported as `not installed`. A stale target gets a `Run:` hint with the exact upgrade command (`pnpm add -g` for global, `pnpm add -D … && fix-gh-packages` for the project). `josh v` and `pnpm josh v` produce the same report.
 
+#### Release-age holds
+
+An upstream's **effective** install can be behind `Latest:` for a reason no upgrade clears. The repository-managed `.npmrc` sets `minimum-release-age`, which withholds a release from **unpinned** resolution until it has aged past that window. Measured on pnpm 11.22.0 with `minimum-release-age=1440`, against a release published 3.5 h earlier:
+
+```text
+pnpm add @joshuafolkken/kit@1.80.0   ->  1.80.0   (pnpm records a minimumReleaseAgeExclude entry)
+pnpm add @joshuafolkken/kit          ->  1.78.0
+```
+
+So a pinned `Run:` hint always installs and is **never** suppressed. What the window actually holds back is peer resolution — the mechanism behind an upstream's effective install ([#698](https://github.com/joshuafolkken/kit/issues/698)) — which is why the explanation appears there and nowhere else:
+
+```text
+@joshuafolkken/app-kit
+  Global:  1.78.0      ⚠ → 1.80.0
+  Held: 1.80.0 is inside the 24 h minimum-release-age window; an unpinned resolve lands on 1.78.0
+  Project:  1.80.0      ✓
+  Latest:  1.80.0
+```
+
+Since kit publishes several releases a day, a residual `⚠` right after a **successful** `version:upgrade` is the normal case rather than a failure — the `Held:` line says so instead of leaving the marker unexplained. An effective install below what an unpinned resolve reaches is genuinely stale and gets no such line.
+
+The publish timestamps come from the same GitHub Packages endpoint that resolves `Latest:`, fetched only when the effective install is behind `Latest:` and only when a window is actually configured; when they cannot be read the report renders exactly as it did before. `version:upgrade` is unchanged. See [#808](https://github.com/joshuafolkken/kit/issues/808).
+
 #### PATH shadowing warning
 
 When the `josh` first on `PATH` is **not** the pnpm-global install — for example a stale `~/.local/bin/josh` shim left behind by a project pinned below `v0.200.0` (see [the design note below](#design-per-project-installs-must-not-touch-the-global-path)) — `version` appends a warning naming both paths and the recovery command:
