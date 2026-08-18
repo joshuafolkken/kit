@@ -21,6 +21,7 @@ interface WorkflowStep {
 interface WorkflowJob {
 	container?: unknown
 	env?: Record<string, string>
+	if?: string
 	outputs?: Record<string, string>
 	steps?: ReadonlyArray<WorkflowStep>
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key

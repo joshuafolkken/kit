@@ -17,8 +17,20 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
 
-      - name: Enable auto-merge for patch updates
-        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
+      # `dependency-type` cannot separate the ecosystems: Dependabot reports github-actions updates
+      # as `direct:production`, the same value it reports for kit's npm production dependencies, so
+      # `package-ecosystem` is the only usable discriminator (kit#802).
+      #
+      # github-actions patch and minor bumps merge unattended because these are the SHA pins
+      # `josh sync` distributes — keeping them current at the source is the intended flow. npm bumps
+      # never do, at any semver level: kit publishes lint plugins as runtime dependencies, so a
+      # patch release can change rule behavior for every consumer while kit's own CI only proves
+      # that kit still builds. Major bumps never auto-merge in either ecosystem.
+      - name: Enable auto-merge for github-actions patch and minor updates
+        if: >-
+          steps.metadata.outputs.package-ecosystem == 'github_actions'
+          && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
+          || steps.metadata.outputs.update-type == 'version-update:semver-minor')
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ github.token }}
