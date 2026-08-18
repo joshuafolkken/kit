@@ -1,13 +1,11 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { gh_spawn } from '#scripts/gh-spawn'
 import { sonar_file } from '#scripts/sonar-file'
 import { init_logic } from './init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 
-function copy_sonar_with_template(): void {
+function copy_sonar_with_template(name_with_owner: string | undefined): void {
 	const destination = init_logic.get_sonar_template_destination()
-	const name_with_owner = gh_spawn.get_repo_name_with_owner()
 
 	if (name_with_owner === undefined) {
 		console.warn(`  ⚠ skipped   ${destination} (gh repo view failed)`)

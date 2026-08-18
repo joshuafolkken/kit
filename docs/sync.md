@@ -48,6 +48,23 @@ SECURITY.md         tsconfig.sonar.json
 > it" — so an advisory still opens an npm PR, provided the consumer has Dependabot security updates
 > enabled. This reaches a consumer on its next `josh sync`. See joshuafolkken/kit#803.
 >
+> **`josh init`, `josh sync` and `josh doctor` all report that prerequisite.** Because the advisory path is now
+> the only npm Dependabot path, a consumer whose `Dependabot security updates` setting is off
+> receives no npm PRs at all — and the absence of a PR is indistinguishable from the absence of an
+> advisory. All three query `GET /repos/{owner}/{repo}/automated-security-fixes` and print one
+> of four results: `enabled`, `paused` (on, but opening no PRs), `disabled`, or `could not be read`.
+> `sync` reports unconditionally, because it overwrites the file on every run. `init` and `doctor`
+> report only where kit's config is actually present: `init` skips the file when the consumer
+> already has its own, and `doctor` is routinely run from a home directory or an unrelated clone to
+> diagnose the global install. Past that gate both always report, so a broken `gh` surfaces as
+> `could not be read` instead of as silence.
+> The last is reported as unchecked rather than as off — a 404 or a token without the scope is not
+> evidence that the setting is disabled — and never fails the command. When the setting is **off**
+> the report prints the enabling command, addressed at the resolved repository; kit does not run it,
+> because changing a repository setting is the maintainer's call. A **paused** repository gets
+> different advice: it is already `enabled: true`, so the enable endpoint is a no-op there — it must
+> be resumed from the repository's Security → Dependabot page instead. See joshuafolkken/kit#805.
+>
 > **Pins are resolved when the file is written, not read from the template.** Every workflow the
 > kit writes into a consumer (`josh init` and `josh sync` alike) passes through
 > `workflow_pin_logic.apply_pins_for_destination`, which substitutes each `uses:` ref from the

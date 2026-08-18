@@ -3,6 +3,7 @@ import:
   - "./cspell/index.yaml"
 words:
   - dedup
+  - Unparseable
   - desync
   - desynced
   - dotless
