@@ -269,9 +269,16 @@ jobs:
       - name: Run E2E tests
         run: pnpm test:e2e
 
+      # continue-on-error because the step exists to collect evidence, and collecting evidence must
+      # not be what decides the release: it runs on always(), so a transient artifact-service error
+      # would end the job red on a run whose tests passed, skipping the auto-tag dispatch below and
+      # withholding kit's own release (#809). The step's outcome stays `failure`, so it is still
+      # marked red on the run and a missing report is never silent. This job is skipped while kit
+      # ships no E2E specs; the guard is here so adding one cannot quietly turn the gap live.
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
+        continue-on-error: true
         with:
           name: playwright-report
           path: playwright-report/

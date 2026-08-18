@@ -425,9 +425,17 @@ jobs:
         if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
         run: pnpm exec playwright test
 
+      # continue-on-error for the same reason the -attempt-1 uploads above carry it, and this is
+      # the step where it matters most: it runs on always(), so it is the one evidence step still
+      # executing after a retry that passed. Without the guard a transient artifact-service error
+      # here would end the job red on a run whose tests are green — skipping the auto-tag dispatch
+      # below and withholding the release exactly as the crash the retry absorbed would have
+      # (#809). The failure is not swallowed: continue-on-error keeps the step's own outcome
+      # `failure`, so it stays marked red on the run and a missing report is never silent.
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
+        continue-on-error: true
         with:
           name: playwright-report
           path: playwright-report/
@@ -440,9 +448,16 @@ jobs:
       # crashing burns the job's timeout, and GitHub cancels a timed-out job rather than
       # failing it — the one case where a `failure()`-only step would skip the log that
       # explains the hang.
+      #
+      # continue-on-error completes the rule rather than fixing a live exposure: this step only
+      # runs once the job is already failing or cancelled, so its own failure withholds nothing
+      # that was not already withheld. It carries the guard so the rule holds for every artifact
+      # the job publishes instead of for the ones that need it today — a later condition change
+      # here would otherwise reintroduce #809 in a step nobody re-audits.
       - name: Upload web server log
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure() || cancelled()
+        continue-on-error: true
         with:
           name: e2e-web-server-log
           path: e2e-web-server-logs/
