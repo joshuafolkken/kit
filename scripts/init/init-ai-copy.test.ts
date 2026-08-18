@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const read_file_mock = vi.hoisted(() => vi.fn().mockReturnValue('content'))
 const mkdir_mock = vi.hoisted(() => vi.fn())
@@ -6,6 +6,8 @@ const write_file_mock = vi.hoisted(() => vi.fn())
 const exists_sync_mock = vi.hoisted(() => vi.fn())
 const cp_sync_mock = vi.hoisted(() => vi.fn())
 const copy_sonar_mock = vi.hoisted(() => vi.fn())
+const OWNER_REPO = vi.hoisted(() => 'owner/repo')
+const get_repo_name_mock = vi.hoisted(() => vi.fn())
 const get_ai_copy_files_mock = vi.hoisted(() => vi.fn().mockReturnValue(['CLAUDE.md']))
 const merge_workspace_mock = vi.hoisted(() =>
 	vi.fn().mockImplementation((existing: string) => existing),
@@ -14,6 +16,9 @@ const transform_copied_content_mock = vi.hoisted(() =>
 	vi.fn().mockImplementation((_destination: string, content: string) => content),
 )
 
+vi.mock('#scripts/gh-spawn', () => ({
+	gh_spawn: { get_repo_name_with_owner: get_repo_name_mock },
+}))
 vi.mock('node:fs', () => ({
 	cpSync: cp_sync_mock,
 	existsSync: exists_sync_mock,
@@ -179,5 +184,41 @@ describe('init_ai_copy.run_ai_copies — pnpm-workspace.yaml merge when exists',
 
 		expect(write_file_mock).toHaveBeenCalled()
 		vi.restoreAllMocks()
+	})
+})
+
+// `run_ai_copies` resolves the repository name once for the Sonar config and hands it back so
+// `josh init` can reuse it for the security-updates report instead of spawning a second
+// `gh repo view` (joshuafolkken/kit#805).
+describe('init_ai_copy.run_ai_copies — repository name', () => {
+	beforeEach(() => {
+		get_repo_name_mock.mockReturnValue(OWNER_REPO)
+	})
+
+	it('returns the resolved repository name', () => {
+		expect(init_ai_copy.run_ai_copies()).toBe(OWNER_REPO)
+	})
+
+	it('forwards the resolved name to the sonar copy', () => {
+		copy_sonar_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(copy_sonar_mock).toHaveBeenCalledWith(OWNER_REPO)
+	})
+
+	it('resolves the repository name only once per run', () => {
+		get_repo_name_mock.mockClear()
+		get_repo_name_mock.mockReturnValue(OWNER_REPO)
+
+		init_ai_copy.run_ai_copies()
+
+		expect(get_repo_name_mock).toHaveBeenCalledTimes(1)
+	})
+
+	it('returns undefined when the repository cannot be resolved', () => {
+		get_repo_name_mock.mockReturnValue(undefined)
+
+		expect(init_ai_copy.run_ai_copies()).toBeUndefined()
 	})
 })

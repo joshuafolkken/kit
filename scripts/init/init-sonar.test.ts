@@ -3,15 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 const exists_sync_mock = vi.hoisted(() => vi.fn())
 const write_sonar_file_mock = vi.hoisted(() => vi.fn())
 const merge_sonar_file_mock = vi.hoisted(() => vi.fn())
-const get_repo_name_with_owner_mock = vi.hoisted(() => vi.fn())
 const SONAR_FILENAME = vi.hoisted(() => 'sonar-project.properties')
 
 vi.mock('node:fs', () => ({ existsSync: exists_sync_mock }))
 vi.mock('node:path', () => ({
 	default: { join: (...parts: Array<string>) => parts.join('/') },
-}))
-vi.mock('#scripts/gh-spawn', () => ({
-	gh_spawn: { get_repo_name_with_owner: get_repo_name_with_owner_mock },
 }))
 vi.mock('./init-logic', () => ({
 	init_logic: {
@@ -37,12 +33,11 @@ const OWNER_REPO = 'owner/repo'
 
 describe('init_sonar.copy_sonar_with_template — skips when gh fails', () => {
 	it('does not call merge_sonar_file when gh repo view returns undefined', () => {
-		get_repo_name_with_owner_mock.mockReset()
 		vi.spyOn(console, 'warn').mockImplementation(() => {
 			/* suppress */
 		})
 
-		init_sonar.copy_sonar_with_template()
+		init_sonar.copy_sonar_with_template(undefined)
 
 		expect(merge_sonar_file_mock).not.toHaveBeenCalled()
 		vi.restoreAllMocks()
@@ -51,14 +46,13 @@ describe('init_sonar.copy_sonar_with_template — skips when gh fails', () => {
 
 describe('init_sonar.copy_sonar_with_template — merges when file exists', () => {
 	it('calls merge_sonar_file when destination already exists', () => {
-		get_repo_name_with_owner_mock.mockReturnValue(OWNER_REPO)
 		exists_sync_mock.mockReturnValue(true)
 		vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})
 		merge_sonar_file_mock.mockClear()
 
-		init_sonar.copy_sonar_with_template()
+		init_sonar.copy_sonar_with_template(OWNER_REPO)
 
 		expect(merge_sonar_file_mock).toHaveBeenCalledWith(
 			expect.any(String),
@@ -69,14 +63,13 @@ describe('init_sonar.copy_sonar_with_template — merges when file exists', () =
 	})
 
 	it('does not call write_sonar_file directly when destination exists', () => {
-		get_repo_name_with_owner_mock.mockReturnValue(OWNER_REPO)
 		exists_sync_mock.mockReturnValue(true)
 		vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})
 		write_sonar_file_mock.mockClear()
 
-		init_sonar.copy_sonar_with_template()
+		init_sonar.copy_sonar_with_template(OWNER_REPO)
 
 		expect(write_sonar_file_mock).not.toHaveBeenCalled()
 		vi.restoreAllMocks()
@@ -85,13 +78,12 @@ describe('init_sonar.copy_sonar_with_template — merges when file exists', () =
 
 describe('init_sonar.copy_sonar_with_template — creates when file is missing', () => {
 	it('calls merge_sonar_file with correct destination when file does not exist', () => {
-		get_repo_name_with_owner_mock.mockReturnValue(OWNER_REPO)
 		exists_sync_mock.mockReturnValue(false)
 		vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})
 
-		init_sonar.copy_sonar_with_template()
+		init_sonar.copy_sonar_with_template(OWNER_REPO)
 
 		expect(merge_sonar_file_mock).toHaveBeenCalledWith(
 			expect.any(String),

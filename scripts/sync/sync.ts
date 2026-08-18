@@ -6,6 +6,7 @@ import { gh_spawn } from '#scripts/gh-spawn'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
+import { security_updates } from '#scripts/security-updates'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { sync_configs } from './sync-configs'
@@ -146,9 +147,8 @@ function sync_deploy_vps(destination_path: string): void {
 	console.info('  ✔ synced    deploy-vps.yml')
 }
 
-function sync_sonar_with_template(is_force = false): void {
+function sync_sonar_with_template(name_with_owner: string | undefined, is_force = false): void {
 	const destination = init_logic.get_sonar_template_destination()
-	const name_with_owner = gh_spawn.get_repo_name_with_owner()
 
 	if (name_with_owner === undefined) {
 		console.warn(`  ⚠ skipped   ${destination} (gh repo view failed)`)
@@ -234,15 +234,26 @@ function sync_secretlint_development_deps(destination_path: string): void {
 	)
 }
 
+// The distributed `.github/dependabot.yml` disables npm version updates (joshuafolkken/kit#803), so
+// a synced consumer only receives npm Dependabot PRs through the security-advisory path — which
+// needs a repository setting kit cannot write. Reporting it here ties the warning to the moment the
+// disable reaches the consumer (joshuafolkken/kit#805). It never fails the sync: the setting is
+// GitHub-side state, not a synced artifact.
 function sync_project_artifacts(is_force: boolean): void {
 	sync_ai_copy_all(is_force)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
 	sync_playwright_config(path.join(PROJECT_ROOT, 'playwright.config.ts'))
 	sync_deploy_vps(path.join(PROJECT_ROOT, '.github/workflows/deploy-vps.yml'))
-	sync_sonar_with_template(is_force)
+	// Resolved where the Sonar sync has always needed it, and reused by the report below, so
+	// `gh repo view` runs once rather than twice. The position is the pre-existing one: the writes
+	// after this line already ran after the lookup before this change.
+	const name_with_owner = gh_spawn.get_repo_name_with_owner()
+
+	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
 	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	sync_secretlint_development_deps(path.join(PROJECT_ROOT, PACKAGE_JSON))
+	security_updates.report_security_updates_section(name_with_owner)
 }
 
 function main(): void {
