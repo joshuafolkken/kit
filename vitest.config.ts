@@ -9,6 +9,7 @@ export default defineConfig({
 			'scripts/**/*.test.ts',
 			'scripts-ai/**/*.test.ts',
 			'eslint/**/*.test.ts',
+			'ports/**/*.test.ts',
 			'prettier/**/*.test.ts',
 			'templates/**/*.test.ts',
 		],

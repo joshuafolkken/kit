@@ -21,6 +21,9 @@ const DEV_COMMAND = 'pnpm run dev'
 const PREVIEW_COMMAND = 'pnpm run build && pnpm run preview'
 const DEV_PORT = 5173
 const PREVIEW_PORT = 4173
+const SEED_KEY = 'PORT_SEED'
+const SEED = 1
+const INVALID_SEED = 'abc'
 
 interface WebServer {
 	command?: string
@@ -64,6 +67,15 @@ async function load_reuse_existing_server(
 	const web_server = await load_web_server(ci, flag)
 
 	return web_server.reuseExistingServer
+}
+
+async function load_seeded_web_server(
+	ci: string | undefined,
+	seed: string | undefined,
+): Promise<WebServer> {
+	vi.stubEnv(SEED_KEY, seed)
+
+	return await load_web_server(ci, undefined)
 }
 
 afterEach(() => {
@@ -174,5 +186,40 @@ describe('playwright.config CI failure cap', () => {
 
 		expect(max_failures).toBeGreaterThanOrEqual(MIN_USEFUL_MAX_FAILURES)
 		expect(max_failures).toBeLessThanOrEqual(MAX_USEFUL_MAX_FAILURES)
+	})
+})
+
+// #818: every kit consumer used to land on the same 5173 / 4173, so two projects could not run
+// their servers at once and the second one drifted onto an unpredictable port. Both ports now come
+// from kit's single definition offset by PORT_SEED, and — baseURL being derived from webServer.port
+// — this config is what makes the whole suite follow the seed.
+describe('playwright.config PORT_SEED', () => {
+	it('keeps the historical dev port when the seed is unset', async () => {
+		const web_server = await load_seeded_web_server(undefined, undefined)
+
+		expect(web_server.port).toBe(DEV_PORT)
+	})
+
+	it('keeps the historical preview port when the seed is unset', async () => {
+		const web_server = await load_seeded_web_server(CI_ON, undefined)
+
+		expect(web_server.port).toBe(PREVIEW_PORT)
+	})
+
+	it('offsets the local dev port by the seed', async () => {
+		const web_server = await load_seeded_web_server(undefined, String(SEED))
+
+		expect(web_server.port).toBe(DEV_PORT + SEED)
+	})
+
+	it('offsets the CI preview port by the same seed', async () => {
+		const web_server = await load_seeded_web_server(CI_ON, String(SEED))
+
+		expect(web_server.port).toBe(PREVIEW_PORT + SEED)
+	})
+
+	// Falling back to the shared default here would silently undo the whole point of the seed.
+	it('fails to load rather than serving a default port for an invalid seed', async () => {
+		await expect(load_seeded_web_server(undefined, INVALID_SEED)).rejects.toThrow(SEED_KEY)
 	})
 })

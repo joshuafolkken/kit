@@ -86,6 +86,39 @@ pnpm josh check        # development mode
 pnpm josh check:ci     # strict mode (--threshold error), used in CI
 ```
 
+### `josh port`
+
+Print the port this project's dev server or preview server runs on, resolved from `PORT_SEED`.
+
+```bash
+pnpm josh port dev       # 5173 with no seed set
+pnpm josh port preview   # 4173 with no seed set
+```
+
+Every kit-distributed SvelteKit project used to land on the same two ports, so a developer working across several of them on one machine could not run two previews at once — the second project's tooling either collided with the first or drifted onto an unpredictable port. `PORT_SEED` is a personal, non-committed integer in `.env` that offsets both ports together:
+
+```bash
+PORT_SEED=1   # dev 5174, preview 4174
+```
+
+Unset means seed `0` — today's numbers exactly — so CI and un-migrated projects are unaffected without doing anything. One seed moves both ports, so a project can never end up with a dev port from one project and a preview port from another. An invalid seed (a non-integer, a negative, or one that would push a port past `65535`) is a hard error rather than a silent fall back to the default: a gate that quietly reverts to the shared port is the collision this exists to remove.
+
+`playwright.config.ts` reads the same definition directly (`import { ports } from '@joshuafolkken/kit/ports'`), so the E2E suite follows the seed with no configuration. This command exists for the contexts that cannot import it — a `package.json` script substitutes its output into a command line:
+
+```json
+{
+	"scripts": {
+		"dev": "vite dev --port $(pnpm josh port dev)",
+		"preview": "wrangler dev --port $(pnpm josh port preview)",
+		"preview:stop": "kill-port $(pnpm josh port preview)"
+	}
+}
+```
+
+Success prints the number and nothing else, so the substitution is safe; a missing or unknown argument prints usage to stderr and exits `1`.
+
+A busy port still **fails loudly** — nothing retries on another port. Incrementing the seed automatically would re-create the vite drift this replaces and would let a verification gate route silently around a stale server. See [Local E2E aborts with "already used"](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used).
+
 ### Composite commands and extra arguments
 
 A few `josh` commands chain several steps behind one name. They are implemented as a fixed shell script (`sh -c '<step> && <step>'`), and a shell script does not expand arguments appended to it — so anything typed after the command name would land in the shell's positional parameters and be discarded without a word.
