@@ -47,6 +47,27 @@ commit-msg:
       run: pnpm josh check-commit-message {1}
 
 pre-push:
+  # Sync dependencies ONCE, before the parallel commands start (kit #813). Every command below
+  # runs through pnpm, and pnpm re-checks that node_modules matches package.json before running
+  # anything — a check that fires on ~every push because `josh bump` rewrites package.json right
+  # before the commit. Without this barrier all three commands (`audit`, `test-unit`, and the
+  # consumer's own preview-owning command) detect the drift at once and each starts its own
+  # install, so `node_modules/.bin` is being torn down and rebuilt while tests execute against it
+  # — observed as `Failed to create bin at .../node_modules/.bin/playwright ENOENT` in a run whose
+  # specs all passed when re-run alone. Measured: with package.json desynced, one `pnpm install`
+  # here leaves the following commands with nothing to install.
+  #
+  # `setup` is the right hook for this because it is a separate key from `commands`, so a
+  # consumer's own pre-push commands still merge in unchanged — unlike restructuring this section
+  # into `jobs`, which would change the merge surface for every consumer at once.
+  #
+  # A failing setup does NOT abort the hook: lefthook logs `Failed to run setup` and runs the
+  # commands anyway. That is intentional here — this barrier is an optimization, not a gate. If it
+  # fails the dependencies are still out of sync, so each command falls back to installing on its
+  # own exactly as it did before, and a genuinely broken tree still fails the push from inside a
+  # command. Never move a correctness check into `setup`; its failure would be a warning only.
+  setup:
+    - run: pnpm install
   # Parallel is SAFE as of kit #676. The old collision was two pre-push commands that each
   # built + booted their own preview server on the same fixed port (4173) — historically
   # app-kit's separate `test-e2e` + `dast` — running at once. That is gone: app-kit #97
@@ -61,6 +82,9 @@ pre-push:
   # Revert to `false` if a consumer reintroduces two colliding preview-owning pre-push
   # commands and cannot unify them (the app-kit #97 pattern: one command owns build + preview,
   # the others are HTTP clients), or if a consumer measures a regression / new flake.
+  # The #676 audit covered preview servers only, not the concurrent installs of #813 — that
+  # second collision is what the `setup` barrier above removes, so it is not a reason to flip
+  # this back. Removing the barrier while leaving this `true` reopens #813.
   parallel: true
   commands:
     audit:

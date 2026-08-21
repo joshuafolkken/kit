@@ -7,8 +7,13 @@ interface LefthookCommand {
 	glob?: string
 }
 
+interface LefthookSetupInstruction {
+	run?: string
+}
+
 interface LefthookHook {
 	parallel?: boolean
+	setup?: ReadonlyArray<LefthookSetupInstruction>
 	commands?: Record<string, LefthookCommand>
 }
 
@@ -33,6 +38,8 @@ const FILE_RELATIVE_BASE = './base.yml'
 function load_config(relative_path: string): LefthookConfig {
 	return yaml_config_fixture.load_yaml_config(relative_path) as LefthookConfig
 }
+
+const PRE_PUSH_HOOK = load_config(BASE_LEFTHOOK)[PRE_PUSH]
 
 function load_extends(relative_path: string): ReadonlyArray<string> {
 	const parsed = yaml_config_fixture.load_yaml_config(relative_path) as LefthookExtends
@@ -95,16 +102,38 @@ describe('lefthook/base.yml pre-commit secretlint command', () => {
 	})
 })
 
-describe('lefthook/base.yml pre-push parallel (kit#676)', () => {
-	const pre_push = load_config(BASE_LEFTHOOK)[PRE_PUSH]
+describe('lefthook/base.yml pre-push dependency barrier (kit#813)', () => {
+	const setup = PRE_PUSH_HOOK?.setup ?? []
 
+	// Every pre-push command runs through pnpm, which re-syncs node_modules before running when
+	// package.json drifted — which `josh bump` guarantees on ~every push. Concurrently, that
+	// rewrites node_modules/.bin underneath the tests already reading from it.
+	it('syncs dependencies before the parallel commands start', () => {
+		expect(setup[0]?.run).toContain('pnpm install')
+	})
+
+	// A second entry would run after the install and race nothing, but it would also make the
+	// barrier's single-purpose contract ambiguous for the next reader.
+	it('declares the barrier as the only setup instruction', () => {
+		expect(setup).toHaveLength(1)
+	})
+
+	// `--ignore-scripts` would make the barrier faster and silently skip the build scripts of the
+	// packages in allowBuilds, leaving native binaries missing while pnpm still records the tree
+	// as synced — so the commands would not repair it either.
+	it('does not skip the build scripts the barrier is meant to settle', () => {
+		expect(setup[0]?.run).not.toContain('--ignore-scripts')
+	})
+})
+
+describe('lefthook/base.yml pre-push parallel (kit#676)', () => {
 	// Enabled in kit#676 after auditing every active consumer: each has at most one
 	// preview-owning pre-push command (app-kit's unified `verify`, or a single `test-e2e`),
 	// so nothing collides on the fixed preview port. Revert to false only if a consumer
 	// reintroduces 2+ colliding preview-owning commands. This assertion guards that decision
 	// against an accidental flip back.
 	it('runs pre-push commands in parallel', () => {
-		expect(pre_push?.parallel).toBe(true)
+		expect(PRE_PUSH_HOOK?.parallel).toBe(true)
 	})
 })
 
