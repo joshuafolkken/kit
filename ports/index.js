@@ -105,8 +105,8 @@ function resolve_preview_port(environment = process.env) {
  * is loaded by Playwright itself — from `pnpm exec playwright test`, the VS Code extension and
  * `josh test:e2e` alike — and no such flag is on that path. Without this the two read the same
  * `.env` and disagree: `josh port preview` printed 4176 while Playwright waited on 4173, so a
- * consumer wiring `--port $(pnpm josh port preview)` exactly as documented lost its whole E2E
- * suite to a webServer timeout (#820).
+ * consumer wiring its `preview` script through `josh port preview` exactly as documented lost its
+ * whole E2E suite to a webServer timeout (#820).
  *
  * The semantics match the flag it stands in for, deliberately and in full: the whole file is
  * loaded rather than the one variable this module cares about, because a loader that read `.env`

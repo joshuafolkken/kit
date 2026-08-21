@@ -19,6 +19,7 @@ const ENV_FILE_FLAG = '--env-file=.env'
 const ALIAS_PAD_WIDTH = 2
 const CHECK_COMMIT_MESSAGE_CMD = 'check-commit-message'
 const UNKNOWN_CMD = 'not-a-command'
+const USAGE_LINE = 'Usage: josh <command>'
 
 const EXPECTED_COMMAND_ENTRIES: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
 	[
@@ -115,7 +116,7 @@ describe('josh_logic.format_help', () => {
 	})
 
 	it('includes usage line', () => {
-		expect(josh_logic.format_help()).toContain('Usage: josh <command>')
+		expect(josh_logic.format_help()).toContain(USAGE_LINE)
 	})
 
 	it('shows alias before full name for aliased commands', () => {
@@ -124,6 +125,24 @@ describe('josh_logic.format_help', () => {
 		expect(help).toContain('l,  lint')
 		expect(help).toContain('tu, test:unit')
 		expect(help).toContain(`cm, ${CHECK_COMMIT_MESSAGE_CMD}`)
+	})
+})
+
+describe('josh_logic.format_unknown_command', () => {
+	it('names the command that was not recognized', () => {
+		expect(josh_logic.format_unknown_command(UNKNOWN_CMD)).toContain(
+			`Unknown command: ${UNKNOWN_CMD}`,
+		)
+	})
+
+	// #825: the two halves used to be printed separately, which is how the listing ended up on
+	// stdout while the error line went to stderr. Composing them here is what lets the caller send
+	// both to stderr in one write and keep stdout empty on a path that resolved no answer.
+	it('carries the help listing in the same string as the error line', () => {
+		const reported = josh_logic.format_unknown_command(UNKNOWN_CMD)
+
+		expect(reported).toContain(josh_logic.format_help())
+		expect(reported.indexOf(UNKNOWN_CMD)).toBeLessThan(reported.indexOf(USAGE_LINE))
 	})
 })
 
