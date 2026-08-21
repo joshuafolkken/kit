@@ -72,8 +72,8 @@ describe('playwright.config PORT_SEED', () => {
 // #820: the config's own comment promised the seed came from `.env`, but Playwright loads this
 // config with none of the `--env-file-if-exists=.env` that `josh port` gets from tsx, so the file
 // was never read. `josh port preview` answered 4176 while the webServer waited on 4173, and a
-// consumer wiring `--port $(pnpm josh port preview)` exactly as the docs instruct lost the whole
-// E2E suite to a webServer timeout.
+// consumer wiring its `preview` script through `josh port preview` exactly as the docs instruct
+// lost the whole E2E suite to a webServer timeout.
 describe('playwright.config PORT_SEED from .env', () => {
 	it('offsets the local dev port by the seed written in .env', async () => {
 		write_seed_file(FILE_SEED_TEXT)

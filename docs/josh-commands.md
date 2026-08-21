@@ -95,6 +95,8 @@ pnpm josh port dev       # 5173 with no seed set
 pnpm josh port preview   # 4173 with no seed set
 ```
 
+Those two are for reading the number at a terminal. A `package.json` script that substitutes the number into a command line calls the binary without the `pnpm` wrapper — see the scripts below and the paragraph explaining why.
+
 Every kit-distributed SvelteKit project used to land on the same two ports, so a developer working across several of them on one machine could not run two previews at once — the second project's tooling either collided with the first or drifted onto an unpredictable port. `PORT_SEED` is a personal, non-committed integer in `.env` that offsets both ports together:
 
 ```bash
@@ -110,14 +112,22 @@ This command exists for the contexts that cannot import the definition — a `pa
 ```json
 {
 	"scripts": {
-		"dev": "vite dev --port $(pnpm josh port dev) --strictPort",
-		"preview": "wrangler dev --port $(pnpm josh port preview)",
-		"preview:stop": "kill-port $(pnpm josh port preview)"
+		"dev": "DEV_PORT=$(josh port dev) && vite dev --port $DEV_PORT --strictPort",
+		"preview": "PREVIEW_PORT=$(josh port preview) && wrangler dev --port $PREVIEW_PORT",
+		"preview:stop": "PREVIEW_PORT=$(josh port preview) && kill-port $PREVIEW_PORT"
 	}
 }
 ```
 
-Success prints the number and nothing else, so the substitution is safe; a missing or unknown argument prints usage to stderr and exits `1`.
+Two details in that shape are load-bearing, and dropping either one puts the substitution back where #825 found it.
+
+**`josh`, not `pnpm josh`.** `pnpm run` already puts `node_modules/.bin` on `PATH`, so the bare binary reaches the same command — and reaches it without a wrapper process writing to the stream the substitution reads. When `node_modules` is older than `package.json`, `pnpm` installs before running and puts the install log and every lifecycle script's output on **stdout**; `josh latest` and a branch switch both leave a tree in that state routinely. And in any project whose `package.json` defines a `josh` script — kit's does, and so does a consumer that wires one — `pnpm josh …` resolves to `pnpm run josh …`, which adds `[ELIFECYCLE] Command failed with exit code 1.` to that same stream when the command fails, so `$(pnpm josh port dev)` hands that sentence to `--port` on an invalid seed. Neither output is something this command can suppress from the inside — they belong to a process kit does not own. Calling the binary directly leaves kit in control of the whole stream, which is what turns "success prints the number and nothing else" from a hope into a promise.
+
+**`VAR=$(...) && cmd`, not the substitution inline.** A failed substitution does not stop the command it feeds: the shell supplies nothing and starts the server anyway, on whatever `--port` then parses as. Assigning first makes the resolver's failure the script's own exit status, so an invalid seed stops at kit's message naming the variable to fix instead of at a vite or wrangler argument error. If a teardown script needs to tolerate "nothing was listening", brace that tolerance — `PREVIEW_PORT=$(josh port preview) && { kill-port $PREVIEW_PORT || true; }` — because a trailing `|| true` binds to the whole chain and forgives the unresolved port along with the absent server.
+
+Success prints the number and nothing else; a missing or unknown argument prints usage to stderr and exits `1`. An unrecognized command name answers the same way — `josh` sends the error line **and** the help listing to stderr — so a script naming a command this kit does not have substitutes an empty string rather than the whole toolkit index.
+
+That listing is where #825 was found, and the remedy for the case that found it lives outside this file: the listing used to go to stdout, so a consumer whose installed kit predated `josh port` had the entire toolkit index substituted into `--port`. A kit old enough to lack the command is also old enough to lack the fix, so the guarantee above covers a mistyped or retired command name on a kit that carries it — not an outdated install. Pair the wiring with a `@joshuafolkken/kit` floor recent enough to have `josh port`.
 
 A busy port still **fails loudly** — nothing retries on another port. Incrementing the seed automatically would re-create the vite drift this replaces and would let a verification gate route silently around a stale server. `--strictPort` is what holds vite to that on the `dev` script: a bare `vite dev --port N` moves to the next free port when `N` is taken, and a dev server quietly on `N + 1` is invisible to Playwright, which waits on the seeded port until `webServer` times out. See [Local E2E aborts with "already used"](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used).
 

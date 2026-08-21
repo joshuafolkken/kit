@@ -140,7 +140,7 @@ describe('COMMAND_MAP — tsx_arguments', () => {
 
 	// #820: this is the half of the agreement that lives outside `playwright.config.ts`. The config
 	// now reads `.env` itself; drop the flag here and `josh port` stops reading it, and the two
-	// answer a consumer's `--port $(pnpm josh port preview)` and its webServer with two numbers again.
+	// answer a consumer's `preview` script and its webServer with two different numbers again.
 	it('port command has tsx_arguments with env-file flag, so it reads the same .env', () => {
 		expect(get_command('port')?.tsx_arguments?.some((flag) => flag.includes('env-file'))).toBe(true)
 	})

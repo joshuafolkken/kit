@@ -27,10 +27,12 @@ function is_port_name(value: string | undefined): value is PortName {
 	return value !== undefined && Object.hasOwn(RESOLVERS, value)
 }
 
-// Shell contexts cannot import the resolver, so `--port $(pnpm josh port preview)` is how a
-// package.json script stays on kit's single port definition instead of re-deriving the arithmetic.
-// The output is substituted straight into a command line, so success prints the number and nothing
-// else; anything else would corrupt the port argument it feeds.
+// Shell contexts cannot import the resolver, so `$(josh port preview)` is how a package.json
+// script stays on kit's single port definition instead of re-deriving the arithmetic. The output is
+// substituted straight into a command line, so success prints the number and nothing else; anything
+// else would corrupt the port argument it feeds. The documented form calls the binary rather than
+// `pnpm josh`, because a `pnpm run` wrapper writes its own `[ELIFECYCLE]` line and any install log
+// to that same stream and nothing here can suppress them (#825).
 function run(argv: ReadonlyArray<string>, environment?: PortEnvironment): PortResult {
 	const [name] = argv
 

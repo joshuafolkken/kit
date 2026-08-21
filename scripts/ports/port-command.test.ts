@@ -56,8 +56,8 @@ describe('josh port argument handling', () => {
 		expect(port_command.USAGE).toContain('preview')
 	})
 
-	// `$(pnpm josh port preview)` substitutes stdout into a command line, so a resolver failure has
-	// to arrive as a readable message and a non-zero exit rather than an uncaught stack trace.
+	// `$(josh port preview)` substitutes stdout into a command line, so a resolver failure has to
+	// arrive as a readable message and a non-zero exit rather than an uncaught stack trace.
 	it('reports an invalid seed as a message instead of throwing', () => {
 		const result = port_command.run(['preview'], { PORT_SEED: 'abc' })
 
