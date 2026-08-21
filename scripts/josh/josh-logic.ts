@@ -153,6 +153,18 @@ function format_help(): string {
 	return [HEADER, '', sections.join('\n\n'), '', USAGE].join('\n')
 }
 
+// `josh <unknown>` used to answer on two streams: the error line on stderr and the help listing on
+// stdout. A shell substituting `$(josh port dev)` captures stdout alone, so the whole listing
+// became the port argument — how #825 surfaced, on a consumer whose kit predated `josh port`. That
+// install cannot be rescued from here (a kit without the command is also a kit without this fix);
+// what this does guarantee is that every kit carrying it answers a name it cannot resolve — a typo,
+// a retired command — with an empty stdout. Composing both halves into one string is what lets the
+// caller put them on the same stream; `josh` and `josh help` still print the listing to stdout,
+// because there the listing is the answer rather than the diagnosis.
+function format_unknown_command(cmd: string): string {
+	return `Unknown command: ${cmd}\n\n${format_help()}`
+}
+
 // A `.cmd` shim needs the win32 shell to be executable, but the node binary does not — and
 // running it through the shell would break on the spaces in a typical Windows install path.
 function should_use_shell(executable: string): boolean {
@@ -215,7 +227,13 @@ function run_command(cmd: string, subcommand_arguments: Array<string>): number {
 	return run_script_entry(entry, subcommand_arguments)
 }
 
-const josh_logic = { format_help, run_command, spawn_script, run_shell_command }
+const josh_logic = {
+	format_help,
+	format_unknown_command,
+	run_command,
+	spawn_script,
+	run_shell_command,
+}
 
 export type { CommandEntry } from './josh-command-map'
 export { ALIASES, COMMAND_MAP } from './josh-command-map'

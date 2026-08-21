@@ -9,10 +9,10 @@ import { defineConfig, devices, type ReporterDescription } from '@playwright/tes
 //
 // Playwright loads this config itself, so nothing on the way in has read `.env` — `josh port` gets
 // it from a tsx flag that no Playwright entry point passes. Reading it here is what makes the two
-// agree; without it the seed reached `josh port` alone and a consumer wiring `--port $(pnpm josh
-// port preview)` as documented lost the whole suite to a webServer timeout (#820). A variable
-// already set in the environment still wins over the file, and a project with no `.env` is
-// untouched.
+// agree; without it the seed reached `josh port` alone and a consumer wiring its `preview` script
+// through `josh port preview` as documented lost the whole suite to a webServer timeout (#820). A
+// variable already set in the environment still wins over the file, and a project with no `.env`
+// is untouched.
 ports.load_environment_file()
 
 const DEV_PORT = ports.resolve_development_port()

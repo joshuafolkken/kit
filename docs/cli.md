@@ -22,7 +22,7 @@ pnpm add -g @joshuafolkken/kit
 josh help
 ```
 
-`josh` now works from any directory. The global bin is a compiled, self-contained executable (`dist/josh.js`) — it is **not** tied to any project's `node_modules`, so reinstalling or removing a project's dependencies never breaks it.
+`josh help` prints the command listing; `josh --help` and `josh -h` do the same. `josh` now works from any directory. The global bin is a compiled, self-contained executable (`dist/josh.js`) — it is **not** tied to any project's `node_modules`, so reinstalling or removing a project's dependencies never breaks it.
 
 ## 3. If `josh` isn't found
 
