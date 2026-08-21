@@ -101,9 +101,11 @@ Every kit-distributed SvelteKit project used to land on the same two ports, so a
 PORT_SEED=1   # dev 5174, preview 4174
 ```
 
-Unset means seed `0` — today's numbers exactly — so CI and un-migrated projects are unaffected without doing anything. One seed moves both ports, so a project can never end up with a dev port from one project and a preview port from another. An invalid seed (a non-integer, a negative, or one that would push a port past `65535`) is a hard error rather than a silent fall back to the default: a gate that quietly reverts to the shared port is the collision this exists to remove.
+Unset means seed `0` — today's numbers exactly — so CI and un-migrated projects are unaffected without doing anything. A blank `PORT_SEED=`, the shape `.env.example` ships and the natural way to turn a seed back off, means the same. One seed moves both ports, so a project can never end up with a dev port from one project and a preview port from another. An invalid seed (a non-integer, a negative, or one that would push a port past `65535`) is a hard error rather than a silent fall back to the default: a gate that quietly reverts to the shared port is the collision this exists to remove.
 
-`playwright.config.ts` reads the same definition directly (`import { ports } from '@joshuafolkken/kit/ports'`), so the E2E suite follows the seed with no configuration. This command exists for the contexts that cannot import it — a `package.json` script substitutes its output into a command line:
+`playwright.config.ts` reads the same definition directly (`import { ports } from '@joshuafolkken/kit/ports'`) and loads `.env` itself (`ports.load_environment_file()`) before resolving the ports, so the E2E suite follows the seed with no configuration — through `pnpm josh test:e2e`, a bare `pnpm exec playwright test` and the VS Code Playwright extension alike. That call is what makes this command and Playwright agree: `josh port` receives `.env` from a tsx flag that no Playwright entry point passes, so in kit 1.85.0 the same file produced `4176` here and `4173` there, and a consumer wiring the `preview` script below lost its whole E2E suite to a `webServer` timeout. A variable already set in the environment still wins over the file, so `PORT_SEED=2 pnpm josh test:e2e` overrides `.env` for one run.
+
+This command exists for the contexts that cannot import the definition — a `package.json` script substitutes its output into a command line:
 
 ```json
 {

@@ -9,10 +9,14 @@ const PORT_SEED_KEY = 'PORT_SEED'
 
 // The no-fallback guarantee is the part that is easy to drop when the row is reworded, and it is
 // the whole reason the variable is safe: a silent default would put two projects back on one port.
+// #820: the docs promised `.env` while only `josh port` read it, so the two answered a consumer's
+// `preview` script and its E2E suite with different ports. Naming both readers is what keeps the
+// documented location and the implemented one from drifting apart again.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'| `PORT_SEED`',
 	'An invalid value is a hard error, never a silent fall back to the shared default',
 	'a busy port still fails loudly with no retry on another port',
+	'`josh port` and `playwright.config.ts` both read the seed from `.env`',
 ]
 
 describe('PORT_SEED documentation', () => {

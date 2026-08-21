@@ -1,8 +1,12 @@
-const ENV_FILE_FLAGS: ReadonlyArray<string> = ['--env-file=.env']
+import { ENV_FILE_NAME } from '#ports'
+
+// The filename comes from the module that reads the same file from inside `playwright.config.ts`,
+// so the two readers of `.env` cannot end up pointed at two different files (#820).
+const ENV_FILE_FLAGS: ReadonlyArray<string> = [`--env-file=${ENV_FILE_NAME}`]
 // `--env-file` aborts when the file is missing, which is correct for a command that cannot work
 // without the personal variables. A command whose variables are all optional uses this form
 // instead, so a project with no `.env` keeps working on the documented defaults.
-const OPTIONAL_ENV_FILE_FLAGS: ReadonlyArray<string> = ['--env-file-if-exists=.env']
+const OPTIONAL_ENV_FILE_FLAGS: ReadonlyArray<string> = [`--env-file-if-exists=${ENV_FILE_NAME}`]
 
 type CommandCategory =
 	'Development' | 'Project' | 'Workflow' | 'Versioning' | 'Maintenance' | 'Git hooks' | 'AI tools'
