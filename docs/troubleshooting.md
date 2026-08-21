@@ -151,7 +151,7 @@ The flag accepts `1`, `true`, `yes` or `on` (case- and whitespace-insensitive); 
 
 ## `CI=0` runs locally but the HTML report never opens
 
-`playwright.config.ts` treats every value of `CI` as CI **except** an empty one and the explicit negatives `0`, `false`, `no` and `off` (case- and whitespace-insensitive). The test is inverted rather than an allow-list because `CI` has no fixed vocabulary — Woodpecker exports `CI=woodpecker`, and an allow-list would drop such a run into dev mode. Exporting `CI=0` therefore selects the local branch: `pnpm run dev` on `5173`, no retries, the `list` reporter.
+`playwright.config.ts` treats every value of `CI` as CI **except** an empty one and the explicit negatives `0`, `false`, `no` and `off` (case- and whitespace-insensitive). The test is inverted rather than an allow-list because `CI` has no fixed vocabulary — Woodpecker exports `CI=woodpecker`, and an allow-list would drop such a run into dev mode. Exporting `CI=0` therefore selects the local branch: `pnpm run dev` on the dev port the seed resolves to (`5173` with no `PORT_SEED` set), no retries, the `list` reporter.
 
 Playwright's own modules read `CI` with plain truthiness, though, and `'0'` is a non-empty string. Left alone they would still classify the run as CI — most visibly in the HTML reporter, which then stays silent when the run ends: no auto-open after a failing run, and no `To open last HTML report run:` hint either, so the report is unreachable unless you already know `pnpm exec playwright show-report`. To keep every reader on one verdict, the config **removes `CI` from the environment** once it has judged the run local. Nothing is removed on the CI branch, and a provider value such as `CI=woodpecker` is never touched.
 

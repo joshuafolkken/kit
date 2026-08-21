@@ -110,7 +110,7 @@ This command exists for the contexts that cannot import the definition — a `pa
 ```json
 {
 	"scripts": {
-		"dev": "vite dev --port $(pnpm josh port dev)",
+		"dev": "vite dev --port $(pnpm josh port dev) --strictPort",
 		"preview": "wrangler dev --port $(pnpm josh port preview)",
 		"preview:stop": "kill-port $(pnpm josh port preview)"
 	}
@@ -119,7 +119,7 @@ This command exists for the contexts that cannot import the definition — a `pa
 
 Success prints the number and nothing else, so the substitution is safe; a missing or unknown argument prints usage to stderr and exits `1`.
 
-A busy port still **fails loudly** — nothing retries on another port. Incrementing the seed automatically would re-create the vite drift this replaces and would let a verification gate route silently around a stale server. See [Local E2E aborts with "already used"](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used).
+A busy port still **fails loudly** — nothing retries on another port. Incrementing the seed automatically would re-create the vite drift this replaces and would let a verification gate route silently around a stale server. `--strictPort` is what holds vite to that on the `dev` script: a bare `vite dev --port N` moves to the next free port when `N` is taken, and a dev server quietly on `N + 1` is invisible to Playwright, which waits on the seeded port until `webServer` times out. See [Local E2E aborts with "already used"](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used).
 
 ### Composite commands and extra arguments
 
