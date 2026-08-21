@@ -146,10 +146,10 @@ describe('report format — canonical reference in the workflow prompt', () => {
 		expect(raw).not.toContain('今こうなっている: <1文')
 	})
 
-	it('keeps artifacts in English while restructuring the completion body', () => {
+	it('routes the completion body through the session language while restructuring it', () => {
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
-		expect(raw).toContain('言語ルールは変えない — 成果物は常に英語')
+		expect(raw).toContain('言語は「出力の言語（`JOSH_SESSION_LANG`）」に従う')
 		for (const marker of COMPLETION_MARKERS) expect(raw).toContain(marker)
 	})
 })
