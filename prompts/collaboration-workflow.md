@@ -21,20 +21,24 @@
 
 一括実行する場合は `fullrun new` で Step 1〜5 を通しで実行する。
 
-### セッション対話の言語（`JOSH_SESSION_LANG`）
+### 出力の言語（`JOSH_SESSION_LANG`）
 
-ワークフローの出力は「チームに残る成果物」と「開発者との対話」で言語ポリシーが分かれる。
+ワークフローの出力言語は、環境変数 `JOSH_SESSION_LANG`（例: `ja` / `en`）で決まる。対象は「開発者との対話」と「成果物の散文」の**両方**であり、変数が未設定のときのフォールバックだけが異なる。
 
-- **成果物は常に英語**: Issue タイトル、Issue／PR コメント、Telegram 通知は、開発者の設定に関わらず英語で記載する（Step 1 のタイトル正規化ルール、Step 3 の計画コメント、`--notify-message` の完了サマリーを含む）。
-- **対話は `JOSH_SESSION_LANG` に従う**: セッション中の説明・質問、および `halfrun` などで提示する **`AskUserQuestion` の選択肢ラベル・説明** は、環境変数 `JOSH_SESSION_LANG`（例: `ja` / `en`）で指定された言語で出力する。未設定の場合は、ユーザーが書いている言語に合わせる。
+- **対話は `JOSH_SESSION_LANG` に従う**: セッション中の説明・質問、および `halfrun` などで提示する **`AskUserQuestion` の選択肢ラベル・説明**。未設定の場合は、ユーザーが書いている言語に合わせる。
+- **成果物の散文も `JOSH_SESSION_LANG` に従う**: Issue 本文、Issue／PR コメント（Step 3 の計画コメント、`pnpm josh followup` が自動投稿する完了コメントを含む）、Telegram 通知の本文（`--body` / `--notify-message`）。**未設定の場合は `ja` を既定とする。** 対話と違い、成果物にはその場で言語を推測できる相手がいない — セッションが終わったあとに読まれるものなので、推測ではなく決め打ちの既定値が要る。
+- **設定に関わらず英語で固定するもの**（3 つ）:
+  1. **Issue／PR タイトル**: Step 1 のタイトル正規化ルールは変更しない。Issue 一覧の見通しを保ち、`pnpm josh git` が作るブランチ名を ASCII に保つため。
+  2. **コード内コメント、テストタイトル（`describe` / `it` / `expect`）、コミットメッセージ**: リポジトリのコード規約であり、開発者個人の言語設定とは別の軸で決まる。
+  3. **スクリプトが出力する固定文字列**: Telegram のヘッダーラベル（`Planning` / `Completion` など）、`Issue:` / `PR:` の URL ラベル、`--notify-message` 省略時の既定メッセージ。AI が書く文面ではなく、翻訳の仕組みも持たない。
 
-`JOSH_SESSION_LANG` は **開発者個人の設定**であり、`.env`（gitignore 済み・非コミット）に置く。リポジトリ共有の設定ではないため、consumer ごと・開発者ごとに自由に変えてよい。`josh sync` で上書きされることもない。この変数はスクリプトの動作を変えず（成果物言語は英語のまま）、AI の対話出力言語のみを制御する。
+`JOSH_SESSION_LANG` は **開発者個人の設定**であり、`.env`（gitignore 済み・非コミット）に置く。リポジトリ共有の設定ではないため、consumer ごと・開発者ごとに自由に変えてよい。`josh sync` で上書きされることもない。この変数はスクリプトの動作を一切変えない（どのスクリプトもこの変数を読まない）。制御するのは AI が書く文面の言語だけである。
 
 ## Step 1: Issue 作成テンプレ
 
 Issue には次の要素を必ず含める。
 
-- タイトルは簡潔で明瞭な英語で記載する（日本語で作成した場合は、AIツールが実装開始前に英語タイトルへ変換する。すでに英語で書かれている場合でも、文法・明確さ・簡潔さの観点で改善できるなら書き換えて良い。いずれの場合も GitHub Issue のタイトルを `gh issue edit` で合わせて更新する）
+- タイトルは簡潔で明瞭な英語で記載する（本文やコメントと違い、タイトルは「出力の言語（`JOSH_SESSION_LANG`）」の例外として常に英語。日本語で作成した場合は、AIツールが実装開始前に英語タイトルへ変換する。すでに英語で書かれている場合でも、文法・明確さ・簡潔さの観点で改善できるなら書き換えて良い。いずれの場合も GitHub Issue のタイトルを `gh issue edit` で合わせて更新する）
 - 目的（何を改善したいか）
 - 現象（現在の不具合や課題）
 - 期待結果（完了時の状態）
@@ -236,7 +240,7 @@ Issue: <issue-url>
 
    `fullrun` / `halfrun` / `queue` では Issue ごとに 1 回、実装に着手する直前に提示する。**Issue body が既に埋まっていて計画コメントを投稿しなかった場合も必ず提示する**（この場合ユーザーには他に作業内容が見えないため）。`kickoff` は既に計画を Issue に投稿するので対象外。
 
-   提示は説明のためであり、**確認待ちで停止する意味ではない**。同一ターンでそのまま実装へ進むこと（停止条件にはならず、`/review` → `followup --merge` のチェーン規則にも影響しない）。セッション向け出力のみに留め、Issue コメントとしては投稿しない（Issue / PR / Telegram の言語は英語のまま変更なし）。
+   提示は説明のためであり、**確認待ちで停止する意味ではない**。同一ターンでそのまま実装へ進むこと（停止条件にはならず、`/review` → `followup --merge` のチェーン規則にも影響しない）。セッション向け出力のみに留め、Issue コメントとしては投稿しない。
 
 8. 実装完了後、**lint/test より前に** `prompts/refactoring.md` に従ってリファクタリングを適用する（高・中優先度項目が残らなくなるまで収束させる）
 9. 検証ゲート（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` の Completion gate）を実行する
@@ -363,7 +367,7 @@ A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part 
 | `Changes and tests`                    | `変更とテスト`                               |
 | `Cause` / `Fix` / `Result`（完了報告） | `原因` / `対応` / `結果`                     |
 
-英語のまま残すのは誤り。成果物（Issue / PR / Telegram）の言語規則は変わらない — そちらは常に英語。
+英語のまま残すのは誤り。成果物の散文（Issue 本文、Issue／PR コメント、Telegram 本文）も同じく `JOSH_SESSION_LANG`（未設定なら `ja`）で書き、その中の `Cause` / `Fix` / `Result` などのラベルもこの対応表に従って訳す。英語のまま残るのは「出力の言語（`JOSH_SESSION_LANG`）」が挙げた 3 つ — Issue／PR タイトル、コード規約（コメント・テストタイトル・コミットメッセージ）、スクリプトが出力する固定文字列 — だけである。
 
 **(2) ラベルに注釈を付けない。** 書式の説明（「平易な説明」「先頭に置く」など）を括弧書きでラベルに足さない。`■ 概要（平易な説明）` は誤りである。
 
@@ -455,7 +459,7 @@ A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part 
 
 ### 成果物（Issue / PR / Telegram）側
 
-言語ルールは変えない — 成果物は常に英語。**構造だけ**同じ 2 層にする。`--notify-message` は `Added ... / Changed ...` の羅列ではなく、`Cause / Fix / Result` の 3 行を先頭に置き、変更点の箇条書きを `Details:` 以下にまとめる（書式は Step 5 の例を参照）。
+言語は「出力の言語（`JOSH_SESSION_LANG`）」に従う — `JOSH_SESSION_LANG` の言語、未設定なら `ja`。**構造も**セッション向けと同じ 2 層にする。`--notify-message` は `Added ... / Changed ...` の羅列ではなく、`Cause / Fix / Result` の 3 行を先頭に置き、変更点の箇条書きを `Details:` 以下にまとめる（書式は Step 5 の例を参照）。
 
 ## Step 5: PR結果確認 + 完了通知（別スクリプト）
 
@@ -473,7 +477,7 @@ A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part 
 主なオプション:
 
 - `--notify-target`: `issue`（固定。PR への完了報告は行わない）
-- `--notify-message`: Issue への完了コメント本文。英語で、「報告フォーマット」の 2 層構造に従う — 先頭に `Cause: / Fix: / Result:` の 3 行（各 1 文、専門用語・ファイル名なし）、続けて `Details:` 以下に変更点の箇条書き。`Added ... / Changed ...` だけの羅列にしない
+- `--notify-message`: Issue への完了コメント本文。`JOSH_SESSION_LANG` の言語（未設定なら `ja`）で、「報告フォーマット」の 2 層構造に従う — 先頭に `Cause: / Fix: / Result:` の 3 行（各 1 文、専門用語・ファイル名なし）、続けて `Details:` 以下に変更点の箇条書き。`Added ... / Changed ...` だけの羅列にしない
 - `--coderabbit-ignore-reason`: 未対応を残す場合の理由コメント
 - `--ai-review-ignore-reason`: AI レビュー（Claude Review / CodeRabbit サマリ）の未対応ブロッカーを残す場合の理由コメント
 - `--issue-number`: Issue 番号（または位置引数に `"<title> #<number>"`）
@@ -683,7 +687,7 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
 
 - 通知は CI チェック成功後に投稿する
 - 通知投稿に失敗しても、実装完了の事実はログで確認できるようにする
-- 自動投稿される Issue コメント文面は英語で記載する
+- 自動投稿される Issue コメント文面は `JOSH_SESSION_LANG` の言語（未設定なら `ja`）で記載する。Issue タイトルだけは英語で固定する
 
 ### CI チェック失敗時の対応
 

@@ -1,5 +1,5 @@
 {
-	"version": "1.82.0",
+	"version": "1.83.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -108,7 +108,7 @@
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.4",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.10"
+		"vitest": "^4.1.11"
 	},
 	"dependencies": {
 		"@eslint/compat": "^2.1.0",
