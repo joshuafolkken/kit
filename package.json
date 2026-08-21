@@ -1,5 +1,5 @@
 {
-	"version": "1.84.0",
+	"version": "1.85.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -24,6 +24,7 @@
 		"prompts",
 		"templates",
 		"eslint",
+		"ports",
 		"prettier",
 		"tsconfig",
 		"cspell",
@@ -51,12 +52,17 @@
 	],
 	"imports": {
 		"#scripts/*": "./scripts/*.ts",
-		"#playwright-config": "./playwright.config.ts"
+		"#playwright-config": "./playwright.config.ts",
+		"#ports": "./ports/index.js"
 	},
 	"exports": {
 		"./eslint/base": "./eslint/base.js",
 		"./eslint/vanilla": "./eslint/vanilla.js",
 		"./eslint/test-filename": "./eslint/rules/test-filename.js",
+		"./ports": {
+			"types": "./ports/index.d.ts",
+			"default": "./ports/index.js"
+		},
 		"./prettier": {
 			"types": "./prettier/index.d.ts",
 			"default": "./prettier/index.js"

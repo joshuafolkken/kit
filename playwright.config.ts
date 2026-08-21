@@ -1,7 +1,13 @@
+import { ports } from '@joshuafolkken/kit/ports'
 import { defineConfig, devices, type ReporterDescription } from '@playwright/test'
 
-const DEV_PORT = 5173
-const PREVIEW_PORT = 4173
+// Both ports come from kit's single definition (`@joshuafolkken/kit/ports`), offset by the personal
+// `PORT_SEED` in `.env` so several kit projects on one machine can each own a pair. An unset seed —
+// the default, and the CI case — reproduces the historical vite / wrangler defaults exactly. An
+// invalid seed throws here rather than serving a default port, which would silently put two
+// projects back on one port.
+const DEV_PORT = ports.resolve_development_port()
+const PREVIEW_PORT = ports.resolve_preview_port()
 
 const CI_TIMEOUT = 120_000
 const LOCAL_TIMEOUT = 30_000
@@ -72,10 +78,11 @@ if (!IS_CI) delete process.env['CI']
 // port below is known to be this project's: Playwright then reuses it and skips its webServer
 // command (no boot, no rebuild). Any other value — including '0', 'false', 'off', empty and unset
 // (default) — makes Playwright boot its own server on both branches, and abort if the port is taken.
-// The default matters most locally: DEV_PORT is vite's default, so every vite project lands on it
-// first and later ones drift to 5174, 5178, … With reuse on, Playwright would adopt whichever
-// foreign app got there first and — baseURL being derived from this port — run the whole suite
-// green against it. Failing on a busy port replaces a silent pass against the wrong application.
+// The default matters most locally: with no `PORT_SEED` set, DEV_PORT is vite's default, so every
+// vite project lands on it first and later ones drift onward. With reuse on, Playwright would adopt
+// whichever foreign app got there first and — baseURL being derived from this port — run the whole
+// suite green against it. Failing on a busy port replaces a silent pass against the wrong
+// application; a seed reduces how often a foreign server is on the port at all.
 const IS_REUSE_ENABLED = is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])
 
 const web_server_config = IS_CI
