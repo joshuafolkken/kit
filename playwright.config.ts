@@ -2,10 +2,19 @@ import { ports } from '@joshuafolkken/kit/ports'
 import { defineConfig, devices, type ReporterDescription } from '@playwright/test'
 
 // Both ports come from kit's single definition (`@joshuafolkken/kit/ports`), offset by the personal
-// `PORT_SEED` in `.env` so several kit projects on one machine can each own a pair. An unset seed —
-// the default, and the CI case — reproduces the historical vite / wrangler defaults exactly. An
-// invalid seed throws here rather than serving a default port, which would silently put two
-// projects back on one port.
+// `PORT_SEED` in `.env` so several kit projects on one machine can each own a pair. An unset or
+// blank seed — the default, and the CI case — reproduces the historical vite / wrangler defaults
+// exactly. An invalid seed throws here rather than serving a default port, which would silently put
+// two projects back on one port.
+//
+// Playwright loads this config itself, so nothing on the way in has read `.env` — `josh port` gets
+// it from a tsx flag that no Playwright entry point passes. Reading it here is what makes the two
+// agree; without it the seed reached `josh port` alone and a consumer wiring `--port $(pnpm josh
+// port preview)` as documented lost the whole suite to a webServer timeout (#820). A variable
+// already set in the environment still wins over the file, and a project with no `.env` is
+// untouched.
+ports.load_environment_file()
+
 const DEV_PORT = ports.resolve_development_port()
 const PREVIEW_PORT = ports.resolve_preview_port()
 

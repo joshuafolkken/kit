@@ -1,8 +1,6 @@
-import type { PlaywrightTestConfig } from '@playwright/test'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { CI_KEY, playwright_config_fixture } from './playwright-config-fixture'
 
-const CI_KEY = 'CI'
-const REUSE_KEY = 'PLAYWRIGHT_REUSE_SERVER'
 const CI_ON = '1'
 
 const EXPECTED_MAX_FAILURES = 10
@@ -21,41 +19,9 @@ const DEV_COMMAND = 'pnpm run dev'
 const PREVIEW_COMMAND = 'pnpm run build && pnpm run preview'
 const DEV_PORT = 5173
 const PREVIEW_PORT = 4173
-const SEED_KEY = 'PORT_SEED'
-const SEED = 1
-const INVALID_SEED = 'abc'
-
-interface WebServer {
-	command?: string
-	port?: number
-	reuseExistingServer?: boolean
-}
-
-// Re-imports the config so its module-level env reads run again with the values under test.
-async function import_config(
-	ci: string | undefined,
-	flag: string | undefined,
-): Promise<PlaywrightTestConfig> {
-	vi.stubEnv(CI_KEY, ci)
-	vi.stubEnv(REUSE_KEY, flag)
-	vi.resetModules()
-	const { default: config } = await import('#playwright-config')
-
-	return config
-}
-
-async function load_web_server(
-	ci: string | undefined,
-	flag: string | undefined,
-): Promise<WebServer> {
-	const { webServer: web_server } = await import_config(ci, flag)
-	if (web_server === undefined || Array.isArray(web_server)) return {}
-
-	return web_server
-}
 
 async function load_max_failures(ci: string | undefined): Promise<number | undefined> {
-	const { maxFailures: max_failures } = await import_config(ci, undefined)
+	const { maxFailures: max_failures } = await playwright_config_fixture.import_config(ci, undefined)
 
 	return max_failures
 }
@@ -64,24 +30,14 @@ async function load_reuse_existing_server(
 	ci: string | undefined,
 	flag: string | undefined,
 ): Promise<boolean | undefined> {
-	const web_server = await load_web_server(ci, flag)
+	const web_server = await playwright_config_fixture.load_web_server(ci, flag)
 
 	return web_server.reuseExistingServer
 }
 
-async function load_seeded_web_server(
-	ci: string | undefined,
-	seed: string | undefined,
-): Promise<WebServer> {
-	vi.stubEnv(SEED_KEY, seed)
-
-	return await load_web_server(ci, undefined)
-}
-
-afterEach(() => {
-	vi.unstubAllEnvs()
-	vi.resetModules()
-})
+beforeEach(playwright_config_fixture.isolate_project)
+afterEach(playwright_config_fixture.restore_project)
+afterAll(playwright_config_fixture.remove_project)
 
 // Both branches read one flag, so both are held to one table — running it twice is what proves the
 // semantics are identical rather than merely similar.
@@ -118,21 +74,21 @@ describe.each(REUSE_BRANCHES)(
 // The inverse predicate must still keep non-boolean provider values such as CI=woodpecker on CI.
 describe('playwright.config CI branch selection', () => {
 	it.each(CI_VALUES)('selects the CI webServer for CI=%j', async (value) => {
-		const web_server = await load_web_server(value, undefined)
+		const web_server = await playwright_config_fixture.load_web_server(value, undefined)
 
 		expect(web_server.command).toBe(PREVIEW_COMMAND)
 		expect(web_server.port).toBe(PREVIEW_PORT)
 	})
 
 	it.each(NOT_CI_VALUES)('selects the local webServer for CI=%j', async (value) => {
-		const web_server = await load_web_server(value, undefined)
+		const web_server = await playwright_config_fixture.load_web_server(value, undefined)
 
 		expect(web_server.command).toBe(DEV_COMMAND)
 		expect(web_server.port).toBe(DEV_PORT)
 	})
 
 	it('selects the local webServer when CI is unset', async () => {
-		const web_server = await load_web_server(undefined, undefined)
+		const web_server = await playwright_config_fixture.load_web_server(undefined, undefined)
 
 		expect(web_server.command).toBe(DEV_COMMAND)
 		expect(web_server.port).toBe(DEV_PORT)
@@ -147,19 +103,19 @@ describe('playwright.config CI branch selection', () => {
 // such as CI=woodpecker intact.
 describe('playwright.config CI env normalization', () => {
 	it.each(NOT_CI_VALUES)('clears CI=%j so Playwright agrees the run is local', async (value) => {
-		await import_config(value, undefined)
+		await playwright_config_fixture.import_config(value, undefined)
 
 		expect(process.env[CI_KEY]).toBeUndefined()
 	})
 
 	it.each(CI_VALUES)('leaves CI=%j intact', async (value) => {
-		await import_config(value, undefined)
+		await playwright_config_fixture.import_config(value, undefined)
 
 		expect(process.env[CI_KEY]).toBe(value)
 	})
 
 	it('leaves CI unset when it was already unset', async () => {
-		await import_config(undefined, undefined)
+		await playwright_config_fixture.import_config(undefined, undefined)
 
 		expect(process.env[CI_KEY]).toBeUndefined()
 	})
@@ -186,40 +142,5 @@ describe('playwright.config CI failure cap', () => {
 
 		expect(max_failures).toBeGreaterThanOrEqual(MIN_USEFUL_MAX_FAILURES)
 		expect(max_failures).toBeLessThanOrEqual(MAX_USEFUL_MAX_FAILURES)
-	})
-})
-
-// #818: every kit consumer used to land on the same 5173 / 4173, so two projects could not run
-// their servers at once and the second one drifted onto an unpredictable port. Both ports now come
-// from kit's single definition offset by PORT_SEED, and — baseURL being derived from webServer.port
-// — this config is what makes the whole suite follow the seed.
-describe('playwright.config PORT_SEED', () => {
-	it('keeps the historical dev port when the seed is unset', async () => {
-		const web_server = await load_seeded_web_server(undefined, undefined)
-
-		expect(web_server.port).toBe(DEV_PORT)
-	})
-
-	it('keeps the historical preview port when the seed is unset', async () => {
-		const web_server = await load_seeded_web_server(CI_ON, undefined)
-
-		expect(web_server.port).toBe(PREVIEW_PORT)
-	})
-
-	it('offsets the local dev port by the seed', async () => {
-		const web_server = await load_seeded_web_server(undefined, String(SEED))
-
-		expect(web_server.port).toBe(DEV_PORT + SEED)
-	})
-
-	it('offsets the CI preview port by the same seed', async () => {
-		const web_server = await load_seeded_web_server(CI_ON, String(SEED))
-
-		expect(web_server.port).toBe(PREVIEW_PORT + SEED)
-	})
-
-	// Falling back to the shared default here would silently undo the whole point of the seed.
-	it('fails to load rather than serving a default port for an invalid seed', async () => {
-		await expect(load_seeded_web_server(undefined, INVALID_SEED)).rejects.toThrow(SEED_KEY)
 	})
 })
