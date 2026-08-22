@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { repo_setting } from './repo-setting'
 import { security_updates_logic, type SecurityUpdatesStatus } from './security-updates-logic'
 
 const OK = 0
@@ -133,7 +134,7 @@ describe('format_security_updates_report unreadable', () => {
 	})
 
 	it('falls back to a placeholder when the repository cannot be resolved', () => {
-		expect(report_without_repo('unreadable')).toContain(security_updates_logic.UNKNOWN_REPOSITORY)
+		expect(report_without_repo('unreadable')).toContain(repo_setting.UNKNOWN_REPOSITORY)
 	})
 
 	// An unidentified repository has different causes, and pointing at a Security page would name no

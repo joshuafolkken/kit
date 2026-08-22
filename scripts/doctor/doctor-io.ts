@@ -11,6 +11,14 @@ const NPM_VERSION_UPDATES_DISABLED = 'open-pull-requests-limit: 0'
 const DEPENDABOT_CONFIG_PATH = '.github/dependabot.yml'
 const ECOSYSTEM_KEY = 'package-ecosystem:'
 const NPM_ECOSYSTEM = 'npm'
+const AUTO_MERGE_WORKFLOW_PATH = '.github/workflows/dependabot-auto-merge.yml'
+// The command that needs the repository's "Allow auto-merge" setting, and the only thing in the
+// workflow that does. Matching it rather than the filename is what keeps the report tied to the
+// prerequisite: a file of that name which never calls `--auto` creates no prerequisite, and a
+// consumer's own auto-merge workflow which does creates the same one kit's does
+// (joshuafolkken/kit#834).
+const AUTO_MERGE_COMMAND = 'gh pr merge --auto'
+const YAML_COMMENT_PREFIX = '#'
 
 // Resolve the `josh` that the shell would run — the first match on PATH, via the platform's
 // lookup command (`where` on Windows, `which` elsewhere). Undefined when the lookup fails or
@@ -114,40 +122,76 @@ function has_npm_version_updates_disabled(content: string): boolean {
 	return npm_entry_lines(content.split('\n')).some((line) => is_version_updates_disabled_line(line))
 }
 
-// The nearest ancestor of `start` holding a `.github/dependabot.yml`, or nothing. Searching upward
-// rather than testing `start` alone is what keeps the check alive in a subdirectory when git could
-// not report the repository root — a `safe.directory` refusal, for instance, which
-// `classify_git_failure` deliberately routes to `undetermined` precisely so the check survives.
+// The nearest ancestor of `start` holding `relative_path`, or nothing. Searching upward rather than
+// testing `start` alone is what keeps the check alive in a subdirectory when git could not report
+// the repository root — a `safe.directory` refusal, for instance, which `classify_git_failure`
+// deliberately routes to `undetermined` precisely so the check survives.
 //
 // `boundary` stops the walk at the repository root when one is known. Without it a repository nested
-// under a kit consumer would inherit the parent's config and be warned about a prerequisite that
+// under a kit consumer would inherit the parent's files and be warned about a prerequisite that
 // belongs to a different project.
-function find_dependabot_config(start: string, boundary: string | undefined): string | undefined {
-	const candidate = path.join(start, DEPENDABOT_CONFIG_PATH)
+function find_project_file(
+	start: string,
+	relative_path: string,
+	boundary: string | undefined,
+): string | undefined {
+	const candidate = path.join(start, relative_path)
 	if (existsSync(candidate)) return candidate
 	if (start === boundary) return undefined
 	const parent = path.dirname(start)
 
-	return parent === start ? undefined : find_dependabot_config(parent, boundary)
+	return parent === start ? undefined : find_project_file(parent, relative_path, boundary)
 }
 
-// Whether the project has received kit's `.github/dependabot.yml`. Existence alone is not enough:
-// any project may ship its own Dependabot config, and warning there would advertise an enabling
-// command for a repository that never consumed kit. The npm entry's `open-pull-requests-limit: 0` is
-// what creates the prerequisite (joshuafolkken/kit#803), so that is what is matched.
-function has_distributed_dependabot_config(start: string, boundary?: string): boolean {
-	const config_path = find_dependabot_config(start, boundary)
-	if (config_path === undefined) return false
+// Whether a distributed artifact is present *and* carries the marker that creates the prerequisite.
+// Existence alone is never enough: any project may ship a file of the same name, and warning there
+// would advertise an enabling command for a repository that never consumed kit.
+//
+// The read is guarded even though existence was just checked: a permission error, a directory in the
+// file's place, or a race between the two calls would otherwise throw out of `josh doctor` and abort
+// a command whose whole contract is that this check never fails it. An unreadable file cannot prove
+// the prerequisite applies, so it reads as absent.
+function has_marked_project_file(
+	start: string,
+	relative_path: string,
+	boundary: string | undefined,
+	is_marked: (content: string) => boolean,
+): boolean {
+	const file_path = find_project_file(start, relative_path, boundary)
+	if (file_path === undefined) return false
 
-	// The read is guarded even though existence was just checked: a permission error, a directory in
-	// the file's place, or a race between the two calls would otherwise throw out of `josh doctor`
-	// and abort a command whose whole contract is that this check never fails it. An unreadable
-	// config cannot prove the prerequisite applies, so it reads as absent.
 	try {
-		return has_npm_version_updates_disabled(readFileSync(config_path, 'utf8'))
+		return is_marked(readFileSync(file_path, 'utf8'))
 	} catch {
 		return false
 	}
+}
+
+// Whether the project has received kit's `.github/dependabot.yml`. The npm entry's
+// `open-pull-requests-limit: 0` is what creates the prerequisite (joshuafolkken/kit#803), so that is
+// what is matched.
+function has_distributed_dependabot_config(start: string, boundary?: string): boolean {
+	return has_marked_project_file(start, DEPENDABOT_CONFIG_PATH, boundary, (content) =>
+		has_npm_version_updates_disabled(content),
+	)
+}
+
+// Whether one line runs the command rather than merely mentioning it. kit's own template explains
+// the prerequisite in a comment containing the same literal, so a substring search over the file
+// would match that comment — and any file that quotes it. The same distinction the npm
+// version-updates check draws above, for the same reason.
+function is_auto_merge_command_line(line: string): boolean {
+	const trimmed = line.trimStart()
+
+	return !trimmed.startsWith(YAML_COMMENT_PREFIX) && trimmed.includes(AUTO_MERGE_COMMAND)
+}
+
+// Whether the project runs a Dependabot auto-merge workflow. `gh pr merge --auto` is what needs the
+// repository's "Allow auto-merge" setting, so that is what is matched (joshuafolkken/kit#834).
+function has_auto_merge_workflow(start: string, boundary?: string): boolean {
+	return has_marked_project_file(start, AUTO_MERGE_WORKFLOW_PATH, boundary, (content) =>
+		content.split('\n').some((line) => is_auto_merge_command_line(line)),
+	)
 }
 
 // Where a repository-scoped check stands: inside a repository (with its root), provably outside
@@ -160,6 +204,7 @@ const doctor_io = {
 	resolve_path_josh,
 	resolve_pnpm_global_josh,
 	has_distributed_dependabot_config,
+	has_auto_merge_workflow,
 	resolve_git_top_level,
 }
 

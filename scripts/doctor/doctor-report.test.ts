@@ -1,3 +1,4 @@
+import { auto_merge_setting } from '#scripts/auto-merge-setting'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { security_updates } from '#scripts/security-updates'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +13,8 @@ const JOSH_PATH = '/Users/example/Library/pnpm/bin/josh'
 const REPO = 'joshuafolkken/kit'
 const TOP_LEVEL = '/Users/example/project'
 const INSIDE: GitTopLevel = { state: 'inside', top_level: TOP_LEVEL }
+const OUTSIDE: GitTopLevel = { state: 'outside' }
+const UNDETERMINED: GitTopLevel = { state: 'undetermined' }
 
 beforeEach(() => {
 	vi.resetAllMocks()
@@ -22,6 +25,13 @@ beforeEach(() => {
 	vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(INSIDE)
 	// The gate is the distributed `.github/dependabot.yml`; present unless a case says otherwise.
 	vi.spyOn(doctor_io, 'has_distributed_dependabot_config').mockReturnValue(true)
+	// The second gate, joshuafolkken/kit#834's distributed auto-merge workflow. Stubbed absent by
+	// default so the pre-existing cases keep asserting the Dependabot report alone; the cases that
+	// care about it turn it on.
+	vi.spyOn(doctor_io, 'has_auto_merge_workflow').mockReturnValue(false)
+	// Stubbed rather than left to call through: a regression of a gate would otherwise spawn a live
+	// `gh api` from the unit suite instead of failing cleanly.
+	vi.spyOn(auto_merge_setting, 'report_auto_merge_section').mockReturnValue('enabled')
 	// The repository name is resolved as the report's argument, so it is evaluated even when the
 	// report itself is stubbed — without this the suite would spawn a real `gh repo view`.
 	vi.spyOn(gh_spawn, 'get_repo_name_with_owner_within').mockReturnValue(REPO)
@@ -79,7 +89,7 @@ describe('josh doctor — where the report applies', () => {
 	// An undetermined root must still be gated, or a missing `git` would warn about a nonexistent
 	// repository from a home directory.
 	it('still applies the config gate when git cannot answer', () => {
-		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue({ state: 'undetermined' })
+		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(UNDETERMINED)
 		vi.spyOn(doctor_io, 'has_distributed_dependabot_config').mockReturnValue(false)
 		const report = vi
 			.spyOn(security_updates, 'report_security_updates_section')
@@ -104,7 +114,7 @@ describe('josh doctor — where the report applies', () => {
 
 describe('josh doctor — when the answer is undetermined', () => {
 	it('skips the report when git proves there is no repository', () => {
-		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue({ state: 'outside' })
+		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(OUTSIDE)
 		// Stubbed rather than left to call through: without an implementation a regression of the
 		// guard would spawn a live `gh api` from the unit suite instead of failing cleanly.
 		const report = vi
@@ -119,7 +129,7 @@ describe('josh doctor — when the answer is undetermined', () => {
 	// The counterpart to the skip: a missing or failing `git` must leave the check running, because
 	// an undetermined answer reported as silence is the false all-clear the feature exists to remove.
 	it('still reports when git cannot answer but the config is present', () => {
-		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue({ state: 'undetermined' })
+		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(UNDETERMINED)
 		// The gate is the distributed `.github/dependabot.yml`; present unless a case says otherwise.
 		vi.spyOn(doctor_io, 'has_distributed_dependabot_config').mockReturnValue(true)
 		const report = vi
@@ -169,5 +179,102 @@ describe('josh doctor — bounded lookup', () => {
 
 		expect(bounded).toHaveBeenCalledTimes(1)
 		expect(unbounded).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#834: the auto-merge workflow `josh sync` now distributes runs `gh pr merge
+// --auto`, which fails outright unless the repository allows auto-merge. `doctor` is where a user
+// goes to ask why a green Dependabot pull request is not merging, so the report has to run there —
+// and only where the workflow that needs it actually exists.
+describe('josh doctor — repository auto-merge setting', () => {
+	it('reports the setting when the auto-merge workflow is present', () => {
+		vi.spyOn(doctor_io, 'has_auto_merge_workflow').mockReturnValue(true)
+		vi.spyOn(security_updates, 'report_security_updates_section').mockReturnValue('enabled')
+		const report = vi
+			.spyOn(auto_merge_setting, 'report_auto_merge_section')
+			.mockReturnValue('disabled')
+
+		doctor.main()
+
+		expect(report).toHaveBeenCalledWith(REPO)
+	})
+
+	// Without the workflow there is no prerequisite, and an enabling command would target a
+	// repository that never asked for auto-merge.
+	it('skips the report when no auto-merge workflow is present', () => {
+		vi.spyOn(security_updates, 'report_security_updates_section').mockReturnValue('enabled')
+		const report = vi
+			.spyOn(auto_merge_setting, 'report_auto_merge_section')
+			.mockReturnValue('enabled')
+
+		doctor.main()
+
+		expect(report).not.toHaveBeenCalled()
+	})
+
+	// The gates are independent: a consumer synced before #834 has the Dependabot config and no
+	// auto-merge workflow, and a repository that only ever added its own auto-merge workflow has the
+	// second prerequisite without the first.
+	it('reports the auto-merge setting even when the dependabot config is absent', () => {
+		vi.spyOn(doctor_io, 'has_distributed_dependabot_config').mockReturnValue(false)
+		vi.spyOn(doctor_io, 'has_auto_merge_workflow').mockReturnValue(true)
+		const security = vi
+			.spyOn(security_updates, 'report_security_updates_section')
+			.mockReturnValue('enabled')
+		const report = vi
+			.spyOn(auto_merge_setting, 'report_auto_merge_section')
+			.mockReturnValue('enabled')
+
+		doctor.main()
+
+		expect(security).not.toHaveBeenCalled()
+		expect(report).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('josh doctor — where the auto-merge report applies', () => {
+	it('bounds the gate to the repository root, so a nested repository inherits nothing', () => {
+		const has_workflow = vi.spyOn(doctor_io, 'has_auto_merge_workflow').mockReturnValue(true)
+
+		vi.spyOn(security_updates, 'report_security_updates_section').mockReturnValue('enabled')
+		doctor.main()
+
+		expect(has_workflow).toHaveBeenCalledWith(TOP_LEVEL, TOP_LEVEL)
+	})
+
+	it('skips the auto-merge report when git proves there is no repository', () => {
+		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(OUTSIDE)
+		vi.spyOn(doctor_io, 'has_auto_merge_workflow').mockReturnValue(true)
+		const report = vi
+			.spyOn(auto_merge_setting, 'report_auto_merge_section')
+			.mockReturnValue('enabled')
+
+		doctor.main()
+
+		expect(report).not.toHaveBeenCalled()
+	})
+})
+
+// The repository name costs a `gh repo view` round trip. It is resolved once for both reports, and
+// not at all when neither prerequisite exists.
+describe('josh doctor — one repository lookup for both reports', () => {
+	it('resolves the repository once when both reports apply', () => {
+		vi.spyOn(doctor_io, 'has_auto_merge_workflow').mockReturnValue(true)
+		vi.spyOn(security_updates, 'report_security_updates_section').mockReturnValue('enabled')
+		const resolve = vi.spyOn(gh_spawn, 'get_repo_name_with_owner_within').mockReturnValue(REPO)
+
+		doctor.main()
+
+		expect(resolve).toHaveBeenCalledTimes(1)
+	})
+
+	it('never spawns the lookup when neither prerequisite is present', () => {
+		vi.spyOn(doctor_io, 'has_distributed_dependabot_config').mockReturnValue(false)
+		const resolve = vi.spyOn(gh_spawn, 'get_repo_name_with_owner_within').mockReturnValue(REPO)
+
+		vi.spyOn(security_updates, 'report_security_updates_section').mockReturnValue('enabled')
+		doctor.main()
+
+		expect(resolve).not.toHaveBeenCalled()
 	})
 })

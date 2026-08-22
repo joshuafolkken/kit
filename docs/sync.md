@@ -22,6 +22,7 @@ CODE_OF_CONDUCT.md
 SECURITY.md         tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
+.github/workflows/dependabot-auto-merge.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
 .github/pull_request_template.md
@@ -65,6 +66,35 @@ SECURITY.md         tsconfig.sonar.json
 > different advice: it is already `enabled: true`, so the enable endpoint is a no-op there — it must
 > be resumed from the repository's Security → Dependabot page instead. See joshuafolkken/kit#805.
 >
+> **The workflow that merges the github-actions PRs is distributed too.**
+> `.github/workflows/dependabot-auto-merge.yml` is the other half of `dependabot.yml`: without it a
+> consumer receives the machinery that _opens_ Dependabot pull requests and none of the machinery
+> that _closes_ them. That is the state joshuafolkken/app-kit#184 was found in — all checks green,
+> `mergeable: MERGEABLE`, and no `autoMergeRequest` on the pull request, because nothing in the
+> repository ever enabled auto-merge. It merges `github-actions` **patch and minor** bumps only, and
+> never an npm bump at any semver level: the npm entry above leaves security advisories as the only
+> npm pull request that can reach it, and an advisory is exactly the kind a human should read. Both
+> kinds of workflow in a consumer benefit — the pins in a kit-distributed workflow are what the next
+> `josh sync` would have written anyway, and the pins in a workflow the consumer owns are real
+> updates nobody else maintains. See joshuafolkken/kit#802 for the gate and joshuafolkken/kit#834
+> for the distribution.
+>
+> **`josh init`, `josh sync` and `josh doctor` report that workflow's prerequisite too.**
+> `gh pr merge --auto` fails outright with `Auto-merge is not allowed for this repository` unless the
+> repository's own **Allow auto-merge** setting is on, and that setting is off by default — so
+> distributing the workflow without reporting the setting would hand every consumer a workflow that
+> never merges anything. All three read the `allow_auto_merge` field of
+> `GET /repos/{owner}/{repo}` and print one of three results: `enabled`, `disabled`, or
+> `could not be read`. The whole repository object is requested rather than a `--jq` projection,
+> because a projection cannot tell a field that is `false` from a field the response never carried —
+> a token without admin access simply does not receive it. `sync` reports unconditionally; `init` and
+> `doctor` report only where a workflow that calls `gh pr merge --auto` is actually present, which
+> also covers a consumer's own auto-merge workflow, since it needs the same setting. When the setting
+> is **off** the report prints the enabling command, addressed at the resolved repository. kit never
+> runs it: changing a repository setting is outward-facing, needs admin scope, and is the
+> maintainer's call — the same line joshuafolkken/kit#805 drew, which is why `josh doctor --fix` does
+> not enable this either. See joshuafolkken/kit#834.
+>
 > **Pins are resolved when the file is written, not read from the template.** Every workflow the
 > kit writes into a consumer (`josh init` and `josh sync` alike) passes through
 > `workflow_pin_logic.apply_pins_for_destination`, which substitutes each `uses:` ref from the
@@ -84,9 +114,10 @@ SECURITY.md         tsconfig.sonar.json
 
 These are fully-managed files whose package source has a different name than the destination. They are byte-copied on every sync (consumers do not hand-edit them):
 
-| Package source               | Destination                |
-| ---------------------------- | -------------------------- |
-| `templates/workflows/ci.yml` | `.github/workflows/ci.yml` |
+| Package source                                  | Destination                                   |
+| ----------------------------------------------- | --------------------------------------------- |
+| `templates/workflows/ci.yml`                    | `.github/workflows/ci.yml`                    |
+| `templates/workflows/dependabot-auto-merge.yml` | `.github/workflows/dependabot-auto-merge.yml` |
 
 If the source file does not exist in the installed package, the destination is skipped with a warning.
 
