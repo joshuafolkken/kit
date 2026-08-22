@@ -1,4 +1,5 @@
 import { git_epic_parse } from './git-epic-parse'
+import { EPIC_LABEL } from './issue-labels'
 
 // The four requirements an epic has to satisfy are otherwise enforced only by an agent reading the
 // procedure carefully, and three of the four fail silently: a missing label or a bare `#N` child
@@ -6,8 +7,6 @@ import { git_epic_parse } from './git-epic-parse'
 // as unordered so a skipped `--add-blocked-by` is never reported. Checking them here reuses
 // `git-epic-parse.ts` rather than restating the patterns, so "what the auto-close can read" and
 // "what this check accepts" are one definition instead of two that can drift.
-
-const EPIC_LABEL = 'epic'
 
 interface EpicSubject {
 	number: number
@@ -119,5 +118,5 @@ const git_epic_validate = {
 	format_check_report,
 }
 
-export { git_epic_validate, EPIC_LABEL }
+export { git_epic_validate }
 export type { CheckResult, EpicSubject }

@@ -1,9 +1,8 @@
 import { git_epic_parse } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
+import { EPIC_LABEL } from './issue-labels'
 import { parse_json_array_safe, parse_json_object_safe } from './parse-json-array'
 import { epic_child_schema, epic_issue_schema, type EpicChildData } from './schemas'
-
-const EPIC_LABEL = 'epic'
 
 // `gh issue list` defaults to 30 rows. Epics are few, but an implicit cap would silently skip the
 // oldest ones, so the limit is stated rather than inherited.

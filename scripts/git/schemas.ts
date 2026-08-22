@@ -56,8 +56,18 @@ const epic_subject_schema = z.object({
 	body: z.string().optional(),
 })
 
+// `gh issue list --json number,title,labels,createdAt` for the next-issues display printed when a
+// workflow completes (#821).
+const open_issue_schema = z.object({
+	number: z.number(),
+	title: z.string(),
+	labels: z.array(issue_label_schema).optional(),
+	createdAt: z.string(),
+})
+
 type RollupItemData = z.infer<typeof rollup_item_schema>
 type EpicChildData = z.infer<typeof epic_child_schema>
+type OpenIssueData = z.infer<typeof open_issue_schema>
 
 export {
 	package_name_schema,
@@ -69,5 +79,6 @@ export {
 	epic_issue_schema,
 	epic_child_schema,
 	epic_subject_schema,
+	open_issue_schema,
 }
-export type { RollupItemData, EpicChildData }
+export type { RollupItemData, EpicChildData, OpenIssueData }
