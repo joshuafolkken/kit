@@ -138,11 +138,13 @@ describe('COMMAND_MAP — tsx_arguments', () => {
 		expect(entry?.tsx_arguments?.some((flag) => flag.includes('env-file'))).toBe(true)
 	})
 
-	// #820: this is the half of the agreement that lives outside `playwright.config.ts`. The config
-	// now reads `.env` itself; drop the flag here and `josh port` stops reading it, and the two
-	// answer a consumer's `preview` script and its webServer with two different numbers again.
-	it('port command has tsx_arguments with env-file flag, so it reads the same .env', () => {
-		expect(get_command('port')?.tsx_arguments?.some((flag) => flag.includes('env-file'))).toBe(true)
+	// #820 put a `--env-file-if-exists=.env` flag here so `josh port` and `playwright.config.ts`
+	// would read one file. #826 replaced it: the flag resolved `.env` against the working directory,
+	// while the config resolves it at the project root, so the two disagreed again from a
+	// subdirectory. The command now calls the same resolver the config does — carrying the flag as
+	// well would only reload the whole file, secrets included, into this process.
+	it('port command reads .env through the shared resolver rather than an env-file flag', () => {
+		expect(get_command('port')?.tsx_arguments).toBeUndefined()
 	})
 
 	it('lint command has no tsx_arguments', () => {
