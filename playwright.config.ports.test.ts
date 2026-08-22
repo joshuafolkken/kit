@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { PROJECT_ENVIRONMENT_KEYS } from '#ports'
 import { port_command } from '#scripts/ports/port-command'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { playwright_config_fixture, SEED_KEY, type WebServer } from './playwright-config-fixture'
@@ -120,5 +122,53 @@ describe('playwright.config PORT_SEED from .env', () => {
 			text: String(web_server.port),
 			exit_code: SUCCESS_EXIT_CODE,
 		})
+	})
+})
+
+// #826: the config resolved `.env` against the working directory while Playwright defaults
+// `webServer.cwd` to the config file's directory and `pnpm run` starts a script from the package
+// root. From a subdirectory the two named different files, so the suite waited on 4173 while the
+// server came up seeded — the #820 failure again, reached from the other side.
+describe('playwright.config PORT_SEED from a subdirectory', () => {
+	const NESTED_DIRECTORY_NAME = 'e2e'
+
+	it('resolves the seeded port when the working directory is under the project root', async () => {
+		write_seed_file(FILE_SEED_TEXT)
+		playwright_config_fixture.isolate_subdirectory(NESTED_DIRECTORY_NAME)
+
+		const web_server = await load_file_seeded_web_server(undefined)
+
+		expect(web_server.port).toBe(DEV_PORT + FILE_SEED)
+	})
+})
+
+// #826 review finding: the allow-list is a set of string literals in one module and the reads it
+// covers are `process.env[...]` lookups in another, and this change already got that pairing wrong
+// once — `PLAYWRIGHT_REUSE_SERVER` was omitted, which would have turned server reuse off for anyone
+// who had set it in `.env` and left Playwright aborting on the busy port. This reads the config
+// back and pins the pairing, so a variable added there has to be decided here rather than silently
+// dropped.
+describe('playwright.config environment reads', () => {
+	// `CI` is the one deliberate exclusion: it describes the run, not the project, so a value pinned
+	// in a file would make every local run claim to be CI.
+	const EXCLUDED_KEYS: ReadonlySet<string> = new Set(['CI'])
+	// Digits included: a name like `CI_2` would otherwise slip past this guard while the loader
+	// still strips it, which is the drift the guard exists to catch.
+	const ENV_READ_PATTERN = /process\.env\['([A-Z0-9_]+)'\]/gu
+
+	function read_config_environment_keys(): Array<string> {
+		const source = readFileSync(new URL('playwright.config.ts', import.meta.url), 'utf8')
+
+		return Array.from(source.matchAll(ENV_READ_PATTERN), (match) => match[1] ?? '')
+	}
+
+	it('reads at least one variable, so the scan is not silently matching nothing', () => {
+		expect(read_config_environment_keys().length).toBeGreaterThan(0)
+	})
+
+	it('decides every variable it reads, either by carrying it from .env or by excluding it', () => {
+		for (const key of read_config_environment_keys()) {
+			expect(PROJECT_ENVIRONMENT_KEYS.has(key) || EXCLUDED_KEYS.has(key)).toBe(true)
+		}
 	})
 })

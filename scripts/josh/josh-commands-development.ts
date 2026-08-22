@@ -1,9 +1,4 @@
-import {
-	ESLINT_CACHE_FLAGS,
-	OPTIONAL_ENV_FILE_FLAGS,
-	PE,
-	type CommandEntry,
-} from './josh-command-types'
+import { ESLINT_CACHE_FLAGS, PE, type CommandEntry } from './josh-command-types'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
@@ -94,7 +89,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/ports/port-command.ts',
 		description: 'Print the PORT_SEED-resolved dev or preview port',
 		category: 'Development',
-		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	health: {
 		script: 'scripts/health-check.ts',
