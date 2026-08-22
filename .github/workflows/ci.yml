@@ -197,8 +197,15 @@ jobs:
       packages: read
     container: ${{ fromJSON(needs.playwright-image.outputs.container) }}
     timeout-minutes: 10
-    # Playwright preview runs on localhost:4173. Using the production BETTER_AUTH_URL would
-    # cause Better Auth to reject the origin. Port must match PREVIEW_PORT in playwright.config.ts.
+    # Better Auth rejects any origin its BETTER_AUTH_URL does not name, so this job pins the value
+    # to the preview server the suite talks to rather than letting a production value reach it.
+    # It has to be the port that server listens on. 4173 is correct because `PORT_SEED` — the
+    # personal offset `playwright.config.ts` resolves the preview port from — is not committed (it
+    # lives in a gitignored `.env`) and is not set anywhere in this workflow, so the port resolves
+    # to its base on every CI run. That is the invariant, not a constant in `playwright.config.ts`:
+    # the port there is seed-derived. Setting the seed as a repository, organization or workflow
+    # variable would move the port and leave this URL behind — for a seeded CI job, derive this URL
+    # from `josh port preview` in the same job instead.
     env:
       BETTER_AUTH_URL: http://localhost:4173
     steps:
