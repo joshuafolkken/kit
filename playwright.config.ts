@@ -7,12 +7,22 @@ import { defineConfig, devices, type ReporterDescription } from '@playwright/tes
 // exactly. An invalid seed throws here rather than serving a default port, which would silently put
 // two projects back on one port.
 //
-// Playwright loads this config itself, so nothing on the way in has read `.env` — `josh port` gets
-// it from a tsx flag that no Playwright entry point passes. Reading it here is what makes the two
-// agree; without it the seed reached `josh port` alone and a consumer wiring its `preview` script
-// through `josh port preview` as documented lost the whole suite to a webServer timeout (#820). A
-// variable already set in the environment still wins over the file, and a project with no `.env`
-// is untouched.
+// Playwright loads this config itself, so nothing on the way in has read `.env`. Reading it here is
+// what makes this config and `josh port` agree — the command calls the same loader — and without it
+// the seed reached `josh port` alone, so a consumer wiring its `preview` script through
+// `josh port preview` as documented lost the whole suite to a webServer timeout (#820). The loader
+// applies only the settings this config reads and leaves the rest of `.env` out of the environment
+// the webServer child inherits (#826). A variable already set in the environment still wins over
+// the file, and a project with no `.env` is untouched.
+//
+// The working directory is the anchor, and the loader ascends from it to the project root — the
+// same root `pnpm run` hands the `webServer` command, so both sides name one file from anywhere
+// inside the project. The one layout that escapes that is a run whose working directory sits in a
+// *different* package from this config, as `playwright test --config ../../playwright.config.ts`
+// does in a workspace: Playwright would default `webServer.cwd` to this file's directory while the
+// seed came from the other package's `.env`. No kit-distributed project has that shape — this
+// config is written to a project root — so the anchor stays where every documented entry point
+// puts it.
 ports.load_environment_file()
 
 const DEV_PORT = ports.resolve_development_port()

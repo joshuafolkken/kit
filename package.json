@@ -1,5 +1,5 @@
 {
-	"version": "1.88.0",
+	"version": "1.89.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -53,7 +53,8 @@
 	"imports": {
 		"#scripts/*": "./scripts/*.ts",
 		"#playwright-config": "./playwright.config.ts",
-		"#ports": "./ports/index.js"
+		"#ports": "./ports/index.js",
+		"#ports/*": "./ports/*.ts"
 	},
 	"exports": {
 		"./eslint/base": "./eslint/base.js",

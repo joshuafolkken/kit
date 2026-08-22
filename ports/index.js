@@ -15,6 +15,13 @@ import path from 'node:path'
 
 const PORT_SEED_KEY = 'PORT_SEED'
 const ENV_FILE_NAME = '.env'
+const PACKAGE_FILE_NAME = 'package.json'
+// What `.env` is allowed to contribute to this process, and through it to the `webServer` child:
+// the settings kit's own Playwright config reads. `CI` is deliberately absent even though the same
+// config reads it — it describes the run, not the project, and a value pinned in a file would make
+// every local run claim to be CI. Everything else in `.env` belongs to the consumer's application,
+// which loads the file in its own start script when it wants it (#826).
+const PROJECT_ENVIRONMENT_KEYS = new Set([PORT_SEED_KEY, 'PLAYWRIGHT_REUSE_SERVER'])
 const DEV_PORT_BASE = 5173
 const PREVIEW_PORT_BASE = 4173
 const MIN_SEED = 0
@@ -98,33 +105,95 @@ function resolve_preview_port(environment = process.env) {
 }
 
 /**
- * Load the project's `.env` into `process.env` so `PORT_SEED` reaches a reader that `josh` did not
- * launch.
+ * Locate the project root that governs `directory` — the nearest ancestor holding a `package.json`.
  *
- * `josh port` gets the file through tsx's `--env-file-if-exists=.env`, but `playwright.config.ts`
- * is loaded by Playwright itself — from `pnpm exec playwright test`, the VS Code extension and
- * `josh test:e2e` alike — and no such flag is on that path. Without this the two read the same
- * `.env` and disagree: `josh port preview` printed 4176 while Playwright waited on 4173, so a
- * consumer wiring its `preview` script through `josh port preview` exactly as documented lost its
- * whole E2E suite to a webServer timeout (#820).
+ * #826: the loader read `.env` from the working directory and nowhere else, while Playwright
+ * defaults `webServer.cwd` to the config file's directory and `pnpm run` executes a script from the
+ * package root. Running `pnpm exec playwright test` from a subdirectory therefore left this side on
+ * seed 0 while its own `webServer` came up seeded — the disagreement #820 fixed, arriving through
+ * the other half of the pair. Resolving the package root first is what makes every reader name one
+ * file from any working directory, because the package root is exactly the directory `pnpm run`
+ * hands the script that reads it.
  *
- * The semantics match the flag it stands in for, deliberately and in full: the whole file is
- * loaded rather than the one variable this module cares about, because a loader that read `.env`
- * selectively would leave `josh` commands and Playwright disagreeing about every other variable in
- * it. A missing file is the documented default and does nothing, and a variable already present in
- * the environment wins over the file, so an explicit `PORT_SEED=2 pnpm josh test:e2e` still
- * overrides `.env`. The directory defaults to the working directory because that is what the
- * flag's relative `.env` resolves against — anchoring on this file instead would make the two
- * disagree whenever Playwright runs from a subdirectory.
+ * The root's `.env` is the only candidate: a `.env` beside the caller is deliberately not preferred
+ * over it, because preferring one would let an `e2e/.env` holding unrelated fixture data shadow the
+ * seed and re-create the very timeout above. A directory with no `package.json` at or above it —
+ * which no installed consumer has — keeps itself rather than climbing to the filesystem root, so a
+ * stray `~/.env` is never adopted.
+ *
+ * @param {string} directory
+ * @returns {string}
+ */
+function resolve_project_directory(directory) {
+	// Absolute first: `path.dirname('.')` is `'.'`, so a relative directory would end the ascent on
+	// its first step and land back in the mismatch this resolves.
+	const start = path.resolve(directory)
+	let current = start
+
+	while (!existsSync(path.join(current, PACKAGE_FILE_NAME))) {
+		const parent = path.dirname(current)
+		if (parent === current) return start
+
+		current = parent
+	}
+
+	return current
+}
+
+/**
+ * Put every key the file introduced back the way it was, the project keys excepted.
+ *
+ * `loadEnvFile` never overwrites a variable already present, so the file's contribution is exactly
+ * the set of keys absent from the snapshot.
+ *
+ * @param {Record<string, string | undefined>} snapshot
+ * @returns {void}
+ */
+function discard_loaded_keys(snapshot) {
+	for (const key of Object.keys(process.env)) {
+		// `Reflect.deleteProperty` rather than `delete`: the key is computed, and `process.env` is the
+		// one object where removing an entry is the documented way to unset a variable.
+		if (!PROJECT_ENVIRONMENT_KEYS.has(key) && !Object.hasOwn(snapshot, key)) {
+			Reflect.deleteProperty(process.env, key)
+		}
+	}
+}
+
+/**
+ * Apply the project settings kit's own Playwright config reads from `.env`, and nothing else.
+ *
+ * Every reader comes through here. `playwright.config.ts` is loaded by Playwright itself — from
+ * `pnpm exec playwright test`, the VS Code extension and `josh test:e2e` alike — with nothing on
+ * the way in that reads `.env`, and `josh port` calls this rather than the
+ * `--env-file-if-exists=.env` tsx flag it used to carry, because that flag resolved the file
+ * against the working directory while this resolves it at the project root (#826). Two readers on
+ * two rules is how `josh port preview` printed 4176 while Playwright waited on 4173, costing a
+ * consumer its whole E2E suite to a webServer timeout (#820).
+ *
+ * The file is parsed by `loadEnvFile`, so `.env` is read exactly as the flag reads it, and then
+ * every key outside `PROJECT_ENVIRONMENT_KEYS` is taken back out. #826: the `webServer` child
+ * inherits this process's environment wholesale, so keeping the rest handed a consumer's `.env`
+ * secrets to the dev or preview server for the sake of two settings. A `CLOUDFLARE_API_TOKEN`
+ * sitting there is not inert: `wrangler` prefers it over the OAuth session it would otherwise use,
+ * so a token short of the needed scopes turned a working preview into a 403. A server that wants
+ * `.env` still loads it in its own start script, which is where that decision was made before this
+ * loader existed.
+ *
+ * A missing file is the documented default and does nothing, and a variable already present in the
+ * environment wins over the file, so an explicit `PORT_SEED=2 pnpm josh test:e2e` still overrides
+ * `.env`.
  *
  * @param {string} [directory]
  * @returns {boolean} whether a file was found and loaded
  */
 function load_environment_file(directory = process.cwd()) {
-	const file = path.join(directory, ENV_FILE_NAME)
+	const file = path.join(resolve_project_directory(directory), ENV_FILE_NAME)
 	if (!existsSync(file)) return false
 
+	const snapshot = { ...process.env }
+
 	process.loadEnvFile(file)
+	discard_loaded_keys(snapshot)
 
 	return true
 }
@@ -136,4 +205,4 @@ const ports = {
 	resolve_preview_port,
 }
 
-export { ENV_FILE_NAME, PORT_SEED_KEY, ports }
+export { ENV_FILE_NAME, PORT_SEED_KEY, PROJECT_ENVIRONMENT_KEYS, ports }
