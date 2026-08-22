@@ -140,6 +140,7 @@ CODE_OF_CONDUCT.md
 SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/workflows/ci.yml
 .github/workflows/auto-tag.yml
+.github/workflows/dependabot-auto-merge.yml
 .github/workflows/production.yml
 .github/workflows/sonar-qube.yml
 .github/pull_request_template.md

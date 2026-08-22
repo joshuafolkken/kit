@@ -88,6 +88,13 @@ interface FileCopyMapping {
 // hand-edit stay here.
 const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	{ src: 'templates/workflows/ci.yml', dest: '.github/workflows/ci.yml' },
+	// The counterpart to the distributed `.github/dependabot.yml`: without it a consumer receives
+	// the machinery that opens Dependabot pull requests and none of the machinery that closes them,
+	// so every github-actions bump sits green and unmerged (joshuafolkken/kit#834).
+	{
+		src: 'templates/workflows/dependabot-auto-merge.yml',
+		dest: '.github/workflows/dependabot-auto-merge.yml',
+	},
 ]
 
 const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
