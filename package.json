@@ -1,5 +1,5 @@
 {
-	"version": "1.89.0",
+	"version": "1.90.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -23,6 +23,7 @@
 		"scripts-ai",
 		"prompts",
 		"templates",
+		"env",
 		"eslint",
 		"ports",
 		"prettier",
@@ -60,6 +61,10 @@
 		"./eslint/base": "./eslint/base.js",
 		"./eslint/vanilla": "./eslint/vanilla.js",
 		"./eslint/test-filename": "./eslint/rules/test-filename.js",
+		"./env": {
+			"types": "./env/index.d.ts",
+			"default": "./env/index.js"
+		},
 		"./ports": {
 			"types": "./ports/index.d.ts",
 			"default": "./ports/index.js"
