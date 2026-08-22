@@ -51,23 +51,41 @@ async function issue_comment(issue_number: string, body: string): Promise<string
 	})
 }
 
-async function issue_list_by_label(label: string, limit: number): Promise<string | undefined> {
+// One invocation shape for every open-issue listing; the callers differ only in filter and fields.
+async function issue_list_open(input: {
+	json_fields: string
+	limit: number
+	filter_arguments?: ReadonlyArray<string>
+}): Promise<string | undefined> {
 	try {
 		return await git_gh_exec.exec_gh_command([
 			'issue',
 			'list',
-			'--label',
-			label,
+			...(input.filter_arguments ?? []),
 			'--state',
 			'open',
 			'--limit',
-			String(limit),
+			String(input.limit),
 			'--json',
-			'number,body',
+			input.json_fields,
 		])
 	} catch {
 		return undefined
 	}
+}
+
+// The newest open issues, for the next-issues display at workflow completion (#821). `createdAt`
+// rides along because the caller re-sorts explicitly rather than inheriting `gh`'s default order.
+async function issue_list_recent(limit: number): Promise<string | undefined> {
+	return await issue_list_open({ json_fields: 'number,title,labels,createdAt', limit })
+}
+
+async function issue_list_by_label(label: string, limit: number): Promise<string | undefined> {
+	return await issue_list_open({
+		json_fields: 'number,body',
+		limit,
+		filter_arguments: ['--label', label],
+	})
 }
 
 // State and dependency relations come from a single `gh issue view`: the epic auto-close needs both
@@ -180,6 +198,7 @@ const git_gh_issue = {
 	issue_get_body,
 	issue_edit_body,
 	issue_comment,
+	issue_list_recent,
 	issue_list_by_label,
 	issue_get_state_and_relations,
 	issue_close,
