@@ -3,7 +3,7 @@ import { create_base_config } from './eslint/base.js'
 
 // Hand-written distributed JS modules: no TS annotations available, so the TS-only style rules
 // that assume a `.ts` source are relaxed exactly as they are for the eslint presets.
-const DISTRIBUTED_JS_FILES = ['eslint/*.js', 'ports/*.js']
+const DISTRIBUTED_JS_FILES = ['env/*.js', 'eslint/*.js', 'ports/*.js']
 const ESLINT_TEST_FILES = ['eslint/*.test.ts', 'eslint/*.spec.ts']
 const TEMPLATE_FILES = ['templates/**/*.ts']
 

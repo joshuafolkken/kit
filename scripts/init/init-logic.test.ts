@@ -66,7 +66,7 @@ describe('generate_playwright_config', () => {
 		const result = init_logic.generate_playwright_config()
 
 		expect(result).toContain(
-			"const IS_REUSE_ENABLED = is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])",
+			"const IS_REUSE_ENABLED = environment_flags.is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])",
 		)
 		expect(result).toContain('reuseExistingServer: IS_REUSE_ENABLED')
 		expect(result).not.toContain('reuseExistingServer: false')
@@ -74,8 +74,10 @@ describe('generate_playwright_config', () => {
 	})
 })
 
-// Regression guard for #775: a bare Boolean() read makes '0' and 'false' enable reuse. The helper
-// must ship inside the byte-copied template — consumers cannot resolve a kit import from there.
+// Regression guard for #775: a bare Boolean() read makes '0' and 'false' enable reuse. The
+// predicate now resolves from `@joshuafolkken/kit/env` (#828) — the template already imports
+// `@joshuafolkken/kit/ports`, so consumers resolve kit subpath imports — and shipping the shared
+// module instead of an inline copy is what stops consumer configs from cloning a diverging set.
 describe('generate_playwright_config - PLAYWRIGHT_REUSE_SERVER flag helper', () => {
 	it('drops the bare Boolean() read of the env var', () => {
 		expect(init_logic.generate_playwright_config()).not.toContain(
@@ -83,11 +85,11 @@ describe('generate_playwright_config - PLAYWRIGHT_REUSE_SERVER flag helper', () 
 		)
 	})
 
-	it('ships a self-contained helper that only affirmative spellings enable', () => {
+	it('imports the shared flag vocabulary instead of declaring its own', () => {
 		const result = init_logic.generate_playwright_config()
 
-		expect(result).toContain("TRUTHY_FLAG_VALUES = new Set(['1', 'true', 'yes', 'on'])")
-		expect(result).toContain('function is_flag_enabled(value: string | undefined): boolean')
+		expect(result).toContain("import { environment_flags } from '@joshuafolkken/kit/env'")
+		expect(result).not.toContain('TRUTHY_FLAG_VALUES')
 	})
 })
 
@@ -98,12 +100,11 @@ describe('generate_playwright_config - CI detection helper', () => {
 		expect(init_logic.generate_playwright_config()).not.toContain("Boolean(process.env['CI'])")
 	})
 
-	it('ships a self-contained helper that only explicit negatives disable', () => {
+	it('reads CI through the shared inverse predicate', () => {
 		const result = init_logic.generate_playwright_config()
 
-		expect(result).toContain("FALSY_FLAG_VALUES = new Set(['0', 'false', 'no', 'off'])")
-		expect(result).toContain('function is_ci_enabled(value: string | undefined): boolean')
-		expect(result).toContain("const IS_CI = is_ci_enabled(process.env['CI'])")
+		expect(result).toContain("const IS_CI = environment_flags.is_ci_enabled(process.env['CI'])")
+		expect(result).not.toContain('FALSY_FLAG_VALUES')
 	})
 })
 

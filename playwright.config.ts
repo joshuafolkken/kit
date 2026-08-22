@@ -1,3 +1,4 @@
+import { environment_flags } from '@joshuafolkken/kit/env'
 import { ports } from '@joshuafolkken/kit/ports'
 import { defineConfig, devices, type ReporterDescription } from '@playwright/test'
 
@@ -54,31 +55,10 @@ type EnvConfig = {
 	reporter: ReporterDescription[]
 }
 
-const TRUTHY_FLAG_VALUES = new Set(['1', 'true', 'yes', 'on'])
-const FALSY_FLAG_VALUES = new Set(['0', 'false', 'no', 'off'])
-
-function normalize_flag_value(value: string): string {
-	return value.trim().toLowerCase()
-}
-
-// Env vars are always strings, so `Boolean(value)` would enable the flag for '0' and 'false' too —
-// the two spellings someone reaches for to turn it off. Only affirmative spellings enable.
-function is_flag_enabled(value: string | undefined): boolean {
-	return value !== undefined && TRUTHY_FLAG_VALUES.has(normalize_flag_value(value))
-}
-
-// `CI` is not an opt-in flag with a fixed vocabulary — Woodpecker exports `CI=woodpecker` — so the
-// affirmative allow-list above would drop such runs into dev mode. Invert the test instead: any
-// value counts as CI except an empty one and the explicit negatives. (`ci-info` opts out on the
-// exact string 'false' alone; the negative set here also covers '0', 'no' and 'off'.)
-function is_ci_enabled(value: string | undefined): boolean {
-	if (value === undefined) return false
-	const normalized = normalize_flag_value(value)
-
-	return normalized.length > 0 && !FALSY_FLAG_VALUES.has(normalized)
-}
-
-const IS_CI = is_ci_enabled(process.env['CI'])
+// The flag vocabulary lives in `@joshuafolkken/kit/env` (#828) — one exported predicate, so this
+// config and every consumer config that adds an env-driven toggle agree on what "switched on"
+// means instead of each declaring its own set and drifting.
+const IS_CI = environment_flags.is_ci_enabled(process.env['CI'])
 
 // `is_ci_enabled` only decides what this config returns; Playwright's own modules read
 // `process.env['CI']` directly with the bare truthiness it replaces, so an explicit opt-out such as
@@ -102,7 +82,7 @@ if (!IS_CI) delete process.env['CI']
 // whichever foreign app got there first and — baseURL being derived from this port — run the whole
 // suite green against it. Failing on a busy port replaces a silent pass against the wrong
 // application; a seed reduces how often a foreign server is on the port at all.
-const IS_REUSE_ENABLED = is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])
+const IS_REUSE_ENABLED = environment_flags.is_flag_enabled(process.env['PLAYWRIGHT_REUSE_SERVER'])
 
 const web_server_config = IS_CI
 	? {
