@@ -139,7 +139,9 @@ Names are Playwright's own and are lowercase — `chromium`, `firefox`, `webkit`
 
 Something else is listening on the port `playwright.config.ts` runs the dev server on, and Playwright refuses to start rather than adopt it. This is deliberate: `5173` is vite's default, so it is the port _every_ vite project takes first, and later ones drift to `5174`, `5178`, and so on. Because the config sets no `use.baseURL`, Playwright derives the base URL from `webServer.port` — so a reused foreign server would send every relative navigation in every spec to a different application, and the suite would report green against it. The abort replaces a silent wrong-app pass.
 
-Free the port — usually by stopping the other project's dev server — and re-run. If the server on that port **is** this project's own and you want Playwright to skip booting a second one, opt in explicitly:
+Free the port — usually by stopping the other project's dev server — and re-run. If you hit this regularly because several kit projects share one machine, give each project its own pair of ports instead by setting `PORT_SEED` in its `.env` (see [`josh port`](./josh-commands.md#josh-port)) — a seed reduces how often a foreign server is on the port at all, while this abort is what stops a foreign server from being adopted when one is.
+
+If the server on that port **is** this project's own and you want Playwright to skip booting a second one, opt in explicitly:
 
 ```bash
 PLAYWRIGHT_REUSE_SERVER=1 pnpm josh test
@@ -149,7 +151,7 @@ The flag accepts `1`, `true`, `yes` or `on` (case- and whitespace-insensitive); 
 
 ## `CI=0` runs locally but the HTML report never opens
 
-`playwright.config.ts` treats every value of `CI` as CI **except** an empty one and the explicit negatives `0`, `false`, `no` and `off` (case- and whitespace-insensitive). The test is inverted rather than an allow-list because `CI` has no fixed vocabulary — Woodpecker exports `CI=woodpecker`, and an allow-list would drop such a run into dev mode. Exporting `CI=0` therefore selects the local branch: `pnpm run dev` on `5173`, no retries, the `list` reporter.
+`playwright.config.ts` treats every value of `CI` as CI **except** an empty one and the explicit negatives `0`, `false`, `no` and `off` (case- and whitespace-insensitive). The test is inverted rather than an allow-list because `CI` has no fixed vocabulary — Woodpecker exports `CI=woodpecker`, and an allow-list would drop such a run into dev mode. Exporting `CI=0` therefore selects the local branch: `pnpm run dev` on the dev port the seed resolves to (`5173` with no `PORT_SEED` set), no retries, the `list` reporter.
 
 Playwright's own modules read `CI` with plain truthiness, though, and `'0'` is a non-empty string. Left alone they would still classify the run as CI — most visibly in the HTML reporter, which then stays silent when the run ends: no auto-open after a failing run, and no `To open last HTML report run:` hint either, so the report is unreachable unless you already know `pnpm exec playwright show-report`. To keep every reader on one verdict, the config **removes `CI` from the environment** once it has judged the run local. Nothing is removed on the CI branch, and a provider value such as `CI=woodpecker` is never touched.
 

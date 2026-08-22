@@ -86,6 +86,57 @@ pnpm josh check        # development mode
 pnpm josh check:ci     # strict mode (--threshold error), used in CI
 ```
 
+### `josh port`
+
+Print the port this project's dev server or preview server runs on, resolved from `PORT_SEED`.
+
+```bash
+pnpm josh port dev       # 5173 with no seed set
+pnpm josh port preview   # 4173 with no seed set
+```
+
+Those two are for reading the number at a terminal. A `package.json` script that substitutes the number into a command line calls the binary without the `pnpm` wrapper — see the scripts below and the paragraph explaining why.
+
+Every kit-distributed SvelteKit project used to land on the same two ports, so a developer working across several of them on one machine could not run two previews at once — the second project's tooling either collided with the first or drifted onto an unpredictable port. `PORT_SEED` is a personal, non-committed integer in `.env` that offsets both ports together:
+
+```bash
+PORT_SEED=1   # dev 5174, preview 4174
+```
+
+Unset means seed `0` — today's numbers exactly — so CI and un-migrated projects are unaffected without doing anything. A blank `PORT_SEED=`, the shape `.env.example` ships and the natural way to turn a seed back off, means the same. One seed moves both ports, so a project can never end up with a dev port from one project and a preview port from another. An invalid seed (a non-integer, a negative, or one that would push a port past `65535`) is a hard error rather than a silent fall back to the default: a gate that quietly reverts to the shared port is the collision this exists to remove.
+
+This command and `playwright.config.ts` read one definition and one file. The config imports the same module directly (`import { ports } from '@joshuafolkken/kit/ports'`) and calls `ports.load_environment_file()` before resolving the ports, so the E2E suite follows the seed with no configuration — through `pnpm josh test:e2e`, a bare `pnpm exec playwright test` and the VS Code Playwright extension alike. This command calls the same loader, so the two cannot answer a consumer's `preview` script and its `webServer` with different numbers; in kit 1.85.0 they did, producing `4176` here and `4173` there and costing a consumer its whole E2E suite to a `webServer` timeout. A variable already set in the environment still wins over the file, so `PORT_SEED=2 pnpm josh test:e2e` overrides `.env` for one run.
+
+Two settings cross from `.env` into the process, and no others: `PORT_SEED` and `PLAYWRIGHT_REUSE_SERVER` — the ones kit's own Playwright config reads. `CI` is deliberately excluded even though that config reads it too, because it describes the run rather than the project, and a value pinned in a file would make every local run claim to be CI. The file is parsed in full, by the same reader Node's `--env-file` uses, and every other key it carried is then taken back out of `process.env`. Playwright's `webServer` child inherits the test runner's environment wholesale, so keeping the rest would hand a consumer's `.env` secrets to the dev or preview server for the sake of two settings: a `CLOUDFLARE_API_TOKEN` sitting there is preferred by `wrangler` over the OAuth session it would otherwise use, and one short of the needed scopes turns a working preview into a `403`. A server that wants `.env` loads it in its own start script, which is where that choice belongs.
+
+This narrows what kit 1.87.0 did for the one version it shipped: that release loaded the whole file, so a `webServer` command and any E2E spec briefly saw every variable in `.env`. If a project came to rely on that — a spec reading a test account's password, say — load the file where it is needed rather than through the port loader: `process.loadEnvFile()` in a Playwright [global setup](https://playwright.dev/docs/test-global-setup-teardown) puts it back for the test process without also handing it to the server, and a `set -a; . ./.env; set +a` prefix in the start script does the same for a server that needs it.
+
+The file is looked for at the project root — the nearest directory at or above the working directory holding a `package.json` — and only there. That is the directory `pnpm run` hands a script, so it is the file the `webServer` command and this command both read. A `.env` beside the caller is deliberately not preferred over the root's: letting an `e2e/.env` of unrelated fixture data shadow the seed would re-create the timeout above. Resolving against the working directory alone used to do exactly that, leaving `pnpm exec playwright test` run from a subdirectory on seed `0` while its own server came up seeded.
+
+This command exists for the contexts that cannot import the definition — a `package.json` script substitutes its output into a command line:
+
+```json
+{
+	"scripts": {
+		"dev": "DEV_PORT=$(josh port dev) && vite dev --port $DEV_PORT --strictPort",
+		"preview": "PREVIEW_PORT=$(josh port preview) && wrangler dev --port $PREVIEW_PORT",
+		"preview:stop": "PREVIEW_PORT=$(josh port preview) && kill-port $PREVIEW_PORT"
+	}
+}
+```
+
+Two details in that shape are load-bearing, and dropping either one puts the substitution back where #825 found it.
+
+**`josh`, not `pnpm josh`.** `pnpm run` already puts `node_modules/.bin` on `PATH`, so the bare binary reaches the same command — and reaches it without a wrapper process writing to the stream the substitution reads. When `node_modules` is older than `package.json`, `pnpm` installs before running and puts the install log and every lifecycle script's output on **stdout**; `josh latest` and a branch switch both leave a tree in that state routinely. And in any project whose `package.json` defines a `josh` script — kit's does, and so does a consumer that wires one — `pnpm josh …` resolves to `pnpm run josh …`, which adds `[ELIFECYCLE] Command failed with exit code 1.` to that same stream when the command fails, so `$(pnpm josh port dev)` hands that sentence to `--port` on an invalid seed. Neither output is something this command can suppress from the inside — they belong to a process kit does not own. Calling the binary directly leaves kit in control of the whole stream, which is what turns "success prints the number and nothing else" from a hope into a promise.
+
+**`VAR=$(...) && cmd`, not the substitution inline.** A failed substitution does not stop the command it feeds: the shell supplies nothing and starts the server anyway, on whatever `--port` then parses as. Assigning first makes the resolver's failure the script's own exit status, so an invalid seed stops at kit's message naming the variable to fix instead of at a vite or wrangler argument error. If a teardown script needs to tolerate "nothing was listening", brace that tolerance — `PREVIEW_PORT=$(josh port preview) && { kill-port $PREVIEW_PORT || true; }` — because a trailing `|| true` binds to the whole chain and forgives the unresolved port along with the absent server.
+
+Success prints the number and nothing else; a missing or unknown argument prints usage to stderr and exits `1`. An unrecognized command name answers the same way — `josh` sends the error line **and** the help listing to stderr — so a script naming a command this kit does not have substitutes an empty string rather than the whole toolkit index.
+
+That listing is where #825 was found, and the remedy for the case that found it lives outside this file: the listing used to go to stdout, so a consumer whose installed kit predated `josh port` had the entire toolkit index substituted into `--port`. A kit old enough to lack the command is also old enough to lack the fix, so the guarantee above covers a mistyped or retired command name on a kit that carries it — not an outdated install. Pair the wiring with a `@joshuafolkken/kit` floor recent enough to have `josh port`.
+
+A busy port still **fails loudly** — nothing retries on another port. Incrementing the seed automatically would re-create the vite drift this replaces and would let a verification gate route silently around a stale server. `--strictPort` is what holds vite to that on the `dev` script: a bare `vite dev --port N` moves to the next free port when `N` is taken, and a dev server quietly on `N + 1` is invisible to Playwright, which waits on the seeded port until `webServer` times out. See [Local E2E aborts with "already used"](./troubleshooting.md#local-e2e-aborts-with-httplocalhost5173-is-already-used).
+
 ### Composite commands and extra arguments
 
 A few `josh` commands chain several steps behind one name. They are implemented as a fixed shell script (`sh -c '<step> && <step>'`), and a shell script does not expand arguments appended to it — so anything typed after the command name would land in the shell's positional parameters and be discarded without a word.
@@ -173,6 +224,8 @@ On completion, the project's own version (from `package.json`, the value `josh b
 While inspecting those children it also reports when the epic body declares a dependency chain (`#101 -> #102` under `Dependencies`) but **none** of the children carries a `blocked-by` relation, meaning the batch order was never recorded natively. The declaration is what triggers the check: an epic is created for every split, ordered or not, so its mere existence says nothing about ordering and warning on that alone would fire on every unordered batch. The check is deliberately weak — it never judges the shape of the chain, only its total absence — and it runs on every child's merge rather than at epic close, so the omission surfaces while it can still be corrected.
 
 After the merge, `followup` also closes any completed epic. It looks for open issues labelled `epic` whose markdown task list references the issue this PR closed; when every other child in that list is already closed, the epic is closed with a comment naming its children. The just-closed issue is treated as closed without being queried, because GitHub applies the `closes #N` side effect asynchronously. An epic with a still-open child is left alone, and any failure in this step is reported as a warning rather than failing the run — the PR has already merged by then. Two cases are skipped on purpose: an epic whose task list tracks a child in **another repository** is never closed automatically (resolving that child's state would need a different repo, and ignoring it could close the epic while the child is open), and nothing runs at all on a `--no-merge` run, where the linked issue is still open.
+
+After a merged run (never on `--no-merge`, where the linked issue is still the current task), right before the final version line, up to five open issues are listed as next-run candidates (`🗒 Next issues (newest first):`), so the next task can be picked straight from the completion output. The newest 20 open issues are fetched and shown newest-first — a newer issue usually encodes the most current understanding of the backlog — excluding the just-completed issue (its `closes #N` close lands asynchronously), `epic`-labeled tracking issues (their children are the runnable work), and `in-progress`-labeled issues already claimed by a workflow. The display is purely informational: when `gh` is unavailable or returns something unexpected, it is skipped silently rather than failing a workflow whose merge already succeeded.
 
 ### `josh notify`
 

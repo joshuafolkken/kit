@@ -1,5 +1,5 @@
 {
-	"version": "1.82.0",
+	"version": "1.92.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -23,7 +23,9 @@
 		"scripts-ai",
 		"prompts",
 		"templates",
+		"env",
 		"eslint",
+		"ports",
 		"prettier",
 		"tsconfig",
 		"cspell",
@@ -51,12 +53,22 @@
 	],
 	"imports": {
 		"#scripts/*": "./scripts/*.ts",
-		"#playwright-config": "./playwright.config.ts"
+		"#playwright-config": "./playwright.config.ts",
+		"#ports": "./ports/index.js",
+		"#ports/*": "./ports/*.ts"
 	},
 	"exports": {
 		"./eslint/base": "./eslint/base.js",
 		"./eslint/vanilla": "./eslint/vanilla.js",
 		"./eslint/test-filename": "./eslint/rules/test-filename.js",
+		"./env": {
+			"types": "./env/index.d.ts",
+			"default": "./env/index.js"
+		},
+		"./ports": {
+			"types": "./ports/index.d.ts",
+			"default": "./ports/index.js"
+		},
 		"./prettier": {
 			"types": "./prettier/index.d.ts",
 			"default": "./prettier/index.js"
@@ -104,11 +116,11 @@
 		"prettier": "^3.9.6",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.62.4",
+		"rollup": "^4.62.5",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.4",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.10"
+		"vitest": "^4.1.11"
 	},
 	"dependencies": {
 		"@eslint/compat": "^2.1.0",

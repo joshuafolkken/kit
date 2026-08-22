@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const RESOLVED_BRANCH = vi.hoisted(() => 'resolved-branch')
 
@@ -16,6 +16,12 @@ vi.mock('../scripts/git/git-branch', () => ({
 
 vi.mock('../scripts/git/git-notify', () => ({
 	git_notify: { build_notify_config: vi.fn<() => void>().mockReturnValue() },
+}))
+
+vi.mock('../scripts/git/git-next-issues', () => ({
+	git_next_issues: {
+		fetch_next_issue_lines: vi.fn<() => Promise<Array<string>>>().mockResolvedValue([]),
+	},
 }))
 
 vi.mock('../scripts/git/git-error', () => ({
@@ -81,6 +87,124 @@ describe('print_project_version', () => {
 			expect(spy).toHaveBeenCalledWith(
 				expect.stringMatching(/^📦 project version: \d+\.\d+\.\d+$/u),
 			)
+		} finally {
+			spy.mockRestore()
+		}
+	})
+})
+
+const { git_next_issues } = await import('../scripts/git/git-next-issues')
+const fetch_next_issue_lines_mock = vi.mocked(git_next_issues.fetch_next_issue_lines)
+
+const NEXT_ISSUES_HEADER = '🗒 Next issues (newest first):'
+
+// Importing the module runs `main()` (parseArgs is mocked to an empty parse), which already calls
+// the mock once. Without this every `toHaveBeenCalledWith` would match that call instead of the
+// one the test made, and an inverted gate or a broken parser would still pass.
+beforeEach(() => {
+	fetch_next_issue_lines_mock.mockClear()
+})
+
+describe('print_next_issues - output', () => {
+	it('prints each returned line', async () => {
+		const lines = [NEXT_ISSUES_HEADER, '  1. #9 Issue 9']
+
+		fetch_next_issue_lines_mock.mockResolvedValueOnce(lines)
+		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		try {
+			await git_followup_workflow.print_next_issues('42')
+			expect(spy).toHaveBeenCalledTimes(lines.length)
+			expect(spy).toHaveBeenNthCalledWith(1, lines[0])
+			expect(spy).toHaveBeenNthCalledWith(2, lines[1])
+		} finally {
+			spy.mockRestore()
+		}
+	})
+
+	it('prints nothing when there are no lines', async () => {
+		fetch_next_issue_lines_mock.mockResolvedValueOnce([])
+		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		try {
+			await git_followup_workflow.print_next_issues(undefined)
+			expect(spy).not.toHaveBeenCalled()
+		} finally {
+			spy.mockRestore()
+		}
+	})
+})
+
+describe('print_next_issues - completed issue number', () => {
+	it('passes the completed issue number as a number', async () => {
+		fetch_next_issue_lines_mock.mockResolvedValueOnce([])
+		await git_followup_workflow.print_next_issues('42')
+
+		expect(fetch_next_issue_lines_mock).toHaveBeenLastCalledWith(42)
+	})
+
+	// `--issue-number "#42"` is the shape the positional parser accepts, so the exclusion must
+	// read it the same way rather than silently skipping it.
+	it('accepts the #N shape', async () => {
+		fetch_next_issue_lines_mock.mockResolvedValueOnce([])
+		await git_followup_workflow.print_next_issues('#42')
+
+		expect(fetch_next_issue_lines_mock).toHaveBeenLastCalledWith(42)
+	})
+
+	it('passes undefined when no issue number is known', async () => {
+		fetch_next_issue_lines_mock.mockResolvedValueOnce([])
+		await git_followup_workflow.print_next_issues(undefined)
+
+		expect(fetch_next_issue_lines_mock).toHaveBeenLastCalledWith(undefined)
+	})
+
+	// Number('42a') is NaN, which compares unequal to every issue number and would silently
+	// disable the just-completed-issue exclusion.
+	it('passes undefined for a non-numeric issue number instead of NaN', async () => {
+		fetch_next_issue_lines_mock.mockResolvedValueOnce([])
+		await git_followup_workflow.print_next_issues('42a')
+
+		expect(fetch_next_issue_lines_mock).toHaveBeenLastCalledWith(undefined)
+	})
+})
+
+// The epic auto-close is gated on the merge for the same reason: on `--no-merge` the linked issue
+// is still open and still the current task, so a "next" list would hide the one issue that matters.
+describe('print_completion - merge gating', () => {
+	it('lists next issues on a merged run', async () => {
+		fetch_next_issue_lines_mock.mockResolvedValueOnce([])
+		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		try {
+			await git_followup_workflow.print_completion('42', true)
+			expect(fetch_next_issue_lines_mock).toHaveBeenLastCalledWith(42)
+		} finally {
+			spy.mockRestore()
+		}
+	})
+
+	it('skips the next-issues list on a --no-merge run', async () => {
+		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		try {
+			await git_followup_workflow.print_completion('42', false)
+			expect(fetch_next_issue_lines_mock).not.toHaveBeenCalled()
+		} finally {
+			spy.mockRestore()
+		}
+	})
+
+	// The version line is the documented final line of the console output.
+	it('prints the project version last', async () => {
+		fetch_next_issue_lines_mock.mockResolvedValueOnce([NEXT_ISSUES_HEADER])
+		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		try {
+			await git_followup_workflow.print_completion('42', true)
+			const last_call = spy.mock.calls.at(-1)
+
+			expect(last_call?.[0]).toMatch(/^📦 project version: \d+\.\d+\.\d+$/u)
 		} finally {
 			spy.mockRestore()
 		}

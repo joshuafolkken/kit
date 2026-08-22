@@ -159,6 +159,16 @@ After all files are processed, `josh init` runs:
 
 1. **`lefthook install`** — installs git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
 
+### Dependency barrier (pre-push)
+
+The pre-push hook runs its commands in parallel, and every one of them goes through pnpm. Before running anything, pnpm re-checks that `node_modules` matches `package.json` and installs when the two have drifted — which `josh bump` causes on nearly every push, because it rewrites `package.json` immediately before the commit. Left alone, each parallel command detects that drift at the same moment and starts its own install, so `node_modules/.bin` is rebuilt while the tests are already executing binaries from it. The symptom is a push that fails for an unrelated reason and passes when the same specs are re-run alone (kit#813).
+
+The hook therefore declares a `setup` step that runs `pnpm install` once, before the parallel commands start. With the tree already synced none of the commands has anything to install.
+
+You will see one `pnpm install` in the push output. When the tree is already in sync pnpm short-circuits without running any lifecycle script — measured at 0.25s — and when it is not, this install replaces the concurrent ones that previously ran inside each command.
+
+This step is an optimization, not a gate: lefthook treats a failing `setup` as a warning and runs the commands anyway. That is intended — if the barrier fails, the dependencies are still out of sync and each command falls back to installing on its own, exactly as before, and a genuinely broken tree still fails the push from inside a command.
+
 ### Secret scanning (pre-commit)
 
 The kit pre-commit hook runs [secretlint](https://github.com/secretlint/secretlint) over the staged files, so a credential is caught before it enters git history. This sits ahead of GitHub push protection and PR-time scanners, which only fire once a commit exists — and push protection alone covers just the known provider patterns, not generic tokens.

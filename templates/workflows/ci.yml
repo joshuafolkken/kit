@@ -248,9 +248,17 @@ jobs:
     # truncating the uploads that would explain it, so the headroom is the point. The cost is that
     # a hung preview server holds a runner for 25 minutes rather than 10 before the job is killed.
     timeout-minutes: 25
-    # Playwright preview は localhost:4173。ワークフロー共通の BETTER_AUTH_URL（本番）を
-    # 引き継ぐと Better Auth が origin を拒否する（CI E2E では本番 URL は使わない）。
-    # ホスト/ポートは playwright.config.ts の PREVIEW_PORT（4173）と一致させること。
+    # Better Auth rejects any origin its BETTER_AUTH_URL does not name, so an unpinned job — one
+    # that reaches the app's production value through a repository variable or the app's own
+    # config — fails every spec. Pinning it to the preview server the suite talks to is the fix,
+    # and it has to be the port that server actually listens on. 4173 is correct here
+    # because `PORT_SEED` — the personal offset `playwright.config.ts` resolves the preview port
+    # from — is not committed (it lives in a gitignored `.env`) and is not set anywhere in this
+    # workflow, so the port resolves to its base, 4173, on every CI run. That is the invariant to
+    # preserve, not a constant in `playwright.config.ts`: the port there is seed-derived, so it is
+    # 4173 in CI and may be anything locally. Setting the seed as a repository, organization or
+    # workflow variable would move the port and leave this URL behind — if a seeded CI job is ever
+    # wanted, derive this URL from `josh port preview` in the same job instead.
     env:
       BETTER_AUTH_URL: http://localhost:4173
       # A crashing preview worker prints nothing but an empty `✘ [ERROR]` to the job log;

@@ -1,7 +1,9 @@
 import { fileURLToPath } from 'node:url'
 import { create_base_config } from './eslint/base.js'
 
-const ESLINT_API_FILES = ['eslint/*.js']
+// Hand-written distributed JS modules: no TS annotations available, so the TS-only style rules
+// that assume a `.ts` source are relaxed exactly as they are for the eslint presets.
+const DISTRIBUTED_JS_FILES = ['env/*.js', 'eslint/*.js', 'ports/*.js']
 const ESLINT_TEST_FILES = ['eslint/*.test.ts', 'eslint/*.spec.ts']
 const TEMPLATE_FILES = ['templates/**/*.ts']
 
@@ -12,7 +14,7 @@ export default [
 		tsconfig_root_dir: fileURLToPath(new URL('.', import.meta.url)),
 	}),
 	{
-		files: ESLINT_API_FILES,
+		files: DISTRIBUTED_JS_FILES,
 		rules: {
 			'@typescript-eslint/explicit-function-return-type': 'off',
 			'@typescript-eslint/explicit-module-boundary-types': 'off',

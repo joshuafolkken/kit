@@ -8,9 +8,11 @@
 		"allowJs": true
 	},
 	"include": [
-		"playwright.config.ts",
-		"playwright.config.test.ts",
+		"playwright.config*.ts",
+		"playwright-config-fixture.ts",
+		"env/**/*.ts",
 		"eslint/**/*.ts",
+		"ports/**/*.ts",
 		"prettier/**/*.d.ts",
 		"scripts/**/*.ts",
 		"scripts-ai/**/*.ts",

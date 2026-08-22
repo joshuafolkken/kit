@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 import { git_branch } from '../scripts/git/git-branch'
 import { git_error } from '../scripts/git/git-error'
+import { git_next_issues } from '../scripts/git/git-next-issues'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 import { version_targets } from '../scripts/version/version-targets'
@@ -105,6 +106,40 @@ function print_project_version(): void {
 	if (line !== undefined) console.info(line)
 }
 
+// One parser for both consumers: `--issue-number` is a free-form string, and `Number('42a')` is
+// NaN — which compares unequal to every issue number and would silently disable the
+// just-completed-issue exclusion. `parse_issue_number_from_text` already accepts every shape the
+// positional does (`42`, `#42`, a title ending in `#42`) and guarantees digits-only output, so
+// reusing it keeps the two paths from disagreeing about what "the completed issue" is.
+function parse_completed_issue_number(raw: string | undefined): number | undefined {
+	const digits = parse_issue_number_from_text(raw)
+
+	return digits === undefined ? undefined : Number(digits)
+}
+
+// #821: surface what to run next right where the completion is read. Printed before the project
+// version line, which stays the final line of the console output by contract.
+async function print_next_issues(completed_issue_number: string | undefined): Promise<void> {
+	const lines = await git_next_issues.fetch_next_issue_lines(
+		parse_completed_issue_number(completed_issue_number),
+	)
+	for (const line of lines) console.info(line)
+}
+
+// The tail printed once the workflow itself has finished. `print_project_version` stays last by
+// contract, so anything added here goes above it.
+async function print_completion(
+	issue_number: string | undefined,
+	should_merge: boolean,
+): Promise<void> {
+	console.info('')
+	console.info('✅ PR followup completed.')
+	// Merged runs only, like the epic auto-close: on `--no-merge` the linked issue is still open
+	// and still the current task, so a "next" list would hide the one issue that matters.
+	if (should_merge) await print_next_issues(issue_number)
+	print_project_version()
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -114,19 +149,20 @@ async function main(): Promise<void> {
 		return
 	}
 
+	const issue_number =
+		cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined)
+	const should_merge = is_merge_resolved(cli.values)
+
 	await git_pr_followup.run({
 		branch_name: await resolve_branch_name(cli.values.branch),
-		issue_number:
-			cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined),
+		issue_number,
 		notify_config: build_notify_config(cli.values),
 		coderabbit_ignore_reason: cli.values['coderabbit-ignore-reason'],
 		ai_review_ignore_reason: cli.values['ai-review-ignore-reason'],
 		is_skip_watch: cli.values['skip-watch'] === true,
-		should_merge: is_merge_resolved(cli.values),
+		should_merge,
 	})
-	console.info('')
-	console.info('✅ PR followup completed.')
-	print_project_version()
+	await print_completion(issue_number, should_merge)
 }
 
 try {
@@ -141,6 +177,8 @@ const git_followup_workflow = {
 	resolve_branch_name,
 	is_merge_resolved,
 	print_project_version,
+	print_next_issues,
+	print_completion,
 }
 
 export { git_followup_workflow }

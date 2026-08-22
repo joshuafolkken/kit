@@ -1,4 +1,8 @@
-const ENV_FILE_FLAGS: ReadonlyArray<string> = ['--env-file=.env']
+import { ENV_FILE_NAME } from '#ports'
+
+// The filename comes from the module that reads the same file from inside `playwright.config.ts`,
+// so the two readers of `.env` cannot end up pointed at two different files (#820).
+const ENV_FILE_FLAGS: ReadonlyArray<string> = [`--env-file=${ENV_FILE_NAME}`]
 
 type CommandCategory =
 	'Development' | 'Project' | 'Workflow' | 'Versioning' | 'Maintenance' | 'Git hooks' | 'AI tools'

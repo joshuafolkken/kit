@@ -24,3 +24,5 @@ words:
   - triaging
   - mnemecha
   - waneccha
+  - ENOENT
+  - ELIFECYCLE

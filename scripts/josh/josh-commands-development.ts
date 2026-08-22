@@ -85,6 +85,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Type-check TypeScript project',
 		category: 'Development',
 	},
+	port: {
+		script: 'scripts/ports/port-command.ts',
+		description: 'Print the PORT_SEED-resolved dev or preview port',
+		category: 'Development',
+	},
 	health: {
 		script: 'scripts/health-check.ts',
 		description: 'Show project health status',
