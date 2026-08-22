@@ -1,5 +1,5 @@
 {
-	"version": "1.91.0",
+	"version": "1.92.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -116,7 +116,7 @@
 		"prettier": "^3.9.6",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.62.4",
+		"rollup": "^4.62.5",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.4",
 		"typescript": "^6.0.3",
