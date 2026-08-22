@@ -2,6 +2,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { auto_merge_setting } from '#scripts/auto-merge-setting'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
@@ -234,11 +235,19 @@ function sync_secretlint_development_deps(destination_path: string): void {
 	)
 }
 
-// The distributed `.github/dependabot.yml` disables npm version updates (joshuafolkken/kit#803), so
-// a synced consumer only receives npm Dependabot PRs through the security-advisory path — which
-// needs a repository setting kit cannot write. Reporting it here ties the warning to the moment the
-// disable reaches the consumer (joshuafolkken/kit#805). It never fails the sync: the setting is
-// GitHub-side state, not a synced artifact.
+// Two distributed artifacts each depend on a repository setting kit cannot write, and both reports
+// are tied to the moment the artifact reaches the consumer. `.github/dependabot.yml` disables npm
+// version updates (joshuafolkken/kit#803), so a synced consumer only receives npm Dependabot pull
+// requests through the security-advisory path (joshuafolkken/kit#805);
+// `.github/workflows/dependabot-auto-merge.yml` runs `gh pr merge --auto`, which fails outright
+// unless the repository allows auto-merge (joshuafolkken/kit#834). Neither ever fails the sync: both
+// are GitHub-side state, not synced artifacts. Unconditional, unlike `init`, because `sync`
+// overwrites both files on every run.
+function report_repository_settings(name_with_owner: string | undefined): void {
+	security_updates.report_security_updates_section(name_with_owner)
+	auto_merge_setting.report_auto_merge_section(name_with_owner)
+}
+
 function sync_project_artifacts(is_force: boolean): void {
 	sync_ai_copy_all(is_force)
 	sync_prettier_config(path.join(PROJECT_ROOT, 'prettier.config.js'))
@@ -253,7 +262,7 @@ function sync_project_artifacts(is_force: boolean): void {
 	sync_config_files()
 	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	sync_secretlint_development_deps(path.join(PROJECT_ROOT, PACKAGE_JSON))
-	security_updates.report_security_updates_section(name_with_owner)
+	report_repository_settings(name_with_owner)
 }
 
 function main(): void {

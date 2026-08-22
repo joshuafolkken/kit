@@ -27,6 +27,17 @@ const LATER_NPM_ENTRY_CONFIG =
 // treat any file quoting that sentence as kit-distributed.
 const COMMENT_ONLY_DEPENDABOT_CONFIG =
 	'version: 2\n# `open-pull-requests-limit: 0` disables version updates only.\nupdates: []\n'
+const AUTO_MERGE_WORKFLOW_PATH = `${TOP_LEVEL}/.github/workflows/dependabot-auto-merge.yml`
+const AUTO_MERGE_WORKFLOW =
+	'jobs:\n  auto-merge:\n    steps:\n      - run: gh pr merge --auto --merge "$PR_URL"\n'
+// A workflow of the same name that never asks GitHub to auto-merge creates no prerequisite.
+const REPORT_ONLY_WORKFLOW = 'jobs:\n  auto-merge:\n    steps:\n      - run: gh pr view "$PR_URL"\n'
+// kit's own template explains the prerequisite in a comment repeating the same literal, so a
+// substring search would treat any file quoting that sentence as an auto-merge workflow.
+const COMMENT_ONLY_WORKFLOW =
+	'jobs:\n  auto-merge:\n    steps:\n      # `gh pr merge --auto` needs the repository setting.\n      - run: echo skip\n'
+const NESTED_REPOSITORY = `${TOP_LEVEL}/vendor/nested`
+const PERMISSION_DENIED = 'EACCES: permission denied'
 const GIT_OK_EXIT = 0
 const GIT_NOT_A_REPOSITORY_EXIT = 128
 
@@ -176,7 +187,7 @@ describe('has_distributed_dependabot_config — rejecting foreign configs', () =
 	it('is false, and does not throw, when the config cannot be read', () => {
 		mocked_exists_sync.mockReturnValue(true)
 		mocked_read_file_sync.mockImplementation(() => {
-			throw new Error('EACCES: permission denied')
+			throw new Error(PERMISSION_DENIED)
 		})
 
 		expect(() => doctor_io.has_distributed_dependabot_config(TOP_LEVEL)).not.toThrow()
@@ -214,9 +225,9 @@ describe('has_distributed_dependabot_config — search boundary', () => {
 		mocked_exists_sync.mockImplementation(
 			(candidate) => candidate === `${TOP_LEVEL}/.github/dependabot.yml`,
 		)
-		const nested = `${TOP_LEVEL}/vendor/nested`
-
-		expect(doctor_io.has_distributed_dependabot_config(nested, nested)).toBe(false)
+		expect(doctor_io.has_distributed_dependabot_config(NESTED_REPOSITORY, NESTED_REPOSITORY)).toBe(
+			false,
+		)
 	})
 
 	it('searches up to the boundary inclusive', () => {
@@ -234,5 +245,80 @@ describe('has_distributed_dependabot_config — search boundary', () => {
 		mocked_exists_sync.mockReturnValue(false)
 
 		expect(doctor_io.has_distributed_dependabot_config(`${TOP_LEVEL}/scripts`)).toBe(false)
+	})
+})
+
+// The workflow is found at exactly one path; every case below fixes that answer explicitly.
+function stub_workflow_at(existing_path: string, content: string): void {
+	mocked_exists_sync.mockImplementation((candidate) => candidate === existing_path)
+	mocked_read_file_sync.mockReturnValue(content)
+}
+
+function stub_no_workflow(): void {
+	mocked_exists_sync.mockReturnValue(false)
+}
+
+// joshuafolkken/kit#834: the gate for the repository auto-merge report. It keys on the command that
+// actually needs the setting rather than on the filename, so a consumer's own auto-merge workflow —
+// which needs the same setting — is covered, and a same-named workflow that never calls it is not.
+describe('has_auto_merge_workflow', () => {
+	it('is true for a workflow that enables auto-merge', () => {
+		stub_workflow_at(AUTO_MERGE_WORKFLOW_PATH, AUTO_MERGE_WORKFLOW)
+
+		expect(doctor_io.has_auto_merge_workflow(TOP_LEVEL)).toBe(true)
+	})
+
+	it('is false for a same-named workflow that never enables auto-merge', () => {
+		stub_workflow_at(AUTO_MERGE_WORKFLOW_PATH, REPORT_ONLY_WORKFLOW)
+
+		expect(doctor_io.has_auto_merge_workflow(TOP_LEVEL)).toBe(false)
+	})
+
+	it('is false when the command appears only inside a comment', () => {
+		stub_workflow_at(AUTO_MERGE_WORKFLOW_PATH, COMMENT_ONLY_WORKFLOW)
+
+		expect(doctor_io.has_auto_merge_workflow(TOP_LEVEL)).toBe(false)
+	})
+
+	it('is false when no such workflow is present', () => {
+		stub_no_workflow()
+
+		expect(doctor_io.has_auto_merge_workflow(TOP_LEVEL)).toBe(false)
+	})
+
+	it('resolves the workflow against the supplied repository root', () => {
+		stub_no_workflow()
+		doctor_io.has_auto_merge_workflow(TOP_LEVEL)
+
+		expect(mocked_exists_sync).toHaveBeenCalledWith(AUTO_MERGE_WORKFLOW_PATH)
+	})
+})
+
+describe('has_auto_merge_workflow — search', () => {
+	// Searching upward is what keeps the check alive from a subdirectory when git could not report
+	// the repository root.
+	it('finds a workflow in an ancestor directory', () => {
+		stub_workflow_at(AUTO_MERGE_WORKFLOW_PATH, AUTO_MERGE_WORKFLOW)
+
+		expect(doctor_io.has_auto_merge_workflow(`${TOP_LEVEL}/scripts/doctor`)).toBe(true)
+	})
+
+	// A repository nested under a kit consumer must not inherit the parent's workflow.
+	it('does not search for a workflow above the supplied boundary', () => {
+		stub_workflow_at(AUTO_MERGE_WORKFLOW_PATH, AUTO_MERGE_WORKFLOW)
+
+		expect(doctor_io.has_auto_merge_workflow(NESTED_REPOSITORY, NESTED_REPOSITORY)).toBe(false)
+	})
+
+	// The same contract as the Dependabot gate: `josh doctor` must not abort on a permission error or
+	// a race between the existence check and the read.
+	it('is false, and does not throw, when the workflow cannot be read', () => {
+		mocked_exists_sync.mockReturnValue(true)
+		mocked_read_file_sync.mockImplementation(() => {
+			throw new Error(PERMISSION_DENIED)
+		})
+
+		expect(() => doctor_io.has_auto_merge_workflow(TOP_LEVEL)).not.toThrow()
+		expect(doctor_io.has_auto_merge_workflow(TOP_LEVEL)).toBe(false)
 	})
 })

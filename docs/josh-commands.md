@@ -176,7 +176,7 @@ pnpm josh init
 
 Creates or merges all config files. See [init.md](./init.md) for the full list of files created and merged.
 
-`init` also reports the repository's **Dependabot security updates** setting as its last step, because it writes the same npm-disabling `.github/dependabot.yml` that `josh sync` distributes — a freshly scaffolded private repository has that setting off by default. The line is skipped when the project already had its own `.github/dependabot.yml`, since `init` does not overwrite it and the npm disable never landed. See [`josh doctor`](#josh-doctor) for the four results and [docs/sync.md](./sync.md) for why the setting matters.
+`init` also reports two **repository settings** as its last step, because it writes the two files that depend on them. The **Dependabot security updates** setting backs the npm-disabling `.github/dependabot.yml`, and the **Allow auto-merge** setting backs `.github/workflows/dependabot-auto-merge.yml` — a freshly scaffolded repository has both off by default. Each line is skipped when the project already had its own copy of the corresponding file, since `init` does not overwrite it and kit's change never landed. See [`josh doctor`](#josh-doctor) for the results each report can print and [docs/sync.md](./sync.md) for why the settings matter.
 
 ### `josh sync`
 
@@ -410,6 +410,16 @@ pnpm josh doctor --fix    # reclaim the global josh by removing a stale kit shim
 | `could not be read` | The setting could not be queried (a 404, or a token without the scope). Reported as unchecked, **not** as off.                                                |
 
 The check never fails the command: an unreadable setting is GitHub-side state kit cannot verify, not a broken install. `doctor` does not enable the setting either — changing a repository setting is the maintainer's call.
+
+`doctor` reports the repository's **Allow auto-merge** setting on the same terms, as the prerequisite of the distributed `.github/workflows/dependabot-auto-merge.yml` ([#834](https://github.com/joshuafolkken/kit/issues/834)). Without it `gh pr merge --auto` fails with `Auto-merge is not allowed for this repository`, and every github-actions bump sits green and unmerged. The gate here is a workflow containing `gh pr merge --auto`, matched rather than the filename: a consumer's own auto-merge workflow needs the same setting, and a same-named workflow that never calls the command creates no prerequisite at all. `josh sync` prints the line unconditionally, and `josh init` prints it when the workflow is present. One of three results is printed:
+
+| Result              | Meaning                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`           | The auto-merge workflow can enable auto-merge on a Dependabot pull request.                                                                                        |
+| `disabled`          | Off — the workflow fails and Dependabot pull requests stay open. The enabling command is printed, addressed at the resolved repository.                            |
+| `could not be read` | The setting could not be queried (no admin access, or a failed request). Reported as unchecked, **not** as off — a token without the scope simply omits the field. |
+
+The two reports are independent: a consumer synced before #834 has the Dependabot config and no auto-merge workflow, and a repository that only ever added its own auto-merge workflow has the second prerequisite without the first. When at least one applies, the repository name is resolved once and shared by both. `--fix` does not enable this setting either, for the same reason it does not enable Dependabot security updates.
 
 `--fix` is your go-ahead to repair: it reads the shadowing binary and, **only if it is a kit shim** (its body references `@joshuafolkken/kit` or the removed `install-bin` script), removes it so the pnpm-global `josh` reclaims `PATH` precedence. Any other shadowing binary is left untouched and reported for manual review — `doctor` never deletes a file it cannot positively identify as a stale kit shim.
 

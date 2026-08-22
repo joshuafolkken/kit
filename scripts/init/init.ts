@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { auto_merge_setting } from '#scripts/auto-merge-setting'
 import { doctor_io } from '#scripts/doctor/doctor-io'
 import { resolve_local_bin } from '#scripts/local-bin'
 import { package_version_schema, with_package_manager_schema } from '#scripts/schemas'
@@ -155,6 +156,21 @@ function run_config_file_actions(): void {
 	}
 }
 
+// Gated, unlike `sync`: `init` skips a file the consumer already has, so neither the npm-disable
+// (joshuafolkken/kit#803) nor the auto-merge workflow (joshuafolkken/kit#834) may have landed, and a
+// report's claim would then be false. `sync` overwrites both unconditionally, which is why it needs
+// no gate. The gates are the artifacts themselves, so a consumer's own pre-existing auto-merge
+// workflow still gets its prerequisite reported — it needs the same repository setting kit's does.
+function report_repository_settings(name_with_owner: string | undefined): void {
+	if (doctor_io.has_distributed_dependabot_config(PROJECT_ROOT, PROJECT_ROOT)) {
+		security_updates.report_security_updates_section(name_with_owner)
+	}
+
+	if (doctor_io.has_auto_merge_workflow(PROJECT_ROOT, PROJECT_ROOT)) {
+		auto_merge_setting.report_auto_merge_section(name_with_owner)
+	}
+}
+
 function main(): void {
 	console.info('\n🚀 Initializing @joshuafolkken/kit\n')
 	run_config_file_actions()
@@ -171,12 +187,7 @@ function main(): void {
 
 	install_lefthook()
 
-	// Gated, unlike `sync`: `init` skips `.github/dependabot.yml` when the consumer already has one,
-	// so the npm-disable may never have landed and the report's claim would be false. `sync`
-	// overwrites unconditionally, which is why it needs no gate.
-	if (doctor_io.has_distributed_dependabot_config(PROJECT_ROOT, PROJECT_ROOT)) {
-		security_updates.report_security_updates_section(name_with_owner)
-	}
+	report_repository_settings(name_with_owner)
 
 	console.info('\n✅ Done.\n')
 }

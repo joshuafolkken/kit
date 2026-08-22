@@ -1,0 +1,47 @@
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
+      # `dependency-type` cannot separate the ecosystems: Dependabot reports github-actions updates
+      # as `direct:production`, the same value it reports for npm production dependencies, so
+      # `package-ecosystem` is the only usable discriminator (joshuafolkken/kit#802).
+      #
+      # github-actions patch and minor bumps merge unattended. Two kinds of workflow live side by
+      # side here and auto-merge is right for both: the pins in a kit-distributed workflow
+      # (`ci.yml`, `auto-tag.yml`, `production.yml`, `sonar-qube.yml`) are resolved from kit at
+      # write time, so a bump merged here is what the next `josh sync` would have written anyway;
+      # the pins in a workflow this repository owns are real updates nobody else maintains.
+      #
+      # npm bumps never auto-merge, at any semver level: the distributed `.github/dependabot.yml`
+      # disables npm version updates (joshuafolkken/kit#803), so the only npm pull request that
+      # reaches this workflow is a security advisory — which is exactly the kind a human should
+      # read. Major bumps never auto-merge in either ecosystem.
+      #
+      # `gh pr merge --auto` needs the repository's own "Allow auto-merge" setting; without it the
+      # step fails with `Auto-merge is not allowed for this repository`. `josh init`, `josh sync`
+      # and `josh doctor` report that setting and print the command that enables it
+      # (joshuafolkken/kit#834).
+      - name: Enable auto-merge for github-actions patch and minor updates
+        if: >-
+          steps.metadata.outputs.package-ecosystem == 'github_actions'
+          && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
+          || steps.metadata.outputs.update-type == 'version-update:semver-minor')
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge --auto --merge "$PR_URL"

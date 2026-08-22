@@ -1,3 +1,5 @@
+import { repo_setting, type RepoSettingStatus } from './repo-setting'
+
 // GitHub's Dependabot security-updates setting, as reported by
 // `GET /repos/{owner}/{repo}/automated-security-fixes`.
 //
@@ -7,33 +9,19 @@
 // default for private repositories — so a consumer that syncs the file without it gets zero npm
 // Dependabot PRs, advisories included. The failure is silent: no PR looks exactly like no advisory
 // (joshuafolkken/kit#805).
-type SecurityUpdatesStatus = 'enabled' | 'paused' | 'disabled' | 'unreadable'
-
-// The API payload. `paused` is absent from older responses, so it is optional.
-interface SecurityUpdatesPayload {
-	enabled?: unknown
-	paused?: unknown
-}
+//
+// `paused` is this setting's own third state, which is why the shared two-state classifier is only
+// half the answer here (see classify_security_updates).
+type SecurityUpdatesStatus = RepoSettingStatus | 'paused'
 
 const SETTING_LABEL = 'Dependabot security updates'
-const UNKNOWN_REPOSITORY = 'unknown repository'
-const REPO_PLACEHOLDER = '<owner>/<repo>'
+const ENABLED_FIELD = 'enabled'
+const PAUSED_FIELD = 'paused'
 const ORIGIN_ISSUE = 'joshuafolkken/kit#803'
 
-// The remediation for `disabled`, addressed at the repository the report actually resolved. A
-// literal `<owner>/<repo>` would be unusable when pasted into a shell, where `<` redirects.
+// The remediation for `disabled`, addressed at the repository the report actually resolved.
 function enable_command(repo: string | undefined): string {
-	return `gh api -X PUT repos/${repo ?? REPO_PLACEHOLDER}/automated-security-fixes`
-}
-
-function parse_payload(stdout: string): SecurityUpdatesPayload | undefined {
-	try {
-		const parsed: unknown = JSON.parse(stdout)
-
-		return typeof parsed === 'object' && parsed !== null ? parsed : undefined
-	} catch {
-		return undefined
-	}
+	return `gh api -X PUT repos/${repo_setting.command_target(repo)}/automated-security-fixes`
 }
 
 // `paused` is held to the same standard as `enabled`: a present but non-boolean value means the
@@ -46,20 +34,15 @@ function classify_active(paused: unknown): SecurityUpdatesStatus {
 	return paused ? 'paused' : 'enabled'
 }
 
-// Unparseable output, a missing `enabled`, or a non-boolean `enabled` are all unreadable: a missing
-// answer is not a negative answer, and reporting one as `disabled` would raise a false alarm.
-function classify_payload(payload: SecurityUpdatesPayload | undefined): SecurityUpdatesStatus {
-	if (typeof payload?.enabled !== 'boolean') return 'unreadable'
-	if (!payload.enabled) return 'disabled'
-
-	return classify_active(payload.paused)
-}
-
-// Classify one `gh api` result. A non-zero exit covers every case where the answer cannot be
-// trusted — 404 on a repository that never had the setting, a token without the scope, no network —
-// and they collapse into `unreadable` because none of them proves the setting is off.
+// Classify one `gh api` result. The shared classifier answers `enabled` / `disabled` / `unreadable`
+// off the `enabled` field — a failed call, unparseable output and a non-boolean field all landing on
+// `unreadable` — and only an affirmative answer is refined further by `paused`.
 function classify_security_updates(exit_code: number, stdout: string): SecurityUpdatesStatus {
-	return exit_code === 0 ? classify_payload(parse_payload(stdout)) : 'unreadable'
+	const payload = repo_setting.parse_payload(exit_code, stdout)
+	const status = repo_setting.classify_boolean_setting(payload, ENABLED_FIELD)
+	if (status !== 'enabled') return status
+
+	return classify_active(repo_setting.read_field(payload, PAUSED_FIELD))
 }
 
 // Whether the status leaves npm security advisories unable to open a PR. `unreadable` is excluded:
@@ -123,7 +106,7 @@ function format_security_updates_report(
 	status: SecurityUpdatesStatus,
 	repo: string | undefined,
 ): ReadonlyArray<string> {
-	const target = repo ?? UNKNOWN_REPOSITORY
+	const target = repo_setting.report_target(repo)
 	if (status === 'enabled') return [`  ✔ ${SETTING_LABEL}: enabled (${target})`]
 
 	if (!is_exposed(status)) {
@@ -138,7 +121,6 @@ function format_security_updates_report(
 
 const security_updates_logic = {
 	SETTING_LABEL,
-	UNKNOWN_REPOSITORY,
 	enable_command,
 	classify_security_updates,
 	is_exposed,
