@@ -6,10 +6,10 @@
  */
 import { fileURLToPath } from 'node:url'
 import { execaSync } from 'execa'
+import { IN_PROGRESS_LABEL } from '../scripts/git/issue-labels'
 import { issue_logic } from '../scripts/issue/issue-logic'
 
 const ARGV_INDEX = 2
-const IN_PROGRESS_LABEL = 'in-progress'
 const IN_PROGRESS_COLOR = '#0075ca'
 const IN_PROGRESS_DESCRIPTION = 'Work is actively in progress'
 

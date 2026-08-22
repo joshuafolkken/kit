@@ -1,6 +1,7 @@
 import { git_epic_body } from './git-epic-body'
-import { EPIC_LABEL, git_epic_validate, type EpicSubject } from './git-epic-validate'
+import { git_epic_validate, type EpicSubject } from './git-epic-validate'
 import { git_gh_command } from './git-gh-command'
+import { EPIC_LABEL } from './issue-labels'
 import { parse_json_object_safe } from './parse-json-array'
 import { epic_subject_schema } from './schemas'
 
