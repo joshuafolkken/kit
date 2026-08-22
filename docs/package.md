@@ -43,6 +43,7 @@ The package exposes config presets for direct import:
 | Prompts         | `node_modules/@joshuafolkken/kit/prompts/*.md`                   |
 | Version library | `@joshuafolkken/kit/version`                                     |
 | Config-merge    | `@joshuafolkken/kit/config-merge`                                |
+| Env flags       | `@joshuafolkken/kit/env`                                         |
 
 Prefer wiring up individual configs without `josh init`? See [manual-config.md](./manual-config.md).
 
@@ -141,6 +142,31 @@ so consumers keep `@joshuafolkken/kit/config-merge` **external** — `js-yaml` /
 kit's own `node_modules`. kit's own `josh sync` / `josh init` consume this same library via
 [`scripts/init/init-logic-yaml-merge.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/init/init-logic-yaml-merge.ts)
 and [`scripts/init/init-logic-json-merge.ts`](https://github.com/joshuafolkken/kit/blob/main/scripts/init/init-logic-json-merge.ts).
+
+### Env-flag library (`@joshuafolkken/kit/env`)
+
+The single source for "is this env var switched on?" — the vocabulary the distributed
+`playwright.config.ts` reads `PLAYWRIGHT_REUSE_SERVER` and `CI` with. Import it instead of
+declaring your own truthy set in a config file: a local clone drifts immediately (the motivating
+case accepted only `'1'`/`'true'`, so `ANALYZE=yes` silently did nothing in the same repository
+where `PLAYWRIGHT_REUSE_SERVER=yes` worked).
+
+```ts
+import { environment_flags } from '@joshuafolkken/kit/env'
+
+// Opt-in flag: only affirmative spellings enable — '1' / 'true' / 'yes' / 'on',
+// case- and whitespace-insensitive. '0', 'false', empty and unset all read as off.
+const is_analyze_enabled = environment_flags.is_flag_enabled(process.env['ANALYZE'])
+
+// CI detection is the inverse: any non-empty value counts as CI (Woodpecker exports
+// CI=woodpecker) except the explicit negatives '0' / 'false' / 'no' / 'off'.
+const is_ci = environment_flags.is_ci_enabled(process.env['CI'])
+```
+
+`environment_flags.normalize_flag_value(value)` (trim + lowercase) is there for callers that extend the
+vocabulary with their own comparisons. The module is plain committed JavaScript with a
+hand-written `.d.ts` — like `./ports`, it must resolve on a fresh clone before any build, because
+`playwright.config.ts` imports it.
 
 ## Next
 
