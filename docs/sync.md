@@ -73,11 +73,26 @@ SECURITY.md         tsconfig.sonar.json
 > `mergeable: MERGEABLE`, and no `autoMergeRequest` on the pull request, because nothing in the
 > repository ever enabled auto-merge. It merges `github-actions` **patch and minor** bumps only, and
 > never an npm bump at any semver level: the npm entry above leaves security advisories as the only
-> npm pull request that can reach it, and an advisory is exactly the kind a human should read. Both
-> kinds of workflow in a consumer benefit — the pins in a kit-distributed workflow are what the next
-> `josh sync` would have written anyway, and the pins in a workflow the consumer owns are real
-> updates nobody else maintains. See joshuafolkken/kit#802 for the gate and joshuafolkken/kit#834
-> for the distribution.
+> npm pull request that can reach it, and an advisory is exactly the kind a human should read.
+>
+> **It merges a bump only in a workflow the consumer owns.** A bump to one of the workflows kit
+> distributes (`ci.yml`, `auto-tag.yml`, `dependabot-auto-merge.yml`, `production.yml`,
+> `sonar-qube.yml`) is left open instead, because the next `josh sync` rewrites those pins from the
+> installed kit package regardless of what was merged. Merging one produces a loop — Dependabot
+> bumps the pin, the workflow merges it, `josh sync` writes it back, Dependabot proposes the same
+> bump again — with a full CI run on every round. kit 1.93.0 shipped the workflow without this
+> exclusion; joshuafolkken/kit#836 added it. The pins in those files are maintained at the source:
+> kit's own Dependabot bumps them and `josh sync` distributes the result. `deploy-vps.yml` is **not**
+> on that list — sync patches its pnpm version but never touches its `uses:` pins, so a bump there is
+> a real update and merges like any other consumer-owned workflow. The exclusion list travels inside
+> the distributed workflow, and a kit unit test compares it against kit's own distribution lists, so
+> it cannot drift from the set of files sync actually overwrites. See joshuafolkken/kit#802 for the
+> ecosystem gate, joshuafolkken/kit#834 for the distribution, and joshuafolkken/kit#836 for the
+> exclusion.
+>
+> In kit's **own** repository the same workflow deliberately has no such exclusion: there
+> `.github/workflows/*` is the source of truth, so a bump merged in kit is precisely the update every
+> consumer then receives.
 >
 > **`josh init`, `josh sync` and `josh doctor` report that workflow's prerequisite too.**
 > `gh pr merge --auto` fails outright with `Auto-merge is not allowed for this repository` unless the

@@ -6,6 +6,24 @@ permissions:
   contents: write
   pull-requests: write
 
+# The workflows kit owns in this repository. `josh sync` overwrites each of them, resolving every
+# `uses:` pin from the installed kit package at write time (joshuafolkken/kit#747) — so a bump to a
+# pin in one of these files is undone by the next sync, whether or not it was merged here. Merging
+# one anyway produces a loop: Dependabot bumps the pin, this workflow merges it, `josh sync` writes
+# it back, Dependabot proposes the same bump again (joshuafolkken/kit#836).
+#
+# The list must stay equal to the set of `.github/workflows/*` destinations kit distributes; a kit
+# unit test compares it against `init-logic`'s own distribution lists and fails on any drift. It is
+# NOT a list of files you may not edit for other reasons — `deploy-vps.yml` is patched by sync but
+# keeps its own pins, so a bump there is a real update and is merged like any other.
+env:
+  KIT_MANAGED_WORKFLOWS: |
+    .github/workflows/auto-tag.yml
+    .github/workflows/ci.yml
+    .github/workflows/dependabot-auto-merge.yml
+    .github/workflows/production.yml
+    .github/workflows/sonar-qube.yml
+
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
@@ -17,15 +35,53 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
 
+      # Whether the pull request touches a file kit will overwrite. Decided from the changed paths
+      # because Dependabot's metadata cannot answer it: for the github-actions ecosystem it reports
+      # one `directory` for the whole repository and never names the workflow file it bumped.
+      #
+      # The paths come from the API, so no checkout is needed, and `--paginate` is what makes the
+      # answer complete rather than the first page of a large diff. They are captured into a variable
+      # before the comparison, not piped straight into it: the default shell is `bash -e` without
+      # `pipefail`, so a `gh` failure inside a pipeline would be masked by grep's exit status and
+      # read as "no kit-managed file" — merging the very pull request this step exists to hold back.
+      # An assignment carries the command's status, so a failed call fails the step instead.
+      #
+      # `grep -x` matches whole lines, so `ci.yml.bak` and `vendor/.github/workflows/ci.yml` are not
+      # mistaken for the managed paths, and `-F` keeps the dots literal.
+      #
+      # An empty list is refused rather than treated as "nothing is managed": `grep -f` on an empty
+      # pattern file matches nothing, so a lost or emptied `env` block would silently reopen the loop
+      # this step closes. Failing loudly is the only reading of an empty list that is not a guess.
+      - name: Check whether the pull request touches a kit-managed workflow
+        id: managed
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "${KIT_MANAGED_WORKFLOWS:-}" ]; then
+            echo 'KIT_MANAGED_WORKFLOWS is empty — refusing to auto-merge.' >&2
+            exit 1
+          fi
+
+          changed="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename')"
+
+          if printf '%s\n' "$changed" \
+            | grep -qxFf <(printf '%s' "$KIT_MANAGED_WORKFLOWS"); then
+            echo 'has-kit-managed=true' >>"$GITHUB_OUTPUT"
+          else
+            echo 'has-kit-managed=false' >>"$GITHUB_OUTPUT"
+          fi
+
       # `dependency-type` cannot separate the ecosystems: Dependabot reports github-actions updates
       # as `direct:production`, the same value it reports for npm production dependencies, so
       # `package-ecosystem` is the only usable discriminator (joshuafolkken/kit#802).
       #
-      # github-actions patch and minor bumps merge unattended. Two kinds of workflow live side by
-      # side here and auto-merge is right for both: the pins in a kit-distributed workflow
-      # (`ci.yml`, `auto-tag.yml`, `production.yml`, `sonar-qube.yml`) are resolved from kit at
-      # write time, so a bump merged here is what the next `josh sync` would have written anyway;
-      # the pins in a workflow this repository owns are real updates nobody else maintains.
+      # github-actions patch and minor bumps merge unattended, but only in a workflow this
+      # repository owns — those pins are real updates nobody else maintains. A bump to a
+      # kit-managed workflow is left open instead: `josh sync` is what updates those pins, and kit
+      # bumps them at the source, so merging here would only start the loop described above and
+      # cost a CI run on every round.
       #
       # npm bumps never auto-merge, at any semver level: the distributed `.github/dependabot.yml`
       # disables npm version updates (joshuafolkken/kit#803), so the only npm pull request that
@@ -39,6 +95,7 @@ jobs:
       - name: Enable auto-merge for github-actions patch and minor updates
         if: >-
           steps.metadata.outputs.package-ecosystem == 'github_actions'
+          && steps.managed.outputs.has-kit-managed == 'false'
           && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
           || steps.metadata.outputs.update-type == 'version-update:semver-minor')
         env:

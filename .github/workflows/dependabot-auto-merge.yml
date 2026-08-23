@@ -22,10 +22,19 @@ jobs:
       # `package-ecosystem` is the only usable discriminator (kit#802).
       #
       # github-actions patch and minor bumps merge unattended because these are the SHA pins
-      # `josh sync` distributes — keeping them current at the source is the intended flow. npm bumps
-      # never do, at any semver level: kit publishes lint plugins as runtime dependencies, so a
-      # patch release can change rule behavior for every consumer while kit's own CI only proves
-      # that kit still builds. Major bumps never auto-merge in either ecosystem.
+      # `josh sync` distributes — keeping them current at the source is the intended flow.
+      #
+      # This is the one place where kit's own workflow and the copy consumers receive diverge in
+      # behavior rather than in wording. Here `.github/workflows/*` IS the source, so a bump merged
+      # here is the update every consumer then receives. In a consumer the same files are overwritten
+      # from the installed kit package on the next `josh sync`, so merging a bump to one of them only
+      # starts a merge/revert loop — `templates/workflows/dependabot-auto-merge.yml` therefore carries
+      # an extra step that skips those paths, and must not be mirrored back into this file
+      # (joshuafolkken/kit#836).
+      #
+      # npm bumps never auto-merge, at any semver level: kit publishes lint plugins as runtime
+      # dependencies, so a patch release can change rule behavior for every consumer while kit's own
+      # CI only proves that kit still builds. Major bumps never auto-merge in either ecosystem.
       - name: Enable auto-merge for github-actions patch and minor updates
         if: >-
           steps.metadata.outputs.package-ecosystem == 'github_actions'
