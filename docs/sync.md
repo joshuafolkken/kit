@@ -92,20 +92,38 @@ SECURITY.md         tsconfig.sonar.json
 >
 > **The exclusion withdraws an auto-merge as well as declining to enable one.** `gh pr merge --auto`
 > is state on the pull request, so a gate that only declines to arm cannot undo one an earlier run
-> already armed — and two routes reach exactly that state: a pull request armed while its diff held
-> no kit-managed workflow and later grew one, and a push by anyone other than Dependabot. The
-> distributed workflow therefore withdraws auto-merge whenever it finds a kit-managed workflow in the
-> diff, reading the pull request's armed state first because `--disable-auto` is an error rather than
-> a no-op on a pull request that has none. So that the withdrawal is reachable in both cases, the job
-> is gated on the pull request's **author** rather than on `github.actor`, which names whoever
-> triggered the run and used to skip the job entirely for a maintainer's push; the actor check moved
-> onto the enabling step instead, so arming still happens only on Dependabot's own events. The
-> withdrawal also runs before `dependabot/fetch-metadata`, which fails the job outright on a branch
-> whose first commit is not Dependabot's — after it, the withdrawal would be unreachable in precisely
-> the hand-amended case that motivates it — and the metadata step carries the actor check too, so
-> that a maintainer's push, which the wider job guard now lets through, cannot fail on a branch whose
-> first commit is no longer Dependabot's. kit 1.94.0 shipped the one-way gate;
-> joshuafolkken/kit#838 made it take effect in both directions.
+> already armed. The distributed workflow therefore withdraws auto-merge on **every run that is not
+> entitled to arm it** — the withdrawal's condition is written as the negation of the one that decides
+> whether a run may consider arming at all, not as its own list of cases, reading the pull request's
+> armed state first because `--disable-auto` is an error rather than a no-op on a pull request that
+> has none. Both known routes into an armed pull request nobody re-approved are the same shape, a run
+> that cannot arm: a pull request armed while its diff held no kit-managed workflow and later grew
+> one, and a push by anyone other than Dependabot — a rebase or an amend carrying commits nobody
+> reviewed as part of the bump. Enumerating them instead left the second uncovered whenever the diff
+> stayed outside the managed set (joshuafolkken/kit#840), which is why the condition is now derived
+> rather than listed. The enabling step's remaining clauses — the ecosystem and the semver level —
+> stay out of that negation on purpose: they are facts about the bump rather than about the run and do
+> not change over a pull request's life, so anything that was ever armed already satisfied them.
+>
+> So that the withdrawal is reachable at all, the job is gated on the pull request's **author** rather
+> than on `github.actor`, which names whoever triggered the run and used to skip the job entirely for
+> a maintainer's push; the actor check moved onto the enabling step instead, so arming still happens
+> only on Dependabot's own events. The withdrawal also runs before `dependabot/fetch-metadata`, which
+> fails the job outright on a branch whose first commit is not Dependabot's — after it, the withdrawal
+> would be unreachable in precisely the hand-amended case that motivates it — and the metadata step
+> carries the actor check too, so that a maintainer's push, which the wider job guard now lets through,
+> cannot fail on a branch whose first commit is no longer Dependabot's.
+>
+> The withdrawal is prefixed with `!cancelled()`, so it is reached even when the kit-managed check
+> itself fails — an emptied `KIT_MANAGED_WORKFLOWS`, or a `gh api` call that did not answer. A failed
+> step publishes no outputs, so the negated condition holds and an undecided diff falls to the safe
+> side. That matters because this workflow is **not** a required check: a red run of it does not hold
+> the merge back on its own, so stopping at the failure would leave the auto-merge armed. `always()`
+> would reach one further run, a cancelled one, where the check was interrupted rather than answered
+> — and there the same empty output would withdraw an auto-merge that was armed legitimately and that
+> nothing re-arms without a new push, so it is deliberately not used. kit 1.94.0 shipped the one-way
+> gate; joshuafolkken/kit#838 made it take effect in both directions, and joshuafolkken/kit#840
+> widened it from the kit-managed case to every run that is not entitled to arm.
 >
 > In kit's **own** repository the same workflow deliberately has no such exclusion — and so has
 > nothing to withdraw, which is why its job keeps the narrower `github.actor` guard: there

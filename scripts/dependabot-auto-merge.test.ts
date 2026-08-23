@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
-import { workflow_expression_fixture, type ContextTree } from './workflow-expression-fixture'
+import { workflow_expression_fixture } from './workflow-expression-fixture'
 
 // `.github/workflows/dependabot-auto-merge.yml` decides which Dependabot PRs merge unattended, so
 // the gate is asserted by evaluating the workflow's own `if` expression with GitHub's expression
@@ -12,47 +12,37 @@ import { workflow_expression_fixture, type ContextTree } from './workflow-expres
 const {
 	ACTOR_GATE: DEPENDABOT_ACTOR_GATE,
 	METADATA_STEP_ID: METADATA_STEP,
+	DEPENDABOT_LOGIN,
+	ECOSYSTEM_OUTPUT,
+	ACTIONS_ECOSYSTEM,
+	NPM_ECOSYSTEM,
+	PATCH_UPDATE,
+	MINOR_UPDATE,
+	MAJOR_UPDATE,
+	NO_OUTPUT,
+	build_run_context,
 	runtime_job,
 	merge_step,
+	merge_condition,
 } = dependabot_workflow_fixture
 const { STEPS_CONTEXT: CONTEXT_ROOT, OUTPUTS_KEY } = workflow_expression_fixture
 
-// The metadata outputs the expression addresses, spelled out so the evaluated context and the
-// asserted reference path cannot drift apart.
-const ECOSYSTEM_OUTPUT = 'package-ecosystem'
-const UPDATE_TYPE_OUTPUT = 'update-type'
+// The reference path the expression addresses, assembled from the same pieces the evaluated context
+// is built from so the two cannot drift apart.
 const ECOSYSTEM_REFERENCE = `${CONTEXT_ROOT}.${METADATA_STEP}.${OUTPUTS_KEY}.${ECOSYSTEM_OUTPUT}`
 
-const ACTIONS_ECOSYSTEM = 'github_actions'
-const NPM_ECOSYSTEM = 'npm_and_yarn'
-const PATCH_UPDATE = 'version-update:semver-patch'
-const MINOR_UPDATE = 'version-update:semver-minor'
-const MAJOR_UPDATE = 'version-update:semver-major'
-
-function read_merge_condition(): string {
-	const condition = merge_step(runtime_job())?.if
-	if (condition === undefined) throw new Error('the auto-merge step declares no `if` condition')
-
-	return condition
-}
-
-// Mirrors the `steps.<id>.outputs.<name>` shape the workflow reads, so the expression under test is
-// evaluated against the same context GitHub supplies at run time.
-function build_metadata_context(ecosystem: string, update_type: string): ContextTree {
-	return {
-		[CONTEXT_ROOT]: {
-			[METADATA_STEP]: {
-				[OUTPUTS_KEY]: { [ECOSYSTEM_OUTPUT]: ecosystem, [UPDATE_TYPE_OUTPUT]: update_type },
-			},
-		},
-	}
-}
-
+// kit's own gate reads no actor and no kit-managed decision — that divergence is the point of
+// joshuafolkken/kit#836 — so a run is described here by the metadata outputs alone; the rest of the
+// shared context is inert.
 function is_merge_step_reached(ecosystem: string, update_type: string): boolean {
-	return workflow_expression_fixture.evaluate_condition(
-		read_merge_condition(),
-		build_metadata_context(ecosystem, update_type),
-	)
+	const context = build_run_context({
+		actor: DEPENDABOT_LOGIN,
+		managed_output: NO_OUTPUT,
+		ecosystem,
+		update_type,
+	})
+
+	return workflow_expression_fixture.evaluate_condition(merge_condition(runtime_job()), context)
 }
 
 describe('dependabot-auto-merge.yml — gate shape (kit#802)', () => {
@@ -67,7 +57,7 @@ describe('dependabot-auto-merge.yml — gate shape (kit#802)', () => {
 	// `dependency-type` reports `direct:production` for github-actions updates and for kit's npm
 	// production dependencies alike, so the ecosystem output is the only signal separating them.
 	it('discriminates on package-ecosystem', () => {
-		expect(read_merge_condition()).toContain(ECOSYSTEM_REFERENCE)
+		expect(merge_condition(runtime_job())).toContain(ECOSYSTEM_REFERENCE)
 	})
 })
 

@@ -1,24 +1,38 @@
 import { describe, expect, it } from 'vitest'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
+import { workflow_expression_fixture } from './workflow-expression-fixture'
 
 // joshuafolkken/kit#836 stopped the workflow from *arming* auto-merge on a bump to a kit-distributed
 // workflow, but `gh pr merge --auto` is state that persists on the pull request, so a gate that only
-// declines to arm cannot undo one that an earlier run already armed. Two routes reach that state: a
-// pull request whose diff grows a kit-managed workflow after it was armed, and a push by anyone
-// other than Dependabot, which used to skip the whole job. Either way the bump merges itself once
-// the checks go green, straight back into the loop #836 closed (joshuafolkken/kit#838).
+// declines to arm cannot undo one that an earlier run already armed. #838 added the withdrawal and
+// enumerated one route into that state — a diff that grew a kit-managed workflow — which left the
+// other one, a push by anyone but Dependabot, uncovered for a diff kit never overwrites
+// (joshuafolkken/kit#840). The withdrawal is now the negation of the condition that lets a run
+// consider arming at all, so every run that cannot arm withdraws instead, and it is prefixed with
+// `!cancelled()` so a failed kit-managed check falls to the safe side rather than leaving the
+// auto-merge armed behind a red job.
 const {
 	WITHDRAW_STEP_ID,
 	METADATA_STEP_ID,
 	MANAGED_STEP_ID,
+	DEPENDABOT_LOGIN,
+	MAINTAINER_LOGIN,
 	ACTOR_GATE,
+	ARM_PRECONDITION,
+	NOT_CANCELLED,
+	NO_OUTPUT,
+	MANAGED,
+	NOT_MANAGED,
+	withdraw_gate,
+	build_run_context,
 	template_job,
 	runtime_job,
 	find_step,
 	merge_step,
+	step_condition,
 } = dependabot_workflow_fixture
 
-const WITHDRAW_GATE = dependabot_workflow_fixture.managed_gate(true)
+const WITHDRAW_STEP_LABEL = 'withdrawal'
 const WITHDRAW_COMMAND = 'gh pr merge --disable-auto'
 const ARMED_QUERY = '--json autoMergeRequest'
 const NOT_FOUND = -1
@@ -27,13 +41,71 @@ function withdraw_step_run(): string {
 	return find_step(template_job(), WITHDRAW_STEP_ID)?.run ?? ''
 }
 
+function withdraw_condition(): string {
+	return step_condition(find_step(template_job(), WITHDRAW_STEP_ID), WITHDRAW_STEP_LABEL)
+}
+
+// The withdrawal names no metadata output, so a run is described here by the two facts it does
+// read: who triggered it, and what the kit-managed check answered — `NO_OUTPUT` being the answer of
+// a check that failed before publishing one.
+function is_withdrawn(actor: string, managed_output: string): boolean {
+	const context = build_run_context({
+		actor,
+		managed_output,
+		ecosystem: NO_OUTPUT,
+		update_type: NO_OUTPUT,
+	})
+
+	return workflow_expression_fixture.evaluate_condition(withdraw_condition(), context)
+}
+
 function template_step_index(step_id: string): number {
 	return template_job()?.steps?.findIndex((step) => step.id === step_id) ?? NOT_FOUND
 }
 
-describe('dependabot-auto-merge.yml withdrawal', () => {
-	it('withdraws auto-merge when a kit-managed workflow is in the diff', () => {
-		expect(find_step(template_job(), WITHDRAW_STEP_ID)?.if ?? '').toBe(WITHDRAW_GATE)
+describe('dependabot-auto-merge.yml withdrawal — which runs withdraw', () => {
+	// The route joshuafolkken/kit#838 closed: armed on `opened` while the diff held nothing kit
+	// overwrites, then a later push adds a kit-managed workflow to it.
+	it('withdraws when a kit-managed workflow is in the diff', () => {
+		expect(is_withdrawn(DEPENDABOT_LOGIN, MANAGED)).toBe(true)
+	})
+
+	// The route joshuafolkken/kit#840 closed. The job runs for this push — it is gated on the pull
+	// request's author, still Dependabot — but the enumerated withdrawal skipped it, and so did
+	// arming, so an auto-merge armed earlier survived a rebase or an amend nobody reviewed.
+	it('withdraws on a push by anyone other than Dependabot, even outside the kit-managed set', () => {
+		expect(is_withdrawn(MAINTAINER_LOGIN, NOT_MANAGED)).toBe(true)
+	})
+
+	// `KIT_MANAGED_WORKFLOWS` empty, or a `gh api` call that did not answer. This workflow is not a
+	// required check, so a red run of it does not hold the merge back — leaving the armed state in
+	// place would ship exactly what the check exists to prevent.
+	it('withdraws when the kit-managed check failed and published no output', () => {
+		expect(is_withdrawn(DEPENDABOT_LOGIN, NO_OUTPUT)).toBe(true)
+	})
+
+	// The ordinary case the distribution exists for, and the only run that arms anything.
+	it('leaves auto-merge alone on a Dependabot bump outside the kit-managed set', () => {
+		expect(is_withdrawn(DEPENDABOT_LOGIN, NOT_MANAGED)).toBe(false)
+	})
+})
+
+describe('dependabot-auto-merge.yml withdrawal — shape', () => {
+	// Both halves are pinned to one declared precondition rather than to each other's text, so a
+	// case added to arming is withdrawn without a second edit and the two cannot disagree.
+	it('is the negation of the condition arming requires', () => {
+		expect(find_step(template_job(), METADATA_STEP_ID)?.if).toBe(ARM_PRECONDITION)
+		expect(withdraw_condition()).toBe(withdraw_gate(ARM_PRECONDITION))
+	})
+
+	// Without it the job stops at a failed kit-managed check with the auto-merge still armed.
+	// `always()` in its place would reach a cancelled run too, where the check was interrupted rather
+	// than answered — and withdraw a legitimately armed auto-merge that nothing re-arms.
+	it('is reached when an earlier step failed, but not when the run was cancelled', () => {
+		expect(withdraw_condition().startsWith(NOT_CANCELLED)).toBe(true)
+	})
+
+	it('disables auto-merge on the pull request', () => {
 		expect(withdraw_step_run()).toContain(WITHDRAW_COMMAND)
 	})
 
@@ -66,13 +138,6 @@ describe('dependabot-auto-merge.yml withdrawal', () => {
 	// rather than disappearing.
 	it('still arms auto-merge only on Dependabot’s own events', () => {
 		expect(merge_step(template_job())?.if ?? '').toContain(ACTOR_GATE)
-	})
-
-	// `dependabot/fetch-metadata` fails the job when the branch's first commit is no longer
-	// Dependabot's — a maintainer who amended or rebased the bump by hand. The job now reaches that
-	// run, so without this gate the wider guard would turn their pull request red.
-	it('reads metadata only on Dependabot’s own events, which cannot fail the job', () => {
-		expect(find_step(template_job(), METADATA_STEP_ID)?.if ?? '').toContain(ACTOR_GATE)
 	})
 })
 
