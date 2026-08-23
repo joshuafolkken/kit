@@ -18,10 +18,43 @@ const ACTIONS_ECOSYSTEM = "steps.metadata.outputs.package-ecosystem == 'github_a
 const PATCH_UPDATE = "steps.metadata.outputs.update-type == 'version-update:semver-patch'"
 const MINOR_UPDATE = "steps.metadata.outputs.update-type == 'version-update:semver-minor'"
 const MAJOR_UPDATE = 'version-update:semver-major'
+const MANAGED_STEP_ID = 'managed'
+const MANAGED_OUTPUT = 'has-kit-managed'
+const MANAGED_GATE = `steps.${MANAGED_STEP_ID}.outputs.${MANAGED_OUTPUT} == 'false'`
+const MANAGED_LIST_KEY = 'KIT_MANAGED_WORKFLOWS'
 const STALE_REFERENCE = '0000000000000000000000000000000000000000 # v0.0.0'
 
 function template_job(): WorkflowJob | undefined {
 	return ci_yml_fixture.find_job(TEMPLATE, JOB)
+}
+
+function find_step(job: WorkflowJob | undefined, step_id: string): WorkflowStep | undefined {
+	return job?.steps?.find((step) => step.id === step_id)
+}
+
+// The paths the template refuses to auto-merge, as the workflow itself declares them.
+function declared_managed_workflows(): Array<string> {
+	const declared = ci_yml_fixture.load_workflow(TEMPLATE).env?.[MANAGED_LIST_KEY] ?? ''
+
+	return declared
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => line !== '')
+		.toSorted((left, right) => left.localeCompare(right))
+}
+
+// The same set derived from kit's own distribution lists — the single source of truth the declared
+// list has to match. A workflow destination is one `josh sync` overwrites through the pin-injecting
+// write path, which is exactly what makes a bump to it revert (joshuafolkken/kit#836).
+function distributed_workflows(): Array<string> {
+	const destinations = [
+		...init_logic.get_ai_copy_files(),
+		...init_logic.get_ai_copy_file_mappings().map((mapping) => mapping.dest),
+	]
+
+	return destinations
+		.filter((destination) => workflow_pin_logic.is_workflow_destination(destination))
+		.toSorted((left, right) => left.localeCompare(right))
 }
 
 function merge_step(job: WorkflowJob | undefined): WorkflowStep | undefined {
@@ -132,5 +165,68 @@ describe('dependabot-auto-merge.yml pins', () => {
 
 		expect(written).toContain(`${METADATA_ACTION}@${runtime_metadata_reference() ?? ''}`)
 		expect(written).not.toContain(STALE_REFERENCE)
+	})
+})
+
+// joshuafolkken/kit#836: a bump to a kit-distributed workflow is undone by the next `josh sync`,
+// which resolves every pin from the installed kit package at write time (joshuafolkken/kit#747).
+// Merging one produces a loop — bump, merge, sync writes it back, Dependabot proposes it again —
+// with a full CI run per round. The template therefore skips those paths; a bump to a workflow the
+// consumer owns is a real update and still merges.
+describe('dependabot-auto-merge.yml kit-managed exclusion', () => {
+	it('decides from the changed paths in a dedicated step', () => {
+		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain('/files')
+	})
+
+	// The default shell is `bash -e` without `pipefail`, so piping `gh` straight into `grep` would
+	// mask a failed call behind grep's exit status and report "no kit-managed file" — merging the
+	// very pull request the step exists to hold back. An assignment carries the command's status.
+	it('captures the changed paths before comparing, so a failed lookup fails the step', () => {
+		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain('changed="$(gh api')
+	})
+
+	// A partial answer is a wrong answer here: a kit-managed path beyond the first page would be
+	// missed and the bump merged.
+	it('reads every page of the changed paths', () => {
+		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain('--paginate')
+	})
+
+	it('publishes the decision as the output the merge gate reads', () => {
+		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain(MANAGED_OUTPUT)
+	})
+
+	it('merges only when no kit-managed workflow is touched', () => {
+		expect(merge_step(template_job())?.if ?? '').toContain(MANAGED_GATE)
+	})
+
+	// The list is a copy of kit's distribution lists because YAML cannot read them, so this
+	// comparison is what keeps the copy honest: adding a workflow to `AI_COPY_FILES` without adding
+	// it here would silently re-open the loop for that file.
+	it('excludes exactly the workflows kit distributes', () => {
+		expect(declared_managed_workflows()).toStrictEqual(distributed_workflows())
+	})
+
+	// Guards the comparison above against passing vacuously if both sides ever became empty.
+	it('declares at least one kit-managed workflow', () => {
+		expect(declared_managed_workflows().length).toBeGreaterThan(0)
+	})
+
+	// `grep -f` on an empty pattern file matches nothing, so an emptied list would read as "nothing
+	// is managed" and reopen the loop. The step refuses that reading instead of guessing.
+	it('refuses to decide when the list is empty', () => {
+		const run = find_step(template_job(), MANAGED_STEP_ID)?.run ?? ''
+
+		expect(run).toContain(`if [ -z "\${${MANAGED_LIST_KEY}:-}" ]; then`)
+		expect(run).toContain('exit 1')
+	})
+
+	// The exclusion belongs to the distributed copy only. In kit `.github/workflows/*` IS the source
+	// of truth, so a bump merged there is the update every consumer receives — excluding it would
+	// stop the pins from ever being maintained (joshuafolkken/kit#802).
+	it('is absent from kit’s own runtime workflow, where those pins are the source', () => {
+		const runtime_job = ci_yml_fixture.find_job(RUNTIME, JOB)
+
+		expect(find_step(runtime_job, MANAGED_STEP_ID)).toBeUndefined()
+		expect(merge_step(runtime_job)?.if ?? '').not.toContain(MANAGED_OUTPUT)
 	})
 })
