@@ -1,5 +1,5 @@
 import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
-import { workflow_expression_fixture } from './workflow-expression-fixture'
+import { workflow_expression_fixture, type ContextTree } from './workflow-expression-fixture'
 
 // The two copies of the auto-merge workflow. They diverge on purpose: in kit
 // `.github/workflows/*` IS the source every action pin is resolved from, so a bump merged here is
@@ -22,12 +22,71 @@ const MANAGED_STEP_ID = 'managed'
 const MANAGED_OUTPUT = 'has-kit-managed'
 const WITHDRAW_STEP_ID = 'withdraw'
 const DEPENDABOT_LOGIN = 'dependabot[bot]'
+const MAINTAINER_LOGIN = 'joshuafolkken'
 const ACTOR_GATE = `${workflow_expression_fixture.GITHUB_CONTEXT}.actor == '${DEPENDABOT_LOGIN}'`
+
+// The metadata outputs the conditions address, and the values Dependabot publishes in them. Spelled
+// out here rather than in each suite so the context a condition is evaluated against and the
+// reference paths asserted on cannot drift apart between the copies of the workflow.
+const ECOSYSTEM_OUTPUT = 'package-ecosystem'
+const UPDATE_TYPE_OUTPUT = 'update-type'
+const ACTIONS_ECOSYSTEM = 'github_actions'
+const NPM_ECOSYSTEM = 'npm_and_yarn'
+const PATCH_UPDATE = 'version-update:semver-patch'
+const MINOR_UPDATE = 'version-update:semver-minor'
+const MAJOR_UPDATE = 'version-update:semver-major'
+
+// A step that was skipped or that failed publishes no outputs, and GitHub renders every missing
+// reference as the empty string — so this is what a condition reads for a step that never answered.
+const NO_OUTPUT = ''
+const MANAGED = 'true'
+const NOT_MANAGED = 'false'
+
+// `managed_output` is the raw value the kit-managed check published, not a boolean: besides `true`
+// and `false` it can be absent entirely, which is how a failed check reads.
+interface WorkflowRun {
+	actor: string
+	managed_output: string
+	ecosystem: string
+	update_type: string
+}
 
 function managed_gate(has_kit_managed: boolean): string {
 	const { STEPS_CONTEXT, OUTPUTS_KEY } = workflow_expression_fixture
 
 	return `${STEPS_CONTEXT}.${MANAGED_STEP_ID}.${OUTPUTS_KEY}.${MANAGED_OUTPUT} == '${String(has_kit_managed)}'`
+}
+
+// The condition a run must satisfy before it may consider arming auto-merge: Dependabot's own
+// event, on a diff kit does not overwrite. The metadata step carries it verbatim, and the
+// withdrawal is `!cancelled()` and its negation — so a run that cannot arm withdraws instead,
+// including one where the kit-managed check failed and published no output at all
+// (joshuafolkken/kit#840). The merge step's remaining clauses are facts about the bump rather than
+// about the run, so they stay out of both.
+const ARM_PRECONDITION = `${ACTOR_GATE} && ${managed_gate(false)}`
+const NOT_CANCELLED = '!cancelled()'
+
+function withdraw_gate(arm_precondition: string): string {
+	return `${NOT_CANCELLED} && !(${arm_precondition})`
+}
+
+// Mirrors the `github.<field>` and `steps.<id>.outputs.<name>` shapes the workflow reads, so every
+// condition under test is evaluated against the same context GitHub supplies at run time. A
+// condition that names none of a given step's outputs simply never reads them.
+function build_run_context(run: WorkflowRun): ContextTree {
+	const { STEPS_CONTEXT, GITHUB_CONTEXT, OUTPUTS_KEY } = workflow_expression_fixture
+	const metadata = {
+		[ECOSYSTEM_OUTPUT]: run.ecosystem,
+		[UPDATE_TYPE_OUTPUT]: run.update_type,
+	}
+
+	return {
+		[GITHUB_CONTEXT]: { actor: run.actor },
+		[STEPS_CONTEXT]: {
+			[METADATA_STEP_ID]: { [OUTPUTS_KEY]: metadata },
+			[MANAGED_STEP_ID]: { [OUTPUTS_KEY]: { [MANAGED_OUTPUT]: run.managed_output } },
+		},
+	}
 }
 
 function job(relative_path: string): WorkflowJob | undefined {
@@ -50,6 +109,25 @@ function merge_step(target: WorkflowJob | undefined): WorkflowStep | undefined {
 	return target?.steps?.find((step) => (step.run ?? '').includes(MERGE_COMMAND))
 }
 
+// A step that is absent and one that carries no `if` are reported apart, because the fixes differ:
+// the first means a guard is addressing a step id the workflow no longer uses, the second that the
+// step now runs unconditionally. Neither may be read as the empty string, which would evaluate to
+// the opposite of the truth.
+function step_condition(step: WorkflowStep | undefined, label: string): string {
+	if (step === undefined) throw new Error(`the workflow declares no ${label} step`)
+	if (step.if === undefined) throw new Error(`the ${label} step declares no \`if\` condition`)
+
+	return step.if
+}
+
+// Names the arming step in the errors above. "arming" rather than "auto-merge" both because the job
+// already carries that name and because it is the vocabulary the two halves' guards are written in.
+const MERGE_STEP_LABEL = 'arming'
+
+function merge_condition(target: WorkflowJob | undefined): string {
+	return step_condition(merge_step(target), MERGE_STEP_LABEL)
+}
+
 const dependabot_workflow_fixture = {
 	TEMPLATE,
 	RUNTIME,
@@ -60,12 +138,29 @@ const dependabot_workflow_fixture = {
 	MANAGED_OUTPUT,
 	WITHDRAW_STEP_ID,
 	DEPENDABOT_LOGIN,
+	MAINTAINER_LOGIN,
 	ACTOR_GATE,
+	ARM_PRECONDITION,
+	NOT_CANCELLED,
+	ECOSYSTEM_OUTPUT,
+	UPDATE_TYPE_OUTPUT,
+	ACTIONS_ECOSYSTEM,
+	NPM_ECOSYSTEM,
+	PATCH_UPDATE,
+	MINOR_UPDATE,
+	MAJOR_UPDATE,
+	NO_OUTPUT,
+	MANAGED,
+	NOT_MANAGED,
 	managed_gate,
+	withdraw_gate,
+	build_run_context,
 	template_job,
 	runtime_job,
 	find_step,
 	merge_step,
+	step_condition,
+	merge_condition,
 }
 
-export { dependabot_workflow_fixture }
+export { dependabot_workflow_fixture, type WorkflowRun }
