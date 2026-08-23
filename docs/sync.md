@@ -125,6 +125,29 @@ SECURITY.md         tsconfig.sonar.json
 > gate; joshuafolkken/kit#838 made it take effect in both directions, and joshuafolkken/kit#840
 > widened it from the kit-managed case to every run that is not entitled to arm.
 >
+> **One run at a time per pull request.** Everything above decides which of arming
+> and withdrawing a _single_ run performs; nothing in it orders the runs against each other, and
+> GitHub leaves them running in parallel unless a workflow declares a `concurrency` group. Without
+> one, a run that computed "no kit-managed workflow in the diff", was overtaken by a force-push that
+> added one, and reached its enabling step after the newer run had already found nothing to withdraw,
+> armed auto-merge on a diff kit overwrites — with nothing left to run afterwards to undo it. Both
+> copies therefore declare `group: ${{ github.workflow }}-${{ github.ref }}` with
+> `cancel-in-progress: true`, the same grouping `ci.yml` uses; `github.ref` is the pull request's own
+> merge ref, so a superseded run is cancelled without one bump waiting on another's.
+>
+> Cancellation is not instantaneous, though — a step already executing can still finish — so the
+> group narrows that window without closing it. The distributed copy's enabling step therefore arms
+> with `gh pr merge --auto --match-head-commit`, naming the head the run was triggered for: the flag
+> reaches GitHub as the auto-merge mutation's `expectedHeadOid`, so the arming is conditional on that
+> head still being the branch's, and no push can land between deciding and arming the way it could
+> between a read and an unconditional arm. A run whose branch moved fails instead of arming, which
+> holds nothing back — the workflow is not a required check, and the run the new head started decides
+> afresh. That guard is template-only, for the same reason the withdrawal is: kit's own copy has no
+> withdrawal for a stale run to arm behind, and its decision — the ecosystem and the semver level —
+> is a fact about the bump that no push changes, because the distributed `.github/dependabot.yml`
+> declares no `groups:` and Dependabot's branch name encodes the target version, so a different
+> version opens a different pull request. See joshuafolkken/kit#842.
+>
 > In kit's **own** repository the same workflow deliberately has no such exclusion — and so has
 > nothing to withdraw, which is why its job keeps the narrower `github.actor` guard: there
 > `.github/workflows/*` is the source of truth, so a bump merged in kit is precisely the update every

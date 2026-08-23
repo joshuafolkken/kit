@@ -28,7 +28,14 @@ interface WorkflowJob {
 	'timeout-minutes'?: number
 }
 
+interface WorkflowConcurrency {
+	group?: string
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
+	'cancel-in-progress'?: boolean | string
+}
+
 interface Workflow {
+	concurrency?: WorkflowConcurrency
 	env?: Record<string, string>
 	jobs: Record<string, WorkflowJob>
 }
@@ -50,6 +57,16 @@ function load_workflow(relative_path: string): Workflow {
 
 function find_job(relative_path: string, job_name: string): WorkflowJob | undefined {
 	return load_workflow(relative_path).jobs[job_name]
+}
+
+// An absent `concurrency` block reads as an empty one rather than as `undefined`, so a guard on it
+// asserts on the declared values instead of having to test for the block's existence first.
+function workflow_concurrency(relative_path: string): WorkflowConcurrency {
+	return load_workflow(relative_path).concurrency ?? {}
+}
+
+function concurrency_cancels_in_progress(relative_path: string): boolean | string | undefined {
+	return workflow_concurrency(relative_path)['cancel-in-progress']
 }
 
 // upload-artifact input keys. Shared because every guard that asserts on an artifact reaches for
@@ -123,6 +140,8 @@ const ci_yml_fixture = {
 	read_workflow,
 	load_workflow,
 	find_job,
+	workflow_concurrency,
+	concurrency_cancels_in_progress,
 	upload_input,
 	upload_steps,
 	find_upload,
@@ -133,4 +152,4 @@ const ci_yml_fixture = {
 }
 
 export { ci_yml_fixture }
-export type { Workflow, WorkflowJob, WorkflowStep }
+export type { Workflow, WorkflowConcurrency, WorkflowJob, WorkflowStep }
