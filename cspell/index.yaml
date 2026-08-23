@@ -65,6 +65,7 @@ words:
   - octocat
   - osv
   - paraglide
+  - pipefail
   - reassignable
   - sonarjs
   - sonarqube
