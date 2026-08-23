@@ -1,24 +1,24 @@
-import { data, Evaluator, Lexer, Parser } from '@actions/expressions'
 import { describe, expect, it } from 'vitest'
-import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
+import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
+import { workflow_expression_fixture, type ContextTree } from './workflow-expression-fixture'
 
 // `.github/workflows/dependabot-auto-merge.yml` decides which Dependabot PRs merge unattended, so
 // the gate is asserted by evaluating the workflow's own `if` expression with GitHub's expression
 // engine rather than by matching substrings: a text match proves the condition was written, not
 // that an npm or major update is unable to reach the merge step (kit#802).
 //
-// The workflow is loaded through ci_yml_fixture, the shared reader for every `.github/workflows`
-// guard in this package — its loader and step/job types are generic despite the CI-flavoured name.
-const WORKFLOW_PATH = '.github/workflows/dependabot-auto-merge.yml'
-const MERGE_JOB = 'auto-merge'
-const MERGE_COMMAND = 'gh pr merge --auto'
-const DEPENDABOT_ACTOR_GATE = "github.actor == 'dependabot[bot]'"
+// The workflow, its job and its step ids come from dependabot_workflow_fixture, shared with the
+// guards on the copy consumers receive so the two cannot address different steps.
+const {
+	ACTOR_GATE: DEPENDABOT_ACTOR_GATE,
+	METADATA_STEP_ID: METADATA_STEP,
+	runtime_job,
+	merge_step,
+} = dependabot_workflow_fixture
+const { STEPS_CONTEXT: CONTEXT_ROOT, OUTPUTS_KEY } = workflow_expression_fixture
 
-// The context root the workflow reads, split into the parts the expression addresses so the
-// evaluated context and the asserted reference path cannot drift apart.
-const CONTEXT_ROOT = 'steps'
-const METADATA_STEP = 'metadata'
-const OUTPUTS_KEY = 'outputs'
+// The metadata outputs the expression addresses, spelled out so the evaluated context and the
+// asserted reference path cannot drift apart.
 const ECOSYSTEM_OUTPUT = 'package-ecosystem'
 const UPDATE_TYPE_OUTPUT = 'update-type'
 const ECOSYSTEM_REFERENCE = `${CONTEXT_ROOT}.${METADATA_STEP}.${OUTPUTS_KEY}.${ECOSYSTEM_OUTPUT}`
@@ -29,16 +29,8 @@ const PATCH_UPDATE = 'version-update:semver-patch'
 const MINOR_UPDATE = 'version-update:semver-minor'
 const MAJOR_UPDATE = 'version-update:semver-major'
 
-function find_merge_job(): WorkflowJob | undefined {
-	return ci_yml_fixture.find_job(WORKFLOW_PATH, MERGE_JOB)
-}
-
-function find_merge_step(): WorkflowStep | undefined {
-	return find_merge_job()?.steps?.find((step) => step.run?.includes(MERGE_COMMAND) === true)
-}
-
 function read_merge_condition(): string {
-	const condition = find_merge_step()?.if
+	const condition = merge_step(runtime_job())?.if
 	if (condition === undefined) throw new Error('the auto-merge step declares no `if` condition')
 
 	return condition
@@ -46,35 +38,30 @@ function read_merge_condition(): string {
 
 // Mirrors the `steps.<id>.outputs.<name>` shape the workflow reads, so the expression under test is
 // evaluated against the same context GitHub supplies at run time.
-function build_metadata_context(ecosystem: string, update_type: string): data.Dictionary {
-	const outputs = new data.Dictionary(
-		{ key: ECOSYSTEM_OUTPUT, value: new data.StringData(ecosystem) },
-		{ key: UPDATE_TYPE_OUTPUT, value: new data.StringData(update_type) },
-	)
-	const metadata = new data.Dictionary({ key: OUTPUTS_KEY, value: outputs })
-
-	return new data.Dictionary({
-		key: CONTEXT_ROOT,
-		value: new data.Dictionary({ key: METADATA_STEP, value: metadata }),
-	})
+function build_metadata_context(ecosystem: string, update_type: string): ContextTree {
+	return {
+		[CONTEXT_ROOT]: {
+			[METADATA_STEP]: {
+				[OUTPUTS_KEY]: { [ECOSYSTEM_OUTPUT]: ecosystem, [UPDATE_TYPE_OUTPUT]: update_type },
+			},
+		},
+	}
 }
 
 function is_merge_step_reached(ecosystem: string, update_type: string): boolean {
-	const lexed = new Lexer(read_merge_condition()).lex()
-	const parsed = new Parser(lexed.tokens, [CONTEXT_ROOT], []).parse()
-	const result = new Evaluator(parsed, build_metadata_context(ecosystem, update_type)).evaluate()
-	if (result.kind !== data.Kind.Boolean) throw new Error('the gate is not a boolean expression')
-
-	return result.value
+	return workflow_expression_fixture.evaluate_condition(
+		read_merge_condition(),
+		build_metadata_context(ecosystem, update_type),
+	)
 }
 
 describe('dependabot-auto-merge.yml — gate shape (kit#802)', () => {
 	it('keeps a step that enables auto-merge on the pull request', () => {
-		expect(find_merge_step()).toBeDefined()
+		expect(merge_step(runtime_job())).toBeDefined()
 	})
 
 	it('runs the job only for Dependabot-authored pull requests', () => {
-		expect(find_merge_job()?.if).toContain(DEPENDABOT_ACTOR_GATE)
+		expect(runtime_job()?.if).toContain(DEPENDABOT_ACTOR_GATE)
 	})
 
 	// `dependency-type` reports `direct:production` for github-actions updates and for kit's npm

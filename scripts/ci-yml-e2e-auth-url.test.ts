@@ -17,6 +17,14 @@ const STALE_CONSTANT_REFERENCE = 'PREVIEW_PORT'
 // What actually holds the number at 4173 in CI: the seed is not committed and not set here.
 const SEED_VARIABLE = 'PORT_SEED'
 const ENV_FILE = '.env'
+// The comment used to name a repository or organization variable as something that would move the
+// port. Neither reaches a step's environment on its own — only an explicit `vars.` expression
+// brings one in, and neither workflow writes any — so the sentence described a setting that
+// cannot have the effect it warned about (joshuafolkken/kit#838). Naming both the mechanism that
+// does work and the reference form that the other one needs is what keeps the correction from
+// being reworded back into the original claim.
+const WORKING_MECHANISM = 'workflow or job level'
+const VARIABLE_REFERENCE_FORM = 'vars.'
 
 const COMMENT_PREFIX = '#'
 const ENV_BLOCK_KEY = 'env:'
@@ -95,6 +103,13 @@ describe('ci.yml e2e BETTER_AUTH_URL rationale', () => {
 		expect(comment).toContain(SEED_VARIABLE)
 		expect(comment).toContain(ENV_FILE)
 		expect(comment).toContain('not committed')
+	})
+
+	it.each(WORKFLOWS)('%s names only settings that can move the port', (relative_path) => {
+		const comment = auth_url_comment(relative_path)
+
+		expect(comment).toContain(WORKING_MECHANISM)
+		expect(comment).toContain(VARIABLE_REFERENCE_FORM)
 	})
 })
 
