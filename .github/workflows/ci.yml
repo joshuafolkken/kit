@@ -203,9 +203,11 @@ jobs:
     # personal offset `playwright.config.ts` resolves the preview port from — is not committed (it
     # lives in a gitignored `.env`) and is not set anywhere in this workflow, so the port resolves
     # to its base on every CI run. That is the invariant, not a constant in `playwright.config.ts`:
-    # the port there is seed-derived. Setting the seed as a repository, organization or workflow
-    # variable would move the port and leave this URL behind — for a seeded CI job, derive this URL
-    # from `josh port preview` in the same job instead.
+    # the port there is seed-derived. The one setting that would move the port and leave this URL
+    # behind is an `env` entry for the seed in this file, at workflow or job level. A repository or
+    # organization variable would not: it reaches a step only through an explicit `vars.PORT_SEED`
+    # expression, and nothing here writes one. For a seeded CI job, derive this URL from
+    # `josh port preview` in the same job instead.
     env:
       BETTER_AUTH_URL: http://localhost:4173
     steps:
