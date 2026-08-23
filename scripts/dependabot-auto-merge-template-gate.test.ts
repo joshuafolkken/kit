@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
-import { workflow_expression_fixture, type ContextTree } from './workflow-expression-fixture'
+import { dependabot_workflow_fixture, type WorkflowRun } from './dependabot-workflow-fixture'
+import { workflow_expression_fixture } from './workflow-expression-fixture'
 
 // The same treatment `dependabot-auto-merge.test.ts` gives kit's own workflow, applied to the copy
 // consumers receive — whose gate carries two clauses kit's does not: the kit-managed decision
@@ -9,67 +9,33 @@ import { workflow_expression_fixture, type ContextTree } from './workflow-expres
 // written; only an evaluation proves that a bump cannot reach the step they guard.
 const {
 	DEPENDABOT_LOGIN,
-	METADATA_STEP_ID,
-	MANAGED_STEP_ID,
-	MANAGED_OUTPUT,
+	MAINTAINER_LOGIN,
+	ACTIONS_ECOSYSTEM,
+	NPM_ECOSYSTEM,
+	PATCH_UPDATE,
+	MINOR_UPDATE,
+	MAJOR_UPDATE,
+	NO_OUTPUT,
+	MANAGED,
+	NOT_MANAGED,
+	build_run_context,
 	template_job,
-	merge_step,
+	merge_condition,
 } = dependabot_workflow_fixture
-const { STEPS_CONTEXT, GITHUB_CONTEXT, OUTPUTS_KEY } = workflow_expression_fixture
 
-const ECOSYSTEM_OUTPUT = 'package-ecosystem'
-const UPDATE_TYPE_OUTPUT = 'update-type'
-
-const ACTIONS_ECOSYSTEM = 'github_actions'
-const NPM_ECOSYSTEM = 'npm_and_yarn'
-const PATCH_UPDATE = 'version-update:semver-patch'
-const MINOR_UPDATE = 'version-update:semver-minor'
-const MAJOR_UPDATE = 'version-update:semver-major'
-
-const MAINTAINER_LOGIN = 'joshuafolkken'
-const NO_OUTPUT = ''
-
-interface Run {
-	actor: string
-	has_kit_managed: boolean
-	ecosystem: string
-	update_type: string
-}
-
-function build_context(run: Run): ContextTree {
-	return {
-		[GITHUB_CONTEXT]: { actor: run.actor },
-		[STEPS_CONTEXT]: {
-			[METADATA_STEP_ID]: {
-				[OUTPUTS_KEY]: {
-					[ECOSYSTEM_OUTPUT]: run.ecosystem,
-					[UPDATE_TYPE_OUTPUT]: run.update_type,
-				},
-			},
-			[MANAGED_STEP_ID]: {
-				[OUTPUTS_KEY]: { [MANAGED_OUTPUT]: String(run.has_kit_managed) },
-			},
-		},
-	}
-}
-
-function read_merge_condition(): string {
-	const condition = merge_step(template_job())?.if
-	if (condition === undefined) throw new Error('the auto-merge step declares no `if` condition')
-
-	return condition
-}
-
-function is_merge_step_reached(run: Run): boolean {
-	return workflow_expression_fixture.evaluate_condition(read_merge_condition(), build_context(run))
+function is_merge_step_reached(run: WorkflowRun): boolean {
+	return workflow_expression_fixture.evaluate_condition(
+		merge_condition(template_job()),
+		build_run_context(run),
+	)
 }
 
 // A bump Dependabot opened against a workflow the consumer owns: the ordinary case, and the one the
 // distribution exists for.
-function consumer_owned_bump(update_type: string): Run {
+function consumer_owned_bump(update_type: string): WorkflowRun {
 	return {
 		actor: DEPENDABOT_LOGIN,
-		has_kit_managed: false,
+		managed_output: NOT_MANAGED,
 		ecosystem: ACTIONS_ECOSYSTEM,
 		update_type,
 	}
@@ -107,7 +73,7 @@ describe('dependabot-auto-merge.yml template gate — held-back updates', () => 
 		expect(
 			is_merge_step_reached({
 				actor: DEPENDABOT_LOGIN,
-				has_kit_managed: true,
+				managed_output: MANAGED,
 				ecosystem: NO_OUTPUT,
 				update_type: NO_OUTPUT,
 			}),

@@ -29,10 +29,22 @@ const STEPS_CONTEXT = 'steps'
 const GITHUB_CONTEXT = 'github'
 const OUTPUTS_KEY = 'outputs'
 
+// `cancelled()` is a workflow status function, and the expression package implements none of them:
+// they answer what happened to the run so far, which is a property of the run rather than of the
+// expression. Every run these guards describe is one that reached its steps and was not cancelled,
+// so `false` is its value throughout — and pinning it here is what keeps a condition written with
+// it evaluable, instead of falling back to a substring match on the clause.
+function cancelled(): data.ExpressionData {
+	return new data.BooleanData(false)
+}
+
+const STATUS_FUNCTIONS = [{ name: 'cancelled', minArgs: 0, maxArgs: 0, call: cancelled }]
+const STATUS_FUNCTION_MAP = new Map(STATUS_FUNCTIONS.map((status) => [status.name, status]))
+
 function evaluate_condition(condition: string, context: ContextTree): boolean {
 	const lexed = new Lexer(condition).lex()
-	const parsed = new Parser(lexed.tokens, Object.keys(context), []).parse()
-	const result = new Evaluator(parsed, to_dictionary(context)).evaluate()
+	const parsed = new Parser(lexed.tokens, Object.keys(context), STATUS_FUNCTIONS).parse()
+	const result = new Evaluator(parsed, to_dictionary(context), STATUS_FUNCTION_MAP).evaluate()
 	if (result.kind !== data.Kind.Boolean) throw new Error('the gate is not a boolean expression')
 
 	return result.value

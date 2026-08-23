@@ -81,17 +81,41 @@ jobs:
 
       # The counterpart of the gate on the merge step below. That gate only declines to arm
       # auto-merge; it cannot un-arm one, and `gh pr merge --auto` persists on the pull request until
-      # something withdraws it. So a pull request that started outside the managed set — armed on
-      # `opened` — and later grew a kit-managed workflow in its diff would still merge itself once the
-      # checks went green, straight back into the loop joshuafolkken/kit#836 closed. This step is what
-      # makes the decision take effect in both directions (joshuafolkken/kit#838).
+      # something withdraws it. So this step withdraws it on every run that is not entitled to arm it:
+      # the condition here is the negation of the one the metadata step below carries, which is what
+      # decides whether a run may consider arming at all (joshuafolkken/kit#840).
+      #
+      # Writing that as a negation rather than as its own list of cases is what keeps the two halves
+      # from drifting apart. Both known routes into an armed pull request nobody re-approved are the
+      # same shape — a run that cannot arm: a diff that started outside the managed set and later
+      # grew a kit-managed workflow (joshuafolkken/kit#838), and a branch someone other than
+      # Dependabot pushed to, whose commits nobody reviewed as part of the bump. Enumerating them
+      # left the second one uncovered for a diff kit never overwrites, which is the whole of #840.
+      #
+      # The merge step carries two further clauses — the ecosystem and the semver level — that this
+      # negation deliberately leaves out. Those are facts about the bump rather than about the run,
+      # and they do not change over a pull request's life, so anything that was ever armed already
+      # satisfied them; re-deciding them here would only make the withdrawal skip runs it must reach.
+      #
+      # `!cancelled()` is what makes the step reachable when the check above fails — an empty
+      # `KIT_MANAGED_WORKFLOWS`, or a `gh api` call that did not answer. A failed step publishes no
+      # outputs, so `has-kit-managed` reads as the empty string, the negated condition holds, and an
+      # undecided diff falls to the safe side. Without it the job would stop at the failure with the
+      # auto-merge still armed — and this workflow is not a required check, so a red run of it does
+      # not hold the merge back on its own. `always()` would reach one run more, a cancelled one,
+      # where the check was interrupted rather than answered: there the same empty output would
+      # withdraw an auto-merge that was armed legitimately and that nothing re-arms without a new
+      # push. A cancelled run changes nothing about the pull request, so it has nothing to undo.
       #
       # The armed state is read first because `--disable-auto` is an error, not a no-op, on a pull
       # request that has no auto-merge enabled: the usual case here — a bump that was never armed —
       # would fail the job on every run. `autoMergeRequest` is null exactly when nothing is armed.
-      - name: Withdraw auto-merge when a kit-managed workflow is in the diff
+      - name: Withdraw auto-merge unless this run would arm it
         id: withdraw
-        if: steps.managed.outputs.has-kit-managed == 'true'
+        if: >-
+          !cancelled()
+          && !(github.actor == 'dependabot[bot]'
+          && steps.managed.outputs.has-kit-managed == 'false')
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ github.token }}
@@ -111,6 +135,10 @@ jobs:
       # Dependabot's: a maintainer amending or rebasing the bump by hand. Running it there would turn
       # the job the wider guard above lets through into a red check on their pull request, so the
       # actor is checked here as well as on the merge step.
+      #
+      # This condition is also the workflow's one statement of which runs may arm auto-merge at all,
+      # which the withdrawal above negates verbatim — so a case added here is withdrawn there without
+      # a second edit, and the two cannot disagree about it.
       - name: Fetch Dependabot metadata
         id: metadata
         if: >-
