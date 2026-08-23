@@ -256,9 +256,11 @@ jobs:
     # from — is not committed (it lives in a gitignored `.env`) and is not set anywhere in this
     # workflow, so the port resolves to its base, 4173, on every CI run. That is the invariant to
     # preserve, not a constant in `playwright.config.ts`: the port there is seed-derived, so it is
-    # 4173 in CI and may be anything locally. Setting the seed as a repository, organization or
-    # workflow variable would move the port and leave this URL behind — if a seeded CI job is ever
-    # wanted, derive this URL from `josh port preview` in the same job instead.
+    # 4173 in CI and may be anything locally. The one setting that would move the port and leave
+    # this URL behind is an `env` entry for the seed in this file, at workflow or job level. A
+    # repository or organization variable would not: it reaches a step only through an explicit
+    # `vars.PORT_SEED` expression, and nothing here writes one. If a seeded CI job is ever wanted,
+    # derive this URL from `josh port preview` in the same job instead.
     env:
       BETTER_AUTH_URL: http://localhost:4173
       # A crashing preview worker prints nothing but an empty `✘ [ERROR]` to the job log;

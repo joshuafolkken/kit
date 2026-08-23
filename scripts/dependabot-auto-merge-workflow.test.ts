@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
+import { ci_yml_fixture } from './ci-yml-fixture'
+import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 import { transform_copied_content } from './init/init-copy-content'
 import { init_logic } from './init/init-logic'
 import { workflow_pin_logic } from './sync/workflow-pin-logic'
@@ -8,29 +9,26 @@ import { workflow_pin_logic } from './sync/workflow-pin-logic'
 // the already-distributed `.github/dependabot.yml` opens. Before it, a consumer received only the
 // half that opens them: joshuafolkken/app-kit#184 sat green, mergeable and unmerged with no
 // `autoMergeRequest` on it, because nothing in the repository ever enabled auto-merge.
-const TEMPLATE = 'templates/workflows/dependabot-auto-merge.yml'
-const RUNTIME = '.github/workflows/dependabot-auto-merge.yml'
-const JOB = 'auto-merge'
-const METADATA_STEP_ID = 'metadata'
+const {
+	TEMPLATE,
+	RUNTIME,
+	MERGE_COMMAND,
+	METADATA_STEP_ID,
+	MANAGED_STEP_ID,
+	MANAGED_OUTPUT,
+	template_job,
+	runtime_job,
+	find_step,
+	merge_step,
+} = dependabot_workflow_fixture
 const METADATA_ACTION = 'dependabot/fetch-metadata'
-const MERGE_COMMAND = 'gh pr merge --auto --merge'
 const ACTIONS_ECOSYSTEM = "steps.metadata.outputs.package-ecosystem == 'github_actions'"
 const PATCH_UPDATE = "steps.metadata.outputs.update-type == 'version-update:semver-patch'"
 const MINOR_UPDATE = "steps.metadata.outputs.update-type == 'version-update:semver-minor'"
 const MAJOR_UPDATE = 'version-update:semver-major'
-const MANAGED_STEP_ID = 'managed'
-const MANAGED_OUTPUT = 'has-kit-managed'
-const MANAGED_GATE = `steps.${MANAGED_STEP_ID}.outputs.${MANAGED_OUTPUT} == 'false'`
+const MANAGED_GATE = dependabot_workflow_fixture.managed_gate(false)
 const MANAGED_LIST_KEY = 'KIT_MANAGED_WORKFLOWS'
 const STALE_REFERENCE = '0000000000000000000000000000000000000000 # v0.0.0'
-
-function template_job(): WorkflowJob | undefined {
-	return ci_yml_fixture.find_job(TEMPLATE, JOB)
-}
-
-function find_step(job: WorkflowJob | undefined, step_id: string): WorkflowStep | undefined {
-	return job?.steps?.find((step) => step.id === step_id)
-}
 
 // The paths the template refuses to auto-merge, as the workflow itself declares them.
 function declared_managed_workflows(): Array<string> {
@@ -55,10 +53,6 @@ function distributed_workflows(): Array<string> {
 	return destinations
 		.filter((destination) => workflow_pin_logic.is_workflow_destination(destination))
 		.toSorted((left, right) => left.localeCompare(right))
-}
-
-function merge_step(job: WorkflowJob | undefined): WorkflowStep | undefined {
-	return job?.steps?.find((step) => (step.run ?? '').includes(MERGE_COMMAND))
 }
 
 function action_names(relative_path: string): Array<string> {
@@ -131,10 +125,12 @@ describe('dependabot-auto-merge.yml gate', () => {
 		expect(condition).not.toContain(MAJOR_UPDATE)
 	})
 
-	// The whole job is Dependabot's; a workflow that merged anyone else's pull request unattended
-	// would be a different feature entirely.
+	// The whole job is Dependabot's; a workflow that acted on anyone else's pull request unattended
+	// would be a different feature entirely. It keys on the author rather than on `github.actor`,
+	// which names whoever triggered the run — see the withdrawal guards for why that distinction is
+	// load-bearing (joshuafolkken/kit#838).
 	it('runs only for pull requests Dependabot opened', () => {
-		expect(template_job()?.if).toBe("github.actor == 'dependabot[bot]'")
+		expect(template_job()?.if).toBe("github.event.pull_request.user.login == 'dependabot[bot]'")
 	})
 
 	// The command `josh doctor` matches to decide whether the repository auto-merge prerequisite
@@ -152,7 +148,7 @@ describe('dependabot-auto-merge.yml pins', () => {
 	})
 
 	it('reads the metadata action through a step the gate can reference', () => {
-		const metadata = template_job()?.steps?.find((step) => step.id === METADATA_STEP_ID)
+		const metadata = find_step(template_job(), METADATA_STEP_ID)
 
 		expect(metadata?.uses ?? '').toContain(METADATA_ACTION)
 	})
@@ -224,9 +220,7 @@ describe('dependabot-auto-merge.yml kit-managed exclusion', () => {
 	// of truth, so a bump merged there is the update every consumer receives — excluding it would
 	// stop the pins from ever being maintained (joshuafolkken/kit#802).
 	it('is absent from kit’s own runtime workflow, where those pins are the source', () => {
-		const runtime_job = ci_yml_fixture.find_job(RUNTIME, JOB)
-
-		expect(find_step(runtime_job, MANAGED_STEP_ID)).toBeUndefined()
-		expect(merge_step(runtime_job)?.if ?? '').not.toContain(MANAGED_OUTPUT)
+		expect(find_step(runtime_job(), MANAGED_STEP_ID)).toBeUndefined()
+		expect(merge_step(runtime_job())?.if ?? '').not.toContain(MANAGED_OUTPUT)
 	})
 })

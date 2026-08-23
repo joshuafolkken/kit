@@ -25,19 +25,25 @@ env:
     .github/workflows/sonar-qube.yml
 
 jobs:
+  # Gated on who opened the pull request, not on who triggered this run. `github.actor` names the
+  # latter, so a push by anyone other than Dependabot — a maintainer rebasing the branch by hand, or
+  # amending the bump — skipped the whole job. That mattered once the job acquired something to undo:
+  # `gh pr merge --auto` is state on the pull request, so a run that never happens cannot withdraw an
+  # auto-merge an earlier run armed, and the bump merges itself the moment the checks go green
+  # (joshuafolkken/kit#838). The author is the stable fact about a Dependabot pull request; arming is
+  # what stays restricted to Dependabot's own events, on the step below.
   auto-merge:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
-      - name: Fetch Dependabot metadata
-        id: metadata
-        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
-        with:
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
-
       # Whether the pull request touches a file kit will overwrite. Decided from the changed paths
       # because Dependabot's metadata cannot answer it: for the github-actions ecosystem it reports
       # one `directory` for the whole repository and never names the workflow file it bumped.
+      #
+      # It runs before the metadata step so that the withdrawal below is reached on every run.
+      # `dependabot/fetch-metadata` fails the job when the first commit is not Dependabot's or is
+      # unsigned — a hand-amended branch, for instance — and a failed step takes every step after it
+      # with it, which would leave exactly the armed auto-merge this job exists to withdraw.
       #
       # The paths come from the API, so no checkout is needed, and `--paginate` is what makes the
       # answer complete rather than the first page of a large diff. They are captured into a variable
@@ -73,6 +79,47 @@ jobs:
             echo 'has-kit-managed=false' >>"$GITHUB_OUTPUT"
           fi
 
+      # The counterpart of the gate on the merge step below. That gate only declines to arm
+      # auto-merge; it cannot un-arm one, and `gh pr merge --auto` persists on the pull request until
+      # something withdraws it. So a pull request that started outside the managed set — armed on
+      # `opened` — and later grew a kit-managed workflow in its diff would still merge itself once the
+      # checks went green, straight back into the loop joshuafolkken/kit#836 closed. This step is what
+      # makes the decision take effect in both directions (joshuafolkken/kit#838).
+      #
+      # The armed state is read first because `--disable-auto` is an error, not a no-op, on a pull
+      # request that has no auto-merge enabled: the usual case here — a bump that was never armed —
+      # would fail the job on every run. `autoMergeRequest` is null exactly when nothing is armed.
+      - name: Withdraw auto-merge when a kit-managed workflow is in the diff
+        id: withdraw
+        if: steps.managed.outputs.has-kit-managed == 'true'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          armed="$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')"
+
+          if [ "$armed" != 'true' ]; then
+            echo 'Auto-merge is not enabled on this pull request — nothing to withdraw.'
+            exit 0
+          fi
+
+          gh pr merge --disable-auto "$PR_URL"
+
+      # Skipped whenever the merge step below cannot run anyway — for a kit-managed diff, and for a
+      # run someone other than Dependabot triggered. This action fails the job outright when it
+      # cannot read Dependabot metadata, which it cannot on a branch whose first commit is no longer
+      # Dependabot's: a maintainer amending or rebasing the bump by hand. Running it there would turn
+      # the job the wider guard above lets through into a red check on their pull request, so the
+      # actor is checked here as well as on the merge step.
+      - name: Fetch Dependabot metadata
+        id: metadata
+        if: >-
+          github.actor == 'dependabot[bot]'
+          && steps.managed.outputs.has-kit-managed == 'false'
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       # `dependency-type` cannot separate the ecosystems: Dependabot reports github-actions updates
       # as `direct:production`, the same value it reports for npm production dependencies, so
       # `package-ecosystem` is the only usable discriminator (joshuafolkken/kit#802).
@@ -82,6 +129,11 @@ jobs:
       # kit-managed workflow is left open instead: `josh sync` is what updates those pins, and kit
       # bumps them at the source, so merging here would only start the loop described above and
       # cost a CI run on every round.
+      #
+      # `github.actor` is checked here rather than on the job, which is gated on the pull request's
+      # author instead (see above). Arming is the half that must stay Dependabot's own: the job now
+      # also runs for a push by someone else, and that push carries commits nobody reviewed as part
+      # of the bump. Withdrawing auto-merge is safe from any actor; enabling it is not.
       #
       # npm bumps never auto-merge, at any semver level: the distributed `.github/dependabot.yml`
       # disables npm version updates (joshuafolkken/kit#803), so the only npm pull request that
@@ -94,7 +146,8 @@ jobs:
       # (joshuafolkken/kit#834).
       - name: Enable auto-merge for github-actions patch and minor updates
         if: >-
-          steps.metadata.outputs.package-ecosystem == 'github_actions'
+          github.actor == 'dependabot[bot]'
+          && steps.metadata.outputs.package-ecosystem == 'github_actions'
           && steps.managed.outputs.has-kit-managed == 'false'
           && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
           || steps.metadata.outputs.update-type == 'version-update:semver-minor')

@@ -90,7 +90,25 @@ SECURITY.md         tsconfig.sonar.json
 > ecosystem gate, joshuafolkken/kit#834 for the distribution, and joshuafolkken/kit#836 for the
 > exclusion.
 >
-> In kit's **own** repository the same workflow deliberately has no such exclusion: there
+> **The exclusion withdraws an auto-merge as well as declining to enable one.** `gh pr merge --auto`
+> is state on the pull request, so a gate that only declines to arm cannot undo one an earlier run
+> already armed — and two routes reach exactly that state: a pull request armed while its diff held
+> no kit-managed workflow and later grew one, and a push by anyone other than Dependabot. The
+> distributed workflow therefore withdraws auto-merge whenever it finds a kit-managed workflow in the
+> diff, reading the pull request's armed state first because `--disable-auto` is an error rather than
+> a no-op on a pull request that has none. So that the withdrawal is reachable in both cases, the job
+> is gated on the pull request's **author** rather than on `github.actor`, which names whoever
+> triggered the run and used to skip the job entirely for a maintainer's push; the actor check moved
+> onto the enabling step instead, so arming still happens only on Dependabot's own events. The
+> withdrawal also runs before `dependabot/fetch-metadata`, which fails the job outright on a branch
+> whose first commit is not Dependabot's — after it, the withdrawal would be unreachable in precisely
+> the hand-amended case that motivates it — and the metadata step carries the actor check too, so
+> that a maintainer's push, which the wider job guard now lets through, cannot fail on a branch whose
+> first commit is no longer Dependabot's. kit 1.94.0 shipped the one-way gate;
+> joshuafolkken/kit#838 made it take effect in both directions.
+>
+> In kit's **own** repository the same workflow deliberately has no such exclusion — and so has
+> nothing to withdraw, which is why its job keeps the narrower `github.actor` guard: there
 > `.github/workflows/*` is the source of truth, so a bump merged in kit is precisely the update every
 > consumer then receives.
 >
