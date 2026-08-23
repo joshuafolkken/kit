@@ -20,6 +20,7 @@ const {
 	runtime_job,
 	find_step,
 	merge_step,
+	step_run,
 } = dependabot_workflow_fixture
 const METADATA_ACTION = 'dependabot/fetch-metadata'
 const ACTIONS_ECOSYSTEM = "steps.metadata.outputs.package-ecosystem == 'github_actions'"
@@ -169,26 +170,30 @@ describe('dependabot-auto-merge.yml pins', () => {
 // Merging one produces a loop — bump, merge, sync writes it back, Dependabot proposes it again —
 // with a full CI run per round. The template therefore skips those paths; a bump to a workflow the
 // consumer owns is a real update and still merges.
+function managed_step_run(): string {
+	return step_run(find_step(template_job(), MANAGED_STEP_ID))
+}
+
 describe('dependabot-auto-merge.yml kit-managed exclusion', () => {
 	it('decides from the changed paths in a dedicated step', () => {
-		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain('/files')
+		expect(managed_step_run()).toContain('/files')
 	})
 
 	// The default shell is `bash -e` without `pipefail`, so piping `gh` straight into `grep` would
 	// mask a failed call behind grep's exit status and report "no kit-managed file" — merging the
 	// very pull request the step exists to hold back. An assignment carries the command's status.
 	it('captures the changed paths before comparing, so a failed lookup fails the step', () => {
-		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain('changed="$(gh api')
+		expect(managed_step_run()).toContain('changed="$(gh api')
 	})
 
 	// A partial answer is a wrong answer here: a kit-managed path beyond the first page would be
 	// missed and the bump merged.
 	it('reads every page of the changed paths', () => {
-		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain('--paginate')
+		expect(managed_step_run()).toContain('--paginate')
 	})
 
 	it('publishes the decision as the output the merge gate reads', () => {
-		expect(find_step(template_job(), MANAGED_STEP_ID)?.run ?? '').toContain(MANAGED_OUTPUT)
+		expect(managed_step_run()).toContain(MANAGED_OUTPUT)
 	})
 
 	it('merges only when no kit-managed workflow is touched', () => {
@@ -210,7 +215,7 @@ describe('dependabot-auto-merge.yml kit-managed exclusion', () => {
 	// `grep -f` on an empty pattern file matches nothing, so an emptied list would read as "nothing
 	// is managed" and reopen the loop. The step refuses that reading instead of guessing.
 	it('refuses to decide when the list is empty', () => {
-		const run = find_step(template_job(), MANAGED_STEP_ID)?.run ?? ''
+		const run = managed_step_run()
 
 		expect(run).toContain(`if [ -z "\${${MANAGED_LIST_KEY}:-}" ]; then`)
 		expect(run).toContain('exit 1')

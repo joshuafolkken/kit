@@ -29,6 +29,7 @@ const {
 	runtime_job,
 	find_step,
 	merge_step,
+	step_run,
 	step_condition,
 } = dependabot_workflow_fixture
 
@@ -38,7 +39,7 @@ const ARMED_QUERY = '--json autoMergeRequest'
 const NOT_FOUND = -1
 
 function withdraw_step_run(): string {
-	return find_step(template_job(), WITHDRAW_STEP_ID)?.run ?? ''
+	return step_run(find_step(template_job(), WITHDRAW_STEP_ID))
 }
 
 function withdraw_condition(): string {
@@ -145,7 +146,7 @@ describe('dependabot-auto-merge.yml withdrawal — shape', () => {
 // to withdraw — the divergence #836 introduced, kept intact.
 describe('dependabot-auto-merge.yml withdrawal is template-only', () => {
 	it('is absent from kit’s own runtime workflow', () => {
-		const runs = runtime_job()?.steps?.map((step) => step.run ?? '') ?? []
+		const runs = runtime_job()?.steps?.map((step) => step_run(step)) ?? []
 
 		expect(runs.length).toBeGreaterThan(0)
 		expect(find_step(runtime_job(), WITHDRAW_STEP_ID)).toBeUndefined()

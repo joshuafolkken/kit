@@ -21,6 +21,19 @@ const METADATA_STEP_ID = 'metadata'
 const MANAGED_STEP_ID = 'managed'
 const MANAGED_OUTPUT = 'has-kit-managed'
 const WITHDRAW_STEP_ID = 'withdraw'
+
+// The concurrency both copies declare. `github.ref` is the pull request's own merge ref, so the
+// group is per pull request: a superseded run is cancelled without one bump delaying another's
+// (joshuafolkken/kit#842). Declared once here so the two copies cannot drift into different
+// groupings, which would leave one of them running its bumps in parallel while its guard passed.
+const CONCURRENCY_GROUP = '${{ github.workflow }}-${{ github.ref }}'
+
+// How the arming step refuses to act on a branch that moved under it. The flag travels to GitHub as
+// the auto-merge mutation's `expectedHeadOid`, so the arming is conditional on the head server-side
+// rather than on a read this step performed first — nothing can land in between.
+const HEAD_MATCH_FLAG = '--match-head-commit'
+const HEAD_SHA_VARIABLE = 'HEAD_SHA'
+const HEAD_SHA_EXPRESSION = '${{ github.event.pull_request.head.sha }}'
 const DEPENDABOT_LOGIN = 'dependabot[bot]'
 const MAINTAINER_LOGIN = 'joshuafolkken'
 const ACTOR_GATE = `${workflow_expression_fixture.GITHUB_CONTEXT}.actor == '${DEPENDABOT_LOGIN}'`
@@ -105,6 +118,12 @@ function find_step(target: WorkflowJob | undefined, step_id: string): WorkflowSt
 	return target?.steps?.find((step) => step.id === step_id)
 }
 
+// A step with no `run` reads as the empty script rather than as `undefined`, so a `toContain` guard
+// on it fails on a missing step instead of throwing.
+function step_run(step: WorkflowStep | undefined): string {
+	return step?.run ?? ''
+}
+
 function merge_step(target: WorkflowJob | undefined): WorkflowStep | undefined {
 	return target?.steps?.find((step) => (step.run ?? '').includes(MERGE_COMMAND))
 }
@@ -142,6 +161,10 @@ const dependabot_workflow_fixture = {
 	ACTOR_GATE,
 	ARM_PRECONDITION,
 	NOT_CANCELLED,
+	CONCURRENCY_GROUP,
+	HEAD_MATCH_FLAG,
+	HEAD_SHA_VARIABLE,
+	HEAD_SHA_EXPRESSION,
 	ECOSYSTEM_OUTPUT,
 	UPDATE_TYPE_OUTPUT,
 	ACTIONS_ECOSYSTEM,
@@ -159,6 +182,7 @@ const dependabot_workflow_fixture = {
 	runtime_job,
 	find_step,
 	merge_step,
+	step_run,
 	step_condition,
 	merge_condition,
 }
