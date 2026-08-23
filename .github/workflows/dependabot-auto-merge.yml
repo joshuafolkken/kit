@@ -2,6 +2,13 @@ name: Dependabot auto-merge
 
 on: pull_request
 
+# One run per pull request, superseded ones cancelled — the same grouping `ci.yml` uses. kit's own
+# copy has no withdrawal for a stale run to arm behind (joshuafolkken/kit#842 is about the
+# distributed copy), so here the group only keeps a force-pushed bump from paying for two runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   pull-requests: write

@@ -2,6 +2,17 @@ name: Dependabot auto-merge
 
 on: pull_request
 
+# One run per pull request, and a superseded one is cancelled rather than left to finish. Both halves
+# of this workflow decide from the pull request as it stands — which files the diff touches, and who
+# pushed — while `gh pr merge --auto` is state that outlives the run that set it. A run that has been
+# overtaken is therefore deciding about a diff that no longer exists: it can arm auto-merge after a
+# newer run already withdrew it, on a diff that newer run found kit-managed, and nothing runs
+# afterwards to undo that (joshuafolkken/kit#842). `github.ref` is the pull request's own merge ref,
+# so the group is per pull request and one bump never waits on another's run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   pull-requests: write
@@ -172,6 +183,20 @@ jobs:
       # step fails with `Auto-merge is not allowed for this repository`. `josh init`, `josh sync`
       # and `josh doctor` report that setting and print the command that enables it
       # (joshuafolkken/kit#834).
+      #
+      # `--match-head-commit` is what stops a superseded run from arming. The concurrency group at the
+      # top cancels one, but cancellation is not instantaneous and a step already executing can still
+      # finish — and this is the one step where finishing leaves state behind, so the group narrows
+      # that race without closing it (joshuafolkken/kit#842). The flag reaches GitHub as the
+      # auto-merge mutation's `expectedHeadOid`, which makes the arming itself conditional on the
+      # head this run decided about still being the branch's: nothing can land between deciding and
+      # arming, which reading the head here and then arming would still allow. A run whose branch
+      # moved fails rather than arming — the honest outcome, and this workflow is not a required
+      # check, so its red run holds nothing back while the run the new head started decides afresh.
+      #
+      # Only arming is guarded this way, the same asymmetry the actor gate above rests on: an
+      # auto-merge withdrawn from a stale view has to be armed again, and until someone does the bump
+      # simply sits open; one armed from a stale view merges code the decision was never about.
       - name: Enable auto-merge for github-actions patch and minor updates
         if: >-
           github.actor == 'dependabot[bot]'
@@ -181,5 +206,6 @@ jobs:
           || steps.metadata.outputs.update-type == 'version-update:semver-minor')
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           GH_TOKEN: ${{ github.token }}
-        run: gh pr merge --auto --merge "$PR_URL"
+        run: gh pr merge --auto --merge --match-head-commit "$HEAD_SHA" "$PR_URL"
