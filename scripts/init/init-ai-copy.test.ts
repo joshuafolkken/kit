@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const WORKFLOW_MAPPING_DEST = vi.hoisted(() => '.github/workflows/ci.yml')
+const PROMPT_FILE_NAME = vi.hoisted(() => 'CLAUDE.md')
 const read_file_mock = vi.hoisted(() => vi.fn().mockReturnValue('content'))
 const mkdir_mock = vi.hoisted(() => vi.fn())
 const write_file_mock = vi.hoisted(() => vi.fn())
@@ -8,7 +10,7 @@ const cp_sync_mock = vi.hoisted(() => vi.fn())
 const copy_sonar_mock = vi.hoisted(() => vi.fn())
 const OWNER_REPO = vi.hoisted(() => 'owner/repo')
 const get_repo_name_mock = vi.hoisted(() => vi.fn())
-const get_ai_copy_files_mock = vi.hoisted(() => vi.fn().mockReturnValue(['CLAUDE.md']))
+const get_ai_copy_files_mock = vi.hoisted(() => vi.fn().mockReturnValue([PROMPT_FILE_NAME]))
 const merge_workspace_mock = vi.hoisted(() =>
 	vi.fn().mockImplementation((existing: string) => existing),
 )
@@ -41,7 +43,7 @@ vi.mock('./init-logic', () => ({
 		get_ai_copy_files: get_ai_copy_files_mock,
 		get_ai_copy_file_mappings: vi
 			.fn()
-			.mockReturnValue([{ src: 'templates/workflows/ci.yml', dest: '.github/workflows/ci.yml' }]),
+			.mockReturnValue([{ src: 'templates/workflows/ci.yml', dest: WORKFLOW_MAPPING_DEST }]),
 		get_ai_copy_directories: vi.fn().mockReturnValue(['prompts']),
 		merge_workspace_yaml: merge_workspace_mock,
 	},
@@ -54,13 +56,27 @@ vi.mock('./init-sonar', () => ({
 	init_sonar: { copy_sonar_with_template: copy_sonar_mock },
 }))
 
+const { managed_marker_logic } = await import('#scripts/managed-marker/managed-marker-logic')
+const { KIT_PACKAGE_NAME } = await import('#scripts/version/kit-descriptor')
 const { init_ai_copy } = await import('./init-ai-copy')
 
-const SRC_PATH = '/pkg/CLAUDE.md'
-const DEST_PATH = '/project/CLAUDE.md'
+const SRC_PATH = `/pkg/${PROMPT_FILE_NAME}`
+const DEST_PATH = `/project/${PROMPT_FILE_NAME}`
 const RAW_CONTENT = 'raw content'
-const MAPPING_DEST_PATH = '/project/.github/workflows/ci.yml'
+const MAPPING_DEST_PATH = `/project/${WORKFLOW_MAPPING_DEST}`
+const READ_FAILURE = 'EACCES'
 const WORKSPACE_YAML = 'pnpm-workspace.yaml'
+
+// A `console` spy left in place accumulates calls into the next test, and a mock implementation left
+// throwing fails one. Reset once here rather than at the end of each test, where a failing assertion
+// skips the cleanup and cascades into every test after it.
+afterEach(() => {
+	vi.restoreAllMocks()
+	read_file_mock.mockReturnValue(RAW_CONTENT)
+	exists_sync_mock.mockReturnValue(false)
+	write_file_mock.mockClear()
+	transform_copied_content_mock.mockClear()
+})
 
 describe('init_ai_copy.copy_ai_file — write behavior', () => {
 	it('writes transformed content to destination path', () => {
@@ -86,18 +102,88 @@ describe('init_ai_copy.copy_ai_file — write behavior', () => {
 	})
 })
 
+// `josh init` declines to overwrite a file that already exists — with one deliberate exception. An
+// existing workflow is stamped in place, because an unstamped one is not merely out of date: the
+// consumer's auto-merge workflow reads the stamp to decide whether an upstream package overwrites
+// the file, so a skipped `ci.yml` would read as consumer-owned and merge bumps the next `josh sync`
+// reverts — the loop joshuafolkken/kit#836 closed, reachable again through `init`
+// (joshuafolkken/kit#844). The header changes nothing else about the file it is added to.
+// `init` leaves an existing file alone — it does not stamp one, because the destination may hold a
+// workflow the consumer wrote themselves and a header claiming this package owns it would hold every
+// bump to it back on a false premise. What it does instead is name the consequence: until `sync`
+// writes a header, the consumer's auto-merge workflow reads that workflow as consumer-owned
+// (joshuafolkken/kit#844).
+function run_over_existing_files(existing_content: string = RAW_CONTENT): Array<string> {
+	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+		/* suppress */
+	})
+
+	vi.spyOn(console, 'info').mockImplementation(() => {
+		/* suppress */
+	})
+	exists_sync_mock.mockReturnValue(true)
+	write_file_mock.mockClear()
+	transform_copied_content_mock.mockClear()
+	read_file_mock.mockReturnValue(existing_content)
+
+	init_ai_copy.run_ai_copies()
+
+	return warn.mock.calls.map((args) => String(args[0]))
+}
+
+function did_warn_about(label: string): boolean {
+	return run_over_existing_files().some((line) => line.includes(label))
+}
+
 describe('init_ai_copy.run_ai_copies — skip behavior', () => {
-	it('does not write when destination file already exists', () => {
-		exists_sync_mock.mockReturnValue(true)
+	it('writes nothing when every destination already exists', () => {
+		run_over_existing_files()
+
+		expect(write_file_mock).not.toHaveBeenCalled()
+	})
+
+	it('does not copy the template over an existing destination', () => {
+		run_over_existing_files()
+
+		expect(transform_copied_content_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('init_ai_copy.run_ai_copies — unstamped workflow warning', () => {
+	it('warns about an existing workflow that carries no header', () => {
+		expect(did_warn_about(WORKFLOW_MAPPING_DEST)).toBe(true)
+	})
+
+	// The header is what the auto-merge workflow reads, so a stamped file needs no warning.
+	it('stays quiet once the workflow carries a header', () => {
+		const stamped = managed_marker_logic.apply_marker_for_destination(
+			MAPPING_DEST_PATH,
+			RAW_CONTENT,
+			KIT_PACKAGE_NAME,
+		)
+
+		expect(run_over_existing_files(stamped)).toEqual([])
+	})
+
+	// Only workflows are read at all: nothing else is opened, and nothing else is warned about.
+	it('says nothing about a file that is not a workflow', () => {
+		expect(did_warn_about(PROMPT_FILE_NAME)).toBe(false)
+	})
+
+	// A permissions problem on the one file kind `init` now opens must not take the command down.
+	it('does not abort when a workflow cannot be read', () => {
+		vi.spyOn(console, 'warn').mockImplementation(() => {
+			/* suppress */
+		})
 		vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})
-		write_file_mock.mockClear()
+		exists_sync_mock.mockReturnValue(true)
+		read_file_mock.mockImplementation(() => {
+			throw new Error(READ_FAILURE)
+		})
 
-		init_ai_copy.run_ai_copies()
-
-		expect(write_file_mock).not.toHaveBeenCalled()
-		vi.restoreAllMocks()
+		expect(() => init_ai_copy.run_ai_copies()).not.toThrow()
 	})
 })
 
@@ -112,20 +198,12 @@ describe('init_ai_copy.run_ai_copies — file mapping behavior', () => {
 		init_ai_copy.run_ai_copies()
 
 		expect(write_file_mock).toHaveBeenCalledWith(MAPPING_DEST_PATH, expect.any(String))
-		vi.restoreAllMocks()
 	})
 
-	it('does not write mapping destination when it already exists', () => {
-		exists_sync_mock.mockReturnValue(true)
-		vi.spyOn(console, 'info').mockImplementation(() => {
-			/* suppress */
-		})
-		write_file_mock.mockClear()
-
-		init_ai_copy.run_ai_copies()
+	it('does not write the mapping destination when it already exists', () => {
+		run_over_existing_files()
 
 		expect(write_file_mock).not.toHaveBeenCalledWith(MAPPING_DEST_PATH, expect.any(String))
-		vi.restoreAllMocks()
 	})
 })
 
@@ -140,7 +218,6 @@ describe('init_ai_copy.run_ai_copies — copy behavior', () => {
 		init_ai_copy.run_ai_copies()
 
 		expect(write_file_mock).toHaveBeenCalled()
-		vi.restoreAllMocks()
 	})
 
 	it('calls init_sonar.copy_sonar_with_template during run', () => {
@@ -153,7 +230,6 @@ describe('init_ai_copy.run_ai_copies — copy behavior', () => {
 		init_ai_copy.run_ai_copies()
 
 		expect(copy_sonar_mock).toHaveBeenCalled()
-		vi.restoreAllMocks()
 	})
 })
 
@@ -169,7 +245,6 @@ describe('init_ai_copy.run_ai_copies — pnpm-workspace.yaml merge when exists',
 		init_ai_copy.run_ai_copies()
 
 		expect(merge_workspace_mock).toHaveBeenCalled()
-		vi.restoreAllMocks()
 	})
 
 	it('creates pnpm-workspace.yaml when file does not exist', () => {
@@ -183,7 +258,6 @@ describe('init_ai_copy.run_ai_copies — pnpm-workspace.yaml merge when exists',
 		init_ai_copy.run_ai_copies()
 
 		expect(write_file_mock).toHaveBeenCalled()
-		vi.restoreAllMocks()
 	})
 })
 

@@ -5,11 +5,11 @@ import { workflow_expression_fixture } from './workflow-expression-fixture'
 // joshuafolkken/kit#836 stopped the workflow from *arming* auto-merge on a bump to a kit-distributed
 // workflow, but `gh pr merge --auto` is state that persists on the pull request, so a gate that only
 // declines to arm cannot undo one that an earlier run already armed. #838 added the withdrawal and
-// enumerated one route into that state — a diff that grew a kit-managed workflow — which left the
+// enumerated one route into that state — a diff that grew an upstream-managed workflow — which left the
 // other one, a push by anyone but Dependabot, uncovered for a diff kit never overwrites
 // (joshuafolkken/kit#840). The withdrawal is now the negation of the condition that lets a run
 // consider arming at all, so every run that cannot arm withdraws instead, and it is prefixed with
-// `!cancelled()` so a failed kit-managed check falls to the safe side rather than leaving the
+// `!cancelled()` so a failed upstream-managed check falls to the safe side rather than leaving the
 // auto-merge armed behind a red job.
 const {
 	WITHDRAW_STEP_ID,
@@ -47,7 +47,7 @@ function withdraw_condition(): string {
 }
 
 // The withdrawal names no metadata output, so a run is described here by the two facts it does
-// read: who triggered it, and what the kit-managed check answered — `NO_OUTPUT` being the answer of
+// read: who triggered it, and what the upstream-managed check answered — `NO_OUTPUT` being the answer of
 // a check that failed before publishing one.
 function is_withdrawn(actor: string, managed_output: string): boolean {
 	const context = build_run_context({
@@ -66,27 +66,27 @@ function template_step_index(step_id: string): number {
 
 describe('dependabot-auto-merge.yml withdrawal — which runs withdraw', () => {
 	// The route joshuafolkken/kit#838 closed: armed on `opened` while the diff held nothing kit
-	// overwrites, then a later push adds a kit-managed workflow to it.
-	it('withdraws when a kit-managed workflow is in the diff', () => {
+	// overwrites, then a later push adds an upstream-managed workflow to it.
+	it('withdraws when an upstream-managed workflow is in the diff', () => {
 		expect(is_withdrawn(DEPENDABOT_LOGIN, MANAGED)).toBe(true)
 	})
 
 	// The route joshuafolkken/kit#840 closed. The job runs for this push — it is gated on the pull
 	// request's author, still Dependabot — but the enumerated withdrawal skipped it, and so did
 	// arming, so an auto-merge armed earlier survived a rebase or an amend nobody reviewed.
-	it('withdraws on a push by anyone other than Dependabot, even outside the kit-managed set', () => {
+	it('withdraws on a push by anyone other than Dependabot, even outside the upstream-managed set', () => {
 		expect(is_withdrawn(MAINTAINER_LOGIN, NOT_MANAGED)).toBe(true)
 	})
 
-	// `KIT_MANAGED_WORKFLOWS` empty, or a `gh api` call that did not answer. This workflow is not a
+	// A `gh api` call that did not answer, for instance. This workflow is not a
 	// required check, so a red run of it does not hold the merge back — leaving the armed state in
 	// place would ship exactly what the check exists to prevent.
-	it('withdraws when the kit-managed check failed and published no output', () => {
+	it('withdraws when the upstream-managed check failed and published no output', () => {
 		expect(is_withdrawn(DEPENDABOT_LOGIN, NO_OUTPUT)).toBe(true)
 	})
 
 	// The ordinary case the distribution exists for, and the only run that arms anything.
-	it('leaves auto-merge alone on a Dependabot bump outside the kit-managed set', () => {
+	it('leaves auto-merge alone on a Dependabot bump outside the upstream-managed set', () => {
 		expect(is_withdrawn(DEPENDABOT_LOGIN, NOT_MANAGED)).toBe(false)
 	})
 })
@@ -99,7 +99,7 @@ describe('dependabot-auto-merge.yml withdrawal — shape', () => {
 		expect(withdraw_condition()).toBe(withdraw_gate(ARM_PRECONDITION))
 	})
 
-	// Without it the job stops at a failed kit-managed check with the auto-merge still armed.
+	// Without it the job stops at a failed upstream-managed check with the auto-merge still armed.
 	// `always()` in its place would reach a cancelled run too, where the check was interrupted rather
 	// than answered — and withdraw a legitimately armed auto-merge that nothing re-arms.
 	it('is reached when an earlier step failed, but not when the run was cancelled', () => {

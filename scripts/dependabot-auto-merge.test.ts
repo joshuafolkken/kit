@@ -31,7 +31,7 @@ const { STEPS_CONTEXT: CONTEXT_ROOT, OUTPUTS_KEY } = workflow_expression_fixture
 // is built from so the two cannot drift apart.
 const ECOSYSTEM_REFERENCE = `${CONTEXT_ROOT}.${METADATA_STEP}.${OUTPUTS_KEY}.${ECOSYSTEM_OUTPUT}`
 
-// kit's own gate reads no actor and no kit-managed decision — that divergence is the point of
+// kit's own gate reads no actor and no upstream-managed decision — that divergence is the point of
 // joshuafolkken/kit#836 — so a run is described here by the metadata outputs alone; the rest of the
 // shared context is inert.
 function is_merge_step_reached(ecosystem: string, update_type: string): boolean {
