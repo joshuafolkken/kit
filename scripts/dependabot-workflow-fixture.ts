@@ -23,7 +23,22 @@ const MANAGED_STEP_ID = 'managed'
 // in the diff. kit is one such package, but a repository can receive workflows from more than one
 // (joshuafolkken/kit#844), so the decision is not kit's alone.
 const MANAGED_OUTPUT = 'has-upstream-managed'
-const WITHDRAW_STEP_ID = 'withdraw'
+const RECONCILE_STEP_ID = 'reconcile'
+
+// The decision, and where it lives. It is an `env` value rather than a step condition because a
+// condition gates a step while this has to be a *value* the reconciling script reads — and it stays
+// an expression rather than shell so that GitHub's own engine evaluates it and these guards can
+// evaluate the very same string (joshuafolkken/kit#845).
+const DECISION_VARIABLE = 'SHOULD_BE_ARMED'
+// The narrower half: whether this *run* may decide at all, as opposed to whether this *bump*
+// qualifies. The withdrawal keys on this one, so a bump that merely falls outside the policy — an
+// npm advisory, a major — is left as it is, including an auto-merge a maintainer enabled by hand.
+const ENTITLEMENT_VARIABLE = 'MAY_ARM'
+// Not a decision — it only lets the reconciling step's log say which of the two reasons kept a run
+// from arming, so a broken metadata action is not mistaken for a queue of bumps that do not qualify.
+const DIAGNOSTIC_VARIABLE = 'METADATA_ANSWERED'
+const EXPRESSION_OPEN = '${{'
+const EXPRESSION_CLOSE = '}}'
 
 // The concurrency both copies declare. `github.ref` is the pull request's own merge ref, so the
 // group is per pull request: a superseded run is cancelled without one bump delaying another's
@@ -73,18 +88,10 @@ function managed_gate(has_kit_managed: boolean): string {
 	return `${STEPS_CONTEXT}.${MANAGED_STEP_ID}.${OUTPUTS_KEY}.${MANAGED_OUTPUT} == '${String(has_kit_managed)}'`
 }
 
-// The condition a run must satisfy before it may consider arming auto-merge: Dependabot's own
-// event, on a diff kit does not overwrite. The metadata step carries it verbatim, and the
-// withdrawal is `!cancelled()` and its negation — so a run that cannot arm withdraws instead,
-// including one where the upstream-managed check failed and published no output at all
-// (joshuafolkken/kit#840). The merge step's remaining clauses are facts about the bump rather than
-// about the run, so they stay out of both.
-const ARM_PRECONDITION = `${ACTOR_GATE} && ${managed_gate(false)}`
+// The one gate left on a step. Everything about *which* updates may arm now lives in the decision
+// expression; this only decides whether the reconciling step runs at all, and it runs whenever the
+// pull request could still be carrying state to correct (joshuafolkken/kit#845).
 const NOT_CANCELLED = '!cancelled()'
-
-function withdraw_gate(arm_precondition: string): string {
-	return `${NOT_CANCELLED} && !(${arm_precondition})`
-}
 
 // Mirrors the `github.<field>` and `steps.<id>.outputs.<name>` shapes the workflow reads, so every
 // condition under test is evaluated against the same context GitHub supplies at run time. A
@@ -131,6 +138,45 @@ function merge_step(target: WorkflowJob | undefined): WorkflowStep | undefined {
 	return target?.steps?.find((step) => (step.run ?? '').includes(MERGE_COMMAND))
 }
 
+// The decision as GitHub will evaluate it, with the `${{ }}` wrapper removed so the expression
+// engine can parse it. Read off the step rather than restated here, so a guard cannot pass against
+// a decision the workflow no longer carries.
+function unwrap_expression(declared: string): string | undefined {
+	const open = declared.indexOf(EXPRESSION_OPEN)
+	const close = declared.lastIndexOf(EXPRESSION_CLOSE)
+	if (open === -1 || close <= open) return undefined
+
+	return declared.slice(open + EXPRESSION_OPEN.length, close).trim()
+}
+
+// Reported apart for the same reason as `step_condition` below: a missing step means a guard is
+// addressing one the workflow no longer has, a missing declaration means the decision moved out of
+// the expression, and the two are fixed differently.
+function declared_expression(target: WorkflowJob | undefined, variable: string): string {
+	const step = find_step(target, RECONCILE_STEP_ID)
+	if (step === undefined) throw new Error('the workflow declares no reconciling step')
+
+	const declared = step.env?.[variable]
+	if (declared === undefined) throw new Error(`the reconciling step declares no ${variable}`)
+
+	const expression = unwrap_expression(declared)
+	if (expression === undefined) throw new Error(`${variable} is not an expression`)
+
+	return expression
+}
+
+function decision_expression(target: WorkflowJob | undefined): string {
+	return declared_expression(target, DECISION_VARIABLE)
+}
+
+function entitlement_expression(target: WorkflowJob | undefined): string {
+	return declared_expression(target, ENTITLEMENT_VARIABLE)
+}
+
+function diagnostic_expression(target: WorkflowJob | undefined): string {
+	return declared_expression(target, DIAGNOSTIC_VARIABLE)
+}
+
 // A step that is absent and one that carries no `if` are reported apart, because the fixes differ:
 // the first means a guard is addressing a step id the workflow no longer uses, the second that the
 // step now runs unconditionally. Neither may be read as the empty string, which would evaluate to
@@ -158,11 +204,13 @@ const dependabot_workflow_fixture = {
 	METADATA_STEP_ID,
 	MANAGED_STEP_ID,
 	MANAGED_OUTPUT,
-	WITHDRAW_STEP_ID,
+	RECONCILE_STEP_ID,
+	DECISION_VARIABLE,
+	ENTITLEMENT_VARIABLE,
+	DIAGNOSTIC_VARIABLE,
 	DEPENDABOT_LOGIN,
 	MAINTAINER_LOGIN,
 	ACTOR_GATE,
-	ARM_PRECONDITION,
 	NOT_CANCELLED,
 	CONCURRENCY_GROUP,
 	HEAD_MATCH_FLAG,
@@ -179,7 +227,9 @@ const dependabot_workflow_fixture = {
 	MANAGED,
 	NOT_MANAGED,
 	managed_gate,
-	withdraw_gate,
+	decision_expression,
+	entitlement_expression,
+	diagnostic_expression,
 	build_run_context,
 	template_job,
 	runtime_job,
