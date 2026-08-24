@@ -1,121 +1,34 @@
-import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
+import { reconcile_script_fixture } from './dependabot-reconcile-script-fixture'
 
-// The arm-versus-withdraw choice used to live in step `if:` conditions, which kit's guards evaluate
-// with GitHub's own engine. joshuafolkken/kit#845 moved it into the reconciling script, and a guard
-// that only matched substrings there would have let an inverted comparison through: the step count,
-// the read-before-write ordering and the `--match-head-commit` placement all still hold when the
-// script arms exactly the bumps it should withdraw. So the script is run, against a `gh` that records
-// what it was asked to do.
 const {
-	RECONCILE_STEP_ID,
-	DECISION_VARIABLE,
-	ENTITLEMENT_VARIABLE,
-	DIAGNOSTIC_VARIABLE,
-	MERGE_COMMAND,
-	template_job,
-	find_step,
-	step_run,
-} = dependabot_workflow_fixture
+	ARM_CALL,
+	ARMED_MARKER,
+	ARMED_QUERY,
+	COMMENT_COMMAND,
+	FALSE,
+	METADATA_SILENT,
+	ARMED_NOTICE_TEXT,
+	NOTHING,
+	TRUE,
+	WITHDRAWN_MARKER,
+	WITHDRAW_CALL,
+	UNKNOWN_OUTCOME,
+	call_count,
+	notice_marker,
+	posted_body,
+	remove_workspace,
+	run_reconcile,
+	withdraw_attempts,
+} = reconcile_script_fixture
 
-// What the reconciling script did: which direction it took, and what it said about why.
-interface Outcome {
-	direction: string
-	stderr: string
-}
+afterAll(remove_workspace)
 
-const WITHDRAW_COMMAND = 'gh pr merge --disable-auto'
-const ARMED_MARKER = 'auto'
-const WITHDRAWN_MARKER = 'disable'
-const NOTHING = ''
-const METADATA_SILENT = 'metadata step did not answer'
-const TRUE = 'true'
-const FALSE = 'false'
+// The arm-versus-withdraw choice and the retry policy both live in the reconciling step's shell, not
+// in an expression, so these guards run the script rather than matching substrings in it: the step
+// count, the read-before-write ordering and the `--match-head-commit` placement all still hold when
+// the script arms exactly the bumps it should withdraw.
 
-const workspace = mkdtempSync(path.join(tmpdir(), 'reconcile-'))
-
-afterAll(() => {
-	rmSync(workspace, { recursive: true, force: true })
-})
-
-// Answers `gh pr view` with the armed state the case describes, and records any `gh pr merge` so the
-// assertion can name which direction the script took.
-function write_gh_stub(is_armed: boolean): string {
-	const bin = path.join(workspace, 'bin')
-	const stub = path.join(bin, 'gh')
-
-	writeFileSync(path.join(workspace, 'calls'), '')
-	mkdirSync(bin, { recursive: true })
-	writeFileSync(
-		stub,
-		[
-			'#!/usr/bin/env bash',
-			'if [ "$2" = "view" ]; then',
-			`  echo '${String(is_armed)}'`,
-			'  exit 0',
-			'fi',
-			`echo "$*" >>"${path.join(workspace, 'calls')}"`,
-			'',
-		].join('\n'),
-	)
-	chmodSync(stub, 0o755)
-
-	return bin
-}
-
-// Both directions are read, not just the first that matches: a script that armed *and* withdrew is
-// the double-write this file exists to catch, and reporting the first hit would hide it.
-function directions_taken(): string {
-	const calls = readFileSync(path.join(workspace, 'calls'), 'utf8')
-	const taken = [
-		calls.includes('--disable-auto') ? WITHDRAWN_MARKER : NOTHING,
-		calls.includes('--auto --merge') ? ARMED_MARKER : NOTHING,
-	].filter(Boolean)
-
-	expect(taken.length).toBeLessThan(2)
-
-	return taken[0] ?? NOTHING
-}
-
-interface Case {
-	should_be_armed: string
-	may_arm: string
-	is_armed: boolean
-	metadata_answered?: string
-}
-
-function run_reconcile(scenario: Case): Outcome {
-	const bin = write_gh_stub(scenario.is_armed)
-	const script = step_run(find_step(template_job(), RECONCILE_STEP_ID))
-
-	// A renamed step yields the empty script, which bash runs happily and which would make every
-	// "does nothing" case below pass without testing anything.
-	expect(script).toContain(MERGE_COMMAND)
-	expect(script).toContain(WITHDRAW_COMMAND)
-	const result = spawnSync('bash', ['-e', '-c', script], {
-		encoding: 'utf8',
-		env: {
-			...process.env,
-			PATH: `${bin}:${process.env['PATH'] ?? ''}`,
-			[DECISION_VARIABLE]: scenario.should_be_armed,
-			[ENTITLEMENT_VARIABLE]: scenario.may_arm,
-			[DIAGNOSTIC_VARIABLE]: scenario.metadata_answered ?? TRUE,
-			PR_URL: 'https://example.invalid/pr/1',
-			HEAD_SHA: 'cafebabe',
-		},
-	})
-
-	expect(result.status).toBe(0)
-
-	return { direction: directions_taken(), stderr: result.stderr }
-}
-
-// The script is bash and only ever runs on GitHub's ubuntu runners, so there is nothing to assert
-// about it on a platform without one.
 describe.skipIf(process.platform === 'win32')(
 	'dependabot-auto-merge.yml reconcile script — which direction it takes',
 	() => {
@@ -203,6 +116,147 @@ describe.skipIf(process.platform === 'win32')(
 			const outcome = run_reconcile({ should_be_armed: FALSE, may_arm: TRUE, is_armed: false })
 
 			expect(outcome.stderr).not.toContain(METADATA_SILENT)
+		})
+	},
+)
+
+// joshuafolkken/kit#846. The withdrawal is the direction whose failure is dangerous: this workflow is
+// not a required check, so a red run does not hold back a merge that a still-armed auto-merge will
+// perform. Retrying is what handles a transient failure; the comment is what keeps a lasting one from
+// being silent.
+describe.skipIf(process.platform === 'win32')(
+	'dependabot-auto-merge.yml reconcile script — a gh call that fails',
+	() => {
+		it('withdraws anyway when the API recovers within the retries', () => {
+			const outcome = run_reconcile({
+				should_be_armed: FALSE,
+				may_arm: FALSE,
+				is_armed: true,
+				fail_merges: withdraw_attempts() - 1,
+			})
+
+			expect(outcome.direction).toBe(WITHDRAWN_MARKER)
+			expect(call_count(WITHDRAW_CALL)).toBe(withdraw_attempts())
+		})
+
+		// Reading the state is what tells the withdrawal there is anything to withdraw, so it retries
+		// on the same terms.
+		it('reads the state again when that is what failed', () => {
+			const outcome = run_reconcile({
+				should_be_armed: FALSE,
+				may_arm: FALSE,
+				is_armed: true,
+				fail_reads: withdraw_attempts() - 1,
+			})
+
+			expect(outcome.direction).toBe(WITHDRAWN_MARKER)
+			expect(call_count(ARMED_QUERY)).toBe(withdraw_attempts())
+		})
+	},
+)
+
+// What it does once the retries are spent. Arming and withdrawing part company here: one leaves the
+// bump open for a human, the other leaves an auto-merge armed on a diff nobody re-approved.
+describe.skipIf(process.platform === 'win32')(
+	'dependabot-auto-merge.yml reconcile script — a gh call that keeps failing',
+	() => {
+		// The hole joshuafolkken/kit#846 names: the read used to abort the step, so `--disable-auto` was
+		// never reached and an armed auto-merge survived on a diff nobody re-approved.
+		it('still tries to withdraw when the state stayed unreadable', () => {
+			const outcome = run_reconcile({
+				should_be_armed: FALSE,
+				may_arm: FALSE,
+				is_armed: true,
+				fail_reads: withdraw_attempts(),
+			})
+
+			expect(outcome.direction).toBe(WITHDRAWN_MARKER)
+		})
+
+		// Arming is the one move that cannot be taken back, so an unreadable state refuses instead.
+		it('refuses to arm when the state stayed unreadable', () => {
+			const outcome = run_reconcile({
+				should_be_armed: TRUE,
+				may_arm: TRUE,
+				is_armed: false,
+				fail_reads: withdraw_attempts(),
+				expect_failure: true,
+			})
+
+			expect(outcome.direction).toBe(NOTHING)
+			expect(outcome.stderr).toContain('Refusing to arm')
+		})
+	},
+)
+
+// The safe direction, kept cheap on purpose, and the loud end of the dangerous one.
+describe.skipIf(process.platform === 'win32')(
+	'dependabot-auto-merge.yml reconcile script — what it costs to give up',
+	() => {
+		// A run that does not arm leaves the bump open for a human, which is the safe side — so it
+		// costs one attempt and a red step, not a retry loop.
+		it('does not retry the arming call', () => {
+			run_reconcile({
+				should_be_armed: TRUE,
+				may_arm: TRUE,
+				is_armed: false,
+				fail_merges: withdraw_attempts(),
+				expect_failure: true,
+			})
+
+			expect(call_count(ARM_CALL)).toBe(1)
+		})
+
+		it('says so on the pull request when the withdrawal never succeeds', () => {
+			const outcome = run_reconcile({
+				should_be_armed: FALSE,
+				may_arm: FALSE,
+				is_armed: true,
+				fail_merges: withdraw_attempts(),
+				expect_failure: true,
+			})
+
+			expect(call_count(COMMENT_COMMAND)).toBe(1)
+			expect(outcome.stderr).not.toContain('Could not leave a comment')
+		})
+	},
+)
+
+// What the confirmation read after a failed withdrawal changes, and what it must not.
+describe.skipIf(process.platform === 'win32')(
+	'dependabot-auto-merge.yml reconcile script — the confirmation read',
+	() => {
+		// The confirmation read runs after the withdrawal failed, and a failed one must not downgrade
+		// a state this run positively read — the notice would then say less than the run knows.
+		it('keeps what it read when the confirmation could not be made', () => {
+			run_reconcile({
+				should_be_armed: FALSE,
+				may_arm: FALSE,
+				is_armed: true,
+				// The first read answers; every read after it — the confirmation — does not.
+				fail_state_reads_from: 2,
+				fail_merges: withdraw_attempts(),
+				expect_failure: true,
+			})
+
+			expect(posted_body()).toContain(ARMED_NOTICE_TEXT)
+		})
+
+		// Re-running the job after a blip is the case the dedup exists for, and also the case where a
+		// run can learn more: "confirmed armed and not disarmed" is worth saying even where the weaker
+		// "state unknown" already stands, so the marker names the outcome as well as the head.
+		it('reports again when this run learned more than the notice already there', () => {
+			run_reconcile({
+				should_be_armed: FALSE,
+				may_arm: FALSE,
+				is_armed: true,
+				fail_merges: withdraw_attempts(),
+				posted_notice: notice_marker(UNKNOWN_OUTCOME),
+				expect_failure: true,
+			})
+
+			expect(call_count(COMMENT_COMMAND)).toBe(1)
+			expect(posted_body()).toContain(ARMED_NOTICE_TEXT)
 		})
 	},
 )
