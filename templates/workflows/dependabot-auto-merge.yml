@@ -224,14 +224,93 @@ jobs:
             || steps.metadata.outputs.update-type == 'version-update:semver-minor') }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # How hard the withdrawal tries before giving up, and what it says when it does. The delay
+          # is a variable so the unit test that runs this script can set it to zero; the workflow's
+          # own value is the one a runner uses.
+          RETRY_ATTEMPTS: '3'
+          RETRY_BACKOFF_SECONDS: '5'
+          # Two notices, because the run does not always know which happened. The first is posted when
+          # it read an armed pull request and could not disarm it; the second when it could not even
+          # read the state, where claiming the auto-merge is still armed would be an assertion nobody
+          # verified.
+          WITHDRAW_FAILED_NOTICE: >-
+            Auto-merge is enabled on this pull request and this workflow could not withdraw it. This
+            workflow is not a required check, so nothing here holds the merge back — please disable
+            auto-merge before the checks go green.
+          # Prefixed to the notice so a later run can recognize its own and not repeat it. The head it
+          # was written for is part of it: a repeat within one degraded window says nothing new, but a
+          # failure after the branch moved is a fresh incident and has to be reported again.
+          NOTICE_MARKER: '<!-- josh-auto-merge-withdrawal-failed'
+          WITHDRAW_UNKNOWN_NOTICE: >-
+            This workflow could not read or change the auto-merge state of this pull request, so it
+            may still be armed. This workflow is not a required check, so nothing here holds the
+            merge back — please check before the checks go green.
           GH_TOKEN: ${{ github.token }}
         run: |
-          armed="$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')"
+          # Used on the state read, which both directions depend on, and on the withdrawal. Not on the
+          # arming call: a run that does not arm leaves the bump open for a human, while a run that
+          # does not withdraw leaves an auto-merge armed on a diff nobody re-approved — and this
+          # workflow is not a required check, so its red run does not hold that merge back
+          # (joshuafolkken/kit#846).
+          # Refused rather than defaulted: the loop's only exit compares against these, and a value
+          # that is not a whole number makes that comparison error instead of ending it — the loop
+          # would then spin with a widening sleep until the job's own timeout.
+          # A leading zero is refused along with the rest: `$((08))` is an invalid octal literal, and
+          # the arithmetic below would error into a backoff of zero rather than the one declared.
+          case "$RETRY_ATTEMPTS:$RETRY_BACKOFF_SECONDS" in
+            '' | *[!0-9:]* | :* | *: | *:*:* | 0[0-9]* | *:0[0-9]*)
+              echo 'RETRY_ATTEMPTS and RETRY_BACKOFF_SECONDS must be whole numbers.' >&2
+              exit 1
+              ;;
+          esac
+
+          retry() {
+            local attempt=1
+
+            while ! "$@"; do
+              if [ "$attempt" -ge "$RETRY_ATTEMPTS" ]; then
+                return 1
+              fi
+
+              sleep "$((attempt * RETRY_BACKOFF_SECONDS))"
+              attempt=$((attempt + 1))
+            done
+          }
+
+          # The answer is checked, not just the exit status: a call that succeeded while returning
+          # something other than `true` or `false` has not told us the state, and accepting it would
+          # skip the retries and land on a decision made from nothing.
+          read_armed() {
+            armed="$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')" ||
+              return 1
+
+            case "$armed" in
+              true | false) return 0 ;;
+            esac
+
+            return 1
+          }
+
+          # `unknown` rather than a failed step: which way an unreadable state should fall depends on
+          # the direction, and the branches below decide that for themselves. Assigned here rather
+          # than before the read, because a failed command substitution leaves the variable empty
+          # rather than untouched — there is nothing to fall back to.
+          if ! retry read_armed; then
+            armed=unknown
+            echo 'Could not read the auto-merge state.' >&2
+          fi
 
           if [ "$SHOULD_BE_ARMED" = 'true' ]; then
             if [ "$armed" = 'true' ]; then
               echo 'Auto-merge is already enabled — nothing to do.'
               exit 0
+            fi
+
+            # Arming on a state nobody could read is the one move that cannot be taken back later, so
+            # an unreadable state refuses rather than guesses.
+            if [ "$armed" != 'false' ]; then
+              echo 'Refusing to arm auto-merge without knowing the current state.' >&2
+              exit 1
             fi
 
             gh pr merge --auto --merge --match-head-commit "$HEAD_SHA" "$PR_URL"
@@ -249,9 +328,101 @@ jobs:
             exit 0
           fi
 
-          if [ "$armed" != 'true' ]; then
+          # `unknown` falls through to the withdrawal, not past it. Skipping it would leave an armed
+          # auto-merge nobody re-approved, and "I could not tell" is not evidence that there is
+          # nothing to take back.
+          #
+          # It is not free. Most pull requests on this path were never armed, so the attempt usually
+          # fails, and the run then leaves a notice saying the state could not be established — on a
+          # pull request that was fine. During a partial outage, where reads fail but comments still
+          # work, that is one notice per open bump. The trade is deliberate: a spurious notice asks
+          # someone to check something that turns out to be fine, while the silence it buys would let
+          # a genuinely armed auto-merge merge an unreviewed diff with nothing to read anywhere. The
+          # notice for this case says the state is unknown rather than claiming it is armed, which is
+          # the most either the run or the reader actually knows.
+          if [ "$armed" = 'false' ]; then
             echo 'Auto-merge is not enabled — nothing to withdraw.'
             exit 0
           fi
 
-          gh pr merge --disable-auto "$PR_URL"
+          if retry gh pr merge --disable-auto "$PR_URL"; then
+            exit 0
+          fi
+
+          # A lost response looks exactly like a failure, and the retry after it then fails for the
+          # honest reason that there is nothing left to disable. One more read tells those apart
+          # before anyone is asked to act — and it is the same read that resolves the case where the
+          # state was never legible: a pull request that turns out not to be armed needs no notice.
+          established=$armed
+
+          if retry read_armed; then
+            if [ "$armed" = 'false' ]; then
+              echo 'Auto-merge is not enabled after all — nothing was left armed.'
+              exit 0
+            fi
+          else
+            # The read assigns before it fails, so a failed confirmation would otherwise downgrade a
+            # state this run had positively read into `unknown` — and the notice would then say less
+            # than the run actually knows.
+            armed=$established
+          fi
+
+          # The retries are what handle a transient failure; this is what keeps a lasting one from
+          # being silent. It is not retracted when a later run succeeds where this one did not: the
+          # notice asks the reader to check the auto-merge state, and finding it already withdrawn is
+          # the cheap end of that. Editing it would mean reading and rewriting someone else's comment
+          # thread on every successful run, for a case the re-read above already narrows.
+          #
+          # It does not stop the merge — nothing here can, short of a repository setting every
+          # consumer would have to change — but it puts the reason where the person looking at the
+          # merged pull request will find it.
+          notice="$WITHDRAW_FAILED_NOTICE"
+          outcome=armed
+          if [ "$armed" != 'true' ]; then
+            notice="$WITHDRAW_UNKNOWN_NOTICE"
+            outcome=unknown
+          fi
+
+          # One notice per outcome per head. Re-running the job after a blip is the case this exists
+          # for; a marker naming only the pull request would silence every incident after the first,
+          # and one naming only the head would silence a re-run that learned more — "confirmed armed
+          # and not disarmed" is worth saying even where "state unknown" already stands.
+          #
+          # The reverse is not worth saying, so an `armed` notice covers an `unknown` one: a later run
+          # that could not read the state adds nothing to a standing notice that read it.
+          #
+          # The lookup retries on the same terms as everything else here. It cannot help in the one
+          # case where the state read itself never succeeded, because that is the same call against
+          # the same API — a lasting read outage duplicates the notice on each re-run, and a duplicate
+          # comment is the better mistake when the alternative is silence.
+          marker="$NOTICE_MARKER $HEAD_SHA $outcome -->"
+          covering="$NOTICE_MARKER $HEAD_SHA armed -->"
+
+          read_posted() {
+            posted="$(gh pr view "$PR_URL" --json comments --jq '.comments[].body')"
+          }
+
+          notice_stands() {
+            retry read_posted && printf '%s' "$posted" | grep -qF -e "$marker" -e "$covering"
+          }
+
+          # Re-checked only after a post that failed: a lost response leaves the comment there, and
+          # the next attempt would otherwise duplicate it.
+          post_notice() {
+            gh pr comment "$PR_URL" --body "$marker $notice" && return 0
+
+            notice_stands
+          }
+
+          if notice_stands; then
+            echo 'A notice about this failure is already on this pull request.' >&2
+            exit 1
+          fi
+
+          # Retried like everything else on this path: this call runs during the same outage that just
+          # defeated the withdrawal, and dropping the notice on its first failure would leave an armed
+          # auto-merge with nothing on the pull request to read.
+          retry post_notice ||
+            echo 'Could not leave a comment about the failed withdrawal either.' >&2
+
+          exit 1
