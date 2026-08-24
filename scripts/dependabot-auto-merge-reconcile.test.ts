@@ -27,6 +27,8 @@ const {
 } = dependabot_workflow_fixture
 
 const WITHDRAW_COMMAND = 'gh pr merge --disable-auto'
+const COMMENT_COMMAND = 'gh pr comment'
+const RETRY_HELPER = 'retry'
 const ARMED_QUERY = '--json autoMergeRequest'
 const RECONCILE_LABEL = 'reconciling'
 const NOT_FOUND = -1
@@ -93,7 +95,38 @@ describe('dependabot-auto-merge.yml reconcile — one decision, one actor', () =
 	})
 })
 
+// The whole line the arming call sits on, so a wrapper written before it is inside what is examined.
+function arming_line(run: string, arming: number): string {
+	const ends = run.indexOf('\n', arming)
+
+	return run.slice(run.lastIndexOf('\n', arming) + 1, ends === NOT_FOUND ? run.length : ends)
+}
+
 describe('dependabot-auto-merge.yml reconcile — the asymmetry between the directions', () => {
+	// Retried because its failure is the dangerous one: this workflow is not a required check, so a
+	// red run does not hold back the merge a still-armed auto-merge will perform
+	// (joshuafolkken/kit#846).
+	it('retries the withdrawal but not the arming', () => {
+		const run = reconcile_run()
+		const arming = run.indexOf(MERGE_COMMAND)
+
+		expect(arming).toBeGreaterThan(NOT_FOUND)
+		expect(run).toContain(`${RETRY_HELPER} ${WITHDRAW_COMMAND}`)
+		// From the start of the line, not from the command: a `retry ` prefix sits before the command
+		// it wraps, so a slice beginning at `gh` would step straight over the thing being ruled out.
+		expect(arming_line(run, arming)).not.toContain(RETRY_HELPER)
+	})
+
+	// A run that could not withdraw has to say so somewhere a human will look, because the red job
+	// itself holds nothing back.
+	it('reports a withdrawal it never managed on the pull request', () => {
+		const run = reconcile_run()
+		const gave_up = run.indexOf(`${RETRY_HELPER} ${WITHDRAW_COMMAND}`)
+
+		expect(gave_up).toBeGreaterThan(NOT_FOUND)
+		expect(run.slice(gave_up)).toContain(COMMENT_COMMAND)
+	})
+
 	// Failing to arm leaves the bump open for a human. Failing to withdraw leaves an auto-merge armed
 	// on a diff nobody re-approved, and this workflow is not a required check, so a red run does not
 	// hold the merge back. joshuafolkken/kit#846 builds its retry policy on this difference.

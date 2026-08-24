@@ -225,8 +225,52 @@ SECURITY.md         tsconfig.sonar.json
 >
 > **The two directions are not equally dangerous.** Failing to arm leaves the bump open for a human —
 > an inconvenience. Failing to withdraw leaves an auto-merge armed on a diff nobody re-approved, and
-> this workflow is not a required check, so a red run does not hold the merge back. That asymmetry is
-> why only the arming call carries `--match-head-commit`, naming the head the run was triggered for:
+> this workflow is not a required check, so a red run does not hold the merge back.
+>
+> That asymmetry is why, of the two calls that change the state, **the arming one does not retry**. A `gh` call that
+> failed once — a rate limit, a 5xx, a network blip — used to end the step where it stood, and the arm
+> survived; the state read and the `--disable-auto` now each get a few attempts with a widening delay.
+> The read is shared, so an arming run gets those attempts too — what it does not get is a second try
+> at arming. The notice below retries on the same terms, and so does the lookup that checks whether one
+> already stands.
+>
+> Those attempts widen the window in which a superseded run could undo an arm a newer one just made,
+> from one failed call to the length of the backoff. The concurrency group above cancels such a run,
+> and where it does not the outcome lands on the same safe side as every other failure here: the bump
+> is left open for a human. When the read never succeeds, the
+> withdrawal is attempted anyway rather than skipped, because "I could not tell" is not evidence that
+> there is nothing to take back; the arming direction does the opposite and refuses, because arming on
+> a state nobody could read is the one move that cannot be undone later. Arming is not retried at all:
+> its failure leaves the bump open, which is where a human wanted it anyway.
+>
+> When the withdrawal still fails after its retries, the run **comments on the pull request**. That
+> does not stop the merge — nothing in a non-required check can — but it puts the reason where the
+> person looking at the merged pull request will find it, instead of leaving a red job nobody had a
+> reason to open. The comment carries a marker naming the head it was written for and what the run
+> established, so re-running the job after a blip does not repeat a notice that already says the same
+> thing — while a failure after the branch moved, or a re-run that learned more ("confirmed armed and not
+> disarmed" where only "state unknown" stood), is reported as the new information it is. The reverse is
+> not: a later run that could not read the state adds nothing to a standing notice that did. The lookup
+> that checks for a standing notice is the same call against the same API as the state read, so it
+> cannot help when that read is what never succeeded — a lasting read outage duplicates the notice on
+> each re-run, which is the better mistake when the alternative is silence.
+>
+> A withdrawal whose response was lost looks the same as one that failed, and the retry after it then
+> fails for the honest reason that there is nothing left to disable — so before anyone is asked to
+> act, the run reads the state once more and exits quietly if the pull request is not armed after all.
+> That same read resolves the case where the state was never legible: a pull request that turns out
+> not to be armed needs no notice. The notice is not retracted when a later run succeeds where an
+> earlier one did not; it asks the reader to check, and finding it already withdrawn is the cheap end
+> of that.
+>
+> The notice is not free: most pull requests reaching the unreadable-state path were never armed, so
+> during a partial outage some of those comments ask someone to check something that turns out to be
+> fine. That is the deliberate side of the trade — the silence it buys would let a genuinely armed
+> auto-merge merge an unreviewed diff with nothing to read anywhere — and the notice for that case says
+> the state is unknown rather than claiming it is armed. See joshuafolkken/kit#846.
+>
+> The same asymmetry is why only the arming call carries `--match-head-commit`, naming the head the run
+> was triggered for:
 > the flag reaches GitHub as the auto-merge mutation's `expectedHeadOid`, so the arm is refused if the
 > branch moved since this run decided. That closes the window the concurrency group only narrows
 > (joshuafolkken/kit#842). Withdrawing from a stale view costs at most an auto-merge the next run
