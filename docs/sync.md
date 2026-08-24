@@ -140,75 +140,112 @@ SECURITY.md         tsconfig.sonar.json
 >
 > Two failure modes are decided on the safe side. A changed workflow that cannot be read at the pull
 > request's head — deleted, rate-limited, or unreachable — fails the step rather than being answered:
-> that lands on the same side as answering "managed" (no output is published, so the withdrawal still
-> runs and nothing can arm) but it lands there visibly, instead of withdrawing an auto-merge on a
-> green job with nothing to look at. And the narrowing to workflow paths
-> happens inside the `--jq` query rather than through `grep`, which answers `1` for "no match" and
-> `2` for "I could not look": the old check read both as "not managed", and one of those readings
-> means "merge it".
+> publishing no output lands on the same side as answering "managed" (the reconciling step below reads
+> a missing input as "do not arm") but it lands there visibly, instead of withdrawing an auto-merge on
+> a green job with nothing to look at. And the narrowing to workflow paths happens inside the `--jq`
+> query rather than through `grep`, which answers `1` for "no match" and `2` for "I could not look":
+> the old check read both as "not managed", and one of those readings means "merge it".
 >
-> **The exclusion withdraws an auto-merge as well as declining to enable one.** `gh pr merge --auto`
-> is state on the pull request, so a gate that only declines to arm cannot undo one an earlier run
-> already armed. The distributed workflow therefore withdraws auto-merge on **every run that is not
-> entitled to arm it** — the withdrawal's condition is written as the negation of the one that decides
-> whether a run may consider arming at all, not as its own list of cases, reading the pull request's
-> armed state first because `--disable-auto` is an error rather than a no-op on a pull request that
-> has none. Both known routes into an armed pull request nobody re-approved are the same shape, a run
-> that cannot arm: a pull request armed while its diff held no upstream-managed workflow and later grew
-> one, and a push by anyone other than Dependabot — a rebase or an amend carrying commits nobody
-> reviewed as part of the bump. Enumerating them instead left the second uncovered whenever the diff
-> stayed outside the managed set (joshuafolkken/kit#840), which is why the condition is now derived
-> rather than listed. The enabling step's remaining clauses — the ecosystem and the semver level —
-> stay out of that negation on purpose: they are facts about the bump rather than about the run and do
-> not change over a pull request's life, so anything that was ever armed already satisfied them.
+> **The decision is made once, and one step makes the pull request match it.** `gh pr merge --auto` is
+> state that outlives the run that set it, so deciding not to arm is not the same as undoing an arm an
+> earlier run performed. For four rounds this workflow carried two steps for that — one that armed and
+> one that withdrew — whose conditions had to be exact complements of each other, with nothing
+> enforcing the complement: joshuafolkken/kit#840 made it hold by writing one as the literal negation
+> of the other, which is a convention rather than a structure. Every fix since joshuafolkken/kit#836
+> had the same shape, a new axis added to several conditions at once.
 >
-> So that the withdrawal is reachable at all, the job is gated on the pull request's **author** rather
-> than on `github.actor`, which names whoever triggered the run and used to skip the job entirely for
-> a maintainer's push; the actor check moved onto the enabling step instead, so arming still happens
-> only on Dependabot's own events. The withdrawal also runs before `dependabot/fetch-metadata`, which
-> fails the job outright on a branch whose first commit is not Dependabot's — after it, the withdrawal
-> would be unreachable in precisely the hand-amended case that motivates it — and the metadata step
-> carries the actor check too, so that a maintainer's push, which the wider job guard now lets through,
-> cannot fail on a branch whose first commit is no longer Dependabot's.
+> joshuafolkken/kit#845 replaced that with one step that changes the state, taking both directions
+> from two declarations that answer two genuinely different questions — which is what the old design
+> conflated:
 >
-> The withdrawal is prefixed with `!cancelled()`, so it is reached even when the upstream-managed check
-> itself fails — a `gh api` call that did not answer at all, for instance. A failed
-> step publishes no outputs, so the negated condition holds and an undecided diff falls to the safe
-> side. That matters because this workflow is **not** a required check: a red run of it does not hold
-> the merge back on its own, so stopping at the failure would leave the auto-merge armed. `always()`
-> would reach one further run, a cancelled one, where the check was interrupted rather than answered
-> — and there the same empty output would withdraw an auto-merge that was armed legitimately and that
-> nothing re-arms without a new push, so it is deliberately not used. kit 1.94.0 shipped the one-way
-> gate; joshuafolkken/kit#838 made it take effect in both directions, and joshuafolkken/kit#840
-> widened it from the upstream-managed case to every run that is not entitled to arm.
+> ```yaml
+> MAY_ARM: >-
+>   ${{ github.actor == 'dependabot[bot]'
+>   && steps.managed.outputs.has-upstream-managed == 'false' }}
+> SHOULD_BE_ARMED: >-
+>   ${{ github.actor == 'dependabot[bot]'
+>   && steps.managed.outputs.has-upstream-managed == 'false'
+>   && steps.metadata.outputs.package-ecosystem == 'github_actions'
+>   && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
+>   || steps.metadata.outputs.update-type == 'version-update:semver-minor') }}
+> ```
 >
-> **One run at a time per pull request.** Everything above decides which of arming
-> and withdrawing a _single_ run performs; nothing in it orders the runs against each other, and
-> GitHub leaves them running in parallel unless a workflow declares a `concurrency` group. Without
-> one, a run that computed "no upstream-managed workflow in the diff", was overtaken by a force-push that
-> added one, and reached its enabling step after the newer run had already found nothing to withdraw,
-> armed auto-merge on a diff kit overwrites — with nothing left to run afterwards to undo it. Both
-> copies therefore declare `group: ${{ github.workflow }}-${{ github.ref }}` with
-> `cancel-in-progress: true`, the same grouping `ci.yml` uses; `github.ref` is the pull request's own
-> merge ref, so a superseded run is cancelled without one bump waiting on another's.
+> `MAY_ARM` asks whether this **run** is entitled to decide — who pushed, and whether the diff holds a
+> workflow an upstream package overwrites. `SHOULD_BE_ARMED` asks whether this **bump** qualifies, and
+> is `MAY_ARM` plus the ecosystem and the semver level, which are facts about the bump that do not
+> change over a pull request's life. The second contains the first verbatim and a kit unit test holds
+> that containment, so they cannot drift into disagreeing the way two complements could.
 >
-> Cancellation is not instantaneous, though — a step already executing can still finish — so the
-> group narrows that window without closing it. The distributed copy's enabling step therefore arms
-> with `gh pr merge --auto --match-head-commit`, naming the head the run was triggered for: the flag
-> reaches GitHub as the auto-merge mutation's `expectedHeadOid`, so the arming is conditional on that
-> head still being the branch's, and no push can land between deciding and arming the way it could
-> between a read and an unconditional arm. A run whose branch moved fails instead of arming, which
-> holds nothing back — the workflow is not a required check, and the run the new head started decides
-> afresh. That guard is template-only, for the same reason the withdrawal is: kit's own copy has no
-> withdrawal for a stale run to arm behind, and its decision — the ecosystem and the semver level —
-> is a fact about the bump that no push changes, because the distributed `.github/dependabot.yml`
-> declares no `groups:` and Dependabot's branch name encodes the target version, so a different
-> version opens a different pull request. See joshuafolkken/kit#842.
+> **The distinction is what the withdrawal keys on, and it is load-bearing.** On a run that is still
+> entitled, a bump that simply does not qualify — an npm security advisory, a github-actions major — is
+> left exactly as it is: if a maintainer read it and enabled auto-merge by hand, that is their
+> decision. Withdrawing there would strand the pull request green, mergeable and unmerged, which is the
+> state joshuafolkken/kit#834 exists to prevent.
 >
-> In kit's **own** repository the same workflow deliberately has no such exclusion — and so has
-> nothing to withdraw, which is why its job keeps the narrower `github.actor` guard: there
-> `.github/workflows/*` is the source of truth, so a bump merged in kit is precisely the update every
-> consumer then receives.
+> What is withdrawn is an arm the **run** is not entitled to. That takes back a hand-armed auto-merge
+> as well, and deliberately: a push nobody reviewed as part of the bump is exactly the case
+> joshuafolkken/kit#840 closed, and who armed it earlier does not make the new commits reviewed. A
+> human is overridden when merging would be harmful, and only then — falling outside this workflow's
+> policy is not.
+>
+> The step reads what the pull request currently says before either direction, because
+> `--disable-auto` is an error rather than a no-op on a pull request that has none. Arming and
+> withdrawing stop being two policies that must not disagree and become two directions of one.
+>
+> It stays an **expression** rather than shell on purpose. Written that way, GitHub's own engine
+> evaluates it and kit's unit tests evaluate the very same string with that engine — a matrix over
+> actor, upstream-managed, ecosystem and semver level proves which updates can reach the arming call.
+> Moved into the script it would still work, and every guard on it would decay from an evaluation into
+> a substring match.
+>
+> **A step that could not answer publishes no outputs, and the chain that names it goes false.** The
+> two chains name different inputs, which is deliberate. An upstream-managed check that refused to
+> decide costs the run its entitlement, so an arm it finds is taken back. A metadata action that could
+> not read the branch costs only qualification: nothing is armed now, and an arm an earlier run made is
+> left alone — that run did verify the ecosystem and the semver level, and neither changes over a pull
+> request's life, so withdrawing would strip a good arm every time the action has a bad day. The safe
+> side is per question rather than per input: _do not arm on what I cannot verify_, and _take back what
+> this run is not entitled to_.
+>
+> The two failures also announce themselves differently, which is why only one of them fails a step. An
+> upstream-managed check that guessed would let an unreviewed bump merge and nothing would say so, so
+> it fails loudly. A metadata action that cannot answer makes bumps stop merging, which announces
+> itself by the pile of open pull requests; the reconciling step names it in the log as well, so a
+> broken action is not mistaken for a queue of bumps that merely do not qualify. The step carries
+> `if: '!cancelled()'` so it is reached after either failure; a cancelled run is left alone, because it
+> changed nothing about the pull request and the run that superseded it will decide from the current
+> state anyway (joshuafolkken/kit#840).
+>
+> **`dependabot/fetch-metadata` no longer constrains the order.** The ecosystem and the semver level
+> come from an action rather than a context, and that action fails outright when the branch's first
+> commit is not Dependabot's — a maintainer who amended or rebased the bump. A failed step used to take
+> every step after it with it, which is why the withdrawal had to be placed ahead of it and why it had
+> to repeat the arming gate to avoid running at all (joshuafolkken/kit#838). `continue-on-error: true`
+> contains that failure, and both workarounds go with it. What order remains is data dependency alone.
+>
+> **The two directions are not equally dangerous.** Failing to arm leaves the bump open for a human —
+> an inconvenience. Failing to withdraw leaves an auto-merge armed on a diff nobody re-approved, and
+> this workflow is not a required check, so a red run does not hold the merge back. That asymmetry is
+> why only the arming call carries `--match-head-commit`, naming the head the run was triggered for:
+> the flag reaches GitHub as the auto-merge mutation's `expectedHeadOid`, so the arm is refused if the
+> branch moved since this run decided. That closes the window the concurrency group only narrows
+> (joshuafolkken/kit#842). Withdrawing from a stale view costs at most an auto-merge the next run
+> re-arms, so it needs no such guard.
+>
+> **One run at a time per pull request.** Nothing above orders the runs against each other, and GitHub
+> leaves them running in parallel unless a workflow declares a `concurrency` group. Without one, a run
+> that found nothing upstream-managed in the diff, was overtaken by a force-push that added one, and
+> reached its arming step after the newer run had already reconciled, would arm auto-merge on a diff
+> kit overwrites — with nothing left to run afterwards to undo it. Both copies therefore declare
+> `group: ${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`, the same grouping
+> `ci.yml` uses; `github.ref` is the pull request's own merge ref, so a superseded run is cancelled
+> without one bump waiting on another's.
+>
+> In kit's **own** repository the same workflow deliberately has no upstream-managed exclusion — and so
+> has nothing to withdraw, which is why it keeps a plain arming step and the narrower `github.actor`
+> guard on its job. Reconciling there would newly withdraw an auto-merge a human enabled by hand, for a
+> decision kit's own copy does not even make. There `.github/workflows/*` is the source of truth, so a
+> bump merged in kit is precisely the update every consumer then receives.
 >
 > **`josh init`, `josh sync` and `josh doctor` report that workflow's prerequisite too.**
 > `gh pr merge --auto` fails outright with `Auto-merge is not allowed for this repository` unless the
