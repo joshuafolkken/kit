@@ -75,20 +75,77 @@ SECURITY.md         tsconfig.sonar.json
 > never an npm bump at any semver level: the npm entry above leaves security advisories as the only
 > npm pull request that can reach it, and an advisory is exactly the kind a human should read.
 >
-> **It merges a bump only in a workflow the consumer owns.** A bump to one of the workflows kit
-> distributes (`ci.yml`, `auto-tag.yml`, `dependabot-auto-merge.yml`, `production.yml`,
-> `sonar-qube.yml`) is left open instead, because the next `josh sync` rewrites those pins from the
-> installed kit package regardless of what was merged. Merging one produces a loop — Dependabot
-> bumps the pin, the workflow merges it, `josh sync` writes it back, Dependabot proposes the same
-> bump again — with a full CI run on every round. kit 1.93.0 shipped the workflow without this
-> exclusion; joshuafolkken/kit#836 added it. The pins in those files are maintained at the source:
-> kit's own Dependabot bumps them and `josh sync` distributes the result. `deploy-vps.yml` is **not**
-> on that list — sync patches its pnpm version but never touches its `uses:` pins, so a bump there is
-> a real update and merges like any other consumer-owned workflow. The exclusion list travels inside
-> the distributed workflow, and a kit unit test compares it against kit's own distribution lists, so
-> it cannot drift from the set of files sync actually overwrites. See joshuafolkken/kit#802 for the
-> ecosystem gate, joshuafolkken/kit#834 for the distribution, and joshuafolkken/kit#836 for the
-> exclusion.
+> **It merges a bump only in a workflow the consumer owns.** A bump to a workflow kit distributes
+> (`ci.yml`, `auto-tag.yml`, `dependabot-auto-merge.yml`, `production.yml`, `sonar-qube.yml`) is left
+> open instead, because the next `josh sync` rewrites those pins from the installed kit package
+> regardless of what was merged. Merging one produces a loop — Dependabot bumps the pin, the workflow
+> merges it, `josh sync` writes it back, Dependabot proposes the same bump again — with a full CI run
+> on every round. kit 1.93.0 shipped the workflow without this exclusion; joshuafolkken/kit#836 added
+> it. The pins in those files are maintained at the source: kit's own Dependabot bumps them and
+> `josh sync` distributes the result. See joshuafolkken/kit#802 for the ecosystem gate,
+> joshuafolkken/kit#834 for the distribution, and joshuafolkken/kit#836 for the exclusion.
+>
+> **Each distributed workflow says so itself, rather than appearing on a list.** Every workflow this
+> package writes into a consumer gets a two-line header naming the package that wrote it:
+>
+> ```yaml
+> # josh-managed-workflow: @joshuafolkken/kit
+> # Overwritten on every sync of that package. Edit it there, not here.
+> ```
+>
+> The stamp is applied by the same write-time transform that resolves the action pins, so a workflow
+> distributed as a file or a renamed mapping cannot arrive without it. Two write paths bypass the
+> transform: the directory copy, which a kit unit test holds to an empty list, and `deploy-vps.yml`,
+> which is deliberately left unstamped for the reason below.
+> `josh init` still leaves an existing file alone — it does not stamp one, because the destination may
+> hold a workflow the consumer wrote themselves and a header claiming this package owns it would hold
+> every bump to it back on a false premise. It warns instead: until `sync` writes a header, the
+> auto-merge workflow reads that file as consumer-owned, and the warning names that rather than
+> leaving it to be discovered from a revert. The auto-merge workflow then reads each changed workflow at the
+> pull request's head and looks for that header on the first line — the answer to "will an upstream
+> package overwrite this?" comes off the file being asked about.
+>
+> Until joshuafolkken/kit#844 the answer came from a list of five paths hardcoded in the auto-merge
+> workflow, and a list can only speak for the package that holds it. **Some kit consumers are
+> distribution packages themselves**: app-kit byte-copies `dast.yml` and `load.yml` into _its_
+> consumers on every sync. Those paths were not on kit's list, so in an app-kit consumer a bump to one
+> of them merged and the next `josh-app sync` wrote it straight back — the loop #836 closed, reopened
+> one tier down. A shared list could not fix it either: kit's write time is the only moment kit
+> controls, and at that moment it knows nothing of what app-kit distributes, so whichever `sync` ran
+> last would decide the list. A stamp written by the package that overwrites the file has no such
+> ordering problem, and any number of distribution tiers can each stamp their own output.
+>
+> **A package built on kit stamps its own files through the same helper.** kit exports it as
+> `@joshuafolkken/kit/managed-marker`, taking the distributor's own package name:
+>
+> ```ts
+> import { managed_marker_logic } from '@joshuafolkken/kit/managed-marker'
+>
+> const written = managed_marker_logic.apply_marker_for_destination(
+> 	destination,
+> 	content,
+> 	'@joshuafolkken/app-kit',
+> )
+> ```
+>
+> It is exported rather than left internal because the alternative is each distributor writing the
+> header itself, and a second implementation that spells the token differently or stacks a duplicate
+> silently breaks the check that reads it. The check matches the token, not any particular package
+> name, so every tier's stamp is recognized the same way.
+>
+> The stamp also draws a line the list could only describe in prose. `deploy-vps.yml` is patched by
+> sync but written directly rather than through that transform, so it is never stamped and a bump to
+> its own pins still merges — a property of how the file is written, not of anyone remembering to
+> leave it out of a list.
+>
+> Two failure modes are decided on the safe side. A changed workflow that cannot be read at the pull
+> request's head — deleted, rate-limited, or unreachable — fails the step rather than being answered:
+> that lands on the same side as answering "managed" (no output is published, so the withdrawal still
+> runs and nothing can arm) but it lands there visibly, instead of withdrawing an auto-merge on a
+> green job with nothing to look at. And the narrowing to workflow paths
+> happens inside the `--jq` query rather than through `grep`, which answers `1` for "no match" and
+> `2` for "I could not look": the old check read both as "not managed", and one of those readings
+> means "merge it".
 >
 > **The exclusion withdraws an auto-merge as well as declining to enable one.** `gh pr merge --auto`
 > is state on the pull request, so a gate that only declines to arm cannot undo one an earlier run
@@ -97,7 +154,7 @@ SECURITY.md         tsconfig.sonar.json
 > whether a run may consider arming at all, not as its own list of cases, reading the pull request's
 > armed state first because `--disable-auto` is an error rather than a no-op on a pull request that
 > has none. Both known routes into an armed pull request nobody re-approved are the same shape, a run
-> that cannot arm: a pull request armed while its diff held no kit-managed workflow and later grew
+> that cannot arm: a pull request armed while its diff held no upstream-managed workflow and later grew
 > one, and a push by anyone other than Dependabot — a rebase or an amend carrying commits nobody
 > reviewed as part of the bump. Enumerating them instead left the second uncovered whenever the diff
 > stayed outside the managed set (joshuafolkken/kit#840), which is why the condition is now derived
@@ -114,8 +171,8 @@ SECURITY.md         tsconfig.sonar.json
 > carries the actor check too, so that a maintainer's push, which the wider job guard now lets through,
 > cannot fail on a branch whose first commit is no longer Dependabot's.
 >
-> The withdrawal is prefixed with `!cancelled()`, so it is reached even when the kit-managed check
-> itself fails — an emptied `KIT_MANAGED_WORKFLOWS`, or a `gh api` call that did not answer. A failed
+> The withdrawal is prefixed with `!cancelled()`, so it is reached even when the upstream-managed check
+> itself fails — a `gh api` call that did not answer at all, for instance. A failed
 > step publishes no outputs, so the negated condition holds and an undecided diff falls to the safe
 > side. That matters because this workflow is **not** a required check: a red run of it does not hold
 > the merge back on its own, so stopping at the failure would leave the auto-merge armed. `always()`
@@ -123,12 +180,12 @@ SECURITY.md         tsconfig.sonar.json
 > — and there the same empty output would withdraw an auto-merge that was armed legitimately and that
 > nothing re-arms without a new push, so it is deliberately not used. kit 1.94.0 shipped the one-way
 > gate; joshuafolkken/kit#838 made it take effect in both directions, and joshuafolkken/kit#840
-> widened it from the kit-managed case to every run that is not entitled to arm.
+> widened it from the upstream-managed case to every run that is not entitled to arm.
 >
 > **One run at a time per pull request.** Everything above decides which of arming
 > and withdrawing a _single_ run performs; nothing in it orders the runs against each other, and
 > GitHub leaves them running in parallel unless a workflow declares a `concurrency` group. Without
-> one, a run that computed "no kit-managed workflow in the diff", was overtaken by a force-push that
+> one, a run that computed "no upstream-managed workflow in the diff", was overtaken by a force-push that
 > added one, and reached its enabling step after the newer run had already found nothing to withdraw,
 > armed auto-merge on a diff kit overwrites — with nothing left to run afterwards to undo it. Both
 > copies therefore declare `group: ${{ github.workflow }}-${{ github.ref }}` with

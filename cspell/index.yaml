@@ -88,3 +88,5 @@ words:
   - shellcheck
   - unawaited
   - entrancy
+  - startswith
+  - unreviewed

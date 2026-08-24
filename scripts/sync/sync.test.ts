@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
+import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 import { workflow_pin_logic } from './workflow-pin-logic'
@@ -28,6 +30,17 @@ function canonical_uses_line(): string {
 	if (reference === undefined) throw new Error(`No canonical pin for ${CHECKOUT_ACTION}`)
 
 	return uses_line(reference)
+}
+
+// What a workflow write actually produces: the canonical pin plus the stamp naming the package that
+// overwrites the file (joshuafolkken/kit#844). Composed from the marker logic so the expectation
+// cannot drift from the transform while the assertion stays an exact comparison.
+function written_workflow(destination: string): string {
+	return managed_marker_logic.apply_marker_for_destination(
+		destination,
+		canonical_uses_line(),
+		KIT_PACKAGE_NAME,
+	)
 }
 
 beforeEach(() => {
@@ -92,7 +105,7 @@ describe('sync_file_mapping — workflow pin resolution', () => {
 		writeFileSync(SRC_PATH, stale_uses_line())
 		sync.sync_file_mapping(SRC_PATH, workflow_destination)
 
-		expect(readFileSync(workflow_destination, 'utf8')).toBe(canonical_uses_line())
+		expect(readFileSync(workflow_destination, 'utf8')).toBe(written_workflow(workflow_destination))
 	})
 })
 
@@ -304,7 +317,7 @@ describe('sync_ai_file', () => {
 		writeFileSync(SRC_PATH, stale_uses_line())
 		sync.sync_ai_file(SRC_PATH, workflow_destination)
 
-		expect(readFileSync(workflow_destination, 'utf8')).toBe(canonical_uses_line())
+		expect(readFileSync(workflow_destination, 'utf8')).toBe(written_workflow(workflow_destination))
 	})
 
 	it('leaves action pins untouched when the destination is not a workflow', () => {

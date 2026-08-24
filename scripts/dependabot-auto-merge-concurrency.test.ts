@@ -4,8 +4,8 @@ import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 
 // #838 and #840 settled which of arming and withdrawing a single run performs. Neither ordered the
 // runs against each other, and GitHub leaves them running in parallel unless a workflow declares a
-// concurrency group — so a run that computed `has-kit-managed=false`, was overtaken by a force-push
-// that added a kit-managed workflow, and reached its arming step after the newer run had already
+// concurrency group — so a run that found nothing upstream-managed in the diff, was overtaken by a
+// force-push that added one, and reached its arming step after the newer run had already
 // found nothing to withdraw, armed auto-merge on a diff kit overwrites. Nothing runs afterwards to
 // undo it (joshuafolkken/kit#842).
 //
