@@ -14,12 +14,15 @@ const JOB = 'auto-merge'
 // pointed at the step that actually arms auto-merge.
 const MERGE_COMMAND = 'gh pr merge --auto --merge'
 
-// The step ids the conditions address, and the gate every guard on the kit-managed decision is
+// The step ids the conditions address, and the gate every guard on the upstream-managed decision is
 // built from. Derived in one place so a rename cannot leave a guard asserting on a step id the
 // workflow no longer uses — which would pass vacuously rather than fail.
 const METADATA_STEP_ID = 'metadata'
 const MANAGED_STEP_ID = 'managed'
-const MANAGED_OUTPUT = 'has-kit-managed'
+// Named for the question it answers: whether some upstream package overwrites one of the workflows
+// in the diff. kit is one such package, but a repository can receive workflows from more than one
+// (joshuafolkken/kit#844), so the decision is not kit's alone.
+const MANAGED_OUTPUT = 'has-upstream-managed'
 const WITHDRAW_STEP_ID = 'withdraw'
 
 // The concurrency both copies declare. `github.ref` is the pull request's own merge ref, so the
@@ -55,7 +58,7 @@ const NO_OUTPUT = ''
 const MANAGED = 'true'
 const NOT_MANAGED = 'false'
 
-// `managed_output` is the raw value the kit-managed check published, not a boolean: besides `true`
+// `managed_output` is the raw value the upstream-managed check published, not a boolean: besides `true`
 // and `false` it can be absent entirely, which is how a failed check reads.
 interface WorkflowRun {
 	actor: string
@@ -73,7 +76,7 @@ function managed_gate(has_kit_managed: boolean): string {
 // The condition a run must satisfy before it may consider arming auto-merge: Dependabot's own
 // event, on a diff kit does not overwrite. The metadata step carries it verbatim, and the
 // withdrawal is `!cancelled()` and its negation — so a run that cannot arm withdraws instead,
-// including one where the kit-managed check failed and published no output at all
+// including one where the upstream-managed check failed and published no output at all
 // (joshuafolkken/kit#840). The merge step's remaining clauses are facts about the bump rather than
 // about the run, so they stay out of both.
 const ARM_PRECONDITION = `${ACTOR_GATE} && ${managed_gate(false)}`

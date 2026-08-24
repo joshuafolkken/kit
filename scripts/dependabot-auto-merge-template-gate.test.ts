@@ -3,7 +3,7 @@ import { dependabot_workflow_fixture, type WorkflowRun } from './dependabot-work
 import { workflow_expression_fixture } from './workflow-expression-fixture'
 
 // The same treatment `dependabot-auto-merge.test.ts` gives kit's own workflow, applied to the copy
-// consumers receive — whose gate carries two clauses kit's does not: the kit-managed decision
+// consumers receive — whose gate carries two clauses kit's does not: the upstream-managed decision
 // (joshuafolkken/kit#836) and the actor check that moved here when the job's own guard widened to
 // the pull request's author (joshuafolkken/kit#838). A substring match proves those clauses were
 // written; only an evaluation proves that a bump cannot reach the step they guard.
@@ -66,10 +66,10 @@ describe('dependabot-auto-merge.yml template gate — reachable updates', () => 
 })
 
 describe('dependabot-auto-merge.yml template gate — held-back updates', () => {
-	// The metadata step is skipped for a kit-managed diff, and a skipped step publishes no outputs —
+	// The metadata step is skipped for an upstream-managed diff, and a skipped step publishes no outputs —
 	// so the run this models is the one that actually happens, not a hypothetical one where the gate
 	// sees a well-formed bump it must reject on the managed clause alone.
-	it('never auto-merges a bump to a kit-managed workflow', () => {
+	it('never auto-merges a bump to an upstream-managed workflow', () => {
 		expect(
 			is_merge_step_reached({
 				actor: DEPENDABOT_LOGIN,
@@ -80,7 +80,7 @@ describe('dependabot-auto-merge.yml template gate — held-back updates', () => 
 		).toBe(false)
 	})
 
-	// The job now runs for a push by someone other than Dependabot, so that a kit-managed workflow
+	// The job now runs for a push by someone other than Dependabot, so that an upstream-managed workflow
 	// entering the diff still withdraws an auto-merge armed earlier. Arming must not widen with it:
 	// such a push carries commits nobody reviewed as part of the bump.
 	it('never arms auto-merge on a push by anyone other than Dependabot', () => {

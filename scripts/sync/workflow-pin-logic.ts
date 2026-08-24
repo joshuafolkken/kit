@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { package_path } from '#scripts/init/init-paths'
+import { is_workflow_destination } from '#scripts/workflow-destination'
 
 // .github/workflows is the single source of truth for action SHA pins. The
 // distributed templates/workflows/* intentionally diverge in structure (steps,
@@ -16,8 +17,6 @@ const RUNTIME_WORKFLOWS_DIR = '.github/workflows'
 const TEMPLATE_WORKFLOWS_DIR = 'templates/workflows'
 const USES_KEY = 'uses:'
 const YAML_PATTERN = /\.ya?ml$/u
-// Matches a consumer workflow destination, absolute or repo-relative, on either separator.
-const WORKFLOW_DESTINATION_PATTERN = /(?:^|[/\\])\.github[/\\]workflows[/\\][^/\\]+\.ya?ml$/u
 const SYNC_HINT = '  Run `pnpm josh sync-workflow-pins` to sync template workflow pins.'
 
 interface ActionPin {
@@ -166,10 +165,6 @@ function unknown_actions_in_source(
 	}
 
 	return unknown
-}
-
-function is_workflow_destination(destination: string): boolean {
-	return WORKFLOW_DESTINATION_PATTERN.test(destination)
 }
 
 function apply_pins_for_destination(destination: string, text: string): string {

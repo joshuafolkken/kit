@@ -3,6 +3,7 @@ import { ci_yml_fixture } from './ci-yml-fixture'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 import { transform_copied_content } from './init/init-copy-content'
 import { init_logic } from './init/init-logic'
+import { managed_marker_logic } from './managed-marker/managed-marker-logic'
 import { workflow_pin_logic } from './sync/workflow-pin-logic'
 
 // joshuafolkken/kit#834 distributes the auto-merge workflow that closes the Dependabot pull requests
@@ -28,23 +29,15 @@ const PATCH_UPDATE = "steps.metadata.outputs.update-type == 'version-update:semv
 const MINOR_UPDATE = "steps.metadata.outputs.update-type == 'version-update:semver-minor'"
 const MAJOR_UPDATE = 'version-update:semver-major'
 const MANAGED_GATE = dependabot_workflow_fixture.managed_gate(false)
-const MANAGED_LIST_KEY = 'KIT_MANAGED_WORKFLOWS'
 const STALE_REFERENCE = '0000000000000000000000000000000000000000 # v0.0.0'
+const WORKFLOWS_PREFIX = '.github/workflows/'
+const DEPLOY_VPS_DESTINATION = `${WORKFLOWS_PREFIX}deploy-vps.yml`
+const MARKER_VARIABLE = 'MANAGED_MARKER'
+const { MARKER_PREFIX } = managed_marker_logic
 
-// The paths the template refuses to auto-merge, as the workflow itself declares them.
-function declared_managed_workflows(): Array<string> {
-	const declared = ci_yml_fixture.load_workflow(TEMPLATE).env?.[MANAGED_LIST_KEY] ?? ''
-
-	return declared
-		.split('\n')
-		.map((line) => line.trim())
-		.filter((line) => line !== '')
-		.toSorted((left, right) => left.localeCompare(right))
-}
-
-// The same set derived from kit's own distribution lists — the single source of truth the declared
-// list has to match. A workflow destination is one `josh sync` overwrites through the pin-injecting
-// write path, which is exactly what makes a bump to it revert (joshuafolkken/kit#836).
+// Every workflow destination kit distributes. A workflow destination is one `josh sync` overwrites
+// through the transform that injects pins and the stamp, which is exactly what makes a bump to it
+// revert (joshuafolkken/kit#836) and exactly what the stamp records (joshuafolkken/kit#844).
 function distributed_workflows(): Array<string> {
 	const destinations = [
 		...init_logic.get_ai_copy_files(),
@@ -165,30 +158,34 @@ describe('dependabot-auto-merge.yml pins', () => {
 	})
 })
 
-// joshuafolkken/kit#836: a bump to a kit-distributed workflow is undone by the next `josh sync`,
-// which resolves every pin from the installed kit package at write time (joshuafolkken/kit#747).
+// joshuafolkken/kit#836: a bump to a workflow an upstream package distributes is undone by the next
+// `sync`, which resolves every pin from the installed package at write time (joshuafolkken/kit#747).
 // Merging one produces a loop — bump, merge, sync writes it back, Dependabot proposes it again —
-// with a full CI run per round. The template therefore skips those paths; a bump to a workflow the
-// consumer owns is a real update and still merges.
+// with a full CI run per round. The template therefore holds those bumps back; a bump to a workflow
+// the consumer owns is a real update and still merges.
+//
+// The decision is read off each changed file's own stamp rather than from a list of paths, because a
+// list can only describe what the package holding it distributes and a repository may receive
+// workflows from several (joshuafolkken/kit#844).
 function managed_step_run(): string {
 	return step_run(find_step(template_job(), MANAGED_STEP_ID))
 }
 
-describe('dependabot-auto-merge.yml kit-managed exclusion', () => {
-	it('decides from the changed paths in a dedicated step', () => {
+describe('dependabot-auto-merge.yml upstream-managed exclusion', () => {
+	it('decides from the changed files in a dedicated step', () => {
 		expect(managed_step_run()).toContain('/files')
 	})
 
-	// The default shell is `bash -e` without `pipefail`, so piping `gh` straight into `grep` would
-	// mask a failed call behind grep's exit status and report "no kit-managed file" — merging the
+	// The default shell is `bash -e` without `pipefail`, so piping `gh` into anything would mask a
+	// failed call behind the downstream command's status and report "nothing managed" — merging the
 	// very pull request the step exists to hold back. An assignment carries the command's status.
-	it('captures the changed paths before comparing, so a failed lookup fails the step', () => {
+	it('captures the changed files before deciding, so a failed lookup fails the step', () => {
 		expect(managed_step_run()).toContain('changed="$(gh api')
 	})
 
-	// A partial answer is a wrong answer here: a kit-managed path beyond the first page would be
-	// missed and the bump merged.
-	it('reads every page of the changed paths', () => {
+	// A partial answer is a wrong answer here: a managed path beyond the first page would be missed
+	// and the bump merged.
+	it('reads every page of the changed files', () => {
 		expect(managed_step_run()).toContain('--paginate')
 	})
 
@@ -196,29 +193,8 @@ describe('dependabot-auto-merge.yml kit-managed exclusion', () => {
 		expect(managed_step_run()).toContain(MANAGED_OUTPUT)
 	})
 
-	it('merges only when no kit-managed workflow is touched', () => {
+	it('merges only when no upstream-managed workflow is touched', () => {
 		expect(merge_step(template_job())?.if ?? '').toContain(MANAGED_GATE)
-	})
-
-	// The list is a copy of kit's distribution lists because YAML cannot read them, so this
-	// comparison is what keeps the copy honest: adding a workflow to `AI_COPY_FILES` without adding
-	// it here would silently re-open the loop for that file.
-	it('excludes exactly the workflows kit distributes', () => {
-		expect(declared_managed_workflows()).toStrictEqual(distributed_workflows())
-	})
-
-	// Guards the comparison above against passing vacuously if both sides ever became empty.
-	it('declares at least one kit-managed workflow', () => {
-		expect(declared_managed_workflows().length).toBeGreaterThan(0)
-	})
-
-	// `grep -f` on an empty pattern file matches nothing, so an emptied list would read as "nothing
-	// is managed" and reopen the loop. The step refuses that reading instead of guessing.
-	it('refuses to decide when the list is empty', () => {
-		const run = managed_step_run()
-
-		expect(run).toContain(`if [ -z "\${${MANAGED_LIST_KEY}:-}" ]; then`)
-		expect(run).toContain('exit 1')
 	})
 
 	// The exclusion belongs to the distributed copy only. In kit `.github/workflows/*` IS the source
@@ -227,5 +203,88 @@ describe('dependabot-auto-merge.yml kit-managed exclusion', () => {
 	it('is absent from kit’s own runtime workflow, where those pins are the source', () => {
 		expect(find_step(runtime_job(), MANAGED_STEP_ID)).toBeUndefined()
 		expect(merge_step(runtime_job())?.if ?? '').not.toContain(MANAGED_OUTPUT)
+	})
+})
+
+// How the step reads the answer off a file, as opposed to which files it looks at. Both halves of
+// the old check could misread — `grep` conflated "no match" with "I could not look", and a list
+// could not describe a file another package writes (joshuafolkken/kit#844).
+describe('dependabot-auto-merge.yml upstream-managed detection', () => {
+	// `grep` answers 1 for "no match" and 2 for "I could not look", and the old check read both as
+	// "not managed" — one of which means "merge it". Narrowing inside `--jq` and matching with
+	// `case` removes the conflation: neither has a failure status to misread.
+	it('narrows to workflow files inside the query rather than through grep', () => {
+		const run = managed_step_run()
+
+		expect(run).toContain(`select(.filename | startswith("${WORKFLOWS_PREFIX}"))`)
+		expect(run).not.toContain('grep')
+	})
+
+	// The stamp is matched at the start of the file: this workflow declares the token in its own
+	// `env` in order to match on it, so a substring test would call every copy of it managed for the
+	// wrong reason and would also flag a file that merely mentions the token.
+	it('matches the stamp at the start of the file', () => {
+		expect(managed_step_run()).toContain(`"$MANAGED_MARKER"*)`)
+		expect(find_step(template_job(), MANAGED_STEP_ID)?.env?.[MARKER_VARIABLE]).toBe(MARKER_PREFIX)
+	})
+
+	// A path composed here would break on the first workflow whose name contains a space or a `#`,
+	// and every read failing means every bump is held back for good. GitHub already encoded the URL
+	// it returns, and it already points at this pull request's head.
+	it('reads each file through the URL the API supplied', () => {
+		const run = managed_step_run()
+
+		expect(run).toContain('.contents_url')
+		expect(run).toContain('gh api "$url"')
+		expect(run).not.toContain('/contents/$file')
+	})
+
+	// A response that named a workflow but carried no URL to read it at has told the step nothing, so
+	// it belongs on the hold-back branch with everything else it could not read — not skipped onto the
+	// merge side, which is where a guard on the URL alone would send it.
+	it('holds the bump back when a changed workflow carries no URL', () => {
+		expect(managed_step_run()).toContain('[ -n "$file$url" ] || continue')
+	})
+
+	// Failing lands on the same safe side as answering "managed" — no output is published, so the
+	// withdrawal still runs and the arming step still cannot — but it lands there visibly. Answering
+	// would withdraw a previously armed auto-merge on a green job, with nothing to look at.
+	it('fails the step when a changed workflow cannot be read', () => {
+		const run = managed_step_run()
+		const unreadable = run.indexOf('could not be read')
+
+		expect(unreadable).toBeGreaterThan(-1)
+		expect(run.slice(unreadable)).toContain('exit 1')
+		expect(run.slice(unreadable)).not.toContain('has_managed=true')
+	})
+})
+
+// The list this replaced had to be kept equal to kit's distribution lists by hand, and #844 is what
+// happens when a list and the files it describes come apart. The stamp is written by the same
+// transform that writes the file, so the invariant becomes a property of the write path — asserted
+// here against the real distribution lists, so a workflow destination added later cannot quietly
+// ship unstamped and merge its own bumps.
+describe('dependabot-auto-merge.yml upstream-managed stamp coverage', () => {
+	it('distributes at least one workflow', () => {
+		expect(distributed_workflows().length).toBeGreaterThan(0)
+	})
+
+	it.each(distributed_workflows())('stamps %s on the way out', (destination) => {
+		expect(managed_marker_logic.is_marked(transform_copied_content(destination, ''))).toBe(true)
+	})
+
+	// `deploy-vps.yml` is patched by sync but written directly rather than through that transform, so
+	// it is never stamped and a bump to its own pins still merges. The old list got this right only
+	// because someone remembered to leave it out.
+	it('does not distribute deploy-vps.yml, which keeps its own pins', () => {
+		expect(distributed_workflows()).not.toContain(DEPLOY_VPS_DESTINATION)
+	})
+
+	// The coverage above enumerates the file lists, which is the whole distribution only while the
+	// directory list is empty: `sync_directory` copies with `cpSync` and never reaches the transform,
+	// so a workflow placed there would ship unstamped and unpinned with every assertion still green.
+	// Pinning the precondition is what turns that into a failing test the day someone adds one.
+	it('copies no directories, the case the coverage above cannot see', () => {
+		expect(init_logic.get_ai_copy_directories()).toEqual([])
 	})
 })

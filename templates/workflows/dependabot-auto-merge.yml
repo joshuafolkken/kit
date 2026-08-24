@@ -6,7 +6,7 @@ on: pull_request
 # of this workflow decide from the pull request as it stands — which files the diff touches, and who
 # pushed — while `gh pr merge --auto` is state that outlives the run that set it. A run that has been
 # overtaken is therefore deciding about a diff that no longer exists: it can arm auto-merge after a
-# newer run already withdrew it, on a diff that newer run found kit-managed, and nothing runs
+# newer run already withdrew it, on a diff that newer run found upstream-managed, and nothing runs
 # afterwards to undo that (joshuafolkken/kit#842). `github.ref` is the pull request's own merge ref,
 # so the group is per pull request and one bump never waits on another's run.
 concurrency:
@@ -16,24 +16,6 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
-
-# The workflows kit owns in this repository. `josh sync` overwrites each of them, resolving every
-# `uses:` pin from the installed kit package at write time (joshuafolkken/kit#747) — so a bump to a
-# pin in one of these files is undone by the next sync, whether or not it was merged here. Merging
-# one anyway produces a loop: Dependabot bumps the pin, this workflow merges it, `josh sync` writes
-# it back, Dependabot proposes the same bump again (joshuafolkken/kit#836).
-#
-# The list must stay equal to the set of `.github/workflows/*` destinations kit distributes; a kit
-# unit test compares it against `init-logic`'s own distribution lists and fails on any drift. It is
-# NOT a list of files you may not edit for other reasons — `deploy-vps.yml` is patched by sync but
-# keeps its own pins, so a bump there is a real update and is merged like any other.
-env:
-  KIT_MANAGED_WORKFLOWS: |
-    .github/workflows/auto-tag.yml
-    .github/workflows/ci.yml
-    .github/workflows/dependabot-auto-merge.yml
-    .github/workflows/production.yml
-    .github/workflows/sonar-qube.yml
 
 jobs:
   # Gated on who opened the pull request, not on who triggered this run. `github.actor` names the
@@ -47,48 +29,89 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
-      # Whether the pull request touches a file kit will overwrite. Decided from the changed paths
-      # because Dependabot's metadata cannot answer it: for the github-actions ecosystem it reports
-      # one `directory` for the whole repository and never names the workflow file it bumped.
+      # Whether the pull request touches a workflow some upstream package overwrites. Decided from
+      # the changed files because Dependabot's metadata cannot answer it: for the github-actions
+      # ecosystem it reports one `directory` for the whole repository and never names the workflow
+      # file it bumped.
+      #
+      # The answer is read off each file rather than looked up in a list of paths. A list can only
+      # describe what the package holding the list distributes, and this repository may receive
+      # workflows from more than one: kit writes `ci.yml`, and a package built on kit writes its own
+      # alongside it. Neither knows the other's set, and whichever `sync` ran last would decide a
+      # shared list — so the list drifts from the files it claims to describe and the merge/revert
+      # loop joshuafolkken/kit#836 closed reopens one tier down (joshuafolkken/kit#844). A stamp
+      # written by the package that overwrites the file cannot drift from it, and composes across any
+      # number of distribution tiers without the distributors having to agree on anything.
       #
       # It runs before the metadata step so that the withdrawal below is reached on every run.
       # `dependabot/fetch-metadata` fails the job when the first commit is not Dependabot's or is
       # unsigned — a hand-amended branch, for instance — and a failed step takes every step after it
       # with it, which would leave exactly the armed auto-merge this job exists to withdraw.
       #
-      # The paths come from the API, so no checkout is needed, and `--paginate` is what makes the
-      # answer complete rather than the first page of a large diff. They are captured into a variable
-      # before the comparison, not piped straight into it: the default shell is `bash -e` without
-      # `pipefail`, so a `gh` failure inside a pipeline would be masked by grep's exit status and
-      # read as "no kit-managed file" — merging the very pull request this step exists to hold back.
-      # An assignment carries the command's status, so a failed call fails the step instead.
+      # Everything comes from the API, so no checkout is needed. `--paginate` is what makes the file
+      # list complete rather than the first page of a large diff, and the `select` narrows it to
+      # workflows inside `--jq` rather than through `grep`: the default shell is `bash -e` without
+      # `pipefail`, so a `gh` failure inside a pipeline would be masked by grep's status, and grep
+      # itself answers 1 for "no match" and 2 for "I could not look" — two readings this step must
+      # not conflate, since one of them means "merge it" (joshuafolkken/kit#844). An assignment
+      # carries the command's status, and `case` has no failure mode at all.
       #
-      # `grep -x` matches whole lines, so `ci.yml.bak` and `vendor/.github/workflows/ci.yml` are not
-      # mistaken for the managed paths, and `-F` keeps the dots literal.
+      # Each file is read through the `contents_url` the same response supplies, rather than a URL
+      # built from the path here. GitHub has already encoded it, and it already points at this pull
+      # request's head — a path composed by hand would break on the first workflow whose name
+      # contains a space or a `#`, and every read failing means every bump is held back for good.
       #
-      # An empty list is refused rather than treated as "nothing is managed": `grep -f` on an empty
-      # pattern file matches nothing, so a lost or emptied `env` block would silently reopen the loop
-      # this step closes. Failing loudly is the only reading of an empty list that is not a guess.
-      - name: Check whether the pull request touches a kit-managed workflow
+      # The stamp is matched at the start of the file, not anywhere in it, because this workflow
+      # declares the token in its own `env` in order to match on it — a substring test would call
+      # every copy of this file managed for the wrong reason, and would say nothing about files that
+      # merely mention it.
+      #
+      # A file that cannot be read fails the step rather than answering. That covers a deletion, a
+      # rate-limited API, a network failure and a response that carried no URL to read alike: none of
+      # them is evidence that the consumer owns the file. Failing lands on the same safe side as
+      # answering "managed" would — the step publishes no output, so the withdrawal below still runs
+      # under `!cancelled()` and the arming step still cannot — and it lands there visibly. Answering
+      # instead would withdraw a previously armed auto-merge on a green job, with nothing to look at
+      # and no retry until the next push; this call runs once per changed workflow, so the case is not
+      # rare enough to leave silent.
+      #
+      # `gh`'s own stderr reaches the job log rather than being discarded, because the causes are not
+      # equally interesting and the step cannot tell them apart: a deletion is routine, a 403 means
+      # every bump in this repository is being held back for a reason someone has to fix.
+      # Only stdout is captured, so the message cannot be mistaken for file content.
+      - name: Check whether the pull request touches an upstream-managed workflow
         id: managed
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
+          MANAGED_MARKER: '# josh-managed-workflow:'
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -z "${KIT_MANAGED_WORKFLOWS:-}" ]; then
-            echo 'KIT_MANAGED_WORKFLOWS is empty — refusing to auto-merge.' >&2
-            exit 1
-          fi
+          changed="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --paginate \
+            --jq '.[] | select(.filename | startswith(".github/workflows/"))
+                      | [.filename, .contents_url] | @tsv')"
 
-          changed="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename')"
+          has_managed=false
 
-          if printf '%s\n' "$changed" \
-            | grep -qxFf <(printf '%s' "$KIT_MANAGED_WORKFLOWS"); then
-            echo 'has-kit-managed=true' >>"$GITHUB_OUTPUT"
-          else
-            echo 'has-kit-managed=false' >>"$GITHUB_OUTPUT"
-          fi
+          while IFS="$(printf '\t')" read -r file url; do
+            [ -n "$file$url" ] || continue
+
+            if [ -n "$url" ] &&
+              content="$(gh api "$url" -H 'Accept: application/vnd.github.raw')"; then
+              case "$content" in
+                "$MANAGED_MARKER"*)
+                  echo "$file is written by an upstream package — holding this bump back."
+                  has_managed=true
+                  break
+                  ;;
+              esac
+            else
+              echo "$file could not be read — refusing to decide." >&2
+              exit 1
+            fi
+          done <<<"$changed"
+
+          echo "has-upstream-managed=$has_managed" >>"$GITHUB_OUTPUT"
 
       # The counterpart of the gate on the merge step below. That gate only declines to arm
       # auto-merge; it cannot un-arm one, and `gh pr merge --auto` persists on the pull request until
@@ -99,7 +122,7 @@ jobs:
       # Writing that as a negation rather than as its own list of cases is what keeps the two halves
       # from drifting apart. Both known routes into an armed pull request nobody re-approved are the
       # same shape — a run that cannot arm: a diff that started outside the managed set and later
-      # grew a kit-managed workflow (joshuafolkken/kit#838), and a branch someone other than
+      # grew an upstream-managed workflow (joshuafolkken/kit#838), and a branch someone other than
       # Dependabot pushed to, whose commits nobody reviewed as part of the bump. Enumerating them
       # left the second one uncovered for a diff kit never overwrites, which is the whole of #840.
       #
@@ -108,9 +131,9 @@ jobs:
       # and they do not change over a pull request's life, so anything that was ever armed already
       # satisfied them; re-deciding them here would only make the withdrawal skip runs it must reach.
       #
-      # `!cancelled()` is what makes the step reachable when the check above fails — an empty
-      # `KIT_MANAGED_WORKFLOWS`, or a `gh api` call that did not answer. A failed step publishes no
-      # outputs, so `has-kit-managed` reads as the empty string, the negated condition holds, and an
+      # `!cancelled()` is what makes the step reachable when the check above fails — a `gh api` call
+      # that did not answer at all, for instance. A failed step publishes no
+      # outputs, so `has-upstream-managed` reads as the empty string, the negated condition holds, and an
       # undecided diff falls to the safe side. Without it the job would stop at the failure with the
       # auto-merge still armed — and this workflow is not a required check, so a red run of it does
       # not hold the merge back on its own. `always()` would reach one run more, a cancelled one,
@@ -126,7 +149,7 @@ jobs:
         if: >-
           !cancelled()
           && !(github.actor == 'dependabot[bot]'
-          && steps.managed.outputs.has-kit-managed == 'false')
+          && steps.managed.outputs.has-upstream-managed == 'false')
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ github.token }}
@@ -140,7 +163,7 @@ jobs:
 
           gh pr merge --disable-auto "$PR_URL"
 
-      # Skipped whenever the merge step below cannot run anyway — for a kit-managed diff, and for a
+      # Skipped whenever the merge step below cannot run anyway — for an upstream-managed diff, and for a
       # run someone other than Dependabot triggered. This action fails the job outright when it
       # cannot read Dependabot metadata, which it cannot on a branch whose first commit is no longer
       # Dependabot's: a maintainer amending or rebasing the bump by hand. Running it there would turn
@@ -154,7 +177,7 @@ jobs:
         id: metadata
         if: >-
           github.actor == 'dependabot[bot]'
-          && steps.managed.outputs.has-kit-managed == 'false'
+          && steps.managed.outputs.has-upstream-managed == 'false'
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
@@ -165,9 +188,9 @@ jobs:
       #
       # github-actions patch and minor bumps merge unattended, but only in a workflow this
       # repository owns — those pins are real updates nobody else maintains. A bump to a
-      # kit-managed workflow is left open instead: `josh sync` is what updates those pins, and kit
-      # bumps them at the source, so merging here would only start the loop described above and
-      # cost a CI run on every round.
+      # workflow an upstream package writes is left open instead: that package's `sync` is what
+      # updates those pins, and it bumps them at the source, so merging here would only start the
+      # loop described above and cost a CI run on every round.
       #
       # `github.actor` is checked here rather than on the job, which is gated on the pull request's
       # author instead (see above). Arming is the half that must stay Dependabot's own: the job now
@@ -201,7 +224,7 @@ jobs:
         if: >-
           github.actor == 'dependabot[bot]'
           && steps.metadata.outputs.package-ecosystem == 'github_actions'
-          && steps.managed.outputs.has-kit-managed == 'false'
+          && steps.managed.outputs.has-upstream-managed == 'false'
           && (steps.metadata.outputs.update-type == 'version-update:semver-patch'
           || steps.metadata.outputs.update-type == 'version-update:semver-minor')
         env:
