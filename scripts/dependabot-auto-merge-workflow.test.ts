@@ -22,6 +22,7 @@ const {
 	find_step,
 	merge_step,
 	step_run,
+	decision_expression,
 } = dependabot_workflow_fixture
 const METADATA_ACTION = 'dependabot/fetch-metadata'
 const ACTIONS_ECOSYSTEM = "steps.metadata.outputs.package-ecosystem == 'github_actions'"
@@ -99,30 +100,34 @@ describe('dependabot-auto-merge.yml distribution', () => {
 	})
 })
 
+// These read the decision the reconciling step declares, not a condition on it: joshuafolkken/kit#845
+// moved every clause about *which* updates may arm out of the step gates and into one expression.
+// What each clause does is proven by evaluation in `dependabot-auto-merge-decision.test.ts`; these
+// hold that the clauses are written at all, and that the majors clause is absent rather than
+// negated somewhere out of sight.
 describe('dependabot-auto-merge.yml gate', () => {
-	const step = merge_step(template_job())
-	const condition = step?.if ?? ''
-
-	it('runs the merge step only for the github-actions ecosystem', () => {
-		expect(condition).toContain(ACTIONS_ECOSYSTEM)
+	it('discriminates on the github-actions ecosystem', () => {
+		expect(decision_expression(template_job())).toContain(ACTIONS_ECOSYSTEM)
 	})
 
 	// `dependency-type` cannot separate the ecosystems — Dependabot reports github-actions updates as
 	// `direct:production`, the same value it reports for npm production dependencies — so
 	// `package-ecosystem` is the only usable discriminator (joshuafolkken/kit#802).
-	it('merges patch and minor updates unattended', () => {
+	it('names patch and minor updates as the ones that merge unattended', () => {
+		const condition = decision_expression(template_job())
+
 		expect(condition).toContain(PATCH_UPDATE)
 		expect(condition).toContain(MINOR_UPDATE)
 	})
 
 	it('never merges a major update', () => {
-		expect(condition).not.toContain(MAJOR_UPDATE)
+		expect(decision_expression(template_job())).not.toContain(MAJOR_UPDATE)
 	})
 
 	// The whole job is Dependabot's; a workflow that acted on anyone else's pull request unattended
 	// would be a different feature entirely. It keys on the author rather than on `github.actor`,
-	// which names whoever triggered the run — see the withdrawal guards for why that distinction is
-	// load-bearing (joshuafolkken/kit#838).
+	// which names whoever triggered the run — see `dependabot-auto-merge-reconcile.test.ts` for why
+	// that distinction is load-bearing (joshuafolkken/kit#838).
 	it('runs only for pull requests Dependabot opened', () => {
 		expect(template_job()?.if).toBe("github.event.pull_request.user.login == 'dependabot[bot]'")
 	})
@@ -130,7 +135,9 @@ describe('dependabot-auto-merge.yml gate', () => {
 	// The command `josh doctor` matches to decide whether the repository auto-merge prerequisite
 	// applies. Renaming it would silently drop the report the workflow depends on.
 	it('enables auto-merge with the command the prerequisite report keys on', () => {
-		expect(step?.run).toContain(MERGE_COMMAND)
+		const arming = merge_step(template_job())
+
+		expect(step_run(arming)).toContain(MERGE_COMMAND)
 	})
 })
 
@@ -193,8 +200,8 @@ describe('dependabot-auto-merge.yml upstream-managed exclusion', () => {
 		expect(managed_step_run()).toContain(MANAGED_OUTPUT)
 	})
 
-	it('merges only when no upstream-managed workflow is touched', () => {
-		expect(merge_step(template_job())?.if ?? '').toContain(MANAGED_GATE)
+	it('arms only when no upstream-managed workflow is touched', () => {
+		expect(decision_expression(template_job())).toContain(MANAGED_GATE)
 	})
 
 	// The exclusion belongs to the distributed copy only. In kit `.github/workflows/*` IS the source
@@ -246,8 +253,8 @@ describe('dependabot-auto-merge.yml upstream-managed detection', () => {
 		expect(managed_step_run()).toContain('[ -n "$file$url" ] || continue')
 	})
 
-	// Failing lands on the same safe side as answering "managed" — no output is published, so the
-	// withdrawal still runs and the arming step still cannot — but it lands there visibly. Answering
+	// Failing lands on the same safe side as answering "managed" — no output is published, and the
+	// reconciling step reads a missing input as "do not arm" — but it lands there visibly. Answering
 	// would withdraw a previously armed auto-merge on a green job, with nothing to look at.
 	it('fails the step when a changed workflow cannot be read', () => {
 		const run = managed_step_run()
