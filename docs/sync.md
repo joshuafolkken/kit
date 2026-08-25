@@ -30,6 +30,8 @@ SECURITY.md         tsconfig.sonar.json
 .github/dependabot.yml
 .claude/settings.json
 .claude/skills/verify-ui/   (directory)
+.claude/skills/workflow-commands/   (directory)
+.claude/skills/dependency-update/   (directory)
 ```
 
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
@@ -373,10 +375,23 @@ SECURITY.md         tsconfig.sonar.json
 > It is distributed as `verify-ui` rather than `verify` deliberately. Claude Code bundles a `/verify`
 > of its own, and a project skill at `.claude/skills/verify/` replaces it — that path is also where
 > the bundled skill records its own recipe, so `josh sync` and the recording would overwrite each
-> other on every run, the same distribution loop the workflow pins had to be pulled out of. The
-> directory is the only entry in the directory-copy list, which is why a unit test now asserts that
-> no `.github/workflows` path is in it rather than that the list is empty: that copy bypasses the
+> other on every run, the same distribution loop the workflow pins had to be pulled out of. A unit
+> test asserts that no `.github/workflows` path is in the directory-copy list: the copy skips the
 > pin-and-stamp transform, and a workflow shipped through it would arrive unpinned and unstamped.
+>
+> **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
+> documents used to inline.** The three paired documents are read in full on every turn, and roughly
+> half of each was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
+> `halfrun` / `queue` steps, the `/review` → `followup --merge` chain rule, and the checks that run
+> after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
+> documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB. What stayed resident
+> is what has to hold when a skill has _not_ been loaded: the rule that a workflow starts only on an
+> explicitly typed keyword, and the prohibitions on touching `overrides` or `devEngines`.
+>
+> Their markdown does cite `prompts/…` paths, which a byte copy would have shipped unresolved — so
+> the directory copy is followed by the same rewrite the file copies run, over the copied markdown
+> only. A binary file under a skill is left untouched, and a `.github/workflows` path still may not
+> live there: the rewrite covers markdown, not the pin-and-stamp transform.
 >
 > **The directory copy merges and never prunes.** `cpSync` writes the package's files over the
 > consumer's and leaves everything else in place, so a file dropped from the skill upstream stays in

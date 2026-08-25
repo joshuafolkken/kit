@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	read_repo_file,
+	read_rule_surface,
+	rule_surface_documents,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 
 // kit #740: every statement of the overrides protection named `package.json` only, so an agent that
 // followed it literally read an absent `pnpm.overrides`, concluded there was nothing to protect,
@@ -33,19 +39,56 @@ const WORKFLOW_MARKERS: ReadonlyArray<string> = [
 // send an agent back to the single wrong file no matter how the dedicated section reads.
 const SINGLE_FILE_VERIFY = /verify `pnpm\.overrides`/iu
 
+// kit#854 moved the procedure into the `dependency-update` skill and left the two prohibitions
+// resident, so the markers split: the ones above stay in the document, while the steps that re-state
+// the check now live in the skills the document routes to. Both halves are still asserted — a step
+// naming the wrong file is the same defect wherever it is written.
+const VERIFY_PHRASE = 'verify the overrides'
+
+// Read as a window of following text rather than as the rest of the physical line: prose in these
+// files is hard-wrapped, so a line-based check would pass or fail on where a paragraph happens to
+// break, and re-wrapping one sentence would silently retire the assertion.
+const RESTATEMENT_WINDOW = 160
+
+function restatements_in(text: string): ReadonlyArray<string> {
+	const lowered = text.toLowerCase()
+	const windows: Array<string> = []
+	let index = lowered.indexOf(VERIFY_PHRASE)
+
+	while (index !== -1) {
+		windows.push(text.slice(index, index + RESTATEMENT_WINDOW))
+		index = lowered.indexOf(VERIFY_PHRASE, index + VERIFY_PHRASE.length)
+	}
+
+	return windows
+}
+
+// Scanned per file rather than over the concatenation: a restatement near the end of one file would
+// otherwise reach into the next, and be satisfied by a file name that belongs to a different rule.
+function restatements_of(document_path: string): ReadonlyArray<string> {
+	return rule_surface_documents(document_path).flatMap((path) =>
+		restatements_in(read_repo_file(path)),
+	)
+}
+
 describe.each(AI_DOCS)('%s — overrides protection names both locations', (document_path) => {
 	const content = read_repo_file(document_path)
+	const surface = read_rule_surface(document_path)
 
 	it.each(AI_DOC_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 
 	it('has no verify instruction that names package.json alone', () => {
-		expect(SINGLE_FILE_VERIFY.test(content)).toBe(false)
+		expect(SINGLE_FILE_VERIFY.test(surface)).toBe(false)
+	})
+
+	it('routes the reader to the skill that owns the procedure', () => {
+		expect(content).toContain('load the `dependency-update` skill')
 	})
 
 	it('names pnpm-workspace.yaml in every workflow step that re-states the check', () => {
-		const steps = content.split('\n').filter((line) => line.includes('verify the overrides'))
+		const steps = restatements_of(document_path)
 
 		expect(steps.length).toBeGreaterThan(0)
 		for (const step of steps) expect(step).toContain(WORKSPACE_YAML)

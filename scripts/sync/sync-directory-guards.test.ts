@@ -30,6 +30,9 @@ vi.mock('node:fs', () => ({
 	existsSync: exists_sync_mock,
 	lstatSync: lstat_sync_mock,
 	mkdirSync: vi.fn(),
+	// The copy is followed by a transform pass over the copied markdown; these suites are about the
+	// guards, so the walk answers with nothing to rewrite.
+	readdirSync: vi.fn(() => []),
 	readFileSync: vi.fn().mockReturnValue(''),
 	rmSync: vi.fn(),
 	writeFileSync: vi.fn(),

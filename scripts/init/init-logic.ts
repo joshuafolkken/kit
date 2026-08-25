@@ -98,12 +98,19 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 ]
 
 // Copied whole rather than file by file: a skill is a directory by definition, and one that grows a
-// supporting file would otherwise ship without it. The copy is a byte copy — `cpSync` reaches none
-// of `transform_copied_content`, so nothing listed here may depend on it: no `.github/workflows`
-// path, because a workflow would arrive unpinned and unstamped (a unit test holds that line), and no
-// file citing a `prompts/…` path, because the rewrite that points those at the installed package
-// never runs on this path.
-const AI_COPY_DIRECTORIES: ReadonlyArray<string> = ['.claude/skills/verify-ui']
+// supporting file would otherwise ship without it. `cpSync` copies bytes, so the walk is followed by
+// a transform pass over the copied markdown (directory-copy-guard.ts → transform_copied_tree) — the
+// same rewrite the file copies get, which is what lets a skill cite a `prompts/…` path and have it
+// resolve inside a consumer. Only markdown is rewritten, so a `.github/workflows` path still may not
+// live under one of these directories: it would arrive unpinned and unstamped.
+const AI_COPY_DIRECTORIES: ReadonlyArray<string> = [
+	'.claude/skills/verify-ui',
+	// joshuafolkken/kit#854: the workflow procedures and the post-dependency-update checks left the
+	// always-loaded AI documents for these two skills, so a consumer that does not receive them is
+	// left with the trigger and none of the procedure it points at.
+	'.claude/skills/workflow-commands',
+	'.claude/skills/dependency-update',
+]
 
 const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
 

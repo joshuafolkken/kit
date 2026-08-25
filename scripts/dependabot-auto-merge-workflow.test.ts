@@ -313,9 +313,10 @@ describe('dependabot-auto-merge.yml upstream-managed stamp coverage', () => {
 
 	// The coverage above enumerates the file lists, which is the whole distribution only while no
 	// workflow reaches a consumer through the directory list: `sync_directory` copies with `cpSync`
-	// and never reaches the transform, so a workflow placed there would ship unstamped and unpinned
-	// with every assertion still green. The list is no longer empty — it carries the `verify-ui`
-	// skill — so the guard names what may not be in it rather than requiring it to stay empty.
+	// and rewrites only the copied markdown afterwards (kit#854), so a workflow placed there would
+	// still skip the pin-and-stamp passes and ship unstamped and unpinned with every assertion green.
+	// The list is no longer empty — it carries the distributed skills — so the guard names what may
+	// not be in it rather than requiring it to stay empty.
 	it('copies no workflow directory, the case the coverage above cannot see', () => {
 		const directories = init_logic.get_ai_copy_directories()
 

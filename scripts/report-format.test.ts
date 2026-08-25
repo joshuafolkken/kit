@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, CLAUDE_SETTINGS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	CLAUDE_SETTINGS,
+	read_repo_file,
+	read_rule_surface,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 
 // The report format lives in five places (three AI docs, the workflow prompt, the hook).
 // Updating only one of them leaves the AI with contradicting instructions, so assert per marker.
@@ -47,7 +53,7 @@ describe('report format — plain-language overview in the AI docs', () => {
 	it.each(AI_DOCS)(
 		'%s requires completion reports to lead with cause, fix and result',
 		(ai_document) => {
-			const raw = read_repo_file(ai_document)
+			const raw = read_rule_surface(ai_document)
 
 			expect(raw).toContain('Completion reports use the same two layers.')
 			for (const marker of COMPLETION_MARKERS) expect(raw).toContain(marker)
