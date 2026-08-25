@@ -6,6 +6,8 @@ const read_file_mock = vi.hoisted(() => vi.fn().mockReturnValue('content'))
 const mkdir_mock = vi.hoisted(() => vi.fn())
 const write_file_mock = vi.hoisted(() => vi.fn())
 const exists_sync_mock = vi.hoisted(() => vi.fn())
+const lstat_sync_mock = vi.hoisted(() => vi.fn())
+
 const cp_sync_mock = vi.hoisted(() => vi.fn())
 const copy_sonar_mock = vi.hoisted(() => vi.fn())
 const OWNER_REPO = vi.hoisted(() => 'owner/repo')
@@ -24,6 +26,7 @@ vi.mock('#scripts/gh-spawn', () => ({
 vi.mock('node:fs', () => ({
 	cpSync: cp_sync_mock,
 	existsSync: exists_sync_mock,
+	lstatSync: lstat_sync_mock,
 	mkdirSync: mkdir_mock,
 	readFileSync: read_file_mock,
 	writeFileSync: write_file_mock,
@@ -32,6 +35,9 @@ vi.mock('node:path', () => ({
 	default: {
 		join: (...parts: Array<string>) => parts.join('/'),
 		dirname: (path_: string) => path_.split('/').slice(0, -1).join('/'),
+		// The directory-copy guard compares the two ends of the copy through `resolve`; these paths are
+		// already absolute in this suite, so returning them unchanged is the honest stub.
+		resolve: (path_: string) => path_,
 	},
 }))
 vi.mock('./init-copy-content', () => ({
@@ -60,6 +66,13 @@ const { managed_marker_logic } = await import('#scripts/managed-marker/managed-m
 const { KIT_PACKAGE_NAME } = await import('#scripts/version/kit-descriptor')
 const { init_ai_copy } = await import('./init-ai-copy')
 
+// The guard behind the directory copy reads `lstat` and treats only an ENOENT-coded error as
+// "nothing there", so a mocked absence has to carry the code — a bare throw reads as a path that
+// could not be inspected, which is a blocked copy rather than a missing one.
+function missing_path_error(): Error {
+	return Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+}
+
 const SRC_PATH = `/pkg/${PROMPT_FILE_NAME}`
 const DEST_PATH = `/project/${PROMPT_FILE_NAME}`
 const RAW_CONTENT = 'raw content'
@@ -74,6 +87,13 @@ afterEach(() => {
 	vi.restoreAllMocks()
 	read_file_mock.mockReturnValue(RAW_CONTENT)
 	exists_sync_mock.mockReturnValue(false)
+	// The guard reads `lstat` and treats only an ENOENT-coded error as "nothing there", so the default
+	// has to carry the code: a bare throw reads as an unreadable path and turns every unrelated test
+	// in this file into a blocked copy that prints a warning.
+	lstat_sync_mock.mockReset()
+	lstat_sync_mock.mockImplementation(() => {
+		throw missing_path_error()
+	})
 	write_file_mock.mockClear()
 	transform_copied_content_mock.mockClear()
 })
@@ -122,6 +142,9 @@ function run_over_existing_files(existing_content: string = RAW_CONTENT): Array<
 		/* suppress */
 	})
 	exists_sync_mock.mockReturnValue(true)
+	// Everything already exists in this fixture, the distributed directory included: `init` declines
+	// to overwrite it, which is an ordinary skip and not a warning.
+	lstat_sync_mock.mockReturnValue({ isDirectory: () => true })
 	write_file_mock.mockClear()
 	transform_copied_content_mock.mockClear()
 	read_file_mock.mockReturnValue(existing_content)
@@ -230,6 +253,71 @@ describe('init_ai_copy.run_ai_copies — copy behavior', () => {
 		init_ai_copy.run_ai_copies()
 
 		expect(copy_sonar_mock).toHaveBeenCalled()
+	})
+})
+
+// #853 made the directory list non-empty for the first time, so this copy runs on every `josh init`.
+// `cpSync` throws ENOENT on a source the installed package does not carry — which the list and the
+// packed files coming from one install makes a packing regression rather than a version mismatch —
+// and the throw would end `josh init` before the sonar config and the repository-settings report.
+function silence_console(): void {
+	vi.spyOn(console, 'info').mockImplementation(() => {
+		/* suppress */
+	})
+	vi.spyOn(console, 'warn').mockImplementation(() => {
+		/* suppress */
+	})
+}
+
+describe('init_ai_copy.run_ai_copies — directory copy', () => {
+	it('copies the directory when the package carries it', () => {
+		exists_sync_mock.mockReturnValue(false)
+		lstat_sync_mock.mockImplementation((candidate: string) => {
+			if (candidate.startsWith('/pkg/')) return { isDirectory: () => true }
+
+			throw missing_path_error()
+		})
+		silence_console()
+		cp_sync_mock.mockClear()
+
+		init_ai_copy.run_ai_copies()
+
+		expect(cp_sync_mock).toHaveBeenCalledWith('/pkg/prompts', '/project/prompts', {
+			recursive: true,
+		})
+	})
+
+	it('skips without throwing when the package does not carry it', () => {
+		exists_sync_mock.mockReturnValue(false)
+		lstat_sync_mock.mockImplementation(() => {
+			throw missing_path_error()
+		})
+		silence_console()
+		cp_sync_mock.mockClear()
+
+		expect(() => init_ai_copy.run_ai_copies()).not.toThrow()
+		expect(cp_sync_mock).not.toHaveBeenCalled()
+	})
+})
+
+// The closing hint offers `josh sync` as the way to overwrite what `init` declined to touch, and
+// `sync` refuses a blocked copy for the same reason `init` did — so raising it here would send the
+// user around a loop instead of at the cause.
+describe('init_ai_copy.run_ai_copies — closing hint', () => {
+	it('does not offer josh sync as the fix for a blocked copy', () => {
+		exists_sync_mock.mockReturnValue(false)
+		lstat_sync_mock.mockImplementation(() => {
+			throw missing_path_error()
+		})
+
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+		init_ai_copy.run_ai_copies()
+
+		const lines = info.mock.calls.map((call) => String(call[0])).join('\n')
+
+		expect(lines).not.toContain('Run `josh sync`')
 	})
 })
 

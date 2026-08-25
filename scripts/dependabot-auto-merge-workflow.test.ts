@@ -31,7 +31,31 @@ const MINOR_UPDATE = "steps.metadata.outputs.update-type == 'version-update:semv
 const MAJOR_UPDATE = 'version-update:semver-major'
 const MANAGED_GATE = dependabot_workflow_fixture.managed_gate(false)
 const STALE_REFERENCE = '0000000000000000000000000000000000000000 # v0.0.0'
-const WORKFLOWS_PREFIX = '.github/workflows/'
+const WORKFLOWS_ROOT = '.github/workflows'
+const WORKFLOWS_PREFIX = `${WORKFLOWS_ROOT}/`
+
+// True for the workflow directory itself, anything under it, and any ancestor of it — `.github`
+// alone, or the repository root, would carry every workflow through the directory copy just as
+// directly. The root is spelled several ways (`.`, `./`, an empty entry), all of which normalize to
+// the empty string and are answered before the prefix comparisons, where they would slip through.
+function shares_path_with_workflows(directory: string): boolean {
+	const normalized = directory
+		.replaceAll('\\', '/')
+		.replace(/^\.$/u, '')
+		.replace(/^\.\//u, '')
+		.replace(/\/$/u, '')
+
+	if (normalized === '') return true
+	// An entry that climbs out of the repository can reach `.github/workflows` from anywhere above it.
+	if (normalized.split('/').includes('..')) return true
+
+	return (
+		normalized === WORKFLOWS_ROOT ||
+		normalized.startsWith(WORKFLOWS_PREFIX) ||
+		`${WORKFLOWS_ROOT}/`.startsWith(`${normalized}/`)
+	)
+}
+
 const DEPLOY_VPS_DESTINATION = `${WORKFLOWS_PREFIX}deploy-vps.yml`
 const MARKER_VARIABLE = 'MANAGED_MARKER'
 const { MARKER_PREFIX } = managed_marker_logic
@@ -287,11 +311,30 @@ describe('dependabot-auto-merge.yml upstream-managed stamp coverage', () => {
 		expect(distributed_workflows()).not.toContain(DEPLOY_VPS_DESTINATION)
 	})
 
-	// The coverage above enumerates the file lists, which is the whole distribution only while the
-	// directory list is empty: `sync_directory` copies with `cpSync` and never reaches the transform,
-	// so a workflow placed there would ship unstamped and unpinned with every assertion still green.
-	// Pinning the precondition is what turns that into a failing test the day someone adds one.
-	it('copies no directories, the case the coverage above cannot see', () => {
-		expect(init_logic.get_ai_copy_directories()).toEqual([])
+	// The coverage above enumerates the file lists, which is the whole distribution only while no
+	// workflow reaches a consumer through the directory list: `sync_directory` copies with `cpSync`
+	// and never reaches the transform, so a workflow placed there would ship unstamped and unpinned
+	// with every assertion still green. The list is no longer empty — it carries the `verify-ui`
+	// skill — so the guard names what may not be in it rather than requiring it to stay empty.
+	it('copies no workflow directory, the case the coverage above cannot see', () => {
+		const directories = init_logic.get_ai_copy_directories()
+
+		expect(directories.some((directory) => shares_path_with_workflows(directory))).toBe(false)
 	})
+
+	// The guard is the only thing standing between the directory list and an unstamped workflow, so
+	// the shapes that would carry one are asserted rather than assumed.
+	it.each([WORKFLOWS_ROOT, `${WORKFLOWS_PREFIX}ci.yml`, '.github', '.', './', '', '..', '../kit'])(
+		'rejects %j as a directory-copy entry',
+		(candidate) => {
+			expect(shares_path_with_workflows(candidate)).toBe(true)
+		},
+	)
+
+	it.each(['.claude/skills/verify-ui', 'prompts', '.github/ISSUE_TEMPLATE'])(
+		'accepts %j as a directory-copy entry',
+		(candidate) => {
+			expect(shares_path_with_workflows(candidate)).toBe(false)
+		},
+	)
 })

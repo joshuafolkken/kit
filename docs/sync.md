@@ -29,6 +29,7 @@ SECURITY.md         tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
+.claude/skills/verify-ui/   (directory)
 ```
 
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow
@@ -357,6 +358,32 @@ SECURITY.md         tsconfig.sonar.json
 > stops the habitual form, which is the form an agent reaches for; the prose rule in `CLAUDE.md` /
 > `AGENTS.md` / `GEMINI.md` stays the authority on intent, and a command being refused is not the
 > boundary of what is forbidden.
+>
+> **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the paired
+> AI documents says a change to the rendered screen is not done until someone has looked at it, and
+> until joshuafolkken/kit#853 it named a skill this package did not ship — so the step pointed at
+> nothing. The skill picks the routes, calls the application layer's own screenshot command, and
+> opens the images. Where no such command exists it says so and leaves the gate open, which is the
+> point: a skill that returned success there would read as closed while verifying nothing. Today that
+> is every consumer — the command it looks for (`josh-app shot` for a SvelteKit project,
+> `josh-game shot` for a game) exists in neither toolkit yet; joshuafolkken/app-kit#200 adds the
+> first one. Shipping the skill ahead of it is what turns a gate that quietly passed into one that
+> says out loud it could not run.
+>
+> It is distributed as `verify-ui` rather than `verify` deliberately. Claude Code bundles a `/verify`
+> of its own, and a project skill at `.claude/skills/verify/` replaces it — that path is also where
+> the bundled skill records its own recipe, so `josh sync` and the recording would overwrite each
+> other on every run, the same distribution loop the workflow pins had to be pulled out of. The
+> directory is the only entry in the directory-copy list, which is why a unit test now asserts that
+> no `.github/workflows` path is in it rather than that the list is empty: that copy bypasses the
+> pin-and-stamp transform, and a workflow shipped through it would arrive unpinned and unstamped.
+>
+> **The directory copy merges and never prunes.** `cpSync` writes the package's files over the
+> consumer's and leaves everything else in place, so a file dropped from the skill upstream stays in
+> the consumer until someone deletes it, and a file a consumer adds beside `SKILL.md` survives every
+> sync. Deleting the destination first would be the alternative, and it would take a consumer's own
+> files with it — so the merge is the deliberate half of the trade, and a removed file is something
+> to announce in the release notes rather than something sync cleans up.
 >
 > **The same file wires the post-edit formatter.** Its `PostToolUse` hook runs
 > `pnpm josh format:edited` after every `Edit` and `Write`, formatting the one file that changed

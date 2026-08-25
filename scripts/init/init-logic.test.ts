@@ -271,8 +271,8 @@ describe('merge_package_scripts retired scripts', () => {
 })
 
 describe('get_ai_copy_directories', () => {
-	it('returns an empty array', () => {
-		expect(init_logic.get_ai_copy_directories()).toHaveLength(0)
+	it('distributes the verify-ui skill', () => {
+		expect(init_logic.get_ai_copy_directories()).toContain('.claude/skills/verify-ui')
 	})
 })
 
