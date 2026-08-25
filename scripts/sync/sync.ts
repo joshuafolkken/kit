@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auto_merge_setting } from '#scripts/auto-merge-setting'
+import { copy_directory_failure, directory_copy_blocker } from '#scripts/directory-copy-guard'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
@@ -71,10 +72,27 @@ function sync_ai_copy_file(filename: string, is_force: boolean): void {
 	sync_file(filename)
 }
 
+// The reason this directory was not synced, or nothing when it was. Both halves answer the same
+// question — what stops the copy — so the caller has one line to print either way.
+function directory_sync_failure(directory_name: string): string | undefined {
+	const source_path = path.join(PACKAGE_DIR, directory_name)
+	const destination_path = path.join(PROJECT_ROOT, directory_name)
+
+	return (
+		directory_copy_blocker(source_path, destination_path) ??
+		copy_directory_failure(source_path, destination_path)
+	)
+}
+
 function sync_directory(directory_name: string): void {
-	cpSync(path.join(PACKAGE_DIR, directory_name), path.join(PROJECT_ROOT, directory_name), {
-		recursive: true,
-	})
+	const failure = directory_sync_failure(directory_name)
+
+	if (failure !== undefined) {
+		console.warn(`  ⚠ skipped   ${directory_name}/ (${failure})`)
+
+		return
+	}
+
 	console.info(`  ✔ synced    ${directory_name}/`)
 }
 
@@ -287,4 +305,6 @@ const sync = {
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 
-export { sync }
+// `sync` is the entry point; `sync_directory` is exported for its own unit test, the way
+// `git-pr-checks.ts` exports the helpers beside its namespace.
+export { sync, sync_directory }
