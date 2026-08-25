@@ -148,10 +148,12 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/dependabot.yml
 .claude/settings.json
 .claude/skills/verify-ui/   (directory)
+.claude/skills/workflow-commands/   (directory)
+.claude/skills/dependency-update/   (directory)
 sonar-project.properties  (generated from GitHub repo name)
 ```
 
-`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/kit/prompts/` so they work correctly in the consuming project.
+`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/kit/prompts/` so they work correctly in the consuming project. The same rewrite runs over the markdown inside every copied `.claude/skills/` directory, so a skill may cite the prompt it extends and have the path resolve in a consumer.
 
 `sonar-project.properties` is generated from the GitHub repo name fetched via `gh repo view`. If `gh` is not available or the repo cannot be identified, the file is skipped with a warning.
 

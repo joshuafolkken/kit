@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './ai-document-fixture'
 
 // An upstream Issue states the defect; the consumer Issue it came from holds the evidence — which
 // project, which version pair, what the output looked like. Both directions have to be required,
@@ -44,7 +44,7 @@ describe('issue backlink — two-way requirement in the AI docs', () => {
 	})
 
 	it.each(AI_DOCS)('%s carries the requirement into the split path', (ai_document) => {
-		const raw = read_repo_file(ai_document)
+		const raw = read_rule_surface(ai_document)
 
 		expect(raw).toContain(
 			'**When the split is filed into a repository other than the one this session is running in**',
