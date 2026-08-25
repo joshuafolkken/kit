@@ -382,7 +382,7 @@ SECURITY.md         tsconfig.sonar.json
 > **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
 > documents used to inline.** The three paired documents are read in full on every turn, and roughly
 > half of each was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
-> `halfrun` / `queue` steps, the `/review` → `followup --merge` chain rule, and the checks that run
+> `halfrun` / `queue` steps, the `/code-review` → `followup --merge` chain rule, and the checks that run
 > after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
 > documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB. What stayed resident
 > is what has to hold when a skill has _not_ been loaded: the rule that a workflow starts only on an
