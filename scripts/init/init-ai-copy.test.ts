@@ -28,6 +28,10 @@ vi.mock('node:fs', () => ({
 	existsSync: exists_sync_mock,
 	lstatSync: lstat_sync_mock,
 	mkdirSync: mkdir_mock,
+	// The directory copy rewrites the copied markdown afterwards, which walks the source listing. An
+	// absent export here does not fail loudly — `copy_directory_failure` catches the missing-export
+	// throw and returns it as `copy failed`, so the success path would quietly stop being exercised.
+	readdirSync: vi.fn(() => []),
 	readFileSync: read_file_mock,
 	writeFileSync: write_file_mock,
 }))
@@ -277,7 +281,9 @@ describe('init_ai_copy.run_ai_copies — directory copy', () => {
 
 			throw missing_path_error()
 		})
-		silence_console()
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
 		cp_sync_mock.mockClear()
 
 		init_ai_copy.run_ai_copies()
@@ -285,6 +291,12 @@ describe('init_ai_copy.run_ai_copies — directory copy', () => {
 		expect(cp_sync_mock).toHaveBeenCalledWith('/pkg/prompts', '/project/prompts', {
 			recursive: true,
 		})
+		// `cpSync` having been called is not the success path: the copy is followed by a transform
+		// pass, and a failure there is caught and reported as a skip with `cpSync` still recorded. A
+		// mock missing an export the pass calls looked exactly like that (kit#854), so the reported
+		// line is what the assertion reads.
+		expect(info.mock.calls.map((call) => String(call[0])).join('\n')).toContain('✔ created')
+		expect(warn).not.toHaveBeenCalled()
 	})
 
 	it('skips without throwing when the package does not carry it', () => {

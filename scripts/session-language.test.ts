@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, ENV_EXAMPLE, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	ENV_EXAMPLE,
+	read_repo_file,
+	read_rule_surface,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 
 // The clause is pasted into every workflow definition, so it is declared once here — a marker
 // that drifts from the documents by one backtick would pass silently as a substring search.
@@ -70,10 +76,21 @@ function expect_present(relative_path: string, markers: ReadonlyArray<string>): 
 	for (const marker of markers) expect(raw).toContain(marker)
 }
 
+// Reads the surface, not the document: the workflow definitions that carried the retired English
+// pins moved into the skills, so a pin re-introduced in `fullrun.md` has to fail here.
 function expect_absent(relative_path: string, markers: ReadonlyArray<string>): void {
-	const raw = read_repo_file(relative_path)
+	const raw = read_rule_surface(relative_path)
 
 	for (const marker of markers) expect(raw).not.toContain(marker)
+}
+
+// kit#854 moved the workflow definitions into `.claude/skills/workflow-commands/`, taking their
+// language clauses with them. The clause still has to be on every definition, so the assertion reads
+// the document plus the skills it routes to rather than the document alone.
+function expect_present_on_surface(document_path: string, markers: ReadonlyArray<string>): void {
+	const raw = read_rule_surface(document_path)
+
+	for (const marker of markers) expect(raw).toContain(marker)
 }
 
 describe('output language — resolution rule in the AI docs', () => {
@@ -86,7 +103,7 @@ describe('output language — resolution rule in the AI docs', () => {
 	})
 
 	it.each(AI_DOCS)('%s routes every plan comment through the session language', (ai_document) => {
-		expect_present(ai_document, WORKFLOW_CLAUSE_MARKERS)
+		expect_present_on_surface(ai_document, WORKFLOW_CLAUSE_MARKERS)
 	})
 
 	it.each(AI_DOCS)('%s no longer pins artifacts to English', (ai_document) => {

@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { AI_DOCS, read_repo_file } from './ai-document-fixture'
 import { init_logic } from './init/init-logic'
-import { package_path } from './init/init-paths'
+import { has_frontmatter, read_skill_file, skill_frontmatter } from './skill-fixture'
 
 // #853: the completion gate named a `/verify` skill that this package did not ship, so the UI
 // verification step pointed at nothing. The skill is distributed under `verify-ui` rather than
@@ -12,14 +11,9 @@ import { package_path } from './init/init-paths'
 const SKILL_DIRECTORY = '.claude/skills/verify-ui'
 const SKILL_PATH = `${SKILL_DIRECTORY}/SKILL.md`
 const SKILL_REFERENCE = '`/verify-ui`'
-const FRONTMATTER_PATTERN = /^---\n([\S\s]*?)\n---\n/u
 
 function read_skill(): string {
-	return readFileSync(package_path(SKILL_PATH), 'utf8')
-}
-
-function skill_frontmatter(): string {
-	return FRONTMATTER_PATTERN.exec(read_skill())?.[1] ?? ''
+	return read_skill_file(SKILL_DIRECTORY)
 }
 
 describe(`${SKILL_PATH} — distribution`, () => {
@@ -28,11 +22,11 @@ describe(`${SKILL_PATH} — distribution`, () => {
 	})
 
 	it('opens with YAML frontmatter Claude Code can read', () => {
-		expect(FRONTMATTER_PATTERN.test(read_skill())).toBe(true)
+		expect(has_frontmatter(read_skill())).toBe(true)
 	})
 
 	it.each(['name: verify-ui', 'description:'])('declares %s', (field) => {
-		expect(skill_frontmatter()).toContain(field)
+		expect(skill_frontmatter(read_skill())).toContain(field)
 	})
 })
 

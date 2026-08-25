@@ -21,6 +21,12 @@
 
 一括実行する場合は `fullrun new` で Step 1〜5 を通しで実行する。
 
+### 手順の置き場所（常時ロードとオンデマンドの分離）
+
+`kickoff` / `fullrun` / `halfrun` / `queue` の**操作手順**は、常時ロードされる `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` からは外され、`.claude/skills/workflow-commands/` に置かれている（joshuafolkken/kit#854）。3 文書に残るのはキーワードとスキルへの導線、およびスキルが読み込まれていない状態でも効く必要のある禁止規範（明示起動の必須ルール）だけである。依存更新後の overrides / `devEngines` 検証手順も同様に `.claude/skills/dependency-update/` へ移した。
+
+このドキュメントは引き続き**正典の詳細版**であり、スキルは操作手順である。両者は一致していなければならないので、片方だけを更新してはならない。
+
 ### 出力の言語（`JOSH_SESSION_LANG`）
 
 ワークフローの出力言語は、環境変数 `JOSH_SESSION_LANG`（例: `ja` / `en`）で決まる。対象は「開発者との対話」と「成果物の散文」の**両方**であり、変数が未設定のときのフォールバックだけが異なる。

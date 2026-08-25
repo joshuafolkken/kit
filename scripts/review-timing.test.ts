@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './ai-document-fixture'
 
+// kit#854 moved the workflow procedures into `.claude/skills/workflow-commands/`, so a rule the
+// documents now route to lives on the surface — document plus skills — rather than in the document
+// alone. Reading the surface is what keeps these suites asserting the rule instead of its address.
 const REVIEW_PROMPT = 'prompts/review.md'
 const GATE_REVIEW =
 	'`/review` skill on `git diff main`, iterating until no high/medium findings remain'
@@ -44,13 +47,13 @@ const HALFRUN_RETIRED_MARKERS: ReadonlyArray<string> = [
 
 describe('review timing — AI docs', () => {
 	it.each(AI_DOCS)('%s runs the workflow review inside the pre-commit gate', (ai_document) => {
-		const raw = read_repo_file(ai_document)
+		const raw = read_rule_surface(ai_document)
 
 		for (const marker of INLINE_MARKERS) expect(raw).toContain(marker)
 	})
 
 	it.each(AI_DOCS)('%s no longer describes the post-PR subagent review', (ai_document) => {
-		const raw = read_repo_file(ai_document)
+		const raw = read_rule_surface(ai_document)
 
 		for (const marker of RETIRED_MARKERS) expect(raw).not.toContain(marker)
 	})
@@ -58,7 +61,7 @@ describe('review timing — AI docs', () => {
 	// halfrun stopping before the commit is the whole point of the mode: the user inspects the
 	// working tree, not an open PR. Leaving it authorized to commit would silently restore #758.
 	it.each(AI_DOCS)('%s keeps halfrun short of commit, push and merge', (ai_document) => {
-		const raw = read_repo_file(ai_document)
+		const raw = read_rule_surface(ai_document)
 
 		expect(raw).toContain('**Invoking `halfrun` is _not_ authorization to commit, push, or merge**')
 		expect(raw).not.toContain('Invoking `halfrun` authorizes commit, push, and PR creation')
@@ -69,17 +72,20 @@ describe('review timing — AI docs', () => {
 	// contradicting itself two lines apart (#765). An agent that trusts the heading commits and
 	// opens a PR before the user has verified anything, which is the failure halfrun prevents.
 	it.each(AI_DOCS)('%s heads the halfrun section with the pre-commit stop', (ai_document) => {
-		const raw = read_repo_file(ai_document)
+		const raw = read_rule_surface(ai_document)
 
+		// Asserted without the heading level: kit#854 moved the section into
+		// `.claude/skills/workflow-commands/halfrun.md`, where the same title is the file's own `#`
+		// heading. What the agent reads first is the wording, not the depth it sits at.
 		expect(raw).toContain(
-			'#### `halfrun` — Implement + verify, stop before commit (for manual verification)',
+			'`halfrun` — Implement + verify, stop before commit (for manual verification)',
 		)
 		expect(raw).toContain('**stops before commit**')
 		expect(raw).toContain("`halfrun`'s built-in stop before commit is a confirmation pause")
 	})
 
 	it.each(AI_DOCS)('%s never describes halfrun as creating a PR', (ai_document) => {
-		const raw = read_repo_file(ai_document)
+		const raw = read_rule_surface(ai_document)
 
 		for (const marker of HALFRUN_RETIRED_MARKERS) expect(raw).not.toContain(marker)
 	})
