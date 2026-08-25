@@ -5,8 +5,11 @@ import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './a
 // documents now route to lives on the surface — document plus skills — rather than in the document
 // alone. Reading the surface is what keeps these suites asserting the rule instead of its address.
 const REVIEW_PROMPT = 'prompts/review.md'
+// kit#876 renamed the invocation: the gate used to name `/review`, a skill this package does not
+// ship, and pinned no effort level. The timing this suite is about — the review runs inside the
+// pre-commit gate, on `git diff main` — is unchanged.
 const GATE_REVIEW =
-	'`/review` skill on `git diff main`, iterating until no high/medium findings remain'
+	'`/code-review medium` on `git diff main`, iterating until no high/medium findings remain'
 
 // The review used to be delegated to a fresh-context subagent (#752) and run after the PR existed,
 // with its output posted as a PR comment (#758). Both were reverted in #762: the round-trip cost —

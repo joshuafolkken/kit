@@ -11,7 +11,21 @@ This document is the **single source of truth** for reviewing a diff. The implem
 - **Pre-commit self-review** (implementing session, inline): before every `git commit` on a feature branch — scope: the staged diff (`git diff --staged`)
 - **Workflow review step** (same session, inline): the last stage of the verification gate in `fullrun` / `halfrun` / `queue`, before `pnpm josh bump minor` and the commit — scope: `git diff main`
 
-Re-run after applying fixes until **no high or medium findings remain**. Low findings may be acknowledged and skipped with a reason.
+Re-run after applying fixes until **no high or medium findings remain — or until two reviews have run in total — the first one included — whichever comes first.** Low findings may be acknowledged and skipped with a reason. The cap is spelled out below and it is not optional.
+
+---
+
+## Review round cap (2 rounds)
+
+The severity rule above is not a stopping condition on its own. Every fix creates new surface, and a review whose scope is the whole change finds something in it — so the loop is bounded by how much new code the fixes produce, which is unbounded.
+
+This is measured, not theorized. On joshuafolkken/kit#854 four rounds produced 18 findings; on joshuafolkken/kit#855 two rounds produced 19. Almost none of them was a repeat: each round found new things, and many of those were about code the **previous round's fix** had just written. One fix replaced a line-based check with a proximity window, and the next two rounds each found a new defect in that window. Another moved a rule into a skill, and a later round moved it back. Two rounds of that is diligence; a third is the review chasing its own tail.
+
+- **After the second round, every remaining finding that is not a confirmed High is filed as a follow-up Issue, and the current Issue completes.** Filing is mandatory — a deferred finding is never silently dropped — and the new Issue references the current one.
+- **A confirmed High is never deferred.** The filing rule above covers Low and Medium only: a real defect does not ship because a round counter ran out, so a standing High blocks the merge.
+- **Blocking the merge is not the same as buying more rounds.** If a High is still standing after the second round, do not start a third — two rounds of fixing failed to close it, and a third is the review chasing its own tail. It says the change itself is not ready: stop, send a `confirmation` Telegram, and put the scope back to the user, where splitting the Issue is usually the answer.
+
+The cap is deliberately mechanical rather than a judgement call, because judgement is what fails here: on #854 the third and fourth rounds were spent on findings that the Low rule already permitted skipping — a misplaced comment, an unused export, a stale comment — treated as blockers because the review returned them without severities.
 
 ---
 
@@ -159,7 +173,7 @@ If the diff is empty or trivial (e.g. whitespace only), state that explicitly an
 
 ## Auto-continue rule (fullrun-conditional) — read this BEFORE sending the review
 
-**This rule fires only when `/review` was invoked inside a `fullrun` / `fullrun new` / `queue` workflow.** Standalone `/review <PR>` invocations are exempt — for those, stop after the review markdown as normal. **A `halfrun` invocation NEVER enters fullrun mode** — halfrun runs this same review inside its verification gate, but it ends at the confirmation stop without committing: once the review settles, send the `confirmation` Telegram and stop with the work uncommitted.
+**This rule fires only when `/code-review` was invoked inside a `fullrun` / `fullrun new` / `queue` workflow.** Standalone `/code-review <PR>` invocations are exempt — for those, stop after the review markdown as normal. **A `halfrun` invocation NEVER enters fullrun mode** — halfrun runs this same review inside its verification gate, but it ends at the confirmation stop without committing: once the review settles, send the `confirmation` Telegram and stop with the work uncommitted.
 
 ### How to tell which mode you are in
 
@@ -175,11 +189,11 @@ If either condition is false, you are in **standalone mode** (or the halfrun con
 Before your response (the one containing the review markdown) is sent, run this self-check:
 
 1. Count high/medium-severity findings across all categories.
-2. If **any** high/medium findings exist → fix them in place and re-run `/review`. Nothing is committed yet, so a round costs no commit, push, or CI run. Loop until none remain. **Do NOT call `followup --merge` yet.**
+2. If **any** high/medium findings exist → fix them in place and re-run `/code-review medium`. Nothing is committed yet, so a round costs no commit, push, or CI run. **Stop at two rounds** — after the second, file every remaining Low/Medium finding as a follow-up Issue and continue the pipeline; a standing High blocks the merge but does not authorize a third round (see "Review round cap"). **Do NOT call `followup --merge` yet.**
 3. If **no** high/medium findings exist (Low-only or completely clean) → your response MUST continue the pipeline in tool calls **after** the review markdown, in the same response: `pnpm josh bump minor`, then `pnpm josh git -y "<title> #<N>"`, then `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`. **Do NOT end the turn with review markdown as the final assistant text.**
 
 ### Concrete failure pattern to self-recognize
 
-If you are about to send a response whose final text is the `/review` Markdown — with sections, severity-tagged findings, and a recommendation line — and **no tool call follows**, that response is a chain-rule violation. Cancel it. Add the `pnpm josh bump minor` → `pnpm josh git -y` → `pnpm josh followup --merge` tool calls to the same response before sending.
+If you are about to send a response whose final text is the `/code-review` Markdown — with sections, severity-tagged findings, and a recommendation line — and **no tool call follows**, that response is a chain-rule violation. Cancel it. Add the `pnpm josh bump minor` → `pnpm josh git -y` → `pnpm josh followup --merge` tool calls to the same response before sending.
 
 This rule mirrors the chain-rule decision table in `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `prompts/collaboration-workflow.md`. It is repeated here because the violation point is at the moment the review skill finishes producing markdown — the rule must be visible in the skill's own context, not just in the always-loaded project docs.

@@ -178,7 +178,7 @@ Run the full verification set **in order**. **Do not** skip or reorder steps. **
 3. `pnpm exec tsc --noEmit`
 4. `pnpm josh cspell:dot`
 5. `pnpm josh test:unit`
-6. **Self-review** — follow `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean.
+6. **Self-review** — run `/code-review medium` per `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean — **at most two reviews in total**. After the second round, file every remaining non-High finding as a follow-up Issue referencing this one, and complete the current Issue; only a confirmed High blocks regardless of round count. See `prompts/review.md` → "Review round cap".
 7. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
 8. **E2E**: Ask the user to run `pnpm josh test` and share the output. Fix any failures, then ask again.
 
@@ -196,7 +196,8 @@ Before every `git commit` — including follow-up commits on the same branch —
 - Scope: the staged diff (`git diff --staged`). Before opening or updating a PR, also review the cumulative branch diff (`git diff main...HEAD`).
 - Produce the full categorized output defined in `prompts/review.md`. Every category must have an explicit verdict (findings or `No issues`).
 - Resolve **all high and medium findings** before committing. Low findings may be skipped with a one-line reason.
-- If a fix introduces new code, re-run the self-review on the updated diff. Iterate until no high/medium findings remain.
+- If a fix introduces new code, re-run the self-review on the updated diff. Iterate until no high/medium findings remain — **at most two reviews in total**.
+- **The round cap is unconditional.** Each fix creates new surface and an unbounded review always finds something in it, so the severity rule alone does not terminate: on joshuafolkken/kit#854 four rounds produced 18 findings, most of them about code the previous round's fix had just written. After the second review, file every remaining non-High finding as a follow-up Issue and complete the current work — reference the current Issue from it when the work has one, and file it standalone when it does not, because a pre-commit review outside any workflow has no Issue to point at and a deferred finding is still never dropped. A confirmed High is the only exception — a real defect never ships on a round count — and a High still standing after the second round means the change is not ready: stop, send a `confirmation` Telegram, and put the scope back to the user rather than starting a third round.
 - CI no longer runs a Claude review — the pre-commit self-review is the authoritative pass, so do not rely on a CI safety net.
 
 ## Doc Sync Rules
@@ -220,7 +221,7 @@ Before every `git commit` — including follow-up commits on the same branch —
 
 ### Shorthand Commands
 
-`kickoff`, `fullrun`, `halfrun` and `queue` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill (`.claude/skills/workflow-commands/`), which also carries the `/review` → `followup --merge` chain rule, the auto-merge authorization and the Telegram notification formats. Each of those rules applies only while its own command is running, so keeping them loaded on every turn spent context describing a workflow most turns never enter.
+`kickoff`, `fullrun`, `halfrun` and `queue` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill (`.claude/skills/workflow-commands/`), which also carries the `/code-review` → `followup --merge` chain rule, the auto-merge authorization and the Telegram notification formats. Each of those rules applies only while its own command is running, so keeping them loaded on every turn spent context describing a workflow most turns never enter.
 
 **Read the skill before running any part of a command — including the first `gh` call.** Acting from the table below alone is not enough: the table says which command was typed, not how to run it.
 
