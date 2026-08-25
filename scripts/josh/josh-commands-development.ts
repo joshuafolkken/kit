@@ -18,6 +18,9 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 	},
 	format: {
+		// prettier first here, unlike `format:edited`, and deliberately: `eslint --fix` exits 1
+		// whenever a non-autofixable error remains, so putting it first behind `&&` would mean one
+		// unused variable anywhere in the tree stops prettier from running at all.
 		shell: [
 			'sh',
 			'-c',
@@ -35,6 +38,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'format:eslint': {
 		shell: [...PE, 'eslint', '.', '--fix', ...ESLINT_CACHE_FLAGS],
 		description: 'Fix eslint issues',
+		category: 'Development',
+	},
+	'format:edited': {
+		script: 'scripts/format-edited-file.ts',
+		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',
 		category: 'Development',
 	},
 	cspell: {

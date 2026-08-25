@@ -157,7 +157,7 @@ For every code modification, follow this order exactly:
 1. **Refactor first** _(mandatory before lint or tests)_: apply high/medium-priority refactoring to all new/modified code — see `prompts/refactoring.md`. Do not proceed until no high/medium items remain.
 2. **Tests**: implement the tests declared in Step 0. See `prompts/testing-guide.md`.
    - **E2E cleanup / leaked data**: When fixing issues where E2E leaves database or UI artifacts, follow the **Regression fix workflow** in `prompts/testing-guide.md` (add a failing guard → fix → confirm green). Prefer stable selectors (`data-testid`) over locale-dependent strings for teardown.
-3. **Lint**: run `pnpm josh lint` then `pnpm exec tsc --noEmit`; fix all errors before reporting done.
+3. **Lint**: run `pnpm josh lint` then `pnpm exec tsc --noEmit`; fix all errors before reporting done. Each `Edit` / `Write` is already followed by `pnpm josh format:edited`, a `PostToolUse` hook that runs `eslint --fix` and `prettier --write` on that one file, so a file may differ from what you wrote and this step mostly reports what the hook could not fix on its own.
 4. **Spell check**: `pnpm josh cspell:dot`; add legitimate project terms to `cspell.config.yaml`
 5. **IDE feedback**: check IDE lint output — often more current than terminal
 6. Never say "it should pass" without running commands. Never finish while errors exist.

@@ -358,6 +358,12 @@ SECURITY.md         tsconfig.sonar.json
 > `AGENTS.md` / `GEMINI.md` stays the authority on intent, and a command being refused is not the
 > boundary of what is forbidden.
 >
+> **The same file wires the post-edit formatter.** Its `PostToolUse` hook runs
+> `pnpm josh format:edited` after every `Edit` and `Write`, formatting the one file that changed
+> instead of leaving an agent to run a whole-project lint to see what a single edit looked like. It
+> reaches a consumer the same way the deny list does, and `docs/josh-commands.md` documents what the
+> command does and why it never fails.
+>
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
 > turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
 > blocked only for the agent: the user runs `git add` in their own terminal unchanged. A permanent

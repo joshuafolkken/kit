@@ -26,6 +26,31 @@ pnpm josh format:prettier  # prettier only
 pnpm josh format:eslint    # eslint only
 ```
 
+### `josh format:edited`
+
+Format the single file an agent just edited. It is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `PostToolUse` event for the `Edit` and `Write` tools, and Claude Code pipes the tool call to it as JSON on stdin. The command reads `tool_input.file_path` out of that payload and runs `eslint --fix` and then `prettier --write` on that path alone.
+
+```json
+"PostToolUse": [
+	{
+		"matcher": "Edit|Write",
+		"hooks": [{ "type": "command", "command": "pnpm josh format:edited", "timeout": 90 }]
+	}
+]
+```
+
+The matcher is the plain alternation rather than an anchored regex on purpose: Claude Code treats a matcher built only from letters, digits, `_`, `-`, spaces, `,` and `|` as an exact list of tool names, and reads anything else as an unanchored regular expression. `Edit|Write` therefore names two tools, while `^(Edit|Write)$` would depend on the regex path being available.
+
+**Why a subcommand rather than a shell one-liner in the settings file.** The settings file is copied verbatim into every consumer, so an inline command would be a second copy of this logic in each of them, un-upgradable and untested. As a subcommand the wiring stays one line and the behavior is single-sourced here.
+
+**eslint first, prettier last.** An `eslint --fix` that removes a now-unused disable directive leaves the whitespace behind it, so a prettier pass before eslint can hand back a file that `prettier --check` then rejects. Prettier having the last word is what keeps the hook's own output passing `pnpm josh lint`. `josh format` keeps the opposite order on purpose: it chains the two with `&&`, and `eslint --fix` exits non-zero whenever a non-autofixable error remains, so eslint first would mean one unused variable anywhere in the tree stops prettier from running at all. Here the two runs are independent, so the ordering is free to be the one that leaves the file correct.
+
+**It never fails.** A `PostToolUse` hook runs after the edit has already landed and cannot undo it, so nothing this command does is worth reporting as a failure: a payload it cannot parse, a path that no longer exists, a file type nothing here formats, and a formatter that exits non-zero on a half-written file all end the run quietly. What eslint could not fix is left for `pnpm josh lint` at the completion gate to report.
+
+**Only files inside the project.** A session can carry additional working directories, and a path in another checkout or a home-directory config file is governed by that tree's rules, not this one's — so anything outside the directory the hook runs in is left alone rather than rewritten to this project's prettier and eslint config. Each formatter is bounded at 25 seconds and the hook entry declares 90, so the script's bound is the one that fires first. Neither number makes a kill safe — `prettier --write` rewrites in place, and any kill can leave the file truncated — but 25 seconds is far beyond what formatting one file takes, so reaching it means something is already wrong.
+
+Only paths that prettier has an opinion about are touched (`.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.svelte`, `.json`, `.jsonc`, `.md`, `.yml`, `.yaml`, `.css`, `.html`), eslint runs on the code subset of those, `node_modules` and `.git` are skipped at any depth, and `dist` and `build` are skipped only as top-level directories — nested, they are ordinary source (`src/routes/build/+page.ts` is a route, not build output). The cost is one eslint and one prettier start per edit. Measured in a SvelteKit consumer that is about five seconds, and eslint is nearly all of it (4.0s against prettier's 0.4s on the same one-file edit) — eslint's config load dominates, and a single file does not make it cheaper. That is the trade: a few seconds per edit against a whole-project lint run to see what one file's formatter made of it, and against formatting problems arriving in a batch at the end of the work instead of one at a time. The shims under `node_modules/.bin` are spawned directly rather than through `pnpm exec`, which removes two process starts from a chain that already holds `pnpm josh` and tsx.
+
 ### `josh cspell`
 
 Run spell check.
