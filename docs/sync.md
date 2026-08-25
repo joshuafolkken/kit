@@ -504,6 +504,38 @@ kit's base layer for `tsconfig.json`, `cspell.config.yaml`, and `lefthook.yml` i
 
 This transformation is applied to backtick-quoted paths matching the pattern `` `prompts/<path>` ``.
 
+## Refused inside the distribution package's own repository
+
+`josh sync` writes nothing and exits non-zero when the project it is aimed at **is** the package
+that distributes the files:
+
+```text
+Refusing to sync: this is @joshuafolkken/kit's own repository.
+Syncing here would overwrite the distribution source with its own derived templates.
+Run this command from a consumer project instead.
+```
+
+Inside the source repository every copy runs backwards. The mapped workflows are written from
+`templates/workflows/` over `.github/workflows/`, which is the authoritative side the pins are
+resolved _from_ ([#747](https://github.com/joshuafolkken/kit/issues/747)); the path transformation
+rewrites the package's own `` `prompts/…` `` references to `node_modules/@joshuafolkken/kit/prompts/…`,
+where nothing resolves; and `tsconfig.json` is pointed at a copy of kit inside kit. Reproduced on a
+clean checkout in [#868](https://github.com/joshuafolkken/kit/issues/868): 14 files, `CLAUDE.md`,
+`AGENTS.md`, `GEMINI.md` and both mapped workflows among them.
+
+The project is recognized by the `name` in its `package.json` matching the running package's own
+name, with two fallbacks for when no manifest can be read there: an identical package/project
+directory, and a project root that sits **inside** the package directory (`pnpm josh sync` run from
+`kit/docs`). Only that direction refuses — the reverse is the ordinary consumer layout, where the
+package always lives at `<project>/node_modules/@joshuafolkken/kit`. The name is what carries the
+check: the incident that prompted it ran a **globally installed** copy against the source
+repository, so the two directories were unrelated and only the name matched. A downstream
+distributor syncing its own upstream — app-kit running kit's base sync inside the app-kit repository
+— is an ordinary consumer sync and is not affected.
+
+The detection ships as the `@joshuafolkken/kit/self-sync-guard` export so app-kit and game-kit apply
+the same rule rather than each re-implementing it.
+
 ## What does NOT get synced
 
 - `package.json` — largely init-only to avoid clobbering project version / dependencies. To refresh kit-managed scripts or dev-dependency pins, re-run `josh init`. The one exception: `sync` realigns `devEngines.packageManager.version` with the whole `packageManager` pin, `+sha512…` Corepack integrity suffix included (pnpm compares the two as raw strings, so any drift — including a stripped suffix — reintroduces the pnpm `Cannot use both "packageManager" and "devEngines.packageManager"` warning); scripts, dependencies, and the project version are never touched.
