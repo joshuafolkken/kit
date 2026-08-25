@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+	CHECK_WAIT_INTERVAL_MS,
 	compute_max_attempts,
 	DEFAULT_MAX_ATTEMPTS,
 	DEFAULT_STABLE_READS,
+	DEFAULT_TIMEOUT_SECONDS,
 	evaluate_pr_state,
 	get_configured_max_attempts,
 	parse_pr_state_snapshot,
@@ -265,17 +267,25 @@ describe('wait_for_pr_success — failure and timeout', () => {
 	})
 })
 
+// One attempt more than the budget holds intervals: the loop sleeps between polls and not after the
+// last one, so N attempts wait out N-1 intervals.
 describe('compute_max_attempts', () => {
-	it('returns 18 for 180s timeout and 10s interval', () => {
-		expect(compute_max_attempts(180, 10_000)).toBe(18)
+	it('returns 19 for 180s timeout and 10s interval', () => {
+		expect(compute_max_attempts(180, 10_000)).toBe(19)
 	})
 
 	it('rounds up when timeout does not divide evenly', () => {
-		expect(compute_max_attempts(181, 10_000)).toBe(19)
+		expect(compute_max_attempts(181, 10_000)).toBe(20)
 	})
 
-	it('returns 3 for 30s timeout and 10s interval', () => {
-		expect(compute_max_attempts(30, 10_000)).toBe(3)
+	it('returns 4 for 30s timeout and 10s interval', () => {
+		expect(compute_max_attempts(30, 10_000)).toBe(4)
+	})
+
+	it.each([30, 180, 1920])('waits out the whole %d-second budget', (timeout_seconds) => {
+		const waited_seconds = (compute_max_attempts(timeout_seconds, 10_000) - 1) * 10
+
+		expect(waited_seconds).toBeGreaterThanOrEqual(timeout_seconds)
 	})
 })
 
@@ -330,9 +340,22 @@ describe('get_configured_max_attempts', () => {
 		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
 	})
 
+	// Seven attempts, not six: the loop sleeps between polls and not after the last one, so covering
+	// 60 seconds at a 10-second interval takes six sleeps and the poll that follows them.
 	it('returns computed value when env var is a valid positive number', () => {
 		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '60')
-		expect(get_configured_max_attempts()).toBe(6)
+		expect(get_configured_max_attempts()).toBe(7)
+	})
+
+	// The override has to work in both directions: shortening it is how a fast project opts out of
+	// the long default, and lengthening it is the escape hatch for a suite slower than the budget.
+	it('honours an override longer than the default', () => {
+		const longer_seconds = DEFAULT_TIMEOUT_SECONDS * 2
+
+		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', String(longer_seconds))
+		expect(get_configured_max_attempts()).toBe(
+			compute_max_attempts(longer_seconds, CHECK_WAIT_INTERVAL_MS),
+		)
 	})
 
 	it.each(['0', '-30', 'abc'])('returns DEFAULT_MAX_ATTEMPTS when env var is %s', (raw_timeout) => {

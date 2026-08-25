@@ -5,10 +5,24 @@ import { package_name_schema } from './schemas'
 
 const SECONDS_TO_MS = 1000
 const CHECK_WAIT_INTERVAL_MS = 10_000
-const DEFAULT_TIMEOUT_SECONDS = 180
+// The wait has to outlast what the CI it is watching is allowed to take, or it gives up on a run
+// that is still legitimately progressing — which is what 180 seconds did to every consumer whose
+// suite includes E2E: `followup` became a command that needed `JOSH_CI_TIMEOUT_SECONDS` set by hand
+// on every invocation and, when that was forgotten, exited red beside a CI that was still running.
+// The budget is therefore read off the distributed `templates/workflows/ci.yml` rather than picked
+// as a round number: its longest chain is `e2e` (25 minutes) behind the `playwright-image` job it
+// needs (2), so 27 minutes is the longest run that workflow permits, and five minutes of
+// runner-queue headroom goes on top. A unit test walks the `needs` graph of the distributed
+// workflows and fails if any declared budget outgrows this value; a job that declares no cap is a
+// gap the number cannot promise to cover rather than a reason to inflate it. Waiting longer costs nothing on a fast project: polling returns as
+// soon as the checks settle, and a failed check throws immediately rather than waiting out the
+// budget. See joshuafolkken/kit#851.
+const DEFAULT_TIMEOUT_SECONDS = 1920
 
+// The poll loop sleeps between attempts and not after the last one, so spanning a budget takes one
+// more attempt than the budget holds intervals: without the `+ 1` a 60-second setting waited 50.
 function compute_max_attempts(timeout_seconds: number, interval_ms: number): number {
-	return Math.ceil(timeout_seconds / (interval_ms / SECONDS_TO_MS))
+	return Math.ceil(timeout_seconds / (interval_ms / SECONDS_TO_MS)) + 1
 }
 
 const DEFAULT_MAX_ATTEMPTS = compute_max_attempts(DEFAULT_TIMEOUT_SECONDS, CHECK_WAIT_INTERVAL_MS)
@@ -136,6 +150,8 @@ export {
 	get_configured_max_attempts,
 	DEFAULT_STABLE_READS,
 	DEFAULT_MAX_ATTEMPTS,
+	DEFAULT_TIMEOUT_SECONDS,
+	CHECK_WAIT_INTERVAL_MS,
 }
 export type { PrStateFetcher }
 export { evaluate_pr_state } from './git-pr-checks-eval'

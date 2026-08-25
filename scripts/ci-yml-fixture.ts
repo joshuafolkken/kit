@@ -23,6 +23,7 @@ interface WorkflowJob {
 	env?: Record<string, string>
 	if?: string
 	outputs?: Record<string, string>
+	needs?: string | ReadonlyArray<string>
 	steps?: ReadonlyArray<WorkflowStep>
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key
 	'timeout-minutes'?: number
@@ -103,6 +104,14 @@ function job_timeout_minutes(job: WorkflowJob | undefined): number | undefined {
 	return job?.['timeout-minutes']
 }
 
+// `needs` is a single name or a list; both reach a caller as a list so a guard on the dependency
+// graph never has to branch on which spelling the workflow happens to use.
+function job_needs(job: WorkflowJob | undefined): ReadonlyArray<string> {
+	const declared = job?.needs ?? []
+
+	return typeof declared === 'string' ? [declared] : declared
+}
+
 function step_continue_on_error(step: WorkflowStep | undefined): string | boolean | undefined {
 	return step?.['continue-on-error']
 }
@@ -146,6 +155,7 @@ const ci_yml_fixture = {
 	upload_steps,
 	find_upload,
 	job_timeout_minutes,
+	job_needs,
 	step_continue_on_error,
 	e2e_template_job,
 	e2e_log_directory,
