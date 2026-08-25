@@ -7,13 +7,14 @@ import { doctor_io } from '#scripts/doctor/doctor-io'
 import { resolve_local_bin } from '#scripts/local-bin'
 import { package_version_schema, with_package_manager_schema } from '#scripts/schemas'
 import { security_updates } from '#scripts/security-updates'
+import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sync } from '#scripts/sync/sync'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { execaSync } from 'execa'
 import { init_actions, PRETTIER_CONFIG_JS, type FileAction } from './init-actions'
 import { init_ai_copy } from './init-ai-copy'
 import { init_logic } from './init-logic'
-import { PROJECT_ROOT } from './init-paths'
+import { PACKAGE_DIR, PROJECT_ROOT } from './init-paths'
 
 const PACKAGE_JSON = 'package.json'
 const KIT_PACKAGE_NAME = '@joshuafolkken/kit'
@@ -171,7 +172,13 @@ function report_repository_settings(name_with_owner: string | undefined): void {
 	}
 }
 
+// The same refusal `sync` makes, for a larger blast radius: `init` calls the `sync` writers directly
+// rather than through `sync`'s own `main()`, so the guard there never ran for it — and on top of the
+// 14 files #868 reproduced, `init` also rewrites `package.json` scripts and devDependencies
+// (joshuafolkken/kit#879). Checked before the first write, for the reason the sync guard is.
 function main(): void {
+	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
+
 	console.info('\n🚀 Initializing @joshuafolkken/kit\n')
 	run_config_file_actions()
 
@@ -200,4 +207,6 @@ const init = {
 	install_lefthook,
 }
 
-export { init }
+// `init` is the entry point; `main` is exported for its own unit test, the way `sync.ts` exports the
+// `main()` its self-run guard lives in.
+export { init, main }
