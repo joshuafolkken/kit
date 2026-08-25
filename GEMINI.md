@@ -358,7 +358,7 @@ Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup --merge`, wh
 
 Never send `completion` Telegram notifications manually with `pnpm josh notify --task-type completion ...`. Always use `pnpm josh followup`.
 
-**Always run `pnpm josh followup` in the foreground** (no `&` suffix, no shell backgrounding). It waits for CI and can take several minutes. Background processes started with `&` do not survive when the tool call returns — the command will silently disappear and the PR will remain unmerged.
+**Always run `pnpm josh followup` in the foreground** (no `&` suffix, no shell backgrounding). It waits for CI — 32 minutes by default, about 34 worst case (see `docs/josh-commands.md`) — which can outlast one tool call, so give the call the largest timeout it accepts (in Claude Code, `timeout: 600000`, 10 min). Where the harness detaches an over-running command and reports when it finishes, wait for that report instead of re-running. Where it kills the call at the cap instead, the merge and the completion notification are lost with it: set `JOSH_CI_TIMEOUT_SECONDS` to a budget that fits inside the cap for that run and re-run `followup` once CI has settled. Shell backgrounding never works — a process started with `&` inside a tool call does not survive the call returning, so the command silently disappears and the PR stays unmerged.
 
 - Applies to the initial PR and every follow-up commit — re-run `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` each time.
 - `pnpm josh notify` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications.
