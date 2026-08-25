@@ -506,8 +506,8 @@ This transformation is applied to backtick-quoted paths matching the pattern `` 
 
 ## Refused inside the distribution package's own repository
 
-`josh sync` writes nothing and exits non-zero when the project it is aimed at **is** the package
-that distributes the files:
+`josh sync` and `josh init` both write nothing and exit non-zero when the project they are aimed at
+**is** the package that distributes the files:
 
 ```text
 Refusing to sync: this is @joshuafolkken/kit's own repository.
@@ -532,6 +532,12 @@ check: the incident that prompted it ran a **globally installed** copy against t
 repository, so the two directories were unrelated and only the name matched. A downstream
 distributor syncing its own upstream — app-kit running kit's base sync inside the app-kit repository
 — is an ordinary consumer sync and is not affected.
+
+`josh init` is guarded for the same reason and by the same check
+([#879](https://github.com/joshuafolkken/kit/issues/879)). It calls the sync writers directly rather
+than through `josh sync`, so the guard on the sync entry point never covered it — and its blast
+radius is the larger of the two: on top of the files above it rewrites the project's `package.json`
+scripts and devDependencies. See [init.md](./init.md#refused-inside-the-packages-own-repository).
 
 The detection ships as the `@joshuafolkken/kit/self-sync-guard` export so app-kit and game-kit apply
 the same rule rather than each re-implementing it.

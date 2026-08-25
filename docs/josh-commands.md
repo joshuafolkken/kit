@@ -201,6 +201,8 @@ pnpm josh init
 
 Creates or merges all config files. See [init.md](./init.md) for the full list of files created and merged.
 
+`init` writes nothing and exits non-zero when the project is the distribution package's own repository, for the reason [`josh sync`](#josh-sync) does and through the same check — `init` calls the sync writers directly, and rewrites the project's `package.json` scripts and devDependencies on top of them ([#879](https://github.com/joshuafolkken/kit/issues/879)). See [init.md](./init.md#refused-inside-the-packages-own-repository).
+
 `init` also reports two **repository settings** as its last step, because it writes the two files that depend on them. The **Dependabot security updates** setting backs the npm-disabling `.github/dependabot.yml`, and the **Allow auto-merge** setting backs `.github/workflows/dependabot-auto-merge.yml` — a freshly scaffolded repository has both off by default. Each line is skipped when the project already had its own copy of the corresponding file, since `init` does not overwrite it and kit's change never landed. See [`josh doctor`](#josh-doctor) for the results each report can print and [docs/sync.md](./sync.md) for why the settings matter.
 
 ### `josh sync`

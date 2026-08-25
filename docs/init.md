@@ -6,6 +6,31 @@
 pnpm josh init
 ```
 
+## Refused inside the package's own repository
+
+`josh init` writes nothing and exits non-zero when the project it is aimed at **is**
+`@joshuafolkken/kit` itself — the case a globally installed kit reaches when it is run from inside
+the kit checkout:
+
+```text
+Refusing to sync: this is @joshuafolkken/kit's own repository.
+Syncing here would overwrite the distribution source with its own derived templates.
+Run this command from a consumer project instead.
+```
+
+`init` writes everything `josh sync` does plus the project's `package.json` scripts and
+devDependencies, so the damage there is strictly larger than the 14 files reproduced in
+[#868](https://github.com/joshuafolkken/kit/issues/868). It shares the sync guard's detection rather
+than repeating it ([#879](https://github.com/joshuafolkken/kit/issues/879)); the rule, its fallbacks
+and why a downstream distributor is unaffected are described in
+[sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository).
+
+A project with no `package.json` yet — the scaffolding case `init` exists for — never matches on the
+name, because an unreadable manifest says nothing about who the project is. What still applies there
+are the two location fallbacks: a directory that **is** the package directory, or one nested inside
+it. So an empty directory created under the kit checkout (`kit/tmp/foo`) is refused, and `josh init`
+in an empty directory anywhere else scaffolds exactly as before.
+
 ## Config files
 
 Each file is either created (if missing) or merged (if it already exists). Files without a merge strategy show a sample you can copy manually.
