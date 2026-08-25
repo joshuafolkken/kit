@@ -7,6 +7,16 @@
 			"Bash(rm -rf /*)",
 			"Bash(git push --force*)",
 			"Bash(git push -f*)",
+			"Bash(git add*)",
+			"Bash(git stage*)",
+			"Bash(git rm*)",
+			"Bash(git mv*)",
+			"Bash(git reset*)",
+			"Bash(git restore --staged*)",
+			"Bash(git restore -S*)",
+			"Bash(git commit -a*)",
+			"Bash(git commit --all*)",
+			"Bash(gh pr merge*)",
 			"Bash(sudo *)"
 		]
 	},

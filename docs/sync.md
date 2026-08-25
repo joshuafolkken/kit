@@ -315,6 +315,54 @@ SECURITY.md         tsconfig.sonar.json
 > `templates/workflows/*`; resolving at write time is what keeps that blind spot from reaching
 > consumers. A template ref that lags behind a bump is therefore harmless, and no longer fails the
 > kit's own CI. See joshuafolkken/kit#747.
+>
+> **`.claude/settings.json` denies the commands the prompts forbid most often.** `CLAUDE.md` /
+> `AGENTS.md` / `GEMINI.md` ban autonomous staging and pull request merges nobody asked for in
+> several places each, but prose is only honored while it is being read — so the distributed
+> settings deny them mechanically, alongside the destructive commands that were already there:
+>
+> ```json
+> "Bash(git add*)", "Bash(git stage*)", "Bash(git rm*)", "Bash(git mv*)",
+> "Bash(git reset*)", "Bash(git restore --staged*)", "Bash(git restore -S*)",
+> "Bash(git commit -a*)", "Bash(git commit --all*)", "Bash(gh pr merge*)"
+> ```
+>
+> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup --merge` run git and gh from
+> inside node scripts, so the only command string the Bash matcher ever sees is the `pnpm josh …`
+> wrapper — denying the direct forms leaves the entire commit-and-merge workflow intact. `git rm` is
+> denied whole rather than as `git rm --cached`, which would leave `git rm -r --cached` through; a
+> tracked file is deleted with plain `rm` and staged by `pnpm josh git`, so nothing legitimate needs
+> it. `git restore <path>` is left unblocked so the documented way to undo a deletion stays
+> available to whoever runs it; the two spellings that carry the index, `--staged` and `-S`, are
+> denied. Unblocked is not the same as endorsed — the prose rule still has the agent ask before
+> running that or any other destructive rewrite.
+>
+> **`git commit` is denied by flag, not as a whole.** `git commit -a` stages every tracked file and
+> commits it, which is the fallback a refused `git add` pushes an agent toward, so both spellings of
+> that flag are denied. Plain `git commit -m "…"` is left alone deliberately:
+> `prompts/git-automation.md` — shipped to consumers in the same package — instructs the agent to run
+> exactly that command, and denying it here would break a documented flow from the other half of the
+> distribution. Routing that prompt through `pnpm josh git` is the change that would let the whole
+> subcommand be denied, and it is a larger one than this.
+>
+> **It is a guardrail, not a sandbox.** Each entry is a prefix pattern, so plenty still runs: a
+> global option ahead of the subcommand (`git -C . add .`), a flag pair the prefix does not cover
+> (`git restore --worktree --staged <path>`), the plumbing spellings (`git update-index`,
+> `git apply --cached`), and everything that stages or commits by another route (`git merge`,
+> `git cherry-pick`, `git revert`). `git stash` is the notable one: the documented `fullrun new` /
+> `queue` steps run it and `git stash pop` themselves, and a `pop` without `--index` reapplies
+> everything unstaged, so that flow flattens a staged baseline the deny entries otherwise protect.
+> Closing all of them would mean denying
+> `git` itself, which takes the read-only inspection commands the prompts require with it. The deny
+> stops the habitual form, which is the form an agent reaches for; the prose rule in `CLAUDE.md` /
+> `AGENTS.md` / `GEMINI.md` stays the authority on intent, and a command being refused is not the
+> boundary of what is forbidden.
+>
+> **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
+> turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
+> blocked only for the agent: the user runs `git add` in their own terminal unchanged. A permanent
+> mechanical guarantee is worth more than an exception that costs one command to work around. See
+> joshuafolkken/kit#850.
 
 ### `pnpm-workspace.yaml` (merged)
 

@@ -1,9 +1,9 @@
 {
-	"version": "1.100.0",
+	"version": "1.101.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
-	"packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621",
+	"packageManager": "pnpm@11.23.0+sha512.f00082e5b283a199b74e079da28d155c008fe232f44c8a06ea7ddfa014ecf719fc362f790ecc67b28106ddac2afb24c49a9a079159da560b2ce7d1e98efd11af",
 	"engines": {
 		"node": ">=22.19.0"
 	},
@@ -113,7 +113,7 @@
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.4",
 		"@types/node": "^26.2.0",
 		"@types/semver": "^7.8.0",
-		"cspell": "^10.0.1",
+		"cspell": "^10.1.0",
 		"esbuild": "^0.28.2",
 		"eslint": "^10.9.0",
 		"lefthook": "^2.1.10",
@@ -150,7 +150,7 @@
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621",
+			"version": "11.23.0+sha512.f00082e5b283a199b74e079da28d155c008fe232f44c8a06ea7ddfa014ecf719fc362f790ecc67b28106ddac2afb24c49a9a079159da560b2ce7d1e98efd11af",
 			"onFail": "error"
 		}
 	}
