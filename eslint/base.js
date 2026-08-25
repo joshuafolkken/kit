@@ -109,6 +109,12 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 				'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
 				// vi mock/stub patterns require explicit undefined (mockResolvedValue/stubGlobal)
 				'unicorn/no-useless-undefined': 'off',
+				// describe-scoped `let` assigned in beforeEach is the standard vitest fixture shape;
+				// the declaration cannot be initialized where it is declared.
+				'init-declarations': 'off',
+				// `expect(x).toBe(0.05)` compares deterministic config constants, not computed
+				// floats; working around the rule only weakens the assertion.
+				'sonarjs/no-floating-point-equality': 'off',
 			},
 		},
 		{
