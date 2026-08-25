@@ -9,6 +9,7 @@ import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { security_updates } from '#scripts/security-updates'
+import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { sync_configs } from './sync-configs'
@@ -283,7 +284,19 @@ function sync_project_artifacts(is_force: boolean): void {
 	report_repository_settings(name_with_owner)
 }
 
+// Checked before anything is written, never per file: the damage is the whole run, and a partial
+// sync that stopped halfway would leave the source repository in a state neither `git checkout` nor
+// a re-run describes (joshuafolkken/kit#868).
 function main(): void {
+	const refusal = self_sync_guard.self_sync_refusal(PACKAGE_DIR, PROJECT_ROOT)
+
+	if (refusal !== undefined) {
+		console.error(`\n${refusal}\n`)
+		process.exitCode = 1
+
+		return
+	}
+
 	const is_force = process.argv.includes('--force')
 
 	console.info('\n🔄 Syncing @joshuafolkken/kit AI files\n')
@@ -305,6 +318,6 @@ const sync = {
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 
-// `sync` is the entry point; `sync_directory` is exported for its own unit test, the way
-// `git-pr-checks.ts` exports the helpers beside its namespace.
-export { sync, sync_directory }
+// `sync` is the entry point; `sync_directory` and `main` are exported for their own unit tests, the
+// way `git-pr-checks.ts` exports the helpers beside its namespace.
+export { main, sync, sync_directory }

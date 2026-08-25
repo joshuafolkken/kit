@@ -213,6 +213,8 @@ pnpm josh sync
 
 Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, GitHub workflow templates, and other managed files. See [sync.md](./sync.md) for the full list. `sync` also realigns `devEngines.packageManager.version` in `package.json` with the `packageManager` pin so the two never drift apart (a mismatch reintroduces the pnpm `Cannot use both "packageManager" and "devEngines.packageManager"` warning).
 
+`sync` writes nothing and exits non-zero when the project is the distribution package's own repository — inside kit, the copies run backwards and overwrite the source with its own derived templates ([#868](https://github.com/joshuafolkken/kit/issues/868)). See [sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository).
+
 > To make `josh` available system-wide, install the kit globally (`pnpm add -g @joshuafolkken/kit`) instead of running an install subcommand. See [cli.md](./cli.md) for details.
 
 ---
