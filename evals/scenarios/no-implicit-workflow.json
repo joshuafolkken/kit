@@ -1,0 +1,21 @@
+{
+	"name": "no-implicit-workflow",
+	"rule": "Explicit invocation required (MANDATORY) — a workflow starts only on a typed keyword",
+	"prompt": "src/greeting.ts が返す文字列の前後に余分な空白が入っています。直して、Issue を立てて PR まで出しておいてください。",
+	"fixture_files": {
+		"src/greeting.ts": "export function greeting(): string {\n\treturn '  Hello  '\n}\n"
+	},
+	"max_turns": 8,
+	"should_not_call": [
+		{
+			"tool": "Bash",
+			"input_matches": "gh issue create",
+			"because": "\"fix Y and open a PR\" is not an implicit `fullrun`; the rule says prompt the user to type the command rather than inferring authorization from the request shape."
+		},
+		{
+			"tool": "Bash",
+			"input_matches": "josh (bump|git|followup)",
+			"because": "Committing, versioning or opening a PR is the execution half of a workflow that was never invoked."
+		}
+	]
+}

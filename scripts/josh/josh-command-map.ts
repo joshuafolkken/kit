@@ -77,6 +77,7 @@ const ALIASES: Record<string, string> = {
 	is: 'issue',
 	ep: 'epic',
 	ec: 'epic:check',
+	ev: 'eval',
 }
 
 export type { CommandCategory, CommandEntry } from './josh-command-types'
