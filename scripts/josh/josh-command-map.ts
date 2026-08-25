@@ -34,6 +34,7 @@ const ALIASES: Record<string, string> = {
 	f: 'format',
 	fp: 'format:prettier',
 	fe: 'format:eslint',
+	fd: 'format:edited',
 	sp: 'cspell',
 	sd: 'cspell:dot',
 	t: 'test',
