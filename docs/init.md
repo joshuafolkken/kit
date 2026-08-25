@@ -147,6 +147,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 .github/release.yml
 .github/dependabot.yml
 .claude/settings.json
+.claude/skills/verify-ui/   (directory)
 sonar-project.properties  (generated from GitHub repo name)
 ```
 

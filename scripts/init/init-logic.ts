@@ -97,7 +97,13 @@ const AI_COPY_FILE_MAPPINGS: ReadonlyArray<FileCopyMapping> = [
 	},
 ]
 
-const AI_COPY_DIRECTORIES: ReadonlyArray<string> = []
+// Copied whole rather than file by file: a skill is a directory by definition, and one that grows a
+// supporting file would otherwise ship without it. The copy is a byte copy — `cpSync` reaches none
+// of `transform_copied_content`, so nothing listed here may depend on it: no `.github/workflows`
+// path, because a workflow would arrive unpinned and unstamped (a unit test holds that line), and no
+// file citing a `prompts/…` path, because the rewrite that points those at the installed package
+// never runs on this path.
+const AI_COPY_DIRECTORIES: ReadonlyArray<string> = ['.claude/skills/verify-ui']
 
 const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
 

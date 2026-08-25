@@ -1,5 +1,10 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import {
+	classify_path,
+	copy_directory_failure,
+	directory_copy_blocker,
+} from '#scripts/directory-copy-guard'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { managed_marker_logic } from '#scripts/managed-marker/managed-marker-logic'
 import { is_workflow_destination } from '#scripts/workflow-destination'
@@ -102,19 +107,75 @@ function did_skip_ai_file_mapping(source: string, destination: string): boolean 
 	)
 }
 
-function did_skip_ai_directory_copy(directory_name: string): boolean {
-	const destination_path = path.join(PROJECT_ROOT, directory_name)
+interface DirectorySkip {
+	reason: string
+	is_blocked: boolean
+}
 
-	if (existsSync(destination_path)) {
-		console.info(`  ⏭ skipped   ${directory_name}/ (already exists — run josh sync to update)`)
+// Two different skips, and telling them apart is what keeps the advice honest. A destination that is
+// already a directory is `josh init` declining to overwrite, and `josh sync` is the answer. Anything
+// the shared guard blocks — a source the package does not carry, a destination that is a file or a
+// symlink — is a condition `josh sync` refuses in exactly the same way, so it is reported as a
+// warning and not with a hint that would send the user around the same loop. The blocker runs first
+// for that reason: it is the more specific reading of the same destination.
+function directory_copy_skip(
+	source_path: string,
+	destination_path: string,
+): DirectorySkip | undefined {
+	const blocker = directory_copy_blocker(source_path, destination_path)
 
-		return true
+	if (blocker !== undefined) return { reason: blocker, is_blocked: true }
+
+	if (classify_path(destination_path) !== 'absent') {
+		return { reason: 'already exists — run josh sync to update', is_blocked: false }
 	}
 
-	cpSync(package_path(directory_name), destination_path, { recursive: true })
+	return undefined
+}
+
+function report_directory_skip(directory_name: string, skip: DirectorySkip): void {
+	const line = `${directory_name}/ (${skip.reason})`
+
+	if (skip.is_blocked) console.warn(`  ⚠ skipped   ${line}`)
+	else console.info(`  ⏭ skipped   ${line}`)
+}
+
+// The boolean answers "would `josh sync` overwrite this?", which is what the hint at the end of the
+// run offers — not "did anything happen?". A blocked copy, and one whose walk failed part way, are
+// both refused by `sync` for the same reason they were refused here, so raising the hint on either
+// would send the user around the loop rather than at the cause.
+function did_copy_directory(directory_name: string): boolean {
+	const failure = copy_directory_failure(
+		package_path(directory_name),
+		path.join(PROJECT_ROOT, directory_name),
+	)
+
+	if (failure !== undefined) {
+		console.warn(`  ⚠ skipped   ${directory_name}/ (${failure})`)
+
+		return false
+	}
+
 	console.info(`  ✔ created   ${directory_name}/`)
 
-	return false
+	return true
+}
+
+function did_skip_ai_directory_copy(directory_name: string): boolean {
+	const skip = directory_copy_skip(
+		package_path(directory_name),
+		path.join(PROJECT_ROOT, directory_name),
+	)
+
+	if (skip === undefined) {
+		did_copy_directory(directory_name)
+
+		return false
+	}
+
+	report_directory_skip(directory_name, skip)
+
+	return !skip.is_blocked
 }
 
 // Returns the repository name resolved for the Sonar config, so `josh init` can reuse it for the
