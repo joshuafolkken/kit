@@ -35,6 +35,18 @@
 					}
 				]
 			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "pnpm josh format:edited",
+						"timeout": 90
+					}
+				]
+			}
 		]
 	}
 }
