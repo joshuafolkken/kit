@@ -1,0 +1,16 @@
+{
+	"name": "workflow-skill-loaded",
+	"rule": "Shorthand Commands — read the workflow-commands skill before running any part of a command",
+	"prompt": "kickoff #42",
+	"fixture_files": {
+		"src/greeting.ts": "export function greeting(): string {\n\treturn 'Hello'\n}\n"
+	},
+	"max_turns": 6,
+	"should_call": [
+		{
+			"tool": "Skill",
+			"input_matches": "workflow-commands",
+			"because": "kit#854 moved the procedures out of the always-loaded documents, so a run that never opens the skill is a run with no procedure — this scenario is the routing itself, and the risk that split introduced."
+		}
+	]
+}
