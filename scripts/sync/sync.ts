@@ -9,7 +9,7 @@ import { transform_copied_content } from '#scripts/init/init-copy-content'
 import { init_logic } from '#scripts/init/init-logic'
 import { PACKAGE_DIR, PROJECT_ROOT } from '#scripts/init/init-paths'
 import { security_updates } from '#scripts/security-updates'
-import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
+import { did_refuse_self_run } from '#scripts/self-sync-guard/self-sync-refusal'
 import { sonar_file } from '#scripts/sonar-file'
 import { package_manager_version } from '#scripts/version/package-manager-version'
 import { sync_configs } from './sync-configs'
@@ -288,14 +288,7 @@ function sync_project_artifacts(is_force: boolean): void {
 // sync that stopped halfway would leave the source repository in a state neither `git checkout` nor
 // a re-run describes (joshuafolkken/kit#868).
 function main(): void {
-	const refusal = self_sync_guard.self_sync_refusal(PACKAGE_DIR, PROJECT_ROOT)
-
-	if (refusal !== undefined) {
-		console.error(`\n${refusal}\n`)
-		process.exitCode = 1
-
-		return
-	}
+	if (did_refuse_self_run(PACKAGE_DIR, PROJECT_ROOT)) return
 
 	const is_force = process.argv.includes('--force')
 
