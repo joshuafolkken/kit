@@ -1,6 +1,6 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun` and `queue` — planning, implementation, the verification gate, the `/review` → `followup --merge` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun` and `queue` — planning, implementation, the verification gate, the `/code-review` → `followup --merge` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
@@ -44,8 +44,9 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 ## 2. What every one of them shares
 
 - **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh lint`
-  → `pnpm exec tsc --noEmit` → `pnpm josh cspell:dot` → `pnpm josh test:unit` → the `/review` skill
-  on `git diff main`, iterating until no high/medium findings remain. `kickoff` is the exception —
+  → `pnpm exec tsc --noEmit` → `pnpm josh cspell:dot` → `pnpm josh test:unit` → `/code-review medium`
+  on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**
+  (`prompts/review.md` → "Review round cap"). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
