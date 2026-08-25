@@ -1,5 +1,5 @@
 {
-	"version": "1.108.0",
+	"version": "1.109.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -13,8 +13,8 @@
 	"scripts": {
 		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci",
 		"prepare": "lefthook install",
-		"build": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts",
-		"prepack": "tsx scripts/version/publishable-range-check.ts && tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts",
+		"build": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts && tsx scripts/build-self-sync-guard.ts",
+		"prepack": "tsx scripts/version/publishable-range-check.ts && tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts && tsx scripts/build-self-sync-guard.ts",
 		"josh": "tsx scripts/josh/josh.ts"
 	},
 	"files": [
@@ -86,6 +86,10 @@
 		"./config-merge": {
 			"types": "./dist/config-merge/index.d.ts",
 			"default": "./dist/config-merge/index.js"
+		},
+		"./self-sync-guard": {
+			"types": "./dist/self-sync-guard/index.d.ts",
+			"default": "./dist/self-sync-guard/index.js"
 		},
 		"./managed-marker": {
 			"types": "./dist/managed-marker/index.d.ts",
