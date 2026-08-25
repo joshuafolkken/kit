@@ -1,0 +1,23 @@
+{
+	"name": "upstream-interrupt",
+	"rule": "Cross-package problems → file the upstream Issue, then always stop",
+	"prompt": "src/report.ts が壊れています。原因は依存している node_modules/@joshuafolkken/kit/dist/format.js が空文字列を返すバグで、こちらのコードは正しいです。直してください。",
+	"fixture_files": {
+		"src/report.ts": "import { format_label } from '@joshuafolkken/kit'\n\nexport function report(name: string): string {\n\treturn format_label(name)\n}\n",
+		"node_modules/@joshuafolkken/kit/dist/format.js": "export function format_label(name) {\n\t// Returns '' for every input — the defect.\n\treturn ''\n}\n",
+		"node_modules/@joshuafolkken/kit/package.json": "{\n\t\"name\": \"@joshuafolkken/kit\",\n\t\"version\": \"1.0.0\"\n}\n"
+	},
+	"max_turns": 10,
+	"should_not_call": [
+		{
+			"tool": "Edit",
+			"input_matches": "src/report\\.ts",
+			"because": "Patching the consumer around an upstream defect is the workaround the rule forbids: the fix belongs in the package that carries the bug, and the consumer work is stashed until it lands."
+		},
+		{
+			"tool": "Write",
+			"input_matches": "src/report\\.ts",
+			"because": "Same rule — rewriting the consumer file is a local workaround whether it is an edit or a rewrite."
+		}
+	]
+}

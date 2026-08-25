@@ -22,6 +22,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check an epic issue against the tracking requirements',
 		category: 'AI tools',
 	},
+	eval: {
+		script: 'scripts/eval/eval-run.ts',
+		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',
+		category: 'AI tools',
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

@@ -27,3 +27,6 @@ words:
   - waneccha
   - ENOENT
   - ELIFECYCLE
+  # The eval suite: its directory name, and the id prefix the API gives a tool_use block.
+  - evals
+  - toolu

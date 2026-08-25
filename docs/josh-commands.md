@@ -690,3 +690,23 @@ Exits `0` when every requirement is satisfied and `1` otherwise, so it works as 
 
 ❌ Epic #700 does not satisfy every requirement.
 ```
+
+### `josh eval`
+
+Run the agent rule-compliance scenarios and report how many held.
+
+```bash
+pnpm josh eval                       # every scenario
+pnpm josh eval consult-not-execute   # one scenario by name
+JOSH_EVAL_MODEL=opus pnpm josh eval  # a different model (default: sonnet)
+```
+
+Each scenario replays a representative situation against a real Claude session in a throwaway
+sandbox carrying the documents and skills kit distributes, then judges it on the tool calls the run
+made — never on what it said. That is what makes it usable for deciding whether a document change
+worked: the `n/m` line is a number you can compare before and after an edit, where prose could only
+be argued about.
+
+Exits `0` only when every scenario held. It needs the `claude` CLI on `PATH` and is deliberately not
+part of CI — every scenario costs tokens and minutes, so it is run when a distributed document,
+skill or hook changes. See [docs/eval.md](./eval.md) for the scenario format and how to add one.
