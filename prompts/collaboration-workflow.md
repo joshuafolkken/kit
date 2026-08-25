@@ -732,6 +732,7 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
 - `fullrun` の auto-merge は上記のとおり `fullrun` の指示自体に含まれるため許可される。それ以外の状況で勝手にマージしてはならない
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
 - 「チェックが全部 green だから次のステップに進む」は承認ではない
+- **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `deny`（`Bash(gh pr merge*)`）で機械的に遮断されている。** `fullrun` の auto-merge は `pnpm josh followup --merge` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけで、承認済みのマージ経路だけが通る
 - **共有状態に影響する操作（このセクションの対象＝Tier C）は迷ったら確認する。** 確認のコストは低いが、意図しない操作の巻き戻しは高コスト
 - ただしこの「迷ったら確認」は Tier C に限る。**可逆な実装・設計判断（Tier A）は別ルール**（CLAUDE.md「Decision autonomy」の3層ポリシー）に従い、明確に優位な選択肢は確認せず自動で選んで記録する — 本当に甲乙つけがたい（Tier B）ときだけ確認する。下記「意思決定の自律ポリシー」を参照
 
@@ -751,6 +752,8 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
 - 上記以外で staging が必要だと考えたときは、**実行せずに先に確認する**
 - 同じ理由で、`git reset` / `git checkout -- <path>` / `git restore <path>` など index や作業ツリーを破壊的に書き換える操作も、自分の判断で実行しない
 - **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`queue` の手順 1、および「別パッケージ起因の問題は割り込み Issue で対応する」。いずれも直後に `git stash pop` で復元することが手順に含まれている。これら以外の場面で退避したくなったときは、実行せずに先に確認する
+- **この禁止は kit 配布の `.claude/settings.json` の `deny`（`Bash(git add*)` / `Bash(git stage*)` / `Bash(git rm*)` / `Bash(git mv*)` / `Bash(git reset*)` / `Bash(git restore --staged*)` / `Bash(git restore -S*)` / `Bash(git commit -a*)` / `Bash(git commit --all*)`）で機械的にも遮断されている。** `pnpm josh git` は node スクリプト内部から git を起動するため影響を受けず、承認済みのコミットフロー（上記ケース 2）は従来どおり動く。**deny には「そのターンでユーザーが明示指示した」という例外がないため、上記ケース 1 も AI 側では実行できない** — その場合はユーザー自身の端末で実行してもらう（ユーザーの手元では従来どおり動く）。恒久的な機械的保証のほうが、コマンド 1 本で回避できる例外より価値が高いという判断（joshuafolkken/kit#850）
+- **「拒否される操作」と「禁止された操作」は同じ集合ではない。** deny に載っているのは上記の直接実行だけで、このセクションが同じく禁じている `git checkout -- <path>` / `git restore <path>` は実行できてしまう。**ツールが通したことを許可と読み替えてはならない** — 何をしてよいかを決めるのは deny ではなくこのルールである
 - このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Git Rules」→「Never stage or mutate the git index on your own」）のカノニカル参照
 
 ### 意思決定の自律ポリシー（確認停止を減らす）
