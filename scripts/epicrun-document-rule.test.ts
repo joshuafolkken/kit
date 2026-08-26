@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_unwrapped, WORKFLOW_PROMPT } from './ai-document-fixture'
 import { NEEDS_DECISION_LABEL } from './git/issue-labels'
 
 // joshuafolkken/kit#861: `epicrun` is the keyword that lets a run finish without a person watching
@@ -11,19 +11,15 @@ import { NEEDS_DECISION_LABEL } from './git/issue-labels'
 const SKILL = '.claude/skills/workflow-commands/epicrun.md'
 const QUEUE_SKILL = '.claude/skills/workflow-commands/queue.md'
 
-// Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
-// a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
-// column they landed in.
-function read_unwrapped(relative_path: string): string {
-	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
-}
-
 // What each AI document has to say for itself. The rule surface concatenates every distributed
 // skill, so a marker checked there passes on the skill's copy alone — which would not detect the
 // paragraph being dropped from one document. These are read from the document itself.
+//
+// joshuafolkken/kit#951 moved the procedure into the skill: parking binds only once `epicrun` is
+// running, so it fails the residency test and the documents carry the routing instead. The rule
+// itself is asserted against the skill in `SKILL_MARKERS` below.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
-	'`epicrun` parks instead of stopping',
-	'never by which labels are present',
+	'**`epicrun` parks a child instead of stopping the session**',
 	'epicrun.md',
 ]
 
@@ -55,10 +51,14 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'Stopping conditions',
 	// The per-repo scoping is the entire reason no locking is implemented.
 	'has to introduce real mutual exclusion',
+	// Reading the labels instead stops in the one moment the run must wait, so the classification
+	// rule travels with the parking procedure rather than staying behind in the documents.
+	"Waiting is decided by `epic:next`'s classification, never by reading labels",
+	'a label-based reading calls that "done" and stops, in the one moment it must wait',
 ]
 
 describe('epicrun definition', () => {
-	it.each(AI_DOCS)('defines the keyword in %s itself, not only in the skill', (document_name) => {
+	it.each(AI_DOCS)('is routed to from %s, by name and by file', (document_name) => {
 		const content = read_unwrapped(document_name)
 
 		for (const marker of AI_DOC_MARKERS) expect(content).toContain(marker)

@@ -23,7 +23,7 @@
 
 ### 手順の置き場所（常時ロードとオンデマンドの分離）
 
-`kickoff` / `fullrun` / `halfrun` / `queue` の**操作手順**は、常時ロードされる `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` からは外され、`.claude/skills/workflow-commands/` に置かれている（joshuafolkken/kit#854）。3 文書に残るのはキーワードとスキルへの導線、およびスキルが読み込まれていない状態でも効く必要のある禁止規範（明示起動の必須ルール）だけである。依存更新後の overrides / `devEngines` 検証手順も同様に `.claude/skills/dependency-update/` へ移した。
+`kickoff` / `fullrun` / `halfrun` / `queue` / `epicrun` の**操作手順**は、常時ロードされる `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` からは外され、`.claude/skills/workflow-commands/` に置かれている（joshuafolkken/kit#854）。3 文書に残るのはキーワードとスキルへの導線、およびスキルが読み込まれていない状態でも効く必要のある規則だけである。依存更新後の overrides / `devEngines` 検証手順も同様に `.claude/skills/dependency-update/` へ移した。**どの規則が「残す」側かは →「常駐ドキュメントと skill の分担（何を常駐に残すか）」が判定基準と全 4 件を定義する。**
 
 このドキュメントは引き続き**正典の詳細版**であり、スキルは操作手順である。両者は一致していなければならないので、片方だけを更新してはならない。
 
@@ -1135,6 +1135,32 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 4. 既に MEMORY にあるルールが実は共有すべきものだと分かったときは、プロンプト／ドキュメントへ移し、MEMORY 側の重複エントリは削除する
 
 - このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Durable rules belong in prompts/docs, not local MEMORY」）のカノニカル参照
+
+## 常駐ドキュメントと skill の分担（何を常駐に残すか）
+
+`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` は毎ターン全文が読み込まれる。したがって常駐に書ける量は有限で、`scripts/workflow-skills.test.ts` の `RESIDENT_CEILING_BYTES` がその上限を固定している。**どの規則を常駐に残すかは、書き手の重要度判断ではなく次の 1 問で決める。**
+
+> **その規則は、skill がロードされていないターンでも効く必要があるか。**
+
+答えが yes の規則だけが常駐に残り、それ以外は skill へ置いて常駐からは導線だけを張る。判定の入力は「その規則が最初に効き始めるのはコマンド開始の前か後か」の 1 点だけであり、規則の重要さは入力に含まれない。
+
+yes になる規則は次で全部であり、`scripts/workflow-skills.test.ts` が 3 文書すべてに残っていることを表明している。**この一覧は網羅的である** — ここに載らずに常駐へ入った規則は、判定基準に照らされていない。
+
+- **明示起動の必須**（「指示されていない行動は取らない」）— そもそもワークフローを開始してよいかを決める規則なので、ユーザーがキーワードを打った瞬間、つまり skill を読むより前に効く必要がある
+- **停止時の `confirmation` 通知** — これを要する停止の大半（別パッケージ起因の割り込み、Tier C の確認）は、ワークフローのキーワードが一度も打たれていないターンで起きる
+- **`overrides` の保護**と **`devEngines` の保護** — 依存更新コマンドはどのターンでも走りうる。`dependency-update` skill をロードしないターンでも走り、skill を読む頃には pin は既に書き換わっている
+- **`josh epic:*` のうちコマンドの外側で効く 3 件** — 決定の記録による `needs-decision` の解除、`epic:audit` の指摘を直すのが Tier A であること、別リポジトリの EPIC を `owner/repo#N` で参照すること。いずれも `epic:*` コマンドを走らせていないターン（Issue を起票した直後、決定を書いた瞬間）に効く
+
+no になり skill 側に本体を置くものの例:
+
+- 分割判定（`.claude/skills/workflow-commands/split-assessment.md`）
+- 実行中に前提 Issue が判明した場合の入口別手順（`fullrun.md` / `halfrun.md` / `epicrun.md`）
+- `epicrun` の単独 Issue 受理と park-and-continue（`epicrun.md`）
+- 検証ゲートとマージ連鎖（`chain-rule.md` / `followup.md`）
+
+**この基準は努力目標ではない。** 常駐に手順を書き戻すと、その分の予算を次に本当に常駐が要る規則が既存の文章から取り返すことになる。上限に張り付いた状態で 1 文を足すために別の文を削ると、**削る対象はマーカーで固定されていなかった箇所から選ばれる** — 規則の重要度ではなく、テストに拾われていなかったかどうかで残る文が決まる（joshuafolkken/kit#951）。上限そのものを引き上げる対処は、上限が防いでいる状態の追認にあたるので採らない。
+
+- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Shorthand Commands」）および `.claude/skills/workflow-commands/SKILL.md`「What stays resident, and what is read from here」のカノニカル参照
 
 ## 運用ルール
 

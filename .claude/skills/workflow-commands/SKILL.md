@@ -57,6 +57,15 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   definition in `split-assessment.md`. Two or more separately-mergeable deliverables always means an
   epic — no count threshold, no ordering condition — and a `fullrun` / `halfrun` that finds one files
   the epic and **stops** rather than widening its own authorization to a batch.
+- **A prerequisite discovered mid-run is a dependency, not a park.** Finding that something else in
+  *this* repository has to land first is a third situation, distinct from an upstream defect (file
+  and stop) and from a split (file the epic and stop): the Issue in hand is still one deliverable, it
+  just needs another one before it. Inside an `epicrun` it is filed without confirmation, recorded as
+  a dependency, and the run **continues rather than parking it** (`epicrun.md` → "A prerequisite
+  discovered mid-run"); inside a `fullrun` or `halfrun` the same filing happens without asking and
+  the command then **stops**, leaving the person one command to type (`fullrun.md` / `halfrun.md`).
+  **Automatic filing is capped at 10 Issues per run** at every entry point. `kickoff` is exempt — it
+  never implements, so it never discovers one.
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
   the Issue instead.
@@ -67,3 +76,39 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   `GEMINI.md` under "Mid-workflow stop notification", because most pauses that need it happen on
   turns where no workflow keyword was typed and this skill was never loaded. `halfrun.md` carries
   the one form specific to a command: the resume-command body of its stop before commit.
+
+## 3. What stays resident, and what is read from here
+
+**A rule stays in the AI documents if and only if it has to fire on a turn where no skill was
+loaded.** That is the whole test, and it has exactly one input: when does the rule first bind — before
+a command has started, or after. Everything a run reaches only *after* it has read this skill is
+routed to from the documents, never restated there.
+
+Every rule that passes the test is resident in full, and `scripts/workflow-skills.test.ts` asserts
+each one present in all three documents. The list is exhaustive — a rule added to the documents
+without appearing here has not been checked against the criterion:
+
+- **Explicit invocation required** — it decides whether a workflow starts at all, so it binds on the
+  turn the user types the keyword, which is before anything here has been read.
+- **The mid-workflow stop notification** — most pauses that need it (an upstream-Issue interrupt, a
+  Tier C confirmation) happen on turns carrying no workflow keyword at all.
+- **The `overrides` prohibition** and **the `devEngines` prohibition** — a dependency command can be
+  run on any turn, including one that never loads `dependency-update`, and by the time the skill
+  would be read the pin has already been rewritten.
+- **The three `josh epic:*` rules that bind outside those commands** — recording a decision removes
+  that child's `needs-decision` label, fixing what `epic:audit` finds is Tier A, and an epic in
+  another repository is referenced as `owner/repo#N`. Each fires on a turn where no `epic:*` command
+  was run: the moment an issue is filed, or a decision written. The commands' own procedures are in
+  `.claude/skills/epic-commands/`, which is where everything else about them lives.
+
+These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
+prerequisite discovered mid-run (`fullrun.md` / `halfrun.md` / `epicrun.md`), `epicrun`'s acceptance
+of an Issue that is not an epic and its park-and-continue behavior (`epicrun.md`), the whole
+verification gate and merge chain (`chain-rule.md` / `followup.md`), and the post-update verification
+procedure (`.claude/skills/dependency-update/`) that the two prohibitions above route to.
+
+**The criterion is not advisory.** `scripts/workflow-skills.test.ts` caps each document at
+`RESIDENT_CEILING_BYTES` and requires headroom under it, so a procedure restated resident costs
+budget that the next genuinely-resident rule then has to take back out of existing prose. When a
+rule is edited by deleting a neighboring sentence to keep a byte count, the deletion is chosen by
+what was not pinned by a marker rather than by what matters (joshuafolkken/kit#951).

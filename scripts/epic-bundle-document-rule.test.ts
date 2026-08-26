@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	read_repo_file,
+	read_rule_surface,
+	read_unwrapped,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 
 // joshuafolkken/kit#873: the value of this rule is entirely in its limits. Without the
 // strong-signal threshold it bundles unrelated issues; without the "already in an epic" branch it
 // creates a second epic for an issue that has one; without the Tier B stop it merges epics on its
 // own. A document that keeps the rule and loses any of the three is worse than not having it.
-
-function read_unwrapped(relative_path: string): string {
-	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
-}
 
 // The procedure moved into the `epic-commands` skill, so these are checked across the rule surface.
 const SURFACE_MARKERS: ReadonlyArray<string> = [
