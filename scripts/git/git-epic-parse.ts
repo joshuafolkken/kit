@@ -1,7 +1,13 @@
 // An epic Issue tracks its children as a markdown task list (`- [ ] #101`). Only that syntax
 // counts as tracked: GitHub auto-checks such an entry when the referenced Issue closes, whereas a
 // bare `#101` reference produces a cross-link with no progress tracking.
-const TASK_LIST_ISSUE_PATTERN = /^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+#(\d+)\b/gmu
+//
+// The source is shared by the whole-body scan and the single-line test rather than written twice: a
+// rewriter has to recognize exactly the rows the reader counts, and two copies of this pattern would
+// be two chances to disagree about what a tracked row is (joshuafolkken/kit#890).
+const TASK_LIST_ISSUE_SOURCE = String.raw`^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+#(\d+)\b`
+const TASK_LIST_ISSUE_PATTERN = new RegExp(TASK_LIST_ISSUE_SOURCE, 'gmu')
+const TASK_LIST_LINE_PATTERN = new RegExp(TASK_LIST_ISSUE_SOURCE, 'u')
 
 // A task list may also reference an Issue in another repository (`owner/repo#101`, or a full URL).
 // Detecting one is what the auto-close used to bail on; joshuafolkken/kit#864 reads them instead,
@@ -46,22 +52,35 @@ const UNORDERED_DEPENDENCIES = 'None — the children are independent; any execu
 
 const CLOSED_STATE = 'CLOSED'
 
+// Which lines a body predicate is allowed to read: `false` for a fence line and for everything
+// between a pair of them. Returned as a mask rather than a filtered string because a rewriter has to
+// put lines back where it found them, and it must skip exactly the lines the readers skip — two
+// separate fence walks would be two chances to disagree (joshuafolkken/kit#890).
+//
 // Toggling on each fence line keeps this linear — a single regex spanning the block would backtrack.
 // An unterminated fence swallows the rest of the body, which fails safe: fewer children means the
 // epic is simply never matched, and it stays open for manual closing.
-function strip_fenced_blocks(body: string): string {
-	const kept: Array<string> = []
+function fence_mask(body: string): Array<boolean> {
 	let is_inside_fence = false
 
-	for (const line of body.split('\n')) {
+	return body.split('\n').map((line) => {
 		if (FENCE_LINE_PATTERN.test(line)) {
 			is_inside_fence = !is_inside_fence
-		} else if (!is_inside_fence) {
-			kept.push(line)
-		}
-	}
 
-	return kept.join('\n')
+			return false
+		}
+
+		return !is_inside_fence
+	})
+}
+
+function strip_fenced_blocks(body: string): string {
+	const mask = fence_mask(body)
+
+	return body
+		.split('\n')
+		.filter((_, index) => mask[index] === true)
+		.join('\n')
 }
 
 function to_issue_number(match: RegExpMatchArray): number | undefined {
@@ -144,6 +163,12 @@ function parse_external_task_list_children(body: string | undefined): Array<Exte
 	})
 }
 
+// Whether one line is a tracked child row. Used by the rewriter to find where the rows end, so a
+// new row lands beside the existing ones rather than at the bottom of the body.
+function is_task_list_line(line: string): boolean {
+	return TASK_LIST_LINE_PATTERN.test(line)
+}
+
 function has_declared_dependency_chain(body: string | undefined): boolean {
 	return has_pattern_match(DEPENDENCY_CHAIN_PATTERN, body)
 }
@@ -179,16 +204,27 @@ function chain_links(references: ReadonlyArray<number>): Array<DependencyLink> {
 		.filter((link) => link.blocker !== link.blocked)
 }
 
-// Every link the body declares, in the order written. Fenced blocks are stripped first for the
-// reason they are everywhere else: a quoted template's sample chain is an illustration.
-function parse_dependency_links(body: string | undefined): Array<DependencyLink> {
+// Every declared chain, one entry per chain line, each holding its references in the order written.
+// Read at this granularity rather than as a flat link list because an insertion has to know *which*
+// chain a target sits in: two disjoint chains and one branching chain produce the same links, and
+// only the line structure tells them apart (joshuafolkken/kit#890).
+//
+// Fenced blocks are stripped first for the reason they are everywhere else: a quoted template's
+// sample chain is an illustration.
+function parse_dependency_chains(body: string | undefined): Array<Array<number>> {
 	if (body === undefined) return []
 
 	return strip_fenced_blocks(body)
 		.split('\n')
 		.map((line) => line.trim())
 		.filter((line) => DECLARED_CHAIN_LINE.test(line))
-		.flatMap((line) => chain_links(chain_references(line)))
+		.map((line) => chain_references(line))
+}
+
+// Every link the body declares, in the order written. Flattened from the chains above rather than
+// re-scanning the body, so "what a chain line is" has one definition.
+function parse_dependency_links(body: string | undefined): Array<DependencyLink> {
+	return parse_dependency_chains(body).flatMap((references) => chain_links(references))
 }
 
 function has_child(children: ReadonlyArray<number>, issue_number: number): boolean {
@@ -203,6 +239,10 @@ function is_state_closed(state: string | undefined): boolean {
 }
 
 const git_epic_parse = {
+	fence_mask,
+	is_task_list_line,
+	chain_links,
+	parse_dependency_chains,
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
@@ -216,6 +256,10 @@ const git_epic_parse = {
 export type { DependencyLink, ExternalChild }
 export {
 	git_epic_parse,
+	fence_mask,
+	is_task_list_line,
+	chain_links,
+	parse_dependency_chains,
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
@@ -225,4 +269,5 @@ export {
 	has_child,
 	is_state_closed,
 	UNORDERED_DEPENDENCIES,
+	DECLARED_CHAIN_LINE,
 }

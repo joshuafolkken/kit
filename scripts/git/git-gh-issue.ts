@@ -239,6 +239,25 @@ async function issue_add_blocked_by(issue_number: string, blocker: string): Prom
 	}
 }
 
+// The counterpart to the above, for an insertion that re-points an existing chain: inserting `#N`
+// between `#B` and `#M` has to drop `#B -> #M`, or the epic would declare one order and record two
+// (joshuafolkken/kit#890). Same gh >= 2.94.0 requirement, same non-fatal treatment.
+async function issue_remove_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
+	try {
+		await git_gh_exec.exec_gh_command([
+			'issue',
+			'edit',
+			issue_number,
+			'--remove-blocked-by',
+			blocker,
+		])
+
+		return true
+	} catch {
+		return false
+	}
+}
+
 async function issue_get_labels_and_body(issue_number: string): Promise<string | undefined> {
 	return await issue_view_json(issue_number, 'number,labels,body')
 }
@@ -247,6 +266,7 @@ const git_gh_issue = {
 	label_ensure,
 	issue_create_with_label,
 	issue_add_blocked_by,
+	issue_remove_blocked_by,
 	issue_add_label,
 	issue_get_labels_and_body,
 	issue_get_title,
