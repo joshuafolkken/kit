@@ -88,8 +88,9 @@ async function issue_list_by_label(label: string, limit: number): Promise<string
 	})
 }
 
-// State and dependency relations come from a single `gh issue view`: the epic auto-close needs both
-// per child, and splitting them would double the API calls for no gain.
+// State, labels and dependency relations come from a single `gh issue view`: the epic auto-close
+// needs state and relations per child, `epic:next` needs the labels too, and splitting them would
+// multiply the API calls for no gain (joshuafolkken/kit#860).
 async function issue_get_state_and_relations(issue_number: string): Promise<string | undefined> {
 	try {
 		return await git_gh_exec.exec_gh_command([
@@ -97,7 +98,7 @@ async function issue_get_state_and_relations(issue_number: string): Promise<stri
 			'view',
 			issue_number,
 			'--json',
-			'state,blockedBy',
+			'number,state,labels,blockedBy',
 		])
 	} catch {
 		return undefined

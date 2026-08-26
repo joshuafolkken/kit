@@ -17,6 +17,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
 	},
+	'epic:next': {
+		script: 'scripts/epic/epic-next.ts',
+		description: "List an epic's runnable children, bundled per repository",
+		category: 'AI tools',
+	},
 	'epic:check': {
 		script: 'scripts-ai/epic-check.ts',
 		description: 'Check an epic issue against the tracking requirements',

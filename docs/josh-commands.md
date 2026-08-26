@@ -754,6 +754,67 @@ An epic has four mechanical requirements, three of which fail **silently** when 
 
 The manual `gh` procedure remains documented in `prompts/collaboration-workflow.md` as the fallback for environments where `josh` is unavailable.
 
+### `josh epic:next`
+
+List an epic's runnable children, bundled per repository ([#860](https://github.com/joshuafolkken/kit/issues/860)).
+
+```bash
+pnpm josh epic:next 858                            # alias: josh en
+pnpm josh epic:next 858 --repo joshuafolkken/kit   # just the next child for one repository
+```
+
+Running an epic's children today means handing `queue` a list a person ordered by hand. When a run is interrupted, "where did we get to" is answered by a person reading the issue list again — which is why it cannot be the base of an unattended run. `epic:next` answers it mechanically, and **all of the state lives on GitHub**: there is no local state file, so asking again after any interruption gives the same answer.
+
+**Every runnable child is returned, not one.** The children are bundled by repository so a caller can run one per repository at the same time. Returning a single candidate would close off cross-repository parallelism in the design itself, making the command slower than the person opening several editors it is meant to replace.
+
+```text
+Runnable children (one per repository may run at a time):
+  joshuafolkken/kit
+    #861
+    #870
+  Waiting on time:
+    #862
+```
+
+Today every child is stamped with the repository the command runs in, so one bundle is what you see; the per-repository shape is what [#864](https://github.com/joshuafolkken/kit/issues/864) fills in when cross-repository children are resolved.
+
+Every open child appears exactly once in the report, so nothing is silently dropped. A child that could not be read is **not** dropped either — it stops the command. Dropping it is wrong in both directions: an epic whose children all failed to read would look like an epic with no open children, and one missing child leaves whatever it blocks looking unblocked.
+
+With `--repo`, standard output carries the issue number and nothing else, so `child=$(josh epic:next 858 --repo joshuafolkken/kit)` captures a number; every explanation goes to standard error.
+
+**The remaining children are sorted by whether waiting helps — never by which label they carry.**
+
+| Bucket              | What is in it                                                                           | What the caller does |
+| ------------------- | --------------------------------------------------------------------------------------- | -------------------- |
+| Runnable            | Open, not parked, not already being worked on, and every dependency resolved            | Run it               |
+| Waiting on time     | Being worked on elsewhere, waiting on a release, or blocked by something in this bucket | Wait and ask again   |
+| Waiting on a person | Carries `needs-decision`, or is blocked by something in this bucket                     | Stop and report      |
+
+Reading the labels instead would fail in a specific, ordinary state. The moment kit's child closes and app-kit's child is waiting for the release to publish, there is no runnable child, nothing carries `in-progress` (kit's child is closed) and nothing carries `needs-decision` (nothing was parked). A label-based reading sees "nothing running, nothing parked" and stops — in the one situation where it should wait.
+
+**Blocking is followed transitively.** A child behind a release-waiting child is waiting on time; a child behind a parked one is waiting on a person, however long the chain. Where both apply, the person wins: waiting would not release a parked blocker whatever the other one does.
+
+The verdict follows from the buckets, and waiting is checked before stopping — a run that stopped while something was still resolving on its own would abandon an epic that was going to finish.
+
+| Verdict  | When                                                              | Exit code |
+| -------- | ----------------------------------------------------------------- | --------- |
+| run      | At least one child is runnable                                    | 0         |
+| wait     | Nothing runnable, but something resolves on its own               | 0         |
+| stop     | Nothing resolves on its own; the remaining children need a person | 0         |
+| complete | No open child is left                                             | 0         |
+| error    | The dependency graph is unusable                                  | 1         |
+
+**Whether a dependency is resolved is a replaceable rule.** By default a dependency is resolved once the blocking child is closed. That is not enough across repositories — kit's issue closes before the package is published — so [#864](https://github.com/joshuafolkken/kit/issues/864) replaces the rule with one that also waits for the publish. The extension point is what keeps that condition in one place rather than duplicated per caller.
+
+**Two things stop the command instead of being worked around.**
+
+- **A circular dependency.** Hand-added `--add-blocked-by` edges can make `#1` wait for `#2` while `#2` waits for `#1`, and every session would then wait forever. The children that can never start are named — including the ones stuck _behind_ the cycle, since those never become runnable either.
+- **A disagreement between the epic body and the relations.** The body's `Dependencies` section is the human-readable record; the `blocked-by` relations are the authority for execution. When they disagree — routinely, since `gh` older than 2.94.0 cannot record a relation at all — the command reports both directions and refuses to pick a winner, because silently following either implements in an order nobody agreed to.
+
+  Only a line that is _nothing but_ a chain counts as a declaration. An epic whose Dependencies section is followed by prose recommending an execution order (`推奨実行順: #869 -> #863 -> …`) is stating a suggestion, not a dependency, and reading those arrows as declarations reported four disagreements against relations that were correct.
+
+The body is parsed through the same module the epic auto-close uses, so "what the auto-close tracks" and "what this command reads" cannot drift apart.
+
 ### `josh epic:check`
 
 Check an existing epic against the same four requirements and report each as pass or fail.
