@@ -21,6 +21,12 @@ const SURFACE_MARKERS: ReadonlyArray<string> = [
 	'No strong signal',
 	'nobody declared is not invented',
 	'It recommends; it writes nothing',
+	// joshuafolkken/kit#947: the open-only search could answer correctly for about three minutes after
+	// a follow-up issue was filed. Past it the command asserted there was no relation rather than that
+	// it had stopped being able to see one, so the widened scope is part of the rule, not a detail.
+	'The search is not limited to the open backlog',
+	'counts only when an open epic already tracks it',
+	'never folded into "no strong signal"',
 ]
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
@@ -30,6 +36,10 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'誰も宣言していない順序をここで捏造しない',
 	'同じ解析を 2 回書かない',
 	'索引やキャッシュは用意しない',
+	'**候補探索は open backlog に限らない。**',
+	'**closed の参照先は、open な EPIC が既に追跡している場合にのみ候補にする。**',
+	'**読み取りの失敗も、上限で読まなかった参照も、欠落として報告し「強い信号なし」に畳み込まない**',
+	'**番号が pull request だった場合は候補にしない。**',
 ]
 
 // The four rows of the decision table; losing one leaves a branch nobody handles.

@@ -144,6 +144,15 @@ order, with the reasoning recorded nowhere.
 already recorded between them. **A similar title never counts on its own** — "related" expands
 without limit, and the threshold is what keeps an unrelated issue out.
 
+**The search is not limited to the open backlog.** Every issue number the subject's body names is read
+on its own, whatever its state — otherwise the command answers correctly only in the minutes between
+a follow-up issue being filed and its parent closing (joshuafolkken/kit#947). A **closed** reference
+counts only when an open epic already tracks it, since the answer worth recovering is `add_to_epic`;
+an epic created over a closed issue has nothing left to run. An **open** reference counts either way.
+A read that fails — and a reference the per-issue cap never reached — is reported as a gap, never
+folded into "no strong signal". A number that answers with a **pull request** is not a candidate at
+all: `gh issue view` serves one too, and a merged PR does not report `CLOSED`.
+
 | Candidates | Do | Tier |
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
