@@ -100,21 +100,28 @@ async function issue_list_by_label(label: string, limit: number): Promise<string
 	})
 }
 
-// State, labels and dependency relations come from a single `gh issue view`: the epic auto-close
-// needs state and relations per child, `epic:next` needs the labels too, and splitting them would
-// multiply the API calls for no gain (joshuafolkken/kit#860).
-async function issue_get_state_and_relations(issue_number: string): Promise<string | undefined> {
+// One `gh issue view --json <fields>`, for every caller that wants a JSON view of one issue. Callers
+// differ only in which fields they ask for, and a helper per field list is how four near-identical
+// functions accumulated (joshuafolkken/kit#862).
+async function issue_view_json(issue_number: string, fields: string): Promise<string | undefined> {
 	try {
-		return await git_gh_exec.exec_gh_command([
-			'issue',
-			'view',
-			issue_number,
-			'--json',
-			'number,state,labels,blockedBy',
-		])
+		return await git_gh_exec.exec_gh_command(['issue', 'view', issue_number, '--json', fields])
 	} catch {
 		return undefined
 	}
+}
+
+// State, labels and dependency relations in one read: the epic auto-close needs state and relations
+// per child, `epic:next` needs the labels too, and splitting them would multiply the API calls for
+// no gain (joshuafolkken/kit#860).
+async function issue_get_state_and_relations(issue_number: string): Promise<string | undefined> {
+	return await issue_view_json(issue_number, 'number,state,labels,blockedBy')
+}
+
+// Everything `epic:plan` puts in front of the batch decision. Read separately from the poll above
+// because it carries the bodies, which a `wait` poll never looks at.
+async function issue_get_plan_fields(issue_number: string): Promise<string | undefined> {
+	return await issue_view_json(issue_number, 'number,title,body,state,labels,blockedBy')
 }
 
 // `gh issue close` takes the comment as a plain string flag — unlike create/comment it has no
@@ -202,17 +209,7 @@ async function issue_add_blocked_by(issue_number: string, blocker: string): Prom
 }
 
 async function issue_get_labels_and_body(issue_number: string): Promise<string | undefined> {
-	try {
-		return await git_gh_exec.exec_gh_command([
-			'issue',
-			'view',
-			issue_number,
-			'--json',
-			'number,labels,body',
-		])
-	} catch {
-		return undefined
-	}
+	return await issue_view_json(issue_number, 'number,labels,body')
 }
 
 const git_gh_issue = {
@@ -228,7 +225,9 @@ const git_gh_issue = {
 	issue_list_recent,
 	issue_list_by_label,
 	issue_search_body,
+	issue_view_json,
 	issue_get_state_and_relations,
+	issue_get_plan_fields,
 	issue_close,
 }
 

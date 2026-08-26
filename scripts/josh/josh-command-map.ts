@@ -80,6 +80,7 @@ const ALIASES: Record<string, string> = {
 	ec: 'epic:check',
 	en: 'epic:next',
 	ea: 'epic:audit',
+	el: 'epic:plan',
 	ev: 'eval',
 }
 

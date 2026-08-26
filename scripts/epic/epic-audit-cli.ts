@@ -9,6 +9,7 @@ import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
 import { epic_audit_report, type AuditResult } from './epic-audit-report'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph } from './epic-graph'
+import { epic_issue } from './epic-issue'
 import { epic_next } from './epic-next'
 
 // `josh epic:audit <E>` — read an epic's children against each other and report what contradicts
@@ -177,15 +178,8 @@ async function gather(epic_number: number, repo: string): Promise<AuditInput | u
 	}
 }
 
-function parse_epic_number(raw = ''): number | undefined {
-	if (raw.includes('/')) return undefined
-	const parsed = Number(raw.replace('#', ''))
-
-	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
-}
-
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const epic_number = parse_epic_number(argv[0])
+	const epic_number = epic_issue.parse_epic_number(argv[0])
 
 	if (epic_number === undefined) {
 		console.error(USAGE)
@@ -209,7 +203,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const epic_audit_cli = {
 	USAGE,
-	parse_epic_number,
+	parse_epic_number: epic_issue.parse_epic_number,
 	attach_bodies,
 	resolve_reference_states,
 	outside_references,
