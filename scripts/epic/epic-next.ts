@@ -5,6 +5,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { epic_classify } from './epic-classify'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph, type GraphAnomaly } from './epic-graph'
+import { epic_issue } from './epic-issue'
 import { epic_report, type EpicNextResult, type EpicVerdict } from './epic-report'
 
 // `josh epic:next <E>` — which of an epic's children can be started right now, bundled per
@@ -27,17 +28,6 @@ interface NextOptions {
 	usage?: string
 }
 
-// `#123` and `123` are both accepted: the number is copied out of an issue reference as often as it
-// is typed. `owner/repo#123` is refused rather than silently read as `123`, which would query the
-// wrong repository's issue of that number — see `CROSS_REPO_USAGE`.
-function parse_epic_number(raw = ''): number | undefined {
-	if (raw.includes('/')) return undefined
-	const parsed = Number(raw.replace('#', ''))
-	if (!Number.isSafeInteger(parsed) || parsed <= 0) return undefined
-
-	return parsed
-}
-
 function usage_for(raw = ''): string {
 	return raw.includes('/') ? CROSS_REPO_USAGE : USAGE
 }
@@ -50,7 +40,7 @@ function parse_repo(rest: ReadonlyArray<string>): string | undefined {
 
 function parse_options(argv: ReadonlyArray<string>): NextOptions {
 	const [first, ...rest] = argv
-	const epic_number = parse_epic_number(first)
+	const epic_number = epic_issue.parse_epic_number(first)
 	if (epic_number === undefined) return { usage: usage_for(first) }
 	const repo = parse_repo(rest)
 	if (repo === undefined) return rest.includes(REPO_FLAG) ? { usage: USAGE } : { epic_number }
@@ -179,7 +169,7 @@ const epic_next = {
 	EXTERNAL_NOTICE,
 	unreadable_anomaly,
 	is_order_declared,
-	parse_epic_number,
+	parse_epic_number: epic_issue.parse_epic_number,
 	repo_verdict,
 	parse_options,
 	decide,

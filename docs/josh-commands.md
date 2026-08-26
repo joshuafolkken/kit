@@ -831,6 +831,31 @@ The verdict follows from the buckets, and waiting is checked before stopping —
 
 The body is parsed through the same module the epic auto-close uses, so "what the auto-close tracks" and "what this command reads" cannot drift apart.
 
+### `josh epic:plan`
+
+Print every child of an epic as one JSON document, so the epic's decisions can be made in one batch ([#862](https://github.com/joshuafolkken/kit/issues/862)).
+
+```bash
+pnpm josh epic:plan 858   # alias: josh el
+```
+
+Most of the stops an implementation makes could have been answered _before_ it started. Arriving scattered through the run is what forces a person to wait through it, asking per child asks the same question several times, and the answers end up only in a conversation nobody can read back. The output carries each child's number, title, body, labels, `blockedBy` and state.
+
+| Phase      | What happens                                                         |
+| ---------- | -------------------------------------------------------------------- |
+| 0 — audit  | [`josh epic:audit`](#josh-epicaudit); fix what it finds (Tier A)     |
+| 1 — triage | Read the plan; sort each decision into `auto`, `ask` or `defer`      |
+| 2 — decide | Put every `ask` to the person **as one question for the whole epic** |
+| 3 — run    | `epicrun` runs to the end                                            |
+
+**Phase 0 is not optional.** A batch decision made on a plan that contradicts itself has to be made again once the contradiction surfaces.
+
+Answers are recorded in **both** the epic's `## Decisions` section and a comment on each child they apply to. One without the other leaves either the child's reader without the reasoning or the epic without the decision. **Recording a decision removes that child's `needs-decision` label** — without that, a child stays parked after the answer arrived.
+
+**An epic whose task list tracks nothing is an empty plan, not a failure** — a checked row is still a tracked row, so a finished epic yields closed children rather than an empty list, and an epic that genuinely tracks nothing is a real answer. An epic whose **body could not be read at all** — a bad number, a failed lookup — is a failure, because an empty plan there is indistinguishable from a finished one.
+
+**A child that could not be read makes the command exit non-zero**, not merely warn. It is named on standard error and left out of the plan, and a consumer capturing standard output would otherwise act on a plan missing a child — a decision made without knowing about it.
+
 ### `josh epic:audit`
 
 Read an epic's children against each other and report what contradicts what ([#870](https://github.com/joshuafolkken/kit/issues/870)).
@@ -856,7 +881,7 @@ The graph's own properties — a cycle, and a body declaring one order while the
 
 What remains an error is a name in the acceptance criteria with **nothing ordering the two at all** — the criteria are where a child states what it must deliver, so a deliverable named there that nothing guarantees will exist first is the contradiction. A child citing another purely as an example still trips it; that is the residual cost of a check the machine cannot make semantically, and rewording or declaring the dependency clears it.
 
-**Run it without being asked** — at the start of an `epicrun`, right after a child is added or a dependency changed, and, once [#862](https://github.com/joshuafolkken/kit/issues/862) lands, in `epic:plan`'s first phase. **Fixing what it finds is Tier A**: re-pointing a dependency or correcting prose is reversible and will otherwise stall the work, so do it without asking and record the reasoning on the Issue. Park with `needs-decision` only when the contradiction is a design choice nobody has made.
+**Run it without being asked** — at the start of an `epicrun`, as [`josh epic:plan`](#josh-epicplan)'s phase 0, and right after a child is added or a dependency changed. **Fixing what it finds is Tier A**: re-pointing a dependency or correcting prose is reversible and will otherwise stall the work, so do it without asking and record the reasoning on the Issue. Park with `needs-decision` only when the contradiction is a design choice nobody has made.
 
 **One thing it cannot check** belongs to the planning step instead. A child introducing a new label, command, state or artifact leaves existing code referencing that concept; three such gaps were found by hand on one epic. List those references and confirm some child owns updating them — label names are single-sourced in `scripts/git/issue-labels.ts`, so consumers can be traced from there.
 

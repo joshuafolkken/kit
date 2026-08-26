@@ -1,8 +1,7 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { parse_json_object_safe } from '#scripts/git/parse-json-array'
-import { z } from 'zod'
 import type { EpicChild } from './epic-graph'
+import { epic_issue, type EpicIssue } from './epic-issue'
 
 // Reading an epic and its children from GitHub.
 //
@@ -12,37 +11,13 @@ import type { EpicChild } from './epic-graph'
 
 const CHILD_LIMIT = 200
 
-const label_schema = z.object({ name: z.string() })
-const blocker_schema = z.object({ number: z.number() })
-// `gh issue view --json blockedBy` answers with a GraphQL connection — `{ nodes, totalCount }` —
-// not a bare array. Measured against a real issue rather than assumed (joshuafolkken/kit#860).
-const blocked_by_schema = z.object({ nodes: z.array(blocker_schema).default([]) }).optional()
-const child_schema = z.object({
-	number: z.number(),
-	state: z.string(),
-	labels: z.array(label_schema).default([]),
-	blockedBy: blocked_by_schema,
-})
-
-const CLOSED = 'CLOSED'
-
-// A shape surprise reads as an unreadable child rather than crashing the command: `gh`'s JSON is
-// somebody else's contract, and `epic:next` is what a run asks when it needs to know where it stands.
-function parse_child(raw: string): z.infer<typeof child_schema> | undefined {
-	try {
-		return parse_json_object_safe(raw, child_schema)
-	} catch {
-		return undefined
-	}
-}
-
-function to_child(parsed: z.infer<typeof child_schema>, repo: string): EpicChild {
+function to_child(parsed: EpicIssue, repo: string): EpicChild {
 	return {
 		number: parsed.number,
 		repo,
-		state: parsed.state.toUpperCase() === CLOSED ? CLOSED : 'OPEN',
-		labels: parsed.labels.map((label) => label.name),
-		blocked_by: (parsed.blockedBy?.nodes ?? []).map((blocker) => blocker.number),
+		state: epic_issue.normalize_state(parsed.state),
+		labels: epic_issue.label_names(parsed),
+		blocked_by: epic_issue.blockers_of(parsed),
 	}
 }
 
@@ -51,8 +26,7 @@ function to_child(parsed: z.infer<typeof child_schema>, repo: string): EpicChild
 // at.
 async function fetch_child(issue_number: number, repo: string): Promise<EpicChild | undefined> {
 	const raw = await git_gh_command.issue_get_state_and_relations(String(issue_number))
-	if (raw === undefined) return undefined
-	const parsed = parse_child(raw)
+	const parsed = epic_issue.parse_epic_issue(raw)
 	if (parsed === undefined) return undefined
 
 	return to_child(parsed, repo)
