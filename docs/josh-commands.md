@@ -831,6 +831,35 @@ The verdict follows from the buckets, and waiting is checked before stopping —
 
 The body is parsed through the same module the epic auto-close uses, so "what the auto-close tracks" and "what this command reads" cannot drift apart.
 
+### `josh epic:audit`
+
+Read an epic's children against each other and report what contradicts what ([#870](https://github.com/joshuafolkken/kit/issues/870)).
+
+```bash
+pnpm josh epic:audit 858   # alias: josh ea
+```
+
+`epic:check` verifies **one epic's format**. Nothing verified that the children agree — and a hand audit of a real epic found two contradictions that would have stalled the implementation while `epic:check` reported all four of its requirements as passing throughout. Work that only surfaces when a person thinks to go looking for it cannot be the basis of an unattended run.
+
+The graph's own properties — a cycle, and a body declaring one order while the `blocked-by` relations record another — are taken from [`josh epic:next`](#josh-epicnext)'s detection rather than re-derived here. What this command adds is reading _inside_ the children:
+
+| Check                | Level     | What it means                                                                                        |
+| -------------------- | --------- | ---------------------------------------------------------------------------------------------------- |
+| Implicit dependency  | warning   | A child's body names another child of the same epic, and nothing orders the two.                     |
+| Order contradiction  | **error** | A child's **acceptance criteria** name another child, and nothing orders the two — it can run first. |
+| Unresolved reference | warning   | A body cites an issue that does not exist, or one already closed.                                    |
+| Orphan child         | warning   | An issue names this epic as its parent but the epic's task list does not track it.                   |
+
+**Only errors change the exit code.** The implicit-dependency check sees only that one child mentioned another, which is as true of a real missing dependency as of a design note about what comes next. Failing on both would make those notes unwritable, so the machine's job is to stop an omission going unnoticed, not to decide.
+
+**A forward reference the other child already depends on is not reported.** When `#860`'s criteria say `#864` will extend a hook it provides, and `#864` is declared to depend on `#860`, the criteria are satisfiable exactly as written. Verified against a real epic: without that suppression, four of five errors were forward references of that shape.
+
+What remains an error is a name in the acceptance criteria with **nothing ordering the two at all** — the criteria are where a child states what it must deliver, so a deliverable named there that nothing guarantees will exist first is the contradiction. A child citing another purely as an example still trips it; that is the residual cost of a check the machine cannot make semantically, and rewording or declaring the dependency clears it.
+
+**Run it without being asked** — at the start of an `epicrun`, right after a child is added or a dependency changed, and, once [#862](https://github.com/joshuafolkken/kit/issues/862) lands, in `epic:plan`'s first phase. **Fixing what it finds is Tier A**: re-pointing a dependency or correcting prose is reversible and will otherwise stall the work, so do it without asking and record the reasoning on the Issue. Park with `needs-decision` only when the contradiction is a design choice nobody has made.
+
+**One thing it cannot check** belongs to the planning step instead. A child introducing a new label, command, state or artifact leaves existing code referencing that concept; three such gaps were found by hand on one epic. List those references and confirm some child owns updating them — label names are single-sourced in `scripts/git/issue-labels.ts`, so consumers can be traced from there.
+
 ### `josh epic:check`
 
 Check an existing epic against the same four requirements and report each as pass or fail.

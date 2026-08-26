@@ -8,6 +8,7 @@ words:
   - gitdir
   - commondir
   - precheck
+  - backlinks
   - dryrun
   - overridability
   - Unparseable
