@@ -26,7 +26,7 @@ After completing the code, ask the user if they want a playground link. Only cal
 
 Whenever modifying, adding, or deleting any code:
 
-1. **Verify the gate**: Run `pnpm josh gate` — lint, type check, spell check and unit tests, run concurrently, with every failing check reported in one pass. Re-run one on its own with `pnpm josh lint` / `pnpm josh check` / `pnpm josh cspell:dot` / `pnpm josh test:unit` while fixing.
+1. **Verify the gate**: Run `pnpm josh gate` — lint, type check, spell check and unit tests, run concurrently, with every failing check reported in one pass. Re-run one on its own by copying the command from its output header while fixing — `pnpm josh lint`, `pnpm josh check`, `pnpm josh cspell:dot`, `pnpm josh test:unit` for a project with no application toolkit.
 2. **Verify IDE Feedback**: ALWAYS run the **ReadLints** tool on every modified file (and any file that might be affected) before finishing. Fix all reported errors and warnings. IDE/ReadLints can report issues that terminal `pnpm josh lint` does not (e.g. type resolution for generated or gitignored paths).
 3. **Fix Issues**: If any check fails (terminal or IDE feedback, or ReadLints), fix all reported issues immediately.
 4. **Repeat**: Repeat the checks until **all** pass and **ReadLints shows no errors** for the modified files.

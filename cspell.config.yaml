@@ -3,6 +3,7 @@ import:
   - "./cspell/index.yaml"
 words:
   - dedup
+  - toolkits
   - worktree
   - worktrees
   - gitdir
