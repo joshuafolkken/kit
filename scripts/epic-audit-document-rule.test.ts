@@ -31,7 +31,7 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 ]
 
 const AUTOMATIC_RUN_MARKERS: ReadonlyArray<string> = [
-	'`josh epic:plan` の相 1',
+	'`josh epic:plan` の相 0',
 	'`epicrun` の開始時',
 	'子 Issue を追加した直後、依存を変更した直後',
 ]

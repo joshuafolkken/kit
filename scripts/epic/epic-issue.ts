@@ -1,0 +1,85 @@
+import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { z } from 'zod'
+
+// The shapes `gh issue view --json …` answers with, and the argument every epic command takes.
+//
+// Single-sourced because three commands read the same JSON and take the same argument. Each had its
+// own copy of the schema, the `blockedBy` unwrapping and the number parser, which is three places to
+// fix the next time `gh` changes shape — and the one place a divergence would not be noticed
+// (joshuafolkken/kit#862).
+
+const label_schema = z.object({ name: z.string() })
+const blocker_schema = z.object({ number: z.number() })
+// `gh` answers a GraphQL connection — `{ nodes, totalCount }` — not a bare array. Measured against a
+// real issue rather than assumed (joshuafolkken/kit#860).
+const blocked_by_schema = z.object({ nodes: z.array(blocker_schema).default([]) }).optional()
+
+const CLOSED = 'CLOSED'
+const UNKNOWN_STATE = 'UNKNOWN'
+
+// Every field any epic command reads. Only `number` is required: a child reported with a field
+// missing is still a child, and dropping it would hide it from the view a decision is made from.
+// `body` is nullable because `gh` answers JSON null for an issue with none.
+const epic_issue_schema = z.object({
+	number: z.number(),
+	title: z.string().default(''),
+	body: z
+		.string()
+		.nullable()
+		.default('')
+		.transform((value) => value ?? ''),
+	state: z.string().default(UNKNOWN_STATE),
+	labels: z.array(label_schema).default([]),
+	blockedBy: blocked_by_schema,
+})
+
+type EpicIssue = z.infer<typeof epic_issue_schema>
+
+// A shape surprise reads as an unreadable issue rather than throwing: `gh`'s JSON is somebody else's
+// contract, and these commands are what a run consults before it starts.
+function parse_epic_issue(raw: string | undefined): EpicIssue | undefined {
+	if (raw === undefined) return undefined
+
+	try {
+		return parse_json_object_safe(raw, epic_issue_schema)
+	} catch {
+		return undefined
+	}
+}
+
+// The blockers an issue declares, unwrapped from the connection.
+function blockers_of(issue: EpicIssue): Array<number> {
+	return (issue.blockedBy?.nodes ?? []).map((blocker) => blocker.number)
+}
+
+function label_names(issue: EpicIssue): Array<string> {
+	return issue.labels.map((label) => label.name)
+}
+
+// `OPEN` or `CLOSED`, whatever casing `gh` used.
+function normalize_state(state: string): 'OPEN' | 'CLOSED' {
+	return state.toUpperCase() === CLOSED ? CLOSED : 'OPEN'
+}
+
+// `#123` and `123` are both accepted: the number is copied out of an issue reference as often as it
+// is typed. `owner/repo#123` is refused rather than read as `123`, which would answer about *this*
+// repository's issue of that number — a different issue entirely.
+function parse_epic_number(raw = ''): number | undefined {
+	if (raw.includes('/')) return undefined
+	const parsed = Number(raw.replace('#', ''))
+
+	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+const epic_issue = {
+	CLOSED,
+	UNKNOWN_STATE,
+	parse_epic_issue,
+	blockers_of,
+	label_names,
+	normalize_state,
+	parse_epic_number,
+}
+
+export type { EpicIssue }
+export { epic_issue }
