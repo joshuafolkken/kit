@@ -151,8 +151,13 @@ async function issue_get_state_and_relations(
 
 // Everything `epic:plan` puts in front of the batch decision. Read separately from the poll above
 // because it carries the bodies, which a `wait` poll never looks at.
+//
+// `epic:bundle` reads a referenced issue through the same call rather than adding a helper for its
+// own field list — it needs the body and the state, which is a subset of this one, and a helper per
+// field list is exactly how the four near-identical functions above accumulated
+// (joshuafolkken/kit#947).
 async function issue_get_plan_fields(issue_number: string): Promise<string | undefined> {
-	return await issue_view_json(issue_number, 'number,title,body,state,labels,blockedBy')
+	return await issue_view_json(issue_number, 'number,title,body,state,url,labels,blockedBy')
 }
 
 // `gh issue close` takes the comment as a plain string flag — unlike create/comment it has no

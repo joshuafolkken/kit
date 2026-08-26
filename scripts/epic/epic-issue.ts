@@ -15,7 +15,9 @@ const blocker_schema = z.object({ number: z.number() })
 const blocked_by_schema = z.object({ nodes: z.array(blocker_schema).default([]) }).optional()
 
 const CLOSED = 'CLOSED'
+const OPEN = 'OPEN'
 const UNKNOWN_STATE = 'UNKNOWN'
+const PULL_REQUEST_SEGMENT = '/pull/'
 
 // Every field any epic command reads. Only `number` is required: a child reported with a field
 // missing is still a child, and dropping it would hide it from the view a decision is made from.
@@ -29,6 +31,10 @@ const epic_issue_schema = z.object({
 		.default('')
 		.transform((value) => value ?? ''),
 	state: z.string().default(UNKNOWN_STATE),
+	// `gh issue view <n>` answers for a pull request as readily as for an issue, and nothing in the
+	// other fields separates them — an open PR reports `state: OPEN`, a merged one `MERGED`. The URL
+	// is what says which it is: `/pull/<n>` against `/issues/<n>` (joshuafolkken/kit#947).
+	url: z.string().default(''),
 	labels: z.array(label_schema).default([]),
 	blockedBy: blocked_by_schema,
 })
@@ -57,8 +63,23 @@ function label_names(issue: EpicIssue): Array<string> {
 }
 
 // `OPEN` or `CLOSED`, whatever casing `gh` used.
+//
+// Anything that is not `CLOSED` reads as open, which is right for the auto-close it was written for:
+// a child in any other state still has work left. It is **not** a test for "this issue is open" —
+// `MERGED` maps to `OPEN` here — so a caller that needs that must ask `is_open` instead.
 function normalize_state(state: string): 'OPEN' | 'CLOSED' {
 	return state.toUpperCase() === CLOSED ? CLOSED : 'OPEN'
+}
+
+// Strictly open: exactly `OPEN`, so `MERGED` (a pull request) and the `UNKNOWN` default of a read
+// that came back shaped wrong both answer false rather than passing as an open issue.
+function is_open(state: string): boolean {
+	return state.toUpperCase() === OPEN
+}
+
+// Whether the number answered with a pull request rather than an issue. `gh issue view` serves both.
+function is_pull_request(issue: EpicIssue): boolean {
+	return issue.url.includes(PULL_REQUEST_SEGMENT)
 }
 
 // `#123` and `123` are both accepted: the number is copied out of an issue reference as often as it
@@ -108,6 +129,8 @@ const epic_issue = {
 	blockers_of,
 	label_names,
 	normalize_state,
+	is_open,
+	is_pull_request,
 	parse_epic_number,
 	parse_epic_reference,
 }
