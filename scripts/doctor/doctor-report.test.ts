@@ -1,9 +1,11 @@
 import { auto_merge_setting } from '#scripts/auto-merge-setting'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { security_updates } from '#scripts/security-updates'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { doctor } from './doctor'
 import { doctor_io, type GitTopLevel } from './doctor-io'
+import { doctor_logic } from './doctor-logic'
 
 // A source-text guard proves the call was written, not that it runs. `josh doctor` is the diagnostic
 // a user reaches for when npm advisories are not arriving, so this drives `main` and asserts the
@@ -15,11 +17,12 @@ const TOP_LEVEL = '/Users/example/project'
 const INSIDE: GitTopLevel = { state: 'inside', top_level: TOP_LEVEL }
 const OUTSIDE: GitTopLevel = { state: 'outside' }
 const UNDETERMINED: GitTopLevel = { state: 'undetermined' }
+const DISCOVER = 'discover_repositories'
+const APP_KIT_KEY = 'joshuafolkken/app-kit'
 
-beforeEach(() => {
-	vi.resetAllMocks()
-	vi.restoreAllMocks()
-	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+// The IO the report reads from, all stubbed: `doctor` otherwise spawns `which`, `pnpm bin -g` and
+// `git` from the unit suite, and scans the real parent directory of the checkout it runs in.
+function stub_doctor_io(): void {
 	vi.spyOn(doctor_io, 'resolve_path_josh').mockReturnValue(JOSH_PATH)
 	vi.spyOn(doctor_io, 'resolve_pnpm_global_josh').mockReturnValue(JOSH_PATH)
 	vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(INSIDE)
@@ -29,6 +32,16 @@ beforeEach(() => {
 	// default so the pre-existing cases keep asserting the Dependabot report alone; the cases that
 	// care about it turn it on.
 	vi.spyOn(doctor_io, 'has_auto_merge_workflow').mockReturnValue(false)
+	// Stubbed rather than left to call through: without this the suite would scan the real parent
+	// directory of the checkout it runs in, making the result depend on the machine.
+	vi.spyOn(repo_discovery, 'discover_repositories').mockReturnValue(new Map())
+}
+
+beforeEach(() => {
+	vi.resetAllMocks()
+	vi.restoreAllMocks()
+	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	stub_doctor_io()
 	// Stubbed rather than left to call through: a regression of a gate would otherwise spawn a live
 	// `gh api` from the unit suite instead of failing cleanly.
 	vi.spyOn(auto_merge_setting, 'report_auto_merge_section').mockReturnValue('enabled')
@@ -276,5 +289,48 @@ describe('josh doctor — one repository lookup for both reports', () => {
 		doctor.main()
 
 		expect(resolve).not.toHaveBeenCalled()
+	})
+})
+
+describe('josh doctor — the discovered repository map', () => {
+	it('prints the map for the repository it is standing in', () => {
+		const discover = vi
+			.spyOn(repo_discovery, DISCOVER)
+			.mockReturnValue(new Map([[APP_KIT_KEY, '/Users/example/app-kit']]))
+		const info = vi.spyOn(console, 'info')
+
+		doctor.main()
+
+		expect(discover).toHaveBeenCalledWith(TOP_LEVEL)
+		expect(info.mock.calls.flat().join('\n')).toContain(APP_KIT_KEY)
+	})
+
+	it('says so rather than staying silent when nothing was discovered', () => {
+		vi.spyOn(repo_discovery, DISCOVER).mockReturnValue(new Map())
+		const info = vi.spyOn(console, 'info')
+
+		doctor.main()
+
+		expect(info.mock.calls.flat().join('\n')).toContain(doctor_logic.NO_REPOSITORIES_FOUND)
+	})
+
+	it('prints no map from outside a repository, where there is no owner to anchor it', () => {
+		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(OUTSIDE)
+		const discover = vi.spyOn(repo_discovery, DISCOVER)
+		const info = vi.spyOn(console, 'info')
+
+		doctor.main()
+
+		expect(discover).not.toHaveBeenCalled()
+		expect(info.mock.calls.flat().join('\n')).not.toContain(doctor_logic.REPOSITORY_MAP_HEADING)
+	})
+
+	it('prints no map when git could not tell where the repository is', () => {
+		vi.spyOn(doctor_io, 'resolve_git_top_level').mockReturnValue(UNDETERMINED)
+		const discover = vi.spyOn(repo_discovery, DISCOVER)
+
+		doctor.main()
+
+		expect(discover).not.toHaveBeenCalled()
 	})
 })

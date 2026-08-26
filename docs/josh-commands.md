@@ -456,6 +456,28 @@ The check never fails the command: an unreadable setting is GitHub-side state ki
 
 The two reports are independent: a consumer synced before #834 has the Dependabot config and no auto-merge workflow, and a repository that only ever added its own auto-merge workflow has the second prerequisite without the first. When at least one applies, the repository name is resolved once and shared by both. `--fix` does not enable this setting either, for the same reason it does not enable Dependabot security updates.
 
+#### The discovered repository map
+
+`doctor` prints the **repository map** — every checkout on this machine that belongs to the same GitHub owner as the repository the command is standing in, with its local path ([#869](https://github.com/joshuafolkken/kit/issues/869)). Other commands need to know where a sibling repository lives before they can carry a release into it or dispatch a run to it; `doctor` is where a wrong map becomes visible, because the alternative is finding out when a write lands in the wrong checkout.
+
+```text
+Repositories (same owner, discovered next to this one):
+  joshuafolkken/app-kit   /Users/example/Development/app-kit
+  joshuafolkken/kit       /Users/example/Development/kit
+```
+
+Discovery is automatic, not registered: `doctor` scans the parent directory of the current repository **one level deep**, reads each work tree's `origin` remote, and keys the map by what that remote says. Four remote spellings all normalize to the same `owner/repo` — `git@github.com:owner/repo.git`, an SSH host alias (`git@github-work:owner/repo.git`), HTTPS with credentials and a trailing slash (`https://user@github.com/owner/repo.git/`), and plain HTTPS. **The directory name is never used as the repository name** — a checkout in a directory called `kit-experiment` whose `origin` points at `game-kit` is mapped as `game-kit`.
+
+**The owner restriction is unconditional and cannot be overridden.** Only repositories whose owner equals the current repository's owner enter the map — the same first-party test the AI documents define. A parent directory routinely holds work belonging to other accounts and organizations, and a map that included them would let tooling file issues against, or push to, a repository that is not yours. Remotes on any host other than GitHub are excluded before the owner is even compared, as are directories with no remote at all.
+
+`JOSH_REPO_PATHS` is the escape hatch for the exceptions — a repository that is not a sibling, or one checked out twice — set in the personal, non-committed `.env`:
+
+```bash
+JOSH_REPO_PATHS=joshuafolkken/game-kit=/Users/example/elsewhere/game-kit,joshuafolkken/kit=/Users/example/kit-review
+```
+
+Entries are `owner/repo=/absolute/path`, comma-separated, and an override wins over the discovered path for the same repository. It is a way in, never a way around: an override naming a different owner is dropped exactly like a discovered sibling would be, and a malformed entry is dropped rather than failing the command — the printed map is what shows you it did not take effect. Outside a git work tree no map is printed at all, since there is no current owner to anchor it against.
+
 `--fix` is your go-ahead to repair: it reads the shadowing binary and, **only if it is a kit shim** (its body references `@joshuafolkken/kit` or the removed `install-bin` script), removes it so the pnpm-global `josh` reclaims `PATH` precedence. Any other shadowing binary is left untouched and reported for manual review — `doctor` never deletes a file it cannot positively identify as a stale kit shim.
 
 #### Design: per-project installs must not touch the global PATH
