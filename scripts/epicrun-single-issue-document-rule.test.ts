@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_unwrapped, WORKFLOW_PROMPT } from './ai-document-fixture'
 
 // joshuafolkken/kit#892: `epicrun` used to require an epic, so work already expected to grow needed
 // a person to build one first. Widening the entry point costs one confirmation, and the parts a
@@ -9,26 +9,21 @@ import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
 // promoted itself would merge a batch on one Issue's authorization.
 
 const SKILL = '.claude/skills/workflow-commands/epicrun.md'
+const ENTRY_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
 const EPIC_NEXT = 'scripts/epic/epic-next.ts'
 const REJECTION_MESSAGE = 'tracks no children in a task list.'
 
-// Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
-// a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
-// column they landed in.
-function read_unwrapped(relative_path: string): string {
-	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
-}
-
 // Read from each document itself rather than from the rule surface: the surface concatenates every
 // distributed skill, so a marker checked there would pass on the skill's copy alone.
+//
+// joshuafolkken/kit#951 moved the branch into the skill — it binds only once `epicrun` has been
+// typed and the skill read — so what the documents owe is the routing: the widening is named, and
+// the canonical section is named. The branch itself is asserted against the skill below.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
-	'`epicrun` also accepts an Issue that is not an epic',
-	'does **not** stop the run',
-	'**Nothing found means no epic**',
-	'**Every `epicrun` guard applies unchanged on this path**',
-	// Without this sentence the paragraph reads as permission for `fullrun` to widen itself.
-	'This does **not** let `fullrun` promote itself',
+	'Three rules decide what a run does when the work turns out not to be one Issue',
+	'`epicrun` accepting an Issue that is not an epic',
+	'EPIC でない Issue も受け取る',
 ]
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
@@ -48,6 +43,9 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'**Do not stop.**',
 	'**Nothing found means no epic.**',
 	'**Every guard below applies on this path unchanged**',
+	// Without this sentence the branch reads as permission for `fullrun` to widen itself.
+	'**This does not let `fullrun` promote itself.**',
+	'it still files the children and the epic and then **stops**',
 	'an epic holding one closed Issue is noise',
 	// The three defects the first review of joshuafolkken/kit#892 found in this branch: it skipped
 	// the two steps the prerequisite section calls load-bearing, and it wrote the epic's arguments
@@ -64,7 +62,7 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 ]
 
 describe('epicrun single-issue entry', () => {
-	it.each(AI_DOCS)('defines the widening in %s itself, not only in the skill', (document_name) => {
+	it.each(AI_DOCS)('is routed to from %s, by name and by section', (document_name) => {
 		const content = read_unwrapped(document_name)
 
 		for (const marker of AI_DOC_MARKERS) expect(content).toContain(marker)
@@ -115,7 +113,7 @@ describe('epicrun single-issue entry — what it must not have widened', () => {
 	// The dispatch table is how a run learns which files to read, and this path is defined in terms
 	// of a mid-run split — a row that omits the split assessment sends the run in without it.
 	it('routes epicrun to the split assessment, and drops the one-difference framing', () => {
-		const content = read_unwrapped('.claude/skills/workflow-commands/SKILL.md')
+		const content = read_unwrapped(ENTRY_SKILL)
 
 		expect(content).toContain('**`epicrun` differs on two points.**')
 		expect(content).toContain('| `epicrun #E` | `epicrun.md` + `split-assessment.md`')

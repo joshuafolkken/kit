@@ -71,6 +71,11 @@ it — an epic holding one closed Issue is noise that the auto-close then leaves
 failures. They are the run's limits, not the epic's, and the whole reason this entry point removes a
 confirmation is that the guards are what remain.
 
+**This does not let `fullrun` promote itself.** The widening belongs to `epicrun` alone, because
+`epicrun` is where the batch was authorized. A `fullrun` that discovered a split and built an epic
+around itself would merge a batch on one Issue's authorization — it still files the children and the
+epic and then **stops** (`split-assessment.md` → "Finding a split mid-run stops the run").
+
 **`josh epic:next` is not changed by any of this.** It still refuses an Issue with no task list, and
 still prints `#<N> tracks no children in a task list.` — the acceptance of a bare Issue belongs to
 `epicrun`, which has not built an epic yet at that point and therefore never asks `epic:next` about
