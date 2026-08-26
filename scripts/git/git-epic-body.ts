@@ -1,11 +1,11 @@
 import { UNORDERED_DEPENDENCIES } from './git-epic-parse'
+import { DEPENDENCY_ARROW, to_issue_reference } from './git-epic-reference'
 
 // The epic body is the machine-readable half of the epic contract: `scripts/git/git-epic-close.ts`
 // reads the task list to decide when the batch is finished, and the order-unrecorded warning reads
 // the `Dependencies` section. Generating both from the same input is what keeps them from
 // disagreeing with each other, or with the run command printed next to them.
 
-const DEPENDENCY_ARROW = ' -> '
 const RATIONALE_PLACEHOLDER = '<why the work was split this way>'
 
 interface EpicBodyInput {
@@ -18,20 +18,16 @@ interface EpicBodyInput {
 	epic_number?: number | undefined
 }
 
-function to_reference(child: number): string {
-	return `#${String(child)}`
-}
-
 // Task-list syntax, never a bare `#N` link: `git_epic_parse.parse_task_list_issue_numbers` matches
 // nothing else, and GitHub only auto-checks a row written this way.
 function format_progress(children: ReadonlyArray<number>): string {
-	return children.map((child) => `- [ ] ${to_reference(child)}`).join('\n')
+	return children.map((child) => `- [ ] ${to_issue_reference(child)}`).join('\n')
 }
 
 function format_dependencies(children: ReadonlyArray<number>, is_ordered: boolean): string {
 	if (!is_ordered) return UNORDERED_DEPENDENCIES
 
-	return children.map((child) => to_reference(child)).join(DEPENDENCY_ARROW)
+	return children.map((child) => to_issue_reference(child)).join(DEPENDENCY_ARROW)
 }
 
 // The command that runs the batch. `epicrun` takes the epic itself rather than a list of children

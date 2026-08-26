@@ -1,5 +1,7 @@
 import { git_epic_parse } from './git-epic-parse'
 import { EPIC_LABEL } from './issue-labels'
+import { parse_json_object_safe } from './parse-json-array'
+import { epic_subject_schema } from './schemas'
 
 // The four requirements an epic has to satisfy are otherwise enforced only by an agent reading the
 // procedure carefully, and three of the four fail silently: a missing label or a bare `#N` child
@@ -18,6 +20,22 @@ interface CheckResult {
 	name: string
 	is_passing: boolean
 	detail: string
+}
+
+// The `gh issue view --json number,labels,body` answer, as the shape every epic writer reads. It
+// lives beside the checks because `EpicSubject` is defined here, and each command that wanted one
+// had otherwise to restate the unwrapping (joshuafolkken/kit#890).
+function parse_epic_subject(raw_json: string | undefined): EpicSubject | undefined {
+	if (raw_json === undefined) return undefined
+
+	const parsed = parse_json_object_safe(raw_json, epic_subject_schema)
+	if (parsed === undefined) return undefined
+
+	return {
+		number: parsed.number,
+		labels: (parsed.labels ?? []).map((label) => label.name),
+		body: parsed.body,
+	}
 }
 
 function check_label(subject: EpicSubject): CheckResult {
@@ -113,6 +131,7 @@ function format_check_report(epic_number: number, results: ReadonlyArray<CheckRe
 }
 
 const git_epic_validate = {
+	parse_epic_subject,
 	validate_epic,
 	is_epic_valid,
 	format_check_report,

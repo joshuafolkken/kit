@@ -1,4 +1,5 @@
 import type { DependencyLink } from '#scripts/git/git-epic-parse'
+import { format_dependency_link } from '#scripts/git/git-epic-reference'
 
 // The dependency graph an epic's children form, and the two ways it can be wrong.
 //
@@ -87,10 +88,6 @@ function find_stuck_children(children: ReadonlyArray<EpicChild>): Array<string> 
 	return [...remaining].toSorted((left, right) => left.localeCompare(right))
 }
 
-function format_link(link: DependencyLink): string {
-	return `#${String(link.blocker)} -> #${String(link.blocked)}`
-}
-
 // Whether a declared link is actually recorded as a native relation on the blocked child. Declared
 // links are always written as bare numbers, which name issues in the epic's own repository.
 function is_link_recorded(link: DependencyLink, children: ReadonlyArray<EpicChild>): boolean {
@@ -122,12 +119,12 @@ function undeclared_relations(
 	links: ReadonlyArray<DependencyLink>,
 	children: ReadonlyArray<EpicChild>,
 ): Array<DependencyLink> {
-	const declared = new Set(links.map((link) => format_link(link)))
+	const declared = new Set(links.map((link) => format_dependency_link(link)))
 	const numbers = new Set(children.map((child) => child.number))
 
 	return children
 		.flatMap((child) => child_links(child, numbers))
-		.filter((link) => !declared.has(format_link(link)))
+		.filter((link) => !declared.has(format_dependency_link(link)))
 }
 
 function cycle_anomaly(stuck: ReadonlyArray<string>): GraphAnomaly {
@@ -145,8 +142,8 @@ function mismatch_anomaly(
 ): GraphAnomaly {
 	const lines = [
 		'The epic body and the blocked-by relations disagree.',
-		...missing.map((link) => `  declared but not recorded: ${format_link(link)}`),
-		...undeclared.map((link) => `  recorded but not declared: ${format_link(link)}`),
+		...missing.map((link) => `  declared but not recorded: ${format_dependency_link(link)}`),
+		...undeclared.map((link) => `  recorded but not declared: ${format_dependency_link(link)}`),
 		'Fix one of them; the run will not choose for you.',
 	]
 

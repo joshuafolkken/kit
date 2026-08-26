@@ -1,10 +1,9 @@
 import { git_epic_body } from './git-epic-body'
 import { git_epic_promote } from './git-epic-promote'
+import { git_epic_relations } from './git-epic-relations'
 import { git_epic_validate, type EpicSubject } from './git-epic-validate'
 import { git_gh_command } from './git-gh-command'
 import { EPIC_LABEL } from './issue-labels'
-import { parse_json_object_safe } from './parse-json-array'
-import { epic_subject_schema } from './schemas'
 
 const EPIC_LABEL_COLOR = '#5319e7'
 const EPIC_LABEL_DESCRIPTION = 'Tracks a batch of child issues from one split'
@@ -19,13 +18,9 @@ interface CreateEpicInput {
 	origin?: string | undefined
 }
 
-// The relation is a nicety, not part of the contract: `--add-blocked-by` needs gh >= 2.94.0 and
-// losing it costs only the native link, while the Issue and its task list are already correct. A
-// failure is therefore reported and stepped over rather than aborting a batch that is otherwise fine.
-async function apply_dependency(pair: { blocked: number; blocker: number }): Promise<boolean> {
-	return await git_gh_command.issue_add_blocked_by(String(pair.blocked), String(pair.blocker))
-}
-
+// The relations the declared order implies, applied through the shared module `--add` also uses so
+// the two cannot drift. A failure is reported and stepped over rather than aborting a batch that is
+// otherwise fine — see `git-epic-relations.ts` for why the relation is not part of the contract.
 async function apply_dependencies(input: {
 	children: ReadonlyArray<number>
 	is_ordered: boolean
@@ -33,8 +28,7 @@ async function apply_dependencies(input: {
 	const pairs = git_epic_body.build_dependency_pairs(input.children, input.is_ordered)
 	if (pairs.length === 0) return
 
-	const applied = await Promise.all(pairs.map(async (pair) => await apply_dependency(pair)))
-	const failures = applied.filter((is_applied) => !is_applied).length
+	const failures = await git_epic_relations.apply_relations(pairs, 'record')
 
 	console.info(
 		failures === 0
@@ -116,19 +110,6 @@ async function create_epic(input: CreateEpicInput): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-function to_epic_subject(raw_json: string | undefined): EpicSubject | undefined {
-	if (raw_json === undefined) return undefined
-
-	const parsed = parse_json_object_safe(raw_json, epic_subject_schema)
-	if (parsed === undefined) return undefined
-
-	return {
-		number: parsed.number,
-		labels: (parsed.labels ?? []).map((label) => label.name),
-		body: parsed.body,
-	}
-}
-
 interface PromoteEpicInput {
 	epic_number: number
 	children: ReadonlyArray<number>
@@ -140,7 +121,7 @@ interface PromoteEpicInput {
 // The issue being promoted, or the reason it cannot be. Refused when it already carries the epic
 // sections — a second append would give the auto-close two task lists to disagree about.
 async function read_promotion_subject(epic_number: number): Promise<EpicSubject | undefined> {
-	const subject = to_epic_subject(
+	const subject = git_epic_validate.parse_epic_subject(
 		await git_gh_command.issue_get_labels_and_body(String(epic_number)),
 	)
 
@@ -212,7 +193,7 @@ async function promote_epic(input: PromoteEpicInput): Promise<number> {
 
 async function check_epic(epic_number: number): Promise<number> {
 	const raw = await git_gh_command.issue_get_labels_and_body(String(epic_number))
-	const subject = to_epic_subject(raw)
+	const subject = git_epic_validate.parse_epic_subject(raw)
 
 	if (subject === undefined) {
 		console.error(`✖ Could not read issue #${String(epic_number)}.`)
