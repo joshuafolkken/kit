@@ -31,8 +31,10 @@ Look for it in this order and stop at the first hit:
 2. `pnpm josh-game shot` — the game toolkit (`@joshuafolkken/game-kit`).
 3. A project-local script named `shot`, `screenshot` or `verify:ui` in `package.json`.
 
-Neither toolkit carries `shot` yet — joshuafolkken/app-kit#200 adds the SvelteKit one — so unless
-the project defines its own script under option 3, this lands on the fallback below today.
+Option 1 exists: `shot` shipped in app-kit 0.86.0 (joshuafolkken/app-kit#200). Option 2 does not
+yet — game-kit carries no `shot` — so a game project still lands on option 3 or the fallback below.
+Neither statement is a substitute for the check in the next paragraph: both are true of a version,
+and the version a project has installed is the only thing that decides.
 
 **Decide by the printed command list, not by whether the toolkit is installed.** Run the toolkit
 with no subcommand (`pnpm josh-app`) and read the usage line it prints; `shot` exists only if that

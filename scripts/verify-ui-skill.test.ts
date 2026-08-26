@@ -47,9 +47,12 @@ describe(`${SKILL_PATH} — refuses to pass without a capture`, () => {
 		// Verified in a consumer: an installed toolkit without the subcommand and an absent toolkit both
 		// exit non-zero with the same usage line, so only the printed command list separates them.
 		'**Decide by the printed command list, not by whether the toolkit is installed.**',
-		// Until app-kit#200 lands, every consumer takes the no-command branch — the skill has to say so
-		// rather than read as broken.
-		'Neither toolkit carries `shot` yet',
+		// app-kit#200 has landed, so option 1 exists and the skill must not forestall the check above
+		// by saying otherwise (#883). What is asserted here is the half that survives the next
+		// release. The statement about a version is asserted here too, and again in
+		// `verify-ui-shot-document-rule.test.ts` alongside the retired phrasings — deliberately, so
+		// that suite reads as one account of the claim rather than half of it.
+		'the version a project has installed is the only thing that decides',
 	])('states %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
@@ -76,7 +79,7 @@ describe.each(AI_DOCS)('%s — UI gate names the shipped skill', (document_path)
 		expect(content).not.toContain('the `/verify` or `/run` skill')
 	})
 
-	it('keeps the gate reachable while no toolkit ships the command', () => {
+	it('keeps the gate reachable where no toolkit ships the command', () => {
 		expect(content).toContain('adding a `page.screenshot()` to the relevant `*.e2e.ts`')
 	})
 

@@ -366,11 +366,12 @@ SECURITY.md         tsconfig.sonar.json
 > until joshuafolkken/kit#853 it named a skill this package did not ship — so the step pointed at
 > nothing. The skill picks the routes, calls the application layer's own screenshot command, and
 > opens the images. Where no such command exists it says so and leaves the gate open, which is the
-> point: a skill that returned success there would read as closed while verifying nothing. Today that
-> is every consumer — the command it looks for (`josh-app shot` for a SvelteKit project,
-> `josh-game shot` for a game) exists in neither toolkit yet; joshuafolkken/app-kit#200 adds the
-> first one. Shipping the skill ahead of it is what turns a gate that quietly passed into one that
-> says out loud it could not run.
+> point: a skill that returned success there would read as closed while verifying nothing. Of the two
+> commands it looks for, `josh-app shot` shipped in app-kit 0.86.0 (joshuafolkken/app-kit#200) and
+> `josh-game shot` does not exist yet, so a SvelteKit project captures for real while a game project
+> still takes the fallback. Which branch a project takes is decided by the command list its toolkit
+> prints, never by a sentence here: this one is true of a version, and the skill is written to check
+> rather than to trust it (joshuafolkken/kit#883).
 >
 > It is distributed as `verify-ui` rather than `verify` deliberately. Claude Code bundles a `/verify`
 > of its own, and a project skill at `.claude/skills/verify/` replaces it — that path is also where
