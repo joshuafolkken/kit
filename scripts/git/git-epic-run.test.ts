@@ -7,6 +7,8 @@ vi.mock('./git-gh-command', () => ({
 		issue_create_with_label: vi.fn(),
 		issue_add_blocked_by: vi.fn(),
 		issue_get_labels_and_body: vi.fn(),
+		issue_edit_body: vi.fn(),
+		issue_add_label: vi.fn(),
 	},
 }))
 
@@ -72,12 +74,10 @@ describe('git_epic_run.create_epic', () => {
 		expect(mocked_blocked_by).not.toHaveBeenCalled()
 	})
 
-	it('prints a queue command containing the children only', async () => {
+	it('prints the epicrun command naming the epic, not a list of children', async () => {
 		await git_epic_run.create_epic(create_input(false))
 
-		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
-			expect.stringContaining('queue #101 #102 #103'),
-		)
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(expect.stringContaining('epicrun #700'))
 	})
 })
 

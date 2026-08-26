@@ -754,6 +754,22 @@ An epic has four mechanical requirements, three of which fail **silently** when 
 
 The manual `gh` procedure remains documented in `prompts/collaboration-workflow.md` as the fallback for environments where `josh` is unavailable.
 
+#### `josh epic --promote` — turn an existing issue into an epic
+
+```bash
+pnpm josh epic --promote 858 101 102 103 [--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]
+```
+
+The discussion that concludes "this is really three issues" almost always happens _inside_ an existing issue, and that discussion is usually the split rationale itself. Creating a separate epic leaves two issues tracking one topic, so `--promote` **appends** the epic's sections to the issue instead of replacing its body ([#865](https://github.com/joshuafolkken/kit/issues/865)).
+
+Everything else matches `josh epic`: the `epic` label is ensured and applied, the children are rendered as task-list rows, `Dependencies` is written in the machine-readable form, and `--ordered` records the whole `blocked-by` chain. A promoted issue therefore passes `pnpm josh epic:check <N>` exactly as a created one does. `--rationale-file` and `--origin` mean the same thing they do on a creation.
+
+**Re-running it is refused, not repeated.** A second append would leave two task lists in one body, and the auto-close would read whichever it matched first. The check is on the body rather than the label alone, since a label can be applied by hand without the sections.
+
+Promote when the issue is a request, a discussion or a container. When the issue is itself one of the deliverables — a bug report that turns out to need three separate fixes — keep it as a child and create a new epic instead; promoting the report would leave the report with nowhere to live.
+
+**The `Execution` section now prints `epicrun #<E>`**, for both creation and promotion. `epicrun` takes the epic rather than a list of children: it re-reads the state from GitHub each round, so an interrupted run resumes without anyone retyping the remaining numbers, and a child that needs a decision is parked rather than ending the run ([#861](https://github.com/joshuafolkken/kit/issues/861)). Epics created before this change still say `queue …` in that section and are unaffected — nothing reads it, the auto-close reads the task list and `epic:check` never looks at it.
+
 ### `josh epic:next`
 
 List an epic's runnable children, bundled per repository ([#860](https://github.com/joshuafolkken/kit/issues/860)).

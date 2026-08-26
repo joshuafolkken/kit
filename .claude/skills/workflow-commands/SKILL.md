@@ -36,9 +36,9 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
-| `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md`                                |
-| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `chain-rule.md` + `followup.md` |
-| `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md`                                |
+| `kickoff` / `kickoff #N` / `kickoff new` | `kickoff.md` + `split-assessment.md`        |
+| `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `split-assessment.md` + `chain-rule.md` + `followup.md` |
+| `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
 | `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 | `epicrun #E`                             | `epicrun.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 
@@ -51,6 +51,10 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   it never implements, so it never reaches the gate.
 - **`epicrun` differs on one point only**: a stop that would end a `queue` parks one child instead
   and the run continues. See `epicrun.md` → "park and continue".
+- **The split assessment** runs before any work starts, at *every* entry point, from the one
+  definition in `split-assessment.md`. Two or more separately-mergeable deliverables always means an
+  epic — no count threshold, no ordering condition — and a `fullrun` / `halfrun` that finds one files
+  the epic and **stops** rather than widening its own authorization to a batch.
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
   the Issue instead.

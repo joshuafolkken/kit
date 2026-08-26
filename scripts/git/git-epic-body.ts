@@ -3,7 +3,7 @@ import { UNORDERED_DEPENDENCIES } from './git-epic-parse'
 // The epic body is the machine-readable half of the epic contract: `scripts/git/git-epic-close.ts`
 // reads the task list to decide when the batch is finished, and the order-unrecorded warning reads
 // the `Dependencies` section. Generating both from the same input is what keeps them from
-// disagreeing with each other, or with the `queue` command printed next to them.
+// disagreeing with each other, or with the run command printed next to them.
 
 const DEPENDENCY_ARROW = ' -> '
 const RATIONALE_PLACEHOLDER = '<why the work was split this way>'
@@ -13,6 +13,9 @@ interface EpicBodyInput {
 	rationale: string
 	is_ordered: boolean
 	origin?: string | undefined
+	// Known when an existing issue is being promoted; absent while a new epic's body is built, since
+	// the number is only assigned on creation.
+	epic_number?: number | undefined
 }
 
 function to_reference(child: number): string {
@@ -31,9 +34,19 @@ function format_dependencies(children: ReadonlyArray<number>, is_ordered: boolea
 	return children.map((child) => to_reference(child)).join(DEPENDENCY_ARROW)
 }
 
-// The epic itself is never passed to `queue`: it has no deliverable and no implementation run.
-function format_queue_command(children: ReadonlyArray<number>): string {
-	return `queue ${children.map((child) => to_reference(child)).join(' ')}`
+// The command that runs the batch. `epicrun` takes the epic itself rather than a list of children
+// (joshuafolkken/kit#861): it re-reads the state from GitHub each round, so an interrupted run
+// resumes without anyone retyping the remaining numbers, and a child that needs a decision is parked
+// rather than ending the run.
+//
+// The epic number is not known while its own body is being built, so the placeholder is filled in by
+// `format_run_command` once the issue exists. Bodies written before this change still say
+// `queue …`; nothing reads the `Execution` section — the auto-close reads the task list and
+// `epic:check` never looks at it — so those epics are unaffected (joshuafolkken/kit#865).
+const EPIC_PLACEHOLDER = '<this epic>'
+
+function format_run_command(epic_number: number | undefined): string {
+	return `epicrun #${epic_number === undefined ? EPIC_PLACEHOLDER : String(epic_number)}`
 }
 
 // A backlink to the Issue this split came from, when the split originated in another repository.
@@ -63,7 +76,7 @@ function build_epic_body(input: EpicBodyInput): string {
 		'',
 		'## Execution',
 		'',
-		format_queue_command(input.children),
+		format_run_command(input.epic_number),
 		'',
 		'## Progress',
 		'',
@@ -86,9 +99,10 @@ function build_dependency_pairs(
 }
 
 const git_epic_body = {
+	EPIC_PLACEHOLDER,
 	build_epic_body,
 	build_dependency_pairs,
-	format_queue_command,
+	format_run_command,
 }
 
 export { git_epic_body }

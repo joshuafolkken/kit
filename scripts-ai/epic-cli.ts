@@ -8,12 +8,23 @@ const STDIN_FD = 0
 const ORDERED_FLAG = '--ordered'
 const RATIONALE_FLAG = '--rationale-file'
 const ORIGIN_FLAG = '--origin'
+const PROMOTE_FLAG = '--promote'
 const FLAG_PREFIX = '--'
 const VALUE_FLAGS: ReadonlySet<string> = new Set([RATIONALE_FLAG, ORIGIN_FLAG])
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 
 interface CreateArguments {
 	title: string
+	children: Array<number>
+	is_ordered: boolean
+	rationale_path?: string | undefined
+	origin?: string | undefined
+}
+
+// `--promote <N> <N1> <N2> …`: the issue to promote, then its children. No title — the issue already
+// has one, and the discussion in it is usually the split rationale (joshuafolkken/kit#865).
+interface PromoteArguments {
+	epic_number: number
 	children: Array<number>
 	is_ordered: boolean
 	rationale_path?: string | undefined
@@ -70,6 +81,30 @@ function parse_create_arguments(argv: ReadonlyArray<string>): CreateArguments | 
 	}
 }
 
+// Whether the invocation is a promotion rather than a creation.
+function is_promotion(argv: ReadonlyArray<string>): boolean {
+	return argv.includes(PROMOTE_FLAG)
+}
+
+// The promoted issue and its children. The number after `--promote` is the epic; everything else
+// positional is a child. Refused when the epic would also be listed as its own child, which would
+// have it block itself under `--ordered`.
+function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {
+	const [raw_epic, ...raw_children] = to_positional_arguments(argv)
+	if (raw_epic === undefined || !ISSUE_NUMBER_PATTERN.test(raw_epic)) return undefined
+	const epic_number = Number(raw_epic)
+	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
+	if (children.length === 0) return undefined
+
+	return {
+		epic_number,
+		children,
+		is_ordered: argv.includes(ORDERED_FLAG),
+		rationale_path: read_flag_value(argv, RATIONALE_FLAG),
+		origin: read_flag_value(argv, ORIGIN_FLAG),
+	}
+}
+
 function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
 	const [raw] = to_positional_arguments(argv)
 	if (raw === undefined || !ISSUE_NUMBER_PATTERN.test(raw)) return undefined
@@ -86,10 +121,12 @@ function read_rationale(rationale_path: string | undefined): string {
 }
 
 const epic_cli = {
+	is_promotion,
 	parse_create_arguments,
+	parse_promote_arguments,
 	parse_check_argument,
 	read_rationale,
 }
 
-export { epic_cli, ORDERED_FLAG, RATIONALE_FLAG, ORIGIN_FLAG }
-export type { CreateArguments }
+export { epic_cli, ORDERED_FLAG, ORIGIN_FLAG, PROMOTE_FLAG, RATIONALE_FLAG }
+export type { CreateArguments, PromoteArguments }
