@@ -27,6 +27,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print every child of an epic as JSON, for one batch of decisions',
 		category: 'AI tools',
 	},
+	'epic:bundle': {
+		script: 'scripts/epic/epic-bundle-cli.ts',
+		description: 'Say whether a newly filed issue belongs with ones already in the backlog',
+		category: 'AI tools',
+	},
 	'epic:audit': {
 		script: 'scripts/epic/epic-audit-cli.ts',
 		description: "Audit an epic's children against each other for contradictions",
