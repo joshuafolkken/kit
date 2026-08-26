@@ -6,7 +6,21 @@ vi.mock('execa', () => ({
 	execa: vi.fn(),
 }))
 
-const { GATE_STEPS, verification_gate } = await import('./verification-gate')
+// The per-project resolution of the type-check step is `type-check-step.test.ts`'s subject. Here it
+// returns a value the default could never produce, so an assertion below fails if the gate stops
+// asking the resolver and goes back to a hardcoded `josh check`.
+const RESOLVED_TYPE_CHECK: ReadonlyArray<string> = ['josh-app', 'check:ci']
+
+vi.mock('./type-check-step', () => ({
+	type_check_step: {
+		resolve_type_check_args: async (): Promise<ReadonlyArray<string>> => RESOLVED_TYPE_CHECK,
+	},
+}))
+
+const PROJECT_ROOT = '/project'
+
+const { verification_gate } = await import('./verification-gate')
+const GATE_STEPS = await verification_gate.build_gate_steps(PROJECT_ROOT)
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
@@ -126,6 +140,22 @@ describe('run_verification_gate', () => {
 
 		expect(positions).toEqual([...positions].toSorted((left, right) => left - right))
 		expect(positions.every((position) => position >= 0)).toBe(true)
+	})
+})
+
+describe('the type check follows the resolver', () => {
+	it('runs the resolved command as the check step', async () => {
+		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT)
+
+		expect(steps[1]?.command_args).toEqual(RESOLVED_TYPE_CHECK)
+	})
+
+	// A failure on the `check` step is only reproducible if the header names what actually ran; the
+	// label alone points at `pnpm josh check`, which is not the command on a SvelteKit project.
+	it('names the command that ran, not only the label', async () => {
+		const [, output] = await run_capturing(ALL_PASS)
+
+		expect(output).toContain('check (pnpm josh-app check:ci)')
 	})
 })
 
