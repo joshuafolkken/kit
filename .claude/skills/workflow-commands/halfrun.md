@@ -8,7 +8,16 @@
 
 1. **File the prerequisite `#<P>` without asking** (Tier A, first-party). It goes first because the steps below name it.
 2. **Stash the work in progress** — `git stash push -u -m "halfrun: paused #<N> for prerequisite #<P>"` — then record it on the Issue: `gh issue comment <N> --body "<what was stashed, and that #<P> must land first>"`. **`-u` is not optional**: the work almost always includes a new `*.test.ts`, which is untracked, and a stash without it leaves exactly those files in the tree for the `epicrun` the person is about to run, whose every child starts with `git switch main && git pull`. **The Issue comment is what gets the stash popped**: the run that later picks `#N` up reads it and pops before implementing — a stash recorded only in a Telegram message is orphaned work. Say it in the Telegram too, but the comment is the record.
-3. **Create a new epic, with `--ordered`** — `pnpm josh epic "<title>" <P> <N> --ordered`. `#N` is itself a deliverable, so it is kept as a child rather than promoted. **`--ordered` is required, not stylistic**: without it the epic is written as `None — the children are independent` and no `blocked-by` relation is recorded, so the follow-up `epicrun` can hand back `#N` before its prerequisite — the exact ordering this rule exists to preserve.
+3. **Find out whether `#N` already belongs to an epic, before creating one** — `pnpm josh epic:bundle <N>`, which names it (`#893 already tracks this issue`) rather than only reporting that one exists.
+
+   | Answer | What to do |
+   | --- | --- |
+   | An epic `#<E>` already tracks `#N` | `pnpm josh epic --add <E> <P> --before <N>` — insert into **that** epic. **Do not create a second one**: two epics tracking `#N` give the auto-close two task lists to disagree about, and `epic:next` answers from two different graphs (joshuafolkken/kit#943) |
+   | No epic tracks it | `pnpm josh epic "<title>" <P> <N> --ordered` — `#N` is itself a deliverable, so it is kept as a child rather than promoted. **`--ordered` is required, not stylistic**: without it the epic is written as `None — the children are independent` and no `blocked-by` relation is recorded, so the follow-up `epicrun` can hand back `#N` before its prerequisite — the exact ordering this rule exists to preserve |
+   | **The command could not answer** — it exited non-zero, could not list the epics, or `#N` is past its backlog cap | Stop and report, naming what it said. **Do not fall through to creating an epic**: "could not tell" is not "no epic tracks it", and reading it as such recreates the duplicate this step exists to prevent |
+
+   **`--add ... --before <N>` can itself be refused**, when the epic declares an order that does not name `#N` — it answers `#N is not named in the declared dependency order` and writes nothing. Do not hand-edit the body and do not create a second epic; the command's refusal is the report. This branch already ends in a stop, so say what was refused in the `confirmation` Telegram and let the person decide (joshuafolkken/kit#949).
+
 4. **Remove `in-progress` from `#N`** — `gh issue edit <N> --remove-label "in-progress"`. `epic:next` classifies a child carrying that label as waiting on time **before** it consults any blocker, so leaving it on ships an epic whose `#N` is never offered and which stalls the moment `#<P>` merges.
 5. Send the `confirmation` Telegram and **stop** with "Please run `epicrun #<E>` to execute this epic."
 

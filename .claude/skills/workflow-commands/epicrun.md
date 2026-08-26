@@ -33,10 +33,23 @@ So inside `epicrun #<N>`, a prerequisite or a split found mid-run does **not** s
    && git pull`, and `epic:next` classifies a child carrying `in-progress` as waiting on time
    **before** it consults any blocker, so `#<N>` would never be offered again and the epic would
    stall. **The path is new; the mechanics are not, and none of them is optional here.**
-3. Create a **new** epic. `#<N>` is being implemented, so it is itself one of the deliverables —
-   which is why this path always takes the keep-as-a-child arm of `split-assessment.md`'s
-   promote-or-create branch, rather than choosing between the two. **Which command depends on what
-   was found**, because `--ordered` makes the argument order the dependency chain:
+3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.** It
+   names the epic (`#893 already tracks this issue`) rather than only reporting that one exists. A
+   bare Issue handed to `epicrun` can already be somebody's epic child — nothing stops
+   `epicrun #943` on a child of `#893` — and creating a second epic over it gives the auto-close two
+   task lists to disagree about, on the entry point that runs with nobody watching
+   (joshuafolkken/kit#943).
+
+   | Answer | What to do |
+   | --- | --- |
+   | An epic `#<E>` already tracks `#<N>` | `pnpm josh epic --add <E> <P> --before <N>` for a prerequisite, or `--add <E> <N1> ...` for a split. **Do not create a second epic.** Continue the loop against `#<E>` |
+   | No epic tracks it | Create one — the command depends on what was found (table below) |
+   | **The command could not answer** | Park `#<N>` with `needs-decision` and report. "Could not tell" is not "no epic tracks it", and reading it as such recreates the duplicate this step prevents |
+
+   When creating one, `#<N>` is being implemented, so it is itself one of the deliverables — which is
+   why this path always takes the keep-as-a-child arm of `split-assessment.md`'s promote-or-create
+   branch, rather than choosing between the two. **Which command depends on what was found**, because
+   `--ordered` makes the argument order the dependency chain:
 
    | Found | Command |
    | --- | --- |
