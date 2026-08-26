@@ -16,6 +16,14 @@ function read_repo_file(relative_path: string): string {
 	return readFileSync(package_file(relative_path), 'utf8')
 }
 
+// Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
+// a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
+// column they landed in. Every marker suite needs this, which is why it lives here rather than being
+// re-declared once per suite (joshuafolkken/kit#951).
+function read_unwrapped(relative_path: string): string {
+	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
+}
+
 // Every markdown file under the distributed skills, sorted so the concatenation below is stable
 // whatever order the filesystem hands them back in.
 function skill_documents(): ReadonlyArray<string> {
@@ -59,6 +67,7 @@ export {
 	ENV_EXAMPLE,
 	read_repo_file,
 	read_rule_surface,
+	read_unwrapped,
 	rule_surface_documents,
 	skill_documents,
 	WORKFLOW_PROMPT,

@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	read_repo_file,
+	read_rule_surface,
+	read_unwrapped,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 
 // joshuafolkken/kit#862: front-loading the decisions only works if three things survive a reword —
 // the audit runs before the batch, the batch is one question for the whole epic, and recording an
 // answer clears the child's park. Losing the first makes decisions on a contradictory plan; losing the
 // second asks the same question per child; losing the third leaves a child stopped after the answer
 // arrived.
-
-function read_unwrapped(relative_path: string): string {
-	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
-}
 
 // The procedure moved into the `epic-commands` skill, so these are checked across the rule surface.
 const SURFACE_MARKERS: ReadonlyArray<string> = [

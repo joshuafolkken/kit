@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_unwrapped, WORKFLOW_PROMPT } from './ai-document-fixture'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from './git/issue-labels'
 
 // joshuafolkken/kit#891: "something else has to land first" is the third thing a run can discover,
@@ -9,6 +9,7 @@ import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from './git/issue-labels'
 // cleared by hand. These markers pin the parts a reword most easily loses — that the run does *not*
 // park, the condition under which it may, and the ceiling that replaces the removed confirmation.
 
+const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
 const FULLRUN_SKILL = '.claude/skills/workflow-commands/fullrun.md'
 const HALFRUN_SKILL = '.claude/skills/workflow-commands/halfrun.md'
@@ -18,29 +19,28 @@ const PARK_ONLY_FOR = 'Parking is only for a prerequisite that cannot be express
 // A stash without `-u` leaves the new `*.test.ts` behind, which is the whole failure the step names.
 const UNTRACKED_REQUIRED = '**`-u` is not optional**'
 
-// Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
-// a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
-// column they landed in.
-function read_unwrapped(relative_path: string): string {
-	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
-}
-
 // Read from the document itself rather than from the rule surface: the surface concatenates every
 // distributed skill, so a marker checked there would pass on the skill's copy alone — which is
 // exactly the drift these three paired documents exist to prevent.
 //
-// Only the rule is pinned here, never the procedure. The mechanics — the stash, the `--ordered`, the
-// `in-progress` removal — are asserted in the skill suites below, because `workflow-skills.test.ts`
-// caps how much may stay resident and inlining them there is what the cap exists to stop.
+// joshuafolkken/kit#951 moved the rule out of the documents and into the skill's shared section: it
+// binds only after a command has started, so restating it resident spent always-loaded budget that
+// `workflow-skills.test.ts` then caps. What is pinned here is the routing — the rule is named, the
+// files that carry each branch are named, and the canonical section is named.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
-	'A prerequisite discovered mid-run is a dependency, not a park',
-	'continues rather than parking it',
-	PARK_ONLY_FOR,
-	'caps automatic filing at 10 Issues per run',
-	// joshuafolkken/kit#943: `fullrun #N` can be typed on an Issue an epic already tracks, and
-	// creating a second one there has the auto-close reading two task lists that disagree.
-	'ask `pnpm josh epic:bundle <N>` which epic already tracks `#N`',
+	'Three rules decide what a run does when the work turns out not to be one Issue',
+	'a prerequisite discovered mid-run (filed and recorded as a dependency, not parked)',
+	'`fullrun.md` / `halfrun.md` / `epicrun.md`',
 	'実行中に前提 Issue が判明した場合',
+]
+
+// The copy that replaced the resident one. It states the rule; the procedure stays in the per-entry
+// files, which the suites below assert.
+const ENTRY_MARKERS: ReadonlyArray<string> = [
+	'**A prerequisite discovered mid-run is a dependency, not a park.**',
+	'continues rather than parking it',
+	'**Automatic filing is capped at 10 Issues per run** at every entry point',
+	'`kickoff` is exempt — it never implements, so it never discovers one',
 ]
 
 // The load-bearing parts of the definition, in the canonical reference.
@@ -80,6 +80,9 @@ const EPICRUN_SKILL_MARKERS: ReadonlyArray<string> = [
 	'## A prerequisite discovered mid-run',
 	'**Do not park.**',
 	PARK_ONLY_FOR,
+	// joshuafolkken/kit#943: `epicrun #N` can be typed on an Issue an epic already tracks, and
+	// creating a second one there has the auto-close reading two task lists that disagree.
+	'Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one',
 	// The loop is where a reader following the run arrives, so the branch has to be stated there.
 	'`epic:next` classifies the original child as resolving on its own',
 	`**Remove \`${IN_PROGRESS_LABEL}\` from \`<M>\`.**`,
@@ -110,10 +113,16 @@ const STOPPING_ENTRY_MARKERS: ReadonlyArray<string> = [
 ]
 
 describe('prerequisite-issue definition', () => {
-	it.each(AI_DOCS)('defines the rule in %s itself, not only in the skill', (document_name) => {
+	it.each(AI_DOCS)('is routed to from %s, by name and by file', (document_name) => {
 		const content = read_unwrapped(document_name)
 
 		for (const marker of AI_DOC_MARKERS) expect(content).toContain(marker)
+	})
+
+	it('states the rule where the skill lists what every command shares', () => {
+		const content = read_unwrapped(WORKFLOW_SKILL)
+
+		for (const marker of ENTRY_MARKERS) expect(content).toContain(marker)
 	})
 
 	it('has a canonical section in the workflow prompt', () => {

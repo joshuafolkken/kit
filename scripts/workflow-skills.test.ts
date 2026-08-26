@@ -1,6 +1,12 @@
 import { readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, skill_documents } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	read_repo_file,
+	read_unwrapped,
+	skill_documents,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 import { init_logic } from './init/init-logic'
 import {
 	has_frontmatter,
@@ -28,6 +34,13 @@ const MINIMUM_DESCRIPTION_LENGTH = 80
 // slack: it is a guard against a procedure being inlined back into the always-loaded surface, not a
 // budget anyone should tune prose against.
 const RESIDENT_CEILING_BYTES = 60_000
+
+// joshuafolkken/kit#951: the ceiling alone stops the wrong thing. Reached, it does not block the
+// next rule — it makes that rule pay for itself by deleting a neighboring sentence, and the
+// sentence chosen is whichever one no marker pinned rather than whichever one matters least. A
+// required margin turns "at the limit" into a failure while there is still room to write the fix,
+// which is the only point at which moving a procedure into a skill is still a choice.
+const RESIDENT_HEADROOM_BYTES = 2000
 
 const KICKOFF_FILE = 'kickoff.md'
 const FULLRUN_FILE = 'fullrun.md'
@@ -149,11 +162,45 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 	})
 })
 
+// joshuafolkken/kit#951: what may stay resident had never been written down, so each new rule was
+// placed by whoever wrote it. The criterion has one input — does the rule bind before a command has
+// started — and every rule that passes it is named, because a criterion with no worked examples is
+// re-derived differently every time it is applied.
+describe('the residency criterion — which rules may stay in the always-loaded documents', () => {
+	it.each([
+		'## 3. What stays resident, and what is read from here',
+		'**A rule stays in the AI documents if and only if it has to fire on a turn where no skill was loaded.**',
+		// Enumerated, because a criterion with no worked examples is re-derived differently each time,
+		// and the set has to match what the suite below asserts resident.
+		'The list is exhaustive — a rule added to the documents without appearing here has not been checked against the criterion',
+		'**The `overrides` prohibition**',
+		'**The three `josh epic:*` rules that bind outside those commands**',
+		'**Explicit invocation required**',
+		'**The mid-workflow stop notification**',
+		'**The criterion is not advisory.**',
+	])('is documented in the workflow skill: %j', (marker) => {
+		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).toContain(marker)
+	})
+
+	// The skill is the operational copy; the canonical reference is where the rule is argued, and the
+	// two have to agree. A criterion stated only in the skill is invisible to a Gemini or Cursor run,
+	// which reads the prompt and never loads a Claude Code skill.
+	it.each([
+		'## 常駐ドキュメントと skill の分担（何を常駐に残すか）',
+		'**その規則は、skill がロードされていないターンでも効く必要があるか。**',
+		'**この基準は努力目標ではない。**',
+	])('is argued in the canonical prompt: %j', (marker) => {
+		expect(read_unwrapped(WORKFLOW_PROMPT)).toContain(marker)
+	})
+})
+
 describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (document_path) => {
 	const content = read_repo_file(document_path)
 
-	it('stays under the resident ceiling', () => {
-		expect(Buffer.byteLength(content, 'utf8')).toBeLessThan(RESIDENT_CEILING_BYTES)
+	it('stays under the resident ceiling, with room left to write the next rule', () => {
+		expect(Buffer.byteLength(content, 'utf8')).toBeLessThan(
+			RESIDENT_CEILING_BYTES - RESIDENT_HEADROOM_BYTES,
+		)
 	})
 
 	it.each([WORKFLOW_SKILL, DEPENDENCY_SKILL])('names %s', (skill_directory) => {
@@ -169,22 +216,60 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 		'#### `queue` — Sequential multi-issue fullrun',
 		'#### `/review` → `followup --merge` chain rule (MANDATORY)',
 		ANTI_PATTERN_MARKER,
+		// joshuafolkken/kit#951: three rules that bind only after a command has started, restated
+		// resident until the documents reached the ceiling. Their opening sentences are pinned absent
+		// so a re-inlining is caught by name rather than only by the byte count it would push past.
+		'**The split assessment runs at every entry point, from one definition.**',
+		'**A prerequisite discovered mid-run is a dependency, not a park.**',
+		'**`epicrun` also accepts an Issue that is not an epic.**',
+		'**`epicrun` parks instead of stopping.**',
 	])('no longer inlines %j', (marker) => {
 		expect(content).not.toContain(marker)
 	})
 
-	// The one rule that cannot move: it decides whether a workflow starts at all, so it has to hold
-	// on a turn where the workflow skill was never loaded.
+	// Removing a procedure is only half of it. Without the routing the rule reaches no run at all,
+	// which reads exactly like the rule having been deleted.
+	it.each([
+		'**Three rules decide what a run does when the work turns out not to be one Issue**',
+		'split-assessment.md',
+		'`fullrun.md` / `halfrun.md` / `epicrun.md`',
+		'**`epicrun` parks a child instead of stopping the session**',
+	])('routes to the moved procedures with %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+// The rules that pass the residency criterion: each one binds on a turn where the workflow skill was
+// never loaded — the first decides whether a workflow starts at all, and the pauses that need the
+// second mostly happen with no workflow keyword typed (an upstream-Issue interrupt, a Tier C stop).
+describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
+	const content = read_repo_file(document_path)
+
 	it.each([
 		ROUTING_END_HEADING,
 		'Please run \\`<command>\\` to start this task.',
-		// The pauses that need this notification mostly happen with no workflow keyword typed — an
-		// upstream-Issue interrupt, a Tier C stop — so the command itself cannot live in a skill.
 		'pnpm josh notify --task-type confirmation',
 		'`parseArgs` rejects it',
 		'**NEVER** remove or modify entries in **either** location without explicit user approval.',
 		'**NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation.',
+		// The three `epic:*` rules the criterion's list names. They fire the moment an issue is filed
+		// or a decision is written, on turns where no `epic:*` command was run.
+		"recording a decision removes that child's `needs-decision` label",
+		'**fixing what the audit finds is Tier A**',
+		'**an epic in another repository is referenced as `owner/repo#N`**',
 	])('keeps %j resident', (marker) => {
+		expect(content).toContain(marker)
+	})
+
+	// The criterion itself is what keeps the next rule from landing resident by default. It is stated
+	// in full in the skill; what the documents carry is the question.
+	// Both halves are pinned: the question, and the set it resolves to. A criterion whose worked
+	// examples drift from what this suite asserts resident is what let the rule be applied two ways
+	// at once (joshuafolkken/kit#951).
+	it.each([
+		'**What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?**',
+		'Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions and the three `epic:*` rules below all do',
+	])('states the test for what may stay resident: %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 })

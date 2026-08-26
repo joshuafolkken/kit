@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	read_repo_file,
+	read_rule_surface,
+	read_unwrapped,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 
 // joshuafolkken/kit#870: the audit only helps if it runs without being asked, and the two rules that
 // make it usable — only errors fail, and fixing what it finds is Tier A — are the ones a reword
@@ -7,10 +13,6 @@ import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './a
 // or a gate that fails on legitimate design notes.
 
 const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
-
-function read_unwrapped(relative_path: string): string {
-	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
-}
 
 // The procedure moved into the `epic-commands` skill (joshuafolkken/kit#873's resident-ceiling
 // guard), so these are checked across each document's rule surface — the document plus every

@@ -385,9 +385,15 @@ SECURITY.md         tsconfig.sonar.json
 > half of each was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
 > `halfrun` / `queue` steps, the `/code-review` → `followup --merge` chain rule, and the checks that run
 > after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
-> documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB. What stayed resident
-> is what has to hold when a skill has _not_ been loaded: the rule that a workflow starts only on an
-> explicitly typed keyword, and the prohibitions on touching `overrides` or `devEngines`.
+> documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB.
+>
+> **What stays resident is decided by one question — must the rule fire on a turn where no skill was
+> loaded?** joshuafolkken/kit#951 wrote that criterion down after the documents grew back to within
+> three bytes of their ceiling and each new rule started paying for itself by deleting a neighboring
+> sentence. `.claude/skills/workflow-commands/SKILL.md` → "What stays resident, and what is read from
+> here" carries the criterion and the exhaustive list of the rules that pass it; a unit test asserts
+> each of them present in all three documents, and asserts headroom under the ceiling so the next
+> rule is written while moving a procedure is still a choice.
 >
 > Their markdown does cite `prompts/…` paths, which a byte copy would have shipped unresolved — so
 > the directory copy is followed by the same rewrite the file copies run, over the copied markdown
