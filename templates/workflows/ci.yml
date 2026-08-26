@@ -276,11 +276,18 @@ jobs:
       # records every level unconditionally. Sanitization (wrangler's own default) is
       # pinned here so a repository-level opt-out cannot leak tokens into the artifact.
       WRANGLER_LOG_SANITIZE: 'true'
-      # Single source for "this run is allowed to retry": a push to the default branch, the only
-      # run whose failure withholds a release. Every step of the retry chain below reads this one
-      # flag, so the rule that permits a failure to be survived and the rule that acts on it
-      # cannot drift apart — a pull request run never enters the chain at all.
-      E2E_RETRY_ENABLED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      # Two rules, each declared once. E2E_RETRY_ENABLED says a run may survive its first failure
+      # long enough for the chain below to decide what to do about it; E2E_RETRY_UNCONDITIONAL says
+      # it may retry without having to justify itself. A push to the default branch is both: its
+      # failure withholds a release, and no signature is worth being wrong about there (#783). A
+      # pull request is only the first — it survives its first failure so the check below can read
+      # the preview server's log, and retries solely when that log says the server process died
+      # (#872). Keeping the two apart is what stops a failing suite from being retried until it
+      # passes, which is the masking the original default-branch-only gate was written to prevent.
+      E2E_RETRY_ENABLED:
+        ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name ==
+        'pull_request' }}
+      E2E_RETRY_UNCONDITIONAL: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -350,12 +357,40 @@ jobs:
 
       # Only a run allowed to retry may continue past a failure: a push to the default branch gates
       # the auto-tag dispatch below, so one transient crash there withholds the release until a
-      # human notices and re-runs the job by hand (#783). A pull request run keeps failing on the
-      # first attempt — a red check there costs nothing but the re-run button.
+      # human notices and re-runs the job by hand (#783). A pull request now continues past its
+      # first failure too — but only as far as the check below, which reports whether there was a
+      # reason. When there was none, `Report the unretried E2E failure` puts the job back to red,
+      # so surviving the failure never turns into shipping it.
+      #
+      # With this workflow's two triggers the flag is constantly true, so the expression currently
+      # decides nothing. It is written this way for the trigger that is not here yet — a schedule or
+      # a manual dispatch has no business surviving its first failure, and would have to remember to
+      # add the term back if it were hard-coded to `true` now.
       - name: Run E2E tests
         id: e2e_tests
         continue-on-error: ${{ env.E2E_RETRY_ENABLED == 'true' }}
         run: pnpm exec playwright test
+
+      # Did the preview server die? A fact, published once so every step below reads one output
+      # instead of re-deriving it. It is a kit command rather than shell in this file because this
+      # is the one part of the chain that can be wrong without anyone noticing: a signature that
+      # stops matching silently stops retrying. As a script it has unit tests
+      # (`scripts/e2e-retry-check.test.ts`) that fail the build when the rule drifts; as a `run:`
+      # block it would have none. The log it reads is wrangler's own debug output, already captured
+      # for the artifact below — not Playwright's reporter output, which is reshaped between
+      # releases and would need re-deriving each time.
+      #
+      # E2E_RETRY_UNCONDITIONAL is applied in the conditions below rather than passed down to this
+      # command, and that placement is load-bearing. continue-on-error means a step that errors
+      # publishes no output at all, so a default-branch push whose rule lived in here would lose the
+      # retry it must never lose — the withheld release of #783, reintroduced by the diagnostic
+      # meant to improve on it. Read as an OR up there, an unreadable log costs a pull request its
+      # retry (the status quo, safe) and costs the default branch nothing.
+      - name: Check whether the preview server crashed
+        id: e2e_retry_check
+        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        continue-on-error: true
+        run: pnpm josh e2e:retry-check
 
       # The retry overwrites both output directories, so the first attempt's evidence is moved
       # aside before it starts and uploaded under its own -attempt-1 names. This is what keeps a
@@ -377,7 +412,10 @@ jobs:
       # with the failed attempt's videos, traces and report. Failing here would withhold the
       # release even when the retry passes — the outcome #783 was opened to prevent (#789).
       - name: Preserve first attempt output
-        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        if: >-
+          ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome ==
+          'failure' && (env.E2E_RETRY_UNCONDITIONAL == 'true' ||
+          steps.e2e_retry_check.outputs.crashed == 'true') }}
         continue-on-error: true
         run: |
           # Announced, not just archived: a retry that passes leaves a green job, and without an
@@ -399,7 +437,10 @@ jobs:
       # consumer whose preview script is not wrangler and writes no log at all.
       - name: Upload first attempt test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        if: >-
+          ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome ==
+          'failure' && (env.E2E_RETRY_UNCONDITIONAL == 'true' ||
+          steps.e2e_retry_check.outputs.crashed == 'true') }}
         continue-on-error: true
         with:
           name: playwright-report-attempt-1
@@ -409,7 +450,10 @@ jobs:
 
       - name: Upload first attempt web server log
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        if: >-
+          ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome ==
+          'failure' && (env.E2E_RETRY_UNCONDITIONAL == 'true' ||
+          steps.e2e_retry_check.outputs.crashed == 'true') }}
         continue-on-error: true
         with:
           name: e2e-web-server-log-attempt-1
@@ -418,13 +462,19 @@ jobs:
           retention-days: 30
 
       # One retry, and only after a failure — a green run never starts this step and pays nothing.
-      # It is deliberately unconditional rather than keyed to a "whole suite is down" signature:
-      # any such rule has to be re-derived from reporter output whenever Playwright changes it and
-      # silently stops retrying the day it drifts, which is the failure mode that is hardest to
-      # notice. The price of the simpler rule is that a genuinely broken suite on the default
-      # branch costs one extra E2E run before it reports red, and that a real failure which
-      # happens to pass on the second attempt is reported green — the -attempt-1 artifacts above
-      # are what make that second case recoverable rather than invisible.
+      # On the default branch it is unconditional: a rule that can stop matching is not something
+      # to put between a merge and its release, so the price is paid there instead — a genuinely
+      # broken suite costs one extra E2E run before it reports red, and a real failure that happens
+      # to pass on the second attempt is reported green, with the -attempt-1 artifacts above the
+      # only thing that makes that case recoverable rather than invisible.
+      #
+      # A pull request pays neither price, because it retries only on the crash signature. Both
+      # ways of being wrong there are cheap, which is what makes the signature acceptable: a false
+      # positive spends one extra run and still reports red, since the second attempt fails too,
+      # and a false negative leaves the status quo of a human pressing re-run. The signature is
+      # read from wrangler's log rather than Playwright's reporter output for the same reason the
+      # default branch does not use it at all — reporter output is reshaped between releases,
+      # while `Error in ProxyController` is the server naming its own death.
       #
       # Known limit: nothing frees the preview port between attempts. A first attempt whose server
       # died releases it, which is the case this retry targets; a server that survived as an
@@ -432,8 +482,33 @@ jobs:
       # loud, diagnosable failure, and killing by port would need tooling the container image does
       # not guarantee and a guess at which process a consumer's preview script actually started.
       - name: Retry E2E tests
-        if: ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome == 'failure' }}
+        id: e2e_retry
+        if: >-
+          ${{ !cancelled() && env.E2E_RETRY_ENABLED == 'true' && steps.e2e_tests.outcome ==
+          'failure' && (env.E2E_RETRY_UNCONDITIONAL == 'true' ||
+          steps.e2e_retry_check.outputs.crashed == 'true') }}
         run: pnpm exec playwright test
+
+      # The first attempt was allowed to fail only so the check above could read the log. When no
+      # retry followed, nothing in the job is red any more, and the suite's failure would ship as a
+      # green check — the one way this change could be worse than the default-branch-only gate it
+      # replaces. This step is what turns a survived failure back into a failure.
+      #
+      # It is keyed to the retry having been skipped rather than to the event name, so every way of
+      # arriving here is covered by one rule: a genuinely failing suite, a log with no signature, a
+      # consumer that writes no log at all, and a check step that errored all reach this point by
+      # the same path, and all four must be red. A default-branch push cannot reach it, because the
+      # flag alone satisfies the retry condition above — and the event is deliberately not named
+      # here even so. A gate that excused the default branch would, on any future path that skipped
+      # the retry there, let a swallowed failure ship green and take the release with it; staying
+      # unconditional costs nothing and cannot fail that way.
+      - name: Report the unretried E2E failure
+        if: >-
+          ${{ !cancelled() && steps.e2e_tests.outcome == 'failure' && steps.e2e_retry.outcome ==
+          'skipped' }}
+        run: |
+          echo "::error::The E2E suite failed and no preview server crash was detected, so it was not retried."
+          exit 1
 
       # continue-on-error for the same reason the -attempt-1 uploads above carry it, and this is
       # the step where it matters most: it runs on always(), so it is the one evidence step still

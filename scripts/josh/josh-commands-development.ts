@@ -77,6 +77,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run unit tests with browser UI',
 		category: 'Development',
 	},
+	'e2e:retry-check': {
+		script: 'scripts/e2e-retry-check.ts',
+		description: 'Report whether the preview server crashed during a failed E2E attempt (CI)',
+		category: 'Development',
+	},
 	'test:e2e': {
 		script: 'scripts/test-e2e-guard.ts',
 		description: 'Run E2E tests with Playwright (skips when absent or no e2e files)',
