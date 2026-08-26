@@ -4,7 +4,7 @@ import { git_epic_parse, UNORDERED_DEPENDENCIES } from './git-epic-parse'
 
 const CHILDREN = [101, 102, 103]
 const RATIONALE = 'Split so the parser and the reporter can merge independently.'
-const QUEUE_COMMAND = 'queue #101 #102 #103'
+const EPIC_NUMBER = 858
 const ORIGIN_HEADING = '## Origin'
 const ORIGIN_REFERENCE = 'joshuafolkken/app-kit#144'
 const BLANK_RATIONALE = ' '.repeat(3)
@@ -50,8 +50,13 @@ describe('git_epic_body.build_epic_body — dependencies', () => {
 })
 
 describe('git_epic_body.build_epic_body — execution and rationale', () => {
-	it('prints a queue command listing the children only', () => {
-		expect(build(false)).toContain(QUEUE_COMMAND)
+	// `epicrun` takes the epic, not the children: it re-reads state from GitHub each round, so an
+	// interrupted run resumes without anyone retyping the remaining numbers (joshuafolkken/kit#861).
+	it('prints the epicrun command rather than a list of children', () => {
+		const body = build(false)
+
+		expect(body).toContain('epicrun')
+		expect(body).not.toContain('queue #101')
 	})
 
 	it('carries the supplied rationale', () => {
@@ -109,8 +114,17 @@ describe('git_epic_body.build_dependency_pairs', () => {
 	})
 })
 
-describe('git_epic_body.format_queue_command', () => {
-	it('never includes the epic itself', () => {
-		expect(git_epic_body.format_queue_command(CHILDREN)).toBe(QUEUE_COMMAND)
+describe('git_epic_body.format_run_command', () => {
+	it('names the epic once its number is known', () => {
+		expect(git_epic_body.format_run_command(EPIC_NUMBER)).toBe(`epicrun #${String(EPIC_NUMBER)}`)
+	})
+
+	// A new epic's body is written before the issue exists, so the number is substituted afterwards.
+	it('leaves a visible placeholder while the number is unknown', () => {
+		expect(git_epic_body.format_run_command(undefined)).toContain(git_epic_body.EPIC_PLACEHOLDER)
+	})
+
+	it('never lists the children, which epicrun does not take', () => {
+		expect(git_epic_body.format_run_command(EPIC_NUMBER)).not.toContain('#101')
 	})
 })

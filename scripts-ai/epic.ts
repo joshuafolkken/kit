@@ -4,30 +4,60 @@
  *
  * Usage: tsx scripts-ai/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
  *                                                       [--origin <owner/repo#N>]
+ *        tsx scripts-ai/epic.ts --promote <N> <N1> <N2> ... [same flags]
  */
 import { git_epic_run } from '../scripts/git/git-epic-run'
 import { epic_cli } from './epic-cli'
 
 const ARGV_OFFSET = 2
-const USAGE =
-	'Usage: josh epic "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]'
+const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]'
+const USAGE = [
+	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
+	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS}`,
+].join('\n')
 const FAILURE_EXIT_CODE = 1
 
-async function main(): Promise<void> {
-	const parsed = epic_cli.parse_create_arguments(process.argv.slice(ARGV_OFFSET))
+async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli.parse_promote_arguments(argv)
+
+	if (parsed === undefined) {
+		console.error(`✖ An issue number and at least one child issue number are required.\n${USAGE}`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await git_epic_run.promote_epic({
+		epic_number: parsed.epic_number,
+		children: parsed.children,
+		rationale: epic_cli.read_rationale(parsed.rationale_path),
+		is_ordered: parsed.is_ordered,
+		origin: parsed.origin,
+	})
+}
+
+async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli.parse_create_arguments(argv)
 
 	if (parsed === undefined) {
 		console.error(`✖ A title and at least one child issue number are required.\n${USAGE}`)
-		process.exit(FAILURE_EXIT_CODE)
+
+		return FAILURE_EXIT_CODE
 	}
 
-	const exit_code = await git_epic_run.create_epic({
+	return await git_epic_run.create_epic({
 		title: parsed.title,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
 		origin: parsed.origin,
 	})
+}
+
+async function main(): Promise<void> {
+	const argv = process.argv.slice(ARGV_OFFSET)
+	const exit_code = epic_cli.is_promotion(argv)
+		? await run_promotion(argv)
+		: await run_creation(argv)
 
 	if (exit_code !== 0) process.exit(exit_code)
 }
