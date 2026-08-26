@@ -55,6 +55,15 @@ on the Issue, without asking.
   A bug report that turns out to need three fixes is the case: promoting the report would leave the
   report itself with nowhere to live.
 
+## `epicrun` is the one entry that does not stop
+
+The table above is about the entries that ask for one Issue's authorization. `epicrun` asked for the
+batch's, so a split found under it is filed and continued through rather than stopped — including
+when the `epicrun` was given a bare, non-epic Issue, where the split is what creates the epic in the
+first place (`epicrun.md` → "When `#N` is not an epic", joshuafolkken/kit#892). The assessment itself
+is identical; only what follows the answer differs, and it differs because the authorization already
+covers a batch.
+
 ## Finding a split mid-run stops the run
 
 `fullrun` and `halfrun` **stop** after filing the children and the epic. They do not continue into

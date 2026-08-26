@@ -17,12 +17,6 @@ const STOPPING_ENTRY_SKILLS: ReadonlyArray<string> = [FULLRUN_SKILL, HALFRUN_SKI
 const PARK_ONLY_FOR = 'Parking is only for a prerequisite that cannot be expressed as a dependency'
 // A stash without `-u` leaves the new `*.test.ts` behind, which is the whole failure the step names.
 const UNTRACKED_REQUIRED = '**`-u` is not optional**'
-// The three mechanical steps a reword loses first, because each reads as housekeeping and is not.
-// `epic_classify.local_category` answers `time` on `in-progress` before it consults any blocker, so
-// a child left labelled is never offered again; `create_epic` records `blocked-by` only under
-// `--ordered`, so an epic written without it can start `#N` before its prerequisite; and a child is
-// implemented on the default branch with an uncommitted tree, which the next child's
-// `git switch main && git pull` would refuse or carry along.
 
 // Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
 // a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
@@ -34,15 +28,16 @@ function read_unwrapped(relative_path: string): string {
 // Read from the document itself rather than from the rule surface: the surface concatenates every
 // distributed skill, so a marker checked there would pass on the skill's copy alone — which is
 // exactly the drift these three paired documents exist to prevent.
+//
+// Only the rule is pinned here, never the procedure. The mechanics — the stash, the `--ordered`, the
+// `in-progress` removal — are asserted in the skill suites below, because `workflow-skills.test.ts`
+// caps how much may stay resident and inlining them there is what the cap exists to stop.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'A prerequisite discovered mid-run is a dependency, not a park',
-	'do not park',
+	'continues rather than parking it',
 	PARK_ONLY_FOR,
 	'caps automatic filing at 10 Issues per run',
 	'実行中に前提 Issue が判明した場合',
-	'stash the work in progress with `git stash push -u`',
-	`remove \`${IN_PROGRESS_LABEL}\` from the paused child`,
-	'`--ordered` is required',
 ]
 
 // The load-bearing parts of the definition, in the canonical reference.
