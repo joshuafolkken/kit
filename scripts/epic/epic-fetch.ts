@@ -1,5 +1,6 @@
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
+import { git_epic_parse, type ExternalChild } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'
 
@@ -24,8 +25,12 @@ function to_child(parsed: EpicIssue, repo: string): EpicChild {
 // One child's state, labels and native relations. A child that cannot be read is reported as
 // missing rather than assumed closed: assuming would let an epic advance past a child nobody looked
 // at.
-async function fetch_child(issue_number: number, repo: string): Promise<EpicChild | undefined> {
-	const raw = await git_gh_command.issue_get_state_and_relations(String(issue_number))
+async function fetch_child(
+	issue_number: number,
+	repo: string,
+	scope?: string,
+): Promise<EpicChild | undefined> {
+	const raw = await git_gh_command.issue_get_state_and_relations(String(issue_number), scope)
 	const parsed = epic_issue.parse_epic_issue(raw)
 	if (parsed === undefined) return undefined
 
@@ -48,16 +53,50 @@ interface FetchedChildren {
 async function fetch_children(
 	child_numbers: ReadonlyArray<number>,
 	repo: string,
+	scope?: string,
 ): Promise<FetchedChildren> {
 	const limited = child_numbers.slice(0, CHILD_LIMIT)
 	const fetched = await Promise.all(
-		limited.map(async (issue_number) => await fetch_child(issue_number, repo)),
+		limited.map(async (issue_number) => await fetch_child(issue_number, repo, scope)),
 	)
 
 	return {
 		children: fetched.filter((child): child is EpicChild => child !== undefined),
 		unreadable: limited.filter((_, index) => fetched[index] === undefined),
 		skipped: child_numbers.slice(CHILD_LIMIT),
+	}
+}
+
+// The children that live in other repositories, read through `gh --repo`. No local checkout is
+// needed: their state is a GitHub fact, and requiring a clone to learn it is what kept the auto-close
+// from ever running on such an epic (joshuafolkken/kit#864).
+//
+// A repository with a different owner is dropped before it is read, inheriting
+// joshuafolkken/kit#869's restriction rather than restating it.
+async function fetch_external_children(
+	external: ReadonlyArray<ExternalChild>,
+	current_owner: string,
+): Promise<FetchedChildren> {
+	const allowed = external.filter((child) =>
+		epic_cross_repo.is_same_owner_repo(child.repo, current_owner),
+	)
+	const fetched = await Promise.all(
+		allowed.map(async (child) => await fetch_child(child.number, child.repo, child.repo)),
+	)
+
+	// A repository the owner restriction refused is reported as unreadable rather than dropped: an
+	// epic must not read as complete while a child nobody may look at is still open.
+	const refused = external.filter(
+		(child) => !epic_cross_repo.is_same_owner_repo(child.repo, current_owner),
+	)
+
+	return {
+		children: fetched.filter((child): child is EpicChild => child !== undefined),
+		unreadable: [
+			...allowed.filter((_, index) => fetched[index] === undefined).map((child) => child.number),
+			...refused.map((child) => child.number),
+		],
+		skipped: [],
 	}
 }
 
@@ -76,15 +115,18 @@ interface EpicSnapshot {
 async function fetch_epic(epic_number: number, repo: string): Promise<EpicSnapshot> {
 	const body = await git_gh_command.issue_get_body(String(epic_number))
 	const child_numbers = git_epic_parse.parse_task_list_issue_numbers(body)
-	const fetched = await fetch_children(child_numbers, repo)
+	const external = git_epic_parse.parse_external_task_list_children(body)
+	const owner = repo.split('/', 1)[0] ?? ''
+	const local = await fetch_children(child_numbers, repo)
+	const remote = await fetch_external_children(external, owner)
 
 	return {
 		body,
-		children: fetched.children,
-		child_numbers,
-		unreadable: fetched.unreadable,
-		skipped: fetched.skipped,
-		has_external_children: git_epic_parse.has_external_task_list_entry(body),
+		children: [...local.children, ...remote.children],
+		child_numbers: [...child_numbers, ...external.map((child) => child.number)],
+		unreadable: [...local.unreadable, ...remote.unreadable],
+		skipped: local.skipped,
+		has_external_children: external.length > 0,
 	}
 }
 

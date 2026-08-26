@@ -20,6 +20,25 @@ interface AuditChild extends EpicChild {
 	body: string | undefined
 }
 
+// Whether anything orders these two, in either direction. A sibling is named by number because that
+// is how a body writes it; the child it refers to is the one in the same repository.
+function is_ordered(
+	index: ReadonlyMap<string, EpicChild>,
+	child: AuditChild,
+	other: number,
+	children: ReadonlyArray<AuditChild>,
+): boolean {
+	const target = children.find(
+		(candidate) => candidate.number === other && candidate.repo === child.repo,
+	)
+	if (target === undefined) return true
+
+	return (
+		epic_audit_logic.depends_on(index, child, target) ||
+		epic_audit_logic.depends_on(index, target, child)
+	)
+}
+
 function reference(issue_number: number): string {
 	return `#${String(issue_number)}`
 }
@@ -69,11 +88,7 @@ function find_implicit_dependencies(
 	return children.flatMap((child) =>
 		referenced_siblings(child, numbers, child.body ?? '')
 			.filter((other) => !reported.has(`${String(child.number)}->${String(other)}`))
-			.filter(
-				(other) =>
-					!epic_audit_logic.depends_on(index, child.number, other) &&
-					!epic_audit_logic.depends_on(index, other, child.number),
-			)
+			.filter((other) => !is_ordered(index, child, other, children))
 			.map((other) => ({
 				level: 'warning' as const,
 				check: IMPLICIT_DEPENDENCY,
@@ -97,11 +112,7 @@ function find_order_contradictions(children: ReadonlyArray<AuditChild>): Array<A
 
 	return children.flatMap((child) =>
 		referenced_siblings(child, numbers, epic_audit_logic.acceptance_section(child.body))
-			.filter(
-				(other) =>
-					!epic_audit_logic.depends_on(index, child.number, other) &&
-					!epic_audit_logic.depends_on(index, other, child.number),
-			)
+			.filter((other) => !is_ordered(index, child, other, children))
 			.map((other) => ({
 				level: 'error' as const,
 				check: ORDER_CONTRADICTION,

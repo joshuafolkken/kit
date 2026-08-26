@@ -4,10 +4,16 @@
 const TASK_LIST_ISSUE_PATTERN = /^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+#(\d+)\b/gmu
 
 // A task list may also reference an Issue in another repository (`owner/repo#101`, or a full URL).
-// Those are deliberately not resolved: their state would need a different `--repo`, and silently
-// ignoring them would let an epic close while such a child is still open.
+// Detecting one is what the auto-close used to bail on; joshuafolkken/kit#864 reads them instead,
+// through `gh --repo`, and the pattern below extracts which repository and which issue.
 const EXTERNAL_TASK_LIST_PATTERN =
 	/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+(?:[\w.-]+\/[\w.-]+#\d+|https?:\/\/)/mu
+// `- [ ] owner/repo#101`
+const EXTERNAL_SHORTHAND_PATTERN =
+	/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+([\w.-]+)\/([\w.-]+)#(\d+)\b/gmu
+// `- [ ] https://github.com/owner/repo/issues/101`
+const EXTERNAL_URL_PATTERN =
+	/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/issues\/(\d+)\b/gmu
 
 // Fenced blocks are stripped before matching. An epic body may quote the body template itself, and
 // its sample rows (`- [ ] #101 <title>`) are illustrations, not tracked children — counting them
@@ -89,6 +95,55 @@ function has_external_task_list_entry(body: string | undefined): boolean {
 	return has_pattern_match(EXTERNAL_TASK_LIST_PATTERN, body)
 }
 
+// A child of this epic that lives in another repository.
+interface ExternalChild {
+	repo: string
+	number: number
+}
+
+const OWNER_GROUP = 1
+const REPO_GROUP = 2
+const EXTERNAL_NUMBER_GROUP = 3
+
+function to_external_child(match: RegExpMatchArray): ExternalChild | undefined {
+	const owner = match[OWNER_GROUP]
+	const repo = match[REPO_GROUP]
+	if (owner === undefined || repo === undefined) return undefined
+	const parsed = Number(match[EXTERNAL_NUMBER_GROUP])
+
+	if (!Number.isSafeInteger(parsed) || parsed <= 0) return undefined
+
+	return { repo: `${owner}/${repo}`, number: parsed }
+}
+
+function match_external(body: string, pattern: RegExp): Array<ExternalChild> {
+	return Array.from(body.matchAll(pattern), (match) => to_external_child(match)).filter(
+		(child): child is ExternalChild => child !== undefined,
+	)
+}
+
+// Every cross-repository child the task list tracks, in both spellings. Reported as `owner/repo`
+// plus a number rather than a URL, which is the form the repository map and `gh --repo` both take
+// (joshuafolkken/kit#864).
+function parse_external_task_list_children(body: string | undefined): Array<ExternalChild> {
+	if (body === undefined) return []
+	const stripped = strip_fenced_blocks(body)
+	const found = [
+		...match_external(stripped, EXTERNAL_SHORTHAND_PATTERN),
+		...match_external(stripped, EXTERNAL_URL_PATTERN),
+	]
+	const seen = new Set<string>()
+
+	return found.filter((child) => {
+		const key = `${child.repo}#${String(child.number)}`
+		const is_new = !seen.has(key)
+
+		seen.add(key)
+
+		return is_new
+	})
+}
+
 function has_declared_dependency_chain(body: string | undefined): boolean {
 	return has_pattern_match(DEPENDENCY_CHAIN_PATTERN, body)
 }
@@ -153,11 +208,12 @@ const git_epic_parse = {
 	has_declared_dependency_chain,
 	has_unordered_declaration,
 	parse_dependency_links,
+	parse_external_task_list_children,
 	has_child,
 	is_state_closed,
 }
 
-export type { DependencyLink }
+export type { DependencyLink, ExternalChild }
 export {
 	git_epic_parse,
 	parse_task_list_issue_numbers,
@@ -165,6 +221,7 @@ export {
 	has_declared_dependency_chain,
 	has_unordered_declaration,
 	parse_dependency_links,
+	parse_external_task_list_children,
 	has_child,
 	is_state_closed,
 	UNORDERED_DEPENDENCIES,
