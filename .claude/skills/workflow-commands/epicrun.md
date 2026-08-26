@@ -213,12 +213,67 @@ The distinction is not academic. When kit's child has closed and app-kit's child
 release to publish, there is no runnable child, nothing carries `in-progress` and nothing carries
 `needs-decision` — a label-based reading calls that "done" and stops, in the one moment it must wait.
 
+## A prerequisite discovered mid-run
+
+Finding that something else in **this** repository has to land first is not a split, and not an
+upstream defect. The child in hand is still one deliverable; it just needs another one before it.
+It gets its own procedure because the two rules it sits between both end in a stop, and this one
+must not (joshuafolkken/kit#891).
+
+`<M>` below is the child being implemented when the prerequisite turned up; `<N>` is the new Issue.
+
+1. File the prerequisite Issue `<N>` — Tier A for a first-party repository, no confirmation. It is
+   filed **first** because the next step has to name it, and its number does not exist until it is.
+2. **Stash the work in progress.** A child is implemented on the default branch with an uncommitted
+   tree — `pnpm josh git` only creates the branch at commit time — so `<M>`'s half-finished edits are
+   sitting there, and the next child's `git switch main && git pull` would either refuse or carry
+   them into the prerequisite's branch and PR.
+
+   ```bash
+   git stash push -u -m "epicrun: paused #<M> for prerequisite #<N>"
+   gh issue comment <M> --body "<what was stashed, and that #<N> must land first>"
+   ```
+
+   **`-u` is not optional**: a child's work almost always includes a new `*.test.ts`, which is
+   untracked, and a stash without `-u` leaves exactly those files behind — the failure this step
+   exists to prevent. The comment is what makes the paused state auditable, exactly as the
+   upstream-interrupt rule requires, and it is what tells the session that resumes `<M>` that a stash
+   is waiting for it. `git stash pop` when `epic:next` offers `<M>` again, after its
+   `git switch main && git pull` — the prerequisite has merged by then, so expect to resolve
+   conflicts rather than to apply cleanly.
+
+3. `pnpm josh epic --add <E> <N> --before <M>` — one command writes the task-list row, the
+   declaration and the `blocked-by` relation together (joshuafolkken/kit#890). Never edit the body
+   by hand: the declaration and the relations then disagree, `epic:next` returns `error`, and the
+   unattended run stops outright.
+4. **Remove `in-progress` from `<M>`.**
+
+   ```bash
+   gh issue edit <M> --remove-label "in-progress"
+   ```
+
+   This is not tidying — it is what lets `<M>` run again. `epic:next` classifies a child carrying
+   `in-progress` as waiting on time **before** it looks at any blocker, so a child left labelled is
+   never offered again however long the run waits, and the epic stalls the moment the prerequisite
+   merges. Nothing in the codebase removes the label; the session that stopped working on the child
+   is the one that has to.
+
+5. **Do not park.** Go back to step 1 of the loop. `epic:next` classifies the original child as
+   resolving on its own and hands back the prerequisite first, so the order is kept with no human
+   input at all.
+
+**Parking is only for a prerequisite that cannot be expressed as a dependency** — one that needs a
+design decision nobody has made, or that is a Tier B toss-up or a Tier C action. Parking one that
+*can* be expressed inverts the whole point: `needs-decision` is cleared by a person, so a park taken
+in the name of unattended execution is what makes the run need a person.
+
 ## Splitting a child mid-run
 
 Discovering that a child is really several is not a reason to stop. File the new children (Tier A
-for a first-party repository — no confirmation), add them to the epic's task list, and record the
-dependencies. Use the same split criteria as `kickoff` (joshuafolkken/kit#865). If what remains of
-the original child needs a person, park **that** child and move on.
+for a first-party repository — no confirmation), then add them with `pnpm josh epic --add <E> <N...>
+[--before <M> | --after <M>]` rather than editing the epic body by hand — for the reason above. Use
+the same split criteria as `kickoff` (joshuafolkken/kit#865). If what remains of the original child
+needs a person, park **that** child and move on.
 
 ## Guards
 
