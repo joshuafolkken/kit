@@ -835,6 +835,36 @@ The verdict follows from the buckets, and waiting is checked before stopping —
 
 The body is parsed through the same module the epic auto-close uses, so "what the auto-close tracks" and "what this command reads" cannot drift apart.
 
+### `josh epic:bundle`
+
+Say whether a newly filed issue belongs with ones already in the backlog ([#873](https://github.com/joshuafolkken/kit/issues/873)).
+
+```bash
+pnpm josh epic:bundle 874   # alias: josh eb
+```
+
+"Two or more always means an epic" already holds when one request is split on the spot. It does not reach the other way in: two issues filed days apart that turn out to be the front and back of one job are executed separately, in whatever order, with the reasoning recorded nowhere.
+
+Run it right after an issue is filed — by `kickoff`, `fullrun` or `halfrun`, or by any Tier A filing during implementation, including inside an `epicrun`. **The command finds candidates and recommends; it writes nothing.** The machine's job is to surface what it found, not to decide.
+
+**Only two things count as a signal**: the two issues referring to each other in prose, or a `blocked-by` already recorded between them. **A similar title never counts on its own** — "related" expands without limit, and a threshold is what keeps an unrelated issue out of the bundle. The candidate search is [`josh epic:audit`](#josh-epicaudit)'s implicit-dependency analysis, shared rather than repeated: one reads inside an epic and the other across the backlog, but what they read is the same prose references.
+
+An issue belongs to at most one epic, because that is what a task list can express — so there is a branch:
+
+| Candidates                                         | What to do                                                                                     | Tier  |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----- |
+| **The new issue itself already has an epic**       | Nothing — an issue belongs to at most one, and moving it between epics is not what this is for | —     |
+| Already a child of an epic                         | **Add to that epic**; do not create a second one                                               | A     |
+| Spread across **different** epics                  | **Stop and ask** — merging epics is not reversible the way adding a child is                   | **B** |
+| In no epic, and two or more counting the new issue | **Create an epic** for them                                                                    | A     |
+| No strong signal                                   | Nothing                                                                                        | —     |
+
+Bundling is reversible — an epic is editable and a child can be removed — so it needs no confirmation. Merging epics is the one branch that does.
+
+**When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies`, on an addition as much as on a new epic: without it the batch survives and the reason it is a batch does not. An order **nobody declared is not invented** — only relations already recorded are carried over.
+
+The whole open backlog is scanned every time. It was thirteen issues when this was written, so there is no index and no cache; add one when the number makes it necessary, not before.
+
 ### `josh epic:plan`
 
 Print every child of an epic as one JSON document, so the epic's decisions can be made in one batch ([#862](https://github.com/joshuafolkken/kit/issues/862)).

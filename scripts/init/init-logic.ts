@@ -110,6 +110,9 @@ const AI_COPY_DIRECTORIES: ReadonlyArray<string> = [
 	// left with the trigger and none of the procedure it points at.
 	'.claude/skills/workflow-commands',
 	'.claude/skills/dependency-update',
+	// joshuafolkken/kit#873: the `josh epic:*` procedures left the always-loaded documents for the
+	// same reason, and the documents now route to this skill instead of carrying them.
+	'.claude/skills/epic-commands',
 ]
 
 const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './ai-document-fixture'
 
 // joshuafolkken/kit#870: the audit only helps if it runs without being asked, and the two rules that
 // make it usable — only errors fail, and fixing what it finds is Tier A — are the ones a reword
@@ -12,15 +12,20 @@ function read_unwrapped(relative_path: string): string {
 	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
 }
 
-const AI_DOC_MARKERS: ReadonlyArray<string> = [
+// The procedure moved into the `epic-commands` skill (joshuafolkken/kit#873's resident-ceiling
+// guard), so these are checked across each document's rule surface — the document plus every
+// distributed skill — which is what the routing is supposed to make reachable.
+const SURFACE_MARKERS: ReadonlyArray<string> = [
 	'`josh epic:audit <E>`',
-	'runs without being asked',
+	'without being asked',
 	'Only errors fail it',
-	'Fixing what it finds is Tier A',
 	// The ripple check is the half no machine performs, so it has to be written down.
 	'confirm some child owns updating it',
-	'reuses `epic:next`',
 ]
+
+// The one part that stays in the always-loaded documents: it binds outside the command, whenever an
+// audit finding is in front of you.
+const RESIDENT_MARKERS: ReadonlyArray<string> = ['fixing what the audit finds is Tier A']
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'その判定を利用する。検出を作り直さない。',
@@ -37,10 +42,20 @@ const AUTOMATIC_RUN_MARKERS: ReadonlyArray<string> = [
 ]
 
 describe('epic:audit documentation', () => {
-	it.each(AI_DOCS)('is defined in %s', (document_name) => {
+	it.each(AI_DOCS)('is reachable from %s', (document_name) => {
+		const surface = read_rule_surface(document_name).replaceAll(/\s+/gu, ' ')
+
+		for (const marker of SURFACE_MARKERS) expect(surface).toContain(marker)
+	})
+
+	it.each(AI_DOCS)('keeps the Tier A response resident in %s', (document_name) => {
 		const content = read_unwrapped(document_name)
 
-		for (const marker of AI_DOC_MARKERS) expect(content).toContain(marker)
+		for (const marker of RESIDENT_MARKERS) expect(content).toContain(marker)
+	})
+
+	it.each(AI_DOCS)('routes %s to the skill rather than inlining it', (document_name) => {
+		expect(read_repo_file(document_name)).toContain('.claude/skills/epic-commands/SKILL.md')
 	})
 
 	it('has a canonical section in the workflow prompt', () => {
