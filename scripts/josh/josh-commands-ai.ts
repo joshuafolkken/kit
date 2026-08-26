@@ -22,6 +22,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: "List an epic's runnable children, bundled per repository",
 		category: 'AI tools',
 	},
+	'epic:audit': {
+		script: 'scripts/epic/epic-audit-cli.ts',
+		description: "Audit an epic's children against each other for contradictions",
+		category: 'AI tools',
+	},
 	'epic:check': {
 		script: 'scripts-ai/epic-check.ts',
 		description: 'Check an epic issue against the tracking requirements',

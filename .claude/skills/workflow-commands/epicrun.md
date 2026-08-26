@@ -52,6 +52,14 @@ Parallelism only helps children that do not depend on each other. When app-kit's
 new feature, that is recorded as `blocked-by` and `epic:next` makes it wait. That is the dependency,
 not a limit of the model.
 
+## Audit before the first child
+
+Run `pnpm josh epic:audit <E>` before step 1 below. An epic whose children contradict each other —
+an acceptance criterion that needs something built later, two children each waiting on the other —
+stalls the moment the run reaches the contradiction, and unattended is the worst time to find that
+out. Errors stop the run; warnings are read and carried on past. Fixing what it finds is Tier A
+(joshuafolkken/kit#870).
+
 ## The loop
 
 `josh epic:next <E> --repo <this repository>` prints **one token** on standard output: an issue
