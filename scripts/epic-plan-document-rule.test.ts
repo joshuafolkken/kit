@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_rule_surface, WORKFLOW_PROMPT } from './ai-document-fixture'
 
 // joshuafolkken/kit#862: front-loading the decisions only works if three things survive a reword —
 // the audit runs before the batch, the batch is one question for the whole epic, and recording an
@@ -11,13 +11,18 @@ function read_unwrapped(relative_path: string): string {
 	return read_repo_file(relative_path).replaceAll(/\s+/gu, ' ')
 }
 
-const AI_DOC_MARKERS: ReadonlyArray<string> = [
-	'`josh epic:plan <E>` front-loads',
-	'run `josh epic:audit` and fix what it finds (Tier A)',
-	'as a single question for the whole epic',
-	'`## Decisions` section and a comment on each child',
-	"Recording a decision removes that child's `needs-decision` label",
-	'`auto` (Tier A, decide it), `ask` (Tier B/C, collect it) or `defer`',
+// The procedure moved into the `epic-commands` skill, so these are checked across the rule surface.
+const SURFACE_MARKERS: ReadonlyArray<string> = [
+	'`josh epic:plan <E>`',
+	'Phase 0 is not optional',
+	'one question for the whole epic',
+	'`## Decisions` and a comment on each child',
+	'`auto` (Tier A — decide it), `ask` (Tier B/C — collect it), `defer`',
+]
+
+// The half that binds outside the command: the answer arrives, and the child's park has to be cleared.
+const RESIDENT_MARKERS: ReadonlyArray<string> = [
+	"recording a decision removes that child's `needs-decision` label",
 ]
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
@@ -48,10 +53,16 @@ const DECISION_FORMAT_MARKERS: ReadonlyArray<string> = [
 ]
 
 describe('epic:plan documentation', () => {
-	it.each(AI_DOCS)('is defined in %s', (document_name) => {
+	it.each(AI_DOCS)('is reachable from %s', (document_name) => {
+		const surface = read_rule_surface(document_name).replaceAll(/\s+/gu, ' ')
+
+		for (const marker of SURFACE_MARKERS) expect(surface).toContain(marker)
+	})
+
+	it.each(AI_DOCS)('keeps the label-clearing rule resident in %s', (document_name) => {
 		const content = read_unwrapped(document_name)
 
-		for (const marker of AI_DOC_MARKERS) expect(content).toContain(marker)
+		for (const marker of RESIDENT_MARKERS) expect(content).toContain(marker)
 	})
 
 	it('has a canonical section in the workflow prompt', () => {

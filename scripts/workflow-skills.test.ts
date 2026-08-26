@@ -1,12 +1,15 @@
+import { readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { AI_DOCS, read_repo_file, skill_documents } from './ai-document-fixture'
 import { init_logic } from './init/init-logic'
 import {
 	has_frontmatter,
+	package_file,
 	read_skill_file,
 	skill_description,
 	SKILL_ENTRY_FILE,
 	skill_frontmatter,
+	SKILL_ROOT,
 } from './skill-fixture'
 
 // joshuafolkken/kit#854: the three AI documents are read in full on every turn, and roughly half of
@@ -54,7 +57,18 @@ function basename_of(file_path: string): string {
 	return file_path.split('/').at(-1) ?? file_path
 }
 
-describe.each([WORKFLOW_SKILL, DEPENDENCY_SKILL])('%s — distribution', (skill_directory) => {
+// Every skill directory in this repository, so the distribution check covers all of them.
+function distributed_skill_directories(): Array<string> {
+	return readdirSync(package_file(SKILL_ROOT), { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => `${SKILL_ROOT}/${entry.name}`)
+		.toSorted((left, right) => left.localeCompare(right))
+}
+
+// Enumerated from disk rather than listed here: a skill added to the repository and forgotten in
+// `AI_COPY_DIRECTORIES` reaches consumers as a pointer to a file they do not have, and a hardcoded
+// list is exactly what let that happen (joshuafolkken/kit#873).
+describe.each(distributed_skill_directories())('%s — distribution', (skill_directory) => {
 	const content = read_skill_file(skill_directory)
 
 	it('is copied into consumers as a directory', () => {
