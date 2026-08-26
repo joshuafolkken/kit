@@ -88,7 +88,15 @@ function candidate_epics(candidates: ReadonlyArray<BacklogIssue>): Array<number>
 }
 
 const NO_SIGNAL_REASON = 'no existing issue shares a reference or a dependency with this one'
-const ALREADY_TRACKED_REASON = 'this issue already belongs to an epic'
+
+// Names the epic, rather than only reporting that one exists. The number is what the caller does
+// something with: the prerequisite procedure inserts into that epic instead of creating a second one,
+// and an issue tracked by two epics gives the auto-close two task lists to disagree about
+// (joshuafolkken/kit#943). The decision already carried the number; only this sentence dropped it.
+function already_tracked_reason(epic: number): string {
+	return `#${String(epic)} already tracks this issue`
+}
+
 const SPREAD_REASON =
 	'the related issues already belong to different epics; merging epics is not a call to make without asking'
 
@@ -127,7 +135,12 @@ function decide_bundle(
 	// An issue an epic already tracks has nothing to bundle: it belongs to at most one, and moving it
 	// between epics is not what this rule is for.
 	if (subject.epic !== undefined) {
-		return { action: 'none', epics: [subject.epic], candidates: [], reason: ALREADY_TRACKED_REASON }
+		return {
+			action: 'none',
+			epics: [subject.epic],
+			candidates: [],
+			reason: already_tracked_reason(subject.epic),
+		}
 	}
 
 	const candidates = find_candidates(subject, backlog)
@@ -168,7 +181,7 @@ function bundle_children(
 
 const epic_bundle = {
 	NO_SIGNAL_REASON,
-	ALREADY_TRACKED_REASON,
+	already_tracked_reason,
 	SPREAD_REASON,
 	has_mutual_reference,
 	has_recorded_dependency,
