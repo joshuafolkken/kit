@@ -78,6 +78,7 @@ const ALIASES: Record<string, string> = {
 	is: 'issue',
 	ep: 'epic',
 	ec: 'epic:check',
+	en: 'epic:next',
 	ev: 'eval',
 }
 

@@ -1,0 +1,122 @@
+import { describe, expect, it } from 'vitest'
+import { epic_graph, type EpicChild } from './epic-graph'
+
+const REPO = 'joshuafolkken/kit'
+
+function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
+	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
+}
+
+describe('epic_graph.find_stuck_children', () => {
+	it('finds nothing in a plain chain', () => {
+		expect(epic_graph.find_stuck_children([child(1), child(2, [1]), child(3, [2])])).toEqual([])
+	})
+
+	it('finds nothing when the children are independent', () => {
+		expect(epic_graph.find_stuck_children([child(1), child(2), child(3)])).toEqual([])
+	})
+
+	// Two hand-added `--add-blocked-by` edges are all it takes, and every session would then wait
+	// forever for the other half of the pair.
+	it('finds a two-child cycle', () => {
+		expect(epic_graph.find_stuck_children([child(1, [2]), child(2, [1])])).toEqual([1, 2])
+	})
+
+	it('finds a longer cycle', () => {
+		const children = [child(1, [3]), child(2, [1]), child(3, [2])]
+
+		expect(epic_graph.find_stuck_children(children)).toEqual([1, 2, 3])
+	})
+
+	it('finds a child blocking itself', () => {
+		expect(epic_graph.find_stuck_children([child(1, [1])])).toEqual([1])
+	})
+
+	// A child behind a cycle never starts either, and telling the caller only about the cycle would
+	// leave it wondering why that child never becomes runnable.
+	it('includes the children a cycle blocks', () => {
+		const children = [child(1, [2]), child(2, [1]), child(3, [1])]
+
+		expect(epic_graph.find_stuck_children(children)).toEqual([1, 2, 3])
+	})
+
+	it('ignores a blocker that is not a child of this epic', () => {
+		expect(epic_graph.find_stuck_children([child(1, [999])])).toEqual([])
+	})
+
+	it('is decided by structure, not by state', () => {
+		const closed: EpicChild = { ...child(1, [2]), state: 'CLOSED' }
+
+		expect(epic_graph.find_stuck_children([closed, child(2, [1])])).toEqual([1, 2])
+	})
+})
+
+describe('epic_graph.missing_relations', () => {
+	it('accepts a declaration the relations record', () => {
+		const links = [{ blocker: 1, blocked: 2 }]
+
+		expect(epic_graph.missing_relations(links, [child(1), child(2, [1])])).toEqual([])
+	})
+
+	// gh older than 2.94.0 cannot record the relation at all, so this is the ordinary way the two
+	// drift apart.
+	it('reports a declaration with no matching relation', () => {
+		const links = [{ blocker: 1, blocked: 2 }]
+
+		expect(epic_graph.missing_relations(links, [child(1), child(2)])).toEqual(links)
+	})
+})
+
+describe('epic_graph.undeclared_relations', () => {
+	it('reports a relation the body never declares', () => {
+		expect(epic_graph.undeclared_relations([], [child(1), child(2, [1])])).toEqual([
+			{ blocker: 1, blocked: 2 },
+		])
+	})
+
+	it('ignores a relation pointing outside the epic', () => {
+		expect(epic_graph.undeclared_relations([], [child(1, [999])])).toEqual([])
+	})
+})
+
+describe('epic_graph.find_anomalies', () => {
+	it('reports nothing when the body and the relations agree', () => {
+		const links = [{ blocker: 1, blocked: 2 }]
+
+		expect(epic_graph.find_anomalies([child(1), child(2, [1])], links, true)).toEqual([])
+	})
+
+	it('reports a mismatch rather than picking a winner', () => {
+		const [anomaly] = epic_graph.find_anomalies(
+			[child(1), child(2)],
+			[{ blocker: 1, blocked: 2 }],
+			true,
+		)
+
+		expect(anomaly?.kind).toBe('declaration_mismatch')
+		expect(anomaly?.message).toContain('will not choose for you')
+	})
+
+	it('names both directions of a disagreement', () => {
+		const children = [child(1), child(2), child(3, [2])]
+		const [anomaly] = epic_graph.find_anomalies(children, [{ blocker: 1, blocked: 2 }], true)
+
+		expect(anomaly?.message).toContain('declared but not recorded: #1 -> #2')
+		expect(anomaly?.message).toContain('recorded but not declared: #2 -> #3')
+	})
+
+	// A mismatch inside a cyclic graph is noise until the cycle is gone.
+	// Without a declaration there is nothing for the relations to disagree with; reporting one would
+	// fail every epic whose Dependencies section could not be read.
+	it('reports no mismatch when the body declares no order at all', () => {
+		expect(epic_graph.find_anomalies([child(1), child(2, [1])], [], false)).toEqual([])
+	})
+
+	it('reports the cycle first when both are wrong', () => {
+		const children = [child(1, [2]), child(2, [1])]
+		const anomalies = epic_graph.find_anomalies(children, [{ blocker: 9, blocked: 8 }], true)
+
+		expect(anomalies).toHaveLength(1)
+		expect(anomalies[0]?.kind).toBe('cycle')
+	})
+})

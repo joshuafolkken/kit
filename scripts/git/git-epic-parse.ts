@@ -20,10 +20,22 @@ const FENCE_LINE_PATTERN = /^[ \t]*(?:`{3,}|~{3,})/u
 // shape of the chain is not validated — only that one was declared at all.
 const DEPENDENCY_CHAIN_PATTERN = /#\d+[ \t]*(?:->|→)[ \t]*#\d+/u
 
+// The same chain, read for its links rather than its existence. `epic:next` compares what the body
+// declares against the `blocked-by` relations actually recorded, and a body that says one order
+// while the relations say another must stop the run rather than silently follow either
+// (joshuafolkken/kit#860).
+//
+// Only a line that is *nothing but* a chain counts, optionally behind a list marker. Measured
+// against joshuafolkken/kit#858, whose Dependencies section is followed by a prose line recommending
+// an execution order — `推奨実行順: #869 -> #863 -> …`. Those arrows are a suggestion, not a
+// declaration, and reading them as one reported four disagreements that did not exist.
+const DECLARED_CHAIN_LINE = /^(?:[-*+][ \t]+)?#\d+(?:[ \t]*(?:->|→)[ \t]*#\d+)+$/u
+const CHAIN_REFERENCE_PATTERN = /#(\d+)/gu
+
 // The other half of a machine-readable `Dependencies` section: the exact sentence that declares a
-// batch to have no order. It lives here, beside the chain pattern, because both are what a reader
-// of the body is allowed to rely on — the generator imports this rather than restating it, so the
-// text it writes and the text checked for are one string.
+// batch to have no order. It lives here, beside the chain patterns, because all of them are what a
+// reader of the body is allowed to rely on — the generator imports this rather than restating it, so
+// the text it writes and the text checked for are one string.
 const UNORDERED_DEPENDENCIES = 'None — the children are independent; any execution order works.'
 
 const CLOSED_STATE = 'CLOSED'
@@ -89,6 +101,41 @@ function has_unordered_declaration(body: string | undefined): boolean {
 	return strip_fenced_blocks(body).includes(UNORDERED_DEPENDENCIES)
 }
 
+// One declared link: `blocker` must finish before `blocked` starts.
+interface DependencyLink {
+	blocker: number
+	blocked: number
+}
+
+const REFERENCE_GROUP = 1
+
+// The issue numbers of one chain line, in order.
+function chain_references(line: string): Array<number> {
+	return Array.from(line.matchAll(CHAIN_REFERENCE_PATTERN), (match) =>
+		Number(match[REFERENCE_GROUP]),
+	).filter((value) => Number.isSafeInteger(value))
+}
+
+// `#1 -> #2 -> #3` becomes two links; consecutive links share their middle reference.
+function chain_links(references: ReadonlyArray<number>): Array<DependencyLink> {
+	return references
+		.slice(1)
+		.map((blocked, index) => ({ blocker: references[index] ?? blocked, blocked }))
+		.filter((link) => link.blocker !== link.blocked)
+}
+
+// Every link the body declares, in the order written. Fenced blocks are stripped first for the
+// reason they are everywhere else: a quoted template's sample chain is an illustration.
+function parse_dependency_links(body: string | undefined): Array<DependencyLink> {
+	if (body === undefined) return []
+
+	return strip_fenced_blocks(body)
+		.split('\n')
+		.map((line) => line.trim())
+		.filter((line) => DECLARED_CHAIN_LINE.test(line))
+		.flatMap((line) => chain_links(chain_references(line)))
+}
+
 function has_child(children: ReadonlyArray<number>, issue_number: number): boolean {
 	return children.includes(issue_number)
 }
@@ -105,16 +152,19 @@ const git_epic_parse = {
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
 	has_unordered_declaration,
+	parse_dependency_links,
 	has_child,
 	is_state_closed,
 }
 
+export type { DependencyLink }
 export {
 	git_epic_parse,
 	parse_task_list_issue_numbers,
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
 	has_unordered_declaration,
+	parse_dependency_links,
 	has_child,
 	is_state_closed,
 	UNORDERED_DEPENDENCIES,
