@@ -39,3 +39,7 @@ words:
   # The eval suite: its directory name, and the id prefix the API gives a tool_use block.
   - evals
   - toolu
+  # In the wrangler stack traces quoted verbatim in `scripts/e2e-retry-check-crash-fixture.ts`. Not
+  # in the distributed dictionary beside `workerd`, because that fixture is one of the `*-fixture.ts`
+  # files `package.json` keeps out of the published package — no consumer ever spell-checks it.
+  - miniflare

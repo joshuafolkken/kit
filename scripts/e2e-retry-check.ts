@@ -24,10 +24,24 @@ import { fileURLToPath } from 'node:url'
 // is the point: each half is individually weaker than it looks. `Network connection lost.` is
 // logged by workerd for any aborted in-flight request — a page closing, a navigation, a timeout —
 // so a suite that merely failed can produce it with the server perfectly healthy. `Error in
-// ProxyController` is the structural marker for a worker that is gone, but it is not established
-// that wrangler never emits it while tearing the proxy down, which happens at the end of every run
-// including a failing one. Requiring both costs nothing — an observed crash carries them together —
-// and each one narrows the other's exposure.
+// ProxyController` is the structural marker for a worker that is gone. Requiring both costs
+// nothing — every observed crash carries them together — and each one narrows the other's exposure.
+//
+// Both halves have now been read against logs wrangler actually wrote, which #872 could only
+// assume (#911). Every `e2e-web-server-log` game-kit retains — 8 artifacts across 6 runs — is from
+// a server that genuinely died, and the pair matches all of them. The open worry was the other
+// direction: that wrangler emits `Error in ProxyController` while tearing the proxy down, which
+// happens at the end of every run including a failing one, and would hand a retry to exactly the
+// flake this gate exists to expose. A run of game-kit's own suite against the same preview server,
+// failing on an assertion with the server serving every request throughout, emits neither string
+// anywhere in its log — it ends on a routine heartbeat with nothing logged behind the last request.
+// That is what this rule reads and all it claims: the log of a healthy failing run is clean, so no
+// shutdown path reachable from one puts a signature in front of this check. It is quoted complete
+// in `e2e-retry-check-healthy-fixture.ts`, the crash in `e2e-retry-check-crash-fixture.ts`, and the
+// suite reads this rule against both rather than against the paragraph above.
+//
+// One marker #872 listed is deliberately absent from this list: the bare `✘ [ERROR]` wrangler
+// prints to the console. It is in the healthy log three times over, each an ordinary 404.
 const CRASH_SIGNATURES: ReadonlyArray<string> = [
 	'Error in ProxyController',
 	'Network connection lost.',
@@ -53,12 +67,17 @@ function read_file_safe(file_path: string): string {
 }
 
 // Every file under the directory, because wrangler names the debug log after the run and a job that
-// restarted the server leaves more than one.
-function read_directory_text(directory: string): string {
+// restarted the server leaves more than one. They stay separate rather than being joined, and the
+// verdict below is taken per file: a crash is one process reporting its own death, so both
+// signatures have to be in the same log. Concatenating them first would let `Network connection
+// lost.` from an aborted request in one file meet `Error in ProxyController` in another — the
+// conjunction satisfied by two unrelated events, and a retry handed to exactly the failing pull
+// request suite this rule exists to keep exposed. Every observed crash carries the pair inside one
+// error record, so nothing is lost by requiring it (#911).
+function read_directory_texts(directory: string): ReadonlyArray<string> {
 	return readdirSync(directory, { recursive: true, withFileTypes: true })
 		.filter((entry) => entry.isFile())
 		.map((entry) => read_file_safe(path.join(entry.parentPath, entry.name)))
-		.join('\n')
 }
 
 // Nothing about reading a log may be fatal: this command decides whether to spend one more CI
@@ -68,12 +87,17 @@ function read_directory_text(directory: string): string {
 // read at all. An empty read is then reported as "no crash", which is the safe verdict: a consumer
 // whose preview script is not wrangler writes no log, and reading silence as a crash would retry
 // every failing suite in that project — the masking this rule exists to prevent.
-function read_log_text(target: string): string {
+function read_log_texts(target: string): ReadonlyArray<string> {
 	try {
-		return statSync(target).isDirectory() ? read_directory_text(target) : read_file_safe(target)
+		return statSync(target).isDirectory() ? read_directory_texts(target) : [read_file_safe(target)]
 	} catch {
-		return ''
+		return []
 	}
+}
+
+// One file carrying every signature, never the set of them between them — see `read_directory_texts`.
+function has_crashed_log(log_texts: ReadonlyArray<string>): boolean {
+	return log_texts.some((log_text) => has_crash_signature(log_text))
 }
 
 // The one write this command makes, and the only call left that could throw: a full disk, a
@@ -100,7 +124,7 @@ function resolve_log_directory(): string {
 }
 
 function run_retry_check(): boolean {
-	const has_crashed = has_crash_signature(read_log_text(resolve_log_directory()))
+	const has_crashed = has_crashed_log(read_log_texts(resolve_log_directory()))
 	const verdict = has_crashed
 		? 'the preview server log carries a crash signature'
 		: 'no crash signature in the preview server log, so the suite itself failed'
@@ -117,7 +141,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const e2e_retry_check = {
 	has_crash_signature,
-	read_log_text,
+	has_crashed_log,
+	read_log_texts,
 	resolve_log_directory,
 	run_retry_check,
 }

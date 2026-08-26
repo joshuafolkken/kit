@@ -8,6 +8,8 @@ import {
 	e2e_retry_check,
 	OUTPUT_NAME,
 } from './e2e-retry-check'
+import { OBSERVED_CRASH_LOG } from './e2e-retry-check-crash-fixture'
+import { OBSERVED_HEALTHY_FAILURE_LOG } from './e2e-retry-check-healthy-fixture'
 
 // A wrangler debug log from a run whose worker died. Trimmed to the lines the rule reads, with
 // ordinary request logging around them so the guard is not satisfied by a file that is nothing but
@@ -34,8 +36,10 @@ const ABORTED_REQUEST_LOG = `
 workerd/io/io-context.c++: Network connection lost.
 `
 
-// The structural marker on its own, with no aborted connection behind it — the shape a proxy
-// teardown at the end of a healthy run would leave. It must not read as a crash.
+// The structural marker on its own, with no aborted connection behind it. A real teardown emits
+// neither string (`OBSERVED_HEALTHY_FAILURE_LOG`), so this shape is not something wrangler is
+// known to produce — which is the reason to keep it: the rule must stay wrong-proof against a
+// build that starts emitting the marker alone, not merely against the builds observed so far.
 const TEARDOWN_LOG = `
 [wrangler:info] GET /en 200 OK (12ms)
 Error in ProxyController: Error inside ProxyWorker
@@ -43,6 +47,8 @@ Error in ProxyController: Error inside ProxyWorker
 
 const CUSTOM_LOG_DIRECTORY = 'custom-logs/'
 const LOG_FILE_NAME = 'wrangler.log'
+const FIRST_LOG_FILE_NAME = 'wrangler-first.log'
+const SECOND_LOG_FILE_NAME = 'wrangler-second.log'
 
 // Assigning an absent value back writes the literal string "undefined", which leaves the variable
 // set for everything that runs after this file — the opposite of restoring it. `vi.stubEnv` is what
@@ -73,8 +79,8 @@ describe('e2e retry crash signature', () => {
 
 	// Neither half is sufficient alone, and the parameterized form is what keeps that true of a
 	// signature added later: `Network connection lost.` appears whenever an in-flight request is
-	// aborted, and `Error in ProxyController` is not established to be absent from an ordinary proxy
-	// teardown — which happens at the end of every run, failing ones included.
+	// aborted, and a marker that reads as a crash on its own is one release away from matching a
+	// log wrangler reshapes — the failure mode a signature has, and the one nothing else catches.
 	it.each(CRASH_SIGNATURES)('does not read a crash out of %s alone', (signature) => {
 		expect(e2e_retry_check.has_crash_signature(`prefix ${signature} suffix`)).toBe(false)
 	})
@@ -89,6 +95,38 @@ describe('e2e retry crash signature', () => {
 	})
 })
 
+// The same rule, read against logs nobody wrote for it. Everything above this point is a fixture
+// shaped to make a point; these two are what wrangler actually produced, and joshuafolkken/kit#911
+// exists because the difference had never been checked.
+describe('e2e retry crash signature against real wrangler logs', () => {
+	it('reads a crash out of the log a preview server that died actually wrote', () => {
+		expect(e2e_retry_check.has_crash_signature(OBSERVED_CRASH_LOG)).toBe(true)
+	})
+
+	// The doubt this suite was extended to settle: `Error in ProxyController` is emitted from the
+	// proxy teardown that ends every run, the argument went, so a pull request whose tests merely
+	// failed would be handed the retry that hides a flake. The observed log says otherwise —
+	// neither signature is anywhere in a run that failed on an assertion with the server serving
+	// every request throughout.
+	it('does not read a crash out of a real run whose suite failed with a healthy server', () => {
+		expect(e2e_retry_check.has_crash_signature(OBSERVED_HEALTHY_FAILURE_LOG)).toBe(false)
+	})
+
+	// Both real logs carry the bare `✘ [ERROR]` that #872 listed as a third crash marker, so
+	// nothing may be built on it: in the healthy log it is an ordinary 404. Asserting it on both
+	// sides is also what stops the healthy fixture from being trimmed down to a log with no errors
+	// in it at all, which would pass the test above while proving nothing.
+	it.each([
+		['crashed', OBSERVED_CRASH_LOG],
+		['healthy failure', OBSERVED_HEALTHY_FAILURE_LOG],
+	])(
+		'carries the console error marker in the %s log, so nothing may read it',
+		(_name, log_text) => {
+			expect(log_text).toContain('✘ [ERROR]')
+		},
+	)
+})
+
 describe('e2e retry check log reading', () => {
 	let directory = ''
 
@@ -101,7 +139,7 @@ describe('e2e retry check log reading', () => {
 	})
 
 	it('reads nothing rather than throwing when the directory was never created', () => {
-		expect(e2e_retry_check.read_log_text(path.join(directory, 'absent'))).toBe('')
+		expect(e2e_retry_check.read_log_texts(path.join(directory, 'absent'))).toEqual([])
 	})
 
 	// wrangler names the debug log after the run, and a job that restarted the server leaves more
@@ -109,10 +147,21 @@ describe('e2e retry check log reading', () => {
 	// miss the crash exactly when the server had to be restarted.
 	it('reads every file under the directory, including nested ones', () => {
 		mkdirSync(path.join(directory, 'nested'))
-		writeFileSync(path.join(directory, 'wrangler-first.log'), 'quiet', 'utf8')
-		writeFileSync(path.join(directory, 'nested', 'wrangler-second.log'), CRASHED_LOG, 'utf8')
+		writeFileSync(path.join(directory, FIRST_LOG_FILE_NAME), 'quiet', 'utf8')
+		writeFileSync(path.join(directory, 'nested', SECOND_LOG_FILE_NAME), CRASHED_LOG, 'utf8')
 
-		expect(e2e_retry_check.has_crash_signature(e2e_retry_check.read_log_text(directory))).toBe(true)
+		expect(e2e_retry_check.has_crashed_log(e2e_retry_check.read_log_texts(directory))).toBe(true)
+	})
+
+	// The conjunction is per file, and this is the run that would break it otherwise: a server that
+	// restarted leaves one log per attempt, and joining them lets an aborted request in the first
+	// meet a proxy error in the second. Neither file is a crash, and the pair of them is not one
+	// either — reading it as one would hand the retry to a failing pull request suite.
+	it('does not read a crash out of two logs that carry one signature each', () => {
+		writeFileSync(path.join(directory, FIRST_LOG_FILE_NAME), ABORTED_REQUEST_LOG, 'utf8')
+		writeFileSync(path.join(directory, SECOND_LOG_FILE_NAME), TEARDOWN_LOG, 'utf8')
+
+		expect(e2e_retry_check.has_crashed_log(e2e_retry_check.read_log_texts(directory))).toBe(false)
 	})
 })
 
@@ -139,7 +188,7 @@ describe('e2e retry check log path shapes', () => {
 
 		writeFileSync(file_path, CRASHED_LOG, 'utf8')
 
-		expect(e2e_retry_check.has_crash_signature(e2e_retry_check.read_log_text(file_path))).toBe(true)
+		expect(e2e_retry_check.has_crashed_log(e2e_retry_check.read_log_texts(file_path))).toBe(true)
 	})
 
 	// Nothing about reading a log may be fatal. An unreadable directory has to end at the same "no
@@ -152,7 +201,7 @@ describe('e2e retry check log path shapes', () => {
 		mkdirSync(locked, { mode: 0o000 })
 
 		try {
-			expect(e2e_retry_check.read_log_text(locked)).toBe('')
+			expect(e2e_retry_check.read_log_texts(locked)).toEqual([])
 		} finally {
 			chmodSync(locked, 0o700)
 		}
@@ -166,7 +215,7 @@ describe('e2e retry check log path shapes', () => {
 
 		writeFileSync(file_path, CRASHED_LOG, 'utf8')
 
-		expect(e2e_retry_check.read_log_text(path.join(file_path, 'nested'))).toBe('')
+		expect(e2e_retry_check.read_log_texts(path.join(file_path, 'nested'))).toEqual([])
 	})
 })
 
