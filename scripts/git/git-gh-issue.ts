@@ -163,6 +163,19 @@ async function issue_create_with_label(input: {
 	})
 }
 
+// Applied after the body edit so a failure leaves an issue with the epic sections and no label,
+// which `epic:check` reports — rather than a labelled issue with nothing to track. The caller checks
+// the return: the label is what the auto-close filters on (joshuafolkken/kit#865).
+async function issue_add_label(issue_number: string, label: string): Promise<boolean> {
+	try {
+		await git_gh_exec.exec_gh_command(['issue', 'edit', issue_number, '--add-label', label])
+
+		return true
+	} catch {
+		return false
+	}
+}
+
 // Applied after creation, never as `gh issue create --blocked-by`: an older `gh` rejects the
 // unknown flag with exit 1 and the Issue is never created. Split this way, an outdated CLI costs
 // only the relation. Requires gh >= 2.94.0; the caller treats a failure as non-fatal.
@@ -194,6 +207,7 @@ const git_gh_issue = {
 	label_ensure,
 	issue_create_with_label,
 	issue_add_blocked_by,
+	issue_add_label,
 	issue_get_labels_and_body,
 	issue_get_title,
 	issue_get_body,
