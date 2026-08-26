@@ -277,7 +277,7 @@ pnpm josh pr
 
 **Do not** run `gh pr create` directly — it bypasses `build_body` which generates `closes #N`, causing the Issue to remain open after merge.
 
-`fullrun` フローでは、コミット後かつ `pnpm josh followup --merge` 実行前に `/code-review` スキルを実行する。高・中優先度の指摘が見つかった場合は修正を行い、再度 `/code-review medium` を実行してから次のステップへ進む。**レビューは合計 2 回まで**であり、2 回目を終えた時点で残る Low/Medium は follow-up Issue に切り出す（`prompts/review.md` → "Review round cap"）。
+`fullrun` フローでは、コミット後かつ `pnpm josh followup --merge` 実行前に `/code-review` スキルを実行する。高・中優先度の指摘が見つかった場合は修正を行い、再度 `/code-review medium` を実行してから次のステップへ進む。**レビューは合計 2 回まで**であり、2 回目を終えた時点で残る Low/Medium は follow-up Issue に切り出し、**現在の Issue が閉じる前に `pnpm josh epic:bundle <新規>` を実行して答えに従う** — `add_to_epic` / `create_epic` は Tier A で、対応する `pnpm josh epic --add` / `pnpm josh epic` を実行する（本文の手編集は不可）。`ask` は停止（`epicrun` 中はその子を park）、`none` は何もしない（`prompts/review.md` → "Review round cap"、→「後追い Issue は起票した直後に EPIC へ束ね直す」）。
 
 ### `fullrun` STOPPING CONDITIONS — read this before you stop
 
@@ -295,7 +295,7 @@ pnpm josh pr
 
 ### レビュー工程は実装セッションがコミット前に実行する
 
-ワークフロー内のレビュー工程（各フローの `/code-review medium`）は、**実装したセッション自身が、コミットの前に**インラインで実行する。対象は `git diff main`、実行時期は検証ゲートの最終段（refactor → lint → tsc → cspell → test:unit → `/code-review medium`）であり、`fullrun` / `halfrun` / `queue` のいずれも同じ時期・同じ対象でレビューする。High/Medium がなくなるまでその場で修正して再実行し、**指摘を潰し切ってから最初のコミットを作る**。ただし**再実行は 2 周まで**であり、2 周を終えた時点で残る High 以外の指摘は follow-up Issue に切り出して現在の Issue を完了させる（`prompts/review.md` → "Review round cap"）。したがって PR に貼るレビューコメントも、ラウンドごとのコミットや CI 再実行も発生しない。
+ワークフロー内のレビュー工程（各フローの `/code-review medium`）は、**実装したセッション自身が、コミットの前に**インラインで実行する。対象は `git diff main`、実行時期は検証ゲートの最終段（refactor → lint → tsc → cspell → test:unit → `/code-review medium`）であり、`fullrun` / `halfrun` / `queue` のいずれも同じ時期・同じ対象でレビューする。High/Medium がなくなるまでその場で修正して再実行し、**指摘を潰し切ってから最初のコミットを作る**。ただし**再実行は 2 周まで**であり、2 周を終えた時点で残る High 以外の指摘は follow-up Issue に切り出して現在の Issue を完了させる（`prompts/review.md` → "Review round cap"）。**切り出しは起票では終わらない** — 直後に `pnpm josh epic:bundle <新規>` を実行し、`add_to_epic` / `create_epic` は確認せずに実行する（→「後追い Issue は起票した直後に EPIC へ束ね直す」）。したがって PR に貼るレビューコメントも、ラウンドごとのコミットや CI 再実行も発生しない。
 
 **フレッシュコンテキストのサブエージェントに委譲する方式（kit#752）と、PR 作成後に実行して結果を PR コメントとして投稿する方式（kit#758）は、これを置き換えるものではなく、これに置き換えられた。** 別コンテキストのレビュアーは実装者のバイアスを持ち込まない利点があったが、毎ラウンド変更を読み直し、指摘のたびに修正コミット・push・必須チェック 6 件の CI 再実行が走るため、PR 作成からレビュー確定まで 10 分を超えるのが常態だった（kit#758 の PR 自身が 3 ラウンドで 10 分 53 秒）。**レビュアーが実装者と同一コンテキストである点は、この方式が受け入れているトレードオフである** — 作者の思い込みが素通りする確率は上がるが、コミット前セルフレビュー（`prompts/review.md`）は従来どおり必須のゲートとして残る。
 
@@ -334,7 +334,7 @@ This rule applies regardless of model (Claude / Gemini / Cursor) or account; the
 The chain rule above has been violated repeatedly even with the decision table and anti-pattern catalog in place (PR #387 on 2026-05-15, PR #398 on 2026-05-20). The rule needs to be visible at the **exact moment of violation** — when the response is about to be sent. Run this check, in order, before sending any response containing `/code-review` output:
 
 1. **Mode check** — Is this `/code-review` part of a `fullrun` / `fullrun new` / `queue` invocation? Decide by both signals: (a) the user's recent prompt contained one of those commands, AND (b) the implementation is finished and the verification gate has reached its review step. A `halfrun` invocation never satisfies (a): halfrun runs the same review inside its gate but ends at the confirmation stop without committing. If either is false → **standalone mode**; stop after the review markdown, do NOT call `followup --merge`. This conditional prevents auto-merging when the user runs `/code-review <PR>` standalone for a code-review-only purpose.
-2. **Severity check** — Count high/medium findings across all categories. If ≥1 → fix in place and re-run `/code-review medium`. Nothing is committed yet, so the loop costs no commit or CI run. **Stop at two rounds** — after the second, file every remaining Low/Medium finding as a follow-up Issue and continue the pipeline; a standing High blocks the merge but does not authorize a third round（`prompts/review.md` → "Review round cap"）。 Do NOT call `followup --merge` yet.
+2. **Severity check** — Count high/medium findings across all categories. If ≥1 → fix in place and re-run `/code-review medium`. Nothing is committed yet, so the loop costs no commit or CI run. **Stop at two rounds** — after the second, file every remaining Low/Medium finding as a follow-up Issue, run `pnpm josh epic:bundle <new>` on it and execute an `add_to_epic` / `create_epic` answer without asking, then continue the pipeline; a standing High blocks the merge but does not authorize a third round（`prompts/review.md` → "Review round cap"）。 Do NOT call `followup --merge` yet.
 3. **Append check** — If in fullrun mode AND 0 high/medium findings (Low-only or fully clean) → the same response that contains the `/code-review` markdown MUST also contain a `pnpm josh followup "<title> #<N>" --merge --notify-message "..."` tool call **after** the review markdown. **A response whose final assistant text is `/code-review` Markdown with no follow-on tool call is a violation.** Cancel and append the tool call before sending.
 
 The check fires at the moment your response would end with review markdown and no follow-on tool call. That is the violation point. Treat the `/code-review` skill's output as an intermediate tool result, not a deliverable.
@@ -586,6 +586,32 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
 **Issue を新規に起票した直後**に、既存の open Issue を調べる。`kickoff` / `fullrun` / `halfrun` が起票したとき、および実装中に Tier A で起票したとき（`epicrun` 実行中を含む）。
 
 `pnpm josh epic:bundle <N>`（エイリアス `eb`）が候補を探して推奨を表示する。**このコマンドは何も書き込まない** — 候補を出すのが機械、束ねるかを決めるのは AI である。
+
+### 後追い Issue は起票した直後に EPIC へ束ね直す
+
+レビュー上限（`prompts/review.md` → "Review round cap"）で切り出す後追い Issue は、**このワークフローで最も件数の多い起票経路**である。それでも手順は長らく「起票して現在の Issue を参照する」までしか定めておらず、束ね直しへの導線が無かった。手順どおりに読むと起票して次へ進んで終わる。
+
+手順は 3 段であり、**上の発火点の一適用ではなく、後追い起票の手順そのものに書く**。別の文書を読みに行く前提にしない。
+
+1. 残指摘を後追い Issue として起票し、現在の Issue を参照する
+2. **現在の Issue が閉じる前に** `pnpm josh epic:bundle <新規>` を実行する。候補探索は open Issue しか読まないため、親が閉じた後では恒久的に `none` になる（joshuafolkken/kit#947）
+3. 答えに従う。**`epic:bundle` は推奨するだけで何も書き込まない**ので、「実行する」とは書き込みコマンドを自分で打つことである。**epic 本文の手編集は禁止** — タスクリストと `blocked-by` が食い違い、`epic:next` が `error` を返す
+
+   | 答え                                                                                              | すること                                                                                                                                                                                                                    | Tier             |
+   | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+   | `add_to_epic`                                                                                     | `pnpm josh epic --add <E> <新規>`（順序があるなら `--before <M>` / `--after <M>`）                                                                                                                                          | **A — 確認不要** |
+   | `create_epic`                                                                                     | `pnpm josh epic "<title>" <新規> <相手> [--ordered]`                                                                                                                                                                        | **A — 確認不要** |
+   | `ask`（候補が複数の EPIC に散っている）                                                           | 停止して尋ねる。epic 同士の統合だけが取り消せないため。**`epicrun` 中はバッチを止めず、その子に `needs-decision` を付けて park する**                                                                                       | **B**            |
+   | `none`                                                                                            | 何もしない                                                                                                                                                                                                                  | —                |
+   | **コマンドが答えられなかった** — 非ゼロ終了、または EPIC 一覧の打ち切り・読めない Issue の ⚠ 警告 | 何と言ったかを添えて停止・報告する。**警告の後の `none` は「束ねる相手が無い」ではない** — 探索が不完全なのであり、答えとして読むと本規則が塞ごうとしている経路そのもので Issue が EPIC 無しになる（joshuafolkken/kit#950） | —                |
+
+**`none` は正当な答えである。** コミット前セルフレビューをワークフローの外で回した場合、現在の Issue が存在せず参照先が無いため候補は出ない。そのときは束ねずにバックログへ残す — 手順が求めるのは「コマンドを実行して答えに従うこと」であって、必ず EPIC に入れることではない。
+
+**逆に、実行せずに起票だけで終えると、指摘は落ちるのではなく永久に park される。** `epic:next` が返すのは EPIC のタスクリストにある子だけなので、どの EPIC にも属さない Issue は実行中の `epicrun` に一度も渡らない（拾うには番号を知っている人が要る）。バックログから見れば「落ちた」のと区別が付かない。
+
+実測である。joshuafolkken/kit#943 は 2 回目のレビューから切り出され、本文に `親: joshuafolkken/kit#891` と明記していながら、どの EPIC の子にもなっていなかった。親 #891 が閉じたのはその 3 分後である。同じ経路でも手順が実行された joshuafolkken/kit#911 では `epic:bundle` が EPIC を名指しし、そのまま追加されている。**差は、コマンドを打ったかどうかだけだった**（joshuafolkken/kit#946）。
+
+なお **#943 の取りこぼしには 2 層目の原因もある** — 起票が親の close より後になると、`epic:bundle` の候補探索が open Issue しか読まないため恒久的に `Nothing to bundle.` を返す。そちらは joshuafolkken/kit#947 が扱う。本節が直すのは「手順が守られなかった」側だけである。
 
 ### 強い信号だけを根拠にする
 

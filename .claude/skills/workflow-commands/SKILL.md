@@ -95,6 +95,10 @@ without appearing here has not been checked against the criterion:
 - **The `overrides` prohibition** and **the `devEngines` prohibition** — a dependency command can be
   run on any turn, including one that never loads `dependency-update`, and by the time the skill
   would be read the pin has already been rewritten.
+- **The follow-up filing step after the review round cap** — filing the Issue and bundling it into an
+  epic. A pre-commit self-review runs outside any workflow as readily as inside one, and the Issue it
+  files is orphaned just the same; the step has to be readable on a turn that never typed a keyword.
+  Its full form is in `prompts/review.md` → "Review round cap" (joshuafolkken/kit#946).
 - **The three `josh epic:*` rules that bind outside those commands** — recording a decision removes
   that child's `needs-decision` label, fixing what `epic:audit` finds is Tier A, and an epic in
   another repository is referenced as `owner/repo#N`. Each fires on a turn where no `epic:*` command
