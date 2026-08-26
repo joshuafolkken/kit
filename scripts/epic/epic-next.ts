@@ -5,7 +5,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { epic_classify } from './epic-classify'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph, type GraphAnomaly } from './epic-graph'
-import { epic_report, type EpicNextResult } from './epic-report'
+import { epic_report, type EpicNextResult, type EpicVerdict } from './epic-report'
 
 // `josh epic:next <E>` — which of an epic's children can be started right now, bundled per
 // repository, and what the rest are waiting on (joshuafolkken/kit#860).
@@ -15,6 +15,9 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const REPO_FLAG = '--repo'
 const USAGE = 'Usage: josh epic:next <epic-number> [--repo <owner/repo>]'
+// An epic in another repository needs its children resolved there too, which is joshuafolkken/kit#864.
+// Refused with this rather than read as a bare number, which would answer about a different issue.
+const CROSS_REPO_USAGE = `An epic in another repository is not supported yet (see joshuafolkken/kit#864). ${USAGE}`
 const EXTERNAL_NOTICE =
 	'Note: this epic tracks children in other repositories. Those are not resolved yet — see joshuafolkken/kit#864.'
 
@@ -25,12 +28,18 @@ interface NextOptions {
 }
 
 // `#123` and `123` are both accepted: the number is copied out of an issue reference as often as it
-// is typed.
-function parse_epic_number(raw: string | undefined): number | undefined {
-	const parsed = Number((raw ?? '').replace('#', ''))
+// is typed. `owner/repo#123` is refused rather than silently read as `123`, which would query the
+// wrong repository's issue of that number — see `CROSS_REPO_USAGE`.
+function parse_epic_number(raw = ''): number | undefined {
+	if (raw.includes('/')) return undefined
+	const parsed = Number(raw.replace('#', ''))
 	if (!Number.isSafeInteger(parsed) || parsed <= 0) return undefined
 
 	return parsed
+}
+
+function usage_for(raw = ''): string {
+	return raw.includes('/') ? CROSS_REPO_USAGE : USAGE
 }
 
 function parse_repo(rest: ReadonlyArray<string>): string | undefined {
@@ -42,7 +51,7 @@ function parse_repo(rest: ReadonlyArray<string>): string | undefined {
 function parse_options(argv: ReadonlyArray<string>): NextOptions {
 	const [first, ...rest] = argv
 	const epic_number = parse_epic_number(first)
-	if (epic_number === undefined) return { usage: USAGE }
+	if (epic_number === undefined) return { usage: usage_for(first) }
 	const repo = parse_repo(rest)
 	if (repo === undefined) return rest.includes(REPO_FLAG) ? { usage: USAGE } : { epic_number }
 
@@ -84,12 +93,23 @@ function decide(snapshot: EpicSnapshot): EpicNextResult {
 	return epic_report.build_result(classification, anomalies)
 }
 
-// Print the candidate for one repository only, for a caller that runs one repository at a time.
+// The verdict as it applies to *this* repository. `run` never reaches a caller here: it means some
+// other repository has work, which for this session is something to wait on rather than a state its
+// loop has a branch for. The whole-run timeout is what bounds that wait.
+function repo_verdict(verdict: EpicVerdict): EpicVerdict {
+	return verdict === 'run' ? 'wait' : verdict
+}
+
+// Print the answer for one repository, as one machine-readable token: the issue number when there
+// is a child to run, otherwise the verdict — `wait`, `stop` or `complete`.
 //
-// Stdout carries the issue number and nothing else, so `child=$(josh epic:next 858 --repo …)`
-// captures a number rather than prose; every explanation goes to stderr. An unusable graph is
-// checked before a candidate is picked — printing a runnable child while the graph is broken would
-// hand a caller work the anomaly says must not start.
+// The verdict is on stdout rather than only in prose because a loop has to tell "poll again" from
+// "stop and report" from "finished"; collapsing all three into one line and exit 0 leaves the caller
+// unable to make the distinction the whole classification exists for. Explanations go to stderr, so
+// `child=$(josh epic:next 858 --repo …)` still captures a single token.
+//
+// An unusable graph is checked before a candidate is picked: printing a runnable child while the
+// graph is broken would hand a caller work the anomaly says must not start.
 function report_single(result: EpicNextResult, repo: string): number {
 	if (result.verdict === 'error') {
 		console.error(epic_report.format_result(result))
@@ -101,6 +121,7 @@ function report_single(result: EpicNextResult, repo: string): number {
 
 	if (child === undefined) {
 		console.error(`No runnable child in ${repo}.`)
+		console.info(repo_verdict(result.verdict))
 
 		return SUCCESS_EXIT_CODE
 	}
@@ -154,10 +175,12 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const epic_next = {
 	USAGE,
+	CROSS_REPO_USAGE,
 	EXTERNAL_NOTICE,
 	unreadable_anomaly,
 	is_order_declared,
 	parse_epic_number,
+	repo_verdict,
 	parse_options,
 	decide,
 	report,

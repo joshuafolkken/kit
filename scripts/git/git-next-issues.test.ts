@@ -20,6 +20,10 @@ const EXCLUDED_LABEL_SPELLINGS: ReadonlyArray<string> = [
 	'Epic',
 	'in-progress',
 	'In-Progress',
+	// An `epicrun` parks a child here when it needs a decision; proposing it as the next run would
+	// propose work that cannot finish (joshuafolkken/kit#861).
+	'needs-decision',
+	'Needs-Decision',
 ]
 
 function issue(

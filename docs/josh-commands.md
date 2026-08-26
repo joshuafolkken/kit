@@ -780,7 +780,7 @@ Today every child is stamped with the repository the command runs in, so one bun
 
 Every open child appears exactly once in the report, so nothing is silently dropped. A child that could not be read is **not** dropped either — it stops the command. Dropping it is wrong in both directions: an epic whose children all failed to read would look like an epic with no open children, and one missing child leaves whatever it blocks looking unblocked.
 
-With `--repo`, standard output carries the issue number and nothing else, so `child=$(josh epic:next 858 --repo joshuafolkken/kit)` captures a number; every explanation goes to standard error.
+With `--repo`, standard output carries exactly one token — the issue number when there is a child to run, otherwise the verdict (`wait`, `stop` or `complete`) — so `answer=$(josh epic:next 858 --repo joshuafolkken/kit)` captures something a loop can branch on. Every explanation goes to standard error. `run` never appears there: it would mean another repository has work, which for this session is something to wait on, so it is reported as `wait`.
 
 **The remaining children are sorted by whether waiting helps — never by which label they carry.**
 
