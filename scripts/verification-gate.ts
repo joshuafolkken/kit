@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
 import { GATE_COMMAND } from './josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh/josh-composite-arguments'
+import { type_check_step } from './type-check-step'
 
 // joshuafolkken/kit#914: the completion gate's four checks are independent and share no mutable
 // state, yet every entry point ran them one after another — 31s serial against a 13s longest step,
@@ -25,22 +26,55 @@ interface GateStep {
 
 interface GateStepResult extends BufferedProcessResult {
 	label: string
+	// What was actually run. The type check's command is resolved per project, so a failure on the
+	// `check` step is only reproducible if the header names the command rather than the label.
+	command: string
 }
 
-const GATE_STEPS: ReadonlyArray<GateStep> = [
-	{ label: 'lint', command_args: ['josh', 'lint'] },
-	{ label: 'check', command_args: ['josh', 'check'] },
-	{ label: 'cspell', command_args: ['josh', 'cspell:dot'] },
-	{ label: 'test:unit', command_args: ['josh', 'test:unit'] },
+const JOSH = 'josh'
+const TYPE_CHECK_LABEL = 'check'
+
+interface GateCheck {
+	label: string
+	// The `josh` sub-command that defines the check, and the one an appended argument belongs to.
+	target: string
+}
+
+// The four checks, in the order their output is printed.
+const GATE_CHECKS: ReadonlyArray<GateCheck> = [
+	{ label: 'lint', target: 'lint' },
+	{ label: TYPE_CHECK_LABEL, target: 'check' },
+	{ label: 'cspell', target: 'cspell:dot' },
+	{ label: 'test:unit', target: 'test:unit' },
 ]
 
-const GATE_TARGETS: ReadonlyArray<string> = GATE_STEPS.map((step) => step.command_args.at(-1) ?? '')
-const STEP_COUNT = String(GATE_STEPS.length)
+const GATE_TARGETS: ReadonlyArray<string> = GATE_CHECKS.map((check) => check.target)
+const STEP_COUNT = String(GATE_CHECKS.length)
+
+// Only the type check is resolved per project (joshuafolkken/kit#934) — a SvelteKit project
+// type-checks through its own toolkit, not through `tsc --noEmit`. Resolving inside the step keeps
+// the probe concurrent with the other three checks rather than delaying every one of them.
+async function build_gate_step(check: GateCheck, start_directory: string): Promise<GateStep> {
+	if (check.label !== TYPE_CHECK_LABEL) {
+		return { label: check.label, command_args: [JOSH, check.target] }
+	}
+
+	return {
+		label: check.label,
+		command_args: await type_check_step.resolve_type_check_args(start_directory),
+	}
+}
+
+async function build_gate_steps(start_directory: string): Promise<ReadonlyArray<GateStep>> {
+	return await Promise.all(
+		GATE_CHECKS.map(async (check) => await build_gate_step(check, start_directory)),
+	)
+}
 
 async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 	const result = await buffered_process.run_buffered_process(step.command_args)
 
-	return { label: step.label, ...result }
+	return { label: step.label, command: step.command_args.join(' '), ...result }
 }
 
 function is_gate_step_failed(result: GateStepResult): boolean {
@@ -50,7 +84,7 @@ function is_gate_step_failed(result: GateStepResult): boolean {
 function print_gate_step(result: GateStepResult): void {
 	const icon = is_gate_step_failed(result) ? FAIL_ICON : PASS_ICON
 
-	process.stdout.write(`\n${icon} ${result.label}\n`)
+	process.stdout.write(`\n${icon} ${result.label} (pnpm ${result.command})\n`)
 	if (result.output) process.stdout.write(`${result.output}\n`)
 }
 
@@ -67,7 +101,8 @@ function print_gate_summary(failed_labels: ReadonlyArray<string>): void {
 // Results are printed in declaration order rather than completion order: a gate whose sections move
 // around between runs cannot be read by scrolling to the same place twice.
 async function run_verification_gate(): Promise<number> {
-	const results = await Promise.all(GATE_STEPS.map(async (step) => await run_gate_step(step)))
+	const steps = await build_gate_steps(process.cwd())
+	const results = await Promise.all(steps.map(async (step) => await run_gate_step(step)))
 
 	for (const result of results) print_gate_step(result)
 
@@ -103,6 +138,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 const verification_gate = {
+	build_gate_step,
+	build_gate_steps,
 	is_gate_step_failed,
 	run_gate_command,
 	run_gate_step,
@@ -110,4 +147,4 @@ const verification_gate = {
 }
 
 export type { GateStep, GateStepResult }
-export { GATE_STEPS, verification_gate }
+export { GATE_TARGETS, verification_gate }

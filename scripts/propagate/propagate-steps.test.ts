@@ -1,5 +1,5 @@
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
-import { GATE_STEPS } from '#scripts/verification-gate'
+import { GATE_TARGETS } from '#scripts/verification-gate'
 import { describe, expect, it } from 'vitest'
 import { propagate_run } from './propagate-run'
 import { propagate_steps } from './propagate-steps'
@@ -61,9 +61,7 @@ describe('propagate_steps.STEP_COMMANDS', () => {
 	it('runs the whole gate, not only the type check', () => {
 		expect(propagate_steps.VERIFY_SCRIPT).toBe(`pnpm josh ${GATE_COMMAND}`)
 
-		const gate_commands = GATE_STEPS.map((step) => step.command_args.at(-1))
-
-		expect(gate_commands).toEqual(['lint', 'check', 'cspell:dot', 'test:unit'])
+		expect(GATE_TARGETS).toEqual(['lint', 'check', 'cspell:dot', 'test:unit'])
 	})
 
 	// A step that failed the gate must never reach the pull request, so the verification has to be

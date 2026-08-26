@@ -19,10 +19,24 @@ The four are independent and share no mutable state, so nothing is gained by run
 The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check's output as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
 ```
+✔ lint (pnpm josh lint)
+✗ check (pnpm josh-app check:ci)
+…
 ✗ verification gate failed: lint, cspell
 ```
 
-The exit code is `1` when any check failed, `0` otherwise. While fixing, re-run one check on its own with `pnpm josh lint`, `pnpm josh check`, `pnpm josh cspell:dot` or `pnpm josh test:unit`.
+Each block's header names the command that ran, not only the check, because the type check's command is resolved per project (below). Re-run a single check while fixing by copying the command from its header; the other three are always `pnpm josh lint`, `pnpm josh cspell:dot` and `pnpm josh test:unit`. The exit code is `1` when any check failed, `0` otherwise.
+
+**The type check follows the application layer.** Three of the four checks are always the `josh` sub-command of the same name. The type check is not: a SvelteKit project type-checks with `svelte-check` behind `svelte-kit sync`, and `tsc --noEmit` there both misses every `.svelte` type error and fails on a clean checkout where `./$types` has not been generated. So the step is asked of the project's own toolkit:
+
+1. The toolkit shim is found by walking up from the working directory to a `node_modules/.bin` — the same walk pnpm performs, so a gate typed in a subdirectory resolves the toolkit its sibling checks resolve. It is never found through `pnpm <bin>`, which falls through to a globally installed toolkit and would run a SvelteKit type check on a project that is not one.
+2. That binary is run with no subcommand and the usage line it prints is read, the same way the `/verify-ui` skill decides whether a `shot` command exists. A toolkit being installed is not the command existing.
+3. The first of `check:ci` (the strict variant a gate wants) then `check` that the usage line names is used; `josh-app` is consulted before `josh-game`.
+4. When no installed toolkit names either, the step stays `pnpm josh check`.
+
+A project with no application toolkit — kit itself, a plain TypeScript package — therefore gets `tsc --noEmit`, unchanged. The probe runs concurrently with the other three checks, so it costs no wall-clock of its own.
+
+The refusal message above names the `josh` sub-commands, `josh check` among them; on a project whose type check resolves to a toolkit command, pass that check's arguments to the command its output header names instead.
 
 Like the composite commands below, `gate` forwards nothing to the four sub-commands, so it refuses extra arguments rather than discarding them:
 
