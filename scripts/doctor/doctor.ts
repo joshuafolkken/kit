@@ -3,11 +3,12 @@ import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auto_merge_setting } from '#scripts/auto-merge-setting'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { security_updates } from '#scripts/security-updates'
 import { running_binary } from '#scripts/version/running-binary'
-import { doctor_io } from './doctor-io'
+import { doctor_io, type GitTopLevel } from './doctor-io'
 import { doctor_logic } from './doctor-logic'
 
 const FIX_FLAG = '--fix'
@@ -93,8 +94,7 @@ function report_path_diagnosis(ctx: DoctorContext, is_fix: boolean): void {
 // skipping the gate there would warn about a nonexistent repository from a home directory whenever
 // `git` is missing or refuses the repository. Inside a known repository the search is bounded to its
 // root, so a repository nested under a kit consumer does not inherit the parent's files.
-function resolve_gate_scope(): GateScope | undefined {
-	const git = doctor_io.resolve_git_top_level()
+function resolve_gate_scope(git: GitTopLevel): GateScope | undefined {
 	if (git.state === 'outside') return undefined
 	if (git.state === 'inside') return { root: git.top_level, boundary: git.top_level }
 
@@ -136,8 +136,8 @@ function report_applicable_settings(
 // The repository name is resolved once, and only when at least one report will use it: `doctor`
 // writes nothing, so the bounded lookup is the right one, and spawning it for a repository with no
 // prerequisite at all would be a network call with nothing to report.
-function report_repository_settings(): void {
-	const scope = resolve_gate_scope()
+function report_repository_settings(git: GitTopLevel): void {
+	const scope = resolve_gate_scope(git)
 	if (scope === undefined) return
 	const applicable = resolve_applicable(scope)
 	if (!applicable.security_updates && !applicable.auto_merge) return
@@ -148,18 +148,43 @@ function report_repository_settings(): void {
 	)
 }
 
+// The discovery map, printed for whichever repository `doctor` is standing in. Nothing is printed
+// from outside a repository: discovery is anchored on the current repository's own owner, so without
+// one there is no map to be right or wrong about (joshuafolkken/kit#869).
+function report_repository_map(git: GitTopLevel): void {
+	if (git.state !== 'inside') return
+
+	const map = repo_discovery.discover_repositories(git.top_level)
+
+	console.info('')
+	console.info(doctor_logic.format_repository_map(map))
+}
+
 function main(): void {
 	const is_fix = process.argv.includes(FIX_FLAG)
 	const ctx = gather_context()
 
+	// Resolved once and shared: `doctor` is what a user runs when things are already broken, and a
+	// second `git rev-parse` would add a second timeout to a command whose whole contract is to stay
+	// responsive when git itself is hanging (joshuafolkken/kit#805).
+	const git = doctor_io.resolve_git_top_level()
+
 	print_report(ctx)
 	report_path_diagnosis(ctx, is_fix)
-	report_repository_settings()
+	report_repository_map(git)
+	report_repository_settings(git)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-const doctor = { gather_context, print_report, reclaim_shim, handle_shadow, main }
+const doctor = {
+	gather_context,
+	print_report,
+	reclaim_shim,
+	handle_shadow,
+	report_repository_map,
+	main,
+}
 
 export type { DoctorContext }
 export { doctor }
