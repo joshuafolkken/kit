@@ -25,21 +25,38 @@ interface GraphAnomaly {
 	message: string
 }
 
-// The children indexed by number, for the lookups the walks below do repeatedly.
-function index_children(children: ReadonlyArray<EpicChild>): Map<number, EpicChild> {
-	return new Map(children.map((child) => [child.number, child]))
+// A child's identity across the whole epic. Issue numbers are unique per repository, not globally:
+// an epic tracking both `#7` and `app-kit#7` has two different children, and keying by number alone
+// had them overwrite each other — and had one's blockers resolve against the other
+// (joshuafolkken/kit#864).
+function key_of(child: EpicChild): string {
+	return `${child.repo}#${String(child.number)}`
 }
 
-// A child's blockers that belong to this epic. A blocker outside the epic is somebody else's
-// problem — the resolver decides whether it counts, and it can never be part of a cycle here.
-function blockers_of(index: ReadonlyMap<number, EpicChild>, node: number): ReadonlyArray<number> {
-	return index.get(node)?.blocked_by ?? []
+// A blocker number, as a key in the repository that declared it. `blockedBy` numbers are issue
+// numbers in the blocked child's own repository.
+function blocker_key(child: EpicChild, blocker: number): string {
+	return `${child.repo}#${String(blocker)}`
+}
+
+// The children indexed by identity, for the lookups the walks below do repeatedly.
+function index_children(children: ReadonlyArray<EpicChild>): Map<string, EpicChild> {
+	return new Map(children.map((child) => [key_of(child), child]))
+}
+
+// A child's blockers that belong to this epic, as keys. A blocker outside the epic is somebody
+// else's problem — the resolver decides whether it counts, and it can never be part of a cycle here.
+function blockers_of(index: ReadonlyMap<string, EpicChild>, node: string): ReadonlyArray<string> {
+	const child = index.get(node)
+	if (child === undefined) return []
+
+	return child.blocked_by.map((blocker) => blocker_key(child, blocker))
 }
 
 function has_remaining_blocker(
-	index: ReadonlyMap<number, EpicChild>,
-	node: number,
-	remaining: ReadonlySet<number>,
+	index: ReadonlyMap<string, EpicChild>,
+	node: string,
+	remaining: ReadonlySet<string>,
 ): boolean {
 	return blockers_of(index, node).some((blocker) => remaining.has(blocker))
 }
@@ -51,9 +68,9 @@ function has_remaining_blocker(
 // Peeling rather than a depth-first search for a back edge: it is iterative, needs no node marking, and
 // its answer is the more useful one. Purely structural, so a child's state and labels do not enter
 // into it — a cycle is wrong whether or not anything in it has been closed.
-function find_stuck_children(children: ReadonlyArray<EpicChild>): Array<number> {
+function find_stuck_children(children: ReadonlyArray<EpicChild>): Array<string> {
 	const index = index_children(children)
-	const remaining = new Set(children.map((child) => child.number))
+	const remaining = new Set(children.map((child) => key_of(child)))
 
 	const peel = (): number => {
 		const ready = [...remaining].filter((node) => !has_remaining_blocker(index, node, remaining))
@@ -67,16 +84,19 @@ function find_stuck_children(children: ReadonlyArray<EpicChild>): Array<number> 
 		/* keep peeling until a pass drops nothing */
 	}
 
-	return [...remaining].toSorted((left, right) => left - right)
+	return [...remaining].toSorted((left, right) => left.localeCompare(right))
 }
 
 function format_link(link: DependencyLink): string {
 	return `#${String(link.blocker)} -> #${String(link.blocked)}`
 }
 
-// Whether a declared link is actually recorded as a native relation on the blocked child.
-function is_link_recorded(link: DependencyLink, index: ReadonlyMap<number, EpicChild>): boolean {
-	return index.get(link.blocked)?.blocked_by.includes(link.blocker) === true
+// Whether a declared link is actually recorded as a native relation on the blocked child. Declared
+// links are always written as bare numbers, which name issues in the epic's own repository.
+function is_link_recorded(link: DependencyLink, children: ReadonlyArray<EpicChild>): boolean {
+	return children.some(
+		(child) => child.number === link.blocked && child.blocked_by.includes(link.blocker),
+	)
 }
 
 // Declared links with no matching relation. Reported rather than applied: `gh` older than 2.94.0
@@ -86,9 +106,7 @@ function missing_relations(
 	links: ReadonlyArray<DependencyLink>,
 	children: ReadonlyArray<EpicChild>,
 ): Array<DependencyLink> {
-	const index = index_children(children)
-
-	return links.filter((link) => !is_link_recorded(link, index))
+	return links.filter((link) => !is_link_recorded(link, children))
 }
 
 // Every relation recorded on one child, as links between children of this epic.
@@ -112,8 +130,8 @@ function undeclared_relations(
 		.filter((link) => !declared.has(format_link(link)))
 }
 
-function cycle_anomaly(stuck: ReadonlyArray<number>): GraphAnomaly {
-	const list = stuck.map((issue_number) => `#${String(issue_number)}`).join(', ')
+function cycle_anomaly(stuck: ReadonlyArray<string>): GraphAnomaly {
+	const list = stuck.join(', ')
 
 	return {
 		kind: 'cycle',
@@ -158,6 +176,8 @@ function find_anomalies(
 }
 
 const epic_graph = {
+	key_of,
+	blocker_key,
 	index_children,
 	blockers_of,
 	find_stuck_children,

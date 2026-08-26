@@ -21,19 +21,23 @@ async function issue_get_title(issue_number: string): Promise<string | undefined
 	}
 }
 
-async function issue_get_body(issue_number: string): Promise<string | undefined> {
+// `repo` reads an issue in another repository — the form a cross-repository epic is referenced in
+// (joshuafolkken/kit#864). Without it a qualified reference would read *this* repository's issue of
+// that number, a different issue entirely.
+async function issue_get_body(issue_number: string, repo?: string): Promise<string | undefined> {
+	const scope = repo === undefined ? [] : ['--repo', repo]
+
 	try {
-		const result: string = await git_gh_exec.exec_gh_command([
+		return await git_gh_exec.exec_gh_command([
 			'issue',
 			'view',
 			issue_number,
+			...scope,
 			'--json',
 			'body',
 			'--jq',
 			'.body',
 		])
-
-		return result
 	} catch {
 		return undefined
 	}
@@ -103,9 +107,22 @@ async function issue_list_by_label(label: string, limit: number): Promise<string
 // One `gh issue view --json <fields>`, for every caller that wants a JSON view of one issue. Callers
 // differ only in which fields they ask for, and a helper per field list is how four near-identical
 // functions accumulated (joshuafolkken/kit#862).
-async function issue_view_json(issue_number: string, fields: string): Promise<string | undefined> {
+async function issue_view_json(
+	issue_number: string,
+	fields: string,
+	repo?: string,
+): Promise<string | undefined> {
+	const scope = repo === undefined ? [] : ['--repo', repo]
+
 	try {
-		return await git_gh_exec.exec_gh_command(['issue', 'view', issue_number, '--json', fields])
+		return await git_gh_exec.exec_gh_command([
+			'issue',
+			'view',
+			issue_number,
+			...scope,
+			'--json',
+			fields,
+		])
 	} catch {
 		return undefined
 	}
@@ -114,8 +131,15 @@ async function issue_view_json(issue_number: string, fields: string): Promise<st
 // State, labels and dependency relations in one read: the epic auto-close needs state and relations
 // per child, `epic:next` needs the labels too, and splitting them would multiply the API calls for
 // no gain (joshuafolkken/kit#860).
-async function issue_get_state_and_relations(issue_number: string): Promise<string | undefined> {
-	return await issue_view_json(issue_number, 'number,state,labels,blockedBy')
+//
+// `repo` reads a child in another repository. Cross-repository children are read this way rather
+// than from a local checkout: their state is a GitHub fact, and requiring a clone to learn it is
+// what kept the auto-close from ever running on such an epic (joshuafolkken/kit#864).
+async function issue_get_state_and_relations(
+	issue_number: string,
+	repo?: string,
+): Promise<string | undefined> {
+	return await issue_view_json(issue_number, 'number,state,labels,blockedBy', repo)
 }
 
 // Everything `epic:plan` puts in front of the batch decision. Read separately from the poll above

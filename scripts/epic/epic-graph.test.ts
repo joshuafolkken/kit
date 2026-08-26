@@ -3,6 +3,12 @@ import { epic_graph, type EpicChild } from './epic-graph'
 
 const REPO = 'joshuafolkken/kit'
 
+// Children are identified by repository and number: an epic can track both `#7` and `app-kit#7`, and
+// keying by number alone had them overwrite each other (joshuafolkken/kit#864).
+function key(number: number, repo = REPO): string {
+	return `${repo}#${String(number)}`
+}
+
 function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
 }
@@ -19,17 +25,17 @@ describe('epic_graph.find_stuck_children', () => {
 	// Two hand-added `--add-blocked-by` edges are all it takes, and every session would then wait
 	// forever for the other half of the pair.
 	it('finds a two-child cycle', () => {
-		expect(epic_graph.find_stuck_children([child(1, [2]), child(2, [1])])).toEqual([1, 2])
+		expect(epic_graph.find_stuck_children([child(1, [2]), child(2, [1])])).toEqual([key(1), key(2)])
 	})
 
 	it('finds a longer cycle', () => {
 		const children = [child(1, [3]), child(2, [1]), child(3, [2])]
 
-		expect(epic_graph.find_stuck_children(children)).toEqual([1, 2, 3])
+		expect(epic_graph.find_stuck_children(children)).toEqual([key(1), key(2), key(3)])
 	})
 
 	it('finds a child blocking itself', () => {
-		expect(epic_graph.find_stuck_children([child(1, [1])])).toEqual([1])
+		expect(epic_graph.find_stuck_children([child(1, [1])])).toEqual([key(1)])
 	})
 
 	// A child behind a cycle never starts either, and telling the caller only about the cycle would
@@ -37,17 +43,25 @@ describe('epic_graph.find_stuck_children', () => {
 	it('includes the children a cycle blocks', () => {
 		const children = [child(1, [2]), child(2, [1]), child(3, [1])]
 
-		expect(epic_graph.find_stuck_children(children)).toEqual([1, 2, 3])
+		expect(epic_graph.find_stuck_children(children)).toEqual([key(1), key(2), key(3)])
 	})
 
 	it('ignores a blocker that is not a child of this epic', () => {
 		expect(epic_graph.find_stuck_children([child(1, [999])])).toEqual([])
 	})
 
+	// A blocker number names an issue in the blocked child's own repository, so a child in another
+	// repository with the same number is a different child entirely.
+	it('does not treat a matching number in another repository as the blocker', () => {
+		const remote: EpicChild = { ...child(1), repo: 'joshuafolkken/app-kit' }
+
+		expect(epic_graph.find_stuck_children([remote, child(2, [1])])).toEqual([])
+	})
+
 	it('is decided by structure, not by state', () => {
 		const closed: EpicChild = { ...child(1, [2]), state: 'CLOSED' }
 
-		expect(epic_graph.find_stuck_children([closed, child(2, [1])])).toEqual([1, 2])
+		expect(epic_graph.find_stuck_children([closed, child(2, [1])])).toEqual([key(1), key(2)])
 	})
 })
 

@@ -9,6 +9,7 @@ words:
   - commondir
   - precheck
   - backlinks
+  - fromjson
   - dryrun
   - overridability
   - Unparseable

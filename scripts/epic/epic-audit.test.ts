@@ -76,25 +76,39 @@ describe('epic_audit_logic.acceptance_section', () => {
 })
 
 describe('epic_audit_logic.depends_on', () => {
-	const index = epic_graph.index_children([child(1, ''), child(2, '', [1]), child(3, '', [2])])
+	const one = child(1, '')
+	const two = child(2, '', [1])
+	const three = child(3, '', [2])
+	const index = epic_graph.index_children([one, two, three])
 
 	it('finds a direct dependency', () => {
-		expect(epic_audit_logic.depends_on(index, 2, 1)).toBe(true)
+		expect(epic_audit_logic.depends_on(index, two, one)).toBe(true)
 	})
 
 	it('finds one through a chain', () => {
-		expect(epic_audit_logic.depends_on(index, 3, 1)).toBe(true)
+		expect(epic_audit_logic.depends_on(index, three, one)).toBe(true)
 	})
 
 	it('does not invent one in the other direction', () => {
-		expect(epic_audit_logic.depends_on(index, 1, 3)).toBe(false)
+		expect(epic_audit_logic.depends_on(index, one, three)).toBe(false)
+	})
+
+	// An epic can track two children whose numbers collide across repositories.
+	it('does not confuse two children that share a number in different repositories', () => {
+		const remote: AuditChild = { ...child(1, ''), repo: 'joshuafolkken/app-kit' }
+		const mixed = epic_graph.index_children([one, two, remote])
+
+		expect(epic_audit_logic.depends_on(mixed, two, remote)).toBe(false)
+		expect(epic_audit_logic.depends_on(mixed, two, one)).toBe(true)
 	})
 
 	// The auditor must not hang on the input it exists to examine.
 	it('terminates on a cyclic graph', () => {
-		const cyclic = epic_graph.index_children([child(1, '', [2]), child(2, '', [1])])
+		const first = child(1, '', [2])
+		const second = child(2, '', [1])
+		const cyclic = epic_graph.index_children([first, second])
 
-		expect(epic_audit_logic.depends_on(cyclic, 1, 99)).toBe(false)
+		expect(epic_audit_logic.depends_on(cyclic, first, child(99, ''))).toBe(false)
 	})
 })
 

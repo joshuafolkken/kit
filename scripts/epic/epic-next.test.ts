@@ -3,12 +3,13 @@ import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild } from './epic-graph'
+import { epic_issue } from './epic-issue'
 import { epic_next } from './epic-next'
 
 const REPO = 'joshuafolkken/kit'
+const CROSS_REPO_REFERENCE = `${REPO}#858`
 const DEPENDENCIES_BODY = 'Dependencies\n\n#1 -> #2'
 const UNORDERED_BODY = 'None — the children are independent; any execution order works.'
-const CROSS_REPO_REFERENCE = 'joshuafolkken/kit#858'
 
 function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
@@ -25,32 +26,45 @@ function snapshot(children: ReadonlyArray<EpicChild>, body?: string): EpicSnapsh
 	}
 }
 
-describe('epic_next.parse_epic_number', () => {
-	it('accepts a bare number', () => {
-		expect(epic_next.parse_epic_number('858')).toBe(858)
+// A cross-repository epic must be qualified: a bare `#858` resolves to *this* repository's issue 858,
+// a different issue entirely (joshuafolkken/kit#864).
+describe('epic_issue.parse_epic_reference', () => {
+	it('accepts a bare number as this repository', () => {
+		expect(epic_issue.parse_epic_reference('858')).toEqual({ number: 858 })
 	})
 
 	it('accepts the number copied out of an issue reference', () => {
-		expect(epic_next.parse_epic_number('#858')).toBe(858)
+		expect(epic_issue.parse_epic_reference('#858')).toEqual({ number: 858 })
+	})
+
+	it('accepts a repository-qualified reference', () => {
+		expect(epic_issue.parse_epic_reference(CROSS_REPO_REFERENCE)).toEqual({
+			repo: REPO,
+			number: 858,
+		})
 	})
 
 	it('refuses anything that is not a positive issue number', () => {
-		for (const raw of ['', 'abc', '0', '-3']) {
-			expect(epic_next.parse_epic_number(raw)).toBeUndefined()
+		for (const raw of ['', 'abc', '0', '-3', `${REPO}#0`]) {
+			expect(epic_issue.parse_epic_reference(raw)).toBeUndefined()
 		}
 	})
 
-	// Read as a bare `858` it would answer about *this* repository's issue 858, which is a different
-	// issue entirely. Resolving an epic in another repository is joshuafolkken/kit#864.
-	it('refuses a cross-repository reference rather than reading the number out of it', () => {
-		expect(epic_next.parse_epic_number(CROSS_REPO_REFERENCE)).toBeUndefined()
+	it('refuses a half-written qualification', () => {
+		expect(epic_issue.parse_epic_reference(REPO)).toBeUndefined()
+	})
+})
+
+describe('epic_next.parse_options — a qualified epic', () => {
+	it('reads the repository the epic lives in', () => {
+		const options = epic_next.parse_options([CROSS_REPO_REFERENCE])
+
+		expect(options.epic_repo).toBe(REPO)
+		expect(options.epic_number).toBe(858)
 	})
 
-	it('says why a cross-repository reference was refused', () => {
-		const { usage } = epic_next.parse_options([CROSS_REPO_REFERENCE])
-
-		expect(usage).toBe(epic_next.CROSS_REPO_USAGE)
-		expect(usage).toContain('#864')
+	it('leaves the epic repository unset for a bare number', () => {
+		expect(epic_next.parse_options(['858']).epic_repo).toBeUndefined()
 	})
 })
 

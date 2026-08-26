@@ -71,6 +71,36 @@ function parse_epic_number(raw = ''): number | undefined {
 	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
+// An epic reference: `858`, `#858`, or `owner/repo#858` for an epic in another repository.
+//
+// A cross-repository epic must be qualified. A bare `#858` resolves to *this* repository's issue 858
+// — a different issue entirely — so reading it as the other repository's would silently point at the
+// wrong thing (joshuafolkken/kit#864).
+interface EpicReference {
+	repo?: string
+	number: number
+}
+
+const QUALIFIED_REFERENCE = /^([\w.-]+\/[\w.-]+)#(\d+)$/u
+const QUALIFIED_REPO_GROUP = 1
+const QUALIFIED_NUMBER_GROUP = 2
+
+function to_qualified_reference(match: RegExpExecArray): EpicReference | undefined {
+	const repo = match[QUALIFIED_REPO_GROUP]
+	if (repo === undefined) return undefined
+	const number = Number(match[QUALIFIED_NUMBER_GROUP])
+
+	return Number.isSafeInteger(number) && number > 0 ? { repo, number } : undefined
+}
+
+function parse_epic_reference(raw = ''): EpicReference | undefined {
+	const match = QUALIFIED_REFERENCE.exec(raw.trim())
+	if (match !== null) return to_qualified_reference(match)
+	const number = parse_epic_number(raw)
+
+	return number === undefined ? undefined : { number }
+}
+
 const epic_issue = {
 	CLOSED,
 	UNKNOWN_STATE,
@@ -79,7 +109,8 @@ const epic_issue = {
 	label_names,
 	normalize_state,
 	parse_epic_number,
+	parse_epic_reference,
 }
 
-export type { EpicIssue }
+export type { EpicIssue, EpicReference }
 export { epic_issue }

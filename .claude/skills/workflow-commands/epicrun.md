@@ -4,12 +4,10 @@
 `chain-rule.md` and `followup.md` as well — each child is a `fullrun` — and read this file for what
 running many of them unattended changes.
 
-**Today the epic and its children must live in the repository the session is standing in.**
-`josh epic:next` refuses `owner/repo#E` outright rather than reading the number out of it, because
-reading it would answer about *this* repository's issue of that number. The cross-repository form —
-`epicrun joshuafolkken/kit#858` from an app-kit checkout — arrives with joshuafolkken/kit#864, which
-owns resolving a child in another repository. Everything below is written so that lands as a
-widening rather than a rewrite.
+**An epic in another repository must be referenced as `owner/repo#E`** — `epicrun
+joshuafolkken/kit#858` from an app-kit checkout. A bare `#858` resolves to *this* repository's issue
+858, a different issue entirely, so the qualification is required rather than optional
+(joshuafolkken/kit#864).
 
 ## What one invocation approves
 
@@ -30,10 +28,15 @@ Execution state lives on GitHub and nowhere else (`epic:next`, joshuafolkken/kit
 pnpm josh epic:next 858 --repo joshuafolkken/kit
 ```
 
-**Until joshuafolkken/kit#864 lands, that is one session**: `epic:next` reads the epic and every
-child from the checkout it runs in, so a second session in another repository has nothing of that
-epic to find. The `--repo` flag and the per-repository bundling are already in place, so #864 widens
-this rather than replacing it — and the reasoning below is what that widening has to preserve.
+A child in another repository is read through `gh --repo`, so no clone is needed to learn its state —
+only to implement it. `epic:next` prints the local checkout for each repository's candidates, from
+joshuafolkken/kit#869's map; a repository with no checkout here says so rather than being cloned.
+
+**A dependency that crosses a repository is not satisfied when the blocking issue closes.** Merging
+kit's issue does not publish kit, so a consumer child told it may start at that moment installs the
+previous release, or fails outright. Such a dependency resolves only once the blocker is closed *and*
+its release has appeared in the registry — and while the blocker is still open the registry is never
+consulted, so a run never sits waiting on a publish from the moment it starts.
 
 **No locking is needed, and none is implemented.** Each session takes only its own repository's
 children, and within a repository children run one at a time, so two sessions cannot reach for the
