@@ -1,7 +1,12 @@
-import { ESLINT_CACHE_FLAGS, PE, type CommandEntry } from './josh-command-types'
+import { ESLINT_CACHE_FLAGS, GATE_COMMAND, PE, type CommandEntry } from './josh-command-types'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
+	[GATE_COMMAND]: {
+		script: 'scripts/verification-gate.ts',
+		description: 'Run lint, type check, spell check and unit tests concurrently',
+		category: 'Development',
+	},
 	lint: {
 		script: 'scripts/lint-parallel.ts',
 		description: 'Check code with prettier and eslint',

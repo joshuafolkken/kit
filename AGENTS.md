@@ -157,17 +157,16 @@ For every code modification, follow this order exactly:
 1. **Refactor first** _(mandatory before lint or tests)_: apply high/medium-priority refactoring to all new/modified code — see `prompts/refactoring.md`. Do not proceed until no high/medium items remain.
 2. **Tests**: implement the tests declared in Step 0. See `prompts/testing-guide.md`.
    - **E2E cleanup / leaked data**: When fixing issues where E2E leaves database or UI artifacts, follow the **Regression fix workflow** in `prompts/testing-guide.md` (add a failing guard → fix → confirm green). Prefer stable selectors (`data-testid`) over locale-dependent strings for teardown.
-3. **Lint**: run `pnpm josh lint` then `pnpm exec tsc --noEmit`; fix all errors before reporting done. Each `Edit` / `Write` is already followed by `pnpm josh format:edited`, a `PostToolUse` hook that runs `eslint --fix` and `prettier --write` on that one file, so a file may differ from what you wrote and this step mostly reports what the hook could not fix on its own.
-4. **Spell check**: `pnpm josh cspell:dot`; add legitimate project terms to `cspell.config.yaml`
-5. **IDE feedback**: check IDE lint output — often more current than terminal
-6. Never say "it should pass" without running commands. Never finish while errors exist.
-7. Do not modify `eslint.config.js` unless explicitly asked; fix issues in application/test code instead.
+3. **Verification gate**: run `pnpm josh gate` — lint, type check, spell check and unit tests **concurrently**, with every failure reported in one pass; fix all errors before reporting done. Add legitimate project terms the spell check flags to `cspell.config.yaml`. Each `Edit` / `Write` is already followed by `pnpm josh format:edited`, a `PostToolUse` hook that runs `eslint --fix` and `prettier --write` on that one file, so a file may differ from what you wrote and the lint check mostly reports what the hook could not fix on its own.
+4. **IDE feedback**: check IDE lint output — often more current than terminal
+5. Never say "it should pass" without running commands. Never finish while errors exist.
+6. Do not modify `eslint.config.js` unless explicitly asked; fix issues in application/test code instead.
 
 ## Completion gate (before you tell the user work is done)
 
 Run the full verification set **in order**. **Do not** skip or reorder steps. **Do not** report completion if any step failed or was skipped without the user agreeing.
 
-**STOP — Refactor before lint.** For any code change, you MUST complete refactoring (`prompts/refactoring.md`) **before** running lint or check. Do not run step 2 or later until refactoring is done. For a **refactor-only** request, follow `refactoring.md`'s own **convergence** (high/medium items until none remain).
+**STOP — Refactor before the gate.** For any code change, you MUST complete refactoring (`prompts/refactoring.md`) **before** running `pnpm josh gate`. Do not run step 2 or later until refactoring is done. For a **refactor-only** request, follow `refactoring.md`'s own **convergence** (high/medium items until none remain).
 
 **E2E:** The user runs `pnpm josh test` and shares the full output. Do **not** claim completion until the user confirms E2E passed or explicitly scopes it out.
 
@@ -175,15 +174,12 @@ Run the full verification set **in order**. **Do not** skip or reorder steps. **
 
 0. **Test gate** — Count (a) code changes made and (b) tests added/updated. If b = 0, allow the run to continue **only** when every change falls under the pre-approved non-runtime exception (see Code Change Rules Step 0) or the user has explicitly approved the infeasibility. Otherwise **stop** — go back to Code Change Rules Step 0 and add tests before continuing.
 1. **Refactor** — read and execute `prompts/refactoring.md` on all changed files. Converge until no high/medium items remain. **Do not proceed to step 2 until complete.**
-2. `pnpm josh lint`
-3. `pnpm exec tsc --noEmit`
-4. `pnpm josh cspell:dot`
-5. `pnpm josh test:unit`
-6. **Self-review** — run `/code-review medium` per `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean — **at most two reviews in total**. After the second round, file every remaining non-High finding as a follow-up Issue referencing this one, and complete the current Issue; only a confirmed High blocks regardless of round count. See `prompts/review.md` → "Review round cap".
-7. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
-8. **E2E**: Ask the user to run `pnpm josh test` and share the output. Fix any failures, then ask again.
+2. `pnpm josh gate` — lint, type check (`tsc --noEmit`), spell check and unit tests, run **concurrently**. Every failing check is reported in one pass, so one run tells you everything that is wrong. Re-run a single check with `pnpm josh lint` / `pnpm josh check` / `pnpm josh cspell:dot` / `pnpm josh test:unit` while fixing.
+3. **Self-review** — run `/code-review medium` per `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean — **at most two reviews in total**. After the second round, file every remaining non-High finding as a follow-up Issue referencing this one, and complete the current Issue; only a confirmed High blocks regardless of round count. See `prompts/review.md` → "Review round cap".
+4. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
+5. **E2E**: Ask the user to run `pnpm josh test` and share the output. Fix any failures, then ask again.
 
-If you changed **only** docs or config that does not affect tests, still run lint + check + cspell; run unit tests when there is any chance of impact.
+If you changed **only** docs or config that does not affect tests, `pnpm josh gate` still applies — it runs the unit tests alongside the rest, which is cheaper than deciding whether they could have been affected.
 
 ## Refactoring Rules
 

@@ -23,8 +23,15 @@ interface CommandEntry {
 	argument_targets?: ReadonlyArray<string>
 }
 
+// The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a
+// consumer of the name — the command map, `propagate` — does not import the script module: that
+// module carries a `process.argv[1] === import.meta.url` main guard, and esbuild bundles every
+// import into one `dist/josh.js` where that guard matches on *any* `josh` invocation
+// (joshuafolkken/kit#914).
+const GATE_COMMAND = 'gate'
+
 const PE = ['pnpm', 'exec'] as const
 const ESLINT_CACHE_FLAGS = ['--cache', '--cache-strategy', 'content'] as const
 
 export type { CommandCategory, CommandEntry }
-export { ENV_FILE_FLAGS, ESLINT_CACHE_FLAGS, OPTIONAL_ENV_FILE_FLAGS, PE }
+export { ENV_FILE_FLAGS, ESLINT_CACHE_FLAGS, GATE_COMMAND, OPTIONAL_ENV_FILE_FLAGS, PE }
