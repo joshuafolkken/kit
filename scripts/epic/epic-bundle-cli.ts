@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { EPIC_LABEL } from '#scripts/git/issue-labels'
-import { parse_json_array_safe } from '#scripts/git/parse-json-array'
+import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
@@ -93,6 +93,10 @@ interface FetchedBacklog {
 	is_readable: boolean
 	is_truncated?: boolean
 	has_epic_list?: boolean
+	// The epic listing hit its own cap. Separate from `is_truncated`, which is the backlog listing:
+	// the two hide different things, so a caller told only "something was truncated" cannot tell
+	// whether the epic that tracks a candidate was among what it could not see.
+	is_epic_list_truncated?: boolean
 	// The epic view, kept so a referenced issue read afterwards can be placed without a second read.
 	context?: ReferencedContext
 }
@@ -106,7 +110,9 @@ async function fetch_backlog(
 	// A failed listing is not an empty backlog. Reported rather than degraded into one, which would
 	// have a `gh` failure arrive as "that issue does not exist".
 	if (raw === undefined) return { issues: [], unreadable: [], is_readable: false }
-	const rows = parse_json_array_safe(raw, backlog_schema)
+	// Same reason as `fetch_epics`: an unparseable listing is not an empty backlog.
+	const rows = parse_json_array_or_undefined(raw, backlog_schema)
+	if (rows === undefined) return { issues: [], unreadable: [], is_readable: false }
 	const relations = await fetch_relations(rows.map((row) => row.number))
 
 	return {
@@ -144,19 +150,32 @@ function headline(decision: BundleDecision): string {
 	return ACTION_LINES[decision.action] ?? ''
 }
 
+interface FetchedEpics {
+	epics: Array<{ number: number; body: string }>
+	// The listing is capped like the backlog's. An epic past the cap is invisible, so the issue it
+	// tracks reads as tracked by nothing and the command recommends creating a second epic over it —
+	// the duplicate that joshuafolkken/kit#943 exists to prevent, arriving with exit 0
+	// (joshuafolkken/kit#950).
+	is_truncated: boolean
+}
+
 // The epics currently open, so a candidate can be matched to the one already tracking it.
 //
 // A failed read is reported rather than treated as "there are no epics": without the list, the
 // guard that keeps an epic out of its own children's candidates is off, and an issue an epic already
 // tracks is told to create a second one — confidently, and with exit 0.
-async function fetch_epics(): Promise<Array<{ number: number; body: string }> | undefined> {
+async function fetch_epics(): Promise<FetchedEpics | undefined> {
 	const raw = await git_gh_command.issue_list_by_label(EPIC_LABEL, BACKLOG_LIMIT)
 	if (raw === undefined) return undefined
+	// Not `parse_json_array_safe`: it answers `[]` for a response that is not JSON at all, which is
+	// indistinguishable from "no epics are open" — the silent absence this whole rule is about.
+	const rows = parse_json_array_or_undefined(raw, backlog_schema)
+	if (rows === undefined) return undefined
 
-	return parse_json_array_safe(raw, backlog_schema).map((row) => ({
-		number: row.number,
-		body: row.body ?? '',
-	}))
+	return {
+		is_truncated: rows.length >= BACKLOG_LIMIT,
+		epics: rows.map((row) => ({ number: row.number, body: row.body ?? '' })),
+	}
 }
 
 function format_numbers(numbers: ReadonlyArray<number>): string {
@@ -213,15 +232,16 @@ async function read_backlog(repo: string): Promise<FetchedBacklog> {
 		return { issues: [], unreadable: [], is_readable: false, has_epic_list: false }
 	}
 
-	const epics = build_epic_index(open_epics)
+	const epics = build_epic_index(open_epics.epics)
 	// From the epic list itself, not from the index's values: an epic tracking no child yet has no
 	// entry in the index, and would enter the backlog as an ordinary issue that its own children then
 	// propose bundling with (joshuafolkken/kit#873).
-	const epic_numbers = new Set(open_epics.map((epic) => epic.number))
+	const epic_numbers = new Set(open_epics.epics.map((epic) => epic.number))
 
 	return {
 		...(await fetch_backlog(repo, epics, epic_numbers)),
 		has_epic_list: true,
+		is_epic_list_truncated: open_epics.is_truncated,
 		context: { repo, epics, epic_numbers },
 	}
 }
@@ -268,6 +288,15 @@ function warn_about_gaps(backlog: FetchedBacklog): void {
 	if (backlog.is_truncated === true) {
 		console.error(
 			`⚠ The backlog listing hit its ${String(BACKLOG_LIMIT)}-issue cap; older issues were not considered.`,
+		)
+	}
+
+	// Named separately from the backlog's cap. What this one hides is which epic tracks a candidate,
+	// so `Nothing to bundle.` under it may mean "the epic was past the cap" rather than "no epic
+	// tracks it" — and acting on the second reading creates the duplicate epic (joshuafolkken/kit#950).
+	if (backlog.is_epic_list_truncated === true) {
+		console.error(
+			`⚠ The epic listing hit its ${String(BACKLOG_LIMIT)}-epic cap; an epic past it was not considered.`,
 		)
 	}
 }

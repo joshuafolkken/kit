@@ -44,7 +44,7 @@ So inside `epicrun #<N>`, a prerequisite or a split found mid-run does **not** s
    | --- | --- |
    | An epic `#<E>` already tracks `#<N>` | `pnpm josh epic --add <E> <P> --before <N>` for a prerequisite, or `--add <E> <N1> ...` for a split. **Do not create a second epic.** Continue the loop against `#<E>` |
    | No epic tracks it | Create one — the command depends on what was found (table below) |
-   | **The command could not answer** | Park `#<N>` with `needs-decision` and report. "Could not tell" is not "no epic tracks it", and reading it as such recreates the duplicate this step prevents |
+   | **The command could not answer** — a non-zero exit, or a ⚠ warning about a truncated listing above a `Nothing to bundle.` verdict. A definitive answer stands even beside a warning | Park `#<N>` with `needs-decision` and report. "Could not tell" is not "no epic tracks it", and reading it as such recreates the duplicate this step prevents |
 
    When creating one, `#<N>` is being implemented, so it is itself one of the deliverables — which is
    why this path always takes the keep-as-a-child arm of `split-assessment.md`'s promote-or-create
