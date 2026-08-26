@@ -1,6 +1,8 @@
 import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 
+const NUMBER_AND_BODY_FIELDS = 'number,body'
+
 async function issue_get_title(issue_number: string): Promise<string | undefined> {
 	try {
 		const result: string = await git_gh_exec.exec_gh_command([
@@ -80,9 +82,19 @@ async function issue_list_recent(limit: number): Promise<string | undefined> {
 	return await issue_list_open({ json_fields: 'number,title,labels,createdAt', limit })
 }
 
+// Open issues whose body mentions `term`. Used by `epic:audit` to find an issue that names an epic
+// as its parent while the epic's task list does not track it (joshuafolkken/kit#870).
+async function issue_search_body(term: string, limit: number): Promise<string | undefined> {
+	return await issue_list_open({
+		json_fields: NUMBER_AND_BODY_FIELDS,
+		limit,
+		filter_arguments: ['--search', `${term} in:body`],
+	})
+}
+
 async function issue_list_by_label(label: string, limit: number): Promise<string | undefined> {
 	return await issue_list_open({
-		json_fields: 'number,body',
+		json_fields: NUMBER_AND_BODY_FIELDS,
 		limit,
 		filter_arguments: ['--label', label],
 	})
@@ -215,6 +227,7 @@ const git_gh_issue = {
 	issue_comment,
 	issue_list_recent,
 	issue_list_by_label,
+	issue_search_body,
 	issue_get_state_and_relations,
 	issue_close,
 }
