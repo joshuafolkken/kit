@@ -28,6 +28,7 @@ const COMMAND_MAP: Record<string, CommandEntry> = {
 }
 
 const ALIASES: Record<string, string> = {
+	ga: 'gate',
 	l: 'lint',
 	lp: 'lint:prettier',
 	le: 'lint:eslint',

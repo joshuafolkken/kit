@@ -1,3 +1,5 @@
+import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
+import { GATE_STEPS } from '#scripts/verification-gate'
 import { describe, expect, it } from 'vitest'
 import { propagate_run } from './propagate-run'
 import { propagate_steps } from './propagate-steps'
@@ -53,16 +55,22 @@ describe('propagate_steps.STEP_COMMANDS', () => {
 		])
 	})
 
+	// The four checks used to be re-chained here as a string. They are now single-sourced in
+	// `josh gate` (joshuafolkken/kit#914), so the coverage is asserted against that definition —
+	// a check added to the gate reaches the consumer-side verification without a second edit.
 	it('runs the whole gate, not only the type check', () => {
-		for (const command of ['lint', 'check', 'cspell:dot', 'test:unit']) {
-			expect(propagate_steps.VERIFY_SCRIPT).toContain(command)
-		}
+		expect(propagate_steps.VERIFY_SCRIPT).toBe(`pnpm josh ${GATE_COMMAND}`)
+
+		const gate_commands = GATE_STEPS.map((step) => step.command_args.at(-1))
+
+		expect(gate_commands).toEqual(['lint', 'check', 'cspell:dot', 'test:unit'])
 	})
 
-	// A step that failed the gate must never reach the pull request, so the gate has to be one
-	// command whose failure ends the sequence.
-	it('chains the gate so the first failing check stops it', () => {
-		expect(propagate_steps.VERIFY_SCRIPT).toContain('&&')
+	// A step that failed the gate must never reach the pull request, so the verification has to be
+	// one command whose failure ends the sequence. `josh gate` runs every check even when one fails
+	// — reporting all of them — and still exits non-zero, which is what stops the sequence.
+	it('verifies with a single command whose failure stops the sequence', () => {
+		expect(propagate_steps.VERIFY_SCRIPT).not.toContain('&&')
 	})
 })
 

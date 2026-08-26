@@ -6,6 +6,33 @@
 
 These commands replace the corresponding `package.json` scripts. Consumer projects no longer need to add them manually.
 
+### `josh gate`
+
+Run the completion gate's four checks — lint, type check, spell check and unit tests — **concurrently**.
+
+```bash
+pnpm josh gate
+```
+
+The four are independent and share no mutable state, so nothing is gained by running them one after another. Measured in kit: 13s (lint), 5s (type check), 2s (spell check) and 11s (unit tests) come to 31s in sequence and about 13s together.
+
+The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check's output as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
+
+```
+✗ verification gate failed: lint, cspell
+```
+
+The exit code is `1` when any check failed, `0` otherwise. While fixing, re-run one check on its own with `pnpm josh lint`, `pnpm josh check`, `pnpm josh cspell:dot` or `pnpm josh test:unit`.
+
+Like the composite commands below, `gate` forwards nothing to the four sub-commands, so it refuses extra arguments rather than discarding them:
+
+```bash
+$ pnpm josh gate --workers=1
+josh gate takes no extra arguments — pass them to josh lint or josh check or josh cspell:dot or josh test:unit instead
+```
+
+Refactoring still comes **before** the gate, and `/code-review` still comes after it — `josh gate` replaces the four checks between them, not the steps around them.
+
 ### `josh lint`
 
 Check code with prettier and eslint.
@@ -200,6 +227,8 @@ josh test takes no extra arguments — pass them to josh test:unit or josh test:
 Every other command — the ones that invoke a single tool or script — forwards extra arguments exactly as before; `pnpm josh test:e2e --workers=1` reaches Playwright unchanged.
 
 The refusal is driven by the **shape** of the command rather than a per-command opt-in, so a composite added later cannot reintroduce the silent discard by forgetting to declare itself. A unit test audits the whole command map on every commit.
+
+The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before.
 
 ---
 
