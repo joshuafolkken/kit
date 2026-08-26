@@ -1,3 +1,4 @@
+import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { build_upgrade_shell_command } from '#scripts/version/upgrade-shell-command'
 import { create_version_command_config } from '#scripts/version/version-command-config'
 import { execaSync } from 'execa'
@@ -16,10 +17,11 @@ const SUCCESS_EXIT_CODE = 0
 // Long enough for a consumer's full unit suite and a `pnpm add`, short enough that a hung step ends
 // the run instead of holding the whole propagation open.
 const STEP_TIMEOUT_MS = 1_800_000
-// The consumer-side gate, as one command so a failing check stops the sequence before the pull
-// request step. Same order the AI documents require of a person.
-const VERIFY_SCRIPT =
-	'pnpm josh lint && pnpm josh check && pnpm josh cspell:dot && pnpm josh test:unit'
+// The consumer-side gate. `josh gate` is the same command the AI documents require of a person
+// (joshuafolkken/kit#914) — running the four checks concurrently and reporting every failure in one
+// pass — so the chain is not repeated here. It resolves in the consumer's directory, which by this
+// point has already been upgraded to the version being propagated, so the command is present.
+const VERIFY_SCRIPT = `pnpm josh ${GATE_COMMAND}`
 
 // The commands each spawning step runs inside the consumer's own directory. `pnpm josh` resolves the
 // consumer's installed CLI, never the supplier's checkout — which is what keeps the sync a
