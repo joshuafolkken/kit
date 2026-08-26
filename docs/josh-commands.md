@@ -829,6 +829,33 @@ Promote when the issue is a request, a discussion or a container. When the issue
 
 **The `Execution` section now prints `epicrun #<E>`**, for both creation and promotion. `epicrun` takes the epic rather than a list of children: it re-reads the state from GitHub each round, so an interrupted run resumes without anyone retyping the remaining numbers, and a child that needs a decision is parked rather than ending the run ([#861](https://github.com/joshuafolkken/kit/issues/861)). Epics created before this change still say `queue …` in that section and are unaffected — nothing reads it, the auto-close reads the task list and `epic:check` never looks at it.
 
+#### `josh epic --add` — insert children into an existing epic
+
+```bash
+pnpm josh epic --add 893 894                  # append to the end
+pnpm josh epic --add 893 894 --before 891     # #894 must finish before #891
+pnpm josh epic --add 893 894 --after 890      # #894 starts once #890 is done
+```
+
+Discovering mid-run that something else has to happen first used to have no tool behind it. The procedure said "add it to the epic's task list and record the dependency", but an epic's dependencies live in **three places at once** — and editing the body by hand updates one of them:
+
+| Where it lives                          | What reads it                                     |
+| --------------------------------------- | ------------------------------------------------- |
+| the `- [ ] #N` task list                | the epic auto-close                               |
+| the `## Dependencies` arrow declaration | [`josh epic:next`](#josh-epicnext)                |
+| the native `blocked-by` relations       | `epic:next` again, as the authority for execution |
+
+A body edited on its own leaves the declaration and the relations disagreeing, `epic:next` reports `declaration_mismatch`, and its verdict is `error` — which is `epicrun`'s stopping condition 3. So the one command that was supposed to keep an unattended run going stopped it instead ([#890](https://github.com/joshuafolkken/kit/issues/890)). `--add` writes all three from one input.
+
+- **`--before <M>` re-points what `#M` was waiting on.** Inserting `#894` before `#891` in `#890 -> #891 -> #892` drops `#890 -> #891` and records `#890 -> #894` and `#894 -> #891`, so the chain is never left broken. The relations come from diffing the declaration before against the declaration after, which is why the re-pointing needs no special case.
+- **No position appends to the end**, and an epic declared unordered **stays** unordered — adding a chain would claim an order nobody declared. Giving a position to an unordered epic starts a chain naming just those two issues; the other children stay unordered, which is what the absence of a chain has always meant.
+- **`#M` must be a child of the epic**, or nothing is written and the command exits non-zero.
+- **Nothing is written unless all three places will agree.** The rewritten body is parsed back before it is sent, and a round trip that does not reproduce the computed order is reported instead of written. The same holds when the epic **already** records a relation its body never declares: that is reconciled by a person, not guessed at.
+- **A declaration the command cannot position within is refused, not rewritten.** `#M` named by two separate chain lines does not identify one place, and a declaration naming the same issue twice is already claiming that issue blocks itself.
+- **A declared link that was never recorded is repaired rather than refused.** `gh` older than 2.94.0 cannot record a relation at all, so a body legitimately runs ahead of the relations; `--add` records the missing ones along with its own. Recording still needs gh >= 2.94.0, and a failure is reported as a count while the body stays correct — the same treatment `--ordered` gives it.
+
+**The prose execution block in an epic body is out of scope.** Some epics carry a hand-written list of `epicrun` lines for a person to type in order — a _fourth_ place the order appears, and the only one `--add` does not touch. It has no defined syntax to parse, and [#900](https://github.com/joshuafolkken/kit/issues/900) removes the need for such a block entirely by making a meta epic runnable, at which point `epicrun #<E>` on one line replaces it. Until then, an epic that carries one needs that block updated by hand after an insertion: the declaration and the relations will agree, so `epic:next` reports nothing, and a person typing the old list is the only thing that notices.
+
 ### `josh epic:next`
 
 List an epic's runnable children, bundled per repository ([#860](https://github.com/joshuafolkken/kit/issues/860)).

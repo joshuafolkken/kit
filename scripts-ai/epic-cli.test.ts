@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { epic_cli } from './epic-cli'
+import { BEFORE_FLAG, epic_cli } from './epic-cli'
 
 const PROMOTE = '--promote'
 const EPIC = '858'
@@ -151,5 +151,105 @@ describe('epic_cli.parse_promote_arguments — the flags', () => {
 		expect(parsed?.rationale_path).toBe(RATIONALE_PATH)
 		expect(parsed?.origin).toBe(ORIGIN_REFERENCE)
 		expect(parsed?.children).toEqual([101])
+	})
+})
+
+describe('epic_cli.is_addition', () => {
+	it('recognizes an insertion', () => {
+		expect(epic_cli.is_addition(['--add', '893', '894'])).toBe(true)
+	})
+
+	it('does not mistake a promotion or a creation for one', () => {
+		expect(epic_cli.is_addition(['--promote', '893', '894'])).toBe(false)
+		expect(epic_cli.is_addition([TITLE, '101'])).toBe(false)
+	})
+})
+
+describe('epic_cli.parse_add_arguments', () => {
+	it('reads the epic first and the children after it', () => {
+		const parsed = epic_cli.parse_add_arguments(['--add', '893', '894', '895'])
+
+		expect(parsed?.epic_number).toBe(893)
+		expect(parsed?.children).toStrictEqual([894, 895])
+		expect(parsed?.position).toBeUndefined()
+	})
+
+	it('reads a --before target without treating it as a child', () => {
+		const parsed = epic_cli.parse_add_arguments(['--add', '893', '894', '--before', '891'])
+
+		expect(parsed?.children).toStrictEqual([894])
+		expect(parsed?.position).toStrictEqual({ kind: 'before', target: 891 })
+	})
+
+	it('reads an --after target', () => {
+		const parsed = epic_cli.parse_add_arguments(['--add', '893', '894', '--after', '890'])
+
+		expect(parsed?.position).toStrictEqual({ kind: 'after', target: 890 })
+	})
+
+	it('drops the epic when it is also listed as a child', () => {
+		expect(epic_cli.parse_add_arguments(['--add', '893', '893', '894'])?.children).toStrictEqual([
+			894,
+		])
+	})
+})
+
+describe('epic_cli.parse_add_arguments — what it refuses', () => {
+	it('refuses both --before and --after in one invocation', () => {
+		expect(
+			epic_cli.parse_add_arguments(['--add', '893', '894', '--before', '891', '--after', '892']),
+		).toBeUndefined()
+	})
+
+	it('refuses a position target that is not an issue number', () => {
+		expect(
+			epic_cli.parse_add_arguments(['--add', '893', '894', '--before', 'soon']),
+		).toBeUndefined()
+	})
+
+	it('refuses an invocation with no child to add', () => {
+		expect(epic_cli.parse_add_arguments(['--add', '893'])).toBeUndefined()
+	})
+
+	it('refuses an invocation with no epic number', () => {
+		expect(epic_cli.parse_add_arguments(['--add'])).toBeUndefined()
+	})
+})
+
+describe('epic_cli — the positioning flags stay scoped to --add', () => {
+	it('does not swallow a creation child after an unknown --after flag', () => {
+		const parsed = epic_cli.parse_create_arguments([TITLE, '101', '102', '--after', '103'])
+
+		expect(parsed?.children).toStrictEqual([101, 102, 103])
+	})
+
+	it('does not swallow a promotion child after an unknown --before flag', () => {
+		const parsed = epic_cli.parse_promote_arguments(['--promote', '893', '101', '--before', '102'])
+
+		expect(parsed?.children).toStrictEqual([101, 102])
+	})
+
+	it('refuses a repeated --before, rather than silently taking the first', () => {
+		const argv = ['--add', '893', '894', '--before', '891', '--before', '892']
+
+		expect(epic_cli.parse_add_arguments(argv)).toBeUndefined()
+	})
+
+	it('refuses a repeated --after', () => {
+		const argv = ['--add', '893', '894', '--after', '891', '--after', '892']
+
+		expect(epic_cli.parse_add_arguments(argv)).toBeUndefined()
+	})
+})
+
+describe('epic_cli.parse_add_arguments — an unknown flag', () => {
+	it('refuses a misspelled positioning flag rather than appending to the end', () => {
+		const mistyped = BEFORE_FLAG.slice(0, -1)
+
+		expect(epic_cli.parse_add_arguments(['--add', '893', '894', mistyped, '891'])).toBeUndefined()
+	})
+
+	it('refuses a flag that means nothing to an insertion', () => {
+		expect(epic_cli.parse_add_arguments(['--add', '893', '894', '--ordered'])).toBeUndefined()
 	})
 })

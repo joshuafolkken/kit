@@ -5,7 +5,9 @@
  * Usage: tsx scripts-ai/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
  *                                                       [--origin <owner/repo#N>]
  *        tsx scripts-ai/epic.ts --promote <N> <N1> <N2> ... [same flags]
+ *        tsx scripts-ai/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
  */
+import { git_epic_add } from '../scripts/git/git-epic-add'
 import { git_epic_run } from '../scripts/git/git-epic-run'
 import { epic_cli } from './epic-cli'
 
@@ -14,6 +16,7 @@ const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS}`,
+	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>]',
 ].join('\n')
 const FAILURE_EXIT_CODE = 1
 
@@ -35,6 +38,26 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	})
 }
 
+// Insertion into an existing epic. No rationale and no `--ordered`: the epic already declares both,
+// and the insertion is positioned relative to what is there rather than restating it.
+async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli.parse_add_arguments(argv)
+
+	if (parsed === undefined) {
+		console.error(
+			`✖ An epic number, at least one child issue number, and at most one valid \`--before\` / \`--after\` target are required.\n${USAGE}`,
+		)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await git_epic_add.add_children({
+		epic_number: parsed.epic_number,
+		children: parsed.children,
+		position: parsed.position,
+	})
+}
+
 async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_create_arguments(argv)
 
@@ -53,11 +76,17 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 	})
 }
 
+// `--add` is checked before `--promote`: both name an existing issue first, and only the flag
+// distinguishes "insert into this epic" from "turn this issue into one".
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (epic_cli.is_addition(argv)) return await run_addition(argv)
+	if (epic_cli.is_promotion(argv)) return await run_promotion(argv)
+
+	return await run_creation(argv)
+}
+
 async function main(): Promise<void> {
-	const argv = process.argv.slice(ARGV_OFFSET)
-	const exit_code = epic_cli.is_promotion(argv)
-		? await run_promotion(argv)
-		: await run_creation(argv)
+	const exit_code = await run(process.argv.slice(ARGV_OFFSET))
 
 	if (exit_code !== 0) process.exit(exit_code)
 }
