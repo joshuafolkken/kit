@@ -130,6 +130,17 @@ const ACTION_LINES: Readonly<Record<string, string>> = {
 	none: 'Nothing to bundle.',
 }
 
+// `Nothing to bundle.` is right when nothing was found, and wrong when an epic already tracks the
+// issue — there the answer is actionable: a caller looking for somewhere to put a prerequisite adds
+// it to *that* epic rather than creating a second one (joshuafolkken/kit#943).
+const ALREADY_TRACKED_LINE = 'Already in an epic — add to that one, do not create a second.'
+
+function headline(decision: BundleDecision): string {
+	if (decision.action === 'none' && decision.epics.length > 0) return ALREADY_TRACKED_LINE
+
+	return ACTION_LINES[decision.action] ?? ''
+}
+
 // The epics currently open, so a candidate can be matched to the one already tracking it.
 //
 // A failed read is reported rather than treated as "there are no epics": without the list, the
@@ -178,7 +189,7 @@ function format_decision(
 	subject: BacklogIssue,
 	backlog: ReadonlyArray<BacklogIssue>,
 ): string {
-	const lines = [ACTION_LINES[decision.action] ?? '', `  ${decision.reason}`]
+	const lines = [headline(decision), `  ${decision.reason}`]
 
 	if (decision.candidates.length > 0) {
 		lines.push(`  Related: ${format_numbers(decision.candidates)}`)
@@ -282,6 +293,7 @@ const epic_bundle_cli = {
 	USAGE,
 	BACKLOG_LIMIT,
 	ACTION_LINES,
+	ALREADY_TRACKED_LINE,
 	build_epic_index,
 	format_numbers,
 	format_order,

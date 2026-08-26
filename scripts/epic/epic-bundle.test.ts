@@ -120,13 +120,26 @@ describe('epic_bundle.decide_bundle — when it declines to act', () => {
 		])
 
 		expect(decision.action).toBe('none')
-		expect(decision.reason).toBe(epic_bundle.ALREADY_TRACKED_REASON)
+		expect(decision.epics).toStrictEqual([900])
 	})
-
 	it('does not create an epic on a hunch with no candidates', () => {
 		const decision = epic_bundle.decide_bundle(issue(1, { body: 'unrelated prose' }), [issue(2)])
 
 		expect(decision.action).toBe('none')
+	})
+})
+
+describe('epic_bundle.decide_bundle — what the reason has to say', () => {
+	// The number is the actionable half: the prerequisite procedure inserts into *that* epic rather
+	// than creating a second one, and a reason that only says "an epic" leaves the caller to go and
+	// find it (joshuafolkken/kit#943).
+	it('names the epic that already tracks it', () => {
+		const decision = epic_bundle.decide_bundle(issue(1, { body: FOLLOWS_TWO, epic: 900 }), [
+			issue(2, { epic: 901 }),
+		])
+
+		expect(decision.reason).toBe(epic_bundle.already_tracked_reason(900))
+		expect(decision.reason).toContain('#900')
 	})
 
 	it('says why it decided what it did', () => {
