@@ -8,6 +8,7 @@ import { epic_next } from './epic-next'
 const REPO = 'joshuafolkken/kit'
 const DEPENDENCIES_BODY = 'Dependencies\n\n#1 -> #2'
 const UNORDERED_BODY = 'None — the children are independent; any execution order works.'
+const CROSS_REPO_REFERENCE = 'joshuafolkken/kit#858'
 
 function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
@@ -38,6 +39,19 @@ describe('epic_next.parse_epic_number', () => {
 			expect(epic_next.parse_epic_number(raw)).toBeUndefined()
 		}
 	})
+
+	// Read as a bare `858` it would answer about *this* repository's issue 858, which is a different
+	// issue entirely. Resolving an epic in another repository is joshuafolkken/kit#864.
+	it('refuses a cross-repository reference rather than reading the number out of it', () => {
+		expect(epic_next.parse_epic_number(CROSS_REPO_REFERENCE)).toBeUndefined()
+	})
+
+	it('says why a cross-repository reference was refused', () => {
+		const { usage } = epic_next.parse_options([CROSS_REPO_REFERENCE])
+
+		expect(usage).toBe(epic_next.CROSS_REPO_USAGE)
+		expect(usage).toContain('#864')
+	})
 })
 
 describe('epic_next.parse_options', () => {
@@ -57,6 +71,20 @@ describe('epic_next.parse_options — refusals', () => {
 
 	it('refuses a missing epic number', () => {
 		expect(epic_next.parse_options([]).usage).toContain('Usage:')
+	})
+})
+
+// The documented `epicrun` loop branches on a number, `wait`, `stop` or `complete`. `run` would be a
+// token it has no branch for — and it only arises when *another* repository has the work.
+describe('epic_next.repo_verdict', () => {
+	it('reports another repository having work as something to wait on', () => {
+		expect(epic_next.repo_verdict('run')).toBe('wait')
+	})
+
+	it('passes the other verdicts through unchanged', () => {
+		for (const verdict of ['wait', 'stop', 'complete'] as const) {
+			expect(epic_next.repo_verdict(verdict)).toBe(verdict)
+		}
 	})
 })
 

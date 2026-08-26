@@ -1,11 +1,11 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun` and `queue` — planning, implementation, the verification gate, the `/code-review` → `followup --merge` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` — planning, implementation, the verification gate, unattended epic execution, the `/code-review` → `followup --merge` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun` and `queue` are the four shorthand commands this package's
+`kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` are the shorthand commands this package's
 collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md` /
 `AGENTS.md` / `GEMINI.md` because each one applies only while its own command is running — keeping
 them resident spent context on every turn to describe a workflow most turns never enter.
@@ -15,8 +15,8 @@ operational procedure, and the two must agree.
 
 ## 0. The rule that fires before any of them — explicit invocation
 
-**Never start a `kickoff` / `halfrun` / `fullrun` / `queue` workflow (including their `#N` and `new`
-variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
+**Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` workflow (including their
+`#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
 resident in the AI documents, because it has to hold when this skill has *not* been loaded.
 
 - Conversational requests like "implement X", "fix Y", "open a PR for Z" are **NOT** implicit
@@ -40,6 +40,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 | `fullrun` / `fullrun #N` / `fullrun new` | `fullrun.md` + `chain-rule.md` + `followup.md` |
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md`                                |
 | `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
+| `epicrun #E`                             | `epicrun.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 
 ## 2. What every one of them shares
 
@@ -48,6 +49,8 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**
   (`prompts/review.md` → "Review round cap"). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
+- **`epicrun` differs on one point only**: a stop that would end a `queue` parks one child instead
+  and the run continues. See `epicrun.md` → "park and continue".
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
   the Issue instead.

@@ -221,7 +221,7 @@ Before every `git commit` — including follow-up commits on the same branch —
 
 ### Shorthand Commands
 
-`kickoff`, `fullrun`, `halfrun` and `queue` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill (`.claude/skills/workflow-commands/`), which also carries the `/code-review` → `followup --merge` chain rule, the auto-merge authorization and the Telegram notification formats. Each of those rules applies only while its own command is running, so keeping them loaded on every turn spent context describing a workflow most turns never enter.
+`kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill (`.claude/skills/workflow-commands/`), which also carries the `/code-review` → `followup --merge` chain rule, the auto-merge authorization and the Telegram notification formats. Each of those rules applies only while its own command is running, so keeping them loaded on every turn spent context describing a workflow most turns never enter.
 
 **Read the skill before running any part of a command — including the first `gh` call.** Acting from the table below alone is not enough: the table says which command was typed, not how to run it.
 
@@ -231,17 +231,20 @@ Before every `git commit` — including follow-up commits on the same branch —
 | `fullrun [#N \| new]` | Plan → implement → verification gate → PR → **merge** → notify                     | `.claude/skills/workflow-commands/SKILL.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 | `halfrun [#N \| new]` | Implement + verification gate, then **stop before commit** for manual verification | `.claude/skills/workflow-commands/SKILL.md` + `halfrun.md`                                   |
 | `queue #N1 #N2 …`     | `fullrun` for each Issue in the given order, stopping at the first failure         | `.claude/skills/workflow-commands/SKILL.md` + `queue.md` + the `fullrun` set                 |
+| `epicrun #E`          | Run an epic's children unattended — park what needs a decision, keep going         | `.claude/skills/workflow-commands/SKILL.md` + `epicrun.md` + the `fullrun` set               |
 
 The canonical extended reference stays `prompts/collaboration-workflow.md`; the skill is the operational procedure, and the two must agree.
 
 #### Explicit invocation required (MANDATORY)
 
-Never start a `kickoff` / `halfrun` / `fullrun` / `queue` workflow (including their `#N` and `new` variants) unless the user has typed the keyword in the **current turn's prompt**.
+Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` workflow (including their `#N` and `new` variants) unless the user has typed the keyword in the **current turn's prompt**.
 
 - Conversational requests like "implement X", "fix Y", "open a PR for Z" are **NOT** implicit invocations. Even if the task clearly fits one of these workflows, do not infer authorization from the request shape.
 - Do **NOT** ask confirmation questions like "May I proceed with `halfrun new`?" or "Shall I run `fullrun`?". A confirmation prompt is not an acceptable substitute for explicit invocation.
 - Instead, **prompt the user to type the command themselves**. Use the exact phrasing: "Please run \`<command>\` to start this task." For example: "Please run \`halfrun new\` to start this task." or "Please run \`fullrun #412\` to execute this Issue." The user must type the command on the next turn.
 - This rule applies even when the user has previously authorized a related workflow in an earlier turn. Each invocation must be re-typed by the user in the current turn.
+
+**`epicrun` parks instead of stopping.** Inside an `epicrun`, a decision that would end a `queue` — a Tier B toss-up, a Tier C action, an upstream defect, a split that needs a person — instead labels **that child** `needs-decision` and the run continues with the children that do not depend on it. The rules that produced the stop are unchanged: an upstream defect is still filed immediately and unconditionally, and a workaround is still forbidden. What changes is the blast radius. Removing the label is Tier A once the decision is recorded, and re-running `epicrun` resumes from GitHub state. Waiting versus stopping is decided by `josh epic:next`'s classification, never by which labels are present — when one repository's child has closed and another's is waiting for a release to publish, nothing carries `in-progress` or `needs-decision`, and a label-based reading would stop in the one moment it must wait. See `prompts/collaboration-workflow.md` → "`epicrun` — EPIC 配下の子 Issue を無人で実行する".
 
 #### Mid-workflow stop notification (`confirmation`)
 

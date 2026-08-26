@@ -9,7 +9,6 @@ words:
   - commondir
   - precheck
   - dryrun
-  - epicrun
   - overridability
   - Unparseable
   - desync
