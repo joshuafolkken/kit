@@ -63,6 +63,60 @@ stalls the moment the run reaches the contradiction, and unattended is the worst
 out. Errors stop the run; warnings are read and carried on past. Fixing what it finds is Tier A
 (joshuafolkken/kit#870).
 
+## `josh latest` runs once per session, not once per child
+
+`josh latest` belongs to the **session**, not to a child. Run it once, the first time the loop below
+hands back a child number — before implementing that child — and never again:
+
+```bash
+git stash            # only if the working tree has staged or modified files
+git switch main && git pull
+pnpm josh latest
+git stash pop        # only if you stashed above
+```
+
+Then load the `dependency-update` skill and follow its procedure, exactly as `queue` does — the
+overrides in **both** `pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines`
+pnpm bump. The stash is the same sanctioned one `queue` step 1 uses; without it `josh latest` runs
+on a dirty tree.
+
+**Session, not run** — the two differ whenever an epic spans repositories. Each session runs one
+repository's children (above), so each one updates its own checkout: a second session that read
+"once per run" and skipped it would merge that repository's children against stale dependencies and
+never run `pnpm audit` there.
+
+**Waiting until a child is in hand is what keeps the tree clean.** Run it before the first
+`epic:next` instead and a run whose first answer is `wait`, `stop` or `complete` — an ordinary
+outcome on a resumed run — leaves a rewritten `pnpm-lock.yaml` modified on the default branch with
+nothing to commit it, which the next `git pull` then refuses to merge over.
+
+A child's own `fullrun` requires `josh latest` before implementing, so following the loop literally
+runs it once per child. That is what this section overrides, and the reason is not the seconds it
+costs: **each run rewrites `pnpm-lock.yaml`, so every child's PR carries dependency updates that
+have nothing to do with that child.** `/code-review` and CodeRabbit then read that diff, a CI
+failure caused by an unrelated bump is attributed to the child — parking it, unattended, for a
+defect it does not have — and the eslint cache key in `.github/workflows/ci.yml`
+(`hashFiles('pnpm-lock.yaml')`) misses on every PR.
+
+**The lock file the update rewrites lands with the first child.** `josh latest` leaves
+`pnpm-lock.yaml` modified, and the first child's `pnpm josh git -y` commits it — so that one PR
+carries the dependency bumps, exactly as the first issue of a `queue` does. What the hoist removes
+is the other N-1 children carrying them; it does not make the first child's diff clean. Should the
+first child then fail CI on a bump rather than on its own change, that is a dependency problem
+found once — fix it forward before the child is parked for it.
+
+**`git switch main && git pull` stays per child.** It is not hoisted with `josh latest`: it is what
+brings the previous child's merge into the tree, and a child that skips it starts implementing on a
+stale main. Only the dependency update moves to the run.
+
+This is the same rule `queue.md` step 1 already states — `josh latest` once, before the first issue,
+mandatory and never skipped. Two entry points to the same serial batch now read the same way; they
+disagreed before (joshuafolkken/kit#913).
+
+**A resumed `epicrun` is a new session**, so it runs `josh latest` once again before its first
+child. The state that decides which children remain lives on GitHub, and the tree the resumed
+session finds may be days old.
+
 ## The loop
 
 `josh epic:next <E> --repo <this repository>` prints **one token** on standard output: an issue
@@ -74,8 +128,10 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
 ```
 
 1. Run the command above.
-2. **A number** — run that child exactly as `fullrun #<N>` does, through the verification gate and
-   the merge, then go back to step 1.
+2. **A number** — run that child as `fullrun #<N>` does, through the verification gate and the
+   merge, **except that `josh latest` is not run** — it runs once, before this session's first
+   child, and not again (above).
+   `git switch main && git pull` still runs, per child. Then go back to step 1.
 3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
    repository has work but this one does not", which is a wait from here.
 4. **`stop`** — report the parked children and finish.

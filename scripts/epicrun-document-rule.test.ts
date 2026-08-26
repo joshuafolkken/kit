@@ -9,6 +9,7 @@ import { NEEDS_DECISION_LABEL } from './git/issue-labels'
 // never finishes or stops in the moment it must wait.
 
 const SKILL = '.claude/skills/workflow-commands/epicrun.md'
+const QUEUE_SKILL = '.claude/skills/workflow-commands/queue.md'
 
 // Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
 // a reflow that changed nothing. Matching against collapsed whitespace pins the words, not the
@@ -101,5 +102,77 @@ describe('epicrun definition', () => {
 
 	it('names the label the park uses', () => {
 		expect(read_repo_file(SKILL)).toContain(NEEDS_DECISION_LABEL)
+	})
+})
+
+// joshuafolkken/kit#913: a child is run as `fullrun #<N>`, and `fullrun` requires `josh latest`
+// before implementing — so following the loop literally runs the dependency update once per child.
+// Each run rewrites `pnpm-lock.yaml`, which puts unrelated dependency bumps into every child's PR
+// and parks children for CI failures they did not cause. `queue`, the same serial batch, already
+// hoists it. These markers pin the hoist, and the one step that deliberately did NOT move with it.
+const LATEST_HOIST_SKILL_MARKERS: ReadonlyArray<string> = [
+	// Session, not run: sessions are per repository, so "once per run" would leave a second
+	// repository's children merging against stale dependencies with no `pnpm audit`.
+	'`josh latest` runs once per session, not once per child',
+	'**Session, not run**',
+	'**`git switch main && git pull` stays per child.**',
+	'A resumed `epicrun` is a new session',
+	// The hoist does not make the first child's diff clean, and a reader who assumes it does will
+	// look for a defect in the child when the bumps show up in its PR.
+	'The lock file the update rewrites lands with the first child.',
+	// Running it before the first `epic:next` strands a rewritten lock file on the default branch
+	// whenever the first answer is not a child number — routine on a resumed run.
+	'**Waiting until a child is in hand is what keeps the tree clean.**',
+	// `josh latest` on a dirty tree is the case `queue` step 1 stashes for; without the same step
+	// here, an unattended run either violates the stash prohibition or has no sanctioned path. The
+	// sentence is pinned rather than the bare command, which `git stash pop` would satisfy alone.
+	'The stash is the same sanctioned one `queue` step 1 uses',
+	// The loop is where the per-child reading came from, so the exception has to be stated there
+	// too — a reader following step 2 never reaches the section above it.
+	'**except that `josh latest` is not run**',
+]
+
+const LATEST_HOIST_CANONICAL_MARKERS: ReadonlyArray<string> = [
+	'`josh latest` はセッションごとに 1 回だけ — 子ごとには走らせない',
+	'**「ラン」ではなく「セッション」である。**',
+	'**子の番号を受け取るまで待つことが、作業ツリーを汚さない条件である。**',
+	'**書き換えられた lock ファイルは最初の子と一緒に入る。**',
+	'**`git switch main && git pull` は子ごとに残す。**',
+	'中断から再開した `epicrun` は、新しいセッションとして扱う',
+	// The sanctioned stash has to be readable from the canonical prompt too, since it is the
+	// document that authorizes the exception to the staging prohibition.
+	'`queue` の手順 1 と同じ、明文化された退避である',
+]
+
+describe('epicrun hoists josh latest out of the child loop', () => {
+	it('states the rule and its exception in the skill', () => {
+		const content = read_unwrapped(SKILL)
+
+		for (const marker of LATEST_HOIST_SKILL_MARKERS) expect(content).toContain(marker)
+	})
+
+	it('states the rule in the canonical reference', () => {
+		const content = read_unwrapped(WORKFLOW_PROMPT)
+
+		for (const marker of LATEST_HOIST_CANONICAL_MARKERS) expect(content).toContain(marker)
+	})
+
+	// The point of the change is that the two entry points to one serial batch stop disagreeing, so
+	// both documents have to name the other. A hoist recorded on one side alone is how they drifted.
+	// Each reference has to be unique to the new section: a bare `queue` already appears throughout
+	// the canonical prompt, so pinning that would stay green after the whole section was deleted.
+	it.each([
+		[SKILL, 'This is the same rule `queue.md` step 1 already states'],
+		[WORKFLOW_PROMPT, 'これは `queue` が既に定めている規則と同一である'],
+	])('makes the agreement with queue traceable from %s', (document_name, reference) => {
+		expect(read_unwrapped(document_name)).toContain(reference)
+	})
+
+	// `queue` is the side that was already correct; if its own hoist is reworded away, `epicrun`
+	// points at a rule that no longer exists.
+	it('keeps the queue rule the skill defers to', () => {
+		expect(read_unwrapped(QUEUE_SKILL)).toContain(
+			'`josh latest` runs only once, before the first issue',
+		)
 	})
 })
