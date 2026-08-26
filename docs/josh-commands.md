@@ -217,6 +217,62 @@ Run after upgrading `@joshuafolkken/kit` to pull in updated AI files, GitHub wor
 
 `sync` writes nothing and exits non-zero when the project is the distribution package's own repository — inside kit, the copies run backwards and overwrite the source with its own derived templates ([#868](https://github.com/joshuafolkken/kit/issues/868)). See [sync.md](./sync.md#refused-inside-the-distribution-packages-own-repository).
 
+### `josh propagate`
+
+Carry the release this repository just published into every consumer repository checked out next to it ([#863](https://github.com/joshuafolkken/kit/issues/863)).
+
+```bash
+pnpm josh propagate                     # alias: josh pg
+pnpm josh propagate --dry-run           # report the targets and the steps without touching anything
+pnpm josh propagate --skip-publish-wait # for a release already known to be published
+```
+
+Any other argument is refused with the usage line rather than ignored — a misspelled `--dryrun` that fell through would run the real write path against every consumer.
+
+`--dry-run` writes nothing, so it also skips the publish wait and downgrades the supplier-side working tree check to a warning: the flag is reached for while work is still in progress, and refusing there would make it useless in exactly that situation.
+
+Publishing a release and consuming it are two different jobs, and only the first is automated: every merge auto-tags and publishes, and then a person opens app-kit, runs the upgrade, syncs the managed files, verifies, and opens a pull request — then does it again in the next consumer. `propagate` is that loop, run once.
+
+**It waits for the publish first.** A merge is not a publish: the auto-tag and publish workflows run _after_ the merge commit lands, so a consumer told to upgrade the moment the pull request merged resolves the previous release. `propagate` polls the registry until **this repository's own declared version** — the one the merge published — actually appears. The target is that exact version, never "something newer": a consumer several releases behind would otherwise be satisfied by any publish at all, including one that predates the change being carried. The wait has a timeout, because a failed publish workflow never produces the version; on timeout, or on a registry that fails several probes in a row, **no consumer is touched at all**. A _single_ failed probe is not that — a rate limit or a 5xx would otherwise end a ten-minute wait seconds into it — so the wait keeps going until the failures are consecutive.
+
+Then, for each consumer in turn:
+
+| Step               | What runs in the consumer's directory                                              |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| Working tree check | Clean tree, on the default branch, not behind its remote (fetched first)           |
+| Upgrade            | `pnpm add -D @joshuafolkken/kit@<version>`, plus kit's lockfile repair             |
+| Sync               | `pnpm josh sync`                                                                   |
+| Verify             | `pnpm josh lint && pnpm josh check && pnpm josh cspell:dot && pnpm josh test:unit` |
+| Open issue         | `gh issue create` — the upgrade issue the pull request will close                  |
+| Pull request       | `pnpm josh git -y "Upgrade @joshuafolkken/kit to <version> #<N>"`                  |
+| Return             | `git checkout <default>` and pull                                                  |
+
+**The working tree check comes first because everything after it writes.** The upgrade rewrites the lockfile, the sync overwrites managed files, and `josh git` stages the whole tree — so a consumer with uncommitted work would have that work swept into the upgrade commit and pushed. A consumer that is dirty, parked on a feature branch, or behind its remote is refused before anything touches it. The remote is fetched before that comparison: without it both refs are pre-merge and the check passes in exactly the situation it exists for — the seconds after a pull request merged on GitHub.
+
+**The upgrade pins the exact version that was waited for**, rather than asking for the registry's latest. Asking for latest would defeat the wait: a release published while the run was in flight would be the one every consumer received.
+
+**The issue is opened before the pull request because `josh git` requires one.** It derives the branch name and the `closes #N` line from the issue argument, so an upgrade with no issue could not open a pull request at all. `propagate` therefore **opens a GitHub issue in each consumer repository** — an outward-facing write, and the reason the command is scoped to repositories with the same owner. Merging the pull request closes it. When the upgrade and the sync changed nothing, no issue is opened at all and the consumer is reported as a skip; opening one and then failing on an empty commit is the alternative.
+
+**The consumer is returned to its default branch last.** `josh git` leaves the checkout on the feature branch, and the next propagation's working tree check would refuse it for that — the consumer would silently stop receiving releases.
+
+Each step runs the **consumer's own** installed CLI from the consumer's directory, which is why the sync is an ordinary consumer-side sync and [#868](https://github.com/joshuafolkken/kit/issues/868)'s self-sync refusal never fires. Every step inherits its output, so a failure shows what failed rather than only an exit code, and each has a timeout so one hung step cannot hold the whole run open. A consumer stops at its first failing step — a failed verification gate never goes on to open an issue or a pull request — and **one consumer's failure never stops another**: the run continues and reports every consumer at the end, because knowing which consumers took the release is the whole point.
+
+**Which repositories are consumers is read, not listed.** The candidates come from the [repository map](#the-discovered-repository-map), so the owner restriction is inherited rather than restated — propagation _writes_, and a write aimed at somebody else's repository is worse than a read aimed at one. A candidate becomes a target when its own `package.json` declares a dependency on `@joshuafolkken/kit`, which is a fact about the checkout rather than a roster: a new consumer needs no change here, and a consumer that is not a published package at all (joshuafolkken-com) is covered, which a list of downstream package names could not do. Candidates that are not targets stay in the report as skips — a consumer silently missing from a run is the failure this command exists to remove.
+
+| Reported as    | Meaning                                                                                                                                                                                                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `✓ propagated` | Checked, upgraded, synced, verified, issue and pull request opened, returned to the default branch. (`would be propagated` in a dry run, which opens nothing.)                                                                                                          |
+| `✗ failed`     | A step failed; the step and its reason are named. The other consumers still ran. **A consumer that failed after the upgrade or the sync is left with those changes uncommitted** — its working tree needs clearing before the next run, which will otherwise refuse it. |
+| `– skipped`    | Already carries this release, does not depend on the package, had nothing to commit, has no local checkout, or has an unreadable `package.json`.                                                                                                                        |
+
+The skips are kept apart because they mean different things. A repository with no `package.json` at all — a Godot or Rust project sharing the parent directory — is simply _not downstream_, not damaged. A `package.json` that exists but cannot be parsed is reported as unreadable. And a mapped path that does not exist (only `JOSH_REPO_PATHS` can name one, since discovery scans directories that do) is reported, **never cloned**: propagation writes into a working tree, and creating one nobody asked for is not a step this command takes on its own. A consumer that is dirty or out of date is reported as a _failure_ rather than a skip — it was eligible and could not be processed.
+
+**`propagate` runs from the supplier's own repository, and only there** — and only when that repository is itself clean, on its default branch, and not behind its remote. Run from a checkout that is behind, the version it would carry is the _previous_ release, which is already published: the wait would pass and every consumer would be sent to a version that does not contain the change.
+
+That boundary is also the answer to who propagates when several sessions are running at once ([#861](https://github.com/joshuafolkken/kit/issues/861)): in the per-repository concurrency model there is one session per checkout, so the session standing in the supplier repository is the one that runs the command and the rest refuse. It is a convention enforced at the boundary, not a lock — two checkouts of the supplier would both pass it — which is why each consumer is _additionally_ refused unless its own working tree is clean.
+
+Because every merge publishes, propagating per pull request would bury the consumers in bump pull requests. Run it **once at the end** of an epic or a queue; it works standalone all the same.
+
 > To make `josh` available system-wide, install the kit globally (`pnpm add -g @joshuafolkken/kit`) instead of running an install subcommand. See [cli.md](./cli.md) for details.
 
 ---

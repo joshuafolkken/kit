@@ -7,6 +7,11 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Project',
 	},
 	sync: { script: 'scripts/sync/sync.ts', description: 'Sync config files', category: 'Project' },
+	propagate: {
+		script: 'scripts/propagate/propagate.ts',
+		description: 'Carry the published release into every consumer repository next to this one',
+		category: 'Project',
+	},
 }
 
 export { PROJECT_COMMANDS }
