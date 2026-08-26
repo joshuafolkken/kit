@@ -4,6 +4,10 @@ import:
 words:
   - dedup
   - worktree
+  - worktrees
+  - gitdir
+  - commondir
+  - overridability
   - Unparseable
   - desync
   - desynced
