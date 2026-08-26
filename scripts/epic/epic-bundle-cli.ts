@@ -6,6 +6,7 @@ import { EPIC_LABEL } from '#scripts/git/issue-labels'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
+import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_issue } from './epic-issue'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
@@ -92,6 +93,8 @@ interface FetchedBacklog {
 	is_readable: boolean
 	is_truncated?: boolean
 	has_epic_list?: boolean
+	// The epic view, kept so a referenced issue read afterwards can be placed without a second read.
+	context?: ReferencedContext
 }
 
 async function fetch_backlog(
@@ -216,7 +219,36 @@ async function read_backlog(repo: string): Promise<FetchedBacklog> {
 	// propose bundling with (joshuafolkken/kit#873).
 	const epic_numbers = new Set(open_epics.map((epic) => epic.number))
 
-	return { ...(await fetch_backlog(repo, epics, epic_numbers)), has_epic_list: true }
+	return {
+		...(await fetch_backlog(repo, epics, epic_numbers)),
+		has_epic_list: true,
+		context: { repo, epics, epic_numbers },
+	}
+}
+
+// The backlog the decision is made from: the open listing, plus the referenced issues it could not
+// show. Without the second half the command answers about a window that closes minutes after the
+// follow-up issue is filed (joshuafolkken/kit#947).
+async function widen_with_referenced(
+	subject: BacklogIssue,
+	backlog: FetchedBacklog,
+): Promise<FetchedBacklog> {
+	const { context } = backlog
+	if (context === undefined) return backlog
+	// An issue an epic already tracks has nothing to bundle — `decide_bundle` answers from that alone
+	// and never looks at the candidates. Widening first spends a request per reference on a verdict
+	// that ignores them, and prints "⚠ Could not read #891." above "Already in an epic", which reads
+	// as a gap in an answer the read was never part of.
+	if (subject.epic !== undefined) return backlog
+	const known = new Set(backlog.issues.map((issue) => issue.number))
+	const found = await epic_bundle_referenced.referenced_candidates(subject, known, context)
+	if (found === undefined) return backlog
+
+	return {
+		...backlog,
+		issues: [...backlog.issues, ...found.issues],
+		unreadable: [...backlog.unreadable, ...found.unreadable],
+	}
 }
 
 // Why nothing could be recommended, when the backlog could not be read. A failed listing is not an
@@ -230,7 +262,7 @@ function unreadable_backlog_message(backlog: FetchedBacklog): string {
 // What the read could not cover, so a verdict is never quietly based on data that never arrived.
 function warn_about_gaps(backlog: FetchedBacklog): void {
 	if (backlog.unreadable.length > 0) {
-		console.error(`⚠ Could not read relations for ${format_numbers(backlog.unreadable)}.`)
+		console.error(`⚠ Could not read ${format_numbers(backlog.unreadable)}.`)
 	}
 
 	if (backlog.is_truncated === true) {
@@ -246,6 +278,16 @@ function report_decision(subject: BacklogIssue, issues: ReadonlyArray<BacklogIss
 	console.info(format_decision(epic_bundle.decide_bundle(subject, others), subject, others))
 
 	return SUCCESS_EXIT_CODE
+}
+
+// Widen, report what the read could not cover, then decide. Split out of `report_for`, which is
+// otherwise all guard clauses.
+async function report_widened(subject: BacklogIssue, backlog: FetchedBacklog): Promise<number> {
+	const widened = await widen_with_referenced(subject, backlog)
+
+	warn_about_gaps(widened)
+
+	return report_decision(subject, widened.issues)
 }
 
 // The recommendation for one issue, from the open backlog around it.
@@ -266,9 +308,7 @@ async function report_for(issue_number: number, repo: string): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	warn_about_gaps(backlog)
-
-	return report_decision(subject, backlog.issues)
+	return await report_widened(subject, backlog)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -302,6 +342,8 @@ const epic_bundle_cli = {
 	report_for,
 	fetch_epics,
 	fetch_backlog,
+	widen_with_referenced,
+	warn_about_gaps,
 	format_decision,
 	run,
 	main,

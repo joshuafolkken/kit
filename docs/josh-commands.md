@@ -951,6 +951,14 @@ Bundling is reversible — an epic is editable and a child can be removed — so
 
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies`, on an addition as much as on a new epic: without it the batch survives and the reason it is a batch does not. An order **nobody declared is not invented** — only relations already recorded are carried over.
 
+**A reference the open backlog cannot show is read directly.** The candidate search scans open issues, which left a window of minutes in which the command could answer correctly: a follow-up issue names its parent, and the parent's pull request merges right after — on [#943](https://github.com/joshuafolkken/kit/issues/943) the gap between filing and the parent closing was about three minutes. Past it, `Nothing to bundle.` was printed with exit 0, asserting there was no relation rather than that the command had stopped being able to see one. Every issue number the subject's body names is now read on its own, whatever its state ([#947](https://github.com/joshuafolkken/kit/issues/947)):
+
+- **A closed reference counts only when an open epic already tracks it** — the answer worth recovering is "add it to that epic". Creating an epic over a closed issue would build one whose other child is already finished: nothing for a run to execute.
+- **An open reference counts either way** — missing from the listing means the listing was capped, not that the issue is unrelated.
+- The lookup is one request per reference, capped per issue and batched like the relation reads. **A read that fails, and a reference the cap never reached, are both reported as gaps** rather than folded into "no relation found" — a guard that truncated in silence would put the command back to asserting there was no relation when it had merely stopped looking.
+- **A number that turns out to be a pull request is not a candidate.** `gh issue view` answers for one as readily as for an issue, and a merged PR reports a state that is not `CLOSED` — so without the check, "the fix landed in #952" would put a pull request among a proposed epic's children.
+- Only the subject's own prose is followed. The reverse — a closed issue naming the subject — would mean scanning every closed issue, and is not needed: a follow-up issue naming its parent is what the filing procedure requires.
+
 The whole open backlog is scanned every time. It was thirteen issues when this was written, so there is no index and no cache; add one when the number makes it necessary, not before.
 
 ### `josh epic:plan`
