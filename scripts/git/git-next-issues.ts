@@ -1,20 +1,26 @@
 import { git_gh_command } from './git-gh-command'
-import { EPIC_LABEL, IN_PROGRESS_LABEL } from './issue-labels'
+import { EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from './issue-labels'
 import { parse_json_array_safe } from './parse-json-array'
 import { open_issue_schema, type OpenIssueData } from './schemas'
 
 // The next-issues display printed when a workflow completes (#821): up to five open issues in
 // priority order, so the user picks the next run from the completion output instead of opening the
 // issue list. Priority is recency — a newer issue usually encodes the most current understanding
-// of the backlog — with two label-based exclusions below.
+// of the backlog — with the label-based exclusions below.
 const FETCH_LIMIT = 20
 const DISPLAY_LIMIT = 5
 const HEADER = '🗒 Next issues (newest first):'
 
-// `epic` issues track a batch and are never run directly (their children are), and `in-progress`
-// issues are already claimed by a running workflow — surfacing either as "next" would suggest a
-// run the workflow rules forbid or duplicate.
-const EXCLUDED_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL, IN_PROGRESS_LABEL])
+// `epic` issues track a batch and are never run directly (their children are), `in-progress` issues
+// are already claimed by a running workflow, and `needs-decision` issues were parked by an
+// `epicrun` precisely because they cannot advance without a person — surfacing any of the three as
+// "next" would suggest a run the workflow rules forbid, duplicate, or cannot finish
+// (joshuafolkken/kit#861).
+const EXCLUDED_LABELS: ReadonlySet<string> = new Set([
+	EPIC_LABEL,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+])
 
 // GitHub keeps the casing a label was created with and treats `Epic` and `epic` as one label, so
 // a repo that predates the scripts can answer with either spelling.
