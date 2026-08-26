@@ -58,6 +58,7 @@ const ALIASES: Record<string, string> = {
 	vu: 'version:upgrade',
 	r: 'ranges',
 	dr: 'doctor',
+	pg: 'propagate',
 	ov: 'overrides',
 	a: 'audit',
 	rt: 'reconcile-templates',
