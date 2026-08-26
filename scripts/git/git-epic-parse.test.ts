@@ -5,6 +5,7 @@ import {
 	has_external_task_list_entry,
 	has_unordered_declaration,
 	is_state_closed,
+	parse_dependency_links,
 	parse_task_list_issue_numbers,
 	UNORDERED_DEPENDENCIES,
 } from './git-epic-parse'
@@ -235,5 +236,55 @@ describe('is_state_closed', () => {
 		{ state: undefined, expected: false },
 	])('maps state $state to $expected', ({ state, expected }) => {
 		expect(is_state_closed(state)).toBe(expected)
+	})
+})
+
+describe('git_epic_parse.parse_dependency_links', () => {
+	it('reads one link', () => {
+		expect(parse_dependency_links('#1 -> #2')).toEqual([{ blocker: 1, blocked: 2 }])
+	})
+
+	it('reads a chain as consecutive links sharing their middle reference', () => {
+		expect(parse_dependency_links('#1 -> #2 -> #3')).toEqual([
+			{ blocker: 1, blocked: 2 },
+			{ blocker: 2, blocked: 3 },
+		])
+	})
+
+	it('accepts the full-width arrow', () => {
+		expect(parse_dependency_links('#1 → #2')).toEqual([{ blocker: 1, blocked: 2 }])
+	})
+
+	it('accepts a chain written as a list item', () => {
+		expect(parse_dependency_links('- #1 -> #2')).toEqual([{ blocker: 1, blocked: 2 }])
+	})
+
+	// joshuafolkken/kit#858 follows its Dependencies section with a prose line recommending an
+	// execution order. Those arrows are a suggestion, not a declaration, and reading them as one
+	// reported four disagreements against relations that were in fact correct.
+	it('ignores arrows on a line that also carries prose', () => {
+		const body = '#1 -> #2\n\n推奨実行順: #1 -> #3 -> #2'
+
+		expect(parse_dependency_links(body)).toEqual([{ blocker: 1, blocked: 2 }])
+	})
+
+	it('ignores a chain quoted inside a fenced block', () => {
+		const body = '```\n#1 -> #2\n```'
+
+		expect(parse_dependency_links(body)).toEqual([])
+	})
+
+	it('reads every declared line', () => {
+		const body = '#1 -> #2\n#1 -> #3\n#3 -> #4'
+
+		expect(parse_dependency_links(body)).toHaveLength(3)
+	})
+
+	it('returns nothing for a body with no chain', () => {
+		expect(parse_dependency_links('no dependencies here')).toEqual([])
+	})
+
+	it('returns nothing for a missing body', () => {
+		expect(parse_dependency_links(undefined)).toEqual([])
 	})
 })

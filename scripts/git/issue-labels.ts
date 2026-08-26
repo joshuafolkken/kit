@@ -3,5 +3,9 @@
 // fail silently — an epic filtered on the wrong name is simply never closed or never excluded.
 const EPIC_LABEL = 'epic'
 const IN_PROGRESS_LABEL = 'in-progress'
+// Parks a child that cannot advance without a person deciding something. `epic:next` is what reads
+// it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
+// forever (joshuafolkken/kit#860).
+const NEEDS_DECISION_LABEL = 'needs-decision'
 
-export { EPIC_LABEL, IN_PROGRESS_LABEL }
+export { EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL }
