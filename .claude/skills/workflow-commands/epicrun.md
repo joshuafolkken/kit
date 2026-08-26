@@ -4,10 +4,64 @@
 `chain-rule.md` and `followup.md` as well — each child is a `fullrun` — and read this file for what
 running many of them unattended changes.
 
+It also accepts an Issue that is **not** an epic; see "When `#N` is not an epic" below.
+
 **An epic in another repository must be referenced as `owner/repo#E`** — `epicrun
 joshuafolkken/kit#858` from an app-kit checkout. A bare `#858` resolves to *this* repository's issue
 858, a different issue entirely, so the qualification is required rather than optional
 (joshuafolkken/kit#864).
+
+## When `#N` is not an epic
+
+`epicrun` accepts an ordinary Issue as well as an epic. `epicrun #<N>` on an Issue with no task list
+runs `#<N>` as a `fullrun` — the same plan, verification gate, PR and merge — and then finishes.
+
+The point is *when* the person is involved. Typing `epicrun` up front is the batch authorization
+given once, before anything is known; `fullrun` is the authorization for one Issue, which is why a
+`fullrun` that discovers a split has to stop and ask for the batch one. Both amount to a single
+human action — this one just spends it at the start, for work already expected to grow
+(joshuafolkken/kit#892).
+
+So inside `epicrun #<N>`, a prerequisite or a split found mid-run does **not** stop the run:
+
+1. File the new Issue(s) — no confirmation; the batch was already approved by the keyword.
+2. **Stash the work in progress and remove `in-progress` from `#<N>`**, exactly as steps 2 and 4 of
+   "A prerequisite discovered mid-run" do — `git stash push -u -m "..."` with the `-u` (a new
+   `*.test.ts` is untracked), the `gh issue comment <N>` that records the stash so whatever resumes
+   `#<N>` knows to pop it, and `gh issue edit <N> --remove-label "in-progress"`. The reasons are the
+   same two: the tree is dirty on the default branch and the next child begins with `git switch main
+   && git pull`, and `epic:next` classifies a child carrying `in-progress` as waiting on time
+   **before** it consults any blocker, so `#<N>` would never be offered again and the epic would
+   stall. **The path is new; the mechanics are not, and none of them is optional here.**
+3. Create a **new** epic. `#<N>` is being implemented, so it is itself one of the deliverables —
+   which is why this path always takes the keep-as-a-child arm of `split-assessment.md`'s
+   promote-or-create branch, rather than choosing between the two. **Which command depends on what
+   was found**, because `--ordered` makes the argument order the dependency chain:
+
+   | Found | Command |
+   | --- | --- |
+   | A prerequisite `<P>` | `pnpm josh epic "<title>" <P> <N> --ordered` — the prerequisite comes **first**; reversing them records the inverse `blocked-by` and the run implements the deliverable before the thing it needs |
+   | A split into independent children | `pnpm josh epic "<title>" <N> <N1> ...` — **no `--ordered`**, which would serialize children that have no order and record `blocked-by` relations nobody declared |
+   | A split whose children do have an order | `pnpm josh epic "<title>" ... --ordered`, arguments written in that order |
+
+4. **Run `pnpm josh epic:audit <E>` now**, not earlier. The audit below is written for a run that
+   starts from an epic; on this path there is no epic until step 3, and `epic:audit` refuses an
+   Issue with no task list exactly as `epic:next` does — running it against the bare `#<N>` would
+   stop the run at its first step, which is the opposite of what this entry point is for.
+5. **Do not stop.** Continue into the loop below against the new epic `#<E>`.
+
+**Nothing found means no epic.** If `#<N>` reaches its merge without a prerequisite or a split
+turning up, the run finishes there. An epic is created only when there is a second child to put in
+it — an epic holding one closed Issue is noise that the auto-close then leaves open.
+
+**Every guard below applies on this path unchanged** — 30 children, 10 Issues filed, 3 consecutive
+failures. They are the run's limits, not the epic's, and the whole reason this entry point removes a
+confirmation is that the guards are what remain.
+
+**`josh epic:next` is not changed by any of this.** It still refuses an Issue with no task list, and
+still prints `#<N> tracks no children in a task list.` — the acceptance of a bare Issue belongs to
+`epicrun`, which has not built an epic yet at that point and therefore never asks `epic:next` about
+one.
 
 ## What one invocation approves
 
@@ -57,7 +111,9 @@ not a limit of the model.
 
 ## Audit before the first child
 
-Run `pnpm josh epic:audit <E>` before step 1 below. An epic whose children contradict each other —
+Run `pnpm josh epic:audit <E>` before step 1 below. **When the run began from a bare Issue there is
+nothing to audit yet** — it has no task list, and `epic:audit` refuses one just as `epic:next` does;
+that path runs the audit at the moment it creates the epic instead (above). An epic whose children contradict each other —
 an acceptance criterion that needs something built later, two children each waiting on the other —
 stalls the moment the run reaches the contradiction, and unattended is the worst time to find that
 out. Errors stop the run; warnings are read and carried on past. Fixing what it finds is Tier A
