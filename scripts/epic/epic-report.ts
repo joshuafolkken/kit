@@ -13,6 +13,10 @@ type EpicVerdict = 'run' | 'wait' | 'stop' | 'complete' | 'error'
 interface RepoCandidates {
 	repo: string
 	children: ReadonlyArray<EpicChild>
+	// The local checkout a runner would work in, from joshuafolkken/kit#869's map. Absent when the
+	// repository is not checked out here — reported rather than cloned, since creating a working tree
+	// nobody asked for is not a step this command takes (joshuafolkken/kit#864).
+	path?: string
 }
 
 interface EpicNextResult {
@@ -26,7 +30,20 @@ interface EpicNextResult {
 
 // Bundle by repository, repositories in name order and children in number order, so a run is
 // reproducible rather than dependent on the order GitHub happened to list the children in.
-function bundle_by_repo(children: ReadonlyArray<EpicChild>): Array<RepoCandidates> {
+// The discovery map is keyed lowercase — GitHub resolves owner and repository names
+// case-insensitively — so the lookup lowercases too. Without it any capital in a repository name
+// printed "no local checkout" for a repository that is checked out (joshuafolkken/kit#864).
+//
+// `exactOptionalPropertyTypes` rejects `{ path: undefined }`, so the key is added only when there
+// is a path to put in it.
+function to_path_field(path: string | undefined): { path?: string } {
+	return path === undefined ? {} : { path }
+}
+
+function bundle_by_repo(
+	children: ReadonlyArray<EpicChild>,
+	paths: ReadonlyMap<string, string> = new Map(),
+): Array<RepoCandidates> {
 	const grouped = new Map<string, Array<EpicChild>>()
 
 	for (const child of children) {
@@ -45,6 +62,7 @@ function bundle_by_repo(children: ReadonlyArray<EpicChild>): Array<RepoCandidate
 		.map((repo) => ({
 			repo,
 			children: (grouped.get(repo) ?? []).toSorted((left, right) => left.number - right.number),
+			...to_path_field(paths.get(repo.toLowerCase())),
 		}))
 }
 
@@ -66,12 +84,13 @@ function decide_verdict(classification: Classification, anomalies: number): Epic
 function build_result(
 	classification: Classification,
 	anomalies: ReadonlyArray<GraphAnomaly>,
+	paths: ReadonlyMap<string, string> = new Map(),
 ): EpicNextResult {
 	const verdict = decide_verdict(classification, anomalies.length)
 
 	return {
 		verdict,
-		candidates: verdict === 'error' ? [] : bundle_by_repo(classification.runnable),
+		candidates: verdict === 'error' ? [] : bundle_by_repo(classification.runnable, paths),
 		waiting: classification.time,
 		blocked_on_people: classification.human,
 		anomalies,
@@ -82,6 +101,12 @@ function build_result(
 // number first, which is the order the children were split in.
 function pick_for_repo(result: EpicNextResult, repo: string): EpicChild | undefined {
 	return result.candidates.find((bundle) => bundle.repo === repo)?.children[0]
+}
+
+// The repository, with the checkout a runner would use. A repository with no local checkout says so
+// rather than being omitted: it is still where the work belongs.
+function format_bundle_heading(bundle: RepoCandidates): string {
+	return `  ${bundle.repo}  ${bundle.path ?? '(no local checkout)'}`
 }
 
 function format_child(child: EpicChild): string {
@@ -111,7 +136,10 @@ function format_result(result: EpicNextResult): string {
 	const lines = [VERDICT_LINES[result.verdict]]
 
 	for (const bundle of result.candidates) {
-		lines.push(`  ${bundle.repo}`, ...bundle.children.map((child) => format_child(child)))
+		lines.push(
+			format_bundle_heading(bundle),
+			...bundle.children.map((child) => format_child(child)),
+		)
 	}
 
 	lines.push(
@@ -124,6 +152,7 @@ function format_result(result: EpicNextResult): string {
 
 const epic_report = {
 	bundle_by_repo,
+	format_bundle_heading,
 	decide_verdict,
 	build_result,
 	pick_for_repo,

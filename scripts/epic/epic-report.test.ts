@@ -5,6 +5,7 @@ import { epic_report } from './epic-report'
 
 const KIT = 'joshuafolkken/kit'
 const APP_KIT = 'joshuafolkken/app-kit'
+const KIT_PATH = '/Users/example/Development/kit'
 const CYCLE_MESSAGE = 'Circular dependency: #1, #2'
 
 function child(number: number, repo = KIT): EpicChild {
@@ -35,6 +36,32 @@ describe('epic_report.bundle_by_repo', () => {
 		const bundles = epic_report.bundle_by_repo([child(2), child(1)])
 
 		expect(bundles[0]?.children.map((entry) => entry.number)).toEqual([1, 2])
+	})
+})
+
+// joshuafolkken/kit#864: a runner needs to know which checkout to work in. The path comes from
+// joshuafolkken/kit#869's map; a repository absent from it is reported without one rather than
+// cloned.
+describe('epic_report.bundle_by_repo — the dispatch target', () => {
+	it('carries the local checkout for a repository the map knows', () => {
+		const paths = new Map([[KIT, KIT_PATH]])
+		const [bundle] = epic_report.bundle_by_repo([child(1)], paths)
+
+		expect(bundle?.path).toBe(KIT_PATH)
+	})
+
+	it('leaves the path unset for a repository the map does not know', () => {
+		const [bundle] = epic_report.bundle_by_repo([child(1)])
+
+		expect(bundle?.path).toBeUndefined()
+	})
+
+	it('says so rather than omitting the repository when there is no checkout', () => {
+		const [bundle] = epic_report.bundle_by_repo([child(1)])
+
+		expect(bundle === undefined ? '' : epic_report.format_bundle_heading(bundle)).toContain(
+			'no local checkout',
+		)
 	})
 })
 

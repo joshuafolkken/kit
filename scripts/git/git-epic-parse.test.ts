@@ -6,6 +6,7 @@ import {
 	has_unordered_declaration,
 	is_state_closed,
 	parse_dependency_links,
+	parse_external_task_list_children,
 	parse_task_list_issue_numbers,
 	UNORDERED_DEPENDENCIES,
 } from './git-epic-parse'
@@ -284,7 +285,51 @@ describe('git_epic_parse.parse_dependency_links', () => {
 		expect(parse_dependency_links('no dependencies here')).toEqual([])
 	})
 
-	it('returns nothing for a missing body', () => {
+	it('returns nothing when the body is absent', () => {
 		expect(parse_dependency_links(undefined)).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#864: the auto-close used to bail the moment it saw one of these. Reading them
+// needs the repository and the number, in both spellings a task list may use.
+const REMOTE_REPO = 'joshuafolkken/app-kit'
+const SHORTHAND_ROW = `- [ ] ${REMOTE_REPO}#7`
+const URL_ROW = `- [ ] https://github.com/${REMOTE_REPO}/issues/7`
+const EXTERNAL_EXPECTED = [{ repo: REMOTE_REPO, number: 7 }]
+
+describe('git_epic_parse.parse_external_task_list_children', () => {
+	it('reads the shorthand form', () => {
+		expect(parse_external_task_list_children(SHORTHAND_ROW)).toEqual(EXTERNAL_EXPECTED)
+	})
+
+	it('reads the full URL form', () => {
+		expect(parse_external_task_list_children(URL_ROW)).toEqual(EXTERNAL_EXPECTED)
+	})
+
+	it('reads a checked row, which is still a tracked child', () => {
+		expect(parse_external_task_list_children(`- [x] ${REMOTE_REPO}#7`)).toHaveLength(1)
+	})
+
+	it('leaves local children to the local parser', () => {
+		expect(parse_external_task_list_children('- [ ] #101')).toEqual([])
+	})
+})
+
+describe('git_epic_parse.parse_external_task_list_children — what it ignores', () => {
+	it('reports a child written both ways only once', () => {
+		expect(parse_external_task_list_children([SHORTHAND_ROW, URL_ROW].join('\n'))).toHaveLength(1)
+	})
+
+	// A quoted template's sample rows are illustrations, not tracked children.
+	it('ignores a row inside a fenced block', () => {
+		expect(parse_external_task_list_children(`\`\`\`\n${SHORTHAND_ROW}\n\`\`\``)).toEqual([])
+	})
+
+	it('ignores a bare reference that is not a task-list row', () => {
+		expect(parse_external_task_list_children(`see ${REMOTE_REPO}#7`)).toEqual([])
+	})
+
+	it('returns nothing for a missing body', () => {
+		expect(parse_external_task_list_children(undefined)).toEqual([])
 	})
 })

@@ -89,15 +89,48 @@ describe('close_completed_epics — incomplete batch', () => {
 	})
 })
 
+// The auto-close used to bail the moment it saw a cross-repository child, because their state could
+// not be read. Reading them through `gh --repo` is the only thing that changed: an epic whose
+// children are *all* readable and closed now closes, and one with a child it cannot read still does
+// not (joshuafolkken/kit#864).
 describe('close_completed_epics — cross-repository children', () => {
-	it('leaves the epic open when a child lives in another repository', async () => {
-		const body = '## Progress\n\n- [ ] #103 merged\n- [ ] joshuafolkken/app-kit#7 remote\n'
+	const REMOTE_REPO = 'joshuafolkken/app-kit'
+	const CROSS_REPO_BODY = `## Progress\n\n- [ ] #103 merged\n- [ ] ${REMOTE_REPO}#7 remote\n`
 
-		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body }]))
+	it('reads the other repository child with --repo, rather than giving up', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: CROSS_REPO_BODY }]))
+		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
 
 		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
-		expect(mocked_get_child).not.toHaveBeenCalled()
+		expect(mocked_get_child).toHaveBeenCalledWith('7', REMOTE_REPO)
+	})
+
+	it('closes the epic once every child, near and far, is closed', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: CROSS_REPO_BODY }]))
+		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
+
+		expect(mocked_close).toHaveBeenCalledTimes(1)
+	})
+
+	it('leaves the epic open when the other repository child is still open', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: CROSS_REPO_BODY }]))
+		mocked_get_child.mockResolvedValue(child_json({ state: 'OPEN' }))
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
+
+		expect(mocked_close).not.toHaveBeenCalled()
+	})
+
+	// Closing while a child's state is unknown is exactly what the old refusal prevented.
+	it('leaves the epic open when the other repository child cannot be read', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: CROSS_REPO_BODY }]))
+		mocked_get_child.mockResolvedValue(undefined)
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
+
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
 })

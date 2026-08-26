@@ -1,4 +1,4 @@
-import { git_epic_parse } from './git-epic-parse'
+import { git_epic_parse, type ExternalChild } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
 import { EPIC_LABEL } from './issue-labels'
 import { parse_json_array_safe, parse_json_object_safe } from './parse-json-array'
@@ -11,7 +11,7 @@ const EPIC_LIST_LIMIT = 100
 interface EpicIssue {
 	number: number
 	children: Array<number>
-	has_external_child: boolean
+	external_children: Array<ExternalChild>
 	has_declared_order: boolean
 }
 
@@ -24,7 +24,7 @@ function to_epic_issue(raw: { number: number; body?: string | undefined }): Epic
 	return {
 		number: raw.number,
 		children: git_epic_parse.parse_task_list_issue_numbers(raw.body),
-		has_external_child: git_epic_parse.has_external_task_list_entry(raw.body),
+		external_children: git_epic_parse.parse_external_task_list_children(raw.body),
 		has_declared_order: git_epic_parse.has_declared_dependency_chain(raw.body),
 	}
 }
@@ -57,8 +57,19 @@ function to_sibling_state(raw_json: string | undefined): SiblingState {
 	}
 }
 
-async function inspect_sibling(sibling: number): Promise<SiblingState> {
-	return to_sibling_state(await git_gh_command.issue_get_state_and_relations(String(sibling)))
+async function inspect_sibling(sibling: number, repo?: string): Promise<SiblingState> {
+	return to_sibling_state(await git_gh_command.issue_get_state_and_relations(String(sibling), repo))
+}
+
+// A cross-repository child, read through `gh --repo`. `is_readable` is what decides whether the epic
+// may close at all: closing while a child's state is unknown is exactly what the old refusal
+// prevented, and reading them is the only thing that changed (joshuafolkken/kit#864).
+async function inspect_external(
+	child: ExternalChild,
+): Promise<SiblingState & { is_readable: boolean }> {
+	const raw = await git_gh_command.issue_get_state_and_relations(String(child.number), child.repo)
+
+	return { ...to_sibling_state(raw), is_readable: raw !== undefined }
 }
 
 // The merged Issue is excluded rather than queried: GitHub applies `closes #N` asynchronously, so
@@ -88,8 +99,13 @@ function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<Sibli
 	)
 }
 
+// Every child, near and far. Listing only the local ones left an all-external epic announcing "All
+// child issues are closed ()" (joshuafolkken/kit#864).
 function build_close_comment(epic: EpicIssue): string {
-	const list = epic.children.map((child) => `#${String(child)}`).join(', ')
+	const list = [
+		...epic.children.map((child) => `#${String(child)}`),
+		...epic.external_children.map((child) => `${child.repo}#${String(child.number)}`),
+	].join(', ')
 
 	return `All child issues are closed (${list}). Closing this epic automatically.`
 }
@@ -105,16 +121,37 @@ async function close_epic(epic: EpicIssue): Promise<void> {
 	)
 }
 
+// The cross-repository children's states, and whether every one of them could be read. An epic with
+// a child whose state is unknown keeps the old handling — left open for manual closing.
+async function inspect_external_children(
+	epic: EpicIssue,
+): Promise<{ states: Array<SiblingState>; is_complete: boolean }> {
+	if (epic.external_children.length === 0) return { states: [], is_complete: true }
+	const results = await Promise.all(
+		epic.external_children.map(async (child) => await inspect_external(child)),
+	)
+
+	return {
+		states: results.map((result) => ({
+			is_closed: result.is_closed,
+			has_blocked_by: result.has_blocked_by,
+		})),
+		is_complete: results.every((result) => result.is_readable),
+	}
+}
+
 async function close_epic_when_complete(epic: EpicIssue, merged_number: number): Promise<void> {
-	if (epic.has_external_child) {
+	const external = await inspect_external_children(epic)
+
+	if (!external.is_complete) {
 		console.info(
-			`ℹ️  Epic #${String(epic.number)} tracks a child in another repository; close it manually.`,
+			`ℹ️  Epic #${String(epic.number)} has a child in another repository whose state could not be read; close it manually.`,
 		)
 
 		return
 	}
 
-	const states = await inspect_siblings(epic, merged_number)
+	const states = [...(await inspect_siblings(epic, merged_number)), ...external.states]
 
 	warn_when_order_unrecorded(epic, states)
 

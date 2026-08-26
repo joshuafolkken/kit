@@ -792,9 +792,13 @@ Runnable children (one per repository may run at a time):
     #862
 ```
 
-Today every child is stamped with the repository the command runs in, so one bundle is what you see; the per-repository shape is what [#864](https://github.com/joshuafolkken/kit/issues/864) fills in when cross-repository children are resolved.
+Each bundle names the local checkout a runner would work in, from the [repository map](#the-discovered-repository-map). A repository with no checkout here is reported as `(no local checkout)` rather than cloned.
 
 Every open child appears exactly once in the report, so nothing is silently dropped. A child that could not be read is **not** dropped either — it stops the command. Dropping it is wrong in both directions: an epic whose children all failed to read would look like an epic with no open children, and one missing child leaves whatever it blocks looking unblocked.
+
+**An epic in another repository is referenced as `owner/repo#N`** — `pnpm josh epic:next joshuafolkken/kit#858 --repo joshuafolkken/app-kit`. A bare `#N` resolves to _this_ repository's issue of that number, a different issue entirely, so the qualification is required rather than optional ([#864](https://github.com/joshuafolkken/kit/issues/864)). Children in other repositories are written in the epic's task list as `owner/repo#N` or a full issue URL, and their state is read through `gh --repo` — no clone is needed to learn it.
+
+**A dependency that crosses a repository is not satisfied when the blocking issue closes.** Merging kit's issue does not publish kit: the merge, the auto-tag and the publish run one after another. A consumer child told it may start at that moment installs the previous release, or fails outright — which surfaces as "it breaks sometimes", the hardest kind to diagnose. Such a dependency resolves only when the blocker is closed **and** the version its default branch declares has appeared in the registry, and the evaluation is an AND **in that order**: while the blocker is still open the registry is never consulted, so a run never sits waiting on a publish from the moment it starts. The target is that exact version, never "something newer" — a consumer several releases behind would otherwise be satisfied by a publish that predates the change. The publish check is [`josh propagate`](#josh-propagate)'s own, shared rather than restated.
 
 With `--repo`, standard output carries exactly one token — the issue number when there is a child to run, otherwise the verdict (`wait`, `stop` or `complete`) — so `answer=$(josh epic:next 858 --repo joshuafolkken/kit)` captures something a loop can branch on. Every explanation goes to standard error. `run` never appears there: it would mean another repository has work, which for this session is something to wait on, so it is reported as `wait`.
 

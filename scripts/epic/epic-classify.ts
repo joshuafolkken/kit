@@ -71,21 +71,23 @@ function dependency_category(
 
 // The context one classification pass carries: the graph, the resolver, and the answers so far.
 interface ClassifyContext {
-	index: ReadonlyMap<number, EpicChild>
+	index: ReadonlyMap<string, EpicChild>
 	resolve: ResolveDependency
-	memo: Map<number, ChildCategory>
+	// Keyed by identity — repository plus number — because two children of one epic can share a
+	// number across repositories (joshuafolkken/kit#864).
+	memo: Map<string, ChildCategory>
 }
 
 // The categories every blocker inside the epic forces on `child`. Reads the memo rather than
 // recursing: the loop below categorizes in dependency order, so every blocker already has an answer.
 function blocker_categories(child: EpicChild, context: ClassifyContext): Array<ChildCategory> {
 	return child.blocked_by
-		.map((number) => context.index.get(number))
+		.map((blocker) => context.index.get(epic_graph.blocker_key(child, blocker)))
 		.filter((blocker): blocker is EpicChild => blocker !== undefined)
 		.map((blocker) =>
 			dependency_category(
 				context.resolve(blocker, child),
-				context.memo.get(blocker.number) ?? 'time',
+				context.memo.get(epic_graph.key_of(blocker)) ?? 'time',
 			),
 		)
 		.filter((category): category is ChildCategory => category !== undefined)
@@ -105,7 +107,7 @@ function compute_category(child: EpicChild, context: ClassifyContext): ChildCate
 }
 
 // Whether every blocker of `node` inside the epic already has a category.
-function is_ready(node: number, context: ClassifyContext): boolean {
+function is_ready(node: string, context: ClassifyContext): boolean {
 	return epic_graph
 		.blockers_of(context.index, node)
 		.every((blocker) => !context.index.has(blocker) || context.memo.has(blocker))
@@ -114,7 +116,7 @@ function is_ready(node: number, context: ClassifyContext): boolean {
 // Categorize in dependency order by peeling, the same way the cycle check does. Iterative on
 // purpose: the recursive form is a mutually recursive pair, and a cycle would make it never return.
 function fill_memo(children: ReadonlyArray<EpicChild>, context: ClassifyContext): void {
-	const pending = new Set(children.map((child) => child.number))
+	const pending = new Set(children.map((child) => epic_graph.key_of(child)))
 
 	const peel = (): number => {
 		const ready = [...pending].filter((node) => is_ready(node, context))
@@ -147,7 +149,7 @@ function classify_children(
 	const context: ClassifyContext = {
 		index: epic_graph.index_children(children),
 		resolve,
-		memo: new Map(),
+		memo: new Map<string, ChildCategory>(),
 	}
 	const buckets: Record<'runnable' | 'time' | 'human', Array<EpicChild>> = {
 		runnable: [],
@@ -158,7 +160,7 @@ function classify_children(
 	fill_memo(children, context)
 
 	for (const child of children) {
-		const category = context.memo.get(child.number) ?? 'time'
+		const category = context.memo.get(epic_graph.key_of(child)) ?? 'time'
 
 		if (category !== 'done') buckets[category].push(child)
 	}

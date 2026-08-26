@@ -73,10 +73,10 @@ function acceptance_section(body: string | undefined): string {
 // still contains a cycle terminates — `epic:next` rejects one first, but an auditor must not hang on
 // the input it exists to examine.
 function collect_blockers(
-	index: ReadonlyMap<number, EpicChild>,
-	node: number,
-): ReadonlySet<number> {
-	const seen = new Set<number>()
+	index: ReadonlyMap<string, EpicChild>,
+	node: string,
+): ReadonlySet<string> {
+	const seen = new Set<string>()
 	const pending = [...epic_graph.blockers_of(index, node)]
 
 	while (pending.length > 0) {
@@ -91,8 +91,14 @@ function collect_blockers(
 	return seen
 }
 
-function depends_on(index: ReadonlyMap<number, EpicChild>, node: number, target: number): boolean {
-	return collect_blockers(index, node).has(target)
+// Both ends are named by identity — repository plus number — because an epic can track two children
+// whose numbers collide across repositories (joshuafolkken/kit#864).
+function depends_on(
+	index: ReadonlyMap<string, EpicChild>,
+	node: EpicChild,
+	target: EpicChild,
+): boolean {
+	return collect_blockers(index, epic_graph.key_of(node)).has(epic_graph.key_of(target))
 }
 
 const epic_audit_logic = {

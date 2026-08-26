@@ -1,8 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { epic_classify } from './epic-classify'
+import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph, type GraphAnomaly } from './epic-graph'
 import { epic_issue } from './epic-issue'
@@ -15,21 +18,17 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const REPO_FLAG = '--repo'
-const USAGE = 'Usage: josh epic:next <epic-number> [--repo <owner/repo>]'
-// An epic in another repository needs its children resolved there too, which is joshuafolkken/kit#864.
-// Refused with this rather than read as a bare number, which would answer about a different issue.
-const CROSS_REPO_USAGE = `An epic in another repository is not supported yet (see joshuafolkken/kit#864). ${USAGE}`
-const EXTERNAL_NOTICE =
-	'Note: this epic tracks children in other repositories. Those are not resolved yet — see joshuafolkken/kit#864.'
+const USAGE = 'Usage: josh epic:next <epic-number|owner/repo#number> [--repo <owner/repo>]'
+const UNKNOWN_REPO = 'unknown/unknown'
+const EXTERNAL_NOTICE = 'Note: this epic tracks children in other repositories.'
 
 interface NextOptions {
 	epic_number?: number
+	// The repository the *epic* lives in, when the reference was qualified (`owner/repo#858`).
+	epic_repo?: string
+	// The repository to narrow the candidates to (`--repo`).
 	repo?: string
 	usage?: string
-}
-
-function usage_for(raw = ''): string {
-	return raw.includes('/') ? CROSS_REPO_USAGE : USAGE
 }
 
 function parse_repo(rest: ReadonlyArray<string>): string | undefined {
@@ -38,14 +37,20 @@ function parse_repo(rest: ReadonlyArray<string>): string | undefined {
 	return flag_index === -1 ? undefined : rest[flag_index + 1]
 }
 
+// `exactOptionalPropertyTypes` rejects `{ epic_repo: undefined }`.
+function to_repo_field(repo: string | undefined): { epic_repo?: string } {
+	return repo === undefined ? {} : { epic_repo: repo }
+}
+
 function parse_options(argv: ReadonlyArray<string>): NextOptions {
 	const [first, ...rest] = argv
-	const epic_number = epic_issue.parse_epic_number(first)
-	if (epic_number === undefined) return { usage: usage_for(first) }
+	const reference = epic_issue.parse_epic_reference(first)
+	if (reference === undefined) return { usage: USAGE }
+	const base = { epic_number: reference.number, ...to_repo_field(reference.repo) }
 	const repo = parse_repo(rest)
-	if (repo === undefined) return rest.includes(REPO_FLAG) ? { usage: USAGE } : { epic_number }
+	if (repo === undefined) return rest.includes(REPO_FLAG) ? { usage: USAGE } : base
 
-	return { epic_number, repo }
+	return { ...base, repo }
 }
 
 // The answer for one epic, from an already-fetched snapshot. Split from the fetch so the whole
@@ -71,16 +76,24 @@ function is_order_declared(body: string | undefined, links: ReadonlyArray<unknow
 	return links.length > 0 || git_epic_parse.has_unordered_declaration(body)
 }
 
-function decide(snapshot: EpicSnapshot): EpicNextResult {
+function decide(
+	snapshot: EpicSnapshot,
+	paths: ReadonlyMap<string, string> = new Map(),
+): EpicNextResult {
 	const links = git_epic_parse.parse_dependency_links(snapshot.body)
 	const unreadable = unreadable_anomaly(snapshot)
 	const anomalies =
 		unreadable === undefined
 			? epic_graph.find_anomalies(snapshot.children, links, is_order_declared(snapshot.body, links))
 			: [unreadable]
-	const classification = epic_classify.classify_children(snapshot.children)
+	// The cross-repository resolver, not the default one: a blocker in another repository is not
+	// finished when it closes, only when its release is published (joshuafolkken/kit#864).
+	const classification = epic_classify.classify_children(
+		snapshot.children,
+		epic_cross_repo.resolve_cross_repo,
+	)
 
-	return epic_report.build_result(classification, anomalies)
+	return epic_report.build_result(classification, anomalies, paths)
 }
 
 // The verdict as it applies to *this* repository. `run` never reaches a caller here: it means some
@@ -138,6 +151,28 @@ function report(result: EpicNextResult, snapshot: EpicSnapshot, repo: string | u
 	return SUCCESS_EXIT_CODE
 }
 
+// The checkout each repository's children would be run in comes from joshuafolkken/kit#869's map. A
+// repository absent from it is reported without a path rather than cloned.
+async function run_epic(options: NextOptions): Promise<number> {
+	const epic_number = options.epic_number ?? 0
+	const current_repo = (await git_gh_command.repo_get_name_with_owner()) ?? UNKNOWN_REPO
+	const snapshot = await epic_fetch.fetch_epic(epic_number, options.epic_repo ?? current_repo)
+
+	if (snapshot.child_numbers.length === 0) {
+		console.error(`#${String(epic_number)} tracks no children in a task list.`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const paths = repo_discovery.discover_repositories(PROJECT_ROOT)
+
+	// One registry answer per repository per invocation. A polling `epicrun` calls this command
+	// again each round, and a release that appeared in between has to be seen.
+	epic_cross_repo.reset_publish_cache()
+
+	return report(decide(snapshot, paths), snapshot, options.repo)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const options = parse_options(argv)
 
@@ -147,16 +182,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const current_repo = (await git_gh_command.repo_get_name_with_owner()) ?? 'unknown/unknown'
-	const snapshot = await epic_fetch.fetch_epic(options.epic_number, current_repo)
-
-	if (snapshot.child_numbers.length === 0) {
-		console.error(`#${String(options.epic_number)} tracks no children in a task list.`)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	return report(decide(snapshot), snapshot, options.repo)
+	return await run_epic(options)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -165,13 +191,12 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const epic_next = {
 	USAGE,
-	CROSS_REPO_USAGE,
 	EXTERNAL_NOTICE,
 	unreadable_anomaly,
 	is_order_declared,
-	parse_epic_number: epic_issue.parse_epic_number,
 	repo_verdict,
 	parse_options,
+	run_epic,
 	decide,
 	report,
 	run,
