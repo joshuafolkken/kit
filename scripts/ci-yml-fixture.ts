@@ -100,6 +100,20 @@ function find_upload(job: WorkflowJob | undefined, artifact: string): WorkflowSt
 	return upload_steps(job).find((step) => upload_input(step, UPLOAD_NAME_INPUT) === artifact)
 }
 
+// A step is looked up by its id rather than its position or its name: the id is what the job's own
+// `outputs:` expressions reference, so a guard and the workflow name the same thing, and renaming
+// the step for readability cannot silently turn a guard into `undefined`. Shared because the ci.yml
+// suites reach for the same two operations.
+function find_step_by_id(job: WorkflowJob | undefined, step_id: string): WorkflowStep | undefined {
+	return job?.steps?.find((step) => step.id === step_id)
+}
+
+// An absent step reads as an empty script, so a guard asserts on what the step runs instead of
+// having to test for the step's existence first.
+function step_run(step: WorkflowStep | undefined): string {
+	return step?.run ?? ''
+}
+
 function job_timeout_minutes(job: WorkflowJob | undefined): number | undefined {
 	return job?.['timeout-minutes']
 }
@@ -156,6 +170,8 @@ const ci_yml_fixture = {
 	find_upload,
 	job_timeout_minutes,
 	job_needs,
+	find_step_by_id,
+	step_run,
 	step_continue_on_error,
 	e2e_template_job,
 	e2e_log_directory,
