@@ -21,7 +21,8 @@ import {
 // `is_mergeable_state` demands `CLEAN`. Both paths are exercised on purpose: the fast fail must not
 // become the only thing standing between a red E2E and a merge. Every fixture states its merge state
 // explicitly rather than defaulting it — that string is the mechanism under test for the second
-// path, not scaffolding. Whether `E2E` should also be a required check is joshuafolkken/kit#991.
+// path, not scaffolding. Whether `E2E` should *also* be a required check was answered in
+// joshuafolkken/kit#991 — it should not, and the last describe in this file is that decision.
 const E2E_CHECK = 'E2E'
 const CODE_RABBIT = 'CodeRabbit'
 const SONAR_QUBE = 'SonarQube'
@@ -30,6 +31,8 @@ const UNSTABLE = 'UNSTABLE'
 const UNKNOWN = 'UNKNOWN'
 const SUCCESS = 'success'
 const REQUIRED_CHECKS_ENV_VAR = 'JOSH_REQUIRED_CHECKS'
+// An empty override reads as "not set", which is how a test asks for the shipped default.
+const NO_OVERRIDE = ''
 
 // The merge state is passed in rather than fixed, because GitHub reports the two cases differently:
 // a *completed* non-required failure gives UNSTABLE, while a job still running leaves the state
@@ -45,6 +48,20 @@ function snapshot_with_e2e(input: {
 		merge_state_status: input.merge_state_status,
 		review_decision: 'APPROVED',
 	}
+}
+
+// `REQUIRED_CHECKS` is resolved from `JOSH_REQUIRED_CHECKS` at module load — a documented override —
+// so a suite that asserts on the list has to pin the variable and re-import, or it passes on one
+// developer's machine and fails on another's. Declared once because two describes below need it.
+function use_required_checks(value: string): void {
+	beforeEach(() => {
+		vi.resetModules()
+		vi.stubEnv(REQUIRED_CHECKS_ENV_VAR, value)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
 }
 
 describe('a non-passing E2E job keeps the merge closed', () => {
@@ -91,9 +108,8 @@ describe('a non-passing E2E job keeps the merge closed', () => {
 // from a raw payload because the claim spans the parser and the evaluator, and because "no suite"
 // must read as a pass rather than as something the gate waits out.
 //
-// The required list is pinned to its default for this one case. `REQUIRED_CHECKS` is resolved from
-// `JOSH_REQUIRED_CHECKS` at module load — a documented override — so a developer who has it set
-// would otherwise see this positive assertion fail on their machine and nowhere else.
+// The required list is pinned for this one case: it is the only assertion here that expects
+// `success`, so an override left set in the environment would break it and nothing else.
 describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 	const raw = JSON.stringify({
 		mergeStateStatus: 'CLEAN',
@@ -106,14 +122,7 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 		],
 	})
 
-	beforeEach(() => {
-		vi.resetModules()
-		vi.stubEnv(REQUIRED_CHECKS_ENV_VAR, SONAR_QUBE)
-	})
-
-	afterEach(() => {
-		vi.unstubAllEnvs()
-	})
+	use_required_checks(SONAR_QUBE)
 
 	it('reads the skipped job as passing', () => {
 		const e2e = parse_pr_state_snapshot(raw).rollup.find((check) => check.name === E2E_CHECK)
@@ -125,5 +134,46 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 		const { evaluate_pr_state: evaluate } = await import('./git-pr-checks-eval')
 
 		expect(evaluate(parse_pr_state_snapshot(raw))).toBe(SUCCESS)
+	})
+})
+
+// The joshuafolkken/kit#991 decision, pinned rather than left in prose: `E2E` stays off the default
+// required list. Three things decide it.
+//
+// It would not have caught the defect that raised the question. A required check is satisfied by a
+// *skipped* job — the parser maps SKIPPED to `pass`, asserted directly above — so a required `E2E`
+// would have passed on exactly the skipped job that let a merge through with the suite never run.
+// What guarantees the job actually runs is the detection rule, and that is where the fix went:
+// `scripts/ci-yml-e2e-detect.test.ts` executes it against the layouts it used to miss.
+//
+// It would add nothing to the failure path either. A red E2E already ends the wait at once
+// (joshuafolkken/kit#990) and can never reach `success`, which is what the first two describes here
+// assert — and they assert it without `E2E` being required.
+//
+// And it would cost a repository that does not use this workflow its whole merge budget. With no
+// `E2E` context reported at all the required entry resolves to `missing`, which is never `pass`, so
+// the evaluation stays `pending` until the 32-minute wait times out with nothing actually wrong.
+// A project that wants it required opts in through `JOSH_REQUIRED_CHECKS` instead.
+describe('E2E is deliberately not a required check', () => {
+	// Emptied rather than left alone, so the default is what is asserted.
+	use_required_checks(NO_OVERRIDE)
+
+	it('leaves E2E off the default required list', async () => {
+		const { REQUIRED_CHECKS } = await import('./git-pr-checks-eval')
+
+		expect(REQUIRED_CHECKS).not.toContain(E2E_CHECK)
+	})
+
+	// The accepted cost, stated as an assertion so nobody has to rediscover it: a repository whose CI
+	// defines no E2E job at all still merges on its own checks rather than waiting out the budget.
+	it('keeps a repository that reports no E2E check mergeable', async () => {
+		const { evaluate_pr_state: evaluate } = await import('./git-pr-checks-eval')
+		const snapshot: PrStateSnapshot = {
+			rollup: [{ name: SONAR_QUBE, status: 'pass' }],
+			merge_state_status: 'CLEAN',
+			review_decision: 'APPROVED',
+		}
+
+		expect(evaluate(snapshot)).toBe(SUCCESS)
 	})
 })

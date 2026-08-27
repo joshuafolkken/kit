@@ -42,7 +42,7 @@ function find_browser_install(job: WorkflowJob | undefined): WorkflowStep | unde
 function resolve_run_of(relative_path: string): string {
 	const resolve_job = ci_yml_fixture.find_job(relative_path, RESOLVE_JOB)
 
-	return find_step(resolve_job, (step) => step.id === RESOLVE_STEP_ID)?.run ?? ''
+	return ci_yml_fixture.step_run(ci_yml_fixture.find_step_by_id(resolve_job, RESOLVE_STEP_ID))
 }
 
 // Shared by the checks and e2e guards: both jobs install browsers on the fallback path, and the

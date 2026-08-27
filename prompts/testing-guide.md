@@ -208,19 +208,27 @@ a **defined** outcome, not an accident: a project with no E2E suite has nothing 
 read, and the run says so out loud. **A skip you did not see printed is not one** — it is an unread
 result, and it falls under the previous paragraph.
 
-**CI decides the same question by a narrower rule, and the difference is a precondition rather than
-a detail.** The `e2e-detect` job in `templates/workflows/ci.yml` enables the `e2e` job only when a
-file named `playwright.config.ts` exists **and** `find tests src/routes` turns up an
-`*.e2e.{ts,js}`; otherwise the job's `if:` is false, GitHub records it as `skipped`, and the rollup
-parser counts that as passing exactly as it does for every other conditional job. The guard's glob
-is wider — any path outside `node_modules`. So a suite kept somewhere else, or a config named
-`playwright.config.js`, reads as "no E2E" in CI while `josh test:e2e` runs it locally, and the first
-row of the table above would then close the gate on a suite nobody ran. **Keep the specs where § 1
-above already requires them — under `src/routes/**` — and keep the config at
-`playwright.config.ts`**: that placement is what makes the CI signal trustworthy, and it is the
-placement this package's conventions already enforce (`eslint/rules/test-filename.js` bans a
-top-level `tests/` directory outright, so the `tests` in CI's `find` command is a search path it
-inherits, never a placement to adopt). Narrowing the divergence itself is joshuafolkken/kit#991.
+**CI decides the same question, and now by the same rule.** The `e2e-detect` job in
+`templates/workflows/ci.yml` enables the `e2e` job when any `*.e2e.{ts,js}` exists outside
+`node_modules` — the guard's own glob, dot-directories left out the way the guard's default leaves
+them out — and it does not look at the config's filename at all (joshuafolkken/kit#991). Before
+that it required a file named exactly `playwright.config.ts` **and** an `*.e2e.{ts,js}` under `tests` or
+`src/routes`, so a suite kept anywhere else, or a config named `playwright.config.js`, read as
+"no E2E" in CI while `josh test:e2e` ran it locally: the job's `if:` went false, GitHub recorded it
+as `skipped`, the rollup parser counted the skip as passing exactly as it does for every other
+conditional job, and the first row of the table above closed the gate on a suite nobody ran.
+**Where the specs live was a precondition on the CI signal; it is now a property of the workflow.**
+The agreement is executed rather than described — `scripts/ci-yml-e2e-detect.test.ts` runs the
+workflow's own script against each layout and compares its verdict to the guard's, and asserts over
+the whole matrix that no layout containing specs can yield `enabled=false`. § 1's placement
+convention still stands on its own merits (`eslint/rules/test-filename.js` bans a top-level
+`tests/` directory outright), but the CI signal no longer depends on following it.
+
+**One difference from the guard remains, and it is deliberate and one-sided.** The guard also skips
+when `@playwright/test` is not installed, which is what keeps that optional peer optional for the
+pre-push hook; CI enables the job on the spec alone, so a spec that cannot run ends red rather than
+silently green. Enabling more than the guard costs a failed job, enabling less costs a merge — so
+the difference may widen in that direction and never narrow.
 
 ### The gate is not weakened
 
@@ -235,6 +243,19 @@ rather than left to prose:
 - **Weakening the gate is a workaround, and the workaround rules apply to it.** Filtering,
   narrowing or reinterpreting E2E output to get past it is the violation `CLAUDE.md` names under
   "Cross-package problems"; reporting the filtered result honestly does not make it compliant.
+
+**`E2E` stays off the required-check list, and that is a decision rather than an oversight**
+(joshuafolkken/kit#991). A required check is satisfied by a _skipped_ job — the rollup parser maps
+`SKIPPED` to `pass` — so requiring `E2E` would have passed on exactly the skipped job described
+above, which is the failure it looks like it would have caught. It adds nothing to the failure path
+either: a red E2E already ends the wait on the poll that sees it. What it would add is a cost —
+a repository whose CI reports no `E2E` context at all resolves the required entry to `missing`,
+which is never `pass`, so the evaluation stays `pending` until the 32-minute wait times out with
+nothing actually wrong. What guarantees the job runs is the detection rule above, not the required
+list. A project that wants it required opts in through `JOSH_REQUIRED_CHECKS`, which
+`scripts/git/git-pr-checks-eval.test.ts` covers; the decision itself — `E2E` off the default list,
+and a repository reporting no `E2E` check still mergeable — is pinned in
+`scripts/git/git-pr-checks-e2e-gate.test.ts`.
 
 **A red E2E is reported as soon as it goes red, and by name.** `E2E` is not on the required list, so
 until joshuafolkken/kit#990 nothing ended the wait when it failed: the rollup read as pending,
