@@ -10,6 +10,8 @@ const mocked_command = vi.mocked(git_gh_exec.exec_gh_command)
 const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
 
 const PLAN_JSON = '{"number":891,"state":"CLOSED"}'
+const OTHER_REPO = 'joshuafolkken/app-kit'
+const ISSUE_TITLE = 'Fix login bug'
 const RATE_LIMITED_STATUS = 429
 
 beforeEach(() => {
@@ -98,7 +100,7 @@ describe('issue_view_json_classified — which repository it probes', () => {
 		mocked_command.mockRejectedValueOnce(new Error('nope'))
 		mocked_status.mockResolvedValueOnce(NOT_FOUND_STATUS)
 
-		await git_gh_issue.issue_view_json_classified('99999', 'state', 'joshuafolkken/app-kit')
+		await git_gh_issue.issue_view_json_classified('99999', 'state', OTHER_REPO)
 
 		expect(mocked_status).toHaveBeenCalledWith('repos/joshuafolkken/app-kit/issues/99999')
 	})
@@ -146,5 +148,42 @@ describe('issue_get_plan_fields_classified', () => {
 		await git_gh_issue.issue_get_plan_fields('891')
 
 		expect(classified).toEqual(mocked_command.mock.calls[1])
+	})
+})
+
+// A notification about another repository's issue reads that repository's title. Unqualified, `gh`
+// answers with this repository's issue of the same number (joshuafolkken/kit#903).
+describe('issue_get_title — which repository it reads', () => {
+	it('reads the current repository when no repo is given', async () => {
+		mocked_command.mockResolvedValueOnce(`"${ISSUE_TITLE}"`)
+
+		await expect(git_gh_issue.issue_get_title('903')).resolves.toBe(ISSUE_TITLE)
+		expect(mocked_command).toHaveBeenCalledWith([
+			'issue',
+			'view',
+			'903',
+			'--json',
+			'title',
+			'--jq',
+			'.title',
+		])
+	})
+
+	it('reads the named repository when one is given', async () => {
+		mocked_command.mockResolvedValueOnce(`"${ISSUE_TITLE}"`)
+
+		await git_gh_issue.issue_get_title('431', OTHER_REPO)
+
+		expect(mocked_command).toHaveBeenCalledWith([
+			'issue',
+			'view',
+			'431',
+			'--repo',
+			OTHER_REPO,
+			'--json',
+			'title',
+			'--jq',
+			'.title',
+		])
 	})
 })

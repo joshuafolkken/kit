@@ -25,7 +25,6 @@ const VALID_TASK_TYPES: ReadonlyArray<TelegramTaskType> = [
 ]
 
 const DEFAULT_TASK_TYPE: TelegramTaskType = 'planning'
-const GITHUB_ISSUE_URL_PATTERN = /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/(\d+)/u
 
 function parse_task_type(raw: string | undefined): TelegramTaskType {
 	if (raw === undefined) return DEFAULT_TASK_TYPE
@@ -39,15 +38,15 @@ function parse_task_type(raw: string | undefined): TelegramTaskType {
 	return matched
 }
 
-function parse_issue_number(issue_url: string | undefined): string | undefined {
-	if (issue_url === undefined) return undefined
-	const match = GITHUB_ISSUE_URL_PATTERN.exec(issue_url)
-
-	return match?.[1]
+// A flag counts as given only when it carries text, so `--issue-title ''` is not an answer. The
+// callers that *skip* a lookup because the flag already answered it read the same predicate, or the
+// two could disagree about an empty string and leave the field blank (joshuafolkken/kit#903).
+function has_flag_value(raw: string | undefined): boolean {
+	return raw !== undefined && raw.length > 0
 }
 
 function coalesce(primary: string | undefined, fallback: string | undefined): string | undefined {
-	if (primary !== undefined && primary.length > 0) return primary
+	if (has_flag_value(primary)) return primary
 
 	return fallback
 }
@@ -72,7 +71,7 @@ function build_input(input: { values: CliValues; context: ResolvedContext }): Te
 const telegram_test_logic = {
 	build_input,
 	parse_task_type,
-	parse_issue_number,
+	has_flag_value,
 }
 
 export { telegram_test_logic }
