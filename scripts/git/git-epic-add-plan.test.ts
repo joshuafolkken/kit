@@ -234,3 +234,76 @@ describe('git_epic_add_plan.build_plan — a cross-repository epic', () => {
 		expect(error_of(plan({ body: external }))).toContain('tracks a child in another repository')
 	})
 })
+
+// joshuafolkken/kit#949: an epic whose task list has a child no chain names. `--before` on that
+// child was refused, which left a prerequisite discovered against it with nowhere to be recorded —
+// and the refusal is the same one raised for a number that is not a child at all.
+const MIXED_BODY = [
+	DEPENDENCIES_HEADING,
+	BLANK,
+	ORDERED_CHAIN,
+	BLANK,
+	PROGRESS_HEADING,
+	BLANK,
+	ROW_890,
+	ROW_891,
+	ROW_892,
+	'- [ ] #895',
+	BLANK,
+].join('\n')
+
+// #895 is tracked and carries no relation, which is what "no order constraint" looks like.
+const MIXED_CHILDREN = [...ORDERED_CHILDREN, child(895)]
+
+function mixed_plan(position: PlanInput['position']): PlanOutcome {
+	return git_epic_add_plan.build_plan({
+		epic_number: EPIC_NUMBER,
+		body: MIXED_BODY,
+		labels: ['epic'],
+		children: [894],
+		recorded: MIXED_CHILDREN,
+		position,
+	})
+}
+
+describe('git_epic_add_plan.build_plan — a child with no order yet', () => {
+	it('declares a new chain rather than refusing', () => {
+		const built = plan_of(mixed_plan({ kind: 'before', target: 895 }))
+
+		expect(built.body).toContain('#894 -> #895')
+		expect(built.added).toStrictEqual([{ blocker: 894, blocked: 895 }])
+	})
+
+	it('puts the target first for --after', () => {
+		expect(plan_of(mixed_plan({ kind: 'after', target: 895 })).body).toContain('#895 -> #894')
+	})
+
+	// The chain that was already declared belongs to somebody else's ordering decision.
+	it('leaves the existing declaration and its relations alone', () => {
+		const built = plan_of(mixed_plan({ kind: 'before', target: 895 }))
+
+		expect(built.body).toContain(ORDERED_CHAIN)
+		expect(built.removed).toStrictEqual([])
+	})
+
+	// The body has to read back as what was written, or `epic:next` reports a declaration mismatch
+	// against the relations the command just recorded.
+	it('writes a declaration that parses back to both chains', () => {
+		const built = plan_of(mixed_plan({ kind: 'before', target: 895 }))
+
+		expect(git_epic_parse.parse_dependency_chains(built.body)).toStrictEqual([
+			[890, 891, 892],
+			[894, 895],
+		])
+		expect(git_epic_parse.parse_task_list_issue_numbers(built.body)).toStrictEqual([
+			890, 891, 892, 895, 894,
+		])
+	})
+
+	// Unchanged: a number the epic does not track still cannot position an insertion.
+	it('still refuses a target that is not a child', () => {
+		expect(error_of(mixed_plan({ kind: 'before', target: 999 }))).toContain(
+			'is not a child of this epic',
+		)
+	})
+})
