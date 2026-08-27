@@ -318,3 +318,66 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		expect(content).toContain(marker)
 	})
 })
+
+// joshuafolkken/kit#964: the residency criterion decides *whether* a rule stays; this is the guard
+// on *how much* of it stays. A rule that cites a canonical section has its procedure there, so the
+// resident text is a trigger and a pointer — and a trigger that grew past this cap has had its
+// procedure pasted back beside the pointer, which is how `CLAUDE.md` reached 585 bytes of headroom
+// with the procedures already moved out.
+//
+// The cap is not a style preference. It is set just above the largest rule that legitimately needs
+// most of its text resident — the cross-package interrupt, whose every sentence changes what an
+// agent does rather than how well it understands why. Anything larger is procedure.
+const RESIDENT_RULE_CAP_BYTES = 2600
+const CANONICAL_CITATION = 'prompts/collaboration-workflow.md` →'
+// Leading whitespace is allowed: several resident rules are sub-bullets under a heading, and an
+// anchored pattern would have exempted exactly the rules that are easiest to grow unnoticed.
+const RULE_BULLET_PATTERN = /^\s*- \*\*(.+?)\*\*/u
+
+interface ResidentRule {
+	title: string
+	body: string
+}
+
+// Every `- **…**` rule in the document, wherever it sits. Scoping this to one section would leave
+// the rules in `## Git Rules` and `## Collaboration Workflow` free to grow a second copy of their
+// procedure beside the pointer — which is the regression the cap exists to stop, so the cap has to
+// see them. Each rule is a single line: prettier runs with `proseWrap: preserve` here, so the line
+// is the rule, and matching line by line also avoids materializing a match iterator, which
+// `prefer-spread` and `prefer-iterator-to-array` disagree about how to spell.
+function resident_rules(content: string): ReadonlyArray<ResidentRule> {
+	return content
+		.split('\n')
+		.map((line) => ({ line, matched: RULE_BULLET_PATTERN.exec(line) }))
+		.filter((entry) => entry.matched !== null)
+		.map((entry) => ({ title: entry.matched?.[1] ?? '', body: entry.line }))
+}
+
+describe.each(AI_DOCS)('%s — a resident rule is a trigger and a pointer', (document_path) => {
+	const rules = resident_rules(read_repo_file(document_path)).filter((rule) =>
+		rule.body.includes(CANONICAL_CITATION),
+	)
+
+	it('has rules that cite a canonical section at all', () => {
+		expect(rules.length).toBeGreaterThan(0)
+	})
+
+	it.each(rules.map((rule) => [rule.title, rule.body] as const))(
+		'%s stays a trigger rather than a second copy of its procedure',
+		(_title, body) => {
+			expect(Buffer.byteLength(body, 'utf8')).toBeLessThan(RESIDENT_RULE_CAP_BYTES)
+		},
+	)
+})
+
+describe('the workflow skill defines how much of a resident rule is resident', () => {
+	const skill = read_unwrapped(`${WORKFLOW_SKILL}/SKILL.md`)
+
+	it.each([
+		'**A resident rule is written as its trigger plus a pointer.**',
+		'The test is whether the resident text still produces correct behavior on a turn where the pointer is never opened.',
+		'**Trimming is moving, never deleting.**',
+	])('states %j', (marker) => {
+		expect(skill).toContain(marker)
+	})
+})

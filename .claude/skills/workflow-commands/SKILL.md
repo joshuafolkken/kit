@@ -87,6 +87,32 @@ routed to from `CLAUDE.md`, never restated there.
 `CLAUDE.md` is the only document this section is about. `AGENTS.md` and `GEMINI.md` hold no rules at
 all since joshuafolkken/kit#963 — they are pointers to it, so nothing can be resident in them.
 
+### The second question: how much of a resident rule is resident
+
+The criterion above decides **whether** a rule stays. It says nothing about **how much of it** stays,
+and for a long time nothing did — so a rule that passed arrived with its whole procedure attached,
+and `CLAUDE.md` grew back to within 585 bytes of its ceiling with the procedures already moved out
+(joshuafolkken/kit#964).
+
+**A resident rule is written as its trigger plus a pointer.** Two things and no third:
+
+1. **The trigger** — the situation that fires it, and the one instruction that must be obeyed before
+   anything else is read. Written so an agent that reads nothing further still does the safe thing:
+   stops, files, refuses, asks.
+2. **The pointer** — the section of `prompts/collaboration-workflow.md` or the skill file that holds
+   the procedure, named exactly enough to open without searching.
+
+Everything else — the steps, the worked examples, the rationale, the failure it was written after —
+belongs at the pointer. **The test is whether the resident text still produces correct behavior on a
+turn where the pointer is never opened.** If dropping a sentence would let an agent proceed wrongly
+rather than merely proceed less well informed, that sentence is part of the trigger. If dropping it
+only costs context, it belongs at the pointer.
+
+**Trimming is moving, never deleting.** Before a sentence leaves `CLAUDE.md` it has to exist at the
+pointer, and the marker suite that pinned it has to be re-pointed there rather than dropped. A
+canonical section that is thinner than the resident copy is the normal case, not a reason to delete
+— the resident text is then the fuller version, and it is moved in before it is cut out.
+
 **The scope of this list is every resident rule that has an on-demand counterpart** — a skill or an
 on-demand prompt carrying the procedure the resident text routes to. Those are the rules the
 criterion is *about*: each one could have moved, and stayed for a reason worth naming. Within that
