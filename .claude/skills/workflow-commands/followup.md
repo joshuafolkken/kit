@@ -49,7 +49,7 @@ pnpm josh ms
 - If the merge fails (e.g. branch protections not met, conflicts), report the reason and stop — do not retry with different flags or bypass protections.
 - **If the user wants to skip the merge step**, use `kickoff` (plan-only) or explicitly say "do not merge" / "do not auto-merge" in the same turn. In that case, pass `--no-merge` to `pnpm josh followup`. Outside a `fullrun` invocation, never run `gh pr merge` on your own.
 
-See `prompts/collaboration-workflow.md` → "Auto-merge（default for `fullrun`）" for the portable, cross-AI version of this rule.
+See `prompts/collaboration-workflow/operating-rules.md` → "Auto-merge（default for `fullrun`）" for the portable, cross-AI version of this rule.
 
 ## Completion notifications: always via `pnpm josh followup`
 

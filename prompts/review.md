@@ -214,4 +214,4 @@ Before your response (the one containing the review markdown) is sent, run this 
 
 If you are about to send a response whose final text is the `/code-review` Markdown — with sections, severity-tagged findings, and a recommendation line — and **no tool call follows**, that response is a chain-rule violation. Cancel it. Add the `pnpm josh bump minor` → `pnpm josh git -y` → `pnpm josh followup --merge` tool calls to the same response before sending.
 
-This rule mirrors the chain-rule decision table in `CLAUDE.md` / `prompts/collaboration-workflow.md`. It is repeated here because the violation point is at the moment the review skill finishes producing markdown — the rule must be visible in the skill's own context, not just in the always-loaded project docs.
+This rule mirrors the chain-rule decision table in `CLAUDE.md` / `prompts/collaboration-workflow/plan-comment.md`. It is repeated here because the violation point is at the moment the review skill finishes producing markdown — the rule must be visible in the skill's own context, not just in the always-loaded project docs.

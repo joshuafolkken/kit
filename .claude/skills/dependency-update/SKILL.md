@@ -11,7 +11,7 @@ half: what you actually run to find out whether a command already touched them, 
 one change that is expected. It applies after `pnpm update`, `josh latest`, `pnpm josh overrides`,
 a Dependabot merge, or any other command that can rewrite dependency versions.
 
-The canonical extended reference is `prompts/collaboration-workflow.md` → the overrides protection
+The canonical extended reference is `prompts/collaboration-workflow/operating-rules.md` → the overrides protection
 section; this skill is the operational procedure, and the two must agree.
 
 ## 1. Overrides live in two files — check both
