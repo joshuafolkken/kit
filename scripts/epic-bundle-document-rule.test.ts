@@ -27,6 +27,11 @@ const SURFACE_MARKERS: ReadonlyArray<string> = [
 	'The search is not limited to the open backlog',
 	'counts only when an open epic already tracks it',
 	'never folded into "no strong signal"',
+	// joshuafolkken/kit#957: reported as a gap, one non-existent number puts a warning above the
+	// verdict — and joshuafolkken/kit#950's rule then stops an unattended run over a reference that
+	// never existed. The distinction is the rule, so it is pinned like the ones around it.
+	'A number that does not exist is not a gap',
+	'told apart by HTTP status',
 ]
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
@@ -40,6 +45,8 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'**closed の参照先は、open な EPIC が既に追跡している場合にのみ候補にする。**',
 	'**読み取りの失敗も、上限で読まなかった参照も、欠落として報告し「強い信号なし」に畳み込まない**',
 	'**番号が pull request だった場合は候補にしない。**',
+	'**実在しない番号は欠落として報告しない。**',
+	'**その判別は `gh` のエラー文言ではなく HTTP ステータスコードで行う。**',
 ]
 
 // The four rows of the decision table; losing one leaves a branch nobody handles.

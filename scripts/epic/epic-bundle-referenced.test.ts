@@ -99,7 +99,7 @@ describe('epic_bundle_referenced.referenced_lookups', () => {
 describe('epic_bundle_referenced.collect_referenced', () => {
 	it('recovers the epic that tracks a closed reference', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 891, issue: fetched(891, CLOSED) }],
+			[{ number: 891, result: fetched(891, CLOSED) }],
 			context(),
 		)
 
@@ -114,7 +114,7 @@ describe('epic_bundle_referenced.collect_referenced', () => {
 	// execute, and half-done from the moment it is created.
 	it('drops a closed reference that no epic tracks', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 700, issue: fetched(700, CLOSED) }],
+			[{ number: 700, result: fetched(700, CLOSED) }],
 			context(),
 		)
 
@@ -125,7 +125,7 @@ describe('epic_bundle_referenced.collect_referenced', () => {
 	// unrelated — so it counts whether or not an epic tracks it.
 	it('keeps an open reference the listing did not carry', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 700, issue: fetched(700, OPEN) }],
+			[{ number: 700, result: fetched(700, OPEN) }],
 			context(),
 		)
 
@@ -138,7 +138,7 @@ describe('epic_bundle_referenced.collect_referenced — what it refuses to answe
 	// each one would find its own epic through this path and be told to bundle with it.
 	it('never returns an epic as a candidate', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 893, issue: fetched(893, OPEN) }],
+			[{ number: 893, result: fetched(893, OPEN) }],
 			context(),
 		)
 
@@ -149,20 +149,51 @@ describe('epic_bundle_referenced.collect_referenced — what it refuses to answe
 	// the confident wrong answer this Issue is about.
 	it('reports a failed read instead of counting it as no relation', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 891, issue: undefined }],
+			[{ number: 891, result: 'unreadable' }],
 			context(),
 		)
 
 		expect(found.unreadable).toEqual([891])
 		expect(found.issues).toEqual([])
 	})
+})
 
+describe('epic_bundle_referenced.collect_referenced — a number that does not exist', () => {
+	// joshuafolkken/kit#957: a number that resolves to nothing is not a gap. Reported as one, a single
+	// typo in prose puts a `⚠ Could not read #N.` above the verdict — and joshuafolkken/kit#950 has an
+	// unattended run stop on exactly that, for a reference that never existed.
+	it('says nothing about a reference that does not exist', () => {
+		const found = epic_bundle_referenced.collect_referenced(
+			[{ number: 99_999, result: 'missing' }],
+			context(),
+		)
+
+		expect(found.unreadable).toEqual([])
+		expect(found.issues).toEqual([])
+	})
+
+	// The two arrive through the same failed `gh issue view`, so the distinction is worth asserting
+	// together: only the one that could have been read is reported.
+	it('separates a reference that does not exist from one it could not read', () => {
+		const found = epic_bundle_referenced.collect_referenced(
+			[
+				{ number: 99_999, result: 'missing' },
+				{ number: 891, result: 'unreadable' },
+			],
+			context(),
+		)
+
+		expect(found.unreadable).toEqual([891])
+	})
+})
+
+describe('epic_bundle_referenced.collect_referenced — a number that is a pull request', () => {
 	// `gh issue view <n>` serves a pull request too, and "the fix landed in #952" is ordinary prose.
 	// A merged PR reports `state: MERGED`, which the auto-close's state reader maps to OPEN — so
 	// without the URL check the command proposes an epic with a pull request among its children.
 	it('never returns a merged pull request as a candidate', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 952, issue: fetched_pull_request(952, 'MERGED') }],
+			[{ number: 952, result: fetched_pull_request(952, 'MERGED') }],
 			context(),
 		)
 
@@ -171,7 +202,7 @@ describe('epic_bundle_referenced.collect_referenced — what it refuses to answe
 
 	it('never returns an open pull request as a candidate', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 952, issue: fetched_pull_request(952, OPEN) }],
+			[{ number: 952, result: fetched_pull_request(952, OPEN) }],
 			context(),
 		)
 
@@ -184,7 +215,7 @@ describe('epic_bundle_referenced.collect_referenced — a read that is not an op
 	// malformed answer into the candidate pool as though it had been read successfully.
 	it('does not treat an unknown state as open', () => {
 		const found = epic_bundle_referenced.collect_referenced(
-			[{ number: 700, issue: fetched(700, 'UNKNOWN') }],
+			[{ number: 700, result: fetched(700, 'UNKNOWN') }],
 			context(),
 		)
 
@@ -196,7 +227,7 @@ describe('epic_bundle_referenced.collect_referenced — a read that is not an op
 			[
 				{
 					number: 891,
-					issue: fetched(891, CLOSED, { blockedBy: { nodes: [{ number: 890 }] } }),
+					result: fetched(891, CLOSED, { blockedBy: { nodes: [{ number: 890 }] } }),
 				},
 			],
 			context(),
@@ -213,7 +244,7 @@ describe('the kit#943 shape reaches the epic it belonged to', () => {
 		const subject = issue(943, { body: SUBJECT_BODY })
 		const lookups = epic_bundle_referenced.referenced_lookups(subject, new Set()).numbers
 		const found = epic_bundle_referenced.collect_referenced(
-			lookups.map((number) => ({ number, issue: fetched(number, CLOSED) })),
+			lookups.map((number) => ({ number, result: fetched(number, CLOSED) })),
 			context(),
 		)
 		const decision = epic_bundle.decide_bundle(subject, found.issues)
