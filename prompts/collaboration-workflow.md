@@ -32,6 +32,7 @@
 | エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` は導線） | [`single-source-rules.md`](./collaboration-workflow/single-source-rules.md)             |
 | 最新優先・fix-forward（pin-back は最終手段）                                   | [`latest-first.md`](./collaboration-workflow/latest-first.md)                           |
 | 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く                     | [`durable-rules.md`](./collaboration-workflow/durable-rules.md)                         |
+| 委譲 — 機械的な工程を安価な実行単位へ回す                                      | [`delegation.md`](./collaboration-workflow/delegation.md)                               |
 | 常駐ドキュメントと skill の分担（何を常駐に残すか）                            | [`residency.md`](./collaboration-workflow/residency.md)                                 |
 | 運用ルール                                                                     | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)                     |
 
