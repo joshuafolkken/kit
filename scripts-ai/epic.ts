@@ -9,7 +9,8 @@
  */
 import { git_epic_add } from '../scripts/git/git-epic-add'
 import { git_epic_run } from '../scripts/git/git-epic-run'
-import { epic_cli } from './epic-cli'
+import { git_gh_command } from '../scripts/git/git-gh-command'
+import { epic_cli, type CrossRepoAddTarget } from './epic-cli'
 
 const ARGV_OFFSET = 2
 const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]'
@@ -38,18 +39,39 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	})
 }
 
+// A qualified target — `owner/repo#N`. Naming this repository it is the same insertion written
+// longer, so it is performed; naming another it is refused with the command to run there, because
+// this command reads and writes only the repository it runs from (joshuafolkken/kit#985).
+async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number> {
+	const local = epic_cli.resolve_local_add(found, await git_gh_command.repo_get_name_with_owner())
+
+	if (local !== undefined) return await git_epic_add.add_children(local)
+
+	console.error(epic_cli.format_cross_repo_refusal(found))
+
+	return FAILURE_EXIT_CODE
+}
+
+// Why an insertion could not be read. A qualified target is answered on its own terms; anything else
+// gets the requirements and the usage line.
+async function refuse_addition(argv: ReadonlyArray<string>): Promise<number> {
+	const qualified = epic_cli.find_cross_repo_add_target(argv)
+
+	if (qualified !== undefined) return await run_qualified_addition(qualified)
+
+	console.error(
+		`✖ An epic number, at least one child issue number, and at most one valid \`--before\` / \`--after\` target are required.\n${USAGE}`,
+	)
+
+	return FAILURE_EXIT_CODE
+}
+
 // Insertion into an existing epic. No rationale and no `--ordered`: the epic already declares both,
 // and the insertion is positioned relative to what is there rather than restating it.
 async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_add_arguments(argv)
 
-	if (parsed === undefined) {
-		console.error(
-			`✖ An epic number, at least one child issue number, and at most one valid \`--before\` / \`--after\` target are required.\n${USAGE}`,
-		)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (parsed === undefined) return await refuse_addition(argv)
 
 	return await git_epic_add.add_children({
 		epic_number: parsed.epic_number,

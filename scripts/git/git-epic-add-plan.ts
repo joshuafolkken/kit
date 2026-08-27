@@ -50,6 +50,18 @@ function missing_declaration_error(epic_number: number): string {
 	return `${to_issue_reference(epic_number)} has no machine-readable \`Dependencies\` declaration; run \`${check}\` first.`
 }
 
+// What to do about a target that is not an epic. The refusal is deliberate — this command never
+// promotes an issue on its own, because promotion rewrites someone's issue into a container and the
+// choice between promoting and creating a new epic depends on what the target *is*, which only a
+// reader of it knows (`prompts/collaboration-workflow/split-assessment.md` → promote-or-create).
+// Naming both arms is what keeps the refusal one command away from being actionable rather than a
+// dead end, which is the whole point of `into <target>` (joshuafolkken/kit#985).
+function promote_remedy(epic_number: number): string {
+	const promote = `josh epic --promote ${String(epic_number)} <N...>`
+
+	return `Promote it with \`${promote}\` when it is a request, a discussion or a container; create a new epic over both when it is itself one of the deliverables.`
+}
+
 // Whether the issue is an epic this command may edit. The label and the task list are checked
 // separately from the declaration because they fail differently: without rows there is nowhere to
 // put a new one, and without a declaration there is nothing for an insertion to be relative to.
@@ -57,7 +69,7 @@ function find_epic_shape_error(input: PlanInput, body: string): string | undefin
 	const reference = to_issue_reference(input.epic_number)
 
 	if (!input.labels.includes(EPIC_LABEL)) {
-		return `${reference} does not carry the \`${EPIC_LABEL}\` label, so it is not an epic.`
+		return `${reference} does not carry the \`${EPIC_LABEL}\` label, so it is not an epic. ${promote_remedy(input.epic_number)}`
 	}
 
 	if (git_epic_parse.has_external_task_list_entry(body)) {
