@@ -140,10 +140,17 @@ async function pr_get_state_snapshot(branch_name: string): Promise<string> {
 	])
 }
 
-async function pr_get_review_comments(branch_name: string): Promise<string> {
+// `undefined` when the listing could not be read — a failed request, or a PR whose number could not
+// be resolved. Not `'[]'`, which every failure used to become.
+//
+// The two are the same string to a caller, and the callers are the merge gate: a rate limit arrived
+// as "no reviewer left a finding" and the PR merged with the gate never actually read
+// (joshuafolkken/kit#973). The direction is what makes it worse than the epic auto-close's version of
+// the same misread — that one only failed to close something.
+async function pr_get_review_comments(branch_name: string): Promise<string | undefined> {
 	const repo_name = await git_gh_repo.repo_get_name_with_owner()
 	const pr_number = await pr_get_number(branch_name)
-	if (repo_name === undefined || pr_number === undefined) return '[]'
+	if (repo_name === undefined || pr_number === undefined) return undefined
 
 	try {
 		return await git_gh_exec.exec_gh_command([
@@ -151,11 +158,11 @@ async function pr_get_review_comments(branch_name: string): Promise<string> {
 			`repos/${repo_name}/pulls/${String(pr_number)}/comments`,
 		])
 	} catch {
-		return '[]'
+		return undefined
 	}
 }
 
-async function pr_get_comments(branch_name: string): Promise<string> {
+async function pr_get_comments(branch_name: string): Promise<string | undefined> {
 	try {
 		return await git_gh_exec.exec_gh_command([
 			'pr',
@@ -167,7 +174,7 @@ async function pr_get_comments(branch_name: string): Promise<string> {
 			'.comments',
 		])
 	} catch {
-		return '[]'
+		return undefined
 	}
 }
 

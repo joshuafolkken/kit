@@ -2,20 +2,14 @@ import { version_targets } from '#scripts/version/version-targets'
 import { git_epic_close } from './git-epic-close'
 import { git_gh_command } from './git-gh-command'
 import { git_notify, type GitNotifyConfig } from './git-notify'
-import { git_pr_ai_review, has_ignore_reason, type TelegramContext } from './git-pr-ai-review'
+import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
 import { git_pr_checks } from './git-pr-checks'
 import { is_coderabbit_check } from './git-pr-checks-eval'
 import { CHECK_STATUS_PASS, type PrStateSnapshot } from './git-pr-checks-parse'
-import { parse_json_array_safe } from './parse-json-array'
-import { pull_comment_schema } from './schemas'
+import { git_pr_coderabbit } from './git-pr-coderabbit'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
 
-// cspell:words coderabbit coderabbitai
-
-const CODERABBIT_AUTHOR = 'coderabbitai[bot]'
 const CLOSES_PATTERN = /closes\s+#\d+/iu
-const CODERABBIT_FLAG = '_⚠️ Potential issue_'
-const CODERABBIT_RESOLVED = '✅ Addressed in commit'
 const GITHUB_PULL_URL_PATTERN = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\/pull\/\d+$/u
 const REPO_NAME_SEPARATOR = '/'
 
@@ -52,12 +46,6 @@ function build_issue_url(
 	return `${match[1]}/issues/${issue_number}`
 }
 
-interface PullComment {
-	body?: string | undefined
-	html_url?: string | undefined
-	user?: { login?: string | undefined } | undefined
-}
-
 interface FollowupInput {
 	branch_name: string
 	issue_number: string | undefined
@@ -66,33 +54,6 @@ interface FollowupInput {
 	ai_review_ignore_reason: string | undefined
 	is_skip_watch: boolean
 	should_merge: boolean
-}
-
-function parse_pull_comments(raw_json: string): Array<PullComment> {
-	return parse_json_array_safe(raw_json, pull_comment_schema)
-}
-
-function read_unresolved_cr_urls(comments: ReadonlyArray<PullComment>): Array<string> {
-	return comments
-		.filter((comment) => comment.user?.login === CODERABBIT_AUTHOR)
-		.filter((comment) => (comment.body ?? '').includes(CODERABBIT_FLAG))
-		.filter((comment) => !(comment.body ?? '').includes(CODERABBIT_RESOLVED))
-		.map((comment) => comment.html_url ?? '')
-		.filter((url) => url.length > 0)
-}
-
-function build_ignore_reason_comment(reason: string, urls: ReadonlyArray<string>): string {
-	const lines = [
-		'Some CodeRabbit findings were intentionally left unresolved.',
-		`Reason: ${reason.trim()}`,
-		'Affected comments:',
-	]
-
-	for (const url of urls) {
-		lines.push(`- ${url}`)
-	}
-
-	return lines.join('\n')
 }
 
 function has_closes_keyword(body: string | undefined): boolean {
@@ -112,36 +73,6 @@ async function warn_if_missing_closes(branch_name: string): Promise<void> {
 	)
 	console.warn('   Recovery: pnpm josh pr  (or: pnpm josh git -y --skip-commit --skip-push)')
 	console.warn('')
-}
-
-function log_unresolved_coderabbit(urls: ReadonlyArray<string>): void {
-	console.warn('⚠ Unresolved CodeRabbit comments are non-blocking (temporary policy — kit#753):')
-
-	for (const url of urls) {
-		console.warn(`- ${url}`)
-	}
-}
-
-// Temporary (kit#753): unresolved CodeRabbit line comments no longer block the merge. They are
-// logged, returned as audit notes for the completion notification, and — when an ignore reason is
-// supplied — still documented on the PR. Revert together with kit#752.
-async function handle_coderabbit_findings(input: {
-	branch_name: string
-	ignore_reason: string | undefined
-}): Promise<Array<string>> {
-	const comments_json = await git_gh_command.pr_get_review_comments(input.branch_name)
-	const unresolved_urls = read_unresolved_cr_urls(parse_pull_comments(comments_json))
-	if (unresolved_urls.length === 0) return []
-
-	if (has_ignore_reason(input.ignore_reason)) {
-		const reason_comment = build_ignore_reason_comment(input.ignore_reason, unresolved_urls)
-
-		await git_gh_command.pr_comment(input.branch_name, reason_comment)
-	} else {
-		log_unresolved_coderabbit(unresolved_urls)
-	}
-
-	return unresolved_urls.map((url) => `CodeRabbit unresolved comment skipped (kit#753): ${url}`)
 }
 
 function build_notify_body(input: {
@@ -277,7 +208,7 @@ async function run_review_checks(
 		is_skip_watch: input.is_skip_watch,
 	})
 	const check_notes = read_coderabbit_skip_notes(snapshot)
-	const comment_notes = await handle_coderabbit_findings({
+	const comment_notes = await git_pr_coderabbit.handle_coderabbit_findings({
 		branch_name: input.branch_name,
 		ignore_reason: input.coderabbit_ignore_reason,
 	})

@@ -16,6 +16,8 @@ here; `halfrun` never reaches this file, because it stops before the commit.
 - If blockers exist and **no** ignore reason is supplied: `pnpm josh followup` sends a `confirmation` Telegram and exits non-zero. Fix the findings (or provide an ignore reason) and re-run.
 - If blockers exist and `--ai-review-ignore-reason "<reason>"` is supplied: the workflow posts an ignore-reason comment to the PR (mirroring the CodeRabbit ignore-reason flow) and proceeds to completion.
 - Acknowledgment-only Claude comments (`All issues resolved ✓`, `Everything else looks good`) do not match the blocker heuristics, so rounds where the AI reviewer explicitly signs off do not trigger a false positive.
+- **A comment listing that could not be read is treated exactly like a standing blocker.** A rate limit, expired auth, a dropped connection — every one of them used to arrive as an empty listing, so the gate passed without having read anything (joshuafolkken/kit#973). `confirmation` Telegram, non-zero exit, re-run once the read succeeds. `--ai-review-ignore-reason` still gets past it, because what it means is unchanged: a person has looked — and the run then carries an audit note saying the scan was bypassed.
+- **The CodeRabbit line-comment listing is the exception**: unreadable there is reported as an audit note rather than blocking, because kit#753 has CodeRabbit not blocking the merge at all. That reader also answers unreadable when the PR number itself would not resolve, which the top-level scan never has to do. Revert with kit#752.
 
 ## Config file update check (during `pnpm josh followup`)
 
