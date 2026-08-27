@@ -1107,6 +1107,8 @@ Measured on one real request: `cache_read_input_tokens` 97,190 against `input_to
 
 **The project's transcript directory is its working directory as a slug** — every character that is not a letter, digit or hyphen becomes a hyphen, so `~/Development/my_project` reads from `-Users-…-Development-my-project`. Verified against a real probe: a directory named `slug_probe.dir` produced `slug-probe-dir`.
 
+**`--over <tokens-per-request>` answers a hand-off question instead of printing a table.** It prints `over` or `under` on stdout and the measured figure on stderr, comparing the session's billed input divided by its request count against the limit. Per request rather than in total, because the total only says the session was long — the ratio says what the _next_ turn will cost, which is what a hand-off decision turns on. `epicrun` uses it after each merged child ([#968](https://github.com/joshuafolkken/kit/issues/968)); measured across one run of six children in one context, the figure went from 222k during the first child to 645k during the sixth.
+
 **Nothing is ever silently zero.** An absent transcript exits non-zero and says where it looked — for every scope, `--all` and `--issue` included; a scope with no requests attributed says so in words rather than printing a table of zeroes; a model the price table does not know is reported as unpriced and the total is labelled a floor; and lines that could not be read are counted and printed. Locally generated `<synthetic>` assistant messages are skipped — they were never sent to the API, so counting them would inflate the request count.
 
 ### `josh eval`

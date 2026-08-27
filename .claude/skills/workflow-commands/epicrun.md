@@ -205,13 +205,74 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
 2. **A number** — run that child as `fullrun #<N>` does, through the verification gate and the
    merge, **except that `josh latest` is not run** — it runs once, before this session's first
    child, and not again (above).
-   `git switch main && git pull` still runs, per child. Then go back to step 1.
+   `git switch main && git pull` still runs, per child. Then **ask whether to hand off** —
+   `pnpm josh cost --over 400000`, immediately after the merge and `pnpm josh ms` — and go back to
+   step 1 on `under`, or finish the session on `over` (see "The hand-off" below).
 3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
    repository has work but this one does not", which is a wait from here.
 4. **`stop`** — report the parked children and finish.
 5. **`complete`** — post the epic summary and finish.
 6. **Exit code 1** — `epic:next` refused a cyclic or contradictory graph, or could not read a child.
    Report and finish.
+
+## The hand-off — one session does not have to run the whole epic
+
+**A session pays for every child it has already run, on every later turn.** What a turn costs is
+decided by the accumulated preamble, not by what the turn does: measured across one `epicrun` that
+ran six children in one context, the billed input was 222k per request during the first child and
+645k during the sixth — the same work at 2.9x the price (joshuafolkken/kit#968). The growth is not
+linear in the number of children; the k-th child re-reads the wreckage of the k-1 before it on every
+turn.
+
+**So the run hands off when the marginal cost crosses a line, and the line is read, not felt.**
+
+```bash
+pnpm josh cost --over 400000
+```
+
+It prints `over` or `under` on standard output and the measured figure on standard error. `over`
+means the next turn of this session costs more than the threshold in billed input; the threshold is
+the same number the epic's own measurement produced, and it is passed explicitly so a run cannot
+drift it by remembering it wrong.
+
+`over` and `under` are not the only answers: the command also **exits 1 with empty standard output** when there is no transcript, or no request in it. **Neither is `under`.** Reading "could not measure" as "still cheap" is the same mistake as reading an unreadable comment listing as "no findings" — report that the check could not answer, and hand off at that child.
+
+
+### When to ask, and what to do
+
+**Ask once per child, immediately after its merge and `pnpm josh ms`** — never mid-child. That
+moment is the only one where nothing is in flight: the PR is merged, the working tree is on the
+default branch and clean, and the epic's state on GitHub is complete. A hand-off taken anywhere else
+would have to carry work that is not written down yet.
+
+- **`under`** — go back to step 1 of the loop and run the next child.
+- **`over`** — finish the session. Post the epic progress comment naming what merged and what
+  remains, send the completion notification with the resume command in its body, and stop with:
+
+  > Please run `epicrun #<E>` to continue this epic in a fresh session.
+
+**This is not a failure and not a park.** No child needs a decision; the run is simply cheaper to
+continue elsewhere. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.
+
+### What carries over, and where it lives
+
+**Nothing is carried in the conversation.** Everything the next session needs it reads back:
+
+| What the next session needs | Where it reads it |
+| --- | --- |
+| Which children remain, and which is runnable | `pnpm josh epic:next <E>` |
+| The order and the dependencies | the epic body |
+| What each remaining child is | the child Issue body |
+| What already merged | the epic's task list, and the closed children |
+
+That is the same state a resumed run has always used (joshuafolkken/kit#861), which is why the
+hand-off needs no new mechanism — it makes deliberate what an interrupted run already did by
+accident. **A planned hand-off is strictly more certain than an interruption**: an interruption can
+land mid-child with a dirty tree and a stale `in-progress` label, and this cannot, because it is
+only ever taken when a child has just closed.
+
+**A resumed session is a new session**, so it runs `josh latest` once before its first child, exactly
+as the rule above says.
 
 ## park and continue
 
@@ -382,5 +443,8 @@ end naming what was merged, what was parked and why, and what was filed.
 3. `epic:next` reports `error` — a cyclic or contradictory graph.
 4. A guard above was reached.
 5. A timeout above elapsed.
+6. `pnpm josh cost --over 400000` answered `over` just after a child merged — the run is cheaper to
+   continue in a fresh session, and the resume command is in the report. This is the one stopping
+   condition that is not a problem: nothing is parked, nothing is filed, and the epic is unchanged.
 
 **A child that needs a decision is not on this list.** It is parked, and the run continues.
