@@ -117,7 +117,14 @@ async function run_selection(chosen: ReadonlyArray<Scenario>): Promise<boolean> 
 
 	console.info(`Running ${String(chosen.length)} scenario(s) on ${model}.\n`)
 
-	return eval_report.report_summary(await run_all(chosen, model))
+	const verdicts = await run_all(chosen, model)
+	// The count first, then what it means for a merge: the verdict line is what `josh eval:scope`
+	// sent the run here for, so it is the last thing printed rather than something to scroll back to.
+	const is_held = eval_report.report_summary(verdicts)
+
+	eval_report.report_merge_verdict(verdicts)
+
+	return is_held
 }
 
 async function main(): Promise<boolean> {
@@ -127,6 +134,10 @@ async function main(): Promise<boolean> {
 
 	if (unknown !== undefined) {
 		console.error(unknown)
+		// Not silence: without a verdict line the caller's rule reads this as `unmeasured`, which does
+		// not block a merge — and this path is reached by a typo in the very re-run a `blocked`
+		// verdict asked for (joshuafolkken/kit#907).
+		eval_report.report_not_run()
 
 		return false
 	}

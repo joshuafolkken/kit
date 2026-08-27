@@ -89,6 +89,7 @@ const ALIASES: Record<string, string> = {
 	rl: 'review:level',
 	dg: 'delegate',
 	ev: 'eval',
+	es: 'eval:scope',
 }
 
 export type { CommandCategory, CommandEntry } from './josh-command-types'

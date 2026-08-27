@@ -75,21 +75,40 @@ async function diff_main(file_path: string): Promise<string> {
 // Names only, for callers that classify a change rather than read it — `josh review:level` decides
 // the review depth from the paths alone, and reading the whole diff to get them would be the
 // expensive half of the thing it exists to make cheaper (joshuafolkken/kit#966).
+//
+// `core.quotePath=false` is not cosmetic. With git's default, a path containing any non-ASCII byte
+// comes back C-quoted — `"prompts/\343\202\263.md"` — and a classifier testing `startsWith('prompts/')`
+// against a string that begins with a quote character answers no. `review:level` fails safe there
+// (non-inert wins), but `josh eval:scope` would answer `skip` for a change it is meant to measure,
+// so the quoting is turned off at the source all three readers share (joshuafolkken/kit#907).
+const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
+
 async function diff_main_names(): Promise<string> {
 	const default_branch = await get_default_branch()
 
-	return await exec_git_command_read(['diff', NAME_ONLY_FLAG, default_branch, '--'])
+	return await exec_git_command_read([
+		...NO_PATH_QUOTING,
+		'diff',
+		NAME_ONLY_FLAG,
+		default_branch,
+		'--',
+	])
 }
 
 async function diff_cached_names(): Promise<string> {
-	return await exec_git_command_read(['diff', '--cached', NAME_ONLY_FLAG])
+	return await exec_git_command_read([...NO_PATH_QUOTING, 'diff', '--cached', NAME_ONLY_FLAG])
 }
 
 // Files git is not tracking yet. `git diff` never lists them, so a classifier built on the diff
 // alone sees a change that adds a whole new module as an empty one — which is how a run adding new
 // code could have been handed a reduced review level (joshuafolkken/kit#966).
 async function untracked_names(): Promise<string> {
-	return await exec_git_command_read(['ls-files', '--others', '--exclude-standard'])
+	return await exec_git_command_read([
+		...NO_PATH_QUOTING,
+		'ls-files',
+		'--others',
+		'--exclude-standard',
+	])
 }
 
 async function checkout_b(branch_name: string): Promise<string> {

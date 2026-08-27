@@ -396,9 +396,13 @@ function strip_managed_postinstall(content: string): string {
 	)
 }
 
+// A span containing `*` is excluded: it is a **glob**, not a reference to a file a consumer can
+// open. `josh eval:scope`'s trigger set is written `prompts/**` in the distributed documents, and
+// rewriting it to `node_modules/@joshuafolkken/kit/prompts/**` would print a path that can never
+// appear in a consumer's diff and is not what the command matches (joshuafolkken/kit#907).
 function transform_prompt_paths(content: string): string {
 	return content.replaceAll(
-		/`prompts\/([^`]+)`/gu,
+		/`prompts\/([^`*]+)`/gu,
 		(_match, prompt_path: string) => `\`${PROMPTS_PACKAGE_PREFIX}${prompt_path}\``,
 	)
 }

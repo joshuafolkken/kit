@@ -20,11 +20,88 @@ JOSH_EVAL_MODEL=opus pnpm josh eval  # a different model (default: sonnet)
 ```
 
 Each scenario is a real Claude session, so a full run costs tokens and takes minutes. It is
-**deliberately not part of CI**: run it when you change a distributed document, a skill or a hook —
-the moment its answer is worth paying for.
+**deliberately not part of CI**: it runs when a distributed document, a skill or a hook changes — the
+moment its answer is worth paying for. **Which change that is, is decided by a command rather than by
+eye** (see "When it runs" below).
 
 It needs the `claude` CLI on `PATH` and an authenticated account. Exit code is `0` only when every
 scenario held.
+
+## When it runs
+
+Until [joshuafolkken/kit#907](https://github.com/joshuafolkken/kit/issues/907) the paragraph above was
+the whole rule — a sentence in a document, in no completion gate and no verification gate. So a pull
+request that rewrote one rule and regressed another had no detection path, and the suite went unpaid
+for. The trigger is now a command:
+
+```bash
+pnpm josh eval:scope            # → required | skip ; the reason on stderr
+pnpm josh eval:scope --staged   # about the staged diff
+```
+
+**The input is the set of changed paths and nothing else.** "This edit is only wording" is a judgement
+made under cost pressure, and cost pressure resolves it toward `skip` exactly when a regression is
+most likely to ship — the same reason `josh review:level` took the review level out of an agent's
+hands. The trigger set is derived from what the sandbox copies rather than restated, so it cannot
+drift from what a scenario can see: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/skills/**`,
+`prompts/**`, `.claude/settings.json`. One measured path decides the whole change; an empty path list
+answers `required`, because `skip` there would hand a caller that failed to read the diff the same
+answer as one that measured; and the harness and the scenarios themselves do not fire it — changing
+the ruler is not changing what it measures.
+
+One entry is coarser than what the suite can see. `.claude/settings.json` is copied through a filter
+that drops every hook invoking `pnpm` / `npm` / `yarn` / `npx` / `josh` ("Where a run happens" below),
+so a change to only such a hook answers `required` and no scenario observes it. That is reported
+rather than read as a measurement; narrowing the trigger would mean parsing the diff, which is the
+judgement the command exists to remove.
+
+**Where it sits:** after `/code-review` has converged and before `pnpm josh bump minor`, and **never
+inside `pnpm josh gate`** — the gate re-runs on every fix round and on every `epicrun` child, and the
+review rewrites the very prose being measured.
+
+**The cost ceiling is on how often, not how many.** Every scenario runs, once per Issue. Selecting
+"the scenarios related to the change" is not available: a scenario declares the _rule_ it measures,
+never the _file_ the agent will read, and the `n/m` line is the unit of comparison — a subset's `n/m`
+cannot be compared against the whole suite's.
+
+**What a result does** is the last line of the run, because the exit code cannot carry it: `0` only
+when every scenario passed, so a failed run and one that measured nothing exit alike.
+
+| Verdict      | Meaning                                  | The merge                                                                    |
+| ------------ | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `held`       | every scenario held                      | continue                                                                     |
+| `blocked`    | a scenario failed — a measured violation | **stops the merge** — fix the prose its `→` line names, re-run that scenario |
+| `unmeasured` | a scenario produced no measurement (`?`) | does not block, and is stated in the completion report                       |
+
+**A `blocked` verdict is attributed before it blocks.** The suite measures the whole distribution
+rather than the diff, so a red scenario may predate the change — which is why the unit is a pair of
+readings. Re-run that one scenario against the pre-change documents (`git stash push -u`, then
+`pnpm josh eval <name>`, then `git stash pop`): red before _and_ after is a standing failure, filed as
+its own Issue and not a reason to hold the change; green before and red after is this change's
+regression, fixed in at most two rounds for the reason `prompts/review.md` caps review rounds. Still
+red after the second, the change is not ready and a person decides. An `unmeasured` one
+says nothing about the rules — a run of inconclusive verdicts is a statement about the shared budget
+(see "How a scenario is judged") — and a run that printed no verdict line at all, an absent `claude`
+CLI included, is `unmeasured` too. **A run nobody saw hold is never reported as green.**
+
+Two things that look like `unmeasured` and are not. An invocation the suite could not act on — a
+mistyped scenario name in the very re-run a `blocked` verdict asked for — prints `blocked`, because
+you asked for a measurement and have none. And **the exit code is not the verdict**: an `unmeasured`
+run exits non-zero exactly as a `blocked` one does, so `josh eval && …` or a `set -e` script turns an
+upstream budget outage into a stopped run.
+
+**In a consumer project the two halves are different trees.** The trigger reads the consumer's own
+changed paths; the sandbox copies the documents from the installed `@joshuafolkken/kit`. A committed
+`josh sync` answers `required` and measures the distribution that sync just installed, which is right
+— a consumer never edits a distributed document locally, so a red scenario there is an upstream Issue
+in kit rather than a local fix. A consumer's own project-local skill is outside what the suite can
+see at all.
+
+**An epic's completion does not run it a second time.** Because each child that touched the
+distribution ran every scenario and blocked on a failure, the gradual degradation an end-of-epic run
+would look for has already been measured; the full reasoning, and the answer to "an unattended run has
+no other instrument for output quality", is in
+`prompts/collaboration-workflow/eval-gate.md`.
 
 ## Reading the output
 
@@ -38,9 +115,11 @@ Running 5 scenario(s) on sonnet.
       calls: Read → Read → Bash
 
 4/5 scenarios held.
+Verdict: blocked — a scenario failed; fix the rule its → line names before merging
 ```
 
-A failure names three things: the expectation that broke, the sentence explaining **why that call was
+The last line is what a run means for a merge, in one token — `held`, `blocked` or `unmeasured`
+("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
 the evidence**, and the calls the run actually made. The `→` line is the one to act on — it points at
 the rule, so a red scenario tells you which prose to change rather than only that something went
 wrong.

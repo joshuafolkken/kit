@@ -9,9 +9,14 @@ const execa_mock = vi.hoisted(() => {
 		stdout: '',
 		fail_plain_push: false as boolean,
 		plain_push_exit_code: UPSTREAM_NOT_SET,
+		// What the last call actually passed, for the assertions that care about the arguments rather
+		// than the output.
+		last_arguments: [] as Array<string>,
 	}
 
 	async function mock_execa(_cmd: string, arguments_: Array<string>): Promise<{ stdout: string }> {
+		state.last_arguments = [...arguments_]
+
 		const is_bare_push = arguments_[0] === 'push' && !arguments_.includes('--set-upstream')
 
 		if (is_bare_push && state.fail_plain_push) {
@@ -42,6 +47,26 @@ beforeEach(() => {
 	execa_mock.state.stdout = ''
 	execa_mock.state.fail_plain_push = false
 	execa_mock.state.plain_push_exit_code = UPSTREAM_NOT_SET_EXIT_CODE
+	execa_mock.state.last_arguments = []
+})
+
+// joshuafolkken/kit#907: with git's default quoting, a path containing a non-ASCII byte comes back
+// C-quoted, and a classifier matching a path prefix answers no for a file it should have matched.
+// `josh eval:scope` fails toward `skip` there — a change it exists to measure would go unmeasured.
+describe('the path listings turn git path quoting off', () => {
+	it.each(['diff_main_names', 'diff_cached_names', 'untracked_names'] as const)(
+		'%s asks git for unquoted paths',
+		async (name) => {
+			const { git_command } = await import('./git-command')
+
+			await git_command[name]()
+
+			expect(execa_mock.state.last_arguments.slice(0, 2)).toStrictEqual([
+				'-c',
+				'core.quotePath=false',
+			])
+		},
+	)
 })
 
 describe('git_command.diff_cached', () => {

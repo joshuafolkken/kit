@@ -49,11 +49,13 @@ describe.each(AI_DOCS)(
 			expect(unwrapped).toContain(marker)
 		})
 
-		// Step 5 is where the instruction lived. A rule rewritten above while the numbered step still
-		// says "ask the user" would read as two rules, and the numbered list is the one a gate run
-		// follows top to bottom.
+		// The numbered step is where the instruction lived. A rule rewritten above while the numbered
+		// step still says "ask the user" would read as two rules, and the numbered list is the one a
+		// gate run follows top to bottom. The number itself moved when the rule-compliance
+		// measurement was inserted ahead of it (joshuafolkken/kit#907), so the marker is the step's
+		// text rather than its position.
 		it('leaves no human run in the numbered step', () => {
-			expect(unwrapped).toContain('5. **E2E** — closed without the user')
+			expect(unwrapped).toMatch(/\d{1,2}\. \*\*E2E\*\* — closed without the user/u)
 		})
 	},
 )

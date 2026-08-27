@@ -67,6 +67,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',
 		category: 'AI tools',
 	},
+	'eval:scope': {
+		script: 'scripts/eval/eval-trigger-cli.ts',
+		description: 'Say whether this change has to be measured by josh eval',
+		category: 'AI tools',
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
