@@ -27,11 +27,11 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "echo 'MANDATORY: Before writing any implementation code, present a two-layer work summary in the session language. First a plain-language overview of exactly 3 sentences (Now / Change / Check) that a non-programmer can follow — no file paths, function or type names, or CLI option flags. Name the concrete subject in each line (which package, which screen, which output); subject-less prose like \"the situation\" or \"the suggestion\" is not acceptable — only internal identifiers are banned, not names the reader sees on screen. Then a Details block (target files/modules, approach and why, side effects / out of scope) and every change with its test (see Code Change Rules Step 0 in CLAUDE.md). Completion reports use the same two layers: Cause / Fix / Result first, technical detail below. Write the summary as ordinary markdown — bold labels and list items, never wrapped in a code fence. The summary is required in fullrun/halfrun/queue even when the Issue body was already filled, and it is presentation only — never a confirmation stop. Tests are required for ALL changes — including bug fixes, timing fixes, and refactors. Zero tests without explicit user approval is a policy violation.'"
+						"command": "echo 'MANDATORY before writing any implementation code: present the two-layer work summary in the session language — 3 plain sentences (Now / Change / Check) a non-programmer can follow. Name the concrete subject in each line — subject-less prose is not acceptable; no file paths, function or type names, or CLI option flags — only internal identifiers are banned, not names the reader sees on screen. Then Details, then every change with its test. Ordinary markdown, never wrapped in a code fence. Required in fullrun/halfrun/queue even when the Issue body was filled; presentation only, never a confirmation stop. Completion reports lead with Cause / Fix / Result. Tests are required for ALL changes; zero tests without explicit approval is a violation. Full rule: Code Change Rules Step 0 in CLAUDE.md.'"
 					},
 					{
 						"type": "command",
-						"command": "echo 'Deleting a git-tracked file is reversible (recoverable via git restore), so it is NOT a Tier C irreversible action — do not ask for confirmation on reversibility grounds alone. Still inspect the target first and surface anything that contradicts the task before deleting.'"
+						"command": "echo 'Deleting a git-tracked file is reversible, so it is NOT Tier C — do not ask for confirmation on reversibility grounds. Still inspect the target first and surface anything that contradicts the task.'"
 					}
 				]
 			}

@@ -16,6 +16,12 @@ const NODE_MODULES = 'node_modules'
 // the two suites behave symmetrically while still running vitest once both are present.
 type GuardAction = 'run' | 'skip-missing-package' | 'skip-no-tests'
 
+// The word the gate looks for to know a passing step did not actually run. Exported and reused on
+// both sides rather than matched by eye: joshuafolkken/kit#967 stopped printing a passing check's
+// body, and without this a gate that skipped the whole unit suite printed the same five lines as one
+// that ran it.
+const SKIP_MARKER = '— skipping'
+
 const SKIP_REASONS: Record<Exclude<GuardAction, 'run'>, string> = {
 	'skip-missing-package': 'vitest is not installed',
 	'skip-no-tests': 'no *.{test,spec}.{ts,js} test files found',
@@ -63,7 +69,7 @@ async function run_guarded_unit(
 	const action = resolve_guard_action(is_installed, has_tests)
 	if (action === 'run') return await run_vitest(extra_arguments)
 
-	console.info(`josh test:unit: ${SKIP_REASONS[action]} — skipping vitest unit tests.`)
+	console.info(`josh test:unit: ${SKIP_REASONS[action]} ${SKIP_MARKER} vitest unit tests.`)
 
 	return 0
 }
@@ -76,6 +82,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 const test_unit_guard = {
+	SKIP_MARKER,
 	resolve_guard_action,
 	is_vitest_installed,
 	has_unit_tests,
