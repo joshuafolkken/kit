@@ -1,47 +1,7 @@
 import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec } from './git-gh-exec'
-import { git_gh_helpers } from './git-gh-helpers'
+import { git_gh_issue_read } from './git-gh-issue-read'
 
 const NUMBER_AND_BODY_FIELDS = 'number,body'
-
-async function issue_get_title(issue_number: string): Promise<string | undefined> {
-	try {
-		const result: string = await git_gh_exec.exec_gh_command([
-			'issue',
-			'view',
-			issue_number,
-			'--json',
-			'title',
-			'--jq',
-			'.title',
-		])
-
-		return git_gh_helpers.parse_pr_state_string(result)
-	} catch {
-		return undefined
-	}
-}
-
-// `repo` reads an issue in another repository — the form a cross-repository epic is referenced in
-// (joshuafolkken/kit#864). Without it a qualified reference would read *this* repository's issue of
-// that number, a different issue entirely.
-async function issue_get_body(issue_number: string, repo?: string): Promise<string | undefined> {
-	const scope = repo === undefined ? [] : ['--repo', repo]
-
-	try {
-		return await git_gh_exec.exec_gh_command([
-			'issue',
-			'view',
-			issue_number,
-			...scope,
-			'--json',
-			'body',
-			'--jq',
-			'.body',
-		])
-	} catch {
-		return undefined
-	}
-}
 
 async function issue_edit_body(issue_number: string, body: string): Promise<string> {
 	return await git_gh_exec.exec_gh_command_with_stdin({
@@ -109,55 +69,6 @@ async function issue_list_by_label(label: string, limit: number): Promise<string
 		limit,
 		filter_arguments: ['--label', label],
 	})
-}
-
-// One `gh issue view --json <fields>`, for every caller that wants a JSON view of one issue. Callers
-// differ only in which fields they ask for, and a helper per field list is how four near-identical
-// functions accumulated (joshuafolkken/kit#862).
-async function issue_view_json(
-	issue_number: string,
-	fields: string,
-	repo?: string,
-): Promise<string | undefined> {
-	const scope = repo === undefined ? [] : ['--repo', repo]
-
-	try {
-		return await git_gh_exec.exec_gh_command([
-			'issue',
-			'view',
-			issue_number,
-			...scope,
-			'--json',
-			fields,
-		])
-	} catch {
-		return undefined
-	}
-}
-
-// State, labels and dependency relations in one read: the epic auto-close needs state and relations
-// per child, `epic:next` needs the labels too, and splitting them would multiply the API calls for
-// no gain (joshuafolkken/kit#860).
-//
-// `repo` reads a child in another repository. Cross-repository children are read this way rather
-// than from a local checkout: their state is a GitHub fact, and requiring a clone to learn it is
-// what kept the auto-close from ever running on such an epic (joshuafolkken/kit#864).
-async function issue_get_state_and_relations(
-	issue_number: string,
-	repo?: string,
-): Promise<string | undefined> {
-	return await issue_view_json(issue_number, 'number,state,labels,blockedBy', repo)
-}
-
-// Everything `epic:plan` puts in front of the batch decision. Read separately from the poll above
-// because it carries the bodies, which a `wait` poll never looks at.
-//
-// `epic:bundle` reads a referenced issue through the same call rather than adding a helper for its
-// own field list — it needs the body and the state, which is a subset of this one, and a helper per
-// field list is exactly how the four near-identical functions above accumulated
-// (joshuafolkken/kit#947).
-async function issue_get_plan_fields(issue_number: string): Promise<string | undefined> {
-	return await issue_view_json(issue_number, 'number,title,body,state,url,labels,blockedBy')
 }
 
 // `gh issue close` takes the comment as a plain string flag — unlike create/comment it has no
@@ -263,28 +174,19 @@ async function issue_remove_blocked_by(issue_number: string, blocker: string): P
 	}
 }
 
-async function issue_get_labels_and_body(issue_number: string): Promise<string | undefined> {
-	return await issue_view_json(issue_number, 'number,labels,body')
-}
-
 const git_gh_issue = {
+	...git_gh_issue_read,
 	label_ensure,
 	issue_create_with_label,
 	issue_add_blocked_by,
 	issue_remove_blocked_by,
 	issue_add_label,
-	issue_get_labels_and_body,
-	issue_get_title,
-	issue_get_body,
 	issue_edit_body,
 	issue_comment,
 	issue_list_recent,
 	issue_list_by_label,
 	issue_search_body,
 	issue_list_open_bodies,
-	issue_view_json,
-	issue_get_state_and_relations,
-	issue_get_plan_fields,
 	issue_close,
 }
 

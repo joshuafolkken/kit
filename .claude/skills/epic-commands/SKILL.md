@@ -153,6 +153,17 @@ A read that fails — and a reference the per-issue cap never reached — is rep
 folded into "no strong signal". A number that answers with a **pull request** is not a candidate at
 all: `gh issue view` serves one too, and a merged PR does not report `CLOSED`.
 
+**A number that does not exist is not a gap.** A typo, or another repository's number quoted in
+prose, is dropped in silence — neither a candidate nor something the command reports it could not
+read. Reported as a gap it puts `⚠ Could not read #N.` above the verdict, and the rule below stops an
+unattended run on exactly that, for a reference that never existed (joshuafolkken/kit#957). **The two
+are told apart by HTTP status, never by `gh`'s wording**: 404 is nothing at that number, 403 and 429
+are a rate limit. GitHub answers 404 for an issue the token may not see as well, so as not to leak
+its existence — which does not reach this command, because it probes the repository whose open issues
+it has just listed. The probe costs one REST request and runs **only** when a read has already
+failed, and only on the path that needs the distinction: the backlog's own relation reads, up to two
+hundred of them, never pay it.
+
 | Candidates | Do | Tier |
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |

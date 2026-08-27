@@ -83,9 +83,17 @@ function is_usable_candidate(issue: BacklogIssue, read: EpicIssue): boolean {
 	return epic_issue.is_open(read.state) || issue.epic !== undefined
 }
 
+// How one referenced number came back. `missing` is GitHub resolving it to nothing — a typo, or a
+// number belonging to another repository quoted in prose — which is an answer, not a gap: there is
+// no candidate and nothing was lost. `unreadable` is the gap, and it is the only one reported
+// (joshuafolkken/kit#957).
 interface ReferencedRead {
 	number: number
-	issue: EpicIssue | undefined
+	result: EpicIssue | 'missing' | 'unreadable'
+}
+
+function is_failed_read(result: ReferencedRead['result']): result is 'missing' | 'unreadable' {
+	return typeof result === 'string'
 }
 
 interface ReferencedResult {
@@ -93,7 +101,8 @@ interface ReferencedResult {
 	issues: Array<BacklogIssue>
 	// The ones whose read failed, and the ones the cap never reached. Both are gaps rather than
 	// answers: folded into "no relation found" they become the confident wrong verdict this whole
-	// module exists to remove.
+	// module exists to remove. A number that resolves to nothing is **not** here — reporting it as a
+	// gap stops an unattended run over a reference that never existed (joshuafolkken/kit#957).
 	unreadable: Array<number>
 }
 
@@ -102,10 +111,10 @@ function usable_candidates(
 	context: ReferencedContext,
 ): Array<BacklogIssue> {
 	return reads.flatMap((read) => {
-		if (read.issue === undefined) return []
-		const candidate = to_backlog_issue(read.issue, context)
+		if (is_failed_read(read.result)) return []
+		const candidate = to_backlog_issue(read.result, context)
 
-		return is_usable_candidate(candidate, read.issue) ? [candidate] : []
+		return is_usable_candidate(candidate, read.result) ? [candidate] : []
 	})
 }
 
@@ -115,7 +124,7 @@ function collect_referenced(
 ): ReferencedResult {
 	return {
 		issues: usable_candidates(reads, context),
-		unreadable: reads.filter((read) => read.issue === undefined).map((read) => read.number),
+		unreadable: reads.filter((read) => read.result === 'unreadable').map((read) => read.number),
 	}
 }
 
@@ -124,11 +133,14 @@ function collect_referenced(
 // refused read arrives as an absence rather than as an error.
 const LOOKUP_CONCURRENCY = 8
 
+// A read that came back shaped wrong counts as unreadable, not as missing: the number resolved to
+// something, so the gap is in what arrived rather than in whether there was anything to arrive.
 async function read_one(number: number): Promise<ReferencedRead> {
-	return {
-		number,
-		issue: epic_issue.parse_epic_issue(await git_gh_command.issue_get_plan_fields(String(number))),
-	}
+	const read = await git_gh_command.issue_get_plan_fields_classified(String(number))
+
+	if (read.kind !== 'read') return { number, result: read.kind }
+
+	return { number, result: epic_issue.parse_epic_issue(read.json) ?? 'unreadable' }
 }
 
 async function fetch_referenced(numbers: ReadonlyArray<number>): Promise<Array<ReferencedRead>> {
@@ -161,6 +173,7 @@ const epic_bundle_referenced = {
 	REFERENCED_LOOKUP_LIMIT,
 	LOOKUP_CONCURRENCY,
 	referenced_lookups,
+	is_failed_read,
 	to_backlog_issue,
 	is_usable_candidate,
 	collect_referenced,
