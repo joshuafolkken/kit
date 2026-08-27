@@ -1,27 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { evaluate_pr_state, read_required_statuses, REQUIRED_CHECKS } from './git-pr-checks-eval'
-import {
-	parse_pr_state_snapshot,
-	type PrStateSnapshot,
-	type RollupCheck,
-} from './git-pr-checks-parse'
+import { CODE_RABBIT, make_pr_snapshot, PASSING_ROLLUP, SONAR_QUBE } from './git-pr-checks-fixture'
+import { parse_pr_state_snapshot, type RollupCheck } from './git-pr-checks-parse'
 
-const CODE_RABBIT = 'CodeRabbit'
-const SONAR_QUBE = 'SonarQube'
-
-const PASSING_ROLLUP: ReadonlyArray<RollupCheck> = [
-	{ name: CODE_RABBIT, status: 'pass' },
-	{ name: SONAR_QUBE, status: 'pass' },
-]
-
-function make_snapshot(overrides: Partial<PrStateSnapshot> = {}): PrStateSnapshot {
-	return {
-		rollup: [...PASSING_ROLLUP],
-		merge_state_status: 'CLEAN',
-		review_decision: 'APPROVED',
-		...overrides,
-	}
-}
+const LIGHTHOUSE = 'Lighthouse'
 
 describe('REQUIRED_CHECKS', () => {
 	it('excludes CodeRabbit while the temporary kit#753 policy is active', () => {
@@ -58,7 +40,7 @@ describe('read_required_statuses', () => {
 	})
 
 	it('ignores non-required checks', () => {
-		const checks: Array<RollupCheck> = [...PASSING_ROLLUP, { name: 'Lighthouse', status: 'fail' }]
+		const checks: Array<RollupCheck> = [...PASSING_ROLLUP, { name: LIGHTHOUSE, status: 'fail' }]
 		const statuses = read_required_statuses(checks)
 
 		expect(statuses.every((status) => status === 'pass')).toBe(true)
@@ -83,19 +65,19 @@ describe('read_required_statuses — check-suite prefix matching', () => {
 
 describe('evaluate_pr_state — success', () => {
 	it('returns success when CLEAN and all required checks pass', () => {
-		expect(evaluate_pr_state(make_snapshot())).toBe('success')
+		expect(evaluate_pr_state(make_pr_snapshot())).toBe('success')
 	})
 
 	it('returns success when non-required check is pending', () => {
-		const snapshot = make_snapshot({
-			rollup: [...PASSING_ROLLUP, { name: 'Lighthouse', status: 'pending' }],
+		const snapshot = make_pr_snapshot({
+			rollup: [...PASSING_ROLLUP, { name: LIGHTHOUSE, status: 'pending' }],
 		})
 
 		expect(evaluate_pr_state(snapshot)).toBe('success')
 	})
 
 	it('returns success when SonarQube is present only as its renamed suite job', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [{ name: `${SONAR_QUBE} / Gate`, status: 'pass' }],
 		})
 
@@ -105,7 +87,7 @@ describe('evaluate_pr_state — success', () => {
 
 describe('evaluate_pr_state — temporary CodeRabbit skip (kit#753)', () => {
 	it('returns success when UNSTABLE is caused only by a pending CodeRabbit check', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			merge_state_status: 'UNSTABLE',
 			rollup: [
 				{ name: CODE_RABBIT, status: 'pending' },
@@ -117,7 +99,7 @@ describe('evaluate_pr_state — temporary CodeRabbit skip (kit#753)', () => {
 	})
 
 	it('returns success when UNSTABLE is caused only by a failing CodeRabbit suite job', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			merge_state_status: 'UNSTABLE',
 			rollup: [
 				{ name: `${CODE_RABBIT} / Review`, status: 'fail' },
@@ -130,21 +112,17 @@ describe('evaluate_pr_state — temporary CodeRabbit skip (kit#753)', () => {
 })
 
 describe('evaluate_pr_state — UNSTABLE not attributable to CodeRabbit', () => {
-	it('returns pending when UNSTABLE involves a non-CodeRabbit check', () => {
-		const snapshot = make_snapshot({
-			merge_state_status: 'UNSTABLE',
-			rollup: [
-				{ name: CODE_RABBIT, status: 'pending' },
-				{ name: 'Lighthouse', status: 'fail' },
-				{ name: SONAR_QUBE, status: 'pass' },
-			],
-		})
+	it('returns pending when UNSTABLE has no non-passing checks to attribute', () => {
+		const snapshot = make_pr_snapshot({ merge_state_status: 'UNSTABLE' })
 
 		expect(evaluate_pr_state(snapshot)).toBe('pending')
 	})
 
-	it('returns pending when UNSTABLE has no non-passing checks to attribute', () => {
-		const snapshot = make_snapshot({ merge_state_status: 'UNSTABLE' })
+	it('returns pending when the only non-passing non-CodeRabbit check is still running', () => {
+		const snapshot = make_pr_snapshot({
+			merge_state_status: 'UNSTABLE',
+			rollup: [...PASSING_ROLLUP, { name: LIGHTHOUSE, status: 'pending' }],
+		})
 
 		expect(evaluate_pr_state(snapshot)).toBe('pending')
 	})
@@ -152,7 +130,7 @@ describe('evaluate_pr_state — UNSTABLE not attributable to CodeRabbit', () => 
 
 describe('evaluate_pr_state — failure', () => {
 	it('returns failure when a required check has failed', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [
 				{ name: CODE_RABBIT, status: 'pass' },
 				{ name: SONAR_QUBE, status: 'fail' },
@@ -163,7 +141,7 @@ describe('evaluate_pr_state — failure', () => {
 	})
 
 	it('returns failure when review decision is CHANGES_REQUESTED', () => {
-		expect(evaluate_pr_state(make_snapshot({ review_decision: 'CHANGES_REQUESTED' }))).toBe(
+		expect(evaluate_pr_state(make_pr_snapshot({ review_decision: 'CHANGES_REQUESTED' }))).toBe(
 			'failure',
 		)
 	})
@@ -171,11 +149,11 @@ describe('evaluate_pr_state — failure', () => {
 
 describe('evaluate_pr_state — pending', () => {
 	it('returns pending when merge state is not CLEAN', () => {
-		expect(evaluate_pr_state(make_snapshot({ merge_state_status: 'UNKNOWN' }))).toBe('pending')
+		expect(evaluate_pr_state(make_pr_snapshot({ merge_state_status: 'UNKNOWN' }))).toBe('pending')
 	})
 
 	it('returns pending when a required check is still pending', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [
 				{ name: CODE_RABBIT, status: 'pass' },
 				{ name: SONAR_QUBE, status: 'pending' },
@@ -186,7 +164,7 @@ describe('evaluate_pr_state — pending', () => {
 	})
 
 	it('returns pending when a required check is missing', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [{ name: CODE_RABBIT, status: 'pass' }],
 		})
 
@@ -247,7 +225,7 @@ describe('REQUIRED_CHECKS — JOSH_REQUIRED_CHECKS env var override', () => {
 	it('uses env var checks instead of defaults', async () => {
 		const { REQUIRED_CHECKS: checks } = await import('./git-pr-checks-eval')
 
-		expect(checks).toContain('Lighthouse')
+		expect(checks).toContain(LIGHTHOUSE)
 		expect(checks).toContain('DeployCheck')
 		expect(checks).not.toContain(CODE_RABBIT)
 	})

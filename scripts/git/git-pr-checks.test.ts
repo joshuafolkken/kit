@@ -11,30 +11,14 @@ import {
 	parse_repo_name_from_package,
 	wait_for_pr_success,
 	type PrStateSnapshot,
-	type RollupCheck,
 } from './git-pr-checks'
+import { CODE_RABBIT, make_pr_snapshot, PASSING_ROLLUP, SONAR_QUBE } from './git-pr-checks-fixture'
 
 const REPO_NAME = 'joshuafolkken-com'
-const CODE_RABBIT = 'CodeRabbit'
-const SONAR_QUBE = 'SonarQube'
 const NO_SNAPSHOT_ERROR = 'No snapshot available for test.'
 
-const PASSING_ROLLUP: ReadonlyArray<RollupCheck> = [
-	{ name: CODE_RABBIT, status: 'pass' },
-	{ name: SONAR_QUBE, status: 'pass' },
-]
-
-function make_snapshot(overrides: Partial<PrStateSnapshot> = {}): PrStateSnapshot {
-	return {
-		rollup: [...PASSING_ROLLUP],
-		merge_state_status: 'CLEAN',
-		review_decision: 'APPROVED',
-		...overrides,
-	}
-}
-
 function pending_rollup_snapshot(): PrStateSnapshot {
-	return make_snapshot({ merge_state_status: 'UNKNOWN', rollup: [] })
+	return make_pr_snapshot({ merge_state_status: 'UNKNOWN', rollup: [] })
 }
 
 function make_sequence_fetcher(snapshots: ReadonlyArray<PrStateSnapshot>): {
@@ -72,11 +56,11 @@ describe('parse_repo_name_from_package', () => {
 
 describe('evaluate_pr_state — success paths', () => {
 	it('success when merge state is CLEAN and every required rollup entry passes', () => {
-		expect(evaluate_pr_state(make_snapshot())).toBe('success')
+		expect(evaluate_pr_state(make_pr_snapshot())).toBe('success')
 	})
 
 	it('success when a non-required check is pending but required checks pass and merge is CLEAN', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [...PASSING_ROLLUP, { name: 'Lighthouse', status: 'pending' }],
 		})
 
@@ -86,7 +70,7 @@ describe('evaluate_pr_state — success paths', () => {
 
 describe('evaluate_pr_state — failure paths', () => {
 	it('failure when a required check has failed', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [
 				{ name: CODE_RABBIT, status: 'pass' },
 				{ name: SONAR_QUBE, status: 'fail' },
@@ -97,7 +81,7 @@ describe('evaluate_pr_state — failure paths', () => {
 	})
 
 	it('failure when the review decision is CHANGES_REQUESTED even with a CLEAN merge', () => {
-		expect(evaluate_pr_state(make_snapshot({ review_decision: 'CHANGES_REQUESTED' }))).toBe(
+		expect(evaluate_pr_state(make_pr_snapshot({ review_decision: 'CHANGES_REQUESTED' }))).toBe(
 			'failure',
 		)
 	})
@@ -105,7 +89,7 @@ describe('evaluate_pr_state — failure paths', () => {
 
 describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () => {
 	it('pending when a required rollup entry is still pending', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [
 				{ name: CODE_RABBIT, status: 'pass' },
 				{ name: SONAR_QUBE, status: 'pending' },
@@ -116,7 +100,7 @@ describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () 
 	})
 
 	it('pending when a required rollup entry is missing', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [{ name: CODE_RABBIT, status: 'pass' }],
 		})
 
@@ -124,7 +108,7 @@ describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () 
 	})
 
 	it('success when Workers Builds check is absent (not a required check for this repo)', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			rollup: [
 				{ name: 'Workers Builds: @joshuafolkken/kit', status: 'missing' },
 				{ name: CODE_RABBIT, status: 'pass' },
@@ -138,15 +122,15 @@ describe('evaluate_pr_state — pending: CLEAN merge but rollup incomplete', () 
 
 describe('evaluate_pr_state — pending: merge state not CLEAN', () => {
 	it('pending when aggregator is UNKNOWN even if every required check is green', () => {
-		expect(evaluate_pr_state(make_snapshot({ merge_state_status: 'UNKNOWN' }))).toBe('pending')
+		expect(evaluate_pr_state(make_pr_snapshot({ merge_state_status: 'UNKNOWN' }))).toBe('pending')
 	})
 
 	it('pending when merge state is BLOCKED and required checks are all green', () => {
-		expect(evaluate_pr_state(make_snapshot({ merge_state_status: 'BLOCKED' }))).toBe('pending')
+		expect(evaluate_pr_state(make_pr_snapshot({ merge_state_status: 'BLOCKED' }))).toBe('pending')
 	})
 
 	it('pending when merge state is UNKNOWN and a required check is still pending', () => {
-		const snapshot = make_snapshot({
+		const snapshot = make_pr_snapshot({
 			merge_state_status: 'UNKNOWN',
 			rollup: [
 				{ name: CODE_RABBIT, status: 'pending' },
@@ -199,8 +183,8 @@ describe('wait_for_pr_success — stable-read window', () => {
 	it('returns only after two consecutive success reads', async () => {
 		const sequence = make_sequence_fetcher([
 			pending_rollup_snapshot(),
-			make_snapshot(),
-			make_snapshot(),
+			make_pr_snapshot(),
+			make_pr_snapshot(),
 		])
 
 		const result = await wait_for_pr_success({
@@ -217,10 +201,10 @@ describe('wait_for_pr_success — stable-read window', () => {
 
 	it('resets the stable counter when a pending read interrupts the run', async () => {
 		const sequence = make_sequence_fetcher([
-			make_snapshot(),
+			make_pr_snapshot(),
 			pending_rollup_snapshot(),
-			make_snapshot(),
-			make_snapshot(),
+			make_pr_snapshot(),
+			make_pr_snapshot(),
 		])
 
 		await wait_for_pr_success({
@@ -238,7 +222,7 @@ describe('wait_for_pr_success — stable-read window', () => {
 describe('wait_for_pr_success — failure and timeout', () => {
 	it('throws immediately when the evaluator reports failure', async () => {
 		const sequence = make_sequence_fetcher([
-			make_snapshot({ review_decision: 'CHANGES_REQUESTED' }),
+			make_pr_snapshot({ review_decision: 'CHANGES_REQUESTED' }),
 		])
 
 		await expect(
@@ -296,8 +280,8 @@ describe('wait_for_pr_success — heartbeat logging', () => {
 		})
 		const sequence = make_sequence_fetcher([
 			pending_rollup_snapshot(),
-			make_snapshot(),
-			make_snapshot(),
+			make_pr_snapshot(),
+			make_pr_snapshot(),
 		])
 
 		await wait_for_pr_success({
@@ -316,7 +300,7 @@ describe('wait_for_pr_success — heartbeat logging', () => {
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => {
 			/* suppress */
 		})
-		const sequence = make_sequence_fetcher([make_snapshot(), make_snapshot()])
+		const sequence = make_sequence_fetcher([make_pr_snapshot(), make_pr_snapshot()])
 
 		await wait_for_pr_success({
 			branch_name: 'feature/x',
