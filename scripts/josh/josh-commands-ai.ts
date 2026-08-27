@@ -42,6 +42,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check an epic issue against the tracking requirements',
 		category: 'AI tools',
 	},
+	cost: {
+		script: 'scripts/cost/cost-cli.ts',
+		description: "Report a run's token and credit cost from Claude Code's session transcripts",
+		category: 'AI tools',
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',
