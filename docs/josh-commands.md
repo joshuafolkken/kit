@@ -1089,10 +1089,11 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 
 **A step earns its place by naming how a wrong result is caught**, by something that runs in the parent tier and costs less than redoing the step. "Unlikely to be wrong" does not qualify, and most candidates fail here: a notification body, a decision-log comment and a status read all ship their mistakes with nothing left to disagree with them. `--list` shows those as rejected with the reason rather than omitting them, so the next person to propose one finds the answer instead of re-deriving it.
 
-| Step       | Delegatable because                                                                                                    |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `gate-fix` | `pnpm josh gate` is re-run; a wrong fix fails it again and the failure names the file                                  |
-| `survey`   | the reported locations are checked directly; a fabricated or missed one does not survive one `grep` of what it claimed |
+| Step         | Delegatable because                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `gate-fix`   | `pnpm josh gate` is re-run; a wrong fix fails it again and the failure names the file                                                                                                |
+| `epic-child` | the parent reads the child's state from GitHub rather than from the summary, so a child reported done but not merged is still open — the failure shows instead of the loop moving on |
+| `survey`     | the reported locations are checked directly; a fabricated or missed one does not survive one `grep` of what it claimed                                                               |
 
 **These were considered and kept**, so the next person to propose one finds the reason instead of re-deriving it. `pnpm josh delegate <step>` answers `kept deliberately` for these, distinguishing them from a step that is merely unlisted:
 
@@ -1106,7 +1107,7 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
 
-**The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step here, one epic child in [#984](https://github.com/joshuafolkken/kit/issues/984). They share one mechanism by design.
+**The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step of a run, or one whole child of an epic ([#984](https://github.com/joshuafolkken/kit/issues/984)). Both are rows of the one enumeration above rather than two mechanisms, which is why `epic-child` is answered by this same command.
 
 ### `josh cost`
 

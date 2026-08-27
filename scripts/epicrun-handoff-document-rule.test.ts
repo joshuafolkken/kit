@@ -84,8 +84,8 @@ describe.each(BOTH)('%s — names where the carried state lives', (document_path
 	})
 })
 
-// The measurement is what makes the threshold a number rather than a feeling. A reader who doubts
-// it has to be able to find it.
+// The measurement is what makes the growth a number rather than a feeling. A reader who doubts it
+// has to be able to find it.
 describe('the threshold cites the measurement it came from', () => {
 	it.each(BOTH)('%s cites the measured growth', (document_path) => {
 		const unwrapped = read_unwrapped(document_path)
@@ -93,5 +93,58 @@ describe('the threshold cites the measurement it came from', () => {
 		expect(unwrapped).toContain('222k per request')
 		expect(unwrapped).toContain('645k')
 		expect(unwrapped).toContain('joshuafolkken/kit#968')
+	})
+})
+
+// joshuafolkken/kit#984: the measurement supports breaking almost immediately, not 400,000 — the
+// number is a tokens-against-human-touches trade-off. A document that keeps claiming the
+// measurement produced it sends the next reader to defend a figure the data does not support.
+describe('the threshold is not passed off as the measurement’s own answer', () => {
+	it.each(BOTH)('%s does not repeat the corrected claim', (document_path) => {
+		expect(read_unwrapped(document_path)).not.toContain(
+			"the threshold is the same number the epic's own measurement produced",
+		)
+	})
+
+	it.each(BOTH)('%s says outright that the measurement did not produce it', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('閾値 400,000 は計測が出した数字ではない')
+	})
+
+	// Naming what the number *is* matters as much as denying what it is not: without it the figure
+	// reads as arbitrary and the next run lowers it on a feeling.
+	it.each(BOTH)('%s names the trade-off the number represents', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('トークン対人の手数')
+	})
+})
+
+// The unit that replaced breaking-per-child. Delegation is what the measurement actually asked for;
+// the hand-off survives as the backstop, and a document that lost the distinction would have a run
+// paying the old bill while believing it had been fixed.
+const DELEGATION_COMMAND = 'pnpm josh delegate epic-child'
+
+describe.each(BOTH)('%s — each child runs in a delegated unit', (document_path) => {
+	const unwrapped = read_unwrapped(document_path)
+
+	it('routes the decision to the command rather than to judgement', () => {
+		expect(unwrapped).toContain(DELEGATION_COMMAND)
+	})
+
+	// The verifier is the reason the unit may be delegated at all. Advancing on the summary discards
+	// it, so both documents have to say where the parent reads the child's state.
+	it('says the parent confirms the child from GitHub, not from the summary', () => {
+		expect(unwrapped).toMatch(
+			/親が読むのは要約ではなく GitHub の状態|The parent reads GitHub, never the summary/u,
+		)
+	})
+
+	it('reuses joshuafolkken/kit#969’s mechanism rather than building a second', () => {
+		expect(unwrapped).toContain('joshuafolkken/kit#969')
+		expect(unwrapped).toMatch(/機構は新設しない|The mechanism is not new/u)
+	})
+
+	// Backstop, not alternative: read the other way, a run that can delegate would still break every
+	// few children and a run that cannot would think itself covered.
+	it('keeps the hand-off as the backstop for where delegation is unavailable', () => {
+		expect(unwrapped).toMatch(/委譲の代替ではなく|not an alternative to it/u)
 	})
 })
