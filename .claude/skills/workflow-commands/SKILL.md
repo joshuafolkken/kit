@@ -97,8 +97,9 @@ nothing left to disagree with them, which is why `--list` shows them as rejected
 
 **The mechanism is not the unit.** How a thing is delegated — an isolated execution unit, an explicit
 brief, a result the parent can verify, a failure that surfaces — is separate from what is delegated.
-Here the unit is one step of a run; in joshuafolkken/kit#984 it is one child of an epic. **They share
-one mechanism**; building a second is the clone `CLAUDE.md` prohibits.
+The units are one step of a run (`gate-fix`, `survey`) and one whole child of an epic (`epic-child`,
+joshuafolkken/kit#984). **They share one mechanism** — one enumeration, one command, one verifier
+requirement; building a second is the clone `CLAUDE.md` prohibits.
 
 Canonical reference: `prompts/collaboration-workflow/delegation.md`.
 
