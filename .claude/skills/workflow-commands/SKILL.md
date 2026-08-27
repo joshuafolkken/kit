@@ -33,6 +33,7 @@ resident in the AI documents, because it has to hold when this skill has *not* b
 
 Read this file, then the one for the command that was typed. `fullrun` and `queue` also need
 `chain-rule.md` and `followup.md`; `halfrun` needs neither, because it stops before the commit.
+`eval-gate.md` is read from the verification gate below, by whichever command reached it.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
@@ -46,8 +47,14 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 
 - **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` at the level `pnpm josh review:level` prints
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**
-  (`prompts/review.md` → "Review round cap"). `kickoff` is the exception —
+  (`prompts/review.md` → "Review round cap") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
+  answers `required` (`eval-gate.md`). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
+  **The rule-compliance measurement sits after the review and before the commit, never inside
+  `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval` is five
+  real Claude sessions. Its last line is the verdict — `blocked` stops the merge, `unmeasured` does
+  not but is reported, and a run nobody saw hold is never reported as green. `eval-gate.md` carries
+  the trigger set, the cost ceiling, and why an epic's completion does not run it a second time.
   **E2E closes after that, and never by asking the user**: where the command ends in a pull request
   (`fullrun` / `queue` / `epicrun`) the CI E2E job is the result and `pnpm josh followup --merge`
   is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
@@ -210,6 +217,10 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   epic. A pre-commit self-review runs outside any workflow as readily as inside one, and the Issue it
   files is orphaned just the same; the step has to be readable on a turn that never typed a keyword.
   Its full form is in `prompts/review.md` → "Review round cap" (joshuafolkken/kit#946).
+- **The rule-compliance measurement's trigger** — `pnpm josh eval:scope`, and `pnpm josh eval` when
+  it answers `required`. A change to a distributed document is reported finished on turns that typed
+  no workflow keyword at all — "fix this wording in `CLAUDE.md`" is the common one — so the trigger
+  has to be readable there. The procedure it routes to is `eval-gate.md`.
 - **The UI-verification gate** — a rendered change is not done until the screen has been looked at,
   and the procedure for capturing it is `verify-ui`. The gate binds whenever a UI change is reported
   finished, which is routinely a turn with no workflow keyword typed and no skill loaded.

@@ -1205,3 +1205,32 @@ be argued about.
 Exits `0` only when every scenario held. It needs the `claude` CLI on `PATH` and is deliberately not
 part of CI — every scenario costs tokens and minutes, so it is run when a distributed document,
 skill or hook changes. See [docs/eval.md](./eval.md) for the scenario format and how to add one.
+
+The run's last line is a verdict rather than only a count — `held`, `blocked` or `unmeasured` — because
+the exit code is `0` only when every scenario passed, so a failed run and one that measured nothing
+exit alike. `blocked` stops a merge; `unmeasured` does not, but is reported.
+
+### `josh eval:scope`
+
+Say whether this change has to be measured by `josh eval` ([#907](https://github.com/joshuafolkken/kit/issues/907)).
+
+```bash
+pnpm josh eval:scope            # → required | skip ; alias: josh es
+pnpm josh eval:scope --staged   # the staged diff
+pnpm josh eval:scope --json     # the scope and the reason, machine-readable
+```
+
+The scope goes to stdout and the reason to stderr, so `$(pnpm josh eval:scope)` reads the scope and a person still sees why.
+
+**The decision takes no judgement**, exactly as `josh review:level`'s does: the input is the list of changed paths and nothing else. "This edit is only wording" is a judgement made under cost pressure, and cost pressure resolves it toward `skip` at the moment a regression is most likely to ship.
+
+| Any changed path is…                                                                                             | Scope      |
+| ---------------------------------------------------------------------------------------------------------------- | ---------- |
+| **measured** — `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.claude/skills/**`, `prompts/**`, `.claude/settings.json` | `required` |
+| anything else                                                                                                    | `skip`     |
+
+The measured set is derived from what the eval sandbox copies rather than restated here, so it cannot claim a path no scenario reads. **One measured path decides the whole change** — the suite measures the distribution, not the file that changed. **An empty diff answers `required`**: `skip` there would hand a caller that failed to read the diff the same answer as one that measured. The harness and the scenarios themselves (`scripts/eval/**`, `evals/scenarios/**`) do not fire it — changing the ruler is not changing what it measures. `.claude/settings.json` is the one coarse entry: the sandbox drops hooks that invoke the toolchain, so a change to only such a hook answers `required` and no scenario can observe it.
+
+The gate asks about the branch diff. `--staged` is for a pre-commit reading, and the empty-list rule bites hardest there: an empty index answers `required`, which costs five real Claude sessions rather than `review:level`'s free `medium`.
+
+Where the answer is used, what a failure does, and why an epic's completion does not run the suite a second time: [docs/eval.md](./eval.md) → "When it runs".

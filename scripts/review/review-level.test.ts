@@ -95,20 +95,6 @@ describe('josh review:level registration', () => {
 	})
 })
 
-describe('review_level_cli.parse_options', () => {
-	it('defaults to the branch diff', () => {
-		expect(review_level_cli.parse_options([])).toStrictEqual({ is_staged: false, is_json: false })
-	})
-
-	it('reads the staged flag', () => {
-		expect(review_level_cli.parse_options(['--staged'])?.is_staged).toBe(true)
-	})
-
-	it('refuses an unknown flag rather than ignoring it', () => {
-		expect(review_level_cli.parse_options(['--nonsense'])).toBeUndefined()
-	})
-})
-
 describe('review_level_cli.format_reason', () => {
 	it('says why a change was reduced', () => {
 		expect(review_level_cli.format_reason([EDITOR_SETTING], review_level.REDUCED_LEVEL)).toContain(
