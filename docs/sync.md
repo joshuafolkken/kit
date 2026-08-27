@@ -319,9 +319,9 @@ SECURITY.md         tsconfig.sonar.json
 > consumers. A template ref that lags behind a bump is therefore harmless, and no longer fails the
 > kit's own CI. See joshuafolkken/kit#747.
 >
-> **`.claude/settings.json` denies the commands the prompts forbid most often.** `CLAUDE.md` /
-> `AGENTS.md` / `GEMINI.md` ban autonomous staging and pull request merges nobody asked for in
-> several places each, but prose is only honored while it is being read — so the distributed
+> **`.claude/settings.json` denies the commands the prompts forbid most often.** `CLAUDE.md` bans
+> autonomous staging and pull request merges nobody asked for in several places, but prose is only
+> honored while it is being read — so the distributed
 > settings deny them mechanically, alongside the destructive commands that were already there:
 >
 > ```json
@@ -357,11 +357,11 @@ SECURITY.md         tsconfig.sonar.json
 > everything unstaged, so that flow flattens a staged baseline the deny entries otherwise protect.
 > Closing all of them would mean denying
 > `git` itself, which takes the read-only inspection commands the prompts require with it. The deny
-> stops the habitual form, which is the form an agent reaches for; the prose rule in `CLAUDE.md` /
-> `AGENTS.md` / `GEMINI.md` stays the authority on intent, and a command being refused is not the
-> boundary of what is forbidden.
+> stops the habitual form, which is the form an agent reaches for; the prose rule in `CLAUDE.md`
+> stays the authority on intent, and a command being refused is not the boundary of what is
+> forbidden.
 >
-> **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the paired
+> **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the rule
 > AI documents says a change to the rendered screen is not done until someone has looked at it, and
 > until joshuafolkken/kit#853 it named a skill this package did not ship — so the step pointed at
 > nothing. The skill picks the routes, calls the application layer's own screenshot command, and
@@ -381,8 +381,8 @@ SECURITY.md         tsconfig.sonar.json
 > pin-and-stamp transform, and a workflow shipped through it would arrive unpinned and unstamped.
 >
 > **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
-> documents used to inline.** The three paired documents are read in full on every turn, and roughly
-> half of each was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
+> documents used to inline.** The rule document is read in full on every turn, and roughly
+> half of it was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
 > `halfrun` / `queue` steps, the `/code-review` → `followup --merge` chain rule, and the checks that run
 > after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
 > documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB.
@@ -392,8 +392,11 @@ SECURITY.md         tsconfig.sonar.json
 > three bytes of their ceiling and each new rule started paying for itself by deleting a neighboring
 > sentence. `.claude/skills/workflow-commands/SKILL.md` → "What stays resident, and what is read from
 > here" carries the criterion and the exhaustive list of the rules that pass it; a unit test asserts
-> each of them present in all three documents, and asserts headroom under the ceiling so the next
-> rule is written while moving a procedure is still a choice.
+> each of them present in `CLAUDE.md`, and asserts headroom under the ceiling so the next rule is
+> written while moving a procedure is still a choice. Since
+> [#963](https://github.com/joshuafolkken/kit/issues/963) that is the only document those markers
+> are asserted against — `AGENTS.md` and `GEMINI.md` are pointers to it, guarded instead by
+> `scripts/ai-document-pointers.test.ts`, which fails if a rule body reappears in either.
 >
 > Their markdown does cite `prompts/…` paths, which a byte copy would have shipped unresolved — so
 > the directory copy is followed by the same rewrite the file copies run, over the copied markdown
@@ -503,7 +506,7 @@ kit's base layer for `tsconfig.json`, `cspell.config.yaml`, and `lefthook.yml` i
 
 ## Path transformation
 
-`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`:
+`CLAUDE.md` and other AI files contain references to `prompts/` files. `josh sync` rewrites these paths so they point to the correct location in `node_modules`. The `AGENTS.md` / `GEMINI.md` pointers are rewritten by the same pass ([#963](https://github.com/joshuafolkken/kit/issues/963)): each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one, and that citation has to resolve in a consumer like any other:
 
 ```text
 `prompts/foo.md`  →  `node_modules/@joshuafolkken/kit/prompts/foo.md`

@@ -175,7 +175,7 @@ describe('upstream interrupt — canonical section in the workflow prompt', () =
 		const raw = read_repo_file(WORKFLOW_PROMPT)
 
 		expect(raw).toContain(
-			'CLAUDE.md / AGENTS.md / GEMINI.md「Cross-package problems → file the upstream Issue, then always stop」',
+			'CLAUDE.md「Cross-package problems → file the upstream Issue, then always stop」',
 		)
 	})
 })

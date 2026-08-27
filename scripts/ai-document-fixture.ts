@@ -1,12 +1,26 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { package_file, SKILL_ROOT } from './skill-fixture'
 
-// Several rules are distributed across the three paired AI docs plus the workflow prompt and the
-// hook, and a rule that lands in only one of them leaves the AI with contradicting instructions.
-// The marker suites that guard against that drift all need the same reader and the same paths, so
-// they live here rather than being re-declared per suite.
+// Where the rules live, for every marker suite that checks one is present.
+//
+// **There is one rule document, not three.** `AGENTS.md` and `GEMINI.md` used to be near-identical
+// copies of `CLAUDE.md`, so every marker suite asserted the same rule three times and every rule
+// change had to be written three times. joshuafolkken/kit#963 single-sourced the rules into
+// `CLAUDE.md` and turned the other two into pointers to it — the clone the rules themselves
+// prohibit, removed from the documents that state the prohibition.
+//
+// `AI_DOCS` stays an array rather than becoming a bare string. Twenty suites iterate it with
+// `it.each`, and their case names, their failure messages and the shape of their assertions all
+// read off it; collapsing it to a scalar would rewrite twenty files to say the same thing. It also
+// leaves the door open should a second tool ever need rules of its own that genuinely differ.
+const AI_DOCS: ReadonlyArray<string> = ['CLAUDE.md']
 
-const AI_DOCS: ReadonlyArray<string> = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']
+// The documents that carry no rules and only point at the one that does. Guarded by
+// `ai-document-pointers.test.ts`, which is what stops a rule being pasted back into them.
+const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md']
+
+// The document the pointers name. Written once so the pointer suite and the pointers agree.
+const CANONICAL_DOC = 'CLAUDE.md'
 const WORKFLOW_PROMPT = 'prompts/collaboration-workflow.md'
 const CLAUDE_SETTINGS = '.claude/settings.json'
 const ENV_EXAMPLE = '.env.example'
@@ -48,9 +62,9 @@ function skill_documents(): ReadonlyArray<string> {
 // AI documents. The message will point at the wrong file; the phrase it names is still the one to
 // look for, and adding it here is one line.
 //
-// The per-document iteration is kept even though a skill-resident marker now reads the same for all
-// three. It is not redundant in general: a rule that is still resident carries only that document's
-// copy into its surface, so a marker dropped from GEMINI.md alone still fails on GEMINI.md alone.
+// The per-document iteration is kept even though `AI_DOCS` now holds one entry. It is what makes a
+// resident marker fail on the document it went missing from rather than on the concatenation of
+// everything, and it is the seam a second rule document would slot into.
 function rule_surface_documents(document_path: string): ReadonlyArray<string> {
 	return [document_path, ...skill_documents()]
 }
@@ -63,10 +77,12 @@ function read_rule_surface(document_path: string): string {
 
 export {
 	AI_DOCS,
+	CANONICAL_DOC,
 	CLAUDE_SETTINGS,
 	ENV_EXAMPLE,
 	read_repo_file,
 	read_rule_surface,
+	POINTER_DOCS,
 	read_unwrapped,
 	rule_surface_documents,
 	skill_documents,

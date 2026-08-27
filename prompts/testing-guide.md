@@ -125,7 +125,7 @@ When fixing bugs where tests leave data behind (or similar persistent state):
 
 ## 3. Checklist
 
-- [ ] **Before “done”:** **Completion gate** in `AGENTS.md` / `CLAUDE.md` — `pnpm run lint`, `pnpm run check`, `pnpm cspell:dot`, then **`pnpm test`** (Vitest **and** Playwright). **Do not** stop at `pnpm test:unit --run` when E2E applies. For local verification, run **`pnpm test` with `CI` unset** so Playwright uses **DEV** (`pnpm run dev` on the port `playwright.config.ts` resolves from `PORT_SEED`), matching the VS Code Test plugin. ReadLints **0 errors** on touched files; Playwright **no failures and no flaky** runs in what you report. **If Playwright cannot run in the agent environment:** do **not** use `pnpm build` or `CI=true` unless the user asked; say Playwright did not complete and ask for local **`pnpm test`** (see **Agent / sandbox** in `AGENTS.md`)
+- [ ] **Before “done”:** **Completion gate** in `CLAUDE.md` — `pnpm run lint`, `pnpm run check`, `pnpm cspell:dot`, then **`pnpm test`** (Vitest **and** Playwright). **Do not** stop at `pnpm test:unit --run` when E2E applies. For local verification, run **`pnpm test` with `CI` unset** so Playwright uses **DEV** (`pnpm run dev` on the port `playwright.config.ts` resolves from `PORT_SEED`), matching the VS Code Test plugin. ReadLints **0 errors** on touched files; Playwright **no failures and no flaky** runs in what you report. **If Playwright cannot run in the agent environment:** do **not** use `pnpm build` or `CI=true` unless the user asked; say Playwright did not complete and ask for local **`pnpm test`** (see **Agent / sandbox** in `CLAUDE.md`)
 - [ ] Magic numbers/strings → constants (except `0`, `1`, `-1`)
 - [ ] `.js` on all import paths
 - [ ] Playwright: `data-testid` selectors only

@@ -1,280 +1,30 @@
-# Gemini Agent Instructions
+# Agent Instructions
 
-> For Claude Code: see `CLAUDE.md`. For Cursor/other AI tools: see `AGENTS.md`.
+> **All rules for this repository live in [`CLAUDE.md`](./CLAUDE.md). Read it in full before doing
+> any work here, and follow every rule in it.** This file exists only to point at it.
 
-## Project
+@CLAUDE.md
 
-Stack: TypeScript · pnpm · SvelteKit · Vitest · Playwright · TailwindCSS · Drizzle · better-auth · Paraglide · MCP
+`CLAUDE.md` is the single source. It is named for the tool that reads it by default, but nothing in
+it is Claude-specific — the naming conventions, quality limits, code-change rules, verification
+gate, git rules and collaboration workflow apply to whatever agent is doing the work.
 
-## Communication
+Rules that only apply while a particular command is running are not in `CLAUDE.md` either. It routes
+to them, and the routing is part of the rules: read `.claude/skills/<name>/SKILL.md` when
+`CLAUDE.md` tells you to, and `prompts/*.md` when it names one.
 
-- **Answer opinion-seeking questions from a neutral standpoint.** When the user asks a leading or preference-shaped question — e.g. "how about X?" ("〜〜ではどうか？"), "wouldn't Y be better?" ("〜〜の方はどうか？"), "isn't Z the right call?" — do not reflexively agree or tailor the answer to the phrasing. Weigh the actual merits and respond impartially: state the trade-offs honestly, recommend the option you genuinely judge best (even when it differs from the one the user hinted at), and explain why. Agreement must be earned by the facts, not assumed from how the question is asked.
-- **Fix root causes, not symptoms.** Do not use your own judgment to reach for ad-hoc workarounds, hacks, or clever tricks to force a goal through. Diagnose the underlying cause first, then recommend and apply the correct, fundamental fix — even when it is larger or slower than a quick patch. If the proper fix is out of scope or needs the user's decision, surface the root cause and the recommended fix rather than silently papering over the symptom.
-- **Cross-package problems → file the upstream Issue, then always stop.** When a problem discovered mid-task originates in a different package — including a dependency or the distribution-source package (e.g. the `josh` / kit tooling this project consumes) — do **not** paper over it with a local workaround in the current repo. **The procedure is unconditional: it contains no "does this block the current task?" evaluation.** Every upstream defect goes through it, blocking or not, and the trigger is **discovery** — never "when it starts blocking". A blocking judgement is made under pressure to keep the run going, so it resolves toward "not blocking" exactly when a workaround is most tempting; the line also does not exist at discovery time, because a defect that looks harmless can turn into an accommodation at the completion gate. Removing the judgement is what makes the rule fire before a stopgap reaches the tree. Steps: (1) stash the current work-in-progress (`git stash`); (2) record in the active Issue that the work was stashed and **why** (which upstream package and problem caused the pause, plus a link to the new Issue) so the paused state is auditable; (3) create a new Issue in the **target package's** repository describing the root cause — **when the target is first-party (its owner equals this session's repository owner), filing is Tier A: never ask for confirmation, neither to file nor to choose the target repository; when the target is third-party, filing is Tier C and you stop for explicit instruction instead — see the next bullet**; (4) send a `confirmation` Telegram naming the upstream Issue and what is blocked, then **stop** — the Issue already exists, so the user decides waiting-vs-deferring with it in hand; (5) only after the upstream fix lands — or the user explicitly decides to defer — `git stash pop` and resume the original task. **Weakening a verification gate is a workaround too**: filtering, narrowing or reinterpreting `lint` / `tsc` / `cspell` / unit / E2E output to accommodate an upstream defect is the same violation as writing a local patch and triggers the same stop — reporting the filtered result honestly does not make it compliant. Mild redundancy is the accepted price: stopping for a finding the user would have waved through costs one round trip, while continuing past one that mattered ships a workaround to every consumer. **Both ends carry a backlink, under a fixed heading.** The upstream Issue's body gets an `## Origin` section naming the consumer Issue, and the consumer Issue records every Issue filed from it under `## Upstream issues` (in the body while you are still authoring it, otherwise as a comment) — the upstream Issue states the defect, the consumer Issue holds the evidence, and without the link neither is interpretable later. Always repo-qualify the reference (`owner/repo#N` or the full URL): a bare `#N` resolves inside the upstream repo and silently points at a different Issue. Write it as prose or a plain bullet, **never as a task-list row** (`- [ ] owner/repo#N`) — a checkbox row referencing another repository disables epic auto-close by design, which is correct for a real cross-repo child and a trap for a backreference. See `prompts/collaboration-workflow.md` → "別パッケージ起因の問題は割り込み Issue で対応する" and "起票元へのバックリンク（`## Origin` / `## Upstream issues`）".
-- **Third-party repositories are Tier C — never write to a tracker we do not own without explicit instruction.** The unconditional filing rule above was written for the **first-party set** (kit / app-kit / game-kit / jgame), where the tracker is ours and a redundant Issue costs one line of backlog. **Decide which side a target is on mechanically, never by judgement**: the target is **first-party** when its owner equals the owner of the repository this session is running in (`gh repo view --json owner --jq .owner.login`); **everything else is third-party**, including forks and org repositories we merely contribute to. **First-party targets are unchanged** — Tier A, file without asking, backlink both ways, stop. **Third-party targets are Tier C for every kind of write** — Issue, comment, pull request, discussion, review — and each one needs the user's explicit instruction **in the current turn**. Publishing there is outward-facing and effectively irreversible: the Issue goes out under the user's GitHub identity, notifies watchers, and is indexed, and closing it later undoes none of that; it also spends maintainer attention that nobody agreed to give. When the target is third-party: (1) record the finding in **our own** consumer Issue with the full evidence under the heading `## Upstream candidate` — never `## Upstream issues`, which asserts that something was filed; (2) prepare the report as a draft inside that Issue, so approving it costs the user one message; (3) send a `confirmation` Telegram naming the third-party project and what would be reported, then **stop**. **Clear the evidence bar before offering the draft**: a **minimal reproduction outside our project** (a bare scaffold containing only the dependency under test), or an explicit statement in the draft that only a project-embedded reproduction exists; **every claim verified** — nothing inferred presented as fact; and **a search for an existing Issue** covering the same defect. **Withdrawal is outward-facing too** — closing, editing or commenting on a third-party Issue already filed needs the same explicit instruction. **A correct diagnosis is not authorization to publish.** See `prompts/collaboration-workflow.md` → "第三者リポジトリへの書き込みは Tier C（明示指示が必要）".
-- **No clones — single-source, even across package boundaries.** Copying, porting, or re-implementing existing non-trivial logic to avoid changing its source is **prohibited by default**. The moment you are about to replicate logic that already lives somewhere — another file, another module, or another **package, including an upstream dependency** — STOP: that is the signal to **single-source** it (one shared module / export / package every consumer imports), not to copy it. (1) An existing duplication is **not** a license to duplicate again — if the code was already cloned once (e.g. jgame copied kit), the shared abstraction is overdue; surface it, do not add a third copy. (2) "Reference the upstream" means **reuse it**, never paste its code. (3) A "don't touch X" constraint never silently justifies a clone — surface the tradeoff first ("the clean fix needs a change in kit; the alternative is a clone — which do you want?"). (4) Duplicate **only** after presenting the single-source alternative and its cost **and** getting the user's explicit approval. See `prompts/collaboration-workflow.md` → "クローン禁止・単一ソース化（パッケージ境界を越えても）".
-- **Distinguish consultation from execution — don't edit files during discussion.** When the user asks how to approach something, what we should do, why something happened, or expresses a goal/desire ("どうすべき？", "how should we…", "なぜ", "理由を知りたい", "〜したい", "〜の方が良い？"), respond with **analysis and a recommendation only** — do **not** edit files, create issues, or take other concrete actions. Act only on an explicit imperative ("do it", "書き換えて", "作成して", "implement") or a workflow keyword (`kickoff` / `halfrun` / `fullrun` / `queue`). When ambiguous, default to propose-and-wait (or ask "should I execute this?"). A goal statement is a request for a plan, not authorization to execute it. See `prompts/collaboration-workflow.md` → "相談と実行を区別する（議論中にファイルを編集しない）".
-- **Route distributed-doc / config changes upstream to kit.** `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` and other kit-distributed docs/config are single-sourced from kit. In a consumer repo (app-kit / game-kit) never edit them locally — `josh sync` would overwrite the edit and the change belongs upstream; before editing any doc/config, check whether it is a distributed artifact and, if so, propose the change for kit (issue / PR) instead. In kit itself you **are** the source, so edit here — and keep the three paired docs in sync per "Doc Sync Rules". See `prompts/collaboration-workflow.md` → "配布ドキュメント・設定の変更は kit に上流化する".
-- **Latest-first, fix forward — pin back only as a last resort.** Adopt the newest versions of dependencies and toolchain by default; never stay on, or revert to, an older version merely to avoid the work of adapting. When a bump breaks something (a lint crash, a newly-enabled rule, a type error), resolve it **forward**: fix consumer code where the new rule/error is legitimate; add or scope rule overrides at the **correct layer** (the shared kit / app-kit config), not as an ad-hoc one-off consumer disable; and when the breakage originates in a first-party package (kit / app-kit), file an issue there and fix it at the right altitude rather than only working around it in the consumer (this is the dependency-bump case of the "Cross-package problems → interrupt" rule above). Pinning back is a **last resort** — only when fixing forward is genuinely blocked (e.g. waiting on an unreleased upstream fix); when you must, record why and open a tracking issue to return to latest, and never present pin-back as the default recommendation. This does **not** override the overrides (`pnpm-workspace.yaml` / `package.json`) / `devEngines` approval gates: fix-forward means _prefer latest + fix the breakage_, never _silently mutate protected pins_ — those still require explicit user approval. See `prompts/collaboration-workflow.md` → "最新優先・fix-forward（pin-back は最終手段）".
-- **Output language follows `JOSH_SESSION_LANG` (personal, optional).** Two kinds of output obey it: **session-facing output** — conversational explanations, questions, and **`AskUserQuestion` option labels and descriptions** — and **artifact prose** — Issue bodies, Issue/PR comments (plan comments and completion comments alike), and Telegram notification bodies. Both are written in the language set in the `JOSH_SESSION_LANG` environment variable (personal, non-committed, stored in `.env`; e.g. `ja`, `en`). **When it is unset the two fall back differently**: session dialogue matches the language the user is writing in, while artifact prose defaults to **`ja`** — an artifact is read long after the session ends and has no live conversation to infer a language from, so it needs a fixed default rather than an inferred one. **Three things stay English no matter what the variable says**: (1) **Issue and PR titles** — the title-normalization step in `kickoff` / `fullrun` / `halfrun` / `queue` is unchanged, which keeps the Issue list easy to scan and branch names ASCII-only; (2) **code comments, test titles, and commit messages** — repository code conventions on a different axis from a developer's language preference; (3) **fixed strings emitted by the scripts** — the Telegram header labels, the `Issue:` / `PR:` URL labels, and the default notify message, which you do not author. See `prompts/collaboration-workflow.md` → "出力の言語（`JOSH_SESSION_LANG`）".
-- **Durable rules belong in prompts/docs, not local MEMORY.** When you identify a behavioral rule that should hold in future sessions, encode it as a change to kit's distributed prompts/docs (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `prompts/*`): version-controlled, reviewable, and shared across every machine, repository, and AI tool. A per-project auto-memory store (e.g. `~/.claude/projects/<repo-slug>/memory/`) is **local and non-portable** — scoped to one machine and one repo, uncommitted, and invisible to other PCs, other repos, and other AI tools — so **keep it minimal**. Reserve it for genuinely local, non-shareable context (machine-specific paths, personal environment quirks); never let it become the only home for a rule that should apply everywhere. If the rule is durable and shareable, upstream it to kit per "Route distributed-doc / config changes upstream to kit"; when the current turn does not authorize a doc change, **propose** the prompt/doc edit instead of silently saving it to MEMORY. See `prompts/collaboration-workflow.md` → "恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く".
+## Why this file is a pointer
 
-### Decision autonomy (minimize confirmation stops)
+`AGENTS.md`, `GEMINI.md` and `CLAUDE.md` used to be three near-identical copies of the same rules,
+which meant one rule change had to be written three times and reviewed three times
+(joshuafolkken/kit#963). That is the clone the rules themselves prohibit — see "No clones —
+single-source" in `CLAUDE.md` — so the rules were single-sourced and these two became pointers.
 
-When you reach a decision point, classify it into one of three tiers and act accordingly. The goal is to stop and ask **only** when the choice genuinely needs the user's judgment — not at every fork.
+The `@CLAUDE.md` line above is Gemini CLI's own import syntax, which pulls the file in rather than
+relying on the agent to open it. It is written alongside the prose pointer rather than instead of
+it: an agent that does not understand the syntax reads the sentence, and one that does gets the
+rules without a tool call. **Neither form has been verified against a live Gemini CLI** — only
+Claude is in use here, and that decision is recorded in joshuafolkken/kit#970 under `## Decisions`.
 
-- **Tier A — reversible implementation / design choices** (a library pick where one option is clearly superior, naming, file layout, test approach, refactor shape). If one option is clearly better on the merits, **select it and proceed without asking.** When the point is one you would normally surface for confirmation, log the decision so the user can audit or override it later (see "Logging auto-decisions" below).
-- **Tier B — genuine toss-up.** The top two options are both sound and the margin is narrow. **This is the only tier that stops** — ask the user (use `AskUserQuestion` where available), presenting the close candidates and their trade-offs.
-- **Tier C — irreversible / shared-state / out-of-scope actions** (merge, branch delete, force push, destructive ops, repo-settings changes, anything outside the stated task scope, `devEngines` / overrides edits in either `pnpm-workspace.yaml` or `package.json`). **Out of scope for this policy.** Always require explicit user instruction — never auto-decide, even when one option looks clearly better. The existing safety rules (`prompts/collaboration-workflow.md` → "指示されていない行動は取らない", the `devEngines` / `pnpm.overrides` protections above) take precedence.
-
-**Criterion for A vs B:** ask only when the margin is narrow **and** the decision is hard to reverse or has lasting architectural impact. "I'm in doubt" alone is not a reason to stop — a clearly-superior option is selected automatically even if some uncertainty remains, and a narrow-margin but cheaply-reversible choice is also made automatically (pick one, log it, move on).
-
-**Tier A also covers self-correction.** Two kinds of cleanup are housekeeping rather than design choices, and both **proceed without asking**:
-
-- **Fixing a factual error in an artifact you yourself published** — an Issue or PR comment, or an Issue body (e.g. a defect attributed to the wrong package).
-- **Closing a gap in your own work that you identified in the same session** — e.g. adding the sibling cross-links you already flagged as missing.
-
-Both are reversible, both have exactly one sensible outcome, and leaving them undone is not something a user would choose. **This half carries no workaround risk** — it repairs work already done rather than routing around a problem. **Boundary against "Distinguish consultation from execution":** Tier A here covers _completing or repairing work already authorized and performed_, never acting on a goal statement ("I'd like X") or a question about approach ("how should we…"). **Boundary against Tier C (restated):** correcting your own comment is Tier A; merges, branch deletions, force pushes and out-of-scope actions stay Tier C **even when you caused the problem**. Log it per "Logging auto-decisions" below — removing the confirmation does not remove the audit trail.
-
-**Logging auto-decisions:** when you auto-decide a Tier A point that would normally warrant confirmation, record the candidates and rationale:
-
-- Inside an Issue-driven workflow (`kickoff` / `halfrun` / `fullrun` / `queue`): post an Issue comment — `gh issue comment <N> --body "..."` — listing the chosen option, the rejected alternatives, and why the chosen option is clearly superior.
-- Outside any Issue (a plain conversational task): surface the same as a one-line "Auto-decided: `<choice>` over `<alt>` because `<reason>`" note in your reply.
-
-## Environment Variables
-
-The following variables configure `scripts-ai/`, personal AI-workflow behavior, and this project's own ports. Store them in a `.env` file at the project root (loaded automatically by the AI scripts, by `josh port` and by `playwright.config.ts`). See [docs/scripts-ai.md](https://github.com/joshuafolkken/kit/blob/main/docs/scripts-ai.md) for setup instructions including how to obtain these values. `TELEGRAM_*` are required for notifications; `JOSH_SESSION_LANG`, `PORT_SEED` and `JOSH_REPO_PATHS` are optional.
-
-| Variable             | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN` | Bot token for Telegram notifications (from BotFather)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `TELEGRAM_CHAT_ID`   | Target chat or user ID for Telegram messages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `JOSH_SESSION_LANG`  | Optional. Personal, non-committed language for session dialogue, `AskUserQuestion` options, and artifact prose — Issue bodies, Issue/PR comments, Telegram notification bodies (e.g. `ja`, `en`). When unset, dialogue matches the conversation and artifact prose defaults to `ja`. Issue/PR titles, code comments, test titles, and commit messages stay English.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `PORT_SEED`          | Optional. Personal, non-committed integer offsetting this project's dev and preview ports together (`PORT_SEED=1` → dev `5174`, preview `4174`), so several kit projects on one machine can run their servers at once. Unset — or left blank, the shape `.env.example` ships — means `0`, the historical `5173` / `4173`, which is what keeps CI and un-migrated projects unaffected. An invalid value is a hard error, never a silent fall back to the shared default, and a busy port still fails loudly with no retry on another port. `josh port` and `playwright.config.ts` both read the seed from `.env`, so the E2E suite waits on the same port a `preview` script wired through `josh port preview` starts. See [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md#josh-port). |
-| `JOSH_REPO_PATHS`    | Optional. Personal, non-committed overrides for the repository map — entries of the form `owner/repo=/absolute/path`, comma-separated. Discovery is automatic (the parent directory of the current repository, one level deep, keyed by each work tree's `origin` remote and never by its directory name), so this variable is only for the exceptions: a repository that is not a sibling, or one checked out twice. **The owner restriction is unconditional and cannot be overridden** — only repositories owned by the current repository's owner enter the map, and an entry naming a different owner is dropped exactly like a discovered sibling would be. `josh doctor` prints the resulting map. See [docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md#josh-doctor).           |
-
-GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no additional env var is needed unless running in CI (set `GH_TOKEN` there).
-
-## Critical Conventions (non-standard — always apply)
-
-### Naming
-
-- Variables / functions / params: `snake_case`
-- Types / classes / interfaces / enums: `PascalCase`; enum members: `UPPER_CASE`
-- Booleans: prefix `is_` / `has_` / `should_` / `can_` / `will_` / `did_`
-- Constants: `UPPER_CASE` or `snake_case`
-
-### Functions & exports
-
-- Use `function` syntax, not arrow functions. Exception: in SvelteKit route files, the named route handlers (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`/`OPTIONS`/`HEAD`/`load`/`actions`/`fallback`) may use the typed-const arrow idiom (`export const load: PageLoad = async () => {}`) — it preserves generated `PageData` / `LayoutData` type inference. Any other exported arrow const in a route file is still flagged.
-- Multiple functions in a file: group into a namespace object `export { my_module }` (constants exempt)
-- No `export default`
-
-### Files
-
-- Svelte: `PascalCase.svelte` / `PascalCase.svelte.ts` · TypeScript: `kebab-case.ts` · Route files: exception
-- Test files: `*.test.ts` (node/unit) / `*.svelte.test.ts` (component/browser) — never `*.spec.ts`; colocate beside the code under test (no top-level `tests/`). Lint-enforced by `eslint/rules/test-filename.js`.
-- `scripts/` is grouped into subdirectories (`init/`, `josh/`, `version/`, `sync/`, `git/`, `issue/`, `overrides/`). Relative parent-directory imports (`../`) are banned by ESLint (`no-restricted-imports`). For cross-directory imports inside `scripts/`, use the `#scripts/*` subpath import (mapped via `package.json` `imports`), e.g. `import { schema } from '#scripts/schemas'`. Same-directory and into-subdirectory imports stay relative (`./sibling`, `./group/file`).
-
-### Quality limits
-
-- Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4
-- Magic numbers: extract all literals except `0`, `1`, `-1` to named `UPPER_CASE` constants
-- No `any` · no unused vars · no floating promises · type assertions (`as`) are restricted
-- All function params and return types must be explicitly typed
-- Early return: single `return` under 100 chars → one-liner `if (x) return y`; otherwise block syntax
-
-### Svelte
-
-- `$state` reactive variables are reassignable
-- Props interface name `Props` is allowed by ESLint
-- DOM manipulation is restricted
-
-### Content rules
-
-- i18n: all user-visible strings (labels, buttons, toasts, validation errors, page titles) must use message keys — never hardcode. Add to all locale message files.
-- Comments / test titles (`describe` / `it` / `test` / `expect` messages): English only. Exception: `eslint/rules/` files may use Japanese comments to explain rule rationale.
-- No code duplication: extract to shared functions/modules immediately
-- `/* @refactor-ignore */` at file top excludes a file from refactoring
-
-### Dependency overrides (`pnpm-workspace.yaml` / `package.json`)
-
-- **Overrides live in two files, and one of them alone is not the project's answer.** pnpm 11 reads them from the `overrides:` block in **`pnpm-workspace.yaml`**, while `pnpm.overrides` in **`package.json`** is the legacy location. **An absent or empty `pnpm.overrides` is not evidence that the project has no overrides** — a verdict that names only `package.json` has not checked anything, and it reports success in exactly the state the rule exists to detect.
-- **NEVER** remove or modify entries in **either** location without explicit user approval.
-- **NEVER** modify the `devEngines` field in `package.json` without explicit user confirmation. `devEngines` pins the required development toolchain (e.g. pnpm version); silently changing it can break CI or other contributors' environments.
-- **The check is a command you run, not a conclusion you reach.** After `pnpm update`, `josh latest`, or any other dependency-update command, **load the `dependency-update` skill** (`.claude/skills/dependency-update/`) and follow its procedure before reporting anything about the pins. It carries the `git diff -- pnpm-workspace.yaml package.json` check, how to quote `josh latest`'s own overrides verdict instead of inferring one, and the single `devEngines` change that is expected rather than a violation.
-
-## Package-First Development
-
-- Before building any system or feature, do NOT write original code first — check whether a well-maintained existing package already solves the problem.
-- Prefer modern, actively-maintained packages. Evaluate candidates on maintenance/activity, popularity, bundle size, TypeScript support, license, and fit. **If one package is clearly the best fit, select it and proceed** (Tier A — log the choice and rationale per "Decision autonomy"). **Only when two or more candidates are genuinely close**, present about three options ranked in a comparison table and let the user choose.
-- For existing code as well, proactively propose replacing hand-rolled implementations with a suitable package when it improves maintainability.
-
-## Code Change Rules
-
-For every code modification, follow this order exactly:
-
-0. **Work summary + test declaration** _(mandatory before writing any implementation code)_: Present a two-layer work summary — a plain-language overview first, technical detail demoted below it — then declare every change and its test. Do not touch implementation files until both exist.
-
-   ```md
-   **■ Overview**
-
-   - **Now**: <one sentence — what is happening, as the reader experiences it>
-   - **Change**: <one sentence — what will be different afterwards, not how>
-   - **Check**: <one sentence — how it will be confirmed>
-
-   **Details**
-
-   - Target: <files / modules>
-   - Approach: <approach and why>
-   - Side effects / out of scope: <omit when none>
-
-   **Changes and tests**
-
-   1. <what changes> — Test: <Unit|E2E> — `<file path>` — <what behavior it verifies>
-   2. ...
-   ```
-
-   - **Translate every label into the session language; never append an annotation to one.** These are two separate rules, and merging them into one reads as "keep the English label". (1) **Labels are translated, not copied.** In a Japanese session write `**■ 概要**`, `**技術詳細**`, `**変更とテスト**`, the `Now / Change / Check` labels as `今こうなっている / こう直す / 確かめ方`, and a completion report's `Cause / Fix / Result` as `原因 / 対応 / 結果`; leaving any of them in English is wrong. Artifact prose follows the same language, and the `Cause` / `Fix` / `Result` labels inside a completion comment are translated by this same mapping; the only English-pinned outputs are the three named above (Issue/PR titles, code conventions, script-emitted strings). (2) **A label carries no annotation.** The explanations in this document — "plain language", "always first" — are instructions to you, never part of the printed label, so `■ 概要（平易な説明）` and `■ Overview (plain language)` are both wrong. Canonical reference: `prompts/collaboration-workflow.md` → 「ラベルはセッション言語に訳し、注釈は付けない（必須）」.
-   - **Never wrap the summary in a code fence.** Write only the contents of the template above, as ordinary markdown. The fence here delimits the template inside this document; in a session it paints the whole block with a background color and a monospace font, which defeats the purpose of the plain-language layer and is especially unreadable for Japanese prose. The template is written to survive unfenced: labels are bold rather than aligned with runs of spaces (markdown collapses consecutive spaces), and there is no bare `---` separator line (it would render as a horizontal rule).
-   - **The plain-language overview comes first and is mandatory.** Write it in the session language (`JOSH_SESSION_LANG`; match the user's language when unset), translating the `Now / Change / Check` labels into that language. Three lines, one sentence each (80–100 characters in Japanese, 20–25 words in English). **Never put file paths, function or type names, or CLI option flags in the overview** — those internal identifiers belong in Details. Names the reader actually sees on screen — package names, what a printed command is for, screen names, the kind of message — are allowed, and usually required (next bullet). Avoid jargon or gloss it inline. Write cause → fix → effect as a causal chain, not a list of changes. **Before sending, re-read the three lines**: if a non-programmer could not follow them, move the offending symbol or abbreviation down into Details and rewrite. Re-read the block as a whole too: if it is wrapped in a code fence, unwrap it before sending. Then ask one more question: could a reader who has not seen the code tell **which** thing each line is about? If not, add one concrete noun.
-   - **Name the concrete subject — the counter-requirement to the prohibition above.** Following the prohibition alone produces subject-less prose: "it stays stale", "the suggested command", "nothing changes" — grammatical, but the reader cannot tell which package is stale or what will appear instead. Whenever a line says something is stale, broken, or unchanged, name the affected package, screen, or kind of output; never settle for "the situation", "the suggestion", "the problem", or "that process". Before: `Now: Even though it is stale a warning appears, but running the suggested command sometimes changes nothing.` After: `Now: The version check warns that the globally installed app-kit is stale, but the update command printed next to it points at a version that is already installed, so nothing changes and the same warning returns.` The rewrite adds no internal identifier — only nouns the reader sees on screen. Canonical reference: `prompts/collaboration-workflow.md` → 「具体的な主語を必ず書く（禁止と対になる要求）」.
-   - **Details come second and stay technical.** They cover the files/modules to be touched, the approach and a one-line rationale, any side effects or deliberately out-of-scope points, and the per-change test declarations. In `fullrun` / `halfrun` / `queue` present the whole block once per Issue, immediately before implementation starts — including when the Issue body was already filled and no plan comment was posted. `kickoff` is exempt (it already posts a plan to the Issue).
-   - **Completion reports use the same two layers.** When you report a finished run, lead with `Cause: / Fix: / Result:` — one plain sentence each, `Result` naming what is different for the user plus the shipped version — and keep changed files, test results, and leftovers below. This shape applies to the session-facing summary and to the `--notify-message` body alike; both are written in the session language (`JOSH_SESSION_LANG`, default `ja`).
-   - **The summary is presentation, not a confirmation stop.** Continue straight into implementation in the same turn; it never becomes a stopping condition and does not affect the `fullrun` chain rule. Keep it session-facing only — do not post it as an Issue comment. Canonical format reference: `prompts/collaboration-workflow.md` → 「報告フォーマット（平易な概要 ＋ 技術詳細）」.
-   - **Tests are required for ALL code changes** — including bug fixes, timing/animation fixes, and refactors. No exceptions without explicit user approval.
-   - Bug fix → regression test that would have caught the bug
-   - UI / animation / timing fix → E2E test for the observable behavior change
-   - Logic / utility change → unit test
-   - **Refactoring → write unit/E2E tests that verify existing behavior BEFORE making any structural changes** — see `prompts/refactoring.md`
-   - **Non-runtime updates (pre-approved manual-only exception)**: Changes that do not add or modify any executable runtime code path may proceed with manual verification only — no automated test and no per-task approval required. Declare the change in Step 0, state why no runtime code is affected, and describe the manual verification plan. This covers:
-     - `.vscode/`, `.editorconfig`, and other editor / IDE preference files
-     - Documentation-only files (`*.md`, `prompts/*`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`)
-     - Non-executable config (`cspell.config.yaml`, `.gitignore`, `.prettierignore`, etc.)
-     - Purely cosmetic asset swaps with no code-side selector / path change
-   - If a test is genuinely infeasible for a change that **does** affect runtime code, state the reason explicitly and obtain user approval before proceeding.
-
-1. **Refactor first** _(mandatory before lint or tests)_: apply high/medium-priority refactoring to all new/modified code — see `prompts/refactoring.md`. Do not proceed until no high/medium items remain.
-2. **Tests**: implement the tests declared in Step 0. See `prompts/testing-guide.md`.
-   - **E2E cleanup / leaked data**: When fixing issues where E2E leaves database or UI artifacts, follow the **Regression fix workflow** in `prompts/testing-guide.md` (add a failing guard → fix → confirm green). Prefer stable selectors (`data-testid`) over locale-dependent strings for teardown.
-3. **Verification gate**: run `pnpm josh gate` — lint, type check, spell check and unit tests **concurrently**, with every failure reported in one pass; fix all errors before reporting done. Add legitimate project terms the spell check flags to `cspell.config.yaml`. Each `Edit` / `Write` is already followed by `pnpm josh format:edited`, a `PostToolUse` hook that runs `eslint --fix` and `prettier --write` on that one file, so a file may differ from what you wrote and the lint check mostly reports what the hook could not fix on its own.
-4. **IDE feedback**: check IDE lint output — often more current than terminal
-5. Never say "it should pass" without running commands. Never finish while errors exist.
-6. Do not modify `eslint.config.js` unless explicitly asked; fix issues in application/test code instead.
-
-## Completion gate (before you tell the user work is done)
-
-Run the full verification set **in order**. **Do not** skip or reorder steps. **Do not** report completion if any step failed or was skipped without the user agreeing.
-
-**STOP — Refactor before the gate.** For any code change, you MUST complete refactoring (`prompts/refactoring.md`) **before** running `pnpm josh gate`. Do not run step 2 or later until refactoring is done. For a **refactor-only** request, follow `refactoring.md`'s own **convergence** (high/medium items until none remain).
-
-**E2E:** The user runs `pnpm josh test` and shares the full output. Do **not** claim completion until the user confirms E2E passed or explicitly scopes it out.
-
-**UI verification (screenshot):** Any change that affects the rendered UI — new or modified components, layout, styling, user-visible copy, visible state, or interactions — is **not** done until you have actually looked at the rendered result. Capture a screenshot of the affected screen with the `/verify-ui` skill this package distributes (`.claude/skills/verify-ui/`): it picks the routes, calls the application layer's own screenshot command, and opens the images. `@joshuafolkken/app-kit` ships that command as `pnpm josh-app shot`; `@joshuafolkken/game-kit` does not yet, so decide by the command list the toolkit prints rather than by which toolkit is installed. Where no such command exists and the project defines no screenshot script of its own, it falls back to adding a `page.screenshot()` to the relevant `*.e2e.ts` — committed test code, not an improvised script — and only where there is no E2E suite either does it report that the gate could not be closed and ask you to look. That report is the answer, never a pass. Confirm the screen matches the intent before reporting completion. **Passing unit/E2E tests are not proof the UI looks correct** — tests routinely stay green while layout, spacing, or styling is visibly broken. If your environment cannot produce a screenshot, say so explicitly and ask the user to verify visually; never report a UI change as done on tests alone.
-
-0. **Test gate** — Count (a) code changes made and (b) tests added/updated. If b = 0, allow the run to continue **only** when every change falls under the pre-approved non-runtime exception (see Code Change Rules Step 0) or the user has explicitly approved the infeasibility. Otherwise **stop** — go back to Code Change Rules Step 0 and add tests before continuing.
-1. **Refactor** — read and execute `prompts/refactoring.md` on all changed files. Converge until no high/medium items remain. **Do not proceed to step 2 until complete.**
-2. `pnpm josh gate` — lint, type check, spell check and unit tests, run **concurrently**. Every failing check is reported in one pass, so one run tells you everything that is wrong. Re-run a single check while fixing by copying the command from its output header — the type check's command is resolved per project, the other three are `pnpm josh lint` / `pnpm josh cspell:dot` / `pnpm josh test:unit`.
-3. **Self-review** — run `/code-review medium` per `prompts/review.md` on the staged diff (and `git diff main...HEAD` before opening a PR). Produce the full categorized output, resolve all high/medium findings, and iterate until clean — **at most two reviews in total**. After the second round, file every remaining non-High finding as a follow-up Issue referencing this one, run `pnpm josh epic:bundle <new>` on it before this Issue closes and act on its answer, and complete the current Issue; only a confirmed High blocks regardless of round count. See `prompts/review.md` → "Review round cap".
-4. **IDE feedback**: zero **errors** on every file you changed (warnings only when documented as an allowed exception).
-5. **E2E**: Ask the user to run `pnpm josh test` and share the output. Fix any failures, then ask again.
-
-If you changed **only** docs or config that does not affect tests, `pnpm josh gate` still applies — it runs the unit tests alongside the rest, which is cheaper than deciding whether they could have been affected.
-
-## Refactoring Rules
-
-- When performing any refactoring, ALWAYS read and follow `prompts/refactoring.md` before starting.
-- Write tests for existing behavior **before** making any structural changes — this is mandatory and not optional.
-
-## Pre-commit Self-Review (mandatory)
-
-Before every `git commit` — including follow-up commits on the same branch — perform a self-review against `prompts/review.md`.
-
-- Scope: the staged diff (`git diff --staged`). Before opening or updating a PR, also review the cumulative branch diff (`git diff main...HEAD`).
-- Produce the full categorized output defined in `prompts/review.md`. Every category must have an explicit verdict (findings or `No issues`).
-- Resolve **all high and medium findings** before committing. Low findings may be skipped with a one-line reason.
-- If a fix introduces new code, re-run the self-review on the updated diff. Iterate until no high/medium findings remain — **at most two reviews in total**.
-- **The round cap is unconditional.** Each fix creates new surface and an unbounded review always finds something in it, so the severity rule alone does not terminate: on joshuafolkken/kit#854 four rounds produced 18 findings, most of them about code the previous round's fix had just written. After the second review, file every remaining non-High finding as a follow-up Issue and complete the current work — reference the current Issue from it when the work has one, and file it standalone when it does not, because a pre-commit review outside any workflow has no Issue to point at and a deferred finding is still never dropped. **Filing does not end at the Issue**: run `pnpm josh epic:bundle <new>` **before the current Issue closes** — the candidate search reads open issues only — and act on its answer before completing the current work. `epic:next` never offers an Issue no epic tracks, so skipping this parks the finding forever rather than dropping it, which reads the same from the backlog. Which answers are Tier A, the write command each one needs, and what an `epicrun` does with `ask`: `prompts/review.md` → "Review round cap". A confirmed High is the only exception — a real defect never ships on a round count — and a High still standing after the second round means the change is not ready: stop, send a `confirmation` Telegram, and put the scope back to the user rather than starting a third round.
-- CI no longer runs a Claude review — the pre-commit self-review is the authoritative pass, so do not rely on a CI safety net.
-
-## Doc Sync Rules
-
-**CLAUDE.md, GEMINI.md, and AGENTS.md are paired documents.** Whenever any one of them is updated, apply the equivalent change to all three in the same commit. This includes rule additions, spec changes, wording fixes, and section additions. Never update one without checking the others.
-
-**docs/ must stay in sync with the package.** Whenever `josh bump` is run (i.e. the package version changes), review `docs/` and update any section that describes changed behavior before committing. This applies to behavior changes in `josh init`, `josh sync`, new or renamed commands, and any new config files managed by the package.
-
-## Git Rules
-
-- **No commits** unless explicitly requested by the user
-- **No PR merges, branch deletions, force pushes, or other shared-state mutations** unless explicitly requested in the current turn. The default end state is PR still OPEN — do not run `gh pr merge` on your own. **Exception**: invoking `fullrun` or `fullrun new` is explicit authorization to merge; use `pnpm josh followup --merge` in that flow. **The distributed `.claude/settings.json` denies `gh pr merge` outright** (`Bash(gh pr merge*)`), so the direct command is refused before it runs; `pnpm josh followup --merge` is unaffected because it calls gh from inside a node script, which leaves the authorized merge path as the only one that works.
-- **Never stage or mutate the git index on your own.** The index belongs to the user — they may have deliberately staged a snapshot to diff later changes against. `git add` / `git add -A` / `git rm --cached` / `git restore --staged` overwrite that snapshot, and the index keeps no history, so the previous staged state cannot be restored. **Never run a staging command merely to inspect something** (computing a diff stat, seeing an untracked file's content, etc.) — inspection is always read-only: `git status --short`, `git diff`, `git diff --stat`, `git diff HEAD`, and `git diff --no-index /dev/null <new-file>` for an untracked file. Staging is allowed only when the user explicitly asks for it in the current turn, or as part of an authorized commit flow (`pnpm josh git`, or a `fullrun` / `queue` invocation). When you believe staging is needed outside those cases, ask first. **The distributed `.claude/settings.json` denies these commands outright** (`Bash(git add*)` / `Bash(git stage*)` / `Bash(git rm*)` / `Bash(git mv*)` / `Bash(git reset*)` / `Bash(git restore --staged*)` / `Bash(git restore -S*)` / `Bash(git commit -a*)` / `Bash(git commit --all*)`), so they are refused before they run, while `pnpm josh git` keeps working because it drives git from inside a node script. The deny carries no per-turn exception, so even an explicit staging instruction is blocked for you — ask the user to run it in their own terminal. **Refused and forbidden are not the same set**: `git checkout -- <path>` and `git restore <path>` still run, and the rule above — not the tool — is what stops them. Never read "the tool let me" as permission.
-- For git operations: use `pnpm josh git`
-- **Recovery after failed push**: If `pnpm josh git -y` fails at the push step (e.g. pre-push hook blocked), fix the issue, push manually, then run `pnpm josh pr` (or `pnpm josh git -y --skip-commit --skip-push`) to create the PR. **Never** use `gh pr create` directly — it bypasses `closes #N` generation and the Issue will not auto-close.
-- **Start-of-conversation git status is a stale snapshot.** The `gitStatus` block in the environment preamble is captured once at session start and never refreshes. Before acting on any assumption about working-tree / index / stash / branch state, run `git status` live first. Never report state or propose a plan based on the snapshot alone.
-
-## Collaboration Workflow
-
-- For issue-driven proposal/plan/execution/notification flow, follow `prompts/collaboration-workflow.md`
-
-### Shorthand Commands
-
-`kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill (`.claude/skills/workflow-commands/`), which also carries the `/code-review` → `followup --merge` chain rule, the auto-merge authorization and the Telegram notification formats. Each of those rules applies only while its own command is running, so keeping them loaded on every turn spent context describing a workflow most turns never enter. **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do, as does the follow-up filing step in Pre-commit Self-Review, and they are resident in full for that reason. Everything a run reaches only after it has read the skill is routed to, never restated; restating it is what drove these documents to their size ceiling. See `.claude/skills/workflow-commands/SKILL.md` → "What stays resident, and what is read from here".
-
-**Read the skill before running any part of a command — including the first `gh` call.** Acting from the table below alone is not enough: the table says which command was typed, not how to run it.
-
-| Typed keyword         | What it does                                                                                                                | Read first                                                                                                           |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `kickoff [#N \| new]` | Plan only — normalize the title, post the plan to the Issue, notify, **stop**                                               | `.claude/skills/workflow-commands/SKILL.md` + `kickoff.md` + `split-assessment.md`                                   |
-| `fullrun [#N \| new]` | Plan → implement → verification gate → PR → **merge** → notify                                                              | `.claude/skills/workflow-commands/SKILL.md` + `fullrun.md` + `split-assessment.md` + `chain-rule.md` + `followup.md` |
-| `halfrun [#N \| new]` | Implement + verification gate, then **stop before commit** for manual verification                                          | `.claude/skills/workflow-commands/SKILL.md` + `halfrun.md` + `split-assessment.md`                                   |
-| `queue #N1 #N2 …`     | `fullrun` for each Issue in the given order, stopping at the first failure                                                  | `.claude/skills/workflow-commands/SKILL.md` + `queue.md` + the `fullrun` set                                         |
-| `epicrun #E`          | Run an epic's children unattended — or one ordinary Issue, growing an epic if the work does — parking what needs a decision | `.claude/skills/workflow-commands/SKILL.md` + `epicrun.md` + `split-assessment.md` + the `fullrun` set               |
-
-The canonical extended reference stays `prompts/collaboration-workflow.md`; the skill is the operational procedure, and the two must agree.
-
-**Three rules decide what a run does when the work turns out not to be one Issue** — the split assessment every entry point applies identically, a prerequisite discovered mid-run (filed and recorded as a dependency, not parked), and `epicrun` accepting an Issue that is not an epic. All three bind only after a command has started, so all three are read from `.claude/skills/workflow-commands/`: `split-assessment.md` for the assessment itself, and `fullrun.md` / `halfrun.md` / `epicrun.md` for the branch each entry takes. Canonical reference: `prompts/collaboration-workflow.md` → "分割判定は全入口で共通（`kickoff epic` は作らない）" / "実行中に前提 Issue が判明した場合" / "EPIC でない Issue も受け取る".
-
-**The `josh epic:*` commands have their own skill.** `epic:plan` front-loads every decision into one batch, `epic:audit` finds contradictions across an epic's children, `epic:next` says what is runnable per repository, and `epic:bundle` says whether a newly filed issue belongs with one already in the backlog — as does an epic that spans repositories, and why a cross-repository dependency waits for a publish rather than for a close. **Read `.claude/skills/epic-commands/SKILL.md` before running any of them, before writing an epic that tracks a child in another repository, and right after filing an issue.** Three rules stay here because they bind outside those commands: **recording a decision removes that child's `needs-decision` label** (Tier A — without it the child stays parked after the answer arrived); **fixing what the audit finds is Tier A**, park only when the contradiction is a design choice nobody has made; and **an epic in another repository is referenced as `owner/repo#N`**, since a bare `#N` resolves to this repository's issue of that number. Canonical reference: `prompts/collaboration-workflow.md`.
-
-#### Explicit invocation required (MANDATORY)
-
-Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` workflow (including their `#N` and `new` variants) unless the user has typed the keyword in the **current turn's prompt**.
-
-- Conversational requests like "implement X", "fix Y", "open a PR for Z" are **NOT** implicit invocations. Even if the task clearly fits one of these workflows, do not infer authorization from the request shape.
-- Do **NOT** ask confirmation questions like "May I proceed with `halfrun new`?" or "Shall I run `fullrun`?". A confirmation prompt is not an acceptable substitute for explicit invocation.
-- Instead, **prompt the user to type the command themselves**. Use the exact phrasing: "Please run \`<command>\` to start this task." For example: "Please run \`halfrun new\` to start this task." or "Please run \`fullrun #412\` to execute this Issue." The user must type the command on the next turn.
-- This rule applies even when the user has previously authorized a related workflow in an earlier turn. Each invocation must be re-typed by the user in the current turn.
-
-**`epicrun` parks a child instead of stopping the session**, and its procedure is read from `.claude/skills/workflow-commands/epicrun.md` → "park and continue". Canonical reference: `prompts/collaboration-workflow.md` → "`epicrun` — EPIC 配下の子 Issue を無人で実行する".
-
-#### Mid-workflow stop notification (`confirmation`)
-
-Whenever you pause **any** run mid-execution to wait for the user — a `kickoff` / `halfrun` / `fullrun` / `queue` stop, an upstream-Issue interrupt, a Tier C confirmation — you MUST send a Telegram notification **before** stopping, so the user is alerted off-screen. This stays resident because most of those pauses happen on turns where no workflow keyword was typed and no workflow skill is loaded. `halfrun`'s built-in stop before commit is a confirmation pause and follows this same rule — the resume-command body required by `.claude/skills/workflow-commands/halfrun.md` is the specific form for that case.
-
-```bash
-pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<one-line reason>\n<what is needed from the user>'
-```
-
-- Use `--body=...` (single token) when the body starts with `-`, otherwise `parseArgs` rejects it
-- Send only once per stop — do not spam if you re-evaluate within the same pause
-- Skip the notification when the stop was explicitly requested by the user in the same turn (they already know)
-
-## MCP Tools (Svelte)
-
-You have access to the Svelte MCP server with comprehensive Svelte 5 and SvelteKit documentation.
-
-### list-sections
-
-Use this FIRST for any Svelte/SvelteKit topic to discover relevant documentation sections.
-
-### get-documentation
-
-After `list-sections`, fetch ALL relevant sections (analyze `use_cases` field to determine relevance).
-
-### svelte-autofixer
-
-MUST use whenever writing Svelte code before sending to the user. Keep calling until no issues remain.
-
-### playground-link
-
-Generates a Svelte Playground link. Only call after user confirmation and NEVER if code was written to project files.
+**Do not copy rules back into this file.** A rule added here is a fourth place to forget to update.
+Every change to how agents work in this repository belongs in `CLAUDE.md`.

@@ -23,7 +23,7 @@
 
 ### 手順の置き場所（常時ロードとオンデマンドの分離）
 
-`kickoff` / `fullrun` / `halfrun` / `queue` / `epicrun` の**操作手順**は、常時ロードされる `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` からは外され、`.claude/skills/workflow-commands/` に置かれている（joshuafolkken/kit#854）。3 文書に残るのはキーワードとスキルへの導線、およびスキルが読み込まれていない状態でも効く必要のある規則だけである。依存更新後の overrides / `devEngines` 検証手順も同様に `.claude/skills/dependency-update/` へ移した。**どの規則が「残す」側かは →「常駐ドキュメントと skill の分担（何を常駐に残すか）」が判定基準と全 4 件を定義する。**
+`kickoff` / `fullrun` / `halfrun` / `queue` / `epicrun` の**操作手順**は、常時ロードされる `CLAUDE.md` からは外され、`.claude/skills/workflow-commands/` に置かれている（joshuafolkken/kit#854）。`CLAUDE.md` に残るのはキーワードとスキルへの導線、およびスキルが読み込まれていない状態でも効く必要のある規則だけである。依存更新後の overrides / `devEngines` 検証手順も同様に `.claude/skills/dependency-update/` へ移した。**どの規則が「残す」側かは →「常駐ドキュメントと skill の分担（何を常駐に残すか）」が判定基準と全 4 件を定義する。**
 
 このドキュメントは引き続き**正典の詳細版**であり、スキルは操作手順である。両者は一致していなければならないので、片方だけを更新してはならない。
 
@@ -242,14 +242,14 @@ Issue: <issue-url>
    ```bash
    git stash pop
    ```
-7. **作業サマリを提示してから**実装を開始する（`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` の Code Change Rules Step 0）。書式は下記「報告フォーマット（平易な概要 ＋ 技術詳細）」に従う — `JOSH_SESSION_LANG` の言語で、平易な概要 3 行を先頭に置き、技術詳細（触るファイル / モジュール、アプローチとその理由、副作用・スコープ外、テスト宣言）はその下に置く。
+7. **作業サマリを提示してから**実装を開始する（`CLAUDE.md` の Code Change Rules Step 0）。書式は下記「報告フォーマット（平易な概要 ＋ 技術詳細）」に従う — `JOSH_SESSION_LANG` の言語で、平易な概要 3 行を先頭に置き、技術詳細（触るファイル / モジュール、アプローチとその理由、副作用・スコープ外、テスト宣言）はその下に置く。
 
    `fullrun` / `halfrun` / `queue` では Issue ごとに 1 回、実装に着手する直前に提示する。**Issue body が既に埋まっていて計画コメントを投稿しなかった場合も必ず提示する**（この場合ユーザーには他に作業内容が見えないため）。`kickoff` は既に計画を Issue に投稿するので対象外。
 
    提示は説明のためであり、**確認待ちで停止する意味ではない**。同一ターンでそのまま実装へ進むこと（停止条件にはならず、`/code-review` → `followup --merge` のチェーン規則にも影響しない）。セッション向け出力のみに留め、Issue コメントとしては投稿しない。
 
 8. 実装完了後、**lint/test より前に** `prompts/refactoring.md` に従ってリファクタリングを適用する（高・中優先度項目が残らなくなるまで収束させる）
-9. 検証ゲート（`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` の Completion gate）を実行する
+9. 検証ゲート（`CLAUDE.md` の Completion gate）を実行する
 
 `pnpm josh git` の基本実行（`-y` で確認プロンプトをスキップ）。**初回コミット前に必ず `pnpm josh bump minor` を実行する。** ただし、同一 PR 内の追加修正コミット（CodeRabbit 指摘対応など）では実行しない。
 
@@ -343,11 +343,11 @@ This self-check is mirrored at the end of the `/code-review` skill prompt (`prom
 
 ### Tooling enforcement (investigated, not implemented)
 
-A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part of this rule. **It is not feasible at the tooling layer**: `/code-review` is an interactive AI skill that returns Markdown for the agent to interpret — a shell command cannot host the skill, parse its severity verdicts, or decide "no high/medium" on the agent's behalf. The strongest available enforcement is the decision table, anti-pattern catalog, and turn-end self-check above, sitting in always-loaded context (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) plus the skill prompt (`prompts/review.md`).
+A `pnpm josh review --auto-followup` style CLI wrapper was investigated as part of this rule. **It is not feasible at the tooling layer**: `/code-review` is an interactive AI skill that returns Markdown for the agent to interpret — a shell command cannot host the skill, parse its severity verdicts, or decide "no high/medium" on the agent's behalf. The strongest available enforcement is the decision table, anti-pattern catalog, and turn-end self-check above, sitting in always-loaded context (`CLAUDE.md`) plus the skill prompt (`prompts/review.md`).
 
 ## 報告フォーマット（平易な概要 ＋ 技術詳細）
 
-作業前サマリ（Step 7）と完了報告（Step 5）は、**平易な概要を先頭に置き、技術詳細をその下に降格する 2 層構造**で書く。ここが横断ドキュメント（`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`）のカノニカル参照。
+作業前サマリ（Step 7）と完了報告（Step 5）は、**平易な概要を先頭に置き、技術詳細をその下に降格する 2 層構造**で書く。ここが横断ドキュメント（`CLAUDE.md`）のカノニカル参照。
 
 理由: 報告の読み手は実装者とは限らない。ファイル名・型名・オプション名が並ぶ説明は「何が原因で、どう対応し、結果どうなったか」を伝えない。詳細を消すのではなく、**先に結論を平易な言葉で伝え、詳細は読み飛ばせる位置に置く**。
 
@@ -1091,7 +1091,7 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
   - 同じ欠陥を扱う**既存 Issue の検索**
 - **取り下げも外向きの行為**: 既に起票した third-party Issue のクローズ・編集・コメントも、同じく明示指示を要する
 - **正しい診断は公開の許可ではない**。sveltejs/kit#16623 の事例では所見自体は上流のソースで検証可能な正しいものだったが、手順として誤っていた。所見の正しさは、この節のどの要求も免除しない
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Third-party repositories are Tier C」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Third-party repositories are Tier C」）のカノニカル参照
 
 ### 検証ゲートを緩めることも「回避策」である
 
@@ -1105,7 +1105,7 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 
 - **即席回避と根本対応は「迷って選ぶもの」ではない**。上流起因と分かった時点で選択肢は根本対応だけであり、「今回は軽いから即席で」という判断はこの手順に存在しない
 - 別パッケージへの新 Issue 作成・stash・Issue コメントは可逆かつ低コストな調査/起票操作なので、Tier C（不可逆・共有状態の操作）ではなく Tier A として確認なしで進める。ただし上流パッケージの **マージ等の共有状態操作** は通常どおりそれぞれのワークフローの明示起動を要する。**「可逆かつ低コスト」という前提が成り立つのは自分たちが所有するリポジトリに対してだけ**で、third-party への起票は外向き・実質不可逆なので Tier C になる（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Cross-package problems → file the upstream Issue, then always stop」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Cross-package problems → file the upstream Issue, then always stop」）のカノニカル参照
 
 ## クローン禁止・単一ソース化（パッケージ境界を越えても）
 
@@ -1115,7 +1115,7 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 - **「上流を参照する」は「再利用する」の意**であって、「そのコードを貼り付ける」ではない
 - **「X を触るな」という制約はクローンを黙って正当化しない**: クリーンな修正には上流（kit）の変更が要る／代替はクローン、というトレードオフを先にユーザーへ提示する（「クリーンな修正は kit の変更が必要、代替はクローン、どちらにする？」）
 - 複製は、単一ソース化の代替案とそのコストを提示し、**ユーザーの明示承認を得た後にのみ**行う
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「No clones — single-source」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「No clones — single-source」）のカノニカル参照
 
 ## 相談と実行を区別する（議論中にファイルを編集しない）
 
@@ -1124,15 +1124,29 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 - 具体的アクションを取ってよいのは、明示的な命令（「do it」「書き換えて」「作成して」「implement」）またはワークフローキーワード（`kickoff` / `halfrun` / `fullrun` / `queue`）があるときだけ
 - 曖昧なときは propose-and-wait を既定とする（「これを実行してよいか？」と尋ねる）
 - **目標の表明は「計画の依頼」であって「実行の承認」ではない**
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Distinguish consultation from execution」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Distinguish consultation from execution」）のカノニカル参照
 
 ## 配布ドキュメント・設定の変更は kit に上流化する
 
-`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` および kit が配布する他のドキュメント／設定は、kit から単一ソースで配布される。
+`CLAUDE.md` および kit が配布する他のドキュメント／設定は、kit から単一ソースで配布される。
 
 - **消費者リポジトリ（app-kit / game-kit）ではこれらをローカル編集しない**: `josh sync` が編集を上書きするうえ、変更は本来上流（kit）に属する。ドキュメント／設定を編集する前に、それが配布物かどうかを確認し、配布物なら kit 側に変更を提案（Issue／PR）する
-- **kit リポジトリ自身ではあなたが配布元**なので、ここでは編集してよい。その際は 3 つの対ドキュメントを「Doc Sync Rules」に従って同期する
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Route distributed-doc / config changes upstream to kit」）のカノニカル参照
+- **kit リポジトリ自身ではあなたが配布元**なので、ここでは編集してよい。編集先は `CLAUDE.md` 1 本である（次節）
+- このルールは横断ドキュメント（CLAUDE.md「Route distributed-doc / config changes upstream to kit」）のカノニカル参照
+
+## エージェント規則の単一ソースは `CLAUDE.md`（`AGENTS.md` / `GEMINI.md` は導線）
+
+**規則の本体は `CLAUDE.md` にしか無い。** `AGENTS.md` と `GEMINI.md` は「規則は `CLAUDE.md` にある。作業前に全文を読むこと」だけを書いた短い導線文書であり、規則を 1 行も持たない（joshuafolkken/kit#963）。
+
+- **規則の追加・仕様変更・文言修正・節の追加は `CLAUDE.md` に 1 回だけ書く。** 他の 2 本には触れない
+- **導線文書に規則を書き戻さない。** そこに書かれた規則は、次の改訂で更新し忘れる 4 つ目の置き場になる
+- `scripts/ai-document-pointers.test.ts` が機械的に守る。導線文書に規則本体が再出現した場合、導線の一文が消えた場合、`CLAUDE.md` が単一ソースであることの記述が消えた場合に落ちる
+
+**なぜこうなったか。** 3 本はほぼ同一の複製で、規則を 1 つ変えるたびに 3 回書いて 3 回レビューする必要があり、しかも 3 本とも常駐上限まで 1KB を切っていた。これは `CLAUDE.md` 自身が「No clones — single-source」で禁じているクローンそのものであり、禁止を書いている文書がその禁止に違反している状態だった。
+
+**他ツールでの検証は行っていない。** Codex / Cursor / Gemini CLI が導線を辿るかは未確認で、現在 Claude しか使っていないという判断による（joshuafolkken/kit#970 の `## Decisions`）。導線を辿らないツールを使い始める時点で、そのツールについて別途扱う。
+
+- このルールは横断ドキュメント（CLAUDE.md「Doc Sync Rules」）のカノニカル参照
 
 ## 最新優先・fix-forward（pin-back は最終手段）
 
@@ -1147,11 +1161,11 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 4. **既存の保護を尊重する**: この方針は overrides / `devEngines` の承認ゲートを上書きしない。fix-forward は _「最新を優先し破壊を直す」_ であって _「保護された pin を黙って書き換える」_ ではない。overrides（`pnpm-workspace.yaml` / `package.json` のいずれも）と `devEngines` の変更は従来どおりユーザーの明示承認を要する（→「overrides の保護（`pnpm-workspace.yaml` / `package.json` の両方を見る）」、および CLAUDE.md の `devEngines` 保護ルール参照）
 5. **タイムリーに**: バンプ起因の破壊は、可能な限り同じ作業セッション内で速やかに対処し、pin の裏に先送りしない
 
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Latest-first, fix forward — pin back only as a last resort」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Latest-first, fix forward — pin back only as a last resort」）のカノニカル参照
 
 ## 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く
 
-今後のセッションでも守るべき恒久的な振る舞いのルールに気付いたときは、**kit が配布するプロンプト／ドキュメント**（`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `prompts/*`）への変更として記述する。プロジェクト単位の自動 MEMORY（例: `~/.claude/projects/<repo-slug>/memory/`）への保存で済ませてはならない。
+今後のセッションでも守るべき恒久的な振る舞いのルールに気付いたときは、**kit が配布するプロンプト／ドキュメント**（`CLAUDE.md` / `prompts/*`）への変更として記述する。プロジェクト単位の自動 MEMORY（例: `~/.claude/projects/<repo-slug>/memory/`）への保存で済ませてはならない。
 
 なぜプロンプト／ドキュメントが正なのか:
 
@@ -1172,11 +1186,11 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 3. 消費者リポジトリで気付いた場合は、ローカル編集ではなく kit 側へ Issue／PR として上流化する
 4. 既に MEMORY にあるルールが実は共有すべきものだと分かったときは、プロンプト／ドキュメントへ移し、MEMORY 側の重複エントリは削除する
 
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Durable rules belong in prompts/docs, not local MEMORY」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Durable rules belong in prompts/docs, not local MEMORY」）のカノニカル参照
 
 ## 常駐ドキュメントと skill の分担（何を常駐に残すか）
 
-`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` は毎ターン全文が読み込まれる。したがって常駐に書ける量は有限で、`scripts/workflow-skills.test.ts` の `RESIDENT_CEILING_BYTES` がその上限を固定している。**どの規則を常駐に残すかは、書き手の重要度判断ではなく次の 1 問で決める。**
+`CLAUDE.md` は毎ターン全文が読み込まれる。したがって常駐に書ける量は有限で、`scripts/workflow-skills.test.ts` の `RESIDENT_CEILING_BYTES` がその上限を固定している。**どの規則を常駐に残すかは、書き手の重要度判断ではなく次の 1 問で決める。**
 
 > **その規則は、skill がロードされていないターンでも効く必要があるか。**
 
@@ -1206,7 +1220,7 @@ no になり skill 側に本体を置くものの例:
 
 **この基準は努力目標ではない。** 常駐に手順を書き戻すと、その分の予算を次に本当に常駐が要る規則が既存の文章から取り返すことになる。上限に張り付いた状態で 1 文を足すために別の文を削ると、**削る対象はマーカーで固定されていなかった箇所から選ばれる** — 規則の重要度ではなく、テストに拾われていなかったかどうかで残る文が決まる（joshuafolkken/kit#951）。上限そのものを引き上げる対処は、上限が防いでいる状態の追認にあたるので採らない。
 
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Shorthand Commands」）および `.claude/skills/workflow-commands/SKILL.md`「What stays resident, and what is read from here」のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Shorthand Commands」）および `.claude/skills/workflow-commands/SKILL.md`「What stays resident, and what is read from here」のカノニカル参照
 
 ## 運用ルール
 
@@ -1279,11 +1293,11 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
 - **`git stash` は例外的に、明文化されたフローの中でのみ自動実行してよい**: `fullrun new` / `halfrun new` の手順 5（作業ツリーに変更がある状態で `josh latest` を回す前の退避）、`queue` の手順 1、`epicrun` のラン開始時の `josh latest`（`queue` の手順 1 と同じ場面）、および「別パッケージ起因の問題は割り込み Issue で対応する」。いずれも直後に `git stash pop` で復元することが手順に含まれている。これら以外の場面で退避したくなったときは、実行せずに先に確認する
 - **この禁止は kit 配布の `.claude/settings.json` の `deny`（`Bash(git add*)` / `Bash(git stage*)` / `Bash(git rm*)` / `Bash(git mv*)` / `Bash(git reset*)` / `Bash(git restore --staged*)` / `Bash(git restore -S*)` / `Bash(git commit -a*)` / `Bash(git commit --all*)`）で機械的にも遮断されている。** `pnpm josh git` は node スクリプト内部から git を起動するため影響を受けず、承認済みのコミットフロー（上記ケース 2）は従来どおり動く。**deny には「そのターンでユーザーが明示指示した」という例外がないため、上記ケース 1 も AI 側では実行できない** — その場合はユーザー自身の端末で実行してもらう（ユーザーの手元では従来どおり動く）。恒久的な機械的保証のほうが、コマンド 1 本で回避できる例外より価値が高いという判断（joshuafolkken/kit#850）
 - **「拒否される操作」と「禁止された操作」は同じ集合ではない。** deny に載っているのは上記の直接実行だけで、このセクションが同じく禁じている `git checkout -- <path>` / `git restore <path>` は実行できてしまう。**ツールが通したことを許可と読み替えてはならない** — 何をしてよいかを決めるのは deny ではなくこのルールである
-- このルールは横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Git Rules」→「Never stage or mutate the git index on your own」）のカノニカル参照
+- このルールは横断ドキュメント（CLAUDE.md「Git Rules」→「Never stage or mutate the git index on your own」）のカノニカル参照
 
 ### 意思決定の自律ポリシー（確認停止を減らす）
 
-AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎるのを防ぐため、各判断を3層に分類して扱う。停止して確認するのは**本当にユーザーの判断が必要な分岐だけ**にする。このセクションが横断ドキュメント（CLAUDE.md / AGENTS.md / GEMINI.md「Decision autonomy」）のカノニカル参照。
+AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎるのを防ぐため、各判断を3層に分類して扱う。停止して確認するのは**本当にユーザーの判断が必要な分岐だけ**にする。このセクションが横断ドキュメント（CLAUDE.md「Decision autonomy」）のカノニカル参照。
 
 - **Tier A — 可逆な実装・設計判断**（明確に優位な選択肢があるライブラリ選定、命名、ファイル構成、テスト手法、リファクタの形）。メリット比較で1案が明確に優位なら**確認せず自動で選んで進める**。本来ユーザー確認すべき分岐だった場合は、後から監査・差し戻せるよう判断を記録する（下記「自動判断の記録」）
 - **Tier B — 本当に甲乙つけがたい判断**。上位2案がどちらも妥当で差が僅差。**ここだけが停止する層** — ユーザーに確認する（`AskUserQuestion` が使えるなら使う）。拮抗する候補とトレードオフを提示する

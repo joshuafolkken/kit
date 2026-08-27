@@ -178,7 +178,7 @@ SECURITY.md         pnpm-workspace.yaml tsconfig.sonar.json
 sonar-project.properties  (generated from GitHub repo name)
 ```
 
-`CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/kit/prompts/` so they work correctly in the consuming project. The same rewrite runs over the markdown inside every copied `.claude/skills/` directory, so a skill may cite the prompt it extends and have the path resolve in a consumer.
+`CLAUDE.md` carries every agent rule; `AGENTS.md` and `GEMINI.md` are short pointers to it and hold no rules of their own ([#963](https://github.com/joshuafolkken/kit/issues/963)). All three have their `prompts/` paths rewritten to point to `node_modules/@joshuafolkken/kit/prompts/` so they work correctly in the consuming project — the pointers included, since each one tells the reader to open `prompts/*.md` when `CLAUDE.md` names one. The same rewrite runs over the markdown inside every copied `.claude/skills/` directory, so a skill may cite the prompt it extends and have the path resolve in a consumer.
 
 `sonar-project.properties` is generated from the GitHub repo name fetched via `gh repo view`. If `gh` is not available or the repo cannot be identified, the file is skipped with a warning.
 
