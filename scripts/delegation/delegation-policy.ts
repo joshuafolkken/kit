@@ -33,6 +33,12 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 			'`pnpm josh gate` is re-run; a wrong fix fails it again, and the failure names the file',
 	},
 	{
+		name: 'epic-child',
+		does: 'run one child of an epic end to end in an isolated unit — plan, verification gate, PR, merge — and return only its summary to the parent loop',
+		verifier:
+			"the parent reads the child's state from GitHub with `gh issue view`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup --merge` would touch the PR",
+	},
+	{
 		name: 'survey',
 		does: 'read across many files and report where something appears — every reference to a symbol, which documents carry a marker',
 		verifier:

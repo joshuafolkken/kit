@@ -89,6 +89,51 @@ every child, which is what forces a person to stay at the machine.
 
 It does **not** approve anything outside the epic. A Tier C action still stops — for that child.
 
+## Each child runs in a delegated unit
+
+**A child is not run in the parent loop's context.** One child goes to an isolated execution unit,
+and only its summary comes back (joshuafolkken/kit#984). The measurement is why: across one
+`epicrun` that ran seven children in one context, the context averaged 99,789 over the first twenty
+requests and 698,928 over the last twenty, and the same 490 requests broken every 50 — about one
+child — would have billed 33% of what they did.
+
+**The mechanism is not new.** It is the one joshuafolkken/kit#969 defined — the enumeration plus
+`pnpm josh delegate` — with the unit changed from one step of a run to one child of an epic.
+Building a second is the clone `CLAUDE.md` prohibits. Ask the command rather than deciding:
+
+```bash
+pnpm josh delegate epic-child   # → delegate
+```
+
+**The parent reads GitHub, never the summary.** That is `epic-child`'s verifier, and it is the whole
+reason the unit may be delegated at all: a unit that reports a child finished without its PR merged
+leaves that child open, and `gh issue view <N> --json state` says so in one call. The child's own
+gate, `/code-review` and CI run inside the unit, and `pnpm josh followup --merge` will not touch the
+PR until they are green. **Never advance the loop on the summary alone** — that discards the
+verifier, and without it `epic-child` is not a delegatable unit.
+
+**Read the state directly rather than asking `epic:next` again.** A child that did not finish still
+carries `in-progress`, and `epic:next` classifies such a child as waiting on time before it consults
+any blocker — so it answers `wait`, not the number, and a loop that took that as its check would
+poll to the 90-minute stale window instead of learning that the child failed.
+
+**The merge authorization reaches the unit.** The batch a person approved by typing `epicrun` covers
+the unit that runs each child (joshuafolkken/kit#986 → `## Decisions`). Delegating changes which
+context spends that authorization, not how far it reaches.
+
+**So does the explicit invocation, and the brief is what carries it.** `CLAUDE.md` → "Explicit
+invocation required" forbids starting a `fullrun`-shaped run that was never typed, and a unit
+holding that rule with nothing to point at would refuse, return the child open, and be booked as a
+failure. What the rule forbids is **inferring** a workflow from the shape of a request; it is not
+a requirement that the keystroke land in the unit's own transcript. **The brief therefore names the
+invocation it descends from** — `epicrun #<E>`, the child number, and that the child is to be run as
+`fullrun #<N>` under that authorization. Written that way there is nothing to infer, which is the
+whole of what the rule asks. A brief that omits it is the defect: the unit is then guessing, and
+refusing is the correct answer to a guess.
+
+**Where no isolated unit exists, run the child in the parent's context.** The hand-off below is what
+covers that case — it is the backstop for delegation being unavailable, not an alternative to it.
+
 ## Concurrency: one child per repository, repositories in parallel
 
 Execution state lives on GitHub and nowhere else (`epic:next`, joshuafolkken/kit#860), so **an
@@ -203,11 +248,45 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
 
 1. Run the command above.
 2. **A number** — run that child as `fullrun #<N>` does, through the verification gate and the
-   merge, **except that `josh latest` is not run** — it runs once, before this session's first
-   child, and not again (above).
-   `git switch main && git pull` still runs, per child. Then **ask whether to hand off** —
-   `pnpm josh cost --over 400000`, immediately after the merge and `pnpm josh ms` — and go back to
-   step 1 on `under`, or finish the session on `over` (see "The hand-off" below).
+   merge, **in a delegated unit where one is available** (`pnpm josh delegate epic-child` →
+   `delegate`; see "Each child runs in a delegated unit" above) and **in this session's own context
+   where none is**, **except that `josh latest` is not run** — it runs once, before this session's
+   first child, and not again (above).
+   `git switch main && git pull` runs per child in whichever context implements it, **and again in
+   this session afterwards** when the child was delegated — otherwise the parent's checkout never
+   receives that merge and the next child starts on a stale default branch.
+
+   When the unit reports back, **confirm the child from GitHub before believing it**:
+
+   ```bash
+   gh issue view <N> --json state --jq .state   # CLOSED, or the unit did not finish
+   ```
+
+   `CLOSED` is the only answer that means the child finished. **Read the labels before calling
+   anything else a failure**, because two different outcomes look alike from here:
+
+   ```bash
+   gh issue view <N> --json state,labels --jq '{state, labels: [.labels[].name]}'
+   ```
+
+   - **Open, carrying `needs-decision`** — the unit **parked** it, exactly as this session would
+     have. That is not a failure: leave the label on, do **not** count it against the
+     consecutive-failure guard, and go back to step 1. Three parks in a row are an ordinary epic,
+     and counting them would abort the run as an environment fault.
+   - **Open, without `needs-decision`** — it failed. Remove the stale `in-progress` here (Tier A,
+     per "`in-progress` is removed by whoever finds it stale"), count it against the
+     consecutive-failure guard, and **park it** — the Guards table's "a failure that is not
+     consecutive parks its child" applies to a delegated child as to any other. Parking is what
+     stops the next `epic:next` from handing the same child straight back, retried without limit
+     because each success in between resets the counter.
+
+   **Never ask `epic:next` in place of this read.** A child that did not finish still carries
+   `in-progress`, which `epic:next` classifies as waiting on time *before* it consults any blocker,
+   so it answers `wait` — the loop would poll to the 90-minute stale window and learn nothing.
+
+   Then **ask whether to hand off** — `pnpm josh cost --over 400000`, immediately after the merge and
+   `pnpm josh ms` — and go back to step 1 on `under`, or finish the session on `over` (see
+   "The hand-off" below).
 3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
    repository has work but this one does not", which is a wait from here.
 4. **`stop`** — report the parked children and finish.
@@ -231,9 +310,14 @@ pnpm josh cost --over 400000
 ```
 
 It prints `over` or `under` on standard output and the measured figure on standard error. `over`
-means the next turn of this session costs more than the threshold in billed input; the threshold is
-the same number the epic's own measurement produced, and it is passed explicitly so a run cannot
-drift it by remembering it wrong.
+means the next turn of this session costs more than the threshold in billed input, and the number is
+passed explicitly so a run cannot drift it by remembering it wrong.
+
+**閾値 400,000 は計測が出した数字ではない。** joshuafolkken/kit#968 がそう書いたのは誤りで、joshuafolkken/kit#984 で訂正した。計測が支持するのは**ほぼ即座に区切ること**である — 50 リクエスト（≒ 子 1 件）ごとに区切れば課金入力は実測の 33% に収まり、区切り 1 回の費用（新しいセッションで常駐を書き直す約 56,000 ＋ EPIC と子 Issue の読み直し約 15,000 で概ね 70,000 トークン）に対して 1 回あたりの節約は約 14,500,000 トークン、**およそ 200 倍**の開きがある。損益分岐は最初の子の途中で既に超えており、400,000 に達した時点では割高な状態で数百ターン走った後である。
+
+**400,000 が表しているのは、トークンと人の手数の釣り合いである。** 区切るたびに人が `epicrun #<E>` を打ち直すため、計測の答え（子ごとに区切る）をそのまま採ると無人性を失う。トークン対トークンではなく**トークン対人の手数**のトレードオフであり、そう書かれていなかった。
+
+**その釣り合いは、子 1 件を委譲するようになった今の親のループには当てはまらない。** 親の文脈には要約しか積まれないため、この閾値に達すること自体がまれである。現在の 400,000 は、**委譲が使えない環境で親の文脈が膨らんだ場合の保険**として残っている数字であって、計測が導いた最適値ではない。
 
 `over` and `under` are not the only answers: the command also **exits 1 with empty standard output** when there is no transcript, or no request in it. **Neither is `under`.** Reading "could not measure" as "still cheap" is the same mistake as reading an unreadable comment listing as "no findings" — report that the check could not answer, and hand off at that child.
 
@@ -247,9 +331,13 @@ would have to carry work that is not written down yet.
 
 - **`under`** — go back to step 1 of the loop and run the next child.
 - **`over`** — finish the session. Post the epic progress comment naming what merged and what
-  remains, send the completion notification with the resume command in its body, and stop with:
+  remains, send a **`confirmation`** Telegram with the resume command in its body — a hand-off waits
+  for the person to type the next command, which is what `confirmation` means; `completion` would
+  announce an epic that has not completed — and stop with:
 
   > Please run `epicrun #<E>` to continue this epic in a fresh session.
+
+  **報告は完了報告の書式で書かない。** 区切りは完了でも park でも失敗でもない**第 4 の停止**であり、専用の書式が `prompts/collaboration-workflow/report-format.md` →「区切りの報告（完了報告と区別する・必須）」にある。`原因 / 対応 / 結果` の 3 行は使わない — それは finished なランの形であり、epic はまだ終わっていない。書くのは 4 つ、**終わったこと / 残っていること / 止めた理由 / 次に打つコマンド**である。Telegram 本文も同じ書式で書く。
 
 **This is not a failure and not a park.** No child needs a decision; the run is simply cheaper to
 continue elsewhere. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.

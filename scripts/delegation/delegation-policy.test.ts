@@ -6,6 +6,7 @@ import { delegation_policy } from './delegation-policy'
 const GATE_FIX = 'gate-fix'
 const UNLISTED = 'anything-nobody-listed'
 const REVIEW = 'review'
+const EPIC_CHILD = 'epic-child'
 
 // joshuafolkken/kit#969: which steps may run in a cheaper tier is decided by an enumeration, and
 // everything not enumerated is kept. The direction of the default is the whole safety argument — a
@@ -65,6 +66,33 @@ describe('every delegatable step names how a wrong result is caught', () => {
 		for (const step of delegation_policy.REJECTED_STEPS) {
 			expect(delegatable.has(step.name)).toBe(false)
 		}
+	})
+})
+
+// joshuafolkken/kit#984 puts a whole child of an epic on this same enumeration. The unit is
+// different, the mechanism is not — so the answer has to come from this one command, and the
+// verifier has to be the state the parent re-reads rather than the summary the unit returns. A
+// verifier that named the summary would be no verifier at all: the thing being checked would be
+// checking itself.
+describe('epic-child is a second unit on the one mechanism', () => {
+	it('is delegatable', () => {
+		expect(delegation_policy.verdict_for(EPIC_CHILD)).toBe(delegation_policy.DELEGATE_VERDICT)
+	})
+
+	// `gh issue view`, and deliberately not `epic:next`: an unfinished child still carries
+	// `in-progress`, which `epic:next` buckets as waiting on time before it looks at any blocker, so
+	// it answers `wait` rather than reporting the failure. A verifier naming it would contradict the
+	// documents in the same change.
+	it('names the parent-side state read as its verifier', () => {
+		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('gh issue view')
+	})
+
+	it('does not name the read that answers `wait` for a failed child', () => {
+		expect(delegation_policy.reason_for(EPIC_CHILD)).not.toContain('epic:next')
+	})
+
+	it('does not rest on the summary the unit returns', () => {
+		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('not from the summary')
 	})
 })
 

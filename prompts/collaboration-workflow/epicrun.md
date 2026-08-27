@@ -45,6 +45,35 @@
 
 EPIC の外側は承認しない。Tier C の行動は従来どおり停止する — ただし停止するのはその子 Issue だけである。
 
+### 子 1 件は隔離された実行単位へ委譲する
+
+`epicrun` の子は、親のループと同じ文脈では実行しない。**子 1 件を隔離された実行単位へ渡し、親のループへは要約だけを返す**（joshuafolkken/kit#984）。
+
+理由は実測である。子 7 件を 1 文脈で回したランでは、文脈の大きさが最初の 20 リクエストで平均 99,789、最後の 20 で 698,928 だった。同じ 490 リクエストを 50 リクエスト（≒ 子 1 件）ごとに区切った場合の課金入力は実測の 33% に収まる。**k 番目の子は、それ以前の k-1 件の残骸を毎ターン読み直している。**
+
+**委譲の機構は新設しない。** joshuafolkken/kit#969 が定めた機構（列挙 ＋ `pnpm josh delegate`）をそのまま使い、単位だけが「ランの 1 工程」から「epic の子 1 件」へ変わる。別に作れば `CLAUDE.md` の「No clones — single-source」が禁じているクローンになる。可否は判断ではなくコマンドが答える:
+
+```bash
+pnpm josh delegate epic-child   # → delegate
+```
+
+**親が読むのは要約ではなく GitHub の状態である。** これが `epic-child` の検証経路であり、委譲が成立する条件そのものである。実行単位が「終わった」と返しても PR がマージされていなければ、その子は `CLOSED` になっていない。子自身の検証ゲート・`/code-review`・CI は実行単位の中で走り、`pnpm josh followup --merge` はそれらが緑でなければ PR に触れない。**要約を信じて次へ進む形にしてはならない** — それは検証経路を捨てることであり、捨てた時点で `epic-child` は委譲してよい単位ではなくなる。
+
+**確認は `epic:next` の次の答えではなく、子の状態を直接読む。** 終わらなかった子は `in-progress` を付けたままであり、`epic:next` はそれをブロッカーより先に「時間で解ける」と分類するため、番号ではなく `wait` を返す。それを検証だと思い込んだループは、失敗を学ぶ代わりに 90 分の stale 判定までポーリングする。**実行単位が返った直後に `gh issue view <N> --json state,labels` を読む。**
+
+**`CLOSED` 以外を一括りに失敗としない。** 見分けるのはラベルである。
+
+- **open ＋ `needs-decision`** — 実行単位が park した。これは失敗ではない。ラベルはそのまま残し、**連続失敗のガードには数えず**、次の子へ進む。park が 3 回続くのは普通の epic であり、数えれば環境障害として打ち切ってしまう
+- **open ＋ `needs-decision` 無し** — 失敗である。`in-progress` を親が外し（Tier A）、連続失敗のガードに数え、**その子を park する**。ガードの表が定める「連続していない失敗はその子を park してランを続ける」は委譲した子にも同じく適用される。park しなければ次の `epic:next` が同じ子を返し、間に成功が挟まるたびにカウンタが戻るため、上限なく再試行され続ける
+
+**`git switch main && git pull` は委譲した場合も親側でもう一度走らせる。** 実行単位の中でマージされた結果は親のチェックアウトには入っていないため、省くと次の子が古い main の上で始まる。
+
+**マージ権限は実行単位まで及ぶ。** 人が `epicrun` を打った時点で与えたバッチの承認は、子を実行する単位にも及ぶものとして扱う（joshuafolkken/kit#986 の `## Decisions`）。委譲しても承認の範囲は変わらない。変わるのは、その承認がどの文脈で使われるかだけである。
+
+**明示起動の要求も同じ経路で及び、それを運ぶのは指示文である。** `CLAUDE.md` の「Explicit invocation required」は、打たれていない `fullrun` 相当のランを始めることを禁じている。指し示す先を持たない実行単位はこれに従って拒否し、子を open のまま返し、失敗として計上される。この規則が禁じているのは**依頼の形からワークフローを推測すること**であって、キーワードの打鍵が実行単位自身の履歴に現れることを要求してはいない。したがって**指示文に、それが由来する起動を明記する** — `epicrun #<E>`、子の番号、そしてその承認の下で `fullrun #<N>` として実行すること。そう書けば推測の余地は無く、規則が求めているのはそこまでである。**書き落とした指示文の側が欠陥**であり、そのとき実行単位は推測しており、拒否こそ正しい答えである。
+
+**委譲できない環境では親の文脈で実行する。** 隔離された実行単位を持たない環境では子を親の文脈で走らせてよく、そのときに効くのが下記の区切り（hand-off）である。**区切りは委譲の代替ではなく、委譲が効かない場合の保険である。**
+
 ### 並行度モデル — repo あたり同時 1 件、repo 間は並行
 
 実行状態を GitHub 側にのみ置く設計（`josh epic:next`）の帰結として、**`epicrun` は 1 セッションである必要がない**。リポジトリごとにセッションを立て、各セッションが同じ EPIC に対して `josh epic:next <E> --repo <owner/repo>` を呼び、自分のリポジトリの子だけを取って走る。
@@ -159,9 +188,14 @@ pnpm josh cost --over 400000
 ```
 
 It prints `over` or `under` on standard output and the measured figure on standard error. `over`
-means the next turn of this session costs more than the threshold in billed input; the threshold is
-the same number the epic's own measurement produced, and it is passed explicitly so a run cannot
-drift it by remembering it wrong.
+means the next turn of this session costs more than the threshold in billed input, and the number is
+passed explicitly so a run cannot drift it by remembering it wrong.
+
+**閾値 400,000 は計測が出した数字ではない。** joshuafolkken/kit#968 がそう書いたのは誤りで、joshuafolkken/kit#984 で訂正した。計測が支持するのは**ほぼ即座に区切ること**である — 50 リクエスト（≒ 子 1 件）ごとに区切れば課金入力は実測の 33% に収まり、区切り 1 回の費用（新しいセッションで常駐を書き直す約 56,000 ＋ EPIC と子 Issue の読み直し約 15,000 で概ね 70,000 トークン）に対して 1 回あたりの節約は約 14,500,000 トークン、**およそ 200 倍**の開きがある。損益分岐は最初の子の途中で既に超えており、400,000 に達した時点では割高な状態で数百ターン走った後である。
+
+**400,000 が表しているのは、トークンと人の手数の釣り合いである。** 区切るたびに人が `epicrun #<E>` を打ち直すため、計測の答え（子ごとに区切る）をそのまま採ると無人性を失う。トークン対トークンではなく**トークン対人の手数**のトレードオフであり、そう書かれていなかった。
+
+**その釣り合いは、子 1 件を委譲するようになった今の親のループには当てはまらない。** 親の文脈には要約しか積まれないため、この閾値に達すること自体がまれである。現在の 400,000 は、**委譲が使えない環境で親の文脈が膨らんだ場合の保険**として残っている数字であって、計測が導いた最適値ではない。
 
 `over` と `under` のほかに、**終了コード 1 で標準出力が空**という答えがある。トランスクリプトが見つからない場合と、リクエストが 0 件の場合である。**どちらも `under` として扱ってはならない** — 測れなかったことを「まだ安い」と読むのは、`epic:next` の読めない一覧を「指摘なし」と読むのと同じ誤りである。判定できない旨を報告してその子で区切る。
 
@@ -174,9 +208,11 @@ would have to carry work that is not written down yet.
 
 - **`under`** — go back to step 1 of the loop and run the next child.
 - **`over`** — finish the session. Post the epic progress comment naming what merged and what
-  remains, send the completion notification with the resume command in its body, and stop with:
+  remains, send a **`confirmation`** Telegram with the resume command in its body — 区切りは人が次のコマンドを打つのを待つ停止であり、それが `confirmation` の意味である。`completion` は完了していない epic を完了として告げてしまう — and stop with:
 
   > Please run `epicrun #<E>` to continue this epic in a fresh session.
+
+  **報告は完了報告の書式で書かない。** 区切りは完了でも park でも失敗でもない**第 4 の停止**であり、専用の書式が `prompts/collaboration-workflow/report-format.md` →「区切りの報告（完了報告と区別する・必須）」にある。`原因 / 対応 / 結果` の 3 行は使わない — それは finished なランの形であり、epic はまだ終わっていない。書くのは 4 つ、**終わったこと / 残っていること / 止めた理由 / 次に打つコマンド**である。Telegram 本文も同じ書式で書く。
 
 **This is not a failure and not a park.** No child needs a decision; the run is simply cheaper to
 continue elsewhere. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.
