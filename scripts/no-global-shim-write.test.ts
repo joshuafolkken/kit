@@ -17,8 +17,54 @@ const INSTALL_BIN_MARKER = 'install-bin'
 // Markers for any code path that could write to a shared, user-level location. `.local/bin` is the
 // literal shim target; `homedir` is the escape hatch the removed shim used (`os.homedir()`), so
 // forbidding it catches an equivalent reconstruction such as `path.join(os.homedir(), '.local', …)`.
-// No kit script legitimately resolves the user's home directory, so this stays a clean tripwire.
-const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = ['.local/bin', 'homedir']
+const SHARED_PATH_MARKERS: ReadonlyArray<string> = ['.local/bin']
+const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = [...SHARED_PATH_MARKERS, 'homedir']
+
+// The files allowed to resolve the home directory, named one by one. `josh cost` reads Claude
+// Code's session transcripts, which live under `~/.claude/projects`, so resolving the home
+// directory is unavoidable there — and reaching for `process.env.HOME` instead would be exactly the
+// "equivalent reconstruction" the marker above exists to catch (joshuafolkken/kit#962).
+//
+// **The exemption is paid for, not granted.** The principle this guard protects is that no kit
+// script *writes* to a shared, user-level location; an exempted file is therefore held to a
+// stricter rule than the ban it escapes — it must contain no write call at all, which the second
+// test below enforces. Adding a name here without that property defeats the guard.
+const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [path.join('cost', 'cost-transcript.ts')]
+// Every way a Node script can put bytes on disk — sync, async and `fs/promises` alike — plus the
+// low-level primitives the named calls are built on. Each entry is written so it can only match a
+// call, never prose in a comment: a bare `rm` would match "confirm" and a bare `open` would match
+// "opened", and a guard that fires on its own documentation gets deleted rather than fixed.
+const WRITE_MARKERS: ReadonlyArray<string> = [
+	'writeFile',
+	'writeSync',
+	'write(',
+	'createWriteStream',
+	'openSync',
+	'open(',
+	'mkdir',
+	'rmSync',
+	'rm(',
+	'unlink',
+	'rename',
+	'copyFile',
+	'cp(',
+	'chmod',
+	'symlink',
+	'truncate',
+	'appendFile',
+]
+
+// Matched against the path relative to `scripts/`, not by suffix: `endsWith` would also accept a
+// file whose name merely ends with an allowed one.
+function is_home_directory_reader(file: string): boolean {
+	const relative = path.relative(SCRIPTS_DIR, file)
+
+	return HOME_DIRECTORY_READERS.includes(relative)
+}
+
+function markers_for(file: string): ReadonlyArray<string> {
+	return is_home_directory_reader(file) ? SHARED_PATH_MARKERS : FORBIDDEN_SOURCE_MARKERS
+}
 
 function all_source_files(): Array<string> {
 	return readdirSync(SCRIPTS_DIR, { recursive: true })
@@ -46,10 +92,29 @@ describe('no global shim write', () => {
 		const offenders = all_source_files().filter((file) => {
 			const content = readFileSync(file, 'utf8')
 
-			return FORBIDDEN_SOURCE_MARKERS.some((marker) => content.includes(marker))
+			return markers_for(file).some((marker) => content.includes(marker))
 		})
 
 		expect(offenders).toStrictEqual([])
+	})
+
+	// The price of the exemption above: a file allowed to resolve the home directory may only read.
+	it('lets no home-directory reader write anything', () => {
+		const offenders = all_source_files()
+			.filter((file) => is_home_directory_reader(file))
+			.filter((file) => {
+				const content = readFileSync(file, 'utf8')
+
+				return WRITE_MARKERS.some((marker) => content.includes(marker))
+			})
+
+		expect(offenders).toStrictEqual([])
+	})
+
+	it('names only files that exist as home-directory readers', () => {
+		const found = all_source_files().filter((file) => is_home_directory_reader(file))
+
+		expect(found).toHaveLength(HOME_DIRECTORY_READERS.length)
 	})
 
 	it('declares no lifecycle hook that reinstalls a global shim', () => {

@@ -1036,6 +1036,42 @@ Exits `0` when every requirement is satisfied and `1` otherwise, so it works as 
 ❌ Epic #700 does not satisfy every requirement.
 ```
 
+### `josh cost`
+
+Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).
+
+```bash
+pnpm josh cost                  # the newest session — the run that just finished; alias: josh co
+pnpm josh cost --session <id>   # one named session
+pnpm josh cost --issue 962      # one issue, across every session that touched it
+pnpm josh cost --all            # every issue in this project, plus a grand total
+pnpm josh cost --json           # the same figures, machine-readable
+```
+
+[`josh epicrun`](#josh-epicnext)'s budget guard needs a number it can cite, and until this command there was no way to produce one — nothing read the `usage` Claude Code records for every request, so "did that change make a run cheaper?" had no answer at all.
+
+**A cost is not tokens times one rate.** The four kinds of input are priced differently, and this is not a rounding difference:
+
+| Kind                      | Price         | Why it is kept apart                                                                          |
+| ------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
+| Uncached input            | base          | The rate the others are multiples of.                                                         |
+| Cache write, 5-minute TTL | 1.25x base    | The default TTL.                                                                              |
+| Cache write, 1-hour TTL   | **2x base**   | What this project's sessions use — folding it into the 5-minute rate under-reports every run. |
+| Cache read                | **0.1x base** | Where nearly all of a long session's input lands.                                             |
+| Output                    | 5x base       | Priced from the model's own output rate.                                                      |
+
+Measured on one real request: `cache_read_input_tokens` 97,190 against `input_tokens` 2. An estimate that picked any single rate would be wrong by more than an order of magnitude.
+
+**One API response is written to the transcript as several lines** — one per content block, all carrying the _same_ `usage` object. Measured: 20 assistant lines for 8 requests. The unit of aggregation is therefore `requestId`, never the line; summing lines over-reports a real session by roughly 3x.
+
+**Billed input is split into resident and history.** The resident baseline is the first request's whole input — system prompt, tool schemas, `CLAUDE.md`, the skills index — because that is what was in context before any work happened, and every later request re-reads it. What the run paid for the resident half is that baseline times the request count; the conversation is the remainder. It is an estimate and says so, but the two shares reconstruct the billed input exactly, so a reader can check it.
+
+**Attribution to an issue reads the branch.** `josh git` names a branch `<N>-<slug>`, so the branch carries the issue number — but a child is implemented on the default branch, because `josh git` only creates the branch at commit time. A request made on the default branch is therefore attributed to the nearest issue branch that appears **later** in the same session, falling back to the nearest earlier one for the tail after a merge. Attribution is per session: concatenating sessions first would let one session's trailing branch claim the next session's opening requests.
+
+**The project's transcript directory is its working directory as a slug** — every character that is not a letter, digit or hyphen becomes a hyphen, so `~/Development/my_project` reads from `-Users-…-Development-my-project`. Verified against a real probe: a directory named `slug_probe.dir` produced `slug-probe-dir`.
+
+**Nothing is ever silently zero.** An absent transcript exits non-zero and says where it looked — for every scope, `--all` and `--issue` included; a scope with no requests attributed says so in words rather than printing a table of zeroes; a model the price table does not know is reported as unpriced and the total is labelled a floor; and lines that could not be read are counted and printed. Locally generated `<synthetic>` assistant messages are skipped — they were never sent to the API, so counting them would inflate the request count.
+
 ### `josh eval`
 
 Run the agent rule-compliance scenarios and report how many held.
