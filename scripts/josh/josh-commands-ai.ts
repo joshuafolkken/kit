@@ -42,6 +42,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check an epic issue against the tracking requirements',
 		category: 'AI tools',
 	},
+	'auto-ok:next': {
+		script: 'scripts/auto-ok/auto-ok-cli.ts',
+		description: 'Print the next opted-in issue an unattended run may pick up outside an epic',
+		category: 'AI tools',
+	},
 	cost: {
 		script: 'scripts/cost/cost-cli.ts',
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",

@@ -87,7 +87,10 @@ one.
 issues the run files itself. That is the point of the keyword: `queue` re-asks for authorization
 every child, which is what forces a person to stay at the machine.
 
-It does **not** approve anything outside the epic. A Tier C action still stops — for that child.
+It does **not** approve anything outside the epic, **except the issues a person has opted in with
+`auto-ok`** — that label is the person's act, not the run's, which is what keeps the widening an
+authorization rather than a self-authorization (see "After the epic" below). A Tier C action still
+stops — for that child.
 
 ## Each child runs in a delegated unit
 
@@ -290,9 +293,86 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
 3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
    repository has work but this one does not", which is a wait from here.
 4. **`stop`** — report the parked children and finish.
-5. **`complete`** — post the epic summary and finish.
+5. **`complete`** — post the epic summary, then run the pickup in "After the epic — issues opted
+   in with `auto-ok`" below, and finish.
 6. **Exit code 1** — `epic:next` refused a cyclic or contradictory graph, or could not read a child.
    Report and finish.
+
+## After the epic — issues opted in with `auto-ok`
+
+An epic's task list is not the whole backlog. An Issue small enough to need no human judgment sits
+there forever unless somebody puts it in an epic, and as execution capacity grows the entrance —
+what is eligible to be run at all — becomes the bottleneck rather than the running
+(joshuafolkken/kit#906). `auto-ok` is the opt-in that widens it.
+
+**Only a person applies `auto-ok`. Never apply it on your own judgement.** `epicrun #<E>` approves
+the merges inside `#<E>` and nothing outside it ("What one invocation approves"), and this label is
+the only way a person extends that approval past the epic's edge. A label an agent could apply to
+itself would let an unattended run widen its own authorization — the self-widening
+`split-assessment.md` forbids when it stops a `fullrun` that discovered a split — which is not a
+guard at all. **Typing the command for the person is not applying it**: an explicit instruction in
+the current turn ("label #912 `auto-ok`") is their decision and yours only to execute. Everything
+else, "this one is obviously trivial" included, is a proposal — written as an Issue comment and left
+for them.
+
+**The pickup happens once the epic's children are done, and nowhere else.**
+
+| `epic:next` answered | What happens to the pickup |
+| --- | --- |
+| a number | Run the child. No pickup — the epic's own children come first |
+| `wait` | Wait. No pickup: the epic is still resolving, and outside work would run ahead of the batch that was authorized |
+| `stop` | Report the parked children and finish. **No pickup** — the epic needs a person, and doing unrelated work instead buries that |
+| `error` | Report and finish. No pickup |
+| `complete` | Post the epic summary, then pick up below |
+
+A run that began from a bare, non-epic Issue reaches the same point when that Issue merges without a
+prerequisite or a split turning up ("Nothing found means no epic"): its authorized work is done, so
+the pickup applies there too. One keyword must not mean two things.
+
+**Ask the command which Issue, never `gh` directly.** The label name is single-sourced in
+`scripts/git/issue-labels.ts`; typing the string into a `gh` query of your own puts a second copy of
+it somewhere nothing checks.
+
+```bash
+answer=$(pnpm josh auto-ok:next)                 # the first time
+answer=$(pnpm josh auto-ok:next --exclude <N>)   # every time after, naming the one just merged
+```
+
+**`--exclude` is not optional after the first pickup.** GitHub applies the `closes #N` side effect
+asynchronously, so for a few seconds after the merge the issue you have just finished is still
+listed as open. Without the flag the loop can be handed that same number back and re-implement work
+that already shipped; the `in-progress` label happens to exclude it too, but that label is removed
+by whoever finds it stale, so it is not something to rely on.
+
+| Answer | What to do |
+| --- | --- |
+| A number | Run it exactly as `fullrun #<N>` does — delegated unit, verification gate, PR, merge — then ask again |
+| `none` | Nothing is opted in. Finish the run |
+| **Exit 1** — the listing could not be read | Report that the pickup could not be attempted, and finish. "Could not tell" is not `none`; reporting it is enough here only because the mistake stops work rather than starting some |
+
+**The order is the one the person was just shown.** `auto-ok:next` ranks with the same function the
+`🗒 Next issues (newest first)` display uses at the end of every workflow — newest first, skipping
+`epic`, `in-progress` and `needs-decision`. A second ordering would have the run start something
+other than what that list has just named.
+
+**Everything a child gets, a picked-up Issue gets**: the split assessment, the two-layer work
+summary, `josh latest` staying hoisted to the session, park-and-continue, and the
+`pnpm josh cost --over 400000` hand-off check after each merge. One that needs a decision is parked
+exactly as a child is, and the run asks again.
+
+**The cap is 5 per run**, in the Guards table below. These issues went through no split assessment
+as a batch, no `epic:audit` and no dependency graph — the label alone is the whole authorization, so
+the cap is the only structural guard on them, and it is deliberately tighter than the epic's 30. On
+reaching it, finish and report; the person types `epicrun` again for more.
+
+**The label has to exist before anyone can apply it**, and a missing one is not an error: `gh`
+answers an empty listing, `auto-ok:next` says `none`, and the run finishes exactly as it did before
+this section existed. Opting in is the default absence. Create the label once per repository that
+wants it:
+
+```bash
+gh label create "auto-ok" --color "0e8a16" --description "Opted in to unattended execution outside an epic"
+```
 
 ## The hand-off — one session does not have to run the whole epic
 
@@ -505,6 +585,7 @@ needs a person, park **that** child and move on.
 | Children per run | 30 | Stop and report; an epic this large should be split. |
 | Issues filed per run | 10 | Stop and report; a run filing more than this has lost the plot. |
 | Consecutive child failures | 3 | Stop and report; something is wrong with the environment, not the children. |
+| `auto-ok` issues per run | 5 | Finish and report; the epic is done, and the rest keeps until the person asks again. |
 
 A failure that is not consecutive parks its child and the run continues.
 
@@ -526,7 +607,8 @@ end naming what was merged, what was parked and why, and what was filed.
 
 `epicrun` stops only here:
 
-1. `epic:next` reports `complete` — the summary has been sent.
+1. `epic:next` reports `complete`, the summary has been sent, and the `auto-ok` pickup has
+   answered `none`, reached its cap, or reported that it could not read the listing.
 2. `epic:next` reports `stop` — every remaining child needs a person; report them.
 3. `epic:next` reports `error` — a cyclic or contradictory graph.
 4. A guard above was reached.
