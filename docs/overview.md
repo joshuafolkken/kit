@@ -4,17 +4,17 @@
 
 ## What it provides
 
-| Area           | Tool                     | What ships                                            |
-| -------------- | ------------------------ | ----------------------------------------------------- |
-| Linting        | ESLint                   | Vanilla config via `create_vanilla_config`            |
-| Formatting     | Prettier                 | Shared config with import sorting                     |
-| Type-checking  | TypeScript               | `base.json` tsconfig preset                           |
-| Git hooks      | Lefthook                 | Pre-commit lint + pre-push checks                     |
-| Spell-checking | cspell                   | Shared word list and ignore rules                     |
-| Editor         | VS Code                  | Extension recommendations and workspace settings      |
-| AI assistants  | Claude / Gemini / Cursor | `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules` |
-| CI/CD          | GitHub Actions           | Workflow templates for CI, tagging, and SonarQube     |
-| Security       | SonarQube + `pnpm audit` | `sonar-project.properties` template + audit script    |
+| Area           | Tool                     | What ships                                                                          |
+| -------------- | ------------------------ | ----------------------------------------------------------------------------------- |
+| Linting        | ESLint                   | Vanilla config via `create_vanilla_config`                                          |
+| Formatting     | Prettier                 | Shared config with import sorting                                                   |
+| Type-checking  | TypeScript               | `base.json` tsconfig preset                                                         |
+| Git hooks      | Lefthook                 | Pre-commit lint + pre-push checks                                                   |
+| Spell-checking | cspell                   | Shared word list and ignore rules                                                   |
+| Editor         | VS Code                  | Extension recommendations and workspace settings                                    |
+| AI assistants  | Claude / Gemini / Cursor | `CLAUDE.md` (the rules), `AGENTS.md` / `GEMINI.md` (pointers to it), `.cursorrules` |
+| CI/CD          | GitHub Actions           | Workflow templates for CI, tagging, and SonarQube                                   |
+| Security       | SonarQube + `pnpm audit` | `sonar-project.properties` template + audit script                                  |
 
 ## How it works
 

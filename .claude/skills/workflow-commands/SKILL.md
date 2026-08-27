@@ -6,9 +6,9 @@ description: The procedures for the Issue-driven shorthand commands `kickoff`, `
 # Issue-driven workflow commands
 
 `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` are the shorthand commands this package's
-collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md` /
-`AGENTS.md` / `GEMINI.md` because each one applies only while its own command is running — keeping
-them resident spent context on every turn to describe a workflow most turns never enter.
+collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md` because
+each one applies only while its own command is running — keeping them resident spent context on
+every turn to describe a workflow most turns never enter.
 
 The canonical extended reference is `prompts/collaboration-workflow.md`; this skill is the
 operational procedure, and the two must agree.
@@ -72,17 +72,20 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 - **Artifact prose** — Issue bodies, Issue/PR comments, Telegram bodies — is written in the session
   language (`JOSH_SESSION_LANG`, default `ja`). Issue and PR titles stay English.
 - **A mid-workflow stop always sends a `confirmation` Telegram first**, so the user is alerted
-  off-screen. The rule and its exact command stay resident in `CLAUDE.md` / `AGENTS.md` /
-  `GEMINI.md` under "Mid-workflow stop notification", because most pauses that need it happen on
+  off-screen. The rule and its exact command stay resident in `CLAUDE.md` under
+  "Mid-workflow stop notification", because most pauses that need it happen on
   turns where no workflow keyword was typed and this skill was never loaded. `halfrun.md` carries
   the one form specific to a command: the resume-command body of its stop before commit.
 
 ## 3. What stays resident, and what is read from here
 
-**A rule stays in the AI documents if and only if it has to fire on a turn where no skill was
-loaded.** That is the whole test, and it has exactly one input: when does the rule first bind — before
-a command has started, or after. Everything a run reaches only *after* it has read this skill is
-routed to from the documents, never restated there.
+**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**
+That is the whole test, and it has exactly one input: when does the rule first bind — before a
+command has started, or after. Everything a run reaches only *after* it has read this skill is
+routed to from `CLAUDE.md`, never restated there.
+
+`CLAUDE.md` is the only document this section is about. `AGENTS.md` and `GEMINI.md` hold no rules at
+all since joshuafolkken/kit#963 — they are pointers to it, so nothing can be resident in them.
 
 **The scope of this list is every resident rule that has an on-demand counterpart** — a skill or an
 on-demand prompt carrying the procedure the resident text routes to. Those are the rules the
@@ -99,7 +102,7 @@ on-demand copy for them to have moved to, so the question the criterion asks doe
 their absence here is correct rather than an omission (joshuafolkken/kit#955).
 
 Within that scope, every rule that passes the test is resident in full, and a marker suite asserts
-each one present in all three documents — `scripts/workflow-skills.test.ts` for most of them,
+each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most of them,
 `scripts/verify-ui-skill.test.ts` for the UI gate, and
 `scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step:
 

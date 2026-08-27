@@ -5,9 +5,9 @@ import { repo_discovery } from './discovery/repo-discovery'
 // joshuafolkken/kit#869: the repository map decides which local checkout other commands write to,
 // and the one rule that keeps those writes off someone else's repository — only the current
 // repository's own owner is ever mapped — is not visible in the map itself. A developer learns it
-// exists from these documents, which the Doc Sync Rules pair, so a row present in one and missing
-// from another leaves two of the three tools unable to explain it. The env sample is where a new
-// project copies its `.env` from.
+// exists from the rule document and the command reference, so a row present in one and missing from
+// the other leaves the tool unable to explain it. The env sample is where a new project copies its
+// `.env` from.
 const JOSH_COMMANDS_DOC = 'docs/josh-commands.md'
 
 // The owner restriction and its non-overridability are pinned literally: they are the part most

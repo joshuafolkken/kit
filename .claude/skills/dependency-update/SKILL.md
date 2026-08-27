@@ -5,7 +5,7 @@ description: The verification procedure that runs after `pnpm update`, `josh lat
 
 # After a dependency-update command
 
-`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` keep the two prohibitions resident — never touch `overrides`
+`CLAUDE.md` keeps the two prohibitions resident — never touch `overrides`
 in either file, never touch `devEngines`, without explicit user approval. This skill is the other
 half: what you actually run to find out whether a command already touched them, and how to read the
 one change that is expected. It applies after `pnpm update`, `josh latest`, `pnpm josh overrides`,
