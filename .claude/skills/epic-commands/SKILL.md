@@ -6,7 +6,7 @@ description: The procedures for the `josh epic:*` commands that make an epic run
 # The `josh epic:*` commands
 
 These four commands are what turn an epic from a list of issue numbers into something a run can
-execute unattended. The canonical extended reference is `prompts/collaboration-workflow.md`; this
+execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-plan.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
 skill is the operational procedure, and the two must agree.
 
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` — live in the

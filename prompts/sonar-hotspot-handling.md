@@ -2,7 +2,7 @@
 
 <!-- cspell:words hotspot Hotspot hotspots Hotspots NOSONAR -->
 
-This guide extends `prompts/collaboration-workflow.md` with a project-local procedure for handling SonarCloud Security Hotspots. It is kept out of the upstream-synced `collaboration-workflow.md` so that file stays byte-identical with `joshuafolkken/tasks`.
+This guide extends the collaboration workflow with a project-local procedure for handling SonarCloud Security Hotspots. It is kept out of the upstream-synced `prompts/collaboration-workflow/` topics so those stay identical across the projects that consume them.
 
 AI tools cannot perform OAuth browser login to SonarCloud, so this guide assumes public-API and config-based actions as the primary path.
 

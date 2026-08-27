@@ -50,5 +50,5 @@ This check exists because the chain rule has been violated repeatedly even with 
 
 The check fires at the moment your response would end with review markdown and no follow-on tool call. That is the violation point. Treat the `/code-review` skill's output as an intermediate tool result, not a deliverable.
 
-See `prompts/collaboration-workflow.md` → "Chain rule: `/code-review` → `followup --merge` decision table" for the canonical extended reference.
+See `prompts/collaboration-workflow/plan-comment.md` → "Chain rule: `/code-review` → `followup --merge` decision table" for the canonical extended reference.
 

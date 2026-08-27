@@ -21,12 +21,41 @@ const POINTER_DOCS: ReadonlyArray<string> = ['AGENTS.md', 'GEMINI.md']
 
 // The document the pointers name. Written once so the pointer suite and the pointers agree.
 const CANONICAL_DOC = 'CLAUDE.md'
+// The canonical workflow document. joshuafolkken/kit#965 split it into one file per topic under
+// `prompts/collaboration-workflow/`, leaving this path as a small index — an agent following a
+// pointer now reads one topic instead of the whole document, and pays for that one topic on every
+// remaining turn of the session rather than all of them.
+//
+// The marker suites read the whole corpus, which is why `read_repo_file(WORKFLOW_PROMPT)` is not
+// what they call: a marker asserting a canonical rule exists does not care which topic file holds
+// it, and making fifteen suites each name a file would turn every future re-grouping into a
+// fifteen-file edit. Reading is cheap here — this is a test process, not a session.
 const WORKFLOW_PROMPT = 'prompts/collaboration-workflow.md'
+const WORKFLOW_PROMPT_DIRECTORY = 'prompts/collaboration-workflow'
 const CLAUDE_SETTINGS = '.claude/settings.json'
 const ENV_EXAMPLE = '.env.example'
 const MARKDOWN_EXTENSION = '.md'
 
+// The index plus every topic file, in name order so the concatenation is stable.
+function workflow_prompt_files(): ReadonlyArray<string> {
+	const entries = readdirSync(package_file(WORKFLOW_PROMPT_DIRECTORY), { encoding: 'utf8' })
+
+	return entries
+		.filter((entry) => entry.endsWith(MARKDOWN_EXTENSION))
+		.map((entry) => `${WORKFLOW_PROMPT_DIRECTORY}/${entry}`)
+		.toSorted((left, right) => left.localeCompare(right))
+}
+
+function read_workflow_prompt(): string {
+	const index = readFileSync(package_file(WORKFLOW_PROMPT), 'utf8')
+	const topics = workflow_prompt_files().map((path) => readFileSync(package_file(path), 'utf8'))
+
+	return [index, ...topics].join('\n')
+}
+
 function read_repo_file(relative_path: string): string {
+	if (relative_path === WORKFLOW_PROMPT) return read_workflow_prompt()
+
 	return readFileSync(package_file(relative_path), 'utf8')
 }
 
@@ -84,7 +113,10 @@ export {
 	read_rule_surface,
 	POINTER_DOCS,
 	read_unwrapped,
+	read_workflow_prompt,
 	rule_surface_documents,
 	skill_documents,
 	WORKFLOW_PROMPT,
+	WORKFLOW_PROMPT_DIRECTORY,
+	workflow_prompt_files,
 }

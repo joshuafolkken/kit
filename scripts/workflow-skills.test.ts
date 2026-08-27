@@ -329,7 +329,9 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 // most of its text resident — the cross-package interrupt, whose every sentence changes what an
 // agent does rather than how well it understands why. Anything larger is procedure.
 const RESIDENT_RULE_CAP_BYTES = 2600
-const CANONICAL_CITATION = 'prompts/collaboration-workflow.md` →'
+// joshuafolkken/kit#965 split the canonical into one file per topic, so a resident rule now cites
+// the topic file rather than the index plus a section name.
+const CANONICAL_CITATION = 'prompts/collaboration-workflow/'
 // Leading whitespace is allowed: several resident rules are sub-bullets under a heading, and an
 // anchored pattern would have exempted exactly the rules that are easiest to grow unnoticed.
 const RULE_BULLET_PATTERN = /^\s*- \*\*(.+?)\*\*/u
