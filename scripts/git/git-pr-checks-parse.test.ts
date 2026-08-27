@@ -121,11 +121,23 @@ describe('parse_rollup_checks — CheckRun conclusions', () => {
 		expect(checks[0]?.status).toBe(CHECK_STATUS_FAIL)
 	})
 
-	// `neutral` is deliberately not in the passing set: no kit check emits it, and a false block
-	// costs one re-run while a false pass would ship code the gate never actually cleared.
-	it('returns fail for a completed CheckRun with neutral conclusion', () => {
+	// GitHub's rollup counts a neutral conclusion as satisfied, so such a pull request reports CLEAN
+	// and merges. Since joshuafolkken/kit#990 a `fail` here ends the wait outright rather than merely
+	// leaving it pending, so reading neutral as a failure would kill a run GitHub considers mergeable.
+	it('returns pass for a completed CheckRun with neutral conclusion', () => {
 		const raw = JSON.stringify({
 			statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED', conclusion: 'NEUTRAL' }],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PASS)
+	})
+
+	// GitHub does not count these as satisfied, so they stay failures — and a wrongly-blocked run
+	// costs one re-run of `followup`, while a wrongly-passed one ships code no gate ever cleared.
+	it.each(['ACTION_REQUIRED', 'STALE'])('returns fail for a %s conclusion', (conclusion) => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [{ name: AUTO_MERGE, status: 'COMPLETED', conclusion }],
 		})
 		const checks = parse_rollup_checks(raw)
 
@@ -146,6 +158,17 @@ describe('parse_rollup_checks — StatusContext items', () => {
 	it('returns pending for a PENDING StatusContext', () => {
 		const raw = JSON.stringify({
 			statusCheckRollup: [status_context_item(CODE_RABBIT, 'PENDING')],
+		})
+		const checks = parse_rollup_checks(raw)
+
+		expect(checks[0]?.status).toBe(CHECK_STATUS_PENDING)
+	})
+
+	// A required context that has not been posted yet is still to come, not failed: ending the wait on
+	// it would be a premature red exit on a run that is still progressing (joshuafolkken/kit#990).
+	it('returns pending for an EXPECTED StatusContext', () => {
+		const raw = JSON.stringify({
+			statusCheckRollup: [status_context_item(CODE_RABBIT, 'EXPECTED')],
 		})
 		const checks = parse_rollup_checks(raw)
 

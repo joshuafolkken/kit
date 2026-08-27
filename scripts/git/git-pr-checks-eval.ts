@@ -33,6 +33,9 @@ const REVIEW_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
 // check name matches that suite when it is the `<App>` segment, so the required-check list stays the
 // bare app name even after the provider renames its job.
 const CHECK_SUITE_SEPARATOR = ' / '
+const FAILURE_MESSAGE_PREFIX = 'PR checks failed'
+const FAILURE_REASON_REVIEW = 'review requested changes'
+const FAILURE_REASON_CHECKS = 'failed checks'
 
 type PrEvaluation = 'success' | 'pending' | 'failure'
 
@@ -62,12 +65,15 @@ function is_review_blocked(review_decision: string | undefined): boolean {
 	return review_decision === REVIEW_CHANGES_REQUESTED
 }
 
+// A required check whose status is `fail` is by definition a rollup entry that
+// `collect_blocking_failures` already names, so the required list needs no condition of its own
+// here — see `is_blocking_failure`.
 function evaluate_failure_state(input: {
 	review_decision: string | undefined
-	statuses: ReadonlyArray<string>
+	failed_checks: ReadonlyArray<string>
 }): PrEvaluation | undefined {
 	if (is_review_blocked(input.review_decision)) return 'failure'
-	if (input.statuses.includes(CHECK_STATUS_FAIL)) return 'failure'
+	if (input.failed_checks.length > 0) return 'failure'
 
 	return undefined
 }
@@ -95,17 +101,59 @@ function is_unstable_only_from_coderabbit(snapshot: PrStateSnapshot): boolean {
 	return non_passing.every((check) => is_coderabbit_check(check.name))
 }
 
+function is_required_check(check_name: string): boolean {
+	return REQUIRED_CHECKS.some((required) => is_required_match(check_name, required))
+}
+
+// A failing job outside the required list used to decide nothing: GitHub reports the pull request as
+// UNSTABLE rather than failed, so `evaluate_pr_state` answered `pending` and the wait ran out its
+// whole 32-minute budget before ending in a timeout that never named the cause
+// (joshuafolkken/kit#990). Any failed check therefore ends the wait now — except CodeRabbit's, which
+// kit#753 keeps non-blocking end to end, unless a project has put it back on the required list via
+// `JOSH_REQUIRED_CHECKS`. This only makes the gate report sooner: nothing here can produce
+// `success`, so no failing check gains a path to a merge. What counts as failed is whatever the
+// parser records as `fail` — `cancelled` and `timed_out` among them — which is the rule the required
+// list has always followed; the cost is that a job cancelled and re-run by hand is no longer picked
+// up by a wait already in progress, and `followup` has to be run again.
+function is_blocking_failure(check: RollupCheck): boolean {
+	if (check.status !== CHECK_STATUS_FAIL) return false
+
+	return !is_coderabbit_check(check.name) || is_required_check(check.name)
+}
+
+function collect_blocking_failures(snapshot: PrStateSnapshot): Array<string> {
+	return snapshot.rollup.filter((check) => is_blocking_failure(check)).map((check) => check.name)
+}
+
 function is_mergeable_state(snapshot: PrStateSnapshot): boolean {
 	if (is_merge_state_clean(snapshot.merge_state_status)) return true
 
 	return is_unstable_only_from_coderabbit(snapshot)
 }
 
+// The wait's own error text: naming the checks that failed is what turns a red `followup` into
+// something actionable without opening the pull request (joshuafolkken/kit#990).
+function collect_failure_reasons(snapshot: PrStateSnapshot): Array<string> {
+	const reasons: Array<string> = []
+	if (is_review_blocked(snapshot.review_decision)) reasons.push(FAILURE_REASON_REVIEW)
+	const failed = collect_blocking_failures(snapshot)
+	if (failed.length > 0) reasons.push(`${FAILURE_REASON_CHECKS}: ${failed.join(', ')}`)
+
+	return reasons
+}
+
+function describe_pr_failure(snapshot: PrStateSnapshot): string {
+	const reasons = collect_failure_reasons(snapshot)
+	if (reasons.length === 0) return `${FAILURE_MESSAGE_PREFIX}.`
+
+	return `${FAILURE_MESSAGE_PREFIX} (${reasons.join('; ')}).`
+}
+
 function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 	const statuses = read_required_statuses(snapshot.rollup)
 	const failure = evaluate_failure_state({
 		review_decision: snapshot.review_decision,
-		statuses,
+		failed_checks: collect_blocking_failures(snapshot),
 	})
 
 	if (failure !== undefined) return failure
@@ -121,6 +169,8 @@ const git_pr_checks_eval = {
 	evaluate_pr_state,
 	read_required_statuses,
 	is_coderabbit_check,
+	collect_blocking_failures,
+	describe_pr_failure,
 }
 
 export {
@@ -128,6 +178,8 @@ export {
 	evaluate_pr_state,
 	read_required_statuses,
 	is_coderabbit_check,
+	collect_blocking_failures,
+	describe_pr_failure,
 	REQUIRED_CHECKS,
 }
 export type { PrEvaluation }

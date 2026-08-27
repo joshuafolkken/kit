@@ -12,9 +12,18 @@ const CHECK_STATUS_MISSING = 'missing'
 // non-passing check is CodeRabbit's, so kit's own conditional jobs (`auto-merge`, `E2E`,
 // `Notify Auto Tag`) kept a slow review blocking the merge until the wait loop timed out. The bug
 // was invisible on fast reviews, where CLEAN short-circuits the predicate — it could only surface on
-// the exact path kit#753 exists to protect. `neutral` is deliberately absent: no kit check emits it,
-// and a false block costs one re-run while a false pass ships code the gate never cleared.
-const PASSING_CONCLUSIONS = new Set(['success', 'skipped'])
+// the exact path kit#753 exists to protect.
+//
+// `neutral` is here for the same reason `skipped` is, and joshuafolkken/kit#990 is what made leaving
+// it out untenable. GitHub's own rollup counts a neutral conclusion as satisfied, so such a pull
+// request reports CLEAN and merges in the UI — reading it as `fail` disagreed with GitHub exactly as
+// `skipped` did. Until kit#990 that disagreement was survivable, because a non-required failure only
+// left the state pending; now it ends the wait outright, so a bot that emits `neutral` to say it has
+// nothing to report would kill a `followup` on a pull request GitHub considers mergeable.
+// `action_required` and `stale` stay out on purpose: GitHub does not count either as satisfied, and
+// a wrongly-blocked run costs one re-run of `followup` while a wrongly-passed one ships code no gate
+// ever cleared.
+const PASSING_CONCLUSIONS = new Set(['success', 'skipped', 'neutral'])
 
 const KEY_TYPE_NAME = '__typename'
 const KEY_STATE = 'state'
@@ -42,10 +51,16 @@ function read_string(value: unknown): string | undefined {
 	return trimmed
 }
 
+// `EXPECTED` is GitHub's state for a required status context that has not been posted yet, so it is
+// a check still to come rather than one that failed. Reading it as `fail` only delayed the merge
+// until joshuafolkken/kit#990; it would now end the wait on the first poll of a run that is still
+// legitimately progressing — the premature red exit kit#851 was filed to remove.
+const PENDING_STATUS_STATES = new Set(['pending', 'expected'])
+
 function parse_status_context(item: RollupItemData): string {
 	const state = read_string(item[KEY_STATE])?.toLowerCase()
 	if (state === 'success') return CHECK_STATUS_PASS
-	if (state === 'pending') return CHECK_STATUS_PENDING
+	if (state !== undefined && PENDING_STATUS_STATES.has(state)) return CHECK_STATUS_PENDING
 
 	return CHECK_STATUS_FAIL
 }
