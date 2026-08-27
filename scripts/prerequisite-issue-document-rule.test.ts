@@ -59,7 +59,11 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'**2 つ目を作ってはならない。**',
 	'**コマンドが答えられなかった**',
 	'**EPIC 作成へ落ちてはならない。**',
-	'**`--add ... --before <N>` 自身が拒否されることもある。**',
+	// joshuafolkken/kit#949 removed the refusal for a child with no order yet; what remains is the
+	// refusal for a number the epic does not track, and the two must not be re-conflated.
+	'**`#N` が宣言された順序に載っていなくても構わない。**',
+	'新しい鎖 `#<P> -> #N` を 1 本追加する',
+	'拒否されるのは `#N` がそもそもその EPIC の子でない場合だけ',
 	'blocker を見る前に',
 	'git stash push -u -m',
 	'**`-u` は省略できない。**',
@@ -103,7 +107,9 @@ const STOPPING_ENTRY_MARKERS: ReadonlyArray<string> = [
 	'**The command could not answer**',
 	'**Do not fall through to creating an epic**',
 	// The command can refuse; without this the procedure dead-ends with the work stashed.
-	'**`--add ... --before <N>` can itself be refused**',
+	'**`#N` needs no place in the declared order for this to work.**',
+	'declares a new chain `#<P> -> #N` beside the existing ones rather than refusing',
+	'It still refuses a target the epic does not track at all',
 	'**`--ordered` is required, not stylistic**',
 	`**Remove \`${IN_PROGRESS_LABEL}\` from \`#N\`**`,
 	'**Stash the work in progress**',

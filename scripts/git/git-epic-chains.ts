@@ -87,19 +87,64 @@ function replace_chain(
 	return chains.map((chain, position) => (position === index ? [...updated] : [...chain]))
 }
 
-function insert_at_position(
+// The chain a position declares, on its own: `#P -> #N` for `before`, `#N -> #P` for `after`.
+function chain_for(additions: ReadonlyArray<number>, position: InsertPosition): Array<number> {
+	return position.kind === 'before'
+		? [...additions, position.target]
+		: [position.target, ...additions]
+}
+
+// An unordered batch with a position given: the position is the first order anyone declared, so it
+// becomes the whole declaration. The children not named in it stay unordered, which is what the
+// absence of a chain has always meant.
+function start_chain(additions: ReadonlyArray<number>, position: InsertPosition): InsertOutcome {
+	return { chains: [chain_for(additions, position)] }
+}
+
+// A second declaration alongside the existing ones. Every other chain is copied through untouched:
+// the target had no order, so nothing that was declared about anything else changes.
+function add_chain(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
 	position: InsertPosition,
 ): InsertOutcome {
+	return { chains: [...chains.map((chain) => [...chain]), chain_for(additions, position)] }
+}
+
+// No declared chain names the target. Two states look identical from the chains alone, and they are
+// not the same thing: a child the epic tracks simply has no order yet — legitimate in an epic mixing
+// ordered and unordered children — and gets the first order anyone declared for it, as a new line.
+// A number that is not a child at all is still refused (joshuafolkken/kit#949).
+// The only reason left to refuse a position. "Not named in the declared order" used to be it, and is
+// now a legitimate state — a child with no order constraint (joshuafolkken/kit#949). The wording
+// matches `find_addition_error`'s, which is what the workflow docs tell the operator to expect.
+function not_a_child_error(target: number): InsertOutcome {
+	return {
+		error: `${to_issue_reference(target)} is not a child of this epic, so it cannot position an insertion.`,
+	}
+}
+
+function insert_outside_chains(
+	chains: Chains,
+	additions: ReadonlyArray<number>,
+	position: InsertPosition,
+	tracked: ReadonlyArray<number>,
+): InsertOutcome {
+	if (tracked.includes(position.target)) return add_chain(chains, additions, position)
+
+	return not_a_child_error(position.target)
+}
+
+function insert_at_position(
+	chains: Chains,
+	additions: ReadonlyArray<number>,
+	position: InsertPosition,
+	tracked: ReadonlyArray<number>,
+): InsertOutcome {
 	const indices = chains_containing(chains, position.target)
 	const [index] = indices
 
-	if (index === undefined) {
-		return {
-			error: `${to_issue_reference(position.target)} is not named in the declared dependency order.`,
-		}
-	}
+	if (index === undefined) return insert_outside_chains(chains, additions, position, tracked)
 
 	if (indices.length >= AMBIGUOUS_MATCH_COUNT) {
 		return {
@@ -125,25 +170,40 @@ function append_to_last(chains: Chains, additions: ReadonlyArray<number>): Inser
 	return { chains: replace_chain(chains, last, [...(chains[last] ?? []), ...additions]) }
 }
 
-// An unordered batch with a position given: the position is the first order anyone declared, so it
-// becomes the whole declaration. The children not named in it stay unordered, which is what the
-// absence of a chain has always meant.
-function start_chain(additions: ReadonlyArray<number>, position: InsertPosition): InsertOutcome {
-	const chain =
-		position.kind === 'before' ? [...additions, position.target] : [position.target, ...additions]
+// An epic with no chain at all, given a position. The target still has to be one of its children:
+// without this the empty-declaration path accepts a target the non-empty one refuses, so the same
+// input answers differently depending on whether anything happened to be declared yet.
+function start_chain_or_refuse(
+	additions: ReadonlyArray<number>,
+	position: InsertPosition,
+	tracked: ReadonlyArray<number>,
+): InsertOutcome {
+	if (!tracked.includes(position.target)) return not_a_child_error(position.target)
 
-	return { chains: [chain] }
+	return start_chain(additions, position)
 }
 
 function apply_insertion(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
 	position: InsertPosition | undefined,
+	tracked: ReadonlyArray<number>,
 ): InsertOutcome {
 	if (position === undefined) return append_to_last(chains, additions)
-	if (chains.length === 0) return start_chain(additions, position)
+	if (chains.length === 0) return start_chain_or_refuse(additions, position, tracked)
 
-	return insert_at_position(chains, additions, position)
+	return insert_at_position(chains, additions, position, tracked)
+}
+
+// An addition the declaration already names, anywhere. `add_chain` can write into a chain the
+// addition is not in, so the intra-chain out-guard below would not see it.
+function find_already_declared_addition(
+	chains: Chains,
+	additions: ReadonlyArray<number>,
+): number | undefined {
+	const declared = new Set(chains.flat())
+
+	return additions.find((addition) => declared.has(addition))
 }
 
 function already_declared_error(issue_number: number): string {
@@ -156,20 +216,43 @@ function already_declared_error(issue_number: number): string {
 // task list has lost but the declaration still names would otherwise be appended a second time,
 // producing `#890 -> #891 -> #892 -> #891` — a cycle, whose verdict is `error`, which halts the very
 // run this command exists to keep going (joshuafolkken/kit#890).
+//
+// The two guards cover different things, and both are needed since `add_chain` can write into a
+// chain the addition is not in. The in-guard refuses an addition the declaration already names
+// **anywhere**; the out-guard catches a repeat **within one chain**. The out-guard deliberately does
+// not scan across chains: one issue named by two of them is a fan-out — `#A -> #B` and `#A -> #C` —
+// which is a legitimate declaration, not a duplicate (joshuafolkken/kit#949).
+// `tracked` is the epic's task list, and it is required rather than defaulted. It separates "this
+// child has no order yet" from "this number is not a child at all": the first gets a new chain, the
+// second is refused. A default would make one path refuse everything and the other check nothing, so
+// the same input would be accepted or refused depending only on whether anything happened to be
+// declared yet (joshuafolkken/kit#949).
+// Everything that can refuse the input, before anything is built from it.
+function find_insertion_error(
+	chains: Chains,
+	additions: ReadonlyArray<number>,
+): string | undefined {
+	const repeated = find_repeated_reference(chains)
+
+	if (repeated !== undefined) {
+		return `The declared dependency order names ${to_issue_reference(repeated)} twice; fix the declaration before inserting.`
+	}
+
+	const declared = find_already_declared_addition(chains, additions)
+
+	return declared === undefined ? undefined : already_declared_error(declared)
+}
+
 function insert_children(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
 	position: InsertPosition | undefined,
+	tracked: ReadonlyArray<number>,
 ): InsertOutcome {
-	const repeated = find_repeated_reference(chains)
+	const error = find_insertion_error(chains, additions)
+	if (error !== undefined) return { error }
 
-	if (repeated !== undefined) {
-		return {
-			error: `The declared dependency order names ${to_issue_reference(repeated)} twice; fix the declaration before inserting.`,
-		}
-	}
-
-	const outcome = apply_insertion(chains, additions, position)
+	const outcome = apply_insertion(chains, additions, position, tracked)
 	if ('error' in outcome) return outcome
 
 	const duplicated = find_repeated_reference(outcome.chains)

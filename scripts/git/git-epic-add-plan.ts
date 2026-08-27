@@ -201,7 +201,14 @@ function build_plan(input: PlanInput): PlanOutcome {
 	if (error !== undefined) return { error }
 
 	const additions = to_additions(input, tracked, declared_numbers(chains_before))
-	const inserted = git_epic_chains.insert_children(chains_before, additions, input.position)
+	// `tracked` reaches the chain builder so it can tell a child with no order yet from a number that
+	// is not a child at all; `find_addition_error` has already refused the second (joshuafolkken/kit#949).
+	const inserted = git_epic_chains.insert_children(
+		chains_before,
+		additions,
+		input.position,
+		tracked,
+	)
 	if ('error' in inserted) return { error: inserted.error }
 
 	return to_plan({ input, additions, chains_before, chains_after: inserted.chains })
