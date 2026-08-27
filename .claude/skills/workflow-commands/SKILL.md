@@ -225,6 +225,11 @@ of an Issue that is not an epic and its park-and-continue behavior (`epicrun.md`
 verification gate and merge chain (`chain-rule.md` / `followup.md`), and the post-update verification
 procedure (`.claude/skills/dependency-update/`) that the two prohibitions above route to.
 
+The `auto-ok` pickup and its "only a person applies the label" rule (`epicrun.md`) are the borderline
+case worth naming, because a prohibition on writing usually *is* resident. It is not, and the reason
+is that `auto-ok` exists nowhere but the documents that also forbid an agent applying it: a turn that
+opens none of them is a turn on which the label is never reached, so residency would buy nothing.
+
 **The criterion is not advisory.** `scripts/workflow-skills.test.ts` caps each document at
 `RESIDENT_CEILING_BYTES` and requires headroom under it, so a procedure restated resident costs
 budget that the next genuinely-resident rule then has to take back out of existing prose. When a

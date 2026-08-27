@@ -2,6 +2,9 @@ import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_read } from './git-gh-issue-read'
 
 const NUMBER_AND_BODY_FIELDS = 'number,body'
+// The fields every listing that is *ranked* asks for: `createdAt` to order by and `labels` to
+// exclude by. Shared by the next-issues display and the `auto-ok` pickup, which rank identically.
+const SUMMARY_FIELDS = 'number,title,labels,createdAt'
 
 async function issue_edit_body(issue_number: string, body: string): Promise<string> {
 	return await git_gh_exec.exec_gh_command_with_stdin({
@@ -43,7 +46,7 @@ async function issue_list_open(input: {
 // The newest open issues, for the next-issues display at workflow completion (#821). `createdAt`
 // rides along because the caller re-sorts explicitly rather than inheriting `gh`'s default order.
 async function issue_list_recent(limit: number): Promise<string | undefined> {
-	return await issue_list_open({ json_fields: 'number,title,labels,createdAt', limit })
+	return await issue_list_open({ json_fields: SUMMARY_FIELDS, limit })
 }
 
 // Every open issue with its body. Used by `epic:bundle` to scan the backlog; a search with an empty
@@ -66,6 +69,21 @@ async function issue_search_body(term: string, limit: number): Promise<string | 
 async function issue_list_by_label(label: string, limit: number): Promise<string | undefined> {
 	return await issue_list_open({
 		json_fields: NUMBER_AND_BODY_FIELDS,
+		limit,
+		filter_arguments: ['--label', label],
+	})
+}
+
+// The same filter with the fields the `auto-ok` pickup needs (joshuafolkken/kit#906): it orders by
+// `createdAt` and re-checks `labels` client-side, so bodies would be fetched and thrown away. A
+// label that does not exist in the repository is not an error — `gh` answers with an empty listing,
+// which is exactly "nobody has opted anything in".
+async function issue_list_by_label_summary(
+	label: string,
+	limit: number,
+): Promise<string | undefined> {
+	return await issue_list_open({
+		json_fields: SUMMARY_FIELDS,
 		limit,
 		filter_arguments: ['--label', label],
 	})
@@ -185,6 +203,7 @@ const git_gh_issue = {
 	issue_comment,
 	issue_list_recent,
 	issue_list_by_label,
+	issue_list_by_label_summary,
 	issue_search_body,
 	issue_list_open_bodies,
 	issue_close,
