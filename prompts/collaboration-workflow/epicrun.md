@@ -133,7 +133,7 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 
 ### 停止条件
 
-`epicrun` が止まってよいのは次の 5 つだけである。
+`epicrun` が止まってよいのは次の 6 つだけである。
 
 1. `epic:next` が `complete` を返した — サマリを送信済み
 2. `epic:next` が `stop` を返した — 残る子はすべて人を要する。一覧を添えて報告する
@@ -141,4 +141,62 @@ EPIC の外側は承認しない。Tier C の行動は従来どおり停止す�
 4. 上記ガードのいずれかに到達した
 5. 上記タイムアウトのいずれかが経過した
 
-**判断が必要になった子は、この一覧に含まれない。** park してランを続ける。
+**判断が必要になった子は、この一覧に含まれない。** park してランを続ける。6. **子のマージ直後に `pnpm josh cost --over 400000` が `over` と答えた** — ランは新しいセッションで続けた方が安い。park でも失敗でもなく、起票も stash も行わない。再開コマンドは報告に含める（→「The hand-off」）
+
+### The hand-off — 1 セッションで epic 全体を回さなくてよい
+
+**A session pays for every child it has already run, on every later turn.** What a turn costs is
+decided by the accumulated preamble, not by what the turn does: measured across one `epicrun` that
+ran six children in one context, the billed input was 222k per request during the first child and
+645k during the sixth — the same work at 2.9x the price (joshuafolkken/kit#968). The growth is not
+linear in the number of children; the k-th child re-reads the wreckage of the k-1 before it on every
+turn.
+
+**So the run hands off when the marginal cost crosses a line, and the line is read, not felt.**
+
+```bash
+pnpm josh cost --over 400000
+```
+
+It prints `over` or `under` on standard output and the measured figure on standard error. `over`
+means the next turn of this session costs more than the threshold in billed input; the threshold is
+the same number the epic's own measurement produced, and it is passed explicitly so a run cannot
+drift it by remembering it wrong.
+
+`over` と `under` のほかに、**終了コード 1 で標準出力が空**という答えがある。トランスクリプトが見つからない場合と、リクエストが 0 件の場合である。**どちらも `under` として扱ってはならない** — 測れなかったことを「まだ安い」と読むのは、`epic:next` の読めない一覧を「指摘なし」と読むのと同じ誤りである。判定できない旨を報告してその子で区切る。
+
+#### いつ聞くか、そして何をするか
+
+**Ask once per child, immediately after its merge and `pnpm josh ms`** — never mid-child. That
+moment is the only one where nothing is in flight: the PR is merged, the working tree is on the
+default branch and clean, and the epic's state on GitHub is complete. A hand-off taken anywhere else
+would have to carry work that is not written down yet.
+
+- **`under`** — go back to step 1 of the loop and run the next child.
+- **`over`** — finish the session. Post the epic progress comment naming what merged and what
+  remains, send the completion notification with the resume command in its body, and stop with:
+
+  > Please run `epicrun #<E>` to continue this epic in a fresh session.
+
+**This is not a failure and not a park.** No child needs a decision; the run is simply cheaper to
+continue elsewhere. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.
+
+#### 何が引き継がれ、それはどこにあるか
+
+**Nothing is carried in the conversation.** Everything the next session needs it reads back:
+
+| What the next session needs                  | Where it reads it                             |
+| -------------------------------------------- | --------------------------------------------- |
+| Which children remain, and which is runnable | `pnpm josh epic:next <E>`                     |
+| The order and the dependencies               | the epic body                                 |
+| What each remaining child is                 | the child Issue body                          |
+| What already merged                          | the epic's task list, and the closed children |
+
+That is the same state a resumed run has always used (joshuafolkken/kit#861), which is why the
+hand-off needs no new mechanism — it makes deliberate what an interrupted run already did by
+accident. **A planned hand-off is strictly more certain than an interruption**: an interruption can
+land mid-child with a dirty tree and a stale `in-progress` label, and this cannot, because it is
+only ever taken when a child has just closed.
+
+**A resumed session is a new session**, so it runs `josh latest` once before its first child, exactly
+as the rule above says.
