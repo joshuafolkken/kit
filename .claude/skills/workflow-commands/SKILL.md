@@ -84,9 +84,24 @@ loaded.** That is the whole test, and it has exactly one input: when does the ru
 a command has started, or after. Everything a run reaches only *after* it has read this skill is
 routed to from the documents, never restated there.
 
-Every rule that passes the test is resident in full, and `scripts/workflow-skills.test.ts` asserts
-each one present in all three documents. The list is exhaustive — a rule added to the documents
-without appearing here has not been checked against the criterion:
+**The scope of this list is every resident rule that has an on-demand counterpart** — a skill or an
+on-demand prompt carrying the procedure the resident text routes to. Those are the rules the
+criterion is *about*: each one could have moved, and stayed for a reason worth naming. Within that
+scope the list is exhaustive, and a rule with a counterpart that is resident without appearing here
+has not been checked.
+
+Counting by skill would draw the line in the wrong place — `verify-ui` is routed to as readily as
+this skill is, and one entry below routes to `prompts/review.md`, which is not a skill at all.
+
+Outside the scope the documents carry a great deal more — the naming conventions, the quality
+limits, the code-change rules, Package-First. **None of that belongs on this list**: there is no
+on-demand copy for them to have moved to, so the question the criterion asks does not arise, and
+their absence here is correct rather than an omission (joshuafolkken/kit#955).
+
+Within that scope, every rule that passes the test is resident in full, and a marker suite asserts
+each one present in all three documents — `scripts/workflow-skills.test.ts` for most of them,
+`scripts/verify-ui-skill.test.ts` for the UI gate, and
+`scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step:
 
 - **Explicit invocation required** — it decides whether a workflow starts at all, so it binds on the
   turn the user types the keyword, which is before anything here has been read.
@@ -99,6 +114,9 @@ without appearing here has not been checked against the criterion:
   epic. A pre-commit self-review runs outside any workflow as readily as inside one, and the Issue it
   files is orphaned just the same; the step has to be readable on a turn that never typed a keyword.
   Its full form is in `prompts/review.md` → "Review round cap" (joshuafolkken/kit#946).
+- **The UI-verification gate** — a rendered change is not done until the screen has been looked at,
+  and the procedure for capturing it is `verify-ui`. The gate binds whenever a UI change is reported
+  finished, which is routinely a turn with no workflow keyword typed and no skill loaded.
 - **The three `josh epic:*` rules that bind outside those commands** — recording a decision removes
   that child's `needs-decision` label, fixing what `epic:audit` finds is Tier A, and an epic in
   another repository is referenced as `owner/repo#N`. Each fires on a turn where no `epic:*` command
