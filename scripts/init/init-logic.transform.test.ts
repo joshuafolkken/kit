@@ -60,15 +60,14 @@ describe('transform_prompt_paths', () => {
 		expect(result).not.toContain('`prompts/')
 	})
 
-	it('returns content unchanged when no prompts/ references exist', () => {
-		const input = 'no references here'
-
-		expect(init_logic.transform_prompt_paths(input)).toBe(input)
-	})
-
-	it('does not replace non-backtick prompts/ occurrences', () => {
-		const input = 'see prompts/refactoring.md without backticks'
-
+	// The glob case: `prompts/**` names a set of paths, not a file a consumer can open. Rewriting it
+	// would print a path a consumer's diff can never contain, while `josh eval:scope` matches the
+	// original (joshuafolkken/kit#907).
+	it.each([
+		['no references here', 'content with no prompts/ reference'],
+		['the measured set is `CLAUDE.md`, `prompts/**`, `.claude/settings.json`', 'a glob'],
+		['see prompts/refactoring.md without backticks', 'an occurrence outside backticks'],
+	])('leaves %j alone — %s', (input) => {
 		expect(init_logic.transform_prompt_paths(input)).toBe(input)
 	})
 })
