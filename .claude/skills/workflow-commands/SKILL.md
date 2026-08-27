@@ -48,6 +48,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**
   (`prompts/review.md` → "Review round cap"). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
+  **E2E closes after that, and never by asking the user**: where the command ends in a pull request
+  (`fullrun` / `queue` / `epicrun`) the CI E2E job is the result and `pnpm josh followup --merge`
+  is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
+  the stop. `CLAUDE.md` → "Completion gate" carries the rule, `prompts/testing-guide.md` → "Closing
+  the E2E gate without a human run" the procedure.
 - **`epicrun` differs on two points.** A stop that would end a `queue` parks one child instead and
   the run continues (`epicrun.md` → "park and continue"), and the keyword accepts an Issue that is
   **not** an epic — running it as a `fullrun`, and building the epic around it only if a prerequisite
