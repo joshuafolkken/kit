@@ -16,7 +16,7 @@ pnpm josh gate
 
 The four are independent and share no mutable state, so nothing is gained by running them one after another. Measured in kit: 13s (lint), 5s (type check), 2s (spell check) and 11s (unit tests) come to 31s in sequence and about 13s together.
 
-The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check's output as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
+The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
 ```
 ✔ lint (pnpm josh lint)
@@ -26,6 +26,20 @@ The bigger saving is in round trips. A serial gate stops at the first failure, s
 ```
 
 Each block's header names the command that ran, not only the check, because the type check's command is resolved per project (below). Re-run a single check while fixing by copying the command from its header; the other three are always `pnpm josh lint`, `pnpm josh cspell:dot` and `pnpm josh test:unit`. The exit code is `1` when any check failed, `0` otherwise.
+
+**Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent or the project has no tests, and a gate that ran zero tests must not look like one that ran them all), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
+
+```bash
+pnpm josh gate --verbose   # every check's output, passing ones included
+```
+
+`--verbose` is the exception to the refusal below: the gate consumes it itself rather than forwarding it, so it cannot vanish into a sub-command the way a forwarded flag would. Every other argument is still refused, and the refusal names both the arguments it rejected and the one flag it accepts:
+
+```
+josh gate takes no extra arguments — pass them to josh lint or josh check or josh cspell:dot or josh test:unit instead
+  refused: --workers=1
+  accepted here: --verbose
+```
 
 **The type check follows the application layer.** Three of the four checks are always the `josh` sub-command of the same name. The type check is not: a SvelteKit project type-checks with `svelte-check` behind `svelte-kit sync`, and `tsc --noEmit` there both misses every `.svelte` type error and fails on a clean checkout where `./$types` has not been generated. So the step is asked of the project's own toolkit:
 

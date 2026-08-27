@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AI_DOCS, read_repo_file } from './ai-document-fixture'
+import { test_unit_guard } from './test-unit-guard'
 import type { GateStep } from './verification-gate'
 
 vi.mock('execa', () => ({
@@ -29,6 +30,8 @@ type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
 const PASS = 0
 const FAIL = 1
 const ALL_PASS: ReadonlyArray<number> = [PASS, PASS, PASS, PASS]
+const FORWARDED_FLAG = '--workers=1'
+const REFUSAL_MESSAGE = 'josh gate takes no extra arguments'
 
 // execa's resolved Result is a large interface; the gate only reads `all` and `exitCode`, so a
 // minimal stub is bridged through `unknown`.
@@ -79,12 +82,15 @@ function capture_stdout(): { text: () => string; restore: () => void } {
 	}
 }
 
-async function run_capturing(exit_codes: ReadonlyArray<number>): Promise<[number, string]> {
+async function run_capturing(
+	exit_codes: ReadonlyArray<number>,
+	is_verbose = false,
+): Promise<[number, string]> {
 	mock_steps(exit_codes)
 	const stdout = capture_stdout()
 
 	try {
-		const code = await verification_gate.run_verification_gate()
+		const code = await verification_gate.run_verification_gate(is_verbose)
 
 		return [code, stdout.text()]
 	} finally {
@@ -133,10 +139,13 @@ describe('run_verification_gate', () => {
 
 	// Concurrent processes writing as they go would interleave; the buffered output is what makes
 	// the result readable, and printing in declaration order is what makes it scannable twice.
+	// Anchored on the section headers rather than the bodies: joshuafolkken/kit#967 stopped printing
+	// a passing check's body, and the property being asserted — sections in declaration order, so a
+	// reader can scroll to the same place twice — is about the headers.
 	it('prints each check as one block, in declaration order', async () => {
 		const [, output] = await run_capturing(ALL_PASS)
 
-		const positions = GATE_STEPS.map((step) => output.indexOf(step_output(step)))
+		const positions = GATE_STEPS.map((step) => output.indexOf(step.label))
 
 		expect(positions).toEqual([...positions].toSorted((left, right) => left - right))
 		expect(positions.every((position) => position >= 0)).toBe(true)
@@ -171,10 +180,10 @@ describe('run_gate_command', () => {
 		})
 
 		try {
-			const code = await verification_gate.run_gate_command(['--workers=1'])
+			const code = await verification_gate.run_gate_command([FORWARDED_FLAG])
 
 			expect(code).toBe(1)
-			expect(stderr.join('')).toContain('josh gate takes no extra arguments')
+			expect(stderr.join('')).toContain(REFUSAL_MESSAGE)
 			expect(mocked_execa).not.toHaveBeenCalled()
 		} finally {
 			spy.mockRestore()
@@ -210,5 +219,137 @@ describe('the gate command is what the documents tell an AI to run', () => {
 		'.claude/skills/workflow-commands/queue.md',
 	])('names the command in the gate description of %s', (skill_path) => {
 		expect(read_repo_file(skill_path)).toContain(GATE_COMMAND)
+	})
+})
+
+// joshuafolkken/kit#967: a passing check's body is never read — the summary line already says the
+// gate passed — and it lands in the conversation to be re-read on every later turn. A failing
+// check's body is the one time it is the answer.
+const FIRST_FAILS: ReadonlyArray<number> = [FAIL, PASS, PASS, PASS]
+
+function every_step_output(): ReadonlyArray<string> {
+	return GATE_STEPS.map((step) => step_output(step))
+}
+
+describe('run_verification_gate — what it prints', () => {
+	it('prints no output body when every check passes', async () => {
+		const [code, text] = await run_capturing(ALL_PASS)
+
+		expect(code).toBe(0)
+		for (const output of every_step_output()) expect(text).not.toContain(output)
+	})
+
+	it('still names every check that ran', async () => {
+		const [, text] = await run_capturing(ALL_PASS)
+
+		for (const step of GATE_STEPS) expect(text).toContain(step.label)
+	})
+
+	it('prints the output body of the check that failed', async () => {
+		const [code, text] = await run_capturing(FIRST_FAILS)
+		const [failed] = GATE_STEPS
+
+		// Asserted rather than defaulted: `toContain('')` passes against any output at all, so an
+		// empty step list would disable this guard instead of failing it.
+		if (failed === undefined) throw new Error('the gate declares no steps')
+
+		expect(code).toBe(1)
+		expect(text).toContain(step_output(failed))
+	})
+
+	// One failure must not drag the other three bodies back in — that is the whole saving.
+	it('prints no body for the checks that passed alongside a failure', async () => {
+		const [, text] = await run_capturing(FIRST_FAILS)
+
+		for (const step of GATE_STEPS.slice(1)) expect(text).not.toContain(step_output(step))
+	})
+
+	it('prints every body when asked to be verbose', async () => {
+		const [code, text] = await run_capturing(ALL_PASS, true)
+
+		expect(code).toBe(0)
+		for (const output of every_step_output()) expect(text).toContain(output)
+	})
+})
+
+describe('run_verification_gate — a check that passed without running', () => {
+	// A check that passed *without running* still has to say so: `test-unit-guard` exits 0 with a
+	// notice when vitest is absent, and suppressing it made a gate that ran zero tests print exactly
+	// what a full one prints.
+	it('prints the notice of a check that passed without running', async () => {
+		mock_steps(ALL_PASS)
+		mocked_execa.mockImplementation((async () =>
+			fake_result(
+				PASS,
+				`josh test:unit: vitest is not installed ${test_unit_guard.SKIP_MARKER} vitest unit tests.`,
+			)) as unknown as ExecaImplementation)
+		const stdout = capture_stdout()
+
+		try {
+			await verification_gate.run_verification_gate()
+
+			expect(stdout.text()).toContain(test_unit_guard.SKIP_MARKER)
+		} finally {
+			stdout.restore()
+		}
+	})
+})
+
+// `lint-parallel` runs eslint without `--max-warnings 0`, so a check can exit 0 with warnings in it.
+// Suppressing those would let the gate report "passed" with the warnings invisible.
+describe('run_verification_gate — a check that passed with warnings', () => {
+	it('prints the body of a passing check whose output carries a warning', async () => {
+		const notice = 'src/a.ts:1:1  warning  Unexpected console statement'
+
+		mock_steps(ALL_PASS)
+		mocked_execa.mockImplementation((async () =>
+			fake_result(PASS, notice)) as unknown as ExecaImplementation)
+		const stdout = capture_stdout()
+
+		try {
+			await verification_gate.run_verification_gate()
+
+			expect(stdout.text()).toContain(notice)
+		} finally {
+			stdout.restore()
+		}
+	})
+})
+
+describe('run_gate_command — the verbose flag', () => {
+	it('accepts the flag it consumes itself', async () => {
+		mock_steps(ALL_PASS)
+		const stdout = capture_stdout()
+
+		try {
+			expect(await verification_gate.run_gate_command([verification_gate.VERBOSE_FLAG])).toBe(0)
+			for (const output of every_step_output()) expect(stdout.text()).toContain(output)
+		} finally {
+			stdout.restore()
+		}
+	})
+
+	// The refusal exists because a forwarded flag vanishes into the sub-commands; consuming one flag
+	// here must not stop the others being refused.
+	it('still refuses an argument it would have to forward', async () => {
+		mock_steps(ALL_PASS)
+		const stderr: Array<string> = []
+		const spy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+			stderr.push(String(chunk))
+
+			return true
+		})
+
+		try {
+			const code = await verification_gate.run_gate_command([
+				verification_gate.VERBOSE_FLAG,
+				FORWARDED_FLAG,
+			])
+
+			expect(code).toBe(1)
+			expect(stderr.join('')).toContain(REFUSAL_MESSAGE)
+		} finally {
+			spy.mockRestore()
+		}
 	})
 })
