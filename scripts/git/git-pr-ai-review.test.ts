@@ -1,6 +1,11 @@
 // cspell:words coderabbit coderabbitai
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { handle_ai_review_findings, type TelegramContext } from './git-pr-ai-review'
+import {
+	handle_ai_review_findings,
+	UNREADABLE_COMMENTS_BODY,
+	UNREADABLE_COMMENTS_NOTE,
+	type TelegramContext,
+} from './git-pr-ai-review'
 
 vi.mock('./git-gh-command', () => ({
 	git_gh_command: {
@@ -154,6 +159,66 @@ describe('handle_ai_review_findings — blocker with ignore reason', () => {
 		expect(branch).toBe(BRANCH)
 		expect(body).toContain('intentionally left unresolved')
 		expect(body).toContain(IGNORE_REASON)
+		expect(mocked_telegram_send).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#973: `pr_get_comments` turned every failure into the string `'[]'`, so a rate
+// limit reached this gate as "no reviewer left a finding" and the PR merged with the gate never
+// actually read. A gate that could not be read is not a gate that passed.
+describe('handle_ai_review_findings — comments that could not be read', () => {
+	const INPUT = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
+
+	it('refuses to pass the gate when the read failed', async () => {
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+	})
+
+	// The rate-limit shape: valid JSON, but an object rather than a listing.
+	it('refuses to pass the gate when the answer is not a listing', async () => {
+		mocked_pr_get_comments.mockResolvedValue('{"message":"API rate limit exceeded"}')
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+	})
+
+	it('refuses to pass the gate when the answer is not json at all', async () => {
+		mocked_pr_get_comments.mockResolvedValue('not json at all')
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+	})
+
+	// The same alert an unresolved finding sends, so the stop reaches the person off-screen.
+	it('sends a confirmation notification before refusing', async () => {
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow()
+		expect(mocked_telegram_send).toHaveBeenCalledWith(
+			expect.objectContaining({ task_type: 'confirmation' }),
+		)
+	})
+
+	// An ignore reason gets past this for the reason it gets past a real finding: a person has looked.
+	// The note is what keeps a bypassed run from reporting like one that read the gate and found
+	// nothing — the CodeRabbit sibling records the same thing for the same reason.
+	it('lets an ignore reason past, recording it on the pull request and in the notes', async () => {
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(
+			handle_ai_review_findings({ ...INPUT, ignore_reason: IGNORE_REASON }),
+		).resolves.toEqual([UNREADABLE_COMMENTS_NOTE])
+		expect(mocked_pr_comment).toHaveBeenCalledWith(BRANCH, expect.stringContaining(IGNORE_REASON))
+	})
+})
+
+describe('handle_ai_review_findings — a listing that is genuinely empty', () => {
+	const INPUT = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
+
+	// `[]` is an answer: the PR has no comments, so there is nothing to block on.
+	it('passes the gate when the pull request has no comments at all', async () => {
+		mocked_pr_get_comments.mockResolvedValue('[]')
+
+		await expect(handle_ai_review_findings(INPUT)).resolves.toEqual([])
 		expect(mocked_telegram_send).not.toHaveBeenCalled()
 	})
 })

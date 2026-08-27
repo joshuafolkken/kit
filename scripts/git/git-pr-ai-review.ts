@@ -5,7 +5,7 @@ import {
 	type ReviewComment,
 } from './git-ai-review-scan'
 import { git_gh_command } from './git-gh-command'
-import { parse_json_array_safe } from './parse-json-array'
+import { parse_json_array_or_undefined } from './parse-json-array'
 import { ai_review_pull_comment_schema } from './schemas'
 import { telegram_notify, type TelegramSendInput } from './telegram-notify'
 
@@ -22,8 +22,14 @@ interface AiReviewPullComment {
 	author?: { login?: string | undefined } | undefined
 }
 
-function parse_ai_review_comments(raw_json: string): Array<AiReviewPullComment> {
-	return parse_json_array_safe(raw_json, ai_review_pull_comment_schema)
+// `undefined` when the answer was not a listing at all. `parse_json_array_safe` returned `[]` for
+// that, which this gate reads as "no reviewer left a finding" (joshuafolkken/kit#973).
+function parse_ai_review_comments(
+	raw_json: string | undefined,
+): Array<AiReviewPullComment> | undefined {
+	if (raw_json === undefined) return undefined
+
+	return parse_json_array_or_undefined(raw_json, ai_review_pull_comment_schema)
 }
 
 function to_review_comment(raw: AiReviewPullComment): ReviewComment {
@@ -106,10 +112,12 @@ function has_ignore_reason(reason: string | undefined): reason is string {
 	return reason !== undefined && reason.trim().length > 0
 }
 
-async function fetch_review_comments(branch_name: string): Promise<Array<ReviewComment>> {
-	const raw_json = await git_gh_command.pr_get_comments(branch_name)
+async function fetch_review_comments(
+	branch_name: string,
+): Promise<Array<ReviewComment> | undefined> {
+	const parsed = parse_ai_review_comments(await git_gh_command.pr_get_comments(branch_name))
 
-	return parse_ai_review_comments(raw_json).map((comment) => to_review_comment(comment))
+	return parsed?.map((comment) => to_review_comment(comment))
 }
 
 async function handle_blockers(input: {
@@ -133,12 +141,47 @@ async function handle_blockers(input: {
 	throw new Error(body)
 }
 
+// A gate that could not be read is not a gate that passed. An unreadable listing is handled exactly
+// like an unresolved finding — the same `confirmation` Telegram, the same non-zero exit — because
+// what it means is the same: nobody has confirmed the reviewers had nothing to say
+// (joshuafolkken/kit#973). An ignore reason still gets past it, for the same reason it gets past a
+// real finding: the person has looked.
+const UNREADABLE_COMMENTS_BODY =
+	'The AI reviewer comments could not be read, so no finding could be ruled out.\n' +
+	'Re-run `pnpm josh followup` once the read succeeds, or pass an ignore reason.'
+
+// The audit note a bypassed run carries into its completion notification. Without it a run that
+// never read the gate reports exactly like one that read it and found nothing.
+const UNREADABLE_COMMENTS_NOTE = 'AI reviewer comments could not be read; the scan was bypassed.'
+
+async function handle_unreadable_comments(input: {
+	branch_name: string
+	ignore_reason: string | undefined
+	context: TelegramContext
+}): Promise<Array<string>> {
+	if (has_ignore_reason(input.ignore_reason)) {
+		await git_gh_command.pr_comment(
+			input.branch_name,
+			`${UNREADABLE_COMMENTS_BODY}\nReason: ${input.ignore_reason.trim()}`,
+		)
+
+		return [UNREADABLE_COMMENTS_NOTE]
+	}
+
+	await notify_ai_review_confirmation({ context: input.context, body: UNREADABLE_COMMENTS_BODY })
+
+	throw new Error(UNREADABLE_COMMENTS_BODY)
+}
+
 async function handle_ai_review_findings(input: {
 	branch_name: string
 	ignore_reason: string | undefined
 	context: TelegramContext
 }): Promise<Array<string>> {
 	const review_comments = await fetch_review_comments(input.branch_name)
+
+	if (review_comments === undefined) return await handle_unreadable_comments(input)
+
 	const { blockers, infos } = classify_ai_review_comments(review_comments)
 	const skip_notes = log_info_findings(infos)
 
@@ -160,5 +203,7 @@ export {
 	parse_ai_review_comments,
 	to_review_comment,
 	has_ignore_reason,
+	UNREADABLE_COMMENTS_BODY,
+	UNREADABLE_COMMENTS_NOTE,
 }
 export type { TelegramContext, AiReviewPullComment }
