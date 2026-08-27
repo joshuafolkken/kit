@@ -73,8 +73,9 @@ describe('verify-ui screenshot command claim', () => {
 		expect(content).not.toContain('Today that\n> is every consumer')
 	})
 
-	// Asserted per document rather than once, so a correction applied to CLAUDE.md and forgotten in
-	// GEMINI.md fails on GEMINI.md — the Doc Sync Rules failure this repository keeps hitting.
+	// Iterated over `AI_DOCS` rather than reading the one document directly: the rules are
+	// single-sourced in `CLAUDE.md` (joshuafolkken/kit#963), and the iteration is the seam a second
+	// rule document would slot into without this suite being rewritten.
 	it.each(AI_DOCS)('%s tells app-kit and game-kit apart', (document_name) => {
 		const document = read_repo_file(document_name)
 

@@ -50,11 +50,20 @@ const CHAIN_RULE_FILE = 'chain-rule.md'
 const FOLLOWUP_FILE = 'followup.md'
 const ANTI_PATTERN_MARKER = '**Anti-pattern catalog**'
 
-// The headings that bound the two sections which stayed resident. `ROUTING_END_HEADING` doubles as
-// the marker for the rule that cannot move — it is the first thing after the routing table.
+// The headings of the two sections that stayed resident. `ROUTING_END_HEADING` doubles as the
+// marker for the rule that cannot move — it is the first thing after the routing table.
+//
+// All three were asserted by a suite that compared these sections byte-for-byte across the three
+// paired documents. joshuafolkken/kit#963 single-sourced the rules, so there is nothing left to
+// compare a document against and that suite is gone. What it was really protecting is that these
+// sections exist and are resident, which is asserted directly below instead — the substance of each
+// one is already pinned marker by marker, and without the headings a rename would go unnoticed.
 const ROUTING_HEADING = '### Shorthand Commands'
 const ROUTING_END_HEADING = '#### Explicit invocation required (MANDATORY)'
 const OVERRIDES_HEADING = '### Dependency overrides (`pnpm-workspace.yaml` / `package.json`)'
+// What follows the overrides section. Pinned in its own right rather than as a slice boundary: it
+// was only ever asserted as the end of that slice, so deleting the slice comparison took the one
+// assertion that `## Package-First Development` still exists with it.
 const OVERRIDES_END_HEADING = '## Package-First Development'
 
 const SUPPORTING_FILES: ReadonlyArray<string> = [
@@ -171,7 +180,7 @@ describe('the residency criterion — which rules may stay in the always-loaded 
 	// the set has to match what the suite below asserts resident.
 	it.each([
 		'## 3. What stays resident, and what is read from here',
-		'**A rule stays in the AI documents if and only if it has to fire on a turn where no skill was loaded.**',
+		'**A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**',
 		'**Explicit invocation required**',
 		'**The mid-workflow stop notification**',
 		'**The `overrides` prohibition**',
@@ -279,7 +288,10 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 	const content = read_repo_file(document_path)
 
 	it.each([
+		ROUTING_HEADING,
 		ROUTING_END_HEADING,
+		OVERRIDES_HEADING,
+		OVERRIDES_END_HEADING,
 		'Please run \\`<command>\\` to start this task.',
 		'pnpm josh notify --task-type confirmation',
 		'`parseArgs` rejects it',
@@ -304,37 +316,5 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		'Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do',
 	])('states the test for what may stay resident: %j', (marker) => {
 		expect(content).toContain(marker)
-	})
-})
-
-// kit#854 traded per-document assertions of the moved rules for one shared copy in the skills, which
-// is what `read_rule_surface` reflects: a marker that lives only in a skill now passes for all three
-// documents, so those suites no longer catch a document that fell behind. What still has to be
-// checked per document is the part that stayed resident — the routing itself. These slices are
-// inserted identically into all three, so comparing them restores the drift detection the surface
-// gave up, at the level where drift is still possible.
-
-function section_of(content: string, heading: string, end_heading: string): string {
-	const start = content.indexOf(heading)
-	const end = content.indexOf(end_heading, start)
-
-	expect(start).toBeGreaterThan(-1)
-	expect(end).toBeGreaterThan(start)
-
-	return content.slice(start, end).trim()
-}
-
-describe('routing sections are identical across the paired documents', () => {
-	const reference = read_repo_file(AI_DOCS[0] ?? '')
-
-	it.each([
-		['workflow routing', ROUTING_HEADING, ROUTING_END_HEADING],
-		['overrides routing', OVERRIDES_HEADING, OVERRIDES_END_HEADING],
-	])('%s reads the same in every document', (_label, heading, end_heading) => {
-		const expected = section_of(reference, heading, end_heading)
-
-		for (const document_path of AI_DOCS) {
-			expect(section_of(read_repo_file(document_path), heading, end_heading)).toBe(expected)
-		}
 	})
 })

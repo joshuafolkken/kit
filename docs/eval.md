@@ -1,7 +1,8 @@
 # `josh eval` — measuring agent rule compliance
 
 `@joshuafolkken/kit` distributes the documents and skills that decide how an AI agent behaves in a
-project: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `prompts/` and `.claude/skills/`. Until
+project: `CLAUDE.md` (the rules), `AGENTS.md` / `GEMINI.md` (pointers to it), `prompts/` and
+`.claude/skills/`. Until
 [joshuafolkken/kit#855](https://github.com/joshuafolkken/kit/issues/855) there was no way to tell
 whether editing them changed anything. Every observed violation was answered with more prose, and
 prose was the only evidence in either direction — so a rule that never worked looked exactly like one

@@ -1,6 +1,6 @@
 # @joshuafolkken/kit
 
-Shared toolchain config and CLI for TypeScript projects — ESLint, Prettier, TypeScript, Lefthook, cspell, VS Code, and AI assistant files (CLAUDE.md, AGENTS.md, GEMINI.md), wired together. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
+Shared toolchain config and CLI for TypeScript projects — ESLint, Prettier, TypeScript, Lefthook, cspell, VS Code, and AI assistant files (CLAUDE.md, plus AGENTS.md / GEMINI.md pointing at it), wired together. It is framework-agnostic; the SvelteKit-specific layer lives in the separate [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) package.
 
 - **`josh` CLI** — lint, format, type-check, git workflow, versioning, and security auditing from any directory.
 - **Project config package** — ESLint / Prettier / tsconfig presets, prompts, and scripts consumed as a devDependency.
@@ -33,7 +33,7 @@ Using the kit inside a project? See [docs/package.md](./docs/package.md).
 
 ## Contributing
 
-Community standards live in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md); security reports go through [SECURITY.md](./SECURITY.md). Development conventions are documented in `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md`.
+Community standards live in [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md); security reports go through [SECURITY.md](./SECURITY.md). Development conventions are documented in `CLAUDE.md`; `AGENTS.md` and `GEMINI.md` are pointers to it.
 
 ## License
 
