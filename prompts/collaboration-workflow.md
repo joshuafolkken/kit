@@ -559,6 +559,8 @@ Details:
   - **CodeRabbit**（`author.login = coderabbitai` / `coderabbitai[bot]`）: 本文に `Actionable comments posted: N` を含み `N > 0`。レート制限通知（`rate limited by coderabbit.ai` / `Rate limit exceeded`）や `No actionable comments` は無視する
 - ブロッカーが残っていて `--ai-review-ignore-reason` が未指定の場合: `confirmation` Telegram 通知を送り、非ゼロで終了する。指摘を修正してから再実行するか、意図的に無視する理由を渡す
 - `--ai-review-ignore-reason "<reason>"` を渡した場合: 無視理由コメントを PR に投稿したうえで完了通知まで進める（`--coderabbit-ignore-reason` と同じ流れ）
+- **コメント一覧そのものを読めなかった場合は、ブロッカーが残っている場合と同じ扱いにする。** レート制限・認証失効・通信断はいずれも「指摘が無かった」ではなく「指摘が無かったことを誰も確認していない」であり、以前はすべて空の一覧として通過していた（joshuafolkken/kit#973）。`confirmation` Telegram 通知を送って非ゼロ終了し、読める状態で再実行する。`--ai-review-ignore-reason` はここでも通過を許す — 人が見たという意味は同じだからである。ただしその場合、スキャンを迂回した事実が完了通知の監査ノートに残る
+- **CodeRabbit の行コメント一覧が読めなかった場合はブロックしない。** kit#753 により CodeRabbit はそもそもマージをブロックしないため、読めなかったことだけがブロック理由になるのは筋が通らない。警告を出し、完了通知の監査ノートに残す。なお PR 番号自体を解決できなかった場合もこちらの「読めなかった」に含まれる — 上のトップレベルコメント走査は PR 番号を解決しない
 
 ### 設定ファイル更新の確認（`pnpm josh followup` 実行中）
 

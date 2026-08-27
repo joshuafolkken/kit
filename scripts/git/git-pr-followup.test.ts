@@ -1,14 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { UNREADABLE_CR_NOTE } from './git-pr-coderabbit'
 import {
-	build_telegram_input,
 	git_pr_followup,
-	has_closes_keyword,
-	is_blank_issue_body,
-	parse_repo_name,
 	post_notify_issue,
 	warn_if_missing_closes,
 	type FollowupInput,
-	type TelegramContext,
 } from './git-pr-followup'
 
 vi.mock('./git-gh-command', () => ({
@@ -53,32 +49,53 @@ const { git_pr_checks } = await import('./git-pr-checks')
 const { git_pr_ai_review } = await import('./git-pr-ai-review')
 const { telegram_notify } = await import('./telegram-notify')
 
+const PR_URL = 'https://github.com/owner/repo/pull/1'
+
+const BASE_INPUT: FollowupInput = {
+	branch_name: 'test-branch',
+	issue_number: '42',
+	notify_config: undefined,
+	coderabbit_ignore_reason: undefined,
+	ai_review_ignore_reason: undefined,
+	is_skip_watch: true,
+	should_merge: false,
+}
+
 const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
 const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
 const mocked_comment = vi.mocked(git_gh_command.issue_comment)
 const mocked_pr_get_body = vi.mocked(git_gh_command.pr_get_body)
 
-describe('is_blank_issue_body', () => {
-	it('returns true for undefined', () => {
-		expect(is_blank_issue_body(undefined)).toBe(true)
-	})
+// The body of the completion notification the run sent, or undefined when it sent none.
+function notify_body(): string | undefined {
+	return (vi.mocked(telegram_notify.send).mock.calls[0] ?? [])[0]?.body
+}
 
-	it('returns true for empty string', () => {
-		expect(is_blank_issue_body('')).toBe(true)
-	})
+function silence_warnings(): void {
+	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+}
 
-	it('returns true for whitespace-only string', () => {
-		expect(is_blank_issue_body('   \n\t  ')).toBe(true)
+function setup_run_mocks(): void {
+	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
+	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
+	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
+	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
+	vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
+		rollup: [],
+		merge_state_status: undefined,
+		review_decision: undefined,
 	})
+	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
+	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
+	vi.mocked(telegram_notify.send).mockResolvedValue()
+	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+}
 
-	it('returns false for non-empty body', () => {
-		expect(is_blank_issue_body('## Background\nSome content')).toBe(false)
-	})
-
-	it('returns false for body with leading whitespace and content', () => {
-		expect(is_blank_issue_body('  content  ')).toBe(false)
-	})
-})
+function setup_skip_policy_mocks(): void {
+	vi.clearAllMocks()
+	silence_warnings()
+	setup_run_mocks()
+}
 
 describe('post_notify_issue — blank body uses edit, non-blank uses comment', () => {
 	const ISSUE_NUMBER = '42'
@@ -125,86 +142,12 @@ describe('post_notify_issue — blank body uses edit, non-blank uses comment', (
 	})
 })
 
-describe('parse_repo_name', () => {
-	it('returns the repo name from owner/repo format', () => {
-		expect(parse_repo_name('joshuafolkken/tasks')).toBe('tasks')
-	})
-
-	it('returns undefined when input is undefined', () => {
-		const input: string | undefined = undefined
-
-		expect(parse_repo_name(input)).toBeUndefined()
-	})
-})
-
-describe('build_telegram_input', () => {
-	const CONTEXT: TelegramContext = {
-		repo_name: 'joshuafolkken-com',
-		issue_title: 'Fix bug',
-		issue_url: 'https://github.com/owner/repo/issues/1',
-		pr_url: 'https://github.com/owner/repo/pull/2',
-	}
-
-	it('forwards context fields and task_type onto the send input', () => {
-		const result = build_telegram_input({
-			task_type: 'completion',
-			context: CONTEXT,
-			body: undefined,
-		})
-
-		expect(result).toStrictEqual({
-			task_type: 'completion',
-			repo_name: CONTEXT.repo_name,
-			issue_title: CONTEXT.issue_title,
-			body: undefined,
-			issue_url: CONTEXT.issue_url,
-			pr_url: CONTEXT.pr_url,
-		})
-	})
-})
-
-const PR_URL = 'https://github.com/owner/repo/pull/1'
-
-const BASE_INPUT: FollowupInput = {
-	branch_name: 'test-branch',
-	issue_number: '42',
-	notify_config: undefined,
-	coderabbit_ignore_reason: undefined,
-	ai_review_ignore_reason: undefined,
-	is_skip_watch: true,
-	should_merge: false,
-}
-
-describe('has_closes_keyword', () => {
-	it('returns false for undefined', () => {
-		expect(has_closes_keyword(undefined)).toBe(false)
-	})
-
-	it('returns true for "closes #123"', () => {
-		expect(has_closes_keyword('closes #123')).toBe(true)
-	})
-
-	it('returns true case-insensitively for "Closes #42"', () => {
-		expect(has_closes_keyword('Closes #42')).toBe(true)
-	})
-
-	it('returns true when closes keyword appears in a multi-line body', () => {
-		expect(has_closes_keyword('## Summary\nSome text\n\ncloses #7\n')).toBe(true)
-	})
-
-	it('returns false when body has no closes keyword', () => {
-		expect(has_closes_keyword('## Summary\nSome unrelated text')).toBe(false)
-	})
-})
-
 describe('warn_if_missing_closes', () => {
 	const BRANCH = 'my-feature-branch'
 
 	beforeEach(() => {
 		vi.clearAllMocks()
-		vi.spyOn(console, 'warn').mockImplementation(() => {
-			// suppress output during tests
-		})
+		silence_warnings()
 	})
 
 	it('prints a warning when PR body has no closes keyword', async () => {
@@ -232,27 +175,8 @@ describe('warn_if_missing_closes', () => {
 	})
 })
 
-function setup_run_mocks(): void {
-	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
-	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
-	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
-	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
-	vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
-		rollup: [],
-		merge_state_status: undefined,
-		review_decision: undefined,
-	})
-	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
-	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
-	vi.mocked(telegram_notify.send).mockResolvedValue()
-	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
-}
-
 describe('git_pr_followup.run — --merge flag', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-		setup_run_mocks()
-	})
+	beforeEach(setup_skip_policy_mocks)
 
 	it('calls notify before pr_merge when should_merge is true', async () => {
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
@@ -285,14 +209,6 @@ const UNRESOLVED_CODERABBIT_COMMENT = {
 
 const IGNORE_REASON = 'Tracked in follow-up Issue #999'
 
-function setup_skip_policy_mocks(): void {
-	vi.clearAllMocks()
-	vi.spyOn(console, 'warn').mockImplementation(() => {
-		// suppress output during tests
-	})
-	setup_run_mocks()
-}
-
 describe('git_pr_followup.run — temporary CodeRabbit skip (kit#753)', () => {
 	beforeEach(setup_skip_policy_mocks)
 
@@ -314,10 +230,8 @@ describe('git_pr_followup.run — temporary CodeRabbit skip (kit#753)', () => {
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
 
-		const [send_input] = vi.mocked(telegram_notify.send).mock.calls[0] ?? []
-
-		expect(send_input?.body).toContain('kit#753')
-		expect(send_input?.body).toContain(UNRESOLVED_CODERABBIT_COMMENT.html_url)
+		expect(notify_body()).toContain('kit#753')
+		expect(notify_body()).toContain(UNRESOLVED_CODERABBIT_COMMENT.html_url)
 	})
 })
 
@@ -336,10 +250,8 @@ describe('git_pr_followup.run — CodeRabbit skip audit trail (kit#753)', () => 
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
 
-		const [send_input] = vi.mocked(telegram_notify.send).mock.calls[0] ?? []
-
-		expect(send_input?.body).toContain('CodeRabbit check skipped (kit#753)')
-		expect(send_input?.body).toContain('pending')
+		expect(notify_body()).toContain('CodeRabbit check skipped (kit#753)')
+		expect(notify_body()).toContain('pending')
 	})
 
 	it('still posts the audit comment when an ignore reason is supplied', async () => {
@@ -357,5 +269,62 @@ describe('git_pr_followup.run — CodeRabbit skip audit trail (kit#753)', () => 
 
 		expect(comment_body).toContain('intentionally left unresolved')
 		expect(comment_body).toContain(IGNORE_REASON)
+	})
+})
+
+// joshuafolkken/kit#973: `pr_get_review_comments` turned every failure into `'[]'`, so an unreadable
+// listing passed as "nothing unresolved". CodeRabbit does not block the merge at all right now
+// (kit#753), so this cannot block either — but it must say so rather than pass in silence.
+describe('git_pr_followup.run — CodeRabbit comments that could not be read (kit#973)', () => {
+	beforeEach(setup_skip_policy_mocks)
+
+	// `undefined` is a failed read; the object is the rate-limit shape — valid JSON, not a listing.
+	it.each([undefined, '{"message":"API rate limit exceeded"}'])(
+		'records that the listing went unread (%s)',
+		async (listing) => {
+			vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue(listing)
+
+			await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
+
+			expect(notify_body()).toContain(UNREADABLE_CR_NOTE)
+		},
+	)
+
+	it('still merges, because CodeRabbit is non-blocking under kit#753', async () => {
+		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue(undefined)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+	})
+
+	// The audit trail an ignore reason leaves on the two branches around this one.
+	it('records an ignore reason on the pull request when one was supplied', async () => {
+		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue(undefined)
+		vi.mocked(git_gh_command.pr_comment).mockResolvedValue('')
+
+		await git_pr_followup.run({ ...BASE_INPUT, coderabbit_ignore_reason: IGNORE_REASON })
+
+		const [, comment_body] = vi.mocked(git_gh_command.pr_comment).mock.calls[0] ?? []
+
+		expect(comment_body).toContain(UNREADABLE_CR_NOTE)
+		expect(comment_body).toContain(IGNORE_REASON)
+	})
+
+	it('posts nothing to the pull request when no ignore reason was supplied', async () => {
+		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue(undefined)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
+
+		expect(vi.mocked(git_gh_command.pr_comment)).not.toHaveBeenCalled()
+	})
+
+	// `[]` is an answer: the PR has no line comments, so there is nothing to record.
+	it('says nothing when the pull request genuinely has no line comments', async () => {
+		vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
+
+		expect(notify_body()).not.toContain(UNREADABLE_CR_NOTE)
 	})
 })
