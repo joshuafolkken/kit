@@ -167,19 +167,48 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 // started — and every rule that passes it is named, because a criterion with no worked examples is
 // re-derived differently every time it is applied.
 describe('the residency criterion — which rules may stay in the always-loaded documents', () => {
+	// Enumerated, because a criterion with no worked examples is re-derived differently each time, and
+	// the set has to match what the suite below asserts resident.
 	it.each([
 		'## 3. What stays resident, and what is read from here',
 		'**A rule stays in the AI documents if and only if it has to fire on a turn where no skill was loaded.**',
-		// Enumerated, because a criterion with no worked examples is re-derived differently each time,
-		// and the set has to match what the suite below asserts resident.
-		'The list is exhaustive — a rule added to the documents without appearing here has not been checked against the criterion',
-		'**The `overrides` prohibition**',
-		'**The three `josh epic:*` rules that bind outside those commands**',
 		'**Explicit invocation required**',
 		'**The mid-workflow stop notification**',
+		'**The `overrides` prohibition**',
+		'**The UI-verification gate**',
+		'**The three `josh epic:*` rules that bind outside those commands**',
 		'**The criterion is not advisory.**',
 	])('is documented in the workflow skill: %j', (marker) => {
 		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#955: written without a scope, the exhaustiveness claim read as governing every
+// resident rule — naming conventions and quality limits included — which would either grow the list
+// without end or mark them as unchecked candidates for a skill. Counting by skill instead drew the
+// line in two wrong places at once: `verify-ui` is routed to just as this skill is, and one entry
+// routes to a prompt rather than to a skill at all. The axis is whether the rule has a counterpart.
+describe('the residency list says what it covers', () => {
+	it.each([
+		'**The scope of this list is every resident rule that has an on-demand counterpart**',
+		'Within that scope the list is exhaustive',
+		'Counting by skill would draw the line in the wrong place',
+		// The pointer has to name where each entry is actually guarded; two of them are asserted by their
+		// own suites, and a maintainer who looks only in this one concludes they are unguarded.
+		'`scripts/verify-ui-skill.test.ts` for the UI gate',
+		'**None of that belongs on this list**',
+		'their absence here is correct rather than an omission',
+	])('scopes the claim in the workflow skill: %j', (marker) => {
+		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).toContain(marker)
+	})
+
+	// Asserted absent, not merely replaced: the unscoped sentence beside the scoped one leaves two
+	// claims about the same list, and a reader applying the first one still grows it without end.
+	it('no longer claims the list covers every resident rule', () => {
+		expect(read_unwrapped(`${WORKFLOW_SKILL}/${SKILL_ENTRY_FILE}`)).not.toContain(
+			'The list is exhaustive — a rule added to the documents',
+		)
+		expect(read_unwrapped(WORKFLOW_PROMPT)).not.toContain('**この一覧は網羅的である**')
 	})
 
 	// The skill is the operational copy; the canonical reference is where the rule is argued, and the
@@ -189,6 +218,10 @@ describe('the residency criterion — which rules may stay in the always-loaded 
 		'## 常駐ドキュメントと skill の分担（何を常駐に残すか）',
 		'**その規則は、skill がロードされていないターンでも効く必要があるか。**',
 		'**この基準は努力目標ではない。**',
+		'**この一覧の対象範囲は、オンデマンド側に対応する手順を持つ常駐規則である**',
+		'**skill の数で線を引くのは誤りである**',
+		'**UI 検証ゲート**',
+		'**範囲の外にある常駐規則はこの一覧に載らないのが正常である。**',
 	])('is argued in the canonical prompt: %j', (marker) => {
 		expect(read_unwrapped(WORKFLOW_PROMPT)).toContain(marker)
 	})
@@ -268,7 +301,7 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 	// at once (joshuafolkken/kit#951).
 	it.each([
 		'**What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?**',
-		'Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions and the three `epic:*` rules below all do',
+		'Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do',
 	])('states the test for what may stay resident: %j', (marker) => {
 		expect(content).toContain(marker)
 	})
