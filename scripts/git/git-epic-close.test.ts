@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { close_completed_epics } from './git-epic-close'
+import { close_completed_epics, UNREADABLE_EPIC_LIST_MESSAGE } from './git-epic-close'
 
 vi.mock('./git-gh-command', () => ({
 	git_gh_command: {
@@ -21,6 +21,7 @@ const UNORDERED_DEPENDENCIES = '## Dependencies\n\nNone — the children are ind
 const EPIC_BODY = ORDERED_DEPENDENCIES + PROGRESS
 const UNORDERED_EPIC_BODY = UNORDERED_DEPENDENCIES + PROGRESS
 const MERGED_ISSUE = '103'
+const ALL_CHILDREN = '#101, #102, #103'
 
 function epic_list_json(entries: Array<{ number: number; body: string }>): string {
 	return JSON.stringify(entries)
@@ -51,7 +52,7 @@ describe('close_completed_epics — completed batch', () => {
 		const [closed_number, comment] = mocked_close.mock.calls[0] ?? []
 
 		expect(closed_number).toBe('200')
-		expect(comment).toContain('#101, #102, #103')
+		expect(comment).toContain(ALL_CHILDREN)
 	})
 
 	it('never queries the state of the just-merged issue', async () => {
@@ -288,5 +289,67 @@ describe('close_completed_epics — per-epic isolation', () => {
 
 		expect(mocked_close).toHaveBeenCalledTimes(2)
 		expect(mocked_close.mock.calls.at(-1)?.[0]).toBe('201')
+	})
+})
+
+// joshuafolkken/kit#959: the listing was read with `parse_json_array_safe`, which answers `[]` for a
+// response it could not parse — indistinguishable from "no epic is open". The auto-close then had
+// nothing to close and said nothing about why, so an epic stayed open with no trace of the failure.
+const MERGED = { issue_number: MERGED_ISSUE, is_merged: true }
+const UNPARSEABLE_LISTING = 'not json at all'
+
+describe('close_completed_epics — a listing that could not be read', () => {
+	it('reports that the listing could not be read rather than closing nothing in silence', async () => {
+		mocked_list.mockResolvedValue(UNPARSEABLE_LISTING)
+
+		await close_completed_epics(MERGED)
+
+		expect(console.info).toHaveBeenCalledWith(UNREADABLE_EPIC_LIST_MESSAGE)
+	})
+
+	// The rate-limit shape: valid JSON, but an object rather than a listing.
+	it('reports an answer that is valid json but not a listing', async () => {
+		mocked_list.mockResolvedValue('{"message":"API rate limit exceeded"}')
+
+		await close_completed_epics(MERGED)
+
+		expect(console.info).toHaveBeenCalledWith(UNREADABLE_EPIC_LIST_MESSAGE)
+	})
+
+	// The same absence arrives when `gh` itself failed, and it was equally silent before.
+	it('reports a listing the gh call could not produce', async () => {
+		mocked_list.mockResolvedValue(undefined)
+
+		await close_completed_epics(MERGED)
+
+		expect(console.info).toHaveBeenCalledWith(UNREADABLE_EPIC_LIST_MESSAGE)
+	})
+
+	it('never closes an epic on a listing it could not read', async () => {
+		mocked_list.mockResolvedValue(UNPARSEABLE_LISTING)
+
+		await close_completed_epics(MERGED)
+
+		expect(mocked_close).not.toHaveBeenCalled()
+	})
+})
+
+describe('close_completed_epics — a listing that is genuinely empty', () => {
+	// `[]` is an answer, not a gap: no epic is open, so there is nothing to warn about.
+	it('says nothing when no epic is open', async () => {
+		mocked_list.mockResolvedValue('[]')
+
+		await close_completed_epics(MERGED)
+
+		expect(console.info).not.toHaveBeenCalledWith(UNREADABLE_EPIC_LIST_MESSAGE)
+	})
+
+	it('still closes a completed epic on a listing it could read', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
+		mocked_get_child.mockResolvedValue(CLOSED_LINKED)
+
+		await close_completed_epics(MERGED)
+
+		expect(mocked_close).toHaveBeenCalledWith('200', expect.stringContaining(ALL_CHILDREN))
 	})
 })

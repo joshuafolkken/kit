@@ -1,7 +1,7 @@
 import { git_epic_parse, type ExternalChild } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
 import { EPIC_LABEL } from './issue-labels'
-import { parse_json_array_safe, parse_json_object_safe } from './parse-json-array'
+import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-json-array'
 import { epic_child_schema, epic_issue_schema, type EpicChildData } from './schemas'
 
 // `gh issue list` defaults to 30 rows. Epics are few, but an implicit cap would silently skip the
@@ -29,11 +29,25 @@ function to_epic_issue(raw: { number: number; body?: string | undefined }): Epic
 	}
 }
 
-async function fetch_open_epics(): Promise<Array<EpicIssue>> {
+// `undefined` when the listing could not be read at all — the request failed, or the answer was not
+// a JSON array. Not `[]`, which is a real answer meaning no epic is open.
+//
+// `parse_json_array_safe` returns `[]` for both, and the auto-close then decides there is no epic to
+// close: it stops for a reason that never reaches a log, and the epic stays open with nothing saying
+// why. The failure leans safe — the other direction, taken by `epic:bundle`, invented a second epic
+// (joshuafolkken/kit#950) — but silence is the same defect, so the two are told apart here as well
+// (joshuafolkken/kit#959).
+//
+// The two ways of failing are folded into one answer deliberately. Which one occurred does not
+// change what the auto-close may do — in neither case does it know what the open epics are — and
+// splitting them would put two warnings on one decision.
+async function fetch_open_epics(): Promise<Array<EpicIssue> | undefined> {
 	const raw_json = await git_gh_command.issue_list_by_label(EPIC_LABEL, EPIC_LIST_LIMIT)
-	if (raw_json === undefined) return []
+	if (raw_json === undefined) return undefined
 
-	return parse_json_array_safe(raw_json, epic_issue_schema).map((raw) => to_epic_issue(raw))
+	const rows = parse_json_array_or_undefined(raw_json, epic_issue_schema)
+
+	return rows?.map((raw) => to_epic_issue(raw))
 }
 
 function parse_child(raw_json: string | undefined): EpicChildData | undefined {
@@ -172,8 +186,18 @@ async function close_epic_isolated(epic: EpicIssue, merged_number: number): Prom
 	}
 }
 
+const UNREADABLE_EPIC_LIST_MESSAGE =
+	'⚠️  Could not read the open epic listing; skipped the epic auto-close check.'
+
 async function resolve_and_close(merged_number: number): Promise<void> {
 	const open_epics = await fetch_open_epics()
+
+	if (open_epics === undefined) {
+		console.info(UNREADABLE_EPIC_LIST_MESSAGE)
+
+		return
+	}
+
 	const epics = open_epics.filter((epic) => git_epic_parse.has_child(epic.children, merged_number))
 
 	for (const epic of epics) {
@@ -216,5 +240,5 @@ const git_epic_close = {
 	close_completed_epics,
 }
 
-export { git_epic_close, close_completed_epics }
+export { git_epic_close, close_completed_epics, UNREADABLE_EPIC_LIST_MESSAGE }
 export type { EpicIssue }
