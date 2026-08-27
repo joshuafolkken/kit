@@ -35,7 +35,10 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 // and the one it reaches for returns no severities at all, which is what left the rule above with
 // nothing to evaluate.
 const RETIRED_SKILL = '`/review`'
-const GATE_INVOCATION = '`/code-review medium`'
+const GATE_INVOCATION = // joshuafolkken/kit#966: the level is no longer typed into the documents. What is pinned now is
+	// that they route to the command that decides it — a bare `/code-review` would inherit whatever
+	// level the previous task used, which is the failure the old pin guarded against.
+	'pnpm josh review:level'
 
 describe(`${REVIEW_PROMPT} — the canonical cap`, () => {
 	const content = read_repo_file(REVIEW_PROMPT)

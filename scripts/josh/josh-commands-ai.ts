@@ -47,6 +47,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",
 		category: 'AI tools',
 	},
+	'review:level': {
+		script: 'scripts/review/review-level-cli.ts',
+		description: 'Print the /code-review level this change is reviewed at',
+		category: 'AI tools',
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',
