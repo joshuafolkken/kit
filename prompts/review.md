@@ -15,6 +15,30 @@ Re-run after applying fixes until **no high or medium findings remain — or unt
 
 ---
 
+## Review level (decided by `josh review:level`, never by judgement)
+
+**Run `pnpm josh review:level` and use what it prints.** It reads the changed paths and answers `low` or `medium`; `--staged` classifies the staged diff instead of the branch diff, and `--json` adds the reason.
+
+```bash
+pnpm josh review:level            # alias: josh rl
+pnpm josh review:level --staged
+```
+
+**The level is decided from the changed paths and nothing else.** "This one is small" is a judgement made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped — the same reason the cross-package interrupt removed its own "does this block?" evaluation. A rule an agent applies from memory is a rule an agent can talk itself out of; one it has to run answers the same way every time.
+
+| Every changed path is…                                                                   | Level    | Rounds                  |
+| ---------------------------------------------------------------------------------------- | -------- | ----------------------- |
+| **inert** — `.editorconfig`, `.gitignore`, `LICENSE`, `CHANGELOG.md`, `*.code-workspace` | `low`    | 1                       |
+| anything else                                                                            | `medium` | up to 2 (the cap below) |
+
+**One non-inert path decides the whole change.** A review reads the change, not a subset of it, so there is no per-file level. An empty diff also takes `medium` — answering `low` to "nothing changed" would hand a reduced level to a caller that failed to read the diff.
+
+**Three things that look inert are not.** `.vscode/**`, `.gitattributes` and `.prettierignore` are all in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`, so a defect in one reaches a consumer and is reviewed at `medium` like any other shipped file.
+
+**Documentation is not inert either, and that is deliberate.** `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` are all reviewed at `medium`. The "Non-runtime updates" exception in `CLAUDE.md` exempts them from _testing_, which is a different question: that exception asks whether an automated test could have caught the defect, and this asks whether a human reading the diff is the only thing that can. Measured on joshuafolkken/kit#963 and #965 — both documentation-only by that classification — a `medium` review found ten real defects in each: pointers into sections that had been removed, and citations naming the wrong file, in artifacts distributed to every consumer. Nothing else would have caught them.
+
+**The round cap below is unchanged**, and so is the rule that a confirmed High blocks regardless of round count.
+
 ## Review round cap (2 rounds)
 
 The severity rule above is not a stopping condition on its own. Every fix creates new surface, and a review whose scope is the whole change finds something in it — so the loop is bounded by how much new code the fixes produce, which is unbounded.
@@ -207,7 +231,7 @@ If either condition is false, you are in **standalone mode** (or the halfrun con
 Before your response (the one containing the review markdown) is sent, run this self-check:
 
 1. Count high/medium-severity findings across all categories.
-2. If **any** high/medium findings exist → fix them in place and re-run `/code-review medium`. Nothing is committed yet, so a round costs no commit, push, or CI run. **Stop at two rounds** — after the second, file every remaining Low/Medium finding as a follow-up Issue, run `pnpm josh epic:bundle <new>` on it **before this Issue closes** and act on its answer — `add_to_epic` / `create_epic` are Tier A, run the matching `pnpm josh epic` write command without asking; `ask` stops (or parks the child inside an `epicrun`); `none` is a no-op — then continue the pipeline; a standing High blocks the merge but does not authorize a third round (see "Review round cap"). **Do NOT call `followup --merge` yet.**
+2. If **any** high/medium findings exist → fix them in place and re-run `/code-review` at the level `pnpm josh review:level` prints. Nothing is committed yet, so a round costs no commit, push, or CI run. **Stop at two rounds** — after the second, file every remaining Low/Medium finding as a follow-up Issue, run `pnpm josh epic:bundle <new>` on it **before this Issue closes** and act on its answer — `add_to_epic` / `create_epic` are Tier A, run the matching `pnpm josh epic` write command without asking; `ask` stops (or parks the child inside an `epicrun`); `none` is a no-op — then continue the pipeline; a standing High blocks the merge but does not authorize a third round (see "Review round cap"). **Do NOT call `followup --merge` yet.**
 3. If **no** high/medium findings exist (Low-only or completely clean) → your response MUST continue the pipeline in tool calls **after** the review markdown, in the same response: `pnpm josh bump minor`, then `pnpm josh git -y "<title> #<N>"`, then `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`. **Do NOT end the turn with review markdown as the final assistant text.**
 
 ### Concrete failure pattern to self-recognize

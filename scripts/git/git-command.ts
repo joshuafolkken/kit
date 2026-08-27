@@ -48,6 +48,7 @@ async function diff_cached(file_path: string): Promise<string> {
 }
 
 const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
+const NAME_ONLY_FLAG = '--name-only'
 const DEFAULT_BRANCH_FALLBACK = 'main'
 
 async function get_default_branch(): Promise<string> {
@@ -69,6 +70,26 @@ async function diff_main(file_path: string): Promise<string> {
 	const default_branch = await get_default_branch()
 
 	return await exec_git_command_read(['diff', default_branch, '--', file_path])
+}
+
+// Names only, for callers that classify a change rather than read it — `josh review:level` decides
+// the review depth from the paths alone, and reading the whole diff to get them would be the
+// expensive half of the thing it exists to make cheaper (joshuafolkken/kit#966).
+async function diff_main_names(): Promise<string> {
+	const default_branch = await get_default_branch()
+
+	return await exec_git_command_read(['diff', NAME_ONLY_FLAG, default_branch, '--'])
+}
+
+async function diff_cached_names(): Promise<string> {
+	return await exec_git_command_read(['diff', '--cached', NAME_ONLY_FLAG])
+}
+
+// Files git is not tracking yet. `git diff` never lists them, so a classifier built on the diff
+// alone sees a change that adds a whole new module as an empty one — which is how a run adding new
+// code could have been handed a reduced review level (joshuafolkken/kit#966).
+async function untracked_names(): Promise<string> {
+	return await exec_git_command_read(['ls-files', '--others', '--exclude-standard'])
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
@@ -142,7 +163,10 @@ const git_command = {
 	branch,
 	status,
 	diff_cached,
+	diff_cached_names,
 	diff_main,
+	diff_main_names,
+	untracked_names,
 	get_default_branch,
 	checkout_b,
 	checkout,

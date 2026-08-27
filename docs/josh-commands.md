@@ -1036,6 +1036,29 @@ Exits `0` when every requirement is satisfied and `1` otherwise, so it works as 
 ❌ Epic #700 does not satisfy every requirement.
 ```
 
+### `josh review:level`
+
+Print the `/code-review` level this change is reviewed at ([#966](https://github.com/joshuafolkken/kit/issues/966)).
+
+```bash
+pnpm josh review:level            # the branch diff; alias: josh rl
+pnpm josh review:level --staged   # the staged diff
+pnpm josh review:level --json     # the level and the reason, machine-readable
+```
+
+The level goes to stdout and the reason to stderr, so `$(pnpm josh review:level)` reads the level and a person still sees why.
+
+**The decision takes no judgement.** "This one is small" is a judgement made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped. So the input is the list of changed paths and nothing else, and the rule is a command rather than a paragraph — a rule an agent applies from memory is one it can talk itself out of.
+
+| Every changed path is…                                                                   | Level    | Rounds  |
+| ---------------------------------------------------------------------------------------- | -------- | ------- |
+| **inert** — `.editorconfig`, `.gitignore`, `LICENSE`, `CHANGELOG.md`, `*.code-workspace` | `low`    | 1       |
+| anything else                                                                            | `medium` | up to 2 |
+
+**One non-inert path decides the whole change** — a review reads the change, not a subset of it. An empty diff also takes `medium`: answering `low` to "nothing changed" would hand a reduced level to a caller that failed to read the diff. The branch form counts untracked files too, since `git diff` never lists them and a change that adds a whole new module would otherwise look empty.
+
+**Three things that look inert are not**: `.vscode/**`, `.gitattributes` and `.prettierignore` are all in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`, so a defect in one reaches a consumer. **Documentation is not inert either** — `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` stay at `medium`. The "Non-runtime updates" exception exempts them from _testing_, which asks whether an automated test could have caught the defect; this asks whether a human reading the diff is the only thing that can. Measured on [#963](https://github.com/joshuafolkken/kit/issues/963) and [#965](https://github.com/joshuafolkken/kit/issues/965), both documentation-only by that classification: a `medium` review found ten real defects in each — pointers into removed sections, citations naming the wrong file — in artifacts distributed to every consumer.
+
 ### `josh cost`
 
 Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).

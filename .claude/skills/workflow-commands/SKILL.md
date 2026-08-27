@@ -44,7 +44,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 
 ## 2. What every one of them shares
 
-- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review medium`
+- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` at the level `pnpm josh review:level` prints
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**
   (`prompts/review.md` → "Review round cap"). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
