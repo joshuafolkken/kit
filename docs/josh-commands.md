@@ -1073,6 +1073,41 @@ The level goes to stdout and the reason to stderr, so `$(pnpm josh review:level)
 
 **Three things that look inert are not**: `.vscode/**`, `.gitattributes` and `.prettierignore` are all in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`, so a defect in one reaches a consumer. **Documentation is not inert either** — `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` stay at `medium`. The "Non-runtime updates" exception exempts them from _testing_, which asks whether an automated test could have caught the defect; this asks whether a human reading the diff is the only thing that can. Measured on [#963](https://github.com/joshuafolkken/kit/issues/963) and [#965](https://github.com/joshuafolkken/kit/issues/965), both documentation-only by that classification: a `medium` review found ten real defects in each — pointers into removed sections, citations naming the wrong file — in artifacts distributed to every consumer.
 
+### `josh delegate`
+
+Say whether a step of a run may go to a cheaper execution tier ([#969](https://github.com/joshuafolkken/kit/issues/969)).
+
+```bash
+pnpm josh delegate gate-fix   # → delegate ; alias: josh dg
+pnpm josh delegate review     # → keep
+pnpm josh delegate --list     # the enumeration, and what was rejected and why
+```
+
+The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <step>)` reads the verdict and a person still sees why.
+
+**The list is the whole of the rule: anything not on the list is `keep`.** A step nobody classified must not be delegated because nobody said it could not be. The direction matters — a missed entry costs money, while a wrong `delegate` costs correctness and does so quietly.
+
+**A step earns its place by naming how a wrong result is caught**, by something that runs in the parent tier and costs less than redoing the step. "Unlikely to be wrong" does not qualify, and most candidates fail here: a notification body, a decision-log comment and a status read all ship their mistakes with nothing left to disagree with them. `--list` shows those as rejected with the reason rather than omitting them, so the next person to propose one finds the answer instead of re-deriving it.
+
+| Step       | Delegatable because                                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `gate-fix` | `pnpm josh gate` is re-run; a wrong fix fails it again and the failure names the file                                  |
+| `survey`   | the reported locations are checked directly; a fabricated or missed one does not survive one `grep` of what it claimed |
+
+**These were considered and kept**, so the next person to propose one finds the reason instead of re-deriving it. `pnpm josh delegate <step>` answers `kept deliberately` for these, distinguishing them from a step that is merely unlisted:
+
+| Step               | Kept because                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| `notify-body`      | no verifier; a wrong body is sent and read as though it were right                      |
+| `issue-comment`    | no verifier; a decision log or completion comment _is_ the record, so nothing checks it |
+| `status-read`      | a misread routes the run to the wrong child and no later step disagrees                 |
+| `diagnosis`        | a wrong root cause produces a fix that passes the gate and leaves the defect            |
+| `design`           | the cost of a wrong design is paid by every step after it                               |
+| `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
+| `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
+
+**The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step here, one epic child in [#984](https://github.com/joshuafolkken/kit/issues/984). They share one mechanism by design.
+
 ### `josh cost`
 
 Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).

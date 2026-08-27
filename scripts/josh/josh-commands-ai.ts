@@ -52,6 +52,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print the /code-review level this change is reviewed at',
 		category: 'AI tools',
 	},
+	delegate: {
+		script: 'scripts/delegation/delegation-cli.ts',
+		description: 'Say whether a run step may go to a cheaper execution tier',
+		category: 'AI tools',
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',

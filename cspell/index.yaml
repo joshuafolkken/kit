@@ -13,6 +13,7 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  - delegatable
   - backgrounding
   - unretried
   - epicrun
