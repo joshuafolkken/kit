@@ -405,6 +405,8 @@ pnpm josh notify --task-type failure --issue-url "https://..." --body="Build fai
 
 Task types: `planning` 📋 · `completion` ✅ · `failure` ❌ · `kickoff_retry` 🔄 · `confirmation` ⏸️
 
+**The repository in the header follows `--issue-url`.** It is resolved in this order: an explicit `--repo-name`, then the repository the `--issue-url` names, then the repository the command is run in. The issue title is read from that same repository, so one URL is enough to describe an issue anywhere. Only a notification with no usable `--issue-url` falls back to the working directory, which is what it always did. This matters wherever a workflow files an issue elsewhere and notifies about it — the upstream-interrupt rule opens the issue with `gh issue create -R <owner>/<repo>` and sends a `confirmation` right after, and the header used to name the repository the session happened to be running in while the link pointed upstream (joshuafolkken/kit#903).
+
 Note: do not use `--task-type completion` manually — always use `josh followup` instead, which automatically includes the PR URL.
 
 ### `josh main:sync`

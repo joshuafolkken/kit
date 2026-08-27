@@ -2,6 +2,8 @@
 import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
+import { git_gh_issue_read } from '../scripts/git/git-gh-issue-read'
+import { github_issue_url, type IssueUrlTarget } from '../scripts/git/github-issue-url'
 import { telegram_notify } from '../scripts/git/telegram-notify'
 import { load_optional_environment } from './environment-loader'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
@@ -52,16 +54,45 @@ async function fetch_repo_name(): Promise<string | undefined> {
 	return parts.at(-1)
 }
 
-async function fetch_issue_title(issue_number: string | undefined): Promise<string | undefined> {
-	if (issue_number === undefined) return undefined
+// The title is read from the repository the URL names, through the same reader every other
+// cross-repository read goes through. Read unqualified, `gh` would answer with the issue of that
+// number in the working directory's repository — a different issue with a different title
+// (joshuafolkken/kit#903).
+//
+// A repository the token cannot read answers the same `undefined` as an issue that does not exist,
+// and the notification would then go out with no title line at all. Say so, so the gap is visible
+// in the console beside the notification it belongs to.
+async function fetch_issue_title(target: IssueUrlTarget | undefined): Promise<string | undefined> {
+	if (target === undefined) return undefined
 
-	return await exec_gh(['issue', 'view', issue_number, '--json', 'title', '-q', '.title'])
+	const title = await git_gh_issue_read.issue_get_title(target.issue_number, target.name_with_owner)
+
+	if (title === undefined) {
+		console.warn(`⚠️  Could not read ${target.name_with_owner}#${target.issue_number}.`)
+	}
+
+	return title
 }
 
+// An explicit `--issue-title` already answers this, and `build_input` prefers it — so reading one
+// would spend a `gh` call whose result is discarded, and a repository the token cannot read would
+// warn about a notification that is not missing its title.
+async function resolve_issue_title(
+	values: CliValues,
+	target: IssueUrlTarget | undefined,
+): Promise<string | undefined> {
+	if (telegram_test_logic.has_flag_value(values['issue-title'])) return undefined
+
+	return await fetch_issue_title(target)
+}
+
+// Resolution order: an explicit `--repo-name` (applied by `build_input`, which prefers the flag),
+// then the repository the `--issue-url` points at, then the working directory. The last step is the
+// backwards-compatible one, and it is reached only when there is no URL to read.
 async function resolve_context(values: CliValues): Promise<ResolvedContext> {
-	const repo_name = await fetch_repo_name()
-	const issue_number = telegram_test_logic.parse_issue_number(values['issue-url'])
-	const issue_title = await fetch_issue_title(issue_number)
+	const target = github_issue_url.parse(values['issue-url'])
+	const repo_name = target?.repo ?? (await fetch_repo_name())
+	const issue_title = await resolve_issue_title(values, target)
 
 	return { repo_name, issue_title }
 }
@@ -77,6 +108,6 @@ async function main(): Promise<void> {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-const telegram_test = { fetch_repo_name, fetch_issue_title }
+const telegram_test = { fetch_repo_name, fetch_issue_title, resolve_context }
 
 export { telegram_test }

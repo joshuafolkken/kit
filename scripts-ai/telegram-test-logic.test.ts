@@ -32,26 +32,6 @@ describe('telegram_test_logic.parse_task_type', () => {
 	})
 })
 
-describe('telegram_test_logic.parse_issue_number', () => {
-	it('extracts the issue number from a GitHub issue URL', () => {
-		expect(
-			telegram_test_logic.parse_issue_number(
-				'https://github.com/joshuafolkken/joshuafolkken-com/issues/431',
-			),
-		).toBe('431')
-	})
-
-	it('returns undefined when the URL does not match', () => {
-		expect(
-			telegram_test_logic.parse_issue_number('https://example.com/not-an-issue'),
-		).toBeUndefined()
-	})
-
-	it('returns undefined when the URL is undefined', () => {
-		expect(telegram_test_logic.parse_issue_number(undefined)).toBeUndefined()
-	})
-})
-
 describe('telegram_test_logic.build_input — explicit flags win', () => {
 	it('uses CLI overrides when provided', () => {
 		const result = telegram_test_logic.build_input({

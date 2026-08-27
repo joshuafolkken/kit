@@ -36,8 +36,12 @@ async function issue_view_field(
 }
 
 // `gh` quotes a `--jq`-extracted string, and an empty answer is not a title.
-async function issue_get_title(issue_number: string): Promise<string | undefined> {
-	const result = await issue_view_field(issue_number, 'title')
+//
+// `repo` reads the title of an issue in another repository — what `josh notify` needs when the
+// `--issue-url` it was given points outside the repository the session runs in
+// (joshuafolkken/kit#903).
+async function issue_get_title(issue_number: string, repo?: string): Promise<string | undefined> {
+	const result = await issue_view_field(issue_number, 'title', repo)
 
 	return result === undefined ? undefined : git_gh_helpers.parse_pr_state_string(result)
 }
