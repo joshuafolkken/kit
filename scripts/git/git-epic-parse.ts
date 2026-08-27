@@ -12,11 +12,21 @@ const TASK_LIST_LINE_PATTERN = new RegExp(TASK_LIST_ISSUE_SOURCE, 'u')
 // A task list may also reference an Issue in another repository (`owner/repo#101`, or a full URL).
 // Detecting one is what the auto-close used to bail on; joshuafolkken/kit#864 reads them instead,
 // through `gh --repo`, and the pattern below extracts which repository and which issue.
-const EXTERNAL_TASK_LIST_PATTERN =
-	/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+(?:[\w.-]+\/[\w.-]+#\d+|https?:\/\/)/mu
+// `owner/repo#101` on its own. The row patterns below are built from this source, so what counts as
+// a cross-repository reference has one definition — a second copy would let a form the task list
+// accepts be refused where a person types it, or the reverse (joshuafolkken/kit#985).
+const EXTERNAL_REFERENCE_SOURCE = String.raw`([\w.-]+)\/([\w.-]+)#(\d+)`
+const EXTERNAL_REFERENCE_PATTERN = new RegExp(`^${EXTERNAL_REFERENCE_SOURCE}$`, 'u')
+const TASK_LIST_ROW_SOURCE = String.raw`^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+`
+const EXTERNAL_TASK_LIST_PATTERN = new RegExp(
+	String.raw`${TASK_LIST_ROW_SOURCE}(?:${EXTERNAL_REFERENCE_SOURCE}|https?:\/\/)`,
+	'mu',
+)
 // `- [ ] owner/repo#101`
-const EXTERNAL_SHORTHAND_PATTERN =
-	/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+([\w.-]+)\/([\w.-]+)#(\d+)\b/gmu
+const EXTERNAL_SHORTHAND_PATTERN = new RegExp(
+	String.raw`${TASK_LIST_ROW_SOURCE}${EXTERNAL_REFERENCE_SOURCE}\b`,
+	'gmu',
+)
 // `- [ ] https://github.com/owner/repo/issues/101`
 const EXTERNAL_URL_PATTERN =
 	/^[ \t]*[-*+][ \t]+\[[ xX]\][ \t]+https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/issues\/(\d+)\b/gmu
@@ -135,6 +145,16 @@ function to_external_child(match: RegExpMatchArray): ExternalChild | undefined {
 	return { repo: `${owner}/${repo}`, number: parsed }
 }
 
+// A bare `owner/repo#101`, as a person types it — the same shape the task-list rows carry, read
+// from a command argument rather than from a body. It reuses `to_external_child` so the two cannot
+// disagree about which owner and repository names are acceptable (joshuafolkken/kit#985).
+function parse_external_reference(text: string): ExternalChild | undefined {
+	const match = EXTERNAL_REFERENCE_PATTERN.exec(text.trim())
+	if (match === null) return undefined
+
+	return to_external_child(match)
+}
+
 function match_external(body: string, pattern: RegExp): Array<ExternalChild> {
 	return Array.from(body.matchAll(pattern), (match) => to_external_child(match)).filter(
 		(child): child is ExternalChild => child !== undefined,
@@ -249,6 +269,7 @@ const git_epic_parse = {
 	has_unordered_declaration,
 	parse_dependency_links,
 	parse_external_task_list_children,
+	parse_external_reference,
 	has_child,
 	is_state_closed,
 }
@@ -266,6 +287,7 @@ export {
 	has_unordered_declaration,
 	parse_dependency_links,
 	parse_external_task_list_children,
+	parse_external_reference,
 	has_child,
 	is_state_closed,
 	UNORDERED_DEPENDENCIES,

@@ -131,6 +131,17 @@ describe('git_epic_add_plan.build_plan — what it refuses without writing', () 
 		expect(error_of(plan({ labels: [] }))).toContain('does not carry the `epic` label')
 	})
 
+	// joshuafolkken/kit#985: `into <target>` sends a run here with a target a person named, and a
+	// refusal that only says "not an epic" leaves that run with nothing to do — the Issue it just
+	// filed then belongs to no epic, which is the state `epic:next` never offers again. Both arms are
+	// named because which one applies depends on what the target is.
+	it('names both ways out of a target that is not an epic', () => {
+		const error = error_of(plan({ labels: [] }))
+
+		expect(error).toContain(`josh epic --promote ${String(EPIC_NUMBER)} <N...>`)
+		expect(error).toContain('create a new epic over both')
+	})
+
 	it('refuses an epic with no task-list row', () => {
 		const outcome = plan({ body: `${DEPENDENCIES_HEADING}\n\n#890 -> #891\n`, recorded: [] })
 

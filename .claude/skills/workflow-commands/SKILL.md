@@ -77,6 +77,42 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   turns where no workflow keyword was typed and this skill was never loaded. `halfrun.md` carries
   the one form specific to a command: the resume-command body of its stop before commit.
 
+## 2a. The `into <target>` suffix — where the new Issue lands
+
+`kickoff new` / `fullrun new` / `halfrun new` accept a suffix naming the epic the run's artifact
+belongs to. Without it the artifact belongs to no epic, and `epic:next` only ever offers an epic's
+children — so a forgotten instruction parks that Issue permanently rather than losing it visibly
+(joshuafolkken/kit#985).
+
+```
+kickoff new into #909
+fullrun new into #909
+halfrun new into #909
+kickoff new "<title>" into #909
+kickoff new into joshuafolkken/kit#909
+```
+
+- **One artifact goes in: the top-level one this run created.** No split, and it is the Issue; a
+  split, and it is the epic. The children belong to that epic, not to the target.
+- **Insert as soon as the artifact exists** — before implementation in `fullrun new`, before the
+  plan comment in `kickoff new`. Left until the end, a run that stops halfway leaves behind exactly
+  the orphaned Issue this suffix exists to prevent.
+- **The insertion always goes through `pnpm josh epic --add <E> <N> [--before <M> | --after <M>]`.**
+  Never hand-edit the epic body: the declaration and the `blocked-by` relations then disagree,
+  `epic:next` answers `error`, and an unattended run stops.
+- **Decide the position, then record why** — in the target epic's body or as an Issue comment. A
+  rationale that exists only in the conversation is not there for whoever next questions the order.
+- **A target that is not an epic is refused, and the refusal names both ways out**:
+  `pnpm josh epic --promote <N> <N...>` when it is a request, a discussion or a container, or a new
+  epic over both when it is itself one of the deliverables. Never promote on your own — which arm
+  applies depends on what the target is.
+- **A cross-repository target is written `owner/repo#N`** and inserted from that repository's
+  checkout; run there, since `epic --add` reads and writes only the repository it runs from. A bare
+  `#N` resolves to this repository's issue of that number.
+- **No suffix leaves the behavior exactly as it was.**
+
+Canonical reference: `prompts/collaboration-workflow/into-epic.md`.
+
 ## 2b. Delegating a step to a cheaper tier
 
 **Ask before delegating any step of a run**, and use what it answers:
