@@ -77,6 +77,31 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   turns where no workflow keyword was typed and this skill was never loaded. `halfrun.md` carries
   the one form specific to a command: the resume-command body of its stop before commit.
 
+## 2b. Delegating a step to a cheaper tier
+
+**Ask before delegating any step of a run**, and use what it answers:
+
+```bash
+pnpm josh delegate <step>   # → delegate | keep ; the reason on stderr
+pnpm josh delegate --list   # the enumeration, and what was rejected and why
+```
+
+**Anything not on the list is `keep`.** A step nobody classified must not be delegated because
+nobody said it could not be — the default is the rule, not a fallback. Put the other way: a missed
+entry costs money, and a wrong `delegate` costs correctness, quietly.
+
+**A step earns its place by naming how a wrong result is caught** — by something that runs in the
+parent tier and costs less than redoing the step. "Unlikely to be wrong" is not that. Most candidates
+fail here: a notification body, a decision-log comment and a status read all ship their mistakes with
+nothing left to disagree with them, which is why `--list` shows them as rejected rather than absent.
+
+**The mechanism is not the unit.** How a thing is delegated — an isolated execution unit, an explicit
+brief, a result the parent can verify, a failure that surfaces — is separate from what is delegated.
+Here the unit is one step of a run; in joshuafolkken/kit#984 it is one child of an epic. **They share
+one mechanism**; building a second is the clone `CLAUDE.md` prohibits.
+
+Canonical reference: `prompts/collaboration-workflow/delegation.md`.
+
 ## 3. What stays resident, and what is read from here
 
 **A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**
