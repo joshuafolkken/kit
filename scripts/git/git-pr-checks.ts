@@ -1,5 +1,5 @@
 import { git_gh_command } from './git-gh-command'
-import { evaluate_pr_state, type PrEvaluation } from './git-pr-checks-eval'
+import { describe_pr_failure, evaluate_pr_state, type PrEvaluation } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot, type PrStateSnapshot } from './git-pr-checks-parse'
 import { package_name_schema } from './schemas'
 
@@ -75,9 +75,7 @@ function classify_poll_result(input: {
 }): { is_done: boolean; next_stable_count: number } {
 	const state = evaluate_pr_state(input.snapshot)
 
-	if (state === 'failure') {
-		throw new Error('PR checks failed (required check failed or review requested changes).')
-	}
+	if (state === 'failure') throw new Error(describe_pr_failure(input.snapshot))
 
 	const next_stable_count = advance_stable_count(input.stable_count, state)
 
@@ -154,7 +152,11 @@ export {
 	CHECK_WAIT_INTERVAL_MS,
 }
 export type { PrStateFetcher }
-export { evaluate_pr_state } from './git-pr-checks-eval'
+export {
+	collect_blocking_failures,
+	describe_pr_failure,
+	evaluate_pr_state,
+} from './git-pr-checks-eval'
 export type { PrEvaluation } from './git-pr-checks-eval'
 export { parse_pr_state_snapshot } from './git-pr-checks-parse'
 export type { RollupCheck, PrStateSnapshot } from './git-pr-checks-parse'

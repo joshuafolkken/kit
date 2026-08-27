@@ -236,8 +236,11 @@ rather than left to prose:
   narrowing or reinterpreting E2E output to get past it is the violation `CLAUDE.md` names under
   "Cross-package problems"; reporting the filtered result honestly does not make it compliant.
 
-**What did change is how fast a red E2E is reported, not whether it is.** Only a check in the
-required list ends the wait the moment it fails; any other failing job leaves the rollup reading as
-pending, so `followup` runs out its budget and ends in `Timed out while waiting for PR checks to
-complete.` The pull request is not harmed — nothing merges, and the CI page says what failed — but
-the command is slower to say so.
+**A red E2E is reported as soon as it goes red, and by name.** `E2E` is not on the required list, so
+until joshuafolkken/kit#990 nothing ended the wait when it failed: the rollup read as pending,
+`followup` ran out its 32-minute budget, and the run ended in `Timed out while waiting for PR checks
+to complete.` — a message naming neither the job nor the cause. Any failing check now ends the wait
+on the poll that sees it, and the error names it (`PR checks failed (failed checks: E2E).`).
+The poll loop keeps CodeRabbit exempt under the temporary kit#753 policy. **This is a change to how fast the gate
+reports, never to what it lets through** — no failing check gained a path to `success`, which
+`scripts/git/git-pr-checks-e2e-gate.test.ts` continues to assert.

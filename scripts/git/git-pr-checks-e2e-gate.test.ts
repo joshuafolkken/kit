@@ -13,12 +13,15 @@ import {
 // gate. The claim they pin is written out in `prompts/testing-guide.md` → "Closing the E2E gate
 // without a human run" → "The gate is not weakened".
 //
-// **What holds the gate closed is GitHub's `mergeStateStatus`, not this evaluator's required list.**
-// `E2E` is deliberately not in `DEFAULT_REQUIRED_CHECKS`, so `evaluate_failure_state` never sees it;
-// a failed E2E job is what makes GitHub report `UNSTABLE` instead of `CLEAN`, and `CLEAN` is what
-// `is_mergeable_state` demands. Every fixture below therefore states `UNSTABLE` explicitly rather
-// than defaulting it — that string is the mechanism under test, not scaffolding. Whether `E2E`
-// should also be a required check is joshuafolkken/kit#991.
+// **Two separate mechanisms hold the gate closed, and each fixture below picks one.** `E2E` is
+// deliberately not in `DEFAULT_REQUIRED_CHECKS`. A *failed* E2E job is caught by
+// `collect_blocking_failures` since joshuafolkken/kit#990, which short-circuits `evaluate_pr_state`
+// before the merge state is consulted at all. A *non-passing but not failed* one — still running, or
+// pending beside a pending CodeRabbit review — reaches GitHub's `mergeStateStatus` instead, and
+// `is_mergeable_state` demands `CLEAN`. Both paths are exercised on purpose: the fast fail must not
+// become the only thing standing between a red E2E and a merge. Every fixture states its merge state
+// explicitly rather than defaulting it — that string is the mechanism under test for the second
+// path, not scaffolding. Whether `E2E` should also be a required check is joshuafolkken/kit#991.
 const E2E_CHECK = 'E2E'
 const CODE_RABBIT = 'CodeRabbit'
 const SONAR_QUBE = 'SonarQube'
@@ -61,20 +64,26 @@ describe('a non-passing E2E job keeps the merge closed', () => {
 	})
 
 	// The one opening in the wall is the temporary kit#753 CodeRabbit skip, and it applies only when
-	// *every* non-passing check is CodeRabbit's. A failing E2E beside a pending review must not be
-	// swept through it — that would be the exact weakening the removed human step used to catch.
-	it('is not swept through the temporary CodeRabbit exemption', () => {
-		const snapshot = snapshot_with_e2e({
-			e2e_status: 'fail',
-			merge_state_status: UNSTABLE,
-			others: [
-				{ name: CODE_RABBIT, status: 'pending' },
-				{ name: SONAR_QUBE, status: 'pass' },
-			],
-		})
+	// *every* non-passing check is CodeRabbit's. An E2E job that is not passing beside a pending
+	// review must not be swept through it — that would be the exact weakening the removed human step
+	// used to catch. Both statuses are asserted because they take different routes: `fail` is caught
+	// by the kit#990 fast fail before the exemption is reached, while `pending` is what actually puts
+	// the exemption to the test.
+	it.each([{ e2e_status: 'fail' }, { e2e_status: 'pending' }])(
+		'is not swept through the temporary CodeRabbit exemption while E2E is $e2e_status',
+		(state) => {
+			const snapshot = snapshot_with_e2e({
+				...state,
+				merge_state_status: UNSTABLE,
+				others: [
+					{ name: CODE_RABBIT, status: 'pending' },
+					{ name: SONAR_QUBE, status: 'pass' },
+				],
+			})
 
-		expect(evaluate_pr_state(snapshot)).not.toBe(SUCCESS)
-	})
+			expect(evaluate_pr_state(snapshot)).not.toBe(SUCCESS)
+		},
+	)
 })
 
 // The defined behavior for a project with no E2E suite: `e2e-detect` leaves the job's `if:` false,
