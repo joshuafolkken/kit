@@ -10,7 +10,7 @@ collaboration workflow is built on. Their procedures live here rather than in `C
 each one applies only while its own command is running — keeping them resident spent context on
 every turn to describe a workflow most turns never enter.
 
-The canonical extended reference is `prompts/collaboration-workflow.md`; this skill is the
+The canonical extended reference is `prompts/collaboration-workflow/` (indexed by `prompts/collaboration-workflow.md`); this skill is the
 operational procedure, and the two must agree.
 
 ## 0. The rule that fires before any of them — explicit invocation
@@ -99,7 +99,7 @@ and `CLAUDE.md` grew back to within 585 bytes of its ceiling with the procedures
 1. **The trigger** — the situation that fires it, and the one instruction that must be obeyed before
    anything else is read. Written so an agent that reads nothing further still does the safe thing:
    stops, files, refuses, asks.
-2. **The pointer** — the section of `prompts/collaboration-workflow.md` or the skill file that holds
+2. **The pointer** — the topic file under `prompts/collaboration-workflow/` or the skill file that holds
    the procedure, named exactly enough to open without searching.
 
 Everything else — the steps, the worked examples, the rationale, the failure it was written after —

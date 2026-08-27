@@ -813,7 +813,7 @@ An epic has four mechanical requirements, three of which fail **silently** when 
 - `--rationale-file <path>` supplies the split rationale prose; `-` reads stdin, matching `gh issue create --body-file -`. Omitting it leaves a visible placeholder rather than a blank section.
 - `--origin <owner/repo#N>` adds the backlink used when the split itself originated in another repository. It is written as prose — a checkbox row referencing another repository disables the auto-close by design.
 
-The manual `gh` procedure remains documented in `prompts/collaboration-workflow.md` as the fallback for environments where `josh` is unavailable.
+The manual `gh` procedure remains documented in `prompts/collaboration-workflow/issue-template.md` as the fallback for environments where `josh` is unavailable.
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
