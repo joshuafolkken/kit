@@ -1056,6 +1056,39 @@ Exits `0` when every requirement is satisfied and `1` otherwise, so it works as 
 ❌ Epic #700 does not satisfy every requirement.
 ```
 
+### `josh auto-ok:next`
+
+Print the next opted-in issue an unattended run may pick up outside an epic ([#906](https://github.com/joshuafolkken/kit/issues/906)).
+
+```bash
+pnpm josh auto-ok:next                 # alias: josh ao
+pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
+```
+
+An epic's task list is not the whole backlog. An issue small enough to need no human judgment sits there forever unless somebody puts it in an epic, so the `auto-ok` label opts one in: [`epicrun`](../prompts/collaboration-workflow/epicrun.md) picks up opted-in issues once the epic's own children are done.
+
+**Only a person applies `auto-ok`.** Typing `epicrun #<E>` approves the merges inside `#<E>` and nothing outside it, and this label is the only way a person extends that approval past the epic's edge — a label an agent could apply to itself would let an unattended run widen its own authorization, which is not a guard at all. An agent typing the command on an explicit instruction in the same turn is executing the person's decision, not making one.
+
+`--exclude <N>` drops one issue from the answer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — a pickup loop names it here so it cannot be handed back and re-implemented.
+
+Standard output carries exactly one token — the issue number, or `none` — so `answer=$(pnpm josh auto-ok:next)` captures something a loop can branch on. Every explanation goes to standard error.
+
+| Answer      | Meaning                                                    | Exit code |
+| ----------- | ---------------------------------------------------------- | --------- |
+| `<number>`  | Run that issue as a `fullrun`, then ask again              | 0         |
+| `none`      | No open issue carries the label                            | 0         |
+| _(nothing)_ | The listing could not be read — **not** the same as `none` | 1         |
+
+The command is read-only and never applies or removes the label. It ranks candidates with the same function the `🗒 Next issues (newest first)` display uses at the end of every workflow — newest first, skipping `epic`, `in-progress` and `needs-decision` — so the pickup starts exactly what that list has just named as next. A second ordering would contradict it.
+
+**Opting in is the default absence.** Nothing creates the label, and a repository that does not have it is not an error: `gh` answers an empty listing, the command answers `none`, and an `epicrun` finishes exactly as it did before the label existed. Create it once where it is wanted:
+
+```bash
+gh label create "auto-ok" --color "0e8a16" --description "Opted in to unattended execution outside an epic"
+```
+
+The listing is capped at 200 issues. `gh` lists newest first, so a cap that filled would have dropped the oldest opted-in issues — reported as a `⚠` on standard error rather than ranked silently, because the answer is still an opted-in issue but may not be the one the order promises.
+
 ### `josh review:level`
 
 Print the `/code-review` level this change is reviewed at ([#966](https://github.com/joshuafolkken/kit/issues/966)).

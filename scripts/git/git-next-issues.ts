@@ -1,5 +1,5 @@
 import { git_gh_command } from './git-gh-command'
-import { EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from './issue-labels'
+import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
 import { parse_json_array_safe } from './parse-json-array'
 import { open_issue_schema, type OpenIssueData } from './schemas'
 
@@ -7,25 +7,20 @@ import { open_issue_schema, type OpenIssueData } from './schemas'
 // priority order, so the user picks the next run from the completion output instead of opening the
 // issue list. Priority is recency — a newer issue usually encodes the most current understanding
 // of the backlog — with the label-based exclusions below.
+//
+// `prioritize` is also the order `epicrun` picks up `auto-ok` issues in (joshuafolkken/kit#906).
+// The two ask one question — which open issue outside an epic is run next — so they share one
+// answer; a second ordering would have the run start something other than what this display, shown
+// at the end of every workflow, has just told the person is next.
 const FETCH_LIMIT = 20
 const DISPLAY_LIMIT = 5
 const HEADER = '🗒 Next issues (newest first):'
 
-// `epic` issues track a batch and are never run directly (their children are), `in-progress` issues
-// are already claimed by a running workflow, and `needs-decision` issues were parked by an
-// `epicrun` precisely because they cannot advance without a person — surfacing any of the three as
-// "next" would suggest a run the workflow rules forbid, duplicate, or cannot finish
-// (joshuafolkken/kit#861).
-const EXCLUDED_LABELS: ReadonlySet<string> = new Set([
-	EPIC_LABEL,
-	IN_PROGRESS_LABEL,
-	NEEDS_DECISION_LABEL,
-])
-
-// GitHub keeps the casing a label was created with and treats `Epic` and `epic` as one label, so
-// a repo that predates the scripts can answer with either spelling.
+// Surfacing an `epic`, an `in-progress` or a `needs-decision` issue as "next" would suggest a run
+// the workflow rules forbid, duplicate, or cannot finish (joshuafolkken/kit#861). The set itself is
+// shared with the `auto-ok` pickup, which asks the same question of the same listing shape.
 function has_excluded_label(issue: OpenIssueData): boolean {
-	return (issue.labels ?? []).some((label) => EXCLUDED_LABELS.has(label.name.toLowerCase()))
+	return has_any_label(issue.labels, NOT_DIRECTLY_RUNNABLE_LABELS)
 }
 
 // The completed issue is excluded by number, not by state: GitHub applies the `closes #N` side

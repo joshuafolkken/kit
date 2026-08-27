@@ -84,6 +84,7 @@ const ALIASES: Record<string, string> = {
 	ea: 'epic:audit',
 	el: 'epic:plan',
 	eb: 'epic:bundle',
+	ao: 'auto-ok:next',
 	co: 'cost',
 	rl: 'review:level',
 	dg: 'delegate',
