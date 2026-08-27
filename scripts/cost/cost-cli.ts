@@ -12,13 +12,25 @@ import type { UsageRecord } from './cost-usage'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
-const USAGE = 'Usage: josh cost [--session <id>] [--issue <number>] [--all] [--json]'
+const USAGE =
+	'Usage: josh cost [--session <id>] [--issue <number>] [--all] [--json] [--over <tokens-per-request>]'
+
+// What a turn costs is decided by the accumulated preamble, not by what the turn does, so the
+// marginal cost of a session is its billed input divided by the requests that paid for it. Measured
+// across one `epicrun` that ran six children in one context: 222k per request during the first
+// child, 645k during the sixth — the same work at 2.9x the price (joshuafolkken/kit#968).
+//
+// Per request rather than in total, because the total only says the session was long. The ratio
+// says what the *next* turn will cost, which is the thing a hand-off decision turns on.
+const OVER_VERDICT = 'over'
+const UNDER_VERDICT = 'under'
 
 interface Options {
 	session?: string
 	issue?: number
 	is_all: boolean
 	is_json: boolean
+	over?: number
 }
 
 interface RawValues {
@@ -26,6 +38,7 @@ interface RawValues {
 	issue?: string | undefined
 	all?: boolean | undefined
 	json?: boolean | undefined
+	over?: string | undefined
 }
 
 // `exactOptionalPropertyTypes` rejects `{ issue: undefined }`, so an absent flag contributes no key
@@ -41,6 +54,23 @@ function to_issue(raw: string | undefined): number | undefined {
 	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
+// A threshold of 0 is a legitimate limit — "hand off after any request at all" — so it does not
+// share `to_issue`'s positive-only rule, which exists because issue numbers cannot collide with
+// `UNATTRIBUTED_KEY`. Negative is still refused: there is no such thing as a negative cost.
+function to_threshold(raw: string | undefined): number | undefined {
+	if (raw === undefined) return undefined
+
+	// `Number('')` is 0, and 0 is a legitimate threshold here — so an empty value would arrive as
+	// "hand off after any request at all" and an unattended run would hand off after its first
+	// child, with nothing reported. `to_issue` escapes this only by its incidental positive-only
+	// rule; this one has to say so.
+	if (raw.trim() === '') return undefined
+
+	const parsed = Number(raw)
+
+	return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined
+}
+
 function optional_session(session: string | undefined): { session?: string } {
 	return session === undefined ? {} : { session }
 }
@@ -49,14 +79,44 @@ function optional_issue(issue: number | undefined): { issue?: number } {
 	return issue === undefined ? {} : { issue }
 }
 
+function optional_over(over: number | undefined): { over?: number } {
+	return over === undefined ? {} : { over }
+}
+
+// A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
+// silently become "no issue".
+function is_unparsed(raw: string | undefined, parsed: number | undefined): boolean {
+	return parsed === undefined && raw !== undefined
+}
+
+// `--over` answers "what will the next turn of *this session* cost". A scope flag would have it
+// answer for one issue's slice instead, which is a different number and not the one the hand-off
+// rule is written against, and `--json` would promise a JSON caller a document it never prints — so
+// every such combination is refused rather than silently reinterpreted.
+function is_scoped(values: RawValues, issue: number | undefined): boolean {
+	return issue !== undefined || values.all === true || values.json === true
+}
+
+function is_refused(
+	values: RawValues,
+	issue: number | undefined,
+	over: number | undefined,
+): boolean {
+	if (is_unparsed(values.issue, issue) || is_unparsed(values.over, over)) return true
+
+	return over !== undefined && is_scoped(values, issue)
+}
+
 function to_options(values: RawValues): Options | undefined {
 	const issue = to_issue(values.issue)
+	const over = to_threshold(values.over)
 
-	if (issue === undefined && values.issue !== undefined) return undefined
+	if (is_refused(values, issue, over)) return undefined
 
 	return {
 		...optional_session(values.session),
 		...optional_issue(issue),
+		...optional_over(over),
 		is_all: values.all ?? false,
 		is_json: values.json ?? false,
 	}
@@ -67,6 +127,7 @@ const PARSE_ARGS_OPTIONS = {
 	issue: { type: 'string' },
 	all: { type: 'boolean', default: false },
 	json: { type: 'boolean', default: false },
+	over: { type: 'string' },
 } as const
 
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
@@ -266,6 +327,38 @@ function report_empty(cwd: string, session_id: string | undefined): number {
 	return FAILURE_EXIT_CODE
 }
 
+// The marginal cost of the next turn, in billed input tokens. Zero requests answers 0 rather than
+// dividing by none — a session that has not asked anything yet has nothing to hand off.
+function per_request_cost(report: CostReport): number {
+	if (report.request_count === 0) return 0
+
+	return Math.round(report.breakdown.billed_input_tokens / report.request_count)
+}
+
+// A verdict, not a table: the point of the flag is that the hand-off is decided by a number rather
+// than by whether the run feels long, which is a judgement made under exactly the pressure that
+// resolves it the wrong way.
+function report_over(reports: ReadonlyArray<CostReport>, limit: number): number {
+	const [report] = reports
+
+	if (report === undefined) return FAILURE_EXIT_CODE
+
+	if (report.request_count === 0) {
+		console.error('No requests in this session; there is nothing to hand off.')
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const cost = per_request_cost(report)
+
+	console.info(cost > limit ? OVER_VERDICT : UNDER_VERDICT)
+	console.error(
+		`${String(cost)} billed input tokens per request over ${String(report.request_count)} request(s); limit ${String(limit)}`,
+	)
+
+	return 0
+}
+
 function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 	const options = parse_options(argv)
 
@@ -278,6 +371,7 @@ function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 	const reports = build_reports(options, load_corpus(cwd, options.session))
 
 	if (reports === undefined) return report_empty(cwd, options.session)
+	if (options.over !== undefined) return report_over(reports, options.over)
 
 	print_reports(reports, options.is_json)
 
@@ -300,6 +394,9 @@ const cost_cli = {
 	report_issue,
 	report_all,
 	attributed,
+	to_threshold,
+	per_request_cost,
+	report_over,
 	build_reports,
 	run,
 	main,

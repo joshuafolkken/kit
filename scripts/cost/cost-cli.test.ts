@@ -30,16 +30,25 @@ function usage_line(request_id: string, branch: string, output_tokens: number): 
 
 // Mutated properties rather than reassigned bindings, so `beforeEach` never assigns to a top-level
 // variable from inside a function.
-const state = { home: '', printed: [] as Array<string> }
+const state = { home: '', printed: [] as Array<string>, out: [] as Array<string> }
 
 function capture(message: unknown): void {
+	state.printed.push(String(message))
+}
+
+// stdout only. The `--over` verdict goes to stdout and its explanation to stderr, and the
+// explanation contains the word "over" whatever the verdict is (`… per request over N request(s)`) —
+// so a test reading both streams together passes on an inverted verdict.
+function capture_out(message: unknown): void {
+	state.out.push(String(message))
 	state.printed.push(String(message))
 }
 
 beforeEach(() => {
 	state.home = mkdtempSync(path.join(tmpdir(), 'cost-cli-'))
 	state.printed = []
-	vi.spyOn(console, 'info').mockImplementation(capture)
+	state.out = []
+	vi.spyOn(console, 'info').mockImplementation(capture_out)
 	vi.spyOn(console, 'error').mockImplementation(capture)
 	vi.spyOn(cost_transcript, 'transcript_directory').mockImplementation((cwd: string) =>
 		path.join(state.home, cost_transcript.project_slug(cwd)),
@@ -59,6 +68,10 @@ function write_session(session_id: string, lines: ReadonlyArray<string>): void {
 
 function output(): string {
 	return state.printed.join('\n')
+}
+
+function stdout(): string {
+	return state.out.join('\n')
 }
 
 describe('josh cost registration', () => {
@@ -210,5 +223,112 @@ describe('cost_cli.run missing-data scoping', () => {
 
 		expect(cost_cli.run([ISSUE_FLAG, ISSUE_NUMBER], CWD)).toBe(0)
 		expect(output()).toContain('unparseable lines: 1')
+	})
+})
+
+// joshuafolkken/kit#968: a session that runs several epic children pays for every earlier child on
+// every later turn. Measured across one `epicrun` that ran six in one context: 222k billed input
+// per request during the first child, 645k during the sixth — the same work at 2.9x the price. The
+// hand-off is decided by that ratio, not by whether the run feels long.
+describe('cost_cli.parse_options — the hand-off threshold', () => {
+	it('reads a threshold', () => {
+		expect(cost_cli.parse_options(['--over', '400000'])?.over).toBe(400_000)
+	})
+
+	it('refuses a threshold that is not a number', () => {
+		expect(cost_cli.parse_options(['--over', 'lots'])).toBeUndefined()
+	})
+
+	// An unparsed flag must not read as an absent one, which would answer `under` to a caller that
+	// asked for a limit and mistyped it.
+	it('refuses rather than ignoring a mistyped threshold', () => {
+		expect(cost_cli.parse_options(['--over', '-5'])).toBeUndefined()
+	})
+})
+
+describe('cost_cli.run --over', () => {
+	// The fixture request bills one input token, so zero is the only limit it exceeds. Chosen
+	// deliberately: the first version of this test asserted against a limit the fixture did *not*
+	// exceed and still passed, because it read stderr — where the word "over" always appears.
+	it('answers over when the marginal cost exceeds the limit', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
+		expect(cost_cli.run(['--over', '0'], CWD)).toBe(0)
+		expect(stdout().trim()).toBe('over')
+	})
+
+	it('answers under when it does not', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+
+		expect(cost_cli.run(['--over', '99999999'], CWD)).toBe(0)
+		expect(stdout().trim()).toBe('under')
+	})
+
+	it('says what the measured cost was, not only the verdict', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
+		cost_cli.run(['--over', '0'], CWD)
+
+		expect(output()).toContain('per request')
+	})
+
+	// The word "under" appears in the missing-transcript message too, so the verdict is checked by
+	// the exit code and the message, not by a substring that both share.
+	it('reports a missing transcript rather than answering a verdict', () => {
+		expect(cost_cli.run(['--over', '0'], CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(NO_TRANSCRIPTS)
+	})
+})
+
+describe('cost_cli.per_request_cost', () => {
+	it('divides the billed input by the requests that paid for it', () => {
+		write_session(SESSION_A, [usage_line('r1', MAIN, 10), usage_line('r2', MAIN, 10)])
+		const corpus = cost_cli.load_corpus(CWD)
+		const reports = cost_cli.build_reports({ is_all: false, is_json: false }, corpus)
+		const [report] = reports ?? []
+
+		expect(report).toBeDefined()
+		expect(cost_cli.per_request_cost(report as never)).toBeGreaterThan(0)
+	})
+
+	// Dividing by no requests would throw or answer Infinity; a session that has asked nothing has
+	// nothing to hand off.
+	it('answers zero for a session with no requests', () => {
+		const empty = {
+			scope: 'x',
+			request_count: 0,
+			breakdown: { billed_input_tokens: 0 },
+		}
+
+		expect(cost_cli.per_request_cost(empty as never)).toBe(0)
+	})
+})
+
+describe('cost_cli.run --over — what it refuses', () => {
+	// The verdict is about this session. Scoped to an issue it would answer for one slice, which is
+	// a different number from the one the hand-off rule is written against.
+	it.each([['--all'], [ISSUE_FLAG]])('refuses to combine the threshold with %s', (flag) => {
+		const argv = flag === '--all' ? ['--over', '1', '--all'] : ['--over', '1', flag, ISSUE_NUMBER]
+
+		expect(cost_cli.run(argv, CWD)).toBe(FAILURE_EXIT_CODE)
+		expect(output()).toContain(cost_cli.USAGE)
+	})
+
+	it('refuses to combine the threshold with --json', () => {
+		expect(cost_cli.run(['--over', '1', '--json'], CWD)).toBe(FAILURE_EXIT_CODE)
+	})
+
+	// A threshold of zero means "hand off after any request at all" — a limit, not a typo.
+	it('accepts a threshold of zero', () => {
+		expect(cost_cli.to_threshold('0')).toBe(0)
+	})
+
+	// `Number('')` is 0, and 0 is legitimate here — so an empty value would silently mean "hand off
+	// after any request at all" and an unattended run would stop after its first child.
+	it.each([[''], ['  ']])('refuses an empty threshold rather than reading it as zero', (raw) => {
+		expect(cost_cli.to_threshold(raw)).toBeUndefined()
+	})
+
+	it('refuses a negative threshold', () => {
+		expect(cost_cli.to_threshold('-1')).toBeUndefined()
 	})
 })
