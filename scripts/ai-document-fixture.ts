@@ -104,6 +104,15 @@ function read_rule_surface(document_path: string): string {
 		.join('\n')
 }
 
+// The rule-surface counterpart of `read_unwrapped`, for the same reason: a marker that happens to
+// span a line break would otherwise fail on a reflow that changed nothing. Three suites predate it
+// and still collapse the surface inline (`epic-plan-` / `epic-bundle-` / `epic-audit-document-rule`);
+// migrating them is a change to files no current issue touches, so new suites call this instead of
+// adding a fourth copy and the three are converted the next time one of them is edited.
+function read_unwrapped_rule_surface(document_path: string): string {
+	return read_rule_surface(document_path).replaceAll(/\s+/gu, ' ')
+}
+
 export {
 	AI_DOCS,
 	CANONICAL_DOC,
@@ -111,6 +120,7 @@ export {
 	ENV_EXAMPLE,
 	read_repo_file,
 	read_rule_surface,
+	read_unwrapped_rule_surface,
 	POINTER_DOCS,
 	read_unwrapped,
 	read_workflow_prompt,

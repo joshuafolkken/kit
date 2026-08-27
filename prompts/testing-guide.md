@@ -125,7 +125,7 @@ When fixing bugs where tests leave data behind (or similar persistent state):
 
 ## 3. Checklist
 
-- [ ] **Before “done”:** **Completion gate** in `CLAUDE.md` — `pnpm run lint`, `pnpm run check`, `pnpm cspell:dot`, then **`pnpm test`** (Vitest **and** Playwright). **Do not** stop at `pnpm test:unit --run` when E2E applies. For local verification, run **`pnpm test` with `CI` unset** so Playwright uses **DEV** (`pnpm run dev` on the port `playwright.config.ts` resolves from `PORT_SEED`), matching the VS Code Test plugin. ReadLints **0 errors** on touched files; Playwright **no failures and no flaky** runs in what you report. **If Playwright cannot run in the agent environment:** do **not** use `pnpm build` or `CI=true` unless the user asked; say Playwright did not complete and ask for local **`pnpm test`** (see **Agent / sandbox** in `CLAUDE.md`)
+- [ ] **Before “done”:** **Completion gate** in `CLAUDE.md` — `pnpm josh gate` (lint, type check, spell check and unit tests), then E2E per § 6 below: the CI E2E job where a pull request is open, **`pnpm josh test:e2e`** run by you where there is none. **Do not** stop at `pnpm josh test:unit` when E2E applies, and **never** ask the user to run it. Run it with `CI` unset so Playwright uses **DEV** (`pnpm run dev` on the port `playwright.config.ts` resolves from `PORT_SEED`), matching the VS Code Test plugin. ReadLints **0 errors** on touched files; Playwright **no failures and no flaky** runs in what you report. **If Playwright cannot run in your environment:** do **not** use `pnpm build` or `CI=true` unless the user asked — say the E2E result is missing and that the gate is therefore not closed
 - [ ] Magic numbers/strings → constants (except `0`, `1`, `-1`)
 - [ ] `.js` on all import paths
 - [ ] Playwright: `data-testid` selectors only
@@ -161,3 +161,83 @@ test('returns expected values in sequence', () => {
 	expect(second_result).toBe('expected-value-2')
 })
 ```
+
+---
+
+## 6. Closing the E2E gate without a human run
+
+The completion gate used to end by asking the user to run `pnpm josh test` and paste the output.
+That step is gone (joshuafolkken/kit#902). It is the rule below that replaces it, and the
+replacement is **not** a relaxation — nothing that a red local run stopped is allowed through.
+
+### Why it existed, and why it no longer does
+
+The reason was never that a human reads E2E output better. It was that `followup` waited 180
+seconds for CI, which no suite containing E2E can finish in — so the command exited red beside a CI
+that was still running, and the only reliable E2E signal left was a person's terminal. That budget
+is now derived from the distributed `templates/workflows/ci.yml` rather than picked as a round
+number: 1920 seconds, the longest run its `needs` graph permits plus runner-queue headroom, with a
+unit test that fails if a declared job budget outgrows it (joshuafolkken/kit#851). CI can now be
+waited on, so it can be relied on.
+
+### Which result closes the gate
+
+Decided by whether a pull request is open, never by judgement:
+
+| Situation                                                                                    | What closes the gate                                                                                                     |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| A pull request is open — `fullrun`, `queue`, `epicrun`                                       | The CI E2E job. `pnpm josh followup --merge` waits for the checks and refuses to merge while any of them is non-passing. |
+| No pull request — `halfrun`'s stop before commit, a completion reported outside any workflow | `pnpm josh test:e2e`, run by **you**, output read by you.                                                                |
+
+**Never ask the user to run it, in either row.** A completion report is not allowed to depend on
+somebody being at the keyboard; that dependency is what made a `fullrun` chain stall at its last
+step. And never report completion on an E2E result nobody read — an unread result is not a pass.
+
+**Where the application layer ships an integrated gate, prefer it** over a bare `pnpm josh test:e2e`
+for the second row: `@joshuafolkken/app-kit` ships `pnpm josh-app verify`, which builds once and
+boots once to run the E2E suite and the DAST scan against that one server — and which delegates E2E
+to `josh test:e2e`, so the skip below still applies. **Decide by the command list the installed
+toolkit prints, not by which toolkit is installed and not by a version number written here**: the
+same rule the UI gate uses, and the only one that survives a release.
+
+### A project with no E2E suite
+
+`pnpm josh test:e2e` runs through `scripts/test-e2e-guard.ts`, which **skips and exits 0**, naming
+the reason, when `@playwright/test` is not installed or no `*.e2e.{ts,js}` file exists. That skip is
+a **defined** outcome, not an accident: a project with no E2E suite has nothing for the gate to
+read, and the run says so out loud. **A skip you did not see printed is not one** — it is an unread
+result, and it falls under the previous paragraph.
+
+**CI decides the same question by a narrower rule, and the difference is a precondition rather than
+a detail.** The `e2e-detect` job in `templates/workflows/ci.yml` enables the `e2e` job only when a
+file named `playwright.config.ts` exists **and** `find tests src/routes` turns up an
+`*.e2e.{ts,js}`; otherwise the job's `if:` is false, GitHub records it as `skipped`, and the rollup
+parser counts that as passing exactly as it does for every other conditional job. The guard's glob
+is wider — any path outside `node_modules`. So a suite kept somewhere else, or a config named
+`playwright.config.js`, reads as "no E2E" in CI while `josh test:e2e` runs it locally, and the first
+row of the table above would then close the gate on a suite nobody ran. **Keep the specs where § 1
+above already requires them — under `src/routes/**` — and keep the config at
+`playwright.config.ts`**: that placement is what makes the CI signal trustworthy, and it is the
+placement this package's conventions already enforce (`eslint/rules/test-filename.js` bans a
+top-level `tests/` directory outright, so the `tests` in CI's `find` command is a search path it
+inherits, never a placement to adopt). Narrowing the divergence itself is joshuafolkken/kit#991.
+
+### The gate is not weakened
+
+Two properties carry the verification the human step used to carry, and both are asserted by tests
+rather than left to prose:
+
+- **A non-passing check keeps the merge closed.** `evaluate_pr_state` returns `success` only when
+  GitHub reports the pull request `CLEAN` **and** every required check passes. A failing E2E job
+  makes GitHub report `UNSTABLE`, and the one opening in that wall — `is_unstable_only_from_coderabbit`,
+  the temporary kit#753 policy — applies only when _every_ non-passing check is CodeRabbit's. So a
+  red E2E can never reach `success`, and `followup` exits non-zero instead of merging.
+- **Weakening the gate is a workaround, and the workaround rules apply to it.** Filtering,
+  narrowing or reinterpreting E2E output to get past it is the violation `CLAUDE.md` names under
+  "Cross-package problems"; reporting the filtered result honestly does not make it compliant.
+
+**What did change is how fast a red E2E is reported, not whether it is.** Only a check in the
+required list ends the wait the moment it fails; any other failing job leaves the rollup reading as
+pending, so `followup` runs out its budget and ends in `Timed out while waiting for PR checks to
+complete.` The pull request is not harmed — nothing merges, and the CI page says what failed — but
+the command is slower to say so.
