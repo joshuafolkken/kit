@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UNREADABLE_CR_NOTE } from './git-pr-coderabbit'
 import {
+	build_issue_url,
 	git_pr_followup,
 	post_notify_issue,
 	warn_if_missing_closes,
@@ -326,5 +327,45 @@ describe('git_pr_followup.run — CodeRabbit comments that could not be read (ki
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
 
 		expect(notify_body()).not.toContain(UNREADABLE_CR_NOTE)
+	})
+})
+
+// joshuafolkken/kit#994 replaced this function's own end-anchored pull-URL regex with the shared
+// parser, which stops at a word boundary instead. The widening is deliberate — a link copied from a
+// file view names the same repository — but nothing pinned either the new acceptance or the
+// rejections that must survive it.
+describe('build_issue_url', () => {
+	const KIT_PULL_URL = 'https://github.com/joshuafolkken/kit/pull/1004'
+	const KIT_ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/994'
+	const ISSUE_NUMBER = '994'
+
+	it('builds the sibling issue URL of a pull request', () => {
+		expect(build_issue_url(KIT_PULL_URL, ISSUE_NUMBER)).toBe(KIT_ISSUE_URL)
+	})
+
+	it('reads a pull URL that continues past the number', () => {
+		expect(build_issue_url(`${KIT_PULL_URL}/files`, ISSUE_NUMBER)).toBe(KIT_ISSUE_URL)
+	})
+
+	it('builds it for a repository other than the one the session runs in', () => {
+		expect(build_issue_url('https://github.com/joshuafolkken/app-kit/pull/7', ISSUE_NUMBER)).toBe(
+			'https://github.com/joshuafolkken/app-kit/issues/994',
+		)
+	})
+
+	it('returns undefined without an issue number', () => {
+		expect(build_issue_url(KIT_PULL_URL, undefined)).toBeUndefined()
+	})
+
+	it('returns undefined without a pull URL', () => {
+		expect(build_issue_url(undefined, ISSUE_NUMBER)).toBeUndefined()
+	})
+
+	it('returns undefined for a URL that is not a pull request', () => {
+		expect(build_issue_url(KIT_ISSUE_URL, ISSUE_NUMBER)).toBeUndefined()
+	})
+
+	it('returns undefined for a non-github host', () => {
+		expect(build_issue_url('https://example.com/a/b/pull/1', ISSUE_NUMBER)).toBeUndefined()
 	})
 })
