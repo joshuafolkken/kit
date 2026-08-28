@@ -37,6 +37,15 @@ function compare_newest_first(first: OpenIssueData, second: OpenIssueData): numb
 	return first.createdAt < second.createdAt ? 1 : -1
 }
 
+// **This display deliberately does not drop a blocked issue, and the `auto-ok` pickup deliberately
+// does.** They share this ordering and differ on the set, which reads as an inconsistency and is not
+// one (joshuafolkken/kit#1005).
+//
+// The display is read by a person, who can see that an issue is blocked, judge that the blocker is
+// nearly done or does not really block it, and start anyway. The pickup feeds an unattended run,
+// which has none of that judgement — so the same row is information to one and an instruction to the
+// other. Filtering here would take the choice away from the only reader equipped to make it, and the
+// blocked issue would simply vanish from the backlog view with nothing said.
 function prioritize(
 	issues: ReadonlyArray<OpenIssueData>,
 	completed_issue_number?: number,

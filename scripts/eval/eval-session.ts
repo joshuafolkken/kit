@@ -31,6 +31,14 @@ function is_timeout_result(result: { timedOut?: boolean | undefined }): boolean 
 	return result.timedOut === true
 }
 
+// execa names the signal that terminated a process; anything else — including an empty string — is
+// not a kill. One definition, because `spawn_failure_note` asks the same question and a second
+// spelling of it let `signal: ''` count as a kill there and as no signal here, which dropped the
+// signal name and the message together (joshuafolkken/kit#1005).
+function read_signal(result: { signal?: string | undefined }): string | undefined {
+	return typeof result.signal === 'string' && result.signal !== '' ? result.signal : undefined
+}
+
 // execa says nothing on stderr when the binary itself could not be started, so the reason is taken
 // from the error it reports instead — otherwise the report names a failure with no cause.
 //
@@ -38,11 +46,6 @@ function is_timeout_result(result: { timedOut?: boolean | undefined }): boolean 
 // one is `<prefix>: <the whole escaped command>` — for this suite, the entire scenario prompt printed
 // where a diagnosis belongs. A kill is recognized by its signal and named from that instead, so this
 // message is used only when nothing ever started (joshuafolkken/kit#1001).
-// execa names the signal that terminated a process; anything else is not a kill.
-function read_signal(result: { signal?: string | undefined }): string | undefined {
-	return typeof result.signal === 'string' && result.signal !== '' ? result.signal : undefined
-}
-
 function spawn_failure_note(result: {
 	exitCode?: number | undefined
 	message?: string | undefined
@@ -50,7 +53,7 @@ function spawn_failure_note(result: {
 	signal?: string | undefined
 }): string {
 	if (is_timeout_result(result) || result.exitCode !== undefined) return ''
-	if (result.signal !== undefined) return ''
+	if (read_signal(result) !== undefined) return ''
 
 	return result.message ?? `could not start ${CLAUDE_BIN}`
 }

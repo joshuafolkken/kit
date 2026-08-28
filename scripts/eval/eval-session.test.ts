@@ -96,3 +96,19 @@ describe('eval_session — a process that exited on its own needs no spawn note'
 		).toBe('')
 	})
 })
+
+// joshuafolkken/kit#1005: `read_signal` treated an empty signal as no signal while the note treated
+// it as a kill, so that combination dropped the signal name and the spawn message together — the
+// reasonless line the change exists to remove.
+describe('eval_session — an empty signal is not a kill', () => {
+	it('falls back to the spawn message when the signal is empty', () => {
+		const note = eval_session.spawn_failure_note({
+			exitCode: undefined,
+			message: SPAWN_ENOENT,
+			signal: '',
+			timedOut: false,
+		})
+
+		expect(note).toBe(SPAWN_ENOENT)
+	})
+})
