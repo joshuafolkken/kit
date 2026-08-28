@@ -355,6 +355,7 @@ it somewhere nothing checks.
 ```bash
 answer=$(pnpm josh auto-ok:next)                 # the first time
 answer=$(pnpm josh auto-ok:next --exclude <N>)   # every time after, naming the one just merged
+answer=$(pnpm josh auto-ok:next --exclude <N>,<M>) # or every one this session has already run
 ```
 
 **`--exclude` is not optional after the first pickup.** GitHub applies the `closes #N` side effect
