@@ -80,15 +80,57 @@ readings. Re-run that one scenario against the pre-change documents (`git stash 
 its own Issue and not a reason to hold the change; green before and red after is this change's
 regression, fixed in at most two rounds for the reason `prompts/review.md` caps review rounds. Still
 red after the second, the change is not ready and a person decides. An `unmeasured` one
-says nothing about the rules — a run of inconclusive verdicts is a statement about the shared budget
-(see "How a scenario is judged") — and a run that printed no verdict line at all, an absent `claude`
+says nothing about the rules — a run of inconclusive verdicts is a statement about the harness or its
+surroundings, and the `?` line on each one names what actually happened (see "How a scenario is
+judged") — and a run that printed no verdict line at all, an absent `claude`
 CLI included, is `unmeasured` too. **A run nobody saw hold is never reported as green.**
+
+**`unmeasured` is never evidence for the gate.** It does not block a merge, and that is a decision
+about who waits, not a statement that the rules held — the run reports what it did not learn, and
+saying so is required rather than optional. A completion report that lists the verdict without saying
+the measurement was not obtained has reported a pass it does not have. In particular, "measured and
+held" and "could not measure" must not both arrive as "nothing stopped the merge": the gate that
+kit#907 added exists to catch a distributed document degrading while every other check stays green,
+and an unmeasured run is exactly that gate not running (joshuafolkken/kit#1001).
+
+**What an unmeasured scenario tells you now.** The report names what happened, because the cases need
+different fixes:
+
+| The report says                                            | What it means                                                                                                                                                             |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session exited N without starting`                        | The session never announced itself — an absent or unauthenticated `claude`, an unknown model, a spawn that failed. A kill is reported on its own row rather than here.    |
+| `session exited N after starting, before calling any tool` | It ran and then stopped without acting. The reason follows the colon; `API Error: Unable to connect to API (ConnectionRefused)` is the one observed so far.               |
+| `session timed out …`                                      | The 10-minute per-session limit ended it. Named from its own flag, because a signal-terminated process reports **no** exit code at all — so the number would say nothing. |
+| `session was killed by <signal> …`                         | Something else ended it — an OOM killer, a harness watchdog. Distinct from both a timeout and a failed start, which otherwise arrive looking identical.                   |
+| `… : <reason>`                                             | The reason, from stderr, or from the stream's own failing `result` event when stderr said nothing — which was every case observed across joshuafolkken/kit#908.           |
+
+**The suite paces itself**: 20 seconds between scenarios and one retry after 60.
+Running sessions back to back was the first suspected cause — across joshuafolkken/kit#908 the suite
+degraded run over run at a 20-second spacing (4/5 scenarios held, then 2/5, then no verdict at all,
+then 1/5) while every one of those same scenarios held when run on its own moments later.
+
+**That explanation has not held up, and the pacing is kept as a margin rather than as the fix.** The
+first run to print a reason named something else entirely — `API Error: Unable to connect to API
+(ConnectionRefused)`, on every inconclusive scenario, after the session had started
+(joshuafolkken/kit#1001). Raising the spacing to 45 seconds and adding a second retry at 180 recovered
+nothing while nearly doubling the worst-case suite time, so both were put back. **Do not read the
+pauses as a solved problem**: the honest state is that the reason is now visible and points at
+connectivity to the API rather than at pacing. To check where it stands after changing anything here:
+
+```bash
+pnpm josh eval <one-scenario>   # must hold on its own
+pnpm josh eval                  # must hold for every scenario, not only the first two
+```
+
+**A full run that holds only its first scenarios is the regression, even though it exits the same
+way.** Compare the counts, not the exit code — `1/5 scenarios held (4 inconclusive)` and
+`5/5 scenarios held` are both non-blocking, and only one of them measured anything.
 
 Two things that look like `unmeasured` and are not. An invocation the suite could not act on — a
 mistyped scenario name in the very re-run a `blocked` verdict asked for — prints `blocked`, because
 you asked for a measurement and have none. And **the exit code is not the verdict**: an `unmeasured`
-run exits non-zero exactly as a `blocked` one does, so `josh eval && …` or a `set -e` script turns an
-upstream budget outage into a stopped run.
+run exits non-zero exactly as a `blocked` one does, so `josh eval && …` or a `set -e` script turns a
+harness or connectivity problem into a stopped run.
 
 **In a consumer project the two halves are different trees.** The trigger reads the consumer's own
 changed paths; the sandbox copies the documents from the installed `@joshuafolkken/kit`. A committed

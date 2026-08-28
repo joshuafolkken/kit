@@ -75,9 +75,16 @@ function report_summary(verdicts: ReadonlyArray<Verdict>): boolean {
 // **What a run means for a merge, in one readable token** (joshuafolkken/kit#907). The exit code
 // cannot carry this: it is `0` only when every scenario passed, so a failed run and one that
 // measured nothing exit alike — and those are the two outcomes that must not be treated alike. A
-// failed scenario is a rule that stopped working and blocks the merge; an inconclusive one says the
-// shared budget was exhausted and says nothing about the rules, so blocking on it would park work
-// for an outage.
+// failed scenario is a rule that stopped working and blocks the merge; an inconclusive one says
+// nothing about the rules, so blocking on it would park work for a problem in the harness or its
+// surroundings.
+//
+// **It does not say *why*, and it used to.** The sentence asserted the shared budget was exhausted —
+// a cause nobody had established, and the first run that printed a reason contradicted it outright:
+// `API Error: Unable to connect to API (ConnectionRefused)` on every inconclusive scenario
+// (joshuafolkken/kit#1001). Naming one cause in a fixed string sends every reader to check the one
+// thing that may not be wrong; the per-scenario `?` line carries the reason that was actually
+// observed, so the verdict points there instead of guessing.
 const VERDICT_BLOCKED = 'blocked'
 const VERDICT_HELD = 'held'
 const VERDICT_UNMEASURED = 'unmeasured'
@@ -88,7 +95,7 @@ const VERDICT_SENTENCES: Record<MergeVerdict, string> = {
 	[VERDICT_BLOCKED]: 'a scenario failed; fix the rule its → line names before merging',
 	[VERDICT_HELD]: 'every scenario held; nothing here blocks the merge',
 	[VERDICT_UNMEASURED]:
-		'not every scenario produced a measurement; that is the shared budget rather than a regression, and it does not block the merge',
+		'not every scenario produced a measurement, so the rules were not measured; the ? line above each one says why. It does not block the merge, and it is not evidence that anything held',
 }
 
 // A failure outranks an inconclusive verdict: one measured violation is a fact about the rules

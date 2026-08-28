@@ -25,19 +25,48 @@ const SPAWN_FAILURE_EXIT_CODE = -1
 // exists for exactly that case. Generous enough for a ten-turn scenario, short enough to end a hang.
 const SESSION_TIMEOUT_MS = 600_000
 
+// execa sets `timedOut` when its own `timeout` killed the process. Read from the result rather than
+// inferred from exit 143, which any SIGTERM produces.
+function is_timeout_result(result: { timedOut?: boolean | undefined }): boolean {
+	return result.timedOut === true
+}
+
 // execa says nothing on stderr when the binary itself could not be started, so the reason is taken
 // from the error it reports instead — otherwise the report names a failure with no cause.
+//
+// **Only for that case.** A process killed by a signal also has no exit code, and execa's message for
+// one is `<prefix>: <the whole escaped command>` — for this suite, the entire scenario prompt printed
+// where a diagnosis belongs. A kill is recognized by its signal and named from that instead, so this
+// message is used only when nothing ever started (joshuafolkken/kit#1001).
+// execa names the signal that terminated a process; anything else is not a kill.
+function read_signal(result: { signal?: string | undefined }): string | undefined {
+	return typeof result.signal === 'string' && result.signal !== '' ? result.signal : undefined
+}
+
 function spawn_failure_note(result: {
 	exitCode?: number | undefined
 	message?: string | undefined
+	timedOut?: boolean | undefined
+	signal?: string | undefined
 }): string {
-	return result.exitCode === undefined ? (result.message ?? `could not start ${CLAUDE_BIN}`) : ''
+	if (is_timeout_result(result) || result.exitCode !== undefined) return ''
+	if (result.signal !== undefined) return ''
+
+	return result.message ?? `could not start ${CLAUDE_BIN}`
 }
 
 interface SessionResult {
 	transcript: string
 	exit_code: number
 	stderr: string
+	// Whether the timeout above is what ended it. Carried out because the exit code cannot say: execa
+	// reports no exit code at all for a signal-terminated process, so a timeout is otherwise
+	// indistinguishable from a failed spawn (joshuafolkken/kit#1001).
+	is_timed_out: boolean
+	// The signal that killed it, when one did. A session ended by the OOM killer or by a harness
+	// watchdog is neither a timeout nor a spawn failure, and saying which signal arrived is the only
+	// thing that separates it from both.
+	signal: string | undefined
 }
 
 function session_arguments(scenario: Scenario, model: string): ReadonlyArray<string> {
@@ -88,10 +117,12 @@ async function run_session(
 		// session that simply called nothing, which is a verdict about the rule rather than the setup.
 		exit_code: result.exitCode ?? SPAWN_FAILURE_EXIT_CODE,
 		stderr: result.stderr === '' ? spawn_failure_note(result) : result.stderr,
+		is_timed_out: is_timeout_result(result),
+		signal: read_signal(result),
 	}
 }
 
-const eval_session = { run_session, session_arguments, session_environment }
+const eval_session = { run_session, session_arguments, session_environment, spawn_failure_note }
 
 export { eval_session }
 export type { SessionResult }

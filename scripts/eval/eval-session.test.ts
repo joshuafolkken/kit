@@ -61,3 +61,38 @@ describe('eval_session.session_environment', () => {
 		expect(environment['GH_CONFIG_DIR']).toContain(SANDBOX_PATH)
 	})
 })
+
+// joshuafolkken/kit#1001: a killed process has no exit code either, and execa's message for one is
+// the whole command line — which for this suite carries the entire scenario prompt. Reporting that as
+// the failure's "reason" put the prompt in the console in place of a diagnosis.
+const SPAWN_ENOENT = 'spawn claude ENOENT'
+
+describe('eval_session — a timeout is not a spawn failure', () => {
+	it('says nothing about the command when the timeout killed it', () => {
+		const note = eval_session.spawn_failure_note({
+			exitCode: undefined,
+			message: 'Command timed out after 600000 milliseconds: claude -p <the whole prompt>',
+			timedOut: true,
+		})
+
+		expect(note).toBe('')
+	})
+
+	it('still names a binary that could not be started', () => {
+		const note = eval_session.spawn_failure_note({
+			exitCode: undefined,
+			message: SPAWN_ENOENT,
+			timedOut: false,
+		})
+
+		expect(note).toBe(SPAWN_ENOENT)
+	})
+})
+
+describe('eval_session — a process that exited on its own needs no spawn note', () => {
+	it('says nothing when the process exited on its own', () => {
+		expect(
+			eval_session.spawn_failure_note({ exitCode: 1, message: 'ignored', timedOut: false }),
+		).toBe('')
+	})
+})
