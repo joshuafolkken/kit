@@ -41,9 +41,43 @@ const epic_issue_schema = z.object({
 	body: z.string().optional(),
 })
 
+// One blocker as `gh` reports it inside the `blockedBy` connection. `state` comes back with the
+// number, so telling a resolved blocker from a standing one costs no extra request
+// (joshuafolkken/kit#996).
+// `number` is **required**. Relaxing it looks harmless and is not: `epic_issue.blockers_of` maps the
+// nodes to their numbers, so an optional one turns a `blockedBy` shape change from a failed parse —
+// which marks the child unreadable — into an empty blocker list, and `epic:next` then hands a
+// dependent to an unattended run before its prerequisite. Fail-safe is the direction that matters
+// here (joshuafolkken/kit#1005).
+const blocking_issue_schema = z.object({
+	number: z.number(),
+	state: z.string().optional(),
+})
+
+// `gh` answers a GraphQL connection — `{ nodes, totalCount }` — not a bare array. Measured against a
+// real issue rather than assumed (joshuafolkken/kit#860).
+//
+// **One definition, every reader.** The same connection was written out three times — twice here and
+// once in `scripts/epic/epic-issue.ts` — each naming only the fields its own caller happened to want,
+// so a shape change had three places to reach and one of them would not be noticed. That is the
+// duplication joshuafolkken/kit#862 removed from the epic commands, reintroduced by the readers that
+// came after (joshuafolkken/kit#1005).
+//
+// `nodes` is a page — `blockedBy(first:50)` — while `totalCount` is exact, so a reader that compares
+// them can tell a complete page from a truncated one. **Only the `auto-ok` pickup does**; the epic
+// readers judge from the page they were given, so an epic child declaring more than fifty blockers
+// is read from the first fifty. Carried here so the field is available, not because every reader
+// consults it (joshuafolkken/kit#1005).
+const blocked_by_schema = z
+	.object({
+		nodes: z.array(blocking_issue_schema).default([]),
+		totalCount: z.number().optional(),
+	})
+	.optional()
+
 const epic_child_schema = z.object({
 	state: z.string().optional(),
-	blockedBy: z.object({ totalCount: z.number().optional() }).optional(),
+	blockedBy: blocked_by_schema,
 })
 
 // `gh issue view --json number,labels,body` for the epic check. Labels come back as objects, so the
@@ -56,14 +90,6 @@ const epic_subject_schema = z.object({
 	body: z.string().optional(),
 })
 
-// One blocker as `gh` reports it inside the `blockedBy` connection. The state comes back with the
-// number, so telling a resolved blocker from a standing one costs no extra request
-// (joshuafolkken/kit#996).
-const blocking_issue_schema = z.object({
-	number: z.number(),
-	state: z.string().optional(),
-})
-
 // `gh issue list --json number,title,labels,createdAt,blockedBy` for the next-issues display
 // printed when a workflow completes (#821) and for the `auto-ok` pickup (joshuafolkken/kit#906).
 // `blockedBy` is optional so a listing taken before the field was requested still parses.
@@ -72,15 +98,7 @@ const open_issue_schema = z.object({
 	title: z.string(),
 	labels: z.array(issue_label_schema).optional(),
 	createdAt: z.string(),
-	// `gh` answers a GraphQL connection. `nodes` is a page — `blockedBy(first:50)` — while
-	// `totalCount` is exact, so a candidate with more blockers than fit the page is recognizable
-	// rather than read from a partial list (joshuafolkken/kit#996).
-	blockedBy: z
-		.object({
-			nodes: z.array(blocking_issue_schema).default([]),
-			totalCount: z.number().optional(),
-		})
-		.optional(),
+	blockedBy: blocked_by_schema,
 })
 
 type RollupItemData = z.infer<typeof rollup_item_schema>
@@ -99,5 +117,6 @@ export {
 	epic_subject_schema,
 	open_issue_schema,
 	blocking_issue_schema,
+	blocked_by_schema,
 }
 export type { RollupItemData, EpicChildData, OpenIssueData }

@@ -1072,6 +1072,12 @@ An epic's task list is not the whole backlog. An issue small enough to need no h
 
 `--exclude <N>` drops issues from the answer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — a pickup loop names it here so it cannot be handed back and re-implemented. It takes a comma-separated list and may be repeated, so a loop past its second pickup can name **every** issue it has already run: `closes #N` can fail to fire at all — a reference dropped from a PR body — and the `in-progress` label is not a guard the procedure itself trusts (joshuafolkken/kit#996).
 
+**The `🗒 Next issues` display is not filtered the same way, on purpose.** It is read by a person, who
+can see a blocked issue, judge that the blocker is nearly done or does not really block it, and start
+anyway; the pickup feeds an unattended run, which has none of that judgement. So the display can name
+an issue `auto-ok:next` refuses — the same row is information to one reader and an instruction to the
+other (joshuafolkken/kit#1005).
+
 **An issue whose prerequisite is still open is not offered.** The pickup reads the same native `blockedBy` relation `epic:next` builds its graph from, and skips any candidate declaring a blocker that has not closed. `auto-ok` says the issue needs no decision; it says nothing about ordering, so without this an unattended run could start an issue before the work it depends on (joshuafolkken/kit#996).
 
 Standard output carries exactly one token — the issue number, or `none` — so `answer=$(pnpm josh auto-ok:next)` captures something a loop can branch on. Every explanation goes to standard error.

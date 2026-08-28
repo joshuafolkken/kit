@@ -1,4 +1,5 @@
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
+import { blocked_by_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
 
 // The shapes `gh issue view --json …` answers with, and the argument every epic command takes.
@@ -9,10 +10,6 @@ import { z } from 'zod'
 // (joshuafolkken/kit#862).
 
 const label_schema = z.object({ name: z.string() })
-const blocker_schema = z.object({ number: z.number() })
-// `gh` answers a GraphQL connection — `{ nodes, totalCount }` — not a bare array. Measured against a
-// real issue rather than assumed (joshuafolkken/kit#860).
-const blocked_by_schema = z.object({ nodes: z.array(blocker_schema).default([]) }).optional()
 
 const CLOSED = 'CLOSED'
 const OPEN = 'OPEN'

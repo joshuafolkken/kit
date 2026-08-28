@@ -83,12 +83,16 @@ async function issue_list_by_label(label: string, limit: number): Promise<string
 // `createdAt` and re-checks `labels` client-side, so bodies would be fetched and thrown away. A
 // label that does not exist in the repository is not an error — `gh` answers with an empty listing,
 // which is exactly "nobody has opted anything in".
+// `json_fields` overrides the pickup's list. Its only caller is the probe that runs *after* a failed
+// read, asking the same question without `blockedBy` so a `gh` too old to know that field is told
+// apart from an access failure (joshuafolkken/kit#1005).
 async function issue_list_by_label_summary(
 	label: string,
 	limit: number,
+	options?: { json_fields?: string },
 ): Promise<string | undefined> {
 	return await issue_list_open({
-		json_fields: PICKUP_FIELDS,
+		json_fields: options?.json_fields ?? PICKUP_FIELDS,
 		limit,
 		filter_arguments: ['--label', label],
 	})
@@ -206,7 +210,6 @@ const git_gh_issue = {
 	issue_add_label,
 	issue_edit_body,
 	issue_comment,
-	PICKUP_FIELDS,
 	issue_list_recent,
 	issue_list_by_label,
 	issue_list_by_label_summary,
@@ -215,4 +218,4 @@ const git_gh_issue = {
 	issue_close,
 }
 
-export { git_gh_issue }
+export { git_gh_issue, PICKUP_FIELDS, SUMMARY_FIELDS }
