@@ -1,7 +1,18 @@
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
-import type { OpenIssueData } from '#scripts/git/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
+import {
+	auto_ok_fixture,
+	CREATED_EARLIER,
+	CREATED_LATER,
+	FAILURE_EXIT_CODE,
+	IN_PROGRESS_SPELLING,
+	NEW_ISSUE_NUMBER,
+	OLD_ISSUE_NUMBER,
+	SUCCESS_EXIT_CODE,
+} from './auto-ok-fixture'
+
+const { issue, record } = auto_ok_fixture
 
 vi.mock('#scripts/git/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_summary: vi.fn() },
@@ -10,25 +21,11 @@ vi.mock('#scripts/git/git-gh-command', () => ({
 const { git_gh_command } = await import('#scripts/git/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
 
-const CREATED_EARLIER = '2026-08-01T00:00:00Z'
-const CREATED_LATER = '2026-08-02T00:00:00Z'
-const OLD_ISSUE_NUMBER = 700
-const NEW_ISSUE_NUMBER = 900
-const FAILURE_EXIT_CODE = 1
-const SUCCESS_EXIT_CODE = 0
-const IN_PROGRESS_SPELLING = 'in-progress'
-
 // The two streams the contract is about: one token on standard output for a loop to branch on, and
 // every explanation on standard error. Captured as text rather than read off the spy, which types
 // its calls as `any`.
 const stdout_lines: Array<string> = []
 const stderr_lines: Array<string> = []
-
-function record(lines: Array<string>): (...args: Array<unknown>) => void {
-	return (...args: Array<unknown>): void => {
-		lines.push(args.map(String).join(' '))
-	}
-}
 
 vi.spyOn(console, 'info').mockImplementation(record(stdout_lines))
 vi.spyOn(console, 'error').mockImplementation(record(stderr_lines))
@@ -39,19 +36,6 @@ function stdout(): string {
 
 function stderr(): string {
 	return stderr_lines.join('\n')
-}
-
-function issue(
-	number: number,
-	created_at: string,
-	labels: ReadonlyArray<string> = [AUTO_OK_LABEL],
-): OpenIssueData {
-	return {
-		number,
-		title: `issue ${String(number)}`,
-		createdAt: created_at,
-		labels: labels.map((name) => ({ name })),
-	}
 }
 
 beforeEach(() => {
@@ -176,9 +160,6 @@ describe('josh auto-ok:next — a listing it could not read is not an empty one'
 		['gh itself failed', undefined],
 		['gh answered something that is not a listing', '{"message":"API rate limit exceeded"}'],
 		['gh answered unparseable output', 'not json'],
-		// Valid JSON, valid array, wrong elements: the zod rejection would otherwise escape as a
-		// stack trace instead of the sentence this command exists to print.
-		['gh answered a listing whose rows are the wrong shape', '[{"unexpected":true}]'],
 	])('exits non-zero when %s', async (_case, raw) => {
 		issue_list.mockResolvedValueOnce(raw)
 
@@ -186,6 +167,17 @@ describe('josh auto-ok:next — a listing it could not read is not an empty one'
 		// Nothing on standard output: a caller reading a token must not see `none` here.
 		expect(stdout()).toBe('')
 		expect(stderr()).toContain(auto_ok_cli.UNREADABLE_MESSAGE)
+	})
+
+	// Valid JSON, valid array, wrong elements: the zod rejection would otherwise escape as a stack
+	// trace instead of the sentence this command exists to print. Since joshuafolkken/kit#996 it is
+	// also the one case that names the field list rather than the authentication.
+	it('exits non-zero when gh answered a listing whose rows are the wrong shape', async () => {
+		issue_list.mockResolvedValueOnce('[{"unexpected":true}]')
+
+		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(stdout()).toBe('')
+		expect(stderr()).toContain(auto_ok_cli.UNEXPECTED_SHAPE_MESSAGE)
 	})
 })
 
@@ -200,13 +192,13 @@ describe('josh auto-ok:next — a truncated listing says so', () => {
 		issue_list.mockResolvedValueOnce(JSON.stringify(rows))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stderr()).toContain(auto_ok_cli.TRUNCATED_MESSAGE)
+		expect(stderr()).toContain(auto_ok_cli.TRUNCATED_WITH_ANSWER)
 	})
 
 	it('stays quiet when the listing is short of the cap', async () => {
 		issue_list.mockResolvedValueOnce(JSON.stringify([issue(NEW_ISSUE_NUMBER, CREATED_LATER)]))
 		await auto_ok_cli.run([])
 
-		expect(stderr()).not.toContain(auto_ok_cli.TRUNCATED_MESSAGE)
+		expect(stderr()).not.toContain(auto_ok_cli.TRUNCATED_WITH_ANSWER)
 	})
 })
