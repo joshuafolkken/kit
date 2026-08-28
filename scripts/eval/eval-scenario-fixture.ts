@@ -23,10 +23,10 @@ function tool_call(name: string, input: Record<string, unknown> = {}): ToolCall 
 
 // A session that finished cleanly. Passed by every suite that is asking about a rule rather than
 // about the harness, so those tests are not silently also asserting the session-level guard.
-const HEALTHY_SESSION: SessionOutcome = { exit_code: 0, stderr: '' }
+const HEALTHY_SESSION: SessionOutcome = { exit_code: 0, stderr: '', transcript: '' }
 
 // A session that ran and then died — the API dropping mid-scenario is the common one.
-const CUT_SHORT_SESSION: SessionOutcome = { exit_code: 1, stderr: '' }
+const CUT_SHORT_SESSION: SessionOutcome = { exit_code: 1, stderr: '', transcript: '' }
 
 export {
 	CUT_SHORT_SESSION,

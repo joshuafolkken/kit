@@ -17,14 +17,23 @@ const MODEL_ENV_KEY = 'JOSH_EVAL_MODEL'
 // `node scripts/eval/eval-run.ts <name...>` — the names begin after the runtime and the script.
 const ARGV_SCENARIO_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-// An inconclusive verdict means the session did not produce a measurement — an API drop, a stalled
-// start. Those cluster in the back half of a long batch, so one retry recovers most of them, and a
-// retried scenario is announced rather than quietly replaced.
+const MS_PER_SECOND = 1000
+// An inconclusive verdict means the session did not produce a measurement, and a retried scenario is
+// announced rather than quietly replaced. One attempt, because a second buys nothing: raised to two
+// while investigating joshuafolkken/kit#1001 and put back, since neither the extra attempt nor the
+// longer waits recovered a single scenario — and the pair roughly doubled the worst-case suite time
+// for the same verdict.
 const INCONCLUSIVE_RETRIES = 1
-// Sessions run back to back exhaust something upstream: measured on this suite, the first two
-// scenarios return full transcripts and every one after them returns an empty one — and each of those
-// passes on its own moments later, so it is pacing rather than the scenario. The pause is what makes
-// a five-scenario run mean the same thing as five single runs.
+// Sessions run back to back were the first suspected cause: measured on this suite, the first two
+// scenarios return full transcripts and every one after them returns an empty one, and each of those
+// passes on its own moments later. The pause is what was meant to make a five-scenario run mean the
+// same thing as five single runs.
+//
+// **Pacing has not been shown to be the cause, and this is not the remedy.** Raising it to 45s with a
+// second retry changed nothing, and the first run to print a reason named something else — `API
+// Error: Unable to connect to API (ConnectionRefused)`, after the session had started. The pause is
+// kept at its original value as a cheap margin; the remedy is whatever that error turns out to be
+// (joshuafolkken/kit#1001).
 const SCENARIO_PAUSE_MS = 20_000
 // A retry follows an empty transcript, which is the signal that the pause was not enough, so it waits
 // longer than the pause that already failed to prevent it.
@@ -70,7 +79,9 @@ async function run_scenario(scenario: Scenario, model: string): Promise<Verdict>
 	let verdict = await run_once(scenario, model)
 
 	for (let attempt = 0; attempt < INCONCLUSIVE_RETRIES && verdict.is_inconclusive; attempt += 1) {
-		log(`  … ${scenario.name} produced no measurement; waiting, then retrying`)
+		log(
+			`  … ${scenario.name} produced no measurement; waiting ${String(RETRY_PAUSE_MS / MS_PER_SECOND)}s, then retrying`,
+		)
 		await pause(RETRY_PAUSE_MS)
 		verdict = await run_once(scenario, model)
 	}
@@ -97,8 +108,17 @@ function unknown_scenarios(
 async function run_all(chosen: ReadonlyArray<Scenario>, model: string): Promise<Array<Verdict>> {
 	const verdicts: Array<Verdict> = []
 
-	for (const scenario of chosen) {
-		if (verdicts.length > 0) await pause(SCENARIO_PAUSE_MS)
+	for (const [index, scenario] of chosen.entries()) {
+		if (verdicts.length > 0) {
+			log(`  … pausing ${String(SCENARIO_PAUSE_MS / MS_PER_SECOND)}s before the next scenario`)
+			await pause(SCENARIO_PAUSE_MS)
+		}
+
+		// Announced before it runs, not only after. A scenario can occupy the ten-minute session
+		// timeout, and until joshuafolkken/kit#1001 the suite printed nothing for that whole time — so
+		// a stall was indistinguishable from slow progress, and the harness watchdog that kills a run
+		// with no output had nothing to see.
+		log(`  ▸ ${scenario.name} (${String(index + 1)}/${String(chosen.length)})`)
 
 		const verdict = await run_scenario(scenario, model)
 
