@@ -1063,13 +1063,16 @@ Print the next opted-in issue an unattended run may pick up outside an epic ([#9
 ```bash
 pnpm josh auto-ok:next                 # alias: josh ao
 pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
+pnpm josh auto-ok:next --exclude 906,912 --exclude 918   # skip several
 ```
 
 An epic's task list is not the whole backlog. An issue small enough to need no human judgment sits there forever unless somebody puts it in an epic, so the `auto-ok` label opts one in: [`epicrun`](../prompts/collaboration-workflow/epicrun.md) picks up opted-in issues once the epic's own children are done.
 
 **Only a person applies `auto-ok`.** Typing `epicrun #<E>` approves the merges inside `#<E>` and nothing outside it, and this label is the only way a person extends that approval past the epic's edge — a label an agent could apply to itself would let an unattended run widen its own authorization, which is not a guard at all. An agent typing the command on an explicit instruction in the same turn is executing the person's decision, not making one.
 
-`--exclude <N>` drops one issue from the answer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — a pickup loop names it here so it cannot be handed back and re-implemented.
+`--exclude <N>` drops issues from the answer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — a pickup loop names it here so it cannot be handed back and re-implemented. It takes a comma-separated list and may be repeated, so a loop past its second pickup can name **every** issue it has already run: `closes #N` can fail to fire at all — a reference dropped from a PR body — and the `in-progress` label is not a guard the procedure itself trusts (joshuafolkken/kit#996).
+
+**An issue whose prerequisite is still open is not offered.** The pickup reads the same native `blockedBy` relation `epic:next` builds its graph from, and skips any candidate declaring a blocker that has not closed. `auto-ok` says the issue needs no decision; it says nothing about ordering, so without this an unattended run could start an issue before the work it depends on (joshuafolkken/kit#996).
 
 Standard output carries exactly one token — the issue number, or `none` — so `answer=$(pnpm josh auto-ok:next)` captures something a loop can branch on. Every explanation goes to standard error.
 

@@ -5,6 +5,11 @@ const NUMBER_AND_BODY_FIELDS = 'number,body'
 // The fields every listing that is *ranked* asks for: `createdAt` to order by and `labels` to
 // exclude by. Shared by the next-issues display and the `auto-ok` pickup, which rank identically.
 const SUMMARY_FIELDS = 'number,title,labels,createdAt'
+// The pickup's list, which is the display's plus the native blocker relation. Kept apart from
+// `SUMMARY_FIELDS` on purpose: `blockedBy` needs a newer `gh`, and asking for it on the shared list
+// would make the next-issues display disappear on an older one — a failure with no message at all,
+// since `issue_list_open` swallows the error (joshuafolkken/kit#996).
+const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy`
 
 async function issue_edit_body(issue_number: string, body: string): Promise<string> {
 	return await git_gh_exec.exec_gh_command_with_stdin({
@@ -83,7 +88,7 @@ async function issue_list_by_label_summary(
 	limit: number,
 ): Promise<string | undefined> {
 	return await issue_list_open({
-		json_fields: SUMMARY_FIELDS,
+		json_fields: PICKUP_FIELDS,
 		limit,
 		filter_arguments: ['--label', label],
 	})
@@ -201,6 +206,7 @@ const git_gh_issue = {
 	issue_add_label,
 	issue_edit_body,
 	issue_comment,
+	PICKUP_FIELDS,
 	issue_list_recent,
 	issue_list_by_label,
 	issue_list_by_label_summary,

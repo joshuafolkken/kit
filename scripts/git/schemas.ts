@@ -56,13 +56,31 @@ const epic_subject_schema = z.object({
 	body: z.string().optional(),
 })
 
-// `gh issue list --json number,title,labels,createdAt` for the next-issues display printed when a
-// workflow completes (#821).
+// One blocker as `gh` reports it inside the `blockedBy` connection. The state comes back with the
+// number, so telling a resolved blocker from a standing one costs no extra request
+// (joshuafolkken/kit#996).
+const blocking_issue_schema = z.object({
+	number: z.number(),
+	state: z.string().optional(),
+})
+
+// `gh issue list --json number,title,labels,createdAt,blockedBy` for the next-issues display
+// printed when a workflow completes (#821) and for the `auto-ok` pickup (joshuafolkken/kit#906).
+// `blockedBy` is optional so a listing taken before the field was requested still parses.
 const open_issue_schema = z.object({
 	number: z.number(),
 	title: z.string(),
 	labels: z.array(issue_label_schema).optional(),
 	createdAt: z.string(),
+	// `gh` answers a GraphQL connection. `nodes` is a page — `blockedBy(first:50)` — while
+	// `totalCount` is exact, so a candidate with more blockers than fit the page is recognizable
+	// rather than read from a partial list (joshuafolkken/kit#996).
+	blockedBy: z
+		.object({
+			nodes: z.array(blocking_issue_schema).default([]),
+			totalCount: z.number().optional(),
+		})
+		.optional(),
 })
 
 type RollupItemData = z.infer<typeof rollup_item_schema>
@@ -80,5 +98,6 @@ export {
 	epic_child_schema,
 	epic_subject_schema,
 	open_issue_schema,
+	blocking_issue_schema,
 }
 export type { RollupItemData, EpicChildData, OpenIssueData }

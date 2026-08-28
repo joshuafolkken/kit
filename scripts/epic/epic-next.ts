@@ -185,8 +185,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_epic(options)
 }
 
+// `process.exitCode` rather than `process.exit()`, for the reason `scripts/cost/cost-cli.ts` records:
+// the answer goes to standard output and a write to a pipe is asynchronous on macOS, so exiting can
+// tear the process down before it drains. This command's contract is `answer=$(pnpm josh epic:next
+// <E>)`, which is exactly that pipe (joshuafolkken/kit#996).
 async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exit(await run(argv))
+	process.exitCode = await run(argv)
 }
 
 const epic_next = {
