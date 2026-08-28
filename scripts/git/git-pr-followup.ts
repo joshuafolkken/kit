@@ -7,10 +7,10 @@ import { git_pr_checks } from './git-pr-checks'
 import { is_coderabbit_check } from './git-pr-checks-eval'
 import { CHECK_STATUS_PASS, type PrStateSnapshot } from './git-pr-checks-parse'
 import { git_pr_coderabbit } from './git-pr-coderabbit'
+import { github_issue_url } from './github-issue-url'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
 
 const CLOSES_PATTERN = /closes\s+#\d+/iu
-const GITHUB_PULL_URL_PATTERN = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\/pull\/\d+$/u
 const REPO_NAME_SEPARATOR = '/'
 
 function parse_repo_name(name_with_owner: string | undefined): string | undefined {
@@ -35,15 +35,18 @@ function build_telegram_input(input: {
 	}
 }
 
+// The sibling issue URL of a pull request: same repository, the number this run is closing. Read
+// through the shared parser rather than a second pattern here, so the two cannot disagree about what
+// a github.com URL looks like (joshuafolkken/kit#994).
 function build_issue_url(
 	pr_url: string | undefined,
 	issue_number: string | undefined,
 ): string | undefined {
-	if (pr_url === undefined || issue_number === undefined) return undefined
-	const match = GITHUB_PULL_URL_PATTERN.exec(pr_url)
-	if (match?.[1] === undefined) return undefined
+	if (issue_number === undefined) return undefined
+	const target = github_issue_url.parse_pull(pr_url)
+	if (target === undefined) return undefined
 
-	return `${match[1]}/issues/${issue_number}`
+	return `${target.base_url}/issues/${issue_number}`
 }
 
 interface FollowupInput {
@@ -256,6 +259,7 @@ const git_pr_followup = {
 
 export {
 	git_pr_followup,
+	build_issue_url,
 	parse_repo_name,
 	is_blank_issue_body,
 	post_notify_issue,

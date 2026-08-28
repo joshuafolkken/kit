@@ -26,8 +26,13 @@ const OTHER_REPO_TARGET = {
 	owner: 'joshuafolkken',
 	repo: OTHER_REPO,
 	name_with_owner: OTHER_REPO_NAME_WITH_OWNER,
+	base_url: `https://github.com/${OTHER_REPO_NAME_WITH_OWNER}`,
 	issue_number: OTHER_REPO_ISSUE_NUMBER,
 }
+const OTHER_REPO_PULL_URL = 'https://github.com/joshuafolkken/joshuafolkken-com/pull/12'
+const KIT_ISSUE_URL = 'https://github.com/joshuafolkken/kit/issues/903'
+const NON_GITHUB_URL = 'https://example.com/x'
+const WORKING_DIRECTORY_REPO = 'my-repo'
 
 const { telegram_test } = await import('./telegram-test')
 
@@ -135,15 +140,75 @@ describe('telegram_test.resolve_context — no issue URL to read', () => {
 
 		const result = await telegram_test.resolve_context({})
 
-		expect(result).toStrictEqual({ repo_name: 'my-repo', issue_title: undefined })
+		expect(result).toStrictEqual({ repo_name: WORKING_DIRECTORY_REPO, issue_title: undefined })
 		expect(issue_get_title_mock).not.toHaveBeenCalled()
 	})
 
 	it('falls back for a URL that is not a GitHub issue URL', async () => {
 		exec_file_mock.mockResolvedValue(REPO_RESPONSE)
 
-		const result = await telegram_test.resolve_context({ 'issue-url': 'https://example.com/x' })
+		const result = await telegram_test.resolve_context({ 'issue-url': NON_GITHUB_URL })
 
-		expect(result.repo_name).toBe('my-repo')
+		expect(result.repo_name).toBe(WORKING_DIRECTORY_REPO)
+	})
+})
+
+// joshuafolkken/kit#994: `--pr-url` was not read, so a completion notification carrying only a PR
+// link went out under the working directory's repository while its link pointed elsewhere — the
+// same mismatch joshuafolkken/kit#903 fixed for `--issue-url`.
+describe('telegram_test.resolve_context — the pull URL names the repository', () => {
+	it('resolves the repository from the pull URL when there is no issue URL', async () => {
+		const result = await telegram_test.resolve_context({ 'pr-url': OTHER_REPO_PULL_URL })
+
+		expect(result.repo_name).toBe(OTHER_REPO)
+	})
+
+	it('never asks the working directory when a pull URL was given', async () => {
+		await telegram_test.resolve_context({ 'pr-url': OTHER_REPO_PULL_URL })
+
+		expect(exec_file_mock).not.toHaveBeenCalled()
+	})
+
+	// A pull URL names no issue, so there is no title to read from it — the title stays the
+	// `--issue-title` flag's job, and no `gh` call is spent guessing.
+	it('reads no issue title from a pull URL', async () => {
+		const result = await telegram_test.resolve_context({ 'pr-url': OTHER_REPO_PULL_URL })
+
+		expect(result.issue_title).toBeUndefined()
+		expect(issue_get_title_mock).not.toHaveBeenCalled()
+	})
+
+	it('falls back to the working directory for a URL that is not a pull URL', async () => {
+		exec_file_mock.mockResolvedValue(REPO_RESPONSE)
+
+		const result = await telegram_test.resolve_context({ 'pr-url': NON_GITHUB_URL })
+
+		expect(result.repo_name).toBe(WORKING_DIRECTORY_REPO)
+	})
+})
+
+// The order is what the Issue asked to be pinned: the issue URL identifies the issue whose title is
+// also read, so it outranks a pull URL that can only answer the repository half.
+describe('telegram_test.resolve_context — the issue URL outranks the pull URL', () => {
+	it('prefers the issue URL when both are given', async () => {
+		issue_get_title_mock.mockResolvedValue(ISSUE_TITLE)
+
+		const result = await telegram_test.resolve_context({
+			'issue-url': KIT_ISSUE_URL,
+			'pr-url': OTHER_REPO_PULL_URL,
+		})
+
+		expect(result.repo_name).toBe('kit')
+	})
+
+	it('still reads the title from the issue URL when both are given', async () => {
+		issue_get_title_mock.mockResolvedValue(ISSUE_TITLE)
+
+		await telegram_test.resolve_context({
+			'issue-url': KIT_ISSUE_URL,
+			'pr-url': OTHER_REPO_PULL_URL,
+		})
+
+		expect(issue_get_title_mock).toHaveBeenCalledWith('903', 'joshuafolkken/kit')
 	})
 })
