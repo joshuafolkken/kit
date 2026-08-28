@@ -1,5 +1,5 @@
 import type { OrderExpectation, Scenario, ToolExpectation, ToolMatcher } from './eval-scenario'
-import type { ToolCall } from './eval-transcript'
+import { eval_transcript, type ToolCall } from './eval-transcript'
 
 // The verdict is computed from the tool calls alone. Every failure carries the scenario's own
 // `because`, so a red run reads as "the rule that broke" rather than "Edit was called" — which is
@@ -128,12 +128,49 @@ function is_inconclusive(
 interface SessionOutcome {
 	exit_code: number
 	stderr: string
+	// The stream the session wrote. **Required, not optional**: `has_started` reads it to say whether
+	// the session announced itself, and a caller that omitted it would get the confident answer
+	// `without starting` from an absence — the conflation this whole change removes
+	// (joshuafolkken/kit#1001).
+	transcript: string
+	is_timed_out?: boolean
+	// The signal that killed it, when one did. A timeout and an OOM kill both arrive with no exit
+	// code, so without this they print the same sentence as a `claude` that never started.
+	signal?: string | undefined
 }
 
-function stderr_detail(session: SessionOutcome): string {
+// The reason, from whichever source has one. stderr first because it is the process's own last word;
+// the stream's `result` event second, because **every** non-measurement observed across
+// joshuafolkken/kit#908 had an empty stderr, which is what made four failed scenarios in a row
+// indistinguishable from each other.
+function failure_detail(session: SessionOutcome): string {
 	const last_line = session.stderr.trim().split('\n').at(-1) ?? ''
 
-	return last_line === '' ? '' : `: ${last_line}`
+	if (last_line !== '') return `: ${last_line}`
+	const reason = eval_transcript.read_error_reason(session.transcript)
+
+	return reason === undefined ? '' : `: ${reason}`
+}
+
+// Whether the session got far enough to announce itself, which is what separates "never started"
+// from "started and then died". The two used to print the same sentence, so a run could not tell an
+// expired login from an API drop mid-scenario.
+function reached_note(session: SessionOutcome, calls: ReadonlyArray<ToolCall>): string {
+	if (calls.length > 0) return 'part way'
+
+	return eval_transcript.has_started(session.transcript)
+		? 'after starting, before calling any tool'
+		: 'without starting'
+}
+
+// How the session ended, in its own terms. The exit code cannot carry this: execa reports none at all
+// for a signal-terminated process, so a timeout, an OOM kill and a `claude` that never started all
+// arrive alike and used to print the same sentence (joshuafolkken/kit#1001).
+function ended_note(session: SessionOutcome): string {
+	if (session.is_timed_out === true) return 'session timed out'
+	if (session.signal !== undefined) return `session was killed by ${session.signal}`
+
+	return `session exited ${String(session.exit_code)}`
 }
 
 // What went wrong at the session level, for the report to print instead of a rule name. A dead
@@ -146,9 +183,7 @@ function session_note(session: SessionOutcome, calls: ReadonlyArray<ToolCall>): 
 		return calls.length === 0 ? 'no tool calls, so nothing was measured' : undefined
 	}
 
-	const reached = calls.length === 0 ? 'without running' : 'part way'
-
-	return `session exited ${String(session.exit_code)} ${reached}${stderr_detail(session)}`
+	return `${ended_note(session)} ${reached_note(session, calls)}${failure_detail(session)}`
 }
 
 function judge(
