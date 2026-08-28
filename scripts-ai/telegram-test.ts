@@ -87,11 +87,19 @@ async function resolve_issue_title(
 }
 
 // Resolution order: an explicit `--repo-name` (applied by `build_input`, which prefers the flag),
-// then the repository the `--issue-url` points at, then the working directory. The last step is the
-// backwards-compatible one, and it is reached only when there is no URL to read.
+// then the repository the `--issue-url` points at, then the one `--pr-url` points at, then the
+// working directory. The last step is the backwards-compatible one, and it is reached only when
+// there is no URL of either kind to read.
+//
+// `--issue-url` outranks `--pr-url` because it identifies the issue the title is read from as well
+// as the repository. A pull URL answers the repository half only, which is why it is read for
+// `repo_name` and not passed to `resolve_issue_title` — a completion notification carrying only a
+// PR link used to go out under the working directory's repository while its link pointed elsewhere
+// (joshuafolkken/kit#994).
 async function resolve_context(values: CliValues): Promise<ResolvedContext> {
 	const target = github_issue_url.parse(values['issue-url'])
-	const repo_name = target?.repo ?? (await fetch_repo_name())
+	const pull_target = github_issue_url.parse_pull(values['pr-url'])
+	const repo_name = target?.repo ?? pull_target?.repo ?? (await fetch_repo_name())
 	const issue_title = await resolve_issue_title(values, target)
 
 	return { repo_name, issue_title }
