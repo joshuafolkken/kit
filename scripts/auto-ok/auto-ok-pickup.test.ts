@@ -1,4 +1,4 @@
-import { git_gh_issue } from '#scripts/git/git-gh-issue'
+import { PICKUP_FIELDS } from '#scripts/git/git-gh-issue'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
@@ -65,6 +65,37 @@ function paged_blockers(total_count: number): string {
 			},
 		},
 	])
+}
+
+interface ProbeCall {
+	limit: number | undefined
+	fields: string | undefined
+}
+
+function read_fields(options: unknown): string | undefined {
+	if (typeof options !== 'object' || options === null) return undefined
+	if (!('json_fields' in options)) return undefined
+	const { json_fields: fields } = options
+
+	return typeof fields === 'string' ? fields : undefined
+}
+
+// The call's shape, read once so a test asserts on plain values rather than on optional chains.
+function describe_call(call: ReadonlyArray<unknown> | undefined): ProbeCall {
+	const limit = call?.[1]
+
+	return {
+		limit: typeof limit === 'number' ? limit : undefined,
+		fields: read_fields(call?.[2]),
+	}
+}
+
+async function run_until_probe(): Promise<{ listing: ProbeCall; probe: ProbeCall }> {
+	issue_list.mockResolvedValueOnce(undefined).mockResolvedValueOnce('[]')
+	await auto_ok_cli.run([])
+	const [listing, probe] = issue_list.mock.calls
+
+	return { listing: describe_call(listing), probe: describe_call(probe) }
 }
 
 function two_issues(): string {
@@ -141,7 +172,80 @@ describe('josh auto-ok:next — what the guard is given', () => {
 	// the field. Without this, dropping it from the field list would silently remove the guard with
 	// every test above still green.
 	it('asks gh for the blocker relation', () => {
-		expect(git_gh_issue.PICKUP_FIELDS).toContain('blockedBy')
+		expect(PICKUP_FIELDS).toContain('blockedBy')
+	})
+
+	// joshuafolkken/kit#1005: a `gh` too old to know that field fails the listing outright, and
+	// `issue_list_open` swallows the error — so the read looked exactly like an access failure and
+	// sent the reader to `gh auth status`, which is green. That is the misdirection kit#996's message
+	// was added to remove, walked back in by the field the same change started asking for.
+	it('blames the gh version when the field-bearing listing fails twice', async () => {
+		issue_list
+			.mockResolvedValueOnce(undefined)
+			.mockResolvedValueOnce('[]')
+			.mockResolvedValueOnce(undefined)
+
+		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(stderr()).toContain(auto_ok_cli.OUTDATED_GH_MESSAGE)
+		expect(stderr()).not.toContain(auto_ok_cli.UNREADABLE_MESSAGE)
+	})
+
+	// A blip on the first read clears by the time the probe runs, and telling someone on a current
+	// `gh` to upgrade it is the same kind of misdirection this whole path exists to avoid.
+	it('does not blame the version when the original read works on a retry', async () => {
+		issue_list
+			.mockResolvedValueOnce(undefined)
+			.mockResolvedValueOnce('[]')
+			.mockResolvedValueOnce(JSON.stringify([issue(NEW_ISSUE_NUMBER, CREATED_LATER)]))
+
+		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stderr()).not.toContain(auto_ok_cli.OUTDATED_GH_MESSAGE)
+	})
+
+	// Both reads failing is an access problem, not a version one — the probe drops the field and still
+	// gets nothing, so the field is not what it tripped over.
+	it('blames access when the listing fails without the field too', async () => {
+		issue_list.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+		// No third call: the retry is reached only once the form without the field has read.
+
+		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(stderr()).toContain(auto_ok_cli.UNREADABLE_MESSAGE)
+		expect(stderr()).not.toContain(auto_ok_cli.OUTDATED_GH_MESSAGE)
+	})
+
+	// The probe costs a request, so a healthy run must never spend it.
+	it('spends no probe when the listing read', async () => {
+		issue_list.mockReset()
+		issue_list.mockResolvedValueOnce('[]')
+
+		await auto_ok_cli.run([])
+
+		expect(issue_list).toHaveBeenCalledTimes(1)
+	})
+})
+
+// Stubbing by return value alone would keep the classification tests green while the probe asked for
+// `blockedBy` itself — which on a genuinely old `gh` fails identically and reports the wrong cause.
+describe('josh auto-ok:next — what the probe actually asks for', () => {
+	it('asks the first time with the pickup fields', async () => {
+		const { listing } = await run_until_probe()
+
+		expect(listing.fields).toBeUndefined()
+	})
+
+	it('drops the blocker field from the probe', async () => {
+		const { probe } = await run_until_probe()
+
+		expect(probe.fields).not.toContain('blockedBy')
+	})
+
+	// The limit stays the same, so a rate limit that a smaller request happens to survive cannot read
+	// as a version problem.
+	it('changes nothing but the fields', async () => {
+		const { listing, probe } = await run_until_probe()
+
+		expect(probe.limit).toBe(listing.limit)
 	})
 
 	// Reading one closed blocker as "unblocked" when the count says a second exists would break the

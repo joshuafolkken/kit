@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { SUMMARY_FIELDS } from '#scripts/git/git-gh-issue'
 import { git_next_issues } from '#scripts/git/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
@@ -37,6 +38,11 @@ const LISTING_LIMIT = 200
 // wastes the one hint the message had to give (joshuafolkken/kit#996).
 const UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing. That is not "nothing is opted in" — check \`gh auth status\` and ask again.`
 const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — \`gh\`'s JSON fields have most likely changed, so check \`gh --version\` and the fields this command asks for rather than your authentication.`
+// A `gh` too old to know `blockedBy` fails the listing outright, and `issue_list_open` swallows the
+// error — so the read looks exactly like an access failure and sends the reader to `gh auth status`,
+// which is green. That is the misdirection joshuafolkken/kit#996 added the message above to remove,
+// walked straight back in by the field the same change started asking for (joshuafolkken/kit#1005).
+const OUTDATED_GH_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing, and this \`gh\` does not support the \`blockedBy\` field the pickup needs — which is the likelier cause than your authentication. Upgrade \`gh\` (\`gh --version\` reports what you have) and ask again.`
 // Said once the answer is known, so it never claims there is an answer below when there is not. The
 // cap only ever drops the *oldest* opted-in issues, `gh` listing newest first.
 const TRUNCATED_PREFIX = `⚠ The listing hit the ${String(LISTING_LIMIT)}-issue cap, so the oldest \`${AUTO_OK_LABEL}\` issues are not in it`
@@ -111,22 +117,58 @@ type OptedInRead =
 	| { kind: 'read'; issues: Array<OpenIssueData> }
 	| { kind: 'unreadable' }
 	| { kind: 'unexpected_shape' }
+	| { kind: 'outdated_gh' }
 
-async function fetch_opted_in(): Promise<OptedInRead> {
-	const raw = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT)
-	if (raw === undefined) return { kind: 'unreadable' }
-
+// `undefined` is unparseable output, or valid JSON that is not a listing at all — `gh` answering
+// `{"message":"API rate limit exceeded"}`. Both are gaps, and reading either as an empty listing is
+// the confident absence kit#950 exists to prevent. Only the rethrown zod rejection means the listing
+// arrived and its *fields* were not what was asked for.
+function parse_listing(raw: string): OptedInRead {
 	try {
 		const issues = parse_json_array_or_undefined(raw, open_issue_schema)
 
-		// `undefined` is unparseable output, or valid JSON that is not a listing at all — `gh`
-		// answering `{"message":"API rate limit exceeded"}`. Both are gaps, and reading either as an
-		// empty listing is the confident absence kit#950 exists to prevent. Only the rethrown zod
-		// rejection below means the listing arrived and its *fields* were not what was asked for.
 		return issues === undefined ? { kind: 'unreadable' } : { kind: 'read', issues }
 	} catch {
 		return { kind: 'unexpected_shape' }
 	}
+}
+
+// Whether the *identical* listing reads once `blockedBy` is dropped from it. Named for what it
+// answers rather than for what it implies, because the two are opposite: a `true` here means the
+// field was the problem, and an earlier spelling returned the failure instead — correct only because
+// its one call site inverted it back (joshuafolkken/kit#1005).
+//
+// **Only the field list changes.** Varying the limit as well would let a rate limit or a timeout that
+// a smaller request happens to survive read as "upgrade `gh`" on a `gh` that is perfectly current.
+async function reads_without_blocked_by(): Promise<boolean> {
+	const probe = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT, {
+		json_fields: SUMMARY_FIELDS,
+	})
+
+	return probe !== undefined
+}
+
+// Which gap a failed listing was. Both probes run only here, so a healthy run never spends either.
+//
+// **The field is blamed only when it fails twice and the form without it succeeds.** One success of
+// that form is not enough on its own: a network blip or a passing rate limit on the first
+// read clears by the time the probe runs, and the run would then tell someone on a perfectly current
+// `gh` to upgrade it. `gh` does put the unsupported-field error on stderr, but `issue_list_open`
+// swallows it, so repeating the original read is what separates a transient failure from a standing
+// one (joshuafolkken/kit#1005).
+async function classify_failed_read(): Promise<OptedInRead> {
+	if (!(await reads_without_blocked_by())) return { kind: 'unreadable' }
+
+	const retry = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT)
+
+	// The original form working on the second attempt means nothing was wrong with the field.
+	return retry === undefined ? { kind: 'outdated_gh' } : parse_listing(retry)
+}
+
+async function fetch_opted_in(): Promise<OptedInRead> {
+	const raw = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT)
+
+	return raw === undefined ? await classify_failed_read() : parse_listing(raw)
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native
@@ -168,7 +210,7 @@ function is_unblocked(issue: OpenIssueData): boolean {
 // also drops a candidate whose prerequisite is still open, while `🗒 Next issues` shows every open
 // issue and leaves the judgement to the person reading it. So the display can name an issue this
 // command refuses — a person can see a blocked issue is next and decide to start it anyway, and an
-// unattended run must not. Whether the display should filter too is a separate question.
+// unattended run must not.
 //
 // Membership of the label is the *query's* job, not this function's: `--label` is what makes the
 // listing the opted-in set, so re-testing it here would be a second definition of opting in.
@@ -176,6 +218,10 @@ function is_unblocked(issue: OpenIssueData): boolean {
 // The exclusions are applied **before** `prioritize`, not after: it keeps only its first few rows,
 // so filtering its output would answer `none` whenever those rows happen to be blocked while a
 // runnable issue sits below them.
+//
+// The `🗒 Next issues` display is deliberately *not* filtered this way; `git-next-issues.ts` records
+// why, and the short version is that a person can see a blocked issue and choose to start it anyway
+// while an unattended run cannot (joshuafolkken/kit#1005).
 function pick_next(
 	issues: ReadonlyArray<OpenIssueData>,
 	exclude: ReadonlyArray<number> = [],
@@ -227,6 +273,7 @@ function report(issues: ReadonlyArray<OpenIssueData>, exclude?: ReadonlyArray<nu
 const READ_FAILURE_MESSAGES = {
 	unreadable: UNREADABLE_MESSAGE,
 	unexpected_shape: UNEXPECTED_SHAPE_MESSAGE,
+	outdated_gh: OUTDATED_GH_MESSAGE,
 } as const
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -263,6 +310,7 @@ const auto_ok_cli = {
 	LISTING_LIMIT,
 	UNREADABLE_MESSAGE,
 	UNEXPECTED_SHAPE_MESSAGE,
+	OUTDATED_GH_MESSAGE,
 	TRUNCATED_WITH_ANSWER,
 	TRUNCATED_WITHOUT_ANSWER,
 	NONE_OPTED_IN_MESSAGE,
@@ -271,6 +319,7 @@ const auto_ok_cli = {
 	parse_pair,
 	parse_options,
 	fetch_opted_in,
+	parse_listing,
 	is_page_complete,
 	is_closed,
 	is_unblocked,
