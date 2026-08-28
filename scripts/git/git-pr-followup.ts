@@ -1,16 +1,19 @@
 import { version_targets } from '#scripts/version/version-targets'
 import { git_epic_close } from './git-epic-close'
 import { git_gh_command } from './git-gh-command'
+import { git_gh_helpers } from './git-gh-helpers'
 import { git_notify, type GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
 import { git_pr_checks } from './git-pr-checks'
 import { is_coderabbit_check } from './git-pr-checks-eval'
-import { CHECK_STATUS_PASS, type PrStateSnapshot } from './git-pr-checks-parse'
+import { CHECK_STATUS_PASS, git_pr_checks_parse, type PrStateSnapshot } from './git-pr-checks-parse'
 import { git_pr_coderabbit } from './git-pr-coderabbit'
 import { github_issue_url } from './github-issue-url'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
 
 const CLOSES_PATTERN = /closes\s+#\d+/iu
+// Named so a test can pin the note without restating it (joshuafolkken/kit#999).
+const WATCH_FAILED_NOTE = 'pr checks --watch failed; falling through to polling'
 const REPO_NAME_SEPARATOR = '/'
 
 function parse_repo_name(name_with_owner: string | undefined): string | undefined {
@@ -145,15 +148,72 @@ async function post_completion_notification(input: {
 	}
 }
 
+// The watch is a look ahead, not a gate. `gh pr checks --watch` exits non-zero when **any** check
+// has failed — CodeRabbit included — and letting that escape ended the run before `evaluate_pr_state`
+// could apply kit#753's CodeRabbit exemption at all. It only ever bit where every check finished
+// inside the two-minute window, so a repository with a slow E2E never saw it and a fast one always
+// would (joshuafolkken/kit#999).
+//
+// Falling through costs nothing: whether the merge may proceed is decided in one place below, and a
+// genuinely failing non-CodeRabbit check still ends the wait on the first poll by kit#990's
+// fast-fail rather than by this exit code.
+// `gh pr checks` exits 1 both for "a check failed" and for "no checks reported on this branch", and
+// the watch inherits stdio so its message is not ours to read — the exit code cannot tell them
+// apart. The pull request itself can: a failed check leaves a rollup, and a branch with no checks
+// leaves it empty. Falling through on the empty case would trade a failure reported in seconds for
+// the whole budget spent waiting on a required check that is missing rather than pending, so that
+// one is rethrown and the old behavior kept.
+//
+// **Read from the raw payload, not from `parse_pr_state_snapshot`.** That parser never throws: a
+// malformed answer or a schema mismatch degrades to `rollup: []`, which is indistinguishable there
+// from a branch that genuinely has no checks. Rethrowing on it would put an unreadable answer back
+// on the path this whole change exists to remove. So the question asked here is the narrow one —
+// *is this definitely an empty rollup* — and every other outcome falls through.
+function reads_as_empty_rollup(raw_json: string): boolean {
+	const parsed = git_pr_checks_parse.parse_json_safe(raw_json)
+
+	if (typeof parsed !== 'object' || parsed === null) return false
+	if (!('statusCheckRollup' in parsed)) return false
+	const { statusCheckRollup: rollup } = parsed
+
+	return Array.isArray(rollup) && rollup.length === 0
+}
+
+// The read throws rather than answering `undefined`, so the `catch` is its only failure path.
+async function has_no_checks(branch_name: string): Promise<boolean> {
+	try {
+		return reads_as_empty_rollup(await git_gh_command.pr_get_state_snapshot(branch_name))
+	} catch {
+		// The read refines the swallow; it is not a gate of its own. An answer it cannot get is not
+		// evidence of anything, so prefer falling through — the poll below reads the same state.
+		return false
+	}
+}
+
+async function handle_watch_failure(branch_name: string, error: unknown): Promise<void> {
+	if (await has_no_checks(branch_name)) throw error
+
+	// Swallowed, but never silently: the reason a run stopped early used to be this line, so it
+	// stays visible even though it no longer decides anything.
+	console.info(`⚠️ ${WATCH_FAILED_NOTE}: ${git_gh_helpers.get_error_message_with_stderr(error)}`)
+}
+
+async function watch_before_polling(branch_name: string): Promise<void> {
+	console.info('')
+	console.info('📊 Watching PR checks...')
+
+	try {
+		await git_gh_command.pr_checks_watch(branch_name)
+	} catch (error) {
+		await handle_watch_failure(branch_name, error)
+	}
+}
+
 async function run_checks(input: {
 	branch_name: string
 	is_skip_watch: boolean
 }): Promise<PrStateSnapshot> {
-	if (!input.is_skip_watch) {
-		console.info('')
-		console.info('📊 Watching PR checks...')
-		await git_gh_command.pr_checks_watch(input.branch_name)
-	}
+	if (!input.is_skip_watch) await watch_before_polling(input.branch_name)
 
 	return await git_pr_checks.wait_for_pr_success(input.branch_name)
 }
@@ -259,6 +319,8 @@ const git_pr_followup = {
 
 export {
 	git_pr_followup,
+	WATCH_FAILED_NOTE,
+	run_checks,
 	build_issue_url,
 	parse_repo_name,
 	is_blank_issue_body,
