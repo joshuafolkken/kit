@@ -13,6 +13,7 @@ const PLAN_JSON = '{"number":891,"state":"CLOSED"}'
 const OTHER_REPO = 'joshuafolkken/app-kit'
 const ISSUE_TITLE = 'Fix login bug'
 const RATE_LIMITED_STATUS = 429
+const RATE_LIMIT_MESSAGE = 'API rate limit exceeded'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -53,7 +54,7 @@ describe('issue_view_json_classified — telling the two failures apart', () => 
 
 	// The distinction is the point: a rate limit is a gap, because the issue may well exist.
 	it('reports a rate-limited read as unreadable', async () => {
-		mocked_command.mockRejectedValueOnce(new Error('API rate limit exceeded'))
+		mocked_command.mockRejectedValueOnce(new Error(RATE_LIMIT_MESSAGE))
 		mocked_status.mockResolvedValueOnce(RATE_LIMITED_STATUS)
 
 		await expect(git_gh_issue.issue_view_json_classified('891', 'state')).resolves.toEqual({
@@ -155,7 +156,7 @@ describe('issue_get_plan_fields_classified', () => {
 // answers with this repository's issue of the same number (joshuafolkken/kit#903).
 describe('issue_get_title — which repository it reads', () => {
 	it('reads the current repository when no repo is given', async () => {
-		mocked_command.mockResolvedValueOnce(`"${ISSUE_TITLE}"`)
+		mocked_command.mockResolvedValueOnce(ISSUE_TITLE)
 
 		await expect(git_gh_issue.issue_get_title('903')).resolves.toBe(ISSUE_TITLE)
 		expect(mocked_command).toHaveBeenCalledWith([
@@ -170,7 +171,7 @@ describe('issue_get_title — which repository it reads', () => {
 	})
 
 	it('reads the named repository when one is given', async () => {
-		mocked_command.mockResolvedValueOnce(`"${ISSUE_TITLE}"`)
+		mocked_command.mockResolvedValueOnce(ISSUE_TITLE)
 
 		await git_gh_issue.issue_get_title('431', OTHER_REPO)
 
@@ -185,5 +186,61 @@ describe('issue_get_title — which repository it reads', () => {
 			'--jq',
 			'.title',
 		])
+	})
+})
+
+// joshuafolkken/kit#993: the title went through a parser that stripped a leading and trailing `"`,
+// on the belief that `gh` wrapped a `--jq`-extracted string. It does not — `--jq` unwraps the JSON
+// string itself — so the stripping ate a real character from any title that carried one, and the
+// notification for such an issue arrived with its first or last character missing.
+describe('issue_get_title — a quote in the title is data, not JSON wrapping', () => {
+	const QUOTED_FIRST_WORD = '"queue" should stop at the first failure'
+	const QUOTED_LAST_WORD = 'the flag is called "--merge"'
+	const FULLY_QUOTED = '"Close the completion gate"'
+
+	it('keeps a title that starts with a quote', async () => {
+		mocked_command.mockResolvedValueOnce(QUOTED_FIRST_WORD)
+
+		await expect(git_gh_issue.issue_get_title('993')).resolves.toBe(QUOTED_FIRST_WORD)
+	})
+
+	it('keeps a title that ends with a quote', async () => {
+		mocked_command.mockResolvedValueOnce(QUOTED_LAST_WORD)
+
+		await expect(git_gh_issue.issue_get_title('993')).resolves.toBe(QUOTED_LAST_WORD)
+	})
+
+	it('keeps a title that both starts and ends with a quote', async () => {
+		mocked_command.mockResolvedValueOnce(FULLY_QUOTED)
+
+		await expect(git_gh_issue.issue_get_title('993')).resolves.toBe(FULLY_QUOTED)
+	})
+})
+
+// The empty answer stays an answer: `undefined` is what tells `josh notify` it has no title to show,
+// and that half of the contract is unchanged by the fix above.
+describe('issue_get_title — an empty answer is still not a title', () => {
+	it('returns undefined for an empty answer', async () => {
+		mocked_command.mockResolvedValueOnce('')
+
+		await expect(git_gh_issue.issue_get_title('993')).resolves.toBeUndefined()
+	})
+
+	it('returns undefined for a whitespace-only answer', async () => {
+		mocked_command.mockResolvedValueOnce(' '.repeat(3))
+
+		await expect(git_gh_issue.issue_get_title('993')).resolves.toBeUndefined()
+	})
+
+	it('returns undefined when the read itself failed', async () => {
+		mocked_command.mockRejectedValueOnce(new Error(RATE_LIMIT_MESSAGE))
+
+		await expect(git_gh_issue.issue_get_title('993')).resolves.toBeUndefined()
+	})
+
+	it('trims surrounding whitespace off a title', async () => {
+		mocked_command.mockResolvedValueOnce(`  ${ISSUE_TITLE}  `)
+
+		await expect(git_gh_issue.issue_get_title('993')).resolves.toBe(ISSUE_TITLE)
 	})
 })

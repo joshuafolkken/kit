@@ -1,15 +1,15 @@
 import { has_stderr_field } from './git-gh-exec'
 
+// One optional string answer from `gh`. Every caller asks with `--jq`, which unwraps the JSON
+// string itself, so the value arrives raw and there is nothing to unquote — this used to strip a
+// leading and trailing `"` anyway, which ate real characters from any answer that legitimately
+// carried them. A title of `"queue" should stop at the first failure` reached Telegram as
+// `queue" should stop at the first failure` (joshuafolkken/kit#993). Trimming and the empty answer
+// are the whole contract.
 function parse_pr_state_string(result: string): string | undefined {
 	const trimmed = result.trim()
 
-	if (trimmed.length === 0) {
-		return undefined
-	}
-
-	const without_quotes = trimmed.replaceAll(/(?:^")|(?:"$)/gu, '')
-
-	return without_quotes.length > 0 ? without_quotes : undefined
+	return trimmed.length > 0 ? trimmed : undefined
 }
 
 function parse_number_output(result: string): number | undefined {

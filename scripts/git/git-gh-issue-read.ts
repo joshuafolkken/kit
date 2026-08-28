@@ -35,7 +35,8 @@ async function issue_view_field(
 	}
 }
 
-// `gh` quotes a `--jq`-extracted string, and an empty answer is not a title.
+// A `--jq`-extracted string arrives raw — `gh` does not quote it — and an empty answer is not a
+// title (joshuafolkken/kit#993).
 //
 // `repo` reads the title of an issue in another repository — what `josh notify` needs when the
 // `--issue-url` it was given points outside the repository the session runs in
