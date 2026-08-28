@@ -63,6 +63,10 @@ describe('PR_CHECKS_WATCH_TIMEOUT_MS', () => {
 	})
 })
 
+const FULLY_QUOTED = '"hello"'
+const QUOTED_FIRST_WORD = '"queue" should stop at the first failure'
+const QUOTED_LAST_WORD = 'the flag is called "--merge"'
+
 describe('parse_pr_state_string', () => {
 	it('returns trimmed string for a valid value', () => {
 		expect(parse_pr_state_string('  hello  ')).toBe('hello')
@@ -72,8 +76,8 @@ describe('parse_pr_state_string', () => {
 		expect(parse_pr_state_string('OPEN')).toBe('OPEN')
 	})
 
-	it('strips quotes and trims surrounding whitespace', () => {
-		expect(parse_pr_state_string('  "main"  ')).toBe('main')
+	it('trims surrounding whitespace without touching the quotes inside it', () => {
+		expect(parse_pr_state_string('  "main"  ')).toBe('"main"')
 	})
 
 	it('returns undefined for empty string', () => {
@@ -84,12 +88,24 @@ describe('parse_pr_state_string', () => {
 		expect(parse_pr_state_string(' '.repeat(3))).toBeUndefined()
 	})
 
-	it('strips surrounding double quotes', () => {
-		expect(parse_pr_state_string('"hello"')).toBe('hello')
+	// joshuafolkken/kit#993: every caller asks with `--jq`, which unwraps the JSON string itself, so
+	// a quote that arrives is data. Stripping it ate a real character from any answer carrying one.
+	it('keeps surrounding double quotes, which are data rather than JSON wrapping', () => {
+		expect(parse_pr_state_string(FULLY_QUOTED)).toBe(FULLY_QUOTED)
 	})
 
-	it('returns undefined when only quotes remain after stripping', () => {
-		expect(parse_pr_state_string('""')).toBeUndefined()
+	it('keeps a leading quote', () => {
+		expect(parse_pr_state_string(QUOTED_FIRST_WORD)).toBe(QUOTED_FIRST_WORD)
+	})
+
+	it('keeps a trailing quote', () => {
+		expect(parse_pr_state_string(QUOTED_LAST_WORD)).toBe(QUOTED_LAST_WORD)
+	})
+
+	// A pair of quotes is two real characters once nothing is stripped, so the answer is no longer
+	// empty and no longer collapses to undefined.
+	it('returns a bare quote pair rather than undefined', () => {
+		expect(parse_pr_state_string('""')).toBe('""')
 	})
 })
 
@@ -192,6 +208,31 @@ describe('git_gh_command.pr_get_url', () => {
 		const url = await git_gh_command.pr_get_url(FEATURE_BRANCH)
 
 		expect(url).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#993 removed the unquoting from the parser these two share with the issue-title
+// read. Neither ever received a quoted answer — both ask with `--jq` — so both must be unchanged by
+// it, which is what the Issue asked to be confirmed rather than assumed.
+describe('the other callers of the shared parser are unaffected', () => {
+	const REPO_NAME = 'joshuafolkken/kit'
+
+	it('still trims whitespace off a PR url', async () => {
+		mocked_exec.mockResolvedValue(`  ${GITHUB_PR_URL}\n`)
+
+		await expect(git_gh_command.pr_get_url(FEATURE_BRANCH)).resolves.toBe(GITHUB_PR_URL)
+	})
+
+	it('reads a repository name unchanged', async () => {
+		mocked_exec.mockResolvedValue(REPO_NAME)
+
+		await expect(git_gh_command.repo_get_name_with_owner()).resolves.toBe(REPO_NAME)
+	})
+
+	it('still trims whitespace off a repository name', async () => {
+		mocked_exec.mockResolvedValue(`${REPO_NAME}\n`)
+
+		await expect(git_gh_command.repo_get_name_with_owner()).resolves.toBe(REPO_NAME)
 	})
 })
 
