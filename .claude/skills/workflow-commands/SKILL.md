@@ -151,6 +151,69 @@ requirement; building a second is the clone `CLAUDE.md` prohibits.
 
 Canonical reference: `prompts/collaboration-workflow/delegation.md`.
 
+## 2c. The `owner/repo#` prefix — which repository the run acts on
+
+Every entry point takes the target repository in front of the Issue reference. Without it the target
+is the repository the session runs in, which is why a conclusion reached in one repository could only
+be filed into that same one and a person had to say the destination out loud every time
+(joshuafolkken/kit#904).
+
+```
+kickoff joshuafolkken/kit#412
+kickoff kit#new
+kickoff kit#new "<title>"
+fullrun joshuafolkken/app-kit#12
+halfrun kit#412
+queue kit#1 kit#2
+epicrun joshuafolkken/kit#858
+```
+
+- **One definition, every entry point.** `epicrun` already accepted `owner/repo#E`; the other four
+  were left behind. The prefix goes where `#N` goes, so no new keyword is added, and `owner/repo#new`
+  stands in the same slot as `owner/repo#N`.
+- **A short name expands by prefixing the session repository's owner** — `gh repo view --json owner
+  --jq .owner.login` — and **never by searching kit#869's map**, which answers where a checkout is
+  rather than which repository is meant. A short name therefore satisfies the first-party test (owner
+  equality) by construction, and a repository that is not checked out here is still a valid `kickoff`
+  target. A name that does not exist fails as `gh` not found: report it, never read it as a near-miss
+  for another name.
+- **An explicit owner that is not the session's is a third-party target, and it stops the run.** The
+  claim above covers short names only; `fullrun <other-owner>/repo#12` names a tracker we do not own,
+  and every write there — Issue, comment, PR — is Tier C (`CLAUDE.md` → "Third-party repositories are
+  Tier C"). Typing the prefix is not the explicit instruction that rule requires. **Send a
+  `confirmation` Telegram and stop — that is the whole action here**: nothing has been produced yet,
+  so there is no finding to record under `## Upstream candidate` and no draft to prepare; that
+  procedure belongs to an upstream defect found mid-run. Being able to pass `-R` is not
+  authorization.
+- **No prefix leaves the behavior exactly as it was** — the target is the session's repository.
+- **`kickoff` needs no checkout**: give every `gh` call `-R <owner/repo>`, reads included — a
+  `gh issue view` without it silently plans against this repository's issue of that number — and
+  never clone. The one exception is the split path's epic, since `pnpm josh epic` only writes the
+  repository it runs in — run it in that repository's checkout, or fall back to `gh label create
+  "epic" … -R` followed by `gh issue create --label epic -R`, and report that `epic:check` could not
+  be run. **The promote arm has no such fallback**: `--promote` writes
+  only its own repository too, and creating an epic instead would leave `#N` neither promoted nor
+  tracked, so with no checkout there, file the children and stop.
+- **The implementing entries require a checkout and never create one — when the target is another
+  repository.** A prefix naming the session's own repository changes nothing: `fullrun kit#412` in
+  the kit checkout behaves exactly as `fullrun #412`, stash step included. Otherwise resolve the
+  checkout from `pnpm josh doctor`; **no checkout there, or a tree that is not clean, stops the run**
+  with a `confirmation` Telegram — cloning decides the layout of someone's machine for them, and a
+  dirty tree holds work that is not yours to stash (each entry's own "stash what is in the tree" step
+  covers the session's repository, never someone else's checkout). Otherwise the commands that act
+  on the target, from `git switch main && git pull` to `pnpm josh followup --merge`, execute in that
+  checkout — **a command naming a different repository still runs where that repository is**, which
+  is why a cross-repository `into` insertion runs in the epic's checkout (§2a).
+- **`epicrun` is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,
+  not where its children are implemented. Its state is read through `gh --repo`, so that repository
+  needs no checkout and a missing or dirty one never stops the launch. The checkout rules bind each
+  child at implementation time, against **that child's** repository, and which session runs which
+  child stays "Concurrency" in `epicrun.md` — one session per repository.
+- **Independent of `into <target>`**: this says which repository the run acts on, `into` says which
+  epic the artifact joins, and both may need qualifying in one line.
+
+Canonical reference: `prompts/collaboration-workflow/target-repo.md`.
+
 ## 3. What stays resident, and what is read from here
 
 **A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**
