@@ -112,9 +112,17 @@ function resolve_cross_repo(
 	return publish_verdict(blocker.repo, read_target_version(blocker.repo))
 }
 
+// The owner half of an `owner/repo`, in the one place that splits it. Read straight off the string
+// rather than through a URL parse: the callers need something to hand `is_same_owner_repo`, and a
+// repository name that does not parse fails there rather than here.
+function owner_of(repo: string): string {
+	return repo.split('/', 1)[0] ?? ''
+}
+
 // Whether a repository may be depended on at all. Inherited from joshuafolkken/kit#869's
 // restriction rather than restated: a child in a repository this owner does not own is not something
-// to wait for, dispatch to, or write into.
+// to wait for, dispatch to, or write into — nor, since joshuafolkken/kit#1014, an issue reference to
+// resolve: a body that mentions a third party's issue must not send this command to their tracker.
 function is_same_owner_repo(repo: string, current_owner: string): boolean {
 	const identity = repo_origin.parse_origin_url(`https://${repo_origin.GITHUB_HOST}/${repo}`)
 	if (identity === undefined) return false
@@ -128,6 +136,7 @@ const epic_cross_repo = {
 	package_name_for,
 	is_published,
 	resolve_cross_repo,
+	owner_of,
 	is_same_owner_repo,
 }
 

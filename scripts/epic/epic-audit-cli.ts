@@ -4,9 +4,15 @@ import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
-import { epic_audit_logic, type AuditFinding } from './epic-audit'
+import {
+	epic_audit_logic,
+	type AuditFinding,
+	type IssueReference,
+	type ReferenceState,
+} from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
 import { epic_audit_report, type AuditResult } from './epic-audit-report'
+import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import { epic_graph } from './epic-graph'
 import { epic_issue } from './epic-issue'
@@ -20,10 +26,6 @@ const ARGV_OFFSET = 2
 const SEARCH_LIMIT = 50
 const USAGE = 'Usage: josh epic:audit <epic-number>'
 const PARENT_MARKERS: ReadonlyArray<string> = ['親:', 'Parent:', '親：']
-const EXTERNAL_NOTICE =
-	'Note: this epic tracks children in other repositories, which are not read yet — see joshuafolkken/kit#864.'
-
-type ReferenceState = 'OPEN' | 'CLOSED' | 'UNRESOLVED'
 
 const searched_issue_schema = z.object({ number: z.number(), body: z.string().nullable() })
 
@@ -52,36 +54,54 @@ async function attach_bodies(
 	return children.map((child, index) => ({ ...child, body: bodies[index] }))
 }
 
-// Whether each referenced issue is open, closed, or absent. Only numbers actually cited are probed,
+// Whether each referenced issue is open, closed, or absent. Only issues actually cited are probed,
 // so an epic whose children cite nothing costs no extra calls.
+//
+// Each one is asked of the repository whose body named it, through the same `epic_fetch.scope_for`
+// every other read goes through, and the answers are keyed by that repository and number both. Asked
+// unqualified, a cross-repository child's `#40` was answered by *this* repository's issue 40 — a
+// different issue, whose state then decided the warning (joshuafolkken/kit#1014).
 async function resolve_reference_states(
-	referenced: ReadonlyArray<number>,
-): Promise<Map<number, ReferenceState>> {
+	referenced: ReadonlyArray<IssueReference>,
+	current_repo: string,
+): Promise<Map<string, ReferenceState>> {
 	const fetched = await Promise.all(
-		referenced.map(async (issue_number) => await epic_fetch.fetch_child(issue_number, '')),
+		referenced.map(
+			async (reference) =>
+				await epic_fetch.fetch_child(
+					reference.number,
+					reference.repo,
+					epic_fetch.scope_for(reference.repo, current_repo),
+				),
+		),
 	)
 
 	return new Map(
-		referenced.map((issue_number, index) => [issue_number, fetched[index]?.state ?? 'UNRESOLVED']),
+		referenced.map((reference, index) => [
+			epic_audit_logic.key_of(reference),
+			fetched[index]?.state ?? 'UNRESOLVED',
+		]),
 	)
 }
 
-// The issue numbers the children cite that are not children themselves — the ones check 3 resolves.
-// `Set#difference` would say this in one call, but the ES2023 lib this project targets predates it.
-function outside_references(children: ReadonlyArray<AuditChild>): Array<number> {
-	const own = new Set(children.map((child) => child.number))
+// The issues the children cite that are not children themselves — the ones check 3 resolves.
+//
+// A reference in a repository this owner does not own is left out rather than probed, inheriting
+// joshuafolkken/kit#869's restriction exactly as `fetch_external_children` does: a body mentioning a
+// third party's issue must not send this command to their tracker.
+function outside_references(
+	children: ReadonlyArray<AuditChild>,
+	current_owner: string,
+): Array<IssueReference> {
+	const own = new Set(children.map((child) => epic_audit_logic.key_of(child)))
 	const cited = children.flatMap((child) =>
-		epic_audit_logic.parse_references(child.body ?? '', child.repo),
+		epic_audit_logic.parse_issue_references(child.body ?? '', child.repo),
 	)
-	const outside = new Set<number>()
 
-	for (const issue_number of cited) {
-		if (!own.has(issue_number)) outside.add(issue_number)
-	}
-
-	const result: Array<number> = [...outside]
-
-	return result
+	return epic_audit_logic
+		.unique_references(cited)
+		.filter((reference) => !own.has(epic_audit_logic.key_of(reference)))
+		.filter((reference) => epic_cross_repo.is_same_owner_repo(reference.repo, current_owner))
 }
 
 function has_parent_marker(line: string): boolean {
@@ -93,30 +113,52 @@ function has_parent_marker(line: string): boolean {
 // Both halves must be on the *same line*. An issue parented to a different epic routinely backlinks
 // this one elsewhere in its body, and matching the marker and the number independently reported
 // every such issue as an orphan.
-function claims_parent(body: string | null, epic_number: number): boolean {
+//
+// The number is read through the same reference parse the checks use, so `親: owner/other#858` names
+// that repository's epic and not this one's (joshuafolkken/kit#1014).
+function names_this_epic(line: string, epic_number: number, repo: string): boolean {
+	return epic_audit_logic
+		.parse_issue_references(line, repo)
+		.some((reference) => reference.repo === repo && reference.number === epic_number)
+}
+
+function claims_parent(body: string | null, epic_number: number, repo: string): boolean {
 	return (body ?? '')
 		.split('\n')
-		.some((line) => has_parent_marker(line) && line.includes(`#${String(epic_number)}`))
+		.some((line) => has_parent_marker(line) && names_this_epic(line, epic_number, repo))
 }
 
 // Open issues naming this epic as their parent. Searched rather than derived, because an orphan is
 // by definition absent from the one list that would otherwise name it. A failed search yields
 // nothing: an unavailable search is not evidence of an orphan.
-async function find_claiming_issues(epic_number: number): Promise<Array<number>> {
+async function find_claiming_issues(epic_number: number, repo: string): Promise<Array<number>> {
 	const raw = await git_gh_command.issue_search_body(`#${String(epic_number)}`, SEARCH_LIMIT)
 	if (raw === undefined) return []
 
 	return parse_json_array_safe(raw, searched_issue_schema)
-		.filter((issue) => issue.number !== epic_number && claims_parent(issue.body, epic_number))
+		.filter((issue) => issue.number !== epic_number && claims_parent(issue.body, epic_number, repo))
 		.map((issue) => issue.number)
+}
+
+// The task-list numbers that name issues in *this* repository. `snapshot.child_numbers` appends the
+// cross-repository children's numbers, and an orphan is recognized by number alone — so a local
+// issue whose number collided with a child in another repository was accepted as tracked and never
+// reported (joshuafolkken/kit#1014). Read with the same parser `epic_fetch` reads the local rows
+// with, which never matches a `- [ ] owner/repo#N` row.
+function locally_tracked(snapshot: EpicSnapshot): Array<number> {
+	return git_epic_parse.parse_task_list_issue_numbers(snapshot.body)
 }
 
 // Everything read from GitHub that the checks need.
 interface AuditInput {
 	epic_number: number
+	// The `owner/repo` the command runs in. A reference is written bare when it names an issue here
+	// and `owner/repo#N` when it does not, so the reader is never handed a number that resolves
+	// somewhere else (joshuafolkken/kit#1014).
+	repo: string
 	children: ReadonlyArray<AuditChild>
 	tracked: ReadonlyArray<number>
-	reference_states: ReadonlyMap<number, ReferenceState>
+	reference_states: ReadonlyMap<string, ReferenceState>
 	claiming: ReadonlyArray<number>
 	anomalies: ReadonlyArray<AuditFinding>
 	// Computed before the implicit-dependency check so that check can skip the pairs already reported
@@ -130,8 +172,16 @@ function audit(input: AuditInput): AuditResult {
 	return epic_audit_report.build_result([
 		...input.anomalies,
 		...input.contradictions,
-		...epic_audit_checks.find_implicit_dependencies(input.children, input.contradictions),
-		...epic_audit_checks.find_unresolved_references(input.children, input.reference_states),
+		...epic_audit_checks.find_implicit_dependencies(
+			input.children,
+			input.repo,
+			input.contradictions,
+		),
+		...epic_audit_checks.find_unresolved_references(
+			input.children,
+			input.reference_states,
+			input.repo,
+		),
 		...epic_audit_checks.find_orphans(input.tracked, input.claiming),
 	])
 }
@@ -180,16 +230,19 @@ async function gather(epic_number: number, repo: string): Promise<AuditInput | u
 		repo,
 	)
 
-	if (snapshot.has_external_children) console.info(EXTERNAL_NOTICE)
+	if (snapshot.has_external_children) console.info(epic_next.EXTERNAL_NOTICE)
+
+	const referenced = outside_references(children, epic_cross_repo.owner_of(repo))
 
 	return {
 		epic_number,
+		repo,
 		children,
-		tracked: snapshot.child_numbers,
-		reference_states: await resolve_reference_states(outside_references(children)),
-		claiming: await find_claiming_issues(epic_number),
+		tracked: locally_tracked(snapshot),
+		reference_states: await resolve_reference_states(referenced, repo),
+		claiming: await find_claiming_issues(epic_number, repo),
 		anomalies: [...unreadable_findings(snapshot), ...graph_anomalies(snapshot, children)],
-		contradictions: epic_audit_checks.find_order_contradictions(children),
+		contradictions: epic_audit_checks.find_order_contradictions(children, repo),
 	}
 }
 
@@ -229,6 +282,7 @@ const epic_audit_cli = {
 	unreadable_findings,
 	claims_parent,
 	find_claiming_issues,
+	locally_tracked,
 	audit,
 	run,
 	main,
@@ -236,5 +290,5 @@ const epic_audit_cli = {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export type { AuditInput, ReferenceState }
+export type { AuditInput }
 export { epic_audit_cli }

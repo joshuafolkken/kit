@@ -26,18 +26,23 @@ interface GraphAnomaly {
 	message: string
 }
 
-// A child's identity across the whole epic. Issue numbers are unique per repository, not globally:
+// An issue's identity across the whole epic. Issue numbers are unique per repository, not globally:
 // an epic tracking both `#7` and `app-kit#7` has two different children, and keying by number alone
 // had them overwrite each other — and had one's blockers resolve against the other
-// (joshuafolkken/kit#864).
+// (joshuafolkken/kit#864). The audit keys the issues its children *cite* the same way, through this
+// one function rather than a second spelling of it (joshuafolkken/kit#1014).
+function reference_key(repo: string, issue_number: number): string {
+	return `${repo}#${String(issue_number)}`
+}
+
 function key_of(child: EpicChild): string {
-	return `${child.repo}#${String(child.number)}`
+	return reference_key(child.repo, child.number)
 }
 
 // A blocker number, as a key in the repository that declared it. `blockedBy` numbers are issue
 // numbers in the blocked child's own repository.
 function blocker_key(child: EpicChild, blocker: number): string {
-	return `${child.repo}#${String(blocker)}`
+	return reference_key(child.repo, blocker)
 }
 
 // The children indexed by identity, for the lookups the walks below do repeatedly.
@@ -173,6 +178,7 @@ function find_anomalies(
 }
 
 const epic_graph = {
+	reference_key,
 	key_of,
 	blocker_key,
 	index_children,
