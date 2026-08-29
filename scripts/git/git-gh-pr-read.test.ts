@@ -16,7 +16,11 @@ import {
 	rest_pull,
 	rest_pull_page,
 } from './git-gh-pr-fixture'
-import { forget_pr_numbers, git_gh_pr_read } from './git-gh-pr-read'
+import {
+	forget_pr_numbers,
+	git_gh_pr_read,
+	UNREADABLE_PULL_REQUEST_MESSAGE,
+} from './git-gh-pr-read'
 
 // joshuafolkken/kit#1027: every read below went through `gh pr view`, which is GraphQL and answered
 // 403 in a cloud session. `gh pr view` also accepted a branch name where REST is keyed by number, so
@@ -101,10 +105,11 @@ describe('the branch to pull request number resolution', () => {
 	})
 })
 
-// The two answers the reads deliberately fold together, asserted side by side. `require_pr_number`
-// tells them apart (joshuafolkken/kit#1048) and nothing here does: every reader below answers its own
-// empty value for both, which is the contract `gh pr view` had and the one `git-pr.ts`,
-// `git-conflict.ts` and the two comment readers are written against.
+// The two answers the *display* reads deliberately fold together, asserted side by side.
+// `require_pr_number` and `pr_exists` tell them apart (joshuafolkken/kit#1048,
+// joshuafolkken/kit#1043); every reader below answers its own empty value for both, which is the
+// contract `gh pr view` had and the one `git-conflict.ts` and the two comment readers are written
+// against.
 describe.each([
 	{
 		name: 'a branch with no pull request',
@@ -120,10 +125,6 @@ describe.each([
 	},
 ])('$name answers exactly what gh pr view answered', ({ arrange }) => {
 	beforeEach(arrange)
-
-	it('reports pr_exists as false', async () => {
-		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).resolves.toBe(false)
-	})
 
 	it('reports pr_get_number as undefined', async () => {
 		await expect(git_gh_pr_read.pr_get_number(PR_BRANCH)).resolves.toBeUndefined()
@@ -142,13 +143,44 @@ describe.each([
 	})
 })
 
-// A 200 carrying an API message object rather than a listing is a failed read too — `parse_rest_pulls`
-// throws rather than degrading it into an empty listing, which `pr_exists` would read as an absence.
-describe('a response that is not a listing folds into the same answers', () => {
-	it('reports pr_exists as false when gh answers something other than a listing', async () => {
-		stub({ [pr_lookup_path()]: RATE_LIMITED })
+// **`pr_exists` is the one reader that does not fold**, because `git-pr.ts` acts on `false` by
+// *opening* a pull request: during a rate limit that used to mean creating a second one on a branch
+// that already had it, caught only by `pr_create`'s 422 recovery (joshuafolkken/kit#1043).
+describe('pr_exists tells an absent pull request from an unreadable lookup', () => {
+	it('answers false only when the listing came back empty', async () => {
+		stub(NO_PULL_REQUEST)
 
 		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).resolves.toBe(false)
+	})
+
+	it('throws when the lookup itself failed', async () => {
+		mocked_api.mockRejectedValue(gh_failure())
+
+		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).rejects.toThrow(
+			UNREADABLE_PULL_REQUEST_MESSAGE,
+		)
+	})
+
+	// A 200 carrying an API message object rather than a listing is a failed read too —
+	// `parse_rest_pulls` throws rather than degrading it into an empty listing.
+	it('throws when gh answers something other than a listing', async () => {
+		stub({ [pr_lookup_path()]: RATE_LIMITED })
+
+		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).rejects.toThrow(
+			UNREADABLE_PULL_REQUEST_MESSAGE,
+		)
+	})
+
+	// gh's own reason is what makes the diagnosis actionable, so it travels rather than being
+	// replaced by this file's message.
+	it('carries gh’s own failure as the cause', async () => {
+		const failure = gh_failure()
+
+		mocked_api.mockRejectedValue(failure)
+
+		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).rejects.toThrow(
+			expect.objectContaining({ cause: failure }) as Error,
+		)
 	})
 })
 

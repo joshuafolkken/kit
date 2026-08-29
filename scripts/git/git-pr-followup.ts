@@ -181,9 +181,15 @@ function reads_as_empty_rollup(raw_json: string): boolean {
 }
 
 // The read throws rather than answering `undefined`, so the `catch` is its only failure path.
+//
+// The **checks** half, not the whole snapshot: the question here is about `statusCheckRollup` alone,
+// and reading the review listing to answer it paged a whole conversation for nothing
+// (joshuafolkken/kit#1043).
 async function has_no_checks(branch_name: string): Promise<boolean> {
 	try {
-		return reads_as_empty_rollup(await git_gh_command.pr_get_state_snapshot(branch_name))
+		const checks = await git_gh_command.pr_get_checks_snapshot(branch_name)
+
+		return reads_as_empty_rollup(checks.snapshot_json)
 	} catch {
 		// The read refines the swallow; it is not a gate of its own. An answer it cannot get is not
 		// evidence of anything, so prefer falling through — the poll below reads the same state.

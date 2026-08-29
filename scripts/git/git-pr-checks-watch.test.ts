@@ -21,6 +21,7 @@ import {
 	git_pr_checks_watch,
 	NO_CHECKS_MESSAGE,
 	PR_CHECKS_WATCH_TIMEOUT_MS,
+	SHOULD_NEVER_READ_REVIEW_DECISION,
 } from './git-pr-checks-watch'
 
 // `gh pr checks --watch` streamed, and REST cannot stream (joshuafolkken/kit#1028). What the two
@@ -30,7 +31,10 @@ import {
 // Only the loop is replaced. `is_pr_checks_timeout` and `compute_max_attempts` stay real, because
 // the message the watch reads a timeout by is exactly what a stub would be free to get wrong.
 vi.mock('./git-gh-pr-snapshot', () => ({
-	git_gh_pr_snapshot: { pr_get_state_snapshot: vi.fn() },
+	git_gh_pr_snapshot: {
+		pr_get_checks_snapshot: vi.fn(),
+		pr_get_review_decision: vi.fn(),
+	},
 }))
 
 vi.mock('./git-pr-checks', async (import_original) => {
@@ -42,7 +46,19 @@ vi.mock('./git-pr-checks', async (import_original) => {
 })
 
 const wait = vi.mocked(wait_for_pr_success)
-const fetch_state = vi.mocked(git_gh_pr_snapshot.pr_get_state_snapshot)
+const fetch_checks = vi.mocked(git_gh_pr_snapshot.pr_get_checks_snapshot)
+const fetch_review = vi.mocked(git_gh_pr_snapshot.pr_get_review_decision)
+
+const PR_NUMBER = 972
+
+// The three-request read the watch makes, with no review listing behind it — the point of
+// `SHOULD_NEVER_READ_REVIEW_DECISION` (joshuafolkken/kit#1043).
+function stub_rollup(rollup: ReadonlyArray<Record<string, unknown>>): void {
+	fetch_checks.mockResolvedValue({
+		pr_number: PR_NUMBER,
+		snapshot_json: JSON.stringify({ statusCheckRollup: rollup }),
+	})
+}
 
 const BRANCH = 'feature-branch'
 const READ_FAILED = 'gh unavailable'
@@ -140,6 +156,14 @@ describe('pr_checks_watch — what it asks the poll loop for', () => {
 		})
 	})
 
+	// The verdict never reads `review_decision`, so the fetcher must not spend a request on it.
+	it('tells the fetcher never to read the review listing', () => {
+		expect(CHECKS_SETTLED_EVALUATOR.should_read_review_decision).toBe(
+			SHOULD_NEVER_READ_REVIEW_DECISION,
+		)
+		expect(SHOULD_NEVER_READ_REVIEW_DECISION(EMPTY_SNAPSHOT)).toBe(false)
+	})
+
 	// No new loop is written here — that is the whole point of the conversion.
 	it('reuses the existing poll loop rather than driving gh', async () => {
 		await git_pr_checks_watch.pr_checks_watch(BRANCH)
@@ -157,7 +181,7 @@ describe('pr_checks_watch — the WatchResult contract', () => {
 	// was: `git-pr.ts` prints "CI still running" rather than failing the run.
 	it('reports a timeout when the poll runs out', async () => {
 		wait.mockRejectedValue(new Error(PR_CHECKS_TIMEOUT_MESSAGE))
-		fetch_state.mockResolvedValue(JSON.stringify({ statusCheckRollup: [{ name: E2E }] }))
+		stub_rollup([{ name: E2E }])
 
 		await expect(git_pr_checks_watch.pr_checks_watch(BRANCH)).resolves.toStrictEqual(TIMED_OUT)
 	})
@@ -181,22 +205,30 @@ describe('pr_checks_watch — the WatchResult contract', () => {
 // budget rather than on every poll is what gives a freshly opened pull request its two minutes.
 describe('fail_when_no_checks', () => {
 	it('throws when the rollup is still empty after the budget', async () => {
-		fetch_state.mockResolvedValue(JSON.stringify({ statusCheckRollup: [] }))
+		stub_rollup([])
 
 		await expect(fail_when_no_checks(BRANCH)).rejects.toThrow(NO_CHECKS_MESSAGE)
 	})
 
 	it('says nothing when the branch does have checks', async () => {
-		fetch_state.mockResolvedValue(JSON.stringify({ statusCheckRollup: [{ name: E2E }] }))
+		stub_rollup([{ name: E2E }])
 
 		await expect(fail_when_no_checks(BRANCH)).resolves.toBeUndefined()
+	})
+
+	// The question it asks is about the rollup, so the review listing is not read for it either.
+	it('reads no review listing to answer it', async () => {
+		stub_rollup([{ name: E2E }])
+		await fail_when_no_checks(BRANCH)
+
+		expect(fetch_review).not.toHaveBeenCalled()
 	})
 
 	// The watch reports a timeout only after this read agrees the branch does have checks, so a
 	// no-checks branch never comes back as `timed_out`.
 	it('turns a timed-out watch on a checkless branch into a failure', async () => {
 		wait.mockRejectedValue(new Error(PR_CHECKS_TIMEOUT_MESSAGE))
-		fetch_state.mockResolvedValue(JSON.stringify({ statusCheckRollup: [] }))
+		stub_rollup([])
 
 		await expect(git_pr_checks_watch.pr_checks_watch(BRANCH)).rejects.toThrow(NO_CHECKS_MESSAGE)
 	})
