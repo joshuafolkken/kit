@@ -12,13 +12,6 @@ function parse_pr_state_string(result: string): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined
 }
 
-function parse_number_output(result: string): number | undefined {
-	const parsed = Number(result.trim())
-	if (!Number.isFinite(parsed)) return undefined
-
-	return parsed
-}
-
 function is_pr_already_exists_message(error_message: string): boolean {
 	return error_message.toLowerCase().includes('already exists')
 }
@@ -43,7 +36,6 @@ function handle_pr_create_error(error: unknown): never {
 
 const git_gh_helpers = {
 	parse_pr_state_string,
-	parse_number_output,
 	is_pr_already_exists_message,
 	get_error_message_with_stderr,
 	handle_pr_create_error,

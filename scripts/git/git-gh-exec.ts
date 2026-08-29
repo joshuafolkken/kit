@@ -97,11 +97,14 @@ const JQ_FLAG = '--jq'
 // one value out of the response, so a caller wanting a single field gets the value rather than an
 // object to parse.
 //
-// `should_slurp` goes with `should_paginate`, and a caller that means to parse the result needs it:
-// `--paginate` alone emits one JSON document *per page*, so a two-page listing arrives as `[…][…]`,
-// which `JSON.parse` rejects. `--slurp` wraps the pages in one outer array instead. It is a separate
-// field rather than implied by `should_paginate` because gh refuses it alongside `--jq`, and a
-// caller reading a single value out of every page wants exactly that combination.
+// `should_slurp` goes with `should_paginate`, and **which endpoints need it is the whole point**:
+// gh merges the pages of an endpoint that answers a bare JSON *array* into one array, so a paged
+// comment listing arrives already parseable and must NOT slurp — `--slurp` would wrap it as
+// `[[…],[…]]`, which every array schema then rejects. An endpoint answering an *object* is the case
+// this field exists for: `--paginate` alone emits one document per page, so a two-page response
+// arrives as `{…}{…}`, which `JSON.parse` rejects, and `--slurp` wraps those pages in one outer
+// array instead. It is a separate field rather than implied by `should_paginate` for that reason,
+// and because gh refuses it alongside `--jq` (joshuafolkken/kit#1027).
 interface GhApiRequest {
 	path: string
 	method?: string

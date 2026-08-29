@@ -1,11 +1,19 @@
 import { git_command } from './git-command'
-import { git_gh_api_path } from './git-gh-api-path'
 import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec, has_stderr_field } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
-import { git_gh_repo } from './git-gh-repo'
+import { forget_pr_numbers, git_gh_pr_read } from './git-gh-pr-read'
+
+// The pull-request writes, plus the two reads the merge gate's own conversion still owns
+// (`pr_checks` and `pr_get_state_snapshot`, joshuafolkken/kit#1028). Everything else here reads
+// through REST and lives in `git-gh-pr-read.ts` (joshuafolkken/kit#1027).
 
 async function pr_create(title: string, body: string): Promise<string> {
 	const base = await git_command.get_default_branch()
+
+	// A branch whose previous pull request merged gets a second one, so the branch → number
+	// resolution the reads memoize is stale from here on. Clearing it is what keeps `pr_get_url`
+	// from answering with the merged pull request afterwards.
+	forget_pr_numbers()
 
 	try {
 		return await git_gh_exec.exec_gh_command([
@@ -35,100 +43,8 @@ async function pr_checks(branch_name: string): Promise<string> {
 	}
 }
 
-async function pr_exists(branch_name: string): Promise<boolean> {
-	try {
-		await git_gh_exec.exec_gh_command(['pr', 'view', branch_name])
-
-		return true
-	} catch {
-		return false
-	}
-}
-
 async function pr_checkout(pr_number: number): Promise<void> {
 	await git_gh_exec.exec_gh_command(['pr', 'checkout', String(pr_number)])
-}
-
-async function pr_head_reference(pr_number: number): Promise<string> {
-	return await git_gh_exec.exec_gh_command([
-		'pr',
-		'view',
-		String(pr_number),
-		'--json',
-		'headRefName',
-		'--jq',
-		'.headRefName',
-	])
-}
-
-async function pr_view(branch_name: string): Promise<string> {
-	try {
-		return await git_gh_exec.exec_gh_command([
-			'pr',
-			'view',
-			branch_name,
-			'--json',
-			'mergeable,mergeStateStatus,state',
-			'--jq',
-			'.',
-		])
-	} catch {
-		return ''
-	}
-}
-
-async function pr_get_url(branch_name: string): Promise<string | undefined> {
-	try {
-		const result: string = await git_gh_exec.exec_gh_command([
-			'pr',
-			'view',
-			branch_name,
-			'--json',
-			'url',
-			'--jq',
-			'.url',
-		])
-
-		return git_gh_helpers.parse_pr_state_string(result)
-	} catch {
-		return undefined
-	}
-}
-
-async function pr_get_body(branch_name: string): Promise<string | undefined> {
-	try {
-		const result: string = await git_gh_exec.exec_gh_command([
-			'pr',
-			'view',
-			branch_name,
-			'--json',
-			'body',
-			'--jq',
-			'.body',
-		])
-
-		return result.length > 0 ? result : undefined
-	} catch {
-		return undefined
-	}
-}
-
-async function pr_get_number(branch_name: string): Promise<number | undefined> {
-	try {
-		const result: string = await git_gh_exec.exec_gh_command([
-			'pr',
-			'view',
-			branch_name,
-			'--json',
-			'number',
-			'--jq',
-			'.number',
-		])
-
-		return git_gh_helpers.parse_number_output(result)
-	} catch {
-		return undefined
-	}
 }
 
 async function pr_get_state_snapshot(branch_name: string): Promise<string> {
@@ -139,43 +55,6 @@ async function pr_get_state_snapshot(branch_name: string): Promise<string> {
 		'--json',
 		'mergeStateStatus,reviewDecision,statusCheckRollup',
 	])
-}
-
-// `undefined` when the listing could not be read — a failed request, or a PR whose number could not
-// be resolved. Not `'[]'`, which every failure used to become.
-//
-// The two are the same string to a caller, and the callers are the merge gate: a rate limit arrived
-// as "no reviewer left a finding" and the PR merged with the gate never actually read
-// (joshuafolkken/kit#973). The direction is what makes it worse than the epic auto-close's version of
-// the same misread — that one only failed to close something.
-async function pr_get_review_comments(branch_name: string): Promise<string | undefined> {
-	const repo_name = await git_gh_repo.repo_get_name_with_owner()
-	const pr_number = await pr_get_number(branch_name)
-	if (repo_name === undefined || pr_number === undefined) return undefined
-
-	try {
-		return await git_gh_exec.exec_gh_api({
-			path: `${git_gh_api_path.repo_api_path(repo_name)}/pulls/${String(pr_number)}/comments`,
-		})
-	} catch {
-		return undefined
-	}
-}
-
-async function pr_get_comments(branch_name: string): Promise<string | undefined> {
-	try {
-		return await git_gh_exec.exec_gh_command([
-			'pr',
-			'view',
-			branch_name,
-			'--json',
-			'comments',
-			'--jq',
-			'.comments',
-		])
-	} catch {
-		return undefined
-	}
 }
 
 async function pr_comment(branch_name: string, body: string): Promise<string> {
@@ -190,18 +69,11 @@ async function pr_merge(branch_name: string): Promise<void> {
 }
 
 const git_gh_pr = {
+	...git_gh_pr_read,
 	pr_create,
 	pr_checks,
-	pr_exists,
 	pr_checkout,
-	pr_head_reference,
-	pr_view,
-	pr_get_url,
-	pr_get_body,
-	pr_get_number,
 	pr_get_state_snapshot,
-	pr_get_review_comments,
-	pr_get_comments,
 	pr_comment,
 	pr_merge,
 }
