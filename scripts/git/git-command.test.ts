@@ -191,3 +191,39 @@ describe('git_command.is_upstream_not_set_error', () => {
 		expect(git_command.is_upstream_not_set_error('not an error')).toBe(false)
 	})
 })
+
+// `gh pr checkout` resolved the pull request through GraphQL and then did exactly this
+// (joshuafolkken/kit#1029). Fetching the branch by name is what creates `refs/remotes/origin/<branch>`,
+// which is the only reason the plain `checkout` below it can resolve a branch that is not local yet.
+describe('git_command.fetch_branch', () => {
+	const PR_HEAD_BRANCH = 'dependabot/npm_and_yarn/vite-7'
+
+	// `gh pr checkout` fast-forwarded an already-local branch after its fetch; without it a repeat
+	// `josh sdp <pr>` run works on the commit the previous run left behind.
+	it('fast-forwards the branch onto its origin counterpart', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.merge_fast_forward(PR_HEAD_BRANCH)
+
+		expect(execa_mock.state.last_arguments).toStrictEqual([
+			'merge',
+			'--ff-only',
+			`origin/${PR_HEAD_BRANCH}`,
+		])
+	})
+
+	// The destination ref is named rather than left to origin's refspec: a `--single-branch` clone —
+	// which is every `actions/checkout` checkout — narrows that refspec to one branch, and a bare name
+	// would then update `FETCH_HEAD` alone, leaving the checkout and the fast-forward nothing to read.
+	it('fetches the named branch into its remote-tracking ref', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.fetch_branch(PR_HEAD_BRANCH)
+
+		expect(execa_mock.state.last_arguments).toStrictEqual([
+			'fetch',
+			'origin',
+			`+refs/heads/${PR_HEAD_BRANCH}:refs/remotes/origin/${PR_HEAD_BRANCH}`,
+		])
+	})
+})

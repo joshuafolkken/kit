@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_command, parse_pr_state_string } from './git-gh-command'
+import { find_request, PR_REPO, request_body } from './git-gh-pr-fixture'
 import { PR_CHECKS_WATCH_TIMEOUT_MS } from './git-pr-checks-watch'
 
 vi.mock('./git-gh-exec', () => ({
@@ -8,7 +9,6 @@ vi.mock('./git-gh-exec', () => ({
 		exec_gh_command_with_stdin: vi.fn(),
 		exec_gh_api: vi.fn(),
 	},
-	BODY_FILE_FLAG: '--body-file',
 	BODY_FROM_STDIN: '-',
 	has_stderr_field: vi.fn(),
 }))
@@ -23,6 +23,10 @@ vi.mock('./git-pr-checks-watch', () => ({
 vi.mock('./git-command', () => ({
 	git_command: {
 		get_default_branch: vi.fn(),
+		branch: vi.fn(),
+		fetch_branch: vi.fn(),
+		checkout: vi.fn(),
+		merge_fast_forward: vi.fn(),
 	},
 }))
 
@@ -31,21 +35,32 @@ const mocked_exec = vi.mocked(git_gh_exec.exec_gh_command)
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const { git_command } = await import('./git-command')
 const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
+const mocked_git = vi.mocked(git_command)
 
 const DEFAULT_BRANCH = 'main'
 const NETWORK_ERROR = 'network error'
 const PR_TITLE = 'title'
 const PR_BODY = 'body'
 const GITHUB_PR_URL = 'https://github.com/owner/repo/pull/1'
-const TITLE_WITH_SPACES = 'title with spaces'
-const BODY_WITH_SPECIAL = 'body with $special chars'
 const PR_NUMBER = 578
+const PULLS_PATH = 'repos/{owner}/{repo}/pulls'
+const HEAD_BRANCH = 'feature-branch'
 const REPO_NAME = 'joshuafolkken/kit'
 
 beforeEach(() => {
 	vi.clearAllMocks()
 	mocked_get_default_branch.mockResolvedValue(DEFAULT_BRANCH)
+	mocked_git.branch.mockResolvedValue(HEAD_BRANCH)
 })
+
+function created_pull_body(): Record<string, unknown> {
+	return request_body(
+		find_request(
+			mocked_api.mock.calls.map(([call]) => call),
+			PULLS_PATH,
+		),
+	)
+}
 
 describe('git_gh_command', () => {
 	it('exposes pr_merge as a callable function', () => {
@@ -109,55 +124,67 @@ describe('parse_pr_state_string', () => {
 	})
 })
 
+// `gh pr checkout` was measured to issue one `POST /graphql` before doing its git work, so the
+// resolution moved to the REST head read and the git half stayed git (joshuafolkken/kit#1029).
 describe('git_gh_command.pr_checkout', () => {
-	it('checks out the PR branch by number', async () => {
-		mocked_exec.mockResolvedValue('')
+	it('checks out the head branch the REST read answered, running no gh subcommand', async () => {
+		mocked_api.mockResolvedValue(
+			JSON.stringify({
+				number: PR_NUMBER,
+				head: { ref: HEAD_BRANCH, repo: { full_name: PR_REPO } },
+				base: { repo: { full_name: PR_REPO } },
+			}),
+		)
+
 		await git_gh_command.pr_checkout(PR_NUMBER)
 
-		expect(mocked_exec).toHaveBeenCalledWith(['pr', 'checkout', String(PR_NUMBER)])
+		expect(mocked_git.checkout).toHaveBeenCalledWith(HEAD_BRANCH)
+		expect(mocked_exec).not.toHaveBeenCalled()
 	})
 })
 
 describe('git_gh_command.pr_create — PR_ALREADY_EXISTS error handling', () => {
-	it('throws PR_ALREADY_EXISTS when error message contains "already exists"', async () => {
-		mocked_exec.mockRejectedValue(new Error('a pull request already exists for this branch'))
+	it('throws PR_ALREADY_EXISTS when the failure says a pull request already exists', async () => {
+		mocked_api.mockRejectedValue(new Error('a pull request already exists for this branch'))
 
 		await expect(git_gh_command.pr_create(PR_TITLE, PR_BODY)).rejects.toThrow('PR_ALREADY_EXISTS')
 	})
 
 	it('rethrows original error when error is unrelated to existing PR', async () => {
-		mocked_exec.mockRejectedValue(new Error(NETWORK_ERROR))
+		mocked_api.mockRejectedValue(new Error(NETWORK_ERROR))
 
 		await expect(git_gh_command.pr_create(PR_TITLE, PR_BODY)).rejects.toThrow(NETWORK_ERROR)
 	})
 })
 
-describe('git_gh_command.pr_create — base branch and label', () => {
-	it('uses the value from get_default_branch for --base', async () => {
+describe('git_gh_command.pr_create — the REST request', () => {
+	it('uses the value from get_default_branch as the base', async () => {
 		mocked_get_default_branch.mockResolvedValue('develop')
-		mocked_exec.mockResolvedValue(GITHUB_PR_URL)
+		mocked_api.mockResolvedValue(GITHUB_PR_URL)
 
 		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
 
-		expect(mocked_exec).toHaveBeenCalledWith(expect.arrayContaining(['--base', 'develop']))
+		expect(created_pull_body()).toMatchObject({ base: 'develop' })
 	})
 
-	it('does not include --label in the pr create command', async () => {
-		mocked_exec.mockResolvedValue(GITHUB_PR_URL)
+	// `gh pr create` inferred the head from the current branch; REST answers 422 without one.
+	it('names the current branch as the head the CLI used to infer', async () => {
+		mocked_api.mockResolvedValue(GITHUB_PR_URL)
 
 		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
 
-		expect(mocked_exec).toHaveBeenCalledWith(expect.not.arrayContaining(['--label']))
+		expect(created_pull_body()).toMatchObject({ head: HEAD_BRANCH })
 	})
 
-	it('passes title and body as separate array elements without shell escaping', async () => {
-		mocked_exec.mockResolvedValue(GITHUB_PR_URL)
+	// The body travels as JSON on stdin, so a title or body carrying shell metacharacters needs no
+	// escaping — the property the argument array gave before.
+	it('carries the title and body verbatim and runs no gh subcommand', async () => {
+		mocked_api.mockResolvedValue(GITHUB_PR_URL)
 
-		await git_gh_command.pr_create(TITLE_WITH_SPACES, BODY_WITH_SPECIAL)
+		await git_gh_command.pr_create(PR_TITLE, PR_BODY)
 
-		expect(mocked_exec).toHaveBeenCalledWith(
-			expect.arrayContaining(['--title', TITLE_WITH_SPACES, '--body', BODY_WITH_SPECIAL]),
-		)
+		expect(created_pull_body()).toMatchObject({ title: PR_TITLE, body: PR_BODY })
+		expect(mocked_exec).not.toHaveBeenCalled()
 	})
 })
 

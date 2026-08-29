@@ -20,6 +20,14 @@ import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-j
 //
 // `mergeable` and `mergeable_state` are served by the single-pull endpoint only — the listing omits
 // both — which is why the branch lookup resolves a number and the reads go back for the detail.
+// `repo.full_name` is what tells a fork's head from this repository's own — `head.ref` is a bare
+// branch name that says nothing about which repository holds it (joshuafolkken/kit#1029). Named once
+// because both sides of a pull request carry the same shape.
+const rest_repo_schema = z.looseObject({ full_name: z.string().optional() }).nullish()
+const rest_pull_side_schema = z.looseObject({ repo: rest_repo_schema })
+
+type RestPullSide = z.infer<typeof rest_pull_side_schema>
+
 const rest_pull_schema = z.looseObject({
 	number: z.number(),
 	html_url: z.string().optional(),
@@ -32,7 +40,10 @@ const rest_pull_schema = z.looseObject({
 	// `sha` is the head commit, which is what both halves of the merge-gate rollup are keyed by —
 	// REST hangs the check runs and the status contexts off the commit rather than off the pull
 	// request (joshuafolkken/kit#1028).
-	head: z.looseObject({ ref: z.string().optional(), sha: z.string().optional() }).nullish(),
+	head: z
+		.looseObject({ ref: z.string().optional(), sha: z.string().optional(), repo: rest_repo_schema })
+		.nullish(),
+	base: rest_pull_side_schema.nullish(),
 })
 
 type RestPull = z.infer<typeof rest_pull_schema>
@@ -93,6 +104,22 @@ function to_pr_state(pull: RestPull): string | undefined {
 	return is_merged(pull) ? MERGED_STATE : to_gh_state(pull.state)
 }
 
+// Whether the head branch lives in this repository rather than in a fork.
+//
+// `gh pr checkout` reached a fork's head through `refs/pull/<N>/head`, which a plain
+// `git fetch origin <branch>` cannot: the fetch either fails outright, or — where `origin` happens to
+// carry a branch of the same name — succeeds on an unrelated branch. Both halves are read out of the
+// one response, so the test costs no second request (joshuafolkken/kit#1029).
+function to_repo_name(side: RestPullSide | null | undefined): string | undefined {
+	return side?.repo?.full_name
+}
+
+function is_same_repository_head(pull: RestPull): boolean {
+	const head_repo = to_repo_name(pull.head)
+
+	return head_repo !== undefined && head_repo === to_repo_name(pull.base)
+}
+
 // The three fields `gh pr view --json mergeable,mergeStateStatus,state` answered with.
 //
 // `mergeable` was a GraphQL enum (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`) and is a nullable boolean
@@ -130,6 +157,7 @@ const git_gh_pr_rest = {
 	parse_rest_pull,
 	parse_rest_pulls,
 	select_pull,
+	is_same_repository_head,
 	to_pr_state,
 	to_pr_info,
 	to_pr_comments,
