@@ -9,9 +9,11 @@ import { git_gh_helpers } from './git-gh-helpers'
 // `undefined` there and every caller needing the name inherited that answer
 // (joshuafolkken/kit#1023).
 //
-// This unblocks the name itself, not yet the callers that also read something else through GraphQL:
-// `pr_get_review_comments` builds a REST path from this value but still asks `gh pr view` for the
-// number, so it stays blocked until that call is converted too (joshuafolkken/kit#1024).
+// The pull-request reads no longer go through it at all: they address `repos/{owner}/{repo}` and
+// name the head filter's owner as `{owner}` too, which `gh api` expands inside a query string as
+// readily as inside a path. That keeps six branch-keyed reads from gaining a second way to fail, and
+// it is what makes `pr_get_review_comments` REST end to end (joshuafolkken/kit#1027). The remaining
+// caller is the completion notification, which puts the name in its Telegram body.
 //
 // The failure contract is unchanged: `undefined` when the read fails, for a caller that has nothing
 // better to do with the error than treat the name as unknown.

@@ -81,7 +81,7 @@ Details:
 
 ### AI レビューコメントのスキャン（Claude Review / CodeRabbit サマリ）
 
-`pnpm josh followup` は CI 完了後、`gh pr view <branch> --json comments` で取得した PR のトップレベルコメントをスキャンし、AI レビュアーが残した未対応の指摘を検出する。**CI がオールグリーンでも、AI レビュアーのブロッカー指摘が残っていれば完了しない**。
+`pnpm josh followup` は CI 完了後、`repos/{owner}/{repo}/issues/{N}/comments`（REST）で取得した PR のトップレベルコメントをスキャンし、AI レビュアーが残した未対応の指摘を検出する。**CI がオールグリーンでも、AI レビュアーのブロッカー指摘が残っていれば完了しない**。
 
 **一時措置（kit#753）**: CodeRabbit のレビューが遅い間、CodeRabbit は全経路で非ブロッキングになっている — 既定の必須チェックから除外（`JOSH_REQUIRED_CHECKS` で復元可）、`Actionable comments posted: N` は情報ログへ格下げ、未解決の行コメントも理由なしで通過する。スキップした事実はコンソールと完了 Telegram 本文に記録される。Claude Review のブロッカー動作は従来どおり。kit#752 と併せて元に戻す。
 

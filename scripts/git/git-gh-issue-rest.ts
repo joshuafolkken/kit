@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-json-array'
 import { blocking_issue_schema } from './schemas'
 
@@ -38,7 +39,6 @@ interface BlockedBy {
 
 const BLOCKED_BY_FIELD = 'blockedBy'
 const STATE_FIELD = 'state'
-const MERGED_STATE = 'MERGED'
 const BODY_FIELD = 'body'
 const FIELD_SEPARATOR = ','
 const EMPTY_BODY = ''
@@ -68,12 +68,6 @@ function split_fields(fields: string): Array<string> {
 		.split(FIELD_SEPARATOR)
 		.map((field) => field.trim())
 		.filter((field) => field.length > 0)
-}
-
-// REST answers `open` / `closed`; `gh --json` answers `OPEN` / `CLOSED`, and the readers downstream
-// compare against the upper-case spelling.
-function to_gh_state(state: string | undefined): string | undefined {
-	return state?.toUpperCase()
 }
 
 // `gh issue view` served a pull request as readily as an issue, and reported a merged one as

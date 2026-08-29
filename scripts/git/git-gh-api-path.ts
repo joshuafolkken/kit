@@ -30,11 +30,40 @@ function blocked_by_api_path(issue_number: string, repo?: string): string {
 	return `${issue_api_path(issue_number, repo)}/dependencies/blocked_by`
 }
 
+// A pull request's *conversation* comments. REST serves them from the issue endpoint rather than the
+// pull one — `pulls/{N}/comments` is the review thread, which is a different listing with a
+// different shape, and reading one where the other was meant is a silent mistake rather than a 404
+// (joshuafolkken/kit#1027).
+function issue_comments_api_path(issue_number: string, repo?: string): string {
+	return `${issue_api_path(issue_number, repo)}/comments`
+}
+
+// The pull request collection — what a branch lookup filters with `?head=<owner>:<branch>`.
+function pulls_api_path(repo?: string): string {
+	return `${repo_api_path(repo)}/pulls`
+}
+
+// One pull request, addressed by number. `gh pr view` accepted a branch name and REST does not, so
+// every read below the branch lookup names the number instead (joshuafolkken/kit#1027).
+function pull_api_path(pr_number: string, repo?: string): string {
+	return `${pulls_api_path(repo)}/${pr_number}`
+}
+
+// The review thread — the line comments a reviewer left on the diff, which is what the CodeRabbit
+// gate reads and is not the same listing as `issue_comments_api_path`.
+function pull_comments_api_path(pr_number: string, repo?: string): string {
+	return `${pull_api_path(pr_number, repo)}/comments`
+}
+
 const git_gh_api_path = {
 	repo_api_path,
 	issues_api_path,
 	issue_api_path,
 	blocked_by_api_path,
+	issue_comments_api_path,
+	pulls_api_path,
+	pull_api_path,
+	pull_comments_api_path,
 }
 
 export { git_gh_api_path }
