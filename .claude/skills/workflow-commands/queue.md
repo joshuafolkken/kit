@@ -6,6 +6,8 @@ Each issue in the queue is a full `fullrun`, so read `fullrun.md`, `chain-rule.m
 
 `queue #N1 #N2 #N3 ...` runs `fullrun` for each issue in order. All issues must already exist (no `new` variant).
 
+**The target repository is named in front of each Issue reference** — `queue kit#1 kit#2`. The definition is the same at every entry point: `SKILL.md` → "2c. The `owner/repo#` prefix" (canonical: `prompts/collaboration-workflow/target-repo.md`). **One queue runs against one repository**: every reference must resolve to the same target, because step 1 below runs `josh latest` once for the whole queue and a mixed queue would run it in only one of them. Split a mixed batch into one queue per repository. The checkout rule is the one every implementing entry follows — resolve it from `pnpm josh doctor`, and stop and report rather than cloning. Step 1's `git stash` covers this session's own tree, and a prefix naming this repository changes nothing; a *different* repository's checkout that is not clean stops the run instead, since that work is not yours to stash. A target whose owner is not this session's is third-party: Tier C, so it stops rather than filing.
+
 **Steps:**
 
 1. If the working tree already has staged or modified files, stash them first: `git stash`. Run `git switch main && git pull`, then `josh latest` once (before the first issue) — **mandatory, never skip**. Verify the overrides are unchanged in both `pnpm-workspace.yaml` and `package.json` and `devEngines` changed only by the expected `josh latest` pnpm bump, by loading the `dependency-update` skill and following its procedure. If you stashed changes, restore them: `git stash pop`.

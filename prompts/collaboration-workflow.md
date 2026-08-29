@@ -20,6 +20,7 @@
 | Step 5: PR結果確認 + 完了通知（別スクリプト）                                  | [`completion-notify.md`](./collaboration-workflow/completion-notify.md)                 |
 | 後から関連が判明した Issue を epic に束ねる                                    | [`epic-bundle.md`](./collaboration-workflow/epic-bundle.md)                             |
 | `into <target>` — 作った Issue をその場で EPIC へ入れる                        | [`into-epic.md`](./collaboration-workflow/into-epic.md)                                 |
+| `owner/repo#` — 対象リポジトリを入口で指定する                                 | [`target-repo.md`](./collaboration-workflow/target-repo.md)                             |
 | 分割判定は全入口で共通（`kickoff epic` は作らない）                            | [`split-assessment.md`](./collaboration-workflow/split-assessment.md)                   |
 | 実行中に前提 Issue が判明した場合                                              | [`prerequisite-issue.md`](./collaboration-workflow/prerequisite-issue.md)               |
 | リポジトリをまたぐ EPIC                                                        | [`cross-repo-epic.md`](./collaboration-workflow/cross-repo-epic.md)                     |
