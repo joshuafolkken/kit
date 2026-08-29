@@ -31,9 +31,11 @@ async function apply_dependencies(input: {
 	const failures = await git_epic_relations.apply_relations(pairs, 'record')
 
 	console.info(
-		failures === 0
-			? `🔗 Recorded ${String(pairs.length)} blocked-by relation(s) along the declared order.`
-			: `⚠️  ${String(failures)} of ${String(pairs.length)} blocked-by relation(s) could not be recorded (gh >= 2.94.0 required); the epic itself is intact.`,
+		git_epic_relations.format_relation_report({
+			total: pairs.length,
+			failures,
+			action: 'record',
+		}),
 	)
 }
 
