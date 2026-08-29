@@ -1,4 +1,5 @@
 import { git_command } from './git-command'
+import { git_gh_api_path } from './git-gh-api-path'
 import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec, has_stderr_field } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_repo } from './git-gh-repo'
@@ -153,10 +154,9 @@ async function pr_get_review_comments(branch_name: string): Promise<string | und
 	if (repo_name === undefined || pr_number === undefined) return undefined
 
 	try {
-		return await git_gh_exec.exec_gh_command([
-			'api',
-			`repos/${repo_name}/pulls/${String(pr_number)}/comments`,
-		])
+		return await git_gh_exec.exec_gh_api({
+			path: `${git_gh_api_path.repo_api_path(repo_name)}/pulls/${String(pr_number)}/comments`,
+		})
 	} catch {
 		return undefined
 	}

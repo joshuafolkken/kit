@@ -67,6 +67,9 @@ describe('exec_gh_command — gh check integration', () => {
 
 const PR_VIEW_ARGS = ['pr', 'view']
 const NON_ERROR_CASE = 'returns false for a non-Error object'
+const GH_FAILED = 'failed'
+const NOT_FOUND_STDERR = 'gh: Not Found'
+const THROWS_STDERR_CASE = 'throws with the stderr text when gh fails'
 
 describe('exec_gh_command — output handling', () => {
 	it('returns trimmed stdout on success', async () => {
@@ -75,11 +78,11 @@ describe('exec_gh_command — output handling', () => {
 		await expect(git_gh_exec.exec_gh_command(PR_VIEW_ARGS)).resolves.toBe('pr-url')
 	})
 
-	it('throws with the stderr text when gh fails', async () => {
+	it(THROWS_STDERR_CASE, async () => {
 		const stderr_text = 'no such pr'
 
 		mocked_execa.mockRejectedValueOnce(
-			Object.assign(new Error('failed'), { stderr: `${stderr_text}\n` }),
+			Object.assign(new Error(GH_FAILED), { stderr: `${stderr_text}\n` }),
 		)
 
 		await expect(git_gh_exec.exec_gh_command(PR_VIEW_ARGS)).rejects.toThrow(stderr_text)
@@ -172,7 +175,7 @@ describe('exec_gh_api_status', () => {
 	// resolved result. Losing it there is what left the two failures indistinguishable.
 	it('returns the status when gh exits non-zero', async () => {
 		mocked_execa.mockRejectedValueOnce(
-			Object.assign(new Error('failed'), { stdout: NOT_FOUND_LINE, stderr: 'gh: Not Found' }),
+			Object.assign(new Error(GH_FAILED), { stdout: NOT_FOUND_LINE, stderr: NOT_FOUND_STDERR }),
 		)
 
 		await expect(git_gh_exec.exec_gh_api_status('repos/o/r/issues/99999')).resolves.toBe(
@@ -216,5 +219,131 @@ describe('has_stdout_field', () => {
 
 	it(NON_ERROR_CASE, () => {
 		expect(has_stdout_field({ stdout: 'out' })).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#1023: the `gh <noun> <verb>` form goes through GraphQL, which a cloud session is
+// refused (403), while repository-scoped REST is allowed. `exec_gh_api` is the single entry point
+// every converted call site goes through, so the verb, the body and the paging are described once
+// here rather than spelled out per call site.
+const API_PATH = 'repos/o/r'
+const API_BODY = '{"title":"t"}'
+const EMPTY_OBJECT = '{}'
+const EMPTY_LISTING = '[]'
+const POST_METHOD = 'POST'
+const REPO_FULL_NAME = 'o/r'
+const FULL_NAME_FILTER = '.full_name'
+const PAGINATE_FLAG = '--paginate'
+
+describe('exec_gh_api — the request it builds', () => {
+	it('makes a plain GET when nothing but the path is given', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(EMPTY_OBJECT))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH })
+
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH])
+	})
+
+	it('names another verb with --method', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(EMPTY_OBJECT))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH, method: 'PATCH' })
+
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, '--method', 'PATCH'])
+	})
+
+	// The body goes in on stdin so a JSON payload needs no temporary file and no per-field escaping.
+	it('passes a request body on stdin and points gh at it with --input -', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(EMPTY_OBJECT))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH, method: POST_METHOD, body: API_BODY })
+
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'gh',
+			['api', API_PATH, '--method', POST_METHOD, '--input', BODY_FROM_STDIN],
+			{ input: API_BODY },
+		)
+	})
+})
+
+describe('exec_gh_api — the optional flags', () => {
+	it('asks for every page with --paginate', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(EMPTY_LISTING))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: true })
+
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, PAGINATE_FLAG])
+	})
+
+	it('omits --paginate when the caller says false', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(EMPTY_LISTING))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: false })
+
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH])
+	})
+
+	it('unwraps one field with --jq', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(REPO_FULL_NAME))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH, jq_filter: FULL_NAME_FILTER })
+
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, '--jq', FULL_NAME_FILTER])
+	})
+})
+
+describe('exec_gh_api — output and failure handling', () => {
+	it('returns the response body with trailing whitespace removed', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(`${REPO_FULL_NAME}\n`))
+
+		await expect(git_gh_exec.exec_gh_api({ path: API_PATH })).resolves.toBe(REPO_FULL_NAME)
+	})
+
+	// Unchanged from the `gh <noun> <verb>` calls this replaces: `to_gh_error` makes gh's stderr the
+	// thrown message, and converting a call site must not change what its caller catches.
+	it(THROWS_STDERR_CASE, async () => {
+		mocked_execa.mockRejectedValueOnce(
+			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR}\n` }),
+		)
+
+		await expect(git_gh_exec.exec_gh_api({ path: API_PATH })).rejects.toThrow(NOT_FOUND_STDERR)
+	})
+
+	// The stdin path throws through the same converter, which a body-carrying call must not bypass.
+	it('throws with the stderr text when a request carrying a body fails', async () => {
+		mocked_execa.mockRejectedValueOnce(
+			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR}\n` }),
+		)
+
+		await expect(
+			git_gh_exec.exec_gh_api({ path: API_PATH, method: POST_METHOD, body: API_BODY }),
+		).rejects.toThrow(NOT_FOUND_STDERR)
+	})
+
+	it('propagates the gh-not-installed error', async () => {
+		mocked_check.mockRejectedValueOnce(new Error(GH_NOT_INSTALLED_MSG))
+
+		await expect(git_gh_exec.exec_gh_api({ path: API_PATH })).rejects.toThrow(GH_NOT_INSTALLED_MSG)
+	})
+})
+
+// gh emits one JSON document per page under `--paginate`, so a caller that means to parse the
+// result asks for `--slurp` as well; the two are separate because gh refuses `--slurp` beside
+// `--jq`, which a caller reading one value per page needs.
+describe('exec_gh_api — paging a listing that will be parsed', () => {
+	it('wraps the pages in one array with --slurp', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(EMPTY_LISTING))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: true, should_slurp: true })
+
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, PAGINATE_FLAG, '--slurp'])
+	})
+
+	it('omits --slurp when the caller does not ask for it', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_stdout_result(EMPTY_LISTING))
+
+		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: true, should_slurp: false })
+
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, PAGINATE_FLAG])
 	})
 })

@@ -1,18 +1,22 @@
 import { execaSync } from 'execa'
+import { git_gh_api_path } from './git/git-gh-api-path'
 import { PROJECT_ROOT } from './init/init-paths'
 
+// The synchronous twin of `git_gh_repo.repo_get_name_with_owner`: same fact, read the same way, but
+// through `execaSync` because `josh init` / `josh sync` / `josh doctor` decide before they can await.
+// It asks REST for the same reason — `gh repo view` goes through GraphQL, which a cloud session is
+// refused (403), and a repository that reads as unresolved makes `init` / `sync` skip
+// `sonar-project.properties` outright (joshuafolkken/kit#1023). The path comes from the shared
+// builder rather than being spelled out again here.
+//
 // `timeout` is spread in rather than passed as `undefined`: execa's options type does not admit an
 // undefined value for it, and an explicit `undefined` would not mean "no timeout" anyway.
 function fetch_repo_name(timeout_ms: number | undefined): string | undefined {
-	const result = execaSync(
-		'gh',
-		['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'],
-		{
-			cwd: PROJECT_ROOT,
-			reject: false,
-			...(timeout_ms !== undefined && { timeout: timeout_ms }),
-		},
-	)
+	const result = execaSync('gh', ['api', git_gh_api_path.repo_api_path(), '--jq', '.full_name'], {
+		cwd: PROJECT_ROOT,
+		reject: false,
+		...(timeout_ms !== undefined && { timeout: timeout_ms }),
+	})
 	if (result.exitCode !== 0 || !result.stdout) return undefined
 
 	return result.stdout.trim() || undefined

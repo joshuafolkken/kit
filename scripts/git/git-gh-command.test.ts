@@ -6,6 +6,7 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: {
 		exec_gh_command: vi.fn(),
 		exec_gh_command_with_stdin: vi.fn(),
+		exec_gh_api: vi.fn(),
 	},
 	BODY_FILE_FLAG: '--body-file',
 	BODY_FROM_STDIN: '-',
@@ -27,6 +28,7 @@ vi.mock('./git-command', () => ({
 
 const { git_gh_exec } = await import('./git-gh-exec')
 const mocked_exec = vi.mocked(git_gh_exec.exec_gh_command)
+const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const { git_command } = await import('./git-command')
 const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
 
@@ -223,14 +225,15 @@ describe('the other callers of the shared parser are unaffected', () => {
 		await expect(git_gh_command.pr_get_url(FEATURE_BRANCH)).resolves.toBe(GITHUB_PR_URL)
 	})
 
+	// joshuafolkken/kit#1023 moved this read to `gh api`; the parser it shares is unchanged.
 	it('reads a repository name unchanged', async () => {
-		mocked_exec.mockResolvedValue(REPO_NAME)
+		mocked_api.mockResolvedValue(REPO_NAME)
 
 		await expect(git_gh_command.repo_get_name_with_owner()).resolves.toBe(REPO_NAME)
 	})
 
 	it('still trims whitespace off a repository name', async () => {
-		mocked_exec.mockResolvedValue(`${REPO_NAME}\n`)
+		mocked_api.mockResolvedValue(`${REPO_NAME}\n`)
 
 		await expect(git_gh_command.repo_get_name_with_owner()).resolves.toBe(REPO_NAME)
 	})

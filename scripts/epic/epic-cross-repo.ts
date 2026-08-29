@@ -1,5 +1,6 @@
 import { repo_map_logic } from '#scripts/discovery/repo-map-logic'
 import { repo_origin } from '#scripts/discovery/repo-origin'
+import { git_gh_api_path } from '#scripts/git/git-gh-api-path'
 import { propagate_publish } from '#scripts/propagate/propagate-publish'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
 import { execaSync } from 'execa'
@@ -78,7 +79,7 @@ const VERSION_JQ = '.content | @base64d | fromjson | .version'
 function read_default_branch_version(repo: string): string | undefined {
 	const result = execaSync(
 		'gh',
-		['api', `repos/${repo}/contents/package.json`, '--jq', VERSION_JQ],
+		['api', `${git_gh_api_path.repo_api_path(repo)}/contents/package.json`, '--jq', VERSION_JQ],
 		{ reject: false, timeout: GH_TIMEOUT_MS },
 	)
 	if (result.exitCode !== SUCCESS_EXIT_CODE) return undefined
