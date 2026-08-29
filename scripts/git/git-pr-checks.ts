@@ -1,4 +1,4 @@
-import { git_gh_command } from './git-gh-command'
+import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import { describe_pr_failure, evaluate_pr_state, type PrEvaluation } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot, type PrStateSnapshot } from './git-pr-checks-parse'
 import { package_name_schema } from './schemas'
@@ -38,7 +38,36 @@ function get_configured_max_attempts(): number {
 const CHECK_MAX_ATTEMPTS = get_configured_max_attempts()
 const DEFAULT_STABLE_READS = 2
 
+// The wait's own timeout, named so a caller can tell it apart from a failing check. The bounded
+// watch in `git-pr-checks-watch.ts` answers `timed_out` for one and rethrows the other, and matching
+// on prose is the only distinction the loop offers (joshuafolkken/kit#1028).
+const PR_CHECKS_TIMEOUT_MESSAGE = 'Timed out while waiting for PR checks to complete.'
+
+function is_pr_checks_timeout(error: unknown): boolean {
+	return error instanceof Error && error.message === PR_CHECKS_TIMEOUT_MESSAGE
+}
+
 type PrStateFetcher = (branch_name: string) => Promise<PrStateSnapshot>
+
+// What the loop asks of each snapshot, and what it says when the answer is `failure`.
+//
+// The loop used to hard-code the merge gate's own verdict, which is the strictest question anyone
+// asks of a pull request: mergeable *and* every required check green *and* no change request
+// standing. `gh pr checks --watch` asked a much weaker one — have the checks finished? — and the
+// conversion in joshuafolkken/kit#1028 gave the watch the strict verdict by accident: on a repository
+// whose `mergeable_state` is `blocked`, the watch could never succeed, and a standing change request
+// made it *throw* out of `pnpm josh git`. Naming the question is what keeps the two apart.
+interface PrStateEvaluator {
+	evaluate: (snapshot: PrStateSnapshot) => PrEvaluation
+	describe: (snapshot: PrStateSnapshot) => string
+}
+
+// The merge gate's verdict, and the default: an omitted `evaluator` leaves every existing caller
+// exactly where it was.
+const MERGE_GATE_EVALUATOR: PrStateEvaluator = {
+	evaluate: evaluate_pr_state,
+	describe: describe_pr_failure,
+}
 
 interface WaitForPrSuccessOptions {
 	branch_name: string
@@ -46,6 +75,7 @@ interface WaitForPrSuccessOptions {
 	interval_ms: number
 	max_attempts: number
 	required_stable_reads: number
+	evaluator?: PrStateEvaluator
 }
 
 function parse_repo_name_from_package(package_json_content: string): string {
@@ -72,10 +102,11 @@ function classify_poll_result(input: {
 	snapshot: PrStateSnapshot
 	stable_count: number
 	required_stable_reads: number
+	evaluator: PrStateEvaluator
 }): { is_done: boolean; next_stable_count: number } {
-	const state = evaluate_pr_state(input.snapshot)
+	const state = input.evaluator.evaluate(input.snapshot)
 
-	if (state === 'failure') throw new Error(describe_pr_failure(input.snapshot))
+	if (state === 'failure') throw new Error(input.evaluator.describe(input.snapshot))
 
 	const next_stable_count = advance_stable_count(input.stable_count, state)
 
@@ -95,6 +126,7 @@ async function attempt_pr_success_poll(input: {
 		snapshot,
 		stable_count: input.stable_count,
 		required_stable_reads: input.options.required_stable_reads,
+		evaluator: input.options.evaluator ?? MERGE_GATE_EVALUATOR,
 	})
 
 	if (classification.is_done) return { snapshot, next_stable_count: 0 }
@@ -117,11 +149,14 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 		stable_count = result.next_stable_count
 	}
 
-	throw new Error('Timed out while waiting for PR checks to complete.')
+	throw new Error(PR_CHECKS_TIMEOUT_MESSAGE)
 }
 
+// The snapshot module rather than `git-gh-command`, which is deliberate: `git-gh-command` also
+// exposes the watch, and the watch now polls through this file (joshuafolkken/kit#1028). Naming the
+// one read it actually needs keeps that from closing into an import cycle.
 async function default_fetch_pr_state(branch_name: string): Promise<PrStateSnapshot> {
-	const raw_json = await git_gh_command.pr_get_state_snapshot(branch_name)
+	const raw_json = await git_gh_pr_snapshot.pr_get_state_snapshot(branch_name)
 
 	return parse_pr_state_snapshot(raw_json)
 }
@@ -150,8 +185,13 @@ export {
 	DEFAULT_MAX_ATTEMPTS,
 	DEFAULT_TIMEOUT_SECONDS,
 	CHECK_WAIT_INTERVAL_MS,
+	PR_CHECKS_TIMEOUT_MESSAGE,
+	SECONDS_TO_MS,
+	is_pr_checks_timeout,
+	default_fetch_pr_state,
+	MERGE_GATE_EVALUATOR,
 }
-export type { PrStateFetcher }
+export type { PrStateFetcher, PrStateEvaluator }
 export {
 	collect_blocking_failures,
 	describe_pr_failure,
