@@ -150,9 +150,10 @@ Execution state lives on GitHub and nowhere else (`epic:next`, joshuafolkken/kit
 pnpm josh epic:next 858 --repo joshuafolkken/kit
 ```
 
-A child in another repository is read through `gh --repo`, so no clone is needed to learn its state —
-only to implement it. `epic:next` prints the local checkout for each repository's candidates, from
-joshuafolkken/kit#869's map; a repository with no checkout here says so rather than being cloned.
+A child in another repository is read against that repository through `gh api`, so no clone is
+needed to learn its state — only to implement it. `epic:next` prints the local checkout for each
+repository's candidates, from joshuafolkken/kit#869's map; a repository with no checkout here says
+so rather than being cloned.
 
 **A dependency that crosses a repository is not satisfied when the blocking issue closes.** Merging
 kit's issue does not publish kit, so a consumer child told it may start at that moment installs the

@@ -205,10 +205,11 @@ epicrun joshuafolkken/kit#858
   checkout — **a command naming a different repository still runs where that repository is**, which
   is why a cross-repository `into` insertion runs in the epic's checkout (§2a).
 - **`epicrun` is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,
-  not where its children are implemented. Its state is read through `gh --repo`, so that repository
-  needs no checkout and a missing or dirty one never stops the launch. The checkout rules bind each
-  child at implementation time, against **that child's** repository, and which session runs which
-  child stays "Concurrency" in `epicrun.md` — one session per repository.
+  not where its children are implemented. Its state is read against that repository through
+  `gh api`, so that repository needs no checkout and a missing or dirty one never stops the launch.
+  The checkout rules bind each child at implementation time, against **that child's** repository,
+  and which session runs which child stays "Concurrency" in `epicrun.md` — one session per
+  repository.
 - **Independent of `into <target>`**: this says which repository the run acts on, `into` says which
   epic the artifact joins, and both may need qualifying in one line.
 

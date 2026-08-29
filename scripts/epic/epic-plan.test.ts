@@ -9,7 +9,8 @@ const OPEN = 'OPEN'
 const NUMBER_ONLY = JSON.stringify({ number: 101 })
 const IN_PROGRESS = 'in-progress'
 
-// The shape `gh issue view --json number,title,body,state,labels,blockedBy` answers with.
+// The shape a `number,title,body,state,labels,blockedBy` read answers with — `gh api` since
+// joshuafolkken/kit#1024, mapped back into the field names `gh issue view --json` used.
 function gh_issue(overrides: Record<string, unknown> = {}): string {
 	return JSON.stringify({
 		number: 101,
@@ -54,9 +55,10 @@ describe('epic_plan.to_plan_child — missing fields', () => {
 		expect(epic_plan.to_plan_child(NUMBER_ONLY)?.title).toBe('')
 	})
 
-	// `gh` answers JSON null for an issue with no body.
+	// REST answers JSON null for an issue with no body. `git-gh-issue-rest.ts` maps that to an empty
+	// string before this parser sees it; the schema tolerates it anyway, and this asserts that guard.
 	it('reports a null body as an empty one', () => {
-		// eslint-disable-next-line unicorn/no-null -- the shape gh's JSON actually produces
+		// eslint-disable-next-line unicorn/no-null -- the shape REST's JSON actually produces
 		expect(epic_plan.to_plan_child(gh_issue({ body: null }))?.body).toBe('')
 	})
 

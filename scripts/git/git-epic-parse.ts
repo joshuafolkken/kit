@@ -11,7 +11,7 @@ const TASK_LIST_LINE_PATTERN = new RegExp(TASK_LIST_ISSUE_SOURCE, 'u')
 
 // A task list may also reference an Issue in another repository (`owner/repo#101`, or a full URL).
 // Detecting one is what the auto-close used to bail on; joshuafolkken/kit#864 reads them instead,
-// through `gh --repo`, and the pattern below extracts which repository and which issue.
+// against their own repository, and the pattern below extracts which repository and which issue.
 // `owner/repo#101` on its own. The row patterns below are built from this source, so what counts as
 // a cross-repository reference has one definition — a second copy would let a form the task list
 // accepts be refused where a person types it, or the reverse (joshuafolkken/kit#985).
@@ -162,8 +162,8 @@ function match_external(body: string, pattern: RegExp): Array<ExternalChild> {
 }
 
 // Every cross-repository child the task list tracks, in both spellings. Reported as `owner/repo`
-// plus a number rather than a URL, which is the form the repository map and `gh --repo` both take
-// (joshuafolkken/kit#864).
+// plus a number rather than a URL, which is the form the repository map takes and the form the
+// read's REST path is built from (joshuafolkken/kit#864).
 function parse_external_task_list_children(body: string | undefined): Array<ExternalChild> {
 	if (body === undefined) return []
 	const stripped = strip_fenced_blocks(body)

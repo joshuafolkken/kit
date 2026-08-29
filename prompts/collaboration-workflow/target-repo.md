@@ -65,7 +65,7 @@ epicrun joshuafolkken/kit#858
 
 ### `epicrun` の前置きは EPIC の在り処だけを指す
 
-`epicrun owner/repo#E` が名指すのは **EPIC の所在**であって、子を実装するリポジトリではない。**したがって上の 1〜4 は `epicrun` の起動には掛からない** — EPIC の状態は `gh --repo` で読めるため、そのリポジトリのチェックアウトは要らず、無くても、汚れていても、起動は止まらない（`.claude/skills/workflow-commands/epicrun.md` → 「Concurrency」）。
+`epicrun owner/repo#E` が名指すのは **EPIC の所在**であって、子を実装するリポジトリではない。**したがって上の 1〜4 は `epicrun` の起動には掛からない** — EPIC の状態はそのリポジトリを指定した REST パスで読めるため、そのリポジトリのチェックアウトは要らず、無くても、汚れていても、起動は止まらない（`.claude/skills/workflow-commands/epicrun.md` → 「Concurrency」）。
 
 チェックアウトが要るのは**子を実装する段**であり、そこで掛かるのは**その子のリポジトリ**に対する 1〜4 である。どのセッションがどの子を実行するかは同節（リポジトリごとに 1 セッション）が決める。本節が `epicrun` に与えるのは EPIC をどう指すかの記法だけであり、子の実装先を上書きしない。
 

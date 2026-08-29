@@ -15,10 +15,21 @@ import { epic_issue, type EpicIssue } from './epic-issue'
 // what supplied them. Only the *reading* of those issues needs a request, and this module decides
 // which ones are worth one and which of the answers count.
 
-// One `gh issue view` each, so the count is what bounds the cost. Chosen an order of magnitude above
-// the references a real issue body carries — kit#946's body names five — so the cap is a runaway
-// guard rather than something an ordinary issue reaches. A body naming more than this is prose about
-// the backlog, not an issue with twenty prerequisites.
+// One read each, so the count is what bounds the cost. Chosen an order of magnitude above the
+// references a real issue body carries — kit#946's body names five — so the cap is a runaway guard
+// rather than something an ordinary issue reaches. A body naming more than this is prose about the
+// backlog, not an issue with twenty prerequisites.
+//
+// Since joshuafolkken/kit#1024 a read is `gh api`, and one reference costs one REST request in the
+// common case. Three cases cost two. The `dependencies/blocked_by` endpoint is asked unless the
+// issue's own dependency summary reports exactly zero blockers, so an issue that declares one pays
+// for it. So does a pull request, which the issue endpoint serves as readily as an issue and which
+// carries no dependency summary at all — an absent summary is not a zero, so the skip that settles
+// the common case cannot apply to one. That second request is a read rather than a failure: the
+// endpoint answers a pull request with an empty array (measured against a merged one), so the
+// reference is read normally and then dropped by the `/pull/` check below. And a read that failed
+// pays for the status probe `issue_view_json_classified` spends telling a number that resolves to
+// nothing from a read that could not be made.
 const REFERENCED_LOOKUP_LIMIT = 20
 
 // The numbers the subject's body names that the open listing did not already provide.
@@ -75,8 +86,8 @@ function to_backlog_issue(issue: EpicIssue, context: ReferencedContext): Backlog
 // that reads as half-done from the moment it is created.
 function is_usable_candidate(issue: BacklogIssue, read: EpicIssue): boolean {
 	if (issue.is_epic === true) return false
-	// `gh issue view` answers for a pull request too, and a body citing "the fix landed in #952" is
-	// ordinary prose. Without this, a merged PR reads as an open issue in no epic and the command
+	// The issue endpoint answers for a pull request too, and a body citing "the fix landed in #952"
+	// is ordinary prose. Without this, a merged PR reads as an open issue in no epic and the command
 	// proposes creating an epic with a pull request among its children (joshuafolkken/kit#947).
 	if (epic_issue.is_pull_request(read)) return false
 
@@ -128,7 +139,7 @@ function collect_referenced(
 	}
 }
 
-// One `gh issue view` per reference, a few at a time. Batched for the same reason the relation reads
+// One `gh api` read per reference, a few at a time. Batched for the same reason the relation reads
 // are: spawning every request at once is what turns a rate limit into a wrong answer, because a
 // refused read arrives as an absence rather than as an error.
 const LOOKUP_CONCURRENCY = 8

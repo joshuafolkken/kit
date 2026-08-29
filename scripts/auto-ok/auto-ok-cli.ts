@@ -179,17 +179,23 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native
-// relation `epic:next` builds its graph from, and `gh` returns each blocker's state alongside its
-// number, so the check costs no extra request.
+// relation `epic:next` builds its graph from, and each blocker's state comes back alongside its
+// number, so no blocker needs a read of its own.
+//
+// The relations are not in the listing response at all since joshuafolkken/kit#1025 — REST serves
+// them from each issue's own dependencies endpoint — so this pickup pays one extra request per row
+// whose own dependency summary does not report exactly zero blockers, and nothing for the rest.
 //
 // An unattended run must not start an issue whose prerequisite is still open: `auto-ok` is applied
 // by a person to an issue they judged needs no decision, which says nothing about ordering, and the
 // pickup previously consulted only the `epic` / `in-progress` / `needs-decision` labels
 // (joshuafolkken/kit#996). A blocker with no state reads as standing — the safe direction, since the
 // cost is deferring an issue rather than implementing one out of order.
-// `nodes` is a page of at most fifty. When `totalCount` says there are more, the ones outside the
-// page are unknown, and unknown reads as standing — the same direction as a blocker with no state.
-// Deferring costs a poll; starting out of order costs the ordering itself.
+// `nodes` is a page — fifty under GraphQL, one hundred under REST. When `totalCount` says there are
+// more, the ones outside the page are unknown, and unknown reads as standing — the same direction
+// as a blocker with no state. Deferring costs a poll; starting out of order costs the ordering
+// itself. The `?? nodes.length` fallback reads a listing that carries no count at all as complete,
+// which every row this pickup reads does carry, from its own dependency summary.
 function is_page_complete(blocked_by: OpenIssueData['blockedBy']): boolean {
 	const nodes = blocked_by?.nodes ?? []
 
