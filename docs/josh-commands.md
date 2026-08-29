@@ -911,6 +911,14 @@ Every open child appears exactly once in the report, so nothing is silently drop
 
 With `--repo`, standard output carries exactly one token — the issue number when there is a child to run, otherwise the verdict (`wait`, `stop` or `complete`) — so `answer=$(josh epic:next 858 --repo joshuafolkken/kit)` captures something a loop can branch on. Every explanation goes to standard error. `run` never appears there: it would mean another repository has work, which for this session is something to wait on, so it is reported as `wait`.
 
+**One child per repository, whichever epic it belongs to.** Before `--repo` hands back a number, the repository is asked whether anything is already running in it: if **any** open issue there carries `in-progress` and is not parked, the answer is `wait` and the holders are named on standard error ([#925](https://github.com/joshuafolkken/kit/issues/925)). A parked issue is excluded because `needs-decision` outranks `in-progress` in the classification too, and a run that had just set a child aside would otherwise be held back by it. The contended resource is one working tree, one `main` and one `package.json` that `josh bump` rewrites, and none of them cares which epic a child belongs to — while the classification sorts only the children the epic tracks, so a second `epicrun` in the same checkout used to answer "nothing of mine is in progress" and both ran.
+
+The check is made **only when there is a candidate to offer**: consulted on `stop` or `complete` as well, an unrelated `in-progress` issue would turn a finished epic into a permanent `wait`.
+
+It is advisory rather than atomic. The label is applied by whoever implements the child, _after_ this read, so two sessions starting in the same instant can both see an idle repository; what the check closes is the window that actually occurs, where a session already running a child holds the label for the whole of it. An abandoned label therefore holds the repository until somebody removes it — which is why the holders are named on standard error, and why [`epicrun`](../prompts/collaboration-workflow/epicrun.md)'s stale rule applies to any open issue in the repository rather than to the epic's children alone.
+
+A listing that could not be read is **not** an idle repository — the answer is `wait` rather than the child, since reading a failed read as "nothing is running" is the one direction a guard like this may not fail in. It is not an exit either: the listing swallows a passing rate limit into the same failure, so exiting would end an unattended run over a blip, while a persistent failure is already caught by the unreadable-child anomaly before this read happens.
+
 **The remaining children are sorted by whether waiting helps — never by which label they carry.**
 
 | Bucket              | What is in it                                                                           | What the caller does |
@@ -932,6 +940,8 @@ The verdict follows from the buckets, and waiting is checked before stopping —
 | stop     | Nothing resolves on its own; the remaining children need a person | 0         |
 | complete | No open child is left                                             | 0         |
 | error    | The dependency graph is unusable                                  | 1         |
+
+`--repo` answers `wait` for two things that are not verdicts of the epic at all: the repository is already running something, and the `in-progress` listing for it could not be read. Both are reported on standard error, and neither changes the exit code — the aggregate form, which does not consult the exclusion, says so there too.
 
 **Whether a dependency is resolved is a replaceable rule.** By default a dependency is resolved once the blocking child is closed. That is not enough across repositories — kit's issue closes before the package is published — so [#864](https://github.com/joshuafolkken/kit/issues/864) replaces the rule with one that also waits for the publish. The extension point is what keeps that condition in one place rather than duplicated per caller.
 
