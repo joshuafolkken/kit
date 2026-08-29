@@ -47,7 +47,7 @@ Options:
   --coderabbit-ignore-reason   Reason text when keeping CodeRabbit findings unresolved
   --ai-review-ignore-reason    Reason text when keeping AI reviewer (Claude Review / CodeRabbit
                                summary) findings unresolved
-  --skip-watch                 Skip "gh pr checks --watch" and only evaluate latest status
+  --skip-watch                 Skip the two-minute check look-ahead and only evaluate latest status
   --no-merge                   Skip merging the PR (merge is on by default)
   --merge                      (Deprecated — merge is now the default; kept for backward compatibility)
   -h, --help                   Show this help

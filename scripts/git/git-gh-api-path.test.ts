@@ -66,3 +66,36 @@ describe('blocked_by_api_path', () => {
 		)
 	})
 })
+
+// The merge gate's snapshot reads three endpoints `gh pr view` hid behind one GraphQL query, and two
+// of them hang off the head *commit* rather than off the pull request (joshuafolkken/kit#1028).
+describe('pull_reviews_api_path', () => {
+	it('builds the review listing on top of the pull request path', () => {
+		expect(git_gh_api_path.pull_reviews_api_path('7', REPO)).toBe(
+			`${git_gh_api_path.pull_api_path('7', REPO)}/reviews`,
+		)
+	})
+})
+
+describe('commit_check_runs_api_path', () => {
+	it('keys the check runs on a commit under the current repository', () => {
+		expect(git_gh_api_path.commit_check_runs_api_path('abc123')).toBe(
+			`${CURRENT_REPO_PATH}/commits/abc123/check-runs`,
+		)
+	})
+})
+
+describe('commit_status_api_path', () => {
+	it('keys the combined status on a commit under the current repository', () => {
+		expect(git_gh_api_path.commit_status_api_path('abc123')).toBe(
+			`${CURRENT_REPO_PATH}/commits/abc123/status`,
+		)
+	})
+
+	// Two endpoints on one commit, so the shared segment is a builder rather than two literals.
+	it('shares the commit segment with the check run path', () => {
+		expect(git_gh_api_path.commit_status_api_path('abc123', REPO)).toBe(
+			`${git_gh_api_path.commit_api_path('abc123', REPO)}/status`,
+		)
+	})
+})

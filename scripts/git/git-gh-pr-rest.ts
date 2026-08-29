@@ -29,7 +29,10 @@ const rest_pull_schema = z.looseObject({
 	merged_at: z.string().nullish(),
 	mergeable: z.boolean().nullish(),
 	mergeable_state: z.string().optional(),
-	head: z.looseObject({ ref: z.string().optional() }).nullish(),
+	// `sha` is the head commit, which is what both halves of the merge-gate rollup are keyed by —
+	// REST hangs the check runs and the status contexts off the commit rather than off the pull
+	// request (joshuafolkken/kit#1028).
+	head: z.looseObject({ ref: z.string().optional(), sha: z.string().optional() }).nullish(),
 })
 
 type RestPull = z.infer<typeof rest_pull_schema>

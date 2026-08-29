@@ -148,21 +148,22 @@ async function post_completion_notification(input: {
 	}
 }
 
-// The watch is a look ahead, not a gate. `gh pr checks --watch` exits non-zero when **any** check
-// has failed — CodeRabbit included — and letting that escape ended the run before `evaluate_pr_state`
-// could apply kit#753's CodeRabbit exemption at all. It only ever bit where every check finished
-// inside the two-minute window, so a repository with a slow E2E never saw it and a fast one always
-// would (joshuafolkken/kit#999).
+// The watch is a look ahead, not a gate. It fails when **any** check has failed — CodeRabbit
+// included — and letting that escape ended the run before `evaluate_pr_state` could apply kit#753's
+// CodeRabbit exemption at all. It only ever bit where every check finished inside the two-minute
+// window, so a repository with a slow E2E never saw it and a fast one always would
+// (joshuafolkken/kit#999). What the watch is has since changed — `gh pr checks --watch` went through
+// GraphQL, so joshuafolkken/kit#1028 replaced it with the same poll loop bounded to two minutes —
+// but its place here has not.
 //
 // Falling through costs nothing: whether the merge may proceed is decided in one place below, and a
 // genuinely failing non-CodeRabbit check still ends the wait on the first poll by kit#990's
-// fast-fail rather than by this exit code.
-// `gh pr checks` exits 1 both for "a check failed" and for "no checks reported on this branch", and
-// the watch inherits stdio so its message is not ours to read — the exit code cannot tell them
-// apart. The pull request itself can: a failed check leaves a rollup, and a branch with no checks
-// leaves it empty. Falling through on the empty case would trade a failure reported in seconds for
-// the whole budget spent waiting on a required check that is missing rather than pending, so that
-// one is rethrown and the old behavior kept.
+// fast-fail rather than by that failure.
+// The watch fails for two different reasons — "a check failed" and "no checks reported on this
+// branch" — and its own error does not say which. The pull request itself can: a failed check leaves
+// a rollup, and a branch with no checks leaves it empty. Falling through on the empty case would
+// trade a failure reported in seconds for the whole budget spent waiting on a required check that is
+// missing rather than pending, so that one is rethrown and the old behavior kept.
 //
 // **Read from the raw payload, not from `parse_pr_state_snapshot`.** That parser never throws: a
 // malformed answer or a schema mismatch degrades to `rollup: []`, which is indistinguishable there

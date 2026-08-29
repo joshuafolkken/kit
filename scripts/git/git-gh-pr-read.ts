@@ -1,4 +1,4 @@
-import { git_gh_api_path } from './git-gh-api-path'
+import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
@@ -39,8 +39,9 @@ const LOOKUP_QUERY = 'state=all&sort=created&direction=desc&per_page=100'
 // answered the whole conversation. Truncating them is the kit#973 failure again in another form — the
 // newest Claude Review blocker falls off a listing that is ordered oldest first, and the merge gate
 // finds nothing to stop on. `gh api --paginate` merges the pages of an array endpoint into one array,
-// so the answer stays the flat listing every caller parses.
-const COMMENTS_QUERY = '?per_page=100'
+// so the answer stays the flat listing every caller parses. The page size itself is
+// `FULL_PAGE_QUERY`, shared with the merge-gate listings (joshuafolkken/kit#1028).
+const COMMENTS_QUERY = FULL_PAGE_QUERY
 // Written as a constant rather than inline: `{owner}` inside a template literal reads as a broken
 // interpolation.
 const OWNER_PLACEHOLDER = '{owner}'
@@ -197,4 +198,8 @@ const git_gh_pr_read = {
 	pr_get_review_comments,
 }
 
-export { git_gh_pr_read, forget_pr_numbers, NO_HEAD_REF_MESSAGE }
+// The merge-gate snapshot needs the same branch → number resolution and the same detail read, and it
+// needs them separately: the reviews endpoint is keyed by number while the rollup is keyed by the
+// head commit the detail carries. Exported rather than re-derived so the memo above stays one memo
+// (joshuafolkken/kit#1028).
+export { git_gh_pr_read, forget_pr_numbers, read_pull, resolve_pr_number, NO_HEAD_REF_MESSAGE }
