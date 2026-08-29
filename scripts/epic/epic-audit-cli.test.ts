@@ -1,14 +1,27 @@
-import { describe, expect, it } from 'vitest'
+import { git_gh_command } from '#scripts/git/git-gh-command'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuditFinding } from './epic-audit'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_audit_cli, type AuditInput } from './epic-audit-cli'
 import type { EpicSnapshot } from './epic-fetch'
 
 const REPO = 'joshuafolkken/kit'
+const OTHER_REPO = 'joshuafolkken/app-kit'
 const EPIC = 858
+const GET_BODY = 'issue_get_body'
+const LOCAL_BODY = 'local body'
+const REMOTE_BODY = 'remote body'
+
+function body_from(repo: string): string {
+	return `body from ${repo}`
+}
+
+function child_in(number: number, repo: string, body?: string): AuditChild {
+	return { number, repo, state: 'OPEN', labels: [], blocked_by: [], body }
+}
 
 function child(number: number, body: string): AuditChild {
-	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by: [], body }
+	return child_in(number, REPO, body)
 }
 
 function snapshot(overrides: Partial<EpicSnapshot> = {}): EpicSnapshot {
@@ -35,6 +48,10 @@ function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
 		...overrides,
 	}
 }
+
+beforeEach(() => {
+	vi.restoreAllMocks()
+})
 
 describe('epic_audit_cli.parse_epic_number', () => {
 	it('accepts a bare number and a hash-prefixed one', () => {
@@ -153,5 +170,40 @@ describe('epic_audit_cli.audit', () => {
 
 		expect(result.findings).toHaveLength(1)
 		expect(result.exit_code).toBe(0)
+	})
+})
+
+// The scope every body read goes through. Without it a cross-repository child's body came from
+// *this* repository's issue of that number, and all four body-reading checks then ran against the
+// wrong text (joshuafolkken/kit#1012).
+describe('epic_audit_cli.attach_bodies', () => {
+	it('reads a child in this repository unqualified, exactly as before', async () => {
+		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(LOCAL_BODY)
+		const attached = await epic_audit_cli.attach_bodies([child_in(1, REPO)], REPO)
+
+		expect(get_body).toHaveBeenCalledWith('1', undefined)
+		expect(attached[0]?.body).toBe(LOCAL_BODY)
+	})
+
+	it("reads a cross-repository child's body from its own repository", async () => {
+		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(REMOTE_BODY)
+		const attached = await epic_audit_cli.attach_bodies([child_in(12, OTHER_REPO)], REPO)
+
+		expect(get_body).toHaveBeenCalledWith('12', OTHER_REPO)
+		expect(attached[0]?.body).toBe(REMOTE_BODY)
+	})
+
+	// The two live side by side in one epic, so the scope has to be decided per child rather than
+	// once for the batch.
+	it('gives each child the body read from its own repository', async () => {
+		vi.spyOn(git_gh_command, GET_BODY).mockImplementation(async (_number, repo) =>
+			repo === undefined ? LOCAL_BODY : body_from(repo),
+		)
+		const attached = await epic_audit_cli.attach_bodies(
+			[child_in(1, REPO), child_in(12, OTHER_REPO)],
+			REPO,
+		)
+
+		expect(attached.map((entry) => entry.body)).toEqual([LOCAL_BODY, body_from(OTHER_REPO)])
 	})
 })

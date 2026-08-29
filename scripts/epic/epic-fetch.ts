@@ -22,6 +22,17 @@ function to_child(parsed: EpicIssue, repo: string): EpicChild {
 	}
 }
 
+// The `--repo` scope a child is read through, in the one place that decides it.
+//
+// A child in the repository the command runs in is read unqualified — exactly as `fetch_children`
+// reads it — and a child elsewhere is read through its own repository, exactly as
+// `fetch_external_children` does. Every read of a child's fields goes through this, bodies included:
+// an unqualified read of a cross-repository child returns *this* repository's issue of that number,
+// a different issue entirely (joshuafolkken/kit#1012).
+function scope_for(child_repo: string, current_repo: string): string | undefined {
+	return child_repo === current_repo ? undefined : child_repo
+}
+
 // One child's state, labels and native relations. A child that cannot be read is reported as
 // missing rather than assumed closed: assuming would let an epic advance past a child nobody looked
 // at.
@@ -132,6 +143,7 @@ async function fetch_epic(epic_number: number, repo: string): Promise<EpicSnapsh
 
 const epic_fetch = {
 	CHILD_LIMIT,
+	scope_for,
 	fetch_child,
 	fetch_children,
 	fetch_epic,

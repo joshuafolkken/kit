@@ -30,9 +30,23 @@ const searched_issue_schema = z.object({ number: z.number(), body: z.string().nu
 // Each child again, this time with its body. `epic:next`'s fetch reads state, labels and relations;
 // the bodies are what this command exists to read, so they are fetched here rather than widening
 // that one — a `wait` poll should not pay for prose it never looks at.
-async function attach_bodies(children: ReadonlyArray<AuditChild>): Promise<Array<AuditChild>> {
+//
+// The scope comes from `epic_fetch.scope_for`, the same convention the state and relation reads
+// follow, rather than a second spelling here. Without it a cross-repository child's body was read
+// from *this* repository's issue of that number, and all four body-reading checks then ran against
+// the wrong text (joshuafolkken/kit#1012).
+async function attach_bodies(
+	children: ReadonlyArray<AuditChild>,
+	repo: string,
+): Promise<Array<AuditChild>> {
 	const bodies = await Promise.all(
-		children.map(async (child) => await git_gh_command.issue_get_body(String(child.number))),
+		children.map(
+			async (child) =>
+				await git_gh_command.issue_get_body(
+					String(child.number),
+					epic_fetch.scope_for(child.repo, repo),
+				),
+		),
 	)
 
 	return children.map((child, index) => ({ ...child, body: bodies[index] }))
@@ -163,6 +177,7 @@ async function gather(epic_number: number, repo: string): Promise<AuditInput | u
 
 	const children = await attach_bodies(
 		snapshot.children.map((child) => ({ ...child, body: undefined })),
+		repo,
 	)
 
 	if (snapshot.has_external_children) console.info(EXTERNAL_NOTICE)
