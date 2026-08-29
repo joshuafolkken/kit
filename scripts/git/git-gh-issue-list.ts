@@ -47,7 +47,7 @@ function listing_path(request: IssueListRequest, page: number): string {
 	const label = request.label === undefined ? '' : `&labels=${encodeURIComponent(request.label)}`
 	const paging = `&per_page=${String(PER_PAGE)}&page=${String(page)}`
 
-	return `${git_gh_api_path.repo_api_path(request.repo)}/issues?${LISTING_QUERY}${label}${paging}`
+	return `${git_gh_api_path.issues_api_path(request.repo)}?${LISTING_QUERY}${label}${paging}`
 }
 
 // `--search "<term> in:body"` matched tokens, so `#858` never matched inside `#8580`. A bare
