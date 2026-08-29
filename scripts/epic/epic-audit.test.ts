@@ -10,6 +10,10 @@ function child(number: number, body: string, blocked_by: ReadonlyArray<number> =
 	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by, body }
 }
 
+function closed(child_to_close: AuditChild): AuditChild {
+	return { ...child_to_close, state: 'CLOSED' }
+}
+
 function messages(findings: ReadonlyArray<{ message: string }>): string {
 	return findings.map((finding) => finding.message).join('\n')
 }
@@ -188,6 +192,52 @@ describe('epic_audit_checks.find_order_contradictions', () => {
 		])
 
 		expect(findings).toEqual([])
+	})
+})
+
+// Both children closed means neither has any execution left, so the sentence that makes an
+// undeclared order a contradiction — "it can run first" — is no longer true of either. An epic that
+// forgot to declare an order would otherwise fail its audit forever, stopping every future `epicrun`
+// on it at the first step (joshuafolkken/kit#1010).
+describe('epic_audit_checks.find_order_contradictions — a pair with nothing left to run', () => {
+	it('demotes the finding to a warning when both children are closed', () => {
+		const findings = epic_audit_checks.find_order_contradictions([
+			closed(child(860, ACCEPTANCE_BODY)),
+			closed(child(869, '')),
+		])
+
+		expect(findings).toHaveLength(1)
+		expect(findings[0]?.level).toBe('warning')
+		expect(messages(findings)).toContain('both are closed')
+	})
+
+	// Demoted, not dropped: the pair keeps a finding, so check 1 still suppresses it as already
+	// reported rather than counting the same omission a second time.
+	it('keeps naming both children, so the pair is still reported once', () => {
+		const children = [closed(child(860, ACCEPTANCE_BODY)), closed(child(869, ''))]
+		const contradictions = epic_audit_checks.find_order_contradictions(children)
+
+		expect(messages(contradictions)).toContain('#860')
+		expect(messages(contradictions)).toContain('#869')
+		expect(epic_audit_checks.find_implicit_dependencies(children, contradictions)).toEqual([])
+	})
+
+	it('keeps the error while the child naming the other is still open', () => {
+		const findings = epic_audit_checks.find_order_contradictions([
+			child(860, ACCEPTANCE_BODY),
+			closed(child(869, '')),
+		])
+
+		expect(findings[0]?.level).toBe('error')
+	})
+
+	it('keeps the error while the child that is named is still open', () => {
+		const findings = epic_audit_checks.find_order_contradictions([
+			closed(child(860, ACCEPTANCE_BODY)),
+			child(869, ''),
+		])
+
+		expect(findings[0]?.level).toBe('error')
 	})
 })
 
