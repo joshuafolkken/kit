@@ -1,18 +1,19 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AuditFinding, IssueReference, ReferenceState } from './epic-audit'
+import type { AuditFinding, ReferenceState } from './epic-audit'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_audit_cli, type AuditInput } from './epic-audit-cli'
-import { epic_fetch, type EpicSnapshot } from './epic-fetch'
+import { epic_fetch } from './epic-fetch'
+import type { IssueReference } from './epic-graph'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'
-const OWNER = 'joshuafolkken'
 const EPIC = 858
 const GET_BODY = 'issue_get_body'
 const FETCH_CHILD = 'fetch_child'
 const LOCAL_BODY = 'local body'
 const REMOTE_BODY = 'remote body'
+const DOTTED_REPO = 'joshuafolkken/site.com'
 
 function body_from(repo: string): string {
 	return `body from ${repo}`
@@ -24,18 +25,6 @@ function child_in(number: number, repo: string, body?: string): AuditChild {
 
 function child(number: number, body: string): AuditChild {
 	return child_in(number, REPO, body)
-}
-
-function snapshot(overrides: Partial<EpicSnapshot> = {}): EpicSnapshot {
-	return {
-		body: undefined,
-		children: [],
-		child_numbers: [1],
-		unreadable: [],
-		skipped: [],
-		has_external_children: false,
-		...overrides,
-	}
 }
 
 function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
@@ -73,46 +62,8 @@ describe('epic_audit_cli.parse_epic_number', () => {
 	})
 })
 
-function claims(body: string | null): boolean {
-	return epic_audit_cli.claims_parent(body, EPIC, REPO)
-}
-
-describe('epic_audit_cli.claims_parent', () => {
-	it('recognizes the parent line the templates write', () => {
-		expect(claims('親: joshuafolkken/kit#858')).toBe(true)
-	})
-
-	it('recognizes the English spelling', () => {
-		expect(claims('Parent: #858')).toBe(true)
-	})
-
-	// An issue parented to a different epic routinely backlinks this one elsewhere in its body;
-	// matching the marker and the number independently reported every such issue as an orphan.
-	it('does not claim an issue whose parent line names a different epic', () => {
-		const body = '親: joshuafolkken/kit#900\n\nRelated to #858 for context.'
-
-		expect(claims(body)).toBe(false)
-	})
-
-	it('does not claim an issue that merely mentions the epic', () => {
-		expect(claims('see #858')).toBe(false)
-	})
-
-	// A parent line naming another repository's epic of the same number is not this epic's child
-	// (joshuafolkken/kit#1014).
-	it('does not claim an issue parented to the same number elsewhere', () => {
-		expect(claims('親: joshuafolkken/app-kit#858')).toBe(false)
-	})
-
-	// `gh issue list --json body` answers with JSON null for an issue that has none.
-	it('handles a body gh reported as null', () => {
-		// eslint-disable-next-line unicorn/no-null -- the shape gh's JSON actually produces
-		expect(claims(null)).toBe(false)
-	})
-})
-
 function outside(children: ReadonlyArray<AuditChild>): ReadonlyArray<IssueReference> {
-	return epic_audit_cli.outside_references(children, OWNER)
+	return epic_audit_cli.outside_references(children, REPO)
 }
 
 describe('epic_audit_cli.outside_references', () => {
@@ -148,6 +99,24 @@ describe('epic_audit_cli.outside_references', () => {
 	// this command to their tracker.
 	it('leaves out a repository this owner does not own', () => {
 		expect(outside([child(1, 'see sveltejs/kit#900')])).toEqual([])
+	})
+
+	// A repository name may contain a dot, and the task list has always tracked one; the prose parse
+	// refused it, so a sibling quoting a child it *does* track was skipped in silence
+	// (joshuafolkken/kit#1016).
+	it('reads a dotted repository name the epic actually tracks', () => {
+		const children = [child(1, `see ${DOTTED_REPO}#40`), child_in(40, DOTTED_REPO)]
+
+		expect(outside(children)).toEqual([])
+		expect(outside([child(1, `see ${DOTTED_REPO}#41`), child_in(40, DOTTED_REPO)])).toEqual([
+			{ repo: DOTTED_REPO, number: 41 },
+		])
+	})
+
+	// The same shape written in prose is a path, and reading it as a repository is the misread the
+	// dot was excluded for. No epic tracks `prompts/review.md`, so it stays prose.
+	it('still refuses a path written in prose', () => {
+		expect(outside([child(1, 'see prompts/review.md#5')])).toEqual([])
 	})
 })
 
@@ -187,41 +156,6 @@ describe('epic_audit_cli.resolve_reference_states', () => {
 
 		expect(states.size).toBe(2)
 		expect(states.get(`${OTHER_REPO}#40`)).toBe('UNRESOLVED')
-	})
-})
-
-// An orphan is recognized by number alone, so the numbers it is checked against must be this
-// repository's rows only (joshuafolkken/kit#1014).
-describe('epic_audit_cli.locally_tracked', () => {
-	it('reads the rows naming this repository', () => {
-		expect(epic_audit_cli.locally_tracked(snapshot({ body: '- [ ] #12\n- [ ] #13' }))).toEqual([
-			12, 13,
-		])
-	})
-
-	it('leaves out a row naming another repository', () => {
-		const body = '- [ ] #12\n- [ ] joshuafolkken/app-kit#40'
-
-		expect(epic_audit_cli.locally_tracked(snapshot({ body }))).toEqual([12])
-	})
-})
-
-// `epic:next` refuses to run on an epic with a child it could not read; an audit reporting a clean
-// bill on the same input would contradict the command that acts on it.
-describe('epic_audit_cli.unreadable_findings', () => {
-	it('reports a child that could not be read as an error', () => {
-		const findings = epic_audit_cli.unreadable_findings(snapshot({ unreadable: [7] }))
-
-		expect(findings[0]?.level).toBe('error')
-		expect(findings[0]?.message).toContain('#7')
-	})
-
-	it('reports children dropped past the fetch limit too', () => {
-		expect(epic_audit_cli.unreadable_findings(snapshot({ skipped: [8] }))).toHaveLength(1)
-	})
-
-	it('reports nothing when every child was read', () => {
-		expect(epic_audit_cli.unreadable_findings(snapshot())).toEqual([])
 	})
 })
 

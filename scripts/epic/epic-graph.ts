@@ -1,5 +1,9 @@
 import type { DependencyLink } from '#scripts/git/git-epic-parse'
-import { format_dependency_link } from '#scripts/git/git-epic-reference'
+import {
+	format_dependency_link,
+	join_references,
+	to_issue_reference,
+} from '#scripts/git/git-epic-reference'
 
 // The dependency graph an epic's children form, and the two ways it can be wrong.
 //
@@ -32,11 +36,43 @@ interface GraphAnomaly {
 // (joshuafolkken/kit#864). The audit keys the issues its children *cite* the same way, through this
 // one function rather than a second spelling of it (joshuafolkken/kit#1014).
 function reference_key(repo: string, issue_number: number): string {
-	return `${repo}#${String(issue_number)}`
+	return `${repo}${to_issue_reference(issue_number)}`
 }
 
-function key_of(child: EpicChild): string {
-	return reference_key(child.repo, child.number)
+// An issue named from outside the graph — a task-list row, a citation in prose, a child that could
+// not be read. Repository and number both, because a number alone cannot identify one: issue numbers
+// are unique per repository, so the same `#40` names two different issues depending on who wrote it
+// (joshuafolkken/kit#1014).
+interface IssueReference {
+	repo: string
+	number: number
+}
+
+// An `EpicChild` is an `IssueReference` with more on it, so children and citations key the same way.
+function key_of(reference: IssueReference): string {
+	return reference_key(reference.repo, reference.number)
+}
+
+// How a reference is written in a message. Bare inside the repository the command runs in — the form
+// every body writes and every existing message used — and `owner/repo#N` outside it, because a bare
+// number resolves against the reader's own repository and names a different issue there
+// (joshuafolkken/kit#864).
+//
+// It lives here rather than in the audit, beside the key it is the readable half of: `epic:next`
+// reports the children it could not read too, and a second spelling there would print a bare `#7`
+// for a child in another repository — the very misreading this exists to prevent
+// (joshuafolkken/kit#1016).
+function format_reference(reference: IssueReference, current_repo: string): string {
+	const is_local = reference.repo === '' || reference.repo === current_repo
+
+	return is_local ? to_issue_reference(reference.number) : key_of(reference)
+}
+
+function format_references(
+	references: ReadonlyArray<IssueReference>,
+	current_repo: string,
+): string {
+	return join_references(references.map((reference) => format_reference(reference, current_repo)))
 }
 
 // A blocker number, as a key in the repository that declared it. `blockedBy` numbers are issue
@@ -180,6 +216,8 @@ function find_anomalies(
 const epic_graph = {
 	reference_key,
 	key_of,
+	format_reference,
+	format_references,
 	blocker_key,
 	index_children,
 	blockers_of,
@@ -189,5 +227,5 @@ const epic_graph = {
 	find_anomalies,
 }
 
-export type { EpicChild, GraphAnomaly, GraphAnomalyKind }
+export type { EpicChild, GraphAnomaly, GraphAnomalyKind, IssueReference }
 export { epic_graph }

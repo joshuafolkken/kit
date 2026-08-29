@@ -1,4 +1,4 @@
-import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // Reading an epic's children against each other.
 //
@@ -18,13 +18,25 @@ import { epic_graph, type EpicChild } from './epic-graph'
 // backtrack, and this runs over every child's whole body.
 const REFERENCE_PATTERN = /#(\d+)\b/gu
 // What may appear in the `owner/repo` written in front of a `#`: exactly the set the previous
-// lookbehind refused a bare reference after. A `.` is deliberately not in it, so a path written in
-// prose ends the prefix rather than becoming one — `prompts/review.md#5` reads back as `md`, which is
-// no repository, and is not a reference at all. The cost is a repository whose name contains a dot,
-// which no first-party one does and which the previous parse missed as well.
-const PREFIX_CHARACTER = /[\w/-]/u
+// lookbehind refused a bare reference after, plus the `.` a repository name may legitimately contain.
+//
+// The dot is where this parse and the task-list parse used to disagree. `git_epic_parse`'s
+// `EXTERNAL_REFERENCE_SOURCE` allows one, so `- [ ] owner/site.com#40` is tracked as a genuine
+// cross-repository child; this one excluded it, so a sibling quoting `owner/site.com#40` was read
+// back as `com` — no repository — and every check skipped it in silence. A child that can be tracked
+// but never cited is the gap joshuafolkken/kit#1016 closes.
+//
+// Nothing in the syntax separates `owner/site.com` from a path written in prose: `prompts/review.md`
+// has the same shape, and reading it as a repository is the misread the exclusion was there to
+// prevent. So the dot is admitted and `reference_repo` decides — a dotted name is a repository only
+// when the epic actually tracks one by that name.
+const PREFIX_CHARACTER = /[\w./-]/u
 const REPO_SEPARATOR = '/'
 const REPO_PART_COUNT = 2
+const REPO_NAME_DOT = '.'
+// No epic in view, so no dotted name can be confirmed against one. Shared rather than allocated per
+// call: it is never written to.
+const NO_KNOWN_REPOS: ReadonlySet<string> = new Set()
 // Where a child states what it must deliver. Both spellings, because the bodies are written in
 // whichever language the session was in.
 const ACCEPTANCE_HEADINGS: ReadonlyArray<string> = ['## 受け入れ条件', '## Acceptance criteria']
@@ -37,24 +49,10 @@ type FindingLevel = 'error' | 'warning'
 // one type instead of two identical ones.
 type ReferenceState = 'OPEN' | 'CLOSED' | 'UNRESOLVED'
 
-// An issue named in prose, with the repository it lives in. A number alone cannot identify one:
-// issue numbers are unique per repository, so the same `#40` names two different issues depending on
-// whose body wrote it (joshuafolkken/kit#1014).
-interface IssueReference {
-	repo: string
-	number: number
-}
-
 interface AuditFinding {
 	level: FindingLevel
 	check: string
 	message: string
-}
-
-// One reference's identity, in the shape `epic_graph` already keys a child by: an `AuditChild` is an
-// `IssueReference` with more on it, so children and citations key the same way.
-function key_of(reference: IssueReference): string {
-	return epic_graph.reference_key(reference.repo, reference.number)
 }
 
 // The text immediately in front of a `#`, up to the first character that cannot be part of an
@@ -67,25 +65,42 @@ function prefix_before(text: string, index: number): string {
 	return text.slice(start, index)
 }
 
+// Two non-empty segments, which is all a repository name and a path have in common.
+function is_repo_shape(parts: ReadonlyArray<string>): boolean {
+	return parts.length === REPO_PART_COUNT && parts.every((part) => part !== '')
+}
+
 // Which repository a reference names: the body's own when nothing is written in front of the `#`,
 // the named one when an `owner/repo` is, and none at all when the prefix is something else — a bare
 // word (`kit#12` names nothing GitHub can resolve) or the tail of a URL.
-function reference_repo(prefix: string, repo: string): string | undefined {
+//
+// A dotted name is the one case the shape cannot settle, so it is settled by `known_repos` — the
+// repositories this epic actually spans. `owner/site.com#40` is read when the epic tracks a child
+// there, and `prompts/review.md#5` is not read at all, because no epic tracks a repository by that
+// name. That makes the set of children that can be *tracked* and the set that can be *cited* the same
+// set, which is what joshuafolkken/kit#1016 asked for, without admitting the path misread that
+// widening the pattern outright would have brought back.
+function reference_repo(
+	prefix: string,
+	repo: string,
+	known: ReadonlySet<string>,
+): string | undefined {
 	if (prefix === '') return repo
-	const parts = prefix.split(REPO_SEPARATOR)
-	if (parts.length !== REPO_PART_COUNT) return undefined
+	if (!is_repo_shape(prefix.split(REPO_SEPARATOR))) return undefined
+	if (!prefix.includes(REPO_NAME_DOT)) return prefix
 
-	return parts.every((part) => part !== '') ? prefix : undefined
+	return known.has(prefix) ? prefix : undefined
 }
 
 function to_reference(
 	text: string,
 	match: RegExpExecArray,
 	repo: string,
+	known: ReadonlySet<string>,
 ): IssueReference | undefined {
 	const issue_number = Number(match[1])
 	if (!Number.isSafeInteger(issue_number)) return undefined
-	const named_repo = reference_repo(prefix_before(text, match.index), repo)
+	const named_repo = reference_repo(prefix_before(text, match.index), repo, known)
 
 	return named_repo === undefined ? undefined : { repo: named_repo, number: issue_number }
 }
@@ -96,7 +111,7 @@ function unique_references(references: ReadonlyArray<IssueReference>): Array<Iss
 	const seen = new Set<string>()
 
 	return references.filter((reference) => {
-		const key = key_of(reference)
+		const key = epic_graph.key_of(reference)
 		const is_new = !seen.has(key)
 
 		seen.add(key)
@@ -107,16 +122,35 @@ function unique_references(references: ReadonlyArray<IssueReference>): Array<Iss
 
 // The issues a piece of prose refers to, each with the repository it lives in. `repo` is the
 // `owner/name` whose body this is: an unqualified `#N` there names that repository's issue N.
-function parse_issue_references(text: string, repo: string): Array<IssueReference> {
+//
+// `known` names the repositories the epic in hand spans, and only a dotted name consults it —
+// see `reference_repo`. A caller with no epic in view passes nothing and gets the dotless reading,
+// which is what every caller got before joshuafolkken/kit#1016.
+function parse_issue_references(
+	text: string,
+	repo: string,
+	known: ReadonlySet<string> = NO_KNOWN_REPOS,
+): Array<IssueReference> {
 	const found: Array<IssueReference> = []
 
 	for (const match of text.matchAll(REFERENCE_PATTERN)) {
-		const reference = to_reference(text, match, repo)
+		const reference = to_reference(text, match, repo, known)
 
 		if (reference !== undefined) found.push(reference)
 	}
 
 	return unique_references(found)
+}
+
+// The repositories an epic actually spans, which is what settles a dotted name written in prose:
+// `owner/site.com#40` is a reference when a child lives there and a path otherwise. Built from the
+// children rather than supplied, so a caller cannot hand the parse a set that disagrees with the
+// epic being read (joshuafolkken/kit#1016).
+function known_repos(
+	children: ReadonlyArray<IssueReference>,
+	current_repo: string,
+): ReadonlySet<string> {
+	return new Set([current_repo, ...children.map((child) => child.repo)])
 }
 
 // The issue numbers a piece of prose refers to *in its own repository*. Kept as the narrower reading
@@ -126,16 +160,6 @@ function parse_references(text: string, repo = ''): Array<number> {
 	return parse_issue_references(text, repo)
 		.filter((reference) => reference.repo === repo)
 		.map((reference) => reference.number)
-}
-
-// How a reference is written in a finding. Bare inside the repository the audit runs in — the form
-// every body writes and every existing message used — and `owner/repo#N` outside it, because a bare
-// number resolves against the reader's own repository and names a different issue there
-// (joshuafolkken/kit#864).
-function format_reference(reference: IssueReference, current_repo: string): string {
-	const is_local = reference.repo === '' || reference.repo === current_repo
-
-	return is_local ? `#${String(reference.number)}` : key_of(reference)
 }
 
 function is_acceptance_heading(line: string): boolean {
@@ -201,15 +225,14 @@ function depends_on(
 // the very reading this module exists to prevent.
 const epic_audit_logic = {
 	ACCEPTANCE_HEADINGS,
-	key_of,
 	unique_references,
+	known_repos,
 	parse_issue_references,
 	parse_references,
-	format_reference,
 	acceptance_section,
 	collect_blockers,
 	depends_on,
 }
 
-export type { AuditFinding, FindingLevel, IssueReference, ReferenceState }
+export type { AuditFinding, FindingLevel, ReferenceState }
 export { epic_audit_logic }
