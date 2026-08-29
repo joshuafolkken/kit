@@ -54,8 +54,11 @@ const blocking_issue_schema = z.object({
 	state: z.string().optional(),
 })
 
-// `gh` answers a GraphQL connection — `{ nodes, totalCount }` — not a bare array. Measured against a
-// real issue rather than assumed (joshuafolkken/kit#860).
+// The blocker relations arrive as a connection — `{ nodes, totalCount }` — not a bare array.
+// Measured against a real issue rather than assumed (joshuafolkken/kit#860). `gh issue view`
+// answered the connection itself; since joshuafolkken/kit#1024 REST serves a bare array from the
+// issue's own `dependencies/blocked_by` endpoint and `git-gh-issue-rest.ts` maps it back into this
+// shape, so every reader below is unchanged.
 //
 // **One definition, every reader.** The same connection was written out three times — twice here and
 // once in `scripts/epic/epic-issue.ts` — each naming only the fields its own caller happened to want,
@@ -63,11 +66,15 @@ const blocking_issue_schema = z.object({
 // duplication joshuafolkken/kit#862 removed from the epic commands, reintroduced by the readers that
 // came after (joshuafolkken/kit#1005).
 //
-// `nodes` is a page — `blockedBy(first:50)` — while `totalCount` is exact, so a reader that compares
-// them can tell a complete page from a truncated one. **Only the `auto-ok` pickup does**; the epic
-// readers judge from the page they were given, so an epic child declaring more than fifty blockers
-// is read from the first fifty. Carried here so the field is available, not because every reader
-// consults it (joshuafolkken/kit#1005).
+// `nodes` is a page — `blockedBy(first:50)` under GraphQL, one unpaged `per_page=100` request under
+// REST — while `totalCount` is exact, read from the issue's own dependency summary. A reader that
+// compares them can tell a complete page from a truncated one, with one exception: where GitHub
+// reports no summary at all the count falls back to the page's own size, and a truncated page then
+// reads as complete. Every issue the reads go through carries one, so that is a guard rather than
+// a case. **Only the `auto-ok` pickup compares them**; the epic readers judge from the page they
+// were given, so an epic child declaring more blockers than one page holds is read from the first
+// page. Carried here so the field is available, not because every reader consults it
+// (joshuafolkken/kit#1005).
 const blocked_by_schema = z
 	.object({
 		nodes: z.array(blocking_issue_schema).default([]),
@@ -80,8 +87,8 @@ const epic_child_schema = z.object({
 	blockedBy: blocked_by_schema,
 })
 
-// `gh issue view --json number,labels,body` for the epic check. Labels come back as objects, so the
-// name is picked out here rather than at every call site.
+// The `number,labels,body` read, for the epic check. Labels come back as objects, so the name is
+// picked out here rather than at every call site.
 const issue_label_schema = z.object({ name: z.string() })
 
 const epic_subject_schema = z.object({

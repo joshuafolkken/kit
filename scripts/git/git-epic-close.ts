@@ -75,9 +75,10 @@ async function inspect_sibling(sibling: number, repo?: string): Promise<SiblingS
 	return to_sibling_state(await git_gh_command.issue_get_state_and_relations(String(sibling), repo))
 }
 
-// A cross-repository child, read through `gh --repo`. `is_readable` is what decides whether the epic
-// may close at all: closing while a child's state is unknown is exactly what the old refusal
-// prevented, and reading them is the only thing that changed (joshuafolkken/kit#864).
+// A cross-repository child, read by naming its repository in the read's REST path. `is_readable`
+// is what decides whether the epic may close at all: closing while a child's state is unknown is
+// exactly what the old refusal prevented, and reading them is the only thing that changed
+// (joshuafolkken/kit#864).
 async function inspect_external(
 	child: ExternalChild,
 ): Promise<SiblingState & { is_readable: boolean }> {

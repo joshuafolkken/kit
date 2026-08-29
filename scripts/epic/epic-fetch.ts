@@ -91,9 +91,10 @@ async function fetch_children(
 	}
 }
 
-// The children that live in other repositories, read through `gh --repo`. No local checkout is
-// needed: their state is a GitHub fact, and requiring a clone to learn it is what kept the auto-close
-// from ever running on such an epic (joshuafolkken/kit#864).
+// The children that live in other repositories, read by naming that repository in the read's REST
+// path (`repos/<owner>/<repo>/issues/<n>`). No local checkout is needed: their state is a GitHub
+// fact, and requiring a clone to learn it is what kept the auto-close from ever running on such an
+// epic (joshuafolkken/kit#864).
 //
 // A repository with a different owner is dropped before it is read, inheriting
 // joshuafolkken/kit#869's restriction rather than restating it.

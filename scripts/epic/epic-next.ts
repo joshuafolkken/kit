@@ -22,9 +22,9 @@ const REPO_FLAG = '--repo'
 const USAGE = 'Usage: josh epic:next <epic-number|owner/repo#number> [--repo <owner/repo>]'
 const UNKNOWN_REPO = 'unknown/unknown'
 const EXTERNAL_NOTICE = 'Note: this epic tracks children in other repositories.'
-// A qualified epic is now read through `gh --repo`, so naming one we do not own would send this
-// command to a third party's tracker — which joshuafolkken/kit#869 forbids for a child and forbids
-// here for the same reason (joshuafolkken/kit#1016).
+// A qualified epic is read by naming its repository in the read's REST path, so naming one we do
+// not own would send this command to a third party's tracker — which joshuafolkken/kit#869 forbids
+// for a child and forbids here for the same reason (joshuafolkken/kit#1016).
 const FOREIGN_EPIC = 'That epic belongs to another owner; this command only reads our own.'
 // What a repository that is already running something answers. `wait` rather than a number, and
 // `wait` rather than `stop`: the holder finishes or its stale label is removed, so asking again is
@@ -229,9 +229,9 @@ function refuse(reason: string): number {
 }
 
 // Where the epic lives, or nothing when it belongs to another owner. The qualified read added by
-// joshuafolkken/kit#1016 goes out as `gh --repo`, so without this a reference naming a third party's
-// epic would send this command to their tracker — the read joshuafolkken/kit#869 forbids for a child,
-// forbidden here for the same reason.
+// joshuafolkken/kit#1016 names that repository in its REST path, so without this a reference naming
+// a third party's epic would send this command to their tracker — the read joshuafolkken/kit#869
+// forbids for a child, forbidden here for the same reason.
 function epic_repo_of(options: NextOptions, current_repo: string): string | undefined {
 	const epic_repo = options.epic_repo ?? current_repo
 	const owner = epic_cross_repo.owner_of(current_repo)

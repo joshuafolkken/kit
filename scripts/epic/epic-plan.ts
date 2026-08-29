@@ -21,9 +21,10 @@ interface EpicPlan {
 	children: ReadonlyArray<PlanChild>
 }
 
-// A child from one `gh issue view --json …` response, or nothing when the response is not an issue
-// at all. Missing optional fields become empty values rather than absent keys, so a consumer reads
-// one shape whatever `gh` answered.
+// A child from one issue read — `gh api` since joshuafolkken/kit#1024, mapped back into the field
+// names `gh issue view --json …` used — or nothing when the response is not an issue at all.
+// Missing optional fields become empty values rather than absent keys, so a consumer reads one
+// shape whatever the read answered.
 function to_plan_child(raw: string | undefined): PlanChild | undefined {
 	const parsed = epic_issue.parse_epic_issue(raw)
 	if (parsed === undefined) return undefined
