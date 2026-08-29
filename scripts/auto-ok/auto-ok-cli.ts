@@ -38,11 +38,22 @@ const LISTING_LIMIT = 200
 // wastes the one hint the message had to give (joshuafolkken/kit#996).
 const UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing. That is not "nothing is opted in" — check \`gh auth status\` and ask again.`
 const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — \`gh\`'s JSON fields have most likely changed, so check \`gh --version\` and the fields this command asks for rather than your authentication.`
-// A `gh` too old to know `blockedBy` fails the listing outright, and `issue_list_open` swallows the
-// error — so the read looks exactly like an access failure and sends the reader to `gh auth status`,
-// which is green. That is the misdirection joshuafolkken/kit#996 added the message above to remove,
-// walked straight back in by the field the same change started asking for (joshuafolkken/kit#1005).
-const OUTDATED_GH_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing, and this \`gh\` does not support the \`blockedBy\` field the pickup needs — which is the likelier cause than your authentication. Upgrade \`gh\` (\`gh --version\` reports what you have) and ask again.`
+// The blocker relations failing takes the whole listing with them, and `issue_list_open` swallows
+// the error — so the read looks exactly like an access failure and sends the reader to
+// `gh auth status`, which is green. That is the misdirection joshuafolkken/kit#996 added the message
+// above to remove, walked straight back in by the field the same change started asking for
+// (joshuafolkken/kit#1005).
+//
+// The listing is REST now, so the cause is no longer `gh`'s version: the relations come from each
+// issue's own `dependencies/blocked_by` endpoint, and it is those requests — not the CLI — that the
+// probe has just shown to be the difference. Naming `gh --version` here would send a reader on a
+// current `gh` to the one place the answer is not.
+//
+// It names both causes rather than asserting one. The probe separates "the relations" from "the
+// listing", and it cannot separate a host that does not serve dependencies from a rate limit reached
+// by the one-request-per-blocked-issue pass — so claiming the first would be the same misdirection
+// in a new place (joshuafolkken/kit#1025).
+const BLOCKERS_UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing, though the same listing reads once the blocker relations are dropped from it — so it is reading the relations that failed, not your authentication. That is one \`dependencies/blocked_by\` request per opted-in issue declaring a blocker: either this GitHub host does not serve issue dependencies, or those requests are being rate limited. Ask again, and check the host if it persists.`
 // Said once the answer is known, so it never claims there is an answer below when there is not. The
 // cap only ever drops the *oldest* opted-in issues, `gh` listing newest first.
 const TRUNCATED_PREFIX = `⚠ The listing hit the ${String(LISTING_LIMIT)}-issue cap, so the oldest \`${AUTO_OK_LABEL}\` issues are not in it`
@@ -117,7 +128,7 @@ type OptedInRead =
 	| { kind: 'read'; issues: Array<OpenIssueData> }
 	| { kind: 'unreadable' }
 	| { kind: 'unexpected_shape' }
-	| { kind: 'outdated_gh' }
+	| { kind: 'blockers_unreadable' }
 
 // `undefined` is unparseable output, or valid JSON that is not a listing at all — `gh` answering
 // `{"message":"API rate limit exceeded"}`. Both are gaps, and reading either as an empty listing is
@@ -146,19 +157,19 @@ async function reads_without_blocked_by(): Promise<boolean> {
 
 // Which gap a failed listing was. Both probes run only here, so a healthy run never spends either.
 //
-// **The field is blamed only when it fails twice and the form without it succeeds.** One success of
-// that form is not enough on its own: a network blip or a passing rate limit on the first
-// read clears by the time the probe runs, and the run would then tell someone on a perfectly current
-// `gh` to upgrade it. `gh` does put the unsupported-field error on stderr, but `issue_list_open`
-// swallows it, so repeating the original read is what separates a transient failure from a standing
-// one (joshuafolkken/kit#1005).
+// **The relations are blamed only when they fail twice and the form without them succeeds.** One
+// success of that form is not enough on its own: a network blip or a passing rate limit on the first
+// read clears by the time the probe runs, and the run would then send someone whose host serves
+// dependencies perfectly well to look at it. `issue_list_open` swallows the underlying error, so
+// repeating the original read is what separates a transient failure from a standing one
+// (joshuafolkken/kit#1005).
 async function classify_failed_read(): Promise<OptedInRead> {
 	if (!(await reads_without_blocked_by())) return { kind: 'unreadable' }
 
 	const retry = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT)
 
 	// The original form working on the second attempt means nothing was wrong with the field.
-	return retry === undefined ? { kind: 'outdated_gh' } : parse_listing(retry)
+	return retry === undefined ? { kind: 'blockers_unreadable' } : parse_listing(retry)
 }
 
 async function fetch_opted_in(): Promise<OptedInRead> {
@@ -269,7 +280,7 @@ function report(issues: ReadonlyArray<OpenIssueData>, exclude?: ReadonlyArray<nu
 const READ_FAILURE_MESSAGES = {
 	unreadable: UNREADABLE_MESSAGE,
 	unexpected_shape: UNEXPECTED_SHAPE_MESSAGE,
-	outdated_gh: OUTDATED_GH_MESSAGE,
+	blockers_unreadable: BLOCKERS_UNREADABLE_MESSAGE,
 } as const
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -306,7 +317,7 @@ const auto_ok_cli = {
 	LISTING_LIMIT,
 	UNREADABLE_MESSAGE,
 	UNEXPECTED_SHAPE_MESSAGE,
-	OUTDATED_GH_MESSAGE,
+	BLOCKERS_UNREADABLE_MESSAGE,
 	TRUNCATED_WITH_ANSWER,
 	TRUNCATED_WITHOUT_ANSWER,
 	NONE_OPTED_IN_MESSAGE,

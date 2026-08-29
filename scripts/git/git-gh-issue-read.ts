@@ -13,14 +13,6 @@ import {
 // and telling a number that resolves to nothing from a read that failed belongs with them
 // (joshuafolkken/kit#957).
 
-// `--repo <owner/repo>` for the `gh <noun> <verb>` calls that still take one. The reads below no
-// longer do — they name the repository inside the REST path instead (`git-gh-api-path.ts`) — but the
-// *listings* in `git-gh-issue.ts` do, and they are converted by joshuafolkken/kit#1025. One
-// definition rather than a second spelling of `['--repo', repo]` over there.
-function repo_scope(repo?: string): Array<string> {
-	return repo === undefined ? [] : ['--repo', repo]
-}
-
 // The blocker relations, which REST serves from their own endpoint rather than inside the issue.
 // `gh issue view --json blockedBy` answered them in the same response because GraphQL selects them
 // as a connection; REST needs a second request (joshuafolkken/kit#1024).
@@ -34,6 +26,11 @@ const BLOCKED_BY_PATH = '/dependencies/blocked_by?per_page=100'
 // case and the one that matters for cost: `epic:bundle` reads relations for the whole open backlog,
 // up to two hundred issues, and every one of those reads names `blockedBy`. Without the skip the
 // pass would be four hundred requests where `gh` made two hundred.
+//
+// Exported because the *listings* need exactly this, and for exactly this reason: a listing response
+// carries every row's `issue_dependencies_summary` but no `blockedBy`, so the pickup that asks for
+// the field pays one request per row that declares a blocker and nothing for the rest. A second copy
+// beside the listing requests is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1025).
 async function read_blocked_by(
 	issue_number: string,
 	rest: RestIssue,
@@ -221,4 +218,4 @@ const git_gh_issue_read = {
 }
 
 export type { IssueRead }
-export { git_gh_issue_read, NOT_FOUND_STATUS, repo_scope }
+export { git_gh_issue_read, read_blocked_by, NOT_FOUND_STATUS }
