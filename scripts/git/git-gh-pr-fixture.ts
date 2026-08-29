@@ -10,6 +10,10 @@ const PR_NUMBER = 972
 const PR_HTML_URL = 'https://github.com/joshuafolkken/kit/pull/972'
 const PR_API_URL = 'https://api.github.com/repos/joshuafolkken/kit/pulls/972'
 const REPO_NAME_PATH = 'repos/{owner}/{repo}'
+// The head and base repository of a pull request opened on a branch of this repository. A fork names
+// a different one in `head.repo`, which is what `is_same_repository_head` reads.
+const PR_REPO = 'joshuafolkken/kit'
+const FORK_REPO = 'someone-else/kit'
 const EMPTY_LISTING = '[]'
 const RATE_LIMITED = '{"message":"API rate limit exceeded"}'
 
@@ -82,7 +86,8 @@ function rest_pull(overrides: Record<string, unknown> = {}): string {
 		state: 'open',
 		url: PR_API_URL,
 		html_url: PR_HTML_URL,
-		head: { ref: PR_BRANCH, sha: PR_HEAD_SHA },
+		head: { ref: PR_BRANCH, sha: PR_HEAD_SHA, repo: { full_name: PR_REPO } },
+		base: { repo: { full_name: PR_REPO } },
 		...overrides,
 	})
 }
@@ -118,8 +123,26 @@ function pr_routes(
 	}
 }
 
+// The request one path received, picked out of everything the `exec_gh_api` mock was called with.
+// Throwing names the path that was never asked for, where an index would report an `undefined` the
+// caller then has to assert away.
+function find_request(requests: ReadonlyArray<GhApiRequest>, path: string): GhApiRequest {
+	const request = requests.find((candidate) => candidate.path === path)
+	if (request === undefined) throw new Error(`gh api was never called with ${path}`)
+
+	return request
+}
+
+// The JSON body a write sent. Both pull-request write test files ask this of the same mock, so it is
+// one helper rather than one per file (joshuafolkken/kit#1029).
+function request_body(request: GhApiRequest): Record<string, unknown> {
+	return JSON.parse(request.body ?? '') as Record<string, unknown>
+}
+
 export {
 	check_runs_pages,
+	find_request,
+	request_body,
 	commit_check_runs_path,
 	commit_status_path,
 	gh_api_routes,
@@ -138,6 +161,8 @@ export {
 	PR_HEAD_SHA,
 	PR_HTML_URL,
 	PR_NUMBER,
+	PR_REPO,
+	FORK_REPO,
 	RATE_LIMITED,
 	REPO_NAME_PATH,
 }

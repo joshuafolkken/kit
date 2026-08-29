@@ -5,7 +5,6 @@ import { git_gh_repo } from './git-gh-repo'
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
 	has_stderr_field: (): boolean => false,
-	BODY_FILE_FLAG: '--body-file',
 	BODY_FROM_STDIN: '-',
 }))
 

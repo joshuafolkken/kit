@@ -1,6 +1,6 @@
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
-import { read_pull, resolve_pr_number } from './git-gh-pr-read'
+import { read_pull, require_pr_number } from './git-gh-pr-read'
 import type { RestPull } from './git-gh-pr-rest'
 import { git_gh_pr_review } from './git-gh-pr-review'
 import { git_gh_pr_rollup } from './git-gh-pr-rollup'
@@ -18,7 +18,6 @@ import { to_gh_state } from './git-gh-rest-state'
 // The answer stays the JSON string `parse_pr_state_snapshot` already parses. Nothing downstream —
 // `git-pr-checks-parse.ts`, `git-pr-checks-eval.ts`, `git-pr-followup.ts` — changes.
 
-const NO_PULL_REQUEST_MESSAGE = 'gh api found no pull request for branch'
 const NO_HEAD_SHA_MESSAGE = 'gh api answered a pull request with no head commit'
 
 // Both commit endpoints answer an *object* wrapping the listing, so `--paginate` alone would emit
@@ -86,12 +85,11 @@ async function build_snapshot(pull: RestPull): Promise<Record<string, unknown>> 
 // had: `git-pr-followup.ts` catches it and falls through to the poll, and folding a failure into an
 // empty snapshot instead would read as "no checks, nothing requested" — green.
 async function pr_get_state_snapshot(branch_name: string): Promise<string> {
-	const pr_number = await resolve_pr_number(branch_name)
-	if (pr_number === undefined) throw new Error(`${NO_PULL_REQUEST_MESSAGE}: ${branch_name}`)
+	const pull = await read_pull(await require_pr_number(branch_name))
 
-	return JSON.stringify(await build_snapshot(await read_pull(pr_number)))
+	return JSON.stringify(await build_snapshot(pull))
 }
 
 const git_gh_pr_snapshot = { pr_get_state_snapshot }
 
-export { git_gh_pr_snapshot, pr_get_state_snapshot, NO_HEAD_SHA_MESSAGE, NO_PULL_REQUEST_MESSAGE }
+export { git_gh_pr_snapshot, pr_get_state_snapshot, NO_HEAD_SHA_MESSAGE }

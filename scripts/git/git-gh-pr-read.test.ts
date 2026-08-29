@@ -24,7 +24,6 @@ import { forget_pr_numbers, git_gh_pr_read } from './git-gh-pr-read'
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_command: vi.fn(), exec_gh_api: vi.fn() },
 	has_stderr_field: (): boolean => false,
-	BODY_FILE_FLAG: '--body-file',
 	BODY_FROM_STDIN: '-',
 }))
 

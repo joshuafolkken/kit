@@ -11,12 +11,8 @@ import {
 	pr_routes,
 	status_pages,
 } from './git-gh-pr-fixture'
-import { forget_pr_numbers } from './git-gh-pr-read'
-import {
-	NO_HEAD_SHA_MESSAGE,
-	NO_PULL_REQUEST_MESSAGE,
-	pr_get_state_snapshot,
-} from './git-gh-pr-snapshot'
+import { forget_pr_numbers, NO_PULL_REQUEST_MESSAGE } from './git-gh-pr-read'
+import { NO_HEAD_SHA_MESSAGE, pr_get_state_snapshot } from './git-gh-pr-snapshot'
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
 

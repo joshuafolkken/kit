@@ -46,6 +46,12 @@ const COMMENTS_QUERY = FULL_PAGE_QUERY
 // interpolation.
 const OWNER_PLACEHOLDER = '{owner}'
 const NO_HEAD_REF_MESSAGE = 'gh api answered a pull request with no head branch'
+const FORK_HEAD_MESSAGE =
+	'gh api answered a pull request whose head branch is in another repository'
+// What a branch-keyed caller that cannot fold an absence into its own answer throws. Lives here
+// rather than beside either caller: the merge-gate snapshot and the two branch-keyed writes all need
+// it, and three copies of one message is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1029).
+const NO_PULL_REQUEST_MESSAGE = 'gh api found no pull request for branch'
 
 // `head` names the owner of the head repository, which for every branch this tooling opens is the
 // repository's own owner. `gh api` expands `{owner}` inside the query string as readily as inside
@@ -77,6 +83,17 @@ async function resolve_pr_number(branch_name: string): Promise<number | undefine
 	} catch {
 		return undefined
 	}
+}
+
+// The number for a caller that has nothing to fold an absence into. The reads above answer their own
+// empty value for a branch with no pull request; a write cannot — `gh pr comment <branch>` and
+// `gh pr merge <branch>` both failed there, and the merge-gate snapshot already threw for the same
+// reason. One throw shared by all three (joshuafolkken/kit#1029).
+async function require_pr_number(branch_name: string): Promise<number> {
+	const pr_number = await resolve_pr_number(branch_name)
+	if (pr_number === undefined) throw new Error(`${NO_PULL_REQUEST_MESSAGE}: ${branch_name}`)
+
+	return pr_number
 }
 
 async function read_pull(pr_number: number): Promise<RestPull> {
@@ -140,6 +157,10 @@ async function pr_head_reference(pr_number: number): Promise<string> {
 	const pull = await read_pull(pr_number)
 	const reference = pull.head?.ref
 	if (reference === undefined) throw new Error(NO_HEAD_REF_MESSAGE)
+	// A fork's head is not on `origin` under this name, and `origin` may well carry a different branch
+	// that answers to it. Refusing is the same contract the missing ref has: the caller checks out what
+	// it is handed, so a guessed branch pushes template pins onto the wrong pull request.
+	if (!git_gh_pr_rest.is_same_repository_head(pull)) throw new Error(FORK_HEAD_MESSAGE)
 
 	return reference
 }
@@ -202,4 +223,13 @@ const git_gh_pr_read = {
 // needs them separately: the reviews endpoint is keyed by number while the rollup is keyed by the
 // head commit the detail carries. Exported rather than re-derived so the memo above stays one memo
 // (joshuafolkken/kit#1028).
-export { git_gh_pr_read, forget_pr_numbers, read_pull, resolve_pr_number, NO_HEAD_REF_MESSAGE }
+export {
+	git_gh_pr_read,
+	forget_pr_numbers,
+	read_pull,
+	require_pr_number,
+	resolve_pr_number,
+	FORK_HEAD_MESSAGE,
+	NO_HEAD_REF_MESSAGE,
+	NO_PULL_REQUEST_MESSAGE,
+}

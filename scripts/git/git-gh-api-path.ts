@@ -54,6 +54,13 @@ function pull_api_path(pr_number: string, repo?: string): string {
 	return `${pulls_api_path(repo)}/${pr_number}`
 }
 
+// The merge of one pull request. `gh pr merge <branch> --merge` is the GraphQL call this replaces,
+// and the method it named is sent as the `merge_method` field of the request body rather than being
+// left to the endpoint's default (joshuafolkken/kit#1029).
+function pull_merge_api_path(pr_number: string, repo?: string): string {
+	return `${pull_api_path(pr_number, repo)}/merge`
+}
+
 // The review thread — the line comments a reviewer left on the diff, which is what the CodeRabbit
 // gate reads and is not the same listing as `issue_comments_api_path`.
 function pull_comments_api_path(pr_number: string, repo?: string): string {
@@ -93,6 +100,7 @@ const git_gh_api_path = {
 	issue_comments_api_path,
 	pulls_api_path,
 	pull_api_path,
+	pull_merge_api_path,
 	pull_comments_api_path,
 	pull_reviews_api_path,
 	commit_api_path,
