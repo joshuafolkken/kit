@@ -2,7 +2,11 @@ import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { blocked_by_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
 
-// The shapes `gh issue view --json …` answers with, and the argument every epic command takes.
+// The shapes one issue is read as, and the argument every epic command takes.
+//
+// The read goes through `gh api` (REST) since joshuafolkken/kit#1024; `git-gh-issue-rest.ts` maps
+// the response back into the field names `gh issue view --json …` used, so the shapes below are
+// the ones they always were.
 //
 // Single-sourced because three commands read the same JSON and take the same argument. Each had its
 // own copy of the schema, the `blockedBy` unwrapping and the number parser, which is three places to
@@ -18,7 +22,8 @@ const PULL_REQUEST_SEGMENT = '/pull/'
 
 // Every field any epic command reads. Only `number` is required: a child reported with a field
 // missing is still a child, and dropping it would hide it from the view a decision is made from.
-// `body` is nullable because `gh` answers JSON null for an issue with none.
+// `body` is nullable as a guard: REST answers JSON null for an issue with none, and
+// `git-gh-issue-rest.ts` already maps that to an empty string before this schema sees it.
 const epic_issue_schema = z.object({
 	number: z.number(),
 	title: z.string().default(''),
@@ -28,7 +33,7 @@ const epic_issue_schema = z.object({
 		.default('')
 		.transform((value) => value ?? ''),
 	state: z.string().default(UNKNOWN_STATE),
-	// `gh issue view <n>` answers for a pull request as readily as for an issue, and nothing in the
+	// The issue endpoint answers for a pull request as readily as for an issue, and nothing in the
 	// other fields separates them — an open PR reports `state: OPEN`, a merged one `MERGED`. The URL
 	// is what says which it is: `/pull/<n>` against `/issues/<n>` (joshuafolkken/kit#947).
 	url: z.string().default(''),
@@ -59,7 +64,7 @@ function label_names(issue: EpicIssue): Array<string> {
 	return issue.labels.map((label) => label.name)
 }
 
-// `OPEN` or `CLOSED`, whatever casing `gh` used.
+// `OPEN` or `CLOSED`, whatever casing the state arrived in.
 //
 // Anything that is not `CLOSED` reads as open, which is right for the auto-close it was written for:
 // a child in any other state still has work left. It is **not** a test for "this issue is open" —
@@ -74,7 +79,8 @@ function is_open(state: string): boolean {
 	return state.toUpperCase() === OPEN
 }
 
-// Whether the number answered with a pull request rather than an issue. `gh issue view` serves both.
+// Whether the number answered with a pull request rather than an issue. The issue endpoint
+// (`repos/{owner}/{repo}/issues/{N}`) serves both.
 function is_pull_request(issue: EpicIssue): boolean {
 	return issue.url.includes(PULL_REQUEST_SEGMENT)
 }

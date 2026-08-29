@@ -87,9 +87,9 @@ describe('epic_next.parse_options — a qualified epic', () => {
 	})
 })
 
-// The qualified read joshuafolkken/kit#1016 added goes out as `gh --repo`, so an epic naming another
-// owner would send this command to their tracker — the read joshuafolkken/kit#869 forbids for a
-// child, forbidden here for the same reason.
+// The qualified read joshuafolkken/kit#1016 added names that repository in its REST path, so an
+// epic naming another owner would send this command to their tracker — the read
+// joshuafolkken/kit#869 forbids for a child, forbidden here for the same reason.
 describe('epic_next.run_epic — an epic that belongs to somebody else', () => {
 	it('refuses without asking that repository anything', async () => {
 		vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)

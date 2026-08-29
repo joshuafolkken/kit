@@ -36,7 +36,8 @@ function fetched(number: number, state: string, overrides: Partial<EpicIssue> = 
 	}
 }
 
-// What `gh issue view` answers when the number turns out to be a pull request.
+// What a read answers when the number turns out to be a pull request: the issue endpoint serves
+// one as readily as an issue.
 function fetched_pull_request(number: number, state: string): EpicIssue {
 	return fetched(number, state, { url: `https://github.com/${REPO}/pull/${String(number)}` })
 }
@@ -71,8 +72,8 @@ describe('epic_bundle_referenced.referenced_lookups', () => {
 		expect(epic_bundle_referenced.referenced_lookups(subject, new Set()).numbers).toEqual([891])
 	})
 
-	// One `gh issue view` each, so the count is the cost. A body naming more than the cap is prose
-	// about the backlog rather than an issue with that many prerequisites.
+	// One read each, so the count is the cost. A body naming more than the cap is prose about the
+	// backlog rather than an issue with that many prerequisites.
 	it('caps how many references one body can spend requests on', () => {
 		const limit = epic_bundle_referenced.REFERENCED_LOOKUP_LIMIT
 		const numbers = Array.from({ length: limit + 5 }, (_, index) => index + 1)
@@ -172,8 +173,8 @@ describe('epic_bundle_referenced.collect_referenced — a number that does not e
 		expect(found.issues).toEqual([])
 	})
 
-	// The two arrive through the same failed `gh issue view`, so the distinction is worth asserting
-	// together: only the one that could have been read is reported.
+	// The two arrive through the same failed read, so the distinction is worth asserting together:
+	// only the one that could have been read is reported.
 	it('separates a reference that does not exist from one it could not read', () => {
 		const found = epic_bundle_referenced.collect_referenced(
 			[
@@ -188,7 +189,7 @@ describe('epic_bundle_referenced.collect_referenced — a number that does not e
 })
 
 describe('epic_bundle_referenced.collect_referenced — a number that is a pull request', () => {
-	// `gh issue view <n>` serves a pull request too, and "the fix landed in #952" is ordinary prose.
+	// The issue endpoint serves a pull request too, and "the fix landed in #952" is ordinary prose.
 	// A merged PR reports `state: MERGED`, which the auto-close's state reader maps to OPEN — so
 	// without the URL check the command proposes an epic with a pull request among its children.
 	it('never returns a merged pull request as a candidate', () => {

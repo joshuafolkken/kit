@@ -30,15 +30,16 @@ const PULL_URL_PATTERN = new RegExp(String.raw`${REPOSITORY_SOURCE}/pull/(\d+)\b
 interface RepoIdentity {
 	owner: string
 	repo: string
-	// `owner/repo`, the form `gh --repo` takes — kept beside the parts so no caller re-joins them.
+	// `owner/repo`, the form a repository-scoped REST path takes — kept beside the parts so no caller
+	// re-joins them.
 	name_with_owner: string
 	// `https://github.com/owner/repo`, so a caller building a sibling URL does not rebuild the host.
 	base_url: string
 }
 
 // The two forms carry their number under different names on purpose. A pull target is then not
-// assignable where an issue target is expected, so handing a PR number to a reader that runs
-// `gh issue view` is a compile error rather than a notification carrying an unrelated issue's title
+// assignable where an issue target is expected, so handing a PR number to a reader that asks the
+// issue endpoint is a compile error rather than a notification carrying an unrelated issue's title
 // — the joshuafolkken/kit#903 mismatch class, which this module exists to close.
 interface IssueUrlTarget extends RepoIdentity {
 	issue_number: string

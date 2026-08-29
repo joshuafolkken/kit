@@ -22,9 +22,9 @@ interface CheckResult {
 	detail: string
 }
 
-// The `gh issue view --json number,labels,body` answer, as the shape every epic writer reads. It
-// lives beside the checks because `EpicSubject` is defined here, and each command that wanted one
-// had otherwise to restate the unwrapping (joshuafolkken/kit#890).
+// The `number,labels,body` read's answer, as the shape every epic writer reads. It lives beside
+// the checks because `EpicSubject` is defined here, and each command that wanted one had otherwise
+// to restate the unwrapping (joshuafolkken/kit#890).
 function parse_epic_subject(raw_json: string | undefined): EpicSubject | undefined {
 	if (raw_json === undefined) return undefined
 

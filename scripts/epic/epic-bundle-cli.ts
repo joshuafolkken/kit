@@ -56,7 +56,14 @@ async function epic_issue_relations(issue_number: string): Promise<Array<number>
 	return parsed === undefined ? undefined : epic_issue.blockers_of(parsed)
 }
 
-// One `gh issue view` per backlog issue, a few at a time.
+// One read per backlog issue, a few at a time.
+//
+// Since joshuafolkken/kit#1024 a read is `gh api`: one REST request for the issue, and a second to
+// its `dependencies/blocked_by` endpoint unless the issue's own dependency summary reports exactly
+// zero blockers — an absent summary is not a zero, so it pays too. The backlog rows are issues
+// rather than pull requests — the issue listing endpoint serves both, and `git-gh-issue-list.ts`
+// filters the pull requests out client-side — so every row here carries that summary, and a
+// backlog with no declared blockers costs exactly one request per issue.
 //
 // One read would do if `gh` exposed the reverse of `blockedBy`, but it does not (`blocks` is not a
 // JSON field), so a dependency declared on the *other* issue is only visible by asking that issue.

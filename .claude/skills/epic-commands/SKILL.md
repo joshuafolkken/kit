@@ -119,7 +119,8 @@ declaration — a prose line recommending an execution order is a suggestion, no
 ## Epics that span repositories
 
 Write cross-repository children in the task list as `owner/repo#N` or a full issue URL. Their state
-is read through `gh --repo`, so **no local clone is needed to learn it** — only to implement.
+is read against that repository through `gh api`, so **no local clone is needed to learn it** — only
+to implement.
 
 - **The owner restriction is inherited unchanged**: a repository with a different owner is never a
   target, by any route.

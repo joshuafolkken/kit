@@ -10,8 +10,10 @@ const THIRD_PARTY_REPO = 'sveltejs/kit'
 const EPIC = 858
 const IN_PROGRESS = 'in-progress'
 
-// The shape `gh issue view --json number,state,labels,blockedBy` actually answers with, measured
-// against a real issue: `blockedBy` is a GraphQL connection, not a bare array.
+// The shape a `number,state,labels,blockedBy` read actually answers with, measured against a real
+// issue: `blockedBy` is a connection — `{ nodes, totalCount }` — not a bare array. GraphQL selected
+// it that way; REST serves a bare array from the issue's own dependencies endpoint, which
+// `git-gh-issue-rest.ts` maps back into the connection (joshuafolkken/kit#1024).
 function gh_child(input: {
 	number: number
 	state?: string
