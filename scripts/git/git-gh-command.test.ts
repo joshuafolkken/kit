@@ -33,16 +33,14 @@ const { git_command } = await import('./git-command')
 const mocked_get_default_branch = vi.mocked(git_command.get_default_branch)
 
 const DEFAULT_BRANCH = 'main'
-const FEATURE_BRANCH = 'feature-branch'
 const NETWORK_ERROR = 'network error'
-const NO_PR_ERROR = 'no PR'
 const PR_TITLE = 'title'
 const PR_BODY = 'body'
 const GITHUB_PR_URL = 'https://github.com/owner/repo/pull/1'
 const TITLE_WITH_SPACES = 'title with spaces'
 const BODY_WITH_SPECIAL = 'body with $special chars'
 const PR_NUMBER = 578
-const DEPENDABOT_HEAD_REF = 'dependabot/github_actions/actions/checkout-7.0.0'
+const REPO_NAME = 'joshuafolkken/kit'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -111,46 +109,12 @@ describe('parse_pr_state_string', () => {
 	})
 })
 
-describe('git_gh_command.pr_exists', () => {
-	it('returns true when exec_gh_command succeeds', async () => {
-		mocked_exec.mockResolvedValue('some output')
-		const is_found = await git_gh_command.pr_exists(FEATURE_BRANCH)
-
-		expect(is_found).toBe(true)
-	})
-
-	it('returns false when exec_gh_command throws', async () => {
-		mocked_exec.mockRejectedValue(new Error('not found'))
-		const is_found = await git_gh_command.pr_exists(FEATURE_BRANCH)
-
-		expect(is_found).toBe(false)
-	})
-})
-
 describe('git_gh_command.pr_checkout', () => {
 	it('checks out the PR branch by number', async () => {
 		mocked_exec.mockResolvedValue('')
 		await git_gh_command.pr_checkout(PR_NUMBER)
 
 		expect(mocked_exec).toHaveBeenCalledWith(['pr', 'checkout', String(PR_NUMBER)])
-	})
-})
-
-describe('git_gh_command.pr_head_reference', () => {
-	it('returns the PR head ref name queried by number', async () => {
-		mocked_exec.mockResolvedValue(DEPENDABOT_HEAD_REF)
-		const head_reference = await git_gh_command.pr_head_reference(PR_NUMBER)
-
-		expect(mocked_exec).toHaveBeenCalledWith([
-			'pr',
-			'view',
-			String(PR_NUMBER),
-			'--json',
-			'headRefName',
-			'--jq',
-			'.headRefName',
-		])
-		expect(head_reference).toBe(DEPENDABOT_HEAD_REF)
 	})
 })
 
@@ -197,34 +161,11 @@ describe('git_gh_command.pr_create — base branch and label', () => {
 	})
 })
 
-describe('git_gh_command.pr_get_url', () => {
-	it('returns parsed URL when exec succeeds', async () => {
-		mocked_exec.mockResolvedValue(GITHUB_PR_URL)
-		const url = await git_gh_command.pr_get_url(FEATURE_BRANCH)
-
-		expect(url).toBe(GITHUB_PR_URL)
-	})
-
-	it('returns undefined when pr_get_url exec throws', async () => {
-		mocked_exec.mockRejectedValue(new Error(NO_PR_ERROR))
-		const url = await git_gh_command.pr_get_url(FEATURE_BRANCH)
-
-		expect(url).toBeUndefined()
-	})
-})
-
-// joshuafolkken/kit#993 removed the unquoting from the parser these two share with the issue-title
-// read. Neither ever received a quoted answer — both ask with `--jq` — so both must be unchanged by
-// it, which is what the Issue asked to be confirmed rather than assumed.
+// joshuafolkken/kit#993 removed the unquoting from the parser the repository-name read shares with
+// the issue-title read. It never received a quoted answer, so it must be unchanged by the removal —
+// which is what the Issue asked to be confirmed rather than assumed. The PR-url reader shares the
+// same parser and is asserted in `git-gh-pr-read.test.ts`, where it now lives.
 describe('the other callers of the shared parser are unaffected', () => {
-	const REPO_NAME = 'joshuafolkken/kit'
-
-	it('still trims whitespace off a PR url', async () => {
-		mocked_exec.mockResolvedValue(`  ${GITHUB_PR_URL}\n`)
-
-		await expect(git_gh_command.pr_get_url(FEATURE_BRANCH)).resolves.toBe(GITHUB_PR_URL)
-	})
-
 	// joshuafolkken/kit#1023 moved this read to `gh api`; the parser it shares is unchanged.
 	it('reads a repository name unchanged', async () => {
 		mocked_api.mockResolvedValue(REPO_NAME)
@@ -236,30 +177,5 @@ describe('the other callers of the shared parser are unaffected', () => {
 		mocked_api.mockResolvedValue(`${REPO_NAME}\n`)
 
 		await expect(git_gh_command.repo_get_name_with_owner()).resolves.toBe(REPO_NAME)
-	})
-})
-
-describe('git_gh_command.pr_get_body', () => {
-	const PR_BODY_TEXT = 'closes #42\n\n## Summary\nSome details'
-
-	it('returns body string when exec succeeds', async () => {
-		mocked_exec.mockResolvedValue(PR_BODY_TEXT)
-		const body = await git_gh_command.pr_get_body(FEATURE_BRANCH)
-
-		expect(body).toBe(PR_BODY_TEXT)
-	})
-
-	it('returns undefined when exec throws', async () => {
-		mocked_exec.mockRejectedValue(new Error(NO_PR_ERROR))
-		const body = await git_gh_command.pr_get_body(FEATURE_BRANCH)
-
-		expect(body).toBeUndefined()
-	})
-
-	it('returns undefined when exec returns empty string', async () => {
-		mocked_exec.mockResolvedValue('')
-		const body = await git_gh_command.pr_get_body(FEATURE_BRANCH)
-
-		expect(body).toBeUndefined()
 	})
 })
