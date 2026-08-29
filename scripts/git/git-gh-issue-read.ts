@@ -9,7 +9,11 @@ import { git_gh_helpers } from './git-gh-helpers'
 // `repo` reads an issue in another repository — the form a cross-repository epic is referenced in
 // (joshuafolkken/kit#864). Without it a qualified reference would read *this* repository's issue of
 // that number, a different issue entirely.
-function view_scope(repo?: string): Array<string> {
+//
+// Exported because a *listing* needs the same two arguments: `epic:next`'s repository-level busy
+// check asks one named repository for its `in-progress` issues (joshuafolkken/kit#925). One
+// definition rather than a second spelling of `['--repo', repo]` in `git-gh-issue.ts`.
+function repo_scope(repo?: string): Array<string> {
 	return repo === undefined ? [] : ['--repo', repo]
 }
 
@@ -24,7 +28,7 @@ async function issue_view_field(
 			'issue',
 			'view',
 			issue_number,
-			...view_scope(repo),
+			...repo_scope(repo),
 			'--json',
 			field,
 			'--jq',
@@ -64,7 +68,7 @@ async function issue_view_json(
 			'issue',
 			'view',
 			issue_number,
-			...view_scope(repo),
+			...repo_scope(repo),
 			'--json',
 			fields,
 		])
@@ -170,4 +174,4 @@ const git_gh_issue_read = {
 }
 
 export type { IssueRead }
-export { git_gh_issue_read, NOT_FOUND_STATUS }
+export { git_gh_issue_read, NOT_FOUND_STATUS, repo_scope }

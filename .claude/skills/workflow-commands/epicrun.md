@@ -160,11 +160,51 @@ previous release, or fails outright. Such a dependency resolves only once the bl
 its release has appeared in the registry — and while the blocker is still open the registry is never
 consulted, so a run never sits waiting on a publish from the moment it starts.
 
-**No locking is needed, and none is implemented.** Each session takes only its own repository's
-children, and within a repository children run one at a time, so two sessions cannot reach for the
-same child. That property comes entirely from the per-repository scoping — **the moment a later epic
-allows two children of the same repository to run at once, it disappears, and that epic has to
-introduce real mutual exclusion.** Do not read this section as "concurrency needs no coordination".
+**The exclusion is per repository, and `epic:next` is what applies it.** When
+`josh epic:next --repo <owner/repo>` has a child to offer, it first asks that repository whether
+anything is already running there: **any** open issue carrying `in-progress` and not parked makes
+the answer `wait` — whichever epic that issue belongs to, and whether or not this epic tracks it at
+all (joshuafolkken/kit#925). Two limits are part of the definition rather than gaps in it. It is
+asked **only when there is a candidate**, so `stop` and `complete` are still answered while
+something is in progress — neither of them is about to start anything. And a **parked** issue does
+not hold the repository: `needs-decision` outranks `in-progress` here exactly as it does in the
+classification, or `park and continue` would hand the repository to the child it just set aside.
+
+**It is advisory and it is not atomic.** The label is applied by whoever is about to implement a
+child, *after* this read — so two sessions starting in the very same instant can both read an idle
+repository and both be handed the same child. What the check closes is the window that actually
+occurs: a session already running a child holds the label for the whole of it, which is minutes,
+against a race measured in seconds. Treat it as a guard that makes the invariant mechanical, not as
+a mutex.
+
+**It is scoped to the resource, not to the epic.** What two children contend for is one working
+tree, one `main` and one `package.json` that `josh bump` rewrites, and none of those cares which
+epic a child belongs to. The earlier reasoning here — each session takes only its own repository's
+children, and within a repository children run one at a time — was true *inside one epic* and said
+nothing about two: `epic-classify.ts` sorts only the children the epic tracks, so a second `epicrun`
+started in the same checkout answered "nothing of mine is in progress" and both ran. What actually
+serialized them was a person typing the runs one after another, which is a habit rather than a
+property of the model.
+
+**A stale label now holds the whole repository, so the stale rule reaches past this epic's own
+children.** An interrupted run leaves `in-progress` behind, and that label holds the checkout rather
+than one child —
+so "`in-progress` is removed by whoever finds it stale" below applies to **any** open issue in the
+repository, not only to this epic's children. `epic:next` names the issues holding the repository on
+standard error for exactly that reason, and the 90-minute stale window bounds the wait.
+
+**A listing it could not read is not an idle repository.** `epic:next` answers `wait` there rather
+than offering the child — reading a failed read as "nothing is running" is the one direction this
+guard may not fail in, because that answer *starts* work. It is not an error either: the listing
+swallows a passing rate limit into the same failure, so an exit would end an unattended run over a
+blip, while a persistent failure is already caught by the unreadable-child anomaly before this read
+happens. So the loop polls, and the reason is on standard error.
+
+**Two children of one repository still may not run at once** — the guard makes that mechanical
+rather than customary, and it does not make same-repository parallelism safe. An epic that wants it
+has to **replace** this guard, with worktrees and a manifest each child can rewrite alone, not merely
+switch it off. Do not read this section as "concurrency needs no coordination": the coordination
+exists, and it is this.
 
 Why same-repository parallelism is out of scope here: `josh bump minor` would have two children
 rewriting one `package.json`, one checkout cannot hold two branches without worktrees, and two
@@ -474,6 +514,10 @@ gh issue edit <N> --add-label "needs-decision"
 gh issue comment <N> --body "<what needs deciding, and the options>"
 ```
 
+`in-progress` is left as it is, and the parked child does **not** hold the repository under the
+per-repository exclusion above — `epic:next` gives `needs-decision` precedence over `in-progress`
+exactly as the classification does, so the next child is offered normally.
+
 Then return to step 1. The other children are unaffected unless they depend on this one, and
 `epic:next` works that out.
 
@@ -498,6 +542,17 @@ Nothing in the codebase removes `in-progress`; a normal finish closes the issue,
 mattered. An interrupted run leaves it behind, and a child that carries it is excluded from every
 future `epic:next` — permanently. **A session that detects a stale child removes the label itself**
 (Tier A) and reports it, before continuing the loop.
+
+**It costs more than that one child now.** Since the repository-level exclusion above, an open issue
+carrying `in-progress` makes `epic:next --repo` answer `wait` for the *whole repository* — so a stale
+label stalls every epic that touches that checkout, including one on an issue this epic does not
+track. **The rule therefore applies to any open issue in the repository, not only to this epic's
+children**, and `epic:next` names the holders on standard error so there is something to go and look
+at. **Age alone is not the test.** Check the 90-minute window below *and* look at what is holding it,
+because two ordinary states hold the label legitimately for longer than that: a `halfrun` stopped for
+manual verification, and any run paused mid-child. Both leave uncommitted work in the checkout, so
+`git status` there is the decisive read — a dirty tree means the hold is real, and the answer is to
+leave the label alone and report, never to strip it and start a second child on top of that work.
 
 ```bash
 gh issue edit <N> --remove-label "in-progress"

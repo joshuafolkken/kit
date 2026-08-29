@@ -5,7 +5,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { SUMMARY_FIELDS } from '#scripts/git/git-gh-issue'
 import { git_next_issues } from '#scripts/git/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
-import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import { read_json_listing } from '#scripts/git/parse-json-array'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next
@@ -124,13 +124,9 @@ type OptedInRead =
 // the confident absence kit#950 exists to prevent. Only the rethrown zod rejection means the listing
 // arrived and its *fields* were not what was asked for.
 function parse_listing(raw: string): OptedInRead {
-	try {
-		const issues = parse_json_array_or_undefined(raw, open_issue_schema)
+	const read = read_json_listing(raw, open_issue_schema)
 
-		return issues === undefined ? { kind: 'unreadable' } : { kind: 'read', issues }
-	} catch {
-		return { kind: 'unexpected_shape' }
-	}
+	return read.kind === 'read' ? { kind: 'read', issues: read.rows } : { kind: read.kind }
 }
 
 // Whether the *identical* listing reads once `blockedBy` is dropped from it. Named for what it
