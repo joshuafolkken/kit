@@ -1,47 +1,95 @@
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
+import {
+	BLOCKED_BY_FIELD,
+	git_gh_issue_rest,
+	type BlockedBy,
+	type RestIssue,
+} from './git-gh-issue-rest'
 
 // Reading one issue. Split out of `git-gh-issue.ts`, which had grown past the file-length limit
 // while holding both the reads and the writes; the reads are what every epic command goes through,
 // and telling a number that resolves to nothing from a read that failed belongs with them
 // (joshuafolkken/kit#957).
 
-// `repo` reads an issue in another repository — the form a cross-repository epic is referenced in
-// (joshuafolkken/kit#864). Without it a qualified reference would read *this* repository's issue of
-// that number, a different issue entirely.
-//
-// Exported because a *listing* needs the same two arguments: `epic:next`'s repository-level busy
-// check asks one named repository for its `in-progress` issues (joshuafolkken/kit#925). One
-// definition rather than a second spelling of `['--repo', repo]` in `git-gh-issue.ts`.
+// `--repo <owner/repo>` for the `gh <noun> <verb>` calls that still take one. The reads below no
+// longer do — they name the repository inside the REST path instead (`git-gh-api-path.ts`) — but the
+// *listings* in `git-gh-issue.ts` do, and they are converted by joshuafolkken/kit#1025. One
+// definition rather than a second spelling of `['--repo', repo]` over there.
 function repo_scope(repo?: string): Array<string> {
 	return repo === undefined ? [] : ['--repo', repo]
 }
 
-// One field of one issue, unwrapped by `--jq` so the caller gets the value rather than an object.
+// The blocker relations, which REST serves from their own endpoint rather than inside the issue.
+// `gh issue view --json blockedBy` answered them in the same response because GraphQL selects them
+// as a connection; REST needs a second request (joshuafolkken/kit#1024).
+//
+// A page of a hundred, where GraphQL asked for `blockedBy(first:50)` — so `nodes` is at least as
+// complete as it was — while `totalCount` comes from the issue's own dependency summary and stays
+// exact whatever the page holds.
+const BLOCKED_BY_PATH = '/dependencies/blocked_by?per_page=100'
+
+// The request is skipped when the issue's own summary says the count is zero, which is the common
+// case and the one that matters for cost: `epic:bundle` reads relations for the whole open backlog,
+// up to two hundred issues, and every one of those reads names `blockedBy`. Without the skip the
+// pass would be four hundred requests where `gh` made two hundred.
+async function read_blocked_by(
+	issue_number: string,
+	rest: RestIssue,
+	repo?: string,
+): Promise<BlockedBy> {
+	const exact_total = git_gh_issue_rest.total_blocked_by(rest)
+	if (exact_total === 0) return git_gh_issue_rest.empty_blocked_by()
+
+	const json = await git_gh_exec.exec_gh_api({
+		path: `${git_gh_api_path.issue_api_path(issue_number, repo)}${BLOCKED_BY_PATH}`,
+	})
+
+	return git_gh_issue_rest.to_blocked_by(json, exact_total)
+}
+
+// One issue through REST, answered in the field names `gh issue view --json` used. Every read below
+// goes through it, so the request, the field mapping and the blocker relations are decided once
+// (joshuafolkken/kit#1024).
+//
+// The blocker request is made **only** when `blockedBy` was asked for — the title, body and
+// labels-and-body reads never name it — and, when it was, only when the issue itself reports a
+// blocker to fetch. Both guards are about the same cost: relations are read per issue across the
+// whole open backlog, so an unconditional second request would double that pass.
+async function read_issue_fields(
+	issue_number: string,
+	fields: string,
+	repo?: string,
+): Promise<Record<string, unknown>> {
+	const rest = git_gh_issue_rest.parse_rest_issue(
+		await git_gh_exec.exec_gh_api({ path: git_gh_api_path.issue_api_path(issue_number, repo) }),
+	)
+	const requested = git_gh_issue_rest.split_fields(fields)
+	const blocked_by = requested.includes(BLOCKED_BY_FIELD)
+		? await read_blocked_by(issue_number, rest, repo)
+		: undefined
+
+	return git_gh_issue_rest.to_gh_issue(rest, requested, blocked_by)
+}
+
+// One field of one issue, unwrapped so the caller gets the value rather than an object.
 async function issue_view_field(
 	issue_number: string,
 	field: string,
 	repo?: string,
 ): Promise<string | undefined> {
 	try {
-		return await git_gh_exec.exec_gh_command([
-			'issue',
-			'view',
-			issue_number,
-			...repo_scope(repo),
-			'--json',
-			field,
-			'--jq',
-			`.${field}`,
-		])
+		const issue = await read_issue_fields(issue_number, field, repo)
+
+		return git_gh_issue_rest.to_field_text(issue[field])
 	} catch {
 		return undefined
 	}
 }
 
-// A `--jq`-extracted string arrives raw — `gh` does not quote it — and an empty answer is not a
-// title (joshuafolkken/kit#993).
+// An extracted string arrives raw — nothing quotes it — and an empty answer is not a title
+// (joshuafolkken/kit#993).
 //
 // `repo` reads the title of an issue in another repository — what `josh notify` needs when the
 // `--issue-url` it was given points outside the repository the session runs in
@@ -56,23 +104,19 @@ async function issue_get_body(issue_number: string, repo?: string): Promise<stri
 	return await issue_view_field(issue_number, 'body', repo)
 }
 
-// One `gh issue view --json <fields>`, for every caller that wants a JSON view of one issue. Callers
-// differ only in which fields they ask for, and a helper per field list is how four near-identical
-// functions accumulated (joshuafolkken/kit#862).
+// A JSON view of one issue, for every caller that wants several fields at once. Callers differ only
+// in which fields they ask for, and a helper per field list is how four near-identical functions
+// accumulated (joshuafolkken/kit#862).
+//
+// The field list is still spelled the way `gh issue view --json` spelled it, and so is the answer:
+// the translation to and from REST is `git-gh-issue-rest.ts`, so no caller downstream changed.
 async function issue_view_json(
 	issue_number: string,
 	fields: string,
 	repo?: string,
 ): Promise<string | undefined> {
 	try {
-		return await git_gh_exec.exec_gh_command([
-			'issue',
-			'view',
-			issue_number,
-			...repo_scope(repo),
-			'--json',
-			fields,
-		])
+		return JSON.stringify(await read_issue_fields(issue_number, fields, repo))
 	} catch {
 		return undefined
 	}
@@ -97,8 +141,14 @@ const NOT_FOUND_STATUS = 404
 
 // The same view as `issue_view_json`, plus why it produced nothing when it did.
 //
-// `gh issue view` goes through GraphQL, which reports a failure as prose and carries no status code,
-// so the classification costs one REST request. It is spent **only** on the failure path, and only
+// The read itself is REST now, but `exec_gh_api` surfaces a failure as gh's stderr text — the status
+// code is not on the Error — and classifying by that wording is exactly what the status probe exists
+// to avoid: a message is prose that can be reworded between releases. So the probe stays, and the
+// three branches come out on the conditions they came out on before (joshuafolkken/kit#1024). What
+// did change is that both requests now go through the same transport, so the probe can no longer
+// disagree with the read about which API answered.
+//
+// The probe costs one extra request. It is spent **only** on the failure path, and only
 // by callers that need the distinction — which is why it is a separate function rather than a change
 // to `issue_view_json`. That matters most for the caller that does *not* opt in: `epic:bundle` reads
 // relations for the whole open backlog, up to two hundred issues, and a rate limit that failed all
