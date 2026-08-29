@@ -1,3 +1,4 @@
+import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 
@@ -94,12 +95,6 @@ type IssueRead = { kind: 'read'; json: string } | { kind: 'missing' } | { kind: 
 // not there.
 const NOT_FOUND_STATUS = 404
 
-// `gh api` expands `{owner}` and `{repo}` from the current repository, so the unqualified form needs
-// no extra lookup to name a path.
-function issue_api_path(issue_number: string, repo?: string): string {
-	return `repos/${repo ?? '{owner}/{repo}'}/issues/${issue_number}`
-}
-
 // The same view as `issue_view_json`, plus why it produced nothing when it did.
 //
 // `gh issue view` goes through GraphQL, which reports a failure as prose and carries no status code,
@@ -118,7 +113,9 @@ async function issue_view_json_classified(
 
 	if (json !== undefined) return { kind: 'read', json }
 
-	const status = await git_gh_exec.exec_gh_api_status(issue_api_path(issue_number, repo))
+	const status = await git_gh_exec.exec_gh_api_status(
+		git_gh_api_path.issue_api_path(issue_number, repo),
+	)
 
 	return status === NOT_FOUND_STATUS ? { kind: 'missing' } : { kind: 'unreadable' }
 }
