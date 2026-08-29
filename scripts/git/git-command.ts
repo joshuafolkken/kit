@@ -111,6 +111,34 @@ async function untracked_names(): Promise<string> {
 	])
 }
 
+// One branch from `origin`, fetched by name. `gh pr checkout` did this itself after resolving the
+// head branch through GraphQL, which a cloud session is answered 403 for (joshuafolkken/kit#1022);
+// the resolution moved to REST and the fetch is spelled out here instead of being re-wrapped.
+//
+// The refspec is written out rather than left to the remote's configuration. A bare branch name is
+// fetched under `origin`'s own refspec **only where it has the default one**: a `--single-branch`
+// clone, and every `actions/checkout` checkout, narrow it to one branch, and there a bare name
+// updates `FETCH_HEAD` alone. The `checkout` and the fast-forward that follow both read
+// `refs/remotes/origin/<branch>`, so naming the destination is what keeps them working off this
+// repository's own machine (joshuafolkken/kit#1029). `+` allows a forced update, matching what the
+// default refspec does.
+async function fetch_branch(branch_name: string): Promise<string> {
+	const refspec = `+refs/heads/${branch_name}:refs/remotes/origin/${branch_name}`
+
+	return await exec_git_command_read(['fetch', 'origin', refspec])
+}
+
+// The fast-forward `gh pr checkout` ran after its fetch, for the case the branch is already local.
+// Without it a second `josh sdp <pr>` run works on the commit the first one left behind: the pin
+// sync reads a stale `.github/workflows` and either reports "already in sync" or commits onto a base
+// that `push` then rejects (joshuafolkken/kit#1029).
+//
+// `--ff-only` is the whole point — a branch that has diverged fails loudly rather than growing a
+// merge commit nobody asked for, which is the behavior the CLI had.
+async function merge_fast_forward(branch_name: string): Promise<string> {
+	return await exec_git_command_read(['merge', '--ff-only', `origin/${branch_name}`])
+}
+
 async function checkout_b(branch_name: string): Promise<string> {
 	return await exec_git_command_read(['checkout', '-b', branch_name])
 }
@@ -187,6 +215,8 @@ const git_command = {
 	diff_main_names,
 	untracked_names,
 	get_default_branch,
+	fetch_branch,
+	merge_fast_forward,
 	checkout_b,
 	checkout,
 	commit,

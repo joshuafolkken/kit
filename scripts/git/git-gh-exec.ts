@@ -1,7 +1,6 @@
 import { execa } from 'execa'
 import { check_gh_installed } from './git-gh-check'
 
-const BODY_FILE_FLAG = '--body-file'
 const BODY_FROM_STDIN = '-'
 
 function has_stderr_field(error: unknown): error is Error & { stderr: string } {
@@ -14,14 +13,25 @@ function has_stdout_field(error: unknown): error is Error & { stdout: string } {
 	return error instanceof Error && 'stdout' in error && typeof error.stdout === 'string'
 }
 
-// Surface the gh CLI's stderr as the thrown message when present (matching the
-// previous spawn behavior), otherwise fall back to execa's own message.
+function to_error_message(error: unknown): string {
+	return error instanceof Error ? error.message : String(error)
+}
+
+// Surface the gh CLI's stderr as the thrown message when present (matching the previous spawn
+// behavior), otherwise fall back to execa's own message — **and append what gh wrote to stdout**.
+//
+// The append is not cosmetic. `gh api` splits a failed request across both streams: stderr carries
+// one summary line (`gh: Validation Failed (HTTP 422)`) and **stdout carries the JSON error body**,
+// which is the only place the reason is written. Every caller here is now a REST request, so
+// dropping stdout dropped the diagnosis from every REST failure — and `handle_pr_create_error`
+// reads the reason: a duplicate pull request is `A pull request already exists for <owner>:<branch>.`
+// inside that body, and matching it against stderr alone answers no (measured on
+// joshuafolkken/kit#1029).
 function to_gh_error(error: unknown): Error {
 	const stderr = has_stderr_field(error) ? error.stderr.trim() : ''
-
-	if (stderr.length > 0) return new Error(stderr, { cause: error })
-
-	const message = error instanceof Error ? error.message : String(error)
+	const stdout = has_stdout_field(error) ? error.stdout.trim() : ''
+	const summary = stderr.length > 0 ? stderr : to_error_message(error)
+	const message = stdout.length > 0 ? `${summary}\n${stdout}` : summary
 
 	return new Error(message, { cause: error })
 }
@@ -139,8 +149,8 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 // (joshuafolkken/kit#1023). The synchronous readers that cannot — `gh-spawn.ts`, `epic-cross-repo.ts`
 // — still share its path builder.
 //
-// Failure handling is deliberately identical to the `gh <noun> <verb>` calls it replaces: both
-// paths below funnel through `to_gh_error`, so gh's stderr is still what the thrown Error carries.
+// Failure handling funnels through `to_gh_error` on both paths below, so a failed request throws
+// with gh's stderr summary *and* the JSON error body it wrote to stdout.
 async function exec_gh_api(request: GhApiRequest): Promise<string> {
 	const args = to_gh_api_args(request)
 
@@ -159,4 +169,4 @@ const git_gh_exec = {
 
 export type { GhApiRequest }
 export { git_gh_exec, has_stderr_field, has_stdout_field }
-export { BODY_FILE_FLAG, BODY_FROM_STDIN }
+export { BODY_FROM_STDIN }

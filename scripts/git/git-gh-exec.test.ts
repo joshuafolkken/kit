@@ -1,13 +1,7 @@
 import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_gh_installed, GH_NOT_INSTALLED_MSG } from './git-gh-check'
-import {
-	BODY_FILE_FLAG,
-	BODY_FROM_STDIN,
-	git_gh_exec,
-	has_stderr_field,
-	has_stdout_field,
-} from './git-gh-exec'
+import { BODY_FROM_STDIN, git_gh_exec, has_stderr_field, has_stdout_field } from './git-gh-exec'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -42,12 +36,6 @@ describe('git_gh_exec', () => {
 
 	it('exposes exec_gh_command_with_stdin as a callable function', () => {
 		expect(typeof git_gh_exec.exec_gh_command_with_stdin).toBe('function')
-	})
-})
-
-describe('BODY_FILE_FLAG', () => {
-	it('is the --body-file flag string', () => {
-		expect(BODY_FILE_FLAG).toBe('--body-file')
 	})
 })
 
@@ -89,12 +77,57 @@ describe('exec_gh_command — output handling', () => {
 	})
 })
 
+// `gh api` splits a failed request across both streams: one summary line on stderr and the JSON
+// error body on stdout. Dropping the body dropped the only place the reason is written — and
+// `handle_pr_create_error` reads the reason (joshuafolkken/kit#1029).
+describe('exec_gh_command — a failed gh api request', () => {
+	const VALIDATION_SUMMARY = 'gh: Validation Failed (HTTP 422)'
+	const DUPLICATE_BODY =
+		'{"message":"Validation Failed","errors":[{"resource":"PullRequest","code":"custom",' +
+		'"message":"A pull request already exists for joshuafolkken:tmp-1029-head."}]}'
+
+	function reject_with_split_output(): void {
+		mocked_execa.mockRejectedValueOnce(
+			Object.assign(new Error(GH_FAILED), {
+				stderr: `${VALIDATION_SUMMARY}\n`,
+				stdout: `${DUPLICATE_BODY}\n`,
+			}),
+		)
+	}
+
+	it('carries the JSON error body gh wrote to stdout', async () => {
+		reject_with_split_output()
+
+		await expect(git_gh_exec.exec_gh_command(PR_VIEW_ARGS)).rejects.toThrow('already exists')
+	})
+
+	it('keeps the stderr summary ahead of the body', async () => {
+		reject_with_split_output()
+
+		await expect(git_gh_exec.exec_gh_command(PR_VIEW_ARGS)).rejects.toThrow(
+			`${VALIDATION_SUMMARY}\n${DUPLICATE_BODY}`,
+		)
+	})
+
+	// A `gh <noun> <verb>` failure writes nothing to stdout, and its message must not grow a trailing
+	// separator for an empty one.
+	it('leaves a stderr-only failure exactly as it was', async () => {
+		mocked_execa.mockRejectedValueOnce(
+			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR}\n`, stdout: '' }),
+		)
+
+		await expect(git_gh_exec.exec_gh_command(PR_VIEW_ARGS)).rejects.toThrow(
+			new Error(NOT_FOUND_STDERR),
+		)
+	})
+})
+
 describe('exec_gh_command_with_stdin', () => {
 	it('passes stdin_body to execa and returns trimmed stdout', async () => {
 		mocked_execa.mockResolvedValueOnce(fake_stdout_result('done\n'))
 
 		const result = await git_gh_exec.exec_gh_command_with_stdin({
-			args: ['pr', 'create', BODY_FILE_FLAG, BODY_FROM_STDIN],
+			args: ['api', 'repos/o/r/pulls', '--input', BODY_FROM_STDIN],
 			stdin_body: 'body text',
 		})
 

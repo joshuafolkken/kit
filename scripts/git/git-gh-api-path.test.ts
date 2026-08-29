@@ -99,3 +99,17 @@ describe('commit_status_api_path', () => {
 		)
 	})
 })
+
+describe('pull_merge_api_path', () => {
+	it('builds the merge endpoint under the current repository', () => {
+		expect(git_gh_api_path.pull_merge_api_path('7')).toBe(`${CURRENT_REPO_PATH}/pulls/7/merge`)
+	})
+
+	// The merge hangs off the same pull request the reads address, so the segment is shared rather
+	// than written out a second time.
+	it('shares the pull request segment with the detail path', () => {
+		expect(git_gh_api_path.pull_merge_api_path('7', REPO)).toBe(
+			`${git_gh_api_path.pull_api_path('7', REPO)}/merge`,
+		)
+	})
+})
