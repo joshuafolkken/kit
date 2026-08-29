@@ -171,28 +171,28 @@ describe('josh auto-ok:next — what the guard is given', () => {
 	// is right for an issue that declares no blockers and wrong for a query that stopped asking for
 	// the field. Without this, dropping it from the field list would silently remove the guard with
 	// every test above still green.
-	it('asks gh for the blocker relation', () => {
+	it('asks for the blocker relation', () => {
 		expect(PICKUP_FIELDS).toContain('blockedBy')
 	})
 
-	// joshuafolkken/kit#1005: a `gh` too old to know that field fails the listing outright, and
+	// joshuafolkken/kit#1005: the blocker relations failing takes the listing with them, and
 	// `issue_list_open` swallows the error — so the read looked exactly like an access failure and
 	// sent the reader to `gh auth status`, which is green. That is the misdirection kit#996's message
 	// was added to remove, walked back in by the field the same change started asking for.
-	it('blames the gh version when the field-bearing listing fails twice', async () => {
+	it('blames the blocker relations when the field-bearing listing fails twice', async () => {
 		issue_list
 			.mockResolvedValueOnce(undefined)
 			.mockResolvedValueOnce('[]')
 			.mockResolvedValueOnce(undefined)
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
-		expect(stderr()).toContain(auto_ok_cli.OUTDATED_GH_MESSAGE)
+		expect(stderr()).toContain(auto_ok_cli.BLOCKERS_UNREADABLE_MESSAGE)
 		expect(stderr()).not.toContain(auto_ok_cli.UNREADABLE_MESSAGE)
 	})
 
-	// A blip on the first read clears by the time the probe runs, and telling someone on a current
-	// `gh` to upgrade it is the same kind of misdirection this whole path exists to avoid.
-	it('does not blame the version when the original read works on a retry', async () => {
+	// A blip on the first read clears by the time the probe runs, and sending someone whose host
+	// serves dependencies to look at it is the same misdirection this whole path exists to avoid.
+	it('does not blame the relations when the original read works on a retry', async () => {
 		issue_list
 			.mockResolvedValueOnce(undefined)
 			.mockResolvedValueOnce('[]')
@@ -200,18 +200,18 @@ describe('josh auto-ok:next — what the guard is given', () => {
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
-		expect(stderr()).not.toContain(auto_ok_cli.OUTDATED_GH_MESSAGE)
+		expect(stderr()).not.toContain(auto_ok_cli.BLOCKERS_UNREADABLE_MESSAGE)
 	})
 
-	// Both reads failing is an access problem, not a version one — the probe drops the field and still
-	// gets nothing, so the field is not what it tripped over.
+	// Both reads failing is an access problem, not a relations one — the probe drops the field and
+	// still gets nothing, so the field is not what it tripped over.
 	it('blames access when the listing fails without the field too', async () => {
 		issue_list.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
 		// No third call: the retry is reached only once the form without the field has read.
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
 		expect(stderr()).toContain(auto_ok_cli.UNREADABLE_MESSAGE)
-		expect(stderr()).not.toContain(auto_ok_cli.OUTDATED_GH_MESSAGE)
+		expect(stderr()).not.toContain(auto_ok_cli.BLOCKERS_UNREADABLE_MESSAGE)
 	})
 
 	// The probe costs a request, so a healthy run must never spend it.
