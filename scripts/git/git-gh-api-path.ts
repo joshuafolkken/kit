@@ -6,6 +6,11 @@
 // from here. Converting kit's GitHub calls to REST multiplies those call sites, so the decision is
 // made once rather than at each one (joshuafolkken/kit#1023).
 
+// One full page of a listing. REST answers 30 rows by default, and every listing this tooling reads
+// is paged through with `--paginate`, so asking for the largest page turns a long listing into fewer
+// round trips. Named once because three readers append it (joshuafolkken/kit#1028).
+const FULL_PAGE_QUERY = '?per_page=100'
+
 // `gh api` expands `{owner}` and `{repo}` from the current repository, so the unqualified form needs
 // no extra lookup to name a path. An explicit `repo` names another repository — the form a
 // cross-repository reference takes.
@@ -55,7 +60,32 @@ function pull_comments_api_path(pr_number: string, repo?: string): string {
 	return `${pull_api_path(pr_number, repo)}/comments`
 }
 
+// The review history of one pull request. There is no REST counterpart to GraphQL's
+// `reviewDecision`, so the merge gate folds this listing into one instead (joshuafolkken/kit#1028).
+function pull_reviews_api_path(pr_number: string, repo?: string): string {
+	return `${pull_api_path(pr_number, repo)}/reviews`
+}
+
+// One commit, addressed by SHA. The two halves of what `gh` merged into `statusCheckRollup` hang off
+// it, and they are keyed by the pull request's *head* commit rather than by its number.
+function commit_api_path(commit_sha: string, repo?: string): string {
+	return `${repo_api_path(repo)}/commits/${commit_sha}`
+}
+
+// The check runs GitHub Actions and check-run apps post — the `CheckRun` half of the rollup.
+function commit_check_runs_api_path(commit_sha: string, repo?: string): string {
+	return `${commit_api_path(commit_sha, repo)}/check-runs`
+}
+
+// The combined commit status — the `StatusContext` half. A different endpoint with a different
+// element shape (`state` / `context` rather than `status` / `conclusion` / `name`), which is why the
+// two are merged by the caller rather than read as one listing.
+function commit_status_api_path(commit_sha: string, repo?: string): string {
+	return `${commit_api_path(commit_sha, repo)}/status`
+}
+
 const git_gh_api_path = {
+	FULL_PAGE_QUERY,
 	repo_api_path,
 	issues_api_path,
 	issue_api_path,
@@ -64,6 +94,10 @@ const git_gh_api_path = {
 	pulls_api_path,
 	pull_api_path,
 	pull_comments_api_path,
+	pull_reviews_api_path,
+	commit_api_path,
+	commit_check_runs_api_path,
+	commit_status_api_path,
 }
 
-export { git_gh_api_path }
+export { git_gh_api_path, FULL_PAGE_QUERY }

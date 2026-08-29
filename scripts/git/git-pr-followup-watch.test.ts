@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_checks, WATCH_FAILED_NOTE } from './git-pr-followup'
 
-// joshuafolkken/kit#999: `gh pr checks --watch` exits non-zero when **any** check has failed,
-// CodeRabbit included, and `run_checks` let that escape. On a pull request whose checks all finished
+// joshuafolkken/kit#999: the watch fails when **any** check has failed, CodeRabbit included, and
+// `run_checks` let that escape. On a pull request whose checks all finished
 // inside the two-minute window with only CodeRabbit red, `followup` therefore died before
 // `evaluate_pr_state` could apply kit#753's exemption at all — invisible on a slower suite, where the
 // watch times out first. The watch is a look ahead, not a gate.
@@ -22,7 +22,7 @@ const { git_gh_command } = await import('./git-gh-command')
 const { git_pr_checks } = await import('./git-pr-checks')
 
 const BRANCH_NAME = 'test-branch'
-const WATCH_EXIT_ONE = 'gh pr checks --watch exited with code 1'
+const WATCH_EXIT_ONE = 'gh api reported a failing check on the branch: CodeRabbit'
 const EVALUATOR_FAILURE = 'PR checks failed (failed checks: E2E).'
 const SNAPSHOT = { rollup: [], merge_state_status: undefined, review_decision: undefined }
 
@@ -98,8 +98,8 @@ describe('run_checks — the swallowed failure stays visible', () => {
 	})
 })
 
-// `gh pr checks` exits 1 both for "a check failed" and for "no checks reported", and the watch
-// inherits stdio so the message is not readable — only the pull request's own rollup separates them.
+// The watch fails both for "a check failed" and for "no checks reported", and `run_checks` does not
+// read its message — only the pull request's own rollup separates them.
 // Falling through on an empty one would trade a failure reported in seconds for the whole 32-minute
 // budget spent on a required check that is missing rather than pending.
 describe('run_checks — a pull request with no checks still fails fast', () => {

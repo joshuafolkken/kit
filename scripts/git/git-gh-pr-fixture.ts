@@ -1,3 +1,4 @@
+import { FULL_PAGE_QUERY } from './git-gh-api-path'
 import type { GhApiRequest } from './git-gh-exec'
 
 // One pull request as `repos/{owner}/{repo}/pulls/{N}` answers it, the paths the reads ask for, and
@@ -34,7 +35,10 @@ function pr_detail_path(pr_number = PR_NUMBER): string {
 
 // Both comment listings are read a full page at a time and paged through, so the query string is
 // part of the path a test has to answer.
-const COMMENTS_QUERY = '?per_page=100'
+// The page size the reads themselves append, taken from the same constant rather than restated:
+// a fixture spelling it out again would keep routing after the reads changed it.
+const PAGE_QUERY = FULL_PAGE_QUERY
+const COMMENTS_QUERY = PAGE_QUERY
 
 function pr_conversation_comments_path(pr_number = PR_NUMBER): string {
 	return `${REPO_NAME_PATH}/issues/${String(pr_number)}/comments${COMMENTS_QUERY}`
@@ -42,6 +46,32 @@ function pr_conversation_comments_path(pr_number = PR_NUMBER): string {
 
 function pr_review_comments_path(pr_number = PR_NUMBER): string {
 	return `${pr_detail_path(pr_number)}/comments${COMMENTS_QUERY}`
+}
+
+// The merge-gate snapshot's three listings. Two of them hang off the head *commit* rather than off
+// the pull request, which is why the fixture carries a head SHA at all (joshuafolkken/kit#1028).
+const PR_HEAD_SHA = 'c0ffee1c0ffee1c0ffee1c0ffee1c0ffee1c0ffe'
+
+function pr_reviews_path(pr_number = PR_NUMBER): string {
+	return `${pr_detail_path(pr_number)}/reviews${PAGE_QUERY}`
+}
+
+function commit_check_runs_path(commit_sha = PR_HEAD_SHA): string {
+	return `${REPO_NAME_PATH}/commits/${commit_sha}/check-runs${PAGE_QUERY}`
+}
+
+function commit_status_path(commit_sha = PR_HEAD_SHA): string {
+	return `${REPO_NAME_PATH}/commits/${commit_sha}/status${PAGE_QUERY}`
+}
+
+// `--paginate --slurp` answers an array of pages for both commit endpoints, so a fixture that is not
+// wrapped would test a shape the reads never see.
+function check_runs_pages(...pages: ReadonlyArray<ReadonlyArray<Record<string, unknown>>>): string {
+	return JSON.stringify(pages.map((check_runs) => ({ total_count: check_runs.length, check_runs })))
+}
+
+function status_pages(...pages: ReadonlyArray<ReadonlyArray<Record<string, unknown>>>): string {
+	return JSON.stringify(pages.map((statuses) => ({ state: 'success', statuses })))
 }
 
 // `state` is lower case and `url` is the API endpoint on purpose: those are two of the fields the
@@ -52,7 +82,7 @@ function rest_pull(overrides: Record<string, unknown> = {}): string {
 		state: 'open',
 		url: PR_API_URL,
 		html_url: PR_HTML_URL,
-		head: { ref: PR_BRANCH },
+		head: { ref: PR_BRANCH, sha: PR_HEAD_SHA },
 		...overrides,
 	})
 }
@@ -89,17 +119,23 @@ function pr_routes(
 }
 
 export {
+	check_runs_pages,
+	commit_check_runs_path,
+	commit_status_path,
 	gh_api_routes,
 	pr_conversation_comments_path,
 	pr_detail_path,
 	pr_lookup_path,
 	pr_review_comments_path,
+	pr_reviews_path,
 	pr_routes,
+	status_pages,
 	rest_pull,
 	rest_pull_page,
 	EMPTY_LISTING,
 	PR_API_URL,
 	PR_BRANCH,
+	PR_HEAD_SHA,
 	PR_HTML_URL,
 	PR_NUMBER,
 	RATE_LIMITED,
