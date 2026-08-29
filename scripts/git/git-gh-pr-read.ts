@@ -52,6 +52,10 @@ const FORK_HEAD_MESSAGE =
 // rather than beside either caller: the merge-gate snapshot and the two branch-keyed writes all need
 // it, and three copies of one message is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1029).
 const NO_PULL_REQUEST_MESSAGE = 'gh api found no pull request for branch'
+// And what it throws when the lookup never answered at all. Separate from the message above because
+// the two are different diagnoses: one says the branch has nothing, the other says nobody looked
+// (joshuafolkken/kit#1048).
+const UNREADABLE_PULL_REQUEST_MESSAGE = 'gh api could not read the pull requests for branch'
 
 // `head` names the owner of the head repository, which for every branch this tooling opens is the
 // repository's own owner. `gh api` expands `{owner}` inside the query string as readily as inside
@@ -69,31 +73,59 @@ async function fetch_pr_number(branch_name: string): Promise<number | undefined>
 	return git_gh_pr_rest.select_pull(git_gh_pr_rest.parse_rest_pulls(json))?.number
 }
 
-// `undefined` covers both "this branch has no pull request" and "the lookup failed", which is the
-// distinction `gh pr view` never made either — every caller here already folds them together.
-async function resolve_pr_number(branch_name: string): Promise<number | undefined> {
+// Why the resolution produced no number. `missing` is the lookup answering: the listing came back and
+// held no pull request for this branch. `unreadable` is the lookup failing — a rate limit, expired
+// auth, a dropped connection, a 200 carrying something other than a listing.
+//
+// The vocabulary is `IssueRead`'s in `git-gh-issue-read.ts`, which tells the same two apart for an
+// issue number (joshuafolkken/kit#957); reusing it rather than inventing a second spelling for one
+// distinction is the point. The *classification* is cheaper here and needs no status probe: a branch
+// with no pull request is a 200 with an empty listing rather than a 404, so the lookup's own outcome
+// already separates them (joshuafolkken/kit#1048).
+type PullNumberRead =
+	{ kind: 'read'; pr_number: number } | { kind: 'missing' } | { kind: 'unreadable'; cause: unknown }
+
+async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
 	const cached = pr_number_by_branch.get(branch_name)
-	if (cached !== undefined) return cached
+	if (cached !== undefined) return { kind: 'read', pr_number: cached }
 
 	try {
 		const pr_number = await fetch_pr_number(branch_name)
-		if (pr_number !== undefined) pr_number_by_branch.set(branch_name, pr_number)
+		if (pr_number === undefined) return { kind: 'missing' }
+		pr_number_by_branch.set(branch_name, pr_number)
 
-		return pr_number
-	} catch {
-		return undefined
+		return { kind: 'read', pr_number }
+	} catch (error) {
+		return { kind: 'unreadable', cause: error }
 	}
+}
+
+// `undefined` covers both "this branch has no pull request" and "the lookup failed", which is the
+// distinction `gh pr view` never made either — every *read* here folds them together on purpose:
+// `pr_exists` answers `false` either way, `pr_view` the empty string, the comment readers `undefined`.
+async function resolve_pr_number(branch_name: string): Promise<number | undefined> {
+	const read = await read_pr_number(branch_name)
+
+	return read.kind === 'read' ? read.pr_number : undefined
 }
 
 // The number for a caller that has nothing to fold an absence into. The reads above answer their own
 // empty value for a branch with no pull request; a write cannot — `gh pr comment <branch>` and
 // `gh pr merge <branch>` both failed there, and the merge-gate snapshot already threw for the same
 // reason. One throw shared by all three (joshuafolkken/kit#1029).
+//
+// **This is the caller the distinction exists for, and the only one that opts in.** Folding both into
+// `NO_PULL_REQUEST_MESSAGE` reported a rate-limited lookup as "there is no pull request for this
+// branch" — safe, in that the run stops without merging, but wrong about why, which is the
+// joshuafolkken/kit#973 misread costing diagnosis time instead of correctness. The failure travels as
+// the `cause`, so `git_error.handle` prints gh's own reason under 💡 Details
+// (joshuafolkken/kit#1048).
 async function require_pr_number(branch_name: string): Promise<number> {
-	const pr_number = await resolve_pr_number(branch_name)
-	if (pr_number === undefined) throw new Error(`${NO_PULL_REQUEST_MESSAGE}: ${branch_name}`)
+	const read = await read_pr_number(branch_name)
+	if (read.kind === 'read') return read.pr_number
+	if (read.kind === 'missing') throw new Error(`${NO_PULL_REQUEST_MESSAGE}: ${branch_name}`)
 
-	return pr_number
+	throw new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name}`, { cause: read.cause })
 }
 
 async function read_pull(pr_number: number): Promise<RestPull> {
@@ -232,4 +264,5 @@ export {
 	FORK_HEAD_MESSAGE,
 	NO_HEAD_REF_MESSAGE,
 	NO_PULL_REQUEST_MESSAGE,
+	UNREADABLE_PULL_REQUEST_MESSAGE,
 }

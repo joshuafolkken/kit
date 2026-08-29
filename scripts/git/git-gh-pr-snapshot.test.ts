@@ -5,13 +5,18 @@ import {
 	commit_check_runs_path,
 	commit_status_path,
 	gh_api_routes,
+	gh_failure,
 	PR_BRANCH,
 	pr_lookup_path,
 	pr_reviews_path,
 	pr_routes,
 	status_pages,
 } from './git-gh-pr-fixture'
-import { forget_pr_numbers, NO_PULL_REQUEST_MESSAGE } from './git-gh-pr-read'
+import {
+	forget_pr_numbers,
+	NO_PULL_REQUEST_MESSAGE,
+	UNREADABLE_PULL_REQUEST_MESSAGE,
+} from './git-gh-pr-read'
 import { NO_HEAD_SHA_MESSAGE, pr_get_state_snapshot } from './git-gh-pr-snapshot'
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
@@ -160,6 +165,14 @@ describe('pr_get_state_snapshot — failures throw rather than answering green',
 		mocked_api.mockImplementation(gh_api_routes({ [pr_lookup_path()]: '[]' }))
 
 		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toThrow(NO_PULL_REQUEST_MESSAGE)
+	})
+
+	// joshuafolkken/kit#1048: a rate-limited lookup used to reach the merge gate as "there is no pull
+	// request for this branch", which sent the diagnosis after a pull request that plainly exists.
+	it('says the lookup failed rather than that the branch has no pull request', async () => {
+		mocked_api.mockRejectedValue(gh_failure())
+
+		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toThrow(UNREADABLE_PULL_REQUEST_MESSAGE)
 	})
 
 	it('throws when the pull request carries no head commit', async () => {

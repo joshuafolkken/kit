@@ -3,6 +3,7 @@ import { git_gh_exec } from './git-gh-exec'
 import {
 	EMPTY_LISTING,
 	gh_api_routes,
+	gh_failure,
 	PR_BRANCH,
 	pr_conversation_comments_path,
 	pr_detail_path,
@@ -29,7 +30,6 @@ vi.mock('./git-gh-exec', () => ({
 
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
-const GH_FAILURE = 'gh exploded'
 const PR_BODY = 'closes #1027'
 const NO_PULL_REQUEST = { [pr_lookup_path()]: EMPTY_LISTING }
 
@@ -77,6 +77,17 @@ describe('the branch to pull request number resolution', () => {
 		expect(lookup_calls()).toBe(2)
 	})
 
+	// A failed lookup is re-tried rather than remembered as an absence: caching it would keep every
+	// later reader in the run answering from one rate-limited request (joshuafolkken/kit#1048).
+	it('does not remember a lookup that failed', async () => {
+		mocked_api.mockRejectedValue(gh_failure())
+
+		await git_gh_pr_read.pr_get_number(PR_BRANCH)
+		await git_gh_pr_read.pr_get_number(PR_BRANCH)
+
+		expect(lookup_calls()).toBe(2)
+	})
+
 	// `git-pr.ts` opens a second pull request on a branch whose first one merged, so the memo has to
 	// be dropped there or `pr_get_url` keeps answering with the merged one.
 	it('re-resolves after the memo is cleared', async () => {
@@ -90,10 +101,25 @@ describe('the branch to pull request number resolution', () => {
 	})
 })
 
-describe('a branch with no pull request answers exactly what gh pr view answered', () => {
-	beforeEach(() => {
-		stub(NO_PULL_REQUEST)
-	})
+// The two answers the reads deliberately fold together, asserted side by side. `require_pr_number`
+// tells them apart (joshuafolkken/kit#1048) and nothing here does: every reader below answers its own
+// empty value for both, which is the contract `gh pr view` had and the one `git-pr.ts`,
+// `git-conflict.ts` and the two comment readers are written against.
+describe.each([
+	{
+		name: 'a branch with no pull request',
+		arrange: (): void => {
+			stub(NO_PULL_REQUEST)
+		},
+	},
+	{
+		name: 'a lookup that could not be read',
+		arrange: (): void => {
+			mocked_api.mockRejectedValue(gh_failure())
+		},
+	},
+])('$name answers exactly what gh pr view answered', ({ arrange }) => {
+	beforeEach(arrange)
 
 	it('reports pr_exists as false', async () => {
 		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).resolves.toBe(false)
@@ -116,13 +142,9 @@ describe('a branch with no pull request answers exactly what gh pr view answered
 	})
 })
 
-describe('a lookup that could not be read folds into the same answers', () => {
-	it('reports pr_exists as false when gh fails', async () => {
-		mocked_api.mockRejectedValue(new Error(GH_FAILURE))
-
-		await expect(git_gh_pr_read.pr_exists(PR_BRANCH)).resolves.toBe(false)
-	})
-
+// A 200 carrying an API message object rather than a listing is a failed read too — `parse_rest_pulls`
+// throws rather than degrading it into an empty listing, which `pr_exists` would read as an absence.
+describe('a response that is not a listing folds into the same answers', () => {
 	it('reports pr_exists as false when gh answers something other than a listing', async () => {
 		stub({ [pr_lookup_path()]: RATE_LIMITED })
 
@@ -236,6 +258,14 @@ describe.each([
 
 	it('reports a pull request number it could not resolve', async () => {
 		stub(NO_PULL_REQUEST)
+
+		await expect(read(PR_BRANCH)).resolves.toBeUndefined()
+	})
+
+	// The merge gate reads `undefined` as a standing blocker, so a lookup that never answered has to
+	// arrive as one too rather than as "this branch has no pull request" (joshuafolkken/kit#1048).
+	it('reports a lookup that could not be read', async () => {
+		mocked_api.mockRejectedValue(gh_failure())
 
 		await expect(read(PR_BRANCH)).resolves.toBeUndefined()
 	})
