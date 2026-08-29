@@ -127,7 +127,7 @@ async function fetch_epic(epic_number: number, repo: string): Promise<EpicSnapsh
 	const body = await git_gh_command.issue_get_body(String(epic_number))
 	const child_numbers = git_epic_parse.parse_task_list_issue_numbers(body)
 	const external = git_epic_parse.parse_external_task_list_children(body)
-	const owner = repo.split('/', 1)[0] ?? ''
+	const owner = epic_cross_repo.owner_of(repo)
 	const local = await fetch_children(child_numbers, repo)
 	const remote = await fetch_external_children(external, owner)
 
