@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_fetch } from './epic-fetch'
 
 const REPO = 'joshuafolkken/kit'
+const OTHER_REPO = 'joshuafolkken/app-kit'
 const GET_CHILD = 'issue_get_state_and_relations'
 const IN_PROGRESS = 'in-progress'
 
@@ -120,5 +121,19 @@ describe('epic_fetch.fetch_children', () => {
 		const fetched = await epic_fetch.fetch_children(numbers, REPO)
 
 		expect(fetched.skipped).toHaveLength(2)
+	})
+})
+
+// The one definition of the `--repo` scope a child is read through. Every read of a child's fields
+// follows it, bodies included (joshuafolkken/kit#1012).
+describe('epic_fetch.scope_for', () => {
+	// Unqualified is what `fetch_children` already does, and what keeps a read working when the
+	// current repository could not be named at all.
+	it('leaves a child in the current repository unqualified', () => {
+		expect(epic_fetch.scope_for(REPO, REPO)).toBeUndefined()
+	})
+
+	it('scopes a child elsewhere to its own repository', () => {
+		expect(epic_fetch.scope_for(OTHER_REPO, REPO)).toBe(OTHER_REPO)
 	})
 })
