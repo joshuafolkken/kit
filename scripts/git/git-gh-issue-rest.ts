@@ -54,6 +54,7 @@ const REST_FIELD_NAMES = new Map<string, string>([
 ])
 
 const NOT_AN_ISSUE_MESSAGE = 'gh api answered something other than an issue object'
+const NOT_AN_ISSUE_LISTING_MESSAGE = 'gh api answered something other than an issue listing'
 const NOT_A_BLOCKER_LISTING_MESSAGE = 'gh api answered something other than a blocked-by listing'
 
 function rest_field_name(field: string): string {
@@ -102,6 +103,25 @@ function to_gh_field_value(field: string, rest: RestIssue): unknown {
 function parse_rest_issue(rest_json: string): RestIssue {
 	const parsed = parse_json_object_safe(rest_json, rest_issue_schema)
 	if (parsed === undefined) throw new Error(NOT_AN_ISSUE_MESSAGE)
+
+	return parsed
+}
+
+// `repos/{owner}/{repo}/issues` serves pull requests alongside issues; `gh issue list` never did,
+// and its six callers all read the answer as issues. The key is present on a pull request and
+// absent on an issue, which is the same signal `to_issue_state` already reads
+// (joshuafolkken/kit#1025).
+function is_pull_request(rest: RestIssue): boolean {
+	return rest.pull_request !== undefined && rest.pull_request !== null
+}
+
+// One page of the listing endpoint, whose elements are the same objects `parse_rest_issue` reads one
+// of. It throws for the reason that one does: a response that is not a listing — `gh` answering
+// `{"message":"API rate limit exceeded"}` — must not degrade into an empty listing, which every
+// caller here reads as "there is nothing" (joshuafolkken/kit#950).
+function parse_rest_issues(rest_json: string): Array<RestIssue> {
+	const parsed = parse_json_array_or_undefined(rest_json, rest_issue_schema)
+	if (parsed === undefined) throw new Error(NOT_AN_ISSUE_LISTING_MESSAGE)
 
 	return parsed
 }
@@ -161,7 +181,9 @@ function to_field_text(value: unknown): string {
 const git_gh_issue_rest = {
 	empty_blocked_by,
 	split_fields,
+	is_pull_request,
 	parse_rest_issue,
+	parse_rest_issues,
 	total_blocked_by,
 	to_blocked_by,
 	to_gh_issue,

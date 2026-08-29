@@ -28,6 +28,26 @@ function rest_issue(overrides: Record<string, unknown> = {}): string {
 	})
 }
 
+// One page of `repos/{owner}/{repo}/issues`, whose elements are the same objects the single-issue
+// endpoint answers with — so the listing tests build their pages from the one response body above
+// rather than writing a second one (joshuafolkken/kit#1025).
+function rest_issue_page(rows: ReadonlyArray<Record<string, unknown>>): string {
+	return `[${rows.map((row) => rest_issue(row)).join(',')}]`
+}
+
+// A pull request as the same endpoint serves it: `repos/{owner}/{repo}/issues` returns both, where
+// `gh issue list` returned only issues.
+function rest_pull_request(number: number): Record<string, unknown> {
+	// eslint-disable-next-line unicorn/no-null -- REST sends null for a pull request never merged
+	return { number, pull_request: { merged_at: null } }
+}
+
+// The dependency counts GitHub puts on every row of a listing. `total_blocked_by` is what decides
+// whether a row costs a second request for its blocker relations.
+function rest_dependencies_summary(total_blocked_by: number): Record<string, unknown> {
+	return { issue_dependencies_summary: { total_blocked_by } }
+}
+
 // The dependencies endpoint answers full issue objects; only `number` and `state` survive the map.
 function rest_blockers(state = 'closed'): string {
 	return JSON.stringify([{ number: BLOCKER_NUMBER, state, html_url: ISSUE_HTML_URL }])
@@ -35,6 +55,9 @@ function rest_blockers(state = 'closed'): string {
 
 export {
 	rest_issue,
+	rest_issue_page,
+	rest_pull_request,
+	rest_dependencies_summary,
 	rest_blockers,
 	BLOCKER_NUMBER,
 	ISSUE_API_URL,
