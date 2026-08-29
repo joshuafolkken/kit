@@ -1,6 +1,6 @@
-import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_list } from './git-gh-issue-list'
 import { git_gh_issue_read } from './git-gh-issue-read'
+import { git_gh_issue_write } from './git-gh-issue-write'
 
 const NUMBER_AND_BODY_FIELDS = 'number,body'
 // The fields every listing that is *ranked* asks for: `createdAt` to order by and `labels` to
@@ -12,20 +12,6 @@ const SUMMARY_FIELDS = 'number,title,labels,createdAt'
 // behind the next-issues display too — where a refused one becomes a failure with no message at all,
 // since `issue_list_open` swallows the error (joshuafolkken/kit#996, joshuafolkken/kit#1025).
 const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy`
-
-async function issue_edit_body(issue_number: string, body: string): Promise<string> {
-	return await git_gh_exec.exec_gh_command_with_stdin({
-		args: ['issue', 'edit', issue_number, BODY_FILE_FLAG, BODY_FROM_STDIN],
-		stdin_body: body,
-	})
-}
-
-async function issue_comment(issue_number: string, body: string): Promise<string> {
-	return await git_gh_exec.exec_gh_command_with_stdin({
-		args: ['issue', 'comment', issue_number, BODY_FILE_FLAG, BODY_FROM_STDIN],
-		stdin_body: body,
-	})
-}
 
 // Every listing below goes through the one REST invocation in `git-gh-issue-list.ts`. It kept the
 // name and the `json_fields` / `limit` contract it had as a `gh issue list` wrapper, so these six
@@ -91,125 +77,15 @@ async function issue_list_by_label_in_repo(
 	return await issue_list_open({ json_fields: SUMMARY_FIELDS, limit, label, repo })
 }
 
-// `gh issue close` takes the comment as a plain string flag — unlike create/comment it has no
-// `--body-file`, so the text cannot be piped through stdin. execa passes argv as an array without a
-// shell, so the value needs no quoting.
-async function issue_close(issue_number: string, comment: string): Promise<boolean> {
-	try {
-		await git_gh_exec.exec_gh_command(['issue', 'close', issue_number, '--comment', comment])
-
-		return true
-	} catch {
-		return false
-	}
-}
-
-// `|| true` semantics: an existing label is not an error. Swallowing the failure is safe because a
-// genuinely missing label surfaces at creation time instead — `gh issue create --label epic` cannot
-// resolve it and fails there, so the anomaly is never lost.
-async function label_ensure(input: {
-	name: string
-	color: string
-	description: string
-}): Promise<void> {
-	try {
-		await git_gh_exec.exec_gh_command([
-			'label',
-			'create',
-			input.name,
-			'--color',
-			input.color,
-			'--description',
-			input.description,
-		])
-	} catch {
-		/* the label already exists */
-	}
-}
-
-// The body goes through stdin for the same reason the other writers use it: an epic body is
-// multi-line markdown, and passing it as an argv string would depend on shell quoting.
-async function issue_create_with_label(input: {
-	title: string
-	label: string
-	body: string
-}): Promise<string> {
-	return await git_gh_exec.exec_gh_command_with_stdin({
-		args: [
-			'issue',
-			'create',
-			'--title',
-			input.title,
-			'--label',
-			input.label,
-			BODY_FILE_FLAG,
-			BODY_FROM_STDIN,
-		],
-		stdin_body: input.body,
-	})
-}
-
-// Applied after the body edit so a failure leaves an issue with the epic sections and no label,
-// which `epic:check` reports — rather than a labelled issue with nothing to track. The caller checks
-// the return: the label is what the auto-close filters on (joshuafolkken/kit#865).
-async function issue_add_label(issue_number: string, label: string): Promise<boolean> {
-	try {
-		await git_gh_exec.exec_gh_command(['issue', 'edit', issue_number, '--add-label', label])
-
-		return true
-	} catch {
-		return false
-	}
-}
-
-// Applied after creation, never as `gh issue create --blocked-by`: an older `gh` rejects the
-// unknown flag with exit 1 and the Issue is never created. Split this way, an outdated CLI costs
-// only the relation. Requires gh >= 2.94.0; the caller treats a failure as non-fatal.
-async function issue_add_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
-	try {
-		await git_gh_exec.exec_gh_command(['issue', 'edit', issue_number, '--add-blocked-by', blocker])
-
-		return true
-	} catch {
-		return false
-	}
-}
-
-// The counterpart to the above, for an insertion that re-points an existing chain: inserting `#N`
-// between `#B` and `#M` has to drop `#B -> #M`, or the epic would declare one order and record two
-// (joshuafolkken/kit#890). Same gh >= 2.94.0 requirement, same non-fatal treatment.
-async function issue_remove_blocked_by(issue_number: string, blocker: string): Promise<boolean> {
-	try {
-		await git_gh_exec.exec_gh_command([
-			'issue',
-			'edit',
-			issue_number,
-			'--remove-blocked-by',
-			blocker,
-		])
-
-		return true
-	} catch {
-		return false
-	}
-}
-
 const git_gh_issue = {
 	...git_gh_issue_read,
-	label_ensure,
-	issue_create_with_label,
-	issue_add_blocked_by,
-	issue_remove_blocked_by,
-	issue_add_label,
-	issue_edit_body,
-	issue_comment,
+	...git_gh_issue_write,
 	issue_list_recent,
 	issue_list_by_label,
 	issue_list_by_label_in_repo,
 	issue_list_by_label_summary,
 	issue_search_body,
 	issue_list_open_bodies,
-	issue_close,
 }
 
 export { git_gh_issue, PICKUP_FIELDS, SUMMARY_FIELDS }

@@ -19,8 +19,9 @@ import {
 //
 // A page of a hundred, where GraphQL asked for `blockedBy(first:50)` — so `nodes` is at least as
 // complete as it was — while `totalCount` comes from the issue's own dependency summary and stays
-// exact whatever the page holds.
-const BLOCKED_BY_PATH = '/dependencies/blocked_by?per_page=100'
+// exact whatever the page holds. The endpoint itself is named in `git-gh-api-path.ts`, which the two
+// writes address as well (joshuafolkken/kit#1026).
+const BLOCKED_BY_QUERY = '?per_page=100'
 
 // The request is skipped when the issue's own summary says the count is zero, which is the common
 // case and the one that matters for cost: `epic:bundle` reads relations for the whole open backlog,
@@ -40,7 +41,7 @@ async function read_blocked_by(
 	if (exact_total === 0) return git_gh_issue_rest.empty_blocked_by()
 
 	const json = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.issue_api_path(issue_number, repo)}${BLOCKED_BY_PATH}`,
+		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${BLOCKED_BY_QUERY}`,
 	})
 
 	return git_gh_issue_rest.to_blocked_by(json, exact_total)

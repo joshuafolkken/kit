@@ -3,9 +3,10 @@ import { git_gh_command } from './git-gh-command'
 
 // Recording and dropping the native `blocked-by` relations an epic's declared order implies.
 //
-// The relation is a nicety, not part of the contract: `--add-blocked-by` needs gh >= 2.94.0 and
-// losing it costs only the native link, while the Issue and its task list are already correct. A
-// failure is therefore counted and reported rather than aborting a batch that is otherwise fine.
+// The relation is a nicety, not part of the contract: losing it costs only the native link, while
+// the Issue and its task list are already correct. A failure is therefore counted and reported
+// rather than aborting a batch that is otherwise fine. It no longer depends on the gh CLI's version
+// — the relation is written through the REST dependencies endpoint (joshuafolkken/kit#1026).
 //
 // Shared by epic creation and `--add` rather than written once per caller: both apply the same
 // relations for the same reason, and a second copy would be the place a fix is forgotten
@@ -40,7 +41,7 @@ function describe_action(action: RelationAction): string {
 }
 
 // What happened, phrased as a count rather than a per-link list: the useful signal is whether the
-// native relations now match the body, and a failure means `gh` is too old for every one of them.
+// native relations now match the body, not which individual link was refused.
 function format_relation_report(input: {
 	total: number
 	failures: number
@@ -52,7 +53,7 @@ function format_relation_report(input: {
 		return `🔗 ${String(input.total)} blocked-by relation(s) ${verb}.`
 	}
 
-	return `⚠️  ${String(input.failures)} of ${String(input.total)} blocked-by relation(s) could not be ${verb} (gh >= 2.94.0 required); the epic body is intact.`
+	return `⚠️  ${String(input.failures)} of ${String(input.total)} blocked-by relation(s) could not be ${verb}; the epic body is intact.`
 }
 
 const git_epic_relations = {
