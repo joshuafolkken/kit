@@ -126,9 +126,10 @@ describe('has_stderr_field', () => {
 })
 
 // joshuafolkken/kit#957: `epic:bundle` has to tell a number that resolves to nothing (404) from a
-// read that failed (403, 429, a dropped connection). `gh issue view` goes through GraphQL and
-// reports a failure as prose, so the status comes from a REST probe — and it is read from the
-// status line `--include` prints, never from `gh`'s wording, which is prose that can be reworded.
+// read that failed (403, 429, a dropped connection). The read reports a failure as gh's stderr text
+// — GraphQL before joshuafolkken/kit#1024, `exec_gh_api`'s thrown Error since — so the status comes
+// from this probe, read from the status line `--include` prints and never from `gh`'s wording,
+// which is prose that can be reworded between releases.
 const NOT_FOUND_LINE = 'HTTP/2.0 404 Not Found\nAccess-Control-Allow-Origin: *\n'
 const OK_LINE = 'HTTP/2.0 200 OK\nServer: github.com\n'
 const ISSUE_PATH = 'repos/o/r/issues/1'
