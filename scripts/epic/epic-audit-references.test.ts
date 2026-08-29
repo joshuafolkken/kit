@@ -1,3 +1,4 @@
+import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { describe, expect, it } from 'vitest'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
@@ -15,6 +16,9 @@ const ACCEPTANCE = '## 受け入れ条件\n\n- [ ] needs #40'
 const OTHER_40 = 'joshuafolkken/app-kit#40'
 const OTHER_12 = 'joshuafolkken/app-kit#12'
 const LOCAL_40 = 'joshuafolkken/kit#40'
+const DOTTED_REPO = 'joshuafolkken/site.com'
+const DOTTED_40 = `${DOTTED_REPO}#40`
+const PROSE_PATH = 'see prompts/review.md#5'
 
 function child(
 	number: number,
@@ -76,7 +80,7 @@ describe('epic_audit_logic.parse_issue_references', () => {
 	// A path written in prose has the shape of an `owner/repo` and is not one; resolving it would
 	// send the audit looking for a repository nobody named.
 	it('does not read a path written in prose as a repository', () => {
-		expect(epic_audit_logic.parse_issue_references('see prompts/review.md#5', REPO)).toEqual([])
+		expect(epic_audit_logic.parse_issue_references(PROSE_PATH, REPO)).toEqual([])
 	})
 
 	// The tail of a URL was refused before and stays refused: the anchor is not an issue reference.
@@ -87,14 +91,71 @@ describe('epic_audit_logic.parse_issue_references', () => {
 	})
 })
 
-describe('epic_audit_logic.format_reference', () => {
+// It lives beside the key it is the readable half of, so `epic:next` writes an unread child exactly
+// as the audit writes a citation (joshuafolkken/kit#1016).
+describe('epic_graph.format_reference', () => {
 	it('writes an issue in this repository bare, as every message always did', () => {
-		expect(epic_audit_logic.format_reference({ repo: REPO, number: 40 }, REPO)).toBe('#40')
+		expect(epic_graph.format_reference({ repo: REPO, number: 40 }, REPO)).toBe('#40')
 	})
 
 	// A bare number resolves against the reader's own repository and names a different issue there.
 	it('writes an issue in another repository with its repository', () => {
-		expect(epic_audit_logic.format_reference({ repo: OTHER_REPO, number: 40 }, REPO)).toBe(OTHER_40)
+		expect(epic_graph.format_reference({ repo: OTHER_REPO, number: 40 }, REPO)).toBe(OTHER_40)
+	})
+
+	it('writes a list of them the way every message lists references', () => {
+		const missing = [
+			{ repo: REPO, number: 7 },
+			{ repo: OTHER_REPO, number: 40 },
+		]
+
+		expect(epic_graph.format_references(missing, REPO)).toBe(`#7, ${OTHER_40}`)
+	})
+})
+
+// The task list has always tracked `- [ ] owner/site.com#40` as a genuine cross-repository child,
+// while this parse refused the dot — so a sibling quoting that child was skipped in silence. The two
+// now accept the same children, and the path misread the exclusion existed for stays refused: no
+// epic tracks a repository called `prompts/review.md` (joshuafolkken/kit#1016).
+describe('epic_audit_logic.parse_issue_references — a repository name with a dot', () => {
+	const known = new Set([REPO, DOTTED_REPO])
+
+	it('reads a dotted name the epic tracks', () => {
+		expect(epic_audit_logic.parse_issue_references(`see ${DOTTED_40}`, REPO, known)).toEqual([
+			{ repo: DOTTED_REPO, number: 40 },
+		])
+	})
+
+	it('refuses a path written in prose even with an epic in view', () => {
+		expect(epic_audit_logic.parse_issue_references(PROSE_PATH, REPO, known)).toEqual([])
+	})
+
+	// The set is what settles it, not the syntax: nothing else can tell the two apart.
+	it('refuses a dotted name no epic tracks', () => {
+		expect(epic_audit_logic.parse_issue_references(`see ${DOTTED_40}`, REPO)).toEqual([])
+	})
+
+	// A name without a dot is unchanged, with or without a set.
+	it('leaves a dotless qualified reference exactly as it was', () => {
+		expect(epic_audit_logic.parse_issue_references(`see ${OTHER_40}`, REPO)).toEqual([
+			{ repo: OTHER_REPO, number: 40 },
+		])
+	})
+})
+
+// Whatever the task list can track, a sibling's prose can cite. That is the alignment
+// joshuafolkken/kit#1016 asked for, checked against the parser that reads the rows.
+describe('the tracked children and the citable ones are the same set', () => {
+	it('cites every repository a task-list row can name', () => {
+		const rows = `- [ ] ${DOTTED_40}\n- [ ] ${OTHER_40}`
+		const tracked = git_epic_parse.parse_external_task_list_children(rows)
+		const known = new Set([REPO, ...tracked.map((entry) => entry.repo)])
+
+		for (const entry of tracked) {
+			const text = `see ${epic_graph.reference_key(entry.repo, entry.number)}`
+
+			expect(epic_audit_logic.parse_issue_references(text, REPO, known)).toEqual([entry])
+		}
 	})
 })
 

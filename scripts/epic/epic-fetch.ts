@@ -1,7 +1,7 @@
 import { git_epic_parse, type ExternalChild } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { epic_cross_repo } from './epic-cross-repo'
-import type { EpicChild } from './epic-graph'
+import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'
 
 // Reading an epic and its children from GitHub.
@@ -33,6 +33,11 @@ function scope_for(child_repo: string, current_repo: string): string | undefined
 	return child_repo === current_repo ? undefined : child_repo
 }
 
+// Numbers read from one repository's task-list rows, as references to issues in that repository.
+function to_references(issue_numbers: ReadonlyArray<number>, repo: string): Array<IssueReference> {
+	return issue_numbers.map((issue_number) => ({ repo, number: issue_number }))
+}
+
 // One child's state, labels and native relations. A child that cannot be read is reported as
 // missing rather than assumed closed: assuming would let an epic advance past a child nobody looked
 // at.
@@ -54,10 +59,15 @@ async function fetch_child(
 // would otherwise look like an epic with no open children — "complete" — and a single unreadable
 // child would vanish from the graph, so whatever it blocks would look unblocked and be run
 // (joshuafolkken/kit#860).
+//
+// The unread ones carry their repository, not just their number. An epic tracking
+// `- [ ] sveltejs/kit#7` had it refused by the owner restriction and reported as `Could not read #7`,
+// which a reader resolves against the repository they are standing in — a different issue
+// (joshuafolkken/kit#1016).
 interface FetchedChildren {
 	children: ReadonlyArray<EpicChild>
-	unreadable: ReadonlyArray<number>
-	skipped: ReadonlyArray<number>
+	unreadable: ReadonlyArray<IssueReference>
+	skipped: ReadonlyArray<IssueReference>
 }
 
 // Every child the epic's task list tracks, in the order the body lists them.
@@ -73,8 +83,11 @@ async function fetch_children(
 
 	return {
 		children: fetched.filter((child): child is EpicChild => child !== undefined),
-		unreadable: limited.filter((_, index) => fetched[index] === undefined),
-		skipped: child_numbers.slice(CHILD_LIMIT),
+		unreadable: to_references(
+			limited.filter((_, index) => fetched[index] === undefined),
+			repo,
+		),
+		skipped: to_references(child_numbers.slice(CHILD_LIMIT), repo),
 	}
 }
 
@@ -103,36 +116,55 @@ async function fetch_external_children(
 
 	return {
 		children: fetched.filter((child): child is EpicChild => child !== undefined),
-		unreadable: [
-			...allowed.filter((_, index) => fetched[index] === undefined).map((child) => child.number),
-			...refused.map((child) => child.number),
-		],
+		unreadable: [...allowed.filter((_, index) => fetched[index] === undefined), ...refused],
 		skipped: [],
 	}
 }
 
 interface EpicSnapshot {
 	body: string | undefined
+	// The `owner/repo` the command is running in — the repository against which a reference is written
+	// bare, and every other one written `owner/repo#N`. Deliberately *not* where the epic lives:
+	// `epic:next owner/other#858` reads an epic elsewhere while the person reading the answer is
+	// standing here, so writing an unread child bare would send them to their own issue of that number
+	// (joshuafolkken/kit#1016).
+	current_repo: string
 	children: ReadonlyArray<EpicChild>
 	child_numbers: ReadonlyArray<number>
-	unreadable: ReadonlyArray<number>
-	skipped: ReadonlyArray<number>
+	unreadable: ReadonlyArray<IssueReference>
+	skipped: ReadonlyArray<IssueReference>
 	has_external_children: boolean
 }
 
 // The epic and its children, as one read. `has_external_children` is surfaced rather than silently
 // ignored: a cross-repository child needs joshuafolkken/kit#864, and an epic that holds one is not
 // fully answered by this command yet.
-async function fetch_epic(epic_number: number, repo: string): Promise<EpicSnapshot> {
-	const body = await git_gh_command.issue_get_body(String(epic_number))
+//
+// `repo` is where the *epic* lives and `current_repo` is where the command is running, so the body
+// and its local rows are read through the same `scope_for` every other read goes through. Read
+// unqualified, `epic:next joshuafolkken/app-kit#858` answered from *this* repository's issue 858 and
+// then stamped the children it found there as app-kit's — and since joshuafolkken/kit#1016 makes
+// `repo` decide how an unread child is written, that mislabelling reached the message too. The
+// default keeps a command whose epic is always local reading exactly as before.
+async function fetch_epic(
+	epic_number: number,
+	repo: string,
+	current_repo: string = repo,
+): Promise<EpicSnapshot> {
+	const scope = scope_for(repo, current_repo)
+	const body = await git_gh_command.issue_get_body(String(epic_number), scope)
 	const child_numbers = git_epic_parse.parse_task_list_issue_numbers(body)
 	const external = git_epic_parse.parse_external_task_list_children(body)
-	const owner = epic_cross_repo.owner_of(repo)
-	const local = await fetch_children(child_numbers, repo)
+	// joshuafolkken/kit#869's restriction is about who *we* are, so the owner comes from the repository
+	// the command runs in. Derived from the epic's own repository instead, a qualified reference to
+	// somebody else's epic would have made their whole organization readable.
+	const owner = epic_cross_repo.owner_of(current_repo)
+	const local = await fetch_children(child_numbers, repo, scope)
 	const remote = await fetch_external_children(external, owner)
 
 	return {
 		body,
+		current_repo,
 		children: [...local.children, ...remote.children],
 		child_numbers: [...child_numbers, ...external.map((child) => child.number)],
 		unreadable: [...local.unreadable, ...remote.unreadable],
@@ -141,9 +173,17 @@ async function fetch_epic(epic_number: number, repo: string): Promise<EpicSnapsh
 	}
 }
 
+// Everything the fetch produced no child for: the reads that failed and the rows past the limit.
+// Both leave the graph missing a node in the same way, and `epic:next` and `epic:audit` each report
+// the pair together — one definition rather than the same concatenation written in both.
+function missing_children(snapshot: EpicSnapshot): Array<IssueReference> {
+	return [...snapshot.unreadable, ...snapshot.skipped]
+}
+
 const epic_fetch = {
 	CHILD_LIMIT,
 	scope_for,
+	missing_children,
 	fetch_child,
 	fetch_children,
 	fetch_epic,

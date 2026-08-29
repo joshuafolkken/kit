@@ -1,13 +1,15 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
+import { git_gh_command } from '#scripts/git/git-gh-command'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { describe, expect, it } from 'vitest'
-import type { EpicSnapshot } from './epic-fetch'
-import type { EpicChild } from './epic-graph'
+import { describe, expect, it, vi } from 'vitest'
+import { epic_fetch, type EpicSnapshot } from './epic-fetch'
+import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue } from './epic-issue'
 import { epic_next } from './epic-next'
 
 const REPO = 'joshuafolkken/kit'
 const CROSS_REPO_REFERENCE = `${REPO}#858`
+const THIRD_PARTY_REPO = 'sveltejs/kit'
 const DEPENDENCIES_BODY = 'Dependencies\n\n#1 -> #2'
 const UNORDERED_BODY = 'None — the children are independent; any execution order works.'
 
@@ -15,15 +17,32 @@ function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChil
 	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
 }
 
+// A child that could not be read, named the way the snapshot now carries it: repository and number.
+function unread(number: number, repo: string = REPO): IssueReference {
+	return { repo, number }
+}
+
 function snapshot(children: ReadonlyArray<EpicChild>, body?: string): EpicSnapshot {
 	return {
 		body,
+		current_repo: REPO,
 		children,
 		child_numbers: children.map((entry) => entry.number),
 		unreadable: [],
 		skipped: [],
 		has_external_children: false,
 	}
+}
+
+// The anomaly an epic gets when its only child could not be read.
+function message_for(missing: IssueReference): string {
+	const result = epic_next.decide({
+		...snapshot([]),
+		child_numbers: [missing.number],
+		unreadable: [missing],
+	})
+
+	return result.anomalies[0]?.message ?? ''
 }
 
 // A cross-repository epic must be qualified: a bare `#858` resolves to *this* repository's issue 858,
@@ -65,6 +84,24 @@ describe('epic_next.parse_options — a qualified epic', () => {
 
 	it('leaves the epic repository unset for a bare number', () => {
 		expect(epic_next.parse_options(['858']).epic_repo).toBeUndefined()
+	})
+})
+
+// The qualified read joshuafolkken/kit#1016 added goes out as `gh --repo`, so an epic naming another
+// owner would send this command to their tracker — the read joshuafolkken/kit#869 forbids for a
+// child, forbidden here for the same reason.
+describe('epic_next.run_epic — an epic that belongs to somebody else', () => {
+	it('refuses without asking that repository anything', async () => {
+		vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
+		const fetch_epic = vi.spyOn(epic_fetch, 'fetch_epic')
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const options = epic_next.parse_options([`${THIRD_PARTY_REPO}#858`])
+
+		expect(await epic_next.run_epic(options)).toBe(1)
+		expect(fetch_epic).not.toHaveBeenCalled()
+		expect(errors).toHaveBeenCalledWith(epic_next.FOREIGN_EPIC)
+
+		vi.restoreAllMocks()
 	})
 })
 
@@ -162,29 +199,46 @@ describe('epic_next.decide — the graph anomalies', () => {
 // read looks complete, and one missing child leaves whatever it blocks looking unblocked.
 describe('epic_next.decide — children that could not be read', () => {
 	it('refuses rather than reporting a fully open epic as complete', () => {
-		const result = epic_next.decide({ ...snapshot([]), child_numbers: [1, 2], unreadable: [1, 2] })
+		const result = epic_next.decide({
+			...snapshot([]),
+			child_numbers: [1, 2],
+			unreadable: [unread(1), unread(2)],
+		})
 
 		expect(result.verdict).toBe('error')
 	})
 
 	it('refuses rather than offering a child whose blocker went missing', () => {
-		const partial = { ...snapshot([child(2, [1])]), child_numbers: [1, 2], unreadable: [1] }
+		const partial = {
+			...snapshot([child(2, [1])]),
+			child_numbers: [1, 2],
+			unreadable: [unread(1)],
+		}
 		const result = epic_next.decide(partial)
 
 		expect(result.verdict).toBe('error')
 		expect(result.candidates).toEqual([])
 	})
 
-	it('names the children it could not read', () => {
-		const result = epic_next.decide({ ...snapshot([]), child_numbers: [7], unreadable: [7] })
-
-		expect(result.anomalies[0]?.message).toContain('#7')
-	})
-
 	it('refuses rather than silently truncating a very large epic', () => {
-		const result = epic_next.decide({ ...snapshot([child(1)]), skipped: [2] })
+		const result = epic_next.decide({ ...snapshot([child(1)]), skipped: [unread(2)] })
 
 		expect(result.verdict).toBe('error')
+	})
+})
+
+// A bare `#7` for a child in another repository sends the reader to this repository's issue 7 — a
+// different issue entirely, or none. An epic made only of local children keeps the wording it always
+// had (joshuafolkken/kit#1016).
+describe('epic_next.decide — how an unread child is named', () => {
+	it('names a child in this repository bare, as it always did', () => {
+		expect(message_for(unread(7))).toContain('Could not read #7.')
+	})
+
+	it('names a child in another repository with that repository', () => {
+		const message = message_for(unread(7, THIRD_PARTY_REPO))
+
+		expect(message).toContain(`Could not read ${THIRD_PARTY_REPO}#7.`)
 	})
 })
 

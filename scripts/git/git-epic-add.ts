@@ -1,5 +1,5 @@
 import { epic_fetch } from '#scripts/epic/epic-fetch'
-import type { EpicChild } from '#scripts/epic/epic-graph'
+import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
 import { git_epic_parse } from './git-epic-parse'
@@ -45,7 +45,7 @@ async function read_recorded(
 	const fetched = await epic_fetch.fetch_children(tracked, repo)
 
 	if (fetched.unreadable.length > 0) {
-		const list = format_issue_references(fetched.unreadable)
+		const list = epic_graph.format_references(fetched.unreadable, repo)
 
 		return { error: `Could not read ${list}; the epic's dependency graph is incomplete.` }
 	}
