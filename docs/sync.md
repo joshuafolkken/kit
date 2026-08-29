@@ -443,7 +443,7 @@ If the source file does not exist in the installed package, the destination is s
 
 ### `sonar-project.properties` (regenerated)
 
-The Sonar config is regenerated from the current GitHub repo name (fetched via `gh repo view`). If `gh` is unavailable or the repo cannot be identified, this file is skipped with a warning.
+The Sonar config is regenerated from the current GitHub repo name (fetched via `gh api repos/{owner}/{repo}`). If `gh` is unavailable or the repo cannot be identified, this file is skipped with a warning.
 
 The project key and organization are derived from the `owner/repo` slug:
 

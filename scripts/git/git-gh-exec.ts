@@ -81,12 +81,79 @@ async function exec_gh_api_status(path: string): Promise<number | undefined> {
 	}
 }
 
+const METHOD_FLAG = '--method'
+const INPUT_FLAG = '--input'
+const PAGINATE_FLAG = '--paginate'
+const SLURP_FLAG = '--slurp'
+const JQ_FLAG = '--jq'
+
+// One REST request through `gh api`. `path` is the only required field: a read names nothing else,
+// because `gh api` sends GET when neither `--method` nor a request body is given. **A `body` alone
+// is not a read** — gh promotes a request carrying `--input` to POST — so a caller that means to
+// send a body under another verb has to say `method` as well.
+//
+// `body` is handed to gh on stdin (`--input -`) rather than as a file or as repeated `-f key=value`
+// pairs — a JSON body then needs no temporary file and no per-field escaping. `jq_filter` unwraps
+// one value out of the response, so a caller wanting a single field gets the value rather than an
+// object to parse.
+//
+// `should_slurp` goes with `should_paginate`, and a caller that means to parse the result needs it:
+// `--paginate` alone emits one JSON document *per page*, so a two-page listing arrives as `[…][…]`,
+// which `JSON.parse` rejects. `--slurp` wraps the pages in one outer array instead. It is a separate
+// field rather than implied by `should_paginate` because gh refuses it alongside `--jq`, and a
+// caller reading a single value out of every page wants exactly that combination.
+interface GhApiRequest {
+	path: string
+	method?: string
+	body?: string
+	should_paginate?: boolean
+	should_slurp?: boolean
+	jq_filter?: string
+}
+
+function optional_flag(flag: string, value?: string): Array<string> {
+	return value === undefined ? [] : [flag, value]
+}
+
+function to_gh_api_args(request: GhApiRequest): Array<string> {
+	const body_args = request.body === undefined ? [] : [INPUT_FLAG, BODY_FROM_STDIN]
+	const paginate_args = request.should_paginate === true ? [PAGINATE_FLAG] : []
+	const slurp_args = request.should_slurp === true ? [SLURP_FLAG] : []
+
+	return [
+		'api',
+		request.path,
+		...optional_flag(METHOD_FLAG, request.method),
+		...body_args,
+		...paginate_args,
+		...slurp_args,
+		...optional_flag(JQ_FLAG, request.jq_filter),
+	]
+}
+
+// The response body of one `gh api` request, as text. Every REST caller that can await one goes
+// through it, so the verb, the body and the paging stop being spelled out per call site
+// (joshuafolkken/kit#1023). The synchronous readers that cannot — `gh-spawn.ts`, `epic-cross-repo.ts`
+// — still share its path builder.
+//
+// Failure handling is deliberately identical to the `gh <noun> <verb>` calls it replaces: both
+// paths below funnel through `to_gh_error`, so gh's stderr is still what the thrown Error carries.
+async function exec_gh_api(request: GhApiRequest): Promise<string> {
+	const args = to_gh_api_args(request)
+
+	if (request.body === undefined) return await exec_gh_command(args)
+
+	return await exec_gh_command_with_stdin({ args, stdin_body: request.body })
+}
+
 const git_gh_exec = {
 	exec_gh_command,
 	exec_gh_command_with_stdin,
+	exec_gh_api,
 	exec_gh_api_status,
 	parse_status_line,
 }
 
+export type { GhApiRequest }
 export { git_gh_exec, has_stderr_field, has_stdout_field }
 export { BODY_FILE_FLAG, BODY_FROM_STDIN }

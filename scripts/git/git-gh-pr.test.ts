@@ -4,7 +4,7 @@ import { git_gh_pr } from './git-gh-pr'
 import { git_gh_repo } from './git-gh-repo'
 
 vi.mock('./git-gh-exec', () => ({
-	git_gh_exec: { exec_gh_command: vi.fn() },
+	git_gh_exec: { exec_gh_command: vi.fn(), exec_gh_api: vi.fn() },
 	has_stderr_field: (): boolean => false,
 	BODY_FILE_FLAG: '--body-file',
 	BODY_FROM_STDIN: '-',
@@ -15,6 +15,7 @@ vi.mock('./git-gh-repo', () => ({
 }))
 
 const mocked_command = vi.mocked(git_gh_exec.exec_gh_command)
+const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const mocked_repo = vi.mocked(git_gh_repo.repo_get_name_with_owner)
 
 const BRANCH = 'feature-branch'
@@ -49,13 +50,29 @@ describe('pr_get_comments', () => {
 
 describe('pr_get_review_comments', () => {
 	it(RETURNS_LISTING, async () => {
-		mocked_command.mockResolvedValueOnce(PR_NUMBER).mockResolvedValueOnce(EMPTY_LISTING)
+		mocked_command.mockResolvedValueOnce(PR_NUMBER)
+		mocked_api.mockResolvedValueOnce(EMPTY_LISTING)
 
 		await expect(git_gh_pr.pr_get_review_comments(BRANCH)).resolves.toBe(EMPTY_LISTING)
 	})
 
+	// The request goes through `exec_gh_api` and its path through `git_gh_api_path` since
+	// joshuafolkken/kit#1023, rather than being concatenated here; what they produce has to stay
+	// byte-for-byte the path gh was asked for before.
+	it('asks gh for the review comments of that pull request', async () => {
+		mocked_command.mockResolvedValueOnce(PR_NUMBER)
+		mocked_api.mockResolvedValueOnce(EMPTY_LISTING)
+
+		await git_gh_pr.pr_get_review_comments(BRANCH)
+
+		expect(mocked_api).toHaveBeenCalledWith({
+			path: `repos/${REPO}/pulls/${PR_NUMBER}/comments`,
+		})
+	})
+
 	it(REPORTS_FAILURE, async () => {
-		mocked_command.mockResolvedValueOnce(PR_NUMBER).mockRejectedValueOnce(new Error(GH_FAILURE))
+		mocked_command.mockResolvedValueOnce(PR_NUMBER)
+		mocked_api.mockRejectedValueOnce(new Error(GH_FAILURE))
 
 		await expect(git_gh_pr.pr_get_review_comments(BRANCH)).resolves.toBeUndefined()
 	})
