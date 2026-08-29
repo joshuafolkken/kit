@@ -1,5 +1,5 @@
 import { BODY_FILE_FLAG, BODY_FROM_STDIN, git_gh_exec } from './git-gh-exec'
-import { git_gh_issue_read } from './git-gh-issue-read'
+import { git_gh_issue_read, repo_scope } from './git-gh-issue-read'
 
 const NUMBER_AND_BODY_FIELDS = 'number,body'
 // The fields every listing that is *ranked* asks for: `createdAt` to order by and `labels` to
@@ -95,6 +95,27 @@ async function issue_list_by_label_summary(
 		json_fields: options?.json_fields ?? PICKUP_FIELDS,
 		limit,
 		filter_arguments: ['--label', label],
+	})
+}
+
+// Open issues carrying `label` in one named repository — the read `epic:next` makes before it
+// offers a child, to see whether that repository already has one running (joshuafolkken/kit#925).
+//
+// `SUMMARY_FIELDS` rather than `PICKUP_FIELDS`: the answer is only "which issues hold this
+// repository", and asking for `blockedBy` would make the guard disappear on a `gh` too old to know
+// that field — a listing failure this caller must never read as "nothing is running".
+//
+// `repo` is `repo_scope`'s, not a second spelling of it. Omitted, the listing is the repository the
+// command runs in, exactly as every other listing here.
+async function issue_list_by_label_in_repo(
+	label: string,
+	limit: number,
+	repo?: string,
+): Promise<string | undefined> {
+	return await issue_list_open({
+		json_fields: SUMMARY_FIELDS,
+		limit,
+		filter_arguments: [...repo_scope(repo), '--label', label],
 	})
 }
 
@@ -212,6 +233,7 @@ const git_gh_issue = {
 	issue_comment,
 	issue_list_recent,
 	issue_list_by_label,
+	issue_list_by_label_in_repo,
 	issue_list_by_label_summary,
 	issue_search_body,
 	issue_list_open_bodies,

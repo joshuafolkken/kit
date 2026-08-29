@@ -35,6 +35,30 @@ function parse_json_array_or_undefined<T>(
 	return element_schema.array().parse(value)
 }
 
+// What one listing read produced. The two gaps are deliberately apart: JSON that is not a listing at
+// all is an access or connectivity problem, while elements the schema rejects mean the tool's fields
+// changed — and those send a reader to two different places (joshuafolkken/kit#996). A caller that
+// treats them the same still reads them from here rather than writing the try/catch again.
+type ListingRead<T> =
+	{ kind: 'read'; rows: Array<T> } | { kind: 'unreadable' } | { kind: 'unexpected_shape' }
+
+/**
+ * Parse a listing, telling the two gaps apart.
+ *
+ * The rethrow `parse_json_array_or_undefined` performs is the whole point, and every caller that
+ * wants both gaps named was catching it itself — the `auto-ok` pickup and `epic:next`'s
+ * repository-level busy check wrote the same six lines (joshuafolkken/kit#925).
+ */
+function read_json_listing<T>(raw_json: string, element_schema: z.ZodType<T>): ListingRead<T> {
+	try {
+		const rows = parse_json_array_or_undefined(raw_json, element_schema)
+
+		return rows === undefined ? { kind: 'unreadable' } : { kind: 'read', rows }
+	} catch {
+		return { kind: 'unexpected_shape' }
+	}
+}
+
 /**
  * Parse a JSON string into an array validated by the given element schema.
  * Malformed JSON yields an empty array.
@@ -66,6 +90,14 @@ const parse_json = {
 	parse_json_array_safe,
 	parse_json_array_or_undefined,
 	parse_json_object_safe,
+	read_json_listing,
 }
 
-export { parse_json, parse_json_array_or_undefined, parse_json_array_safe, parse_json_object_safe }
+export type { ListingRead }
+export {
+	parse_json,
+	parse_json_array_or_undefined,
+	parse_json_array_safe,
+	parse_json_object_safe,
+	read_json_listing,
+}

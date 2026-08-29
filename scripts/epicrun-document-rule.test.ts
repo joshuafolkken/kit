@@ -26,8 +26,22 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 // The parts of the definition that are load-bearing, checked in the canonical reference.
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'repo あたり同時 1 件、repo 間は並行',
+	// The invariant is per *repository*, not per epic: the working tree, `main` and the
+	// `package.json` `josh bump` rewrites are shared by every epic that touches the checkout, so an
+	// `in-progress` issue this epic does not track still has to stop it (joshuafolkken/kit#925).
+	'排他はリポジトリ単位であり、それを適用するのは `epic:next` である',
+	'どの epic に属するかを問わず',
+	// The two limits are part of the definition: read as unconditional, an agent treats a `complete`
+	// answer during an in-progress issue as impossible, and a parked child holds the repository it
+	// was just set aside from.
+	'park された Issue はリポジトリを押さえない',
+	// Overstated as a mutex, a reader stops guarding the check-then-act window it does not close.
+	'これは advisory であり、アトミックではない',
+	// The label is only advisory, so the rule that removes an abandoned one has to reach past this
+	// epic's own children — otherwise one stale label stalls every epic in the checkout, forever.
+	'そのリポジトリの open Issue すべてに適用される',
 	// Without this the next epic inherits "concurrency needs no coordination" and ships a race.
-	'同一リポジトリ内の並行を認めた時点で失われる',
+	'このガードを止めるのではなく置き換える必要がある',
 	'park はセッション停止の置き換えであって、停止を生んだルールの置き換えではない',
 	'park の解除は Tier A',
 	'待つべき場面で終了する',
@@ -49,8 +63,15 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'park and continue',
 	'one child per repository, repositories in parallel',
 	'Stopping conditions',
-	// The per-repo scoping is the entire reason no locking is implemented.
-	'has to introduce real mutual exclusion',
+	// The exclusion is real and it is per repository; a reword that drops it takes the guard's
+	// reason with it, and the next reader restores the race joshuafolkken/kit#925 closed.
+	'**The exclusion is per repository, and `epic:next` is what applies it.**',
+	'whichever epic that issue belongs to',
+	'a **parked** issue does not hold the repository',
+	'**It is advisory and it is not atomic.**',
+	'**A listing it could not read is not an idle repository.**',
+	// Same-repository parallelism is still out; the guard made that mechanical, not obsolete.
+	'has to **replace** this guard',
 	// Reading the labels instead stops in the one moment the run must wait, so the classification
 	// rule travels with the parking procedure rather than staying behind in the documents.
 	"Waiting is decided by `epic:next`'s classification, never by reading labels",

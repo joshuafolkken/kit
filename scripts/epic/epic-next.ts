@@ -4,10 +4,11 @@ import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { epic_busy } from './epic-busy'
 import { epic_classify } from './epic-classify'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
-import { epic_graph, type GraphAnomaly } from './epic-graph'
+import { epic_graph, type EpicChild, type GraphAnomaly } from './epic-graph'
 import { epic_issue } from './epic-issue'
 import { epic_report, type EpicNextResult, type EpicVerdict } from './epic-report'
 
@@ -25,6 +26,12 @@ const EXTERNAL_NOTICE = 'Note: this epic tracks children in other repositories.'
 // command to a third party's tracker — which joshuafolkken/kit#869 forbids for a child and forbids
 // here for the same reason (joshuafolkken/kit#1016).
 const FOREIGN_EPIC = 'That epic belongs to another owner; this command only reads our own.'
+// What a repository that is already running something answers. `wait` rather than a number, and
+// `wait` rather than `stop`: the holder finishes or its stale label is removed, so asking again is
+// what resolves it — exactly the verdict a child carrying `in-progress` already produces.
+const BUSY_VERDICT: EpicVerdict = 'wait'
+const UNCHECKED_EXCLUSION =
+	'Note: the one-child-per-repository exclusion is applied by `--repo`; a child listed here may still be held back there.'
 
 interface NextOptions {
 	epic_number?: number
@@ -111,6 +118,37 @@ function repo_verdict(verdict: EpicVerdict): EpicVerdict {
 	return verdict === 'run' ? 'wait' : verdict
 }
 
+// The candidate, once the repository has been asked whether anything is already running in it —
+// **whichever epic that belongs to** (joshuafolkken/kit#925). The invariant is one child per
+// *repository* rather than one per epic, because the working tree, `main` and the `package.json`
+// `josh bump` rewrites are shared by every epic that touches this checkout.
+//
+// Asked only when there *is* a candidate: consulted on `stop` or `complete` too, an unrelated
+// `in-progress` issue would turn a finished epic into a permanent `wait`, and neither of those
+// verdicts is about to start anything. It also never reaches a third party's tracker, since a child
+// in a repository with another owner is refused before it is read (joshuafolkken/kit#869).
+//
+// **A read that failed answers `wait` too** — never the child, and not an error either
+// (`epic-busy.ts` records why both wrong answers are wrong).
+async function offer_child(child: EpicChild, repo: string): Promise<number> {
+	const busy = await epic_busy.read_repository(repo)
+
+	if (busy.kind === 'idle') {
+		console.info(String(child.number))
+
+		return SUCCESS_EXIT_CODE
+	}
+
+	console.error(
+		busy.kind === 'busy'
+			? epic_busy.busy_message(busy.issues, repo)
+			: epic_busy.unreadable_message(repo),
+	)
+	console.info(BUSY_VERDICT)
+
+	return SUCCESS_EXIT_CODE
+}
+
 // Print the answer for one repository, as one machine-readable token: the issue number when there
 // is a child to run, otherwise the verdict — `wait`, `stop` or `complete`.
 //
@@ -121,7 +159,7 @@ function repo_verdict(verdict: EpicVerdict): EpicVerdict {
 //
 // An unusable graph is checked before a candidate is picked: printing a runnable child while the
 // graph is broken would hand a caller work the anomaly says must not start.
-function report_single(result: EpicNextResult, repo: string): number {
+async function report_single(result: EpicNextResult, repo: string): Promise<number> {
 	if (result.verdict === 'error') {
 		console.error(epic_report.format_result(result))
 
@@ -137,14 +175,26 @@ function report_single(result: EpicNextResult, repo: string): number {
 		return SUCCESS_EXIT_CODE
 	}
 
-	console.info(String(child.number))
-
-	return SUCCESS_EXIT_CODE
+	return await offer_child(child, repo)
 }
 
-function report(result: EpicNextResult, snapshot: EpicSnapshot, repo: string | undefined): number {
+// The aggregate listing does not consult the repository-level exclusion — `--repo` is what asks a
+// repository whether it is busy, and doing it here would be one listing per repository for a report
+// nobody branches on. Said out loud rather than left implicit: this output names runnable children,
+// and the `--repo` form may answer `wait` for the very same child (joshuafolkken/kit#925).
+function note_unchecked_exclusion(result: EpicNextResult): void {
+	if (result.verdict === 'run') console.error(UNCHECKED_EXCLUSION)
+}
+
+async function report(
+	result: EpicNextResult,
+	snapshot: EpicSnapshot,
+	repo: string | undefined,
+): Promise<number> {
 	if (snapshot.has_external_children) console.error(EXTERNAL_NOTICE)
-	if (repo !== undefined) return report_single(result, repo)
+	if (repo !== undefined) return await report_single(result, repo)
+
+	note_unchecked_exclusion(result)
 
 	const text = epic_report.format_result(result)
 
@@ -161,14 +211,14 @@ function report(result: EpicNextResult, snapshot: EpicSnapshot, repo: string | u
 
 // The checkout each repository's children would be run in comes from joshuafolkken/kit#869's map. A
 // repository absent from it is reported without a path rather than cloned.
-function report_epic(snapshot: EpicSnapshot, options: NextOptions): number {
+async function report_epic(snapshot: EpicSnapshot, options: NextOptions): Promise<number> {
 	const paths = repo_discovery.discover_repositories(PROJECT_ROOT)
 
 	// One registry answer per repository per invocation. A polling `epicrun` calls this command
 	// again each round, and a release that appeared in between has to be seen.
 	epic_cross_repo.reset_publish_cache()
 
-	return report(decide(snapshot, paths), snapshot, options.repo)
+	return await report(decide(snapshot, paths), snapshot, options.repo)
 }
 
 // A refusal: the reason on stderr, where every other explanation this command prints goes.
@@ -200,7 +250,7 @@ async function run_epic(options: NextOptions): Promise<number> {
 		return refuse(`#${String(epic_number)} tracks no children in a task list.`)
 	}
 
-	return report_epic(snapshot, options)
+	return await report_epic(snapshot, options)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -230,6 +280,8 @@ const epic_next = {
 	unreadable_anomaly,
 	is_order_declared,
 	repo_verdict,
+	offer_child,
+	UNCHECKED_EXCLUSION,
 	parse_options,
 	run_epic,
 	decide,
