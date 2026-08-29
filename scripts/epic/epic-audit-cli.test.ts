@@ -1,14 +1,16 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AuditFinding } from './epic-audit'
+import type { AuditFinding, IssueReference, ReferenceState } from './epic-audit'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_audit_cli, type AuditInput } from './epic-audit-cli'
-import type { EpicSnapshot } from './epic-fetch'
+import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'
+const OWNER = 'joshuafolkken'
 const EPIC = 858
 const GET_BODY = 'issue_get_body'
+const FETCH_CHILD = 'fetch_child'
 const LOCAL_BODY = 'local body'
 const REMOTE_BODY = 'remote body'
 
@@ -39,6 +41,7 @@ function snapshot(overrides: Partial<EpicSnapshot> = {}): EpicSnapshot {
 function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
 	return {
 		epic_number: EPIC,
+		repo: REPO,
 		children: [],
 		tracked: [],
 		reference_states: new Map(),
@@ -70,13 +73,17 @@ describe('epic_audit_cli.parse_epic_number', () => {
 	})
 })
 
+function claims(body: string | null): boolean {
+	return epic_audit_cli.claims_parent(body, EPIC, REPO)
+}
+
 describe('epic_audit_cli.claims_parent', () => {
 	it('recognizes the parent line the templates write', () => {
-		expect(epic_audit_cli.claims_parent('親: joshuafolkken/kit#858', EPIC)).toBe(true)
+		expect(claims('親: joshuafolkken/kit#858')).toBe(true)
 	})
 
 	it('recognizes the English spelling', () => {
-		expect(epic_audit_cli.claims_parent('Parent: #858', EPIC)).toBe(true)
+		expect(claims('Parent: #858')).toBe(true)
 	})
 
 	// An issue parented to a different epic routinely backlinks this one elsewhere in its body;
@@ -84,39 +91,118 @@ describe('epic_audit_cli.claims_parent', () => {
 	it('does not claim an issue whose parent line names a different epic', () => {
 		const body = '親: joshuafolkken/kit#900\n\nRelated to #858 for context.'
 
-		expect(epic_audit_cli.claims_parent(body, EPIC)).toBe(false)
+		expect(claims(body)).toBe(false)
 	})
 
 	it('does not claim an issue that merely mentions the epic', () => {
-		expect(epic_audit_cli.claims_parent('see #858', EPIC)).toBe(false)
+		expect(claims('see #858')).toBe(false)
+	})
+
+	// A parent line naming another repository's epic of the same number is not this epic's child
+	// (joshuafolkken/kit#1014).
+	it('does not claim an issue parented to the same number elsewhere', () => {
+		expect(claims('親: joshuafolkken/app-kit#858')).toBe(false)
 	})
 
 	// `gh issue list --json body` answers with JSON null for an issue that has none.
 	it('handles a body gh reported as null', () => {
 		// eslint-disable-next-line unicorn/no-null -- the shape gh's JSON actually produces
-		expect(epic_audit_cli.claims_parent(null, EPIC)).toBe(false)
+		expect(claims(null)).toBe(false)
 	})
 })
 
+function outside(children: ReadonlyArray<AuditChild>): ReadonlyArray<IssueReference> {
+	return epic_audit_cli.outside_references(children, OWNER)
+}
+
 describe('epic_audit_cli.outside_references', () => {
 	it('reports a cited issue that is not a child', () => {
-		expect(epic_audit_cli.outside_references([child(1, 'see #900')])).toEqual([900])
+		expect(outside([child(1, 'see #900')])).toEqual([{ repo: REPO, number: 900 }])
 	})
 
 	it('leaves out the children themselves', () => {
-		expect(epic_audit_cli.outside_references([child(1, 'see #2'), child(2, '')])).toEqual([])
+		expect(outside([child(1, 'see #2'), child(2, '')])).toEqual([])
 	})
 
 	// `joshuafolkken/app-kit#12` is another repository's issue 12; reading its tail as a local `#12`
-	// produced warnings about issues that were fine.
-	it('does not read the tail of a repository-qualified reference', () => {
-		expect(epic_audit_cli.outside_references([child(1, 'see joshuafolkken/app-kit#12')])).toEqual(
-			[],
-		)
+	// produced warnings about issues that were fine. It is read now — as that repository's issue.
+	it('reads a repository-qualified reference as that repository', () => {
+		expect(outside([child(1, 'see joshuafolkken/app-kit#12')])).toEqual([
+			{ repo: OTHER_REPO, number: 12 },
+		])
 	})
 
-	it('reports each number once', () => {
-		expect(epic_audit_cli.outside_references([child(1, '#900'), child(2, '#900')])).toEqual([900])
+	it('reports each issue once', () => {
+		expect(outside([child(1, '#900'), child(2, '#900')])).toEqual([{ repo: REPO, number: 900 }])
+	})
+
+	// A child of another repository is not this repository's child of the same number, so the
+	// citation is an outside reference here and must still be resolved (joshuafolkken/kit#1014).
+	it('keeps a citation a same-numbered child elsewhere used to swallow', () => {
+		expect(outside([child(1, 'see #12'), child_in(12, OTHER_REPO)])).toEqual([
+			{ repo: REPO, number: 12 },
+		])
+	})
+
+	// Inherited from joshuafolkken/kit#869: a body mentioning a third party's issue must not send
+	// this command to their tracker.
+	it('leaves out a repository this owner does not own', () => {
+		expect(outside([child(1, 'see sveltejs/kit#900')])).toEqual([])
+	})
+})
+
+async function resolve(
+	references: ReadonlyArray<IssueReference>,
+): Promise<Map<string, ReferenceState>> {
+	return await epic_audit_cli.resolve_reference_states(references, REPO)
+}
+
+// Each reference is asked of the repository whose body named it. Asked unqualified, a
+// cross-repository child's `#40` was answered by this repository's issue 40 (joshuafolkken/kit#1014).
+describe('epic_audit_cli.resolve_reference_states', () => {
+	it('asks this repository unqualified and keys the answer by repository and number', async () => {
+		const fetch_child = vi.spyOn(epic_fetch, FETCH_CHILD).mockResolvedValue(child_in(900, REPO))
+		const states = await resolve([{ repo: REPO, number: 900 }])
+
+		expect(fetch_child).toHaveBeenCalledWith(900, REPO, undefined)
+		expect(states.get(`${REPO}#900`)).toBe('OPEN')
+	})
+
+	it('asks another repository through its own scope', async () => {
+		const closed = { ...child_in(40, OTHER_REPO), state: 'CLOSED' as const }
+		const fetch_child = vi.spyOn(epic_fetch, FETCH_CHILD).mockResolvedValue(closed)
+		const states = await resolve([{ repo: OTHER_REPO, number: 40 }])
+
+		expect(fetch_child).toHaveBeenCalledWith(40, OTHER_REPO, OTHER_REPO)
+		expect(states.get(`${OTHER_REPO}#40`)).toBe('CLOSED')
+	})
+
+	// Two issues of the same number in different repositories are two entries, not one.
+	it('keeps the same number in two repositories apart', async () => {
+		vi.spyOn(epic_fetch, FETCH_CHILD).mockResolvedValue(undefined)
+		const states = await resolve([
+			{ repo: REPO, number: 40 },
+			{ repo: OTHER_REPO, number: 40 },
+		])
+
+		expect(states.size).toBe(2)
+		expect(states.get(`${OTHER_REPO}#40`)).toBe('UNRESOLVED')
+	})
+})
+
+// An orphan is recognized by number alone, so the numbers it is checked against must be this
+// repository's rows only (joshuafolkken/kit#1014).
+describe('epic_audit_cli.locally_tracked', () => {
+	it('reads the rows naming this repository', () => {
+		expect(epic_audit_cli.locally_tracked(snapshot({ body: '- [ ] #12\n- [ ] #13' }))).toEqual([
+			12, 13,
+		])
+	})
+
+	it('leaves out a row naming another repository', () => {
+		const body = '- [ ] #12\n- [ ] joshuafolkken/app-kit#40'
+
+		expect(epic_audit_cli.locally_tracked(snapshot({ body }))).toEqual([12])
 	})
 })
 

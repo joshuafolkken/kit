@@ -120,20 +120,23 @@ describe('epic_audit_logic.depends_on', () => {
 // deliverable, `blocked_by` empty on both, and the epic declaring them independent.
 describe('epic_audit_checks.find_implicit_dependencies', () => {
 	it('warns about the mutual-reference shape that was found by hand', () => {
-		const findings = epic_audit_checks.find_implicit_dependencies([
-			child(863, 'uses the discovery result of #864'),
-			child(864, 'shares the publish check with #863'),
-		])
+		const findings = epic_audit_checks.find_implicit_dependencies(
+			[
+				child(863, 'uses the discovery result of #864'),
+				child(864, 'shares the publish check with #863'),
+			],
+			REPO,
+		)
 
 		expect(findings).toHaveLength(2)
 		expect(findings.every((finding) => finding.level === 'warning')).toBe(true)
 	})
 
 	it('says nothing when the dependency is declared', () => {
-		const findings = epic_audit_checks.find_implicit_dependencies([
-			child(863, 'delivers what #864 needs'),
-			child(864, 'uses #863', [863]),
-		])
+		const findings = epic_audit_checks.find_implicit_dependencies(
+			[child(863, 'delivers what #864 needs'), child(864, 'uses #863', [863])],
+			REPO,
+		)
 
 		expect(findings).toEqual([])
 	})
@@ -141,21 +144,21 @@ describe('epic_audit_checks.find_implicit_dependencies', () => {
 	// "This part is filled in by #864" is a legitimate design note, and an undeclared one is exactly
 	// what the warning is for — but it must never become an error.
 	it('keeps a forward reference at warning level', () => {
-		const findings = epic_audit_checks.find_implicit_dependencies([
-			child(1, 'this part is filled in by #2'),
-			child(2, ''),
-		])
+		const findings = epic_audit_checks.find_implicit_dependencies(
+			[child(1, 'this part is filled in by #2'), child(2, '')],
+			REPO,
+		)
 
 		expect(findings).toHaveLength(1)
 		expect(findings[0]?.level).toBe('warning')
 	})
 
 	it('ignores a reference to an issue outside the epic', () => {
-		expect(epic_audit_checks.find_implicit_dependencies([child(1, 'see #999')])).toEqual([])
+		expect(epic_audit_checks.find_implicit_dependencies([child(1, 'see #999')], REPO)).toEqual([])
 	})
 
 	it('ignores a child citing its own number', () => {
-		expect(epic_audit_checks.find_implicit_dependencies([child(1, 'this is #1')])).toEqual([])
+		expect(epic_audit_checks.find_implicit_dependencies([child(1, 'this is #1')], REPO)).toEqual([])
 	})
 })
 
@@ -163,10 +166,10 @@ describe('epic_audit_checks.find_implicit_dependencies', () => {
 // and #864, while the graph let #860 run first.
 describe('epic_audit_checks.find_order_contradictions', () => {
 	it('fails a child whose acceptance criteria need something built later', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			child(860, ACCEPTANCE_BODY),
-			child(869, ''),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[child(860, ACCEPTANCE_BODY), child(869, '')],
+			REPO,
+		)
 
 		expect(findings).toHaveLength(1)
 		expect(findings[0]?.level).toBe('error')
@@ -177,19 +180,19 @@ describe('epic_audit_checks.find_order_contradictions', () => {
 	// criteria are satisfiable exactly as written; calling that an error made four of five errors on
 	// the real epic false positives.
 	it('accepts a forward reference the other child already depends on', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			child(860, '## 受け入れ条件\n\n- [ ] a hook #864 can extend'),
-			child(864, '', [860]),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[child(860, '## 受け入れ条件\n\n- [ ] a hook #864 can extend'), child(864, '', [860])],
+			REPO,
+		)
 
 		expect(findings).toEqual([])
 	})
 
 	it('accepts the same criteria once the dependency is declared', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			child(860, ACCEPTANCE_BODY, [869]),
-			child(869, ''),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[child(860, ACCEPTANCE_BODY, [869]), child(869, '')],
+			REPO,
+		)
 
 		expect(findings).toEqual([])
 	})
@@ -201,10 +204,10 @@ describe('epic_audit_checks.find_order_contradictions', () => {
 // on it at the first step (joshuafolkken/kit#1010).
 describe('epic_audit_checks.find_order_contradictions — a pair with nothing left to run', () => {
 	it('demotes the finding to a warning when both children are closed', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			closed(child(860, ACCEPTANCE_BODY)),
-			closed(child(869, '')),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[closed(child(860, ACCEPTANCE_BODY)), closed(child(869, ''))],
+			REPO,
+		)
 
 		expect(findings).toHaveLength(1)
 		expect(findings[0]?.level).toBe('warning')
@@ -215,27 +218,27 @@ describe('epic_audit_checks.find_order_contradictions — a pair with nothing le
 	// reported rather than counting the same omission a second time.
 	it('keeps naming both children, so the pair is still reported once', () => {
 		const children = [closed(child(860, ACCEPTANCE_BODY)), closed(child(869, ''))]
-		const contradictions = epic_audit_checks.find_order_contradictions(children)
+		const contradictions = epic_audit_checks.find_order_contradictions(children, REPO)
 
 		expect(messages(contradictions)).toContain('#860')
 		expect(messages(contradictions)).toContain('#869')
-		expect(epic_audit_checks.find_implicit_dependencies(children, contradictions)).toEqual([])
+		expect(epic_audit_checks.find_implicit_dependencies(children, REPO, contradictions)).toEqual([])
 	})
 
 	it('keeps the error while the child naming the other is still open', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			child(860, ACCEPTANCE_BODY),
-			closed(child(869, '')),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[child(860, ACCEPTANCE_BODY), closed(child(869, ''))],
+			REPO,
+		)
 
 		expect(findings[0]?.level).toBe('error')
 	})
 
 	it('keeps the error while the child that is named is still open', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			closed(child(860, ACCEPTANCE_BODY)),
-			child(869, ''),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[closed(child(860, ACCEPTANCE_BODY)), child(869, '')],
+			REPO,
+		)
 
 		expect(findings[0]?.level).toBe('error')
 	})
@@ -243,11 +246,10 @@ describe('epic_audit_checks.find_order_contradictions — a pair with nothing le
 
 describe('epic_audit_checks.find_order_contradictions — what it accepts', () => {
 	it('accepts a transitive dependency', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			child(1, '## 受け入れ条件\n\n- [ ] needs #3', [2]),
-			child(2, '', [3]),
-			child(3, ''),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[child(1, '## 受け入れ条件\n\n- [ ] needs #3', [2]), child(2, '', [3]), child(3, '')],
+			REPO,
+		)
 
 		expect(findings).toEqual([])
 	})
@@ -255,41 +257,12 @@ describe('epic_audit_checks.find_order_contradictions — what it accepts', () =
 	// A reference in the background section is a design note; only the criteria state what must be
 	// deliverable, so only they can contradict the order.
 	it('ignores a reference outside the acceptance criteria', () => {
-		const findings = epic_audit_checks.find_order_contradictions([
-			child(1, '## 背景\n\nrelated to #2'),
-			child(2, ''),
-		])
+		const findings = epic_audit_checks.find_order_contradictions(
+			[child(1, '## 背景\n\nrelated to #2'), child(2, '')],
+			REPO,
+		)
 
 		expect(findings).toEqual([])
-	})
-})
-
-describe('epic_audit_checks.find_unresolved_references', () => {
-	it('warns about a reference to an issue that does not exist', () => {
-		const states = new Map([[999, 'UNRESOLVED' as const]])
-		const findings = epic_audit_checks.find_unresolved_references([child(1, 'see #999')], states)
-
-		expect(findings[0]?.level).toBe('warning')
-		expect(messages(findings)).toContain('could not be resolved')
-	})
-
-	it('warns about a reference to a closed issue', () => {
-		const states = new Map([[900, 'CLOSED' as const]])
-		const findings = epic_audit_checks.find_unresolved_references([child(1, 'see #900')], states)
-
-		expect(messages(findings)).toContain('already closed')
-	})
-
-	it('says nothing about an open one', () => {
-		const states = new Map([[900, 'OPEN' as const]])
-
-		expect(epic_audit_checks.find_unresolved_references([child(1, 'see #900')], states)).toEqual([])
-	})
-
-	it('says nothing about a number it was given no state for', () => {
-		expect(epic_audit_checks.find_unresolved_references([child(1, 'see #900')], new Map())).toEqual(
-			[],
-		)
 	})
 })
 
