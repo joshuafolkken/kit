@@ -20,17 +20,27 @@ interface AuditChild extends EpicChild {
 	body: string | undefined
 }
 
-// Whether anything orders these two, in either direction. A sibling is named by number because that
-// is how a body writes it; the child it refers to is the one in the same repository.
+// The child a bare `#N` in `child`'s prose names. A sibling is named by number because that is how a
+// body writes it, and issue numbers are unique per repository rather than globally, so the match is
+// on both. Extracted so the level decision below reads the same child this ordering test does —
+// asking GitHub a second time for a state already on the record would be the duplication
+// `CLAUDE.md` prohibits.
+function find_sibling(
+	children: ReadonlyArray<AuditChild>,
+	child: AuditChild,
+	other: number,
+): AuditChild | undefined {
+	return children.find((candidate) => candidate.number === other && candidate.repo === child.repo)
+}
+
+// Whether anything orders these two, in either direction.
 function is_ordered(
 	index: ReadonlyMap<string, EpicChild>,
 	child: AuditChild,
 	other: number,
 	children: ReadonlyArray<AuditChild>,
 ): boolean {
-	const target = children.find(
-		(candidate) => candidate.number === other && candidate.repo === child.repo,
-	)
+	const target = find_sibling(children, child, other)
 	if (target === undefined) return true
 
 	return (
@@ -106,6 +116,49 @@ function find_implicit_dependencies(
 // honest. `#860`'s criteria say `#864` will extend a hook it provides, and `#864` is declared to
 // depend on `#860` — a forward reference, and satisfiable exactly as written. Verified against the
 // real epic: without this, four of the run's five errors were forward references of that shape.
+//
+// The level depends on whether either end still has execution left. What makes an undeclared order a
+// contradiction is that the criteria's child *can run first*; once both children are closed that
+// sentence is simply false, and an epic that ever forgot to declare an order would otherwise fail its
+// audit forever — which stops every future `epicrun` on it at the first step, for something that can
+// no longer stall anything (joshuafolkken/kit#1010). Confirmed on the real epic: `epic:next` handed
+// back a runnable child while the audit was red.
+//
+// **Demoted rather than dropped**, and the choice is not cosmetic. Dropping the finding does not
+// shorten the report: the acceptance criteria are part of the body, so the same pair falls straight
+// through to check 1 — `reported_pairs` suppresses it only while this check reports it — and arrives
+// as `implicit dependency` instead. Same line count, and the message loses the one thing that made it
+// worth reading, that the name is in the *acceptance criteria*. So the history stays visible at the
+// level that matches what is left to go wrong: nothing.
+//
+// Closed is asserted, never inferred: `epic_issue.normalize_state` maps everything that is not
+// `CLOSED` — `MERGED` included — to `OPEN`, so a state this cannot confirm keeps the error. The
+// unknown case falls to the loud side, which is the only side it may fall to.
+function are_both_closed(child: AuditChild, target: AuditChild | undefined): boolean {
+	return child.state === 'CLOSED' && target?.state === 'CLOSED'
+}
+
+// Both wordings open with the same clause, and deliberately so: `reported_pairs` reads the first two
+// references out of the message to suppress check 1's duplicate, so whichever level is chosen, the
+// two numbers must appear in the same order.
+function order_message(child: AuditChild, other: number, is_settled: boolean): string {
+	const named = `${reference(child.number)} names ${reference(other)} in its acceptance criteria`
+
+	if (is_settled) {
+		return `${named} with nothing ordering the two, but both are closed — neither can run first any more.`
+	}
+
+	return `${named}, but nothing orders the two — it can run first.`
+}
+
+function order_finding(child: AuditChild, other: number, is_settled: boolean): AuditFinding {
+	return {
+		level: is_settled ? 'warning' : 'error',
+		check: ORDER_CONTRADICTION,
+		message: order_message(child, other, is_settled),
+	}
+}
+
 function find_order_contradictions(children: ReadonlyArray<AuditChild>): Array<AuditFinding> {
 	const index = epic_graph.index_children(children)
 	const numbers = new Set(children.map((child) => child.number))
@@ -113,11 +166,9 @@ function find_order_contradictions(children: ReadonlyArray<AuditChild>): Array<A
 	return children.flatMap((child) =>
 		referenced_siblings(child, numbers, epic_audit_logic.acceptance_section(child.body))
 			.filter((other) => !is_ordered(index, child, other, children))
-			.map((other) => ({
-				level: 'error' as const,
-				check: ORDER_CONTRADICTION,
-				message: `${reference(child.number)} names ${reference(other)} in its acceptance criteria, but nothing orders the two — it can run first.`,
-			})),
+			.map((other) =>
+				order_finding(child, other, are_both_closed(child, find_sibling(children, child, other))),
+			),
 	)
 }
 

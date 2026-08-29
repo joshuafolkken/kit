@@ -1020,18 +1020,22 @@ pnpm josh epic:audit 858   # alias: josh ea
 
 The graph's own properties — a cycle, and a body declaring one order while the `blocked-by` relations record another — are taken from [`josh epic:next`](#josh-epicnext)'s detection rather than re-derived here. What this command adds is reading _inside_ the children:
 
-| Check                | Level     | What it means                                                                                        |
-| -------------------- | --------- | ---------------------------------------------------------------------------------------------------- |
-| Implicit dependency  | warning   | A child's body names another child of the same epic, and nothing orders the two.                     |
-| Order contradiction  | **error** | A child's **acceptance criteria** name another child, and nothing orders the two — it can run first. |
-| Unresolved reference | warning   | A body cites an issue that does not exist, or one already closed.                                    |
-| Orphan child         | warning   | An issue names this epic as its parent but the epic's task list does not track it.                   |
+| Check                | Level     | What it means                                                                                                                                         |
+| -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implicit dependency  | warning   | A child's body names another child of the same epic, and nothing orders the two.                                                                      |
+| Order contradiction  | **error** | A child's **acceptance criteria** name another child, and nothing orders the two — it can run first. A warning instead once both children are closed. |
+| Unresolved reference | warning   | A body cites an issue that does not exist, or one already closed.                                                                                     |
+| Orphan child         | warning   | An issue names this epic as its parent but the epic's task list does not track it.                                                                    |
 
 **Only errors change the exit code.** The implicit-dependency check sees only that one child mentioned another, which is as true of a real missing dependency as of a design note about what comes next. Failing on both would make those notes unwritable, so the machine's job is to stop an omission going unnoticed, not to decide.
 
 **A forward reference the other child already depends on is not reported.** When `#860`'s criteria say `#864` will extend a hook it provides, and `#864` is declared to depend on `#860`, the criteria are satisfiable exactly as written. Verified against a real epic: without that suppression, four of five errors were forward references of that shape.
 
 What remains an error is a name in the acceptance criteria with **nothing ordering the two at all** — the criteria are where a child states what it must deliver, so a deliverable named there that nothing guarantees will exist first is the contradiction. A child citing another purely as an example still trips it; that is the residual cost of a check the machine cannot make semantically, and rewording or declaring the dependency clears it.
+
+**Unless both children are closed, in which case it is a warning** ([#1010](https://github.com/joshuafolkken/kit/issues/1010)). The whole force of the error is that the criteria's child _can run first_; once neither child has any execution left, that is no longer true of either, and the finding cannot describe anything that will happen. Left as an error it is permanent — every epic that ever forgot to declare an order fails its audit from then on, and `epicrun` runs the audit before its first child, so the epic stops at step one for a contradiction nothing can trip over. It was confirmed on a real epic: the audit was red while `epic:next` handed back a runnable child perfectly happily.
+
+**Demoted rather than dropped, and the choice was made on the output.** The acceptance criteria are part of the body, so the same pair also matches the implicit-dependency check, which stays quiet only while this one reports the pair. Drop the finding and the pair reappears one line lower as `implicit dependency` — the report is not one line shorter, and the message has lost the one thing worth reading in it, that the name is in the **acceptance criteria**. Since the brevity a drop would buy does not exist, the history stays visible at the level matching what is left to go wrong. Closed is asserted rather than inferred: a state the audit cannot confirm as `CLOSED` (a `MERGED` pull request among them) keeps the error.
 
 **Run it without being asked** — at the start of an `epicrun`, as [`josh epic:plan`](#josh-epicplan)'s phase 0, and right after a child is added or a dependency changed. **Fixing what it finds is Tier A**: re-pointing a dependency or correcting prose is reversible and will otherwise stall the work, so do it without asking and record the reasoning on the Issue. Park with `needs-decision` only when the contradiction is a design choice nobody has made.
 

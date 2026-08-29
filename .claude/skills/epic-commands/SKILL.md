@@ -70,13 +70,21 @@ adds is reading *inside* the children:
 | Check | Level |
 | --- | --- |
 | A child's body names another child, nothing orders the two | warning |
-| A child's **acceptance criteria** name another child, nothing orders the two | **error** |
+| A child's **acceptance criteria** name another child, nothing orders the two | **error**, or a warning once both children are closed |
 | A body cites a missing or already-closed issue | warning |
 | An issue names this epic as parent that the task list does not track | warning |
 
 **Only errors fail it.** The first check fires on a legitimate forward reference as readily as on a
 real missing dependency; failing on both would make design notes unwritable. A forward reference the
 other child *already depends on* is not reported at all.
+
+**A pair whose children are both closed is a warning, not an error.** What makes an undeclared order
+a contradiction is that the criteria's child *can run first*, and neither child has any execution
+left — so an epic that once forgot to declare an order would otherwise fail its audit forever, which
+stops every future `epicrun` on it at the first step. It is demoted rather than dropped because
+dropping it hands the same pair to the first check, which reports it as an implicit dependency
+instead: the same one line, minus the detail that the name is in the acceptance criteria
+(joshuafolkken/kit#1010).
 
 **Fixing what it finds is Tier A** — re-pointing a dependency or correcting prose is reversible and
 will otherwise stall the work. Park with `needs-decision` only when the contradiction is a design
