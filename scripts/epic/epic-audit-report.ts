@@ -1,5 +1,5 @@
 import type { AuditFinding } from './epic-audit'
-import type { GraphAnomaly } from './epic-graph'
+import { epic_graph, type GraphAnomaly, type IssueReference } from './epic-graph'
 
 // Turning the findings into a report and an exit code.
 //
@@ -11,6 +11,7 @@ import type { GraphAnomaly } from './epic-graph'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const PASS_LINE = '✓ No cross-child contradictions found.'
+const UNREADABLE_CHECK = 'unreadable children'
 
 interface AuditResult {
 	findings: ReadonlyArray<AuditFinding>
@@ -26,6 +27,30 @@ function anomaly_findings(anomalies: ReadonlyArray<GraphAnomaly>): Array<AuditFi
 		check: anomaly.kind.replaceAll('_', ' '),
 		message: anomaly.message,
 	}))
+}
+
+// A child that could not be read makes every check unreliable, and `epic:next` already refuses to
+// run on that state — an audit that reported a clean bill on the same input would contradict the
+// command that acts on it.
+//
+// Each one is written with the repository it lives in. `- [ ] sveltejs/kit#7`, refused by the owner
+// restriction, was reported as `Could not read #7` and sent the reader to this repository's issue 7
+// — the one message joshuafolkken/kit#1014 left resolving against the wrong repository
+// (joshuafolkken/kit#1016).
+function unreadable_findings(
+	missing: ReadonlyArray<IssueReference>,
+	current_repo: string,
+): Array<AuditFinding> {
+	if (missing.length === 0) return []
+	const list = epic_graph.format_references(missing, current_repo)
+
+	return [
+		{
+			level: 'error',
+			check: UNREADABLE_CHECK,
+			message: `Could not read ${list}; the audit would be reading an incomplete epic.`,
+		},
+	]
 }
 
 function has_error(findings: ReadonlyArray<AuditFinding>): boolean {
@@ -65,6 +90,7 @@ function format_report(result: AuditResult): string {
 const epic_audit_report = {
 	PASS_LINE,
 	anomaly_findings,
+	unreadable_findings,
 	has_error,
 	build_result,
 	sort_findings,

@@ -1,10 +1,5 @@
-import {
-	epic_audit_logic,
-	type AuditFinding,
-	type IssueReference,
-	type ReferenceState,
-} from './epic-audit'
-import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
+import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // The four cross-child checks. Each takes the children with their bodies and returns findings.
 //
@@ -36,12 +31,13 @@ interface ReportedReference {
 	state: 'CLOSED' | 'UNRESOLVED'
 }
 
-// An issue's identity and how it is written, both taken from `epic_audit_logic` rather than spelled
-// a second time here.
-const { key_of } = epic_audit_logic
+// An issue's identity and how it is written, both taken from `epic_graph` rather than spelled a
+// second time here: `epic:next` reports the same references and must write them the same way.
+const { key_of } = epic_graph
+const { known_repos } = epic_audit_logic
 
 function shown(reference: IssueReference, current_repo: string): string {
-	return epic_audit_logic.format_reference(reference, current_repo)
+	return epic_graph.format_reference(reference, current_repo)
 }
 
 // The child a reference names, or nothing when it names an issue outside the epic. Extracted so the
@@ -82,9 +78,10 @@ function referenced_siblings(
 	children: ReadonlyArray<AuditChild>,
 	child: AuditChild,
 	text: string,
+	known: ReadonlySet<string>,
 ): Array<AuditChild> {
 	return epic_audit_logic
-		.parse_issue_references(text, child.repo)
+		.parse_issue_references(text, child.repo, known)
 		.map((reference) => find_sibling(children, reference))
 		.filter(
 			(sibling): sibling is AuditChild =>
@@ -105,11 +102,16 @@ function pair_key(from: IssueReference, to: IssueReference): string {
 function reported_pairs(
 	findings: ReadonlyArray<AuditFinding>,
 	current_repo: string,
+	known: ReadonlySet<string>,
 ): ReadonlySet<string> {
 	const pairs = new Set<string>()
 
 	for (const finding of findings) {
-		const [first, second] = epic_audit_logic.parse_issue_references(finding.message, current_repo)
+		const [first, second] = epic_audit_logic.parse_issue_references(
+			finding.message,
+			current_repo,
+			known,
+		)
 
 		if (first !== undefined && second !== undefined) pairs.add(pair_key(first, second))
 	}
@@ -129,10 +131,11 @@ function find_implicit_dependencies(
 	already_reported: ReadonlyArray<AuditFinding> = [],
 ): Array<AuditFinding> {
 	const index = epic_graph.index_children(children)
-	const reported = reported_pairs(already_reported, current_repo)
+	const known = known_repos(children, current_repo)
+	const reported = reported_pairs(already_reported, current_repo, known)
 
 	return children.flatMap((child) =>
-		referenced_siblings(children, child, child.body ?? '')
+		referenced_siblings(children, child, child.body ?? '', known)
 			.filter((other) => !reported.has(pair_key(child, other)))
 			.filter((other) => !is_ordered(index, child, other))
 			.map((other) => ({
@@ -207,9 +210,10 @@ function find_order_contradictions(
 	current_repo: string,
 ): Array<AuditFinding> {
 	const index = epic_graph.index_children(children)
+	const known = known_repos(children, current_repo)
 
 	return children.flatMap((child) =>
-		referenced_siblings(children, child, epic_audit_logic.acceptance_section(child.body))
+		referenced_siblings(children, child, epic_audit_logic.acceptance_section(child.body), known)
 			.filter((other) => !is_ordered(index, child, other))
 			.map((other) => order_finding(child, other, current_repo)),
 	)
@@ -233,9 +237,10 @@ function reported_state(
 function reported_references(
 	child: AuditChild,
 	states: ReadonlyMap<string, ReferenceState>,
+	known: ReadonlySet<string>,
 ): Array<ReportedReference> {
 	return epic_audit_logic
-		.parse_issue_references(child.body ?? '', child.repo)
+		.parse_issue_references(child.body ?? '', child.repo, known)
 		.filter((reference) => key_of(reference) !== key_of(child))
 		.flatMap((reference) => {
 			const state = reported_state(states, reference)
@@ -263,8 +268,10 @@ function find_unresolved_references(
 	states: ReadonlyMap<string, ReferenceState>,
 	current_repo: string,
 ): Array<AuditFinding> {
+	const known = known_repos(children, current_repo)
+
 	return children.flatMap((child) =>
-		reported_references(child, states).map((reported) => ({
+		reported_references(child, states, known).map((reported) => ({
 			level: 'warning' as const,
 			check: UNRESOLVED_REFERENCE,
 			message: unresolved_message(child, reported, current_repo),

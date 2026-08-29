@@ -5,6 +5,9 @@ import { epic_fetch } from './epic-fetch'
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'
 const GET_CHILD = 'issue_get_state_and_relations'
+const GET_BODY = 'issue_get_body'
+const THIRD_PARTY_REPO = 'sveltejs/kit'
+const EPIC = 858
 const IN_PROGRESS = 'in-progress'
 
 // The shape `gh issue view --json number,state,labels,blockedBy` actually answers with, measured
@@ -24,6 +27,11 @@ function gh_child(input: {
 			totalCount: (input.blocked_by ?? []).length,
 		},
 	})
+}
+
+// The epic's own body, which decides which rows the fetch then tries to read.
+function epic_body(rows: string): void {
+	vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(rows)
 }
 
 beforeEach(() => {
@@ -112,7 +120,7 @@ describe('epic_fetch.fetch_children', () => {
 		const fetched = await epic_fetch.fetch_children([1, 2], REPO)
 
 		expect(fetched.children).toHaveLength(1)
-		expect(fetched.unreadable).toEqual([2])
+		expect(fetched.unreadable).toEqual([{ repo: REPO, number: 2 }])
 	})
 
 	it('reports what it skipped rather than truncating in silence', async () => {
@@ -121,6 +129,85 @@ describe('epic_fetch.fetch_children', () => {
 		const fetched = await epic_fetch.fetch_children(numbers, REPO)
 
 		expect(fetched.skipped).toHaveLength(2)
+		expect(fetched.skipped[0]?.repo).toBe(REPO)
+	})
+})
+
+// A child that could not be read is named with the repository it lives in. Reported as a bare number,
+// `- [ ] sveltejs/kit#7` came out as `Could not read #7` and sent the reader to this repository's
+// issue 7 (joshuafolkken/kit#1016).
+describe('epic_fetch.fetch_epic — naming what it could not read', () => {
+	// The repository the *reader* is standing in, not the one the epic lives in: an unread child of a
+	// qualified epic written bare would send them to their own issue of that number.
+	it('carries the repository the command is running in', async () => {
+		epic_body('- [ ] #1')
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 1 }))
+		const snapshot = await epic_fetch.fetch_epic(EPIC, OTHER_REPO, REPO)
+
+		expect(snapshot.current_repo).toBe(REPO)
+	})
+
+	it('names a local child it could not read as this repository', async () => {
+		epic_body('- [ ] #7')
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(snapshot.unreadable).toEqual([{ repo: REPO, number: 7 }])
+	})
+
+	// The owner restriction refuses this row before it is read; the number alone said nothing about
+	// which tracker it belongs to.
+	it('names a child the owner restriction refused with its own repository', async () => {
+		epic_body(`- [ ] ${THIRD_PARTY_REPO}#7`)
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(snapshot.unreadable).toEqual([{ repo: THIRD_PARTY_REPO, number: 7 }])
+	})
+
+	it('names a child in a sibling repository it could not read with that repository', async () => {
+		epic_body(`- [ ] ${OTHER_REPO}#40`)
+		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(snapshot.unreadable).toEqual([{ repo: OTHER_REPO, number: 40 }])
+	})
+})
+
+// A qualified epic lives somewhere else, and its task-list rows name issues there. Read unqualified,
+// the body came from *this* repository's issue of that number and its rows were read here too, while
+// the children were still stamped with the other repository (joshuafolkken/kit#1016).
+describe('epic_fetch.fetch_epic — the repository the epic itself lives in', () => {
+	it('reads an epic in this repository unqualified, exactly as before', async () => {
+		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue('- [ ] #1')
+		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 1 }))
+
+		await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(get_body).toHaveBeenCalledWith(String(EPIC), undefined)
+		expect(get_child).toHaveBeenCalledWith('1', undefined)
+	})
+
+	// joshuafolkken/kit#869's restriction is about who *we* are. Derived from the epic's repository
+	// instead, a qualified reference to somebody else's epic would have made their whole organization
+	// readable through the very read that was just added.
+	it('takes the owner allow-list from the repository the command runs in', async () => {
+		epic_body(`- [ ] ${THIRD_PARTY_REPO}#7`)
+		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(undefined)
+		const snapshot = await epic_fetch.fetch_epic(EPIC, THIRD_PARTY_REPO, REPO)
+
+		expect(get_child).not.toHaveBeenCalled()
+		expect(snapshot.unreadable).toEqual([{ repo: THIRD_PARTY_REPO, number: 7 }])
+	})
+
+	it('reads an epic elsewhere, and its rows, through that repository', async () => {
+		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue('- [ ] #1')
+		const get_child = vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 1 }))
+
+		await epic_fetch.fetch_epic(EPIC, OTHER_REPO, REPO)
+
+		expect(get_body).toHaveBeenCalledWith(String(EPIC), OTHER_REPO)
+		expect(get_child).toHaveBeenCalledWith('1', OTHER_REPO)
 	})
 })
 

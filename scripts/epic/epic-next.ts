@@ -21,6 +21,10 @@ const REPO_FLAG = '--repo'
 const USAGE = 'Usage: josh epic:next <epic-number|owner/repo#number> [--repo <owner/repo>]'
 const UNKNOWN_REPO = 'unknown/unknown'
 const EXTERNAL_NOTICE = 'Note: this epic tracks children in other repositories.'
+// A qualified epic is now read through `gh --repo`, so naming one we do not own would send this
+// command to a third party's tracker — which joshuafolkken/kit#869 forbids for a child and forbids
+// here for the same reason (joshuafolkken/kit#1016).
+const FOREIGN_EPIC = 'That epic belongs to another owner; this command only reads our own.'
 
 interface NextOptions {
 	epic_number?: number
@@ -58,10 +62,14 @@ function parse_options(argv: ReadonlyArray<string>): NextOptions {
 // A child that could not be read stops the run. Continuing would answer with a graph that is
 // missing a node: an epic whose children all failed to read reads as complete, and one missing child
 // leaves whatever it blocks looking unblocked.
+//
+// Each one is named with the repository it lives in, through the same writer the audit uses: an epic
+// tracking `- [ ] sveltejs/kit#7` reported `Could not read #7`, and a reader sent to this
+// repository's issue 7 finds a different issue or none (joshuafolkken/kit#1016).
 function unreadable_anomaly(snapshot: EpicSnapshot): GraphAnomaly | undefined {
-	const missing = [...snapshot.unreadable, ...snapshot.skipped]
+	const missing = epic_fetch.missing_children(snapshot)
 	if (missing.length === 0) return undefined
-	const list = missing.map((issue_number) => `#${String(issue_number)}`).join(', ')
+	const list = epic_graph.format_references(missing, snapshot.current_repo)
 
 	return {
 		kind: 'unreadable_children',
@@ -153,17 +161,7 @@ function report(result: EpicNextResult, snapshot: EpicSnapshot, repo: string | u
 
 // The checkout each repository's children would be run in comes from joshuafolkken/kit#869's map. A
 // repository absent from it is reported without a path rather than cloned.
-async function run_epic(options: NextOptions): Promise<number> {
-	const epic_number = options.epic_number ?? 0
-	const current_repo = (await git_gh_command.repo_get_name_with_owner()) ?? UNKNOWN_REPO
-	const snapshot = await epic_fetch.fetch_epic(epic_number, options.epic_repo ?? current_repo)
-
-	if (snapshot.child_numbers.length === 0) {
-		console.error(`#${String(epic_number)} tracks no children in a task list.`)
-
-		return FAILURE_EXIT_CODE
-	}
-
+function report_epic(snapshot: EpicSnapshot, options: NextOptions): number {
 	const paths = repo_discovery.discover_repositories(PROJECT_ROOT)
 
 	// One registry answer per repository per invocation. A polling `epicrun` calls this command
@@ -171,6 +169,38 @@ async function run_epic(options: NextOptions): Promise<number> {
 	epic_cross_repo.reset_publish_cache()
 
 	return report(decide(snapshot, paths), snapshot, options.repo)
+}
+
+// A refusal: the reason on stderr, where every other explanation this command prints goes.
+function refuse(reason: string): number {
+	console.error(reason)
+
+	return FAILURE_EXIT_CODE
+}
+
+// Where the epic lives, or nothing when it belongs to another owner. The qualified read added by
+// joshuafolkken/kit#1016 goes out as `gh --repo`, so without this a reference naming a third party's
+// epic would send this command to their tracker — the read joshuafolkken/kit#869 forbids for a child,
+// forbidden here for the same reason.
+function epic_repo_of(options: NextOptions, current_repo: string): string | undefined {
+	const epic_repo = options.epic_repo ?? current_repo
+	const owner = epic_cross_repo.owner_of(current_repo)
+
+	return epic_cross_repo.is_same_owner_repo(epic_repo, owner) ? epic_repo : undefined
+}
+
+async function run_epic(options: NextOptions): Promise<number> {
+	const epic_number = options.epic_number ?? 0
+	const current_repo = (await git_gh_command.repo_get_name_with_owner()) ?? UNKNOWN_REPO
+	const epic_repo = epic_repo_of(options, current_repo)
+	if (epic_repo === undefined) return refuse(FOREIGN_EPIC)
+	const snapshot = await epic_fetch.fetch_epic(epic_number, epic_repo, current_repo)
+
+	if (snapshot.child_numbers.length === 0) {
+		return refuse(`#${String(epic_number)} tracks no children in a task list.`)
+	}
+
+	return report_epic(snapshot, options)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -196,6 +226,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const epic_next = {
 	USAGE,
 	EXTERNAL_NOTICE,
+	FOREIGN_EPIC,
 	unreadable_anomaly,
 	is_order_declared,
 	repo_verdict,
