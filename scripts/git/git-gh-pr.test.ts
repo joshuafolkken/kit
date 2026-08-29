@@ -7,13 +7,19 @@ import {
 	find_request,
 	FORK_REPO,
 	gh_api_routes,
+	gh_failure,
 	PR_BRANCH,
 	pr_lookup_path,
 	PR_NUMBER,
 	pr_routes,
 	request_body,
 } from './git-gh-pr-fixture'
-import { forget_pr_numbers, FORK_HEAD_MESSAGE, NO_PULL_REQUEST_MESSAGE } from './git-gh-pr-read'
+import {
+	forget_pr_numbers,
+	FORK_HEAD_MESSAGE,
+	NO_PULL_REQUEST_MESSAGE,
+	UNREADABLE_PULL_REQUEST_MESSAGE,
+} from './git-gh-pr-read'
 
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: {
@@ -63,7 +69,6 @@ const DUPLICATE_BODY =
 const DUPLICATE_MESSAGE = `${DUPLICATE_STDERR}\n${DUPLICATE_BODY}`
 const PR_ALREADY_EXISTS = 'PR_ALREADY_EXISTS'
 const NOT_FOUND = 'gh: Not Found (HTTP 404)'
-const NO_PR_CASE = 'throws when the branch has no pull request'
 
 function write_extra(): Record<string, string> {
 	return {
@@ -169,14 +174,6 @@ describe('pr_comment', () => {
 	it('answers the comment URL', async () => {
 		await expect(git_gh_pr.pr_comment(PR_BRANCH, BODY)).resolves.toBe(COMMENT_URL)
 	})
-
-	// `gh pr comment <branch>` failed for a branch with no pull request, and the callers let that
-	// surface. Folding it into a silent success would lose a CodeRabbit ignore reason.
-	it(NO_PR_CASE, async () => {
-		mocked_api.mockImplementation(gh_api_routes({ [pr_lookup_path()]: EMPTY_LISTING }))
-
-		await expect(git_gh_pr.pr_comment(PR_BRANCH, BODY)).rejects.toThrow(NO_PULL_REQUEST_MESSAGE)
-	})
 })
 
 describe('pr_merge', () => {
@@ -188,11 +185,49 @@ describe('pr_merge', () => {
 		expect(request_to(PR_MERGE_PATH).method).toBe('PUT')
 		expect(parsed_body(PR_MERGE_PATH)).toStrictEqual({ merge_method: 'merge' })
 	})
+})
 
-	it(NO_PR_CASE, async () => {
+// `gh pr comment <branch>` and `gh pr merge <branch>` both failed for a branch with no pull request
+// and the callers let that surface — folding it into a silent success would lose a CodeRabbit ignore
+// reason, or merge nothing while reporting a merge.
+//
+// joshuafolkken/kit#1048: what they could not say is *why*. A rate-limited or unauthenticated lookup
+// answered the same `undefined` as an empty listing, so a run reported a pull request that plainly
+// exists as missing and the diagnosis started in the wrong place. Both writes resolve through
+// `require_pr_number`, so both said it and both are asserted here.
+describe.each([
+	{
+		name: 'pr_comment',
+		write: async (): Promise<void> => {
+			await git_gh_pr.pr_comment(PR_BRANCH, BODY)
+		},
+	},
+	{
+		name: 'pr_merge',
+		write: async (): Promise<void> => {
+			await git_gh_pr.pr_merge(PR_BRANCH)
+		},
+	},
+])('$name when the branch resolves to no number', ({ write }) => {
+	it('throws when the branch has no pull request', async () => {
 		mocked_api.mockImplementation(gh_api_routes({ [pr_lookup_path()]: EMPTY_LISTING }))
 
-		await expect(git_gh_pr.pr_merge(PR_BRANCH)).rejects.toThrow(NO_PULL_REQUEST_MESSAGE)
+		await expect(write()).rejects.toThrow(NO_PULL_REQUEST_MESSAGE)
+	})
+
+	it('throws a different message when the lookup itself failed', async () => {
+		mocked_api.mockRejectedValue(gh_failure())
+
+		await expect(write()).rejects.toThrow(UNREADABLE_PULL_REQUEST_MESSAGE)
+	})
+
+	// The reason travels as the cause, which is what `git_error.handle` prints under 💡 Details.
+	it('carries the failure gh reported as the cause', async () => {
+		const failure = gh_failure()
+
+		mocked_api.mockRejectedValue(failure)
+
+		await expect(write()).rejects.toHaveProperty('cause', failure)
 	})
 })
 

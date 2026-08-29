@@ -16,6 +16,15 @@ const PR_REPO = 'joshuafolkken/kit'
 const FORK_REPO = 'someone-else/kit'
 const EMPTY_LISTING = '[]'
 const RATE_LIMITED = '{"message":"API rate limit exceeded"}'
+// A lookup that never answered — the rate limit, expired auth or dropped connection that
+// `require_pr_number` now reports as its own diagnosis rather than as "this branch has no pull
+// request" (joshuafolkken/kit#1048). All three pull-request test files arrange it, so the message and
+// the error it is wrapped in are one definition rather than three.
+const GH_FAILURE = 'gh exploded'
+
+function gh_failure(): Error {
+	return new Error(GH_FAILURE)
+}
 
 // Newest first, spelled out rather than left to the endpoint's default — the lookup's fallback to
 // the first row only means "the most recent one" while this ordering holds.
@@ -146,6 +155,7 @@ export {
 	commit_check_runs_path,
 	commit_status_path,
 	gh_api_routes,
+	gh_failure,
 	pr_conversation_comments_path,
 	pr_detail_path,
 	pr_lookup_path,
