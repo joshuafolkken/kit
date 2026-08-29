@@ -58,7 +58,10 @@ async function read_status_check_rollup(commit_sha: string): Promise<Array<objec
 	return git_gh_pr_rollup.to_status_check_rollup({ check_runs_json, status_json })
 }
 
-async function read_review_decision(pr_number: number): Promise<string> {
+// The review history, folded into GraphQL's `reviewDecision`. One request, and the only one of the
+// four the merge gate does not need on every poll — see `is_review_decision_decisive`
+// (joshuafolkken/kit#1043).
+async function pr_get_review_decision(pr_number: number): Promise<string> {
 	const path = git_gh_api_path.pull_reviews_api_path(String(pr_number))
 
 	return git_gh_pr_review.to_review_decision(await read_array_pages(path))
@@ -68,28 +71,69 @@ async function read_review_decision(pr_number: number): Promise<string> {
 // `git-pr-checks-eval.ts` compares strictly against: `MERGE_STATE_CLEAN` never matches a lower-case
 // `clean`, which would also take every pull request out of the kit#753 escape hatch keyed on
 // `UNSTABLE`. The rule is shared with `to_pr_info` rather than written twice.
-async function build_snapshot(pull: RestPull): Promise<Record<string, unknown>> {
-	const [rollup, review_decision] = await Promise.all([
-		read_status_check_rollup(read_head_sha(pull)),
-		read_review_decision(pull.number),
-	])
-
+async function build_checks_fields(pull: RestPull): Promise<Record<string, unknown>> {
 	return {
-		statusCheckRollup: rollup,
+		statusCheckRollup: await read_status_check_rollup(read_head_sha(pull)),
 		mergeStateStatus: to_gh_state(pull.mergeable_state),
-		reviewDecision: review_decision,
 	}
+}
+
+interface ResolvedPull {
+	pr_number: number
+	pull: RestPull
+}
+
+// The resolution and the detail read, which every path below needs and which the branch → number
+// memo in `git-gh-pr-read.ts` makes free after the first poll.
+async function resolve_pull(branch_name: string): Promise<ResolvedPull> {
+	const pr_number = await require_pr_number(branch_name)
+
+	return { pr_number, pull: await read_pull(pr_number) }
+}
+
+// Everything the snapshot carries except the review decision: three requests rather than four.
+// `pr_number` travels with it so a caller that then *does* want the review decision needs no second
+// resolution (joshuafolkken/kit#1043).
+interface PrChecksSnapshot {
+	pr_number: number
+	snapshot_json: string
+}
+
+async function pr_get_checks_snapshot(branch_name: string): Promise<PrChecksSnapshot> {
+	const { pr_number, pull } = await resolve_pull(branch_name)
+
+	return { pr_number, snapshot_json: JSON.stringify(await build_checks_fields(pull)) }
 }
 
 // Throws where the branch has no pull request or a read fails, which is the contract `gh pr view`
 // had: `git-pr-followup.ts` catches it and falls through to the poll, and folding a failure into an
 // empty snapshot instead would read as "no checks, nothing requested" — green.
+//
+// **This is the definition the two halves above must compose to.** The merge gate reads them
+// separately so it can skip the review listing on a poll that cannot conclude anything, but the
+// three-field value `gh pr view --json …` answered with is still one thing, and it is asserted here
+// rather than reassembled inside a test (joshuafolkken/kit#1043).
 async function pr_get_state_snapshot(branch_name: string): Promise<string> {
-	const pull = await read_pull(await require_pr_number(branch_name))
+	const { pr_number, pull } = await resolve_pull(branch_name)
+	const [fields, review_decision] = await Promise.all([
+		build_checks_fields(pull),
+		pr_get_review_decision(pr_number),
+	])
 
-	return JSON.stringify(await build_snapshot(pull))
+	return JSON.stringify({ ...fields, reviewDecision: review_decision })
 }
 
-const git_gh_pr_snapshot = { pr_get_state_snapshot }
+const git_gh_pr_snapshot = {
+	pr_get_state_snapshot,
+	pr_get_checks_snapshot,
+	pr_get_review_decision,
+}
 
-export { git_gh_pr_snapshot, pr_get_state_snapshot, NO_HEAD_SHA_MESSAGE }
+export type { PrChecksSnapshot }
+export {
+	git_gh_pr_snapshot,
+	pr_get_state_snapshot,
+	pr_get_checks_snapshot,
+	pr_get_review_decision,
+	NO_HEAD_SHA_MESSAGE,
+}

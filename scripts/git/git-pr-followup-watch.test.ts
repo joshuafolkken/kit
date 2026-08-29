@@ -11,7 +11,7 @@ import { run_checks, WATCH_FAILED_NOTE } from './git-pr-followup'
 // collaborators, and the file it came from was already at its length limit.
 
 vi.mock('./git-gh-command', () => ({
-	git_gh_command: { pr_checks_watch: vi.fn(), pr_get_state_snapshot: vi.fn() },
+	git_gh_command: { pr_checks_watch: vi.fn(), pr_get_checks_snapshot: vi.fn() },
 }))
 
 vi.mock('./git-pr-checks', () => ({
@@ -28,7 +28,15 @@ const SNAPSHOT = { rollup: [], merge_state_status: undefined, review_decision: u
 
 const watch = vi.mocked(git_gh_command.pr_checks_watch)
 const wait = vi.mocked(git_pr_checks.wait_for_pr_success)
-const fetch_state = vi.mocked(git_gh_command.pr_get_state_snapshot)
+const fetch_checks = vi.mocked(git_gh_command.pr_get_checks_snapshot)
+const PR_NUMBER = 972
+
+// The checks half is the read this guard needs — the question is about `statusCheckRollup` alone, so
+// paging the review listing for it bought nothing (joshuafolkken/kit#1043).
+function answer_checks(snapshot_json: string): void {
+	fetch_checks.mockResolvedValue({ pr_number: PR_NUMBER, snapshot_json })
+}
+
 // The raw `gh pr view` payload, which is what the guard reads — the parsed snapshot cannot answer
 // the question, because it degrades an unreadable answer to the same empty rollup.
 const WITH_A_CHECK = JSON.stringify({
@@ -49,8 +57,8 @@ beforeEach(() => {
 	watch.mockReset()
 	wait.mockReset()
 	wait.mockResolvedValue(SNAPSHOT)
-	fetch_state.mockReset()
-	fetch_state.mockResolvedValue(WITH_A_CHECK)
+	fetch_checks.mockReset()
+	answer_checks(WITH_A_CHECK)
 })
 
 describe('run_checks — the watch never decides the outcome', () => {
@@ -105,7 +113,7 @@ describe('run_checks — the swallowed failure stays visible', () => {
 describe('run_checks — a pull request with no checks still fails fast', () => {
 	it('rethrows the watch failure when the pull request has no checks', async () => {
 		watch_fails()
-		fetch_state.mockResolvedValue(WITH_NO_CHECKS)
+		answer_checks(WITH_NO_CHECKS)
 
 		await expect(run_with_watch()).rejects.toThrow(WATCH_EXIT_ONE)
 		expect(wait).not.toHaveBeenCalled()
@@ -122,7 +130,7 @@ describe('run_checks — a pull request with no checks still fails fast', () => 
 	// into a second way for the watch to end the run.
 	it('falls through when the check read itself fails', async () => {
 		watch_fails()
-		fetch_state.mockRejectedValue(new Error('gh unavailable'))
+		fetch_checks.mockRejectedValue(new Error('gh unavailable'))
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
 	})
@@ -139,7 +147,7 @@ describe('run_checks — only a definite empty rollup may rethrow', () => {
 		['a rollup that is not an array', JSON.stringify({ statusCheckRollup: 'nope' })],
 	])('falls through for %s', async (_case, raw) => {
 		watch_fails()
-		fetch_state.mockResolvedValue(raw)
+		answer_checks(raw)
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
 	})
@@ -147,7 +155,7 @@ describe('run_checks — only a definite empty rollup may rethrow', () => {
 	// The read throws rather than answering, so an unreachable pull request falls through too.
 	it('falls through when the read throws', async () => {
 		watch_fails()
-		fetch_state.mockRejectedValue(new Error('no pull requests found'))
+		fetch_checks.mockRejectedValue(new Error('no pull requests found'))
 
 		await expect(run_with_watch()).resolves.toStrictEqual(SNAPSHOT)
 	})
@@ -158,6 +166,6 @@ describe('run_checks — only a definite empty rollup may rethrow', () => {
 
 		await run_with_watch()
 
-		expect(fetch_state).not.toHaveBeenCalled()
+		expect(fetch_checks).not.toHaveBeenCalled()
 	})
 })

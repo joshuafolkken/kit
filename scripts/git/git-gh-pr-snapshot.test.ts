@@ -17,7 +17,12 @@ import {
 	NO_PULL_REQUEST_MESSAGE,
 	UNREADABLE_PULL_REQUEST_MESSAGE,
 } from './git-gh-pr-read'
-import { NO_HEAD_SHA_MESSAGE, pr_get_state_snapshot } from './git-gh-pr-snapshot'
+import {
+	NO_HEAD_SHA_MESSAGE,
+	pr_get_checks_snapshot,
+	pr_get_review_decision,
+	pr_get_state_snapshot,
+} from './git-gh-pr-snapshot'
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
 
@@ -156,6 +161,35 @@ describe('pr_get_state_snapshot — which endpoints it reads', () => {
 		const paths = mocked_api.mock.calls.map(([request]) => request.path)
 
 		expect(paths).toContain(commit_check_runs_path())
+	})
+})
+
+// The two halves the merge gate reads separately: the checks portion every poll, the review decision
+// only where it can change the verdict (joshuafolkken/kit#1043).
+describe('the snapshot split into its checks half and its review half', () => {
+	it('reads no review listing for the checks half', async () => {
+		mocked_api.mockImplementation(gh_api_routes(routes({ pull: { mergeable_state: 'clean' } })))
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		expect(mocked_api.mock.calls.map(([request]) => request.path)).not.toContain(pr_reviews_path())
+		expect(parse_pr_state_snapshot(checks.snapshot_json).merge_state_status).toBe('CLEAN')
+	})
+
+	// The number travels with it so the review read that may follow needs no second resolution.
+	it('hands back the number the review read is keyed by', async () => {
+		mocked_api.mockImplementation(gh_api_routes(routes({})))
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		await expect(pr_get_review_decision(checks.pr_number)).resolves.toBe('')
+	})
+
+	it('folds the review history when the review half is read', async () => {
+		const approved = routes({ reviews: JSON.stringify([APPROVED_REVIEW]) })
+
+		mocked_api.mockImplementation(gh_api_routes(approved))
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		await expect(pr_get_review_decision(checks.pr_number)).resolves.toBe('APPROVED')
 	})
 })
 

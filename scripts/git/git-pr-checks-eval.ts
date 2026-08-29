@@ -165,8 +165,33 @@ function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 	return 'pending'
 }
 
+// **When the review listing can still change what this poll concludes.**
+//
+// `evaluate_pr_state` reads `review_decision` in exactly one place — `is_review_blocked`, which
+// produces `failure`. So a poll that answers `pending` without one answers `pending` or `failure`
+// with it, and neither merges: the read buys nothing on that poll. A poll that answers `success` or
+// `failure` without one is a poll that ends the wait, and both need it — `success` because a standing
+// change request must demote it, `failure` because `describe_pr_failure` names the reasons and
+// dropping "review requested changes" from a message that also lists failed checks loses half the
+// diagnosis (joshuafolkken/kit#1043).
+//
+// **This is a freshness rule, not a cache.** Nothing is remembered between polls, which is the one
+// shape that would be wrong here — a stale non-blocking decision is exactly the direction that ships
+// a merge past a change request. The poll that concludes a merge always carries a review decision
+// read in that same poll.
+//
+// **What it costs, stated rather than glossed.** A change request standing on a pull request whose
+// checks never settle used to end the wait on the first poll with `review requested changes`; it now
+// runs the budget out and ends with the wait's own timeout, which names no cause. That run was red
+// either way — the trade only ever moves a red result later, never a green one earlier — but the
+// diagnosis is genuinely worse in that one case.
+function is_review_decision_decisive(snapshot: PrStateSnapshot): boolean {
+	return evaluate_pr_state(snapshot) !== 'pending'
+}
+
 const git_pr_checks_eval = {
 	evaluate_pr_state,
+	is_review_decision_decisive,
 	read_required_statuses,
 	is_coderabbit_check,
 	collect_blocking_failures,
@@ -176,6 +201,7 @@ const git_pr_checks_eval = {
 export {
 	git_pr_checks_eval,
 	evaluate_pr_state,
+	is_review_decision_decisive,
 	read_required_statuses,
 	is_coderabbit_check,
 	collect_blocking_failures,

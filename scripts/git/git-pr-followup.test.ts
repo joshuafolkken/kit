@@ -24,8 +24,10 @@ vi.mock('./git-gh-command', () => ({
 		pr_checks_watch: vi.fn(),
 		// Read by the watch guard when `pr_checks_watch` rejects. Mocked even though this suite never
 		// makes it reject, so the first test that does fails on its assertion rather than on a missing
-		// mock (joshuafolkken/kit#999).
-		pr_get_state_snapshot: vi.fn(),
+		// mock (joshuafolkken/kit#999) — the guard swallows every failure, so a missing mock would
+		// answer `false` silently rather than failing. It is the *checks* half since
+		// joshuafolkken/kit#1043.
+		pr_get_checks_snapshot: vi.fn(),
 	},
 }))
 

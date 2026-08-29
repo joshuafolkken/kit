@@ -7,6 +7,7 @@ import {
 	SECONDS_TO_MS,
 	wait_for_pr_success,
 	type PrStateEvaluator,
+	type ReviewDecisionPredicate,
 } from './git-pr-checks'
 import type { PrEvaluation } from './git-pr-checks-eval'
 import {
@@ -70,9 +71,15 @@ function describe_checks_failure(snapshot: PrStateSnapshot): string {
 	return `${CHECKS_FAILED_MESSAGE}: ${failed.map((check) => check.name).join(', ')}`
 }
 
+// **The watch never reads `review_decision`**, so the poll must not spend a request fetching it. It
+// is the same difference `evaluate_checks_settled` is written for, said to the fetcher instead of to
+// the verdict: three requests a poll rather than four (joshuafolkken/kit#1043).
+const SHOULD_NEVER_READ_REVIEW_DECISION: ReviewDecisionPredicate = () => false
+
 const CHECKS_SETTLED_EVALUATOR: PrStateEvaluator = {
 	evaluate: evaluate_checks_settled,
 	describe: describe_checks_failure,
+	should_read_review_decision: SHOULD_NEVER_READ_REVIEW_DECISION,
 }
 
 async function watch_until_settled(branch_name: string): Promise<void> {
@@ -96,7 +103,7 @@ async function watch_until_settled(branch_name: string): Promise<void> {
 // from failing on the first read: two minutes is the grace, and an empty rollup at the end of them
 // is the answer `gh` gave immediately.
 async function fail_when_no_checks(branch_name: string): Promise<void> {
-	const snapshot = await default_fetch_pr_state(branch_name)
+	const snapshot = await default_fetch_pr_state(branch_name, SHOULD_NEVER_READ_REVIEW_DECISION)
 	if (snapshot.rollup.length === 0) throw new Error(NO_CHECKS_MESSAGE)
 }
 
@@ -124,6 +131,7 @@ export {
 	git_pr_checks_watch,
 	fail_when_no_checks,
 	CHECKS_SETTLED_EVALUATOR,
+	SHOULD_NEVER_READ_REVIEW_DECISION,
 	evaluate_checks_settled,
 	describe_checks_failure,
 	PR_CHECKS_WATCH_TIMEOUT_MS,

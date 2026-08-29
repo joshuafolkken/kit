@@ -7,7 +7,9 @@ import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 //
 // `gh pr view` goes through GraphQL, which a cloud session is answered 403 for (joshuafolkken/kit#1022).
 // The reads move to `gh api`, and every caller downstream keeps the contract it already reads — the
-// empty string from `pr_view`, `false` from `pr_exists`, `undefined` from the two comment readers.
+// empty string from `pr_view`, `undefined` from the two comment readers. `pr_exists` is the one
+// exception, and it is deliberate: it gates a **write**, so a lookup that failed cannot answer
+// `false` there (joshuafolkken/kit#1043).
 //
 // One thing has no counterpart in REST: `gh pr view` accepted a **branch name** and every REST
 // endpoint is keyed by **number**. The resolution below is the single place that bridges the two
@@ -102,11 +104,18 @@ async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
 
 // `undefined` covers both "this branch has no pull request" and "the lookup failed", which is the
 // distinction `gh pr view` never made either — every *read* here folds them together on purpose:
-// `pr_exists` answers `false` either way, `pr_view` the empty string, the comment readers `undefined`.
+// `pr_view` answers the empty string either way, the comment readers `undefined`. The two callers
+// that act on the absence rather than displaying it — `require_pr_number` and `pr_exists` — opt out.
 async function resolve_pr_number(branch_name: string): Promise<number | undefined> {
 	const read = await read_pr_number(branch_name)
 
 	return read.kind === 'read' ? read.pr_number : undefined
+}
+
+// One definition, because both callers that refuse to fold an unreadable lookup raise it —
+// `require_pr_number` and `pr_exists` (joshuafolkken/kit#1043).
+function to_unreadable_error(branch_name: string, cause: unknown): Error {
+	return new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name}`, { cause })
 }
 
 // The number for a caller that has nothing to fold an absence into. The reads above answer their own
@@ -114,7 +123,7 @@ async function resolve_pr_number(branch_name: string): Promise<number | undefine
 // `gh pr merge <branch>` both failed there, and the merge-gate snapshot already threw for the same
 // reason. One throw shared by all three (joshuafolkken/kit#1029).
 //
-// **This is the caller the distinction exists for, and the only one that opts in.** Folding both into
+// **This is the caller the distinction was written for.** Folding both into
 // `NO_PULL_REQUEST_MESSAGE` reported a rate-limited lookup as "there is no pull request for this
 // branch" — safe, in that the run stops without merging, but wrong about why, which is the
 // joshuafolkken/kit#973 misread costing diagnosis time instead of correctness. The failure travels as
@@ -125,7 +134,7 @@ async function require_pr_number(branch_name: string): Promise<number> {
 	if (read.kind === 'read') return read.pr_number
 	if (read.kind === 'missing') throw new Error(`${NO_PULL_REQUEST_MESSAGE}: ${branch_name}`)
 
-	throw new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name}`, { cause: read.cause })
+	throw to_unreadable_error(branch_name, read.cause)
 }
 
 async function read_pull(pr_number: number): Promise<RestPull> {
@@ -149,8 +158,18 @@ async function read_pull_of_branch(branch_name: string): Promise<RestPull | unde
 	}
 }
 
+// **`false` means the branch has no pull request, and nothing else.** This is the second half of
+// joshuafolkken/kit#1048's distinction, on the caller that needs it most: `pr_exists` is not read for
+// display, it decides whether `git-pr.ts` **opens** a pull request. Folding an unreadable lookup into
+// `false` therefore made a rate-limited run try to create a second pull request on a branch that
+// already had one — surviving only because `pr_create`'s 422 → `PR_ALREADY_EXISTS` recovery caught it
+// (joshuafolkken/kit#1029), which is an accident rather than a design. The throw is the one
+// `require_pr_number` raises, so gh's own reason travels as the `cause` (joshuafolkken/kit#1043).
 async function pr_exists(branch_name: string): Promise<boolean> {
-	return (await resolve_pr_number(branch_name)) !== undefined
+	const read = await read_pr_number(branch_name)
+	if (read.kind === 'unreadable') throw to_unreadable_error(branch_name, read.cause)
+
+	return read.kind === 'read'
 }
 
 async function pr_get_number(branch_name: string): Promise<number | undefined> {
