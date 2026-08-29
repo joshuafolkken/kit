@@ -11,6 +11,8 @@ joshuafolkken/kit#858` from an app-kit checkout. A bare `#858` resolves to *this
 858, a different issue entirely, so the qualification is required rather than optional
 (joshuafolkken/kit#864).
 
+That qualification is not a form of its own: it is the `owner/repo#` prefix every entry point takes, and the definition is the same at every entry point — `SKILL.md` → "2c. The `owner/repo#` prefix" (canonical: `prompts/collaboration-workflow/target-repo.md`). What it names here is where the *epic* lives; how the children are divided between sessions is "Concurrency" below.
+
 ## When `#N` is not an epic
 
 `epicrun` accepts an ordinary Issue as well as an epic. `epicrun #<N>` on an Issue with no task list
