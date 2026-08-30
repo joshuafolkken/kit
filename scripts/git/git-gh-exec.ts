@@ -129,11 +129,12 @@ async function exec_gh_command_with_stdin(input: {
 }): Promise<string> {
 	await check_gh_installed()
 
+	// Built ahead of the call so the spawn itself stays on one line: `// NOSONAR` suppresses the rule
+	// only on the line it sits on, and a wrapped call moves that line away from the reported one.
+	const options = { input: input.stdin_body, ...to_timeout_option(input.timeout_ms) }
+
 	try {
-		const { stdout } = await execa('gh', input.args, {
-			input: input.stdin_body,
-			...to_timeout_option(input.timeout_ms),
-		}) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+		const { stdout } = await execa('gh', input.args, options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return stdout.trimEnd()
 	} catch (error) {
@@ -166,16 +167,16 @@ function parse_status_line(output: string): number | undefined {
 // `undefined`, which already means "no status was reached", which its one caller already reads as a
 // failed read rather than as a 404.
 async function exec_gh_api_status(path: string, timeout_ms?: number): Promise<number | undefined> {
+	// Hoisted so the spawn below fits on one line, which `// NOSONAR` requires — it suppresses only
+	// the line it sits on. The **argument list** stays an inline literal for the opposite reason:
+	// `gh-subcommand-guard.ts` resolves the subcommand from it, and hoisting that into a `const`
+	// makes the scan report `<dynamic>` instead of `api`, leaving a future edit to
+	// `['issue', 'view', …]` uncaught (joshuafolkken/kit#1063).
+	const options = to_timeout_option(timeout_ms)
+
 	try {
 		await check_gh_installed()
-		// The argument list stays an inline literal: `gh-subcommand-guard.ts` resolves the subcommand
-		// from it, and hoisting it into a `const` makes the scan report `<dynamic>` instead of `api` —
-		// which would leave a future edit to `['issue', 'view', …]` uncaught (joshuafolkken/kit#1063).
-		const { stdout } = await execa(
-			'gh',
-			['api', '--include', '--silent', path],
-			to_timeout_option(timeout_ms),
-		) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+		const { stdout } = await execa('gh', ['api', '--include', '--silent', path], options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
 
 		return parse_status_line(stdout)
 	} catch (error) {
