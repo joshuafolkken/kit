@@ -97,6 +97,13 @@ async function pr_comment(branch_name: string, body: string): Promise<string> {
 	return await git_gh_issue_write.issue_comment(String(pr_number), body)
 }
 
+// **The least idempotent write in this layer.** Since joshuafolkken/kit#1065 it carries the shared
+// request budget like everything else, and a merge that lands server-side but overruns it throws:
+// `followup` then skips its completion notification and the epic auto-close, and a re-run answers
+// 405 on a pull request that is already merged. The budget is not what created that — before it the
+// same request hung forever, with no notification either and no end to the run — but what `followup`
+// should *do* about a request that failed after its effect landed is a recovery design of its own,
+// deliberately out of joshuafolkken/kit#1065's scope. Tracked in joshuafolkken/kit#1077.
 async function pr_merge(branch_name: string): Promise<void> {
 	const pr_number = await require_pr_number(branch_name)
 

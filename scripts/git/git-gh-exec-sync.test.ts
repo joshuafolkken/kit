@@ -1,6 +1,11 @@
 import { execa, execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { BODY_FROM_STDIN, git_gh_exec } from './git-gh-exec'
+import {
+	BODY_FROM_STDIN,
+	GH_REQUEST_TIMEOUT_MESSAGE,
+	GH_REQUEST_TIMEOUT_MS,
+	git_gh_exec,
+} from './git-gh-exec'
 
 // joshuafolkken/kit#1042: `josh propagate` opens its consumer's upgrade issue from a synchronous
 // step chain and cannot await, so the last `gh <noun> <verb>` spawn in kit's own code is replaced by
@@ -59,7 +64,7 @@ describe('exec_gh_api_sync — the body never becomes an argument', () => {
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'gh',
 			['api', API_PATH, '--input', BODY_FROM_STDIN],
-			{ input: MULTILINE_BODY },
+			{ input: MULTILINE_BODY, timeout: GH_REQUEST_TIMEOUT_MS },
 		)
 	})
 
@@ -71,7 +76,7 @@ describe('exec_gh_api_sync — the body never becomes an argument', () => {
 		expect(mocked_execa_sync).toHaveBeenCalledWith(
 			'gh',
 			['api', API_PATH, '--jq', HTML_URL_FILTER],
-			{},
+			{ timeout: GH_REQUEST_TIMEOUT_MS },
 		)
 	})
 })
@@ -117,6 +122,48 @@ describe('exec_gh_api_sync — output and failure handling', () => {
 
 		expect(() => git_gh_exec.exec_gh_api_sync({ path: API_PATH, body: API_BODY })).toThrow(
 			`${VALIDATION_SUMMARY}\n${VALIDATION_BODY}`,
+		)
+	})
+})
+
+// joshuafolkken/kit#1065: this is the entry `josh propagate`'s issue-creation step goes through, and
+// the one place that step can be bounded in time. Every other propagation step is spawned through
+// `spawn_step`, which passes `STEP_TIMEOUT_MS`; `open_issue` calls this directly, so before the
+// budget below a hung `gh` blocked the single-threaded runner forever and no later consumer was
+// processed at all.
+const OVERRIDE_TIMEOUT_MS = 5000
+
+describe('exec_gh_api_sync — the request budget', () => {
+	it('bounds the write josh propagate opens its consumer issue with', () => {
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(ISSUE_URL))
+
+		git_gh_exec.exec_gh_api_sync({ path: API_PATH, body: API_BODY })
+
+		expect(mocked_execa_sync).toHaveBeenCalledWith('gh', expect.any(Array), {
+			input: API_BODY,
+			timeout: GH_REQUEST_TIMEOUT_MS,
+		})
+	})
+
+	it('lets the caller override the budget through the request field', () => {
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(ISSUE_URL))
+
+		git_gh_exec.exec_gh_api_sync({ path: API_PATH, timeout_ms: OVERRIDE_TIMEOUT_MS })
+
+		expect(mocked_execa_sync).toHaveBeenCalledWith('gh', expect.any(Array), {
+			timeout: OVERRIDE_TIMEOUT_MS,
+		})
+	})
+
+	// The same direction the asynchronous twin takes: a timeout leaves as an exception, so the step
+	// reports a failure rather than answering as though the write had succeeded.
+	it('throws a labelled error when the spawn runs out of time', () => {
+		mocked_execa_sync.mockImplementationOnce(() => {
+			throw Object.assign(new Error('Command timed out'), { stderr: '', timedOut: true })
+		})
+
+		expect(() => git_gh_exec.exec_gh_api_sync({ path: API_PATH, body: API_BODY })).toThrow(
+			GH_REQUEST_TIMEOUT_MESSAGE,
 		)
 	})
 })

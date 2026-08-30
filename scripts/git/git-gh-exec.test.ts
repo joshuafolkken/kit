@@ -1,7 +1,13 @@
 import { execa } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_gh_installed, GH_NOT_INSTALLED_MSG } from './git-gh-check'
-import { BODY_FROM_STDIN, git_gh_exec, has_stderr_field, has_stdout_field } from './git-gh-exec'
+import {
+	BODY_FROM_STDIN,
+	GH_REQUEST_TIMEOUT_MS,
+	git_gh_exec,
+	has_stderr_field,
+	has_stdout_field,
+} from './git-gh-exec'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -25,6 +31,8 @@ function fake_stdout_result(stdout: string): ExecaResult {
 
 	return result as unknown as ExecaResult
 }
+
+const TIMEOUT_OPTION = { timeout: GH_REQUEST_TIMEOUT_MS }
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -133,7 +141,10 @@ describe('exec_gh_command_with_stdin', () => {
 		})
 
 		expect(result).toBe('done')
-		expect(mocked_execa).toHaveBeenCalledWith('gh', expect.any(Array), { input: 'body text' })
+		expect(mocked_execa).toHaveBeenCalledWith('gh', expect.any(Array), {
+			input: 'body text',
+			timeout: GH_REQUEST_TIMEOUT_MS,
+		})
 	})
 })
 
@@ -231,7 +242,11 @@ describe('exec_gh_api_status — what it asks gh for', () => {
 
 		await git_gh_exec.exec_gh_api_status(ISSUE_PATH)
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', '--include', '--silent', ISSUE_PATH])
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'gh',
+			['api', '--include', '--silent', ISSUE_PATH],
+			TIMEOUT_OPTION,
+		)
 	})
 
 	it('returns undefined rather than throwing when gh is not installed', async () => {
@@ -276,7 +291,7 @@ describe('exec_gh_api — the request it builds', () => {
 
 		await git_gh_exec.exec_gh_api({ path: API_PATH })
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH])
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH], TIMEOUT_OPTION)
 	})
 
 	it('names another verb with --method', async () => {
@@ -284,7 +299,11 @@ describe('exec_gh_api — the request it builds', () => {
 
 		await git_gh_exec.exec_gh_api({ path: API_PATH, method: 'PATCH' })
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, '--method', 'PATCH'])
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'gh',
+			['api', API_PATH, '--method', 'PATCH'],
+			TIMEOUT_OPTION,
+		)
 	})
 
 	// The body goes in on stdin so a JSON payload needs no temporary file and no per-field escaping.
@@ -296,7 +315,7 @@ describe('exec_gh_api — the request it builds', () => {
 		expect(mocked_execa).toHaveBeenCalledWith(
 			'gh',
 			['api', API_PATH, '--method', POST_METHOD, '--input', BODY_FROM_STDIN],
-			{ input: API_BODY },
+			{ input: API_BODY, timeout: GH_REQUEST_TIMEOUT_MS },
 		)
 	})
 })
@@ -307,7 +326,11 @@ describe('exec_gh_api — the optional flags', () => {
 
 		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: true })
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, PAGINATE_FLAG])
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'gh',
+			['api', API_PATH, PAGINATE_FLAG],
+			TIMEOUT_OPTION,
+		)
 	})
 
 	it('omits --paginate when the caller says false', async () => {
@@ -315,7 +338,7 @@ describe('exec_gh_api — the optional flags', () => {
 
 		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: false })
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH])
+		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH], TIMEOUT_OPTION)
 	})
 
 	it('unwraps one field with --jq', async () => {
@@ -323,7 +346,11 @@ describe('exec_gh_api — the optional flags', () => {
 
 		await git_gh_exec.exec_gh_api({ path: API_PATH, jq_filter: FULL_NAME_FILTER })
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, '--jq', FULL_NAME_FILTER])
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'gh',
+			['api', API_PATH, '--jq', FULL_NAME_FILTER],
+			TIMEOUT_OPTION,
+		)
 	})
 })
 
@@ -371,7 +398,11 @@ describe('exec_gh_api — paging a listing that will be parsed', () => {
 
 		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: true, should_slurp: true })
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, PAGINATE_FLAG, '--slurp'])
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'gh',
+			['api', API_PATH, PAGINATE_FLAG, '--slurp'],
+			TIMEOUT_OPTION,
+		)
 	})
 
 	it('omits --slurp when the caller does not ask for it', async () => {
@@ -379,6 +410,10 @@ describe('exec_gh_api — paging a listing that will be parsed', () => {
 
 		await git_gh_exec.exec_gh_api({ path: API_PATH, should_paginate: true, should_slurp: false })
 
-		expect(mocked_execa).toHaveBeenCalledWith('gh', ['api', API_PATH, PAGINATE_FLAG])
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'gh',
+			['api', API_PATH, PAGINATE_FLAG],
+			TIMEOUT_OPTION,
+		)
 	})
 })
