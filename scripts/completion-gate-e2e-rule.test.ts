@@ -22,10 +22,21 @@ const NO_LONGER_SAYS = 'no longer says %j'
 // Phrasings that only ever appear in the retired rule. Asserted against the whole rule surface —
 // the document plus every distributed skill — because a run reads the skill and the document as one
 // set of instructions, and the human step reinstated in either would be obeyed just the same.
+//
+// joshuafolkken/kit#1099 adds one that was never part of the human step: a precondition on *where*
+// the specs live. `Detect E2E specs` walks the whole tree and `playwright.config.ts` sets
+// `testMatch` with no `testDir`, so neither imposes it — and a document stating a narrower rule than
+// the implementation is read as the specification, which makes "restore the narrowing in CI" the
+// repair a reader reaches for. That is the defect `ci-yml-e2e-detect.test.ts` was written after: a
+// repository full of specs emits `enabled=false`, the job is skipped, the rollup counts the skip as
+// a pass, and the merge goes through with the suite never run. The whole retired sentence is matched
+// rather than `src/routes` alone, because that path is a live colocation convention in
+// `prompts/testing-guide.md` — which this list is also asserted against.
 const RETIRED_PHRASINGS: ReadonlyArray<string> = [
 	'The user runs `pnpm josh test` and shares the full output',
 	'Ask the user to run `pnpm josh test` and share the output',
 	'until the user confirms E2E passed',
+	'CI only runs the suite it can find, so specs stay under',
 ]
 
 // The trigger half of the resident rule: what an agent must do even if it never opens the pointer.
@@ -38,6 +49,12 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	'**you** run `pnpm josh test:e2e` yourself and read what it prints',
 	'a skip you did not see printed is not one',
 	'`prompts/testing-guide.md` → "Closing the E2E gate without a human run"',
+	// joshuafolkken/kit#1099: what the precondition actually is, now that it is not a path. The
+	// middle marker is the detection range itself, so a reword that quietly re-scopes it fails here
+	// rather than in a consumer's skipped E2E job.
+	'and it is not where the specs live',
+	'outside `node_modules` and dot-directories',
+	'whatever the config is called',
 ]
 
 describe.each(AI_DOCS)(
