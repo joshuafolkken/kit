@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-json-array'
+import { rest_comment_schema } from './schemas'
 
 // The translation between one REST pull request (`repos/{owner}/{repo}/pulls/{N}`) and the JSON
 // shape `gh pr view --json <fields>` used to answer with.
@@ -47,15 +48,6 @@ const rest_pull_schema = z.looseObject({
 })
 
 type RestPull = z.infer<typeof rest_pull_schema>
-
-// One conversation comment as `repos/{owner}/{repo}/issues/{N}/comments` serves it.
-// `ai_review_pull_comment_schema` reads `author.login` and `url`, which REST spells `user.login` and
-// `html_url`.
-const rest_comment_schema = z.looseObject({
-	body: z.string().nullish(),
-	html_url: z.string().optional(),
-	user: z.looseObject({ login: z.string().optional() }).nullish(),
-})
 
 const NOT_A_PULL_MESSAGE = 'gh api answered something other than a pull request object'
 const NOT_A_PULL_LISTING_MESSAGE = 'gh api answered something other than a pull request listing'

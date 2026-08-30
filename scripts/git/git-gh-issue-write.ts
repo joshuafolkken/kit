@@ -70,9 +70,19 @@ async function issue_comment(issue_number: string, body: string): Promise<string
 // then says "the issue is still open" in *both* failure branches, because the state change is the
 // last thing attempted. Closing first would answer `false` for an issue that is in fact closed, and
 // `git-epic-close.ts` prints "close it manually" on that answer.
-async function issue_close(issue_number: string, comment: string): Promise<boolean> {
+//
+// **`comment: undefined` closes without commenting**, and it is what the ordering above costs: a run
+// whose comment landed and whose close was refused leaves the issue open carrying the comment, so
+// the next run must close it without posting a second copy (joshuafolkken/kit#1039). The return
+// value keeps meaning what it meant — with no comment to post, the state change is not merely the
+// last thing attempted but the only one.
+//
+// It is a required parameter that may be `undefined` rather than an optional one: skipping the
+// announcement is a decision the caller makes from what it read, never something a call site can
+// fall into by leaving an argument off.
+async function issue_close(issue_number: string, comment: string | undefined): Promise<boolean> {
 	return await did_write_succeed(async () => {
-		await issue_comment(issue_number, comment)
+		if (comment !== undefined) await issue_comment(issue_number, comment)
 		await git_gh_exec.exec_gh_api({
 			path: git_gh_api_path.issue_api_path(issue_number),
 			method: PATCH_METHOD,

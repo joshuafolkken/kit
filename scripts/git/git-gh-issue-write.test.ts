@@ -130,6 +130,26 @@ describe('issue_close', () => {
 		expect(await git_gh_issue_write.issue_close(ISSUE_NUMBER, CLOSE_COMMENT)).toBe(false)
 		expect(requests()).toHaveLength(TWO_REQUESTS)
 	})
+
+	// joshuafolkken/kit#1039: the case the split ordering costs — a previous run's comment landed and
+	// its close was refused, so the retry has to close without posting a second copy.
+	it('sends only the state change when there is no comment to post', async () => {
+		const is_closed = await git_gh_issue_write.issue_close(ISSUE_NUMBER, undefined)
+
+		expect(is_closed).toBe(true)
+		expect(requests()).toHaveLength(1)
+		expect(request_at(0)).toMatchObject({ path: ISSUE_PATH, method: 'PATCH' })
+		expect(parsed_body(request_at(0))).toStrictEqual({ state: 'closed' })
+	})
+
+	// The return value keeps meaning what it meant: with no comment to post, the state change is not
+	// merely the last thing attempted but the only one.
+	it('returns false when the state change fails with no comment to post', async () => {
+		mocked_api.mockRejectedValue(new Error(WRITE_FAILED))
+
+		expect(await git_gh_issue_write.issue_close(ISSUE_NUMBER, undefined)).toBe(false)
+		expect(requests()).toHaveLength(1)
+	})
 })
 
 describe('label_ensure', () => {
