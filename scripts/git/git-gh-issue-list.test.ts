@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
-import { git_gh_issue_list, PER_PAGE } from './git-gh-issue-list'
+import { git_gh_issue_list, MAX_PAGES, PER_PAGE, type IssueListOutcome } from './git-gh-issue-list'
 import {
 	BLOCKER_NUMBER,
 	ISSUE_BODY,
@@ -40,6 +40,8 @@ const LIMIT_TWO = 2
 const LIMIT_MANY = 50
 const ONE_REQUEST = 1
 const TWO_REQUESTS = 2
+const SEARCH_TERM = '#1022'
+const FIRST_PAGE_OFFSET = 0
 
 function api_paths(): Array<string> {
 	return mocked_api.mock.calls.map(([request]) => request.path)
@@ -58,6 +60,34 @@ function serve(pages: ReadonlyArray<string>, blockers: string = EMPTY_PAGE): voi
 
 		return page
 	})
+}
+
+// The body search is the one listing the page ceiling applies to, so every case about the ceiling
+// goes through it. `SEARCH_TERM` matches nothing the filler rows carry unless a row says so.
+async function search_outcome(limit: number): Promise<IssueListOutcome> {
+	return await git_gh_issue_list.issue_list_open_outcome({
+		json_fields: BODY_FIELDS,
+		limit,
+		body_term: SEARCH_TERM,
+	})
+}
+
+async function search_is_capped(limit: number): Promise<boolean> {
+	const outcome = await search_outcome(limit)
+
+	return outcome.is_capped
+}
+
+// One page at the endpoint's own ceiling, so the paging reads it as "there may be more". Filled with
+// pull requests when the client-side filter should empty it, and with issues when it should not.
+function full_page_of(page: number, is_filtered_out: boolean): string {
+	return rest_issue_page(
+		Array.from({ length: PER_PAGE }, (_value, index) =>
+			is_filtered_out
+				? rest_pull_request(PR_NUMBER + page * PER_PAGE + index)
+				: { number: ISSUE_NUMBER + page * PER_PAGE + index, body: SEARCH_TERM },
+		),
+	)
 }
 
 // Through the schema the next-issues display and the `auto-ok` pickup read the listing with, so the
@@ -209,6 +239,65 @@ describe('issue_list_open — the paging', () => {
 		expect(
 			await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY }),
 		).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1033: the body search below matches nothing on a normal run, so "stop once
+// `limit` rows are selected" never fires and the paging read the whole open backlog every time.
+describe('issue_list_open_outcome — the page ceiling', () => {
+	// A page the filter empties is still a full page, so the paging continues — which is exactly the
+	// shape that has no natural end short of the backlog running out.
+	it('stops paging at the ceiling and says the scan was cut short', async () => {
+		serve(Array.from({ length: MAX_PAGES + LIMIT_ONE }, (_value, page) => full_page_of(page, true)))
+
+		const outcome = await search_outcome(LIMIT_MANY)
+
+		expect(mocked_api).toHaveBeenCalledTimes(MAX_PAGES)
+		expect(outcome.is_capped).toBe(true)
+	})
+
+	// The ceiling is answered to one caller and discarded by `issue_list_open`, so putting it on a
+	// listing whose caller cannot read the flag would silently shorten that listing's answer — this
+	// change's own defect, introduced by the fix for it. The pull-request exclusion is client-side on
+	// every listing, so `epic:bundle`'s backlog scan is exactly that case.
+	it('leaves a listing with no body search unbounded', async () => {
+		const pages = Array.from({ length: MAX_PAGES + LIMIT_ONE }, (_value, page) =>
+			full_page_of(page, true),
+		)
+
+		serve([...pages, EMPTY_PAGE])
+
+		const outcome = await git_gh_issue_list.issue_list_open_outcome({
+			json_fields: BODY_FIELDS,
+			limit: LIMIT_MANY,
+		})
+
+		expect(mocked_api.mock.calls.length).toBeGreaterThan(MAX_PAGES)
+		expect(outcome.is_capped).toBe(false)
+	})
+
+	// A cap applied silently turns "I did not look at everything" into "there is nothing there", so a
+	// listing that genuinely ran out has to be distinguishable from one that was cut off.
+	it('does not call a listing that ran out capped', async () => {
+		serve([rest_issue_page([{ body: SEARCH_TERM }])])
+
+		expect(await search_is_capped(LIMIT_MANY)).toBe(false)
+	})
+
+	// The ordinary `limit` cap is a different thing, and every caller already detects that one from
+	// the row count it got back.
+	it('does not call a listing that filled its limit capped', async () => {
+		serve([full_page_of(FIRST_PAGE_OFFSET, false)])
+
+		expect(await search_is_capped(LIMIT_MANY)).toBe(false)
+	})
+
+	// An unreadable listing is fully described by `json`; a truncation flag on it would be about
+	// pages that were never fetched.
+	it('answers no json and no cap when the read fails', async () => {
+		mocked_api.mockRejectedValue(new Error('HTTP 403'))
+
+		expect(await search_outcome(LIMIT_MANY)).toEqual({ json: undefined, is_capped: false })
 	})
 })
 

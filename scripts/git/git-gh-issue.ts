@@ -1,4 +1,4 @@
-import { git_gh_issue_list } from './git-gh-issue-list'
+import { git_gh_issue_list, type IssueListOutcome } from './git-gh-issue-list'
 import { git_gh_issue_read } from './git-gh-issue-read'
 import { git_gh_issue_write } from './git-gh-issue-write'
 
@@ -16,7 +16,7 @@ const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy`
 // Every listing below goes through the one REST invocation in `git-gh-issue-list.ts`. It kept the
 // name and the `json_fields` / `limit` contract it had as a `gh issue list` wrapper, so these six
 // callers changed only where a `gh` flag became a query parameter (joshuafolkken/kit#1025).
-const { issue_list_open } = git_gh_issue_list
+const { issue_list_open, issue_list_open_outcome } = git_gh_issue_list
 
 // The newest open issues, for the next-issues display at workflow completion (#821). `createdAt`
 // rides along because the caller re-sorts explicitly rather than inheriting the listing's order.
@@ -33,8 +33,17 @@ async function issue_list_open_bodies(limit: number): Promise<string | undefined
 
 // Open issues whose body mentions `term`. Used by `epic:audit` to find an issue that names an epic
 // as its parent while the epic's task list does not track it (joshuafolkken/kit#870).
-async function issue_search_body(term: string, limit: number): Promise<string | undefined> {
-	return await issue_list_open({ json_fields: NUMBER_AND_BODY_FIELDS, limit, body_term: term })
+//
+// The one listing here whose filter runs client-side, and so the one that reaches the page ceiling:
+// its matches are normally zero, which is why it answers the whole outcome rather than the JSON
+// alone — `epic:audit` has to tell a scan that was cut short from one that found nothing
+// (joshuafolkken/kit#1033).
+async function issue_search_body(term: string, limit: number): Promise<IssueListOutcome> {
+	return await issue_list_open_outcome({
+		json_fields: NUMBER_AND_BODY_FIELDS,
+		limit,
+		body_term: term,
+	})
 }
 
 async function issue_list_by_label(label: string, limit: number): Promise<string | undefined> {

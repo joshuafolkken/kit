@@ -1,8 +1,9 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { MAX_SCANNED } from '#scripts/git/git-gh-issue-list'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
-import { epic_audit_logic } from './epic-audit'
+import { epic_audit_logic, type AuditFinding, type FindingLevel } from './epic-audit'
 import type { EpicSnapshot } from './epic-fetch'
 
 // Check 4's half of `epic:audit`: an issue that names this epic as its parent but that the epic's
@@ -14,6 +15,13 @@ import type { EpicSnapshot } from './epic-fetch'
 
 const SEARCH_LIMIT = 50
 const PARENT_MARKERS: ReadonlyArray<string> = ['親:', 'Parent:', '親：']
+// Named apart from `epic_audit_checks.ORPHAN_CHILD`: that check reports an orphan it found, this one
+// reports that the search for orphans was incomplete, and a reader has to be able to tell them apart.
+const ORPHAN_SEARCH = 'orphan search'
+const UNREADABLE_SEARCH =
+	'Could not list the open issues, so an issue naming this epic as its parent would not have been found.'
+const CAPPED_BY_ISSUES = `The open-issue scan hit its ${String(MAX_SCANNED)}-issue cap; an issue older than that was not looked at.`
+const CAPPED_BY_MATCHES = `The open-issue scan filled its ${String(SEARCH_LIMIT)}-match cap; an issue mentioning this epic further down the backlog was not looked at.`
 
 const searched_issue_schema = z.object({ number: z.number(), body: z.string().nullable() })
 
@@ -44,16 +52,86 @@ function claims_parent(body: string | null, epic_number: number, repo: string): 
 		.some((line) => has_parent_marker(line) && names_this_epic(line, epic_number, repo))
 }
 
-// Open issues naming this epic as their parent. Searched rather than derived, because an orphan is
-// by definition absent from the one list that would otherwise name it. A failed search yields
-// nothing: an unavailable search is not evidence of an orphan.
-async function find_claiming_issues(epic_number: number, repo: string): Promise<Array<number>> {
-	const raw = await git_gh_command.issue_search_body(`#${String(epic_number)}`, SEARCH_LIMIT)
-	if (raw === undefined) return []
+// Why the scan stopped before the end of the open backlog, or that it did not. Both cutoffs hide the
+// same thing — an older issue naming this epic — and they are told apart only so the report can say
+// which one to raise (joshuafolkken/kit#1033).
+//
+// `issues`: the page ceiling. `matches`: `SEARCH_LIMIT` body mentions of `#<epic>` came back, and
+// the scan stopped there. The second is the one this caller alone can see: it maps the rows through
+// `claims_parent` before anything counts them, so the row count the other listings read their own
+// `limit` cap off is gone by the time the answer leaves here.
+type ScanCutoff = 'none' | 'issues' | 'matches'
 
-	return parse_json_array_safe(raw, searched_issue_schema)
+// What the search found, and what it could not cover. The `read` / `unreadable` vocabulary is
+// `git-gh-issue-read.ts`'s, and the union rather than a flag beside the numbers is deliberate: a
+// cutoff on an unreadable search would describe pages that were never fetched.
+type ClaimingSearch =
+	{ kind: 'read'; numbers: Array<number>; cutoff: ScanCutoff } | { kind: 'unreadable' }
+
+// The two are mutually exclusive by construction — the paging stops once `limit` rows are selected,
+// so a scan that filled `SEARCH_LIMIT` never reached the ceiling — and `matches` is checked first so
+// that stays true even if the paging changes.
+//
+// Exactly `SEARCH_LIMIT` mentions answers `'matches'` though nothing was missed, the same boundary
+// the page ceiling has in `git-gh-issue-list.ts` and accepted for the same reason: proving the
+// backlog ended there costs a request on every capped run, and erring toward "I may not have seen
+// everything" is the safe direction for a check whose whole subject is an issue nobody listed.
+function cutoff_of(row_count: number, is_capped: boolean): ScanCutoff {
+	if (row_count >= SEARCH_LIMIT) return 'matches'
+
+	return is_capped ? 'issues' : 'none'
+}
+
+// Open issues naming this epic as their parent. Searched rather than derived, because an orphan is
+// by definition absent from the one list that would otherwise name it.
+//
+// A failed search used to yield `[]` on the reasoning that an unavailable search is no evidence of
+// an orphan. That is true of the *finding* and false of the *report*: `[]` is what "no issue claims
+// this epic" looks like, so a rate limit arrived as a clean audit — the same "could not read" read
+// as "there is nothing" that joshuafolkken/kit#925, #950, #973 and #1048 closed elsewhere. The
+// answer is now carried out and reported instead (joshuafolkken/kit#1033).
+async function find_claiming_issues(epic_number: number, repo: string): Promise<ClaimingSearch> {
+	const { json, is_capped } = await git_gh_command.issue_search_body(
+		`#${String(epic_number)}`,
+		SEARCH_LIMIT,
+	)
+	if (json === undefined) return { kind: 'unreadable' }
+	const rows = parse_json_array_safe(json, searched_issue_schema)
+
+	const numbers = rows
 		.filter((issue) => issue.number !== epic_number && claims_parent(issue.body, epic_number, repo))
 		.map((issue) => issue.number)
+
+	return { kind: 'read', numbers, cutoff: cutoff_of(rows.length, is_capped) }
+}
+
+function search_finding(level: FindingLevel, message: string): Array<AuditFinding> {
+	return [{ level, check: ORPHAN_SEARCH, message }]
+}
+
+// The gap the search itself leaves, as findings, so it is never absorbed into "no orphans".
+//
+// An unreadable listing is an **error**: check 4 did not run at all, and an audit that reported a
+// clean bill on that input would contradict itself — the same level `epic:audit` already gives a
+// child it could not read, and the level a rate limit already fails this command at through that
+// check.
+//
+// Either cutoff is a **warning**: the scan *did* run, over the newest issues, and an orphan is
+// normally an issue filed minutes ago. That is something to read rather than a check that did not
+// happen — the level `epic:bundle` reports its own `⚠ … cap` at (joshuafolkken/kit#950).
+function search_findings(search: ClaimingSearch): Array<AuditFinding> {
+	if (search.kind === 'unreadable') return search_finding('error', UNREADABLE_SEARCH)
+	if (search.cutoff === 'issues') return search_finding('warning', CAPPED_BY_ISSUES)
+	if (search.cutoff === 'matches') return search_finding('warning', CAPPED_BY_MATCHES)
+
+	return []
+}
+
+// The numbers the orphan check compares against the task list. Empty when the search failed, which
+// `search_findings` has already reported as an error — so the check contributes nothing rather than
+// asserting that nothing claims the epic.
+function claimed_numbers(search: ClaimingSearch): Array<number> {
+	return search.kind === 'read' ? search.numbers : []
 }
 
 // The task-list numbers that name issues in *this* repository. `snapshot.child_numbers` appends the
@@ -67,9 +145,13 @@ function locally_tracked(snapshot: EpicSnapshot): Array<number> {
 
 const epic_audit_orphans = {
 	PARENT_MARKERS,
+	ORPHAN_SEARCH,
+	claimed_numbers,
 	claims_parent,
 	find_claiming_issues,
 	locally_tracked,
+	search_findings,
 }
 
+export type { ClaimingSearch, ScanCutoff }
 export { epic_audit_orphans }
