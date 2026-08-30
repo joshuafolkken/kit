@@ -1,4 +1,5 @@
 import { PICKUP_FIELDS } from '#scripts/git/git-gh-issue'
+import { listing_of, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
@@ -27,6 +28,17 @@ vi.mock('#scripts/git/git-gh-command', () => ({
 const { git_gh_command } = await import('#scripts/git/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
 const { issue, blocked_issue, capped_listing, record } = auto_ok_fixture
+
+// The two answers the probe cases queue over and over: a read that failed, and one that arrived
+// empty. Named so a three-call sequence fits on one line and reads as a sequence.
+const READ_FAILED = listing_outcome(undefined)
+const READ_EMPTY = listing_outcome('[]')
+
+// Queues one answer per call, in order. `mockResolvedValueOnce` chains do the same thing three lines
+// at a time, which pushed these cases past the function-length limit.
+function serve(...answers: ReadonlyArray<ReturnType<typeof listing_outcome>>): void {
+	for (const answer of answers) issue_list.mockResolvedValueOnce(answer)
+}
 
 const stdout_lines: Array<string> = []
 const stderr_lines: Array<string> = []
@@ -91,7 +103,9 @@ function describe_call(call: ReadonlyArray<unknown> | undefined): ProbeCall {
 }
 
 async function run_until_probe(): Promise<{ listing: ProbeCall; probe: ProbeCall }> {
-	issue_list.mockResolvedValueOnce(undefined).mockResolvedValueOnce('[]')
+	issue_list
+		.mockResolvedValueOnce(listing_outcome(undefined))
+		.mockResolvedValueOnce(listing_outcome('[]'))
 	await auto_ok_cli.run([])
 	const [listing, probe] = issue_list.mock.calls
 
@@ -110,6 +124,10 @@ vi.spyOn(console, 'error').mockImplementation(record(stderr_lines))
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	// The default answer for a call the case did not queue one for. Every wrapper answers
+	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
+	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
+	issue_list.mockResolvedValue(listing_outcome(undefined))
 	stdout_lines.length = 0
 	stderr_lines.length = 0
 })
@@ -119,14 +137,14 @@ beforeEach(() => {
 // depends on.
 describe('josh auto-ok:next — an issue whose prerequisite is still open', () => {
 	it('does not answer an issue blocked by an open issue', async () => {
-		issue_list.mockResolvedValueOnce(blocked_by(OPEN_SPELLING))
+		issue_list.mockResolvedValueOnce(listing_outcome(blocked_by(OPEN_SPELLING)))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
 	})
 
 	it('answers it once every blocker has closed', async () => {
-		issue_list.mockResolvedValueOnce(blocked_by(CLOSED_SPELLING))
+		issue_list.mockResolvedValueOnce(listing_outcome(blocked_by(CLOSED_SPELLING)))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
@@ -136,7 +154,7 @@ describe('josh auto-ok:next — an issue whose prerequisite is still open', () =
 	// which keeps only its first few rows — would answer `none` here.
 	it('skips past a blocked issue to an older runnable one', async () => {
 		issue_list.mockResolvedValueOnce(
-			JSON.stringify([
+			listing_of([
 				blocked_issue(NEW_ISSUE_NUMBER, CREATED_LATER, [
 					{ number: BLOCKER_NUMBER, state: OPEN_SPELLING },
 				]),
@@ -150,14 +168,14 @@ describe('josh auto-ok:next — an issue whose prerequisite is still open', () =
 
 	// Deferring an issue costs a poll; implementing one out of order costs the ordering itself.
 	it('treats a blocker of unknown state as still standing', async () => {
-		issue_list.mockResolvedValueOnce(blocked_by_stateless())
+		issue_list.mockResolvedValueOnce(listing_outcome(blocked_by_stateless()))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
 	})
 
 	it('says a standing blocker is among the reasons there is nothing to run', async () => {
-		issue_list.mockResolvedValueOnce(blocked_by(OPEN_SPELLING))
+		issue_list.mockResolvedValueOnce(listing_outcome(blocked_by(OPEN_SPELLING)))
 		await auto_ok_cli.run([])
 
 		expect(stderr()).toContain('blocked by an open issue')
@@ -180,10 +198,7 @@ describe('josh auto-ok:next — what the guard is given', () => {
 	// sent the reader to `gh auth status`, which is green. That is the misdirection kit#996's message
 	// was added to remove, walked back in by the field the same change started asking for.
 	it('blames the blocker relations when the field-bearing listing fails twice', async () => {
-		issue_list
-			.mockResolvedValueOnce(undefined)
-			.mockResolvedValueOnce('[]')
-			.mockResolvedValueOnce(undefined)
+		serve(READ_FAILED, READ_EMPTY, READ_FAILED)
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
 		expect(stderr()).toContain(auto_ok_cli.BLOCKERS_UNREADABLE_MESSAGE)
@@ -193,10 +208,7 @@ describe('josh auto-ok:next — what the guard is given', () => {
 	// A blip on the first read clears by the time the probe runs, and sending someone whose host
 	// serves dependencies to look at it is the same misdirection this whole path exists to avoid.
 	it('does not blame the relations when the original read works on a retry', async () => {
-		issue_list
-			.mockResolvedValueOnce(undefined)
-			.mockResolvedValueOnce('[]')
-			.mockResolvedValueOnce(JSON.stringify([issue(NEW_ISSUE_NUMBER, CREATED_LATER)]))
+		serve(READ_FAILED, READ_EMPTY, listing_of([issue(NEW_ISSUE_NUMBER, CREATED_LATER)]))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
@@ -206,7 +218,9 @@ describe('josh auto-ok:next — what the guard is given', () => {
 	// Both reads failing is an access problem, not a relations one — the probe drops the field and
 	// still gets nothing, so the field is not what it tripped over.
 	it('blames access when the listing fails without the field too', async () => {
-		issue_list.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+		issue_list
+			.mockResolvedValueOnce(listing_outcome(undefined))
+			.mockResolvedValueOnce(listing_outcome(undefined))
 		// No third call: the retry is reached only once the form without the field has read.
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
@@ -217,7 +231,7 @@ describe('josh auto-ok:next — what the guard is given', () => {
 	// The probe costs a request, so a healthy run must never spend it.
 	it('spends no probe when the listing read', async () => {
 		issue_list.mockReset()
-		issue_list.mockResolvedValueOnce('[]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
 		await auto_ok_cli.run([])
 
@@ -251,14 +265,14 @@ describe('josh auto-ok:next — what the probe actually asks for', () => {
 	// Reading one closed blocker as "unblocked" when the count says a second exists would break the
 	// fail-safe direction the rest of these blocks rely on.
 	it('treats blockers beyond the returned page as still standing', async () => {
-		issue_list.mockResolvedValueOnce(paged_blockers(2))
+		issue_list.mockResolvedValueOnce(listing_outcome(paged_blockers(2)))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
 	})
 
 	it('answers when the page holds every blocker it counts', async () => {
-		issue_list.mockResolvedValueOnce(paged_blockers(1))
+		issue_list.mockResolvedValueOnce(listing_outcome(paged_blockers(1)))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
@@ -269,7 +283,9 @@ describe('josh auto-ok:next — what the probe actually asks for', () => {
 // in" — which contradicted the `none` that followed, in the one situation where the cap mattered.
 describe('josh auto-ok:next — the cap notice agrees with the answer', () => {
 	it('warns the answer may not be the highest priority when there is one', async () => {
-		issue_list.mockResolvedValueOnce(capped_listing(auto_ok_cli.LISTING_LIMIT, [AUTO_OK_LABEL]))
+		issue_list.mockResolvedValueOnce(
+			listing_outcome(capped_listing(auto_ok_cli.LISTING_LIMIT, [AUTO_OK_LABEL])),
+		)
 		await auto_ok_cli.run([])
 
 		expect(stderr()).toContain(auto_ok_cli.TRUNCATED_WITH_ANSWER)
@@ -278,7 +294,9 @@ describe('josh auto-ok:next — the cap notice agrees with the answer', () => {
 
 	it('warns an older opted-in issue may still be runnable when everything listed was excluded', async () => {
 		issue_list.mockResolvedValueOnce(
-			capped_listing(auto_ok_cli.LISTING_LIMIT, [AUTO_OK_LABEL, IN_PROGRESS_SPELLING]),
+			listing_outcome(
+				capped_listing(auto_ok_cli.LISTING_LIMIT, [AUTO_OK_LABEL, IN_PROGRESS_SPELLING]),
+			),
 		)
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
@@ -292,7 +310,7 @@ describe('josh auto-ok:next — the cap notice agrees with the answer', () => {
 // to look when the listing arrived and only its fields were unexpected.
 describe('josh auto-ok:next — why the listing could not be used', () => {
 	it('sends an unexpected shape to the field list rather than the authentication', async () => {
-		issue_list.mockResolvedValueOnce('[{"unexpected":true}]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[{"unexpected":true}]'))
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
 		expect(stderr()).toContain(auto_ok_cli.UNEXPECTED_SHAPE_MESSAGE)
@@ -306,7 +324,7 @@ describe('josh auto-ok:next — why the listing could not be used', () => {
 		['gh answered something that is not a listing', '{"message":"API rate limit exceeded"}'],
 		['gh answered unparseable output', 'not json'],
 	])('sends %s to the authentication check', async (_case, raw) => {
-		issue_list.mockResolvedValueOnce(raw)
+		issue_list.mockResolvedValueOnce(listing_outcome(raw))
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
 		expect(stdout()).toBe('')
@@ -318,7 +336,7 @@ describe('josh auto-ok:next — why the listing could not be used', () => {
 // run — while the procedure itself says the `in-progress` label is not a guard to rely on.
 describe('josh auto-ok:next — excluding more than one issue', () => {
 	it('accepts a repeated flag', async () => {
-		issue_list.mockResolvedValueOnce(two_issues())
+		issue_list.mockResolvedValueOnce(listing_outcome(two_issues()))
 
 		expect(
 			await auto_ok_cli.run([
@@ -332,14 +350,14 @@ describe('josh auto-ok:next — excluding more than one issue', () => {
 	})
 
 	it('accepts a comma-separated list', async () => {
-		issue_list.mockResolvedValueOnce(two_issues())
+		issue_list.mockResolvedValueOnce(listing_outcome(two_issues()))
 		await auto_ok_cli.run(['--exclude', `${String(NEW_ISSUE_NUMBER)},${String(OLD_ISSUE_NUMBER)}`])
 
 		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
 	})
 
 	it('still answers the ones not excluded', async () => {
-		issue_list.mockResolvedValueOnce(two_issues())
+		issue_list.mockResolvedValueOnce(listing_outcome(two_issues()))
 		await auto_ok_cli.run(['--exclude', String(NEW_ISSUE_NUMBER)])
 
 		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))

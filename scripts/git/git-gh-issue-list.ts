@@ -97,33 +97,27 @@ async function fetch_page(
 	}
 }
 
-// The ceiling on how far the *body search* pages. Without it that request pages until the backlog
-// runs out, every time: its matches are normally zero, so "stop once `limit` rows are selected"
-// never fires and the whole open backlog is read, bodies included (joshuafolkken/kit#1033).
+// The ceiling on how far *any* listing pages. Without it a request pages until the backlog runs
+// out: the body search's matches are normally zero, so "stop once `limit` rows are selected" never
+// fires for it (joshuafolkken/kit#1033), and the other five reach `limit` only after the client-side
+// pull-request exclusion has discarded whatever the endpoint served alongside the issues — which in
+// a repository with hundreds of open pull requests is the whole backlog again
+// (joshuafolkken/kit#1067).
 //
-// Five pages bounds it at five requests, and an `epic:audit` orphan is normally an issue filed
-// minutes ago — well inside the newest five hundred. A repository big enough to reach the ceiling is
-// *told* rather than handed a shorter answer: a cap applied silently turns "I did not look at
-// everything" into "there is nothing there", which is the defect this bound would otherwise
-// introduce.
+// Five pages bounds every listing at five requests, and five hundred rows is comfortably above what
+// each caller asks for: the widest is `epic:bundle`'s two hundred, which the ceiling only cuts short
+// once more than three in five of the newest five hundred open items are pull requests. A repository
+// big enough to reach it is *told* rather than handed a shorter answer.
+//
+// **It applies to every listing only because the flag now reaches every caller.** Until
+// joshuafolkken/kit#1067 `issue_list_open` discarded `is_capped`, so bounding a listing whose caller
+// could not read the flag would have shortened that listing's answer in silence — the defect the
+// bound exists to prevent, introduced by the fix for it. Threading the flag out came first for that
+// reason, and the two must never be separated again: a ceiling is only ever as safe as the caller's
+// ability to say it was reached.
 const MAX_PAGES = 5
-// The ceiling in issues, which is how the caller that reports the gap phrases it.
+// The ceiling in issues, which is how the callers that report the gap phrase it.
 const MAX_SCANNED = MAX_PAGES * PER_PAGE
-const UNBOUNDED_PAGES = Infinity
-
-// **Only the body search is bounded**, and that is not a detail of where the cost happens to be.
-// `is_capped` is answered to one caller and discarded by `issue_list_open`, so a ceiling on a
-// listing whose caller cannot read the flag would silently shorten that listing's answer — this
-// change's own defect, introduced by the fix for it.
-//
-// The other five stop at `limit`, which the endpoint's own filters get them to in
-// `ceil(limit / PER_PAGE)` pages plus whatever the client-side pull-request exclusion discards. That
-// overshoot is unbounded in a repository with hundreds of open pull requests, and it is left exactly
-// as it was: bounding it means reporting it, which means the flag reaching six callers and two
-// commands' output — a separate deliverable from this one.
-function page_ceiling(request: IssueListRequest): number {
-	return request.body_term === undefined ? UNBOUNDED_PAGES : MAX_PAGES
-}
 
 // Whether the listing has more to give and the caller still has room for it. Used twice on purpose:
 // as the loop's continue condition, and — once the ceiling is what stopped the loop — as the answer
@@ -151,14 +145,13 @@ interface SelectedRows {
 // fits in one page still costs one request.
 //
 // A short page is the end of the listing, which is what terminates the loop when there are fewer
-// than `limit` matches; the page ceiling is what terminates the body search when there are not.
+// than `limit` matches; the page ceiling is what terminates any listing that has not reached either.
 async function fetch_selected(request: IssueListRequest): Promise<SelectedRows> {
 	const selected: Array<RestIssue> = []
-	const ceiling = page_ceiling(request)
 	let page = FIRST_PAGE
 	let has_more = true
 
-	while (page <= ceiling && wants_more(has_more, selected.length, request.limit)) {
+	while (page <= MAX_PAGES && wants_more(has_more, selected.length, request.limit)) {
 		const result = await fetch_page(request, page)
 
 		selected.push(...result.selected)
@@ -207,7 +200,7 @@ interface IssueListOutcome {
 }
 
 // One invocation shape for every open-issue listing.
-async function issue_list_open_outcome(request: IssueListRequest): Promise<IssueListOutcome> {
+async function issue_list_open(request: IssueListRequest): Promise<IssueListOutcome> {
 	try {
 		const { rows, is_capped } = await fetch_selected(request)
 		const fields = git_gh_issue_rest.split_fields(request.json_fields)
@@ -224,18 +217,14 @@ async function issue_list_open_outcome(request: IssueListRequest): Promise<Issue
 	}
 }
 
-// The same listing for the five callers that cannot reach the page ceiling — every one of them asks
-// for a `limit` well under `MAX_SCANNED` with a filter the endpoint itself applies, so there is no
-// truncation for them to report and their contract is unchanged (joshuafolkken/kit#1033).
-async function issue_list_open(request: IssueListRequest): Promise<string | undefined> {
-	const outcome = await issue_list_open_outcome(request)
-
-	return outcome.json
-}
-
+// The flag-discarding second entry point is gone (joshuafolkken/kit#1067). It answered
+// `string | undefined` for the five callers that could not reach the page ceiling, and once the
+// ceiling applies to all six there is no such caller left: a wrapper that dropped `is_capped` would
+// be the one way back to a silently shortened answer, so it is removed rather than left for someone
+// to reach for. Every caller now receives the whole outcome and decides what truncation means for
+// it — `git-gh-issue.ts` records that decision, caller by caller.
 const git_gh_issue_list = {
 	issue_list_open,
-	issue_list_open_outcome,
 }
 
 export type { IssueListOutcome, IssueListRequest }

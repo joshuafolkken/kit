@@ -199,7 +199,10 @@ than offering the child — reading a failed read as "nothing is running" is the
 guard may not fail in, because that answer *starts* work. It is not an error either: the listing
 swallows a passing rate limit into the same failure, so an exit would end an unattended run over a
 blip, while a persistent failure is already caught by the unreadable-child anomaly before this read
-happens. So the loop polls, and the reason is on standard error.
+happens. So the loop polls, and the reason is on standard error. **A listing that was *cut short* is
+the same answer** (joshuafolkken/kit#1067): the paging bounds every listing now, and a short one with
+no visible holder is still not "nothing is running" — `wait`, with its own message, since clearing a
+stale label would not change it.
 
 **Two children of one repository still may not run at once** — the guard makes that mechanical
 rather than customary, and it does not make same-repository parallelism safe. An epic that wants it

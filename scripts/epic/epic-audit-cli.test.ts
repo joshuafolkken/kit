@@ -1,9 +1,10 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import type { ScanCutoff } from '#scripts/git/listing-cutoff'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuditFinding, ReferenceState } from './epic-audit'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_audit_cli, type AuditInput } from './epic-audit-cli'
-import type { ClaimingSearch, ScanCutoff } from './epic-audit-orphans'
+import type { ClaimingSearch } from './epic-audit-orphans'
 import { epic_fetch } from './epic-fetch'
 import type { IssueReference } from './epic-graph'
 
@@ -218,7 +219,9 @@ describe('epic_audit_cli.audit — the orphan search itself', () => {
 	// A cap that is not surfaced is the same defect wearing a different hat, so the report carries it
 	// — as a warning, because the scan did run over the newest issues.
 	it('warns without failing when the orphan search was cut short', () => {
-		const result = epic_audit_cli.audit(audit_input({ claiming: read_claiming([], 'issues') }))
+		const result = epic_audit_cli.audit(
+			audit_input({ claiming: read_claiming([], 'page_ceiling') }),
+		)
 
 		expect(result.findings.map((finding) => finding.level)).toEqual(['warning'])
 		expect(result.exit_code).toBe(0)

@@ -129,7 +129,14 @@ function repo_verdict(verdict: EpicVerdict): EpicVerdict {
 // in a repository with another owner is refused before it is read (joshuafolkken/kit#869).
 //
 // **A read that failed answers `wait` too** — never the child, and not an error either
-// (`epic-busy.ts` records why both wrong answers are wrong).
+// (`epic-busy.ts` records why both wrong answers are wrong). **So does a listing that was cut
+// short**: since joshuafolkken/kit#1067 the page ceiling bounds this listing as well, and a short
+// listing with no visible holder is not "nothing is running". Only `idle` offers the child, so the
+// verdict is decided by what came back rather than by what did not.
+//
+// The token on standard output is unchanged in every branch — the child's number, or `wait` — so a
+// loop reading `child=$(josh epic:next …)` sees exactly what it saw before; the new case is one more
+// explanation on standard error.
 async function offer_child(child: EpicChild, repo: string): Promise<number> {
 	const busy = await epic_busy.read_repository(repo)
 
@@ -139,11 +146,7 @@ async function offer_child(child: EpicChild, repo: string): Promise<number> {
 		return SUCCESS_EXIT_CODE
 	}
 
-	console.error(
-		busy.kind === 'busy'
-			? epic_busy.busy_message(busy.issues, repo)
-			: epic_busy.unreadable_message(repo),
-	)
+	console.error(epic_busy.busy_reason(busy, repo))
 	console.info(BUSY_VERDICT)
 
 	return SUCCESS_EXIT_CODE
