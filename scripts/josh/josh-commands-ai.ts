@@ -12,6 +12,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Fetch GitHub issue details',
 		category: 'AI tools',
 	},
+	'issue:state': {
+		script: 'scripts/issue/issue-state-cli.ts',
+		description:
+			"Print one issue's state and labels, in the spelling the documents compare against",
+		category: 'AI tools',
+	},
 	epic: {
 		script: 'scripts-ai/epic.ts',
 		description: 'Create an epic issue from its child issue numbers',

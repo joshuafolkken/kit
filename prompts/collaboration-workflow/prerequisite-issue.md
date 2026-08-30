@@ -19,7 +19,7 @@
 
    ```bash
    git stash push -u -m "epicrun: paused #<M> for prerequisite #<N>"
-   gh issue comment <M> --body "<何を stash したか、#<N> が先に必要であること>"
+   gh api repos/{owner}/{repo}/issues/<M>/comments -f body="<何を stash したか、#<N> が先に必要であること>"
    ```
 
    **`-u` は省略できない。** 子の作業にはほぼ必ず新規の `*.test.ts` が含まれ、それは untracked である。`-u` の無い stash はまさにそのファイルを作業ツリーに残し、この手順が防ごうとしている状態そのものを作る。コメントは中断状態を後から追跡可能にするためで、割り込み Issue のルールが求めているものと同じであり、**`<M>` を再開するセッションに stash の存在を伝えるのもこのコメントである**。`epic:next` が `<M>` を再び返したら、その `git switch main && git pull` の後に `git stash pop` する。前提 Issue はその時点でマージ済みなので、そのまま当たると考えず衝突の解決を見込む。
@@ -28,7 +28,7 @@
 4. **`<M>` から `in-progress` を外す。**
 
    ```bash
-   gh issue edit <M> --remove-label "in-progress"
+   gh api -X DELETE repos/{owner}/{repo}/issues/<M>/labels/in-progress 2>/dev/null || true
    ```
 
    これは後片付けではなく、`<M>` が再び実行されるための条件である。`epic:next` は `in-progress` が付いた子を、**blocker を見る前に**「時間で解ける」と分類する。ラベルが残ったままの子は、どれだけ待っても二度と候補にならず、前提 Issue がマージされた瞬間に EPIC が詰まる。ラベルを外す処理はコードベースに無いため、その子の作業をやめたセッションが自分で外すしかない。
@@ -42,7 +42,7 @@
 `#<P>` を新しく起票する前提 Issue、`#N` を実行中の Issue とする。
 
 1. 前提 Issue `#<P>` を**確認せずに**起票する（first-party なので Tier A）。以降の手順がその番号を書くため、先に起票する
-2. **作業中の変更を stash する** — `git stash push -u -m "fullrun: paused #<N> for prerequisite #<P>"` — そのうえで Issue に記録する: `gh issue comment <N> --body "<何を stash したか、#<P> が先に必要であること>"`。**`-u` は省略できない。** 作業にはほぼ必ず新規の `*.test.ts`（untracked）が含まれ、`-u` の無い stash はそれを作業ツリーに残す。この後に人が打つ `epicrun` は子ごとに `git switch main && git pull` から始まる。**stash を pop させるのはこの Issue コメントである。** 後に `#N` を取り上げたランがこれを読んで実装前に pop する。Telegram にしか書かれていない stash は行き場を失う。Telegram にも書くが、記録として効くのはコメントの方である
+2. **作業中の変更を stash する** — `git stash push -u -m "fullrun: paused #<N> for prerequisite #<P>"` — そのうえで Issue に記録する: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<何を stash したか、#<P> が先に必要であること>"`。**`-u` は省略できない。** 作業にはほぼ必ず新規の `*.test.ts`（untracked）が含まれ、`-u` の無い stash はそれを作業ツリーに残す。この後に人が打つ `epicrun` は子ごとに `git switch main && git pull` から始まる。**stash を pop させるのはこの Issue コメントである。** 後に `#N` を取り上げたランがこれを読んで実装前に pop する。Telegram にしか書かれていない stash は行き場を失う。Telegram にも書くが、記録として効くのはコメントの方である
 3. **新規 EPIC を作る前に、`#N` が既に EPIC の子でないかを確かめる** — `pnpm josh epic:bundle <N>`。「EPIC に属している」だけでなく、**どの EPIC かを名乗る**（`#893 already tracks this issue`）
 
    | 答え                                                                                                                                                                                                                                                                                                                                                                                        | すること                                                                                                                                                                                                                                                                                                                        |
@@ -53,7 +53,7 @@
 
    **`#N` が宣言された順序に載っていなくても構わない。** 順序を持つ子と持たない子が混在する EPIC では、鎖に名前が無い子は正当な状態である。この場合コマンドは拒否せず、既存の鎖はそのままに **新しい鎖 `#<P> -> #N` を 1 本追加する**（joshuafolkken/kit#949）。拒否されるのは `#N` がそもそもその EPIC の子でない場合だけで、`#N is not a child of this epic, so it cannot position an insertion` と答えて何も書き込まない。そのときは本文を手で書き換えてはならず、2 つ目の EPIC も作らない。**コマンドの拒否がそのまま報告内容である。** この分岐はもともと停止で終わるので、拒否された内容を `confirmation` の Telegram に書いて人の判断に委ねる。
 
-4. **`#N` から `in-progress` を外す** — `gh issue edit <N> --remove-label "in-progress"`。`epic:next` は `in-progress` が付いた子を blocker を見る前に「時間で解ける」と分類するため、付けたままだと `#N` が二度と候補にならない EPIC を作ることになり、`#<P>` がマージされた瞬間に詰まる
+4. **`#N` から `in-progress` を外す** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`。`epic:next` は `in-progress` が付いた子を blocker を見る前に「時間で解ける」と分類するため、付けたままだと `#N` が二度と候補にならない EPIC を作ることになり、`#<P>` がマージされた瞬間に詰まる
 5. `confirmation` の Telegram を送り、「Please run `epicrun #<E>` to execute this epic.」で報告を終えて**停止**する
 
 `fullrun` と入力したのは 1 件の実装とマージの承認であり、バッチは別の承認である。**この停止は残す。** ただし起票と EPIC 作成までは確認せずに済ませるので、人の操作はコマンドを 1 回打つことだけになる。

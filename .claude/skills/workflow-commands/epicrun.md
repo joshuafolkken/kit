@@ -29,8 +29,8 @@ So inside `epicrun #<N>`, a prerequisite or a split found mid-run does **not** s
 1. File the new Issue(s) — no confirmation; the batch was already approved by the keyword.
 2. **Stash the work in progress and remove `in-progress` from `#<N>`**, exactly as steps 2 and 4 of
    "A prerequisite discovered mid-run" do — `git stash push -u -m "..."` with the `-u` (a new
-   `*.test.ts` is untracked), the `gh issue comment <N>` that records the stash so whatever resumes
-   `#<N>` knows to pop it, and `gh issue edit <N> --remove-label "in-progress"`. The reasons are the
+   `*.test.ts` is untracked), the `gh api repos/{owner}/{repo}/issues/<N>/comments` post that records the stash so whatever resumes
+   `#<N>` knows to pop it, and `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`. The reasons are the
    same two: the tree is dirty on the default branch and the next child begins with `git switch main
    && git pull`, and `epic:next` classifies a child carrying `in-progress` as waiting on time
    **before** it consults any blocker, so `#<N>` would never be offered again and the epic would
@@ -112,7 +112,7 @@ pnpm josh delegate epic-child   # → delegate
 
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier, and it is the whole
 reason the unit may be delegated at all: a unit that reports a child finished without its PR merged
-leaves that child open, and `gh issue view <N> --json state` says so in one call. The child's own
+leaves that child open, and `pnpm josh issue:state <N>` says so in one call. The child's own
 gate, `/code-review` and CI run inside the unit, and `pnpm josh followup --merge` will not touch the
 PR until they are green. **Never advance the loop on the summary alone** — that discards the
 verifier, and without it `epic-child` is not a delegatable unit.
@@ -305,15 +305,25 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
    ```bash
-   gh issue view <N> --json state --jq .state   # CLOSED, or the unit did not finish
+   pnpm josh issue:state <N>                          # a child in this repository
+   pnpm josh issue:state <N> --repo <owner/repo>      # a child in another one
+   # state: CLOSED
+   # labels: (none)
    ```
 
-   `CLOSED` is the only answer that means the child finished. **Read the labels before calling
-   anything else a failure**, because two different outcomes look alike from here:
+   **`--repo` is not optional for a cross-repository child.** Without it the read resolves `<N>`
+   against the repository this session runs in, and confirms a completely different issue that
+   happens to carry that number — silently, because that issue usually exists.
 
-   ```bash
-   gh issue view <N> --json state,labels --jq '{state, labels: [.labels[].name]}'
-   ```
+   `state: CLOSED` is the only answer that means the child finished. **Read the labels line before
+   calling anything else a failure**, because two different outcomes look alike from here — which is
+   why one command prints both rather than two reads being made.
+
+   **A non-zero exit is not `OPEN`.** The command exits non-zero without printing a state when the
+   number resolves to nothing (`does not resolve`) and when the read itself failed (`could not
+   read`), and the second is a rate limit or expired auth rather than anything about the child.
+   Treating it as an unfinished child would count an environment fault against the
+   consecutive-failure guard. Re-read before deciding.
 
    - **Open, carrying `needs-decision`** — the unit **parked** it, exactly as this session would
      have. That is not a failure: leave the label on, do **not** count it against the
@@ -434,7 +444,7 @@ this section existed. Opting in is the default absence. Create the label once pe
 wants it:
 
 ```bash
-gh label create "auto-ok" --color "0e8a16" --description "Opted in to unattended execution outside an epic"
+gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
 ```
 
 ## The hand-off — one session does not have to run the whole epic
@@ -511,8 +521,8 @@ When a child hits something this run may not decide — a Tier B toss-up, a Tier
 defect, a split that needs a person — **park the child and keep going.**
 
 ```bash
-gh issue edit <N> --add-label "needs-decision"
-gh issue comment <N> --body "<what needs deciding, and the options>"
+gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'
+gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<what needs deciding, and the options>"
 ```
 
 `in-progress` is left as it is, and the parked child does **not** hold the repository under the
@@ -531,7 +541,7 @@ writes it to the epic's `## Decisions`), remove the label and re-run `epicrun`; 
 GitHub, so the run picks up where it left off.
 
 ```bash
-gh issue edit <N> --remove-label "needs-decision"
+gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-decision 2>/dev/null || true
 ```
 
 Without this the parked child never runs again — it is the second half of the human-in-the-loop
@@ -556,7 +566,7 @@ manual verification, and any run paused mid-child. Both leave uncommitted work i
 leave the label alone and report, never to strip it and start a second child on top of that work.
 
 ```bash
-gh issue edit <N> --remove-label "in-progress"
+gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
 ```
 
 ## Waiting, and never waiting forever
@@ -612,7 +622,7 @@ must not (joshuafolkken/kit#891).
 
    ```bash
    git stash push -u -m "epicrun: paused #<M> for prerequisite #<N>"
-   gh issue comment <M> --body "<what was stashed, and that #<N> must land first>"
+   gh api repos/{owner}/{repo}/issues/<M>/comments -f body="<what was stashed, and that #<N> must land first>"
    ```
 
    **`-u` is not optional**: a child's work almost always includes a new `*.test.ts`, which is
@@ -630,7 +640,7 @@ must not (joshuafolkken/kit#891).
 4. **Remove `in-progress` from `<M>`.**
 
    ```bash
-   gh issue edit <M> --remove-label "in-progress"
+   gh api -X DELETE repos/{owner}/{repo}/issues/<M>/labels/in-progress 2>/dev/null || true
    ```
 
    This is not tidying — it is what lets `<M>` run again. `epic:next` classifies a child carrying

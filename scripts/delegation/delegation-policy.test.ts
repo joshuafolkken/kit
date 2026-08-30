@@ -79,12 +79,19 @@ describe('epic-child is a second unit on the one mechanism', () => {
 		expect(delegation_policy.verdict_for(EPIC_CHILD)).toBe(delegation_policy.DELEGATE_VERDICT)
 	})
 
-	// `gh issue view`, and deliberately not `epic:next`: an unfinished child still carries
+	// `pnpm josh issue:state`, and deliberately not `epic:next`: an unfinished child still carries
 	// `in-progress`, which `epic:next` buckets as waiting on time before it looks at any blocker, so
 	// it answers `wait` rather than reporting the failure. A verifier naming it would contradict the
 	// documents in the same change.
 	it('names the parent-side state read as its verifier', () => {
-		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('gh issue view')
+		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('pnpm josh issue:state')
+	})
+
+	// joshuafolkken/kit#1054: `gh issue view` goes through GraphQL, which a cloud session is answered
+	// 403 for — so a verifier naming it is a verifier that does not run in the environment the epic
+	// exists to make workable, and the delegation would continue with nothing checking it.
+	it('does not name the GraphQL read a cloud session is refused', () => {
+		expect(delegation_policy.reason_for(EPIC_CHILD)).not.toContain('gh issue view')
 	})
 
 	it('does not name the read that answers `wait` for a failed child', () => {

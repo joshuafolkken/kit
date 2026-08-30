@@ -174,7 +174,7 @@ counts only when an open epic already tracks it, since the answer worth recoveri
 an epic created over a closed issue has nothing left to run. An **open** reference counts either way.
 A read that fails — and a reference the per-issue cap never reached — is reported as a gap, never
 folded into "no strong signal". A number that answers with a **pull request** is not a candidate at
-all: `gh issue view` serves one too, and a merged PR does not report `CLOSED`.
+all: `repos/{owner}/{repo}/issues/<N>` serves one too, and a merged PR does not report `CLOSED`.
 
 **A number that does not exist is not a gap.** A typo, or another repository's number quoted in
 prose, is dropped in silence — neither a candidate nor something the command reports it could not
