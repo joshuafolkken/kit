@@ -226,3 +226,39 @@ describe('epic_fetch.scope_for', () => {
 		expect(epic_fetch.scope_for(OTHER_REPO, REPO)).toBe(OTHER_REPO)
 	})
 })
+
+// joshuafolkken/kit#1113: the snapshot corrects a relation GitHub's summary count under-reported,
+// so `epic:next` and `epic:audit` both see the graph as it is rather than as the counter said. The
+// child read below answers `blockedBy: []` — the shape a stale `total_blocked_by: 0` produces —
+// while the relations listing has the blocker.
+describe('epic_fetch.fetch_epic — relations the summary count missed', () => {
+	const BLOCKED_BY_NUMBERS = 'issue_blocked_by_numbers'
+	const ORDERED_EPIC_BODY = '- [ ] #1\n- [ ] #2\n\n#1 -> #2\n'
+
+	it('re-reads a declared link the first read found unrecorded', async () => {
+		vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(ORDERED_EPIC_BODY)
+		vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(async (issue_number) =>
+			gh_child({ number: Number(issue_number) }),
+		)
+		const listing = vi.spyOn(git_gh_command, BLOCKED_BY_NUMBERS).mockResolvedValue([1])
+
+		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(snapshot.children.find((child) => child.number === 2)?.blocked_by).toStrictEqual([1])
+		expect(listing).toHaveBeenCalledWith('2', undefined)
+	})
+
+	// The cost guard the correction must not undo: an epic whose relations already match asks the
+	// listing nothing at all.
+	it('asks the listing nothing when the declared link is already recorded', async () => {
+		vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(ORDERED_EPIC_BODY)
+		vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(async (issue_number) =>
+			gh_child({ number: Number(issue_number), blocked_by: Number(issue_number) === 2 ? [1] : [] }),
+		)
+		const listing = vi.spyOn(git_gh_command, BLOCKED_BY_NUMBERS).mockResolvedValue([1])
+
+		await epic_fetch.fetch_epic(EPIC, REPO)
+
+		expect(listing).not.toHaveBeenCalled()
+	})
+})

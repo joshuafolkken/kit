@@ -23,10 +23,31 @@ import {
 // holds. The endpoint itself is named in `git-gh-api-path.ts`, which the two writes address as well
 // (joshuafolkken/kit#1026).
 //
-// The request is skipped when the issue's own summary says the count is zero, which is the common
-// case and the one that matters for cost: `epic:bundle` reads relations for the whole open backlog,
-// up to two hundred issues, and every one of those reads names `blockedBy`. Without the skip the
-// pass would be four hundred requests where `gh` made two hundred.
+// joshuafolkken/kit#1113 split this out for the one caller that may not consult the summary the
+// wrapper below trusts: the summary is GitHub's own count and it can disagree with the listing it
+// counts. Measured on joshuafolkken/kit#1111, whose `issue_dependencies_summary` read
+// `total_blocked_by: 0` while this endpoint returned `#1106` — and re-POSTing that relation was
+// refused with `Target issue has already been taken`, so the relation was real and only the counter
+// was wrong. `epic:next` then called a graph that agreed with itself contradictory and exited 1,
+// which stops an unattended run at its first step with nothing to fix.
+async function read_blocked_by_listing(
+	issue_number: string,
+	repo?: string,
+	exact_total?: number,
+): Promise<BlockedBy> {
+	const json = await git_gh_exec.exec_gh_api({
+		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
+	})
+
+	return git_gh_issue_rest.to_blocked_by(json, exact_total)
+}
+
+// The same relations, with the request skipped when the issue's own summary says the count is zero.
+// That skip is the common case and the one that matters for cost: `epic:bundle` reads relations for
+// the whole open backlog, up to two hundred issues, and every one of those reads names `blockedBy`.
+// Without it the pass would be four hundred requests where `gh` made two hundred — which is why
+// joshuafolkken/kit#1113 left it in place and gave the rare path its own entry point above rather
+// than making every read pay for it.
 //
 // A pull request is skipped ahead of that, structurally rather than on a count. It carries no
 // `issue_dependencies_summary` at all, and an absent summary is deliberately not read as a zero — so
@@ -50,11 +71,7 @@ async function read_blocked_by(
 	const exact_total = git_gh_issue_rest.total_blocked_by(rest)
 	if (exact_total === 0) return git_gh_issue_rest.empty_blocked_by()
 
-	const json = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
-	})
-
-	return git_gh_issue_rest.to_blocked_by(json, exact_total)
+	return await read_blocked_by_listing(issue_number, repo, exact_total)
 }
 
 // One issue through REST, answered in the field names `gh issue view --json` used. Every read below
@@ -246,7 +263,46 @@ async function issue_list_comments(issue_number: string): Promise<string | undef
 	}
 }
 
+// Whether the relations endpoint has nothing at that number at all. Probed for its status rather
+// than read off `gh`'s stderr wording, exactly as the issue read's own classification does it — the
+// status code is not on the Error, and classifying by the message is what that probe exists to
+// avoid.
+async function has_no_relations_endpoint(issue_number: string, repo?: string): Promise<boolean> {
+	const status = await git_gh_exec.exec_gh_api_status(
+		git_gh_api_path.blocked_by_api_path(issue_number, repo),
+	)
+
+	return status === NOT_FOUND_STATUS
+}
+
+// The blocker numbers of one issue, read from the relations listing rather than from the issue's own
+// summary count (joshuafolkken/kit#1113). Exposed on the command object so the callers that need the
+// uncounted answer reach it the way they reach every other read, and so a suite that already fakes
+// the command layer does not fall through to a real `gh api`.
+//
+// A 404 is answered as no relations rather than raised. `read_blocked_by` never reaches this
+// endpoint for a pull request — joshuafolkken/kit#1066 skips one structurally, since a PR carries no
+// `issue_dependencies_summary` to skip on — and this entry point has no issue payload to make that
+// judgement from. A PR pasted into an epic's task list would otherwise turn a read of an endpoint
+// that has nothing for it into a warning about a relation nobody lost. Every other failure still
+// raises: a rate limit is a gap, and the caller says so.
+async function issue_blocked_by_numbers(
+	issue_number: string,
+	repo?: string,
+): Promise<Array<number>> {
+	try {
+		const listing = await read_blocked_by_listing(issue_number, repo)
+
+		return listing.nodes.map((blocker) => blocker.number)
+	} catch (error) {
+		if (await has_no_relations_endpoint(issue_number, repo)) return []
+
+		throw error
+	}
+}
+
 const git_gh_issue_read = {
+	issue_blocked_by_numbers,
 	issue_get_title,
 	issue_get_body,
 	issue_view_json,
