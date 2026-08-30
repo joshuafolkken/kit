@@ -1,6 +1,6 @@
 ## `owner/repo#` — 実行対象のリポジトリを入口で指定する
 
-`kickoff` / `fullrun` / `halfrun` / `queue` / `epicrun` は、対象リポジトリを受け取る手段を持っていなかった。`kickoff.md` の `gh issue create` は 3 か所とも `-R` を持たず、**起票先は常に「セッションが動いているリポジトリ」になる**。別リポジトリのセッションで課題を検討し、その結論を対象パッケージへ起票する — この使い方は例外ではなく日常であり、そのたびに人が口頭で起票先を指示していた（joshuafolkken/kit#904）。
+`kickoff` / `fullrun` / `halfrun` / `queue` / `epicrun` は、対象リポジトリを受け取る手段を持っていなかった。`kickoff.md` の起票コマンドは 3 か所とも対象リポジトリを指定しておらず、**起票先は常に「セッションが動いているリポジトリ」になる**。別リポジトリのセッションで課題を検討し、その結論を対象パッケージへ起票する — この使い方は例外ではなく日常であり、そのたびに人が口頭で起票先を指示していた（joshuafolkken/kit#904）。
 
 記法の先例は既にあった。`epicrun joshuafolkken/kit#858` は別リポジトリの EPIC を指す正しい書式として定義済みで、**入口だけがこの記法から取り残されていた**。したがって定義は本節に 1 つだけ置き、全ての入口がそれを参照する（joshuafolkken/kit#865 が分割判定に対して行った是正と同じ形）。運用手順は `.claude/skills/workflow-commands/SKILL.md` → 「2c. The `owner/repo#` prefix」にある。
 
@@ -22,7 +22,7 @@ epicrun joshuafolkken/kit#858
 
 ### 短縮名は owner を前置して展開する（マップは引かない）
 
-`kit#new` は、**セッションが動いているリポジトリの owner を前置して**展開する（`gh repo view --json owner --jq .owner.login`）。joshuafolkken/kit#869 の発見マップは引かない — マップが答えるのは「チェックアウトがどこにあるか」であって「どのリポジトリを指しているか」ではなく、**チェックアウトが無いリポジトリも `kickoff` の対象としては正しい**からである。
+`kit#new` は、**セッションが動いているリポジトリの owner を前置して**展開する（`gh api repos/{owner}/{repo} --jq .owner.login`）。joshuafolkken/kit#869 の発見マップは引かない — マップが答えるのは「チェックアウトがどこにあるか」であって「どのリポジトリを指しているか」ではなく、**チェックアウトが無いリポジトリも `kickoff` の対象としては正しい**からである。
 
 **短縮名が third-party に解決される経路は構造上存在しない。** first-party の判定は owner の一致だけであり（`CLAUDE.md` → 「Third-party repositories are Tier C」）、セッションの owner を前置して作った名前はその判定を定義から満たす。`repo_map_logic.is_same_owner` が発見マップの全エントリに対して置いている関門と同じ基準である。**これは短縮名についてのみ成り立つ主張であり、owner を明示した完全形には当てはまらない** — 次節がその場合を定める。
 
@@ -32,7 +32,7 @@ epicrun joshuafolkken/kit#858
 
 ### 別 owner を明示したら third-party — Tier C として止まる
 
-`sveltejs/svelte#new` のように**セッションのリポジトリと owner が異なる**完全形は、third-party の指定である。判定は機械的に行う — `gh repo view --json owner --jq .owner.login` が返す owner と一致するかどうかだけであり、判断を挟まない。
+`sveltejs/svelte#new` のように**セッションのリポジトリと owner が異なる**完全形は、third-party の指定である。判定は機械的に行う — `gh api repos/{owner}/{repo} --jq .owner.login` が返す owner と一致するかどうかだけであり、判断を挟まない。
 
 **third-party への書き込みは Issue・コメント・PR のいずれも Tier C であり、そのターンでの明示指示が無ければ実行してはならない**（`CLAUDE.md` → 「Third-party repositories are Tier C」）。前置きが打たれたことは指示ではない — 指しているリポジトリを言っただけで、他人のトラッカーへ書いてよいとは言っていない。
 
@@ -46,13 +46,13 @@ epicrun joshuafolkken/kit#858
 
 ### 計画のみの入口（`kickoff`）— チェックアウトは要らない
 
-`kickoff` は起票と計画コメントで完結するので、**読み取りを含む全ての `gh` 呼び出しに `-R <owner/repo>` を付ければ足りる** — `gh issue view` / `gh issue create` / `gh issue edit` / `gh issue comment` / `gh label create`。**読み取りにこそ付け忘れやすく、付け忘れは黙って通る**：`kickoff joshuafolkken/kit#412` の 1 手目で `-R` 無しに `gh issue view 412` を打つと、自リポジトリの別 Issue を読んで計画を書くことになり、エラーは出ない。クローンは不要であり、行ってはならない。
+`kickoff` は起票と計画コメントで完結するので、**読み取りを含む全ての `gh api` 呼び出しのパスに `repos/<owner/repo>/…` を書けば足りる** — Issue の読み取り・作成・更新・コメント・ラベル作成のいずれもである。**読み取りにこそ付け忘れやすく、付け忘れは黙って通る**：`kickoff joshuafolkken/kit#412` の 1 手目でパスを `repos/{owner}/{repo}/issues/412` のままにすると、自リポジトリの別 Issue を読んで計画を書くことになり、エラーは出ない。クローンは不要であり、行ってはならない。
 
-**例外は分割パスの EPIC 作成である。** `pnpm josh epic` は自分が走っているリポジトリしか読み書きしない（`into-epic.md` の `epic --add` と同じ制約）。子は `gh issue create -R` で作れるので、EPIC だけが次の 2 通りになる。
+**例外は分割パスの EPIC 作成である。** `pnpm josh epic` は自分が走っているリポジトリしか読み書きしない（`into-epic.md` の `epic --add` と同じ制約）。子は `gh api repos/<owner/repo>/issues` で作れるので、EPIC だけが次の 2 通りになる。
 
 - 対象リポジトリのチェックアウトがあれば、**そこで** `pnpm josh epic` を実行する（場所は `pnpm josh doctor` が印字する）
-- 無ければ `kickoff.md` が既に定める手動フォールバック（`gh issue create --label epic -R <owner/repo>`）で作り、**`pnpm josh epic:check` を回せなかったことを報告する** — 検査していないものを検査済みとして報告しない
-- **昇格（`pnpm josh epic --promote`）を選ぶ分岐には、この手動フォールバックが無い。** `--promote` も自分が走るリポジトリしか書き換えないうえ、`gh issue create` で代用すると `#N` は昇格も子への参加もしないまま取り残される。チェックアウトが無ければ、子を作った時点で**停止して報告する**
+- 無ければ `kickoff.md` が既に定める手動フォールバック（`gh api repos/<owner/repo>/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>"`）で作り、**`pnpm josh epic:check` を回せなかったことを報告する** — 検査していないものを検査済みとして報告しない
+- **昇格（`pnpm josh epic --promote`）を選ぶ分岐には、この手動フォールバックが無い。** `--promote` も自分が走るリポジトリしか書き換えないうえ、起票で代用すると `#N` は昇格も子への参加もしないまま取り残される。チェックアウトが無ければ、子を作った時点で**停止して報告する**
 
 ### 実装を伴う入口（`fullrun` / `halfrun` / `queue`）— チェックアウト必須、勝手に clone しない
 

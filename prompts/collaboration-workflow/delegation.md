@@ -57,4 +57,4 @@ pnpm josh delegate --list       # 一覧と、却下した工程とその理由
 
 **`epic-child` の検証経路は、子の完了報告ではない。** 親が読むのは GitHub 上の子の状態であり、実行単位が返す要約ではない。要約が「終わった」と言っても PR がマージされていなければ、その子は `CLOSED` になっていない — これが「誤りが捕まる」の中身である。加えて子自身の検証ゲート・`/code-review`・CI は実行単位の中で走り、`pnpm josh followup --merge` はそれらが緑でなければ PR に触れない。
 
-**確認は `epic:next` の次の答えに任せない。** 終わらなかった子は `in-progress` を付けたままであり、`epic:next` はそれをブロッカーより先に「時間で解ける」と分類する（`scripts/epic/epic-classify.ts`）。放っておくと親は 90 分の stale 判定までポーリングするだけで、何も学ばない。**実行単位が返った直後に `gh issue view <N> --json state` を読み、`CLOSED` でなければ失敗として扱う** — ラベルを親が外し、連続失敗のガードに数え、人が要るなら park する。
+**確認は `epic:next` の次の答えに任せない。** 終わらなかった子は `in-progress` を付けたままであり、`epic:next` はそれをブロッカーより先に「時間で解ける」と分類する（`scripts/epic/epic-classify.ts`）。放っておくと親は 90 分の stale 判定までポーリングするだけで、何も学ばない。**実行単位が返った直後に `pnpm josh issue:state <N>`（別リポジトリの子なら `--repo <owner/repo>` を付ける）を読み、`CLOSED` でなければ失敗として扱う** — ラベルを親が外し、連続失敗のガードに数え、人が要るなら park する。

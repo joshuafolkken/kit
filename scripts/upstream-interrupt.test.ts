@@ -32,7 +32,7 @@ const GATE_MARKERS: ReadonlyArray<string> = [
 const THIRD_PARTY_MARKERS: ReadonlyArray<string> = [
 	'Third-party repositories are Tier C',
 	'Decide which side a target is on mechanically, never by judgement',
-	'`gh repo view --json owner --jq .owner.login`',
+	'`gh api repos/{owner}/{repo} --jq .owner.login`',
 	'everything else is third-party',
 	'First-party targets are unchanged',
 	'Third-party targets are Tier C for every kind of write',

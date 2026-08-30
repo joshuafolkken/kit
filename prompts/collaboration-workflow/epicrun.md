@@ -13,7 +13,7 @@
 そのため `epicrun #<N>` の実行中に前提 Issue または分割が判明しても、**停止しない**。
 
 1. 新規 Issue を起票する（確認しない。バッチの承認はキーワードの時点で与えられている）
-2. **作業中の変更を stash し、`#<N>` から `in-progress` を外す。** 「実行中に前提 Issue が判明した場合」の手順 2 と 4 とまったく同じで、`-u` 付きの `git stash push -u -m "..."`（新規の `*.test.ts` は untracked である）、stash の存在を伝える `gh issue comment <N>`、`gh issue edit <N> --remove-label "in-progress"` の 3 つとも要る。理由も同じで、作業ツリーは既定ブランチで汚れており次の子は `git switch main && git pull` から始まること、`epic:next` が `in-progress` の付いた子を blocker を見る前に「時間で解ける」と分類するため `#<N>` が二度と候補にならず EPIC が詰まること、の 2 点である。**経路が新しいだけで、要る手当ては変わらず、どれも省略できない**
+2. **作業中の変更を stash し、`#<N>` から `in-progress` を外す。** 「実行中に前提 Issue が判明した場合」の手順 2 と 4 とまったく同じで、`-u` 付きの `git stash push -u -m "..."`（新規の `*.test.ts` は untracked である）、stash の存在を伝える `gh api repos/{owner}/{repo}/issues/<N>/comments`、`gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true` の 3 つとも要る。理由も同じで、作業ツリーは既定ブランチで汚れており次の子は `git switch main && git pull` から始まること、`epic:next` が `in-progress` の付いた子を blocker を見る前に「時間で解ける」と分類するため `#<N>` が二度と候補にならず EPIC が詰まること、の 2 点である。**経路が新しいだけで、要る手当ては変わらず、どれも省略できない**
 3. **作る前に `pnpm josh epic:bundle <N>` で、既に `#<N>` を追跡している EPIC が無いかを確かめる。** どの EPIC かを名乗る（`#893 already tracks this issue`）。`epicrun` に渡された素の Issue が、既に誰かの EPIC の子であることはありうる——`#893` の子である `#943` に対して `epicrun #943` と打つことを止めるものは無い——そこで 2 つ目の EPIC を作ると、どちらの自動クローズも他方を知らないまま動く。しかも**人が見ていない入口で**起きる。
 
    | 答え                                                                                                                                                     | すること                                                                                                                                                              |
@@ -59,9 +59,11 @@ pnpm josh delegate epic-child   # → delegate
 
 **親が読むのは要約ではなく GitHub の状態である。** これが `epic-child` の検証経路であり、委譲が成立する条件そのものである。実行単位が「終わった」と返しても PR がマージされていなければ、その子は `CLOSED` になっていない。子自身の検証ゲート・`/code-review`・CI は実行単位の中で走り、`pnpm josh followup --merge` はそれらが緑でなければ PR に触れない。**要約を信じて次へ進む形にしてはならない** — それは検証経路を捨てることであり、捨てた時点で `epic-child` は委譲してよい単位ではなくなる。
 
-**確認は `epic:next` の次の答えではなく、子の状態を直接読む。** 終わらなかった子は `in-progress` を付けたままであり、`epic:next` はそれをブロッカーより先に「時間で解ける」と分類するため、番号ではなく `wait` を返す。それを検証だと思い込んだループは、失敗を学ぶ代わりに 90 分の stale 判定までポーリングする。**実行単位が返った直後に `gh issue view <N> --json state,labels` を読む。**
+**確認は `epic:next` の次の答えではなく、子の状態を直接読む。** 終わらなかった子は `in-progress` を付けたままであり、`epic:next` はそれをブロッカーより先に「時間で解ける」と分類するため、番号ではなく `wait` を返す。それを検証だと思い込んだループは、失敗を学ぶ代わりに 90 分の stale 判定までポーリングする。**実行単位が返った直後に `pnpm josh issue:state <N>` を読む。** 子が別リポジトリにあるなら `--repo <owner/repo>` を必ず付ける — 付けなければ `<N>` は自リポジトリで解決され、たまたま同じ番号を持つ無関係な Issue を確認したことになる。その Issue はたいてい実在するので、誤りは黙って通る。
 
-**`CLOSED` 以外を一括りに失敗としない。** 見分けるのはラベルである。
+**非ゼロ終了は `OPEN` ではない。** `pnpm josh issue:state` は、番号が何にも解決しないとき（`does not resolve`）と、読み取り自体が失敗したとき（`could not read`）に、状態を印字せず非ゼロで終わる。後者はレート制限や認証切れであって子について何も言っていないので、終わらなかった子として扱うと環境障害を連続失敗のガードに数えることになる。判断の前に読み直す。
+
+**`CLOSED` 以外を一括りに失敗としない。** 見分けるのは同じ出力の `labels:` 行である。
 
 - **open ＋ `needs-decision`** — 実行単位が park した。これは失敗ではない。ラベルはそのまま残し、**連続失敗のガードには数えず**、次の子へ進む。park が 3 回続くのは普通の epic であり、数えれば環境障害として打ち切ってしまう
 - **open ＋ `needs-decision` 無し** — 失敗である。`in-progress` を親が外し（Tier A）、連続失敗のガードに数え、**その子を park する**。ガードの表が定める「連続していない失敗はその子を park してランを続ける」は委譲した子にも同じく適用される。park しなければ次の `epic:next` が同じ子を返し、間に成功が挟まるたびにカウンタが戻るため、上限なく再試行され続ける
@@ -207,7 +209,7 @@ answer=$(pnpm josh auto-ok:next --exclude <N>,<M>) # そのセッションで既
 **ラベルは、人が付ける前に存在していなければならない。** 自動で作られるものは無く、存在しないことはエラーでもない — `gh` は空の一覧を返し、`auto-ok:next` は `none` と答え、ランはこの節が無かったときとまったく同じに終わる。**オプトインが無いことが既定である。** 使うリポジトリで一度だけ作る。
 
 ```bash
-gh label create "auto-ok" --color "0e8a16" --description "Opted in to unattended execution outside an epic"
+gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
 ```
 
 ### ガード（暴走の上限）

@@ -171,7 +171,7 @@ epicrun joshuafolkken/kit#858
 - **One definition, every entry point.** `epicrun` already accepted `owner/repo#E`; the other four
   were left behind. The prefix goes where `#N` goes, so no new keyword is added, and `owner/repo#new`
   stands in the same slot as `owner/repo#N`.
-- **A short name expands by prefixing the session repository's owner** — `gh repo view --json owner
+- **A short name expands by prefixing the session repository's owner** — `gh api repos/{owner}/{repo}
   --jq .owner.login` — and **never by searching kit#869's map**, which answers where a checkout is
   rather than which repository is meant. A short name therefore satisfies the first-party test (owner
   equality) by construction, and a repository that is not checked out here is still a valid `kickoff`
@@ -186,11 +186,12 @@ epicrun joshuafolkken/kit#858
   procedure belongs to an upstream defect found mid-run. Being able to pass `-R` is not
   authorization.
 - **No prefix leaves the behavior exactly as it was** — the target is the session's repository.
-- **`kickoff` needs no checkout**: give every `gh` call `-R <owner/repo>`, reads included — a
-  `gh issue view` without it silently plans against this repository's issue of that number — and
-  never clone. The one exception is the split path's epic, since `pnpm josh epic` only writes the
-  repository it runs in — run it in that repository's checkout, or fall back to `gh label create
-  "epic" … -R` followed by `gh issue create --label epic -R`, and report that `epic:check` could not
+- **`kickoff` needs no checkout**: name the target repository in the path of every `gh api` call,
+  reads included — a read left on `repos/{owner}/{repo}` silently plans against this repository's issue of
+  that number — and never clone. The one exception is the split path's epic, since `pnpm josh epic`
+  only writes the repository it runs in — run it in that repository's checkout, or fall back to
+  `gh api repos/<owner/repo>/labels …` followed by
+  `gh api repos/<owner/repo>/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>"`, and report that `epic:check` could not
   be run. **The promote arm has no such fallback**: `--promote` writes
   only its own repository too, and creating an epic instead would leave `#N` neither promoted nor
   tracked, so with no checkout there, file the children and stop.

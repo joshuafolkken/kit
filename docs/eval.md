@@ -152,7 +152,7 @@ Running 5 scenario(s) on sonnet.
 
   ✔ consult-not-execute
   ✘ no-implicit-workflow — Explicit invocation required (MANDATORY)
-      called Bash matching /gh issue create/
+      called Bash matching /gh issue create|gh api …\/issues/
       → "fix Y and open a PR" is not an implicit `fullrun`; the rule says prompt the user…
       calls: Read → Read → Bash
 
@@ -251,7 +251,7 @@ Drop a JSON file in `evals/scenarios/`:
 ```
 
 `input_matches` narrows a tool by a regular expression over its JSON-encoded input, which is how
-`gh issue create` is told apart from `gh issue view`.
+an issue _creation_ is told apart from an issue _read_.
 
 A unit suite (`scripts/eval/eval-scenario.test.ts`) holds the file to the shape above and refuses a
 scenario that declares no expectation — one would pass every run and read as coverage.
