@@ -34,7 +34,23 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 	return defineConfig(
 		includeIgnoreFile(fileURLToPath(gitignore_path)),
 		{
-			ignores: ['node_modules/**', '*.config.{ts,js,cjs,mjs}'],
+			// joshuafolkken/kit#1112: `.claude/worktrees/` is where Claude Code puts its bridge work
+			// trees — a full checkout of the project, carrying its own repository root. Linted, every
+			// one of its TypeScript files fails to parse: typescript-eslint finds two candidate
+			// `tsconfigRootDir`s, the project's and the work tree's, and refuses to choose. The work
+			// trees are created and removed on their own, so the same commit lints green or red
+			// depending on whether one happens to exist, which reads as an unstable linter rather
+			// than as a scope problem.
+			//
+			// It is listed here rather than left to `includeIgnoreFile` above, because git excludes
+			// these through `.git/info/exclude` — a per-checkout file that is never committed and
+			// that nothing outside git reads. The same gap published them to npm until
+			// joshuafolkken/kit#1107 narrowed `files`; this is that gap's other half, and the fix has
+			// to live in the shared config so every consumer inherits it.
+			// `**/` anchors nowhere: a monorepo puts a package's work trees at
+			// `packages/<name>/.claude/worktrees/`, and a root-anchored pattern lints every one of
+			// them. It is the spelling git's own exclude uses, for the same reason.
+			ignores: ['node_modules/**', '**/.claude/worktrees/**', '*.config.{ts,js,cjs,mjs}'],
 		},
 		js.configs.recommended,
 		...ts.configs.strictTypeChecked,
