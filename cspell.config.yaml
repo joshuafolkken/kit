@@ -6,8 +6,9 @@ words:
   - refspec
   - issuecomment
   - toolkits
+  # `worktrees` is not here: it appears in a skill `josh sync` copies, so it lives in the
+  # distributed dictionary instead (joshuafolkken/kit#1092). The singular reaches no copied file.
   - worktree
-  - worktrees
   - gitdir
   - commondir
   - precheck
@@ -38,8 +39,8 @@ words:
   - waneccha
   - ENOENT
   - ELIFECYCLE
-  # The eval suite: its directory name, and the id prefix the API gives a tool_use block.
-  - evals
+  # The id prefix the API gives a tool_use block. The eval suite's directory name, `evals`, is in
+  # the distributed dictionary instead — a copied skill cites it (joshuafolkken/kit#1092).
   - toolu
   # In the wrangler stack traces quoted verbatim in `scripts/e2e-retry-check-crash-fixture.ts`. Not
   # in the distributed dictionary beside `workerd`, because that fixture is one of the `*-fixture.ts`

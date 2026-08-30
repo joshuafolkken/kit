@@ -94,3 +94,9 @@ words:
   - entrancy
   - startswith
   - unreviewed
+  # Words the skills `josh sync` copies into a consumer use. They belong here rather than in kit's
+  # own `cspell.config.yaml`, because a consumer spell-checks the copies and resolves them only
+  # through this dictionary (joshuafolkken/kit#1092). `scripts/cspell-distributed-words.test.ts` is
+  # what keeps the two in step.
+  - worktrees
+  - evals
