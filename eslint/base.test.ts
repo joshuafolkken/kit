@@ -204,3 +204,23 @@ describe('create_base_config — require-await', () => {
 		expect(rules['@typescript-eslint/require-await']).toBe('off')
 	})
 })
+
+// joshuafolkken/kit#1112: asserted through the linter's own ignore resolution rather than by
+// matching the glob in the config, because what has to hold is that eslint does not open the file —
+// and a glob that reads correctly can still miss, since these paths are relative to the project
+// root while a work tree's files are addressed through it. The second expectation is the other half
+// of the same claim: an exclusion wide enough to catch a work tree must not reach the project's own
+// sources, which sit one directory away from it.
+describe('create_base_config — nested checkouts', () => {
+	const WORKTREE_FILE = '.claude/worktrees/bridge-example/env/index.js'
+	// A monorepo puts a package's work trees here, and a root-anchored pattern would lint them all.
+	const NESTED_WORKTREE_FILE = 'packages/web/.claude/worktrees/bridge-example/env/index.js'
+
+	it('does not lint a bridge work tree, and still lints the project', async () => {
+		const linter = new ESLint({ cwd: REPO_ROOT })
+
+		expect(await linter.isPathIgnored(WORKTREE_FILE)).toBe(true)
+		expect(await linter.isPathIgnored(NESTED_WORKTREE_FILE)).toBe(true)
+		expect(await linter.isPathIgnored(SOURCE_FILE)).toBe(false)
+	})
+})
