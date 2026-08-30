@@ -178,7 +178,7 @@ async function close_epic_with(epic_number: string, comment: string | undefined)
 // `absent` and one of `unreadable` both post it, and the second says so.
 async function close_epic(epic: EpicIssue): Promise<void> {
 	const epic_number = String(epic.number)
-	const state = await git_epic_close_comment.read_close_comment_state(epic_number)
+	const state = await git_epic_close_comment.read_close_comment_state(epic_number, epic)
 
 	if (state === 'unreadable') console.info(`ℹ️  Epic #${epic_number}${UNREADABLE_COMMENTS_NOTE}`)
 
