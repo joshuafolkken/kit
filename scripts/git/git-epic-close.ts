@@ -5,8 +5,19 @@ import { EPIC_LABEL } from './issue-labels'
 import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-json-array'
 import { epic_child_schema, epic_issue_schema, type EpicChildData } from './schemas'
 
-// `gh issue list` defaults to 30 rows. Epics are few, but an implicit cap would silently skip the
-// oldest ones, so the limit is stated rather than inherited.
+// How many open epics the auto-close will look at, and — since joshuafolkken/kit#1025 made the
+// listing REST — the only thing that bounds the request it makes. `git-gh-issue-list.ts` pages until
+// `limit` rows have been selected or the backlog runs out, and its page ceiling (`MAX_PAGES`,
+// joshuafolkken/kit#1033) applies to the body search alone, so without this number the check would
+// read every open epic on every merge. 100 is `PER_PAGE`, which keeps the ordinary case at exactly
+// one request.
+//
+// The listing is newest-first and the surplus is cut off the tail, so a repository holding more open
+// epics than this loses the oldest — and loses them silently: nothing here compares the row count
+// against the limit the way `epic:bundle` does. The `is_capped` flag the paging computes is not that
+// check and answers `false` here by construction, since a listing that filled `limit` is exactly the
+// case it treats as complete. That is why the value sits well above the number of epics ever open at
+// once rather than close to it.
 const EPIC_LIST_LIMIT = 100
 
 interface EpicIssue {
