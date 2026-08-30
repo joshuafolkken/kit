@@ -81,9 +81,12 @@ describe('epic_audit_orphans.claims_parent', () => {
 		expect(claims('親: joshuafolkken/app-kit#858')).toBe(false)
 	})
 
-	// `gh issue list --json body` answers with JSON null for an issue that has none.
-	it('handles a body gh reported as null', () => {
-		// eslint-disable-next-line unicorn/no-null -- the shape gh's JSON actually produces
+	// REST answers JSON null for an issue with no body, and `git-gh-issue-rest.ts` maps that to an
+	// empty string before a search row reaches here — so the null is what `searched_issue_schema` and
+	// `claims_parent` still admit rather than a shape the listing delivers, and this pins that the
+	// tolerance holds.
+	it('handles a body reported as null', () => {
+		// eslint-disable-next-line unicorn/no-null -- the shape the schema still admits
 		expect(claims(null)).toBe(false)
 	})
 })

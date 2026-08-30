@@ -182,8 +182,11 @@ describe('josh auto-ok:next — an issue whose prerequisite is still open', () =
 	})
 })
 
-// `gh` returns `blockedBy(first:50)`, so `nodes` is a page while `totalCount` is exact — and the
-// guard fails open by construction, so what it is given matters as much as what it does with it.
+// The relations come from each issue's own `dependencies/blocked_by` endpoint, one page of a hundred,
+// while `totalCount` is the exact figure the issue's own dependency summary reports
+// (`git-gh-issue-read.ts`) — so `nodes` is a page while `totalCount` is exact, as it was under
+// GraphQL's `blockedBy(first:50)`. The guard fails open by construction, so what it is given matters
+// as much as what it does with it.
 describe('josh auto-ok:next — what the guard is given', () => {
 	// The guard fails open by construction: a candidate with no `blockedBy` at all is runnable, which
 	// is right for an issue that declares no blockers and wrong for a query that stopped asking for
