@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const exec_file_mock = vi.hoisted(() => vi.fn())
+const repo_get_name_with_owner_mock = vi.hoisted(() => vi.fn())
 const issue_get_title_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('node:child_process', () => ({ execFile: exec_file_mock }))
-vi.mock('node:util', () => ({
-	promisify: (function_: unknown) => function_,
-	parseArgs: vi.fn().mockReturnValue({ values: {} }),
+vi.mock('node:util', () => ({ parseArgs: vi.fn().mockReturnValue({ values: {} }) }))
+vi.mock('../scripts/git/git-gh-repo', () => ({
+	git_gh_repo: { repo_get_name_with_owner: repo_get_name_with_owner_mock },
 }))
 vi.mock('../scripts/git/git-gh-issue-read', () => ({
 	git_gh_issue_read: { issue_get_title: issue_get_title_mock },
@@ -16,7 +15,7 @@ vi.mock('../scripts/git/telegram-notify', () => ({
 }))
 vi.mock('./environment-loader', () => ({ load_optional_environment: vi.fn() }))
 
-const REPO_RESPONSE = { stdout: 'owner/my-repo\n', stderr: '' }
+const REPO_NAME_WITH_OWNER = 'owner/my-repo'
 const ISSUE_TITLE = 'Fix login bug'
 const OTHER_REPO_ISSUE_URL = 'https://github.com/joshuafolkken/joshuafolkken-com/issues/431'
 const OTHER_REPO = 'joshuafolkken-com'
@@ -37,21 +36,31 @@ const WORKING_DIRECTORY_REPO = 'my-repo'
 const { telegram_test } = await import('./telegram-test')
 
 beforeEach(() => {
-	exec_file_mock.mockReset()
+	repo_get_name_with_owner_mock.mockReset()
 	issue_get_title_mock.mockReset()
 })
 
 describe('telegram_test.fetch_repo_name — the working directory lookup', () => {
 	it('returns only the repo name part after the slash', async () => {
-		exec_file_mock.mockResolvedValue(REPO_RESPONSE)
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
 
 		expect(await telegram_test.fetch_repo_name()).toBe('my-repo')
 	})
 
-	it('returns undefined when gh command throws', async () => {
-		exec_file_mock.mockRejectedValue(new Error('not found'))
+	it('returns undefined when the repository could not be read', async () => {
+		repo_get_name_with_owner_mock.mockResolvedValue(undefined)
 
 		expect(await telegram_test.fetch_repo_name()).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#1063: this was a `gh repo view` spawn, which goes through GraphQL and is
+	// answered 403 in a cloud session — so the notification header lost its repository name there.
+	it('reads the name through the REST repository reader', async () => {
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
+
+		await telegram_test.fetch_repo_name()
+
+		expect(repo_get_name_with_owner_mock).toHaveBeenCalledWith()
 	})
 })
 
@@ -101,7 +110,7 @@ describe('telegram_test.resolve_context — the issue URL names the repository',
 
 		await telegram_test.resolve_context({ 'issue-url': OTHER_REPO_ISSUE_URL })
 
-		expect(exec_file_mock).not.toHaveBeenCalled()
+		expect(repo_get_name_with_owner_mock).not.toHaveBeenCalled()
 		expect(issue_get_title_mock).toHaveBeenCalledWith(
 			OTHER_REPO_ISSUE_NUMBER,
 			OTHER_REPO_NAME_WITH_OWNER,
@@ -136,7 +145,7 @@ describe('telegram_test.resolve_context — an explicit title answers already', 
 
 describe('telegram_test.resolve_context — no issue URL to read', () => {
 	it('falls back to the working directory repository', async () => {
-		exec_file_mock.mockResolvedValue(REPO_RESPONSE)
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
 
 		const result = await telegram_test.resolve_context({})
 
@@ -145,7 +154,7 @@ describe('telegram_test.resolve_context — no issue URL to read', () => {
 	})
 
 	it('falls back for a URL that is not a GitHub issue URL', async () => {
-		exec_file_mock.mockResolvedValue(REPO_RESPONSE)
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
 
 		const result = await telegram_test.resolve_context({ 'issue-url': NON_GITHUB_URL })
 
@@ -166,7 +175,7 @@ describe('telegram_test.resolve_context — the pull URL names the repository', 
 	it('never asks the working directory when a pull URL was given', async () => {
 		await telegram_test.resolve_context({ 'pr-url': OTHER_REPO_PULL_URL })
 
-		expect(exec_file_mock).not.toHaveBeenCalled()
+		expect(repo_get_name_with_owner_mock).not.toHaveBeenCalled()
 	})
 
 	// A pull URL names no issue, so there is no title to read from it — the title stays the
@@ -179,7 +188,7 @@ describe('telegram_test.resolve_context — the pull URL names the repository', 
 	})
 
 	it('falls back to the working directory for a URL that is not a pull URL', async () => {
-		exec_file_mock.mockResolvedValue(REPO_RESPONSE)
+		repo_get_name_with_owner_mock.mockResolvedValue(REPO_NAME_WITH_OWNER)
 
 		const result = await telegram_test.resolve_context({ 'pr-url': NON_GITHUB_URL })
 
