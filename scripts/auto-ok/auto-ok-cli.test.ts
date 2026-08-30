@@ -177,18 +177,28 @@ describe('josh auto-ok:next — a listing it could not read is not an empty one'
 	// Valid JSON, valid array, wrong elements: the zod rejection would otherwise escape as a stack
 	// trace instead of the sentence this command exists to print. Since joshuafolkken/kit#996 it is
 	// also the one case that names the field list rather than the authentication.
-	it('exits non-zero when gh answered a listing whose rows are the wrong shape', async () => {
+	it('exits non-zero when the listing rows are the wrong shape', async () => {
 		issue_list.mockResolvedValueOnce(listing_outcome('[{"unexpected":true}]'))
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
 		expect(stdout()).toBe('')
 		expect(stderr()).toContain(auto_ok_cli.UNEXPECTED_SHAPE_MESSAGE)
 	})
+
+	// joshuafolkken/kit#1069: the listing has been REST since joshuafolkken/kit#1025 and
+	// `git-gh-issue-list.ts` builds the JSON this command parses, so the CLI's version cannot be what
+	// changed the row shape. Sending a reader to `gh --version` is the misdirection kit#996 removed
+	// from the access message, standing one constant away from where kit#1005 removed it again.
+	it('sends a wrong row shape to the field mapping rather than to the CLI version', () => {
+		expect(auto_ok_cli.UNEXPECTED_SHAPE_MESSAGE).not.toContain('gh --version')
+		expect(auto_ok_cli.UNEXPECTED_SHAPE_MESSAGE).toContain('git-gh-issue-rest.ts')
+	})
 })
 
 describe('josh auto-ok:next — a truncated listing says so', () => {
-	// `gh` lists newest first, so the cap drops the oldest opted-in issues. The answer is still an
-	// opted-in issue, which is why this warns rather than refusing.
+	// The listing is newest first — `git-gh-issue-list.ts` asks for `sort=created&direction=desc` on
+	// every request — so the cap drops the oldest opted-in issues. The answer is still an opted-in
+	// issue, which is why this warns rather than refusing.
 	it('warns when the listing filled the cap', async () => {
 		const rows = Array.from({ length: auto_ok_cli.LISTING_LIMIT }, (_value, index) =>
 			issue(index + 1, CREATED_EARLIER),
