@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { close_completed_epics, UNREADABLE_EPIC_LIST_MESSAGE } from './git-epic-close'
+import {
+	close_completed_epics,
+	UNREADABLE_COMMENTS_NOTE,
+	UNREADABLE_EPIC_LIST_MESSAGE,
+} from './git-epic-close'
+import { CLOSE_ANNOUNCEMENT } from './git-epic-close-comment'
 
 vi.mock('./git-gh-command', () => ({
 	git_gh_command: {
 		issue_list_by_label: vi.fn(),
 		issue_get_state_and_relations: vi.fn(),
+		issue_list_comments: vi.fn(),
 		issue_close: vi.fn(),
 	},
 }))
@@ -12,6 +18,7 @@ vi.mock('./git-gh-command', () => ({
 const { git_gh_command } = await import('./git-gh-command')
 const mocked_list = vi.mocked(git_gh_command.issue_list_by_label)
 const mocked_get_child = vi.mocked(git_gh_command.issue_get_state_and_relations)
+const mocked_comments = vi.mocked(git_gh_command.issue_list_comments)
 const mocked_close = vi.mocked(git_gh_command.issue_close)
 
 const GH_FAILURE = 'gh exploded'
@@ -34,9 +41,14 @@ function child_json(input: { state: string; blocked_by?: number }): string {
 const CLOSED_UNLINKED = child_json({ state: 'CLOSED' })
 const CLOSED_LINKED = child_json({ state: 'CLOSED', blocked_by: 1 })
 
+const NO_COMMENTS = '[]'
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	mocked_close.mockResolvedValue(true)
+	// The default is an epic nobody has announced yet, which is what every case below except the
+	// re-run ones is about.
+	mocked_comments.mockResolvedValue(NO_COMMENTS)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
@@ -351,5 +363,63 @@ describe('close_completed_epics — a listing that is genuinely empty', () => {
 		await close_completed_epics(MERGED)
 
 		expect(mocked_close).toHaveBeenCalledWith('200', expect.stringContaining(ALL_CHILDREN))
+	})
+})
+
+// joshuafolkken/kit#1039: `issue_close` posts the comment and *then* changes the state, so a run
+// whose comment landed and whose close was refused leaves the epic open carrying the announcement.
+// The next run reached the same point and posted it again — once per attempt, for as long as the
+// close kept failing. The state machine behind the check is `git-epic-close-comment.test.ts`; what
+// is pinned here is what the auto-close does with its answer.
+const POSTED_ANNOUNCEMENT = JSON.stringify([
+	{ body: `All child issues are closed (${ALL_CHILDREN}). ${CLOSE_ANNOUNCEMENT}` },
+])
+
+function complete_epic(): void {
+	mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
+	mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+}
+
+describe('close_completed_epics — a re-run after a partial close', () => {
+	// The whole sequence: the first run's comment lands and its close is refused, the second run finds
+	// the comment it left behind and closes without posting a second copy.
+	it('posts the announcement exactly once across a failed run and its retry', async () => {
+		complete_epic()
+		mocked_close.mockResolvedValueOnce(false)
+
+		await close_completed_epics(MERGED)
+		mocked_comments.mockResolvedValue(POSTED_ANNOUNCEMENT)
+		await close_completed_epics(MERGED)
+
+		const posted = mocked_close.mock.calls.filter(([, comment]) => comment !== undefined)
+
+		expect(posted).toHaveLength(1)
+		expect(mocked_close).toHaveBeenLastCalledWith('200', undefined)
+	})
+
+	// One request, and only on a run that has already found every child closed. An incomplete batch
+	// never gets that far, which is what keeps the ordinary `josh followup` run costing nothing.
+	it('never reads the comments of an epic whose batch is incomplete', async () => {
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
+		mocked_get_child.mockResolvedValue(child_json({ state: 'OPEN' }))
+
+		await close_completed_epics(MERGED)
+
+		expect(mocked_comments).not.toHaveBeenCalled()
+	})
+})
+
+// Nothing re-triggers the auto-close once every child is closed, so refusing here would strand a
+// finished epic on one rate-limited read. Announcing twice costs one redundant comment; the epic
+// still closes, which is what ends the repetition this fix is about.
+describe('close_completed_epics — comments that could not be read', () => {
+	it('closes and announces anyway rather than stranding a finished epic', async () => {
+		complete_epic()
+		mocked_comments.mockResolvedValue(undefined)
+
+		await close_completed_epics(MERGED)
+
+		expect(mocked_close).toHaveBeenCalledWith('200', expect.stringContaining(ALL_CHILDREN))
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(UNREADABLE_COMMENTS_NOTE))
 	})
 })

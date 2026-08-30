@@ -17,12 +17,12 @@ import {
 // `gh issue view --json blockedBy` answered them in the same response because GraphQL selects them
 // as a connection; REST needs a second request (joshuafolkken/kit#1024).
 //
-// A page of a hundred, where GraphQL asked for `blockedBy(first:50)` — so `nodes` is at least as
-// complete as it was — while `totalCount` comes from the issue's own dependency summary and stays
-// exact whatever the page holds. The endpoint itself is named in `git-gh-api-path.ts`, which the two
-// writes address as well (joshuafolkken/kit#1026).
-const BLOCKED_BY_QUERY = '?per_page=100'
-
+// One page of a hundred — `FULL_PAGE_QUERY`, the same one every other listing here asks for — where
+// GraphQL asked for `blockedBy(first:50)`, so `nodes` is at least as complete as it was, while
+// `totalCount` comes from the issue's own dependency summary and stays exact whatever the page
+// holds. The endpoint itself is named in `git-gh-api-path.ts`, which the two writes address as well
+// (joshuafolkken/kit#1026).
+//
 // The request is skipped when the issue's own summary says the count is zero, which is the common
 // case and the one that matters for cost: `epic:bundle` reads relations for the whole open backlog,
 // up to two hundred issues, and every one of those reads names `blockedBy`. Without the skip the
@@ -41,7 +41,7 @@ async function read_blocked_by(
 	if (exact_total === 0) return git_gh_issue_rest.empty_blocked_by()
 
 	const json = await git_gh_exec.exec_gh_api({
-		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${BLOCKED_BY_QUERY}`,
+		path: `${git_gh_api_path.blocked_by_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`,
 	})
 
 	return git_gh_issue_rest.to_blocked_by(json, exact_total)
@@ -207,6 +207,35 @@ async function issue_get_labels_and_body(issue_number: string): Promise<string |
 	return await issue_view_json(issue_number, 'number,labels,body')
 }
 
+// The conversation comments of one issue, as REST serves them. `undefined` — never `'[]'` — when the
+// listing could not be read: the one caller has to tell "this epic carries no closing comment" from
+// "nobody looked", because posting on the second answer is the duplicate it exists to prevent
+// (joshuafolkken/kit#1039).
+//
+// Paged, and for the same reason `pr_get_comments` is: REST answers 30 rows and an epic's
+// conversation outgrows that, while the comment being looked for is the **newest** one — so an
+// unpaged read would miss exactly the comment it is asking about. The endpoint answers a bare array,
+// which `--paginate` merges into one array, so nothing is slurped (`git-gh-exec.ts`).
+//
+// Deliberately not routed through `git-gh-pr-read.ts`'s `read_comments`, near-identical though the
+// request is: that one is keyed by **branch name** and exists to bridge gh's branch argument to
+// REST's number, and it maps the rows into the `gh --json` spelling its own callers read. This one
+// is already keyed by a number and wants the rows as served. What the two genuinely share — the path
+// and the page size — is single-sourced in `git-gh-api-path.ts` and read from there by both.
+//
+// No `repo` parameter, unlike the reads above: the auto-close lists its candidate epics from the
+// repository it runs in, so the epic whose comments are read is always a local one. The path builder
+// takes one when a caller that needs it appears.
+async function issue_list_comments(issue_number: string): Promise<string | undefined> {
+	const path = `${git_gh_api_path.issue_comments_api_path(issue_number)}${git_gh_api_path.FULL_PAGE_QUERY}`
+
+	try {
+		return await git_gh_exec.exec_gh_api({ path, should_paginate: true })
+	} catch {
+		return undefined
+	}
+}
+
 const git_gh_issue_read = {
 	issue_get_title,
 	issue_get_body,
@@ -216,6 +245,7 @@ const git_gh_issue_read = {
 	issue_get_plan_fields,
 	issue_get_plan_fields_classified,
 	issue_get_labels_and_body,
+	issue_list_comments,
 }
 
 export type { IssueRead }
