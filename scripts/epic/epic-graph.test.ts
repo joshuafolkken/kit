@@ -72,8 +72,8 @@ describe('epic_graph.missing_relations', () => {
 		expect(epic_graph.missing_relations(links, [child(1), child(2, [1])])).toEqual([])
 	})
 
-	// gh older than 2.94.0 cannot record the relation at all, so this is the ordinary way the two
-	// drift apart.
+	// An epic written before `josh` recorded the relations, or one whose recording failed, is the
+	// ordinary way the two drift apart.
 	it('reports a declaration with no matching relation', () => {
 		const links = [{ blocker: 1, blocked: 2 }]
 

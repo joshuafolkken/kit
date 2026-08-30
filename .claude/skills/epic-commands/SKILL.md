@@ -126,9 +126,9 @@ another's is waiting for a release to publish, nothing carries `in-progress` or 
 and a label-based reading calls that "done" in the one moment it must wait.
 
 Two things stop the command rather than being worked around: a **circular dependency**, and a
-**disagreement between the epic body and the `blocked-by` relations** (routine, since `gh` older than
-2.94.0 cannot record a relation at all). Only a line that is *nothing but* a chain counts as a
-declaration — a prose line recommending an execution order is a suggestion, not a dependency.
+**disagreement between the epic body and the `blocked-by` relations** (an epic written before `josh`
+recorded them, a recording that failed, or a relation hand-added since). Only a line that is
+*nothing but* a chain counts as a declaration — a prose line recommending an execution order is a suggestion, not a dependency.
 
 ## Epics that span repositories
 

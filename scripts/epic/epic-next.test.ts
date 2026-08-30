@@ -153,8 +153,9 @@ describe('epic_next.decide', () => {
 		expect(epic_next.decide(snapshot([closed])).verdict).toBe('complete')
 	})
 
-	// The body declares an order the relations do not record — gh older than 2.94.0 produces exactly
-	// this, and following either silently would implement in an order nobody agreed to.
+	// The body declares an order the relations do not record — an epic written before `josh` recorded
+	// them produces exactly this, and following either silently would implement in an order nobody
+	// agreed to.
 	it('stops on a disagreement between the body and the relations', () => {
 		const result = epic_next.decide(snapshot([child(1), child(2)], DEPENDENCIES_BODY))
 
