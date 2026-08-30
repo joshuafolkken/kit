@@ -330,6 +330,46 @@ SECURITY.md         tsconfig.sonar.json
 > "Bash(git commit -a*)", "Bash(git commit --all*)", "Bash(gh pr merge*)"
 > ```
 >
+> **The REST era gave every write a second spelling, and joshuafolkken/kit#1022 left the deny list
+> matching only the first.** `gh <noun> <verb>` was the shape the entries above were written
+> against; once the merge became `PUT repos/{owner}/{repo}/pulls/<N>/merge`, `Bash(gh pr merge*)`
+> stopped covering the command the tooling actually runs, and `CLAUDE.md` was left claiming a
+> guarantee the file no longer provided. joshuafolkken/kit#1054 corrected the prose;
+> joshuafolkken/kit#1062 audited the whole list and closed what a pattern can close:
+>
+> ```json
+> "Bash(gh api *pulls/*/merge*)", "Bash(gh api graphql*mergePullRequest*)",
+> "Bash(git push *--force*)", "Bash(git push * -f)", "Bash(git push * -f *)",
+> "Bash(git push * +*)", "Bash(git push *--delete*)", "Bash(git push -d*)",
+> "Bash(git push * -d)", "Bash(git push * -d *)", "Bash(git branch -d*)",
+> "Bash(git branch -D*)", "Bash(git branch --delete*)",
+> "Bash(gh api *DELETE*git/refs/heads/*)", "Bash(gh api *git/refs/heads/*DELETE*)"
+> ```
+>
+> The merge entries match the **path**, not the method: `-X PUT` may be written before or after it,
+> and an entry pinned to one ordering leaves the other open. That also refuses a `GET` of the same
+> path, which is the accepted cost — merge state is read from `pulls/{N}` instead. The force-push and
+> branch-deletion entries exist because `CLAUDE.md` forbids all three shared-state mutations in one
+> sentence while only one spelling of one of them was denied: `git push origin main --force` put the
+> flag after the arguments and walked straight past `Bash(git push --force*)`, and branch deletion
+> had no entry at all. **Each flag git spells two ways is denied both ways, in both positions** —
+> `--force` and `-f`, `--delete` and `-d` — plus `+<ref>`, which force-updates a branch with no flag
+> at all. The short-flag entries carry a leading space (`git push * -f`) so a branch whose name ends
+> in `-f` can still be pushed; written as `*-f` they would match that branch name and block the
+> manual push the recovery path depends on. **A grouped short flag is the spelling that still gets
+> through** — `git push -uf origin main` matches none of them, because the glob has only `*` and
+> cannot say "inside the first token", and every approximation that catches `-uf` also catches an
+> ordinary push. It is left to the prose rule rather than closed with a pattern that would strand a
+> run. No josh step deletes a branch or force-pushes, so none of this constrains the workflow.
+>
+> **A rule cannot match a literal `:`.** Measured against the running harness, not inferred: an entry
+> containing `=` or `+` matched exactly what it named, and every entry containing `:` matched nothing
+> at all — the character is grammar in the rule syntax (the `:*` trailing-wildcard form).
+> `Bash(git push origin :*)` refuses neither `git push origin :branch` nor `git push origin main`; it
+> is simply dead. So `git push origin :branch`, the colon-refspec spelling of a branch deletion,
+> cannot be denied and is left to the prose rule. An entry carrying a colon would ship as a guard
+> that was never in force, which is why `claude-settings.test.ts` fails one.
+>
 > **No josh step is affected.** `pnpm josh git` and `pnpm josh followup --merge` run git and gh from
 > inside node scripts, so the only command string the Bash matcher ever sees is the `pnpm josh …`
 > wrapper — denying the direct forms leaves the entire commit-and-merge workflow intact. `git rm` is
