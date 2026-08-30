@@ -227,9 +227,11 @@ const RETIRED_PROMPT = 'prompts/git-automation.md'
 const OPERATING_RULES = 'prompts/collaboration-workflow/operating-rules.md'
 const FOLLOWUP_SKILL = '.claude/skills/workflow-commands/followup.md'
 const UNSHIPPED_DOC = 'docs/sync.md'
-// The directory Claude Code keeps its runtime state in, and the one path under it the package
-// distributes — `.claude/settings.json` is the other, and `init-logic.ts` names both.
+// The directory Claude Code keeps its runtime state in, and the two paths under it the package
+// distributes. `init-logic.ts` copies from exactly these two — `.claude/settings.json`, and each
+// skill directory by name — and nothing else under `.claude` is the package's to ship.
 const CLAUDE_ROOT = '.claude'
+const SHIPPED_CLAUDE_SETTINGS = '.claude/settings.json'
 const SHIPPED_CLAUDE_SKILLS = '.claude/skills'
 // Well under the count at the time of writing (53), so an ordinary addition or removal does not
 // touch it while a directory dropping out of the scan does.
@@ -279,6 +281,7 @@ describe('gh document guard — the distribution as it stands', () => {
 	// add to: a blocklist is stale the first time a release invents a file, and each new name would
 	// be found the way these were — by a document guard failing on a document nobody wrote.
 	it('ships the two paths of `.claude` it distributes, not the directory', () => {
+		expect(manifest_files()).toContain(SHIPPED_CLAUDE_SETTINGS)
 		expect(manifest_files()).toContain(SHIPPED_CLAUDE_SKILLS)
 		expect(manifest_files()).not.toContain(CLAUDE_ROOT)
 	})
