@@ -15,8 +15,8 @@
 手順:
 
 1. **現在の作業を退避する**: `git stash`（WIP コミットでも可）。退避したことを忘れないよう、この時点で stash を作る
-2. **進行中の Issue に状況を明記する**: `gh issue comment <N> --body "..."` で、(a) 作業を stash したこと、(b) 中断理由（どの別パッケージの・どんな問題で中断したか）、(c) 対象パッケージに作成した新 Issue へのリンクを `## Upstream issues` 見出しの下に `owner/repo#N` 形式で、を記載する。これにより「なぜこの Issue が一時停止しているか」と「何を待っているのか」が後から監査できる（→「起票元へのバックリンク」）
-3. **対象パッケージのリポジトリに新しい Issue を作成する（確認なし）**: `gh issue create -R <owner>/<repo> --title "<root-cause title>" --body "<root cause and context>"`。根本原因・再現・期待結果を Step 1 のテンプレに沿って記載し、**本文に `## Origin` 節を置いて起票元 Issue を `owner/repo#N` 形式で書く**（→「起票元へのバックリンク」）。上流 Issue は欠陥を、起票元 Issue は証拠を持つため、リンクがないと上流 Issue は後から解釈できなくなる。ここで「起票してよいか」を尋ねて停止してはならない。**ただし確認なしで起票してよいのは対象が first-party のときだけ**で、third-party（owner が自リポジトリと一致しないリポジトリ）なら起票せずに停止する（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
+2. **進行中の Issue に状況を明記する**: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="..."` で、(a) 作業を stash したこと、(b) 中断理由（どの別パッケージの・どんな問題で中断したか）、(c) 対象パッケージに作成した新 Issue へのリンクを `## Upstream issues` 見出しの下に `owner/repo#N` 形式で、を記載する。これにより「なぜこの Issue が一時停止しているか」と「何を待っているのか」が後から監査できる（→「起票元へのバックリンク」）
+3. **対象パッケージのリポジトリに新しい Issue を作成する（確認なし）**: `gh api repos/<owner>/<repo>/issues -f title="<root-cause title>" -f body="<root cause and context>"`。根本原因・再現・期待結果を Step 1 のテンプレに沿って記載し、**本文に `## Origin` 節を置いて起票元 Issue を `owner/repo#N` 形式で書く**（→「起票元へのバックリンク」）。上流 Issue は欠陥を、起票元 Issue は証拠を持つため、リンクがないと上流 Issue は後から解釈できなくなる。ここで「起票してよいか」を尋ねて停止してはならない。**ただし確認なしで起票してよいのは対象が first-party のときだけ**で、third-party（owner が自リポジトリと一致しないリポジトリ）なら起票せずに停止する（→「第三者リポジトリへの書き込みは Tier C（明示指示が必要）」）
 4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と、何が止まっているかを本文に書く（→「確認待ちで停止するときの Telegram 通知（`confirmation`）」）。無人実行でも画面外でユーザーが気付ける。停止は Issue が既に存在する状態で行うので、ユーザーは「待つ / 先送りする」を Issue を見ながら 1 語で答えられる
 5. **元の作業を再開する**: 上流の修正がマージされた、または**ユーザーが先送りを明示判断した**後に `git stash pop` して、退避していた元タスクを続行する。上流 Issue を割り込みで実装するかどうかもユーザーの判断（上流パッケージの実装・PR・マージはそれぞれのワークフロー規則に従う）
 
@@ -24,7 +24,7 @@
 
 上の「起票は確認なし」は **first-party の集合**（kit / app-kit / game-kit / jgame）を前提に書かれている。トラッカーが自分たちのもので、重複起票のコストがバックログ 1 行で済むからである。**自分たちが所有しないリポジトリへの書き込みは、これとは別物**として扱う。
 
-- **判定は機械的に行い、判断に委ねない**: 対象リポジトリの owner が、いまセッションが動いているリポジトリの owner と一致すれば **first-party**（`gh repo view --json owner --jq .owner.login`）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る
+- **判定は機械的に行い、判断に委ねない**: 対象リポジトリの owner が、いまセッションが動いているリポジトリの owner と一致すれば **first-party**（`gh api repos/{owner}/{repo} --jq .owner.login`）。**それ以外は全て third-party** で、fork も、単に contribute しているだけの org リポジトリも third-party に入る
 - **first-party は従来どおり**: Tier A。確認なしで起票し、双方向バックリンクを書き、停止する。kit / app-kit / game-kit のフローに新しい摩擦は加わらない
 - **third-party は書き込みの種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビューのいずれも、**その turn におけるユーザーの明示指示**なしに行ってはならない。公開は外向きかつ実質不可逆で、Issue はユーザーの GitHub アカウント名義で公開され、watcher へ通知され、検索に載る。後からクローズしてもそのいずれも取り消せない。加えて、誰も差し出すと約束していないメンテナの時間を消費する
 - **third-party だと判明したときの手順**: (1) **自分たちの側の Issue** に証拠込みで所見を記録する。見出しは `## Upstream candidate` を使い、`## Upstream issues` は使わない（後者は「起票済み」を主張する見出しであるため）。(2) 報告本文の下書きをその Issue 内に用意し、ユーザーが 1 メッセージで承認できる状態にする。(3) 対象プロジェクト名と報告しようとしている内容を書いた `confirmation` Telegram を送って**停止する**

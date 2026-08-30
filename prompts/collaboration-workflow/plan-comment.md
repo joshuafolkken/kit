@@ -1,7 +1,7 @@
 ## Step 3: 計画コメントを記録して通知する
 
 1. 提案を人間が判断する
-2. 採用した計画を Issue に記録する（Issue body が空の場合は `gh issue edit <N> --body "<plan>"` で body に書き込む。body が既にある場合は `gh issue comment <N> --body "<plan>"` でコメント追加する）
+2. 採用した計画を Issue に記録する（Issue body が空の場合は `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f body="<plan>"` で body に書き込む。body が既にある場合は `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<plan>"` でコメント追加する）
 3. Telegram で計画開始を通知する:
 
    ```bash
@@ -49,7 +49,7 @@ pnpm josh git -y "<issue-title> #<issue-number>"
 
 > **Note**: Issue タイトルは `pnpm josh git` を実行する前に、簡潔で明瞭な英語に整えること。
 > 日本語で書かれている場合は英語に変換する。すでに英語で書かれている場合でも、文法・明確さ・簡潔さの観点で改善できるなら書き換えて良い（AI ツールは実装前にタイトル品質を判断する）。
-> いずれの場合も `gh issue edit <number> --title "<english-title>"` で GitHub Issue タイトルを合わせて更新する。
+> いずれの場合も `gh api -X PATCH repos/{owner}/{repo}/issues/<number> -f title="<english-title>"` で GitHub Issue タイトルを合わせて更新する。
 
 ### Recovery after failed push (pre-push hook blocked)
 

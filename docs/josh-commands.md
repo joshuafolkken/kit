@@ -407,7 +407,7 @@ pnpm josh notify --task-type failure --issue-url "https://..." --body="Build fai
 
 Task types: `planning` 📋 · `completion` ✅ · `failure` ❌ · `kickoff_retry` 🔄 · `confirmation` ⏸️
 
-**The repository in the header follows the URL the notification carries.** It is resolved in this order: an explicit `--repo-name`, then the repository the `--issue-url` names, then the repository the `--pr-url` names, then the repository the command is run in. The issue title is read from the `--issue-url`'s repository, so one URL is enough to describe an issue anywhere; a `--pr-url` names no issue, so it answers the repository only and no title is read from it (joshuafolkken/kit#994). Only a notification with no usable URL of either kind falls back to the working directory, which is what it always did. This matters wherever a workflow files an issue elsewhere and notifies about it — the upstream-interrupt rule opens the issue with `gh issue create -R <owner>/<repo>` and sends a `confirmation` right after, and the header used to name the repository the session happened to be running in while the link pointed upstream (joshuafolkken/kit#903).
+**The repository in the header follows the URL the notification carries.** It is resolved in this order: an explicit `--repo-name`, then the repository the `--issue-url` names, then the repository the `--pr-url` names, then the repository the command is run in. The issue title is read from the `--issue-url`'s repository, so one URL is enough to describe an issue anywhere; a `--pr-url` names no issue, so it answers the repository only and no title is read from it (joshuafolkken/kit#994). Only a notification with no usable URL of either kind falls back to the working directory, which is what it always did. This matters wherever a workflow files an issue elsewhere and notifies about it — the upstream-interrupt rule opens the issue with `gh api repos/<owner>/<repo>/issues` and sends a `confirmation` right after, and the header used to name the repository the session happened to be running in while the link pointed upstream (joshuafolkken/kit#903).
 
 Note: do not use `--task-type completion` manually — always use `josh followup` instead, which automatically includes the PR URL.
 
@@ -807,6 +807,27 @@ Fetch GitHub issue details for use in an AI-assisted workflow.
 pnpm josh issue 42
 ```
 
+### `josh issue:state`
+
+Print one issue's state and labels, in the spelling the workflow documents compare against.
+
+```bash
+pnpm josh issue:state 42
+pnpm josh issue:state 42 --repo joshuafolkken/app-kit
+```
+
+```
+state: CLOSED
+labels: in-progress
+```
+
+It replaces the two reads the workflow documents used to prescribe — `gh issue view <N> --json state --jq .state` and `gh issue view <N> --json state,labels --jq …` — with one call that answers both. Those go through GraphQL, which a cloud session is answered 403 for, and that read is `epic-child`'s verifier: the whole reason a child of an epic may be delegated is that the parent re-reads the child's state from GitHub rather than trusting the unit's summary ([#1054](https://github.com/joshuafolkken/kit/issues/1054)).
+
+The state is printed as `OPEN` / `CLOSED` / `MERGED`, not as REST's lower-case `open` / `closed`. That mapping is [#1024](https://github.com/joshuafolkken/kit/issues/1024)'s, single-sourced in `scripts/git/git-gh-rest-state.ts` — which is the reason this is a command rather than a `gh api` line written into the documents, where the casing rule would have had to be restated.
+
+- `--repo <owner/repo>` reads a child in another repository, which a cross-repository epic needs. Its state is a GitHub fact, so no checkout there is required.
+- **A non-zero exit is never a state.** A number that resolves to nothing prints `does not resolve`; a read that failed — a rate limit, expired auth, a dropped connection — prints `could not read` and says explicitly that this is not "the issue is open". `gh issue view` exited non-zero with an empty stdout for both, and a loop reading that as "not CLOSED" reports a child as failed because nobody could reach GitHub.
+
 ### `josh epic`
 
 Create the epic issue that tracks a batch of child issues from one split, from the child issue numbers.
@@ -828,7 +849,7 @@ An epic has four mechanical requirements, three of which fail **silently** when 
 | children-only `queue` | prints the `queue` command from the children; the epic is never included            |
 
 - `--ordered` declares that **the argument order is the dependency order**. The command then writes the arrow chain _and_ records the matching `blocked-by` relation down the same chain, so the declared order and the native relations come from one input and cannot disagree. The relation goes through the REST dependencies endpoint (`gh api`), so it does not depend on the `gh` CLI's version ([#1026](https://github.com/joshuafolkken/kit/issues/1026)). That endpoint names the blocker by its **database id** rather than its issue number, and does not check that the id belongs to this repository — so the command resolves the id from the number before writing, and a resolution that fails is a failed relation rather than a relation pointing somewhere else. It is applied **after** the issues exist rather than as part of creating them, which is what keeps a failure costing only the relation: the count is reported and the run still succeeds, because the epic and its task list are already correct.
-- `--rationale-file <path>` supplies the split rationale prose; `-` reads stdin, matching `gh issue create --body-file -`. Omitting it leaves a visible placeholder rather than a blank section.
+- `--rationale-file <path>` supplies the split rationale prose; `-` reads stdin, matching the `--input -` the REST writes use. Omitting it leaves a visible placeholder rather than a blank section.
 - `--origin <owner/repo#N>` adds the backlink used when the split itself originated in another repository. It is written as prose — a checkbox row referencing another repository disables the auto-close by design.
 
 The manual `gh` procedure remains documented in `prompts/collaboration-workflow/issue-template.md` as the fallback for environments where `josh` is unavailable.
@@ -1113,7 +1134,7 @@ The command is read-only and never applies or removes the label. It ranks candid
 **Opting in is the default absence.** Nothing creates the label, and a repository that does not have it is not an error: `gh` answers an empty listing, the command answers `none`, and an `epicrun` finishes exactly as it did before the label existed. Create it once where it is wanted:
 
 ```bash
-gh label create "auto-ok" --color "0e8a16" --description "Opted in to unattended execution outside an epic"
+gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f description="Opted in to unattended execution outside an epic"
 ```
 
 The listing is capped at 200 issues. `gh` lists newest first, so a cap that filled would have dropped the oldest opted-in issues — reported as a `⚠` on standard error rather than ranked silently, because the answer is still an opted-in issue but may not be the one the order promises.

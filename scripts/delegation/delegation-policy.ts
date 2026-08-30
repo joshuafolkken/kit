@@ -36,7 +36,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		name: 'epic-child',
 		does: 'run one child of an epic end to end in an isolated unit — plan, verification gate, PR, merge — and return only its summary to the parent loop',
 		verifier:
-			"the parent reads the child's state from GitHub with `gh issue view`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup --merge` would touch the PR",
+			"the parent reads the child's state from GitHub with `pnpm josh issue:state`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup --merge` would touch the PR",
 	},
 	{
 		name: 'survey',

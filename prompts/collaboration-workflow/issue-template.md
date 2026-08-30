@@ -2,7 +2,7 @@
 
 Issue には次の要素を必ず含める。
 
-- タイトルは簡潔で明瞭な英語で記載する（本文やコメントと違い、タイトルは「出力の言語（`JOSH_SESSION_LANG`）」の例外として常に英語。日本語で作成した場合は、AIツールが実装開始前に英語タイトルへ変換する。すでに英語で書かれている場合でも、文法・明確さ・簡潔さの観点で改善できるなら書き換えて良い。いずれの場合も GitHub Issue のタイトルを `gh issue edit` で合わせて更新する）
+- タイトルは簡潔で明瞭な英語で記載する（本文やコメントと違い、タイトルは「出力の言語（`JOSH_SESSION_LANG`）」の例外として常に英語。日本語で作成した場合は、AIツールが実装開始前に英語タイトルへ変換する。すでに英語で書かれている場合でも、文法・明確さ・簡潔さの観点で改善できるなら書き換えて良い。いずれの場合も GitHub Issue のタイトルを `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` で合わせて更新する）
 - 目的（何を改善したいか）
 - 現象（現在の不具合や課題）
 - 期待結果（完了時の状態）
@@ -58,7 +58,7 @@ Issue には次の要素を必ず含める。
 なぜ必要か: 分割の根拠を「最初の Issue のコメント」に置くと、その Issue は `queue` が最初にマージしてクローズする対象でもあるため、残りの作業の設計図がクローズ済み Issue の中に埋もれる。epic の役割は、その情報の**閉じない置き場**を用意することにある。実行順序は epic が載せられる情報の一つであって、epic が存在する理由ではない。埋没は順序の有無と無関係に、複数分割のたびに起きる。
 
 - **条件分岐を置かない。** 「件数が少ないうちは epic の管理コストが情報整理の利益を上回る」という以前の但し書きは、`scripts/git/git-epic-close.ts`（`pnpm josh followup` から駆動）が子 Issue の全クローズを検知して epic を自動クローズするようになった時点で根拠を失った。放置される epic という管理コストがもう存在しない以上、避けるべきは分岐の誤判定だけである。2 件・順序不問の分割に epic が付く冗長さは軽微で、分岐の見落としによる情報消失より常に安い
-- epic には `epic` ラベルを付ける（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of child issues from one split" 2>/dev/null || true`）。放置された open epic を `gh issue list --label epic` で棚卸しできるようにするため
+- epic には `epic` ラベルを付ける（未作成なら `gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent 2>/dev/null || true`）。放置された open epic を `gh api "repos/{owner}/{repo}/issues?labels=epic&state=open"` で棚卸しできるようにするため
 - **epic を `queue` に渡してはならない。** `queue` には子 Issue のみを渡す。epic には成果物がなく、実装ランを走らせる対象ではない
 - epic は最後の子 Issue がクローズされた時点で `pnpm josh followup` が自動クローズする。マージ後に `epic` ラベルの open な Issue を探し、タスクリストの子が全てクローズ済みなら子を列挙したコメント付きで閉じる。1 件でも open なら放置し、この処理の失敗は警告のみでランを止めない。最終 PR に `closes #<epic>` を書く方法は、バッチが途中で失敗したときにも発火して未完了を完了扱いにするため採用しない
 - 自動クローズは `epic` ラベルとタスクリスト記法の両方に依存する。どちらかを欠くと epic は open のまま残るので、手動でクローズする
@@ -89,20 +89,22 @@ pnpm josh epic "<epic-title>" <N1> <N2> --origin <owner/repo#N>
 作成手順（フォールバック）: **`josh` が使えない環境でのみ**、以下を手で行う。
 
 1. 子 Issue を全て作成し、番号 `<N1> <N2> ...` を控える
-2. `epic` ラベルを用意する（未作成なら `gh label create "epic" --color "#5319e7" --description "Tracks a batch of child issues from one split" 2>/dev/null || true`）
-3. epic を作成し、番号 `<E>` を控える: `gh issue create --title "<epic-title>" --label epic --body "<body>"`
+2. `epic` ラベルを用意する（未作成なら `gh api repos/{owner}/{repo}/labels -f name=epic -f color=5319e7 -f description="Tracks a batch of child issues from one split" --silent 2>/dev/null || true`）
+3. epic を作成し、番号 `<E>` を控える: `gh api repos/{owner}/{repo}/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>" --jq .number`（`--jq` を落とすと Issue の JSON 全体が出る。そこには `id` も含まれるが、**控えるのは `number` である** — `id` はデータベース id で、手順 4 が要求する値ではあっても epic の番号ではない）
 4. 実行順序が**ある場合のみ**、子 Issue に依存関係を付与する（後述の理由により**作成後の独立ステップ**として行う）:
 
    ```bash
-   gh issue edit <N2> --add-blocked-by <N1>
-   gh issue edit <N3> --add-blocked-by <N2>
+   gh api repos/{owner}/{repo}/issues/<N2>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N1> --jq .id)"
+   gh api repos/{owner}/{repo}/issues/<N3>/dependencies/blocked_by -F issue_id="$(gh api repos/{owner}/{repo}/issues/<N2> --jq .id)"
    ```
+
+   **エンドポイントが受け取るのは Issue 番号ではなくデータベース id である。** 番号をそのまま送っても 200 が返るが、記録されるのは「その数値を id に持つ、まったく無関係なリポジトリの Issue」である（joshuafolkken/kit#1026 が実測）。`--jq .id` の一段はこの取り違えを防ぐためにあり、省略できない。
 
    順序が不問なら手順 4 は行わない。epic の作成は無条件だが、依存関係の記録は順序が実在するときだけで、両者は独立している。
 
-手順 2 の `|| true` はラベルが既に存在する場合を無視するためのもので、作成失敗を握り潰す危険はない。ラベルが存在しないまま手順 3 に進むと `--label epic` が解決できず `gh issue create` 自体が失敗するため、異常は必ずそこで顕在化する。
+手順 2 の `|| true` はラベルが既に存在する場合（REST は 422 `already_exists` を返す）を無視するためのものである。**握り潰しの代償は `gh` の頃と変わっており、安全な方向に変わっている。** `gh issue create --label epic` はラベルを解決できずに失敗したため、異常は手順 3 で顕在化した。REST の `POST /issues` は `labels` に無いラベルを**その場で作る**（色と説明は既定値、joshuafolkken/kit#1026 が実測）ので、握り潰しが失うのは色と説明だけでラベル自体ではない。`epic:next` と自動クローズは名前だけを見るため、追跡は成立する。
 
-手順 4 は `gh` 2.94.0 以降が必要で、**失敗しても続行してよい**（付かないのは関係だけで、Issue とタスクリストは無傷）。作成時に `gh issue create --blocked-by` を使ってはならない — 古い `gh` は未知フラグを exit 1 で即座に拒否し、**Issue 自体が作られない**。作成と関係付与を分けることで、古い CLI での劣化が「Issue が消える」から「関係が付かない」に下がる。
+手順 4 は REST の依存関係エンドポイントを直接叩くので `gh` のバージョンに依存しない。**失敗しても続行してよい**（付かないのは関係だけで、Issue とタスクリストは無傷）。関係付与は作成と分けて行う — 作成呼び出しに畳み込むと、関係の失敗が Issue の失敗になり、**Issue 自体が作られない**。分けておけば劣化は「Issue が消える」ではなく「関係が付かない」で済む。
 
 epic 本文のテンプレート:
 
@@ -134,7 +136,7 @@ epicrun #<E>
 
 `gh` は Issue 間の関係をネイティブに扱える。下表のフラグと JSON フィールドは **2.97.0 の実バイナリで存在を確認済み**。導入バージョンを 2.94.0 とするのは `cli/cli` のリリースノート記載によるもので、2.94.0 自体での動作確認は行っていない。GitHub Enterprise Server では依存関係に 3.19 以降が必要（github.com では制約なし）。
 
-**下表は `gh` CLI の対応状況であり、`pnpm josh epic` はこれを経由しない。** `josh` は REST の依存関係エンドポイントを `gh api` で直接叩くため、下表のフラグにも 2.94.0 要件にも依存しない（joshuafolkken/kit#1026）。バージョン要件が意味を持つのは、手で `gh` を叩く上記のフォールバック手順 4 だけである。
+**下表は `gh` CLI の対応状況の記録であり、本ドキュメントのどの手順もこれを経由しない。** `pnpm josh epic` も上記のフォールバック手順 4 も、REST の依存関係エンドポイントを `gh api` で直接叩くため、下表のフラグにも 2.94.0 要件にも依存しない（joshuafolkken/kit#1026）。**下表の形は `gh issue edit` / `gh issue view` であり、いずれも GraphQL を通るためクラウドセッションでは 403 になる**（joshuafolkken/kit#1022）。表を残すのは、sub-issues を採らなかった理由が CLI の対応状況とは無関係であることを示すためである。
 
 | 種別     | 書き込み                                                                   | 読み取り                                                     |
 | -------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ |

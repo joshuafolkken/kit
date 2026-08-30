@@ -71,17 +71,20 @@ describe.each(BOTH)('%s — what each entry point does with it', (document_path)
 		)
 	})
 
-	// The plan-only entry completes through `gh -R`, so requiring a checkout there would refuse work
-	// that needs none.
+	// The plan-only entry completes by naming the target repository in each REST path, so requiring a
+	// checkout there would refuse work that needs none. It used to be `gh -R`; the calls moved to
+	// `gh api` because `gh issue view` / `create` / `edit` go through GraphQL, which a cloud session
+	// is refused (joshuafolkken/kit#1054).
 	it('completes the plan-only entry without a checkout', () => {
 		expect(unwrapped).toMatch(/needs no checkout|チェックアウトは要らない/u)
-		expect(unwrapped).toContain('-R <owner/repo>')
+		expect(unwrapped).toContain('repos/<owner/repo>')
 	})
 
-	// The read is where `-R` is forgotten, and forgetting it plans against this repository's issue of
-	// the same number without erroring.
-	it('requires the prefix on reads too', () => {
-		expect(unwrapped).toContain('gh issue view')
+	// The read is where the target repository is forgotten, and forgetting it plans against this
+	// repository's issue of the same number without erroring.
+	it('requires the target repository on reads too', () => {
+		expect(unwrapped).toMatch(/reads included|読み取りを含む/u)
+		expect(unwrapped).toContain('repos/{owner}/{repo}')
 	})
 
 	// The short form is now the recommended notation, so it has to leave a run against this
