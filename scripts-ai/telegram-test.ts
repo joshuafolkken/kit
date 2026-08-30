@@ -1,14 +1,12 @@
 #!/usr/bin/env tsx
-import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { parseArgs, promisify } from 'node:util'
+import { parseArgs } from 'node:util'
 import { git_gh_issue_read } from '../scripts/git/git-gh-issue-read'
+import { git_gh_repo } from '../scripts/git/git-gh-repo'
 import { github_issue_url, type IssueUrlTarget } from '../scripts/git/github-issue-url'
 import { telegram_notify } from '../scripts/git/telegram-notify'
 import { load_optional_environment } from './environment-loader'
 import { telegram_test_logic, type CliValues, type ResolvedContext } from './telegram-test-logic'
-
-const exec_file_async = promisify(execFile)
 
 const REPO_NAME_SEPARATOR = '/'
 
@@ -27,31 +25,22 @@ function parse_cli_arguments(): CliValues {
 	return values
 }
 
-async function exec_gh(arguments_: ReadonlyArray<string>): Promise<string | undefined> {
-	try {
-		const { stdout } = await exec_file_async('gh', [...arguments_])
-
-		return stdout.trim()
-	} catch {
-		return undefined
-	}
-}
-
+// The repository this notification is about, for the Telegram header.
+//
+// joshuafolkken/kit#1063: this used to spawn `gh repo view --json nameWithOwner` through a
+// promisified `execFile`, which is why joshuafolkken/kit#1022's survey never counted it — the
+// callee was not `execa` and the file was not `scripts/`. `gh repo view` goes through GraphQL and
+// is answered 403 in a cloud session, so the header simply lost its repository name there.
+//
+// The same fact is already read over REST by `git_gh_repo`, whose failure contract is the
+// `undefined` this caller was already handling, so it is read from there rather than from a second
+// spawn (`CLAUDE.md` → "No clones").
 async function fetch_repo_name(): Promise<string | undefined> {
-	const name_with_owner = await exec_gh([
-		'repo',
-		'view',
-		'--json',
-		'nameWithOwner',
-		'-q',
-		'.nameWithOwner',
-	])
+	const name_with_owner = await git_gh_repo.repo_get_name_with_owner()
 
 	if (name_with_owner === undefined) return undefined
 
-	const parts = name_with_owner.split(REPO_NAME_SEPARATOR)
-
-	return parts.at(-1)
+	return name_with_owner.split(REPO_NAME_SEPARATOR).at(-1)
 }
 
 // The title is read from the repository the URL names, through the same reader every other
