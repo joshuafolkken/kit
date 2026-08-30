@@ -39,6 +39,18 @@ const DISTRIBUTED_FILES: ReadonlyArray<string> = [
 	init_logic.get_sonar_template_source(),
 ]
 
+// The skills are copied whole, so the guard has to walk them rather than name their files — and
+// until joshuafolkken/kit#1092 it did neither. `worktrees` and `evals` sat in kit's private list
+// while `.claude/skills/workflow-commands/` shipped using them, so kit stayed green and every
+// consumer's first `josh sync` failed. Reading the same list `sync` copies from is what keeps a
+// skill added later from re-opening the gap.
+const DISTRIBUTED_DIRECTORIES: ReadonlyArray<string> = init_logic.get_ai_copy_directories()
+
+// cspell takes a glob for a directory; the existence check above takes the directory itself.
+const DISTRIBUTED_GLOBS: ReadonlyArray<string> = DISTRIBUTED_DIRECTORIES.map(
+	(directory) => `${directory}/**`,
+)
+
 function collect_unknown_words(files: ReadonlyArray<string>): Array<string> {
 	const result = execaSync(resolve_local_bin(REPO_ROOT, CSPELL_BIN), [...CSPELL_FLAGS, ...files], {
 		cwd: REPO_ROOT,
@@ -55,7 +67,8 @@ describe('files distributed by josh init / josh sync', () => {
 	// Without this, a renamed or removed source file would turn the spelling assertion below
 	// into a check over nothing while still reporting green.
 	it('ships every file it copies into a consumer', () => {
-		const missing = DISTRIBUTED_FILES.filter((file) => !existsSync(path.join(REPO_ROOT, file)))
+		const copied = [...DISTRIBUTED_FILES, ...DISTRIBUTED_DIRECTORIES]
+		const missing = copied.filter((entry) => !existsSync(path.join(REPO_ROOT, entry)))
 
 		expect(missing).toEqual([])
 	})
@@ -63,6 +76,6 @@ describe('files distributed by josh init / josh sync', () => {
 	// Fails the moment a distributed document gains a term that only kit's private word list
 	// knows — exactly the state that broke every consumer on 1.44.0.
 	it('spells every word through the distributed dictionary alone', () => {
-		expect(collect_unknown_words(DISTRIBUTED_FILES)).toEqual([])
+		expect(collect_unknown_words([...DISTRIBUTED_FILES, ...DISTRIBUTED_GLOBS])).toEqual([])
 	})
 })
