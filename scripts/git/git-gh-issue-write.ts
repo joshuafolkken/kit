@@ -1,5 +1,5 @@
 import { git_gh_api_path } from './git-gh-api-path'
-import { git_gh_exec } from './git-gh-exec'
+import { git_gh_exec, type GhApiRequest } from './git-gh-exec'
 
 // Writing issues and labels through REST, in the return-value contracts the `gh <noun> <verb>`
 // wrappers had.
@@ -127,6 +127,38 @@ async function label_ensure(input: {
 	}
 }
 
+// What creating an issue over REST means, as one value both execution paths build from: the
+// collection to post to, the JSON body, and the `.html_url` unwrap that answers the browser URL
+// `gh issue create` used to print.
+//
+// It exists as a request rather than only as the writer below because `josh propagate` opens its
+// consumer's issue **synchronously** and cannot await (joshuafolkken/kit#1042). Spelling the same
+// three decisions out again at that call site would be a second definition of the same write
+// (`CLAUDE.md` → "No clones"), so the request is shared and only the spawn differs.
+//
+// `repo` names another repository, which is what propagation needs — the issue belongs to the
+// consumer, not to the repository the command runs in. `labels` is left off the body entirely when
+// there is none, rather than sent as an empty array: an issue with no label is what omitting the
+// field means to the endpoint, and it keeps the labelled form the only one that creates a label.
+function issue_create_request(input: {
+	title: string
+	body: string
+	labels?: ReadonlyArray<string>
+	repo?: string
+}): GhApiRequest {
+	const { labels } = input
+
+	return {
+		path: git_gh_api_path.issues_api_path(input.repo),
+		body: JSON.stringify({
+			title: input.title,
+			...(labels !== undefined && { labels }),
+			body: input.body,
+		}),
+		jq_filter: HTML_URL_FILTER,
+	}
+}
+
 // The browser URL of the created issue, which is what `gh issue create` printed and what
 // `git-epic-run.ts` parses the epic's number out of.
 async function issue_create_with_label(input: {
@@ -134,11 +166,9 @@ async function issue_create_with_label(input: {
 	label: string
 	body: string
 }): Promise<string> {
-	return await git_gh_exec.exec_gh_api({
-		path: git_gh_api_path.issues_api_path(),
-		body: JSON.stringify({ title: input.title, labels: [input.label], body: input.body }),
-		jq_filter: HTML_URL_FILTER,
-	})
+	return await git_gh_exec.exec_gh_api(
+		issue_create_request({ title: input.title, body: input.body, labels: [input.label] }),
+	)
 }
 
 // Applied after the body edit so a failure leaves an issue with the epic sections and no label,
@@ -217,6 +247,7 @@ const git_gh_issue_write = {
 	issue_comment,
 	issue_close,
 	label_ensure,
+	issue_create_request,
 	issue_create_with_label,
 	issue_add_label,
 	issue_add_blocked_by,

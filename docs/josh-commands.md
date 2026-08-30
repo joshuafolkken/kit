@@ -318,7 +318,7 @@ Then, for each consumer in turn:
 | Upgrade            | `pnpm add -D @joshuafolkken/kit@<version>`, plus kit's lockfile repair             |
 | Sync               | `pnpm josh sync`                                                                   |
 | Verify             | `pnpm josh lint && pnpm josh check && pnpm josh cspell:dot && pnpm josh test:unit` |
-| Open issue         | `gh issue create` — the upgrade issue the pull request will close                  |
+| Open issue         | `POST repos/<consumer>/issues` — the upgrade issue the pull request will close     |
 | Pull request       | `pnpm josh git -y "Upgrade @joshuafolkken/kit to <version> #<N>"`                  |
 | Return             | `git checkout <default>` and pull                                                  |
 
@@ -327,6 +327,8 @@ Then, for each consumer in turn:
 **The upgrade pins the exact version that was waited for**, rather than asking for the registry's latest. Asking for latest would defeat the wait: a release published while the run was in flight would be the one every consumer received.
 
 **The issue is opened before the pull request because `josh git` requires one.** It derives the branch name and the `closes #N` line from the issue argument, so an upgrade with no issue could not open a pull request at all. `propagate` therefore **opens a GitHub issue in each consumer repository** — an outward-facing write, and the reason the command is scoped to repositories with the same owner. Merging the pull request closes it. When the upgrade and the sync changed nothing, no issue is opened at all and the consumer is reported as a skip; opening one and then failing on an empty commit is the alternative.
+
+**It is created through REST rather than by running `gh issue create`.** That command goes through GraphQL, which a cloud session is answered 403 for, so propagation could not open the consumer's issue from one at all — while `POST repos/{owner}/{repo}/issues` is served normally (joshuafolkken/kit#1042). The issue body travels over standard input, so its multi-line markdown depends on no shell quoting, and the path names the consumer repository outright rather than relying on the directory the call is spawned in.
 
 **The consumer is returned to its default branch last.** `josh git` leaves the checkout on the feature branch, and the next propagation's working tree check would refuse it for that — the consumer would silently stop receiving releases.
 

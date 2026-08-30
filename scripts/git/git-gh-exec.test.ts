@@ -5,6 +5,7 @@ import { BODY_FROM_STDIN, git_gh_exec, has_stderr_field, has_stdout_field } from
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
+	execaSync: vi.fn(),
 }))
 
 vi.mock('./git-gh-check', () => ({

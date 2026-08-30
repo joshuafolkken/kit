@@ -1,4 +1,4 @@
-import { execa } from 'execa'
+import { execa, execaSync } from 'execa'
 import { check_gh_installed } from './git-gh-check'
 
 const BODY_FROM_STDIN = '-'
@@ -159,10 +159,45 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 	return await exec_gh_command_with_stdin({ args, stdin_body: request.body })
 }
 
+// The synchronous twin of `exec_gh_api`, for a caller that cannot await. `josh propagate` runs each
+// consumer's steps as a sequential chain of `execaSync` spawns with inherited stdio, and that shape
+// reaches from `open_issue` up through `RunStep`, `run_target` and `run_targets` — so the issue it
+// opens in the consumer is created here rather than by turning the whole runner asynchronous for
+// one request (joshuafolkken/kit#1042).
+//
+// It is the **write** side's synchronous entry, and the only one so far. The synchronous *readers*
+// named above `exec_gh_api` — `gh-spawn.ts`, `epic-cross-repo.ts`, `repo-setting.ts`,
+// `propagate-publish.ts`, `version-remote.ts` — each spell their own `['api', path, '--jq', …]` out
+// and share only the path builder; a read has no body and no verb to get wrong, which is why they
+// were left as they are rather than migrated here in passing.
+//
+// **It is the same layer, not a second one.** The argument builder and the error translation are
+// shared with the asynchronous path above, so `--input -` for the body, `--jq` for the unwrap, and
+// the failure text that carries the JSON reason REST writes to stdout are each defined once.
+//
+// The body travels over stdin here too: `execaSync` accepts `input`, so multi-line markdown depends
+// on no shell quoting — the same property `exec_gh_command_with_stdin` gives the asynchronous path.
+//
+// `check_gh_installed` is the one thing it cannot share, because it awaits. A missing gh surfaces as
+// the spawn's own failure and is reported like any other, which is what the direct spawn this
+// replaced already did.
+function exec_gh_api_sync(request: GhApiRequest): string {
+	const options = request.body === undefined ? {} : { input: request.body }
+
+	try {
+		const { stdout } = execaSync('gh', to_gh_api_args(request), options) // NOSONAR S8705: execa array args (no shell), trusted dev CLI tooling
+
+		return stdout.trimEnd()
+	} catch (error) {
+		throw to_gh_error(error)
+	}
+}
+
 const git_gh_exec = {
 	exec_gh_command,
 	exec_gh_command_with_stdin,
 	exec_gh_api,
+	exec_gh_api_sync,
 	exec_gh_api_status,
 	parse_status_line,
 }
