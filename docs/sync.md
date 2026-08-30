@@ -382,11 +382,15 @@ SECURITY.md         tsconfig.sonar.json
 >
 > **`git commit` is denied by flag, not as a whole.** `git commit -a` stages every tracked file and
 > commits it, which is the fallback a refused `git add` pushes an agent toward, so both spellings of
-> that flag are denied. Plain `git commit -m "…"` is left alone deliberately:
-> `prompts/git-automation.md` — shipped to consumers in the same package — instructs the agent to run
-> exactly that command, and denying it here would break a documented flow from the other half of the
-> distribution. Routing that prompt through `pnpm josh git` is the change that would let the whole
-> subcommand be denied, and it is a larger one than this.
+> that flag are denied. Plain `git commit -m "…"` was left alone deliberately:
+> `prompts/git-automation.md` — shipped to consumers in the same package — instructed the agent to
+> run exactly that command, and denying it here would have broken a documented flow from the other
+> half of the distribution. **That reason is gone**: joshuafolkken/kit#1064 retired the prompt, and
+> nothing distributed asks for a bare `git commit` any more, because `pnpm josh git` drives the whole
+> commit through a node script. Widening the deny to the subcommand is joshuafolkken/kit#1075 rather
+> than part of that retirement — it rewrites the entry list `CLAUDE.md` and
+> `prompts/collaboration-workflow/operating-rules.md` both quote, which is a separate deliverable
+> from removing the document that blocked it.
 >
 > **It is a guardrail, not a sandbox.** Each entry is a prefix pattern, so plenty still runs: a
 > global option ahead of the subcommand (`git -C . add .`), a flag pair the prefix does not cover
