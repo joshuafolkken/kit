@@ -43,6 +43,22 @@ async function status(): Promise<string> {
 	return await exec_git_command_read(['status', '--porcelain'])
 }
 
+// Both git directories this checkout has, absolute, one per line. In the main work tree they are the
+// same path; in a linked work tree the first is `<repo>/.git/worktrees/<name>` and the second is
+// `<repo>/.git`, and the commit-message file lives under the first. Asking git rather than assuming
+// a directory named `.git` is what makes a bare repository and a `--separate-git-dir` clone answer
+// correctly too (joshuafolkken/kit#1106).
+async function git_directories(): Promise<Array<string>> {
+	const output = await exec_git_command_read([
+		'rev-parse',
+		'--absolute-git-dir',
+		'--path-format=absolute',
+		'--git-common-dir',
+	])
+
+	return output.split('\n').filter((line) => line !== '')
+}
+
 async function diff_cached(file_path: string): Promise<string> {
 	return await exec_git_command_read(['diff', '--cached', file_path])
 }
@@ -209,6 +225,7 @@ async function add_path(file_path: string): Promise<void> {
 const git_command = {
 	branch,
 	status,
+	git_directories,
 	diff_cached,
 	diff_cached_names,
 	diff_main,
