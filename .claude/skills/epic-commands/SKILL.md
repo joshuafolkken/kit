@@ -73,6 +73,8 @@ adds is reading *inside* the children:
 | A child's **acceptance criteria** name another child, nothing orders the two | **error**, or a warning once both children are closed |
 | A body cites a missing or already-closed issue | warning |
 | An issue names this epic as parent that the task list does not track | warning |
+| The search for those issues could not read the open backlog | **error** |
+| That search stopped before the end of the backlog | warning |
 
 **Only errors fail it.** The first check fires on a legitimate forward reference as readily as on a
 real missing dependency; failing on both would make design notes unwritable. A forward reference the
@@ -89,6 +91,18 @@ instead: the same one line, minus the detail that the name is in the acceptance 
 **Fixing what it finds is Tier A** — re-pointing a dependency or correcting prose is reversible and
 will otherwise stall the work. Park with `needs-decision` only when the contradiction is a design
 choice nobody has made.
+
+**The two `orphan search` findings are the exception, because neither is a contradiction.** They are
+about the search itself rather than about anything the children say (joshuafolkken/kit#1033):
+
+- `✖ orphan search: Could not list the open issues…` — the search never ran, so "no orphans" would
+  be a claim about a listing that never arrived. It fails the audit, which stops an `epicrun` at its
+  step 0. **Re-run the audit**; that is the whole response. There is nothing to fix and nothing to
+  decide, so neither Tier A nor a `needs-decision` park applies. If it keeps failing, check
+  `gh auth status` and whether the rate limit has reset.
+- `⚠ orphan search: The open-issue scan hit its …` — the search covered only the newest part of the
+  backlog (500 issues, or 50 bodies mentioning the epic). It ran, so the audit passes; read the line,
+  and look further down the backlog by hand if an orphan is expected there.
 
 **One thing it cannot check** belongs to planning: when a child introduces a new label, command,
 state or artifact, list the existing code referencing that concept and confirm some child owns
