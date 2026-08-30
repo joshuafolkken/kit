@@ -4,7 +4,6 @@ import {
 	UNREADABLE_COMMENTS_NOTE,
 	UNREADABLE_EPIC_LIST_MESSAGE,
 } from './git-epic-close'
-import { CLOSE_ANNOUNCEMENT } from './git-epic-close-comment'
 import type { IssueListOutcome } from './git-gh-issue-list'
 import { listing_outcome } from './git-gh-issue-list-fixture'
 
@@ -375,9 +374,16 @@ describe('close_completed_epics — a listing that is genuinely empty', () => {
 // The next run reached the same point and posted it again — once per attempt, for as long as the
 // close kept failing. The state machine behind the check is `git-epic-close-comment.test.ts`; what
 // is pinned here is what the auto-close does with its answer.
-const POSTED_ANNOUNCEMENT = JSON.stringify([
-	{ body: `All child issues are closed (${ALL_CHILDREN}). ${CLOSE_ANNOUNCEMENT}` },
-])
+//
+// The listing the retry reads is the comment the first run actually posted, taken back out of the
+// call rather than spelled out here. Since joshuafolkken/kit#1068 that body carries a marker built
+// from the epic's child set, and a copy composed in the test would stop exercising the check the
+// moment either the marker or the wording moved.
+function listing_of_posted_announcement(): string {
+	const [, comment] = mocked_close.mock.calls[0] ?? []
+
+	return JSON.stringify([{ body: comment }])
+}
 
 function complete_epic(): void {
 	mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
@@ -392,7 +398,7 @@ describe('close_completed_epics — a re-run after a partial close', () => {
 		mocked_close.mockResolvedValueOnce(false)
 
 		await close_completed_epics(MERGED)
-		mocked_comments.mockResolvedValue(POSTED_ANNOUNCEMENT)
+		mocked_comments.mockResolvedValue(listing_of_posted_announcement())
 		await close_completed_epics(MERGED)
 
 		const posted = mocked_close.mock.calls.filter(([, comment]) => comment !== undefined)
