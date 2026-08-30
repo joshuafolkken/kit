@@ -5,6 +5,8 @@ import {
 	UNREADABLE_EPIC_LIST_MESSAGE,
 } from './git-epic-close'
 import { CLOSE_ANNOUNCEMENT } from './git-epic-close-comment'
+import type { IssueListOutcome } from './git-gh-issue-list'
+import { listing_outcome } from './git-gh-issue-list-fixture'
 
 vi.mock('./git-gh-command', () => ({
 	git_gh_command: {
@@ -30,8 +32,10 @@ const UNORDERED_EPIC_BODY = UNORDERED_DEPENDENCIES + PROGRESS
 const MERGED_ISSUE = '103'
 const ALL_CHILDREN = '#101, #102, #103'
 
-function epic_list_json(entries: Array<{ number: number; body: string }>): string {
-	return JSON.stringify(entries)
+// The listing as the wrapper answers it since joshuafolkken/kit#1067 — `{ json, is_capped }` rather
+// than the JSON alone. Built here so each case names only the epics it is about.
+function epic_list_json(entries: Array<{ number: number; body: string }>): IssueListOutcome {
+	return listing_outcome(JSON.stringify(entries))
 }
 
 function child_json(input: { state: string; blocked_by?: number }): string {
@@ -186,7 +190,7 @@ describe('close_completed_epics — no-op cases', () => {
 	})
 
 	it('does nothing when the epic label lookup is unavailable', async () => {
-		mocked_list.mockResolvedValue(undefined)
+		mocked_list.mockResolvedValue(listing_outcome(undefined))
 
 		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
@@ -194,7 +198,7 @@ describe('close_completed_epics — no-op cases', () => {
 	})
 
 	it('does nothing when the label lookup returns malformed json', async () => {
-		mocked_list.mockResolvedValue('{not json')
+		mocked_list.mockResolvedValue(listing_outcome('{not json'))
 
 		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
@@ -312,7 +316,7 @@ const UNPARSEABLE_LISTING = 'not json at all'
 
 describe('close_completed_epics — a listing that could not be read', () => {
 	it('reports that the listing could not be read rather than closing nothing in silence', async () => {
-		mocked_list.mockResolvedValue(UNPARSEABLE_LISTING)
+		mocked_list.mockResolvedValue(listing_outcome(UNPARSEABLE_LISTING))
 
 		await close_completed_epics(MERGED)
 
@@ -321,7 +325,7 @@ describe('close_completed_epics — a listing that could not be read', () => {
 
 	// The rate-limit shape: valid JSON, but an object rather than a listing.
 	it('reports an answer that is valid json but not a listing', async () => {
-		mocked_list.mockResolvedValue('{"message":"API rate limit exceeded"}')
+		mocked_list.mockResolvedValue(listing_outcome('{"message":"API rate limit exceeded"}'))
 
 		await close_completed_epics(MERGED)
 
@@ -330,7 +334,7 @@ describe('close_completed_epics — a listing that could not be read', () => {
 
 	// The same absence arrives when `gh` itself failed, and it was equally silent before.
 	it('reports a listing the gh call could not produce', async () => {
-		mocked_list.mockResolvedValue(undefined)
+		mocked_list.mockResolvedValue(listing_outcome(undefined))
 
 		await close_completed_epics(MERGED)
 
@@ -338,7 +342,7 @@ describe('close_completed_epics — a listing that could not be read', () => {
 	})
 
 	it('never closes an epic on a listing it could not read', async () => {
-		mocked_list.mockResolvedValue(UNPARSEABLE_LISTING)
+		mocked_list.mockResolvedValue(listing_outcome(UNPARSEABLE_LISTING))
 
 		await close_completed_epics(MERGED)
 
@@ -349,7 +353,7 @@ describe('close_completed_epics — a listing that could not be read', () => {
 describe('close_completed_epics — a listing that is genuinely empty', () => {
 	// `[]` is an answer, not a gap: no epic is open, so there is nothing to warn about.
 	it('says nothing when no epic is open', async () => {
-		mocked_list.mockResolvedValue('[]')
+		mocked_list.mockResolvedValue(listing_outcome('[]'))
 
 		await close_completed_epics(MERGED)
 

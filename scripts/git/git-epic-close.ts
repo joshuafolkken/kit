@@ -2,23 +2,32 @@ import { git_epic_close_comment } from './git-epic-close-comment'
 import { git_epic_parse, type ExternalChild } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
 import { EPIC_LABEL } from './issue-labels'
+import { cutoff_cause, cutoff_of, type ScanCutoff } from './listing-cutoff'
 import { parse_json_array_or_undefined, parse_json_object_safe } from './parse-json-array'
 import { epic_child_schema, epic_issue_schema, type EpicChildData } from './schemas'
 
-// How many open epics the auto-close will look at, and — since joshuafolkken/kit#1025 made the
-// listing REST — the only thing that bounds the request it makes. `git-gh-issue-list.ts` pages until
-// `limit` rows have been selected or the backlog runs out, and its page ceiling (`MAX_PAGES`,
-// joshuafolkken/kit#1033) applies to the body search alone, so without this number the check would
-// read every open epic on every merge. 100 is `PER_PAGE`, which keeps the ordinary case at exactly
-// one request.
+// How many open epics the auto-close will look at. `git-gh-issue-list.ts` pages until `limit` rows
+// have been selected or the backlog runs out, so this is what keeps the ordinary case at exactly one
+// request — 100 is `PER_PAGE`. Since joshuafolkken/kit#1067 the paging's own page ceiling bounds
+// this listing too, but as a backstop rather than as this number's replacement: it stops the request
+// count, not the row count.
 //
 // The listing is newest-first and the surplus is cut off the tail, so a repository holding more open
-// epics than this loses the oldest — and loses them silently: nothing here compares the row count
-// against the limit the way `epic:bundle` does. The `is_capped` flag the paging computes is not that
-// check and answers `false` here by construction, since a listing that filled `limit` is exactly the
-// case it treats as complete. That is why the value sits well above the number of epics ever open at
-// once rather than close to it.
+// epics than this loses the oldest. It no longer loses them silently: since joshuafolkken/kit#1067
+// both cutoffs are reported, because an epic past the cut is never checked for completion and stays
+// open with nothing saying why — the same silence this file's `undefined`-not-`[]` handling exists
+// to remove. The value still sits well above the number of epics ever open at once, so the report is
+// the exception rather than a line on every merge.
 const EPIC_LIST_LIMIT = 100
+
+// Printed rather than thrown: this runs after the PR has already merged, so nothing here may fail
+// the run. `console.info` is what every other note in this file uses, for that same reason.
+function truncated_epic_list_note(cutoff: ScanCutoff): string | undefined {
+	const cause = cutoff_cause(cutoff, `hit its ${String(EPIC_LIST_LIMIT)}-epic cap`)
+	if (cause === undefined) return undefined
+
+	return `⚠️  The open epic listing ${cause}; an epic past it was not checked for completion.`
+}
 
 interface EpicIssue {
 	number: number
@@ -54,12 +63,16 @@ function to_epic_issue(raw: { number: number; body?: string | undefined }): Epic
 // change what the auto-close may do — in neither case does it know what the open epics are — and
 // splitting them would put two warnings on one decision.
 async function fetch_open_epics(): Promise<Array<EpicIssue> | undefined> {
-	const raw_json = await git_gh_command.issue_list_by_label(EPIC_LABEL, EPIC_LIST_LIMIT)
-	if (raw_json === undefined) return undefined
+	const { json, is_capped } = await git_gh_command.issue_list_by_label(EPIC_LABEL, EPIC_LIST_LIMIT)
+	if (json === undefined) return undefined
 
-	const rows = parse_json_array_or_undefined(raw_json, epic_issue_schema)
+	const rows = parse_json_array_or_undefined(json, epic_issue_schema)
+	if (rows === undefined) return undefined
+	const note = truncated_epic_list_note(cutoff_of(rows.length, EPIC_LIST_LIMIT, is_capped))
 
-	return rows?.map((raw) => to_epic_issue(raw))
+	if (note !== undefined) console.info(note)
+
+	return rows.map((raw) => to_epic_issue(raw))
 }
 
 function parse_child(raw_json: string | undefined): EpicChildData | undefined {
@@ -282,6 +295,8 @@ const git_epic_close = {
 export {
 	git_epic_close,
 	close_completed_epics,
+	truncated_epic_list_note,
+	EPIC_LIST_LIMIT,
 	UNREADABLE_EPIC_LIST_MESSAGE,
 	UNREADABLE_COMMENTS_NOTE,
 }

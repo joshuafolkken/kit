@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
-import { git_gh_issue_list, MAX_PAGES, PER_PAGE, type IssueListOutcome } from './git-gh-issue-list'
+import {
+	git_gh_issue_list,
+	MAX_PAGES,
+	PER_PAGE,
+	type IssueListOutcome,
+	type IssueListRequest,
+} from './git-gh-issue-list'
 import {
 	BLOCKER_NUMBER,
 	ISSUE_BODY,
@@ -47,6 +53,15 @@ function api_paths(): Array<string> {
 	return mocked_api.mock.calls.map(([request]) => request.path)
 }
 
+// The JSON half of the answer, for the cases that are about the rows rather than about the cut. The
+// listing answers `{ json, is_capped }` to every caller since joshuafolkken/kit#1067, so the two
+// halves are asserted by the cases each one belongs to rather than through one wider assertion.
+async function list_json(request: IssueListRequest): Promise<string | undefined> {
+	const outcome = await git_gh_issue_list.issue_list_open(request)
+
+	return outcome.json
+}
+
 // The listing endpoint answers the pages in order; the dependencies endpoint answers blockers.
 function serve(pages: ReadonlyArray<string>, blockers: string = EMPTY_PAGE): void {
 	let index = 0
@@ -65,7 +80,7 @@ function serve(pages: ReadonlyArray<string>, blockers: string = EMPTY_PAGE): voi
 // The body search is the one listing the page ceiling applies to, so every case about the ceiling
 // goes through it. `SEARCH_TERM` matches nothing the filler rows carry unless a row says so.
 async function search_outcome(limit: number): Promise<IssueListOutcome> {
-	return await git_gh_issue_list.issue_list_open_outcome({
+	return await git_gh_issue_list.issue_list_open({
 		json_fields: BODY_FIELDS,
 		limit,
 		body_term: SEARCH_TERM,
@@ -104,7 +119,7 @@ describe('issue_list_open — the request', () => {
 	it('reads the REST listing rather than gh issue list', async () => {
 		serve([rest_issue_page([{}])])
 
-		await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
+		await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
 
 		expect(api_paths()[0]).toContain(`${CURRENT_REPO_ISSUES}?state=open`)
 	})
@@ -114,7 +129,7 @@ describe('issue_list_open — the request', () => {
 	it('asks for the newest first', async () => {
 		serve([rest_issue_page([{}])])
 
-		await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
+		await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
 
 		expect(api_paths()[0]).toContain('sort=created&direction=desc')
 	})
@@ -123,7 +138,7 @@ describe('issue_list_open — the request', () => {
 	it('sends a label filter as the labels parameter', async () => {
 		serve([rest_issue_page([{}])])
 
-		await git_gh_issue_list.issue_list_open({
+		await list_json({
 			json_fields: SUMMARY_FIELDS,
 			limit: LIMIT_MANY,
 			label: 'auto-ok',
@@ -137,7 +152,7 @@ describe('issue_list_open — the request', () => {
 	it('names another repository in the path', async () => {
 		serve([rest_issue_page([{}])])
 
-		await git_gh_issue_list.issue_list_open({
+		await list_json({
 			json_fields: SUMMARY_FIELDS,
 			limit: LIMIT_MANY,
 			label: 'in-progress',
@@ -154,9 +169,7 @@ describe('issue_list_open — the answer', () => {
 	it('answers in the field names gh answered in', async () => {
 		serve([rest_issue_page([{}])])
 
-		const rows = parse_listing(
-			await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY }),
-		)
+		const rows = parse_listing(await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY }))
 
 		expect(rows).toEqual([
 			{
@@ -174,9 +187,7 @@ describe('issue_list_open — the answer', () => {
 	it('drops pull requests from the listing', async () => {
 		serve([rest_issue_page([rest_pull_request(PR_NUMBER), {}])])
 
-		const rows = parse_listing(
-			await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY }),
-		)
+		const rows = parse_listing(await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY }))
 
 		expect(rows?.map((row) => row.number)).toEqual([ISSUE_NUMBER])
 	})
@@ -185,7 +196,7 @@ describe('issue_list_open — the answer', () => {
 	it('stops at the end of the listing', async () => {
 		serve([rest_issue_page([{}])])
 
-		await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
+		await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
 
 		expect(mocked_api).toHaveBeenCalledTimes(ONE_REQUEST)
 	})
@@ -195,9 +206,7 @@ describe('issue_list_open — the answer', () => {
 	it('cuts the listing off at limit', async () => {
 		serve([rest_issue_page([{}, { number: SECOND_NUMBER }])])
 
-		const rows = parse_listing(
-			await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_ONE }),
-		)
+		const rows = parse_listing(await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_ONE }))
 
 		expect(rows?.map((row) => row.number)).toEqual([ISSUE_NUMBER])
 	})
@@ -213,9 +222,7 @@ describe('issue_list_open — the paging', () => {
 
 		serve([rest_issue_page([{}, ...fillers]), rest_issue_page([{ number: SECOND_NUMBER }])])
 
-		const rows = parse_listing(
-			await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_TWO }),
-		)
+		const rows = parse_listing(await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_TWO }))
 
 		expect(rows?.map((row) => row.number)).toEqual([ISSUE_NUMBER, SECOND_NUMBER])
 		expect(mocked_api).toHaveBeenCalledTimes(TWO_REQUESTS)
@@ -226,9 +233,7 @@ describe('issue_list_open — the paging', () => {
 	it('answers undefined rather than an empty listing when the read fails', async () => {
 		mocked_api.mockRejectedValue(new Error('HTTP 403'))
 
-		expect(
-			await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY }),
-		).toBeUndefined()
+		expect(await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })).toBeUndefined()
 	})
 
 	// A response that is not a listing — `gh` answering `{"message":"API rate limit exceeded"}` — is
@@ -236,15 +241,13 @@ describe('issue_list_open — the paging', () => {
 	it('answers undefined when the response is not a listing', async () => {
 		serve(['{"message":"API rate limit exceeded"}'])
 
-		expect(
-			await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY }),
-		).toBeUndefined()
+		expect(await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })).toBeUndefined()
 	})
 })
 
 // joshuafolkken/kit#1033: the body search below matches nothing on a normal run, so "stop once
 // `limit` rows are selected" never fires and the paging read the whole open backlog every time.
-describe('issue_list_open_outcome — the page ceiling', () => {
+describe('issue_list_open — the page ceiling', () => {
 	// A page the filter empties is still a full page, so the paging continues — which is exactly the
 	// shape that has no natural end short of the backlog running out.
 	it('stops paging at the ceiling and says the scan was cut short', async () => {
@@ -256,24 +259,27 @@ describe('issue_list_open_outcome — the page ceiling', () => {
 		expect(outcome.is_capped).toBe(true)
 	})
 
-	// The ceiling is answered to one caller and discarded by `issue_list_open`, so putting it on a
-	// listing whose caller cannot read the flag would silently shorten that listing's answer — this
-	// change's own defect, introduced by the fix for it. The pull-request exclusion is client-side on
-	// every listing, so `epic:bundle`'s backlog scan is exactly that case.
-	it('leaves a listing with no body search unbounded', async () => {
+	// joshuafolkken/kit#1067: the ceiling now bounds *every* listing, not only the body search. The
+	// pull-request exclusion is client-side on all of them, so a repository with hundreds of open pull
+	// requests had `epic:bundle`'s backlog scan reading the whole backlog to fill its `limit`.
+	//
+	// **And it reports the cut on the same answer.** Bounding a listing whose caller cannot see the
+	// bound is a silently shortened answer — the defect the bound exists to prevent — so the flag was
+	// threaded out to all six callers before this test could be written.
+	it('bounds a listing with no body search too, and says the scan was cut short', async () => {
 		const pages = Array.from({ length: MAX_PAGES + LIMIT_ONE }, (_value, page) =>
 			full_page_of(page, true),
 		)
 
 		serve([...pages, EMPTY_PAGE])
 
-		const outcome = await git_gh_issue_list.issue_list_open_outcome({
+		const outcome = await git_gh_issue_list.issue_list_open({
 			json_fields: BODY_FIELDS,
 			limit: LIMIT_MANY,
 		})
 
-		expect(mocked_api.mock.calls.length).toBeGreaterThan(MAX_PAGES)
-		expect(outcome.is_capped).toBe(false)
+		expect(mocked_api).toHaveBeenCalledTimes(MAX_PAGES)
+		expect(outcome.is_capped).toBe(true)
 	})
 
 	// A cap applied silently turns "I did not look at everything" into "there is nothing there", so a
@@ -307,7 +313,7 @@ describe('issue_list_open — the search replacement', () => {
 	it('keeps only the rows whose body carries the term', async () => {
 		serve([rest_issue_page([{}, { number: SECOND_NUMBER, body: 'no mention here' }])])
 
-		const json = await git_gh_issue_list.issue_list_open({
+		const json = await list_json({
 			json_fields: BODY_FIELDS,
 			limit: LIMIT_MANY,
 			body_term: ISSUE_BODY,
@@ -321,7 +327,7 @@ describe('issue_list_open — the search replacement', () => {
 	it('does not match the term inside a longer number', async () => {
 		serve([rest_issue_page([{ body: 'blocked by #10220' }])])
 
-		const json = await git_gh_issue_list.issue_list_open({
+		const json = await list_json({
 			json_fields: BODY_FIELDS,
 			limit: LIMIT_MANY,
 			body_term: '#1022',
@@ -337,7 +343,7 @@ describe('issue_list_open — the search replacement, term boundaries', () => {
 	it('matches the term where it is not followed by a digit', async () => {
 		serve([rest_issue_page([{ body: 'blocked by #10220, parent #1022.' }])])
 
-		const json = await git_gh_issue_list.issue_list_open({
+		const json = await list_json({
 			json_fields: BODY_FIELDS,
 			limit: LIMIT_MANY,
 			body_term: '#1022',
@@ -351,7 +357,7 @@ describe('issue_list_open — the search replacement, term boundaries', () => {
 		// eslint-disable-next-line unicorn/no-null -- REST answers JSON null for an issue with no body
 		serve([rest_issue_page([{ body: null }])])
 
-		const json = await git_gh_issue_list.issue_list_open({
+		const json = await list_json({
 			json_fields: BODY_FIELDS,
 			limit: LIMIT_MANY,
 			body_term: '#1022',
@@ -367,9 +373,7 @@ describe('issue_list_open — the blocker relations', () => {
 	it('answers blockedBy for a row that declares a blocker', async () => {
 		serve([rest_issue_page([rest_dependencies_summary(LIMIT_ONE)])], rest_blockers())
 
-		const rows = parse_listing(
-			await git_gh_issue_list.issue_list_open({ json_fields: PICKUP_FIELDS, limit: LIMIT_MANY }),
-		)
+		const rows = parse_listing(await list_json({ json_fields: PICKUP_FIELDS, limit: LIMIT_MANY }))
 
 		expect(rows?.[0]?.blockedBy).toEqual({
 			nodes: [{ number: BLOCKER_NUMBER, state: 'CLOSED' }],
@@ -383,9 +387,7 @@ describe('issue_list_open — the blocker relations', () => {
 	it('spends no request on a row GitHub reports as unblocked', async () => {
 		serve([rest_issue_page([rest_dependencies_summary(0)])])
 
-		const rows = parse_listing(
-			await git_gh_issue_list.issue_list_open({ json_fields: PICKUP_FIELDS, limit: LIMIT_MANY }),
-		)
+		const rows = parse_listing(await list_json({ json_fields: PICKUP_FIELDS, limit: LIMIT_MANY }))
 
 		expect(rows?.[0]?.blockedBy).toEqual({ nodes: [], totalCount: 0 })
 		expect(api_paths().some((path) => path.includes(BLOCKED_BY_SEGMENT))).toBe(false)
@@ -396,7 +398,7 @@ describe('issue_list_open — the blocker relations', () => {
 	it('spends no request when blockedBy was not asked for', async () => {
 		serve([rest_issue_page([rest_dependencies_summary(LIMIT_ONE)])])
 
-		await git_gh_issue_list.issue_list_open({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
+		await list_json({ json_fields: SUMMARY_FIELDS, limit: LIMIT_MANY })
 
 		expect(mocked_api).toHaveBeenCalledTimes(ONE_REQUEST)
 	})
@@ -410,8 +412,6 @@ describe('issue_list_open — the blocker relations', () => {
 			return rest_issue_page([rest_dependencies_summary(LIMIT_ONE)])
 		})
 
-		expect(
-			await git_gh_issue_list.issue_list_open({ json_fields: PICKUP_FIELDS, limit: LIMIT_MANY }),
-		).toBeUndefined()
+		expect(await list_json({ json_fields: PICKUP_FIELDS, limit: LIMIT_MANY })).toBeUndefined()
 	})
 })

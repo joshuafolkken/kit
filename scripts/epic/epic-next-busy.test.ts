@@ -1,4 +1,9 @@
 import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
+import {
+	capped_listing_outcome,
+	listing_of,
+	listing_outcome,
+} from '#scripts/git/git-gh-issue-list-fixture'
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
@@ -26,6 +31,8 @@ const SECOND_CHILD = 862
 const FOREIGN_HOLDER = 700
 const SUCCESS_EXIT_CODE = 0
 const WAIT_TOKEN = 'wait'
+// The half of every not-idle explanation that says the guard did not fall open.
+const NOT_IDLE = 'not "nothing is running"'
 
 function child(number: number, labels: ReadonlyArray<string> = []): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels, blocked_by: [] }
@@ -79,7 +86,7 @@ beforeEach(() => {
 
 describe('josh epic:next --repo — a repository that is already running something', () => {
 	it('offers the child when nothing is in progress there', async () => {
-		issue_list.mockResolvedValueOnce('[]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
 		expect(await answer_for([child(FIRST_CHILD)])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(FIRST_CHILD))
@@ -88,7 +95,7 @@ describe('josh epic:next --repo — a repository that is already running somethi
 	// The whole point: the holder is not tracked by this epic, so no classification of *its* children
 	// could ever have seen it.
 	it('waits on an in-progress issue this epic does not track', async () => {
-		issue_list.mockResolvedValueOnce(listing([FOREIGN_HOLDER]))
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FOREIGN_HOLDER])))
 
 		expect(await answer_for([child(FIRST_CHILD)])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(WAIT_TOKEN)
@@ -97,7 +104,7 @@ describe('josh epic:next --repo — a repository that is already running somethi
 	// Named because the stale-label rule is applied by whoever finds the label stale, and a run told
 	// only "wait" has nothing to go and look at.
 	it('names the issue that holds the repository', async () => {
-		issue_list.mockResolvedValueOnce(listing([FOREIGN_HOLDER]))
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FOREIGN_HOLDER])))
 
 		await answer_for([child(FIRST_CHILD)])
 
@@ -107,11 +114,11 @@ describe('josh epic:next --repo — a repository that is already running somethi
 	// The stale path: removing an abandoned `in-progress` label empties the listing, and the same
 	// epic is offered its child on the next ask. Without this the guard could wait forever.
 	it('offers the child again once a stale label has been removed', async () => {
-		issue_list.mockResolvedValueOnce(listing([FOREIGN_HOLDER]))
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FOREIGN_HOLDER])))
 		await answer_for([child(FIRST_CHILD)])
 
 		stdout_lines.length = 0
-		issue_list.mockResolvedValueOnce('[]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
 		expect(await answer_for([child(FIRST_CHILD)])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(FIRST_CHILD))
@@ -121,18 +128,18 @@ describe('josh epic:next --repo — a repository that is already running somethi
 	// guard exists to prevent. It is not an error either — `issue_list_open` swallows a passing rate
 	// limit into the same `undefined`, and ending an unattended run over a blip is what `wait` avoids.
 	it('waits rather than offering a child when the listing could not be read', async () => {
-		issue_list.mockResolvedValueOnce(undefined)
+		issue_list.mockResolvedValueOnce(listing_outcome(undefined))
 
 		expect(await answer_for([child(FIRST_CHILD)])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(WAIT_TOKEN)
 	})
 
 	it('says why it is waiting when the listing could not be read', async () => {
-		issue_list.mockResolvedValueOnce(undefined)
+		issue_list.mockResolvedValueOnce(listing_outcome(undefined))
 
 		await answer_for([child(FIRST_CHILD)])
 
-		expect(stderr()).toContain('not "nothing is running"')
+		expect(stderr()).toContain(NOT_IDLE)
 	})
 })
 
@@ -157,7 +164,7 @@ describe('josh epic:next --repo — an in-progress child of this epic', () => {
 	// A sibling is runnable by the classification, and the repository is busy — the invariant is one
 	// child per repository, so the sibling waits too.
 	it('holds a runnable sibling back while it runs', async () => {
-		issue_list.mockResolvedValueOnce(listing([FIRST_CHILD]))
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FIRST_CHILD])))
 
 		const children = [child(FIRST_CHILD, [IN_PROGRESS_LABEL]), child(SECOND_CHILD)]
 
@@ -172,9 +179,7 @@ describe('josh epic:next --repo — a parked child', () => {
 	// run it was meant to keep going.
 	it('offers a sibling rather than waiting on the child it just set aside', async () => {
 		issue_list.mockResolvedValueOnce(
-			JSON.stringify([
-				issue(FIRST_CHILD, CREATED_EARLIER, [IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL]),
-			]),
+			listing_of([issue(FIRST_CHILD, CREATED_EARLIER, [IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL])]),
 		)
 
 		const children = [
@@ -218,5 +223,41 @@ describe('josh epic:next without --repo', () => {
 		await epic_next.report(epic_next.decide(state), state, undefined)
 
 		expect(stderr()).not.toContain(epic_next.UNCHECKED_EXCLUSION)
+	})
+})
+
+// joshuafolkken/kit#1067: the page ceiling bounds this listing too now, and a short listing with no
+// visible holder must land where an unreadable one lands. The direction is the one kit#925 closed —
+// reading "I did not see everything" as "nothing is running" starts a second child in one checkout.
+describe('josh epic:next --repo — a listing that was cut short', () => {
+	it('waits rather than offering a child when the listing was truncated', async () => {
+		issue_list.mockResolvedValueOnce(capped_listing_outcome('[]'))
+
+		expect(await answer_for([child(FIRST_CHILD)])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(WAIT_TOKEN)
+	})
+
+	// The token is the whole contract: a loop reads `child=$(josh epic:next … --repo …)` and branches
+	// on it, so the explanation goes to standard error and nothing else joins it on standard output.
+	it('keeps the explanation off standard output', async () => {
+		issue_list.mockResolvedValueOnce(capped_listing_outcome('[]'))
+
+		await answer_for([child(FIRST_CHILD)])
+
+		expect(stdout()).toBe(WAIT_TOKEN)
+		expect(stderr()).toContain(NOT_IDLE)
+	})
+
+	// Removing the stale labels shortens the listing below the cut, and the same epic is offered its
+	// child on the next ask — so the guard resolves the way the busy one does rather than latching.
+	it('offers the child again once the listing fits', async () => {
+		issue_list.mockResolvedValueOnce(capped_listing_outcome('[]'))
+		await answer_for([child(FIRST_CHILD)])
+
+		stdout_lines.length = 0
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		expect(await answer_for([child(FIRST_CHILD)])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(FIRST_CHILD))
 	})
 })

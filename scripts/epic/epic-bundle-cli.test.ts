@@ -1,4 +1,5 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { capped_listing_outcome, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
@@ -159,7 +160,7 @@ describe('epic_bundle_cli.warn_about_gaps — a listing that was cut short', () 
 	const CAP = String(epic_bundle_cli.BACKLOG_LIMIT)
 
 	it('says so when the epic listing hit its cap', () => {
-		const warned = captured({ ...read_backlog(), is_epic_list_truncated: true })
+		const warned = captured({ ...read_backlog(), epic_cutoff: 'row_limit' })
 
 		expect(warned).toContain(EPIC_LISTING)
 		expect(warned).toContain(CAP)
@@ -168,8 +169,8 @@ describe('epic_bundle_cli.warn_about_gaps — a listing that was cut short', () 
 	// The two caps hide different things — one an epic, the other a backlog issue — so a caller told
 	// only "something was truncated" cannot tell whether the epic tracking a candidate was missed.
 	it('distinguishes the epic cap from the backlog cap', () => {
-		const epics = captured({ ...read_backlog(), is_epic_list_truncated: true })
-		const issues = captured({ ...read_backlog(), is_truncated: true })
+		const epics = captured({ ...read_backlog(), epic_cutoff: 'row_limit' })
+		const issues = captured({ ...read_backlog(), cutoff: 'row_limit' })
 
 		expect(epics).not.toBe(issues)
 		expect(epics).not.toContain(BACKLOG_LISTING)
@@ -181,13 +182,11 @@ describe('epic_bundle_cli.warn_about_gaps — the quiet path and both caps at on
 	// The normal path must be unchanged: a warning on every run is a warning nobody reads. The flags
 	// are set explicitly false rather than left off — omitted, this repeats the case above it.
 	it('says nothing when both listings reported themselves complete', () => {
-		expect(
-			captured({ ...read_backlog(), is_truncated: false, is_epic_list_truncated: false }),
-		).toBe('')
+		expect(captured({ ...read_backlog(), cutoff: 'none', epic_cutoff: 'none' })).toBe('')
 	})
 
 	it('reports both caps when both were reached', () => {
-		const warned = captured({ ...read_backlog(), is_truncated: true, is_epic_list_truncated: true })
+		const warned = captured({ ...read_backlog(), cutoff: 'row_limit', epic_cutoff: 'row_limit' })
 
 		expect(warned).toContain(EPIC_LISTING)
 		expect(warned).toContain(BACKLOG_LISTING)
@@ -197,7 +196,9 @@ describe('epic_bundle_cli.warn_about_gaps — the quiet path and both caps at on
 // The epic listing is what places a candidate in an epic, so a response it could not parse must not
 // arrive as "no epics are open" — that is the confident duplicate joshuafolkken/kit#950 is about.
 async function fetch_epics_with(raw: string | undefined): Promise<unknown> {
-	const spy = vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(raw)
+	const spy = vi
+		.spyOn(git_gh_command, 'issue_list_by_label')
+		.mockResolvedValue(listing_outcome(raw))
 
 	try {
 		return await epic_bundle_cli.fetch_epics()
@@ -212,10 +213,52 @@ describe('epic_bundle_cli.fetch_epics — an answer it could not parse', () => {
 	})
 
 	it('still reads an empty listing as no epics', async () => {
-		expect(await fetch_epics_with('[]')).toEqual({ epics: [], is_truncated: false })
+		expect(await fetch_epics_with('[]')).toEqual({ epics: [], cutoff: 'none' })
 	})
 
 	it('reports a failed listing', async () => {
 		expect(await fetch_epics_with(undefined)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1067: the backlog and epic listings can now also be stopped by the paging's own
+// page ceiling, which is a different number from the `limit` this command sets. A reader who wants
+// the answer widened reaches for a different knob for each, so the two cite the number that applies.
+describe('epic_bundle_cli.warn_about_gaps — which cut stopped the listing', () => {
+	const CAP = String(epic_bundle_cli.BACKLOG_LIMIT)
+
+	it('cites the page ceiling rather than the caller cap when the paging stopped', () => {
+		const warned = captured({ ...read_backlog(), cutoff: 'page_ceiling' })
+
+		expect(warned).toContain(BACKLOG_LISTING)
+		expect(warned).not.toContain(CAP)
+	})
+
+	it('cites the caller cap when that is what the listing filled', () => {
+		expect(captured({ ...read_backlog(), cutoff: 'row_limit' })).toContain(CAP)
+	})
+
+	// The epic listing has the same two cuts, and what it hides — which epic tracks a candidate — is
+	// unchanged by which one stopped it.
+	it('reports a page-ceiling cut on the epic listing too', () => {
+		const warned = captured({ ...read_backlog(), epic_cutoff: 'page_ceiling' })
+
+		expect(warned).toContain(EPIC_LISTING)
+		expect(warned).not.toContain(BACKLOG_LISTING)
+	})
+})
+
+// The flag has to survive the fetch, or the warning above can never fire from a real run.
+describe('epic_bundle_cli.fetch_epics — a listing the paging cut short', () => {
+	it('carries the page ceiling out of the listing', async () => {
+		const spy = vi
+			.spyOn(git_gh_command, 'issue_list_by_label')
+			.mockResolvedValue(capped_listing_outcome('[]'))
+
+		try {
+			expect(await epic_bundle_cli.fetch_epics()).toEqual({ epics: [], cutoff: 'page_ceiling' })
+		} finally {
+			spy.mockRestore()
+		}
 	})
 })

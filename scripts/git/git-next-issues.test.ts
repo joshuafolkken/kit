@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { listing_of, listing_outcome } from './git-gh-issue-list-fixture'
 import { git_next_issues } from './git-next-issues'
 import type { OpenIssueData } from './schemas'
 
@@ -114,7 +115,7 @@ describe('git_next_issues.format_lines', () => {
 describe('git_next_issues.fetch_next_issue_lines', () => {
 	it('fetches, prioritizes and formats', async () => {
 		issue_list_recent.mockResolvedValueOnce(
-			JSON.stringify([issue(1, CREATED_EARLIER), issue(2, CREATED_LATER)]),
+			listing_of([issue(1, CREATED_EARLIER), issue(2, CREATED_LATER)]),
 		)
 
 		expect(await git_next_issues.fetch_next_issue_lines()).toEqual([
@@ -125,7 +126,7 @@ describe('git_next_issues.fetch_next_issue_lines', () => {
 	})
 
 	it('returns no lines when gh is unavailable', async () => {
-		issue_list_recent.mockResolvedValueOnce(undefined)
+		issue_list_recent.mockResolvedValueOnce(listing_outcome(undefined))
 
 		expect(await git_next_issues.fetch_next_issue_lines()).toEqual([])
 	})
@@ -138,7 +139,7 @@ describe('git_next_issues.fetch_next_issue_lines', () => {
 	})
 
 	it('returns no lines on malformed JSON', async () => {
-		issue_list_recent.mockResolvedValueOnce('not json')
+		issue_list_recent.mockResolvedValueOnce(listing_outcome('not json'))
 
 		expect(await git_next_issues.fetch_next_issue_lines()).toEqual([])
 	})
@@ -146,7 +147,7 @@ describe('git_next_issues.fetch_next_issue_lines', () => {
 	// This runs after the merge has already succeeded — an unexpected `gh` output shape must not
 	// make a completed workflow look failed over a purely informational display.
 	it('returns no lines when the payload shape is unexpected', async () => {
-		issue_list_recent.mockResolvedValueOnce(JSON.stringify([{ unexpected: true }]))
+		issue_list_recent.mockResolvedValueOnce(listing_of([{ unexpected: true }]))
 
 		expect(await git_next_issues.fetch_next_issue_lines()).toEqual([])
 	})
