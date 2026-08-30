@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuditFinding, ReferenceState } from './epic-audit'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_audit_cli, type AuditInput } from './epic-audit-cli'
+import type { ClaimingSearch, ScanCutoff } from './epic-audit-orphans'
 import { epic_fetch } from './epic-fetch'
 import type { IssueReference } from './epic-graph'
 
@@ -14,6 +15,7 @@ const FETCH_CHILD = 'fetch_child'
 const LOCAL_BODY = 'local body'
 const REMOTE_BODY = 'remote body'
 const DOTTED_REPO = 'joshuafolkken/site.com'
+const ORPHAN_NUMBER = 5
 
 function body_from(repo: string): string {
 	return `body from ${repo}`
@@ -27,6 +29,11 @@ function child(number: number, body: string): AuditChild {
 	return child_in(number, REPO, body)
 }
 
+// A search that read the whole backlog — the state every existing case here assumed.
+function read_claiming(numbers: Array<number>, cutoff: ScanCutoff = 'none'): ClaimingSearch {
+	return { kind: 'read', numbers, cutoff }
+}
+
 function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
 	return {
 		epic_number: EPIC,
@@ -34,7 +41,7 @@ function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
 		children: [],
 		tracked: [],
 		reference_states: new Map(),
-		claiming: [],
+		claiming: read_claiming([]),
 		anomalies: [],
 		contradictions: [],
 		...overrides,
@@ -184,11 +191,36 @@ describe('epic_audit_cli.audit', () => {
 
 		expect(result.findings).toHaveLength(1)
 	})
+})
 
+// What check 4 could not cover, as opposed to what it found. Split from the block above because the
+// two are separately wrong-able: the check can report its orphans correctly while a search that read
+// nothing at all still arrives as a clean report (joshuafolkken/kit#1033).
+describe('epic_audit_cli.audit — the orphan search itself', () => {
 	it('reports an orphan the task list does not track', () => {
-		const result = epic_audit_cli.audit(audit_input({ tracked: [1], claiming: [1, 5] }))
+		const result = epic_audit_cli.audit(
+			audit_input({ tracked: [1], claiming: read_claiming([1, ORPHAN_NUMBER]) }),
+		)
 
 		expect(result.findings).toHaveLength(1)
+		expect(result.exit_code).toBe(0)
+	})
+
+	// joshuafolkken/kit#1033: folded into `[]`, a failed listing produced exactly the report a
+	// backlog with no orphans produces — clean, and with exit 0.
+	it('fails the audit when the orphan search could not be read', () => {
+		const result = epic_audit_cli.audit(audit_input({ claiming: { kind: 'unreadable' } }))
+
+		expect(result.findings).toHaveLength(1)
+		expect(result.exit_code).toBe(1)
+	})
+
+	// A cap that is not surfaced is the same defect wearing a different hat, so the report carries it
+	// — as a warning, because the scan did run over the newest issues.
+	it('warns without failing when the orphan search was cut short', () => {
+		const result = epic_audit_cli.audit(audit_input({ claiming: read_claiming([], 'issues') }))
+
+		expect(result.findings.map((finding) => finding.level)).toEqual(['warning'])
 		expect(result.exit_code).toBe(0)
 	})
 })

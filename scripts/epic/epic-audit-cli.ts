@@ -4,7 +4,7 @@ import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
-import { epic_audit_orphans } from './epic-audit-orphans'
+import { epic_audit_orphans, type ClaimingSearch } from './epic-audit-orphans'
 import { epic_audit_report, type AuditResult } from './epic-audit-report'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
@@ -112,7 +112,10 @@ interface AuditInput {
 	children: ReadonlyArray<AuditChild>
 	tracked: ReadonlyArray<number>
 	reference_states: ReadonlyMap<string, ReferenceState>
-	claiming: ReadonlyArray<number>
+	// The orphan search's whole outcome, not just what it found: a listing that failed and a listing
+	// the page ceiling cut short are both reported, because `[]` here is indistinguishable from
+	// "nothing claims this epic" (joshuafolkken/kit#1033).
+	claiming: ClaimingSearch
 	anomalies: ReadonlyArray<AuditFinding>
 	// Computed before the implicit-dependency check so that check can skip the pairs already reported
 	// as errors — the acceptance criteria are part of the body, so every one of them would otherwise
@@ -135,7 +138,11 @@ function audit(input: AuditInput): AuditResult {
 			input.reference_states,
 			input.repo,
 		),
-		...epic_audit_checks.find_orphans(input.tracked, input.claiming),
+		...epic_audit_orphans.search_findings(input.claiming),
+		...epic_audit_checks.find_orphans(
+			input.tracked,
+			epic_audit_orphans.claimed_numbers(input.claiming),
+		),
 	])
 }
 
