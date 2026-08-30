@@ -1,3 +1,4 @@
+import { git_epic_close_comment } from './git-epic-close-comment'
 import { git_epic_parse, type ExternalChild } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
 import { EPIC_LABEL } from './issue-labels'
@@ -114,26 +115,52 @@ function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<Sibli
 	)
 }
 
-// Every child, near and far. Listing only the local ones left an all-external epic announcing "All
-// child issues are closed ()" (joshuafolkken/kit#864).
-function build_close_comment(epic: EpicIssue): string {
-	const list = [
-		...epic.children.map((child) => `#${String(child)}`),
-		...epic.external_children.map((child) => `${child.repo}#${String(child.number)}`),
-	].join(', ')
+// The one thing the two refusals below ask for, written once — a child state that could not be read,
+// and a close the API refused (joshuafolkken/kit#1039).
+const CLOSE_MANUALLY = 'close it manually.'
 
-	return `All child issues are closed (${list}). Closing this epic automatically.`
-}
+// **An unreadable comment listing does not stop the close.** It is announced and closed exactly as
+// it was before the duplicate check existed, because refusing here would strand the epic: nothing
+// re-triggers the auto-close once every child is closed — `resolve_and_close` only evaluates epics
+// holding the issue that just merged, and that merge has already happened. One rate-limited read
+// would leave a finished epic open until somebody noticed.
+//
+// The direction is chosen on what each mistake costs, and they are not symmetric. Announcing twice
+// costs one redundant comment and nothing else, because the epic *closes* — which is what ends the
+// loop joshuafolkken/kit#1039 is about, where the comment repeated once per attempt for as long as
+// the close kept failing. Refusing costs a manual close on every transient failure.
+const UNREADABLE_COMMENTS_NOTE =
+	"'s comments could not be read; announcing again rather than leaving it open."
 
-async function close_epic(epic: EpicIssue): Promise<void> {
-	const epic_number = String(epic.number)
-	const is_closed = await git_gh_command.issue_close(epic_number, build_close_comment(epic))
+// The write, once the announcement has been decided. `comment` is `undefined` when the epic already
+// carries one — which is what stops a run whose comment landed and whose close was refused from
+// posting the same comment again on the next attempt, and again for as long as the close keeps
+// failing (joshuafolkken/kit#1039).
+//
+// The comment-first ordering inside `issue_close` is what produces that half-succeeded state, and it
+// is left exactly as it is: it is what keeps a `false` meaning "the epic is still open" in every
+// branch, which is the answer the second message here is written against (joshuafolkken/kit#1026).
+async function close_epic_with(epic_number: string, comment: string | undefined): Promise<void> {
+	const is_closed = await git_gh_command.issue_close(epic_number, comment)
 
 	console.info(
 		is_closed
 			? `🏁 Closed epic #${epic_number} — every child issue is complete.`
-			: `⚠️  Could not close epic #${epic_number}; close it manually.`,
+			: `⚠️  Could not close epic #${epic_number}; ${CLOSE_MANUALLY}`,
 	)
+}
+
+// The comment listing is read **once**: only `present` skips the announcement, so an answer of
+// `absent` and one of `unreadable` both post it, and the second says so.
+async function close_epic(epic: EpicIssue): Promise<void> {
+	const epic_number = String(epic.number)
+	const state = await git_epic_close_comment.read_close_comment_state(epic_number)
+
+	if (state === 'unreadable') console.info(`ℹ️  Epic #${epic_number}${UNREADABLE_COMMENTS_NOTE}`)
+
+	const comment = state === 'present' ? undefined : git_epic_close_comment.build_close_comment(epic)
+
+	await close_epic_with(epic_number, comment)
 }
 
 // The cross-repository children's states, and whether every one of them could be read. An epic with
@@ -160,7 +187,7 @@ async function close_epic_when_complete(epic: EpicIssue, merged_number: number):
 
 	if (!external.is_complete) {
 		console.info(
-			`ℹ️  Epic #${String(epic.number)} has a child in another repository whose state could not be read; close it manually.`,
+			`ℹ️  Epic #${String(epic.number)} has a child in another repository whose state could not be read; ${CLOSE_MANUALLY}`,
 		)
 
 		return
@@ -241,5 +268,10 @@ const git_epic_close = {
 	close_completed_epics,
 }
 
-export { git_epic_close, close_completed_epics, UNREADABLE_EPIC_LIST_MESSAGE }
+export {
+	git_epic_close,
+	close_completed_epics,
+	UNREADABLE_EPIC_LIST_MESSAGE,
+	UNREADABLE_COMMENTS_NOTE,
+}
 export type { EpicIssue }

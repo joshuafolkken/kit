@@ -87,6 +87,19 @@ const epic_child_schema = z.object({
 	blockedBy: blocked_by_schema,
 })
 
+// One conversation comment as `repos/{owner}/{repo}/issues/{N}/comments` serves it — the listing
+// both the AI-review scan and the epic auto-close read.
+//
+// Carried here rather than beside either reader: the pull request's conversation comments and an
+// epic's are the *same endpoint* answering the same objects, so a second declaration of this shape
+// would be the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1039). `ai_review_pull_comment_schema`
+// above is the `gh --json` spelling the scan reads after the mapping, not this one.
+const rest_comment_schema = z.looseObject({
+	body: z.string().nullish(),
+	html_url: z.string().optional(),
+	user: z.looseObject({ login: z.string().optional() }).nullish(),
+})
+
 // The `number,labels,body` read, for the epic check. Labels come back as objects, so the name is
 // picked out here rather than at every call site.
 const issue_label_schema = z.object({ name: z.string() })
@@ -111,12 +124,14 @@ const open_issue_schema = z.object({
 type RollupItemData = z.infer<typeof rollup_item_schema>
 type EpicChildData = z.infer<typeof epic_child_schema>
 type OpenIssueData = z.infer<typeof open_issue_schema>
+type RestCommentData = z.infer<typeof rest_comment_schema>
 
 export {
 	package_name_schema,
 	rollup_item_schema,
 	pr_raw_schema,
 	pull_comment_schema,
+	rest_comment_schema,
 	ai_review_pull_comment_schema,
 	pr_info_schema,
 	epic_issue_schema,
@@ -126,4 +141,4 @@ export {
 	blocking_issue_schema,
 	blocked_by_schema,
 }
-export type { RollupItemData, EpicChildData, OpenIssueData }
+export type { RollupItemData, EpicChildData, OpenIssueData, RestCommentData }
