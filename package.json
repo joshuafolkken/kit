@@ -1,9 +1,9 @@
 {
-	"version": "1.193.0",
+	"version": "1.194.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
-	"packageManager": "pnpm@11.24.0+sha512.bd27e345e976dcb0be0b7a1228217b049a817e21b1f355c90dbe7dc46671895a8bc1e6d06c24554505ea93ea0b45f489a27ec1bfbc8de6a9659fca0f16fa0000",
+	"packageManager": "pnpm@11.25.0+sha512.5cde925b4f075f725eb71fbae18a42ffe784524789f19b61c731cb8721ec28aaee160e01a8d5af4fedb2a42cdbf300efe23db356b0d4a17b4d63e11f8ab7c956",
 	"engines": {
 		"node": ">=22.19.0"
 	},
@@ -31,7 +31,8 @@
 		"tsconfig",
 		"cspell",
 		"lefthook",
-		".claude",
+		".claude/settings.json",
+		".claude/skills",
 		".vscode",
 		".github",
 		"CLAUDE.md",
@@ -141,7 +142,7 @@
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-promise": "^7.3.0",
 		"eslint-plugin-sonarjs": "^4.2.0",
-		"eslint-plugin-unicorn": "^73.0.0",
+		"eslint-plugin-unicorn": "^74.0.0",
 		"execa": "^10.0.1",
 		"globals": "^17.11.0",
 		"js-yaml": "^5.4.1",
@@ -151,12 +152,12 @@
 		"strip-json-comments": "^5.0.3",
 		"tsx": "^4.23.12",
 		"typescript-eslint": "^8.68.0",
-		"zod": "^4.4.3"
+		"zod": "^4.5.2"
 	},
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "11.24.0+sha512.bd27e345e976dcb0be0b7a1228217b049a817e21b1f355c90dbe7dc46671895a8bc1e6d06c24554505ea93ea0b45f489a27ec1bfbc8de6a9659fca0f16fa0000",
+			"version": "11.25.0+sha512.5cde925b4f075f725eb71fbae18a42ffe784524789f19b61c731cb8721ec28aaee160e01a8d5af4fedb2a42cdbf300efe23db356b0d4a17b4d63e11f8ab7c956",
 			"onFail": "error"
 		}
 	}
