@@ -1,4 +1,8 @@
-import { git_gh_exec, type GhApiRequest } from '#scripts/git/git-gh-exec'
+import {
+	GH_REQUEST_TIMEOUT_MESSAGE,
+	git_gh_exec,
+	type GhApiRequest,
+} from '#scripts/git/git-gh-exec'
 import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { GATE_TARGETS } from '#scripts/verification-gate'
@@ -7,7 +11,10 @@ import { propagate_run } from './propagate-run'
 import { propagate_steps } from './propagate-steps'
 import type { PropagateTarget } from './propagate-targets'
 
-vi.mock('#scripts/git/git-gh-exec', () => ({
+// The spawns are replaced, the module's own constants are not: `GH_REQUEST_TIMEOUT_MESSAGE` is
+// asserted below and a test-local copy of it would assert nothing (`CLAUDE.md` → "No clones").
+vi.mock('#scripts/git/git-gh-exec', async (import_original) => ({
+	...(await import_original<Record<string, unknown>>()),
 	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_sync: vi.fn() },
 }))
 
@@ -122,6 +129,23 @@ describe('propagate_steps.open_issue — the outcome it answers', () => {
 
 		expect(detail).not.toContain('\n')
 		expect(detail).toContain('Validation Failed (HTTP 422)')
+	})
+
+	// joshuafolkken/kit#1065: this step is the one propagation step that does not go through
+	// `spawn_step`, so it never carried `STEP_TIMEOUT_MS` and a hung `gh` blocked the single-threaded
+	// runner forever — no later consumer was processed at all. The budget now lives on the shared REST
+	// entry (`GH_REQUEST_TIMEOUT_MS`, asserted in `git-gh-exec-sync.test.ts`); what this asserts is the
+	// half that belongs here: the step **reports** the timeout as a failed write rather than answering
+	// as though the issue had been opened.
+	it('reports a timed-out write as a failed step naming the timeout', () => {
+		mocked_api_sync.mockImplementation(() => {
+			throw new Error(`${GH_REQUEST_TIMEOUT_MESSAGE}: Command timed out`)
+		})
+
+		const outcome = propagate_steps.open_issue(TARGET, KIT, VERSION)
+
+		expect(outcome.url).toBeUndefined()
+		expect(outcome.detail).toContain(GH_REQUEST_TIMEOUT_MESSAGE)
 	})
 })
 
