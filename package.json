@@ -1,5 +1,5 @@
 {
-	"version": "1.183.0",
+	"version": "1.184.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -49,6 +49,7 @@
 		"tsconfig.sonar.json",
 		"playwright.config.ts",
 		"!**/*.test.ts",
+		"!scripts/gh-subcommand-guard.ts",
 		"!**/*.spec.ts",
 		"!**/*-fixture.ts"
 	],
