@@ -29,16 +29,24 @@ const USAGE = `Usage: josh auto-ok:next [${EXCLUDE_FLAG} <issue-number>[,<issue-
 // The token for "nobody has opted anything in", which is the ordinary answer: opting in is the
 // default absence, so a repository that has never used the label answers this on every run.
 const NONE_TOKEN = 'none'
-// Wide enough that the cap is never what decides the order. `gh` lists newest first, so a truncated
-// listing drops the *oldest* opted-in issues — which is reported rather than silently ranked.
+// Wide enough that the cap is never what decides the order. The listing is newest first because
+// `git-gh-issue-list.ts` spells `sort=created&direction=desc` into every request rather than leaning
+// on REST's default (joshuafolkken/kit#1025), so a truncated listing drops the *oldest* opted-in
+// issues — which is reported rather than silently ranked.
 const LISTING_LIMIT = 200
 
 // Two different gaps, told apart because they send a person to two different places. A listing that
 // never arrived is an access or connectivity problem; a listing that arrived in a shape the schema
-// rejects is `gh`'s JSON contract having changed, where `gh auth status` is green and checking it
-// wastes the one hint the message had to give (joshuafolkken/kit#996).
+// rejects is the rows' fields having changed under the REST mapping in `git-gh-issue-rest.ts`, where
+// `gh auth status` is green and checking it wastes the one hint the message had to give
+// (joshuafolkken/kit#996).
+//
+// The second message named `gh --version` until joshuafolkken/kit#1069. The listing has been REST
+// since joshuafolkken/kit#1025 and `git-gh-issue-list.ts` builds the JSON this parser reads, so the
+// CLI's version cannot be what changed the row shape — the same misdirection the message below
+// already refuses to repeat for the blocker relations, left standing one constant above it.
 const UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing. That is not "nothing is opted in" — check \`gh auth status\` and ask again.`
-const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — \`gh\`'s JSON fields have most likely changed, so check \`gh --version\` and the fields this command asks for rather than your authentication.`
+const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — the rows came back in a shape this command does not recognize, so check the fields it asks for and the REST field mapping in \`scripts/git/git-gh-issue-rest.ts\` rather than your authentication.`
 // The blocker relations failing takes the whole listing with them, and `issue_list_open` swallows
 // the error — so the read looks exactly like an access failure and sends the reader to
 // `gh auth status`, which is green. That is the misdirection joshuafolkken/kit#996 added the message
@@ -132,18 +140,22 @@ function parse_options(argv: ReadonlyArray<string>): NextOptions {
 // Every open issue carrying the label, or which of two gaps stopped the read. Neither gap is an
 // empty listing: reading a failed read as "none" ends the run reporting a confident absence built on
 // a response nobody parsed (joshuafolkken/kit#950). They stay apart from each other because the zod
-// rejection `parse_json_array_or_undefined` deliberately rethrows means `gh`'s fields changed, not
-// that the caller's authentication lapsed (joshuafolkken/kit#996).
+// rejection `parse_json_array_or_undefined` deliberately rethrows means the listing's *fields*
+// changed, not that the caller's authentication lapsed (joshuafolkken/kit#996).
 type OptedInRead =
 	| { kind: 'read'; issues: Array<OpenIssueData>; cutoff: ScanCutoff }
 	| { kind: 'unreadable' }
 	| { kind: 'unexpected_shape' }
 	| { kind: 'blockers_unreadable' }
 
-// `undefined` is unparseable output, or valid JSON that is not a listing at all — `gh` answering
-// `{"message":"API rate limit exceeded"}`. Both are gaps, and reading either as an empty listing is
-// the confident absence kit#950 exists to prevent. Only the rethrown zod rejection means the listing
-// arrived and its *fields* were not what was asked for.
+// The two gaps `read_json_listing` names, carried through unchanged. Since joshuafolkken/kit#1025
+// `raw` is the JSON `git-gh-issue-list.ts` assembles from the REST rows rather than a CLI's stdout,
+// so a transport failure — a rate limit, a dropped connection — never reaches this parser at all:
+// `issue_list_open` catches it into `json === undefined` and `classify_failed_read` decides what it
+// was. What does reach here is the rethrown zod rejection, meaning the listing arrived and its
+// *fields* were not what was asked for. `unreadable` is passed on rather than folded away because
+// reading a gap as an empty listing is the confident absence kit#950 exists to prevent, and this is
+// not the place to make that assumption.
 function parse_listing(raw: string, is_capped: boolean): OptedInRead {
 	const read = read_json_listing(raw, open_issue_schema)
 	if (read.kind !== 'read') return { kind: read.kind }
@@ -161,7 +173,8 @@ function parse_listing(raw: string, is_capped: boolean): OptedInRead {
 // its one call site inverted it back (joshuafolkken/kit#1005).
 //
 // **Only the field list changes.** Varying the limit as well would let a rate limit or a timeout that
-// a smaller request happens to survive read as "upgrade `gh`" on a `gh` that is perfectly current.
+// a smaller request happens to survive read as the blocker relations failing, on a host that serves
+// them perfectly well.
 async function reads_without_blocked_by(): Promise<boolean> {
 	const probe = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT, {
 		json_fields: SUMMARY_FIELDS,
@@ -307,8 +320,8 @@ function report(
 	return SUCCESS_EXIT_CODE
 }
 
-// The gap that stopped the read decides the message, so a changed `gh` field list does not send
-// anyone to `gh auth status` (joshuafolkken/kit#996).
+// The gap that stopped the read decides the message, so a changed field list does not send anyone to
+// `gh auth status` (joshuafolkken/kit#996).
 const READ_FAILURE_MESSAGES = {
 	unreadable: UNREADABLE_MESSAGE,
 	unexpected_shape: UNEXPECTED_SHAPE_MESSAGE,

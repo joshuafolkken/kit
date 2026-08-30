@@ -123,11 +123,16 @@ async function inspect_siblings(
 	return await Promise.all(siblings.map(async (sibling) => await inspect_sibling(sibling)))
 }
 
-// #702 made recording the batch order a manual step (`gh issue edit <N> --add-blocked-by <M>`), and
-// skipping it is otherwise symptomless. The epic body's declared chain is the trigger: since #713
-// every split gets an epic, so its existence no longer implies an order, and warning on that alone
-// would fire on every unordered batch. Only a total absence of relations is reported — checking each
-// dependent pair would mean inferring the chain from task-list order, which need not match.
+// `pnpm josh epic --ordered` and `--add` record the declared chain themselves, through the REST
+// dependencies endpoint (`git-epic-relations.ts`, joshuafolkken/kit#1026), so the default route
+// arrives here with the relations already in place. Three routes still reach a declared order with
+// none recorded: an epic body written by hand, the manual fallback in `issue-template.md`, and
+// `apply_relations` failing — it counts the refusals, reports that the body is intact and lets the
+// batch finish. Each is otherwise symptomless, which is what this warning is for. The epic body's
+// declared chain is the trigger: since #713 every split gets an epic, so its existence no longer
+// implies an order, and warning on that alone would fire on every unordered batch. Only a total
+// absence of relations is reported — checking each dependent pair would mean inferring the chain
+// from task-list order, which need not match.
 function warn_when_order_unrecorded(epic: EpicIssue, states: ReadonlyArray<SiblingState>): void {
 	if (states.length === 0) return
 	if (!epic.has_declared_order) return
