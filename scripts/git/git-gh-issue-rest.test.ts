@@ -8,6 +8,7 @@ import {
 	ISSUE_LABEL,
 	ISSUE_NUMBER,
 	ISSUE_TITLE,
+	PULL_HTML_URL,
 	rest_blockers,
 	rest_issue,
 } from './git-gh-issue-rest-fixture'
@@ -77,9 +78,7 @@ describe('to_gh_issue — the fields whose names or values differ', () => {
 	})
 
 	it('keeps a pull request identifiable by its browser URL', () => {
-		const url = 'https://github.com/joshuafolkken/kit/pull/891'
-
-		expect(map('url', { html_url: url })).toEqual({ url })
+		expect(map('url', { html_url: PULL_HTML_URL })).toEqual({ url: PULL_HTML_URL })
 	})
 })
 
