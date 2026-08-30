@@ -33,8 +33,18 @@ const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL])
 // so an exit would end an unattended run over a blip. A persistent failure never arrives here: the
 // children are read first, and one that could not be read is already an anomaly that exits 1. What
 // is left at this line is transient, and `wait` self-heals where an exit needs a person.
+//
+// **`truncated` is kept apart from `idle` for the same reason, one step further in**
+// (joshuafolkken/kit#1067). Since the page ceiling applies to every listing, a listing can now come
+// back well-formed, short, and missing the very issue that holds this repository — and "no holder in
+// the rows I was given" is not "no holder". It is grouped with `unreadable` rather than with `idle`
+// because what it authorizes is identical: nothing. It gets its own kind only so the message names
+// the real cause — `unreadable_message` sends a reader to `gh auth status`, which is green here.
 type BusyRead =
-	{ kind: 'idle' } | { kind: 'busy'; issues: ReadonlyArray<OpenIssueData> } | { kind: 'unreadable' }
+	| { kind: 'idle' }
+	| { kind: 'busy'; issues: ReadonlyArray<OpenIssueData> }
+	| { kind: 'unreadable' }
+	| { kind: 'truncated' }
 
 // Named so the reader can go and look at them: the stale-label rule is what keeps an abandoned
 // `in-progress` from holding a repository forever, and it cannot be applied to an issue nobody was
@@ -51,6 +61,37 @@ function unreadable_message(repo: string): string {
 	return `Could not read the \`${IN_PROGRESS_LABEL}\` listing for ${repo}. That is not "nothing is running" — check \`gh auth status\` and ask again.`
 }
 
+// Said in the `⚠ … cap` shape joshuafolkken/kit#1033 settled on, because it is the same kind of
+// statement: the read happened and covered less than the whole listing. What it means here is
+// stronger than elsewhere, so the message says the consequence out loud rather than leaving a reader
+// to infer it from a warning marker.
+//
+// **It does not tell anyone to clear stale labels, the way `busy_message` does.** The only cut that
+// reaches here is the page ceiling, which needs hundreds of labelled pull requests to fire — nothing
+// an issue label can clear, and nothing asking again will resolve either. So it names what the run
+// is waiting on and sends the reader to the one thing that would change the answer.
+function truncated_message(repo: string): string {
+	return `⚠ The \`${IN_PROGRESS_LABEL}\` listing for ${repo} could not be read to the end, so an issue holding that repository may not be in it. That is not "nothing is running" — nothing is offered here, and asking again will not clear it. Narrow what carries \`${IN_PROGRESS_LABEL}\` in that repository, or run this child there by hand.`
+}
+
+// Which of the three non-idle answers to print, by kind rather than by fall-through. `idle` has no
+// message — it is the branch that offers the child — and a kind added later gets a compile error at
+// the table instead of silently inheriting the unreadable listing's advice, which would send a
+// reader to `gh auth status` for something that has nothing to do with it.
+const BUSY_REASONS: Readonly<
+	Record<Exclude<BusyRead['kind'], 'busy' | 'idle'>, (repo: string) => string>
+> = {
+	unreadable: unreadable_message,
+	truncated: truncated_message,
+}
+
+function busy_reason(read: BusyRead, repo: string): string {
+	if (read.kind === 'busy') return busy_message(read.issues, repo)
+	if (read.kind === 'idle') return ''
+
+	return BUSY_REASONS[read.kind](repo)
+}
+
 // A parked issue does not hold the repository, and this is not a special case bolted on: it is the
 // precedence `epic_classify.local_category` already applies, which reads `needs-decision` *before*
 // `in-progress` and so calls a parked child `human` rather than `time`. Two readings of one issue
@@ -64,31 +105,47 @@ function is_parked(issue: OpenIssueData): boolean {
 // A listing that arrived, or a gap. The shared reader tells the two gaps apart — output that is not
 // a listing from elements the schema rejects — and both are `unreadable` here: this guard has one
 // safe answer and it is the same for either, while the `auto-ok` pickup names them separately.
-function parse_listing(raw: string): BusyRead {
+//
+// A holder that *is* visible settles the question whatever the paging did — something is running,
+// which is the answer — so `is_capped` is consulted only when no holder came back.
+//
+// **`is_capped` alone, not the `limit` cap the other callers also report.** A page ceiling here means
+// the paging could not reach `limit` at all, which normal operation does not produce and which
+// nothing the run can do will clear — waiting is the right answer and it is a state a person has to
+// look at. A *filled* `limit` is different: `epicrun` parks a child by adding `needs-decision` and
+// **leaving `in-progress` on**, so parked issues accumulate under this label, and a hundred of them
+// would fill the listing with rows this function then discards as non-holders. Calling that
+// truncated answers `wait` on every ask, for a condition nothing resolves — one stalled repository
+// for every epic, traded against the second run one possibly-hidden holder would allow. The `wait`
+// this guard is built on is the kind a holder finishing clears, and that one is not it.
+function parse_listing(raw: string, is_capped: boolean): BusyRead {
 	const read = read_json_listing(raw, open_issue_schema)
 	if (read.kind !== 'read') return { kind: 'unreadable' }
 
 	const holders = read.rows.filter((row) => !is_parked(row))
+	if (holders.length > 0) return { kind: 'busy', issues: holders }
 
-	return holders.length === 0 ? { kind: 'idle' } : { kind: 'busy', issues: holders }
+	return is_capped ? { kind: 'truncated' } : { kind: 'idle' }
 }
 
 // The label filter is the query's job — membership is what makes the listing the running set, so
 // re-testing it here would be a second definition of "running".
 async function read_repository(repo: string): Promise<BusyRead> {
-	const raw = await git_gh_command.issue_list_by_label_in_repo(
+	const { json, is_capped } = await git_gh_command.issue_list_by_label_in_repo(
 		IN_PROGRESS_LABEL,
 		LISTING_LIMIT,
 		repo,
 	)
 
-	return raw === undefined ? { kind: 'unreadable' } : parse_listing(raw)
+	return json === undefined ? { kind: 'unreadable' } : parse_listing(json, is_capped)
 }
 
 const epic_busy = {
 	LISTING_LIMIT,
 	busy_message,
 	unreadable_message,
+	truncated_message,
+	busy_reason,
 	format_holders,
 	is_parked,
 	parse_listing,

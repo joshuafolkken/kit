@@ -5,6 +5,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { SUMMARY_FIELDS } from '#scripts/git/git-gh-issue'
 import { git_next_issues } from '#scripts/git/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import { cutoff_cause, cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 
@@ -54,11 +55,20 @@ const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but coul
 // by the one-request-per-blocked-issue pass — so claiming the first would be the same misdirection
 // in a new place (joshuafolkken/kit#1025).
 const BLOCKERS_UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing, though the same listing reads once the blocker relations are dropped from it — so it is reading the relations that failed, not your authentication. That is one \`dependencies/blocked_by\` request per opted-in issue declaring a blocker: either this GitHub host does not serve issue dependencies, or those requests are being rate limited. Ask again, and check the host if it persists.`
-// Said once the answer is known, so it never claims there is an answer below when there is not. The
-// cap only ever drops the *oldest* opted-in issues, `gh` listing newest first.
-const TRUNCATED_PREFIX = `⚠ The listing hit the ${String(LISTING_LIMIT)}-issue cap, so the oldest \`${AUTO_OK_LABEL}\` issues are not in it`
-const TRUNCATED_WITH_ANSWER = `${TRUNCATED_PREFIX}; the answer below is opted in, but it may not be the highest-priority one.`
-const TRUNCATED_WITHOUT_ANSWER = `${TRUNCATED_PREFIX}, and every issue in it was excluded — an opted-in issue older than the cap may still be runnable.`
+// Said once the answer is known, so it never claims there is an answer below when there is not.
+// Either cutoff only ever drops the *oldest* opted-in issues, the listing being newest first, so the
+// consequence is one sentence — but the two cite different numbers and a reader who wants the
+// listing widened reaches for a different knob for each (joshuafolkken/kit#1067).
+const TRUNCATED_BY_LIMIT = `hit the ${String(LISTING_LIMIT)}-issue cap`
+const TRUNCATED_WITH_ANSWER =
+	'; the answer below is opted in, but it may not be the highest-priority one.'
+const TRUNCATED_WITHOUT_ANSWER =
+	', and every issue in it was excluded — an opted-in issue older than the cut may still be runnable.'
+
+function truncated_cause(cutoff: ScanCutoff): string | undefined {
+	return cutoff_cause(cutoff, TRUNCATED_BY_LIMIT)
+}
+
 const NONE_OPTED_IN_MESSAGE = `No open issue carries \`${AUTO_OK_LABEL}\`.`
 const CLOSED_STATE = 'CLOSED'
 
@@ -125,7 +135,7 @@ function parse_options(argv: ReadonlyArray<string>): NextOptions {
 // rejection `parse_json_array_or_undefined` deliberately rethrows means `gh`'s fields changed, not
 // that the caller's authentication lapsed (joshuafolkken/kit#996).
 type OptedInRead =
-	| { kind: 'read'; issues: Array<OpenIssueData> }
+	| { kind: 'read'; issues: Array<OpenIssueData>; cutoff: ScanCutoff }
 	| { kind: 'unreadable' }
 	| { kind: 'unexpected_shape' }
 	| { kind: 'blockers_unreadable' }
@@ -134,10 +144,15 @@ type OptedInRead =
 // `{"message":"API rate limit exceeded"}`. Both are gaps, and reading either as an empty listing is
 // the confident absence kit#950 exists to prevent. Only the rethrown zod rejection means the listing
 // arrived and its *fields* were not what was asked for.
-function parse_listing(raw: string): OptedInRead {
+function parse_listing(raw: string, is_capped: boolean): OptedInRead {
 	const read = read_json_listing(raw, open_issue_schema)
+	if (read.kind !== 'read') return { kind: read.kind }
 
-	return read.kind === 'read' ? { kind: 'read', issues: read.rows } : { kind: read.kind }
+	return {
+		kind: 'read',
+		issues: read.rows,
+		cutoff: cutoff_of(read.rows.length, LISTING_LIMIT, is_capped),
+	}
 }
 
 // Whether the *identical* listing reads once `blockedBy` is dropped from it. Named for what it
@@ -152,7 +167,7 @@ async function reads_without_blocked_by(): Promise<boolean> {
 		json_fields: SUMMARY_FIELDS,
 	})
 
-	return probe !== undefined
+	return probe.json !== undefined
 }
 
 // Which gap a failed listing was. Both probes run only here, so a healthy run never spends either.
@@ -169,13 +184,18 @@ async function classify_failed_read(): Promise<OptedInRead> {
 	const retry = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT)
 
 	// The original form working on the second attempt means nothing was wrong with the field.
-	return retry === undefined ? { kind: 'blockers_unreadable' } : parse_listing(retry)
+	return retry.json === undefined
+		? { kind: 'blockers_unreadable' }
+		: parse_listing(retry.json, retry.is_capped)
 }
 
 async function fetch_opted_in(): Promise<OptedInRead> {
-	const raw = await git_gh_command.issue_list_by_label_summary(AUTO_OK_LABEL, LISTING_LIMIT)
+	const { json, is_capped } = await git_gh_command.issue_list_by_label_summary(
+		AUTO_OK_LABEL,
+		LISTING_LIMIT,
+	)
 
-	return raw === undefined ? await classify_failed_read() : parse_listing(raw)
+	return json === undefined ? await classify_failed_read() : parse_listing(json, is_capped)
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native
@@ -256,15 +276,21 @@ function none_reason(count: number): string {
 // Said only when the cap actually bit, and worded from the answer rather than before it: the one run
 // where truncation matters is the one where everything listed was excluded, and announcing "the
 // answer below is opted in" there contradicted the `none` that followed (joshuafolkken/kit#996).
-function truncation_note(count: number, has_answer: boolean): string | undefined {
-	if (count < LISTING_LIMIT) return undefined
+function truncation_note(cutoff: ScanCutoff, has_answer: boolean): string | undefined {
+	const cause = truncated_cause(cutoff)
+	if (cause === undefined) return undefined
+	const tail = has_answer ? TRUNCATED_WITH_ANSWER : TRUNCATED_WITHOUT_ANSWER
 
-	return has_answer ? TRUNCATED_WITH_ANSWER : TRUNCATED_WITHOUT_ANSWER
+	return `⚠ The listing ${cause}, so the oldest \`${AUTO_OK_LABEL}\` issues are not in it${tail}`
 }
 
-function report(issues: ReadonlyArray<OpenIssueData>, exclude?: ReadonlyArray<number>): number {
+function report(
+	issues: ReadonlyArray<OpenIssueData>,
+	cutoff: ScanCutoff,
+	exclude?: ReadonlyArray<number>,
+): number {
 	const next = pick_next(issues, exclude)
-	const note = truncation_note(issues.length, next !== undefined)
+	const note = truncation_note(cutoff, next !== undefined)
 
 	if (note !== undefined) console.error(note)
 
@@ -306,7 +332,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return report(read.issues, options.exclude)
+	return report(read.issues, read.cutoff, options.exclude)
 }
 
 // `process.exitCode` rather than `process.exit()`: the answer is written with `console.info`, and on
@@ -327,6 +353,7 @@ const auto_ok_cli = {
 	TRUNCATED_WITH_ANSWER,
 	TRUNCATED_WITHOUT_ANSWER,
 	NONE_OPTED_IN_MESSAGE,
+	truncated_cause,
 	parse_issue_number,
 	parse_exclude,
 	parse_pair,

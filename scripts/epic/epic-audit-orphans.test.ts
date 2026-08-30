@@ -137,7 +137,7 @@ describe('epic_audit_orphans.find_claiming_issues', () => {
 		expect(await epic_audit_orphans.find_claiming_issues(EPIC, REPO)).toEqual({
 			kind: 'read',
 			numbers: [],
-			cutoff: 'issues',
+			cutoff: 'page_ceiling',
 		})
 	})
 })
@@ -156,7 +156,7 @@ describe('epic_audit_orphans.find_claiming_issues — the match cap', () => {
 		expect(await epic_audit_orphans.find_claiming_issues(EPIC, REPO)).toEqual({
 			kind: 'read',
 			numbers: [],
-			cutoff: 'matches',
+			cutoff: 'row_limit',
 		})
 	})
 })
@@ -174,7 +174,7 @@ describe('epic_audit_orphans.search_findings', () => {
 		const findings = epic_audit_orphans.search_findings({
 			kind: 'read',
 			numbers: [],
-			cutoff: 'issues',
+			cutoff: 'page_ceiling',
 		})
 
 		expect(findings.map((finding) => finding.level)).toEqual(['warning'])
@@ -187,7 +187,7 @@ describe('epic_audit_orphans.search_findings', () => {
 		const findings = epic_audit_orphans.search_findings({
 			kind: 'read',
 			numbers: [],
-			cutoff: 'matches',
+			cutoff: 'row_limit',
 		})
 
 		expect(findings.map((finding) => finding.level)).toEqual(['warning'])

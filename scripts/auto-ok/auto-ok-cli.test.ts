@@ -1,3 +1,4 @@
+import { listing_of, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
@@ -40,6 +41,10 @@ function stderr(): string {
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	// The default answer for a call the case did not queue one for. Every wrapper answers
+	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
+	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
+	issue_list.mockResolvedValue(listing_outcome(undefined))
 	stdout_lines.length = 0
 	stderr_lines.length = 0
 })
@@ -47,7 +52,7 @@ beforeEach(() => {
 describe('josh auto-ok:next — the token on standard output', () => {
 	it('answers the newest opted-in issue, matching the next-issues display order', async () => {
 		issue_list.mockResolvedValueOnce(
-			JSON.stringify([
+			listing_of([
 				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
 				issue(NEW_ISSUE_NUMBER, CREATED_LATER),
 			]),
@@ -60,14 +65,14 @@ describe('josh auto-ok:next — the token on standard output', () => {
 	// Opting in is the default absence: a repository that has never used the label answers this on
 	// every run, and the run then finishes exactly as it did before the label existed.
 	it('answers none when no open issue carries the label', async () => {
-		issue_list.mockResolvedValueOnce('[]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
 	})
 
 	it('asks GitHub for the opt-in label, not for some other listing', async () => {
-		issue_list.mockResolvedValueOnce('[]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 		await auto_ok_cli.run([])
 
 		expect(issue_list).toHaveBeenCalledWith(AUTO_OK_LABEL, auto_ok_cli.LISTING_LIMIT)
@@ -81,7 +86,7 @@ describe('josh auto-ok:next — what it refuses to run', () => {
 		'skips an opted-in issue also carrying %s',
 		async (label) => {
 			issue_list.mockResolvedValueOnce(
-				JSON.stringify([issue(NEW_ISSUE_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, label])]),
+				listing_of([issue(NEW_ISSUE_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, label])]),
 			)
 
 			expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
@@ -91,7 +96,7 @@ describe('josh auto-ok:next — what it refuses to run', () => {
 
 	it('falls through to the next candidate when the newest one is excluded', async () => {
 		issue_list.mockResolvedValueOnce(
-			JSON.stringify([
+			listing_of([
 				issue(NEW_ISSUE_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, IN_PROGRESS_SPELLING]),
 				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
 			]),
@@ -113,7 +118,7 @@ describe('josh auto-ok:next — the issue just merged', () => {
 	// back and re-implement work that already shipped.
 	it('excludes the number the caller names', async () => {
 		issue_list.mockResolvedValueOnce(
-			JSON.stringify([
+			listing_of([
 				issue(NEW_ISSUE_NUMBER, CREATED_LATER),
 				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
 			]),
@@ -137,7 +142,7 @@ describe('josh auto-ok:next — the issue just merged', () => {
 
 describe('josh auto-ok:next — why there is nothing to run', () => {
 	it('says the label is absent when it is', async () => {
-		issue_list.mockResolvedValueOnce('[]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 		await auto_ok_cli.run([])
 
 		expect(stderr()).toContain(auto_ok_cli.NONE_OPTED_IN_MESSAGE)
@@ -146,7 +151,7 @@ describe('josh auto-ok:next — why there is nothing to run', () => {
 	// Telling a person the label is absent when it is applied sends them to apply it again.
 	it('says the candidates were excluded when they were', async () => {
 		issue_list.mockResolvedValueOnce(
-			JSON.stringify([issue(NEW_ISSUE_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, 'epic'])]),
+			listing_of([issue(NEW_ISSUE_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, 'epic'])]),
 		)
 		await auto_ok_cli.run([])
 
@@ -161,7 +166,7 @@ describe('josh auto-ok:next — a listing it could not read is not an empty one'
 		['gh answered something that is not a listing', '{"message":"API rate limit exceeded"}'],
 		['gh answered unparseable output', 'not json'],
 	])('exits non-zero when %s', async (_case, raw) => {
-		issue_list.mockResolvedValueOnce(raw)
+		issue_list.mockResolvedValueOnce(listing_outcome(raw))
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
 		// Nothing on standard output: a caller reading a token must not see `none` here.
@@ -173,7 +178,7 @@ describe('josh auto-ok:next — a listing it could not read is not an empty one'
 	// trace instead of the sentence this command exists to print. Since joshuafolkken/kit#996 it is
 	// also the one case that names the field list rather than the authentication.
 	it('exits non-zero when gh answered a listing whose rows are the wrong shape', async () => {
-		issue_list.mockResolvedValueOnce('[{"unexpected":true}]')
+		issue_list.mockResolvedValueOnce(listing_outcome('[{"unexpected":true}]'))
 
 		expect(await auto_ok_cli.run([])).toBe(FAILURE_EXIT_CODE)
 		expect(stdout()).toBe('')
@@ -189,16 +194,35 @@ describe('josh auto-ok:next — a truncated listing says so', () => {
 			issue(index + 1, CREATED_EARLIER),
 		)
 
-		issue_list.mockResolvedValueOnce(JSON.stringify(rows))
+		issue_list.mockResolvedValueOnce(listing_of(rows))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stderr()).toContain(auto_ok_cli.TRUNCATED_WITH_ANSWER)
 	})
 
 	it('stays quiet when the listing is short of the cap', async () => {
-		issue_list.mockResolvedValueOnce(JSON.stringify([issue(NEW_ISSUE_NUMBER, CREATED_LATER)]))
+		issue_list.mockResolvedValueOnce(listing_of([issue(NEW_ISSUE_NUMBER, CREATED_LATER)]))
 		await auto_ok_cli.run([])
 
 		expect(stderr()).not.toContain(auto_ok_cli.TRUNCATED_WITH_ANSWER)
+	})
+
+	// joshuafolkken/kit#1067: the paging can now stop before the cap is filled, and a short listing
+	// that nobody was told about is the silently reduced answer this whole change removes.
+	it('warns when the paging stopped before the cap was filled', async () => {
+		issue_list.mockResolvedValueOnce(listing_of([issue(NEW_ISSUE_NUMBER, CREATED_LATER)], true))
+
+		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+		expect(stderr()).toContain(auto_ok_cli.TRUNCATED_WITH_ANSWER)
+	})
+
+	// The two cuts cite different numbers because a reader who wants the listing widened reaches for
+	// a different knob for each — the caller's cap, or the paging's ceiling.
+	it('cites the page ceiling rather than the cap when the paging stopped', () => {
+		expect(auto_ok_cli.truncated_cause('page_ceiling')).not.toBe(
+			auto_ok_cli.truncated_cause('row_limit'),
+		)
+		expect(auto_ok_cli.truncated_cause('none')).toBeUndefined()
 	})
 })

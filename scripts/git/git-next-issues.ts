@@ -72,11 +72,17 @@ function format_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 // failed over a purely informational display.
 async function fetch_next_issue_lines(completed_issue_number?: number): Promise<Array<string>> {
 	try {
-		const raw_json = await git_gh_command.issue_list_recent(FETCH_LIMIT)
-		if (raw_json === undefined) return []
+		// **`is_capped` is deliberately not read here** (joshuafolkken/kit#1067). The paging is
+		// newest-first and this display keeps only the five newest of the twenty it asks for, so a
+		// listing the page ceiling cut short is a *prefix* of the one it would otherwise have got — the
+		// same five rows, in the same order. There is nothing the truncation hides that this display
+		// would have shown, and a warning above a correct list would be noise at the end of every
+		// completed run.
+		const { json } = await git_gh_command.issue_list_recent(FETCH_LIMIT)
+		if (json === undefined) return []
 
 		return format_lines(
-			prioritize(parse_json_array_safe(raw_json, open_issue_schema), completed_issue_number),
+			prioritize(parse_json_array_safe(json, open_issue_schema), completed_issue_number),
 		)
 	} catch {
 		return []
