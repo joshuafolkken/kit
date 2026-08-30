@@ -66,7 +66,7 @@ pnpm josh pr
 
 **Do not** run `gh pr create` directly — it bypasses `build_body` which generates `closes #N`, causing the Issue to remain open after merge.
 
-`fullrun` フローでは、コミット後かつ `pnpm josh followup --merge` 実行前に `/code-review` スキルを実行する。高・中優先度の指摘が見つかった場合は修正を行い、再度 run `pnpm josh review:level` and run `/code-review <what it printed>` を実行してから次のステップへ進む。**レビューは合計 2 回まで**であり、2 回目を終えた時点で残る Low/Medium は follow-up Issue に切り出し、**現在の Issue が閉じる前に `pnpm josh epic:bundle <新規>` を実行して答えに従う** — `add_to_epic` / `create_epic` は Tier A で、対応する `pnpm josh epic --add` / `pnpm josh epic` を実行する（本文の手編集は不可）。`ask` は停止（`epicrun` 中はその子を park）、`none` は何もしない（`prompts/review.md` → "Review round cap"、→「後追い Issue は起票した直後に EPIC へ束ね直す」）。
+`fullrun` フローでは、コミット後かつ `pnpm josh followup --merge` 実行前に `/code-review` スキルを実行する。高・中優先度の指摘が見つかった場合は修正を行い、再度 `pnpm josh review:level` と `/code-review <what it printed>` を実行してから次のステップへ進む。**レビューは合計 2 回まで**であり、2 回目を終えた時点で残る Low/Medium は follow-up Issue に切り出し、**現在の Issue が閉じる前に `pnpm josh epic:bundle <新規>` を実行して答えに従う** — `add_to_epic` / `create_epic` は Tier A で、対応する `pnpm josh epic --add` / `pnpm josh epic` を実行する（本文の手編集は不可）。`ask` は停止（`epicrun` 中はその子を park）、`none` は何もしない（`prompts/review.md` → "Review round cap"、→「後追い Issue は起票した直後に EPIC へ束ね直す」）。
 
 ### `fullrun` STOPPING CONDITIONS — read this before you stop
 
@@ -84,7 +84,7 @@ pnpm josh pr
 
 ### レビュー工程は実装セッションがコミット前に実行する
 
-ワークフロー内のレビュー工程（各フローの run `pnpm josh review:level` and run `/code-review <what it printed>`）は、**実装したセッション自身が、コミットの前に**インラインで実行する。対象は `git diff main`、実行時期は検証ゲートの最終段（refactor → lint → tsc → cspell → test:unit → `/code-review` at the level `pnpm josh review:level` prints）であり、`fullrun` / `halfrun` / `queue` のいずれも同じ時期・同じ対象でレビューする。High/Medium がなくなるまでその場で修正して再実行し、**指摘を潰し切ってから最初のコミットを作る**。ただし**再実行は 2 周まで**であり、2 周を終えた時点で残る High 以外の指摘は follow-up Issue に切り出して現在の Issue を完了させる（`prompts/review.md` → "Review round cap"）。**切り出しは起票では終わらない** — 直後に `pnpm josh epic:bundle <新規>` を実行し、`add_to_epic` / `create_epic` は確認せずに実行する（→「後追い Issue は起票した直後に EPIC へ束ね直す」）。したがって PR に貼るレビューコメントも、ラウンドごとのコミットや CI 再実行も発生しない。
+ワークフロー内のレビュー工程（各フローの `pnpm josh review:level` と `/code-review <what it printed>`）は、**実装したセッション自身が、コミットの前に**インラインで実行する。対象は `git diff main`、実行時期は検証ゲートの最終段（refactor → lint → tsc → cspell → test:unit → `/code-review` at the level `pnpm josh review:level` prints）であり、`fullrun` / `halfrun` / `queue` のいずれも同じ時期・同じ対象でレビューする。High/Medium がなくなるまでその場で修正して再実行し、**指摘を潰し切ってから最初のコミットを作る**。ただし**再実行は 2 周まで**であり、2 周を終えた時点で残る High 以外の指摘は follow-up Issue に切り出して現在の Issue を完了させる（`prompts/review.md` → "Review round cap"）。**切り出しは起票では終わらない** — 直後に `pnpm josh epic:bundle <新規>` を実行し、`add_to_epic` / `create_epic` は確認せずに実行する（→「後追い Issue は起票した直後に EPIC へ束ね直す」）。したがって PR に貼るレビューコメントも、ラウンドごとのコミットや CI 再実行も発生しない。
 
 **フレッシュコンテキストのサブエージェントに委譲する方式（kit#752）と、PR 作成後に実行して結果を PR コメントとして投稿する方式（kit#758）は、これを置き換えるものではなく、これに置き換えられた。** 別コンテキストのレビュアーは実装者のバイアスを持ち込まない利点があったが、毎ラウンド変更を読み直し、指摘のたびに修正コミット・push・必須チェック 6 件の CI 再実行が走るため、PR 作成からレビュー確定まで 10 分を超えるのが常態だった（kit#758 の PR 自身が 3 ラウンドで 10 分 53 秒）。**レビュアーが実装者と同一コンテキストである点は、この方式が受け入れているトレードオフである** — 作者の思い込みが素通りする確率は上がるが、コミット前セルフレビュー（`prompts/review.md`）は従来どおり必須のゲートとして残る。
 
