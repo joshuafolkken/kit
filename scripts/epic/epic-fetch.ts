@@ -3,6 +3,7 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'
+import { epic_relation_recheck } from './epic-relation-recheck'
 
 // Reading an epic and its children from GitHub.
 //
@@ -31,6 +32,62 @@ function to_child(parsed: EpicIssue, repo: string): EpicChild {
 // a different issue entirely (joshuafolkken/kit#1012).
 function scope_for(child_repo: string, current_repo: string): string | undefined {
 	return child_repo === current_repo ? undefined : child_repo
+}
+
+// One child's blockers, read from the relations listing rather than from the issue's own summary
+// count (joshuafolkken/kit#1113). Addressed through the same `scope_for` every other read of a child
+// goes through. The recheck only ever reaches children of the epic's own repository, so what the
+// scope varies with is where the *epic* is: `epic:next owner/other#858` run from here reads them
+// through `owner/other`, and reading them unqualified would answer from this repository's issues of
+// those numbers instead (joshuafolkken/kit#1012).
+async function read_child_blockers(child: EpicChild, current_repo: string): Promise<Array<number>> {
+	return await git_gh_command.issue_blocked_by_numbers(
+		String(child.number),
+		scope_for(child.repo, current_repo),
+	)
+}
+
+// The epic's own row, read once and parsed once: the body every later step consults, the bare
+// numbers naming children in the epic's repository, and the qualified rows naming children elsewhere.
+interface EpicBody {
+	body: string | undefined
+	child_numbers: ReadonlyArray<number>
+	external: ReadonlyArray<ExternalChild>
+}
+
+async function fetch_epic_body(epic_number: number, scope?: string): Promise<EpicBody> {
+	const body = await git_gh_command.issue_get_body(String(epic_number), scope)
+
+	return {
+		body,
+		child_numbers: git_epic_parse.parse_task_list_issue_numbers(body),
+		external: git_epic_parse.parse_external_task_list_children(body),
+	}
+}
+
+// What the recheck needs to know about the read it is correcting: the epic's body, the repository
+// its bare declared numbers name, and the repository the command runs in.
+interface RecheckScope {
+	body: string | undefined
+	repo: string
+	current_repo: string
+}
+
+// joshuafolkken/kit#1113: the second look at the relations, taken here rather than in `epic:next`
+// and `epic:audit` separately — both read their children through this one snapshot, so correcting it
+// once corrects both, and neither command needs to know the check exists.
+// `repo` is the epic's own repository, which is what a bare declared number names — not
+// `current_repo`, which is where the command happens to be running.
+async function rechecked_children(
+	children: ReadonlyArray<EpicChild>,
+	snapshot: RecheckScope,
+): Promise<ReadonlyArray<EpicChild>> {
+	return await epic_relation_recheck.recheck_missing_relations(
+		children,
+		snapshot.body,
+		snapshot.repo,
+		async (child) => await read_child_blockers(child, snapshot.current_repo),
+	)
 }
 
 // Numbers read from one repository's task-list rows, as references to issues in that repository.
@@ -153,20 +210,23 @@ async function fetch_epic(
 	current_repo: string = repo,
 ): Promise<EpicSnapshot> {
 	const scope = scope_for(repo, current_repo)
-	const body = await git_gh_command.issue_get_body(String(epic_number), scope)
-	const child_numbers = git_epic_parse.parse_task_list_issue_numbers(body)
-	const external = git_epic_parse.parse_external_task_list_children(body)
+	const { body, child_numbers, external } = await fetch_epic_body(epic_number, scope)
 	// joshuafolkken/kit#869's restriction is about who *we* are, so the owner comes from the repository
 	// the command runs in. Derived from the epic's own repository instead, a qualified reference to
 	// somebody else's epic would have made their whole organization readable.
 	const owner = epic_cross_repo.owner_of(current_repo)
 	const local = await fetch_children(child_numbers, repo, scope)
 	const remote = await fetch_external_children(external, owner)
+	const scope_of_recheck: RecheckScope = { body, repo, current_repo }
+	const children = await rechecked_children(
+		[...local.children, ...remote.children],
+		scope_of_recheck,
+	)
 
 	return {
 		body,
 		current_repo,
-		children: [...local.children, ...remote.children],
+		children,
 		child_numbers: [...child_numbers, ...external.map((child) => child.number)],
 		unreadable: [...local.unreadable, ...remote.unreadable],
 		skipped: local.skipped,
