@@ -163,7 +163,7 @@ Verify **every** rule below. These are non-standard, so call out any violation.
 - **Naming**: `snake_case` for variables / functions / params; `PascalCase` for types / classes / interfaces / enums; `UPPER_CASE` for enum members and constants; booleans prefixed `is_` / `has_` / `should_` / `can_` / `will_` / `did_`
 - **Functions & exports**: `function` syntax (not arrow); multiple functions grouped into a namespace object `export { my_module }`; no `export default`
 - **Files**: Svelte → `PascalCase.svelte` / `PascalCase.svelte.ts`; TypeScript → `kebab-case.ts` (route files exempt)
-- **Quality limits**: function complexity ≤4, nesting ≤1, function ≤25 lines, file ≤300 lines, params ≤3; magic numbers extracted to `UPPER_CASE` constants except `0`, `1`, `-1`; no `any`, no unused vars, no floating promises; explicit param and return types
+- **Quality limits**: function complexity ≤5, nesting ≤2, function ≤25 lines, file ≤300 lines, params ≤4, statements per function ≤10, cognitive complexity ≤4 — **the line counts are code lines, not physical lines**: `max-lines` and `max-lines-per-function` run with `skipBlankLines` and `skipComments`, so review against what `pnpm josh lint` reports rather than `wc -l`, and test files (`*.test.ts` / `*.spec.ts` / `*.e2e.ts`) allow 35 code lines per function instead of 25; magic numbers extracted to `UPPER_CASE` constants except `0`, `1`, `-1`; no `any`, no unused vars, no floating promises; explicit param and return types
 - **Early return**: single `return` under 100 chars → one-liner `if (x) return y`
 - **Svelte**: `$state` is reassignable; `Props` interface name is allowed; DOM manipulation restricted
 
