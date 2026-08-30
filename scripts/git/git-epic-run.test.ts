@@ -90,8 +90,8 @@ describe('git_epic_run.create_epic — declared order', () => {
 		expect(mocked_blocked_by).toHaveBeenCalledWith('103', '102')
 	})
 
-	// gh < 2.94.0 cannot record the relation, and losing it costs only the native link — the epic
-	// and its task list are already correct, so the run must not fail.
+	// Losing the relation costs only the native link — the epic and its task list are already
+	// correct, so the run must not fail.
 	it('succeeds when a relation cannot be recorded', async () => {
 		mocked_blocked_by.mockResolvedValue(false)
 

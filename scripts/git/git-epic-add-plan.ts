@@ -133,8 +133,8 @@ function find_addition_error(
 // repaired: someone recorded it deliberately, and rewriting the declaration around it would either
 // drop that intent or leave the epic disagreeing with itself, which is what stops an unattended run.
 //
-// The other direction — declared but never recorded, routine when `gh` is older than 2.94.0 — is not
-// an error here. It is folded into the relations this command records, so the write repairs it.
+// The other direction — declared but never recorded, which an older epic or a failed recording
+// leaves behind — is not an error here. It is folded into the relations this command records, so the write repairs it.
 function find_relation_error(
 	links: ReadonlyArray<DependencyLink>,
 	recorded: ReadonlyArray<EpicChild>,
