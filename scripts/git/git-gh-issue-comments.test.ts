@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_read } from './git-gh-issue-read'
+import { CURRENT_REPO_ISSUES } from './git-gh-issue-rest-fixture'
 
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
@@ -15,8 +16,6 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 // Its own file rather than a section of `git-gh-issue-read.test.ts`, which is within a handful of
 // lines of the three hundred a file may hold.
 const ISSUE_NUMBER = '1039'
-// `gh api` expands the two placeholders from the current repository, so they stay literal here.
-const CURRENT_REPO_ISSUES = 'repos/{owner}/{repo}/issues'
 const COMMENTS_PATH = `${CURRENT_REPO_ISSUES}/${ISSUE_NUMBER}/comments`
 const COMMENT_LISTING = '[{"body":"a plan comment"}]'
 const READ_FAILED = 'API rate limit exceeded'

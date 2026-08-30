@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_issue_read as git_gh_issue, NOT_FOUND_STATUS } from './git-gh-issue-read'
 import {
+	BLOCKED_BY_SEGMENT,
 	BLOCKER_NUMBER,
+	CURRENT_REPO_ISSUES,
 	ISSUE_BODY,
 	ISSUE_CREATED_AT,
 	ISSUE_HTML_URL,
@@ -23,9 +25,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
 
 const OTHER_REPO = 'joshuafolkken/app-kit'
-const CURRENT_REPO_ISSUES = 'repos/{owner}/{repo}/issues'
 const ISSUE_PATH = `${CURRENT_REPO_ISSUES}/${String(ISSUE_NUMBER)}`
-const BLOCKED_BY_SEGMENT = '/dependencies/blocked_by'
 const RATE_LIMITED_STATUS = 429
 const RATE_LIMIT_MESSAGE = 'API rate limit exceeded'
 const NO_BLOCKERS = '[]'

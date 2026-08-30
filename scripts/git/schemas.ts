@@ -110,9 +110,19 @@ const epic_subject_schema = z.object({
 	body: z.string().optional(),
 })
 
-// `gh issue list --json number,title,labels,createdAt,blockedBy` for the next-issues display
-// printed when a workflow completes (#821) and for the `auto-ok` pickup (joshuafolkken/kit#906).
-// `blockedBy` is optional so a listing taken before the field was requested still parses.
+// One row of an open-issue listing, under the field names `gh issue list --json` answered with.
+// Three readers parse a listing through this shape: the next-issues display printed when a workflow
+// completes (#821), the `auto-ok` pickup (joshuafolkken/kit#906), and the per-repository busy check
+// `epic:next` makes before it offers a child (joshuafolkken/kit#925).
+//
+// The row is *assembled* under those names rather than returned under them. Since
+// joshuafolkken/kit#1025 the listing is REST, and `blockedBy` is not part of a listing response at
+// all: `git-gh-issue-list.ts` reads the relations from each row's own dependencies endpoint, and
+// only for the pickup, which is the one caller whose field list names `blockedBy` at all.
+//
+// So `blockedBy` is optional for the reason it is absent in practice — the display and the busy
+// check never ask for it, and a field that was not asked for is left out of the mapped row rather
+// than filled in.
 const open_issue_schema = z.object({
 	number: z.number(),
 	title: z.string(),
