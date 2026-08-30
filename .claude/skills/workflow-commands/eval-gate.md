@@ -57,6 +57,34 @@ every scenario passed, so a failed run and one that measured nothing exit alike.
 | `blocked`    | a scenario failed — a measured violation    | **stop** — fix the prose its `→` line names, re-run that scenario by name     |
 | `unmeasured` | a scenario produced no measurement (`?`)    | continue, and say so in the completion report                                 |
 
+- **A red scenario is confirmed on the same tree before a pair is formed.** One scenario is one real
+  Claude session, so its verdict is a sample rather than a fact: measured on joshuafolkken/kit#1071,
+  `no-implicit-workflow` failed 2 of 10 readings of an **unchanged** tree. Reading each side once
+  therefore manufactures `held → failed` about one time in six on its own, which is what
+  stopped the merge on joshuafolkken/kit#1062 — the same tree read twice, disagreeing with
+  itself. Re-run the failing scenario alone, against the tree that just failed:
+
+  ```bash
+  pnpm josh eval <name>          # the same tree, a second reading
+  ```
+
+  | The second reading | What it is |
+  | --- | --- |
+  | failed again | The failure belongs to this tree. Take the baseline below and attribute it |
+  | held | **The scenario disagreed with itself on one tree**, so there is nothing to attribute and no baseline to take. Record both readings on the Issue in hand, file the instability as its own Issue against that scenario (Tier A, first-party) unless one is already open, and continue |
+  | measured nothing (`?`) | No confirmation either way. Re-read once more; if it still will not measure, report the whole run as `unmeasured` and neither block nor attribute — the same answer the baseline table's `inconclusive` row gives |
+
+  **What this trades, stated plainly — and it is not uniformly favorable.** A rule that stopped
+  working outright fails both readings and stops the merge exactly as before. A rule that only
+  *sometimes* fires can pass the second reading and merge: one failing 7 readings in 10 gets through
+  about 3 times in 10, which is *larger* than the one-in-six false block being removed. So this buys
+  a reliable gate rather than a strictly stronger one, and it is taken for a reason about behavior
+  rather than about probability — **a gate that stops merges at random is one that runs learn to
+  argue with**, and the next real failure is then attributed away with the reasoning the false ones
+  taught. **The disagreement is what keeps the trade honest**: it is recorded on the Issue in hand
+  and filed against the scenario, so a rule failing half its readings surfaces as a ruler nobody can
+  read rather than as silence. It costs one extra session only when a scenario is red, and where the
+  red was noise it *replaces* the baseline session rather than adding to it.
 - **A `blocked` verdict is attributed before it blocks.** The suite measures the whole distribution,
   not the diff, so a scenario can be red for something that predates the change — and `docs/eval.md`
   already makes the unit a **pair** of readings, before and after. Take the second one, for that one

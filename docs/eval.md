@@ -73,9 +73,31 @@ when every scenario passed, so a failed run and one that measured nothing exit a
 | `blocked`    | a scenario failed — a measured violation | **stops the merge** — fix the prose its `→` line names, re-run that scenario |
 | `unmeasured` | a scenario produced no measurement (`?`) | does not block, and is stated in the completion report                       |
 
-**A `blocked` verdict is attributed before it blocks.** The suite measures the whole distribution
-rather than the diff, so a red scenario may predate the change — which is why the unit is a pair of
-readings. Re-run that one scenario against the pre-change documents (`git stash push -u`, then
+**A `blocked` verdict is confirmed, then attributed, before it blocks.** One scenario is one real
+Claude session, so its verdict is a sample rather than a fact: measured on
+[joshuafolkken/kit#1071](https://github.com/joshuafolkken/kit/issues/1071), `no-implicit-workflow`
+failed 2 of 10 readings of an **unchanged** tree. Reading each side once therefore manufactures
+`held → failed` about one time in six on its own, which is what stopped the merge on
+joshuafolkken/kit#1062. So re-run the failing scenario alone against **the same tree** first
+(`pnpm josh eval <name>`): a second reading that holds means the scenario disagreed with itself, and
+there is no pair to form — record both readings, file the instability as its own Issue against that
+scenario unless one is already open, and continue. A second reading that fails again belongs to the
+tree, and the attribution follows. A confirmation that measures nothing (`?`) is re-read once more,
+and if it still will not measure the whole run is reported `unmeasured`.
+
+**That is a trade, and not a uniformly favorable one.** A rule that stopped working outright fails
+both readings and still stops the merge; one that only _sometimes_ fires can pass the second reading
+and merge — at 7 failures in 10 readings it gets through about 3 times in 10, which is larger than
+the one-in-six false block being removed. What it buys is a gate that is reliable rather than one
+that is strictly stronger, and the reason is about behavior rather than probability: a gate that
+stops merges at random is one that runs learn to argue with, and the next real failure is then
+attributed away with the reasoning the false ones taught. Filing the disagreement against the
+scenario is what keeps it honest — a rule failing half its readings surfaces as a ruler nobody can
+read rather than as silence.
+
+The suite measures the whole distribution rather than the diff, so a red scenario may also predate
+the change — which is why the unit is a pair of readings. Re-run that one scenario against the
+pre-change documents (`git stash push -u`, then
 `pnpm josh eval <name>`, then `git stash pop`): red before _and_ after is a standing failure, filed as
 its own Issue and not a reason to hold the change; green before and red after is this change's
 regression, fixed in at most two rounds for the reason `prompts/review.md` caps review rounds. Still
@@ -203,6 +225,11 @@ An inconclusive scenario is **retried once**, after a wait, and the retry is ann
 
 Only inconclusive verdicts are retried. A scenario that failed measured something, and re-running it
 until it passes would turn the suite into a slot machine.
+
+**The gate's same-tree confirmation is not that retry, and it is not in the harness.** It is a second
+reading a person or an agent takes after a `blocked` verdict, and a disagreement between the two is
+recorded and filed against the scenario rather than read as a pass ("When it runs" above). The
+harness still reports the first reading exactly as it found it.
 
 **Sessions draw on a shared upstream budget, and a batch can exhaust it.** What was observed while
 building this suite: each scenario passes when run on its own, while a full run returned complete
