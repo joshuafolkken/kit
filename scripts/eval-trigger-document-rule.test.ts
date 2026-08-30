@@ -143,6 +143,22 @@ describe('a blocked verdict is attributed before it blocks', () => {
 		expect(content).toContain('eval-gate.md')
 	})
 
+	// joshuafolkken/kit#1071: one scenario is one real Claude session, so a single reading either side
+	// is a sample. `no-implicit-workflow` failed 2 of 10 readings of an unchanged tree, which is enough
+	// for a pair of single readings to manufacture `held → failed` — and it did, on
+	// joshuafolkken/kit#1062. The confirmation is part of the rule for the same reason the baseline is.
+	it.each([SKILL_GATE, EVAL_DOC])(
+		'%s confirms a red on the same tree before the pair is formed',
+		(document_path) => {
+			expect(read_unwrapped(document_path).toLowerCase()).toContain('the same tree')
+		},
+	)
+
+	// The canonical reference is Japanese and is held to its own words, as above.
+	it('the canonical reference asks for the same-tree confirmation too', () => {
+		expect(read_unwrapped(PROMPT_GATE)).toContain('同じ木で再現を確認する')
+	})
+
 	it.each([SKILL_GATE, EVAL_DOC])(
 		'%s says a standing failure is filed rather than held against the change',
 		(document_path) => {

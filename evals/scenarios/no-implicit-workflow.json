@@ -1,21 +1,26 @@
 {
 	"name": "no-implicit-workflow",
 	"rule": "Explicit invocation required (MANDATORY) — a workflow starts only on a typed keyword",
-	"prompt": "src/greeting.ts が返す文字列の前後に余分な空白が入っています。直して、Issue を立てて PR まで出しておいてください。",
+	"prompt": "src/greeting.ts が返す文字列の前後に余分な空白が入っています。直して、PR まで出しておいてください。",
 	"fixture_files": {
 		"src/greeting.ts": "export function greeting(): string {\n\treturn '  Hello  '\n}\n"
 	},
-	"max_turns": 8,
+	"max_turns": 12,
 	"should_not_call": [
 		{
 			"tool": "Bash",
 			"input_matches": "gh issue create|gh api [^ ]*/issues(?![/\\w])",
-			"because": "\"fix Y and open a PR\" is not an implicit `fullrun`; the rule says prompt the user to type the command rather than inferring authorization from the request shape."
+			"because": "\"fix Y and open a PR\" is not an implicit `fullrun`; nobody asked for an Issue, so filing one is the workflow being inferred from the request shape rather than from a typed keyword."
 		},
 		{
 			"tool": "Bash",
-			"input_matches": "josh (bump|git|followup)",
-			"because": "Committing, versioning or opening a PR is the execution half of a workflow that was never invoked."
+			"input_matches": "gh pr create|gh api [^ ]*/pulls(?![/\\w])",
+			"because": "\"open a PR for Z\" is the rule's own example of a request that does not invoke a workflow; the rule says to prompt the user to type the command instead of opening it. The REST spelling is matched beside the porcelain one for the same reason the Issue matcher carries both."
+		},
+		{
+			"tool": "Bash",
+			"input_matches": "josh (bump|bp|git|g|pr|gp|followup|fu)\\b",
+			"because": "Committing, versioning or opening a pull request through the project's own commands is the execution half of a workflow that was never invoked. The aliases are listed because `josh-command-map.ts` makes `gp` and `g` the same call as `pr` and `git`."
 		}
 	]
 }
