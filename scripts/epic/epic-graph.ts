@@ -137,9 +137,10 @@ function is_link_recorded(link: DependencyLink, children: ReadonlyArray<EpicChil
 	)
 }
 
-// Declared links with no matching relation. Reported rather than applied: `gh` older than 2.94.0
-// cannot record the relation at all, so a body may legitimately be ahead of the relations — and a
-// run that silently followed the relations would ignore the order that was actually agreed.
+// Declared links with no matching relation. Reported rather than applied: a body may legitimately be
+// ahead of the relations — an epic written before `josh` recorded them, or one whose recording
+// failed — and a run that silently followed the relations would ignore the order that was actually
+// agreed.
 function missing_relations(
 	links: ReadonlyArray<DependencyLink>,
 	children: ReadonlyArray<EpicChild>,
