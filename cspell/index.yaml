@@ -3,6 +3,14 @@ useGitignore: true
 language: en
 ignorePaths:
   - '**/.git/**'
+  # joshuafolkken/kit#1114: where Claude Code puts its bridge work trees — a full checkout of the
+  # project, on another branch, inside a directory this package ships. `useGitignore` above does not
+  # reach them: git excludes them through `.git/info/exclude`, a per-checkout file that is never
+  # committed and that nothing outside git reads. Left in, a spell check fails on a word introduced
+  # by work on a different branch, in a file the current one does not contain — the same gap that
+  # published them to npm until joshuafolkken/kit#1107 and linted them until joshuafolkken/kit#1112.
+  # `**/` rather than a root anchor, because a monorepo puts a package's work trees under it.
+  - '**/.claude/worktrees/**'
   - '**/.gitignore'
   - '**/pnpm-lock.yaml'
   - '**/.vscode/**'
