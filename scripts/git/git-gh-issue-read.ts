@@ -28,6 +28,14 @@ import {
 // up to two hundred issues, and every one of those reads names `blockedBy`. Without the skip the
 // pass would be four hundred requests where `gh` made two hundred.
 //
+// A pull request is skipped ahead of that, structurally rather than on a count. It carries no
+// `issue_dependencies_summary` at all, and an absent summary is deliberately not read as a zero — so
+// the numeric skip cannot fire for one, and the endpoint was asked every time. GitHub answers an
+// empty array today, but a 404 there would fail the whole read and `epic:bundle` would report the
+// reference as `unreadable` **before** the `/pull/` check that drops it (joshuafolkken/kit#947) ever
+// ran. The guard rested on API behavior nobody controls; this makes it a fact about pull requests
+// (joshuafolkken/kit#1066).
+//
 // Exported because the *listings* need exactly this, and for exactly this reason: a listing response
 // carries every row's `issue_dependencies_summary` but no `blockedBy`, so the pickup that asks for
 // the field pays one request per row that declares a blocker and nothing for the rest. A second copy
@@ -37,6 +45,8 @@ async function read_blocked_by(
 	rest: RestIssue,
 	repo?: string,
 ): Promise<BlockedBy> {
+	if (git_gh_issue_rest.is_pull_request(rest)) return git_gh_issue_rest.empty_blocked_by()
+
 	const exact_total = git_gh_issue_rest.total_blocked_by(rest)
 	if (exact_total === 0) return git_gh_issue_rest.empty_blocked_by()
 

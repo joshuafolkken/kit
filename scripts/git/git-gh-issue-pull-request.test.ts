@@ -19,30 +19,37 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 // joshuafolkken/kit#1052: `epic:bundle` keeps a pull request out of its candidates by the `/pull/`
 // in the url it read (joshuafolkken/kit#947) — a guard that only works if the reference was read at
-// all.
+// all. That is what this file pins, and it is unchanged.
 //
-// A pull request carries no `issue_dependencies_summary`, and an absent summary is not a zero, so
-// the skip that settles the common case in `read_blocked_by` cannot fire for one: the dependencies
-// endpoint is asked every time. It answers a bare empty array, measured against a merged pull
-// request while joshuafolkken/kit#1031 was written. A 404 there would instead fail the whole read,
-// and the reference would be reported as `unreadable` rather than dropped — which is why the answer
-// is pinned here rather than left as something the live API happens to do.
+// What changed is the mechanism underneath it (joshuafolkken/kit#1066). A pull request carries no
+// `issue_dependencies_summary`, and an absent summary is deliberately not read as a zero, so the
+// numeric skip in `read_blocked_by` could never fire for one and the dependencies endpoint was asked
+// every time. It answered a bare empty array — measured against a merged pull request while
+// joshuafolkken/kit#1031 was written — and #1052 pinned that answer, because a 404 there would fail
+// the whole read and report the reference as `unreadable` rather than dropping it.
+//
+// `read_blocked_by` now recognizes a pull request structurally and answers the empty relation without
+// a request, so the guard no longer depends on what the endpoint replies. The mock below therefore
+// makes that endpoint *fail*: it stands in for the 404 the old pin was defending against, and the
+// read staying `read` proves the defense no longer rests on GitHub's behavior.
 //
 // Its own file rather than a section of `git-gh-issue-read.test.ts`, which is within a handful of
 // lines of the three hundred a file may hold — the same reason `git-gh-issue-comments.test.ts` is
 // separate.
 
 const ISSUE_PATH = `${CURRENT_REPO_ISSUES}/${String(ISSUE_NUMBER)}`
-const BLOCKED_BY_PATH = `${ISSUE_PATH}${BLOCKED_BY_SEGMENT}?per_page=100`
-// What the dependencies endpoint actually answers for a pull request.
-const NO_BLOCKERS = '[]'
 const READ_NUMBER = String(ISSUE_NUMBER)
 const MERGED_PULL_REQUEST = rest_issue(rest_pull_request(ISSUE_NUMBER, MERGED_AT))
+// The hazard the skip exists for: GitHub answering the dependencies endpoint with anything but an
+// empty array. Nothing may reach it, so any request there is a failure of the test.
+const DEPENDENCIES_FAILED = 'gh: Not Found (HTTP 404)'
 
 function serve_pull_request(): void {
-	mocked_api.mockImplementation(async (request) =>
-		request.path.includes(BLOCKED_BY_SEGMENT) ? NO_BLOCKERS : MERGED_PULL_REQUEST,
-	)
+	mocked_api.mockImplementation(async (request) => {
+		if (request.path.includes(BLOCKED_BY_SEGMENT)) throw new Error(DEPENDENCIES_FAILED)
+
+		return MERGED_PULL_REQUEST
+	})
 }
 
 function api_paths(): Array<string> {
@@ -54,17 +61,20 @@ beforeEach(() => {
 })
 
 describe('the dependencies endpoint for a pull request', () => {
-	it('is asked, since a pull request carries no dependency summary to skip on', async () => {
+	// The saving is incidental — one request per pull-request reference — but it is what makes the
+	// two tests below independent of what the endpoint would have replied.
+	it('is not asked, since a pull request has no blocker relations to read', async () => {
 		serve_pull_request()
 
 		await git_gh_issue_read.issue_get_plan_fields_classified(READ_NUMBER)
 
-		expect(api_paths()).toEqual([ISSUE_PATH, BLOCKED_BY_PATH])
+		expect(api_paths()).toEqual([ISSUE_PATH])
 	})
 
-	// `read`, not `unreadable`: the empty array is a successful read, so the reference reaches the
-	// `/pull/` check that drops it instead of being reported as a gap nobody could look into.
-	it('leaves the read succeeding when it answers an empty array', async () => {
+	// #1052's purpose, kept: `read`, not `unreadable`, so the reference reaches the `/pull/` check
+	// that drops it instead of being reported as a gap nobody could look into. It now holds even
+	// though the endpoint would have failed, which is the whole point of the structural skip.
+	it('leaves the read succeeding even where the endpoint would answer 404', async () => {
 		serve_pull_request()
 
 		const read = await git_gh_issue_read.issue_get_plan_fields_classified(READ_NUMBER)
