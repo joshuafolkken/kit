@@ -1,9 +1,17 @@
+import { git_gh_exec, type GhApiRequest } from '#scripts/git/git-gh-exec'
+import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { GATE_TARGETS } from '#scripts/verification-gate'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { propagate_run } from './propagate-run'
 import { propagate_steps } from './propagate-steps'
 import type { PropagateTarget } from './propagate-targets'
+
+vi.mock('#scripts/git/git-gh-exec', () => ({
+	git_gh_exec: { exec_gh_api: vi.fn(), exec_gh_api_sync: vi.fn() },
+}))
+
+const mocked_api_sync = vi.mocked(git_gh_exec.exec_gh_api_sync)
 
 const KIT = '@joshuafolkken/kit'
 const VERSION = '1.111.0'
@@ -12,6 +20,110 @@ const TARGET: PropagateTarget = {
 	path: '/Users/example/Development/app-kit',
 	state: 'ready',
 }
+
+const ISSUE_URL = `https://github.com/${TARGET.repo}/issues/42`
+const CONSUMER_ISSUES_PATH = `repos/${TARGET.repo}/issues`
+const HTML_URL_FILTER = '.html_url'
+const REFUSAL =
+	'gh: Validation Failed (HTTP 422)\n{"message":"Issues are disabled for this repository"}'
+
+beforeEach(() => {
+	vi.clearAllMocks()
+	mocked_api_sync.mockReturnValue(ISSUE_URL)
+})
+
+// What a refused write throws: `to_gh_error` puts gh's one-line stderr summary ahead of the JSON
+// body REST wrote to stdout, on separate lines.
+function refuse_the_request(): void {
+	mocked_api_sync.mockImplementation(() => {
+		throw new Error(REFUSAL)
+	})
+}
+
+function issue_request(): GhApiRequest {
+	const request = mocked_api_sync.mock.calls[0]?.[0]
+	if (request === undefined) throw new Error('gh api was never called')
+
+	return request
+}
+
+// joshuafolkken/kit#1042: this was the last `gh <noun> <verb>` spawn in kit's own code. `gh issue
+// create` goes through GraphQL, which a cloud session is answered 403 for, so propagation could not
+// open the consumer's issue at all from one — while the REST endpoint below is served normally.
+describe('propagate_steps.open_issue — what it asks GitHub for', () => {
+	it('posts to the consumer repository issue collection over REST', () => {
+		propagate_steps.open_issue(TARGET, KIT, VERSION)
+
+		expect(issue_request()).toMatchObject({
+			path: CONSUMER_ISSUES_PATH,
+			jq_filter: HTML_URL_FILTER,
+		})
+	})
+
+	// The body is multi-line markdown. Sending it as JSON over stdin is what keeps it independent of
+	// shell quoting, and asserting it here is what would fail if it were spelled out as an argument.
+	it('carries the multi-line body as JSON rather than as an argument', () => {
+		propagate_steps.open_issue(TARGET, KIT, VERSION)
+		const body = issue_request().body ?? ''
+
+		expect(JSON.parse(body)).toStrictEqual({
+			title: propagate_steps.issue_title(KIT, VERSION),
+			body: propagate_steps.issue_body(KIT, VERSION),
+		})
+		expect(propagate_steps.issue_body(KIT, VERSION)).toContain('\n')
+	})
+
+	// One write layer: the request is the one `git_gh_issue_write` builds for every issue creation,
+	// not a second description of the same write (`CLAUDE.md` → "No clones").
+	it('builds its request through the shared issue-creation request', () => {
+		propagate_steps.open_issue(TARGET, KIT, VERSION)
+
+		expect(issue_request()).toStrictEqual(
+			git_gh_issue_write.issue_create_request({
+				title: propagate_steps.issue_title(KIT, VERSION),
+				body: propagate_steps.issue_body(KIT, VERSION),
+				repo: TARGET.repo,
+			}),
+		)
+	})
+})
+
+// The return contract is what `issue_step` and `parse_issue_number` read, and `josh git` derives the
+// branch name and the `closes #N` line from the number in it — so the shape had to survive the
+// switch unchanged.
+describe('propagate_steps.open_issue — the outcome it answers', () => {
+	it('answers the new issue URL, which still yields the number', () => {
+		const outcome = propagate_steps.open_issue(TARGET, KIT, VERSION)
+
+		expect(outcome).toStrictEqual({ url: ISSUE_URL })
+		expect(propagate_steps.parse_issue_number(outcome.url ?? '')).toBe('42')
+	})
+
+	// A refused request states its reason instead of throwing: the sequence reports the step as
+	// failed, and a missing scope, disabled issues and a repository that does not exist are three
+	// different reasons the report has to be able to name.
+	it('answers gh reason rather than throwing when the request is refused', () => {
+		refuse_the_request()
+
+		const outcome = propagate_steps.open_issue(TARGET, KIT, VERSION)
+
+		expect(outcome.url).toBeUndefined()
+		expect(outcome.detail).toContain('Issues are disabled')
+	})
+
+	// The run's report is one line per consumer, and the failure reason has the "changes left
+	// uncommitted" warning appended to its end — so a reason spanning two lines would print raw JSON
+	// as a second line and hide that warning behind it. `to_gh_error` puts the stderr summary and the
+	// JSON body on separate lines, and both are kept (joshuafolkken/kit#1029).
+	it('folds gh two-stream reason onto one line without losing either half', () => {
+		refuse_the_request()
+
+		const { detail } = propagate_steps.open_issue(TARGET, KIT, VERSION)
+
+		expect(detail).not.toContain('\n')
+		expect(detail).toContain('Validation Failed (HTTP 422)')
+	})
+})
 
 describe('propagate_steps.parse_issue_number', () => {
 	it('reads the number gh prints as the new issue URL', () => {

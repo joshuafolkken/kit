@@ -1,3 +1,5 @@
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { build_upgrade_shell_command } from '#scripts/version/upgrade-shell-command'
 import { create_version_command_config } from '#scripts/version/version-command-config'
@@ -88,30 +90,50 @@ function precheck_step(target: PropagateTarget, step: string): StepResult {
 // Open the issue the pull request will close. `josh git` requires an issue argument — it derives the
 // branch name and the `closes #N` line from it — so the upgrade gets a tracked issue in the consumer
 // rather than a branchless pull request that cannot be opened at all.
-function open_issue(target: PropagateTarget, package_name: string, version: string): IssueOutcome {
-	const result = execaSync(
-		'gh',
-		[
-			'issue',
-			'create',
-			'--repo',
-			target.repo,
-			'--title',
-			issue_title(package_name, version),
-			'--body',
-			issue_body(package_name, version),
-		],
-		{ cwd: target.path, reject: false },
-	)
+//
+// It posts to REST instead of running `gh issue create`: that command goes through GraphQL, which a
+// cloud session is answered 403 for, while the REST endpoint is served normally
+// (joshuafolkken/kit#1022). This was the last `gh <noun> <verb>` spawn in kit's own code, and it was
+// missed by that epic's survey because the survey counted `exec_gh_command` call sites and this one
+// spawned gh directly (joshuafolkken/kit#1042).
+//
+// The request is the one every issue creation builds, and the spawn is the synchronous twin of the
+// one the asynchronous writers use — so no second write layer exists to disagree with the first.
+// Two things follow from the switch: the multi-line body travels over stdin rather than as an
+// argument, and the path names the consumer repository outright, so the call no longer depends on
+// the directory it is spawned in.
+// gh's own output is the only thing that distinguishes a missing scope from disabled issues from a
+// repository that does not exist. Reporting `could not open an issue` alone hides all three, so the
+// whole message is kept — `to_gh_error` puts the stderr summary and the JSON body REST writes to
+// stdout on separate lines (joshuafolkken/kit#1029), and both carry the reason.
+//
+// **It is folded back onto one line here.** The run's report is one line per consumer, and
+// `failure_reason` appends the "changes left uncommitted" warning to the end of this text — so a
+// multi-line detail would print raw JSON as an unindented second line and glue that warning to the
+// end of it, where nobody reading the report would see it.
+function to_issue_detail(error: unknown): string {
+	const message = error instanceof Error ? error.message : String(error)
 
-	if (result.exitCode === SUCCESS_EXIT_CODE) return { url: result.stdout.trim() }
-
-	// gh's own stderr is the only thing that distinguishes a missing scope from disabled issues from
-	// a repository that does not exist. Reporting `could not open an issue` alone hides all three.
-	return { detail: result.stderr.trim() }
+	return message.replaceAll('\n', ' ').trim()
 }
 
-// What `gh issue create` produced: the new issue's URL, or gh's reason for refusing.
+function open_issue(target: PropagateTarget, package_name: string, version: string): IssueOutcome {
+	try {
+		const url = git_gh_exec.exec_gh_api_sync(
+			git_gh_issue_write.issue_create_request({
+				title: issue_title(package_name, version),
+				body: issue_body(package_name, version),
+				repo: target.repo,
+			}),
+		)
+
+		return { url }
+	} catch (error) {
+		return { detail: to_issue_detail(error) }
+	}
+}
+
+// What the creation produced: the new issue's URL, or gh's reason for refusing.
 interface IssueOutcome {
 	url?: string
 	detail?: string
@@ -119,7 +141,8 @@ interface IssueOutcome {
 
 const ISSUE_NUMBER_PATTERN = /\/(?<number>\d+)\s*$/u
 
-// `gh issue create` prints the new issue's URL; its last path segment is the number `josh git` needs.
+// The creation answers the new issue's browser URL — `.html_url`, which is the value `gh issue
+// create` used to print — and its last path segment is the number `josh git` needs.
 function parse_issue_number(issue_url: string): string | undefined {
 	const { groups } = ISSUE_NUMBER_PATTERN.exec(issue_url.trim()) ?? {}
 	const { number: issue_number } = groups ?? {}
@@ -223,6 +246,7 @@ const propagate_steps = {
 	issue_title,
 	issue_body,
 	parse_issue_number,
+	open_issue,
 	precheck_step,
 	create_step_runner,
 	describe_step,

@@ -30,6 +30,7 @@ const LABEL_DESCRIPTION = 'Tracks a batch of child issues from one split'
 const HASH_COLOR = '#5319e7'
 const BARE_COLOR = '5319e7'
 const EPIC_TITLE = 'Convert the GitHub calls to REST'
+const OTHER_REPO = 'joshuafolkken/app-kit'
 const CLOSE_COMMENT = 'All child issues are closed. Closing this epic automatically.'
 const WRITE_FAILED = 'gh: Not Found (HTTP 404)'
 const TWO_REQUESTS = 2
@@ -210,6 +211,71 @@ describe('issue_create_with_label', () => {
 		expect(parsed_body(first_request())).toStrictEqual({
 			title: EPIC_TITLE,
 			labels: [LABEL_NAME],
+			body: MULTILINE_BODY,
+		})
+	})
+})
+
+function unlabelled_request(): GhApiRequest {
+	return git_gh_issue_write.issue_create_request({ title: EPIC_TITLE, body: MULTILINE_BODY })
+}
+
+function cross_repo_request(): GhApiRequest {
+	return git_gh_issue_write.issue_create_request({
+		title: EPIC_TITLE,
+		body: MULTILINE_BODY,
+		repo: OTHER_REPO,
+	})
+}
+
+// joshuafolkken/kit#1042: `josh propagate` opens the consumer's upgrade issue synchronously and
+// cannot call the writer above, so the request itself is what the two execution paths share. These
+// assertions are what would fail if that call site grew its own idea of how an issue is created.
+describe('issue_create_request', () => {
+	it('is the request the labelled writer sends, not a separate description of one', async () => {
+		await git_gh_issue_write.issue_create_with_label({
+			title: EPIC_TITLE,
+			label: LABEL_NAME,
+			body: MULTILINE_BODY,
+		})
+
+		expect(first_request()).toStrictEqual(
+			git_gh_issue_write.issue_create_request({
+				title: EPIC_TITLE,
+				body: MULTILINE_BODY,
+				labels: [LABEL_NAME],
+			}),
+		)
+	})
+
+	// `gh api` promotes a request carrying `--input` to POST, so naming a method would be the one way
+	// to send this body under a different verb by accident.
+	it('names no method, so the body is what makes it a creation', () => {
+		expect(unlabelled_request().method).toBeUndefined()
+	})
+
+	// An empty `labels` array is not the same request as no labels field, and only the labelled form
+	// has a label to create.
+	it('omits the labels field entirely when no label is named', () => {
+		expect(unlabelled_request().body).not.toContain('labels')
+	})
+})
+
+// The propagation form: the issue belongs to the consumer, so the collection is that repository's
+// rather than the one the command runs in.
+describe('issue_create_request — naming another repository', () => {
+	it('posts to that repository issue collection and still unwraps the browser URL', () => {
+		const request = cross_repo_request()
+
+		expect(request.path).toBe(`repos/${OTHER_REPO}/issues`)
+		expect(request.jq_filter).toBe(HTML_URL_FILTER)
+	})
+
+	// The body carries the markdown as JSON, so a multi-line value reaches gh over stdin rather than
+	// being spelled out on a command line.
+	it('carries the title and the multi-line body in the JSON body', () => {
+		expect(parsed_body(cross_repo_request())).toStrictEqual({
+			title: EPIC_TITLE,
 			body: MULTILINE_BODY,
 		})
 	})
