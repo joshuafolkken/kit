@@ -1,5 +1,6 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { MARKDOWN_EXTENSION, markdown_files_under } from './shipped-documents-fixture'
 import { package_file } from './skill-fixture'
 
 // joshuafolkken/kit#1064: joshuafolkken/kit#1022 moved kit's own GitHub calls to REST and
@@ -53,7 +54,6 @@ interface AllowedCommand {
 }
 
 const MANIFEST = 'package.json'
-const MARKDOWN_EXTENSION = '.md'
 const NEGATION_PREFIX = '!'
 const API_SUBCOMMAND = 'api'
 const BACKTICK = '`'
@@ -103,21 +103,25 @@ function is_document(entry: string): boolean {
 	return entry.endsWith(MARKDOWN_EXTENSION) || EXTRA_DOCUMENT_FILES.has(entry)
 }
 
+// joshuafolkken/kit#1107: the walk prunes nested `node_modules` and nested checkouts rather than
+// flattening the tree, because `.claude` is a shipped directory and Claude Code puts its bridge work
+// trees under it. `shipped-documents-fixture.ts` carries the reasoning and the prune itself.
 function documents_under(entry: string): Array<string> {
 	const absolute = package_file(entry)
 	if (!existsSync(absolute)) return []
 	if (!statSync(absolute).isDirectory()) return is_document(entry) ? [entry] : []
 
-	return readdirSync(absolute, { encoding: 'utf8', recursive: true })
-		.filter((name) => name.endsWith(MARKDOWN_EXTENSION))
-		.map((name) => `${entry}/${name}`)
+	return markdown_files_under(absolute).map((name) => `${entry}/${name}`)
+}
+
+function manifest_files(): ReadonlyArray<string> {
+	const manifest: unknown = JSON.parse(readFileSync(package_file(MANIFEST), 'utf8'))
+
+	return (manifest as { files: ReadonlyArray<string> }).files
 }
 
 function manifest_entries(): ReadonlyArray<string> {
-	const manifest: unknown = JSON.parse(readFileSync(package_file(MANIFEST), 'utf8'))
-	const { files } = manifest as { files: ReadonlyArray<string> }
-
-	return files.filter((entry) => !entry.startsWith(NEGATION_PREFIX))
+	return manifest_files().filter((entry) => !entry.startsWith(NEGATION_PREFIX))
 }
 
 // Every document this package ships, in a stable order.
@@ -223,6 +227,10 @@ const RETIRED_PROMPT = 'prompts/git-automation.md'
 const OPERATING_RULES = 'prompts/collaboration-workflow/operating-rules.md'
 const FOLLOWUP_SKILL = '.claude/skills/workflow-commands/followup.md'
 const UNSHIPPED_DOC = 'docs/sync.md'
+// The directory Claude Code keeps its runtime state in, and the one path under it the package
+// distributes — `.claude/settings.json` is the other, and `init-logic.ts` names both.
+const CLAUDE_ROOT = '.claude'
+const SHIPPED_CLAUDE_SKILLS = '.claude/skills'
 // Well under the count at the time of writing (53), so an ordinary addition or removal does not
 // touch it while a directory dropping out of the scan does.
 const MINIMUM_DOCUMENT_COUNT = 40
@@ -257,6 +265,22 @@ describe('gh document guard — the distribution as it stands', () => {
 	// repository documentation and is free to quote whatever it explains.
 	it('scans only what the package ships', () => {
 		expect(distributed_documents()).not.toContain(UNSHIPPED_DOC)
+	})
+
+	// joshuafolkken/kit#1107: the walk stops at a nested checkout, and `files` has to stop there too
+	// — the two answer the same question for different readers, and only one of them was answering
+	// it. `.claude` is where Claude Code keeps its own runtime state, all of it invisible to git
+	// through `.git/info/exclude` — a file npm never reads — so shipping the directory wholesale
+	// published it: measured on a tarball carrying `checkpoints/`, `mailbox/` and
+	// `scheduled_tasks.json`, plus a probe at `.claude/worktrees/<name>/docs/probe.md`. `josh sync`
+	// copies this package's `.claude` into consumers, so none of it stopped at the registry either.
+	//
+	// Named subpaths rather than a list of exclusions, because the artifacts are Claude Code's to
+	// add to: a blocklist is stale the first time a release invents a file, and each new name would
+	// be found the way these were — by a document guard failing on a document nobody wrote.
+	it('ships the two paths of `.claude` it distributes, not the directory', () => {
+		expect(manifest_files()).toContain(SHIPPED_CLAUDE_SKILLS)
+		expect(manifest_files()).not.toContain(CLAUDE_ROOT)
 	})
 
 	// A `files` entry that stops resolving on disk — rewritten as a glob, or renamed — contributes
