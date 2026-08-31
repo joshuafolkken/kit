@@ -43,6 +43,11 @@ cannot change what happens next.
 The epic is the non-closing home for the split rationale. A comment on the first child is buried the
 moment that child merges and closes, which happens on every split.
 
+**Each split child is filed with the `route:split` label.** `kickoff.md`'s multi-issue path carries
+it in the `gh api … issues` call; every entry that files children through this assessment applies
+the same label, so the backlog's composition stays countable by filing route rather than by grepping
+issue bodies (joshuafolkken/kit#1083).
+
 ## Promote, or create a new epic
 
 `kickoff #N` and the `#N` runs have one branch, and it is Tier A — decide it and record the reasoning

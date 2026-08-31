@@ -46,6 +46,45 @@ const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 	NEEDS_DECISION_LABEL,
 ])
 
+// joshuafolkken/kit#1083: filing-route labels, applied at filing time so the backlog's composition —
+// a review-cap carry-forward vs a split child vs a Tier A in-implementation filing — is countable
+// with `gh api "repos/{owner}/{repo}/issues?labels=<route>"` instead of grepping issue bodies by
+// hand, which is how the 2026-08-30 breakdown was produced and why it did not reproduce. Purely
+// informational: unlike the three above, a route label says nothing about whether an issue may run,
+// so none of them joins NOT_DIRECTLY_RUNNABLE_LABELS. The names are duplicated as literals in the
+// filing procedures (prose cannot import this module); `scripts/filing-route-label.test.ts` keys the
+// docs to these constants so a filing command that drops the label fails rather than drifting.
+const REVIEW_CAP_ROUTE_LABEL = 'route:review-cap'
+const SPLIT_ROUTE_LABEL = 'route:split'
+const TIER_A_ROUTE_LABEL = 'route:tier-a'
+
+// The three route labels with the metadata `gh api ... labels` needs, in one place so a repository is
+// provisioned from the single source rather than three scattered creation commands. Applying one at
+// issue-creation time already auto-creates a missing label (REST, with a generated color and no
+// description); creating them here first is what gives each its stable color and description.
+const FILING_ROUTE_LABELS: ReadonlyArray<{
+	name: string
+	color: string
+	description: string
+}> = [
+	{
+		name: REVIEW_CAP_ROUTE_LABEL,
+		color: 'eab308',
+		description:
+			"Filed by the review round cap's carry-forward (prompts/review.md → Review round cap)",
+	},
+	{
+		name: SPLIT_ROUTE_LABEL,
+		color: '0e8a16',
+		description: 'A child issue created by a split (split-assessment.md)',
+	},
+	{
+		name: TIER_A_ROUTE_LABEL,
+		color: 'd93f0b',
+		description: 'Filed Tier A during implementation — an upstream defect or a prerequisite',
+	},
+]
+
 // The shape `gh issue list --json labels` returns; narrowed here so the predicate below takes any
 // listing row without importing a schema.
 interface LabelReference {
@@ -65,9 +104,13 @@ function has_any_label(
 export {
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
+	FILING_ROUTE_LABELS,
 	has_any_label,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
+	REVIEW_CAP_ROUTE_LABEL,
+	SPLIT_ROUTE_LABEL,
+	TIER_A_ROUTE_LABEL,
 }
