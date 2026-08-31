@@ -103,6 +103,24 @@ describe('epic_report.decide_verdict', () => {
 	})
 })
 
+describe('epic_report.candidates_for_repo', () => {
+	// The whole bundle rather than its head: the confirmation walk offers the next candidate when the
+	// first is withheld (joshuafolkken/kit#1121).
+	it('returns every candidate for the repository, lowest number first', () => {
+		const result = epic_report.build_result(classification({ runnable: [child(2), child(1)] }), [])
+
+		expect(epic_report.candidates_for_repo(result, KIT).map((entry) => entry.number)).toEqual([
+			1, 2,
+		])
+	})
+
+	it('returns an empty bundle for a repository nothing is runnable in', () => {
+		const result = epic_report.build_result(classification({ runnable: [child(1)] }), [])
+
+		expect(epic_report.candidates_for_repo(result, APP_KIT)).toEqual([])
+	})
+})
+
 describe('epic_report.pick_for_repo', () => {
 	it('takes the lowest-numbered candidate for the repository', () => {
 		const result = epic_report.build_result(classification({ runnable: [child(2), child(1)] }), [])

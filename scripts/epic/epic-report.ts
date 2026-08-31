@@ -97,10 +97,20 @@ function build_result(
 	}
 }
 
-// The single candidate for one repository, for a caller that runs one repository at a time. Lowest
-// number first, which is the order the children were split in.
+// Every runnable child of one repository, in the order they would be offered. Lowest number first,
+// which is the order the children were split in.
+//
+// The whole bundle rather than only its head, because the confirmation walk needs the rest of it: a
+// candidate whose relations listing disagrees with its summary is withheld and the next one is
+// confirmed in its place (joshuafolkken/kit#1121).
+function candidates_for_repo(result: EpicNextResult, repo: string): ReadonlyArray<EpicChild> {
+	return result.candidates.find((bundle) => bundle.repo === repo)?.children ?? []
+}
+
+// The single candidate for one repository, for a caller that runs one repository at a time. The head
+// of the list above rather than a second spelling of the same lookup.
 function pick_for_repo(result: EpicNextResult, repo: string): EpicChild | undefined {
-	return result.candidates.find((bundle) => bundle.repo === repo)?.children[0]
+	return candidates_for_repo(result, repo)[0]
 }
 
 // The repository, with the checkout a runner would use. A repository with no local checkout says so
@@ -155,6 +165,7 @@ const epic_report = {
 	format_bundle_heading,
 	decide_verdict,
 	build_result,
+	candidates_for_repo,
 	pick_for_repo,
 	format_result,
 	VERDICT_LINES,
