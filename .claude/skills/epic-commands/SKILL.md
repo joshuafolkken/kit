@@ -70,7 +70,7 @@ adds is reading *inside* the children:
 | Check | Level |
 | --- | --- |
 | A child's body names another child, nothing orders the two | warning |
-| A child's **acceptance criteria** name another child, nothing orders the two | **error**, or a warning once both children are closed |
+| A child's **acceptance criteria** name another child, nothing orders the two | **error**; a warning once both children are closed, and a warning when the pair is in two repositories (joshuafolkken/kit#1128 — such an order only became recordable with joshuafolkken/kit#1126, so an error would stop every epic written before it). A warning there does **not** mean the pair is safe: the child is still offered as runnable, and recording the relation is what clears it |
 | A body cites a missing or already-closed issue | warning |
 | An issue names this epic as parent that the task list does not track | warning |
 | The search for those issues could not read the open backlog | **error** |
