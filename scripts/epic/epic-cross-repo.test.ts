@@ -20,7 +20,15 @@ function never_read(): string | undefined {
 	throw new Error('the registry must not be consulted here')
 }
 
-const MANIFEST_READ_SUCCESS = { exitCode: 0, stdout: `"${VERSION}"` }
+// The shape the manifest read asks `jq` for since joshuafolkken/kit#1129: the version and whether the
+// package declares itself private, rather than the version alone.
+const MANIFEST_READ_SUCCESS = {
+	exitCode: 0,
+	stdout: `{"version":"${VERSION}","private":null}`,
+}
+const MANIFEST_MISSING = { exitCode: 1, stdout: 'HTTP/2.0 404 Not Found' }
+const MANIFEST_UNREADABLE = { exitCode: 1, stdout: 'HTTP/2.0 429 Too Many Requests' }
+const READ_PLUS_PROBE = 2
 
 beforeEach(() => {
 	vi.restoreAllMocks()
@@ -196,11 +204,71 @@ describe('epic_cross_repo.read_default_branch_version', () => {
 		expect(gh).toHaveBeenCalledTimes(2)
 	})
 
+	// A failed read costs two calls — the read, then the status probe that says whether the manifest
+	// is missing or the request failed — and then nothing for the rest of the pass.
 	it('caches a read that failed rather than retrying it all pass', () => {
-		gh.mockReturnValue({ exitCode: 1, stdout: '' } as unknown as ReturnType<typeof execa.execaSync>)
+		gh.mockReturnValue(MANIFEST_UNREADABLE as unknown as ReturnType<typeof execa.execaSync>)
 
 		expect(epic_cross_repo.read_default_branch_version(KIT)).toBeUndefined()
 		expect(epic_cross_repo.read_default_branch_version(KIT)).toBeUndefined()
-		expect(gh).toHaveBeenCalledTimes(1)
+		expect(gh).toHaveBeenCalledTimes(READ_PLUS_PROBE)
+	})
+})
+
+// joshuafolkken/kit#1129: joshuafolkken/kit#1126 made this branch reachable, and a closed blocker in a
+// repository that ships no package then waited until the run's own timeout — there is no release for
+// the publish check to ever find, and nothing an operator could edit to clear it.
+describe('epic_cross_repo.publishes_nothing', () => {
+	it('reads a repository with no manifest as shipping nothing', () => {
+		gh.mockReturnValue(MANIFEST_MISSING as unknown as ReturnType<typeof execa.execaSync>)
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(true)
+	})
+
+	it('reads a manifest that declares itself private as shipping nothing', () => {
+		gh.mockReturnValue({
+			exitCode: 0,
+			stdout: `{"version":"${VERSION}","private":true}`,
+		} as unknown as ReturnType<typeof execa.execaSync>)
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(true)
+	})
+
+	it('reads a published manifest as shipping something', () => {
+		gh.mockReturnValue(MANIFEST_READ_SUCCESS as unknown as ReturnType<typeof execa.execaSync>)
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(false)
+	})
+
+	// The one direction this may not fail in: read as "nothing to wait for", a rate limit would start
+	// work on a prerequisite that has not finished.
+	it('does not read a failed request as shipping nothing', () => {
+		gh.mockReturnValue(MANIFEST_UNREADABLE as unknown as ReturnType<typeof execa.execaSync>)
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(false)
+	})
+})
+
+describe('epic_cross_repo.resolve_cross_repo — a repository that publishes nothing', () => {
+	it('resolves a closed blocker rather than waiting for a release that cannot come', () => {
+		gh.mockReturnValue(MANIFEST_MISSING as unknown as ReturnType<typeof execa.execaSync>)
+
+		const verdict = epic_cross_repo.resolve_cross_repo(
+			child(1, KIT, 'CLOSED'),
+			child(2, APP_KIT, 'OPEN'),
+		)
+
+		expect(verdict).toBe('resolved')
+	})
+
+	it('keeps waiting when the manifest read failed rather than answering 404', () => {
+		gh.mockReturnValue(MANIFEST_UNREADABLE as unknown as ReturnType<typeof execa.execaSync>)
+
+		const verdict = epic_cross_repo.resolve_cross_repo(
+			child(1, KIT, 'CLOSED'),
+			child(2, APP_KIT, 'OPEN'),
+		)
+
+		expect(verdict).toBe('time')
 	})
 })
