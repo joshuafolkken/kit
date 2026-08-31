@@ -18,7 +18,13 @@ import { git_gh_command } from './git-gh-command'
 
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
-const UNKNOWN_REPO = 'unknown/unknown'
+// Refused rather than stood in for, and this path *writes*. Since joshuafolkken/kit#1126 the plan
+// filters recorded relations by the declared repository, so a placeholder drops every one of them:
+// the "reconcile them before inserting" guard never fires, the superseded link is never dropped, and
+// relations that already exist are re-POSTed — leaving the epic in exactly the mismatched state
+// `epic:audit` refuses to run on.
+const UNKNOWN_REPO =
+	"Could not read this repository from `git remote`, so the epic's relations cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote."
 
 interface AddChildrenInput {
 	epic_number: number
@@ -38,7 +44,8 @@ async function read_subject(epic_number: number): Promise<EpicSubject | undefine
 async function read_recorded(
 	body: string | undefined,
 ): Promise<{ children: ReadonlyArray<EpicChild>; repo: string } | { error: string }> {
-	const repo = (await git_gh_command.repo_get_name_with_owner()) ?? UNKNOWN_REPO
+	const repo = await git_gh_command.repo_get_name_with_owner()
+	if (repo === undefined) return { error: UNKNOWN_REPO }
 	const tracked = git_epic_parse.parse_task_list_issue_numbers(body)
 	if (tracked.length === 0) return { children: [], repo }
 

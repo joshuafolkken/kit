@@ -234,7 +234,9 @@ describe('epic_bundle_referenced.collect_referenced — a read that is not an op
 			context(),
 		)
 
-		expect(found.issues[0]?.blocked_by).toEqual([890])
+		// Repository-qualified since joshuafolkken/kit#1130: a bare number cannot say which repository's
+		// issue 890 it names.
+		expect(found.issues[0]?.blocked_by).toEqual([{ repo: REPO, number: 890 }])
 	})
 })
 

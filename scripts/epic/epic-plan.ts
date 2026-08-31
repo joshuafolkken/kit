@@ -13,6 +13,10 @@ interface PlanChild {
 	body: string
 	state: string
 	labels: ReadonlyArray<string>
+	// Bare numbers, deliberately, where joshuafolkken/kit#1130 qualified the bundler's. This plan lists
+	// one epic's children so a person can answer their open questions in one batch; it never matches a
+	// blocker against another issue, so there is nothing here for a repository to disambiguate. The
+	// moment it compares one, it needs the qualified read `epic_issue.blocker_references_of` gives.
 	blocked_by: ReadonlyArray<number>
 }
 
