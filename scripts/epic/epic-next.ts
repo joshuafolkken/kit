@@ -25,7 +25,14 @@ const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const REPO_FLAG = '--repo'
 const USAGE = 'Usage: josh epic:next <epic-number|owner/repo#number> [--repo <owner/repo>]'
-const UNKNOWN_REPO = 'unknown/unknown'
+// A repository that could not be read is refused rather than stood in for. Since
+// joshuafolkken/kit#1126 a blocker carries the repository it lives in, so a placeholder on the
+// children keys them as `unknown/unknown#N` while their blockers keep their real names: every
+// relation misses, `from_blockers([])` calls the child runnable, and an unattended run starts a
+// dependent before its prerequisite. The old placeholder was harmless only while every blocker
+// inherited the child's own repository — it matched itself.
+const UNKNOWN_REPO =
+	'Could not read this repository from `git remote`, so the children cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
 const EXTERNAL_NOTICE = 'Note: this epic tracks children in other repositories.'
 // A qualified epic is read by naming its repository in the read's REST path, so naming one we do
 // not own would send this command to a third party's tracker — which joshuafolkken/kit#869 forbids
@@ -295,7 +302,8 @@ function epic_repo_of(options: NextOptions, current_repo: string): string | unde
 
 async function run_epic(options: NextOptions): Promise<number> {
 	const epic_number = options.epic_number ?? 0
-	const current_repo = (await git_gh_command.repo_get_name_with_owner()) ?? UNKNOWN_REPO
+	const current_repo = await git_gh_command.repo_get_name_with_owner()
+	if (current_repo === undefined) return refuse(UNKNOWN_REPO)
 	const epic_repo = epic_repo_of(options, current_repo)
 	if (epic_repo === undefined) return refuse(FOREIGN_EPIC)
 	const snapshot = await epic_fetch.fetch_epic(epic_number, epic_repo, current_repo)

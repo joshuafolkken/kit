@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
+import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { EPIC_LABEL } from '#scripts/git/issue-labels'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
@@ -24,7 +25,8 @@ const ARGV_OFFSET = 2
 // no index and no cache; add one when the number makes it necessary, not before.
 const BACKLOG_LIMIT = 200
 const USAGE = 'Usage: josh epic:bundle <issue-number>'
-const UNKNOWN_REPO = 'unknown/unknown'
+const UNKNOWN_REPO_MESSAGE =
+	'Could not read this repository from `git remote`, so the backlog cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
 
 const backlog_schema = z.object({ number: z.number(), body: z.string().nullable() })
 
@@ -50,12 +52,15 @@ function to_epic_field(epic: number | undefined): { epic?: number } {
 
 // Undefined when the read failed, which the caller reports — as opposed to an issue that genuinely
 // declares no relations, which is an empty array.
-async function epic_issue_relations(issue_number: string): Promise<Array<number> | undefined> {
+async function epic_issue_relations(
+	issue_number: string,
+	repo: string,
+): Promise<Array<IssueReference> | undefined> {
 	const parsed = epic_issue.parse_epic_issue(
 		await git_gh_command.issue_get_state_and_relations(issue_number),
 	)
 
-	return parsed === undefined ? undefined : epic_issue.blockers_of(parsed)
+	return parsed === undefined ? undefined : epic_issue.blocker_references_of(parsed, repo)
 }
 
 // One read per backlog issue, a few at a time.
@@ -77,15 +82,16 @@ const RELATION_CONCURRENCY = 8
 
 async function fetch_relations(
 	numbers: ReadonlyArray<number>,
-): Promise<Array<Array<number> | undefined>> {
-	const results: Array<Array<number> | undefined> = []
+	repo: string,
+): Promise<Array<Array<IssueReference> | undefined>> {
+	const results: Array<Array<IssueReference> | undefined> = []
 
 	for (let index = 0; index < numbers.length; index += RELATION_CONCURRENCY) {
 		const slice = numbers.slice(index, index + RELATION_CONCURRENCY)
 
 		results.push(
 			...(await Promise.all(
-				slice.map(async (number) => await epic_issue_relations(String(number))),
+				slice.map(async (number) => await epic_issue_relations(String(number), repo)),
 			)),
 		)
 	}
@@ -113,6 +119,23 @@ interface FetchedBacklog {
 	context?: ReferencedContext
 }
 
+// One listing row as the bundler reads it. Split from the fetch so that function stays a list of
+// requests rather than a request list plus a row mapping.
+function to_backlog_issue(
+	row: { number: number; body?: string | null },
+	context: { repo: string; epics: Map<number, number>; epic_numbers: ReadonlySet<number> },
+	blocked_by: ReadonlyArray<IssueReference>,
+): BacklogIssue {
+	return {
+		number: row.number,
+		repo: context.repo,
+		body: row.body ?? '',
+		blocked_by,
+		is_epic: context.epic_numbers.has(row.number),
+		...to_epic_field(context.epics.get(row.number)),
+	}
+}
+
 async function fetch_backlog(
 	repo: string,
 	epics: Map<number, number>,
@@ -125,21 +148,19 @@ async function fetch_backlog(
 	// Same reason as `fetch_epics`: an unparseable listing is not an empty backlog.
 	const rows = parse_json_array_or_undefined(json, backlog_schema)
 	if (rows === undefined) return { issues: [], unreadable: [], is_readable: false }
-	const relations = await fetch_relations(rows.map((row) => row.number))
+	const relations = await fetch_relations(
+		rows.map((row) => row.number),
+		repo,
+	)
 
 	return {
 		is_readable: true,
 		// Either cutoff hides the same thing: a related issue past it, reported as "no existing issue
 		// shares a reference" — an assertion about data that was never loaded.
 		cutoff: cutoff_of(rows.length, BACKLOG_LIMIT, is_capped),
-		issues: rows.map((row, index) => ({
-			number: row.number,
-			repo,
-			body: row.body ?? '',
-			blocked_by: relations[index] ?? [],
-			is_epic: epic_numbers.has(row.number),
-			...to_epic_field(epics.get(row.number)),
-		})),
+		issues: rows.map((row, index) =>
+			to_backlog_issue(row, { repo, epics, epic_numbers }, relations[index] ?? []),
+		),
 		unreadable: rows.filter((_, index) => relations[index] === undefined).map((row) => row.number),
 	}
 }
@@ -356,7 +377,18 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	const repo = (await git_gh_command.repo_get_name_with_owner()) ?? UNKNOWN_REPO
+	const repo = await git_gh_command.repo_get_name_with_owner()
+
+	// A repository that could not be read is refused rather than stood in for. Since
+	// joshuafolkken/kit#1130 the members are keyed by repository and the blockers carry their own, so a
+	// placeholder matches nothing: every recorded dependency would vanish and the command would answer
+	// `Nothing to bundle.` with exit 0 — a confident verdict built on a read that failed, on the
+	// command a run consults before deciding an issue belongs nowhere.
+	if (repo === undefined) {
+		console.error(UNKNOWN_REPO_MESSAGE)
+
+		return FAILURE_EXIT_CODE
+	}
 
 	return await report_for(issue_number, repo)
 }

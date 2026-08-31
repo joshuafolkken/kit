@@ -262,3 +262,24 @@ describe('epic_bundle_cli.fetch_epics — a listing the paging cut short', () =>
 		}
 	})
 })
+
+// joshuafolkken/kit#1130 keys the backlog by repository, so a repository that could not be read is no
+// longer a cosmetic gap: a placeholder matches no blocker, every recorded dependency vanishes, and
+// the command answers `Nothing to bundle.` with exit 0 — a confident verdict built on a failed read,
+// on the command a run consults before deciding an issue belongs nowhere.
+describe('epic_bundle_cli.run — a repository that could not be read', () => {
+	const FAILURE_EXIT_CODE = 1
+
+	it('refuses rather than answering nothing to bundle', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		const repo_read = vi
+			.spyOn(git_gh_command, 'repo_get_name_with_owner')
+			.mockResolvedValue(undefined)
+
+		expect(await epic_bundle_cli.run(['1'])).toBe(FAILURE_EXIT_CODE)
+		expect(error.mock.calls.join('\n')).toContain('cannot be keyed by repository')
+		repo_read.mockRestore()
+		error.mockRestore()
+	})
+})

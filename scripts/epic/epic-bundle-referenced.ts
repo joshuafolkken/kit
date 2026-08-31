@@ -71,7 +71,7 @@ function to_backlog_issue(issue: EpicIssue, context: ReferencedContext): Backlog
 		number: issue.number,
 		repo: context.repo,
 		body: issue.body,
-		blocked_by: epic_issue.blockers_of(issue),
+		blocked_by: epic_issue.blocker_references_of(issue, context.repo),
 		is_epic: context.epic_numbers.has(issue.number),
 		...(epic !== undefined && { epic }),
 	}
