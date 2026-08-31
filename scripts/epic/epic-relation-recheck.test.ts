@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { EpicChild } from './epic-graph'
+import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_relation_recheck } from './epic-relation-recheck'
 
 const REPO = 'joshuafolkken/kit'
@@ -31,14 +31,22 @@ function child(
 	blocked_by: ReadonlyArray<number> = [],
 	repo: string = REPO,
 ): EpicChild {
-	return { number, repo, state: 'OPEN', labels: [], blocked_by: [...blocked_by] }
+	return {
+		number,
+		repo,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blocked_by.map((blocker) => ({ repo, number: blocker })),
+	}
 }
 
 function blockers_of(
 	children: ReadonlyArray<EpicChild>,
 	repo: string,
 ): ReadonlyArray<number> | undefined {
-	return children.find((entry) => entry.number === BLOCKED && entry.repo === repo)?.blocked_by
+	return children
+		.find((entry) => entry.number === BLOCKED && entry.repo === repo)
+		?.blocked_by.map((blocker) => blocker.number)
 }
 
 // The state joshuafolkken/kit#1113 was measured in: the body declares `#1106 -> #1111`, the relation
@@ -54,11 +62,11 @@ async function recheck(
 	return await epic_relation_recheck.recheck_missing_relations(children, body, REPO, read_blockers)
 }
 
-type BlockersStub = (child: EpicChild) => Promise<Array<number>>
+type BlockersStub = (child: EpicChild) => Promise<Array<IssueReference>>
 
 describe('recheck_missing_relations — when it looks again', () => {
 	it('replaces the blockers of a child a declared link says should have one', async () => {
-		const read_blockers = vi.fn().mockResolvedValue([BLOCKER])
+		const read_blockers = vi.fn().mockResolvedValue([{ repo: REPO, number: BLOCKER }])
 
 		const rechecked = await recheck(STALE_SUMMARY_CHILDREN, ORDERED_BODY, read_blockers)
 
@@ -69,7 +77,7 @@ describe('recheck_missing_relations — when it looks again', () => {
 	// joshuafolkken/kit#1024's optimization is what this must not undo. An epic whose relations all
 	// match is the ordinary case, and it has to cost exactly what it cost before: nothing.
 	it('reads nothing when every declared link is already recorded', async () => {
-		const read_blockers = vi.fn().mockResolvedValue([BLOCKER])
+		const read_blockers = vi.fn().mockResolvedValue([{ repo: REPO, number: BLOCKER }])
 		const children = [child(BLOCKER), child(BLOCKED, [BLOCKER])]
 
 		const rechecked = await recheck(children, ORDERED_BODY, read_blockers)
@@ -79,7 +87,7 @@ describe('recheck_missing_relations — when it looks again', () => {
 	})
 
 	it('reads nothing when the body declares no order', async () => {
-		const read_blockers = vi.fn().mockResolvedValue([BLOCKER])
+		const read_blockers = vi.fn().mockResolvedValue([{ repo: REPO, number: BLOCKER }])
 
 		await recheck(STALE_SUMMARY_CHILDREN, undefined, read_blockers)
 
@@ -92,7 +100,7 @@ describe('recheck_missing_relations — what it refuses to touch', () => {
 	// child of the same number elsewhere is a different issue, and re-reading it would replace its
 	// relations on another issue's account.
 	it('leaves a same-numbered child in another repository alone', async () => {
-		const read_blockers = vi.fn().mockResolvedValue([BLOCKER])
+		const read_blockers = vi.fn().mockResolvedValue([{ repo: REPO, number: BLOCKER }])
 		const children = [child(BLOCKER), child(BLOCKED), child(BLOCKED, [], OTHER_REPO)]
 
 		const rechecked = await recheck(children, ORDERED_BODY, read_blockers)
@@ -104,7 +112,7 @@ describe('recheck_missing_relations — what it refuses to touch', () => {
 	// A body legitimately ahead of its relations declares a mismatch for every child, and confirming
 	// that one request at a time is a fan-out this check was never for.
 	it('reports a whole-graph mismatch unchecked rather than fanning out, and says so', async () => {
-		const read_blockers = vi.fn().mockResolvedValue([BLOCKER])
+		const read_blockers = vi.fn().mockResolvedValue([{ repo: REPO, number: BLOCKER }])
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 		const numbers = over_limit_numbers()
 		const children = numbers.map((number) => child(number))

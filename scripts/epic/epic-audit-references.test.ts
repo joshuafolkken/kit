@@ -26,7 +26,14 @@ function child(
 	body: string,
 	blocked_by: ReadonlyArray<number> = [],
 ): AuditChild {
-	return { number, repo, state: 'OPEN', labels: [], blocked_by, body }
+	return {
+		number,
+		repo,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blocked_by.map((blocker) => ({ repo, number: blocker })),
+		body,
+	}
 }
 
 // The resolved states, keyed the way the audit keys them: repository and number both.
@@ -196,10 +203,11 @@ describe('epic_audit_checks — references between children of another repositor
 	})
 })
 
-describe('epic_audit_checks — a pair the graph cannot order', () => {
-	// `blocked_by` carries issue numbers with the repository dropped, so a cross-repository order
-	// cannot be recorded on the graph at all. An error nobody could ever clear would fail the audit
-	// forever and stop every `epicrun` on that epic at its first step.
+describe('epic_audit_checks — a pair in two repositories', () => {
+	// The exemption predates joshuafolkken/kit#1126, when a cross-repository order could not be
+	// recorded at all and the finding would have been one nobody could ever clear. It is recordable
+	// now, and the exemption is kept deliberately: lifting it turns an **error** red on epics that are
+	// green today, which stops every `epicrun` on them. joshuafolkken/kit#1128 decides that.
 	it('raises no contradiction between children of two different repositories', () => {
 		const criteria = `## 受け入れ条件\n\n- [ ] needs ${LOCAL_40}`
 		const findings = epic_audit_checks.find_order_contradictions(

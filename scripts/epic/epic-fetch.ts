@@ -19,7 +19,7 @@ function to_child(parsed: EpicIssue, repo: string): EpicChild {
 		repo,
 		state: epic_issue.normalize_state(parsed.state),
 		labels: epic_issue.label_names(parsed),
-		blocked_by: epic_issue.blockers_of(parsed),
+		blocked_by: epic_issue.blocker_references_of(parsed, repo),
 	}
 }
 
@@ -40,9 +40,13 @@ function scope_for(child_repo: string, current_repo: string): string | undefined
 // scope varies with is where the *epic* is: `epic:next owner/other#858` run from here reads them
 // through `owner/other`, and reading them unqualified would answer from this repository's issues of
 // those numbers instead (joshuafolkken/kit#1012).
-async function read_child_blockers(child: EpicChild, current_repo: string): Promise<Array<number>> {
-	return await git_gh_command.issue_blocked_by_numbers(
+async function read_child_blockers(
+	child: EpicChild,
+	current_repo: string,
+): Promise<Array<IssueReference>> {
+	return await git_gh_command.issue_blocked_by_references(
 		String(child.number),
+		child.repo,
 		scope_for(child.repo, current_repo),
 	)
 }
@@ -181,6 +185,10 @@ async function fetch_external_children(
 
 interface EpicSnapshot {
 	body: string | undefined
+	// The repository the *epic* lives in — what a bare number in its body and in a declared dependency
+	// names. Distinct from `current_repo` below, which is where the command is running
+	// (joshuafolkken/kit#1126).
+	repo: string
 	// The `owner/repo` the command is running in — the repository against which a reference is written
 	// bare, and every other one written `owner/repo#N`. Deliberately *not* where the epic lives:
 	// `epic:next owner/other#858` reads an epic elsewhere while the person reading the answer is
@@ -192,6 +200,32 @@ interface EpicSnapshot {
 	unreadable: ReadonlyArray<IssueReference>
 	skipped: ReadonlyArray<IssueReference>
 	has_external_children: boolean
+}
+
+// The snapshot the two reads add up to, with the relations looked at a second time where a declared
+// link says one is missing. Split from the reads above so `fetch_epic` stays a list of requests.
+async function to_snapshot(
+	epic_body: EpicBody,
+	scope: { repo: string; current_repo: string },
+	local: FetchedChildren,
+	remote: FetchedChildren,
+): Promise<EpicSnapshot> {
+	const { body, child_numbers, external } = epic_body
+	const children = await rechecked_children([...local.children, ...remote.children], {
+		body,
+		...scope,
+	})
+
+	return {
+		body,
+		repo: scope.repo,
+		current_repo: scope.current_repo,
+		children,
+		child_numbers: [...child_numbers, ...external.map((child) => child.number)],
+		unreadable: [...local.unreadable, ...remote.unreadable],
+		skipped: local.skipped,
+		has_external_children: external.length > 0,
+	}
 }
 
 // The epic and its children, as one read. `has_external_children` is surfaced rather than silently
@@ -210,28 +244,15 @@ async function fetch_epic(
 	current_repo: string = repo,
 ): Promise<EpicSnapshot> {
 	const scope = scope_for(repo, current_repo)
-	const { body, child_numbers, external } = await fetch_epic_body(epic_number, scope)
+	const epic_body = await fetch_epic_body(epic_number, scope)
 	// joshuafolkken/kit#869's restriction is about who *we* are, so the owner comes from the repository
 	// the command runs in. Derived from the epic's own repository instead, a qualified reference to
 	// somebody else's epic would have made their whole organization readable.
 	const owner = epic_cross_repo.owner_of(current_repo)
-	const local = await fetch_children(child_numbers, repo, scope)
-	const remote = await fetch_external_children(external, owner)
-	const scope_of_recheck: RecheckScope = { body, repo, current_repo }
-	const children = await rechecked_children(
-		[...local.children, ...remote.children],
-		scope_of_recheck,
-	)
+	const local = await fetch_children(epic_body.child_numbers, repo, scope)
+	const remote = await fetch_external_children(epic_body.external, owner)
 
-	return {
-		body,
-		current_repo,
-		children,
-		child_numbers: [...child_numbers, ...external.map((child) => child.number)],
-		unreadable: [...local.unreadable, ...remote.unreadable],
-		skipped: local.skipped,
-		has_external_children: external.length > 0,
-	}
+	return await to_snapshot(epic_body, { repo, current_repo }, local, remote)
 }
 
 // Everything the fetch produced no child for: the reads that failed and the rows past the limit.

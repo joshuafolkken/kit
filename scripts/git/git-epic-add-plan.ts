@@ -20,6 +20,9 @@ interface PlanInput {
 	position?: InsertPosition | undefined
 	// The epic's current children with their native relations, as `epic:next` reads them.
 	recorded: ReadonlyArray<EpicChild>
+	// The epic's own repository — what a declared bare number names. Needed since
+	// joshuafolkken/kit#1126 made a recorded relation carry the repository it lives in.
+	repo: string
 }
 
 interface AddPlan {
@@ -138,8 +141,9 @@ function find_addition_error(
 function find_relation_error(
 	links: ReadonlyArray<DependencyLink>,
 	recorded: ReadonlyArray<EpicChild>,
+	repo: string,
 ): string | undefined {
-	const undeclared = epic_graph.undeclared_relations(links, recorded)
+	const undeclared = epic_graph.undeclared_relations(links, recorded, repo)
 	if (undeclared.length === 0) return undefined
 
 	const list = format_links(undeclared)
@@ -153,8 +157,9 @@ function find_relation_error(
 function to_removed_links(
 	dropped: ReadonlyArray<DependencyLink>,
 	recorded: ReadonlyArray<EpicChild>,
+	repo: string,
 ): Array<DependencyLink> {
-	const unapplied = epic_graph.missing_relations(dropped, recorded)
+	const unapplied = epic_graph.missing_relations(dropped, recorded, repo)
 	const unrecorded = new Set(unapplied.map((link) => format_dependency_link(link)))
 
 	return dropped.filter((link) => !unrecorded.has(format_dependency_link(link)))
@@ -182,8 +187,8 @@ function to_plan(context: {
 		plan: {
 			body: rewritten.body,
 			additions: context.additions,
-			added: epic_graph.missing_relations(links_after, context.input.recorded),
-			removed: to_removed_links(removed, context.input.recorded),
+			added: epic_graph.missing_relations(links_after, context.input.recorded, context.input.repo),
+			removed: to_removed_links(removed, context.input.recorded, context.input.repo),
 		},
 	}
 }
@@ -202,7 +207,7 @@ function find_input_error(
 			input.position,
 			tracked,
 		) ??
-		find_relation_error(git_epic_chains.links_of(chains_before), input.recorded)
+		find_relation_error(git_epic_chains.links_of(chains_before), input.recorded, input.repo)
 	)
 }
 

@@ -14,7 +14,13 @@ const DEPENDENCIES_BODY = 'Dependencies\n\n#1 -> #2'
 const UNORDERED_BODY = 'None — the children are independent; any execution order works.'
 
 function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
-	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
+	return {
+		number,
+		repo: REPO,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blocked_by.map((blocker) => ({ repo: REPO, number: blocker })),
+	}
 }
 
 // A child that could not be read, named the way the snapshot now carries it: repository and number.
@@ -25,6 +31,7 @@ function unread(number: number, repo: string = REPO): IssueReference {
 function snapshot(children: ReadonlyArray<EpicChild>, body?: string): EpicSnapshot {
 	return {
 		body,
+		repo: REPO,
 		current_repo: REPO,
 		children,
 		child_numbers: children.map((entry) => entry.number),

@@ -37,11 +37,11 @@ async function read_subject(epic_number: number): Promise<EpicSubject | undefine
 // an insertion computed against that graph would record the wrong order.
 async function read_recorded(
 	body: string | undefined,
-): Promise<{ children: ReadonlyArray<EpicChild> } | { error: string }> {
-	const tracked = git_epic_parse.parse_task_list_issue_numbers(body)
-	if (tracked.length === 0) return { children: [] }
-
+): Promise<{ children: ReadonlyArray<EpicChild>; repo: string } | { error: string }> {
 	const repo = (await git_gh_command.repo_get_name_with_owner()) ?? UNKNOWN_REPO
+	const tracked = git_epic_parse.parse_task_list_issue_numbers(body)
+	if (tracked.length === 0) return { children: [], repo }
+
 	const fetched = await epic_fetch.fetch_children(tracked, repo)
 
 	if (fetched.unreadable.length > 0) {
@@ -50,7 +50,7 @@ async function read_recorded(
 		return { error: `Could not read ${list}; the epic's dependency graph is incomplete.` }
 	}
 
-	return { children: fetched.children }
+	return { children: fetched.children, repo }
 }
 
 function report_relations(plan: AddPlan, failures: { added: number; removed: number }): void {
@@ -97,14 +97,16 @@ function report_success(epic_number: number, plan: AddPlan): void {
 // The epic and its current graph, or the reason neither could be read.
 async function read_epic(
 	epic_number: number,
-): Promise<{ subject: EpicSubject; recorded: ReadonlyArray<EpicChild> } | { error: string }> {
+): Promise<
+	{ subject: EpicSubject; recorded: ReadonlyArray<EpicChild>; repo: string } | { error: string }
+> {
 	const subject = await read_subject(epic_number)
 	if (subject === undefined) return { error: `Could not read issue #${String(epic_number)}.` }
 
 	const recorded = await read_recorded(subject.body)
 	if ('error' in recorded) return { error: recorded.error }
 
-	return { subject, recorded: recorded.children }
+	return { subject, recorded: recorded.children, repo: recorded.repo }
 }
 
 async function write_plan(epic_number: number, plan: AddPlan): Promise<void> {
@@ -131,6 +133,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		children: input.children,
 		position: input.position,
 		recorded: epic.recorded,
+		repo: epic.repo,
 	})
 
 	if ('error' in outcome) {

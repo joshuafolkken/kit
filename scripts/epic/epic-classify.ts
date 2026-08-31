@@ -1,5 +1,5 @@
 import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
-import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // Sorting an epic's open children into what a caller should do about them.
 //
@@ -78,18 +78,61 @@ interface ClassifyContext {
 	memo: Map<string, ChildCategory>
 }
 
+// A blocker this epic does not track as a child. Said out loud rather than dropped in silence: the
+// relation is real, the graph has nothing to order it against, and a reader watching an unattended
+// run start that child should be able to see what was not weighed (joshuafolkken/kit#1126).
+//
+// Whether such a blocker should hold the child back at all is a separate question, and it belongs to
+// joshuafolkken/kit#1123 — this reports, it does not decide.
+// Announced once per invocation rather than once per pass. One `epic:next --repo` classifies the same
+// children several times — the report, the candidate confirmation, and once per candidate it withholds
+// — so an unguarded warning said the same thing up to four times, in two wordings.
+const reported = new Set<string>()
+
+// Discard what has been announced. Called once per command invocation, beside
+// `epic_cross_repo.reset_publish_cache`, for the same reason: a long-lived process must not go quiet
+// about a relation it is still ignoring.
+function reset_reported(): void {
+	reported.clear()
+}
+
+function report_untracked(child: EpicChild, blocker: IssueReference): void {
+	const line = `${epic_graph.key_of(child)}:${epic_graph.key_of(blocker)}`
+	if (reported.has(line)) return
+
+	reported.add(line)
+	console.warn(
+		`⚠ #${String(child.number)} is blocked by ${epic_graph.key_of(blocker)}, ` +
+			'which this epic does not track — the dependency is not weighed',
+	)
+}
+
+// What one recorded relation contributes. A blocker inside the epic is resolved through the caller's
+// resolver; one outside it is reported and contributes nothing.
+function relation_category(
+	child: EpicChild,
+	blocker_reference: IssueReference,
+	context: ClassifyContext,
+): ChildCategory | undefined {
+	const blocker = context.index.get(epic_graph.blocker_key(blocker_reference))
+
+	if (blocker === undefined) {
+		report_untracked(child, blocker_reference)
+
+		return undefined
+	}
+
+	return dependency_category(
+		context.resolve(blocker, child),
+		context.memo.get(epic_graph.key_of(blocker)) ?? 'time',
+	)
+}
+
 // The categories every blocker inside the epic forces on `child`. Reads the memo rather than
 // recursing: the loop below categorizes in dependency order, so every blocker already has an answer.
 function blocker_categories(child: EpicChild, context: ClassifyContext): Array<ChildCategory> {
 	return child.blocked_by
-		.map((blocker) => context.index.get(epic_graph.blocker_key(child, blocker)))
-		.filter((blocker): blocker is EpicChild => blocker !== undefined)
-		.map((blocker) =>
-			dependency_category(
-				context.resolve(blocker, child),
-				context.memo.get(epic_graph.key_of(blocker)) ?? 'time',
-			),
-		)
+		.map((blocker) => relation_category(child, blocker, context))
 		.filter((category): category is ChildCategory => category !== undefined)
 }
 
@@ -170,6 +213,7 @@ function classify_children(
 
 const epic_classify = {
 	resolve_by_state,
+	reset_reported,
 	local_category,
 	classify_children,
 }

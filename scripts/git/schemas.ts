@@ -49,9 +49,16 @@ const epic_issue_schema = z.object({
 // which marks the child unreadable — into an empty blocker list, and `epic:next` then hands a
 // dependent to an unattended run before its prerequisite. Fail-safe is the direction that matters
 // here (joshuafolkken/kit#1005).
+//
+// `repository_url` is the repository the blocker lives in, as REST names it
+// (`https://api.github.com/repos/<owner>/<repo>`). Carried since joshuafolkken/kit#1126: a
+// `blocked-by` relation may cross a repository, and a reader that keeps only the number resolves it
+// against the blocked child's own repository — a different issue, or none. Optional because a
+// caller that only wants numbers must not be made to fail on a response shape it never reads.
 const blocking_issue_schema = z.object({
 	number: z.number(),
 	state: z.string().optional(),
+	repository_url: z.string().optional(),
 })
 
 // The blocker relations arrive as a connection — `{ nodes, totalCount }` — not a bare array.

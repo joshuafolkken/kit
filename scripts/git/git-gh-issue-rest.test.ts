@@ -254,3 +254,21 @@ describe('the mapped shape parses under the schemas written for gh', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#1126: a `blocked-by` relation may cross a repository, and the number alone cannot
+// say which one it names. REST puts the repository in `repository_url`.
+describe('repo_of_url', () => {
+	it('reads the owner and repository out of a REST repository url', () => {
+		expect(git_gh_issue_rest.repo_of_url('https://api.github.com/repos/joshuafolkken/kit')).toBe(
+			'joshuafolkken/kit',
+		)
+	})
+
+	it('answers nothing for an absent field, so the caller falls back to its own repository', () => {
+		expect(git_gh_issue_rest.repo_of_url(undefined)).toBeUndefined()
+	})
+
+	it('answers nothing for a url that is not a repository', () => {
+		expect(git_gh_issue_rest.repo_of_url('https://api.github.com/user')).toBeUndefined()
+	})
+})

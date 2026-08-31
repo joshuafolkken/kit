@@ -3,7 +3,7 @@ import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import { IN_PROGRESS_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
-import type { EpicChild } from './epic-graph'
+import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_next } from './epic-next'
 
 // joshuafolkken/kit#1121: `read_blocked_by` answers from the issue's own dependency summary when that
@@ -17,13 +17,13 @@ import { epic_next } from './epic-next'
 vi.mock('#scripts/git/git-gh-command', () => ({
 	git_gh_command: {
 		issue_list_by_label_in_repo: vi.fn(),
-		issue_blocked_by_numbers: vi.fn(),
+		issue_blocked_by_references: vi.fn(),
 	},
 }))
 
 const { git_gh_command } = await import('#scripts/git/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
-const blocked_by = vi.mocked(git_gh_command.issue_blocked_by_numbers)
+const blocked_by = vi.mocked(git_gh_command.issue_blocked_by_references)
 
 const { record } = auto_ok_fixture
 
@@ -34,6 +34,10 @@ const SIBLING = 863
 const SUCCESS_EXIT_CODE = 0
 const WAIT_TOKEN = 'wait'
 
+function reference(number: number, repo: string = REPO): IssueReference {
+	return { repo, number }
+}
+
 function child(number: number, labels: ReadonlyArray<string> = []): EpicChild {
 	return { number, repo: REPO, state: 'OPEN', labels, blocked_by: [] }
 }
@@ -41,6 +45,7 @@ function child(number: number, labels: ReadonlyArray<string> = []): EpicChild {
 function snapshot(children: ReadonlyArray<EpicChild>): EpicSnapshot {
 	return {
 		body: undefined,
+		repo: REPO,
 		current_repo: REPO,
 		children,
 		child_numbers: children.map((entry) => entry.number),
@@ -85,7 +90,7 @@ describe('josh epic:next --repo — confirming the candidate', () => {
 	// The defect itself: the summary counted zero, the listing names an open blocker, and the child
 	// would otherwise have been handed to an unattended run ahead of its prerequisite.
 	it('withholds a child whose listing names a blocker the summary did not count', async () => {
-		blocked_by.mockResolvedValue([BLOCKER])
+		blocked_by.mockResolvedValue([reference(BLOCKER)])
 
 		expect(await answer_for([child(BLOCKER, [IN_PROGRESS_LABEL]), child(BLOCKED)])).toBe(
 			SUCCESS_EXIT_CODE,
@@ -96,7 +101,7 @@ describe('josh epic:next --repo — confirming the candidate', () => {
 	it('names the relation that withheld the candidate rather than only answering wait', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-		blocked_by.mockResolvedValue([BLOCKER])
+		blocked_by.mockResolvedValue([reference(BLOCKER)])
 		await answer_for([child(BLOCKER, [IN_PROGRESS_LABEL]), child(BLOCKED)])
 
 		expect(warn.mock.calls.join('\n')).toContain(`#${String(BLOCKER)}`)
@@ -108,7 +113,7 @@ describe('josh epic:next --repo — confirming the candidate', () => {
 	// child whose counter is stale, because nobody repairs that counter and the wait would not clear.
 	it('offers the sibling behind a candidate it withheld', async () => {
 		blocked_by.mockImplementation(async (issue_number: string) =>
-			issue_number === String(BLOCKED) ? [BLOCKER] : [],
+			issue_number === String(BLOCKED) ? [reference(BLOCKER)] : [],
 		)
 
 		await answer_for([child(BLOCKER, [IN_PROGRESS_LABEL]), child(BLOCKED), child(SIBLING)])
