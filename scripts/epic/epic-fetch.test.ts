@@ -45,7 +45,7 @@ describe('epic_fetch.fetch_child', () => {
 		vi.spyOn(git_gh_command, GET_CHILD).mockResolvedValue(gh_child({ number: 2, blocked_by: [1] }))
 		const child = await epic_fetch.fetch_child(2, REPO)
 
-		expect(child?.blocked_by).toEqual([1])
+		expect(child?.blocked_by).toEqual([{ repo: REPO, number: 1 }])
 	})
 
 	it('reads a child with no relations at all', async () => {
@@ -232,7 +232,7 @@ describe('epic_fetch.scope_for', () => {
 // child read below answers `blockedBy: []` — the shape a stale `total_blocked_by: 0` produces —
 // while the relations listing has the blocker.
 describe('epic_fetch.fetch_epic — relations the summary count missed', () => {
-	const BLOCKED_BY_NUMBERS = 'issue_blocked_by_numbers'
+	const BLOCKED_BY_REFERENCES = 'issue_blocked_by_references'
 	const ORDERED_EPIC_BODY = '- [ ] #1\n- [ ] #2\n\n#1 -> #2\n'
 
 	it('re-reads a declared link the first read found unrecorded', async () => {
@@ -240,12 +240,16 @@ describe('epic_fetch.fetch_epic — relations the summary count missed', () => {
 		vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(async (issue_number) =>
 			gh_child({ number: Number(issue_number) }),
 		)
-		const listing = vi.spyOn(git_gh_command, BLOCKED_BY_NUMBERS).mockResolvedValue([1])
+		const listing = vi
+			.spyOn(git_gh_command, BLOCKED_BY_REFERENCES)
+			.mockResolvedValue([{ repo: REPO, number: 1 }])
 
 		const snapshot = await epic_fetch.fetch_epic(EPIC, REPO)
 
-		expect(snapshot.children.find((child) => child.number === 2)?.blocked_by).toStrictEqual([1])
-		expect(listing).toHaveBeenCalledWith('2', undefined)
+		const blocked = snapshot.children.find((child) => child.number === 2)
+
+		expect(blocked?.blocked_by.map((blocker) => blocker.number)).toStrictEqual([1])
+		expect(listing).toHaveBeenCalledWith('2', REPO, undefined)
 	})
 
 	// The cost guard the correction must not undo: an epic whose relations already match asks the
@@ -255,7 +259,9 @@ describe('epic_fetch.fetch_epic — relations the summary count missed', () => {
 		vi.spyOn(git_gh_command, GET_CHILD).mockImplementation(async (issue_number) =>
 			gh_child({ number: Number(issue_number), blocked_by: Number(issue_number) === 2 ? [1] : [] }),
 		)
-		const listing = vi.spyOn(git_gh_command, BLOCKED_BY_NUMBERS).mockResolvedValue([1])
+		const listing = vi
+			.spyOn(git_gh_command, BLOCKED_BY_REFERENCES)
+			.mockResolvedValue([{ repo: REPO, number: 1 }])
 
 		await epic_fetch.fetch_epic(EPIC, REPO)
 

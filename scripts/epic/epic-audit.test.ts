@@ -7,7 +7,14 @@ const REPO = 'joshuafolkken/kit'
 const ACCEPTANCE_BODY = '## 受け入れ条件\n\n- [ ] uses the map from #869'
 
 function child(number: number, body: string, blocked_by: ReadonlyArray<number> = []): AuditChild {
-	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by, body }
+	return {
+		number,
+		repo: REPO,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blocked_by.map((blocker) => ({ repo: REPO, number: blocker })),
+		body,
+	}
 }
 
 function closed(child_to_close: AuditChild): AuditChild {

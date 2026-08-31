@@ -104,7 +104,12 @@ function decide(
 	const unreadable = unreadable_anomaly(snapshot)
 	const anomalies =
 		unreadable === undefined
-			? epic_graph.find_anomalies(snapshot.children, links, is_order_declared(snapshot.body, links))
+			? epic_graph.find_anomalies(
+					snapshot.children,
+					links,
+					is_order_declared(snapshot.body, links),
+					snapshot.repo,
+				)
 			: [unreadable]
 	// The cross-repository resolver, not the default one: a blocker in another repository is not
 	// finished when it closes, only when its release is published (joshuafolkken/kit#864).
@@ -265,6 +270,7 @@ async function report_epic(snapshot: EpicSnapshot, options: NextOptions): Promis
 	// One registry answer per repository per invocation. A polling `epicrun` calls this command
 	// again each round, and a release that appeared in between has to be seen.
 	epic_cross_repo.reset_publish_cache()
+	epic_classify.reset_reported()
 
 	return await report(decide(snapshot, paths), snapshot, options.repo)
 }

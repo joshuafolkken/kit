@@ -37,6 +37,11 @@ interface BlockedBy {
 	totalCount: number
 }
 
+// `https://api.github.com/repos/<owner>/<repo>` — the only shape REST writes, matched at the end so
+// a host or an api prefix that changes does not break the read.
+const REPOSITORY_URL = /\/repos\/([\w.-]+\/[\w.-]+)$/u
+const REPOSITORY_URL_GROUP = 1
+
 const BLOCKED_BY_FIELD = 'blockedBy'
 const STATE_FIELD = 'state'
 const BODY_FIELD = 'body'
@@ -134,6 +139,19 @@ function empty_blocked_by(): BlockedBy {
 	return { nodes: [], totalCount: 0 }
 }
 
+// The `owner/repo` a REST `repository_url` names — `https://api.github.com/repos/<owner>/<repo>`.
+//
+// A blocker relation may cross a repository, and the number alone cannot say which one it is: issue
+// numbers are unique per repository, so a blocker read bare resolves against the blocked child's own
+// repository and names a different issue there (joshuafolkken/kit#1126). Undefined when the field is
+// absent or shaped otherwise; the caller then falls back to the repository it is reading in, which is
+// what an unqualified relation has always meant.
+function repo_of_url(repository_url: string | undefined): string | undefined {
+	const match = REPOSITORY_URL.exec(repository_url ?? '')
+
+	return match?.[REPOSITORY_URL_GROUP]
+}
+
 // `repos/{owner}/{repo}/issues/{N}/dependencies/blocked_by` answers a bare array of issues, which is
 // mapped into the connection `blocked_by_schema` expects.
 //
@@ -174,6 +192,7 @@ function to_field_text(value: unknown): string {
 
 const git_gh_issue_rest = {
 	empty_blocked_by,
+	repo_of_url,
 	split_fields,
 	is_pull_request,
 	parse_rest_issue,

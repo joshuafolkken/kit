@@ -1,5 +1,5 @@
 import { epic_classify, type ResolveDependency } from './epic-classify'
-import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import type { BlockersReader } from './epic-relation-recheck'
 import { epic_report, type EpicVerdict } from './epic-report'
 
@@ -48,11 +48,17 @@ const NO_ANOMALIES = 0
 
 // Blocker sets, compared as sets: the listing and the summary-derived read need not agree on order,
 // and a difference in order is not a difference in dependencies.
-function is_same_blockers(left: ReadonlyArray<number>, right: ReadonlyArray<number>): boolean {
-	const sort_ascending = (numbers: ReadonlyArray<number>): string =>
-		numbers.toSorted((first, second) => first - second).join(',')
+function is_same_blockers(
+	left: ReadonlyArray<IssueReference>,
+	right: ReadonlyArray<IssueReference>,
+): boolean {
+	const sorted = (blockers: ReadonlyArray<IssueReference>): string =>
+		blockers
+			.map((blocker) => epic_graph.key_of(blocker))
+			.toSorted((first, second) => first.localeCompare(second))
+			.join(',')
 
-	return sort_ascending(left) === sort_ascending(right)
+	return sorted(left) === sorted(right)
 }
 
 // The children with one child's relations replaced by what the listing returned. Matched by identity
@@ -60,7 +66,7 @@ function is_same_blockers(left: ReadonlyArray<number>, right: ReadonlyArray<numb
 function with_blockers(
 	children: ReadonlyArray<EpicChild>,
 	target: EpicChild,
-	blocked_by: ReadonlyArray<number>,
+	blocked_by: ReadonlyArray<IssueReference>,
 ): Array<EpicChild> {
 	const key = epic_graph.key_of(target)
 
@@ -91,7 +97,7 @@ function is_still_runnable(
 async function read_or_withhold(
 	candidate: EpicChild,
 	read_blockers: BlockersReader,
-): Promise<Array<number> | undefined> {
+): Promise<Array<IssueReference> | undefined> {
 	try {
 		return await read_blockers(candidate)
 	} catch (error) {
@@ -108,8 +114,8 @@ async function read_or_withhold(
 
 // Said out loud for the same reason a failed read is: the caller reports only that every candidate
 // was withheld, and an operator reading that should not have to guess which relation did it.
-function warn_withheld(candidate: EpicChild, listed: ReadonlyArray<number>): void {
-	const named = listed.map((blocker) => `#${String(blocker)}`).join(', ')
+function warn_withheld(candidate: EpicChild, listed: ReadonlyArray<IssueReference>): void {
+	const named = listed.map((blocker) => epic_graph.key_of(blocker)).join(', ')
 
 	console.warn(
 		`⚠ #${String(candidate.number)} is withheld: its relations listing names ${named}, ` +
@@ -126,17 +132,16 @@ function warn_withheld(candidate: EpicChild, listed: ReadonlyArray<number>): voi
 // still offered. What is new is that the run has just paid a request to learn the relation exists, so
 // the discard is named rather than silent (joshuafolkken/kit#1121).
 function untracked_blockers(
-	candidate: EpicChild,
-	listed: ReadonlyArray<number>,
+	listed: ReadonlyArray<IssueReference>,
 	children: ReadonlyArray<EpicChild>,
-): Array<number> {
+): Array<IssueReference> {
 	const index = epic_graph.index_children(children)
 
-	return listed.filter((blocker) => !index.has(epic_graph.blocker_key(candidate, blocker)))
+	return listed.filter((blocker) => !index.has(epic_graph.blocker_key(blocker)))
 }
 
-function warn_untracked(candidate: EpicChild, untracked: ReadonlyArray<number>): void {
-	const named = untracked.map((blocker) => `#${String(blocker)}`).join(', ')
+function warn_untracked(candidate: EpicChild, untracked: ReadonlyArray<IssueReference>): void {
+	const named = untracked.map((blocker) => epic_graph.key_of(blocker)).join(', ')
 
 	console.warn(
 		`⚠ #${String(candidate.number)} is offered although its relations listing names ${named}: ` +
@@ -148,7 +153,7 @@ function warn_untracked(candidate: EpicChild, untracked: ReadonlyArray<number>):
 // summary produces a line, whichever way it was resolved.
 function warn_recovered(
 	candidate: EpicChild,
-	listed: ReadonlyArray<number>,
+	listed: ReadonlyArray<IssueReference>,
 	children: ReadonlyArray<EpicChild>,
 	is_confirmed: boolean,
 ): void {
@@ -158,7 +163,7 @@ function warn_recovered(
 		return
 	}
 
-	const untracked = untracked_blockers(candidate, listed, children)
+	const untracked = untracked_blockers(listed, children)
 
 	if (untracked.length > 0) warn_untracked(candidate, untracked)
 }

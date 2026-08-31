@@ -46,7 +46,13 @@ const UNORDERED_BODY = [
 ].join('\n')
 
 function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
-	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
+	return {
+		number,
+		repo: REPO,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blocked_by.map((blocker) => ({ repo: REPO, number: blocker })),
+	}
 }
 
 // The relations an epic created with `--ordered` actually carries for `#890 -> #891 -> #892`.
@@ -57,6 +63,7 @@ const UNRECORDED_CHILDREN = [child(890), child(891), child(892)]
 function plan(overrides: Partial<PlanInput>): PlanOutcome {
 	return git_epic_add_plan.build_plan({
 		epic_number: EPIC_NUMBER,
+		repo: REPO,
 		body: ORDERED_BODY,
 		labels: ['epic'],
 		children: [894],
@@ -269,6 +276,7 @@ const MIXED_CHILDREN = [...ORDERED_CHILDREN, child(895)]
 function mixed_plan(position: PlanInput['position']): PlanOutcome {
 	return git_epic_add_plan.build_plan({
 		epic_number: EPIC_NUMBER,
+		repo: REPO,
 		body: MIXED_BODY,
 		labels: ['epic'],
 		children: [894],

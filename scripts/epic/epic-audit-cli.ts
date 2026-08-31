@@ -156,7 +156,9 @@ function graph_anomalies(
 	const links = git_epic_parse.parse_dependency_links(snapshot.body)
 	const is_declared = epic_next.is_order_declared(snapshot.body, links)
 
-	return epic_audit_report.anomaly_findings(epic_graph.find_anomalies(children, links, is_declared))
+	return epic_audit_report.anomaly_findings(
+		epic_graph.find_anomalies(children, links, is_declared, snapshot.repo),
+	)
 }
 
 // The findings that come from the fetch and the graph rather than from reading the bodies.

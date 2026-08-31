@@ -24,6 +24,7 @@ function mention_row(_value: unknown, index: number): { number: number; body: st
 function snapshot(body: string | undefined): EpicSnapshot {
 	return {
 		body,
+		repo: REPO,
 		current_repo: REPO,
 		children: [],
 		child_numbers: [1],

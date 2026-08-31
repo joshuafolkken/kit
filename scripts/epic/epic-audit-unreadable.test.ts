@@ -25,6 +25,7 @@ function unread(number: number, repo: string = REPO): IssueReference {
 function snapshot(overrides: Partial<EpicSnapshot> = {}): EpicSnapshot {
 	return {
 		body: undefined,
+		repo: REPO,
 		current_repo: REPO,
 		children: [],
 		child_numbers: [1],

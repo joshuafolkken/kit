@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 const REPO = 'joshuafolkken/kit'
+const OTHER_REPO = 'joshuafolkken/joshuafolkken-com'
 
 // Children are identified by repository and number: an epic can track both `#7` and `app-kit#7`, and
 // keying by number alone had them overwrite each other (joshuafolkken/kit#864).
@@ -9,8 +10,21 @@ function key(number: number, repo = REPO): string {
 	return `${repo}#${String(number)}`
 }
 
-function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
-	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
+// `blocked_by` is written as bare numbers because most cases keep the blocker in the child's own
+// repository; `blockers` is the escape hatch for a relation that crosses one (joshuafolkken/kit#1126).
+function child(
+	number: number,
+	blocked_by: ReadonlyArray<number> = [],
+	repo = REPO,
+	blockers?: ReadonlyArray<IssueReference>,
+): EpicChild {
+	return {
+		number,
+		repo,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blockers ?? blocked_by.map((blocker) => ({ repo, number: blocker })),
+	}
 }
 
 describe('epic_graph.find_stuck_children', () => {
@@ -69,7 +83,7 @@ describe('epic_graph.missing_relations', () => {
 	it('accepts a declaration the relations record', () => {
 		const links = [{ blocker: 1, blocked: 2 }]
 
-		expect(epic_graph.missing_relations(links, [child(1), child(2, [1])])).toEqual([])
+		expect(epic_graph.missing_relations(links, [child(1), child(2, [1])], REPO)).toEqual([])
 	})
 
 	// An epic written before `josh` recorded the relations, or one whose recording failed, is the
@@ -77,19 +91,36 @@ describe('epic_graph.missing_relations', () => {
 	it('reports a declaration with no matching relation', () => {
 		const links = [{ blocker: 1, blocked: 2 }]
 
-		expect(epic_graph.missing_relations(links, [child(1), child(2)])).toEqual(links)
+		expect(epic_graph.missing_relations(links, [child(1), child(2)], REPO)).toEqual(links)
 	})
 })
 
 describe('epic_graph.undeclared_relations', () => {
 	it('reports a relation the body never declares', () => {
-		expect(epic_graph.undeclared_relations([], [child(1), child(2, [1])])).toEqual([
+		expect(epic_graph.undeclared_relations([], [child(1), child(2, [1])], REPO)).toEqual([
 			{ blocker: 1, blocked: 2 },
 		])
 	})
 
 	it('ignores a relation pointing outside the epic', () => {
-		expect(epic_graph.undeclared_relations([], [child(1, [999])])).toEqual([])
+		expect(epic_graph.undeclared_relations([], [child(1, [999])], REPO)).toEqual([])
+	})
+
+	// joshuafolkken/kit#1126: the number set was repository-blind, so a child elsewhere whose number
+	// happened to equal a blocker's was reported as a relation nobody recorded.
+	it('does not report a coincidence between two repositories', () => {
+		const other = child(2, [], OTHER_REPO)
+		const blocked = child(3, [], OTHER_REPO, [{ repo: OTHER_REPO, number: 2 }])
+
+		expect(epic_graph.undeclared_relations([], [child(2), other, blocked], REPO)).toEqual([])
+	})
+
+	// A declared link is a bare number, which names the epic's own repository — so a relation that
+	// crosses one is never something the body could have declared.
+	it('leaves a cross-repository relation out of the declarable set', () => {
+		const blocked = child(2, [], REPO, [{ repo: OTHER_REPO, number: 1 }])
+
+		expect(epic_graph.undeclared_relations([], [child(1), blocked], REPO)).toEqual([])
 	})
 })
 
@@ -97,7 +128,7 @@ describe('epic_graph.find_anomalies', () => {
 	it('reports nothing when the body and the relations agree', () => {
 		const links = [{ blocker: 1, blocked: 2 }]
 
-		expect(epic_graph.find_anomalies([child(1), child(2, [1])], links, true)).toEqual([])
+		expect(epic_graph.find_anomalies([child(1), child(2, [1])], links, true, REPO)).toEqual([])
 	})
 
 	it('reports a mismatch rather than picking a winner', () => {
@@ -105,6 +136,7 @@ describe('epic_graph.find_anomalies', () => {
 			[child(1), child(2)],
 			[{ blocker: 1, blocked: 2 }],
 			true,
+			REPO,
 		)
 
 		expect(anomaly?.kind).toBe('declaration_mismatch')
@@ -113,7 +145,7 @@ describe('epic_graph.find_anomalies', () => {
 
 	it('names both directions of a disagreement', () => {
 		const children = [child(1), child(2), child(3, [2])]
-		const [anomaly] = epic_graph.find_anomalies(children, [{ blocker: 1, blocked: 2 }], true)
+		const [anomaly] = epic_graph.find_anomalies(children, [{ blocker: 1, blocked: 2 }], true, REPO)
 
 		expect(anomaly?.message).toContain('declared but not recorded: #1 -> #2')
 		expect(anomaly?.message).toContain('recorded but not declared: #2 -> #3')
@@ -123,12 +155,12 @@ describe('epic_graph.find_anomalies', () => {
 	// Without a declaration there is nothing for the relations to disagree with; reporting one would
 	// fail every epic whose Dependencies section could not be read.
 	it('reports no mismatch when the body declares no order at all', () => {
-		expect(epic_graph.find_anomalies([child(1), child(2, [1])], [], false)).toEqual([])
+		expect(epic_graph.find_anomalies([child(1), child(2, [1])], [], false, REPO)).toEqual([])
 	})
 
 	it('reports the cycle first when both are wrong', () => {
 		const children = [child(1, [2]), child(2, [1])]
-		const anomalies = epic_graph.find_anomalies(children, [{ blocker: 9, blocked: 8 }], true)
+		const anomalies = epic_graph.find_anomalies(children, [{ blocker: 9, blocked: 8 }], true, REPO)
 
 		expect(anomalies).toHaveLength(1)
 		expect(anomalies[0]?.kind).toBe('cycle')
