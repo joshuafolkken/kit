@@ -15,8 +15,15 @@ import { epic_next } from './epic-next'
 // then both answered "nothing of mine is in progress", and two children ran in the same working
 // tree — destruction rather than interleaving. The invariant is now one child per *repository*.
 
+// `issue_blocked_by_numbers` is here because `epic:next --repo` confirms the candidate it is about
+// to offer against its own relations listing (joshuafolkken/kit#1121). Left out, every candidate is
+// withheld — which is the guard's safe direction working, and would make each test below assert the
+// confirmation's failure rather than the exclusion it is about.
 vi.mock('#scripts/git/git-gh-command', () => ({
-	git_gh_command: { issue_list_by_label_in_repo: vi.fn() },
+	git_gh_command: {
+		issue_list_by_label_in_repo: vi.fn(),
+		issue_blocked_by_numbers: vi.fn(async () => []),
+	},
 }))
 
 const { git_gh_command } = await import('#scripts/git/git-gh-command')

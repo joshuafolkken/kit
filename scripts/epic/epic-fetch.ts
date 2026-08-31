@@ -244,6 +244,7 @@ function missing_children(snapshot: EpicSnapshot): Array<IssueReference> {
 const epic_fetch = {
 	CHILD_LIMIT,
 	scope_for,
+	read_child_blockers,
 	missing_children,
 	fetch_child,
 	fetch_children,

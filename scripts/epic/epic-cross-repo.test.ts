@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild } from './epic-graph'
 
+vi.mock('execa', () => ({ execaSync: vi.fn() }))
+
+const execa = await import('execa')
+const gh = vi.mocked(execa.execaSync)
+
 const KIT = 'joshuafolkken/kit'
 const APP_KIT = 'joshuafolkken/app-kit'
 const VERSION = '1.117.0'
@@ -15,11 +20,15 @@ function never_read(): string | undefined {
 	throw new Error('the registry must not be consulted here')
 }
 
+const MANIFEST_READ_SUCCESS = { exitCode: 0, stdout: `"${VERSION}"` }
+
 beforeEach(() => {
 	vi.restoreAllMocks()
-	// The registry answers are cached per repository for one pass; a stale entry would make the next
-	// case read the previous one's answer.
+	// The registry answers and the manifest reads are cached per repository for one pass; a stale
+	// entry would make the next case read the previous one's answer.
 	epic_cross_repo.reset_publish_cache()
+	gh.mockReset()
+	gh.mockReturnValue(MANIFEST_READ_SUCCESS as unknown as ReturnType<typeof execa.execaSync>)
 })
 
 describe('epic_cross_repo.package_name_for', () => {
@@ -165,5 +174,33 @@ describe('epic_cross_repo.resolve_cross_repo — what it cannot determine', () =
 		)
 
 		expect(verdict).toBe('time')
+	})
+})
+
+// joshuafolkken/kit#1121 made a classification pass run once per withheld candidate rather than once,
+// so an uncached manifest read is a blocking `gh` call multiplied by the size of the bundle.
+describe('epic_cross_repo.read_default_branch_version', () => {
+	it(`reads a repository's manifest once per pass`, () => {
+		epic_cross_repo.read_default_branch_version(KIT)
+		epic_cross_repo.read_default_branch_version(KIT)
+
+		expect(gh).toHaveBeenCalledTimes(1)
+	})
+
+	// A polling run must see the version a merge in between has bumped.
+	it('reads again after the cache is reset', () => {
+		epic_cross_repo.read_default_branch_version(KIT)
+		epic_cross_repo.reset_publish_cache()
+		epic_cross_repo.read_default_branch_version(KIT)
+
+		expect(gh).toHaveBeenCalledTimes(2)
+	})
+
+	it('caches a read that failed rather than retrying it all pass', () => {
+		gh.mockReturnValue({ exitCode: 1, stdout: '' } as unknown as ReturnType<typeof execa.execaSync>)
+
+		expect(epic_cross_repo.read_default_branch_version(KIT)).toBeUndefined()
+		expect(epic_cross_repo.read_default_branch_version(KIT)).toBeUndefined()
+		expect(gh).toHaveBeenCalledTimes(1)
 	})
 })
