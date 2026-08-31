@@ -1,4 +1,5 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
+import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { describe, expect, it } from 'vitest'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
@@ -20,20 +21,19 @@ const DOTTED_REPO = 'joshuafolkken/site.com'
 const DOTTED_40 = `${DOTTED_REPO}#40`
 const PROSE_PATH = 'see prompts/review.md#5'
 
+// `blocked_by` is written as bare numbers, which name the child's own repository; `blockers` is the
+// escape hatch for a relation that crosses one (joshuafolkken/kit#1128).
 function child(
 	number: number,
 	repo: string,
 	body: string,
-	blocked_by: ReadonlyArray<number> = [],
+	blocked_by: ReadonlyArray<number> | ReadonlyArray<IssueReference> = [],
 ): AuditChild {
-	return {
-		number,
-		repo,
-		state: 'OPEN',
-		labels: [],
-		blocked_by: blocked_by.map((blocker) => ({ repo, number: blocker })),
-		body,
-	}
+	const references = blocked_by.map((blocker) =>
+		typeof blocker === 'number' ? { repo, number: blocker } : blocker,
+	)
+
+	return { number, repo, state: 'OPEN', labels: [], blocked_by: references, body }
 }
 
 // The resolved states, keyed the way the audit keys them: repository and number both.
@@ -203,28 +203,56 @@ describe('epic_audit_checks — references between children of another repositor
 	})
 })
 
+const NEEDS_40 = `## 受け入れ条件\n\n- [ ] needs ${LOCAL_40}`
+
+// The pair the audit is asked about: a child elsewhere whose criteria need an issue here, with
+// nothing ordering the two.
+function unordered_pair(
+	blockers: ReadonlyArray<IssueReference> = [],
+): ReturnType<typeof epic_audit_checks.find_order_contradictions> {
+	return epic_audit_checks.find_order_contradictions(
+		[child(12, OTHER_REPO, NEEDS_40, blockers), child(40, REPO, '')],
+		REPO,
+	)
+}
+
+// Such a pair was exempt until joshuafolkken/kit#1128, because the order could not be recorded at all
+// before joshuafolkken/kit#1126 and the finding would have been one nobody could ever clear. It is
+// asked the same question as any other pair now — as a **warning**, so an epic written before the
+// capability existed is told rather than stopped.
 describe('epic_audit_checks — a pair in two repositories', () => {
-	// The exemption predates joshuafolkken/kit#1126, when a cross-repository order could not be
-	// recorded at all and the finding would have been one nobody could ever clear. It is recordable
-	// now, and the exemption is kept deliberately: lifting it turns an **error** red on epics that are
-	// green today, which stops every `epicrun` on them. joshuafolkken/kit#1128 decides that.
-	it('raises no contradiction between children of two different repositories', () => {
-		const criteria = `## 受け入れ条件\n\n- [ ] needs ${LOCAL_40}`
+	it('reports a contradiction between children of two different repositories', () => {
+		expect(unordered_pair()).toHaveLength(1)
+	})
+
+	// An error would fail the audit `epicrun` runs before its first child, stopping every epic that
+	// predates joshuafolkken/kit#1126 at step one — joshuafolkken/kit#1010's failure, repeated.
+	it('reports it as a warning rather than an error', () => {
+		expect(unordered_pair()[0]?.level).toBe('warning')
+	})
+
+	// Recorded, it resolves through the cross-repository walk joshuafolkken/kit#1126 made possible.
+	it('reports nothing once the order is recorded', () => {
+		expect(unordered_pair([{ repo: REPO, number: 40 }])).toEqual([])
+	})
+
+	// A pair inside one repository is unchanged: still an error, still what it always was.
+	it('leaves a same-repository pair an error', () => {
 		const findings = epic_audit_checks.find_order_contradictions(
-			[child(12, OTHER_REPO, criteria), child(40, REPO, '')],
+			[child(12, REPO, NEEDS_40), child(40, REPO, '')],
 			REPO,
 		)
 
-		expect(findings).toEqual([])
+		expect(findings[0]?.level).toBe('error')
 	})
 
-	it('raises no implicit dependency across a repository boundary', () => {
+	it('reports an implicit dependency across a repository boundary', () => {
 		const findings = epic_audit_checks.find_implicit_dependencies(
 			[child(12, OTHER_REPO, `uses ${LOCAL_40}`), child(40, REPO, '')],
 			REPO,
 		)
 
-		expect(findings).toEqual([])
+		expect(findings).toHaveLength(1)
 	})
 
 	// The pair check 2 reported is suppressed in check 1 by repository and number both, which is what

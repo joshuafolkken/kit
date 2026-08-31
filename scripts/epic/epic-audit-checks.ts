@@ -1,4 +1,9 @@
-import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
+import {
+	epic_audit_logic,
+	type AuditFinding,
+	type FindingLevel,
+	type ReferenceState,
+} from './epic-audit'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // The four cross-child checks. Each takes the children with their bodies and returns findings.
@@ -56,20 +61,16 @@ function find_sibling(
 // statement about the pair but about what could be recorded: `blocked_by` was read as bare numbers,
 // so a cross-repository order could not be written onto the graph at all, and reporting one as a
 // contradiction would have failed the audit with no edit to either issue that could ever clear it.
-// joshuafolkken/kit#1126 makes such an order recordable and readable, so the premise no longer holds
-// and `depends_on` would now answer a cross-repository chain exactly as it answers a local one. The
-// exemption is kept all the same, and deliberately: lifting it turns `find_order_contradictions` —
-// an **error**, which stops every `epicrun` on that epic at its first step — red on epics that are
-// green today and were written before a cross-repository relation could be recorded at all. That is a
-// decision about audit strictness rather than part of making the relation readable, so it is
-// joshuafolkken/kit#1128's to make.
+// joshuafolkken/kit#1126 made such an order recordable and readable, so the premise stopped holding
+// and joshuafolkken/kit#1128 removed the exemption: every pair is asked the same question now, and
+// `depends_on` walks a cross-repository chain by identity exactly as it walks a local one. What keeps
+// that from failing epics written before the capability existed is the finding's *level* rather than
+// a blind spot — see `order_level`.
 function is_ordered(
 	index: ReadonlyMap<string, EpicChild>,
 	child: AuditChild,
 	other: AuditChild,
 ): boolean {
-	if (child.repo !== other.repo) return true
-
 	return (
 		epic_audit_logic.depends_on(index, child, other) ||
 		epic_audit_logic.depends_on(index, other, child)
@@ -199,11 +200,38 @@ function order_message(
 	return `${named}, but nothing orders the two — it can run first.`
 }
 
+// Whether this finding may stop a run. An `error` fails `epic:audit`, and `epicrun` runs the audit
+// before its first child — so an error stops the whole epic at step one.
+//
+// Two cases are deliberately warnings, and they are warnings for different reasons.
+//
+// **Both children closed**: neither can run first any more, so the finding cannot describe anything
+// that will happen.
+//
+// **A pair in two repositories** (joshuafolkken/kit#1128): that order only became recordable with
+// joshuafolkken/kit#1126, so an error would fail the audit `epicrun` runs before its first child and
+// stop every epic written before it — joshuafolkken/kit#1010 is what that looks like.
+//
+// **Be clear about what the warning does and does not buy.** It does *not* make the run safe: the
+// finding fires precisely when nothing orders the pair, so there is no relation for `epic:next` to
+// read and the child is offered as runnable — it can start before the work it cites. What changed is
+// that this was previously *silent*, and is now said out loud. Making it safe means stopping, and
+// stopping is what the recorded decision declined for epics that predate the capability. Clearing one
+// means recording the relation; `josh epic --add` cannot write it yet (joshuafolkken/kit#1138), so
+// until then it is the `dependencies/blocked_by` endpoint by hand.
+function order_level(child: AuditChild, other: AuditChild, is_settled: boolean): FindingLevel {
+	if (is_settled) return 'warning'
+
+	return child.repo === other.repo ? 'error' : 'warning'
+}
+
 function order_finding(child: AuditChild, other: AuditChild, current_repo: string): AuditFinding {
+	// Decided once and handed to both. Asked twice — once for the level, once for the wording — the
+	// two could disagree, and the report would carry a level that contradicts the sentence under it.
 	const is_settled = are_both_closed(child, other)
 
 	return {
-		level: is_settled ? 'warning' : 'error',
+		level: order_level(child, other, is_settled),
 		check: ORDER_CONTRADICTION,
 		message: order_message(child, other, current_repo, is_settled),
 	}
