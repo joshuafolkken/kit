@@ -116,10 +116,23 @@ step, and both may be applied **only by a person**.
 **Stopping is the specification, not a failure.** The label's job is not to keep a batch moving; it
 is to stop a batch walking past a decision that was a person's to make.
 
-**Match the label case-insensitively.** GitHub keeps the spelling a label was created with and treats
-`Needs-Human-Review` as the same label, so an issue read by eye against the lowercase string is one
-whose run does not stop — and the artifact ships, which is the whole thing this label exists to
-prevent. `has_any_label` lowercases for exactly this reason; do the same when you read the labels.
+**Read the answer from `pnpm josh issue:state <N>`, never by matching the label string yourself**
+(joshuafolkken/kit#1132). It prints a `human_review: yes` / `human_review: no` line beside the state
+and the labels, decided through the same case-insensitive comparison every other workflow label goes
+through. GitHub keeps the spelling a label was created with and treats `Needs-Human-Review` as the
+same label, so an issue read by eye against the lowercase string is one whose run does not stop — and
+the artifact ships, which is the whole thing this label exists to prevent.
+
+**Ask once, before implementing.** `epic:next` prints a bare issue number and `fullrun` / `queue` are
+handed one, so nothing has read this issue's labels by the time work would start — the check is one
+call of its own, made the moment the number is in hand and before the plan. The confirmation an
+`epicrun` makes *after* a delegated child returns reads the same line for free, but that is too late
+to decide whether to degrade: by then the child has either committed or it has not.
+
+```bash
+pnpm josh issue:state <N>                      # state, labels, and human_review
+pnpm josh issue:state <N> --repo <owner/repo>  # a child in another repository
+```
 
 **Never apply or remove it**, exactly as strongly as `auto-ok`: a mark a run can clear for itself is
 not a mark. Typing the command on an explicit instruction in the current turn is not applying it;
