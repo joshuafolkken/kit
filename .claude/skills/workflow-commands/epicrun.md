@@ -26,7 +26,7 @@ human action — this one just spends it at the start, for work already expected
 
 So inside `epicrun #<N>`, a prerequisite or a split found mid-run does **not** stop the run:
 
-1. File the new Issue(s) — no confirmation; the batch was already approved by the keyword.
+1. File the new Issue(s) with the matching route label — `route:split` for a split, `route:tier-a` for a prerequisite (joshuafolkken/kit#1083) — no confirmation; the batch was already approved by the keyword.
 2. **Stash the work in progress and remove `in-progress` from `#<N>`**, exactly as steps 2 and 4 of
    "A prerequisite discovered mid-run" do — `git stash push -u -m "..."` with the `-u` (a new
    `*.test.ts` is untracked), the `gh api repos/{owner}/{repo}/issues/<N>/comments` post that records the stash so whatever resumes
@@ -665,7 +665,7 @@ must not (joshuafolkken/kit#891).
 
 `<M>` below is the child being implemented when the prerequisite turned up; `<N>` is the new Issue.
 
-1. File the prerequisite Issue `<N>` — Tier A for a first-party repository, no confirmation. It is
+1. File the prerequisite Issue `<N>` with the `route:tier-a` label — Tier A for a first-party repository, no confirmation (joshuafolkken/kit#1083). It is
    filed **first** because the next step has to name it, and its number does not exist until it is.
 2. **Stash the work in progress.** A child is implemented on the default branch with an uncommitted
    tree — `pnpm josh git` only creates the branch at commit time — so `<M>`'s half-finished edits are
@@ -712,7 +712,7 @@ in the name of unattended execution is what makes the run need a person.
 
 ## Splitting a child mid-run
 
-Discovering that a child is really several is not a reason to stop. File the new children (Tier A
+Discovering that a child is really several is not a reason to stop. File the new children with the `route:split` label (joshuafolkken/kit#1083) (Tier A
 for a first-party repository — no confirmation), then add them with `pnpm josh epic --add <E> <N...>
 [--before <M> | --after <M>]` rather than editing the epic body by hand — for the reason above. Use
 the same split criteria as `kickoff` (joshuafolkken/kit#865). If what remains of the original child

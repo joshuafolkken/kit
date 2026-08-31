@@ -10,6 +10,8 @@
 | この Issue が実は複数だった（分割）                       | 子と EPIC を起票して**停止** または park（「分割判定は全入口で共通」）                 |
 | 同一リポジトリ内に、先にやるべき Issue がある（**前提**） | 本節                                                                                   |
 
+**前提 Issue は `route:tier-a` を付けて起票する** — `gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f body="<body>"`。実装中に判明した Tier A 起票を、起票経路として後から機械的に集計できるようにするため（joshuafolkken/kit#1083）。以下の各手順の「起票する」はこのラベル付きの起票を指す。
+
 ### `epicrun` 実行中 — park せず、依存として記録して続ける
 
 `<M>` は前提が判明した時点で実装していた子、`<N>` は新しく起票する Issue とする。

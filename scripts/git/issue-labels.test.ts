@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
+	FILING_ROUTE_LABELS,
 	has_any_label,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
+	REVIEW_CAP_ROUTE_LABEL,
+	SPLIT_ROUTE_LABEL,
+	TIER_A_ROUTE_LABEL,
 } from './issue-labels'
 
 // The label names are the contract between these scripts and GitHub, and every one of them fails
@@ -20,6 +24,12 @@ const NEEDS_DECISION_SPELLING = 'needs-decision'
 const AUTO_OK_SPELLING = 'auto-ok'
 const NEEDS_HUMAN_REVIEW_SPELLING = 'needs-human-review'
 const NOT_DIRECTLY_RUNNABLE_COUNT = 3
+// joshuafolkken/kit#1083: the route labels are the same GitHub contract, and the aggregation query
+// (`?labels=route:split`) fails silently on a drifted name exactly as the others do.
+const REVIEW_CAP_ROUTE_SPELLING = 'route:review-cap'
+const SPLIT_ROUTE_SPELLING = 'route:split'
+const TIER_A_ROUTE_SPELLING = 'route:tier-a'
+const FILING_ROUTE_COUNT = 3
 
 describe('the label names', () => {
 	it.each([
@@ -28,8 +38,34 @@ describe('the label names', () => {
 		[NEEDS_DECISION_LABEL, NEEDS_DECISION_SPELLING],
 		[AUTO_OK_LABEL, AUTO_OK_SPELLING],
 		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
+		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
+		[SPLIT_ROUTE_LABEL, SPLIT_ROUTE_SPELLING],
+		[TIER_A_ROUTE_LABEL, TIER_A_ROUTE_SPELLING],
 	])('%s is spelled exactly as GitHub holds it', (actual, expected) => {
 		expect(actual).toBe(expected)
+	})
+})
+
+describe('FILING_ROUTE_LABELS', () => {
+	// The provisioning source: one entry per route label, each with the color and description a repo
+	// is created with. A route added to the constants but not here would never be provisioned.
+	it('carries one entry per route label', () => {
+		expect(FILING_ROUTE_LABELS.map((label) => label.name)).toStrictEqual([
+			REVIEW_CAP_ROUTE_LABEL,
+			SPLIT_ROUTE_LABEL,
+			TIER_A_ROUTE_LABEL,
+		])
+	})
+
+	it('holds exactly the three route labels', () => {
+		expect(FILING_ROUTE_LABELS).toHaveLength(FILING_ROUTE_COUNT)
+	})
+
+	it('gives every route a non-empty color and description', () => {
+		for (const label of FILING_ROUTE_LABELS) {
+			expect(label.color).toMatch(/^[0-9a-f]{6}$/u)
+			expect(label.description.length).toBeGreaterThan(0)
+		}
 	})
 })
 

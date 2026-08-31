@@ -12,7 +12,7 @@
 
 そのため `epicrun #<N>` の実行中に前提 Issue または分割が判明しても、**停止しない**。
 
-1. 新規 Issue を起票する（確認しない。バッチの承認はキーワードの時点で与えられている）
+1. 新規 Issue を起票する（見つかった経路に応じて `route:split`／`route:tier-a` を付ける — joshuafolkken/kit#1083。確認しない。バッチの承認はキーワードの時点で与えられている）
 2. **作業中の変更を stash し、`#<N>` から `in-progress` を外す。** 「実行中に前提 Issue が判明した場合」の手順 2 と 4 とまったく同じで、`-u` 付きの `git stash push -u -m "..."`（新規の `*.test.ts` は untracked である）、stash の存在を伝える `gh api repos/{owner}/{repo}/issues/<N>/comments`、`gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true` の 3 つとも要る。理由も同じで、作業ツリーは既定ブランチで汚れており次の子は `git switch main && git pull` から始まること、`epic:next` が `in-progress` の付いた子を blocker を見る前に「時間で解ける」と分類するため `#<N>` が二度と候補にならず EPIC が詰まること、の 2 点である。**経路が新しいだけで、要る手当ては変わらず、どれも省略できない**
 3. **作る前に `pnpm josh epic:bundle <N>` で、既に `#<N>` を追跡している EPIC が無いかを確かめる。** どの EPIC かを名乗る（`#893 already tracks this issue`）。`epicrun` に渡された素の Issue が、既に誰かの EPIC の子であることはありうる——`#893` の子である `#943` に対して `epicrun #943` と打つことを止めるものは無い——そこで 2 つ目の EPIC を作ると、どちらの自動クローズも他方を知らないまま動く。しかも**人が見ていない入口で**起きる。
 
