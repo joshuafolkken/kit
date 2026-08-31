@@ -161,6 +161,13 @@ previous release, or fails outright. Such a dependency resolves only once the bl
 its release has appeared in the registry — and while the blocker is still open the registry is never
 consulted, so a run never sits waiting on a publish from the moment it starts.
 
+**Unless that repository publishes nothing** (joshuafolkken/kit#1129). A repository with no
+`package.json` on its default branch, or one declaring `private`, ships no release for the check to
+wait on — so a closed blocker there resolves rather than waiting until the run's own eight-hour
+timeout with nothing an operator can edit to clear it. The answer is read from the blocker
+repository's own manifest and never from the registry: a registry 404 also means "this token may not
+see it", so resolving on one would start a consumer child before its blocker's release existed.
+
 **The exclusion is per repository, and `epic:next` is what applies it.** When
 `josh epic:next --repo <owner/repo>` has a child to offer, it first asks that repository whether
 anything is already running there: **any** open issue carrying `in-progress` and not parked makes
