@@ -5,6 +5,11 @@ import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { epic_busy } from './epic-busy'
+import {
+	epic_candidate_confirm,
+	type ConfirmContext,
+	type RepoAnswer,
+} from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
@@ -118,6 +123,24 @@ function repo_verdict(verdict: EpicVerdict): EpicVerdict {
 	return verdict === 'run' ? 'wait' : verdict
 }
 
+// The confirmed candidate's number, or the verdict that stands in its place when the relations
+// listing withheld every one of them (joshuafolkken/kit#1121). The token on standard output is a
+// number or a verdict either way, so a loop reading `child=$(josh epic:next …)` is unchanged.
+function report_answer(answer: RepoAnswer, repo: string): number {
+	if (answer.child === undefined) {
+		console.error(
+			`No runnable child in ${repo}: every candidate was withheld when its blocker relations were confirmed — the reason for each is above.`,
+		)
+		console.info(repo_verdict(answer.verdict))
+
+		return SUCCESS_EXIT_CODE
+	}
+
+	console.info(String(answer.child.number))
+
+	return SUCCESS_EXIT_CODE
+}
+
 // The candidate, once the repository has been asked whether anything is already running in it —
 // **whichever epic that belongs to** (joshuafolkken/kit#925). The invariant is one child per
 // *repository* rather than one per epic, because the working tree, `main` and the `package.json`
@@ -137,19 +160,37 @@ function repo_verdict(verdict: EpicVerdict): EpicVerdict {
 // The token on standard output is unchanged in every branch — the child's number, or `wait` — so a
 // loop reading `child=$(josh epic:next …)` sees exactly what it saw before; the new case is one more
 // explanation on standard error.
-async function offer_child(child: EpicChild, repo: string): Promise<number> {
+//
+// The candidate confirmation is taken **after** this read and never before it (joshuafolkken/kit#1121):
+// a busy repository is handed nothing, so the relations request that would confirm a candidate there
+// buys an answer nobody reads — and an `epicrun` polling every sixty seconds would pay it every round.
+async function offer_child(
+	candidates: ReadonlyArray<EpicChild>,
+	repo: string,
+	context: ConfirmContext,
+): Promise<number> {
 	const busy = await epic_busy.read_repository(repo)
 
-	if (busy.kind === 'idle') {
-		console.info(String(child.number))
+	if (busy.kind !== 'idle') {
+		console.error(epic_busy.busy_reason(busy, repo))
+		console.info(BUSY_VERDICT)
 
 		return SUCCESS_EXIT_CODE
 	}
 
-	console.error(epic_busy.busy_reason(busy, repo))
-	console.info(BUSY_VERDICT)
+	return report_answer(await epic_candidate_confirm.answer_for_repo(candidates, context), repo)
+}
 
-	return SUCCESS_EXIT_CODE
+// What the candidate confirmation reads with. The blockers come from `epic_fetch`'s own reader, so
+// a candidate is addressed exactly as every other read of a child is — a cross-repository child
+// through its own repository, and a local one bare (joshuafolkken/kit#1012).
+function confirm_context(snapshot: EpicSnapshot): ConfirmContext {
+	return {
+		children: snapshot.children,
+		resolve: epic_cross_repo.resolve_cross_repo,
+		read_blockers: async (child) =>
+			await epic_fetch.read_child_blockers(child, snapshot.current_repo),
+	}
 }
 
 // Print the answer for one repository, as one machine-readable token: the issue number when there
@@ -162,23 +203,27 @@ async function offer_child(child: EpicChild, repo: string): Promise<number> {
 //
 // An unusable graph is checked before a candidate is picked: printing a runnable child while the
 // graph is broken would hand a caller work the anomaly says must not start.
-async function report_single(result: EpicNextResult, repo: string): Promise<number> {
+async function report_single(
+	result: EpicNextResult,
+	repo: string,
+	snapshot: EpicSnapshot,
+): Promise<number> {
 	if (result.verdict === 'error') {
 		console.error(epic_report.format_result(result))
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const child = epic_report.pick_for_repo(result, repo)
+	const candidates = epic_report.candidates_for_repo(result, repo)
 
-	if (child === undefined) {
+	if (candidates.length === 0) {
 		console.error(`No runnable child in ${repo}.`)
 		console.info(repo_verdict(result.verdict))
 
 		return SUCCESS_EXIT_CODE
 	}
 
-	return await offer_child(child, repo)
+	return await offer_child(candidates, repo, confirm_context(snapshot))
 }
 
 // The aggregate listing does not consult the repository-level exclusion — `--repo` is what asks a
@@ -195,7 +240,7 @@ async function report(
 	repo: string | undefined,
 ): Promise<number> {
 	if (snapshot.has_external_children) console.error(EXTERNAL_NOTICE)
-	if (repo !== undefined) return await report_single(result, repo)
+	if (repo !== undefined) return await report_single(result, repo, snapshot)
 
 	note_unchecked_exclusion(result)
 
@@ -284,6 +329,8 @@ const epic_next = {
 	is_order_declared,
 	repo_verdict,
 	offer_child,
+	report_answer,
+	confirm_context,
 	UNCHECKED_EXCLUSION,
 	parse_options,
 	run_epic,

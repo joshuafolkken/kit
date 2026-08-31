@@ -49,10 +49,15 @@ function published_versions(repo: string): ReadonlyArray<string> | undefined {
 	return versions
 }
 
-// Discard the cached registry answers. A long-lived process — an `epicrun` polling every minute —
-// must see a release that appeared since its last round.
+// The default-branch version per repository — the other half of the answer `published_cache` holds,
+// cached for the same reason and cleared with it.
+const version_cache = new Map<string, string | undefined>()
+
+// Discard the cached registry and manifest answers. A long-lived process — an `epicrun` polling every
+// minute — must see a release that appeared since its last round.
 function reset_publish_cache(): void {
 	published_cache.clear()
+	version_cache.clear()
 }
 
 // Whether a version of the blocker's package has appeared in the registry.
@@ -76,7 +81,7 @@ const VERSION_JQ = '.content | @base64d | fromjson | .version'
 //
 // Never "whatever is newest": a consumer several releases behind would be satisfied by any publish
 // at all, including one that predates the change it is waiting for.
-function read_default_branch_version(repo: string): string | undefined {
+function fetch_default_branch_version(repo: string): string | undefined {
 	const result = execaSync(
 		'gh',
 		['api', `${git_gh_api_path.repo_api_path(repo)}/contents/package.json`, '--jq', VERSION_JQ],
@@ -86,6 +91,18 @@ function read_default_branch_version(repo: string): string | undefined {
 	const version = result.stdout.trim()
 
 	return version === '' || version === 'null' ? undefined : version
+}
+
+// Read once per pass, for the reason `published_cache` holds the other half: every edge to one
+// repository asks the same question, and joshuafolkken/kit#1121 made a pass run once per withheld
+// candidate rather than once — so an uncached read is a blocking `gh` call multiplied by both.
+function read_default_branch_version(repo: string): string | undefined {
+	if (version_cache.has(repo)) return version_cache.get(repo)
+	const version = fetch_default_branch_version(repo)
+
+	version_cache.set(repo, version)
+
+	return version
 }
 
 // A version that could not be read leaves the dependency waiting rather than resolved: not knowing
