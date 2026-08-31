@@ -319,15 +319,16 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
    pnpm josh issue:state <N> --repo <owner/repo>      # a child in another one
    # state: CLOSED
    # labels: (none)
+   # human_review: no
    ```
 
    **`--repo` is not optional for a cross-repository child.** Without it the read resolves `<N>`
    against the repository this session runs in, and confirms a completely different issue that
    happens to carry that number — silently, because that issue usually exists.
 
-   `state: CLOSED` is the only answer that means the child finished. **Read the labels line before
-   calling anything else a failure**, because two different outcomes look alike from here — which is
-   why one command prints both rather than two reads being made.
+   `state: CLOSED` is the only answer that means the child finished. **Read the `human_review:` and
+   `labels:` lines before calling anything else a failure**, because three different outcomes look
+   alike from here — which is why one command prints all of them rather than three reads being made.
 
    **A non-zero exit is not `OPEN`.** The command exits non-zero without printing a state when the
    number resolves to nothing (`does not resolve`) and when the read itself failed (`could not
@@ -339,8 +340,16 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
      have. That is not a failure: leave the label on, do **not** count it against the
      consecutive-failure guard, and go back to step 1. Three parks in a row are an ordinary epic,
      and counting them would abort the run as an environment fault.
-   - **Open, carrying `needs-human-review`** — the child **stopped before its commit**, which is
-     the run's own ending rather than a failure (§2z). Leave `in-progress` **on** — the uncommitted
+   - **Open, and `human_review: yes`** — the child **stopped before its commit**, which is the run's
+     own ending rather than a failure (§2z). **`Open` is part of the test, as it is for the two
+     branches below**: a CLOSED child carrying the label finished and merged, so it is `state:
+     CLOSED` and nothing else — reading it as a stop would strand `in-progress` on a closed issue,
+     end the epic without its remaining children, and report a stop that never happened over an
+     artifact that has already shipped. **Read that line, not the `labels:` one**: GitHub keeps the
+     spelling a label was created with, so `Needs-Human-Review` is the same label, and matching the
+     lowercase string by eye drops the child into the failure branch below — the label is stripped,
+     the stop counts against the consecutive-failure guard, and the next child starts on this one's
+     uncommitted tree (joshuafolkken/kit#1132). Leave `in-progress` **on** — the uncommitted
      work is still in the checkout and the child must go on holding the repository — do not park it,
      do not count it against the consecutive-failure guard, and do **not** go back to step 1. Finish
      the session and report. **Do not send a second `confirmation` Telegram** — the unit that ran the

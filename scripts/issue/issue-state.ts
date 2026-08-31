@@ -1,3 +1,4 @@
+import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from '#scripts/git/issue-labels'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
@@ -15,6 +16,18 @@ const NO_LABELS = '(none)'
 const LABEL_SEPARATOR = ', '
 const STATE_LABEL = 'state: '
 const LABELS_LABEL = 'labels: '
+// Whether this issue is one a run must stop on before committing. Printed as its own line rather than
+// left to a reader matching `needs-human-review` against the `labels:` line above
+// (joshuafolkken/kit#1132): GitHub keeps the spelling a label was created with and treats
+// `Needs-Human-Review` as the same label, so an eye comparing against the lowercase string misses it —
+// and a missed one is a run that does not stop and an artifact that ships, which is the whole thing
+// the label exists to prevent. Every other workflow label already reaches its decision through
+// `has_any_label`, which lowercases; this gives that one the same footing.
+const HUMAN_REVIEW_LABEL_LINE = 'human_review: '
+const YES = 'yes'
+const NO = 'no'
+
+const HUMAN_REVIEW_LABELS: ReadonlySet<string> = new Set([NEEDS_HUMAN_REVIEW_LABEL])
 
 // `state` and `labels` as `git_gh_issue_read` answers them — the field names and the casing
 // `gh issue view --json` used, not REST's. A response missing `state` is not a state report, so it
@@ -29,6 +42,8 @@ const issue_state_schema = z.looseObject({
 interface IssueState {
 	state: string
 	labels: ReadonlyArray<string>
+	// Decided here rather than by the caller, so the casing rule lives with the labels it is about.
+	is_human_review: boolean
 }
 
 // `undefined` for anything that is not a state report — malformed JSON, and equally a well-formed
@@ -41,7 +56,13 @@ function parse_issue_state(json: string): IssueState | undefined {
 
 		if (parsed === undefined) return undefined
 
-		return { state: parsed.state, labels: (parsed.labels ?? []).map((label) => label.name) }
+		const labels = parsed.labels ?? []
+
+		return {
+			state: parsed.state,
+			labels: labels.map((label) => label.name),
+			is_human_review: has_any_label(labels, HUMAN_REVIEW_LABELS),
+		}
 	} catch {
 		return undefined
 	}
@@ -54,10 +75,19 @@ function format_labels(labels: ReadonlyArray<string>): string {
 }
 
 function format_issue_state(state: IssueState): string {
-	return `${STATE_LABEL}${state.state}\n${LABELS_LABEL}${format_labels(state.labels)}`
+	const human_review = `${HUMAN_REVIEW_LABEL_LINE}${state.is_human_review ? YES : NO}`
+
+	return `${STATE_LABEL}${state.state}\n${LABELS_LABEL}${format_labels(state.labels)}\n${human_review}`
 }
 
-const issue_state = { NO_LABELS, STATE_LABEL, LABELS_LABEL, parse_issue_state, format_issue_state }
+const issue_state = {
+	NO_LABELS,
+	STATE_LABEL,
+	LABELS_LABEL,
+	HUMAN_REVIEW_LABEL_LINE,
+	parse_issue_state,
+	format_issue_state,
+}
 
 export type { IssueState }
 export { issue_state }

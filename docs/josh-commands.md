@@ -809,7 +809,7 @@ pnpm josh issue 42
 
 ### `josh issue:state`
 
-Print one issue's state and labels, in the spelling the workflow documents compare against.
+Print one issue's state, labels, and whether it is one a run must stop on — in the spelling the workflow documents compare against.
 
 ```bash
 pnpm josh issue:state 42
@@ -819,12 +819,14 @@ pnpm josh issue:state 42 --repo joshuafolkken/app-kit
 ```
 state: CLOSED
 labels: in-progress
+human_review: no
 ```
 
 It replaces the two reads the workflow documents used to prescribe — `gh issue view <N> --json state --jq .state` and `gh issue view <N> --json state,labels --jq …` — with one call that answers both. Those go through GraphQL, which a cloud session is answered 403 for, and that read is `epic-child`'s verifier: the whole reason a child of an epic may be delegated is that the parent re-reads the child's state from GitHub rather than trusting the unit's summary ([#1054](https://github.com/joshuafolkken/kit/issues/1054)).
 
 The state is printed as `OPEN` / `CLOSED` / `MERGED`, not as REST's lower-case `open` / `closed`. That mapping is [#1024](https://github.com/joshuafolkken/kit/issues/1024)'s, single-sourced in `scripts/git/git-gh-rest-state.ts` — which is the reason this is a command rather than a `gh api` line written into the documents, where the casing rule would have had to be restated.
 
+- **`human_review:` answers whether the issue carries [`needs-human-review`](#needs-human-review--the-opposite-label)** ([#1132](https://github.com/joshuafolkken/kit/issues/1132)) — a run reads that line rather than matching the label string itself. GitHub keeps the spelling a label was created with, so an issue whose label reads `Needs-Human-Review` is the same label and an eye comparing against the lowercase string misses it; the run then does not stop and the artifact ships, which is the one thing that label exists to prevent. The line is decided through `has_any_label`, the case-insensitive comparison every other workflow label already reaches its decision through. **A run asks once, before implementing** — `epic:next` prints a bare issue number and `fullrun` / `queue` are handed one, so nothing has read the labels by the time work would start, and the check is a call of its own made the moment the number is in hand. The confirmation an `epicrun` makes _after_ a delegated child returns reads the same line for free, but that is too late to decide whether to degrade.
 - `--repo <owner/repo>` reads a child in another repository, which a cross-repository epic needs. Its state is a GitHub fact, so no checkout there is required.
 - **A non-zero exit is never a state.** A number that resolves to nothing prints `does not resolve`; a read that failed — a rate limit, expired auth, a dropped connection — prints `could not read` and says explicitly that this is not "the issue is open". `gh issue view` exited non-zero with an empty stdout for both, and a loop reading that as "not CLOSED" reports a child as failed because nobody could reach GitHub.
 

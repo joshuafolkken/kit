@@ -48,11 +48,18 @@
 
 この区別はコードにも出ている。`scripts/git/issue-labels.ts` は `needs-human-review` を `NOT_DIRECTLY_RUNNABLE_LABELS` に**入れない**（入れると一度も提示されず、人に見せるべき成果物が永久に作られない）。`scripts/epic/epic-busy.ts` の parked 集合にも**入れない**（入れると上記の踏みつけが起きる）。
 
-## 大文字小文字は問わない（読み間違えると出荷される）
+## 判定はコマンドの出力から読む（文字列を目で合わせない）
 
-GitHub はラベルを**作られたときの綴りのまま**保持し、`Needs-Human-Review` と `needs-human-review` を同じ 1 つのラベルとして扱う。したがって Issue のラベルを読むときは**小文字化して突き合わせる**。文字列を目で一致させると、別リポジトリで大文字混じりに作られたラベルを見落とし、**止まるべき run が止まらずに成果物が出荷される** — このラベルが存在する理由そのものが失われる。
+`pnpm josh issue:state <N>` が `state:` / `labels:` に並べて **`human_review: yes` / `human_review: no`** を出す（joshuafolkken/kit#1132）。**降格するかどうかはこの行で判断し、ラベル文字列を自分で突き合わせない。**
 
-`scripts/git/issue-labels.ts` の `has_any_label` が同じ理由で全ラベルに対して小文字化を行っている。ここだけ人手の一致に頼ってはならない。
+```bash
+pnpm josh issue:state <N>                      # state・labels・human_review
+pnpm josh issue:state <N> --repo <owner/repo>  # 別リポジトリの子
+```
+
+理由は綴りである。GitHub はラベルを**作られたときの綴りのまま**保持し、`Needs-Human-Review` と `needs-human-review` を同じ 1 つのラベルとして扱う。文字列を目で一致させると、別リポジトリで大文字混じりに作られたラベルを見落とし、**止まるべき run が止まらずに成果物が出荷される** — このラベルが存在する理由そのものが失われる。この行は `scripts/git/issue-labels.ts` の `has_any_label`（小文字化を行う、他の全ワークフローラベルが通っている判定）を通して決まる。
+
+このコマンドは `epicrun` が委譲した子の状態確認で**すでに呼んでいる**ものなので、読むための往復は増えない。
 
 ## 付けるのも外すのも人だけ
 
