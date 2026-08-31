@@ -23,6 +23,9 @@ const BUNDLE_COMMAND_QUOTED = `\`${BUNDLE_COMMAND}\``
 // tier from any one of them fails rather than leaving three copies saying different things.
 const TIER_A_ANSWER =
 	'`add_to_epic` / `create_epic` are Tier A, executed with the matching `pnpm josh epic --add` / `pnpm josh epic` write command and never a hand edit of the epic body'
+// joshuafolkken/kit#1082: the one-line routing clause the resident triggers and the turn-end
+// self-check share — a copy left on the blanket "file everything" rule fails against it.
+const THREE_WAY_ROUTE = 'route each remaining non-High finding through the three-way disposition'
 
 // The two entry points that state the filing step in the skill. `halfrun` and `queue` state the cap
 // but route the filing itself through these, so they are deliberately not in this list.
@@ -31,7 +34,27 @@ const FILING_SKILLS: ReadonlyArray<string> = [
 	`${SKILL_ROOT}/fullrun.md`,
 ]
 
+// joshuafolkken/kit#1082: the blanket "file every non-High finding" rule made the round cap the
+// largest follow-up-Issue manufacturing line — six Issues to correct three comments that changed no
+// executable line. It is replaced by a three-way disposition decided from the finding, not the
+// filer's discretion: fix-in-place (never a new review round), file, or drop with a one-line PR note.
+// The markers pin the three exits, the fix-in-place round-cap ceiling, the same-root bundling rule,
+// and that only the file branch reaches the filing procedure below — so a reword cannot quietly
+// collapse it back to the blanket rule this Issue removed.
+const THREE_WAY_MARKERS: ReadonlyArray<string> = [
+	'### Three-way disposition after the cap',
+	"**A finding's disposition is decided from what it is, mechanically — not from the filer's discretion.**",
+	'**Fix it in place.**',
+	'**A fix-in-place never starts a new review round.**',
+	'**File it as an Issue.**',
+	'**Drop it with a one-line note in the PR body.**',
+	'extended past the round cap — the two documents no longer disagree about what happens to a Low',
+	'**Findings that reduce to one root judgement are filed as one Issue, not several.**',
+	'Only branch 2 files an Issue.',
+]
+
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
+	...THREE_WAY_MARKERS,
 	'**Filing does not end at the Issue.**',
 	BUNDLE_COMMAND_QUOTED,
 	// `epic:bundle` writes nothing, so "execute the answer" is unactionable without the write
@@ -94,6 +117,14 @@ const WORKFLOW_PROMPT_MARKERS: ReadonlyArray<string> = [
 // so a marker checked there would pass on the skill's copy alone — which is exactly the drift the
 // three paired documents exist to prevent.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
+	// joshuafolkken/kit#1082: the resident copy states the three-way disposition as its trigger and
+	// routes to the canonical cap for the detail, and it reconciles the "Low may be skipped" line with
+	// branch 3 in the same document so the two no longer contradict.
+	"the same disposition the round cap's branch 3 extends past the second round",
+	'place each remaining non-High finding in one of three exits',
+	'**a fix-in-place never starts a new review round**',
+	'Findings that reduce to one root judgement are filed as **one** Issue with a section per symptom',
+	THREE_WAY_ROUTE,
 	'**Filing does not end at the Issue**',
 	BUNDLE_COMMAND_QUOTED,
 	// The bundle has to happen while the parent is open, and before the current work completes.
@@ -114,12 +145,13 @@ describe(`${REVIEW_PROMPT} — the canonical filing step`, () => {
 		expect(content).toContain(marker)
 	})
 
-	// The chain-rule copy inside the review prompt states the same filing step in one line. A copy
-	// that stops at "file it" is the instruction this Issue replaces, sitting beside the new one.
-	it('carries the step in the turn-end self-check too', () => {
-		expect(content).toContain(
-			`file every remaining Low/Medium finding as a follow-up Issue, run \`${BUNDLE_COMMAND}\` on it`,
-		)
+	// joshuafolkken/kit#1082: the turn-end self-check states the same disposition in one line. It must
+	// route non-High findings through the three-way disposition — not the blanket "file everything"
+	// rule this Issue replaced — and still bundle a finding it files. A copy left on the blanket rule,
+	// beside the new canonical section, is exactly the drift this marker now catches.
+	it('carries the three-way disposition in the turn-end self-check too', () => {
+		expect(content).toContain(THREE_WAY_ROUTE)
+		expect(content).toContain(`run \`${BUNDLE_COMMAND}\` on it`)
 	})
 })
 
@@ -135,6 +167,10 @@ describe.each(FILING_SKILLS)('%s — states the step where the filing happens', 
 	const content = read_unwrapped(skill_path)
 
 	it.each([
+		// joshuafolkken/kit#1082: without this the suite only pins markers the blanket rule carried too,
+		// so a revert of either skill to "file every remaining non-High finding" would pass — the exact
+		// copy-vs-canonical drift this Issue closes. Pinning the route clause makes that revert fail here.
+		THREE_WAY_ROUTE,
 		BUNDLE_COMMAND,
 		TIER_A_ANSWER,
 		'before this Issue closes',
