@@ -36,12 +36,18 @@ const SURFACE_MARKERS: ReadonlyArray<string> = [
 	'It is not `needs-decision`',
 	'goes on holding its repository',
 	'the resume command',
+	// joshuafolkken/kit#1132: the stop must not rest on an agent matching the label string by eye.
+	'Read the answer from `pnpm josh issue:state <N>`, never by matching the label string yourself',
 	// With no pull request there is no CI E2E job and `followup --merge` is never reached, so the gate
 	// closes only if the run executes the suite itself — `halfrun`'s situation exactly.
 	'Run `pnpm josh test:e2e` yourself before stopping',
 	// The delegated child comes back OPEN without `needs-decision`, which the failure branch would
 	// otherwise claim: it strips `in-progress`, releasing the repository the stopped child must keep.
-	'Open, carrying `needs-human-review`',
+	// Decided from the command's own line rather than by eye — joshuafolkken/kit#1132.
+	'**Open, and `human_review: yes`**',
+	'Read that line, not the `labels:` one',
+	// The check has to happen before implementation; the post-return confirmation is too late.
+	'Ask once, before implementing',
 	'Leave `in-progress` **on**',
 ]
 
@@ -58,6 +64,7 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'「人が選ぶ」を満たさない',
 	// The E2E gate has no pull request to close it here.
 	'E2E は自分で `pnpm josh test:e2e` を回して閉じる',
+	'判定はコマンドの出力から読む（文字列を目で合わせない）',
 ]
 
 describe('the human-review label rule reaches the rule surface', () => {
