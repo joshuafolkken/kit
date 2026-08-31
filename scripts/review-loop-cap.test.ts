@@ -26,7 +26,11 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 
 const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	CAP_CLAUSE,
-	'file every remaining non-High finding as a follow-up Issue',
+	// joshuafolkken/kit#1082: the blanket "file every remaining non-High finding" is replaced by the
+	// three-way disposition. The resident copy states it as its trigger — fix-in-place, file, or drop —
+	// and filing is now one of three exits rather than the only one.
+	'place each remaining non-High finding in one of three exits',
+	'file it as a follow-up Issue when it reaches a runtime path or needs a decision',
 	CAP_TITLE,
 ]
 
