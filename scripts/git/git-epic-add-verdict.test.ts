@@ -36,7 +36,13 @@ const EPIC_BODY = [
 ].join('\n')
 
 function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
-	return { number, repo: REPO, state: 'OPEN', labels: [], blocked_by }
+	return {
+		number,
+		repo: REPO,
+		state: 'OPEN',
+		labels: [],
+		blocked_by: blocked_by.map((blocker) => ({ repo: REPO, number: blocker })),
+	}
 }
 
 const RECORDED = [child(890), child(891, [890]), child(892, [891])]
@@ -44,6 +50,7 @@ const RECORDED = [child(890), child(891, [890]), child(892, [891])]
 function plan_for(position?: { kind: 'before' | 'after'; target: number }): AddPlan {
 	const outcome = git_epic_add_plan.build_plan({
 		epic_number: EPIC_NUMBER,
+		repo: REPO,
 		body: EPIC_BODY,
 		labels: ['epic'],
 		children: [894],
@@ -67,9 +74,11 @@ function apply_to_children(plan: AddPlan): Array<EpicChild> {
 		...current,
 		blocked_by: [
 			...current.blocked_by.filter(
-				(blocker) => !dropped.has(`${String(current.number)}:${String(blocker)}`),
+				(blocker) => !dropped.has(`${String(current.number)}:${String(blocker.number)}`),
 			),
-			...plan.added.filter((link) => link.blocked === current.number).map((link) => link.blocker),
+			...plan.added
+				.filter((link) => link.blocked === current.number)
+				.map((link) => ({ repo: REPO, number: link.blocker })),
 		],
 	}))
 }
@@ -79,6 +88,7 @@ function anomalies_after(plan: AddPlan): ReturnType<typeof epic_graph.find_anoma
 		apply_to_children(plan),
 		git_epic_parse.parse_dependency_links(plan.body),
 		true,
+		REPO,
 	)
 }
 

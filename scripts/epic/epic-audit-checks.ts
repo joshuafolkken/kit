@@ -52,13 +52,17 @@ function find_sibling(
 
 // Whether anything orders these two, in either direction.
 //
-// A pair in two different repositories is treated as ordered, and that is a statement about what can
-// be recorded rather than about this pair: `blocked_by` carries issue numbers with the repository
-// dropped (`epic_issue.blockers_of`), so a cross-repository order cannot be written onto the graph at
-// all. Reporting one as a contradiction would fail the audit with no edit to either issue that could
-// ever clear it, and an error stops every `epicrun` on that epic at its first step. The rule is the
-// one the pre-joshuafolkken/kit#1014 code applied by accident, when a sibling in another repository
-// simply failed to resolve — kept deliberately now that such a sibling does resolve.
+// A pair in two different repositories used to be treated as ordered, unconditionally. That was not a
+// statement about the pair but about what could be recorded: `blocked_by` was read as bare numbers,
+// so a cross-repository order could not be written onto the graph at all, and reporting one as a
+// contradiction would have failed the audit with no edit to either issue that could ever clear it.
+// joshuafolkken/kit#1126 makes such an order recordable and readable, so the premise no longer holds
+// and `depends_on` would now answer a cross-repository chain exactly as it answers a local one. The
+// exemption is kept all the same, and deliberately: lifting it turns `find_order_contradictions` —
+// an **error**, which stops every `epicrun` on that epic at its first step — red on epics that are
+// green today and were written before a cross-repository relation could be recorded at all. That is a
+// decision about audit strictness rather than part of making the relation readable, so it is
+// joshuafolkken/kit#1128's to make.
 function is_ordered(
 	index: ReadonlyMap<string, EpicChild>,
 	child: AuditChild,

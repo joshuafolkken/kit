@@ -107,6 +107,13 @@ function read_default_branch_version(repo: string): string | undefined {
 
 // A version that could not be read leaves the dependency waiting rather than resolved: not knowing
 // what to wait for is not the same as having nothing to wait for.
+//
+// One gap this leaves is joshuafolkken/kit#1129's, and it opened when joshuafolkken/kit#1126 made this
+// branch reachable at all: a closed blocker in a repository that ships no npm package waits forever,
+// because there is no release for `is_published` to ever find. It is not fixed here because the
+// registry read cannot tell "this package does not exist" from "the registry could not be read" —
+// both arrive as `undefined` — and reading the second as the first would resolve a dependency on a
+// rate limit, which is the one direction this guard may not fail in, since that answer starts work.
 function publish_verdict(repo: string, version: string | undefined): DependencyVerdict {
 	if (version === undefined) return 'time'
 

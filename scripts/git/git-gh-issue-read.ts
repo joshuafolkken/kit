@@ -1,3 +1,4 @@
+import type { IssueReference } from './git-epic-reference'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
@@ -286,14 +287,25 @@ async function has_no_relations_endpoint(issue_number: string, repo?: string): P
 // judgement from. A PR pasted into an epic's task list would otherwise turn a read of an endpoint
 // that has nothing for it into a warning about a relation nobody lost. Every other failure still
 // raises: a rate limit is a gap, and the caller says so.
-async function issue_blocked_by_numbers(
+// The same relations, each carrying the repository it lives in (joshuafolkken/kit#1126). A
+// `blocked-by` relation may cross a repository, and a number alone cannot say which one it names —
+// issue numbers are unique per repository — so a caller that orders work has to keep the pair.
+//
+// `own_repo` is what an unqualified relation has always meant: the repository the issue being read
+// lives in. It is the issue's own repository rather than the one the command is running in, which is
+// what `repo` scopes the request to.
+async function issue_blocked_by_references(
 	issue_number: string,
+	own_repo: string,
 	repo?: string,
-): Promise<Array<number>> {
+): Promise<Array<IssueReference>> {
 	try {
 		const listing = await read_blocked_by_listing(issue_number, repo)
 
-		return listing.nodes.map((blocker) => blocker.number)
+		return listing.nodes.map((blocker) => ({
+			repo: git_gh_issue_rest.repo_of_url(blocker.repository_url) ?? own_repo,
+			number: blocker.number,
+		}))
 	} catch (error) {
 		if (await has_no_relations_endpoint(issue_number, repo)) return []
 
@@ -301,8 +313,18 @@ async function issue_blocked_by_numbers(
 	}
 }
 
+async function issue_blocked_by_numbers(
+	issue_number: string,
+	repo?: string,
+): Promise<Array<number>> {
+	const references = await issue_blocked_by_references(issue_number, '', repo)
+
+	return references.map((blocker) => blocker.number)
+}
+
 const git_gh_issue_read = {
 	issue_blocked_by_numbers,
+	issue_blocked_by_references,
 	issue_get_title,
 	issue_get_body,
 	issue_view_json,

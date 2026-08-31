@@ -2,7 +2,7 @@ import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labe
 import { describe, expect, it, vi, type Mock } from 'vitest'
 import { epic_candidate_confirm, type ConfirmContext } from './epic-candidate-confirm'
 import { epic_classify } from './epic-classify'
-import type { EpicChild } from './epic-graph'
+import type { EpicChild, IssueReference } from './epic-graph'
 
 const REPO = 'joshuafolkken/kit'
 const OTHER_REPO = 'joshuafolkken/app-kit'
@@ -14,19 +14,32 @@ interface ChildOptions {
 	repo?: string
 }
 
-const CHILD_DEFAULTS = { repo: REPO, state: 'OPEN', labels: [], blocked_by: [] } as const
+const CHILD_DEFAULTS = { repo: REPO, state: 'OPEN', labels: [] } as const
 
 function child(number: number, options: ChildOptions = {}): EpicChild {
-	return { ...CHILD_DEFAULTS, ...options, number }
+	const { blocked_by = [], ...rest } = options
+	const repo = options.repo ?? REPO
+
+	return {
+		...CHILD_DEFAULTS,
+		...rest,
+		number,
+		blocked_by: blocked_by.map((blocker) => ({ repo, number: blocker })),
+	}
 }
 
 // What the relations listing answers for each child. A number the map does not name has no
 // relations, which is what an issue whose zero summary is honest looks like.
 type Listing = ReadonlyMap<number, ReadonlyArray<number>>
-type Reader = Mock<(candidate: EpicChild) => Promise<Array<number>>>
+type Reader = Mock<(candidate: EpicChild) => Promise<Array<IssueReference>>>
 
 function reader(listing: Listing): Reader {
-	return vi.fn(async (candidate: EpicChild) => [...(listing.get(candidate.number) ?? [])])
+	return vi.fn(async (candidate: EpicChild) =>
+		(listing.get(candidate.number) ?? []).map((blocker) => ({
+			repo: candidate.repo,
+			number: blocker,
+		})),
+	)
 }
 
 function context(
@@ -217,11 +230,21 @@ describe('epic_candidate_confirm.answer_for_repo — a read that failed', () => 
 })
 
 describe('epic_candidate_confirm.is_same_blockers', () => {
+	const one = { repo: REPO, number: 1 }
+	const two = { repo: REPO, number: 2 }
+
 	it('ignores the order the two reads listed the blockers in', () => {
-		expect(epic_candidate_confirm.is_same_blockers([2, 1], [1, 2])).toBe(true)
+		expect(epic_candidate_confirm.is_same_blockers([two, one], [one, two])).toBe(true)
 	})
 
 	it('separates a listing that names more than the summary counted', () => {
-		expect(epic_candidate_confirm.is_same_blockers([], [1])).toBe(false)
+		expect(epic_candidate_confirm.is_same_blockers([], [one])).toBe(false)
+	})
+
+	// The same number in two repositories is two different blockers (joshuafolkken/kit#1126).
+	it('separates the same number in a different repository', () => {
+		expect(epic_candidate_confirm.is_same_blockers([one], [{ repo: OTHER_REPO, number: 1 }])).toBe(
+			false,
+		)
 	})
 })

@@ -13,6 +13,20 @@ const DEPENDENCY_ARROW = ' -> '
 // and two separators would let the two disagree over something a reader reads side by side.
 const REFERENCE_SEPARATOR = ', '
 
+// An issue named from outside any one graph — a task-list row, a citation in prose, a blocker
+// relation, a child that could not be read. Repository **and** number, because a number alone cannot
+// identify one: issue numbers are unique per repository, so the same `#40` names two different issues
+// depending on who wrote it (joshuafolkken/kit#1014).
+//
+// It lives here rather than in `epic-graph` because the `blocked-by` relations are read in the git
+// layer and carry a repository of their own (joshuafolkken/kit#1126) — a second declaration there
+// would be the clone `CLAUDE.md` prohibits, and an import the other way would point the lower layer
+// at the higher one. `epic-graph` re-exports it, so every existing importer is unchanged.
+interface IssueReference {
+	repo: string
+	number: number
+}
+
 function to_issue_reference(issue_number: number): string {
 	return `#${String(issue_number)}`
 }
@@ -38,6 +52,7 @@ const git_epic_reference = {
 	format_issue_references,
 }
 
+export type { IssueReference }
 export {
 	git_epic_reference,
 	DEPENDENCY_ARROW,

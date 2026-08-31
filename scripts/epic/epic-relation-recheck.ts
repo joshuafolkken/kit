@@ -1,5 +1,5 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
-import { epic_graph, type EpicChild } from './epic-graph'
+import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 
 // joshuafolkken/kit#1113: a second look at the relations, taken only where the first one is about to
 // become a verdict.
@@ -28,7 +28,7 @@ const RECHECK_LIMIT = 20
 // How the caller reads one child's blockers without consulting the summary. Injected so the
 // decision above can be tested without a network, and so this module needs no opinion about how a
 // child in another repository is addressed.
-type BlockersReader = (child: EpicChild) => Promise<Array<number>>
+type BlockersReader = (child: EpicChild) => Promise<Array<IssueReference>>
 
 // The children a declared-but-unrecorded link points at. `link.blocked` is the child whose
 // `blocked_by` would have to carry the blocker, so it is the only side worth reading again.
@@ -45,7 +45,9 @@ function suspect_children(
 	const links = git_epic_parse.parse_dependency_links(body)
 	const local = children.filter((child) => child.repo === declared_repo)
 
-	return new Set(epic_graph.missing_relations(links, local).map((link) => link.blocked))
+	return new Set(
+		epic_graph.missing_relations(links, local, declared_repo).map((link) => link.blocked),
+	)
 }
 
 // A read that fails leaves the child exactly as the first read found it, and says so. The mismatch

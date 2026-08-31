@@ -1,3 +1,5 @@
+import type { IssueReference } from '#scripts/git/git-epic-reference'
+import { git_gh_issue_rest } from '#scripts/git/git-gh-issue-rest'
 import { parse_json_object_safe } from '#scripts/git/parse-json-array'
 import { blocked_by_schema } from '#scripts/git/schemas'
 import { z } from 'zod'
@@ -55,9 +57,30 @@ function parse_epic_issue(raw: string | undefined): EpicIssue | undefined {
 	}
 }
 
-// The blockers an issue declares, unwrapped from the connection.
+// The blockers an issue declares, unwrapped from the connection and carrying the repository each one
+// lives in (joshuafolkken/kit#1126).
+//
+// `fallback_repo` is what an unqualified relation has always meant: the repository the issue itself is
+// read in. REST names the blocker's repository in `repository_url`, and a relation may cross one — so
+// keeping only the number resolved every blocker against the blocked issue's own repository, which
+// named a different issue or none at all.
+function blocker_references_of(issue: EpicIssue, fallback_repo = ''): Array<IssueReference> {
+	return (issue.blockedBy?.nodes ?? []).map((blocker) => ({
+		repo: git_gh_issue_rest.repo_of_url(blocker.repository_url) ?? fallback_repo,
+		number: blocker.number,
+	}))
+}
+
+// The same blockers as bare numbers, for the callers that predate the qualified read: the planner and
+// the bundler. A projection of the read above rather than a second unwrapping of the connection.
+//
+// **The number alone is lossy, and those callers inherit that.** A blocker in another repository
+// collapses to its number here and can then match a local issue that happens to share it —
+// joshuafolkken/kit#1130 carries the case, which is `epic:bundle` reading a false relation and
+// recording one onto the wrong issue. It predates joshuafolkken/kit#1126 rather than being introduced
+// by it, and threading the repository through the bundler is its own change with its own reach.
 function blockers_of(issue: EpicIssue): Array<number> {
-	return (issue.blockedBy?.nodes ?? []).map((blocker) => blocker.number)
+	return blocker_references_of(issue).map((blocker) => blocker.number)
 }
 
 function label_names(issue: EpicIssue): Array<string> {
@@ -127,6 +150,7 @@ function parse_epic_reference(raw = ''): EpicReference | undefined {
 
 const epic_issue = {
 	CLOSED,
+	blocker_references_of,
 	UNKNOWN_STATE,
 	parse_epic_issue,
 	blockers_of,
