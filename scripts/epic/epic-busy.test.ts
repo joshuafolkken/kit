@@ -4,7 +4,11 @@ import {
 	listing_of,
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_REVIEW_LABEL,
+} from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_busy } from './epic-busy'
 
@@ -114,6 +118,29 @@ describe('epic_busy.read_repository — a parked issue', () => {
 		const parked = issue(HOLDER_NUMBER, CREATED_EARLIER, [NEEDS_DECISION_LABEL.toUpperCase()])
 
 		expect(epic_busy.is_parked(parked)).toBe(true)
+	})
+})
+
+// A child that ran and then stopped before its commit: still `in-progress`, and marked for a person
+// to look at.
+function stopped_child(): ReturnType<typeof issue> {
+	return issue(HOLDER_NUMBER, CREATED_EARLIER, [IN_PROGRESS_LABEL, NEEDS_HUMAN_REVIEW_LABEL])
+}
+
+// joshuafolkken/kit#1125: a child degraded to a `halfrun`-shaped stop leaves uncommitted work in the
+// checkout, so it must go on holding the repository. Read as parked, the next child would start
+// `git switch main && git pull` on top of that work.
+describe('epic_busy.read_repository — a child stopped for human review', () => {
+	it('is not parked', () => {
+		expect(epic_busy.is_parked(stopped_child())).toBe(false)
+	})
+
+	it('holds the repository', async () => {
+		issue_list.mockResolvedValueOnce(listing_of([stopped_child()]))
+
+		const read = await epic_busy.read_repository(REPO)
+
+		expect(read.kind).toBe('busy')
 	})
 })
 

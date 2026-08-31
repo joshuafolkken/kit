@@ -60,6 +60,9 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
   the stop. `CLAUDE.md` → "Completion gate" carries the rule, `prompts/testing-guide.md` → "Closing
   the E2E gate without a human run" the procedure.
+- **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
+  §2z. It is the one *child's* stop `epicrun` does not turn into a park — an `epic:audit` error and
+  the consecutive-failure abort end a run too, but neither is a child asking for something.
 - **`epicrun` differs on two points.** A stop that would end a `queue` parks one child instead and
   the run continues (`epicrun.md` → "park and continue"), and the keyword accepts an Issue that is
   **not** an epic — running it as a `fullrun`, and building the epic around it only if a prerequisite
@@ -88,6 +91,48 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   "Mid-workflow stop notification", because most pauses that need it happen on
   turns where no workflow keyword was typed and this skill was never loaded. `halfrun.md` carries
   the one form specific to a command: the resume-command body of its stop before commit.
+
+## 2z. `needs-human-review` — the child that stops before its commit
+
+An issue carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop, whichever entry
+point reached it — `epicrun`, `fullrun` or `queue` (joshuafolkken/kit#1125). It is `auto-ok`'s
+opposite: that label widens unattended execution past an epic's edge, this one withholds its last
+step, and both may be applied **only by a person**.
+
+- **Implementation and the verification gate run normally** — refactor, `pnpm josh gate`,
+  `/code-review`, `pnpm josh eval:scope`, exactly as for any other child.
+- **Run `pnpm josh test:e2e` yourself before stopping.** With no pull request there is no CI E2E job,
+  and `pnpm josh followup --merge` — the thing that blocks a merge on it — is never reached. This is
+  `halfrun`'s situation exactly, and `CLAUDE.md` → "Completion gate" gives it the same answer: where
+  no pull request is open, you run it and read what it prints. A printed skip is the answer for a
+  project with no E2E suite; a skip nobody saw printed is not.
+- **Nothing is committed, pushed, opened as a pull request or merged.** `pnpm josh bump`,
+  `pnpm josh git` and `pnpm josh followup` are never reached.
+- **The working tree is left uncommitted, and nothing is stashed.**
+- **Send a `confirmation` Telegram and stop the whole run.** The remaining children are not started —
+  inside an `epicrun` this is the one thing that is *not* park-and-continue.
+- The Telegram body carries the **resume command**, in the same form `halfrun`'s own stop uses.
+
+**Stopping is the specification, not a failure.** The label's job is not to keep a batch moving; it
+is to stop a batch walking past a decision that was a person's to make.
+
+**Match the label case-insensitively.** GitHub keeps the spelling a label was created with and treats
+`Needs-Human-Review` as the same label, so an issue read by eye against the lowercase string is one
+whose run does not stop — and the artifact ships, which is the whole thing this label exists to
+prevent. `has_any_label` lowercases for exactly this reason; do the same when you read the labels.
+
+**Never apply or remove it**, exactly as strongly as `auto-ok`: a mark a run can clear for itself is
+not a mark. Typing the command on an explicit instruction in the current turn is not applying it;
+everything else is a proposal, written as an Issue comment and left for the person.
+
+**It is not `needs-decision`, and reading it as one breaks two things.** `needs-decision` withholds a
+run's *start*; this withholds its *end*. So a `needs-human-review` issue is still offered — excluded,
+the artifact a person is meant to look at would never be produced — and a child stopped by it **goes
+on holding its repository**, because the uncommitted work is still in the checkout. Read as parked
+there, the next child would start `git switch main && git pull` on top of it. `issue-labels.ts` and
+`epic-busy.ts` encode both halves.
+
+Canonical reference: `prompts/collaboration-workflow/human-review-label.md`.
 
 ## 2a. The `into <target>` suffix — where the new Issue lands
 

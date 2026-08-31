@@ -332,6 +332,14 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
      have. That is not a failure: leave the label on, do **not** count it against the
      consecutive-failure guard, and go back to step 1. Three parks in a row are an ordinary epic,
      and counting them would abort the run as an environment fault.
+   - **Open, carrying `needs-human-review`** — the child **stopped before its commit**, which is
+     the run's own ending rather than a failure (§2z). Leave `in-progress` **on** — the uncommitted
+     work is still in the checkout and the child must go on holding the repository — do not park it,
+     do not count it against the consecutive-failure guard, and do **not** go back to step 1. Finish
+     the session and report. **Do not send a second `confirmation` Telegram** — the unit that ran the
+     child already sent one for this stop, and `CLAUDE.md`'s rule is one per stop, not one per
+     context that notices it. Where the child ran in this session's own context, that first
+     notification is yours to send.
    - **Open, without `needs-decision`** — it failed. Remove the stale `in-progress` here (Tier A,
      per "`in-progress` is removed by whoever finds it stale"), count it against the
      consecutive-failure guard, and **park it** — the Guards table's "a failure that is not
@@ -422,7 +430,7 @@ by whoever finds it stale, so it is not something to rely on.
 
 | Answer | What to do |
 | --- | --- |
-| A number | Run it exactly as `fullrun #<N>` does — delegated unit, verification gate, PR, merge — then ask again |
+| A number | Run it exactly as `fullrun #<N>` does — delegated unit, verification gate, PR, merge — then ask again. **Unless it carries `needs-human-review`**, which degrades it exactly as it degrades a child: the gate runs, nothing is committed, and the run ends there rather than asking again (§2z) |
 | `none` | Nothing is opted in. Finish the run |
 | **Exit 1** — the listing could not be read | Report that the pickup could not be attempted, and finish. "Could not tell" is not `none`; reporting it is enough here only because the mistake stops work rather than starting some |
 
@@ -434,7 +442,8 @@ other than what that list has just named.
 **Everything a child gets, a picked-up Issue gets**: the split assessment, the two-layer work
 summary, `josh latest` staying hoisted to the session, park-and-continue, and the
 `pnpm josh cost --over 400000` hand-off check after each merge. One that needs a decision is parked
-exactly as a child is, and the run asks again.
+exactly as a child is, and the run asks again — and one carrying `needs-human-review` stops the run
+exactly as a child carrying it does, so the pickup does not ask again either.
 
 **The cap is 5 per run**, in the Guards table below. These issues went through no split assessment
 as a batch, no `epic:audit` and no dependency graph — the label alone is the whole authorization, so
@@ -518,6 +527,28 @@ only ever taken when a child has just closed.
 **A resumed session is a new session**, so it runs `josh latest` once before its first child, exactly
 as the rule above says.
 
+## `needs-human-review` — the one stop that is not a park
+
+A child carrying **`needs-human-review`** is degraded to a `halfrun`-shaped stop and **the whole run
+ends there** — implementation and the verification gate run, nothing is committed, the working tree
+is left dirty and unstashed, a `confirmation` Telegram carrying the resume command goes out, and the
+remaining children are not started (joshuafolkken/kit#1125).
+
+**This is the exception to park-and-continue below, and it is not an oversight.** Parking works
+because the parked child leaves the checkout clean; this child does not. Its uncommitted work is the
+artifact a person has to look at, so there is nothing to hand the next child a clean tree with —
+which is exactly why the alternative that kept the batch running (commit and open a pull request,
+merge nothing) was rejected: it satisfies "a person approves publication" and fails "a person
+chooses", and the choosing is what the label exists for on a candidate-selection issue.
+
+**The child goes on holding its repository.** `needs-decision` outranks `in-progress` in the
+per-repository exclusion so a parked child releases the checkout; this label deliberately does not,
+because releasing it would start the next child on top of uncommitted work.
+
+**Never apply or remove the label** — `auto-ok`'s rule, at `auto-ok`'s strength. Full definition and
+the `needs-decision` comparison: `SKILL.md` → §2z (canonical:
+`prompts/collaboration-workflow/human-review-label.md`).
+
 ## park and continue
 
 When a child hits something this run may not decide — a Tier B toss-up, a Tier C action, an upstream
@@ -563,8 +594,10 @@ label stalls every epic that touches that checkout, including one on an issue th
 track. **The rule therefore applies to any open issue in the repository, not only to this epic's
 children**, and `epic:next` names the holders on standard error so there is something to go and look
 at. **Age alone is not the test.** Check the 90-minute window below *and* look at what is holding it,
-because two ordinary states hold the label legitimately for longer than that: a `halfrun` stopped for
-manual verification, and any run paused mid-child. Both leave uncommitted work in the checkout, so
+because three ordinary states hold the label legitimately for longer than that: a `halfrun` stopped
+for manual verification, any run paused mid-child, and a child stopped by `needs-human-review` — that
+last one waits on a person reading an artifact, which routinely outlasts ninety minutes, and the
+label is carried alongside `in-progress` so the issue says plainly which state it is in. Both leave uncommitted work in the checkout, so
 `git status` there is the decisive read — a dirty tree means the hold is real, and the answer is to
 leave the label alone and report, never to strip it and start a second child on top of that work.
 
