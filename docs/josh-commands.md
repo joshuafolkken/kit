@@ -1152,6 +1152,22 @@ gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f descriptio
 
 The listing is capped at 200 issues, and the paging behind it stops after 500 rows whatever the cap says ([#1067](https://github.com/joshuafolkken/kit/issues/1067)). The listing is newest first, so either cut drops the oldest opted-in issues — reported as a `⚠` on standard error rather than ranked silently, because the answer is still an opted-in issue but may not be the one the order promises. The warning names which cut stopped it: a reader who wants the answer widened reaches for the command's own cap in one case and for the paging's ceiling in the other.
 
+### `needs-human-review` — the opposite label
+
+`auto-ok` widens unattended execution past an epic's edge; **`needs-human-review` withholds its last step** ([#1125](https://github.com/joshuafolkken/kit/issues/1125)). An issue carrying it is implemented and taken through the verification gate as usual, and then nothing is committed, pushed, opened as a pull request or merged: the working tree is left uncommitted and unstashed, a `confirmation` notification goes out carrying the resume command, and the run stops there rather than starting the next issue.
+
+It exists for work whose quality no test can judge — a published article, or a choice among generated candidates. Writing "run this with `halfrun`" in the issue body has no force, and pre-applying `needs-decision` is worse than useless: that label stops the issue being **started**, so the artifact a person is meant to look at is never produced.
+
+The two labels sit on opposite sides of a run, and the code says so. `needs-decision` is in `NOT_DIRECTLY_RUNNABLE_LABELS` and in the busy check's parked set; `needs-human-review` is in neither. Excluded from the first it would never be offered; treated as parked in the second, the repository would be handed to the next child while the stopped one's uncommitted work is still in the checkout.
+
+**Only a person applies or removes it**, at the same strength as `auto-ok` — a mark a run can clear for itself is not a mark. Create it once where it is wanted:
+
+```bash
+gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f description="Implement and verify, but stop before committing so a person can look"
+```
+
+The behavior it triggers belongs to the workflow commands rather than to any `josh` subcommand: [`prompts/collaboration-workflow/human-review-label.md`](../prompts/collaboration-workflow/human-review-label.md) is the canonical definition.
+
 ### `josh review:level`
 
 Print the `/code-review` level this change is reviewed at ([#966](https://github.com/joshuafolkken/kit/issues/966)).
