@@ -280,3 +280,20 @@ describe('josh epic:next registration', () => {
 		expect(en).toBe('epic:next')
 	})
 })
+
+// joshuafolkken/kit#1130: since joshuafolkken/kit#1126 a blocker carries its own repository, so a
+// placeholder on the children keys them apart from their blockers — every relation misses and a
+// dependent is offered before its prerequisite. Fail-open on the path that starts unattended work.
+describe('josh epic:next — a repository that could not be read', () => {
+	it('refuses rather than keying the children to a placeholder', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const repo_read = vi
+			.spyOn(git_gh_command, 'repo_get_name_with_owner')
+			.mockResolvedValue(undefined)
+
+		expect(await epic_next.run_epic({ epic_number: 858 })).toBe(1)
+		expect(error.mock.calls.join('\n')).toContain('cannot be keyed by repository')
+		repo_read.mockRestore()
+		error.mockRestore()
+	})
+})

@@ -1,5 +1,7 @@
 import type { DependencyLink } from '#scripts/git/git-epic-parse'
+import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { epic_audit_logic } from './epic-audit'
+import { epic_graph } from './epic-graph'
 
 // Bundling a newly filed issue with the ones it turns out to be related to.
 //
@@ -24,7 +26,12 @@ interface BacklogIssue {
 	// its parent, so without this every child would find its own epic as a candidate and be told to
 	// bundle with it (joshuafolkken/kit#873, found by running the command on a real backlog).
 	is_epic?: boolean
-	blocked_by: ReadonlyArray<number>
+	// Repository-qualified, not bare numbers (joshuafolkken/kit#1130). Issue numbers are unique per
+	// repository, so a blocker read as `40` alone matched any candidate numbered 40 — including one in
+	// a different repository entirely. That produced a bundle nobody's data supported, and, through
+	// `bundle_dependency_links`, a `blocked-by` relation recorded onto the wrong issue: a write, not
+	// only a misreading.
+	blocked_by: ReadonlyArray<IssueReference>
 }
 
 // What to do with the candidates found. Bundling is reversible — an epic is editable and a child can
@@ -50,9 +57,17 @@ function has_mutual_reference(subject: BacklogIssue, other: BacklogIssue): boole
 	return from_subject.includes(other.number) || from_other.includes(subject.number)
 }
 
-// Whether a dependency is already recorded between the two.
+// Whether `blocked` names `blocker` in its recorded relations. Compared by identity — repository and
+// number — through the same key the epic graph uses, rather than a second spelling of the comparison.
+function names_as_blocker(blocked: BacklogIssue, blocker: BacklogIssue): boolean {
+	const wanted = epic_graph.key_of(blocker)
+
+	return blocked.blocked_by.some((recorded) => epic_graph.key_of(recorded) === wanted)
+}
+
+// Whether a dependency is already recorded between the two, in either direction.
 function has_recorded_dependency(subject: BacklogIssue, other: BacklogIssue): boolean {
-	return subject.blocked_by.includes(other.number) || other.blocked_by.includes(subject.number)
+	return names_as_blocker(subject, other) || names_as_blocker(other, subject)
 }
 
 // A strong signal, and only a strong signal.
@@ -162,13 +177,21 @@ function bundle_dependency_links(
 	candidates: ReadonlyArray<BacklogIssue>,
 ): Array<DependencyLink> {
 	const members = [subject, ...candidates]
-	const numbers = new Set(members.map((member) => member.number))
+	const keys = new Set(members.map((member) => epic_graph.key_of(member)))
+	// The bundle's own repository, which is what a bare declared number names. Taken from the subject
+	// rather than from each member: comparing a blocker against its *own* member's repository would
+	// let two members elsewhere emit a link between them, and the epic body would then resolve those
+	// bare numbers against this repository — a different pair of issues. `epic_graph.child_links`
+	// guards the identical case the identical way (joshuafolkken/kit#1130).
+	const declared_repo = subject.repo
 
-	return members.flatMap((member) =>
-		member.blocked_by
-			.filter((blocker) => numbers.has(blocker))
-			.map((blocker) => ({ blocker, blocked: member.number })),
-	)
+	return members
+		.filter((member) => member.repo === declared_repo)
+		.flatMap((member) =>
+			member.blocked_by
+				.filter((blocker) => blocker.repo === declared_repo && keys.has(epic_graph.key_of(blocker)))
+				.map((blocker) => ({ blocker: blocker.number, blocked: member.number })),
+		)
 }
 
 // The children a new epic would track, in number order so the batch reads the way it was filed.
@@ -180,6 +203,7 @@ function bundle_children(
 }
 
 const epic_bundle = {
+	names_as_blocker,
 	NO_SIGNAL_REASON,
 	already_tracked_reason,
 	SPREAD_REASON,

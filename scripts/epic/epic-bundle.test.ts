@@ -1,3 +1,4 @@
+import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 import { epic_bundle, type BacklogIssue } from './epic-bundle'
@@ -13,12 +14,24 @@ interface IssueOptions {
 	epic?: number
 	is_epic?: boolean
 	blocked_by?: ReadonlyArray<number>
+	blockers?: ReadonlyArray<IssueReference>
+	repo?: string
 }
 
-const ISSUE_DEFAULTS = { repo: REPO, body: '', blocked_by: [], is_epic: false } as const
+const ISSUE_DEFAULTS = { repo: REPO, body: '', is_epic: false } as const
 
+// `blocked_by` is written as bare numbers because most cases keep the blocker in the issue's own
+// repository; `blockers` is the escape hatch for one that names another (joshuafolkken/kit#1130).
 function issue(number: number, options: IssueOptions = {}): BacklogIssue {
-	return { ...ISSUE_DEFAULTS, ...options, number }
+	const { blocked_by = [], blockers, ...rest } = options
+	const repo = options.repo ?? REPO
+
+	return {
+		...ISSUE_DEFAULTS,
+		...rest,
+		number,
+		blocked_by: blockers ?? blocked_by.map((blocker) => ({ repo, number: blocker })),
+	}
 }
 
 describe('epic_bundle.is_strong_signal', () => {
@@ -255,5 +268,54 @@ describe('josh epic:bundle registration', () => {
 		const { eb } = ALIASES
 
 		expect(eb).toBe('epic:bundle')
+	})
+})
+
+// joshuafolkken/kit#1130: issue numbers are unique per repository, so a blocker read as `40` alone
+// matched any candidate numbered 40 — including one in a different repository. That produced a bundle
+// nobody's data supported, and, through `bundle_dependency_links`, a `blocked-by` relation recorded
+// onto the wrong issue.
+describe('epic_bundle — a blocker in another repository', () => {
+	const OTHER_REPO = 'joshuafolkken/app-kit'
+	const SHARED_NUMBER = 40
+
+	it('does not read a same-numbered issue elsewhere as a recorded dependency', () => {
+		const subject = issue(1, { blockers: [{ repo: OTHER_REPO, number: SHARED_NUMBER }] })
+
+		expect(epic_bundle.has_recorded_dependency(subject, issue(SHARED_NUMBER))).toBe(false)
+	})
+
+	it('reads the blocker it actually names as a recorded dependency', () => {
+		const subject = issue(1, { blockers: [{ repo: OTHER_REPO, number: SHARED_NUMBER }] })
+		const blocker = issue(SHARED_NUMBER, { repo: OTHER_REPO })
+
+		expect(epic_bundle.has_recorded_dependency(subject, blocker)).toBe(true)
+	})
+
+	it('leaves a cross-repository blocker out of the links a bundle would record', () => {
+		const subject = issue(1, { blockers: [{ repo: OTHER_REPO, number: SHARED_NUMBER }] })
+
+		expect(epic_bundle.bundle_dependency_links(subject, [issue(SHARED_NUMBER)])).toEqual([])
+	})
+
+	// The bundle's own repository is what a bare declared number names, so two members elsewhere must
+	// not emit a link the epic body would resolve against this repository — a different pair entirely.
+	it('leaves out a link between two members that both live elsewhere', () => {
+		const subject = issue(1)
+		const blocked = issue(2, {
+			repo: OTHER_REPO,
+			blockers: [{ repo: OTHER_REPO, number: SHARED_NUMBER }],
+		})
+		const blocker = issue(SHARED_NUMBER, { repo: OTHER_REPO })
+
+		expect(epic_bundle.bundle_dependency_links(subject, [blocked, blocker])).toEqual([])
+	})
+
+	it('still records a link between two issues of the same repository', () => {
+		const subject = issue(1, { blocked_by: [SHARED_NUMBER] })
+
+		expect(epic_bundle.bundle_dependency_links(subject, [issue(SHARED_NUMBER)])).toEqual([
+			{ blocker: SHARED_NUMBER, blocked: 1 },
+		])
 	})
 })
