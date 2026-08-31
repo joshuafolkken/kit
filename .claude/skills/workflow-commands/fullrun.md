@@ -7,6 +7,14 @@ most often breaks live there, not here.
 
 **The target repository is named in front of the Issue reference** — `fullrun joshuafolkken/app-kit#12`, `fullrun kit#new`. The definition is the same at every entry point: `SKILL.md` → "2c. The `owner/repo#` prefix" (canonical: `prompts/collaboration-workflow/target-repo.md`). An implementing entry needs that repository's checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than cloning** when there is none, or when the tree there is not clean — the `new` path's stash step covers this session's repository, never someone else's checkout, and a prefix naming this repository changes nothing. A target whose owner is not this session's is third-party: Tier C, so it stops rather than filing.
 
+**A `needs-human-review` issue stops before the commit.** Implement it and take it through the
+verification gate as usual — **including `pnpm josh test:e2e`, which you run yourself, because with
+no pull request there is no CI E2E job and `followup --merge` is never reached** — then commit
+nothing, push nothing, open no pull request and merge nothing; leave the working tree uncommitted and unstashed, send a `confirmation` Telegram carrying
+the resume command, and stop. The label is applied only by a person, never by you, and it is **not**
+`needs-decision` — that one withholds a run's start, this one its end. Definition and the comparison:
+`SKILL.md` → §2z (canonical: `prompts/collaboration-workflow/human-review-label.md`).
+
 **Before implementing, run the scope assessment in `split-assessment.md`.** It is the same assessment `kickoff` makes, applied at the same strength: two or more separately-mergeable deliverables always means an epic, with no count threshold and no ordering condition. **When it finds a split, file the children and the epic and then STOP** — do not implement, and do not continue as an `epicrun`. Typing `fullrun` approved implementing and merging **one** Issue; a batch of N is a different authorization, and widening it silently would take a decision the person never made. Report what was filed and end with "Please run `epicrun #<E>` to execute this epic."
 
 **A prerequisite Issue discovered mid-run stops this command too — but files everything first.** When the work in hand turns out to need a *different* deliverable in this repository to land before it, that is neither a split nor an upstream defect: `#N` is still one deliverable, it just has something in front of it. Typing `fullrun` approved implementing and merging **one** Issue; a batch is a different authorization, so the stop stays. What the filing removes is every confirmation before it, leaving the person one command to type. Inside an `epicrun` the same discovery is handled differently — recorded as a dependency and **not** parked; see `epicrun.md` → "A prerequisite discovered mid-run". The procedure, in order:

@@ -5,6 +5,7 @@ import {
 	has_any_label,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 } from './issue-labels'
 
@@ -17,6 +18,7 @@ const EPIC_SPELLING = 'epic'
 const IN_PROGRESS_SPELLING = 'in-progress'
 const NEEDS_DECISION_SPELLING = 'needs-decision'
 const AUTO_OK_SPELLING = 'auto-ok'
+const NEEDS_HUMAN_REVIEW_SPELLING = 'needs-human-review'
 const NOT_DIRECTLY_RUNNABLE_COUNT = 3
 
 describe('the label names', () => {
@@ -25,6 +27,7 @@ describe('the label names', () => {
 		[IN_PROGRESS_LABEL, IN_PROGRESS_SPELLING],
 		[NEEDS_DECISION_LABEL, NEEDS_DECISION_SPELLING],
 		[AUTO_OK_LABEL, AUTO_OK_SPELLING],
+		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
 	])('%s is spelled exactly as GitHub holds it', (actual, expected) => {
 		expect(actual).toBe(expected)
 	})
@@ -39,6 +42,13 @@ describe('NOT_DIRECTLY_RUNNABLE_LABELS', () => {
 	// filter out every candidate the pickup exists to find.
 	it('does not hold the opt-in label', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(AUTO_OK_LABEL)).toBe(false)
+	})
+
+	// joshuafolkken/kit#1125: this label withholds the *end* of a run, not its start. Excluded here it
+	// would never be offered, so the work it asks a person to look at would never be produced — the
+	// label would silently become a second `needs-decision`.
+	it('does not hold the human-review label', () => {
+		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(NEEDS_HUMAN_REVIEW_LABEL)).toBe(false)
 	})
 
 	it('holds those three and nothing else', () => {

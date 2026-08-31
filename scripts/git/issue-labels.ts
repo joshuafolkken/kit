@@ -12,6 +12,22 @@ const NEEDS_DECISION_LABEL = 'needs-decision'
 // a person extends that approval past the epic's edge, so a label an AI could apply to itself would
 // let an unattended run widen its own authorization — which is not a guard at all.
 const AUTO_OK_LABEL = 'auto-ok'
+// Degrades one issue's run to a `halfrun`-shaped stop: it is implemented and taken through the
+// verification gate, and then nothing is committed, pushed, opened as a pull request or merged
+// (joshuafolkken/kit#1125). **Only a person applies it**, exactly as strongly as `auto-ok` — a mark a
+// run could clear for itself is not a mark.
+//
+// It is the opposite of `auto-ok` in what it does and its twin in who may apply it: one widens
+// unattended execution past an epic's edge, the other withholds the last step of it. `auto-ok`
+// answers "may this run at all", this one answers "may its result ship without a person looking".
+//
+// **Not `needs-decision`, and the difference is what the two sets below encode.** A parked issue is
+// one a run must not *start*; this one is started, and only its ending is withheld. So it stays out
+// of `NOT_DIRECTLY_RUNNABLE_LABELS` — an issue nobody would ever offer cannot be implemented — and
+// out of `epic-busy.ts`'s parked set, because a stopped child leaves uncommitted work in the
+// checkout and must go on holding the repository. Read as parked in either place, the next child
+// would start on top of that work.
+const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
 
 // The three labels that mean an open issue must not be handed to a run as it stands: an `epic`
 // tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
@@ -19,6 +35,11 @@ const AUTO_OK_LABEL = 'auto-ok'
 // person. Held here rather than in either caller because both the next-issues display and the
 // `auto-ok` pickup ask the same question, and two copies would answer it differently the first time
 // one of them gained a fourth label.
+//
+// **`needs-human-review` is deliberately not a fourth.** It withholds the end of a run, not its
+// start: an issue carrying it is implemented and verified like any other and only stops before the
+// commit. Excluded here it would never be offered, so the work it asks a person to look at would
+// never be produced — the label would silently become a second `needs-decision`.
 const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
@@ -47,5 +68,6 @@ export {
 	has_any_label,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
+	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 }
