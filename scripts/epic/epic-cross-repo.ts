@@ -5,6 +5,7 @@ import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { propagate_publish } from '#scripts/propagate/propagate-publish'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
 import { execaSync } from 'execa'
+import { load } from 'js-yaml'
 import type { DependencyVerdict } from './epic-classify'
 import type { EpicChild } from './epic-graph'
 
@@ -72,7 +73,9 @@ function is_published(repo: string, version: string): boolean {
 const GH_TIMEOUT_MS = 20_000
 const SUCCESS_EXIT_CODE = 0
 // The manifest arrives base64-encoded in the API's `content` field; `jq` decodes and reads it.
-const VERSION_JQ = '.content | @base64d | fromjson | {version, private} | tojson'
+const VERSION_JQ = '.content | @base64d | fromjson | {version, private, workspaces} | tojson'
+const PNPM_WORKSPACE_FILE = 'pnpm-workspace.yaml'
+const WORKSPACE_JQ = '.content | @base64d'
 const NOT_FOUND_STATUS = 404
 
 // What the blocker repository's default branch says about what it ships.
@@ -88,8 +91,12 @@ const NOT_FOUND_STATUS = 404
 // registry 404 would start a consumer child before its blocker's release existed. The manifest is a
 // fact about the repository we already have access to, and `private: true` is a positive statement
 // rather than an inference from an absence.
+// **`private` alone does not settle it** (joshuafolkken/kit#1134). A workspace root is private by
+// convention while the packages under it publish, so reading one as "ships nothing" would resolve a
+// dependency before its blocker's release existed — the direction this module may not fail in.
+// `is_workspace` is what keeps that case waiting.
 type ManifestAnswer =
-	| { kind: 'manifest'; version: string | undefined; is_private: boolean }
+	| { kind: 'manifest'; version: string | undefined; is_private: boolean; is_workspace: boolean }
 	| { kind: 'absent' }
 	| { kind: 'unreadable' }
 
@@ -105,22 +112,109 @@ function manifest_path(repo: string): string {
 	return `${git_gh_api_path.repo_api_path(repo)}/contents/package.json`
 }
 
-function to_manifest(stdout: string): ManifestAnswer {
+// What the layout question answered. `unreadable` is a third answer rather than a boolean's loser:
+// a probe that failed says nothing about the layout, and laundering it into "is a workspace" turns
+// one transient read into a permanent wait.
+type WorkspaceCheck = 'workspace' | 'single' | 'unreadable'
+
+// Whether `pnpm-workspace.yaml` actually declares members.
+//
+// **The file's existence proves nothing.** `josh sync` distributes it to every consumer regardless of
+// layout — it carries `allowBuilds`, `overrides` and the like — so probing for its presence read every
+// private first-party repository as a workspace and restored joshuafolkken/kit#1129's eight-hour wait
+// for all of them. Measured: 20 of 20 private first-party checkouts have the file and none declares
+// `packages:` (joshuafolkken/kit#1134). What makes a repository a workspace is a non-empty `packages`
+// key, so that is what is read.
+function declares_packages(yaml: string): boolean {
+	try {
+		const parsed: unknown = load(yaml)
+		if (typeof parsed !== 'object' || parsed === null) return false
+		const { packages } = parsed as { packages?: unknown }
+
+		return Array.isArray(packages) && packages.length > 0
+	} catch {
+		return false
+	}
+}
+
+function pnpm_workspace_path(repo: string): string {
+	return `${git_gh_api_path.repo_api_path(repo)}/contents/${PNPM_WORKSPACE_FILE}`
+}
+
+// A read that failed for any reason other than a missing file leaves the layout unknown.
+function classify_workspace_failure(repo: string): WorkspaceCheck {
+	const probe = execaSync('gh', ['api', '--include', '--silent', pnpm_workspace_path(repo)], {
+		reject: false,
+		timeout: GH_TIMEOUT_MS,
+	})
+
+	return git_gh_exec.parse_status_line(probe.stdout) === NOT_FOUND_STATUS ? 'single' : 'unreadable'
+}
+
+function read_pnpm_workspace(repo: string): WorkspaceCheck {
+	const result = execaSync('gh', ['api', pnpm_workspace_path(repo), '--jq', WORKSPACE_JQ], {
+		reject: false,
+		timeout: GH_TIMEOUT_MS,
+	})
+	if (result.exitCode !== SUCCESS_EXIT_CODE) return classify_workspace_failure(repo)
+
+	return declares_packages(result.stdout) ? 'workspace' : 'single'
+}
+
+// Whether the repository declares a workspace. `workspaces` covers npm and yarn; pnpm keeps its
+// members in `pnpm-workspace.yaml` and leaves the manifest without the field, so that file is read —
+// but only in the one case where the answer can still change the verdict, which is a private root
+// with no `workspaces` entries. A public root publishes, and a private non-workspace root does not,
+// whatever the file would say.
+//
+// `null` counts as absent, not as a declaration: `jq`'s `{version, private, workspaces}` shorthand
+// emits an explicit `"workspaces": null` for a manifest with no such key, so testing only against
+// `undefined` read every private repository as a workspace.
+// Whether the manifest's own `workspaces` field settles it. `null` counts as absent rather than as a
+// declaration; an empty array is a workspace that lists nothing, which is not one.
+function declared_workspaces(declared: unknown): WorkspaceCheck | undefined {
+	if (declared === undefined || declared === null) return undefined
+	if (Array.isArray(declared)) return declared.length > 0 ? 'workspace' : 'single'
+
+	return 'workspace'
+}
+
+function workspace_check(repo: string, fields: { workspaces?: unknown }): WorkspaceCheck {
+	return declared_workspaces(fields.workspaces) ?? read_pnpm_workspace(repo)
+}
+
+interface ManifestFields {
+	version?: unknown
+	private?: unknown
+	workspaces?: unknown
+}
+
+// The fields read out of a manifest that parsed. `is_private` is strictly the boolean, which is the
+// only form npm defines: a looser test — a truthy string, say — would call *more* repositories "ships
+// nothing", and that is the unsafe direction here, because answering it wrongly resolves a dependency
+// and starts a child before its blocker's release. A manifest that misspells `private` therefore
+// waits, which is the failure that is merely slow rather than the one that is wrong.
+function to_answer(repo: string, fields: ManifestFields): ManifestAnswer {
+	const version = typeof fields.version === 'string' ? fields.version : undefined
+
+	if (fields.private !== true) {
+		return { kind: 'manifest', version, is_private: false, is_workspace: false }
+	}
+
+	const check = workspace_check(repo, fields)
+	// A layout nobody could read is not a repository that ships nothing. Answering `unreadable` keeps
+	// the dependency waiting, which is the direction that merely costs time.
+	if (check === 'unreadable') return { kind: 'unreadable' }
+
+	return { kind: 'manifest', version, is_private: true, is_workspace: check === 'workspace' }
+}
+
+function to_manifest(repo: string, stdout: string): ManifestAnswer {
 	try {
 		const parsed: unknown = JSON.parse(stdout.trim())
 		if (typeof parsed !== 'object' || parsed === null) return { kind: 'unreadable' }
-		const fields = parsed as { version?: unknown; private?: unknown }
 
-		return {
-			kind: 'manifest',
-			version: typeof fields.version === 'string' ? fields.version : undefined,
-			// Strictly the boolean, which is the only form npm defines. A looser test — a truthy string,
-			// say — would call *more* repositories "ships nothing", and that is the unsafe direction here:
-			// answering it wrongly resolves a dependency and starts a child before its blocker's release.
-			// A manifest that misspells `private` therefore waits, which is the failure that is merely
-			// slow rather than the one that is wrong.
-			is_private: fields.private === true,
-		}
+		return to_answer(repo, parsed)
 	} catch {
 		return { kind: 'unreadable' }
 	}
@@ -154,7 +248,7 @@ function fetch_manifest(repo: string): ManifestAnswer {
 	})
 
 	return result.exitCode === SUCCESS_EXIT_CODE
-		? to_manifest(result.stdout)
+		? to_manifest(repo, result.stdout)
 		: classify_manifest_failure(repo)
 }
 
@@ -181,17 +275,18 @@ function read_default_branch_version(repo: string): string | undefined {
 // Whether the repository ships no package at all: no manifest on its default branch, or one that
 // declares itself private. Either way there is no release for a dependency to wait on.
 //
-// **The root manifest is the whole of what is read, and that is an assumption worth naming.** A
-// workspace root is private by convention while its packages publish, so such a repository would be
-// read as shipping nothing and its dependents would start early — the direction this module may not
-// fail in. No first-party repository is shaped that way today — app-kit, game-kit and
-// joshuafolkken-com were checked when this landed — and the package name this module derives is the
-// repository's own, so a workspace would break the derivation before it reached here. Reading the
-// workspace members is joshuafolkken/kit#1134's if one ever appears.
+// **A workspace root is excluded, and the exclusion is deliberately coarse** (joshuafolkken/kit#1134).
+// Such a root is private by convention while its packages publish, so reading one as shipping nothing
+// would start a dependent before its blocker's release existed. What is asked is only whether the
+// repository *is* a workspace — the members are not enumerated and nothing looks for which of them
+// publishes, so a workspace whose members are all private waits when it need not. That is the safe
+// direction: waiting ends at the run's own timeout, resolving early does not end at all.
 function publishes_nothing(repo: string): boolean {
 	const answer = read_manifest(repo)
 
-	return answer.kind === 'absent' || (answer.kind === 'manifest' && answer.is_private)
+	if (answer.kind === 'absent') return true
+
+	return answer.kind === 'manifest' && answer.is_private && !answer.is_workspace
 }
 
 // A version that could not be read leaves the dependency waiting rather than resolved: not knowing

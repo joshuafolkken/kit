@@ -29,6 +29,19 @@ const MANIFEST_READ_SUCCESS = {
 const MANIFEST_MISSING = { exitCode: 1, stdout: 'HTTP/2.0 404 Not Found' }
 const MANIFEST_UNREADABLE = { exitCode: 1, stdout: 'HTTP/2.0 429 Too Many Requests' }
 const READ_PLUS_PROBE = 2
+const READ_FAILED = { exitCode: 1, stdout: '' }
+const PRIVATE_MANIFEST = {
+	exitCode: 0,
+	stdout: `{"version":"${VERSION}","private":true,"workspaces":null}`,
+}
+
+// The `gh` results one read should see, in order: the manifest, then the probe the module makes only
+// when the answer can still change.
+function queue(...results: ReadonlyArray<{ exitCode: number; stdout: string }>): void {
+	for (const result of results) {
+		gh.mockReturnValueOnce(result as unknown as ReturnType<typeof execa.execaSync>)
+	}
+}
 
 beforeEach(() => {
 	vi.restoreAllMocks()
@@ -225,13 +238,56 @@ describe('epic_cross_repo.publishes_nothing', () => {
 		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(true)
 	})
 
-	it('reads a manifest that declares itself private as shipping nothing', () => {
-		gh.mockReturnValue({
-			exitCode: 0,
-			stdout: `{"version":"${VERSION}","private":true}`,
-		} as unknown as ReturnType<typeof execa.execaSync>)
+	// A private root is only conclusive once it is known not to be a workspace, so the manifest read is
+	// followed by one read of `pnpm-workspace.yaml` (joshuafolkken/kit#1134).
+	it('reads a private manifest with no workspace file as shipping nothing', () => {
+		queue(PRIVATE_MANIFEST, READ_FAILED, MANIFEST_MISSING)
 
 		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(true)
+	})
+
+	// `josh sync` distributes `pnpm-workspace.yaml` to every consumer whatever its layout — it carries
+	// `overrides` and the like — so its presence proves nothing and only `packages:` does. Measured:
+	// 20 of 20 private first-party checkouts have the file and none declares members.
+	it('reads a workspace file that declares no members as shipping nothing', () => {
+		queue(PRIVATE_MANIFEST, { exitCode: 0, stdout: 'overrides:\n  esbuild: 0.25.0\n' })
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(true)
+	})
+
+	// A layout nobody could read is not a repository that ships nothing.
+	it('does not read an unreadable workspace file as shipping nothing', () => {
+		queue(PRIVATE_MANIFEST, READ_FAILED, MANIFEST_UNREADABLE)
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(false)
+	})
+
+	it('does not read a root declaring workspaces as shipping nothing', () => {
+		queue({ exitCode: 0, stdout: `{"version":"${VERSION}","private":true,"workspaces":["pkg/*"]}` })
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(false)
+	})
+
+	// pnpm keeps its members in `pnpm-workspace.yaml` and leaves the manifest without the field, so the
+	// file's presence is what says workspace there.
+})
+
+describe('epic_cross_repo.publishes_nothing — what it costs', () => {
+	it('asks for the workspace file once per pass', () => {
+		queue(PRIVATE_MANIFEST, { exitCode: 0, stdout: 'packages:\n  - packages/*\n' })
+
+		epic_cross_repo.publishes_nothing(KIT)
+		epic_cross_repo.publishes_nothing(KIT)
+
+		expect(gh).toHaveBeenCalledTimes(READ_PLUS_PROBE)
+	})
+
+	// A public root publishes whatever its layout is, so the probe is never worth a request.
+	it('asks for nothing further when the manifest is not private', () => {
+		queue(MANIFEST_READ_SUCCESS)
+
+		expect(epic_cross_repo.publishes_nothing(KIT)).toBe(false)
+		expect(gh).toHaveBeenCalledTimes(1)
 	})
 
 	it('reads a published manifest as shipping something', () => {
