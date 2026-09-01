@@ -16,6 +16,7 @@
 | Step 1: Issue 作成テンプレ                                                     | [`issue-template.md`](./collaboration-workflow/issue-template.md)                       |
 | Step 2: 提案依頼（AI 共通）                                                    | [`proposal-request.md`](./collaboration-workflow/proposal-request.md)                   |
 | Step 3: 計画コメントを記録して通知する                                         | [`plan-comment.md`](./collaboration-workflow/plan-comment.md)                           |
+| `/code-review` → `followup --merge` の連鎖規則                                 | [`chain-rule.md`](./collaboration-workflow/chain-rule.md)                               |
 | 報告フォーマット（平易な概要 ＋ 技術詳細）                                     | [`report-format.md`](./collaboration-workflow/report-format.md)                         |
 | Step 5: PR結果確認 + 完了通知（別スクリプト）                                  | [`completion-notify.md`](./collaboration-workflow/completion-notify.md)                 |
 | 後から関連が判明した Issue を epic に束ねる                                    | [`epic-bundle.md`](./collaboration-workflow/epic-bundle.md)                             |

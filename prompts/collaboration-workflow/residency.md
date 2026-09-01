@@ -28,7 +28,7 @@ no になり skill 側に本体を置くものの例:
 - 分割判定（`.claude/skills/workflow-commands/split-assessment.md`）
 - 実行中に前提 Issue が判明した場合の入口別手順（`fullrun.md` / `halfrun.md` / `epicrun.md`）
 - `epicrun` の単独 Issue 受理と park-and-continue（`epicrun.md`）
-- 検証ゲートとマージ連鎖（`chain-rule.md` / `followup.md`）
+- 検証ゲートとマージ連鎖（`.claude/skills/workflow-commands/chain-rule.md` / `followup.md`）
 - `auto-ok` の拾い上げと「ラベルを付けるのは人だけ」（`epicrun.md`）。書き込みの禁止は普通なら常駐側に来るが、`auto-ok` はそれを禁じているドキュメント以外のどこにも存在しないため、それらを開かないターンではそもそも到達しない
 
 ### 指し先になった話題ファイルは引用しない
