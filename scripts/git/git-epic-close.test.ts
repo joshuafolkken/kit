@@ -269,6 +269,20 @@ describe('close_completed_epics — unordered batch', () => {
 		expect(console.info).not.toHaveBeenCalledWith(expect.stringMatching(NO_RELATION_REGEX))
 	})
 
+	// joshuafolkken/kit#1155: an unordered epic whose split rationale recommends an execution order
+	// in prose. The arrow made the body read as ordered, and since an unordered batch carries no
+	// `blocked-by` relation by construction, every child's merge said the order was never recorded.
+	it('stays silent when only a rationale paragraph carries an arrow', async () => {
+		const body = `## Split rationale\n\nRunning #102 first is sensible (#101 -> #102).\n\n${UNORDERED_EPIC_BODY}`
+
+		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body }]))
+		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)
+
+		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
+
+		expect(console.info).not.toHaveBeenCalledWith(expect.stringMatching(NO_RELATION_REGEX))
+	})
+
 	it('still closes an unordered epic once every child is closed', async () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: UNORDERED_EPIC_BODY }]))
 		mocked_get_child.mockResolvedValue(CLOSED_UNLINKED)

@@ -153,8 +153,10 @@ async function write_promotion(
 ): Promise<number> {
 	const body = git_epic_promote.build_promoted_body({ ...input, body: existing_body })
 
-	if (!git_epic_promote.is_tracking_complete(body, input.children)) {
-		console.error('✖ The promoted body would not track every child; nothing was written.')
+	const tracking_error = git_epic_promote.find_tracking_error(body, input.children)
+
+	if (tracking_error !== undefined) {
+		console.error(`✖ ${tracking_error}`)
 
 		return FAILURE_EXIT_CODE
 	}

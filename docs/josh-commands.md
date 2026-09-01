@@ -389,7 +389,7 @@ Set `JOSH_CI_TIMEOUT_SECONDS` to a positive number of seconds to override it in 
 
 An AI agent driving this command should give the tool call the longest timeout it allows and let the command finish: the wait can outlast a single tool call, and shell backgrounding (`&`) does not survive the call returning.
 
-While inspecting those children it also reports when the epic body declares a dependency chain (`#101 -> #102` under `Dependencies`) but **none** of the children carries a `blocked-by` relation, meaning the batch order was never recorded natively. The declaration is what triggers the check: an epic is created for every split, ordered or not, so its mere existence says nothing about ordering and warning on that alone would fire on every unordered batch. The check is deliberately weak — it never judges the shape of the chain, only its total absence — and it runs on every child's merge rather than at epic close, so the omission surfaces while it can still be corrected.
+While inspecting those children it also reports when the epic body declares a dependency chain (`#101 -> #102` under `Dependencies`) but **none** of the children carries a `blocked-by` relation, meaning the batch order was never recorded natively. The declaration is what triggers the check: an epic is created for every split, ordered or not, so its mere existence says nothing about ordering and warning on that alone would fire on every unordered batch. The check is deliberately weak — it never judges the shape of the chain, only its total absence — and it runs on every child's merge rather than at epic close, so the omission surfaces while it can still be corrected. What counts as a declaration is read from the same place `epic:next` reads its links: a line that is _nothing but_ a chain. An arrow inside a rationale paragraph is a recommendation, and reading one as a declaration made an epic that says `None — the children are independent` report this warning on every child's merge ([#1155](https://github.com/joshuafolkken/kit/issues/1155)).
 
 After the merge, `followup` also closes any completed epic. It looks for open issues labelled `epic` whose markdown task list references the issue this PR closed; when every other child in that list is already closed, the epic is closed with a comment naming its children. The just-closed issue is treated as closed without being queried, because GitHub applies the `closes #N` side effect asynchronously. An epic with a still-open child is left alone, and any failure in this step is reported as a warning rather than failing the run — the PR has already merged by then. A run whose comment landed but whose close was refused does not post a second copy: the announcement ends with an HTML comment marker naming the children it was posted for, and a later run that finds that marker closes without commenting again. The marker renders as nothing, so quoting the announcement in an ordinary issue comment no longer suppresses the next one, and an epic that was reopened and gained a child announces the enlarged batch on its own terms. Two cases are skipped on purpose: an epic whose task list tracks a child in **another repository** is never closed automatically (resolving that child's state would need a different repo, and ignoring it could close the epic while the child is open), and nothing runs at all on a `--no-merge` run, where the linked issue is still open.
 
@@ -993,7 +993,7 @@ The verdict follows from the buckets, and waiting is checked before stopping —
 - **A circular dependency.** Hand-added `--add-blocked-by` edges can make `#1` wait for `#2` while `#2` waits for `#1`, and every session would then wait forever. The children that can never start are named — including the ones stuck _behind_ the cycle, since those never become runnable either.
 - **A disagreement between the epic body and the relations.** The body's `Dependencies` section is the human-readable record; the `blocked-by` relations are the authority for execution. When they disagree — an epic written before `josh` recorded the relations, a recording that failed, or a relation hand-added since — the command reports both directions and refuses to pick a winner, because silently following either implements in an order nobody agreed to.
 
-  Only a line that is _nothing but_ a chain counts as a declaration. An epic whose Dependencies section is followed by prose recommending an execution order (`推奨実行順: #869 -> #863 -> …`) is stating a suggestion, not a dependency, and reading those arrows as declarations reported four disagreements against relations that were correct.
+  Only a line that is _nothing but_ a chain counts as a declaration. An epic whose Dependencies section is followed by prose recommending an execution order (`推奨実行順: #869 -> #863 -> …`) is stating a suggestion, not a dependency, and reading those arrows as declarations reported four disagreements against relations that were correct. **Every reader of the body answers from that one definition** — the link reading here, `epic:check`'s "is an order declared at all", and `josh epic --add`'s rewrite, which protects an arrow outside the `Dependencies` section as prose. Until [#1155](https://github.com/joshuafolkken/kit/issues/1155) the existence reading used a pattern of its own that matched anywhere in the body, so two readers of one epic answered the same question differently.
 
 The body is parsed through the same module the epic auto-close uses, so "what the auto-close tracks" and "what this command reads" cannot drift apart.
 
@@ -1114,11 +1114,19 @@ Exits `0` when every requirement is satisfied and `1` otherwise, so it works as 
 ```
 ✔ epic label — the `epic` label is applied
 ✔ child task list — 2 child issue(s) tracked: #101, #102
-✖ dependencies section — neither `#N -> #M` nor the `None — ...` literal found; prose order is not machine-readable
+✖ dependencies section — neither a line that is only `#N -> #M` nor the `None — ...` literal found; an arrow sharing its line with anything else is prose, and prose order is not machine-readable
 ✔ auto-close eligibility — every tracked child is in this repository
 
 ❌ Epic #700 does not satisfy every requirement.
 ```
+
+The dependencies check wants **exactly one** of the two machine-readable forms. Neither present is the ambiguous middle it was written for — "there is no order" and "the order was never written down" then read alike. Both present is a contradiction, and it used to pass while the report named only the half that contradicted the other ([#1155](https://github.com/joshuafolkken/kit/issues/1155)):
+
+```
+✖ dependencies section — a chain (`#N -> #M`) and the `None — ...` literal are both declared; they contradict each other
+```
+
+An epic written before [#1155](https://github.com/joshuafolkken/kit/issues/1155) can start failing this check without its body changing, and the verdict is the accurate one: a chain sharing its line with a rationale (`#101 -> #102 (#102 needs the API from #101)`) or buried in a prose bullet was never read by `epic:next`, so the check used to call machine-readable a body from which the run read no order at all. Fix such an epic by putting the chain on a line of its own and moving the rationale to the next line; `josh epic --add` and `josh epic --promote` refuse the epic until then, and their refusals name this command.
 
 ### `josh auto-ok:next`
 

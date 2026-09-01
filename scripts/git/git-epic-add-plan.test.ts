@@ -177,7 +177,7 @@ describe('git_epic_add_plan.build_plan — what it refuses without writing', () 
 		const prose = `${DEPENDENCIES_HEADING}\n\nDo #890 first.\n\n${PROGRESS_HEADING}\n\n- [ ] #890\n`
 
 		expect(error_of(plan({ body: prose }))).toContain(
-			'no machine-readable `Dependencies` declaration',
+			'no unambiguous machine-readable `Dependencies` declaration',
 		)
 	})
 })

@@ -199,7 +199,9 @@ describe('git_epic_add_body.rewrite_body — what it refuses to write', () => {
 			chains_after: [],
 		})
 
-		expect(error_of(outcome)).toContain('no machine-readable `Dependencies` declaration')
+		expect(error_of(outcome)).toContain(
+			'no unambiguous machine-readable `Dependencies` declaration',
+		)
 	})
 })
 

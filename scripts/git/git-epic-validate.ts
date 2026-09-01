@@ -1,4 +1,4 @@
-import { git_epic_parse } from './git-epic-parse'
+import { git_epic_parse, type DeclarationState } from './git-epic-parse'
 import { EPIC_LABEL } from './issue-labels'
 import { parse_json_object_safe } from './parse-json-array'
 import { epic_subject_schema } from './schemas'
@@ -67,25 +67,29 @@ function check_task_list(subject: EpicSubject): CheckResult {
 	}
 }
 
-function describe_dependencies(state: { has_chain: boolean; has_none_literal: boolean }): string {
+function describe_dependencies(state: DeclarationState): string {
+	if (state.has_chain && state.has_none_literal) {
+		return 'a chain (`#N -> #M`) and the `None — ...` literal are both declared; they contradict each other'
+	}
+
 	if (state.has_chain) return 'an ordered chain (`#N -> #M`) is declared'
 	if (state.has_none_literal) return 'declared as an unordered batch'
 
-	return 'neither `#N -> #M` nor the `None — ...` literal found; prose order is not machine-readable'
+	return 'neither a line that is only `#N -> #M` nor the `None — ...` literal found; an arrow sharing its line with anything else is prose, and prose order is not machine-readable'
 }
 
 // An unordered batch is a legitimate state, so the absence of a chain is not a failure by itself.
-// What this reports is the ambiguous middle: neither the arrow form nor the literal is present, so
-// a reader cannot tell "no order" from "the order was never written down". The literal is compared
-// against the constant the generator emits, so the two cannot drift into disagreement.
+// What this reports is the two states a reader cannot act on: neither form present, so "no order"
+// and "the order was never written down" are indistinguishable, and both present, so the body says
+// each of them. The literal is compared against the constant the generator emits, and the chain
+// against the one the link reader parses, so no two of them can drift into disagreement.
 function check_dependencies(subject: EpicSubject): CheckResult {
-	const has_chain = git_epic_parse.has_declared_dependency_chain(subject.body)
-	const has_none_literal = git_epic_parse.has_unordered_declaration(subject.body)
+	const state = git_epic_parse.read_declaration(subject.body)
 
 	return {
 		name: 'dependencies section',
-		is_passing: has_chain || has_none_literal,
-		detail: describe_dependencies({ has_chain, has_none_literal }),
+		is_passing: git_epic_parse.is_declaration_readable(state),
+		detail: describe_dependencies(state),
 	}
 }
 

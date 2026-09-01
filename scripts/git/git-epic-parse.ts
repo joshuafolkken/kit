@@ -36,16 +36,10 @@ const EXTERNAL_URL_PATTERN =
 // would attach a nonexistent Issue to the batch and keep the epic open forever.
 const FENCE_LINE_PATTERN = /^[ \t]*(?:`{3,}|~{3,})/u
 
-// An epic is created for every split, so its existence no longer implies an ordered batch. The
-// declaration in its body is what distinguishes "the order was never recorded" from "there is no
-// order": a chain between two Issue references (`#101 -> #102`, or the arrow written as `→`). The
-// shape of the chain is not validated — only that one was declared at all.
-const DEPENDENCY_CHAIN_PATTERN = /#\d+[ \t]*(?:->|→)[ \t]*#\d+/u
-
-// The same chain, read for its links rather than its existence. `epic:next` compares what the body
-// declares against the `blocked-by` relations actually recorded, and a body that says one order
-// while the relations say another must stop the run rather than silently follow either
-// (joshuafolkken/kit#860).
+// A chain between two Issue references (`#101 -> #102`, or the arrow written as `→`), read for its
+// links. `epic:next` compares what the body declares against the `blocked-by` relations actually
+// recorded, and a body that says one order while the relations say another must stop the run rather
+// than silently follow either (joshuafolkken/kit#860).
 //
 // Only a line that is *nothing but* a chain counts, optionally behind a list marker. Measured
 // against joshuafolkken/kit#858, whose Dependencies section is followed by a prose line recommending
@@ -189,10 +183,6 @@ function is_task_list_line(line: string): boolean {
 	return TASK_LIST_LINE_PATTERN.test(line)
 }
 
-function has_declared_dependency_chain(body: string | undefined): boolean {
-	return has_pattern_match(DEPENDENCY_CHAIN_PATTERN, body)
-}
-
 // Fenced blocks are stripped here for the same reason they are everywhere else: an epic body may
 // quote the template, and a declaration inside that quote is an illustration, not a declaration.
 function has_unordered_declaration(body: string | undefined): boolean {
@@ -247,6 +237,54 @@ function parse_dependency_links(body: string | undefined): Array<DependencyLink>
 	return parse_dependency_chains(body).flatMap((references) => chain_links(references))
 }
 
+// Whether the body declares an order at all — asked by `epic:check` and by the order-unrecorded
+// warning, which need to tell "the order was never recorded" from "there is no order".
+//
+// Answered from the chains above rather than from a pattern of its own, because a second pattern is
+// a second answer: until joshuafolkken/kit#1155 this scanned the whole body for a bare `#N -> #M`,
+// so a rationale paragraph recommending an execution order made an epic declared
+// `None — the children are independent` report as ordered, and `josh followup` then said the batch
+// order was never recorded on every child's merge. The narrowing joshuafolkken/kit#858 applied to
+// the link reader was the same judgement, and `epic --add` writes on that judgement too
+// (`git-epic-add-body.ts` protects an arrow outside the `Dependencies` section as prose) — so the
+// three readers of one body now recognize the same lines, instead of two patterns that could
+// disagree about which line is a declaration. They still answer different questions of those lines:
+// a self-loop (`#101 -> #101`) is a declaration here and yields no link, since `chain_links` drops
+// an edge from an issue to itself.
+function has_declared_dependency_chain(body: string | undefined): boolean {
+	return parse_dependency_chains(body).length > 0
+}
+
+// What the body declares about order, as the two independent answers every reader of it needs. Read
+// from the whole fence-stripped body rather than from the `Dependencies` section, because that is
+// where `epic:next` reads its links from: a chain line left outside the section is followed by the
+// run, so a check that could not see it would call such a body consistent.
+interface DeclarationState {
+	has_chain: boolean
+	has_none_literal: boolean
+}
+
+function read_declaration(body: string | undefined): DeclarationState {
+	return {
+		has_chain: has_declared_dependency_chain(body),
+		has_none_literal: has_unordered_declaration(body),
+	}
+}
+
+// Whether that declaration says something a machine can act on: exactly one of the two forms, never
+// both. A body carrying a chain *and* the `None — ...` literal declares an order and declares that
+// there is none, and `epic:check` used to pass it while reporting only the half that contradicts the
+// other (joshuafolkken/kit#1155). Single-sourced here because `epic:check`, `epic --add` and
+// `epic --promote` all mean this same question, and three copies of the disjunction were three
+// chances to accept a body the check rejects.
+function is_declaration_readable(state: DeclarationState): boolean {
+	return state.has_chain !== state.has_none_literal
+}
+
+function has_machine_readable_declaration(body: string | undefined): boolean {
+	return is_declaration_readable(read_declaration(body))
+}
+
 function has_child(children: ReadonlyArray<number>, issue_number: number): boolean {
 	return children.includes(issue_number)
 }
@@ -267,6 +305,9 @@ const git_epic_parse = {
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
 	has_unordered_declaration,
+	read_declaration,
+	is_declaration_readable,
+	has_machine_readable_declaration,
 	parse_dependency_links,
 	parse_external_task_list_children,
 	parse_external_reference,
@@ -274,7 +315,7 @@ const git_epic_parse = {
 	is_state_closed,
 }
 
-export type { DependencyLink, ExternalChild }
+export type { DeclarationState, DependencyLink, ExternalChild }
 export {
 	git_epic_parse,
 	fence_mask,
@@ -285,6 +326,9 @@ export {
 	has_external_task_list_entry,
 	has_declared_dependency_chain,
 	has_unordered_declaration,
+	read_declaration,
+	is_declaration_readable,
+	has_machine_readable_declaration,
 	parse_dependency_links,
 	parse_external_task_list_children,
 	parse_external_reference,
