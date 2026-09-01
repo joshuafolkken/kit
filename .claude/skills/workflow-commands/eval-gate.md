@@ -3,8 +3,9 @@
 `josh eval` (joshuafolkken/kit#855) measures whether a change to the distributed documents, skills or
 hooks actually changed what an agent does, by judging real sessions on their **tool calls**. Until
 joshuafolkken/kit#907 nothing said *when* to spend it, so a pull request that rewrote one rule and
-regressed another had no detection path. This file is that definition. The canonical extended
-reference is `prompts/collaboration-workflow/eval-gate.md`.
+regressed another had no detection path. This file is that definition **and the single source of the
+procedure**; `prompts/collaboration-workflow/eval-gate.md` is a pointer to it (joshuafolkken/kit#1177
+rollout of the joshuafolkken/kit#1174 pattern).
 
 ## Ask the command; do not decide
 
@@ -183,5 +184,12 @@ not cost: because every child that touched the distribution ran **all** the scen
 a failure, the gradual degradation an epic-completion run would look for has already been measured —
 at the end of an epic the tree is the one the last document-touching child measured. A second
 measurement of the same state is what would be bought, at the price of a baseline stored across
-sessions, which `epicrun` keeps nowhere but GitHub. Full reasoning, and the answer to "an unattended
-run has no other instrument": `prompts/collaboration-workflow/eval-gate.md`.
+sessions, which `epicrun` keeps nowhere but GitHub (joshuafolkken/kit#860).
+
+The objection "an unattended run has no other instrument" is answered by that same per-child firing:
+the measurement is present, and it fires per child against the whole distribution with the strength
+to stop a merge — which is what closes the path the intervention count of joshuafolkken/kit#917
+cannot see, not a re-run at epic completion. Judging degradation from the epic's start would also
+need two `n/m` readings compared across sessions, and a suite where `?` is routine would fail runs on
+a budget-driven false dip. An epic that never touches the distribution fires neither point, correctly
+— nothing changed the agent's behavior.
