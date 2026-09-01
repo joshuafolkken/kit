@@ -69,6 +69,22 @@ describe('eval_trigger.scope_for', () => {
 	})
 })
 
+// joshuafolkken/kit#1152: the concurrent placement asks the same question of a list that already
+// holds only measured paths — what a review changed while `josh eval` was running.
+describe('eval_trigger.scope_for_measured_changes', () => {
+	it('requires another run when the review touched a measured path', () => {
+		expect(eval_trigger.scope_for_measured_changes([SKILL_FILE])).toBe(eval_trigger.REQUIRED_SCOPE)
+	})
+
+	// The deliberate opposite of `scope_for`'s empty case. There the empty list is a caller that
+	// failed to read the diff; here it is the positive fact that a walk of the trigger's own path set
+	// found nothing moved, and measuring again would re-read a tree that has not changed.
+	it('skips an empty list where scope_for would require a run', () => {
+		expect(eval_trigger.scope_for_measured_changes([])).toBe(eval_trigger.SKIPPED_SCOPE)
+		expect(eval_trigger.scope_for([])).toBe(eval_trigger.REQUIRED_SCOPE)
+	})
+})
+
 describe('eval_trigger.deciding_paths', () => {
 	it('names the paths that forced the run', () => {
 		expect(eval_trigger.deciding_paths([CODE, SKILL_FILE])).toStrictEqual([SKILL_FILE])

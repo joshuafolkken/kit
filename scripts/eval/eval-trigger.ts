@@ -76,6 +76,19 @@ function scope_for(paths: ReadonlyArray<string>): EvalScope {
 	return deciding_paths(changed).length > 0 ? REQUIRED_SCOPE : SKIPPED_SCOPE
 }
 
+// The same question asked of a list that is already known to hold only measured paths — what the
+// review changed while a concurrent `josh eval` was running (joshuafolkken/kit#1152).
+//
+// **The empty case answers the opposite way, and deliberately.** `scope_for` reads an empty list as
+// a caller that failed to read the diff, so it measures. Here the list comes from walking the
+// trigger's own path set, so empty is the positive fact "the review changed nothing the scenarios
+// can see" — measuring again would spend five real Claude sessions to re-read a tree that has not
+// moved. The two are separate functions rather than one flag for exactly that reason: the ambiguity
+// `scope_for` resolves does not exist here, and a flag would invite resolving it by judgement.
+function scope_for_measured_changes(changed: ReadonlyArray<string>): EvalScope {
+	return changed.length > 0 ? REQUIRED_SCOPE : SKIPPED_SCOPE
+}
+
 const eval_trigger = {
 	deciding_paths,
 	documented_form,
@@ -85,6 +98,7 @@ const eval_trigger = {
 	MEASURED_PATHS,
 	REQUIRED_SCOPE,
 	scope_for,
+	scope_for_measured_changes,
 	SKIPPED_SCOPE,
 }
 
