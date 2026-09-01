@@ -210,6 +210,11 @@ pointer to it (joshuafolkken/kit#1181 rollout of the joshuafolkken/kit#1174 patt
 
 ## 2b. Delegating a step to a cheaper tier
 
+**Every step of a run used to execute at the same depth** (joshuafolkken/kit#969). Designing,
+assessing a split and reviewing are judgement; applying a fix the gate has already named is not —
+and both were billed at the same rate. Delegation is the correction: the steps whose answer is
+already decided go to a cheaper execution tier, and the judgement stays where it is.
+
 **Ask before delegating any step of a run**, and use what it answers:
 
 ```bash
@@ -217,26 +222,55 @@ pnpm josh delegate <step>   # → delegate | keep ; the reason on stderr
 pnpm josh delegate --list   # the enumeration, and what was rejected and why
 ```
 
+**Never decide it yourself.** "This one is simple enough for the cheap tier" is a judgement made
+under cost pressure, and cost pressure resolves it toward *cheap enough* exactly when a mistake is
+most likely — the same reason `pnpm josh review:level` takes the review level out of an agent's
+hands and reads it off the changed paths instead.
+
 **Anything not on the list is `keep`.** A step nobody classified must not be delegated because
 nobody said it could not be — the default is the rule, not a fallback. Put the other way: a missed
 entry costs money, and a wrong `delegate` costs correctness, quietly.
 
 **A step earns its place by naming how a wrong result is caught** — by something that runs in the
-parent tier and costs less than redoing the step. "Unlikely to be wrong" is not that. Most candidates
-fail here: a notification body, a decision-log comment and a status read all ship their mistakes with
-nothing left to disagree with them, which is why `--list` shows them as rejected rather than absent.
+parent tier and costs less than redoing the step. "Unlikely to be wrong" is not that. That is the
+substantive one of three conditions: (1) the step can be verified without being redone, (2) a wrong
+result is *caught* by that verification, and (3) the row exists on the enumeration — meeting the
+first two is not membership until someone adds it.
+
+**A candidate is rejected on one of two arms, and both are recorded.** One arm **names no verifier**
+at all: a notification body, a decision-log comment and a status read each ship their mistakes with
+nothing left to disagree with them. The other arm has a verifier and is kept anyway, because **a
+wrong result propagates too far** to be worth catching after the fact — a wrong root cause produces a
+fix that passes the gate, a wrong design is paid for by every step after it, a missed split widens
+one Issue into a batch nobody authorized, and a cheaper review finds less of what is left between a
+defect and a merge. **Neither arm is the exception**, and reading one as the common case is what lets
+a candidate that clears it read as qualifying. `--list` shows both groups as **rejected** rather than
+absent, and `pnpm josh delegate <step>` answers `kept deliberately` for a step that was weighed and
+`kept by default` for one nobody ever considered — so the next person to propose one finds the reason
+instead of re-deriving it.
 
 **The mechanism is not the unit.** How a thing is delegated — an isolated execution unit, an explicit
 brief, a result the parent can verify, a failure that surfaces — is separate from what is delegated.
 The units are one step of a run (`gate-fix`, `survey`) and one whole child of a batch (`epic-child`,
 joshuafolkken/kit#984) — an epic's child under `epicrun` and one issue of a `queue` alike
 (joshuafolkken/kit#1149). **They share one mechanism** — one enumeration, one command, one verifier
-requirement; building a second is the clone `CLAUDE.md` prohibits. **A batch entry point that does
-not delegate is the defect**, not a variant: `queue` accumulated every issue's history in one context
-until it was wired to this same row, and the per-issue procedure is `queue.md` → "Each issue runs in
-a delegated unit".
+requirement; building a second is the clone `CLAUDE.md` prohibits. What joshuafolkken/kit#1149
+widened is the reach of that one row and not the enumeration, so **no second row like `queue-child`
+is added**: the brief, the summary and the verifier are identical, and only the keyword that started
+the batch differs. **A batch entry point that does not delegate is the defect**, not a variant:
+`queue` accumulated every issue's history in one context until it was wired to this same row, and
+the per-issue procedure is `queue.md` → "Each issue runs in a delegated unit".
 
-Canonical reference: `prompts/collaboration-workflow/delegation.md`.
+**`epic-child`'s verifier is not the child's own completion report.** The parent reads the child's
+state from GitHub — `pnpm josh issue:state <N>`, the moment the unit returns — because a child
+reported done whose pull request never merged is still open, and a loop advancing on the summary has
+discarded the very thing that made the unit delegatable. The per-entry procedure is
+`epicrun.md` → "Each child runs in a delegated unit" and `queue.md` → "Each issue runs in a
+delegated unit"; the enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in
+readable form by `docs/josh-commands.md` → "`josh delegate`".
+
+This section is the single source of the rule; `prompts/collaboration-workflow/delegation.md` is a
+pointer to it (joshuafolkken/kit#1183 rollout of the joshuafolkken/kit#1174 pattern).
 
 ## 2c. The `owner/repo#` prefix — which repository the run acts on
 

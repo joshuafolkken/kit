@@ -33,9 +33,10 @@ pnpm josh delegate epic-child   # → delegate
 ```
 
 How the unit is handed its work, what it returns, and how a failure surfaces are defined once, in
-`SKILL.md` → "2b. Delegating a step to a cheaper tier" and at "Each child runs in a delegated unit"
-in `epicrun.md` (canonical: `prompts/collaboration-workflow/delegation.md`). Every paragraph there
-applies here unchanged — the brief naming the invocation the run descends from (`queue #N1 #N2 …`,
+`SKILL.md` → "2b. Delegating a step to a cheaper tier" — the single source of the delegation rule.
+`epicrun.md` → "Each child runs in a delegated unit" is that definition applied to one child of a
+batch, and every paragraph of it applies to a queued issue
+unchanged — the brief naming the invocation the run descends from (`queue #N1 #N2 …`,
 this issue's number, and that it is to be run as `fullrun #<N>` under that authorization), the merge
 authorization typing `queue` gave reaching the unit, and the fallback where no isolated unit exists.
 
