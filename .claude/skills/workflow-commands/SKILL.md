@@ -50,9 +50,12 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   (`prompts/review.md` → "Review round cap") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
   answers `required` (`eval-gate.md`). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
-  **The rule-compliance measurement sits after the review and before the commit, never inside
+  **The rule-compliance measurement is read after the review and before the commit, never inside
   `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval` is five
-  real Claude sessions. Its last line is the verdict — `blocked` stops the merge, `unmeasured` does
+  real Claude sessions. **It is *started* when the review starts, because neither writes to the
+  working tree**, and `pnpm josh eval:scope --since-eval` afterwards says whether the review moved a
+  measured path and the run has to be repeated (joshuafolkken/kit#1152) — a stale result is never
+  reported. Its last line is the verdict — `blocked` stops the merge, `unmeasured` does
   not but is reported, and a run nobody saw hold is never reported as green. `eval-gate.md` carries
   the trigger set, the cost ceiling, and why an epic's completion does not run it a second time.
   **E2E closes after that, and never by asking the user**: where the command ends in a pull request

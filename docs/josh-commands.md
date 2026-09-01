@@ -1335,14 +1335,26 @@ The run's last line is a verdict rather than only a count — `held`, `blocked` 
 the exit code is `0` only when every scenario passed, so a failed run and one that measured nothing
 exit alike. `blocked` stops a merge; `unmeasured` does not, but is reported.
 
+**Before the first session it records what it is about to measure** — a content hash per file under
+the measured paths, written to a temp-directory file keyed to this checkout
+([#1152](https://github.com/joshuafolkken/kit/issues/1152)). That is what lets the run start
+alongside `/code-review` and still be checked for staleness afterwards, with
+[`josh eval:scope --since-eval`](#josh-evalscope). **Only a whole-suite run writes it** — a named
+re-run (`pnpm josh eval <name>`, what a `blocked` verdict asks for) leaves the record alone, so a
+one-scenario reading can never stand in for the suite's measurement. A run that cannot write it says
+so and continues, which leaves the check with no record — and no record answers `required`. The file
+is created owner-only and exclusively, after unlinking whatever was at the path, so a predictable
+name in a shared temp directory cannot redirect the write or plant a record the check would trust.
+
 ### `josh eval:scope`
 
 Say whether this change has to be measured by `josh eval` ([#907](https://github.com/joshuafolkken/kit/issues/907)).
 
 ```bash
-pnpm josh eval:scope            # → required | skip ; alias: josh es
-pnpm josh eval:scope --staged   # the staged diff
-pnpm josh eval:scope --json     # the scope and the reason, machine-readable
+pnpm josh eval:scope              # → required | skip ; alias: josh es
+pnpm josh eval:scope --staged     # the staged diff
+pnpm josh eval:scope --since-eval # what a review changed under a concurrent run
+pnpm josh eval:scope --json       # the scope and the reason, machine-readable
 ```
 
 The scope goes to stdout and the reason to stderr, so `$(pnpm josh eval:scope)` reads the scope and a person still sees why.
@@ -1357,5 +1369,9 @@ The scope goes to stdout and the reason to stderr, so `$(pnpm josh eval:scope)` 
 The measured set is derived from what the eval sandbox copies rather than restated here, so it cannot claim a path no scenario reads. **One measured path decides the whole change** — the suite measures the distribution, not the file that changed. **An empty diff answers `required`**: `skip` there would hand a caller that failed to read the diff the same answer as one that measured. The harness and the scenarios themselves (`scripts/eval/**`, `evals/scenarios/**`) do not fire it — changing the ruler is not changing what it measures. `.claude/settings.json` is the one coarse entry: the sandbox drops hooks that invoke the toolchain, so a change to only such a hook answers `required` and no scenario can observe it.
 
 The gate asks about the branch diff. `--staged` is for a pre-commit reading, and the empty-list rule bites hardest there: an empty index answers `required`, which costs five real Claude sessions rather than `review:level`'s free `medium`.
+
+**`--since-eval` asks the same question of a different diff — the one `/code-review` itself produced** ([#1152](https://github.com/joshuafolkken/kit/issues/1152)). The gate starts `josh eval` when the review starts, since neither writes to the working tree; the suite therefore measures the documents as they stood at that moment, and a review that then edited a measured path leaves the verdict describing a tree that no longer exists. This flag compares the record `josh eval` wrote before its first session against the tree now: `skip` means the review changed nothing the scenarios can see and the concurrent verdict stands, `required` means it edited a measured path — or that no record exists — and the suite runs again. Git cannot answer this: the implementation and the review's fixes are uncommitted in the same tree, so a diff cannot say which side of the review a change fell on.
+
+Two differences from the branch reading, both deliberate. **An empty result answers `skip` here**, the opposite of the branch reading's empty diff: the paths come from walking the trigger's own set rather than from a caller's diff, so nothing found is the positive fact that nothing moved. And **`--staged` alongside it is refused rather than resolved** — one asks about the index, the other about a recorded run, and answering one of them silently would answer a question nobody asked. The reason line names when the recorded run started, so a record left by some other loop is visible rather than assumed away.
 
 Where the answer is used, what a failure does, and why an epic's completion does not run the suite a second time: [docs/eval.md](./eval.md) → "When it runs".

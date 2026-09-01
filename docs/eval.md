@@ -70,9 +70,35 @@ so a change to only such a hook answers `required` and no scenario observes it. 
 rather than read as a measurement; narrowing the trigger would mean parsing the diff, which is the
 judgement the command exists to remove.
 
-**Where it sits:** after `/code-review` has converged and before `pnpm josh bump minor`, and **never
-inside `pnpm josh gate`** — the gate re-runs on every fix round and on every `epicrun` child, and the
-review rewrites the very prose being measured.
+**Where it sits:** started when `/code-review` starts, read once the review has converged and before
+`pnpm josh bump minor`, and **never inside `pnpm josh gate`** — the gate re-runs on every fix round
+and on every `epicrun` child, and the review rewrites the very prose being measured.
+
+**The suite and the review overlap because neither writes.** Both only read the working tree — a
+review's fixes are applied after it reports — so the suite's wall-clock hides inside the review's
+instead of following it ([joshuafolkken/kit#1152](https://github.com/joshuafolkken/kit/issues/1152)).
+It was the longest serial stretch left in the gate: `pnpm josh gate` is 17s and already concurrent,
+CI is 95–120s and already parallel, and the suite alone runs 100s and up.
+
+**What the overlap costs is certainty, and it is bought back mechanically.** A run measures the
+documents as they stood when it started, so a review that then edited a measured path leaves the
+verdict describing a tree that no longer exists — and a stale result is never reported. `josh eval`
+writes a record of what it measured before its first session; once the review has converged,
+`pnpm josh eval:scope --since-eval` compares that record against the tree now. `skip` means the
+review changed nothing the scenarios can see and the concurrent verdict stands; `required` means it
+edited a measured path — or that there is no record at all — and the suite runs again. The common
+answer is `skip`: a review that lands no high/medium finding changes nothing. Only _when_ the
+measurement is taken changes; what a verdict does is untouched, and a concurrent run's output is read
+in full before its verdict is treated as an answer. Running the suite after the review instead is
+still correct, only slower.
+
+**Two things the record does not cover.** It is written only by a whole-suite run — a named re-run
+(`pnpm josh eval <name>`) leaves it alone, so a one-scenario reading can never stand in for the
+suite's measurement. And it describes the tree the suite read, which in a consumer is the installed
+`@joshuafolkken/kit` rather than the repository being reviewed (see "In a consumer project" below);
+`--since-eval` therefore answers `skip` there whatever the review changed, which is correct for what
+it measures and is not a statement about the consumer's own diff. The plain `pnpm josh eval:scope`
+is what asks about that.
 
 **The cost ceiling is on how often, not how many.** Every scenario runs, once per Issue. Selecting
 "the scenarios related to the change" is not available: a scenario declares the _rule_ it measures,

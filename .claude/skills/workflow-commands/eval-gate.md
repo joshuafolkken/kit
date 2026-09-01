@@ -37,12 +37,53 @@ The trigger set is derived from what the eval sandbox copies, not restated: `CLA
   than reading the run as a measurement of the hook. Narrowing the trigger instead would mean parsing
   the diff, which is the judgement this command exists to remove.
 
-## Where it sits
+## Where it sits — started with the review, read after it
 
-**After `/code-review` has converged, before `pnpm josh bump minor`. Never inside `pnpm josh gate`.**
-Two reasons, each sufficient: the gate re-runs on every fix round and on every `epicrun` child, and
-one `josh eval` is five real Claude sessions; and the review rewrites the very prose being measured,
-so measuring before it converges measures a draft.
+**Start `pnpm josh eval` in the background when `/code-review` starts, and read its verdict once the
+review has converged — before `pnpm josh bump minor`, and never inside `pnpm josh gate`.** Two
+reasons keep it out of the gate, each sufficient: the gate re-runs on every fix round and on every
+`epicrun` child, and one `josh eval` is five real Claude sessions; and the review rewrites the very
+prose being measured, so a verdict *read* before the review converges is a verdict about a draft.
+
+**The two overlap because neither writes.** `/code-review` and `josh eval` both only read the working
+tree — a review's fixes are applied after it reports — so the suite's wall-clock hides inside the
+review's instead of following it (joshuafolkken/kit#1152). Measured on the loop this shipped in,
+`josh eval` was the longest remaining serial stretch of the gate: `pnpm josh gate` is 17s and already
+concurrent, CI is 95–120s and already parallel, and the suite alone runs 100s and up.
+
+**What the overlap costs is certainty, and that is bought back mechanically.** `josh eval` measures
+the documents as they stood when it started. If the review then edited a measured path, the verdict
+describes a tree that no longer exists — **a stale result is never reported**. Ask, once the review
+has converged:
+
+```bash
+pnpm josh eval:scope --since-eval   # → required | skip ; the reason on stderr
+```
+
+| Answer     | What it means                                                                             | What to do                                           |
+| ---------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `skip`     | the review changed nothing the scenarios can see                                          | the concurrent verdict stands — read it and go on    |
+| `required` | the review edited a measured path, **or there is no record of what a run measured**       | run `pnpm josh eval` again and read *that* verdict    |
+
+**The question is asked of the review's own diff, not the branch's.** `josh eval` writes the record
+before its first session, so the comparison is against exactly the tree those scenarios read; the
+reason line names when it was taken, which is how a record left by some other loop shows itself. The
+plain `pnpm josh eval:scope` still asks about the branch — the two are different questions, and
+`--staged` alongside `--since-eval` is refused rather than resolved. **Only a whole-suite run writes
+the record**, so the named re-runs a `blocked` verdict asks for below leave it alone rather than
+letting one scenario stand in for the suite.
+
+**The common answer is `skip`.** A review that lands no high/medium finding changes nothing at all,
+and that is the case this placement is for.
+
+**Only *when* the measurement is taken changes; what a verdict does does not.** `blocked` still stops
+the merge and is still attributed before it does, `unmeasured` still does not block and is still
+reported, and the verdict is still the run's last line rather than its exit code. The rule that
+outranks the saving is unchanged too: **never report as green a run you did not see hold** — a
+concurrent run's output is read in full before its verdict is treated as an answer.
+
+A serial run remains correct, only slower: starting the suite after the review has converged and
+skipping the `--since-eval` question measures the same tree.
 
 `halfrun` reaches the same point — the measurement runs inside its gate, before the stop.
 

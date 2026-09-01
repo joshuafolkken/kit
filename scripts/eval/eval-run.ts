@@ -8,6 +8,7 @@ import { eval_runner, type RunnerDependencies } from './eval-runner'
 import { eval_sandbox } from './eval-sandbox'
 import { eval_scenario, type Scenario } from './eval-scenario'
 import { eval_session } from './eval-session'
+import { eval_stamp } from './eval-stamp'
 import { eval_transcript } from './eval-transcript'
 
 // `pnpm josh eval [name...]`. Deliberately not wired into CI: every scenario is a real Claude
@@ -95,6 +96,19 @@ function report_startup_problem(message: string): boolean {
 // Returns the exit state rather than setting it: assigning `process.exitCode` after an await is a
 // write to shared state from a point where nothing guarantees the process is still the one that
 // started the run, and the lint rule that says so is right.
+// Recorded before the first session starts, so a `/code-review` running alongside can afterwards be
+// checked against exactly the tree the suite read (joshuafolkken/kit#1152). Best-effort on
+// purpose: a record that could not be written leaves `josh eval:scope --since-eval` with nothing,
+// which answers `required` — measure again rather than trust a result nothing vouches for. Failing
+// the run instead would turn a temp-directory problem into a lost measurement.
+function record_measured_tree(): void {
+	try {
+		eval_stamp.write_stamp()
+	} catch (error) {
+		console.error(`Could not record what this run measures: ${String(error)}`)
+	}
+}
+
 async function run_selection(
 	chosen: ReadonlyArray<Scenario>,
 	concurrency: number,
@@ -126,6 +140,13 @@ async function main(): Promise<boolean> {
 	const unknown = unknown_scenarios(names, scenarios)
 
 	if (unknown !== undefined) return report_startup_problem(unknown)
+
+	// **Only a whole-suite run leaves a record.** A named re-run — what a `blocked` verdict asks for —
+	// would otherwise overwrite the record with a newer timestamp and the tree as it is now, and
+	// `--since-eval` would then compare that tree against itself and answer `skip`: a one-scenario
+	// reading standing in for the suite's measurement. The record says what the suite measured, so it
+	// is written only where the suite is what ran.
+	if (names.length === 0) record_measured_tree()
 
 	return await run_selection(selected(scenarios, names), choice.limit)
 }
