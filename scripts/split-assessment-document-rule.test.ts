@@ -19,11 +19,17 @@ const ENTRY_SKILLS: ReadonlyArray<string> = [`${SKILL_ROOT}/kickoff.md`, FULLRUN
 // command has started, so a document that restated it was spending always-loaded budget on a
 // procedure no turn outside a run reads. What the documents still owe is the routing — the rule is
 // named, and the run is sent to the one definition — and that is all these markers pin.
+//
+// joshuafolkken/kit#1178: the canonical topic file's Japanese section title used to be a marker here,
+// because the resident text named that file as the "Canonical reference". It is a pointer now, and a
+// citation names the file the body is in — so what the resident text owes is the skill path and the
+// reason it is cited directly. The negative half (the pointer is cited by nothing) is mechanical and
+// lives in `pointer-citation-document-rule.test.ts`, which covers every converted topic at once.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'Three rules decide what a run does when the work turns out not to be one Issue',
 	'the split assessment every entry point applies identically',
 	SHARED_FILE,
-	'分割判定は全入口で共通',
+	'its single source, cited directly because the canonical topic file is now a pointer to it',
 ]
 
 // The entry file summarizes the rule for a run that has loaded the skill but not yet opened the
