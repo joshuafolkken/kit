@@ -197,3 +197,35 @@ describe('epicrun hoists josh latest out of the child loop', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#1139: the stale-`in-progress` paragraph counts the states that legitimately hold
+// the label, and the sentence right after it is the whole instruction — a dirty tree means the hold
+// is real, so leave the label alone. joshuafolkken/kit#1125 added a third state and left that
+// sentence saying `Both`, which reads the `needs-human-review` stop straight out of the instruction.
+// That state waits on a person reading an artifact, so it is the one most likely to outlast the
+// 90-minute window and the one that must not be stripped. The count and the sentence have to move
+// together, in both documents.
+const STALE_HOLDER_SKILL_MARKERS: ReadonlyArray<string> = [
+	'three ordinary states hold the label legitimately for longer than that',
+	'a child stopped by `needs-human-review`',
+	'**All three leave uncommitted work in the checkout**',
+	'the `needs-human-review` stop by specification, since it commits nothing and stashes nothing',
+]
+
+const STALE_HOLDER_CANONICAL_MARKERS: ReadonlyArray<string> = [
+	'90 分を超えて正当に保持される状態が 3 つある',
+	'`needs-human-review` で停止した子である',
+	'**3 つとも**チェックアウトに未コミットの作業を残す',
+	'`needs-human-review` の停止は仕様としてコミットも stash もしないためである',
+]
+
+describe('the stale-in-progress rule covers every state that holds the label', () => {
+	it.each([
+		[SKILL, STALE_HOLDER_SKILL_MARKERS],
+		[WORKFLOW_PROMPT, STALE_HOLDER_CANONICAL_MARKERS],
+	])('names all three of them in %s', (document_name, markers) => {
+		const content = read_unwrapped(document_name)
+
+		for (const marker of markers) expect(content).toContain(marker)
+	})
+})
