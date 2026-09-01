@@ -80,13 +80,14 @@ describe('the workflow-command filing copies name their route label', () => {
 // The canonical extended references must agree with the skill copies above (each of those files
 // declares that the two must match). Wiring only the operational layer would leave the declared
 // source of truth saying children and prerequisites file unlabeled — the same drift in mirror image.
-// The bare-issue epicrun path and the split assessment are the canonical filing sites; pin the
-// labels they name so the canonical and operational layers cannot diverge (joshuafolkken/kit#1083).
+// The bare-issue epicrun path is a canonical filing site; pin the labels it names so the canonical
+// and operational layers cannot diverge (joshuafolkken/kit#1083). The split assessment is the
+// exception: joshuafolkken/kit#1174 single-sourced its body into the skill, so only the skill copy
+// carries the filing command and the canonical topic file is a pointer with none of its own.
 const WORKFLOW_ROOT = 'prompts/collaboration-workflow'
 const CANONICAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [
 	{ doc: `${WORKFLOW_ROOT}/epicrun.md`, label: SPLIT_ROUTE_LABEL },
 	{ doc: `${WORKFLOW_ROOT}/epicrun.md`, label: TIER_A_ROUTE_LABEL },
-	{ doc: `${WORKFLOW_ROOT}/split-assessment.md`, label: SPLIT_ROUTE_LABEL },
 	{ doc: `${SKILL_ROOT}/split-assessment.md`, label: SPLIT_ROUTE_LABEL },
 ]
 

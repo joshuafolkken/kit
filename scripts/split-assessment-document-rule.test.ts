@@ -33,11 +33,14 @@ const ENTRY_MARKERS: ReadonlyArray<string> = [
 	'Two or more separately-mergeable deliverables always means an epic — no count threshold, no ordering condition',
 ]
 
-const CANONICAL_MARKERS: ReadonlyArray<string> = [
+// joshuafolkken/kit#1174: the rule body is single-sourced into the skill and the canonical topic
+// file is a pointer to it. The pointer test names the source; the body test proves the Japanese full
+// copy that used to live here — the clone this issue removed — has not crept back.
+const CANONICAL_POINTER_FILE = 'prompts/collaboration-workflow/split-assessment.md'
+const CANONICAL_POINTER_MARKERS: ReadonlyArray<string> = [SHARED, 'クローン禁止・単一ソース化']
+const REMOVED_BODY_MARKERS: ReadonlyArray<string> = [
 	'2 件以上に分割したら常に epic を作る。件数の閾値も、実行順序の有無による分岐も無い',
 	'入口ごとに条件が違う状態は欠陥である',
-	'承認範囲の拡大が人の知らないところで起きる',
-	'`kickoff epic` というキーワードは作らない',
 ]
 
 const SHARED_MARKERS: ReadonlyArray<string> = [
@@ -50,6 +53,10 @@ const SHARED_MARKERS: ReadonlyArray<string> = [
 	'--promote',
 	'Finding a split mid-run stops the run',
 	'There is no `kickoff epic`',
+	// joshuafolkken/kit#1174 folded the canonical-only #873 note in when the body was single-sourced,
+	// so the single source now carries it too.
+	'Issues filed separately, found related later',
+	'joshuafolkken/kit#873',
 ]
 
 describe('split assessment', () => {
@@ -65,10 +72,16 @@ describe('split assessment', () => {
 		for (const marker of ENTRY_MARKERS) expect(content).toContain(marker)
 	})
 
-	it('has a canonical section in the workflow prompt', () => {
-		const content = read_unwrapped(WORKFLOW_PROMPT)
+	it('points the canonical topic file at the skill single source', () => {
+		const content = read_unwrapped(CANONICAL_POINTER_FILE)
 
-		for (const marker of CANONICAL_MARKERS) expect(content).toContain(marker)
+		for (const marker of CANONICAL_POINTER_MARKERS) expect(content).toContain(marker)
+	})
+
+	it('does not duplicate the rule body in the canonical topic file', () => {
+		const content = read_unwrapped(CANONICAL_POINTER_FILE)
+
+		for (const marker of REMOVED_BODY_MARKERS) expect(content).not.toContain(marker)
 	})
 
 	it('carries one shared definition in the skill', () => {
