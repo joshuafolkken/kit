@@ -189,13 +189,6 @@ function missing_rows(body: string, expected: ReadonlyArray<number>): Array<numb
 	return expected.filter((issue_number) => !tracked.includes(issue_number))
 }
 
-function has_machine_readable_dependencies(body: string): boolean {
-	return (
-		git_epic_parse.has_declared_dependency_chain(body) ||
-		git_epic_parse.has_unordered_declaration(body)
-	)
-}
-
 // The three things `epic:check` and `epic:next` read, verified against the body that would be
 // written. Every failure here means the rewrite could not express the insertion, which is reported
 // rather than written — a body that half-expresses it is exactly the state that stops a run.
@@ -206,8 +199,8 @@ function find_rewrite_error(body: string, input: RewriteInput): string | undefin
 		return `The rewritten body would not track ${format_issue_references(missing)} as a task-list row.`
 	}
 
-	if (!has_machine_readable_dependencies(body)) {
-		return 'The rewritten body would carry no machine-readable `Dependencies` declaration.'
+	if (!git_epic_parse.has_machine_readable_declaration(body)) {
+		return 'The rewritten body would carry no unambiguous machine-readable `Dependencies` declaration.'
 	}
 
 	if (!has_intended_links(body, input.chains_after)) {

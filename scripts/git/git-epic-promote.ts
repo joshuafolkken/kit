@@ -61,16 +61,32 @@ function build_promoted_body(input: PromoteInput): string {
 	return [existing, '', PROMOTED_HEADING, '', epic_sections, ''].join('\n').trimStart()
 }
 
-// Whether the promoted body satisfies what `epic:check` reads: a task list of children, and a
-// machine-readable `Dependencies` declaration. The label is applied separately by the caller.
-function is_tracking_complete(body: string, children: ReadonlyArray<number>): boolean {
-	const tracked = git_epic_parse.parse_task_list_issue_numbers(body)
-	const has_all = children.every((child) => tracked.includes(child))
-	const has_dependencies =
-		git_epic_parse.has_declared_dependency_chain(body) ||
-		git_epic_parse.has_unordered_declaration(body)
+// Why the promoted body would not satisfy what `epic:check` reads — a task list of children and an
+// unambiguous machine-readable `Dependencies` declaration — or `undefined` when it would. The label
+// is applied separately by the caller.
+//
+// The two causes are named apart because they need different actions and only one of them is about
+// the children: a declaration-shaped line already present in the issue being promoted is carried
+// into the epic verbatim, and an unordered promotion then adds the `None — ...` literal beside it,
+// so the body would declare an order and declare that there is none. Reported as "does not track
+// every child", that state left nothing to act on (joshuafolkken/kit#1155).
+function declaration_error(body: string): string | undefined {
+	const state = git_epic_parse.read_declaration(body)
+	if (git_epic_parse.is_declaration_readable(state)) return undefined
 
-	return has_all && has_dependencies
+	return state.has_chain
+		? 'The promoted body would declare an order and declare that there is none: the issue being promoted already carries a line that is only a chain (`#N -> #M`), and it contradicts the `Dependencies` section written for the epic. Reword that line first; nothing was written.'
+		: 'The promoted body would carry no machine-readable `Dependencies` declaration; nothing was written.'
+}
+
+function find_tracking_error(body: string, children: ReadonlyArray<number>): string | undefined {
+	const tracked = git_epic_parse.parse_task_list_issue_numbers(body)
+
+	if (children.some((child) => !tracked.includes(child))) {
+		return 'The promoted body would not track every child; nothing was written.'
+	}
+
+	return declaration_error(body)
 }
 
 const git_epic_promote = {
@@ -79,7 +95,7 @@ const git_epic_promote = {
 	has_conflicting_tracking,
 	conflict_reason,
 	build_promoted_body,
-	is_tracking_complete,
+	find_tracking_error,
 }
 
 export type { PromoteInput }

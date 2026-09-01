@@ -38,19 +38,10 @@ function format_links(links: ReadonlyArray<DependencyLink>): string {
 	return links.map((link) => format_dependency_link(link)).join(', ')
 }
 
-// Whether the body carries a declaration an insertion can be relative to. Split from the checks
-// below so each stays one question.
-function has_declaration(body: string | undefined): boolean {
-	return (
-		git_epic_parse.has_declared_dependency_chain(body) ||
-		git_epic_parse.has_unordered_declaration(body)
-	)
-}
-
 function missing_declaration_error(epic_number: number): string {
 	const check = `josh epic:check ${String(epic_number)}`
 
-	return `${to_issue_reference(epic_number)} has no machine-readable \`Dependencies\` declaration; run \`${check}\` first.`
+	return `${to_issue_reference(epic_number)} has no unambiguous machine-readable \`Dependencies\` declaration; run \`${check}\` first.`
 }
 
 // What to do about a target that is not an epic. The refusal is deliberate — this command never
@@ -92,7 +83,10 @@ function find_subject_error(input: PlanInput, tracked: ReadonlyArray<number>): s
 		return `${reference} tracks no child as a \`- [ ] #N\` row; there is nowhere to add one.`
 	}
 
-	return has_declaration(input.body) ? undefined : missing_declaration_error(input.epic_number)
+	// A declaration an insertion can be relative to: exactly one of the two machine-readable forms.
+	return git_epic_parse.has_machine_readable_declaration(input.body)
+		? undefined
+		: missing_declaration_error(input.epic_number)
 }
 
 // The requested children minus the ones there is nothing to do for. The epic itself is dropped
