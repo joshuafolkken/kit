@@ -562,8 +562,7 @@ per-repository exclusion so a parked child releases the checkout; this label del
 because releasing it would start the next child on top of uncommitted work.
 
 **Never apply or remove the label** — `auto-ok`'s rule, at `auto-ok`'s strength. Full definition and
-the `needs-decision` comparison: `SKILL.md` → §2z (canonical:
-`prompts/collaboration-workflow/human-review-label.md`).
+the `needs-decision` comparison: `SKILL.md` → §2z, which is the single source.
 
 ## park and continue
 
