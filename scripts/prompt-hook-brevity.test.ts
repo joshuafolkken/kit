@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { prompt_hooks } from './prompt-hooks'
 
 // The `UserPromptSubmit` hooks are injected into the conversation on **every user turn**, and what
 // is injected is then re-read as accumulated context on every turn after it. joshuafolkken/kit#967
@@ -50,24 +51,11 @@ const REQUIRED_DIRECTIVES: ReadonlyArray<string> = [
 
 const SETTINGS_PATH = fileURLToPath(new URL('../.claude/settings.json', import.meta.url))
 
-interface HookHandler {
-	command: string
-}
-
-interface HookMatcher {
-	hooks: ReadonlyArray<HookHandler>
-}
-
-interface SettingsShape {
-	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code hook event name
-	hooks: { UserPromptSubmit?: ReadonlyArray<HookMatcher> }
-}
-
+// Read through the same parser `josh cost` prices these with (joshuafolkken/kit#1151). A ceiling
+// and a report that disagreed about what "the injected text" is would guard one quantity and print
+// another.
 function prompt_hook_commands(): ReadonlyArray<string> {
-	const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8')) as SettingsShape
-	const matchers = settings.hooks.UserPromptSubmit ?? []
-
-	return matchers.flatMap((matcher) => matcher.hooks.map((hook) => hook.command))
+	return prompt_hooks.user_prompt_hook_commands(readFileSync(SETTINGS_PATH, 'utf8'))
 }
 
 function injected_text(): string {

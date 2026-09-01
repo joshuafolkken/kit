@@ -1,4 +1,6 @@
+import { cost_composition, type Composition } from './cost-composition'
 import { cost_pricing, type ModelCost } from './cost-pricing'
+import { cost_resident, type ResidentBreakdown } from './cost-resident'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 
 // Turning per-request usage into the report a person reads and joshuafolkken/kit#921 cites
@@ -55,6 +57,15 @@ interface MissingData {
 	unreadable_sessions: number
 }
 
+// The two decompositions joshuafolkken/kit#1151 added, carried together because they answer the two
+// halves of one question: the resident preamble is made of these parts, and the history is made of
+// those. Present only on a whole-session scope — both are read from one transcript's own lines, and
+// an issue's slice or a `--all` corpus has no single session to read.
+interface Measurement {
+	resident: ResidentBreakdown
+	composition: Composition
+}
+
 interface CostReport {
 	scope: string
 	request_count: number
@@ -65,6 +76,7 @@ interface CostReport {
 	unpriced_models: Array<string>
 	breakdown: InputBreakdown
 	missing: MissingData
+	measurement?: Measurement
 }
 
 interface ReportInput {
@@ -72,6 +84,13 @@ interface ReportInput {
 	records: ReadonlyArray<UsageRecord>
 	missing: MissingData
 	resident_billed_tokens: number
+	measurement?: Measurement
+}
+
+// `exactOptionalPropertyTypes` rejects `{ measurement: undefined }`, so an absent measurement
+// contributes no key at all — the same idiom the CLI's optional flags use.
+function optional_measurement(measurement: Measurement | undefined): { measurement?: Measurement } {
+	return measurement === undefined ? {} : { measurement }
 }
 
 function build_report(input: ReportInput): CostReport {
@@ -87,6 +106,7 @@ function build_report(input: ReportInput): CostReport {
 		unpriced_models: unpriced,
 		breakdown: build_breakdown(input.records, input.resident_billed_tokens),
 		missing: input.missing,
+		...optional_measurement(input.measurement),
 	}
 }
 
@@ -147,6 +167,20 @@ function missing_lines(missing: MissingData): Array<string> {
 	return rows.length === 0 ? [] : ['', 'Missing data (not counted above):', ...rows]
 }
 
+// The two decompositions, and the one sentence that keeps them readable. Printing a table of
+// estimates beside a measured total without saying which is which is how an estimate becomes a
+// figure someone later quotes as measured.
+function measurement_lines(measurement: Measurement | undefined): Array<string> {
+	if (measurement === undefined) return []
+
+	return [
+		'',
+		...cost_resident.format_resident(measurement.resident),
+		'',
+		...cost_composition.format_composition(measurement.composition),
+	]
+}
+
 function unpriced_lines(models: ReadonlyArray<string>): Array<string> {
 	if (models.length === 0) return []
 
@@ -191,6 +225,7 @@ function format_report(report: CostReport): string {
 		'',
 		'Cost by model:',
 		...model_lines(report.by_model),
+		...measurement_lines(report.measurement),
 		...unpriced_lines(report.unpriced_models),
 		...missing_lines(report.missing),
 	].join('\n')
@@ -206,5 +241,5 @@ const cost_report = {
 	format_report,
 }
 
-export type { CostReport, InputBreakdown, MissingData, ReportInput }
+export type { CostReport, InputBreakdown, Measurement, MissingData, ReportInput }
 export { cost_report }

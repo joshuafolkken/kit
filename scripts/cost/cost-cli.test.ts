@@ -18,13 +18,38 @@ const BAD_FLAG = '--nonsense'
 const NO_TRANSCRIPTS = 'No transcripts found'
 const ONE_REQUEST_FOR_962 = 'issue #962 — 1 request(s)'
 const ISSUE_NUMBER = '962'
+const MODEL = 'claude-opus-5'
+const ALL_FLAG = '--all'
+const RESIDENT_HEADING = 'Resident breakdown'
+const COMPOSITION_HEADING = 'Context composition'
+const THINKING_TOKENS = 7
 
 function usage_line(request_id: string, branch: string, output_tokens: number): string {
 	return JSON.stringify({
 		type: 'assistant',
 		requestId: request_id,
 		gitBranch: branch,
-		message: { model: 'claude-opus-5', usage: { input_tokens: 1, output_tokens } },
+		message: { model: MODEL, usage: { input_tokens: 1, output_tokens } },
+	})
+}
+
+// A line carrying both a usage block and content, which is what the two decompositions read
+// (joshuafolkken/kit#1151). `usage_line` deliberately carries no content, so the older suites keep
+// exercising the usage reader on its own.
+function content_line(command: string): string {
+	return JSON.stringify({
+		type: 'assistant',
+		requestId: 'r2',
+		gitBranch: ISSUE_BRANCH,
+		message: {
+			model: MODEL,
+			usage: {
+				input_tokens: 1,
+				output_tokens: 5,
+				output_tokens_details: { thinking_tokens: THINKING_TOKENS },
+			},
+			content: [{ type: 'tool_use', name: 'Bash', input: { command } }],
+		},
 	})
 }
 
@@ -72,6 +97,20 @@ function output(): string {
 
 function stdout(): string {
 	return state.out.join('\n')
+}
+
+function write_populated(): void {
+	write_session(SESSION_A, [usage_line('r1', MAIN, 10), content_line('git status --short')])
+}
+
+interface JsonReport {
+	measurement?: { composition: { rows: Array<{ category: string; tokens: number }> } }
+}
+
+function thinking_row(json: string): { tokens: number } | undefined {
+	const [report] = JSON.parse(json) as Array<JsonReport>
+
+	return report?.measurement?.composition.rows.find((row) => row.category === 'thinking')
 }
 
 describe('josh cost registration', () => {
@@ -283,7 +322,7 @@ describe('cost_cli.per_request_cost', () => {
 	it('divides the billed input by the requests that paid for it', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10), usage_line('r2', MAIN, 10)])
 		const corpus = cost_cli.load_corpus(CWD)
-		const reports = cost_cli.build_reports({ is_all: false, is_json: false }, corpus)
+		const reports = cost_cli.build_reports({ is_all: false, is_json: false }, corpus, CWD)
 		const [report] = reports ?? []
 
 		expect(report).toBeDefined()
@@ -300,6 +339,49 @@ describe('cost_cli.per_request_cost', () => {
 		}
 
 		expect(cost_cli.per_request_cost(empty as never)).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#1151. Both decompositions are read from one transcript's own lines, so they
+// belong to the whole-session scope and to no other — an issue's slice and a `--all` corpus have no
+// single session to read them from.
+describe('cost_cli.run — the resident and context decompositions', () => {
+	it('prints both on the session scope', () => {
+		write_populated()
+
+		expect(cost_cli.run([], CWD)).toBe(0)
+		expect(output()).toContain(RESIDENT_HEADING)
+		expect(output()).toContain(COMPOSITION_HEADING)
+	})
+
+	// The half another run consumes: joshuafolkken/kit#1159 has to read the Bash command-body share
+	// from here rather than write its own script.
+	it('carries them in --json under measurement', () => {
+		write_populated()
+		cost_cli.run(['--json'], CWD)
+
+		const thinking = thinking_row(stdout())
+
+		expect(thinking?.tokens).toBe(THINKING_TOKENS)
+	})
+
+	// A breakdown against a baseline of 0 is a table of estimates beside a measurement that was never
+	// made — "this could not be read" dressed as a reading.
+	it('omits them for a session with no readable request', () => {
+		write_session(SESSION_A, [BAD_LINE])
+		cost_cli.run(['--json'], CWD)
+
+		expect(thinking_row(stdout())).toBeUndefined()
+	})
+
+	it.each([[ALL_FLAG], [ISSUE_FLAG]])('omits them from the %s scope', (flag) => {
+		write_populated()
+
+		const argv = flag === ALL_FLAG ? [ALL_FLAG] : [ISSUE_FLAG, ISSUE_NUMBER]
+
+		expect(cost_cli.run(argv, CWD)).toBe(0)
+		expect(output()).not.toContain(RESIDENT_HEADING)
+		expect(output()).not.toContain(COMPOSITION_HEADING)
 	})
 })
 

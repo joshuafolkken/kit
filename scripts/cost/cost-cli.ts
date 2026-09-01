@@ -2,9 +2,12 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { cost_attribute } from './cost-attribute'
-import { cost_report, type CostReport, type MissingData } from './cost-report'
-import { cost_transcript, type SessionUsage } from './cost-transcript'
-import type { UsageRecord } from './cost-usage'
+import { cost_blocks } from './cost-blocks'
+import { cost_composition } from './cost-composition'
+import { cost_report, type CostReport, type Measurement, type MissingData } from './cost-report'
+import { cost_resident } from './cost-resident'
+import { cost_transcript, type SessionFile, type SessionUsage } from './cost-transcript'
+import { cost_usage, type UsageRecord } from './cost-usage'
 
 // `josh cost` — what a run actually spent, read from Claude Code's own session transcripts
 // (joshuafolkken/kit#962).
@@ -146,6 +149,11 @@ function scope_label(key: number): string {
 
 interface Corpus {
 	sessions: Array<SessionUsage>
+	// Kept beside the sessions so the whole-session scope can re-read its transcript for the two
+	// decompositions (joshuafolkken/kit#1151). Parsed lazily and only for that one file: classifying
+	// the content blocks of all 158 transcripts to print one issue's cost would be work nothing
+	// reads.
+	files: Array<SessionFile>
 	missing: MissingData
 }
 
@@ -165,7 +173,35 @@ function load_corpus(cwd: string, session_id?: string): Corpus {
 		session_id === undefined ? files : files.filter((file) => file.session_id === session_id)
 	const sessions = wanted.map((file) => cost_transcript.read_session(file))
 
-	return { sessions, missing: accumulate_missing(sessions) }
+	return { sessions, files: wanted, missing: accumulate_missing(sessions) }
+}
+
+// The resident and context decompositions for one whole session. Built here rather than in
+// `build_report` because only this scope has a transcript file to read them from.
+function build_measurement(cwd: string, file: SessionFile, session: SessionUsage): Measurement {
+	const blocks = cost_blocks.parse_content(cost_transcript.read_raw(file))
+
+	return {
+		resident: cost_resident.build(cwd, session.baseline_tokens),
+		composition: cost_composition.build(
+			blocks,
+			cost_usage.sum_totals(session.records).thinking_tokens,
+		),
+	}
+}
+
+// A session with no readable request has a baseline of 0, and a breakdown against a baseline of 0
+// is a table of estimates beside a measurement that was never made — "this could not be read"
+// dressed as a reading. The text report already says so through `format_empty`; this keeps `--json`
+// from saying otherwise.
+function optional_measurement(
+	cwd: string,
+	file: SessionFile,
+	session: SessionUsage,
+): { measurement?: Measurement } {
+	if (session.records.length === 0) return {}
+
+	return { measurement: build_measurement(cwd, file, session) }
 }
 
 // One session — the newest by default, which is "the run that just finished".
@@ -173,16 +209,18 @@ function load_corpus(cwd: string, session_id?: string): Corpus {
 // Its missing counts are the session's own, never the corpus's. A malformed line in some unrelated
 // session is not missing data about *this* one, and reporting it as such attributes a defect to the
 // wrong run — the same misreading, one level up, that this command exists to stop.
-function report_session(corpus: Corpus): CostReport | undefined {
+function report_session(corpus: Corpus, cwd: string): CostReport | undefined {
 	const [session] = corpus.sessions
+	const [file] = corpus.files
 
-	if (session === undefined) return undefined
+	if (session === undefined || file === undefined) return undefined
 
 	return cost_report.build_report({
 		scope: `session ${session.session_id}`,
 		records: session.records,
 		missing: accumulate_missing([session]),
 		resident_billed_tokens: session.baseline_tokens * session.records.length,
+		...optional_measurement(cwd, file, session),
 	})
 }
 
@@ -291,12 +329,16 @@ function report_all(corpus: Corpus): Array<CostReport> {
 // The empty check is made once, for every scope. `--all` and `--issue` used to answer an absent
 // transcript directory with an empty listing and a zero-cost issue — exit 0 either way, which is
 // exactly the silent zero this command exists to remove.
-function build_reports(options: Options, corpus: Corpus): Array<CostReport> | undefined {
+function build_reports(
+	options: Options,
+	corpus: Corpus,
+	cwd: string,
+): Array<CostReport> | undefined {
 	if (corpus.sessions.length === 0) return undefined
 	if (options.is_all) return report_all(corpus)
 	if (options.issue !== undefined) return [report_issue(corpus, options.issue)]
 
-	const single = report_session(corpus)
+	const single = report_session(corpus, cwd)
 
 	return single === undefined ? undefined : [single]
 }
@@ -368,7 +410,7 @@ function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
 		return FAILURE_EXIT_CODE
 	}
 
-	const reports = build_reports(options, load_corpus(cwd, options.session))
+	const reports = build_reports(options, load_corpus(cwd, options.session), cwd)
 
 	if (reports === undefined) return report_empty(cwd, options.session)
 	if (options.over !== undefined) return report_over(reports, options.over)
