@@ -5,13 +5,14 @@ import {
 	read_repo_file,
 	read_unwrapped,
 	read_unwrapped_rule_surface,
-	WORKFLOW_PROMPT,
 } from './ai-document-fixture'
 import { package_file } from './skill-fixture'
 
 const SCRIPTS_ROOT = 'scripts'
 const LABEL_MODULE = 'scripts/git/issue-labels.ts'
 const LABEL_LITERAL = "'needs-human-review'"
+const CANONICAL = 'prompts/collaboration-workflow/human-review-label.md'
+const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 
 // joshuafolkken/kit#1125: the label's whole value is in four prohibitions and one distinction, and a
 // document that keeps the label and loses any of them is worse than not having it. Lose "commit
@@ -19,6 +20,13 @@ const LABEL_LITERAL = "'needs-human-review'"
 // lose "do not stash" and the work a person is meant to look at is hidden; lose "only a person
 // applies it" and an unattended run clears its own mark. Lose the `needs-decision` distinction and
 // somebody parks the issue instead, which means it is never implemented at all.
+//
+// joshuafolkken/kit#1184: the rule body is single-sourced into the skill and the canonical topic file
+// is now a pointer to it (the joshuafolkken/kit#1174 pattern, rolled out under
+// joshuafolkken/kit#1176). The canonical was formerly a Japanese full copy asserted here beside the
+// rule surface, marker for marker; those paired assertions become surface-only ones, plus the
+// folded-in suite that pins what the canonical alone used to carry and the pointer suite at the
+// bottom.
 
 const SURFACE_MARKERS: ReadonlyArray<string> = [
 	'`needs-human-review`',
@@ -49,22 +57,12 @@ const SURFACE_MARKERS: ReadonlyArray<string> = [
 	// The check has to happen before implementation; the post-return confirmation is too late.
 	'Ask once, before implementing',
 	'Leave `in-progress` **on**',
-]
-
-const CANONICAL_MARKERS: ReadonlyArray<string> = [
-	'成果物を人が見るまで出荷させない',
-	'コミット・push・PR 作成・マージのいずれも行わない',
-	'作業ツリーは未コミットのまま残す',
-	'run 全体を停止する',
-	'止まることは失敗ではなく仕様である',
-	'AI は付与も削除もしてはならない',
-	// The comparison table's decisive row: a parked child releases the checkout, this one must not.
-	'リポジトリを保持するか',
-	// Why the batch-preserving option was rejected — the reason is the requirement, not a preference.
-	'「人が選ぶ」を満たさない',
-	// The E2E gate has no pull request to close it here.
-	'E2E は自分で `pnpm josh test:e2e` を回して閉じる',
-	'判定はコマンドの出力から読む（文字列を目で合わせない）',
+	// A batch that halts on its first such issue is the intended end, not a run that broke. Read the
+	// other way, the next reader removes the stop to keep the batch moving.
+	'Stopping is the specification, not a failure',
+	// The label is a person's to create as well as to apply, so the command belongs in the single
+	// source rather than only in `docs/`, which a consumer does not receive.
+	'-f name=needs-human-review -f color=d93f0b',
 ]
 
 describe('the human-review label rule reaches the rule surface', () => {
@@ -73,9 +71,56 @@ describe('the human-review label rule reaches the rule surface', () => {
 	})
 })
 
-describe('the canonical reference carries the rule in full', () => {
-	it.each(CANONICAL_MARKERS)('states %s', (marker) => {
-		expect(read_unwrapped(WORKFLOW_PROMPT)).toContain(marker)
+// What the canonical alone used to carry. `SKILL.md` → "Trimming is moving, never deleting.": each
+// of these had to exist in the single source before the Japanese full copy was cut, so they are
+// pinned by name rather than left to be noticed missing later.
+describe(`${SKILL} — carries what only the canonical used to give`, () => {
+	const unwrapped = read_unwrapped(SKILL)
+
+	// Why the label was filed at all, and the two shapes of work it was filed for. Dropped, the label
+	// reads as a mood — "stop when it feels important" — rather than as the one requirement no test
+	// can stand in for.
+	it('names the origin and the two kinds of work it was filed for', () => {
+		expect(unwrapped).toContain('joshuafolkken/kit#1125')
+		expect(unwrapped).toContain("some work's quality is not something a test can judge")
+		expect(unwrapped).toContain('published artifact')
+		expect(unwrapped).toContain("a choice that was a person's to make")
+	})
+
+	// Each of the three things somebody reaches for instead, and why each fails. Without them the
+	// next reader re-derives the wrong one — and `needs-decision` is the wrong one that looks right.
+	it('says why every already-available means fails', () => {
+		expect(unwrapped).toContain('Pre-applying `needs-decision` is worse than useless')
+		expect(unwrapped).toContain('carries no force')
+		expect(unwrapped).toContain('Withholding `auto-ok` does nothing whatever')
+	})
+
+	// The batch-preserving alternative was the early recommendation, so its rejection is the part a
+	// reader is most likely to want to reopen. Both arms of the requirement, and both rejected cases.
+	it('records the alternatives that were rejected and what each one failed', () => {
+		expect(unwrapped).toContain('Opening the pull request and leaving it unmerged')
+		expect(unwrapped).toContain('changes from **choosing** to reverting what was chosen')
+		expect(unwrapped).toContain('thirteen children, thirteen stashes')
+	})
+
+	// joshuafolkken/kit#1132's reason, not merely its instruction: an agent told to run the command
+	// without being told what an eye-match misses will fall back to the eye the first time the
+	// command is inconvenient.
+	it('gives the spelling reason behind reading the command output', () => {
+		expect(unwrapped).toContain('GitHub keeps the spelling a label was created with')
+		expect(unwrapped).toContain('joshuafolkken/kit#1132')
+	})
+
+	// Both halves of the `needs-decision` distinction as the code encodes them. Named as the two sets
+	// the label is kept *out* of, because that is the shape a reader has to check the code against.
+	it('names the two sets the label is deliberately kept out of', () => {
+		expect(unwrapped).toContain('NOT_DIRECTLY_RUNNABLE_LABELS')
+		expect(unwrapped).toContain('keeps it out of the parked set')
+	})
+
+	// The stop is only half an instruction without the way back out of it.
+	it('says how the stop is resumed', () => {
+		expect(unwrapped).toContain("Resuming is `halfrun`'s stop exactly")
 	})
 })
 
@@ -105,5 +150,45 @@ describe('the label is single-sourced rather than typed into prose', () => {
 			.filter((path) => read_repo_file(path).includes(LABEL_LITERAL))
 
 		expect(offenders).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#1184: the canonical topic file is a pointer to the skill single source, not a
+// second copy. The pointer test names the source; the body test proves the Japanese full copy that
+// used to live here — asserted marker for marker above until this rollout — has not crept back.
+describe('the canonical topic file is a pointer to the skill single source', () => {
+	const POINTER_MARKERS: ReadonlyArray<string> = [SKILL, 'クローン禁止・単一ソース化']
+	// One marker per section the Japanese body used to carry, not merely a couple. The generic size
+	// check in `pointer-citation-document-rule.test.ts` compares this pointer against the whole of
+	// `SKILL.md`, so a single paragraph creeping back would stay far under it and pass — the
+	// paragraph-level guard has to live here.
+	const REMOVED_BODY_MARKERS: ReadonlyArray<string> = [
+		'成果物の良し悪しは機械では測れない',
+		'候補画像からの採用決定など',
+		'Issue 本文に「`halfrun` で実行すること」と書いても強制力が無く',
+		'検討した 3 案のうち',
+		'子が 13 件なら stash も 13 個になる',
+		'最後の行が最も重要である',
+		'理由は綴りである',
+		'自分で外せる印は印として機能せず',
+		'ラベルはリポジトリごとに一度作る',
+	]
+
+	const pointer = read_unwrapped(CANONICAL)
+
+	// Named per marker rather than looped inside one case: a failure has to say which marker went
+	// missing, not only that the first one did.
+	it.each(POINTER_MARKERS)('names the skill as the single source: %j', (marker) => {
+		expect(pointer).toContain(marker)
+	})
+
+	it.each(REMOVED_BODY_MARKERS)('does not duplicate the rule body: %j', (marker) => {
+		expect(pointer).not.toContain(marker)
+	})
+
+	// A back-reference from the single source itself costs no second hop, and it is what tells a
+	// reader who landed on the skill that the topic file holds no body.
+	it('is named as a pointer by the skill that now holds the body', () => {
+		expect(read_unwrapped(SKILL)).toContain(`\`${CANONICAL}\` is a pointer to it`)
 	})
 })

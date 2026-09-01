@@ -13,7 +13,7 @@ no pull request there is no CI E2E job and `followup --merge` is never reached**
 nothing, push nothing, open no pull request and merge nothing; leave the working tree uncommitted and unstashed, send a `confirmation` Telegram carrying
 the resume command, and stop. The label is applied only by a person, never by you, and it is **not**
 `needs-decision` — that one withholds a run's start, this one its end. Definition and the comparison:
-`SKILL.md` → §2z (canonical: `prompts/collaboration-workflow/human-review-label.md`).
+`SKILL.md` → §2z, which is the single source.
 
 **Before implementing, run the scope assessment in `split-assessment.md`.** It is the same assessment `kickoff` makes, applied at the same strength: two or more separately-mergeable deliverables always means an epic, with no count threshold and no ordering condition. **When it finds a split, file the children and the epic and then STOP** (each child carries the `route:split` label — joshuafolkken/kit#1083) — do not implement, and do not continue as an `epicrun`. Typing `fullrun` approved implementing and merging **one** Issue; a batch of N is a different authorization, and widening it silently would take a decision the person never made. Report what was filed and end with "Please run `epicrun #<E>` to execute this epic."
 
