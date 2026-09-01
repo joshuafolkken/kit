@@ -243,7 +243,8 @@ Canonical reference: `prompts/collaboration-workflow/delegation.md`.
 Every entry point takes the target repository in front of the Issue reference. Without it the target
 is the repository the session runs in, which is why a conclusion reached in one repository could only
 be filed into that same one and a person had to say the destination out loud every time
-(joshuafolkken/kit#904).
+(joshuafolkken/kit#904). `kickoff`'s three filing commands all left the path on this repository, and
+reaching a conclusion in one repository about a different package is daily rather than exceptional.
 
 ```
 kickoff joshuafolkken/kit#412
@@ -255,40 +256,54 @@ queue kit#1 kit#2
 epicrun joshuafolkken/kit#858
 ```
 
-- **One definition, every entry point.** `epicrun` already accepted `owner/repo#E`; the other four
-  were left behind. The prefix goes where `#N` goes, so no new keyword is added, and `owner/repo#new`
-  stands in the same slot as `owner/repo#N`.
+- **One definition, every entry point.** The notation was not invented here: `epicrun
+  joshuafolkken/kit#858` was already defined as the way to name an epic in another repository, and
+  **only the entry points had been left out of it** — so the definition sits in this one section and
+  every entry point references it rather than restating it, the correction joshuafolkken/kit#865 made
+  for the split assessment. The prefix goes where `#N` goes, so no new keyword is added, and
+  `owner/repo#new` stands in the same slot as `owner/repo#N`.
 - **A short name expands by prefixing the session repository's owner** — `gh api repos/{owner}/{repo}
   --jq .owner.login` — and **never by searching kit#869's map**, which answers where a checkout is
   rather than which repository is meant. A short name therefore satisfies the first-party test (owner
-  equality) by construction, and a repository that is not checked out here is still a valid `kickoff`
+  equality) by construction — the same gate `repo_map_logic.is_same_owner` puts in front of every
+  discovered entry — so **there is structurally no path by which a short name resolves to a
+  third-party target**, and a repository that is not checked out here is still a valid `kickoff`
   target. A name that does not exist fails as `gh` not found: report it, never read it as a near-miss
-  for another name.
+  for another name — silently correcting a typo writes into a repository nobody named.
+- **It is not the standing prohibition on a bare `#N`.** What that forbids is a bare *Issue number*,
+  which resolves without complaint to a different issue of the same number in whichever repository is
+  read; a bare *repository* name whose owner is determined has no such failure mode.
 - **An explicit owner that is not the session's is a third-party target, and it stops the run.** The
   claim above covers short names only; `fullrun <other-owner>/repo#12` names a tracker we do not own,
   and every write there — Issue, comment, PR — is Tier C (`CLAUDE.md` → "Third-party repositories are
-  Tier C"). Typing the prefix is not the explicit instruction that rule requires. **Send a
-  `confirmation` Telegram and stop — that is the whole action here**: nothing has been produced yet,
-  so there is no finding to record under `## Upstream candidate` and no draft to prepare; that
-  procedure belongs to an upstream defect found mid-run. Being able to pass `-R` is not
-  authorization.
+  Tier C"). **Decide it mechanically**: whether the owner equals what `gh api repos/{owner}/{repo}
+  --jq .owner.login` returns, with no judgement in between. Typing the prefix is not the explicit
+  instruction that rule requires. **Send a `confirmation` Telegram and stop — that is the whole action
+  here**: nothing has been produced yet, so there is no finding to record under `## Upstream
+  candidate` and no draft to prepare; that procedure belongs to an upstream defect found mid-run.
+  Being able to pass `-R` is not authorization — what goes out lands on someone else's tracker, and
+  neither the notifications nor the indexing can be taken back afterwards.
 - **No prefix leaves the behavior exactly as it was** — the target is the session's repository.
-- **`kickoff` needs no checkout**: name the target repository in the path of every `gh api` call,
-  reads included — a read left on `repos/{owner}/{repo}` silently plans against this repository's issue of
-  that number — and never clone. The one exception is the split path's epic, since `pnpm josh epic`
-  only writes the repository it runs in — run it in that repository's checkout, or fall back to
-  `gh api repos/<owner/repo>/labels …` followed by
+- **`kickoff` needs no checkout**: name the target repository in the path of every `gh api` call —
+  reading, creating, updating, commenting and creating a label alike — and never clone. **The read is
+  where it is forgotten, and forgetting it passes silently**: leave the first call of
+  `kickoff joshuafolkken/kit#412` on `repos/{owner}/{repo}/issues/412` and the plan is written against
+  this repository's issue of that number, with no error anywhere. The one exception is the split
+  path's epic, since `pnpm josh epic` only writes the repository it runs in — run it in that
+  repository's checkout, or fall back to `gh api repos/<owner/repo>/labels …` followed by
   `gh api repos/<owner/repo>/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>"`, and report that `epic:check` could not
-  be run. **The promote arm has no such fallback**: `--promote` writes
-  only its own repository too, and creating an epic instead would leave `#N` neither promoted nor
-  tracked, so with no checkout there, file the children and stop.
+  be run: never report as checked something that was not checked. **The promote arm has no such
+  fallback**: `--promote` writes only its own repository too, and creating an epic instead would leave
+  `#N` neither promoted nor tracked, so with no checkout there, file the children and stop.
 - **The implementing entries require a checkout and never create one — when the target is another
   repository.** A prefix naming the session's own repository changes nothing: `fullrun kit#412` in
   the kit checkout behaves exactly as `fullrun #412`, stash step included. Otherwise resolve the
-  checkout from `pnpm josh doctor`; **no checkout there, or a tree that is not clean, stops the run**
-  with a `confirmation` Telegram — cloning decides the layout of someone's machine for them, and a
-  dirty tree holds work that is not yours to stash (each entry's own "stash what is in the tree" step
-  covers the session's repository, never someone else's checkout). Otherwise the commands that act
+  checkout from `pnpm josh doctor`'s map (joshuafolkken/kit#869); **no checkout there, or a tree that
+  is not clean, stops the run** with a `confirmation` Telegram — cloning decides the layout of
+  someone's machine for them, the same judgement kit#869 made when it prints a repository that is not
+  checked out rather than cloning it, and a dirty tree holds work that is not yours to stash or
+  discard (each entry's own "stash what is in the tree" step covers the session's repository, never
+  someone else's checkout). Otherwise the commands that act
   on the target, from `git switch main && git pull` to `pnpm josh followup --merge`, execute in that
   checkout — **a command naming a different repository still runs where that repository is**, which
   is why a cross-repository `into` insertion runs in the epic's checkout (§2a).
@@ -299,9 +314,16 @@ epicrun joshuafolkken/kit#858
   and which session runs which child stays "Concurrency" in `epicrun.md` — one session per
   repository.
 - **Independent of `into <target>`**: this says which repository the run acts on, `into` says which
-  epic the artifact joins, and both may need qualifying in one line.
+  epic the artifact joins, and both may need qualifying in one line — `kickoff kit#new into
+  joshuafolkken/kit#909` is one correct line.
 
-Canonical reference: `prompts/collaboration-workflow/target-repo.md`.
+**It is not resident, and §3's criterion is why.** The notation first binds *after* a keyword has been
+typed, and by then this skill has been read (`CLAUDE.md` → "Read the skill before running any part of
+a command"), so the question "must it fire on a turn where no skill was loaded?" answers no — the same
+reason `into <target>` (joshuafolkken/kit#985) lives in this skill, its topic file a pointer too.
+
+This section is the single source of the rule; `prompts/collaboration-workflow/target-repo.md` is a
+pointer to it (joshuafolkken/kit#1182 rollout of the joshuafolkken/kit#1174 pattern).
 
 ## 3. What stays resident, and what is read from here
 
