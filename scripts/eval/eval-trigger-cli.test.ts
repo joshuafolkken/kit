@@ -1,3 +1,4 @@
+import { path_decision } from '#scripts/josh/path-decision'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { eval_stamp, type EvalStamp } from './eval-stamp'
 import {
@@ -129,16 +130,34 @@ describe('eval_trigger_cli.run', () => {
 		expect(info).toHaveBeenCalledWith(expect.stringContaining(`"${eval_trigger_cli.JSON_KEY}"`))
 	})
 
-	// The record is only consulted for the flag that asks about it: the branch reading has to keep
-	// answering from the diff even while a record sits in the temp directory.
-	it('leaves the branch reading asking the diff', async () => {
+	// The record is only consulted for the flag that asks about it: the branch reading keeps going to
+	// the shared path decision, which is what reads the diff. Delegation is asserted rather than run,
+	// because running it shells out to `git diff main` — a revision a shallow CI checkout does not
+	// have, which is a statement about the checkout rather than about this command.
+	it('leaves the branch reading to the shared path decision', async () => {
+		const delegated = vi
+			.spyOn(path_decision, 'run_path_decision')
+			.mockResolvedValue(SUCCESS_EXIT_CODE)
 		const read_stamp = vi.spyOn(eval_stamp, 'read_stamp')
-
-		silence_output()
 
 		await eval_trigger_cli.run([])
 
+		expect(delegated).toHaveBeenCalledTimes(1)
 		expect(read_stamp).not.toHaveBeenCalled()
+	})
+
+	it('keeps the recorded-run reading away from that same path decision', async () => {
+		const files = { [STAMP_DOCUMENT]: STAMP_HASH }
+		const delegated = vi
+			.spyOn(path_decision, 'run_path_decision')
+			.mockResolvedValue(SUCCESS_EXIT_CODE)
+
+		silence_output()
+		given(stamp_of(files), { ...files })
+
+		await eval_trigger_cli.run([eval_trigger_cli.SINCE_EVAL_FLAG])
+
+		expect(delegated).not.toHaveBeenCalled()
 	})
 
 	it('names both readings in its usage line', () => {
