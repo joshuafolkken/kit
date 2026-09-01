@@ -613,9 +613,11 @@ at. **Age alone is not the test.** Check the 90-minute window below *and* look a
 because three ordinary states hold the label legitimately for longer than that: a `halfrun` stopped
 for manual verification, any run paused mid-child, and a child stopped by `needs-human-review` — that
 last one waits on a person reading an artifact, which routinely outlasts ninety minutes, and the
-label is carried alongside `in-progress` so the issue says plainly which state it is in. Both leave uncommitted work in the checkout, so
-`git status` there is the decisive read — a dirty tree means the hold is real, and the answer is to
-leave the label alone and report, never to strip it and start a second child on top of that work.
+label is carried alongside `in-progress` so the issue says plainly which state it is in. **All three
+leave uncommitted work in the checkout** — the `needs-human-review` stop by specification, since it
+commits nothing and stashes nothing — so `git status` there is the decisive read: a dirty tree means
+the hold is real, and the answer is to leave the label alone and report, never to strip it and start
+a second child on top of that work.
 
 ```bash
 gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
