@@ -155,7 +155,9 @@ Canonical reference: `prompts/collaboration-workflow/human-review-label.md`.
 `kickoff new` / `fullrun new` / `halfrun new` accept a suffix naming the epic the run's artifact
 belongs to. Without it the artifact belongs to no epic, and `epic:next` only ever offers an epic's
 children — so a forgotten instruction parks that Issue permanently rather than losing it visibly
-(joshuafolkken/kit#985).
+(joshuafolkken/kit#985). Before the suffix existed the same three lines were typed by hand every
+time — the keyword, then two instructions after it, the second there only to say what happens when
+the run splits.
 
 ```
 kickoff new into #909
@@ -164,6 +166,11 @@ halfrun new into #909
 kickoff new "<title>" into #909
 kickoff new into joshuafolkken/kit#909
 ```
+
+**`into` is the spelling because the alternatives collide with forms that already mean something
+else.** `kickoff new #909` reads as the existing `kickoff #N`, and `kickoff new epic #909` reads as
+"create a new epic" when what gets created is often a single Issue. `into` can only mean "put what
+this run created into #909", and the one sentence holds for a lone Issue and an epic alike.
 
 - **One artifact goes in: the top-level one this run created.** No split, and it is the Issue; a
   split, and it is the epic. The children belong to that epic, not to the target.
@@ -175,16 +182,31 @@ kickoff new into joshuafolkken/kit#909
   `epic:next` answers `error`, and an unattended run stops.
 - **Decide the position, then record why** — in the target epic's body or as an Issue comment. A
   rationale that exists only in the conversation is not there for whoever next questions the order.
+  The position itself follows whatever criteria the target epic has already been ordered by — work
+  whose effect compounds over the remaining children goes earlier, and a child already in progress is
+  never jumped ahead of.
 - **A target that is not an epic is refused, and the refusal names both ways out**:
   `pnpm josh epic --promote <N> <N...>` when it is a request, a discussion or a container, or a new
   epic over both when it is itself one of the deliverables. Never promote on your own — which arm
-  applies depends on what the target is.
+  applies depends on what the target is. **The command will not choose either**, because promoting
+  rewrites someone else's Issue into a container, which is a structural change rather than an
+  insertion (the same promote-or-create branch `split-assessment.md` describes). Naming both in the
+  refusal is what keeps the run one command away from moving on.
 - **A cross-repository target is written `owner/repo#N`** and inserted from that repository's
-  checkout; run there, since `epic --add` reads and writes only the repository it runs from. A bare
-  `#N` resolves to this repository's issue of that number.
+  checkout; run there, since `epic --add` reads and writes only the repository it runs from. Run in
+  the wrong one, it answers with the command to retype rather than a usage list — "Run
+  `pnpm josh epic --add 909 985` in that repository's checkout" — and `pnpm josh doctor` prints where
+  each checkout is (`prompts/collaboration-workflow/cross-repo-epic.md`). A bare `#N` resolves to
+  this repository's issue of that number.
 - **No suffix leaves the behavior exactly as it was.**
 
-Canonical reference: `prompts/collaboration-workflow/into-epic.md`.
+**It is not `epic:bundle`, and both still run.** `epic:bundle` *recommends* an epic for a newly filed
+Issue and does nothing when the signal is weak; `into` is a person naming one explicitly, and the
+naming is itself the signal. They are separate routes, so the `epic:bundle` call that follows a
+filing happens exactly as before.
+
+This section is the single source of the rule; `prompts/collaboration-workflow/into-epic.md` is a
+pointer to it (joshuafolkken/kit#1181 rollout of the joshuafolkken/kit#1174 pattern).
 
 ## 2b. Delegating a step to a cheaper tier
 
