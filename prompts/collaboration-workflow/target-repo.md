@@ -48,7 +48,7 @@ epicrun joshuafolkken/kit#858
 
 `kickoff` は起票と計画コメントで完結するので、**読み取りを含む全ての `gh api` 呼び出しのパスに `repos/<owner/repo>/…` を書けば足りる** — Issue の読み取り・作成・更新・コメント・ラベル作成のいずれもである。**読み取りにこそ付け忘れやすく、付け忘れは黙って通る**：`kickoff joshuafolkken/kit#412` の 1 手目でパスを `repos/{owner}/{repo}/issues/412` のままにすると、自リポジトリの別 Issue を読んで計画を書くことになり、エラーは出ない。クローンは不要であり、行ってはならない。
 
-**例外は分割パスの EPIC 作成である。** `pnpm josh epic` は自分が走っているリポジトリしか読み書きしない（`into-epic.md` の `epic --add` と同じ制約）。子は `gh api repos/<owner/repo>/issues` で作れるので、EPIC だけが次の 2 通りになる。
+**例外は分割パスの EPIC 作成である。** `pnpm josh epic` は自分が走っているリポジトリしか読み書きしない（`.claude/skills/workflow-commands/SKILL.md` → 「2a. The `into <target>` suffix」の `epic --add` と同じ制約）。子は `gh api repos/<owner/repo>/issues` で作れるので、EPIC だけが次の 2 通りになる。
 
 - 対象リポジトリのチェックアウトがあれば、**そこで** `pnpm josh epic` を実行する（場所は `pnpm josh doctor` が印字する）
 - 無ければ `kickoff.md` が既に定める手動フォールバック（`gh api repos/<owner/repo>/issues -f title="<epic-title>" -f 'labels[]=epic' -f body="<body>"`）で作り、**`pnpm josh epic:check` を回せなかったことを報告する** — 検査していないものを検査済みとして報告しない
@@ -61,7 +61,7 @@ epicrun joshuafolkken/kit#858
 1. チェックアウトの場所を `pnpm josh doctor` の地図から引く（joshuafolkken/kit#869）
 2. **無ければ停止して報告する。勝手に clone してはならない。** kit#869 が「チェックアウトが無いリポジトリは clone せずそう表示する」と定めたのと同じ判断であり、勝手に clone することは人の作業機の配置を勝手に決めることである。`confirmation` の Telegram を送って止まる
 3. **対象の作業ツリーが clean でなければ停止して報告する。** そこに残っている変更は自分が作ったものではないので、stash も破棄もしない。**各入口の「作業ツリーに変更があれば `git stash`」の手順が掛かるのはセッション自身のリポジトリだけ**であり、他人のチェックアウトには掛からない
-4. clean なら、**対象リポジトリに対して働くコマンド**（`git switch main && git pull` から `pnpm josh followup --merge` まで）を、そのチェックアウトを作業ディレクトリとして実行する。セッション自身のリポジトリには触れない。**別のリポジトリを名指しするコマンドはこの限りではない** — `into joshuafolkken/kit#909` の挿入は `pnpm josh epic --add` が自分の走るリポジトリしか読み書きしないため、EPIC のある側のチェックアウトで実行する（`into-epic.md`）
+4. clean なら、**対象リポジトリに対して働くコマンド**（`git switch main && git pull` から `pnpm josh followup --merge` まで）を、そのチェックアウトを作業ディレクトリとして実行する。セッション自身のリポジトリには触れない。**別のリポジトリを名指しするコマンドはこの限りではない** — `into joshuafolkken/kit#909` の挿入は `pnpm josh epic --add` が自分の走るリポジトリしか読み書きしないため、EPIC のある側のチェックアウトで実行する（`.claude/skills/workflow-commands/SKILL.md` → 「2a. The `into <target>` suffix」）
 
 ### `epicrun` の前置きは EPIC の在り処だけを指す
 
