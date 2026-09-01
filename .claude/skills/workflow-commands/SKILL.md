@@ -75,15 +75,9 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   definition in `split-assessment.md`. Two or more separately-mergeable deliverables always means an
   epic — no count threshold, no ordering condition — and a `fullrun` / `halfrun` that finds one files
   the epic and **stops** rather than widening its own authorization to a batch.
-- **A prerequisite discovered mid-run is a dependency, not a park.** Finding that something else in
-  *this* repository has to land first is a third situation, distinct from an upstream defect (file
-  and stop) and from a split (file the epic and stop): the Issue in hand is still one deliverable, it
-  just needs another one before it. Inside an `epicrun` it is filed without confirmation, recorded as
-  a dependency, and the run **continues rather than parking it** (`epicrun.md` → "A prerequisite
-  discovered mid-run"); inside a `fullrun` or `halfrun` the same filing happens without asking and
-  the command then **stops**, leaving the person one command to type (`fullrun.md` / `halfrun.md`).
-  **Automatic filing is capped at 10 Issues per run** at every entry point. `kickoff` is exempt — it
-  never implements, so it never discovers one.
+- **A prerequisite discovered mid-run is a dependency rather than a park**, at every entry point —
+  §2d. It is the third thing a run can discover, beside an upstream defect and a split, and the one
+  whose procedure is neither of theirs.
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
   the Issue instead.
@@ -392,6 +386,70 @@ reason `into <target>` (joshuafolkken/kit#985) lives in this skill, its topic fi
 This section is the single source of the rule; `prompts/collaboration-workflow/target-repo.md` is a
 pointer to it (joshuafolkken/kit#1182 rollout of the joshuafolkken/kit#1174 pattern).
 
+## 2d. A prerequisite discovered mid-run — a dependency, not a park
+
+**A prerequisite discovered mid-run is a dependency, not a park.** Finding that something else in
+*this* repository has to land first is a third situation, distinct from an upstream defect and from a
+split: the Issue in hand is still one deliverable, it just needs another one before it.
+
+**Three kinds of other work turn up mid-run, and the procedure differs for each.** Reading one as
+another is the failure this section exists to prevent: a prerequisite was the only one of the three
+with no procedure of its own, and the two it sits between both end in a stop, so the nearest written
+rule was the one that parks (joshuafolkken/kit#891).
+
+| What turned up                                                              | What to do                                                                                                              |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
+| This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `epicrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
+| Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
+
+**File it with the `route:tier-a` label**, so a Tier A filing made during implementation stays
+countable by filing route afterwards (joshuafolkken/kit#1083):
+
+```bash
+gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f body="<body>"
+```
+
+Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
+steps after it have to name a number that does not exist until it is.
+
+**Each entry point's own branch stays in that entry's file**, which is where the numbered procedure
+lives:
+
+- **`epicrun`** files without confirmation, records the dependency with
+  `pnpm josh epic --add <E> <N> --before <M>` — `<E>` the epic, `<N>` the prerequisite just filed,
+  `<M>` the child in hand — and the run **continues rather than parking it**
+  (`epicrun.md` → "A prerequisite discovered mid-run"). **The letters differ by entry file**:
+  `fullrun.md` and `halfrun.md` write the same two Issues `#<P>` and `#N`, so read them from the file
+  you are in rather than carrying them across. Parking is only for a prerequisite that
+  *cannot* be expressed as a dependency — one needing a design decision nobody has made, a Tier B
+  toss-up, or a Tier C action. Parking one that can be expressed inverts the point: `needs-decision`
+  is cleared by a person, so a park taken in the name of unattended execution is what makes the run
+  need one.
+- **`fullrun` / `halfrun`** file the same way without asking, insert the prerequisite into the epic
+  that already tracks the Issue or create one over both, and then **stop**, leaving the person one
+  command to type (`fullrun.md` / `halfrun.md`). The stop stays because typing `fullrun` approved
+  implementing **one** Issue and a batch is a different authorization; what the filing removes is
+  every confirmation in front of it, not the stop itself.
+
+**Two steps every entry's procedure turns on**, both load-bearing rather than tidy-up:
+
+- **`git stash push -u` — the `-u` is not optional.** The work in progress almost always includes a
+  new `*.test.ts`, which is untracked, and a stash without `-u` leaves exactly those files in the
+  tree — for the next child's `git switch main && git pull` to refuse, or to carry into the
+  prerequisite's branch and PR.
+- **The Issue comment is what gets the stash popped, not the Telegram.** The run that later picks the
+  paused Issue up reads that comment and pops before implementing; a stash recorded only in a
+  Telegram message is orphaned work. Say it in the Telegram too — the comment is the record.
+
+**Automatic filing is capped at 10 Issues per run** at every entry point, the guard `epicrun` already
+carried. Removing the confirmation removes the only thing that stopped a chain of false positives, so
+a ceiling replaces it; on reaching it, stop and report. `kickoff` is exempt — it never implements, so
+it never discovers one.
+
+This section is the single source of the rule; `prompts/collaboration-workflow/prerequisite-issue.md`
+is a pointer to it (joshuafolkken/kit#1185 rollout of the joshuafolkken/kit#1174 pattern).
+
 ## 3. What stays resident, and what is read from here
 
 **A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**
@@ -480,7 +538,8 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   was used (joshuafolkken/kit#1150).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
-prerequisite discovered mid-run (`fullrun.md` / `halfrun.md` / `epicrun.md`), `epicrun`'s acceptance
+prerequisite discovered mid-run (§2d, with each entry's branch in
+`fullrun.md` / `halfrun.md` / `epicrun.md`), `epicrun`'s acceptance
 of an Issue that is not an epic and its park-and-continue behavior (`epicrun.md`), the whole
 verification gate and merge chain (`chain-rule.md` / `followup.md`), and the post-update verification
 procedure (`.claude/skills/dependency-update/`) that the two prohibitions above route to.
