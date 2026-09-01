@@ -27,9 +27,10 @@ alone are two, however small.
 "This needs something else done first" is a different answer from "this is really several things".
 A split means the request in hand contains two or more deliverables; a prerequisite means it is
 still **one** deliverable that has another one in front of it. Reading the second as the first sends
-it down this file's procedure, which ends in a stop even inside an `epicrun` — where a prerequisite
-is meant to be recorded as a dependency and run straight through. The prerequisite procedure lives
-in `epicrun.md` → "A prerequisite discovered mid-run" and, for the stopping entry points, in
+it down this file's procedure, which files children that do not exist and stops every entry but
+`epicrun` — where a prerequisite is instead recorded as a dependency and run straight through. The prerequisite rule is
+defined in `SKILL.md` → §2d, which is its single source; each entry's own branch is in
+`epicrun.md` → "A prerequisite discovered mid-run" and, for the stopping entry points, in
 `fullrun.md` / `halfrun.md` (joshuafolkken/kit#891).
 
 ## Two or more always means an epic

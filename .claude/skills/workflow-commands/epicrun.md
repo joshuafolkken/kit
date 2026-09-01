@@ -46,7 +46,7 @@ So inside `epicrun #<N>`, a prerequisite or a split found mid-run does **not** s
    | --- | --- |
    | An epic `#<E>` already tracks `#<N>` | `pnpm josh epic --add <E> <P> --before <N>` for a prerequisite, or `--add <E> <N1> ...` for a split. **Do not create a second epic.** Continue the loop against `#<E>` |
    | No epic tracks it | Create one — the command depends on what was found (table below) |
-   | **The command could not answer** — a non-zero exit, or a ⚠ warning about a truncated listing above a `Nothing to bundle.` verdict. A definitive answer stands even beside a warning | Park `#<N>` with `needs-decision` and report. "Could not tell" is not "no epic tracks it", and reading it as such recreates the duplicate this step prevents |
+   | **The command could not answer** — a non-zero exit, or a ⚠ warning about a truncated listing above a `Nothing to bundle.` verdict. The truncation warning is the one beginning `⚠ The epic listing …`, in either of two forms — `hit its …-epic cap` and `stopped at the …-issue page ceiling` — both saying the listing was not read to the end (joshuafolkken/kit#1067); `⚠ Could not read #N.` is one failed relation read and voids nothing. A definitive answer stands even beside a warning | Park `#<N>` with `needs-decision` and report. "Could not tell" is not "no epic tracks it", and reading it as such recreates the duplicate this step prevents |
 
    When creating one, `#<N>` is being implemented, so it is itself one of the deliverables — which is
    why this path always takes the keep-as-a-child arm of `split-assessment.md`'s promote-or-create
@@ -662,7 +662,9 @@ release to publish, there is no runnable child, nothing carries `in-progress` an
 Finding that something else in **this** repository has to land first is not a split, and not an
 upstream defect. The child in hand is still one deliverable; it just needs another one before it.
 It gets its own procedure because the two rules it sits between both end in a stop, and this one
-must not (joshuafolkken/kit#891).
+must not (joshuafolkken/kit#891). The three-way distinction, the `route:tier-a` filing command and
+the filing ceiling are `SKILL.md` → §2d, which is the single source; what follows is this entry's
+branch.
 
 `<M>` below is the child being implemented when the prerequisite turned up; `<N>` is the new Issue.
 
