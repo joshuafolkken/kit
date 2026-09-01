@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/json-value'
 import { z } from 'zod'
 
 // Reading Claude Code's own session transcripts for what a run actually cost
@@ -125,14 +126,6 @@ function to_totals(usage: RawUsage): UsageTotals {
 	}
 }
 
-function safe_json(line: string): unknown {
-	try {
-		return JSON.parse(line)
-	} catch {
-		return undefined
-	}
-}
-
 type ParsedLine = z.infer<typeof LINE_SCHEMA>
 
 // A line with neither id is its own request rather than a duplicate of one, so the fallback has to
@@ -175,7 +168,7 @@ function classify(data: ParsedLine): LineOutcome {
 function parse_line(line: string): LineOutcome {
 	if (line.trim() === '') return { kind: 'skipped' }
 
-	const parsed = LINE_SCHEMA.safeParse(safe_json(line))
+	const parsed = LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
 
 	return parsed.success ? classify(parsed.data) : { kind: 'malformed' }
 }
