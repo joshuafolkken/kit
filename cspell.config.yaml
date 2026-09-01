@@ -5,6 +5,7 @@ words:
   - dedup
   - refspec
   - issuecomment
+  - frontmatter
   - toolkits
   # `worktrees` is not here: it appears in a skill `josh sync` copies, so it lives in the
   # distributed dictionary instead (joshuafolkken/kit#1092). The singular reaches no copied file.

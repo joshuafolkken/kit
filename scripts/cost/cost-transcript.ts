@@ -129,6 +129,15 @@ function read_session(file: SessionFile): SessionUsage {
 	return { session_id: file.session_id, ...tally(content) }
 }
 
+// The transcript's own text, for the readers that need the lines rather than the usage totals —
+// `cost-blocks.ts` classifies what the conversation is made of and cannot work from `UsageRecord`s.
+// An unreadable file yields an empty string, exactly as `read_session` yields an empty session:
+// "could not be read" is already reported through `is_readable`, and throwing here would turn one
+// missing session into a failed command.
+function read_raw(file: SessionFile): string {
+	return read_text(file.path) ?? ''
+}
+
 const cost_transcript = {
 	TRANSCRIPT_EXTENSION,
 	project_slug,
@@ -136,6 +145,7 @@ const cost_transcript = {
 	list_sessions,
 	tally,
 	read_session,
+	read_raw,
 }
 
 export type { SessionFile, SessionUsage }

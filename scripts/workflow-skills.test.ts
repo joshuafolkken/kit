@@ -7,6 +7,7 @@ import {
 	skill_documents,
 	WORKFLOW_PROMPT,
 } from './ai-document-fixture'
+import { cost_tokens } from './cost/cost-tokens'
 import { init_logic } from './init/init-logic'
 import {
 	has_frontmatter,
@@ -41,6 +42,27 @@ const RESIDENT_CEILING_BYTES = 60_000
 // required margin turns "at the limit" into a failure while there is still room to write the fix,
 // which is the only point at which moving a procedure into a skill is still a choice.
 const RESIDENT_HEADROOM_BYTES = 2000
+
+// joshuafolkken/kit#1151: the budget above is held in bytes and the bill arrives in tokens, so a
+// reduction could not be read in the unit it is paid in. This is the same limit expressed in that
+// unit, **derived** from the byte budget rather than chosen beside it — for pure ASCII, where one
+// byte is one character, the two are the same limit, which is what "does not contradict the byte
+// ceiling" has to mean.
+//
+// It is a second *unit*, not a second, tighter guard. Where the two differ is where a byte buys a
+// different number of tokens: every non-ASCII character costs one token, so a two-byte one costs a
+// token per two bytes against ASCII's three and the token ceiling binds first, while a four-byte one
+// costs a token per four and the byte ceiling does. Japanese, at three bytes per character, lands
+// exactly on the conversion and the two ceilings coincide there.
+// Converted once, from the budget the documents are actually measured against. Converting the
+// ceiling and the headroom separately and subtracting would agree with this only by rounding
+// coincidence — at 60,000 and 2,000 it happens to, and at 61,000 it is off by one, which would fail
+// the equality below on a constant bump that touched no document at all.
+const EFFECTIVE_CEILING_BYTES = RESIDENT_CEILING_BYTES - RESIDENT_HEADROOM_BYTES
+const EFFECTIVE_CEILING_TOKENS = cost_tokens.ascii_bytes_to_tokens(EFFECTIVE_CEILING_BYTES)
+// A symbol rather than a letter, so a long run of it is not a word the spell check has to know.
+const TWO_BYTE_CHAR = '±'
+const THREE_BYTE_CHAR_BYTES = 3
 
 const KICKOFF_FILE = 'kickoff.md'
 const FULLRUN_FILE = 'fullrun.md'
@@ -240,9 +262,14 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 	const content = read_repo_file(document_path)
 
 	it('stays under the resident ceiling, with room left to write the next rule', () => {
-		expect(Buffer.byteLength(content, 'utf8')).toBeLessThan(
-			RESIDENT_CEILING_BYTES - RESIDENT_HEADROOM_BYTES,
-		)
+		expect(Buffer.byteLength(content, 'utf8')).toBeLessThan(EFFECTIVE_CEILING_BYTES)
+	})
+
+	// The same ceiling read in the unit the bill arrives in. It is not a second, looser guard: for
+	// ASCII it fails on exactly the same edit the byte assertion does, and for anything denser it
+	// fails earlier — which is the case the byte ceiling cannot see.
+	it('stays under the resident ceiling measured in tokens', () => {
+		expect(cost_tokens.estimate(content)).toBeLessThan(EFFECTIVE_CEILING_TOKENS)
 	})
 
 	it.each([WORKFLOW_SKILL, DEPENDENCY_SKILL])('names %s', (skill_directory) => {
@@ -370,6 +397,40 @@ describe.each(AI_DOCS)('%s — a resident rule is a trigger and a pointer', (doc
 			expect(Buffer.byteLength(body, 'utf8')).toBeLessThan(RESIDENT_RULE_CAP_BYTES)
 		},
 	)
+})
+
+// joshuafolkken/kit#1151. Without this the two ceilings are two numbers a later edit can move apart,
+// and the pair then disagrees about the same document — which is the state "hold the budget in
+// tokens as well" was meant to remove, not create.
+describe('the resident budget reads the same in both units', () => {
+	// The property that makes them one limit rather than two: an ASCII document that exactly fills
+	// the byte budget exactly fills the token budget.
+	it('puts an ASCII document at the same point in each budget', () => {
+		const document = 'a'.repeat(EFFECTIVE_CEILING_BYTES)
+
+		expect(Buffer.byteLength(document, 'utf8')).toBe(EFFECTIVE_CEILING_BYTES)
+		expect(cost_tokens.estimate(document)).toBe(EFFECTIVE_CEILING_TOKENS)
+	})
+
+	// Where the two units genuinely disagree: a two-byte character costs a whole token, so half the
+	// byte budget spent on one is already the whole token budget. The byte ceiling cannot see this.
+	it('catches two-byte content the byte ceiling would pass', () => {
+		const dense = TWO_BYTE_CHAR.repeat(EFFECTIVE_CEILING_TOKENS)
+
+		expect(Buffer.byteLength(dense, 'utf8')).toBeLessThan(EFFECTIVE_CEILING_BYTES)
+		expect(cost_tokens.estimate(dense)).toBeGreaterThanOrEqual(EFFECTIVE_CEILING_TOKENS)
+	})
+
+	// And where they do not: Japanese is three bytes per character and one token, which is exactly
+	// the conversion, so the two ceilings land on the same document. Asserted so the pair is not
+	// later described as the stricter guard it is not.
+	it('agrees with the byte ceiling on three-byte content', () => {
+		const japanese = 'あ'.repeat(EFFECTIVE_CEILING_TOKENS)
+		const short_by = EFFECTIVE_CEILING_BYTES - Buffer.byteLength(japanese, 'utf8')
+
+		expect(short_by).toBeLessThan(THREE_BYTE_CHAR_BYTES)
+		expect(cost_tokens.estimate(japanese)).toBe(EFFECTIVE_CEILING_TOKENS)
+	})
 })
 
 describe('the workflow skill defines how much of a resident rule is resident', () => {
