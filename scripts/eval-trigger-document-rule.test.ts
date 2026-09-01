@@ -84,6 +84,41 @@ describe('the placement is stated where a run would otherwise fold it into the g
 	})
 })
 
+// joshuafolkken/kit#1152: the suite now starts when `/code-review` does, because neither writes to
+// the working tree. That is only sound while the staleness check travels with it — a document that
+// described the overlap without the re-check would ship a rule for reporting a verdict about a tree
+// the review had already changed.
+describe('the concurrent placement carries its staleness check', () => {
+	const SINCE_EVAL_COMMAND = 'pnpm josh eval:scope --since-eval'
+
+	it.each([SKILL_GATE, PROMPT_GATE, EVAL_DOC, COMMAND_DOC])(
+		'%s names the re-check command',
+		(document_path) => {
+			expect(read_unwrapped(document_path)).toContain(SINCE_EVAL_COMMAND)
+		},
+	)
+
+	it.each([SKILL_GATE, EVAL_DOC])('%s says a stale result is never reported', (document_path) => {
+		expect(read_unwrapped(document_path).toLowerCase()).toContain('stale result is never reported')
+	})
+
+	// The canonical reference is Japanese and is held to its own words, as elsewhere in this suite.
+	it('the canonical reference refuses a stale result too', () => {
+		expect(read_unwrapped(PROMPT_GATE)).toContain('古い結果は報告しない')
+	})
+
+	// The overlap is sound because of a property of the two commands, not because it is faster. A
+	// document that dropped the reason would leave the next reader unable to tell whether a third
+	// step could join them.
+	it.each([SKILL_GATE, EVAL_DOC])('%s says why the two may overlap', (document_path) => {
+		expect(read_unwrapped(document_path).toLowerCase()).toContain('neither writes')
+	})
+
+	it('the canonical reference states the same property', () => {
+		expect(read_unwrapped(PROMPT_GATE)).toContain('どちらも書かない')
+	})
+})
+
 describe('what a verdict does is stated with the tokens the run prints', () => {
 	const ALL_VERDICTS: ReadonlyArray<string> = [
 		eval_report.VERDICT_BLOCKED,
