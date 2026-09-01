@@ -21,7 +21,20 @@ import { describe, expect, it } from 'vitest'
 const INDEX = 'prompts/collaboration-workflow.md'
 const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
 // The index exists to be read instead of the corpus, so it has to stay far smaller than it.
-const INDEX_CEILING_BYTES = 8000
+//
+// A share of the corpus was tried for this and is wrong, because the two quantities move in
+// opposite directions. The index grows only by table rows — the suite below requires every topic
+// file to be listed, so a conversion that splits a section into its own topic file
+// (joshuafolkken/kit#1186 is the first) owes it one — while the joshuafolkken/kit#1176 rollout
+// shrinks the corpus, each conversion replacing a body with a pointer of a few KB. Converting
+// `epicrun.md` alone takes the corpus from 220 KB to about 174 KB; with `operating-rules.md` after
+// it, a 5% share falls under the index's current size and the assertion fails on a change that
+// never touched the index.
+//
+// So the ceiling stays a byte count, raised from 8000 by the one row joshuafolkken/kit#1186 adds
+// plus room for the rollout's remaining section extractions at roughly 180 bytes a row. Measured
+// there, the index is 8090 bytes.
+const INDEX_CEILING_BYTES = 9000
 
 // The fixture already enumerates them for the concatenating reader; re-implementing it here would
 // let the two drift and quietly stop covering a file the reader still concatenates.
