@@ -21,8 +21,8 @@ const SCRUBBED_ENV: Readonly<Record<string, string>> = {
 
 const GH_CONFIG_KEY = 'GH_CONFIG_DIR'
 const SPAWN_FAILURE_EXIT_CODE = -1
-// A stalled session blocks the whole sequential suite with no output and never reaches the retry that
-// exists for exactly that case. Generous enough for a ten-turn scenario, short enough to end a hang.
+// A stalled session holds its pool slot with no output and never reaches the retry that exists for
+// exactly that case. Generous enough for a ten-turn scenario, short enough to end a hang.
 const SESSION_TIMEOUT_MS = 600_000
 
 // execa sets `timedOut` when its own `timeout` killed the process. Read from the result rather than

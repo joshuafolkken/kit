@@ -14,15 +14,30 @@ agent and judges each one on **what the agent did**, never on what it said.
 ## Running it
 
 ```bash
-pnpm josh eval                       # every scenario
-pnpm josh eval consult-not-execute   # one scenario by name
-JOSH_EVAL_MODEL=opus pnpm josh eval  # a different model (default: sonnet)
+pnpm josh eval                          # every scenario
+pnpm josh eval consult-not-execute      # one scenario by name
+JOSH_EVAL_MODEL=opus pnpm josh eval     # a different model (default: sonnet)
+JOSH_EVAL_CONCURRENCY=2 pnpm josh eval  # fewer sessions at a time (default: 5)
 ```
 
 Each scenario is a real Claude session, so a full run costs tokens and takes minutes. It is
 **deliberately not part of CI**: it runs when a distributed document, a skill or a hook changes — the
 moment its answer is worth paying for. **Which change that is, is decided by a command rather than by
 eye** (see "When it runs" below).
+
+**The scenarios run side by side, up to five at a time.** Each builds its own sandbox and spawns its
+own session, so nothing about them has to be serialized, and the suite's wall-clock is close to its
+slowest scenario rather than the sum of all of them. They used to run one at a time with a 20-second
+pause between them, on the stated grounds that "the scenarios share one API rate budget" — a cause
+[#1001](https://github.com/joshuafolkken/kit/issues/1001) went looking for and did not find: what it
+measured instead was `API Error: Unable to connect to API (ConnectionRefused)`, which is a connection
+failure rather than throttling ([#1144](https://github.com/joshuafolkken/kit/issues/1144)).
+
+The width is a cap rather than a fan-out: five is the number the suite's five scenarios were measured
+at, so a suite that grows does not silently start testing a wider one. Lower it with
+`JOSH_EVAL_CONCURRENCY` where the connection cannot hold that many sessions — a value that is not a
+positive integer is refused rather than replaced by the default, because a run measured at a width
+nobody asked for is about to be compared against one that was.
 
 It needs the `claude` CLI on `PATH` and an authenticated account. Exit code is `0` only when every
 scenario held.
@@ -126,18 +141,24 @@ different fixes:
 | `session was killed by <signal> …`                         | Something else ended it — an OOM killer, a harness watchdog. Distinct from both a timeout and a failed start, which otherwise arrive looking identical.                   |
 | `… : <reason>`                                             | The reason, from stderr, or from the stream's own failing `result` event when stderr said nothing — which was every case observed across joshuafolkken/kit#908.           |
 
-**The suite paces itself**: 20 seconds between scenarios and one retry after 60.
-Running sessions back to back was the first suspected cause — across joshuafolkken/kit#908 the suite
-degraded run over run at a 20-second spacing (4/5 scenarios held, then 2/5, then no verdict at all,
-then 1/5) while every one of those same scenarios held when run on its own moments later.
+**The suite no longer paces itself.** Running sessions back to back was the first suspected cause of
+an empty transcript — across joshuafolkken/kit#908 the suite degraded run over run at a 20-second
+spacing (4/5 scenarios held, then 2/5, then no verdict at all, then 1/5) while every one of those
+same scenarios held when run on its own moments later — so a 20-second pause went between scenarios
+and a 60-second one before the single retry.
 
-**That explanation has not held up, and the pacing is kept as a margin rather than as the fix.** The
-first run to print a reason named something else entirely — `API Error: Unable to connect to API
-(ConnectionRefused)`, on every inconclusive scenario, after the session had started
-(joshuafolkken/kit#1001). Raising the spacing to 45 seconds and adding a second retry at 180 recovered
-nothing while nearly doubling the worst-case suite time, so both were put back. **Do not read the
-pauses as a solved problem**: the honest state is that the reason is now visible and points at
-connectivity to the API rather than at pacing. To check where it stands after changing anything here:
+**That explanation did not hold up.** The first run to print a reason named something else entirely —
+`API Error: Unable to connect to API (ConnectionRefused)`, on every inconclusive scenario, after the
+session had started (joshuafolkken/kit#1001). Raising the spacing to 45 seconds and adding a second
+retry at 180 recovered nothing while nearly doubling the worst-case suite time. The inter-scenario
+pause is therefore gone and the retry waits 5 seconds rather than 60: a wait that was never shown to
+prevent anything, and under a pool it holds a slot for the whole time
+(joshuafolkken/kit#1144). **The retry itself is unchanged** — one attempt, only for an inconclusive
+verdict.
+
+**Do not read that as a solved problem.** The honest state is that the reason is visible and points at
+connectivity to the API rather than at pacing, and nothing here fixes it. To check where it stands
+after changing anything here:
 
 ```bash
 pnpm josh eval <one-scenario>   # must hold on its own
@@ -231,16 +252,24 @@ reading a person or an agent takes after a `blocked` verdict, and a disagreement
 recorded and filed against the scenario rather than read as a pass ("When it runs" above). The
 harness still reports the first reading exactly as it found it.
 
-**Sessions draw on a shared upstream budget, and a batch can exhaust it.** What was observed while
+**A batch of sessions can stop starting, and nobody has established why.** What was observed while
 building this suite: each scenario passes when run on its own, while a full run returned complete
 transcripts for the first two and empty ones for the rest — and after several full runs in one
-sitting, even the first scenario stopped starting. So the suite pauses between scenarios and waits
-longer before a retry. **Treat that as a mitigation, not a cure — it has not been shown to prevent
-the exhaustion**, and it is most of why a full run takes minutes.
+sitting, even the first scenario stopped starting. That was read as a shared upstream budget being
+exhausted, which nobody had measured; what the first reason to be printed actually named was
+`ConnectionRefused` (joshuafolkken/kit#1001). Pacing was the mitigation, and it was never shown to
+prevent anything, so it is gone (joshuafolkken/kit#1144).
 
-The practical rule: a run of consecutive inconclusive verdicts is a statement about the budget, not
-about the rules. Run the scenarios one at a time (`pnpm josh eval <name>`), or come back later, before
-concluding anything from them.
+One thing that _was_ measured, on joshuafolkken/kit#1144: the symptom tracks how many Claude sessions
+that machine is running at once, not how closely one run's scenarios follow each other. Two eval
+runners left running as orphans were enough to make the next scenario fail with `ConnectionRefused`
+twice in a row; the same scenario held once they were stopped, and a five-wide run of the whole suite
+held 5/5. **So look at what else is running before concluding anything.**
+
+The practical rule is unchanged: a run of consecutive inconclusive verdicts is a statement about the
+harness or its surroundings, not about the rules. Run the scenarios one at a time
+(`pnpm josh eval <name>`), lower `JOSH_EVAL_CONCURRENCY`, or come back later, before concluding
+anything from them.
 
 A session that ran and then **died part way** — an API drop mid-scenario is the common one — is
 handled by what it managed to do rather than thrown out wholesale. A forbidden call it actually made
