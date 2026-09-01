@@ -35,6 +35,30 @@ const WORKFLOW_PROMPT_DIRECTORY = 'prompts/collaboration-workflow'
 const CLAUDE_SETTINGS = '.claude/settings.json'
 const ENV_EXAMPLE = '.env.example'
 const MARKDOWN_EXTENSION = '.md'
+const PROMPT_ROOT = 'prompts'
+const DOCS_ROOT = 'docs'
+
+// Every markdown file under one root, recursively, as repository-relative paths. Deliberately not
+// exported: the roots that matter are the ones `routing_documents` below composes, and handing out
+// the raw walker invites a suite to rebuild that list and let the two drift.
+function markdown_under(root: string): ReadonlyArray<string> {
+	return readdirSync(package_file(root), { encoding: 'utf8', recursive: true })
+		.filter((entry) => entry.endsWith(MARKDOWN_EXTENSION))
+		.map((entry) => `${root}/${entry}`)
+}
+
+// Every file that can route a reader somewhere — the rule document, every distributed skill, and
+// every markdown file under `prompts/` and `docs/`. Two suites check citations against this set and
+// each excludes a different handful from it; the *set* is what must not drift between them, since a
+// directory dropped from one copy would take its citations out of that suite's reach silently.
+function routing_documents(): ReadonlyArray<string> {
+	return [
+		...AI_DOCS,
+		...markdown_under(SKILL_ROOT),
+		...markdown_under(PROMPT_ROOT),
+		...markdown_under(DOCS_ROOT),
+	]
+}
 
 // The index plus every topic file, in name order so the concatenation is stable.
 function workflow_prompt_files(): ReadonlyArray<string> {
@@ -57,6 +81,13 @@ function read_repo_file(relative_path: string): string {
 	if (relative_path === WORKFLOW_PROMPT) return read_workflow_prompt()
 
 	return readFileSync(package_file(relative_path), 'utf8')
+}
+
+// The index alone, straight from disk. `read_repo_file` deliberately answers its path with the whole
+// concatenated corpus so the marker suites did not have to change, which is the opposite of what a
+// suite measuring or quoting the index itself needs.
+function read_index(): string {
+	return readFileSync(package_file(WORKFLOW_PROMPT), 'utf8')
 }
 
 // Prose is re-wrapped by the formatter, so a marker that happens to span a line break would fail on
@@ -118,7 +149,10 @@ export {
 	CANONICAL_DOC,
 	CLAUDE_SETTINGS,
 	ENV_EXAMPLE,
+	PROMPT_ROOT,
+	read_index,
 	read_repo_file,
+	routing_documents,
 	read_rule_surface,
 	read_unwrapped_rule_surface,
 	POINTER_DOCS,

@@ -45,7 +45,7 @@
 
 ## 参照の書き方
 
-`CLAUDE.md` と `.claude/skills/` からこの正典を指すときは、**話題ファイルを直接指す**。索引を指してから節名を書く形（`prompts/collaboration-workflow.md` → 「節名」）は、読み手に索引と本体の 2 回読みを強いるうえ、節名が変わると黙って行き止まりになる。
+`CLAUDE.md` と `.claude/skills/` からこの正典を指すときは、**本文があるファイルを直接指す**（話題ファイル、skill へ単一ソース化済みならその skill。[`residency.md`](./collaboration-workflow/residency.md)）。索引や指し先を経由させる形（`prompts/collaboration-workflow.md` → 「節名」）は、読み手に 2 回読みを強いるうえ、節名が変わると黙って行き止まりになる。
 
 ```md
 See `prompts/collaboration-workflow/upstream-interrupt.md`.
