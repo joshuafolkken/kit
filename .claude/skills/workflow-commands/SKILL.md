@@ -330,8 +330,9 @@ their absence here is correct rather than an omission (joshuafolkken/kit#955).
 
 Within that scope, every rule that passes the test is resident in full, and a marker suite asserts
 each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most of them,
-`scripts/verify-ui-skill.test.ts` for the UI gate, and
-`scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step:
+`scripts/verify-ui-skill.test.ts` for the UI gate,
+`scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step, and
+`scripts/inline-edit-rule.test.ts` for the file-editing prohibition:
 
 - **Explicit invocation required** — it decides whether a workflow starts at all, so it binds on the
   turn the user types the keyword, which is before anything here has been read.
@@ -356,6 +357,13 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   another repository is referenced as `owner/repo#N`. Each fires on a turn where no `epic:*` command
   was run: the moment an issue is filed, or a decision written. The commands' own procedures are in
   `.claude/skills/epic-commands/`, which is where everything else about them lives.
+- **The prohibition on carrying a file's new text inside a shell command** — an edit happens on any
+  turn at all, and there is no skill that a run loads *before* editing. Placed on demand, this one
+  rule would never fire once, which reads exactly like having deleted it. The measured cost, the
+  allowed/prohibited table and the reasoning are at
+  `prompts/collaboration-workflow/file-edits.md`; what stays resident is the instruction and the
+  criterion that decides it — whether the command carries the replacement wholesale, not which tool
+  was used (joshuafolkken/kit#1150).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (`fullrun.md` / `halfrun.md` / `epicrun.md`), `epicrun`'s acceptance
