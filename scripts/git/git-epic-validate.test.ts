@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { git_epic_body } from './git-epic-body'
+import { UNORDERED_DEPENDENCIES } from './git-epic-parse'
 import { git_epic_validate, type EpicSubject } from './git-epic-validate'
 
 const CHILDREN = [101, 102]
@@ -83,18 +84,22 @@ describe('git_epic_validate.validate_epic — silent failure modes', () => {
 	})
 })
 
+const DEPENDENCIES_HEADING = '## Dependencies'
+const PROGRESS_HEADING = '## Progress'
+const FIRST_TASK_ROW = '- [ ] #101'
+
 const QUOTED_TEMPLATE_BODY = [
-	'## Dependencies',
+	DEPENDENCIES_HEADING,
 	'',
 	'see the template:',
 	'',
 	'```md',
-	'None — the children are independent; any execution order works.',
+	UNORDERED_DEPENDENCIES,
 	'```',
 	'',
-	'## Progress',
+	PROGRESS_HEADING,
 	'',
-	'- [ ] #101',
+	FIRST_TASK_ROW,
 ].join('\n')
 
 describe('git_epic_validate.validate_epic — quoted template', () => {
@@ -104,6 +109,63 @@ describe('git_epic_validate.validate_epic — quoted template', () => {
 	it('does not accept an unordered declaration that only appears inside a fenced block', () => {
 		expect(check_names_failing(to_subject({ body: QUOTED_TEMPLATE_BODY }))).toContain(
 			DEPENDENCIES_CHECK,
+		)
+	})
+})
+
+function dependencies_detail(subject: EpicSubject): string {
+	return (
+		git_epic_validate.validate_epic(subject).find((result) => result.name === DEPENDENCIES_CHECK)
+			?.detail ?? ''
+	)
+}
+
+describe('git_epic_validate.validate_epic — an order recommended in prose', () => {
+	// joshuafolkken/kit#1155: an epic created without `--ordered` whose split rationale recommends an
+	// execution order was reported as declaring an ordered chain, contradicting the `None — ...`
+	// literal in its own Dependencies section — and both halves counted as passing.
+	const PROSE_ORDER_BODY = [
+		'## Split rationale',
+		'',
+		'Running #102 before #101 is the sensible order (#101 -> #102).',
+		'',
+		generated_body(false),
+	].join('\n')
+
+	it('reports the batch as unordered rather than as an ordered chain', () => {
+		expect(dependencies_detail(to_subject({ body: PROSE_ORDER_BODY }))).toBe(
+			'declared as an unordered batch',
+		)
+	})
+
+	it('keeps the epic valid', () => {
+		expect(is_valid(to_subject({ body: PROSE_ORDER_BODY }))).toBe(true)
+	})
+})
+
+describe('git_epic_validate.validate_epic — a body declaring both forms', () => {
+	const CONTRADICTORY_BODY = [
+		DEPENDENCIES_HEADING,
+		'',
+		'#101 -> #102',
+		'',
+		UNORDERED_DEPENDENCIES,
+		'',
+		PROGRESS_HEADING,
+		'',
+		FIRST_TASK_ROW,
+		'- [ ] #102',
+	].join('\n')
+
+	it('fails rather than passing on whichever half is read first', () => {
+		expect(check_names_failing(to_subject({ body: CONTRADICTORY_BODY }))).toContain(
+			DEPENDENCIES_CHECK,
+		)
+	})
+
+	it('says the two declarations contradict each other', () => {
+		expect(dependencies_detail(to_subject({ body: CONTRADICTORY_BODY }))).toContain(
+			'they contradict each other',
 		)
 	})
 })

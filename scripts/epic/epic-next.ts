@@ -99,6 +99,12 @@ function unreadable_anomaly(snapshot: EpicSnapshot): GraphAnomaly | undefined {
 // Whether the body states an order at all. Read through the same parser the links come from, so a
 // body whose arrows are all prose cannot count as a declaration with zero links — which would report
 // every correct relation as undeclared.
+//
+// Deliberately a disjunction where `epic:check` takes exactly one of the two: a body declaring both
+// a chain and the `None — ...` literal is a contradiction, and reporting it is the check's job
+// (joshuafolkken/kit#1155). Refusing to hand out work here as well would stop an unattended run on a
+// body whose declared chain and recorded relations agree — a worse outcome than following the chain
+// the run's own `epic:check` already flagged.
 function is_order_declared(body: string | undefined, links: ReadonlyArray<unknown>): boolean {
 	return links.length > 0 || git_epic_parse.has_unordered_declaration(body)
 }

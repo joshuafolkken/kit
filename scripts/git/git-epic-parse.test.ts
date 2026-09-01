@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
 	has_child,
-	has_declared_dependency_chain,
 	has_external_task_list_entry,
-	has_unordered_declaration,
 	is_state_closed,
 	parse_dependency_links,
 	parse_external_task_list_children,
 	parse_task_list_issue_numbers,
-	UNORDERED_DEPENDENCIES,
 } from './git-epic-parse'
 
 const PARSE_CASES = [
@@ -152,72 +149,6 @@ const BACKLINK_CASES = [
 describe('has_external_task_list_entry — Origin backlink shapes', () => {
 	it.each(BACKLINK_CASES)('$label', ({ body, expected }) => {
 		expect(has_external_task_list_entry(body)).toBe(expected)
-	})
-})
-
-function dependencies_body(declaration: string): string {
-	return `## Dependencies\n\n${declaration}\n`
-}
-
-const DEPENDENCY_CASES = [
-	{
-		label: 'detects an ascii arrow chain under Dependencies',
-		body: dependencies_body('#101 -> #102 -> #103 (#102 needs the API from #101)'),
-		expected: true,
-	},
-	{
-		label: 'detects a unicode arrow chain',
-		body: dependencies_body('#101 → #102'),
-		expected: true,
-	},
-	{
-		label: 'detects a chain written without surrounding spaces',
-		body: dependencies_body('#101->#102'),
-		expected: true,
-	},
-	{
-		label: 'reports none when the batch is declared unordered',
-		body: dependencies_body('None — the children are independent; any execution order works.'),
-		expected: false,
-	},
-	{
-		label: 'reports none for a bare list of children with no arrow',
-		body: dependencies_body('#101, #102, #103'),
-		expected: false,
-	},
-	{ label: UNDEFINED_BODY_LABEL, body: undefined, expected: false },
-	{
-		label: 'ignores a chain shown only inside a fenced template sample',
-		body: `\`\`\`md\n${dependencies_body('#101 -> #102')}\`\`\`\n\n${dependencies_body('None — independent.')}`,
-		expected: false,
-	},
-] as const satisfies ReadonlyArray<{ label: string; body: string | undefined; expected: boolean }>
-
-describe('has_declared_dependency_chain', () => {
-	it.each(DEPENDENCY_CASES)('$label', ({ body, expected }) => {
-		expect(has_declared_dependency_chain(body)).toBe(expected)
-	})
-})
-
-describe('has_unordered_declaration', () => {
-	it('detects the literal that declares a batch to have no order', () => {
-		expect(has_unordered_declaration(`## Dependencies\n\n${UNORDERED_DEPENDENCIES}\n`)).toBe(true)
-	})
-
-	it('rejects a body whose dependencies are prose', () => {
-		expect(has_unordered_declaration('## Dependencies\n\n#102 depends on #101\n')).toBe(false)
-	})
-
-	// Same reason every other predicate strips fences: an epic body may quote the template, and the
-	// declaration inside that quote is an illustration rather than this epic's own.
-	it('ignores the literal when it only appears inside a fenced block', () => {
-		const body = `## Dependencies\n\nsee below\n\n\`\`\`md\n${UNORDERED_DEPENDENCIES}\n\`\`\`\n`
-
-		expect(has_unordered_declaration(body)).toBe(false)
-	})
-
-	it('reports false for a missing body', () => {
-		expect(has_unordered_declaration(undefined)).toBe(false)
 	})
 })
 

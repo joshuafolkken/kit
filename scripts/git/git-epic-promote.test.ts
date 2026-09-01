@@ -162,16 +162,29 @@ describe('git_epic_promote.conflict_reason', () => {
 	})
 })
 
-describe('git_epic_promote.is_tracking_complete', () => {
+describe('git_epic_promote.find_tracking_error', () => {
 	it('accepts a body tracking every child', () => {
-		expect(git_epic_promote.is_tracking_complete(promote(), CHILDREN)).toBe(true)
+		expect(git_epic_promote.find_tracking_error(promote(), CHILDREN)).toBeUndefined()
 	})
 
 	it('rejects a body missing one of them', () => {
-		expect(git_epic_promote.is_tracking_complete(promote(), [...CHILDREN, 999])).toBe(false)
+		expect(git_epic_promote.find_tracking_error(promote(), [...CHILDREN, 999])).toContain(
+			'would not track every child',
+		)
 	})
 
 	it('rejects a body with no dependency declaration', () => {
-		expect(git_epic_promote.is_tracking_complete(FIRST_CHILD_ROW, [101])).toBe(false)
+		expect(git_epic_promote.find_tracking_error(FIRST_CHILD_ROW, [101])).toContain(
+			'no machine-readable',
+		)
+	})
+
+	// joshuafolkken/kit#1155: the issue being promoted is kept verbatim, so a line of its own that is
+	// only a chain survives into the epic and contradicts the `None — ...` literal an unordered
+	// promotion writes. Reported as "does not track every child", that left nothing to act on.
+	it('names the contradicting line when the original body already declares a chain', () => {
+		const body = promote({ body: `${ORIGINAL_BODY}\n\n- #101 -> #102\n` })
+
+		expect(git_epic_promote.find_tracking_error(body, CHILDREN)).toContain('Reword that line first')
 	})
 })
