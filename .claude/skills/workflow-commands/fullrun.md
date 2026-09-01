@@ -5,7 +5,7 @@ running the `/code-review` step and `followup.md` before the merge — the two r
 most often breaks live there, not here.
 
 
-**The target repository is named in front of the Issue reference** — `fullrun joshuafolkken/app-kit#12`, `fullrun kit#new`. The definition is the same at every entry point: `SKILL.md` → "2c. The `owner/repo#` prefix" (canonical: `prompts/collaboration-workflow/target-repo.md`). An implementing entry needs that repository's checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than cloning** when there is none, or when the tree there is not clean — the `new` path's stash step covers this session's repository, never someone else's checkout, and a prefix naming this repository changes nothing. A target whose owner is not this session's is third-party: Tier C, so it stops rather than filing.
+**The target repository is named in front of the Issue reference** — `fullrun joshuafolkken/app-kit#12`, `fullrun kit#new`. The definition is the same at every entry point: `SKILL.md` → "2c. The `owner/repo#` prefix". An implementing entry needs that repository's checkout: resolve it from `pnpm josh doctor`, and **stop and report rather than cloning** when there is none, or when the tree there is not clean — the `new` path's stash step covers this session's repository, never someone else's checkout, and a prefix naming this repository changes nothing. A target whose owner is not this session's is third-party: Tier C, so it stops rather than filing.
 
 **A `needs-human-review` issue stops before the commit.** Implement it and take it through the
 verification gate as usual — **including `pnpm josh test:e2e`, which you run yourself, because with
