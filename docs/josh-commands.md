@@ -1280,9 +1280,10 @@ Measured on one real request: `cache_read_input_tokens` 97,190 against `input_to
 Run the agent rule-compliance scenarios and report how many held.
 
 ```bash
-pnpm josh eval                       # every scenario
-pnpm josh eval consult-not-execute   # one scenario by name
-JOSH_EVAL_MODEL=opus pnpm josh eval  # a different model (default: sonnet)
+pnpm josh eval                          # every scenario
+pnpm josh eval consult-not-execute      # one scenario by name
+JOSH_EVAL_MODEL=opus pnpm josh eval     # a different model (default: sonnet)
+JOSH_EVAL_CONCURRENCY=2 pnpm josh eval  # fewer sessions at a time (default: 5)
 ```
 
 Each scenario replays a representative situation against a real Claude session in a throwaway
@@ -1294,6 +1295,11 @@ be argued about.
 Exits `0` only when every scenario held. It needs the `claude` CLI on `PATH` and is deliberately not
 part of CI — every scenario costs tokens and minutes, so it is run when a distributed document,
 skill or hook changes. See [docs/eval.md](./eval.md) for the scenario format and how to add one.
+
+**Scenarios run up to five at a time**, so the suite's wall-clock is close to its slowest scenario
+rather than the sum of all of them ([#1144](https://github.com/joshuafolkken/kit/issues/1144)).
+`JOSH_EVAL_CONCURRENCY` lowers the width; a value that is not a positive integer is refused rather
+than replaced by the default.
 
 The run's last line is a verdict rather than only a count — `held`, `blocked` or `unmeasured` — because
 the exit code is `0` only when every scenario passed, so a failed run and one that measured nothing

@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { bounded_pool } from '#scripts/bounded-pool'
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { git_gh_command } from '#scripts/git/git-gh-command'
@@ -77,26 +78,19 @@ async function epic_issue_relations(
 // Spawning all of them at once is what turns a rate limit into a wrong answer: a refused read becomes
 // an empty relation list, and a bundle that should have been proposed is reported as "no strong
 // signal" instead. Batching bounds the burst; the `unreadable` list below is what keeps a refused
-// read from passing as an answer (joshuafolkken/kit#873).
+// read from passing as an answer (joshuafolkken/kit#873). The pool itself is `bounded-pool.ts`,
+// shared with the reference reads below it and with the eval suite (joshuafolkken/kit#1144).
 const RELATION_CONCURRENCY = 8
 
 async function fetch_relations(
 	numbers: ReadonlyArray<number>,
 	repo: string,
 ): Promise<Array<Array<IssueReference> | undefined>> {
-	const results: Array<Array<IssueReference> | undefined> = []
-
-	for (let index = 0; index < numbers.length; index += RELATION_CONCURRENCY) {
-		const slice = numbers.slice(index, index + RELATION_CONCURRENCY)
-
-		results.push(
-			...(await Promise.all(
-				slice.map(async (number) => await epic_issue_relations(String(number), repo)),
-			)),
-		)
-	}
-
-	return results
+	return await bounded_pool.bounded_map(
+		numbers,
+		RELATION_CONCURRENCY,
+		async (number) => await epic_issue_relations(String(number), repo),
+	)
 }
 
 // The open backlog, with each issue's relations and the epic tracking it. `unreadable` names the
