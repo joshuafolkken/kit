@@ -212,7 +212,7 @@ see at all.
 distribution ran every scenario and blocked on a failure, the gradual degradation an end-of-epic run
 would look for has already been measured; the full reasoning, and the answer to "an unattended run has
 no other instrument for output quality", is in
-`prompts/collaboration-workflow/eval-gate.md`.
+`.claude/skills/workflow-commands/eval-gate.md`.
 
 ## Reading the output
 
