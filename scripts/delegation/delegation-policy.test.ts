@@ -7,6 +7,7 @@ const GATE_FIX = 'gate-fix'
 const UNLISTED = 'anything-nobody-listed'
 const REVIEW = 'review'
 const EPIC_CHILD = 'epic-child'
+const QUEUE_CHILD = 'queue-child'
 
 // joshuafolkken/kit#969: which steps may run in a cheaper tier is decided by an enumeration, and
 // everything not enumerated is kept. The direction of the default is the whole safety argument — a
@@ -100,6 +101,35 @@ describe('epic-child is a second unit on the one mechanism', () => {
 
 	it('does not rest on the summary the unit returns', () => {
 		expect(delegation_policy.reason_for(EPIC_CHILD)).toContain('not from the summary')
+	})
+
+	// joshuafolkken/kit#1149 widens the unit from "an epic's child" to "one child of a batch", so a
+	// `queue`'s issues run isolated too. The widening has to be in the row the command prints: a
+	// `queue` asking `josh delegate epic-child` reads `--list` to learn what it is agreeing to, and a
+	// row that still says "epic" reads as an answer about someone else's run.
+	it('covers a queued issue as well as an epic child', () => {
+		const step = delegation_policy.find_step(EPIC_CHILD)
+
+		expect(step?.does).toContain('`queue`')
+		expect(step?.does).toContain('`epicrun`')
+	})
+
+	// The single-source half. A second row would be a second mechanism in everything but name — same
+	// brief, same summary, same verifier — and the two would drift from the first edit onward.
+	it.each([QUEUE_CHILD, 'batch-child'])(
+		'keeps %s off the list rather than cloning the row',
+		(name) => {
+			expect(delegation_policy.find_step(name)).toBeUndefined()
+			expect(delegation_policy.verdict_for(name)).toBe(delegation_policy.KEEP_VERDICT)
+		},
+	)
+
+	it('stays one row for both entry points', () => {
+		const covering = delegation_policy.DELEGATABLE_STEPS.filter((step) =>
+			step.does.includes('`queue`'),
+		)
+
+		expect(covering.map((step) => step.name)).toStrictEqual([EPIC_CHILD])
 	})
 })
 

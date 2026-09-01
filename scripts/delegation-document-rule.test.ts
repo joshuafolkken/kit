@@ -158,3 +158,108 @@ describe.each(BOTH)('%s — separates the mechanism from the unit', (document_pa
 		expect(read_repo_file(document_path)).toContain('984')
 	})
 })
+
+// joshuafolkken/kit#1149: the unit widened from "an epic's child" to "one child of a batch", so a
+// `queue`'s issues run isolated too. A document that still describes the row as an epic-only unit
+// sends a `queue` to accumulate every issue's history in one context — which is what it did before
+// the widening, and reads as correct because the row it consulted said so.
+const QUEUE_SKILL = '.claude/skills/workflow-commands/queue.md'
+const EPIC_CHILD = 'epic-child'
+const DELEGATION_COMMAND = `pnpm josh delegate ${EPIC_CHILD}`
+const STATE_READ = 'pnpm josh issue:state'
+
+const QUEUE_UNIT_MARKERS: ReadonlyArray<[string, string]> = [
+	[CANONICAL, '`queue-child` のような 2 行目を足さない'],
+	[SKILL, "an epic's child under `epicrun` and one issue of a `queue` alike"],
+	[COMMAND_DOC, 'One row covers both batch entry points'],
+]
+
+describe.each(QUEUE_UNIT_MARKERS)(
+	'%s — the unit covers a queue as well as an epic',
+	(document_path, marker) => {
+		it('says one row covers both batch entry points', () => {
+			expect(read_unwrapped(document_path)).toContain(marker)
+		})
+	},
+)
+
+describe('the widened unit is one row, not a second', () => {
+	// The prose above is only true while the command agrees with it: a `queue` reading `--list` to
+	// learn what it is agreeing to must find itself in the row it was told to ask about.
+	it('is what the command prints for the one row', () => {
+		expect(delegation_policy.find_step(EPIC_CHILD)?.does).toContain('`queue`')
+	})
+
+	it('adds no queue-only row for the documents to describe', () => {
+		expect(delegation_policy.find_step('queue-child')).toBeUndefined()
+	})
+})
+
+describe(`${QUEUE_SKILL} — each issue runs in the delegated unit`, () => {
+	const content = read_repo_file(QUEUE_SKILL)
+	const unwrapped = read_unwrapped(QUEUE_SKILL)
+
+	// A heading, not merely the words: step 2b points at it by name, and a paragraph buried in the
+	// key rules is one a run scanning the headings never reaches.
+	it('has the section as a heading of its own', () => {
+		expect(content).toMatch(/^#{2,4} Each issue runs in a delegated unit$/mu)
+	})
+
+	it('routes the decision to the command rather than to judgement', () => {
+		expect(unwrapped).toContain(DELEGATION_COMMAND)
+	})
+
+	// The verifier is the whole reason the unit may be delegated. A queue that advanced on the
+	// returned summary would start the next issue against an issue that never merged.
+	it('says the parent confirms the issue from GitHub, not from the summary', () => {
+		expect(unwrapped).toContain(STATE_READ)
+		expect(unwrapped).toContain('The parent reads GitHub, never the summary')
+	})
+
+	// Pointing rather than restating is the single-source half: a second copy of the mechanism drifts
+	// from the first edit onward, and `CLAUDE.md` prohibits it by name.
+	it('points at the one definition instead of restating it', () => {
+		expect(unwrapped).toContain(CANONICAL)
+	})
+})
+
+// What the parent still owes once the work is out of its context: the reads that decide whether an
+// issue actually finished, and the two rules a unit briefed only with "run `fullrun #<N>`" would
+// otherwise break. Each was written after a failure, and each is silent when omitted.
+describe(`${QUEUE_SKILL} — what the parent keeps when the issue is delegated`, () => {
+	const unwrapped = read_unwrapped(QUEUE_SKILL)
+
+	it.each([
+		'`--repo` is not optional for a cross-repository issue',
+		'read the `human_review:` line rather than eye-matching the `labels:` one',
+		'a non-zero exit is not `OPEN`',
+		// One stop, one Telegram: the unit already notified the pause it stopped for.
+		'Do not send a second `confirmation` Telegram',
+	])('carries %j', (marker) => {
+		expect(unwrapped).toContain(marker)
+	})
+
+	// Step 2a only covers issues that have a successor, so the last merge reaches this checkout only
+	// if the loop's tail says so.
+	it('pulls the final delegated merge back after the last issue', () => {
+		expect(unwrapped).toContain('Run `pnpm josh ms` once more here')
+	})
+
+	// Delegation moves the merge out of the checkout the loop implements in, so the step that pulls it
+	// back stops being defensive. Left unsaid, the next issue is implemented against a stale default
+	// branch.
+	it('says the per-issue `pnpm josh ms` is what brings the merge back', () => {
+		expect(unwrapped).toContain('the checkout the queue implements in')
+	})
+
+	// The two rules a unit briefed only with "run `fullrun #<N>`" would otherwise break: it would
+	// follow `fullrun.md` and bump dependencies into every PR after the first, and the label it
+	// applied would outlive it on a failure — which makes `epic:next` answer `wait` for the whole
+	// repository.
+	it.each(['`josh latest` is not run', 'Remove the stale `in-progress` here'])(
+		'keeps the parent-side rule %j',
+		(marker) => {
+			expect(unwrapped).toContain(marker)
+		},
+	)
+})
