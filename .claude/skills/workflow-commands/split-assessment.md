@@ -89,3 +89,10 @@ A separate keyword for "split this conversation into an epic" would duplicate `k
 leaving a person to decide which of two commands to type for one job. That is more human involvement,
 which is the opposite of what these commands are for. The assessment above is how a split is reached
 from every entry.
+
+## Issues filed separately, found related later
+
+Issues that were filed at different times and turn out to be related afterwards are **not** a split
+either — a split is about one request in hand containing several deliverables, not about relating
+things that already exist. That case is outside this assessment, and `pnpm josh epic --promote` is
+what handles it, as a separate use of the same command (joshuafolkken/kit#873).
