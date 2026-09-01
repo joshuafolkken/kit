@@ -21,9 +21,13 @@ function label_flag(label: string): string {
 	return `-f 'labels[]=${label}'`
 }
 
+const SKILL_ROOT = '.claude/skills/workflow-commands'
+
 // Each filing route, the constant that names its label, and the document whose filing command must
 // carry it. Tier A files from two procedures — a prerequisite (same repo) and an upstream defect
-// (a first-party target) — so both are pinned.
+// (a first-party target) — so both are pinned. The prerequisite's command moved to the skill under
+// joshuafolkken/kit#1185, which single-sourced that rule body there and left the canonical topic
+// file a pointer holding no command of its own.
 const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: string }> = [
 	{
 		route: 'review round-cap carry-forward',
@@ -33,12 +37,12 @@ const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: 
 	{
 		route: 'split child',
 		label: SPLIT_ROUTE_LABEL,
-		doc: '.claude/skills/workflow-commands/kickoff.md',
+		doc: `${SKILL_ROOT}/kickoff.md`,
 	},
 	{
 		route: 'Tier A prerequisite',
 		label: TIER_A_ROUTE_LABEL,
-		doc: 'prompts/collaboration-workflow/prerequisite-issue.md',
+		doc: `${SKILL_ROOT}/SKILL.md`,
 	},
 	{
 		route: 'Tier A upstream defect',
@@ -59,7 +63,7 @@ describe('every filing route labels the issue it creates', () => {
 // `gh api` command, so it must name the route label or the run files unlabeled and the count is
 // wrong. Pinning the label name here is what stops the canonical wiring from being complete while
 // the copies that do the filing are not (joshuafolkken/kit#1083).
-const SKILL_ROOT = '.claude/skills/workflow-commands'
+//
 // The it.each case name shared by the two label-mention suites below.
 const NAMES_LABEL_CASE = '$doc names $label'
 const OPERATIONAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [
@@ -81,9 +85,10 @@ describe('the workflow-command filing copies name their route label', () => {
 // declares that the two must match). Wiring only the operational layer would leave the declared
 // source of truth saying children and prerequisites file unlabeled — the same drift in mirror image.
 // The bare-issue epicrun path is a canonical filing site; pin the labels it names so the canonical
-// and operational layers cannot diverge (joshuafolkken/kit#1083). The split assessment is the
-// exception: joshuafolkken/kit#1174 single-sourced its body into the skill, so only the skill copy
-// carries the filing command and the canonical topic file is a pointer with none of its own.
+// and operational layers cannot diverge (joshuafolkken/kit#1083). The split assessment and the
+// mid-run prerequisite are the exceptions: joshuafolkken/kit#1174 and joshuafolkken/kit#1185
+// single-sourced their bodies into the skill, so only the skill copy carries the filing command and
+// each canonical topic file is a pointer with none of its own.
 const WORKFLOW_ROOT = 'prompts/collaboration-workflow'
 const CANONICAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [
 	{ doc: `${WORKFLOW_ROOT}/epicrun.md`, label: SPLIT_ROUTE_LABEL },

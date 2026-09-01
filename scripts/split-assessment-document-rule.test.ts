@@ -29,7 +29,9 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'Three rules decide what a run does when the work turns out not to be one Issue',
 	'the split assessment every entry point applies identically',
 	SHARED_FILE,
-	'its single source, cited directly because the canonical topic file is now a pointer to it',
+	// joshuafolkken/kit#1185 converted the mid-run prerequisite too, so one clause now covers both
+	// single sources rather than this one alone.
+	'both single sources, cited directly because their canonical topic files are now pointers to them',
 ]
 
 // The entry file summarizes the rule for a run that has loaded the skill but not yet opened the
