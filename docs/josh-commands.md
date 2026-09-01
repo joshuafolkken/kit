@@ -1184,7 +1184,7 @@ The two labels sit on opposite sides of a run, and the code says so. `needs-deci
 gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f description="Implement and verify, but stop before committing so a person can look"
 ```
 
-The behavior it triggers belongs to the workflow commands rather than to any `josh` subcommand: [`prompts/collaboration-workflow/human-review-label.md`](../prompts/collaboration-workflow/human-review-label.md) is the canonical definition.
+The behavior it triggers belongs to the workflow commands rather than to any `josh` subcommand: [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workflow-commands/SKILL.md) → §2z is the single source of the definition.
 
 ### `josh review:level`
 

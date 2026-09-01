@@ -102,6 +102,16 @@ point reached it — `epicrun`, `fullrun` or `queue` (joshuafolkken/kit#1125). I
 opposite: that label widens unattended execution past an epic's edge, this one withholds its last
 step, and both may be applied **only by a person**.
 
+**It exists because some work's quality is not something a test can judge**, and nothing in the
+workflow could say so. Two kinds recur: a **published artifact** — an article is the usual one —
+where the unit tests on length and required front matter pass and say nothing at all about the
+writing; and **a choice that was a person's to make**, such as picking one of several generated
+candidates. **None of the means already available expresses that.** Pre-applying `needs-decision` is
+worse than useless: `epic:next` classifies the child as waiting on a person and never starts it, so
+the artifact a person is meant to look at is never produced. Writing "run this one with `halfrun`" in
+the issue body carries no force, and `epicrun #<E>` walks straight past it. Withholding `auto-ok`
+does nothing whatever — an epic's children run without it.
+
 - **Implementation and the verification gate run normally** — refactor, `pnpm josh gate`,
   `/code-review`, `pnpm josh eval:scope`, exactly as for any other child.
 - **Run `pnpm josh test:e2e` yourself before stopping.** With no pull request there is no CI E2E job,
@@ -115,9 +125,21 @@ step, and both may be applied **only by a person**.
 - **Send a `confirmation` Telegram and stop the whole run.** The remaining children are not started —
   inside an `epicrun` this is the one thing that is *not* park-and-continue.
 - The Telegram body carries the **resume command**, in the same form `halfrun`'s own stop uses.
+- **Resuming is `halfrun`'s stop exactly**: a person looks at the working tree and, if it is right,
+  carries on from the commit themselves. The stop report carries that resume command too, not only
+  the Telegram.
 
 **Stopping is the specification, not a failure.** The label's job is not to keep a batch moving; it
 is to stop a batch walking past a decision that was a person's to make.
+
+**What the alternatives could not do is leave the choosing with a person**, and the batch-preserving
+one was the early recommendation. Opening the pull request and leaving it unmerged keeps the run
+going, and it satisfies **only half** the requirement: a person approves *publication*, but on a
+candidate-selection issue the run has already chosen one and committed it, so the person's job
+changes from **choosing** to reverting what was chosen. Stopping, stashing and moving to the next
+child satisfies both halves and pays in stashes — thirteen children, thirteen stashes, and work that
+disappears the first time two are confused. Stopping before the commit and leaving the tree exactly
+as it is satisfies both at no such price. The decision in full is joshuafolkken/kit#1125 → `## 決定`.
 
 **Read the answer from `pnpm josh issue:state <N>`, never by matching the label string yourself**
 (joshuafolkken/kit#1132). It prints a `human_review: yes` / `human_review: no` line beside the state
@@ -139,16 +161,27 @@ pnpm josh issue:state <N> --repo <owner/repo>  # a child in another repository
 
 **Never apply or remove it**, exactly as strongly as `auto-ok`: a mark a run can clear for itself is
 not a mark. Typing the command on an explicit instruction in the current turn is not applying it;
-everything else is a proposal, written as an Issue comment and left for the person.
+everything else is a proposal, written as an Issue comment and left for the person. The label itself
+is created once per repository, by a person:
+
+```bash
+gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f description="Implement and verify, but stop before committing so a person can look"
+```
 
 **It is not `needs-decision`, and reading it as one breaks two things.** `needs-decision` withholds a
 run's *start*; this withholds its *end*. So a `needs-human-review` issue is still offered — excluded,
 the artifact a person is meant to look at would never be produced — and a child stopped by it **goes
 on holding its repository**, because the uncommitted work is still in the checkout. Read as parked
-there, the next child would start `git switch main && git pull` on top of it. `issue-labels.ts` and
-`epic-busy.ts` encode both halves.
+there, the next child would start `git switch main && git pull` on top of it. **The code encodes both
+halves by leaving the label out of two sets**: `scripts/git/issue-labels.ts` keeps it out of
+`NOT_DIRECTLY_RUNNABLE_LABELS` — in it, the issue is never offered — and `scripts/epic/epic-busy.ts`
+keeps it out of the parked set, in which the checkout would be handed to the next child while the
+stopped one's uncommitted work is still sitting in it.
 
-Canonical reference: `prompts/collaboration-workflow/human-review-label.md`.
+This section is the single source of the rule; `prompts/collaboration-workflow/human-review-label.md`
+is a pointer to it (joshuafolkken/kit#1184 rollout of the joshuafolkken/kit#1174 pattern). Each entry
+point's own branch stays in its own file — `fullrun.md`, `halfrun.md`, `queue.md`, `epicrun.md` — and
+routes here for the definition.
 
 ## 2a. The `into <target>` suffix — where the new Issue lands
 

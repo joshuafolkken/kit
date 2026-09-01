@@ -1,78 +1,17 @@
-# `needs-human-review` — 成果物を人が見るまで出荷させない
+## `needs-human-review` — 成果物を人が見るまで出荷させない
 
-`auto-ok` が無人実行を EPIC の外へ**広げる** opt-in であるのに対し、`needs-human-review` は無人実行の**最後の一歩を差し止める** opt-out である（joshuafolkken/kit#1125）。
+**この規則の単一ソースは [`.claude/skills/workflow-commands/SKILL.md`](../../.claude/skills/workflow-commands/SKILL.md) である。** ここに本文を複製しない（「クローン禁止・単一ソース化」の適用。joshuafolkken/kit#1174 のパイロットに続く横展開 joshuafolkken/kit#1184）。
 
-このラベルを持つ Issue は、`epicrun` / `fullrun` / `queue` のいずれで到達しても **`halfrun` 相当に降格**する。
+`residency.md` が定めるとおり、このラベルはコマンドが始まった後にだけ効く規則なので手順本体は skill 側に置く。かつては同じ内容の日本語全文がここにも重複していたが、1 つの規則を直すのに書く箇所が増えるだけで設計上の意味がないため、指し先へ縮小した。参照文書だけにあったのは、起票背景（joshuafolkken/kit#1125 — 「機械では測れない品質は人が見るまで出荷してはならない」を表す手段が無く、公開物と人が選ぶものの 2 類型がある）、既存の手段が成立しない理由（`needs-decision` の先付けは実行そのものを止め、Issue 本文の指示には強制力が無く、`auto-ok` を付けないことは EPIC の子に効かない）、採らなかった 2 案とその理由（PR まで作る案は「人が選ぶ」を満たさない／stash して次へ進む案は stash が積み上がる）、joshuafolkken/kit#1132 でラベル文字列を目で照合しない理由、`needs-decision` と取り違えると壊れる 2 点とそれを支えるコード側の 2 集合、そして再開の経路である。いずれも縮小の前に手順書へ畳み込み済み。
 
-## 何のためにあるか
+手順書（「2z. `needs-human-review` — the child that stops before its commit」）に置かれている内容:
 
-「成果物の良し悪しは機械では測れないので、人が見てからでなければ出してはならない」という要求を表す手段が無かった。典型は 2 つある。
+- `epicrun` / `fullrun` / `queue` のどこから到達しても `halfrun` 相当へ降格すること。`auto-ok` とはちょうど逆向きの opt-out で、付けるのも外すのも人だけであること
+- 何のために存在するか（公開物と人が選ぶもの）と、既存の手段がいずれも成立しない理由
+- 降格したときの手順 — 実装と検証ゲートは通常どおり、E2E は `pnpm josh test:e2e` を自分で回して閉じる、コミット・push・PR・マージのいずれも行わない、作業ツリーは未コミットのまま stash もしない、`confirmation` Telegram に再開コマンドを載せて run 全体を止める
+- 止まることは失敗ではなく仕様であること。「PR まで作ってマージしない」案と「stash して次の子へ」案を採らなかった理由
+- 降格の判定は `pnpm josh issue:state <N>` の `human_review:` 行から読み、ラベル文字列を自分で突き合わせないこと（joshuafolkken/kit#1132）。判定は実装の前に一度だけ行うこと
+- `needs-decision` との違い（開始前か終了前か、リポジトリを保持するかどうか）と、それを支える `issue-labels.ts` / `epic-busy.ts` の 2 集合
+- ラベルをリポジトリごとに一度だけ作る `gh api` コマンド
 
-- **公開物**（ブログ記事など）— 分量と必須フロントマターの単体テストは通ってしまう。文章の質は通らない
-- **人が選ぶもの**（候補画像からの採用決定など）— AI が 1 枚選んで先へ進めてしまい、選択がレビュー後の差し戻しに変わる
-
-既存の手段はいずれも成立しない。`needs-decision` を先に付けると `epic:next` がその子を人待ちと分類して**そもそも実行しない**（「実装させたうえで止める」にならない）。Issue 本文に「`halfrun` で実行すること」と書いても強制力が無く、`epicrun #<E>` を打たれれば素通りする。`auto-ok` を付けないことは EPIC の子には何の効果も無い — EPIC の子は `auto-ok` 無しで実行される。
-
-## 降格したときに何が起きるか
-
-1. **実装と検証ゲートは通常どおり走る。** リファクタ、`pnpm josh gate`、`/code-review`、`pnpm josh eval:scope` まで、他の子と何ひとつ変わらない
-2. **E2E は自分で `pnpm josh test:e2e` を回して閉じる。** PR を作らないため CI の E2E ジョブが無く、それを待って止める `pnpm josh followup --merge` にも到達しない。`halfrun` の停止とまったく同じ状況で、`CLAUDE.md` の「Completion gate」が同じ答えを与えている — PR が無い側は自分で回して出力を読む。E2E スイートが無いプロジェクトでは印字されたスキップが答えであり、印字を見ていないスキップは答えではない
-3. **コミット・push・PR 作成・マージのいずれも行わない。** `pnpm josh bump`、`pnpm josh git`、`pnpm josh followup` のどれにも到達しない
-4. **作業ツリーは未コミットのまま残す。** stash もしない
-5. **`confirmation` Telegram を送り、run 全体を停止する。** 残りの子は開始しない
-6. Telegram 本文には `halfrun` の停止と同じ形で**再開コマンド**を載せる
-
-**止まることは失敗ではなく仕様である。** このラベルの役割は「バッチを回すこと」ではなく「バッチが人の判断を踏み越えるのを止めること」であり、バッチが最初の該当子で止まるのは想定どおりの結末である。
-
-## なぜ「PR まで作ってマージしない」ではないのか
-
-検討した 3 案のうち、(A) 「PR まで作りマージしない」は**バッチを続行できる**という明確な利点があり、当初の推奨でもあった。採らなかった理由は 1 つである。
-
-**(A) は「人が公開を承認する」は満たすが、「人が選ぶ」を満たさない。** 候補から人が選ぶ工程では、(A) だと AI が 1 つ選んでコミットしてしまい、人の仕事が「選ぶ」から「選ばれた結果を差し戻す」に変質する。コミット前で止まる案だけが両方を満たす。
-
-(C) 「止めて stash し次の子へ」も両方を満たすが、stash が積み上がり取り違えれば作業が消える。子が 13 件なら stash も 13 個になる。
-
-決定の全文は joshuafolkken/kit#1125 の `## 決定` にある。
-
-## `needs-decision` との違い（混同すると壊れる）
-
-|                        | `needs-decision`   | `needs-human-review`                   |
-| ---------------------- | ------------------ | -------------------------------------- |
-| いつ効くか             | 実行の**開始前**   | 実行の**終了前**                       |
-| 実装されるか           | されない           | される                                 |
-| 検証ゲートを通るか     | 通らない           | 通る                                   |
-| 何を待っているか       | 人が**決める**こと | 人が**見る**こと                       |
-| リポジトリを保持するか | **しない**         | **する**（未コミットの作業があるため） |
-
-**最後の行が最も重要である。** `epic:next` の per-repository 排他は `needs-decision` を `in-progress` より優先して読むため、park された子はリポジトリを保持しない — park して次の子へ進むために必要な性質である。降格して止まった子は逆で、未コミットの作業をチェックアウトに残しているので**保持し続けなければならない**。ここを取り違えると、次の子が `git switch main && git pull` をその作業の上で始める。
-
-この区別はコードにも出ている。`scripts/git/issue-labels.ts` は `needs-human-review` を `NOT_DIRECTLY_RUNNABLE_LABELS` に**入れない**（入れると一度も提示されず、人に見せるべき成果物が永久に作られない）。`scripts/epic/epic-busy.ts` の parked 集合にも**入れない**（入れると上記の踏みつけが起きる）。
-
-## 判定はコマンドの出力から読む（文字列を目で合わせない）
-
-`pnpm josh issue:state <N>` が `state:` / `labels:` に並べて **`human_review: yes` / `human_review: no`** を出す（joshuafolkken/kit#1132）。**降格するかどうかはこの行で判断し、ラベル文字列を自分で突き合わせない。**
-
-```bash
-pnpm josh issue:state <N>                      # state・labels・human_review
-pnpm josh issue:state <N> --repo <owner/repo>  # 別リポジトリの子
-```
-
-理由は綴りである。GitHub はラベルを**作られたときの綴りのまま**保持し、`Needs-Human-Review` と `needs-human-review` を同じ 1 つのラベルとして扱う。文字列を目で一致させると、別リポジトリで大文字混じりに作られたラベルを見落とし、**止まるべき run が止まらずに成果物が出荷される** — このラベルが存在する理由そのものが失われる。この行は `scripts/git/issue-labels.ts` の `has_any_label`（小文字化を行う、他の全ワークフローラベルが通っている判定）を通して決まる。
-
-このコマンドは `epicrun` が委譲した子の状態確認で**すでに呼んでいる**ものなので、読むための往復は増えない。
-
-## 付けるのも外すのも人だけ
-
-**AI は付与も削除もしてはならない。** `auto-ok` とまったく同じ強さの禁止である。自分で外せる印は印として機能せず、無人実行が自分の権限を自分で広げられることになる。
-
-**人のためにコマンドを打つことは付与ではない。** 現在のターンでの明示的な指示（「#912 に `needs-human-review` を付けて」）はその人の決定であり、実行するだけである。それ以外はすべて提案であり、Issue コメントとして書いて人に委ねる。
-
-ラベルはリポジトリごとに一度作る。
-
-```bash
-gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f description="Implement and verify, but stop before committing so a person can look"
-```
-
-## 再開の経路
-
-停止後は `halfrun` の停止とまったく同じである。人が作業ツリーを確認し、問題なければ自分でコミット以降を進める。Telegram 本文と停止時の報告には、その再開コマンドを必ず載せる。
+各入口での分岐そのものは、それぞれの入口ファイル（[`fullrun.md`](../../.claude/skills/workflow-commands/fullrun.md) / [`halfrun.md`](../../.claude/skills/workflow-commands/halfrun.md) / [`queue.md`](../../.claude/skills/workflow-commands/queue.md) / [`epicrun.md`](../../.claude/skills/workflow-commands/epicrun.md)）にあり、定義はいずれも上の 2z 節を指している。

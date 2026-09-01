@@ -94,8 +94,8 @@ Never advance the queue on the summary alone.
   pull request means no CI E2E job** — then commit nothing, leave the working tree uncommitted
   and unstashed, send a `confirmation` Telegram carrying the resume command, and stop — the issues
   after it are not started. That is the specification rather than a failure, so it is a
-  `confirmation` and not the `failure` notification step 2c sends. Definition: `SKILL.md` → §2z
-  (canonical: `prompts/collaboration-workflow/human-review-label.md`).
+  `confirmation` and not the `failure` notification step 2c sends. Definition: `SKILL.md` → §2z,
+  which is the single source.
 - Invoking `queue` is explicit authorization to merge each PR (same as `fullrun`).
 - `josh latest` runs only once, before the first issue. If files were pre-staged when `queue` was invoked, they must be stashed before `josh latest` and restored after.
 - All `kickoff`/`fullrun` mid-workflow stop rules (confirmation notification, AI review blocker handling, etc.) apply within each issue's execution.
