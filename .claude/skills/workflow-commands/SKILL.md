@@ -203,9 +203,13 @@ nothing left to disagree with them, which is why `--list` shows them as rejected
 
 **The mechanism is not the unit.** How a thing is delegated — an isolated execution unit, an explicit
 brief, a result the parent can verify, a failure that surfaces — is separate from what is delegated.
-The units are one step of a run (`gate-fix`, `survey`) and one whole child of an epic (`epic-child`,
-joshuafolkken/kit#984). **They share one mechanism** — one enumeration, one command, one verifier
-requirement; building a second is the clone `CLAUDE.md` prohibits.
+The units are one step of a run (`gate-fix`, `survey`) and one whole child of a batch (`epic-child`,
+joshuafolkken/kit#984) — an epic's child under `epicrun` and one issue of a `queue` alike
+(joshuafolkken/kit#1149). **They share one mechanism** — one enumeration, one command, one verifier
+requirement; building a second is the clone `CLAUDE.md` prohibits. **A batch entry point that does
+not delegate is the defect**, not a variant: `queue` accumulated every issue's history in one context
+until it was wired to this same row, and the per-issue procedure is `queue.md` → "Each issue runs in
+a delegated unit".
 
 Canonical reference: `prompts/collaboration-workflow/delegation.md`.
 

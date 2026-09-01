@@ -1235,7 +1235,7 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
 
-**The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step of a run, or one whole child of an epic ([#984](https://github.com/joshuafolkken/kit/issues/984)). Both are rows of the one enumeration above rather than two mechanisms, which is why `epic-child` is answered by this same command.
+**The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step of a run, or one whole child of a batch ([#984](https://github.com/joshuafolkken/kit/issues/984)). Both are rows of the one enumeration above rather than two mechanisms, which is why `epic-child` is answered by this same command. **One row covers both batch entry points**: an epic's child under `epicrun` and one issue of a `queue` are the same unit — same brief, same summary, same `pnpm josh issue:state` verifier — so the queue was wired to this row rather than given one of its own ([#1149](https://github.com/joshuafolkken/kit/issues/1149)).
 
 ### `josh cost`
 
