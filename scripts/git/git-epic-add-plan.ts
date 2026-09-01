@@ -47,7 +47,7 @@ function missing_declaration_error(epic_number: number): string {
 // What to do about a target that is not an epic. The refusal is deliberate — this command never
 // promotes an issue on its own, because promotion rewrites someone's issue into a container and the
 // choice between promoting and creating a new epic depends on what the target *is*, which only a
-// reader of it knows (`prompts/collaboration-workflow/split-assessment.md` → promote-or-create).
+// reader of it knows (`.claude/skills/workflow-commands/split-assessment.md` → promote-or-create).
 // Naming both arms is what keeps the refusal one command away from being actionable rather than a
 // dead end, which is the whole point of `into <target>` (joshuafolkken/kit#985).
 function promote_remedy(epic_number: number): string {

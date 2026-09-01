@@ -45,7 +45,7 @@ kickoff new into joshuafolkken/kit#909
 - 指定先が要望・議論・容れ物なら `pnpm josh epic --promote <N> <N...>` で昇格する
 - 指定先自身が成果物の 1 つなら、両方を子とする新しい EPIC を作る
 
-**コマンドが勝手に昇格しない理由**は、昇格が他人の Issue を容れ物へ書き換える構造変更であり、2 つのうちどちらが正しいかは指定先が何であるかに依るからである（`split-assessment.md` の promote-or-create と同じ分岐）。断り文句が対処を名指しするので、ランは 1 コマンドで先へ進める。
+**コマンドが勝手に昇格しない理由**は、昇格が他人の Issue を容れ物へ書き換える構造変更であり、2 つのうちどちらが正しいかは指定先が何であるかに依るからである（`.claude/skills/workflow-commands/split-assessment.md` の promote-or-create と同じ分岐）。断り文句が対処を名指しするので、ランは 1 コマンドで先へ進める。
 
 ### 別リポジトリの EPIC を指したとき
 

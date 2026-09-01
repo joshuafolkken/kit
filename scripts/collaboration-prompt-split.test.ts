@@ -1,11 +1,13 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import {
-	AI_DOCS,
+	PROMPT_ROOT,
+	read_index,
 	read_repo_file,
+	routing_documents,
 	WORKFLOW_PROMPT_DIRECTORY,
 	workflow_prompt_files,
 } from '#scripts/ai-document-fixture'
-import { package_file, SKILL_ROOT } from '#scripts/skill-fixture'
+import { package_file } from '#scripts/skill-fixture'
 import { describe, expect, it } from 'vitest'
 
 // The canonical workflow document used to be one 169 KB file, and every pointer into it named a
@@ -18,16 +20,8 @@ import { describe, expect, it } from 'vitest'
 
 const INDEX = 'prompts/collaboration-workflow.md'
 const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
-const MARKDOWN_EXTENSION = '.md'
 // The index exists to be read instead of the corpus, so it has to stay far smaller than it.
 const INDEX_CEILING_BYTES = 8000
-
-// Read straight from disk, never through `read_repo_file`: that reader deliberately answers the
-// index path with the whole concatenated corpus so the marker suites did not have to change, which
-// is the opposite of what a suite measuring the index needs.
-function read_index(): string {
-	return readFileSync(package_file(INDEX), 'utf8')
-}
 
 // The fixture already enumerates them for the concatenating reader; re-implementing it here would
 // let the two drift and quietly stop covering a file the reader still concatenates.
@@ -35,29 +29,17 @@ function topic_files(): ReadonlyArray<string> {
 	return workflow_prompt_files().map((path) => path.slice(`${WORKFLOW_PROMPT_DIRECTORY}/`.length))
 }
 
-const PROMPT_ROOT = 'prompts'
-const DOCS_ROOT = 'docs'
-
-function markdown_under(root: string): ReadonlyArray<string> {
-	return readdirSync(package_file(root), { encoding: 'utf8', recursive: true })
-		.filter((entry) => entry.endsWith(MARKDOWN_EXTENSION))
-		.map((entry) => `${root}/${entry}`)
-}
-
 // Every file that routes a reader into the split, not only the AI documents and the skills. The
 // first version of this list stopped at those two, which left the citations in `prompts/review.md`
-// and `docs/josh-commands.md` — added by the very change this suite guards — unchecked.
+// and `docs/josh-commands.md` — added by the very change this suite guards — unchecked. The set
+// itself is the fixture's, shared with the pointer-citation suite so a root cannot drop out of one.
+//
+// The topic files themselves are excluded here: a cross-reference between two of them is checked by
+// the same rule, but the index is read raw elsewhere and would double-count.
 function citing_documents(): ReadonlyArray<string> {
 	const topics = `${PROMPT_ROOT}/collaboration-workflow/`
 
-	return [
-		...AI_DOCS,
-		...markdown_under(SKILL_ROOT),
-		// The topic files themselves are excluded: a cross-reference between two of them is checked
-		// by the same rule, but the index is read raw elsewhere and would double-count.
-		...markdown_under(PROMPT_ROOT).filter((path) => !path.startsWith(topics) && path !== INDEX),
-		...markdown_under(DOCS_ROOT),
-	]
+	return routing_documents().filter((path) => !path.startsWith(topics) && path !== INDEX)
 }
 
 // The index lists its topics as markdown links, not as paths in backticks, so the citation pattern
