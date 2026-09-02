@@ -146,4 +146,4 @@ Telegram 本文も同じ書式で書き、**`--task-type confirmation` で送る
 
 ### 成果物（Issue / PR / Telegram）側
 
-言語は「出力の言語（`JOSH_SESSION_LANG`）」に従う — `JOSH_SESSION_LANG` の言語、未設定なら `ja`。**構造も**セッション向けと同じ 2 層にする。`--notify-message` は `Added ... / Changed ...` の羅列ではなく、`Cause / Fix / Result` の 3 行を先頭に置き、変更点の箇条書きを `Details:` 以下にまとめる（書式は Step 5 の例を参照）。
+言語は「出力の言語（`JOSH_SESSION_LANG`）」に従う — `JOSH_SESSION_LANG` の言語、未設定なら `ja`。**構造も**セッション向けと同じ 2 層にする。`--notify-message` は `Added ... / Changed ...` の羅列ではなく、`Cause / Fix / Result` の 3 行を先頭に置き、変更点の箇条書きを `Details:` 以下にまとめる（`--notify-message` の実例は [`followup.md`](../../.claude/skills/workflow-commands/followup.md) にある）。
