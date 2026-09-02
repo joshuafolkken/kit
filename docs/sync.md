@@ -405,6 +405,15 @@ SECURITY.md         tsconfig.sonar.json
 > stays the authority on intent, and a command being refused is not the boundary of what is
 > forbidden.
 >
+> **The same file caps what one command's output contributes to the context.** Its `env` block
+> declares `BASH_MAX_OUTPUT_LENGTH`, which Claude Code applies by middle-truncating a longer Bash
+> result — so the limit sits in the harness rather than in the judgement of whichever agent typed the
+> command. The harness default of 30,000 characters fired on none of 1,848 Bash results measured
+> across 25 sessions, which is why the distributed value is lower. The number, the measurement behind
+> it and the two designs it was chosen over are in
+> `prompts/collaboration-workflow/output-bounds.md`; `scripts/bash-output-cap.test.ts` fails a value
+> that would not fire.
+>
 > **`.claude/skills/verify-ui/` is the UI gate's implementation.** The completion gate in the rule
 > AI documents says a change to the rendered screen is not done until someone has looked at it, and
 > until joshuafolkken/kit#853 it named a skill this package did not ship — so the step pointed at
