@@ -327,20 +327,23 @@ out. Errors stop the run; warnings are read and carried on past. Fixing what it 
 
 ## `josh latest` runs once per session, not once per child
 
-`josh latest` belongs to the **session**, not to a child. Run it once, the first time the loop below
+`josh latest` belongs to the **session**, not to a child. Ask once, the first time the loop below
 hands back a child number — before implementing that child — and never again:
 
 ```bash
-git stash            # only if the working tree has staged or modified files
+pnpm josh latest:scope   # → required | skip ; the reason on stderr
+git stash push -u        # only if the tree has staged or modified files — never conditional on the answer
 git switch main && git pull
-pnpm josh latest
-git stash pop        # only if you stashed above
+pnpm josh latest         # on `required` only
+git stash pop            # only if you stashed above
 ```
 
-Then load the `dependency-update` skill and follow its procedure, exactly as `queue` does — the
-overrides in **both** `pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines`
+On `required`, load the `dependency-update` skill and follow its procedure, exactly as `queue` does —
+the overrides in **both** `pnpm-workspace.yaml` and `package.json`, and the one expected `devEngines`
 pnpm bump. The stash is the same sanctioned one `queue` step 1 uses; without it `josh latest` runs
-on a dirty tree.
+on a dirty tree. **The answer is the command's, never a judgement**, and `latest-gate.md` is its
+single source — the session hoist here is preserved by it rather than replaced, because a second
+child asking the same command is told `skip`.
 
 **Session, not run** — the two differ whenever an epic spans repositories. Each session runs one
 repository's children (above), so each one updates its own checkout: a second session that read
@@ -352,8 +355,9 @@ never run `pnpm audit` there.
 outcome on a resumed run — leaves a rewritten `pnpm-lock.yaml` modified on the default branch with
 nothing to commit it, which the next `git pull` then refuses to merge over.
 
-A child's own `fullrun` requires `josh latest` before implementing, so following the loop literally
-runs it once per child. That is what this section overrides, and the reason is not the seconds it
+A child's own `fullrun` asks `pnpm josh latest:scope` before implementing, so following the loop
+literally asks it once per child — and before the elapsed-time window existed, ran the update every
+time. That is what this section overrides, and the reason is not the seconds it
 costs: **each run rewrites `pnpm-lock.yaml`, so every child's PR carries dependency updates that
 have nothing to do with that child.** `/code-review` and CodeRabbit then read that diff, a CI
 failure caused by an unrelated bump is attributed to the child — parking it, unattended, for a
@@ -371,13 +375,14 @@ found once — fix it forward before the child is parked for it.
 brings the previous child's merge into the tree, and a child that skips it starts implementing on a
 stale main. Only the dependency update moves to the run.
 
-This is the same rule `queue.md` step 1 already states — `josh latest` once, before the first issue,
-mandatory and never skipped. Two entry points to the same serial batch now read the same way; they
-disagreed before (joshuafolkken/kit#913).
+This is the same rule `queue.md` step 1 already states — the dependency update once, before the
+first issue, and asked of `pnpm josh latest:scope` rather than decided. Two entry points to the same
+serial batch now read the same way; they disagreed before (joshuafolkken/kit#913).
 
-**A resumed `epicrun` is a new session**, so it runs `josh latest` once again before its first
-child. The state that decides which children remain lives on GitHub, and the tree the resumed
-session finds may be days old.
+**A resumed `epicrun` is a new session**, so it asks once again before its first child. The state
+that decides which children remain lives on GitHub, and the tree the resumed session finds may be
+days old — which is exactly what the window answers: a session resumed within it is told `skip`, and
+one resumed a day later is told `required`.
 
 ## The loop
 
@@ -727,8 +732,8 @@ accident. **A planned hand-off is strictly more certain than an interruption**: 
 land mid-child with a dirty tree and a stale `in-progress` label, and this cannot, because it is
 only ever taken when a child has just closed.
 
-**A resumed session is a new session**, so it runs `josh latest` once before its first child, exactly
-as the rule above says.
+**A resumed session is a new session**, so it asks `pnpm josh latest:scope` once before its first
+child, exactly as the rule above says — and updates only if that answers `required`.
 
 ## `needs-human-review` — the one stop that is not a park
 

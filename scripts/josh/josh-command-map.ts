@@ -69,6 +69,7 @@ const ALIASES: Record<string, string> = {
 	u: 'latest',
 	lc: 'latest:corepack',
 	lu: 'latest:update',
+	ls: 'latest:scope',
 	pm: 'prevent-main-commit',
 	cm: 'check-commit-message',
 	ss: 'secretlint-scan',

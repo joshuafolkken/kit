@@ -38,6 +38,7 @@
 | ファイル編集はコマンド本文に本文を載せない                                     | [`file-edits.md`](./collaboration-workflow/file-edits.md)                               |
 | 委譲 — 機械的な工程を安価な実行単位へ回す                                      | [`delegation.md`](./collaboration-workflow/delegation.md)                               |
 | `josh eval` をいつ回すか（配布物の変更を測る）                                 | [`eval-gate.md`](./collaboration-workflow/eval-gate.md)                                 |
+| 依存更新（`josh latest`）をいつ回すか                                          | [`latest-gate.md`](./collaboration-workflow/latest-gate.md)                             |
 | 常駐ドキュメントと skill の分担（何を常駐に残すか）                            | [`residency.md`](./collaboration-workflow/residency.md)                                 |
 | `needs-human-review` — 成果物を人が見るまで出荷させない                        | [`human-review-label.md`](./collaboration-workflow/human-review-label.md)               |
 | 運用ルール                                                                     | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)                     |
