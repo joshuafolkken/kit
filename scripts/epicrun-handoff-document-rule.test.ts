@@ -2,13 +2,17 @@ import { read_repo_file, read_unwrapped } from '#scripts/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#968: an `epicrun` that runs every child in one context pays for the earlier
-// children on every later turn. The hand-off is what stops that, and it only works if the skill and
-// the canonical agree — a run reads the skill, and a person settling a disagreement reads the
-// canonical.
+// children on every later turn. The hand-off is what stops that.
+//
+// It used to be asserted against two documents that had to agree — the skill a run reads and the
+// Japanese canonical a person settling a disagreement reads. joshuafolkken/kit#1188 single-sourced
+// the procedure into the skill and shrank the canonical to a pointer, so there is one document to
+// assert against and nothing left to disagree. `POINTER` is checked for the opposite: that the body
+// did not stay behind.
 
 const SKILL = '.claude/skills/workflow-commands/epicrun.md'
-const CANONICAL = 'prompts/collaboration-workflow/epicrun.md'
-const BOTH: ReadonlyArray<string> = [SKILL, CANONICAL]
+const POINTER = 'prompts/collaboration-workflow/epicrun.md'
+const SINGLE_SOURCE: ReadonlyArray<string> = [SKILL]
 
 const COMMAND = 'pnpm josh cost --over 400000'
 
@@ -27,7 +31,7 @@ const REQUIRED: ReadonlyArray<string> = [
 	'A resumed session is a new session',
 ]
 
-describe.each(BOTH)('%s — the hand-off is written down', (document_path) => {
+describe.each(SINGLE_SOURCE)('%s — the hand-off is written down', (document_path) => {
 	const content = read_repo_file(document_path)
 	const unwrapped = read_unwrapped(document_path)
 
@@ -69,7 +73,7 @@ describe('the skill asks the question inside the loop', () => {
 	})
 })
 
-describe.each(BOTH)('%s — names where the carried state lives', (document_path) => {
+describe.each(SINGLE_SOURCE)('%s — names where the carried state lives', (document_path) => {
 	const unwrapped = read_unwrapped(document_path)
 
 	it.each(['pnpm josh epic:next', 'the epic body', 'the child Issue body'])(
@@ -87,7 +91,7 @@ describe.each(BOTH)('%s — names where the carried state lives', (document_path
 // The measurement is what makes the growth a number rather than a feeling. A reader who doubts it
 // has to be able to find it.
 describe('the threshold cites the measurement it came from', () => {
-	it.each(BOTH)('%s cites the measured growth', (document_path) => {
+	it.each(SINGLE_SOURCE)('%s cites the measured growth', (document_path) => {
 		const unwrapped = read_unwrapped(document_path)
 
 		expect(unwrapped).toContain('222k per request')
@@ -100,19 +104,22 @@ describe('the threshold cites the measurement it came from', () => {
 // number is a tokens-against-human-touches trade-off. A document that keeps claiming the
 // measurement produced it sends the next reader to defend a figure the data does not support.
 describe('the threshold is not passed off as the measurement’s own answer', () => {
-	it.each(BOTH)('%s does not repeat the corrected claim', (document_path) => {
+	it.each(SINGLE_SOURCE)('%s does not repeat the corrected claim', (document_path) => {
 		expect(read_unwrapped(document_path)).not.toContain(
 			"the threshold is the same number the epic's own measurement produced",
 		)
 	})
 
-	it.each(BOTH)('%s says outright that the measurement did not produce it', (document_path) => {
-		expect(read_unwrapped(document_path)).toContain('閾値 400,000 は計測が出した数字ではない')
-	})
+	it.each(SINGLE_SOURCE)(
+		'%s says outright that the measurement did not produce it',
+		(document_path) => {
+			expect(read_unwrapped(document_path)).toContain('閾値 400,000 は計測が出した数字ではない')
+		},
+	)
 
 	// Naming what the number *is* matters as much as denying what it is not: without it the figure
 	// reads as arbitrary and the next run lowers it on a feeling.
-	it.each(BOTH)('%s names the trade-off the number represents', (document_path) => {
+	it.each(SINGLE_SOURCE)('%s names the trade-off the number represents', (document_path) => {
 		expect(read_unwrapped(document_path)).toContain('トークン対人の手数')
 	})
 })
@@ -122,7 +129,7 @@ describe('the threshold is not passed off as the measurement’s own answer', ()
 // paying the old bill while believing it had been fixed.
 const DELEGATION_COMMAND = 'pnpm josh delegate epic-child'
 
-describe.each(BOTH)('%s — each child runs in a delegated unit', (document_path) => {
+describe.each(SINGLE_SOURCE)('%s — each child runs in a delegated unit', (document_path) => {
 	const unwrapped = read_unwrapped(document_path)
 
 	it('routes the decision to the command rather than to judgement', () => {
@@ -146,5 +153,22 @@ describe.each(BOTH)('%s — each child runs in a delegated unit', (document_path
 	// few children and a run that cannot would think itself covered.
 	it('keeps the hand-off as the backstop for where delegation is unavailable', () => {
 		expect(unwrapped).toMatch(/委譲の代替ではなく|not an alternative to it/u)
+	})
+})
+
+// The other half of single-sourcing: asserting the skill carries the procedure says nothing about
+// whether the Japanese copy went away. A pointer that kept its body would satisfy every case above
+// while leaving the hand-off a rule to be written twice — the state joshuafolkken/kit#1188 removed.
+// What must be absent is the directive prose, not the command name. Every pointer written under
+// joshuafolkken/kit#1176 lists what the skill holds, and naming the command in that list is a
+// signpost a reader follows — `eval-gate.md` names `pnpm josh eval:scope` the same way. Excluding it
+// is what keeps this suite checking for a body left behind rather than for a contents list.
+const POINTER_MUST_NOT_RESTATE = REQUIRED.filter((marker) => marker !== COMMAND)
+
+describe(`${POINTER} — keeps none of the hand-off body`, () => {
+	const unwrapped = read_unwrapped(POINTER)
+
+	it.each(POINTER_MUST_NOT_RESTATE)('does not restate %j', (marker) => {
+		expect(unwrapped).not.toContain(marker)
 	})
 })

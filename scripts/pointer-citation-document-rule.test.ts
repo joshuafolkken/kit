@@ -91,9 +91,21 @@ function byte_size(relative_path: string): number {
 // one of them would go green on the other three. What a document may still carry is the *skill*
 // path, which ends in the same file name — so it is removed before the search rather than matched
 // around.
+// A markdown link to the skill carries the file name **twice** — once in the destination and once
+// in the label a reader clicks — so removing the destination alone leaves `[`epicrun.md`](../../)`
+// behind, and a sibling topic file reads as citing the pointer while it is correctly citing the
+// skill. `epicrun` is the first topic whose skill file shares the pointer's name *and* is linked
+// under that name (joshuafolkken/kit#1188), so the whole link goes, label included.
+function strip_skill_citations(content: string, skill: string): string {
+	const escaped = skill.replaceAll('.', String.raw`\.`)
+	const link = new RegExp(String.raw`\[[^\]]*\]\([^)]*${escaped}\)`, 'gu')
+
+	return content.replaceAll(link, '').replaceAll(skill, '')
+}
+
 function cites_pointer(document_path: string, pointer: PointerTopic): boolean {
 	const name = pointer.topic.slice(`${WORKFLOW_PROMPT_DIRECTORY}/`.length)
-	const content = read_repo_file(document_path).replaceAll(pointer.skill, '')
+	const content = strip_skill_citations(read_repo_file(document_path), pointer.skill)
 
 	// Inside the topic directory a bare file name is already a citation; from anywhere else it takes
 	// the directory in front of it, and that segment is what the absolute and relative forms share.

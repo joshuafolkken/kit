@@ -2,7 +2,7 @@
 
 **この規則の単一ソースは [`.claude/skills/workflow-commands/SKILL.md`](../../.claude/skills/workflow-commands/SKILL.md) である。** ここに本文を複製しない（「クローン禁止・単一ソース化」の適用。joshuafolkken/kit#1174 のパイロットに続く横展開 joshuafolkken/kit#1185）。
 
-`residency.md` が定めるとおり、前提 Issue の扱いはコマンドが始まった後にだけ効く規則なので手順本体は skill 側に置く。かつては同じ内容の日本語全文がここにも重複していたが、1 つの規則を直すのに書く箇所が増えるだけで設計上の意味がないため、指し先へ縮小した。参照文書だけにあったのは、起票背景（joshuafolkken/kit#891 — 実行中に見つかる「別の作業」3 種のうち前提だけが手順を持たず、両隣がどちらも停止で終わるため park が最も近い規則になっていた）、その 3 種の切り分け表、`route:tier-a` を付ける起票コマンドそのもの、`git stash push -u` の `-u` が必須である理由、Telegram ではなく Issue コメントが stash を回収する記録である理由、そして `epic:bundle` が答えられなかったときの打ち切り警告の見分け方（joshuafolkken/kit#1067）である。いずれも縮小の前に手順書へ畳み込み済みで、最後の打ち切り警告だけは共通節ではなく `epic:bundle` を呼ぶ各入口ファイル（`fullrun.md` / `halfrun.md` / `epicrun.md`）の判定表に入っている。
+`residency.md` が定めるとおり、前提 Issue の扱いはコマンドが始まった後にだけ効く規則なので手順本体は skill 側に置く。かつては同じ内容の日本語全文がここにも重複していたが、1 つの規則を直すのに書く箇所が増えるだけで設計上の意味がないため、指し先へ縮小した。参照文書だけにあったのは、起票背景（joshuafolkken/kit#891 — 実行中に見つかる「別の作業」3 種のうち前提だけが手順を持たず、両隣がどちらも停止で終わるため park が最も近い規則になっていた）、その 3 種の切り分け表、`route:tier-a` を付ける起票コマンドそのもの、`git stash push -u` の `-u` が必須である理由、Telegram ではなく Issue コメントが stash を回収する記録である理由、そして `epic:bundle` が答えられなかったときの打ち切り警告の見分け方（joshuafolkken/kit#1067）である。いずれも縮小の前に手順書へ畳み込み済みで、最後の打ち切り警告だけは共通節ではなく `epic:bundle` を呼ぶ各入口ファイル（`fullrun.md` / `halfrun.md` / `.claude/skills/workflow-commands/epicrun.md`）の判定表に入っている。
 
 手順書（「2d. A prerequisite discovered mid-run — a dependency, not a park」）に置かれている内容:
 
