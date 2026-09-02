@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, read_unwrapped, WORKFLOW_PROMPT } from './ai-document-fixture'
+import { AI_DOCS, read_repo_file, read_unwrapped } from './ai-document-fixture'
 
 // joshuafolkken/kit#892: `epicrun` used to require an epic, so work already expected to grow needed
 // a person to build one first. Widening the entry point costs one confirmation, and the parts a
@@ -23,19 +23,10 @@ const REJECTION_MESSAGE = 'tracks no children in a task list.'
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'Three rules decide what a run does when the work turns out not to be one Issue',
 	'`epicrun` accepting an Issue that is not an epic',
-	'EPIC でない Issue も受け取る',
-]
-
-const CANONICAL_MARKERS: ReadonlyArray<string> = [
-	'### EPIC でない Issue も受け取る',
-	'停止しない',
-	'**何も出てこなければ EPIC は作らない。**',
-	'**ガードはこの経路でも変わらず適用される**',
-	// The reason the entry point exists at all: one human action, spent earlier.
-	'人がいつ関与するか',
-	// Written 「昇格せず」 here; 「昇格ではなく」 is the older prerequisite section, which this
-	// marker matched vacuously until joshuafolkken/kit#892's second review.
-	'「昇格せず子として残す」側に落ちる',
+	// joshuafolkken/kit#1188 made the canonical topic file a pointer, so the routing names the skill
+	// section that now holds the body. A citation names the file the body is in
+	// (joshuafolkken/kit#1178).
+	'`epicrun.md` → "When `#N` is not an epic"',
 ]
 
 const SKILL_MARKERS: ReadonlyArray<string> = [
@@ -59,6 +50,10 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	// `epic:audit` refuses a bare Issue exactly as `epic:next` does, and the audit step runs first.
 	'**Run `pnpm josh epic:audit <E>` now**, not earlier.',
 	'`git stash push -u -m "..."` with the `-u`',
+	// Folded in from the canonical topic file when it became a pointer (joshuafolkken/kit#1188): the
+	// reason the entry point exists at all is *when* the one human action is spent, not how many of
+	// them there are. Nothing else pinned it once the Japanese section was cut.
+	'The point is *when* the person is involved.',
 ]
 
 describe('epicrun single-issue entry', () => {
@@ -68,12 +63,10 @@ describe('epicrun single-issue entry', () => {
 		for (const marker of AI_DOC_MARKERS) expect(content).toContain(marker)
 	})
 
-	it('has a canonical section in the workflow prompt', () => {
-		const content = read_unwrapped(WORKFLOW_PROMPT)
-
-		for (const marker of CANONICAL_MARKERS) expect(content).toContain(marker)
-	})
-
+	// There is deliberately no canonical-corpus case here. The Japanese section this suite used to
+	// assert against became a pointer under joshuafolkken/kit#1188, and what it alone carried moved
+	// into `SKILL_MARKERS` above rather than being dropped. That the pointer stays a pointer is
+	// `epicrun-document-rule.test.ts`'s job.
 	it('carries the operational branch in the skill', () => {
 		const content = read_unwrapped(SKILL)
 
@@ -94,9 +87,6 @@ describe('epicrun single-issue entry — what it must not have widened', () => {
 	it('leaves the epic:next rejection in place, in the code and in the documents', () => {
 		expect(read_repo_file(EPIC_NEXT)).toContain(REJECTION_MESSAGE)
 		expect(read_unwrapped(SKILL)).toContain('`josh epic:next` is not changed by any of this.')
-		expect(read_unwrapped(WORKFLOW_PROMPT)).toContain(
-			'`josh epic:next` はこの変更の影響を受けない。',
-		)
 	})
 
 	// `fullrun` stopping on a split is the one human touch point in the epic flow; this Issue widened

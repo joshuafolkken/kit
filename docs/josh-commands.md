@@ -950,7 +950,7 @@ With `--repo`, standard output carries exactly one token — the issue number wh
 
 The check is made **only when there is a candidate to offer**: consulted on `stop` or `complete` as well, an unrelated `in-progress` issue would turn a finished epic into a permanent `wait`.
 
-It is advisory rather than atomic. The label is applied by whoever implements the child, _after_ this read, so two sessions starting in the same instant can both see an idle repository; what the check closes is the window that actually occurs, where a session already running a child holds the label for the whole of it. An abandoned label therefore holds the repository until somebody removes it — which is why the holders are named on standard error, and why [`epicrun`](../prompts/collaboration-workflow/epicrun.md)'s stale rule applies to any open issue in the repository rather than to the epic's children alone.
+It is advisory rather than atomic. The label is applied by whoever implements the child, _after_ this read, so two sessions starting in the same instant can both see an idle repository; what the check closes is the window that actually occurs, where a session already running a child holds the label for the whole of it. An abandoned label therefore holds the repository until somebody removes it — which is why the holders are named on standard error, and why [`epicrun`](../.claude/skills/workflow-commands/epicrun.md)'s stale rule applies to any open issue in the repository rather than to the epic's children alone.
 
 A listing that could not be read is **not** an idle repository — the answer is `wait` rather than the child, since reading a failed read as "nothing is running" is the one direction a guard like this may not fail in. It is not an exit either: the listing swallows a passing rate limit into the same failure, so exiting would end an unattended run over a blip, while a persistent failure is already caught by the unreadable-child anomaly before this read happens.
 
@@ -1138,7 +1138,7 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 pnpm josh auto-ok:next --exclude 906,912 --exclude 918   # skip several
 ```
 
-An epic's task list is not the whole backlog. An issue small enough to need no human judgment sits there forever unless somebody puts it in an epic, so the `auto-ok` label opts one in: [`epicrun`](../prompts/collaboration-workflow/epicrun.md) picks up opted-in issues once the epic's own children are done.
+An epic's task list is not the whole backlog. An issue small enough to need no human judgment sits there forever unless somebody puts it in an epic, so the `auto-ok` label opts one in: [`epicrun`](../.claude/skills/workflow-commands/epicrun.md) picks up opted-in issues once the epic's own children are done.
 
 **Only a person applies `auto-ok`.** Typing `epicrun #<E>` approves the merges inside `#<E>` and nothing outside it, and this label is the only way a person extends that approval past the epic's edge — a label an agent could apply to itself would let an unattended run widen its own authorization, which is not a guard at all. An agent typing the command on an explicit instruction in the same turn is executing the person's decision, not making one.
 

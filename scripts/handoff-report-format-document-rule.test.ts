@@ -9,8 +9,10 @@ import { describe, expect, it } from 'vitest'
 
 const FORMAT = 'prompts/collaboration-workflow/report-format.md'
 const SKILL = '.claude/skills/workflow-commands/epicrun.md'
-const CANONICAL = 'prompts/collaboration-workflow/epicrun.md'
-const EPICRUN_DOCS: ReadonlyArray<string> = [SKILL, CANONICAL]
+// One document, not two. `prompts/collaboration-workflow/epicrun.md` used to carry the hand-off
+// procedure in Japanese as well, so the reference to the format had to exist in both copies; under
+// joshuafolkken/kit#1188 that file became a pointer with no procedure to attach a reference to.
+const EPICRUN_DOCS: ReadonlyArray<string> = [SKILL]
 
 // The four things a hand-off has to say. Dropping any one of them collapses it back into a report
 // that could be read as a completion — and `残っていること` is the load-bearing one, since it is

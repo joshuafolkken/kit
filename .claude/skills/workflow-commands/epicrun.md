@@ -4,6 +4,14 @@
 `chain-rule.md` and `followup.md` as well — each child is a `fullrun` — and read this file for what
 running many of them unattended changes.
 
+**What it changes about `queue` is the blast radius of a stop.** `queue` makes each issue's explicit
+invocation its safety valve, so **a decision needed mid-implementation stops the whole session** —
+and because nothing predicts *when* a child will need one, a person has to stay at the machine for
+the length of the run. `epicrun` **sets aside only the child that needs the decision and moves on to
+the others** (see "park and continue" below). That is what the keyword buys: the same guards, with
+the blast radius of a stop reduced from the session to one issue. What each keyword *authorizes* is
+a separate axis, and it is "What one invocation approves" below.
+
 It also accepts an Issue that is **not** an epic; see "When `#N` is not an epic" below.
 
 **An epic in another repository must be referenced as `owner/repo#E`** — `epicrun
@@ -450,10 +458,21 @@ by whoever finds it stale, so it is not something to rely on.
 | `none` | Nothing is opted in. Finish the run |
 | **Exit 1** — the listing could not be read | Report that the pickup could not be attempted, and finish. "Could not tell" is not `none`; reporting it is enough here only because the mistake stops work rather than starting some |
 
+**An issue whose prerequisite is unresolved is never handed over.** The pickup reads the same
+GitHub-native `blockedBy` relations `epic:next` builds its dependency graph from, and drops any
+candidate declaring a blocker that has not closed. `auto-ok` says "this issue needs no decision" and
+says nothing at all about order, so without this an unattended run could start a deliverable before
+the thing it needs (joshuafolkken/kit#996).
+
 **The order is the one the person was just shown.** `auto-ok:next` ranks with the same function the
 `🗒 Next issues (newest first)` display uses at the end of every workflow — newest first, skipping
 `epic`, `in-progress` and `needs-decision`. A second ordering would have the run start something
 other than what that list has just named.
+
+**The same ordering, though, is not the same set.** The dependency check above exists only on the
+pickup side, so `auto-ok:next` can refuse an issue that `🗒 Next issues` is showing at the top of its
+list. That difference is deliberate: a person can see the issue is blocked and decide to start it
+anyway, and an unattended run has no such judgement to exercise.
 
 **Everything a child gets, a picked-up Issue gets**: the split assessment, the two-layer work
 summary, `josh latest` staying hoisted to the session, park-and-continue, and the
@@ -632,7 +651,9 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null 
 | Whole run | 8 h | An unattended run that has not finished overnight needs a person, not more waiting. |
 
 Each timeout **ends the wait and reports** — none of them is retried indefinitely. A stale child's
-label is removed first (above), so the next poll can offer it.
+label is removed first (above), so the next poll can offer it. **A graph that has deadlocked on a
+cycle is not this loop's to untangle**: `epic:next` detects it and exits with an error, so `epicrun`
+confines itself to ending the wait and reporting it.
 
 `epic:next` does not report when a label was applied, so read that from the issue's timeline:
 
@@ -651,7 +672,7 @@ Waiting is decided by `epic:next`'s classification, never by reading labels:
 | Something is runnable | Run it |
 | Nothing runnable, something resolves on its own | **Wait** |
 | Nothing runnable, nothing resolves on its own, children remain | **Stop and report the parked children** |
-| No open child | Finish |
+| No open child | Post the epic summary, pick up the `auto-ok` issues ("After the epic" above), then finish |
 
 The distinction is not academic. When kit's child has closed and app-kit's child is waiting for the
 release to publish, there is no runnable child, nothing carries `in-progress` and nothing carries
@@ -761,3 +782,7 @@ end naming what was merged, what was parked and why, and what was filed.
    condition that is not a problem: nothing is parked, nothing is filed, and the epic is unchanged.
 
 **A child that needs a decision is not on this list.** It is parked, and the run continues.
+
+---
+
+This file is the single source of the `epicrun` procedure; `prompts/collaboration-workflow/epicrun.md` is a pointer to it (joshuafolkken/kit#1188, the joshuafolkken/kit#1176 rollout of the joshuafolkken/kit#1174 pattern). That topic file used to open by declaring that the two had to agree, which is what made every rule here a rule to be written twice.
