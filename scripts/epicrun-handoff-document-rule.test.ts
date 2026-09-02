@@ -1,4 +1,5 @@
 import { read_repo_file, read_unwrapped } from '#scripts/ai-document-fixture'
+import { epicrun_loop, EPICRUN_SKILL } from '#scripts/epicrun-loop-fixture'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#968: an `epicrun` that runs every child in one context pays for the earlier
@@ -10,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 // assert against and nothing left to disagree. `POINTER` is checked for the opposite: that the body
 // did not stay behind.
 
-const SKILL = '.claude/skills/workflow-commands/epicrun.md'
+const SKILL = EPICRUN_SKILL
 const POINTER = 'prompts/collaboration-workflow/epicrun.md'
 const SINGLE_SOURCE: ReadonlyArray<string> = [SKILL]
 
@@ -65,11 +66,7 @@ describe.each(SINGLE_SOURCE)('%s — the hand-off is written down', (document_pa
 // the procedure — so this one is asserted there rather than against both.
 describe('the skill asks the question inside the loop', () => {
 	it('reaches the check by following the numbered steps', () => {
-		const content = read_repo_file(SKILL)
-		const loop = content.slice(content.indexOf('1. Run the command above.'))
-		const per_child = loop.slice(0, loop.indexOf('3. '))
-
-		expect(per_child.replaceAll(/\s+/gu, ' ')).toContain(COMMAND)
+		expect(epicrun_loop.per_child_step()).toContain(COMMAND)
 	})
 })
 
