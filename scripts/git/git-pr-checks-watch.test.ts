@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
 	CHECK_WAIT_INTERVAL_MS,
@@ -10,7 +10,7 @@ import {
 	wait_for_pr_success,
 } from './git-pr-checks'
 import { evaluate_pr_state } from './git-pr-checks-eval'
-import { make_pr_snapshot, SONAR_QUBE } from './git-pr-checks-fixture'
+import { CODE_RABBIT, make_pr_snapshot, SONAR_QUBE } from './git-pr-checks-fixture'
 import type { PrStateSnapshot } from './git-pr-checks-parse'
 import {
 	CHECKS_FAILED_MESSAGE,
@@ -19,6 +19,7 @@ import {
 	evaluate_checks_settled,
 	fail_when_no_checks,
 	git_pr_checks_watch,
+	is_awaited_check,
 	NO_CHECKS_MESSAGE,
 	PR_CHECKS_WATCH_TIMEOUT_MS,
 	SHOULD_NEVER_READ_REVIEW_DECISION,
@@ -66,6 +67,7 @@ const NOT_TIMED_OUT = { timed_out: false }
 const TIMED_OUT = { timed_out: true }
 const TWO_MINUTES_MS = 120_000
 const E2E = 'E2E'
+const REQUIRED_CHECKS_ENV_VAR = 'JOSH_REQUIRED_CHECKS'
 const EMPTY_SNAPSHOT = make_pr_snapshot({ rollup: [] })
 
 // Deliberately carrying the states that would make the *merge gate* refuse: the watch must not read
@@ -86,6 +88,20 @@ const ONE_PENDING = settled([
 const ONE_FAILING = settled([
 	{ name: SONAR_QUBE, status: 'pass' },
 	{ name: E2E, status: 'fail' },
+])
+const CODERABBIT_PENDING = settled([
+	{ name: SONAR_QUBE, status: 'pass' },
+	{ name: CODE_RABBIT, status: 'pending' },
+])
+const CODERABBIT_AND_E2E_PENDING = settled([
+	{ name: SONAR_QUBE, status: 'pass' },
+	{ name: E2E, status: 'pending' },
+	{ name: CODE_RABBIT, status: 'pending' },
+])
+const ONLY_CODERABBIT = settled([{ name: CODE_RABBIT, status: 'pending' }])
+const CODERABBIT_FAILING = settled([
+	{ name: SONAR_QUBE, status: 'pass' },
+	{ name: CODE_RABBIT, status: 'fail' },
 ])
 
 beforeEach(() => {
@@ -123,6 +139,70 @@ describe('evaluate_checks_settled — the weaker question the watch asks', () =>
 	// checks is asked once, after the budget runs out.
 	it('keeps waiting on a branch whose checks have not appeared yet', () => {
 		expect(evaluate_checks_settled(EMPTY_SNAPSHOT)).toBe('pending')
+	})
+})
+
+// Temporary (kit#753/kit#1217): CodeRabbit blocks nothing downstream, so the look-ahead must not
+// spend its whole budget waiting for a review the merge gate is about to exempt anyway.
+describe('evaluate_checks_settled — CodeRabbit is not waited on', () => {
+	it('settles while CodeRabbit is still pending and every other check has passed', () => {
+		expect(evaluate_checks_settled(CODERABBIT_PENDING)).toBe('success')
+	})
+
+	it('keeps waiting while a check other than CodeRabbit is pending', () => {
+		expect(evaluate_checks_settled(CODERABBIT_AND_E2E_PENDING)).toBe('pending')
+	})
+
+	// Answering `success` here would report a pull request as settled seconds after it opened:
+	// CodeRabbit posts `Review queued` before any workflow has attached a check run.
+	it('keeps waiting on a rollup carrying nothing but CodeRabbit', () => {
+		expect(evaluate_checks_settled(ONLY_CODERABBIT)).toBe('pending')
+	})
+
+	// Only the *pending* reading is dropped — a CodeRabbit check that already failed still answers
+	// `failure`, which is what `git-pr-followup.ts` swallows and falls through on.
+	it('still fails on a CodeRabbit check that failed', () => {
+		expect(evaluate_checks_settled(CODERABBIT_FAILING)).toBe('failure')
+	})
+
+	// A rollup holding nothing but CodeRabbit falls back to the whole rollup, so a lone CodeRabbit
+	// that has already reported answers exactly what it did before the exemption existed.
+	it('fails on a lone CodeRabbit check that failed', () => {
+		expect(evaluate_checks_settled(settled([{ name: CODE_RABBIT, status: 'fail' }]))).toBe(
+			'failure',
+		)
+	})
+
+	it('settles on a lone CodeRabbit check that passed', () => {
+		expect(evaluate_checks_settled(settled([{ name: CODE_RABBIT, status: 'pass' }]))).toBe(
+			'success',
+		)
+	})
+
+	it('reads the check name from the production constant', () => {
+		expect(is_awaited_check({ name: CODE_RABBIT, status: 'pending' })).toBe(false)
+		expect(is_awaited_check({ name: SONAR_QUBE, status: 'pending' })).toBe(true)
+	})
+})
+
+// `REQUIRED_CHECKS` is resolved from `JOSH_REQUIRED_CHECKS` at module load, so the override is read
+// by re-importing — the pattern `git-pr-checks-eval.test.ts` already uses for the same variable.
+describe('evaluate_checks_settled — CodeRabbit put back on the required list', () => {
+	beforeEach(() => {
+		vi.resetModules()
+		vi.stubEnv(REQUIRED_CHECKS_ENV_VAR, CODE_RABBIT)
+	})
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	// A project that opted back in has said it wants the merge gate to block on CodeRabbit, and a
+	// look-ahead that settled without it would disagree with the gate it looks ahead for.
+	it('waits for CodeRabbit again', async () => {
+		const reloaded = await import('./git-pr-checks-watch')
+
+		expect(reloaded.evaluate_checks_settled(CODERABBIT_PENDING)).toBe('pending')
 	})
 })
 
