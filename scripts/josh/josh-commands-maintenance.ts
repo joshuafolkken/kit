@@ -39,11 +39,21 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		shell: [
 			'sh',
 			'-c',
-			'export NODE_AUTH_TOKEN=$(gh auth token) && pnpm josh latest:corepack && pnpm josh latest:update && pnpm josh ranges && pnpm josh audit',
+			'export NODE_AUTH_TOKEN=$(gh auth token) && pnpm josh latest:corepack && pnpm josh latest:update && pnpm josh ranges && pnpm josh audit && pnpm josh latest:scope --record',
 		],
 		description: 'Update pnpm, dependencies, and run security audit',
 		category: 'Maintenance',
 		argument_targets: ['latest:corepack', 'latest:update', 'audit'],
+	},
+	'latest:scope': {
+		script: 'scripts/version/latest-scope-cli.ts',
+		description:
+			'Say whether this run has to update dependencies, from when josh latest last finished (--record notes a run)',
+		category: 'Maintenance',
+		// `JOSH_LATEST_MAX_AGE_HOURS` is documented as a project setting, so it has to be readable
+		// where the project keeps its settings — a variable that only works when exported from the
+		// shell is one a user follows the documentation for and gets the default from, silently.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	'latest:corepack': {
 		script: 'scripts/version/latest-corepack.ts',

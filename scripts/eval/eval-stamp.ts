@@ -1,16 +1,7 @@
-import { createHash } from 'node:crypto'
-import {
-	existsSync,
-	lstatSync,
-	readdirSync,
-	readFileSync,
-	rmSync,
-	statSync,
-	writeFileSync,
-} from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { stamp_file } from '#scripts/josh/stamp-file'
 import { eval_trigger } from './eval-trigger'
 
 // What a `josh eval` run measured, and when (joshuafolkken/kit#1152).
@@ -25,39 +16,19 @@ import { eval_trigger } from './eval-trigger'
 // are uncommitted in the same tree, so `git diff` cannot say which side of the review a change fell
 // on, which is exactly the question the staleness check asks.
 
-const HASH_ALGORITHM = 'sha256'
 const STAMP_PREFIX = 'josh-eval-stamp-'
-const STAMP_SUFFIX = '.json'
-// Enough of the package path's digest to keep one checkout's record apart from another's in a shared
-// temp directory, and short enough to read in a printed path.
-const STAMP_KEY_LENGTH = 16
-// The path is deterministic — both commands have to reach it without being told where it is — and it
-// sits in a directory every account on the host may write to. A mode alone does not make that safe:
-// it applies on creation, and a plain write follows a symlink someone else put there.
-const STAMP_FILE_MODE = 0o600
-// Create-exclusively. Refusing an existing path is what keeps a write from being redirected into a
-// file the running user owns; the unlink below is what keeps the normal rewrite working.
-const STAMP_WRITE_FLAG = 'wx'
 
 interface EvalStamp {
 	started_at: string
 	files: Record<string, string>
 }
 
-// Bytes rather than a decoded string. UTF-8 decoding is lossy — every invalid sequence collapses to
-// the same replacement character — so hashing the decoded form would let two different files under a
-// measured path agree, and the check exists precisely to notice that they do not.
-function digest(content: Buffer | string): string {
-	return createHash(HASH_ALGORITHM).update(content).digest('hex')
-}
-
-// The temp directory rather than the repository: this is a handoff between two commands of one
-// loop, and a file in the tree would have to be gitignored in kit and in every consumer `josh sync`
-// reaches — a distributed ignore entry bought for something nobody is meant to keep.
+// The path, the guarded write and the guarded read are `#scripts/josh/stamp-file`'s since
+// joshuafolkken/kit#1215 — `josh latest:scope` keeps the same kind of record, and a second copy of
+// the symlink and ownership defenses would let the two drift. What stays here is the payload and the
+// question asked of it.
 function stamp_path(): string {
-	const key = digest(PACKAGE_DIR).slice(0, STAMP_KEY_LENGTH)
-
-	return path.join(tmpdir(), `${STAMP_PREFIX}${key}${STAMP_SUFFIX}`)
+	return stamp_file.stamp_path(STAMP_PREFIX)
 }
 
 function is_directory(relative: string): boolean {
@@ -86,7 +57,10 @@ function read_tree(): Record<string, string> {
 	const sorted = relatives.toSorted((left, right) => left.localeCompare(right))
 
 	return Object.fromEntries(
-		sorted.map((relative) => [relative, digest(readFileSync(path.join(PACKAGE_DIR, relative)))]),
+		sorted.map((relative) => [
+			relative,
+			stamp_file.digest(readFileSync(path.join(PACKAGE_DIR, relative))),
+		]),
 	)
 }
 
@@ -108,21 +82,12 @@ function try_read_tree(
 
 // The destination is a parameter so a test can exercise the round trip without overwriting the
 // record a real run may be relying on — the two commands share one path by design, and a suite that
-// wrote to it would be a second writer nobody declared.
-//
-// **The write unlinks first, then creates exclusively.** `rmSync` removes a symlink rather than
-// following it, and `wx` refuses an existing path outright, so someone who re-creates the path in
-// the window between the two can make this write *fail* — never make it land somewhere else. A
-// failed write leaves no record, and no record answers `required`, which is the safe direction. On a
-// sticky temp directory a file another account owns cannot be unlinked at all, so that case fails
-// here too rather than being silently trusted later.
+// wrote to it would be a second writer nobody declared. A failed write leaves no record, and no
+// record answers `required`, which is the safe direction.
 function write_stamp(target: string = stamp_path()): string {
 	const stamp: EvalStamp = { started_at: new Date().toISOString(), files: read_tree() }
 
-	rmSync(target, { force: true })
-	writeFileSync(target, JSON.stringify(stamp), { flag: STAMP_WRITE_FLAG, mode: STAMP_FILE_MODE })
-
-	return target
+	return stamp_file.write_stamp(target, stamp)
 }
 
 // Takes `unknown` rather than the declared field type, because the declared type is an assertion
@@ -142,29 +107,17 @@ function parse_stamp(raw: string): EvalStamp | undefined {
 	return { started_at, files }
 }
 
-// The read side of the write's problem. A record is trusted to say a measurement is still current, so a
-// planted one answers `skip` and suppresses the re-measure this check exists to force. `lstatSync`
-// reports the link rather than what it points at, and it throws where the path is simply absent —
-// both of which are "no record". `getuid` is missing on Windows, where a shared temp directory is not
-// the same hazard; the check reduces to "is it a regular file" there.
-function is_own_regular_file(source: string): boolean {
-	const stats = lstatSync(source)
-
-	if (!stats.isFile()) return false
-
-	const uid = process.getuid?.()
-
-	return uid === undefined || stats.uid === uid
-}
-
 // `undefined` rather than a throw or an empty record: "there is no record" and "the record says
 // nothing changed" are the two answers this module exists to keep apart, and only the first of them
-// is a reason to measure again.
+// is a reason to measure again. A planted record would answer `skip` and suppress the re-measure the
+// check exists to force, which is why the read is the guarded one in `stamp-file`.
 function read_stamp(source: string = stamp_path()): EvalStamp | undefined {
-	try {
-		if (!is_own_regular_file(source)) return undefined
+	const raw = stamp_file.read_stamp_text(source)
 
-		return parse_stamp(readFileSync(source, 'utf8'))
+	if (raw === undefined) return undefined
+
+	try {
+		return parse_stamp(raw)
 	} catch {
 		return undefined
 	}
