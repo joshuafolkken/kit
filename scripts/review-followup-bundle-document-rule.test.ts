@@ -91,6 +91,53 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'The only difference was whether the command was run',
 ]
 
+// joshuafolkken/kit#1239: the filing and the bundle used to run before the commit, so their seconds
+// were the run's own — `epic:bundle` 43s and `epic --add` 18s on kit#1229 — while the CI wait that
+// follows had nothing beside it: 78 of the 122 seconds kit#1238's `followup --merge` took. Neither
+// step changes a line of code, so running them after the pull request is open leaves the CI already
+// running valid, and the bundle's only deadline is met because the parent Issue closes at the merge.
+//
+// The markers pin the placement and the distinction a reword collapses first: this is not kit#1216's
+// rejected "review during CI", which would overlap work that *does* change code and pay the overlap
+// back through a restarted CI on every pushed fix.
+const CI_WAIT_PLACEMENT = 'inside the CI wait'
+
+const CANONICAL_PLACEMENT_MARKERS: ReadonlyArray<string> = [
+	`**The three steps run ${CI_WAIT_PLACEMENT}, not before the commit.**`,
+	'after `pnpm josh git -y` and before `pnpm josh followup --merge`',
+	// Without this the move reads as relaxing step 2 rather than as satisfying it elsewhere.
+	'**The deadline is unchanged**',
+	'**This is not "review during CI", which was decided against.**',
+	'that would overlap work which **changes code**',
+]
+
+const WORKFLOW_PROMPT_PLACEMENT_MARKERS: ReadonlyArray<string> = [
+	'**3 段は CI 待ちの中で実行する。コミットの前ではない。**',
+	'`pnpm josh git -y` の後・`pnpm josh followup --merge` の前に置く',
+	'**期限は変わらない**',
+	'**これは「レビューを CI と並走させる」ではない。**',
+]
+
+// The three files that spell the pipeline out as an ordered list of commands, each paired with the
+// chain as that file writes it. **The pairing is what pins the order**: asserting the two commands
+// and the phrase separately passes on a file that puts the filing in front of `git -y` and still
+// calls it the CI wait, which is the one arrangement this change exists to rule out. Each entry is
+// therefore the literal chain, filing included, from `git -y` through to `followup`.
+const PIPELINE_CHAINS: ReadonlyArray<readonly [string, string]> = [
+	[
+		`${SKILL_ROOT}/chain-rule.md`,
+		'`pnpm josh git -y` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup --merge`',
+	],
+	[
+		`${SKILL_ROOT}/fullrun.md`,
+		'`pnpm josh git -y` → **the follow-up filing and `pnpm josh epic:bundle`, run here so they sit inside the CI wait** → `pnpm josh followup --merge`',
+	],
+	[
+		`${SKILL_ROOT}/queue.md`,
+		'`pnpm josh git -y "<title> #<N>"` → the follow-up filing and `pnpm josh epic:bundle` for whatever the round cap routed to branch 2, placed here so it runs inside the CI wait',
+	],
+]
+
 // The canonical prompt is what a Gemini or Cursor run reads; it never loads a Claude Code skill.
 const WORKFLOW_PROMPT_MARKERS: ReadonlyArray<string> = [
 	'### 後追い Issue は起票した直後に EPIC へ束ね直す',
@@ -152,6 +199,54 @@ describe(`${REVIEW_PROMPT} — the canonical filing step`, () => {
 	it('carries the three-way disposition in the turn-end self-check too', () => {
 		expect(content).toContain(THREE_WAY_ROUTE)
 		expect(content).toContain(`run \`${BUNDLE_COMMAND}\` on it`)
+	})
+})
+
+describe(`${REVIEW_PROMPT} — the filing runs inside the CI wait`, () => {
+	const content = read_unwrapped(REVIEW_PROMPT)
+
+	it.each(CANONICAL_PLACEMENT_MARKERS)('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+describe(`${WORKFLOW_PROMPT} — the extended reference states the placement`, () => {
+	const content = read_unwrapped(WORKFLOW_PROMPT)
+
+	it.each(WORKFLOW_PROMPT_PLACEMENT_MARKERS)('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+describe.each(PIPELINE_CHAINS)(
+	'%s — orders the filing after the pull request',
+	(skill_path, chain) => {
+		const content = read_unwrapped(skill_path)
+
+		it('writes the chain with the filing between `git -y` and `followup`', () => {
+			expect(content).toContain(chain)
+		})
+
+		it('says the placement is the CI wait', () => {
+			expect(content).toContain(CI_WAIT_PLACEMENT)
+		})
+	},
+)
+
+// The one contradiction the placement edit sat on top of: this file said the review runs *after* the
+// commit, while its own section heading below — pinned by `chain-rule-document-rule.test.ts` — says
+// before. The filing moved; the review did not.
+describe('prompts/collaboration-workflow/plan-comment.md — the review still precedes the commit', () => {
+	const content = read_unwrapped('prompts/collaboration-workflow/plan-comment.md')
+
+	it('no longer says the review runs after the commit', () => {
+		expect(content).not.toContain('コミット後かつ `pnpm josh followup --merge` 実行前')
+	})
+
+	it('places the filing after the pull request instead', () => {
+		expect(content).toContain(
+			'**この起票と束ね直しは `pnpm josh git -y` の後・`pnpm josh followup --merge` の前に置く**',
+		)
 	})
 })
 
