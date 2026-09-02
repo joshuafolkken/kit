@@ -43,6 +43,31 @@ pnpm josh review:level --staged
 
 **The round cap below is unchanged**, and so is the rule that a confirmed High blocks regardless of round count.
 
+## Severity (decided by a test, never by discretion)
+
+The output format below demands a severity on every finding, and for a long time nothing said what earns one. `medium` is a blocker — it must be fixed before the PR is opened — so a borderline finding rated `medium` costs a whole round, and whether it got one was left to whoever happened to be reviewing (joshuafolkken/kit#1220).
+
+**A finding is `medium` or higher only when both of these hold:**
+
+1. **It reaches something real** — a runtime code path, a distributed artifact a consumer reads, **or the verification that guards either**: a test, fixture or CI check whose defect lets one of the first two ship unnoticed. The third member is not decoration. `package.json` excludes `**/*.test.ts` and `**/*-fixture.ts` from what it ships, so without it a vacuous or wrongly-pinned suite — the failure mode this repository's marker suites exist to prevent — could never exceed `low` and would always be skippable in one line.
+2. **You can write the concrete failure scenario** — the inputs or state, and the wrong output, breakage or misreading that follows. Not "this could be confusing": the actual sequence.
+
+**Fail either test and the finding is `low`.** In particular, **a finding whose failure scenario you cannot write is `low` however uncomfortable it looks** — that is the whole of the second test, and it is the one that decides borderline cases.
+
+**Test 2 asks whether a scenario can be written, not whether you wrote one.** The cheap action — not attempting it — produces the non-blocking severity, which is the same cost-pressure inversion the level rule one section up exists to remove, and it is the one place this test is weaker than a command you run. So the obligation is to **attempt the scenario for every finding that passes test 1, and to say so when the attempt failed**: "no failure scenario — <what you tried>" is the evidence, and a `low` on a test-1 finding without it is not a severity, it is a skipped step.
+
+**A distributed artifact is on that list deliberately.** "Documentation is not inert either" above already reviews `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` at `medium`, on the measurement that joshuafolkken/kit#963 and #965 each carried ten real defects reaching every consumer with no test in front of them. A severity rule that ranked documentation below runtime code would contradict the level rule one section up.
+
+**This is the same move `josh review:level` made, one level down.** A rule an agent applies from memory is a rule an agent can talk itself out of, and a severity nobody defined is a severity that drifts upward under an instruction to find something. Measured, not theorized: rounds three and four of joshuafolkken/kit#854 were spent on a misplaced comment, an unused export and a stale comment — findings the Low rule already permitted skipping, treated as blockers because they came back without severities.
+
+**Test 2 is not a new demand.** Category 1 already requires an explicit trace — `Traced [input/state] → [result]` — and the failure scenario is that same sentence. What changes is that a finding without one no longer carries a blocking severity.
+
+**`high` and `low` are unchanged.** A `high` is fixed before committing and blocks the merge regardless of round count; a `low` that does not reach the user may be skipped with a one-line reason. This section decides which findings reach `medium`, not what a severity then does — with the one clarification below, which the second way of becoming a `low` makes necessary.
+
+**It agrees with the three-way disposition below.** Branch 2 files a finding that "reaches a runtime code path, or it needs a decision", and that phrase is read with the same extension as test 1 here — a distributed artifact, and the verification guarding either, both count as reaching one.
+
+**A `low` is not automatically droppable, and the two ways of becoming one are why.** Branch 3 drops "a Low finding that does not reach the user" — that is **test 1** failing, and only that. **A finding that passed test 1 and was rated `low` for want of a failure scenario still reaches the user**, so it is not branch 3's: it goes to branch 1 when it closes in a few lines inside a file the diff already touches, and to branch 2 otherwise. Reading every `low` as droppable is what would let the cheaper severity double as the cheaper disposition, which is the drift this section exists to stop.
+
 ## Review round cap (2 rounds)
 
 The severity rule above is not a stopping condition on its own. Every fix creates new surface, and a review whose scope is the whole change finds something in it — so the loop is bounded by how much new code the fixes produce, which is unbounded.
@@ -91,7 +116,7 @@ Template for the second round:
 
 1. **Fix it in place.** The finding closes in a few lines inside a file the diff already touches, with no design judgement — a stale comment, a name, an unused export. **A fix-in-place never starts a new review round.** This is the ceiling that keeps the exit from buying back the round cap: the fix widens the diff, so a naive re-review would find it and re-open the loop the cap just closed. The bound is written into the exit itself — the fix must stay **inside a file the diff already changed** and carry **no design decision**; a finding that cannot close under both limits is not a fix-in-place, it is filed.
 2. **File it as an Issue.** The finding reaches a runtime code path, or it needs a decision. This is the branch the old blanket rule collapsed everything into, and the filing procedure below — reference the current Issue, then bundle — is unchanged for it.
-3. **Drop it with a one-line note in the PR body.** A Low finding that does not reach the user. This is the same disposition the pre-commit self-review already permits for a Low ("Low findings may be skipped with a one-line reason"), extended past the round cap — the two documents no longer disagree about what happens to a Low.
+3. **Drop it with a one-line note in the PR body.** A Low finding that does not reach the user — that is, one that failed test 1 of "Severity" above, and **only** that one. A `low` rated for want of a failure scenario passed test 1 and does reach the user, so it takes branch 1 or branch 2 instead. This is the same disposition the pre-commit self-review already permits for a Low ("Low findings that do not reach the user may be skipped with a one-line reason"), extended past the round cap — the two documents no longer disagree about what happens to a Low.
 
 **Findings that reduce to one root judgement are filed as one Issue, not several.** When two or more findings are the same underlying design decision seen from different call sites, they belong in a single follow-up Issue with a section per symptom (`## 現象 1` / `## 現象 2`), the shape joshuafolkken/kit#1077, #1068 and #1069 already use. Deciding this from the findings rather than the filer's discretion is the point: without the rule, whether they collapse is left to whoever happens to be filing.
 
@@ -132,8 +157,9 @@ Output every category below with an explicit verdict. Do **not** omit categories
 For each finding:
 
 - Cite `file_path:line_number`
-- State **severity** (`high` / `medium` / `low`)
+- State **severity** (`high` / `medium` / `low`) — decided by the two tests in "Severity" above, not by discretion
 - Explain the concrete problem and the minimal fix
+- On a finding that passes test 1 of "Severity" but is rated `low`, write the attempt: `no failure scenario — <what you tried>`
 
 For categories with no findings, you **must** write a brief proof statement — not just `No issues`. Example: `No issues — checked null returns on X, verified Y edge case, Z is guarded by type.` A bare `No issues` is only acceptable for Security, Performance, i18n, and Comments when there is genuinely nothing to check (no auth code, no hot paths, no user strings, no comments touched).
 
