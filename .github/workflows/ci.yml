@@ -136,20 +136,42 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Run spell check
-        run: pnpm exec cspell . --dot
-
-      - name: Run prettier check
-        run: pnpm exec prettier --check .
-
-      - name: Run eslint check
-        run: pnpm exec eslint . --cache --cache-strategy content
-
-      - name: Run type check
-        run: pnpm exec tsc --noEmit
-
-      - name: Run unit tests
-        run: pnpm exec vitest run
+      # One step rather than five, and concurrent rather than serial (joshuafolkken/kit#1216).
+      # `josh gate` is the command a developer runs before committing; it fans out to the same
+      # `josh` sub-commands that define each check — `lint` (prettier and eslint), `check` (the
+      # type check), `cspell:dot`, `test:unit` — so nothing here restates a tool invocation and CI
+      # cannot verify a different set from the local gate. Measured on this repository the five
+      # steps took 78–162 seconds end to end while the longest of them takes a fraction of that;
+      # the serial time was pure waiting, and it sat on the critical path between the pull request
+      # opening and the merge.
+      #
+      # **Every failure is reported in one pass.** The serial form stopped at the first red step,
+      # so a tree with a lint error and a type error cost two full CI runs to discover. The gate
+      # buffers each check and prints them all, failures with their whole output, which is the
+      # property `josh gate` was written for and the reason the five steps are not merely
+      # run in the background here.
+      #
+      # `--verbose` prints every check's body, not only the failing ones. Locally the quiet form is
+      # right — the gate runs many times per issue and the bodies pile up in the conversation — but a
+      # CI log is read once, after the fact, by someone who cannot re-run it: the unit summary's test
+      # count is what says the suite actually ran, and without it a green log looks the same whether
+      # vitest executed six thousand tests or none.
+      #
+      # **The unit step goes through `josh test:unit`, which skips rather than fails when vitest is
+      # absent or nothing matches the test glob.** That is deliberate and not new — the distributed
+      # `templates/workflows/ci.yml` has routed through the same guard for exactly this reason, and
+      # `scripts/ci-yml-unit-step.test.ts` pins it; this repository's own workflow was the one
+      # calling vitest directly. The skip prints its notice either way, and `--verbose` is what keeps
+      # the count beside it.
+      #
+      # Two things are given up. GitHub's per-step timing and log grouping: the run shows one `Run
+      # verification gate` step instead of five named ones, and the gate's own summary names which
+      # check failed, which is what the grouping was being read for. And each check's output is
+      # buffered until it exits, so a check that *hangs* until this job's `timeout-minutes` is
+      # cancelled with nothing printed — where a serial step streamed. That costs one local
+      # `pnpm josh gate` to identify, and it is the price of the all-failures-in-one-pass summary.
+      - name: Run verification gate
+        run: pnpm josh gate --verbose
 
   security:
     name: Security Audit
