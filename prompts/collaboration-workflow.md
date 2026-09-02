@@ -41,6 +41,7 @@
 | 依存更新（`josh latest`）をいつ回すか                                          | [`latest-gate.md`](./collaboration-workflow/latest-gate.md)                             |
 | 常駐ドキュメントと skill の分担（何を常駐に残すか）                            | [`residency.md`](./collaboration-workflow/residency.md)                                 |
 | `needs-human-review` — 成果物を人が見るまで出荷させない                        | [`human-review-label.md`](./collaboration-workflow/human-review-label.md)               |
+| コマンド出力が文脈へ持ち込む量の上限                                           | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)                         |
 | 運用ルール                                                                     | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)                     |
 
 **どの 1 本を開けばよいかを決めるのに必要なのは、この索引だけである。** バイト数はここに書かない — 手で保守した数字は本文より先に古くなり、古い数字は無いより悪い。実サイズは `ls -l prompts/collaboration-workflow/` が答える。
