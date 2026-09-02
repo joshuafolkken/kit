@@ -21,6 +21,9 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  # The process-listing command `epicrun.md` names among the traces a stopped delegated unit leaves
+  # (joshuafolkken/kit#1212). Distributed, because the skill that names it is copied by `josh sync`.
+  - pgrep
   - delegatable
   - backgrounding
   - unretried
