@@ -52,8 +52,10 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   `dependency-update` skill is loaded afterwards exactly as before whenever the update actually ran.
   `latest-gate.md` is the single source; `kickoff` never reaches it, because it never implements.
 - **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` at the level `pnpm josh review:level` prints
-  on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**
-  (`prompts/review.md` → "Review round cap") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
+  on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**,
+  the second one a verification pass over the fixes rather than a second full read of the diff
+  (`prompts/review.md` → "Review round cap" and "The second round is a verification pass, not a second
+  full review") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
   answers `required` (`eval-gate.md`). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
   **The rule-compliance measurement is read after the review and before the commit, never inside
