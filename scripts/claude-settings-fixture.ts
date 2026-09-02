@@ -31,8 +31,18 @@ interface HooksBlock {
 	PostToolUse?: ReadonlyArray<HookMatcher>
 }
 
+// The harness environment the settings file declares. Values are strings because Claude Code reads
+// them as environment variables; `bash-output-cap.test.ts` is what turns a string back into the
+// number the cap is compared against, so a value that is not a number fails there rather than
+// silently reading as an absent cap.
+interface EnvironmentBlock {
+	// eslint-disable-next-line @typescript-eslint/naming-convention -- Claude Code environment variable name
+	BASH_MAX_OUTPUT_LENGTH?: string
+}
+
 interface SettingsShape {
 	permissions: PermissionsBlock
+	env: EnvironmentBlock
 	hooks: HooksBlock
 }
 
@@ -47,4 +57,11 @@ function load_settings(): SettingsShape {
 const claude_settings_fixture = { load_settings, read_settings_text }
 
 export { claude_settings_fixture, SETTINGS_PATH }
-export type { HookHandler, HookMatcher, HooksBlock, PermissionsBlock, SettingsShape }
+export type {
+	EnvironmentBlock,
+	HookHandler,
+	HookMatcher,
+	HooksBlock,
+	PermissionsBlock,
+	SettingsShape,
+}
