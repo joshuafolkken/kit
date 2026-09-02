@@ -33,7 +33,8 @@ resident in the AI documents, because it has to hold when this skill has *not* b
 
 Read this file, then the one for the command that was typed. `fullrun` and `queue` also need
 `chain-rule.md` and `followup.md`; `halfrun` needs neither, because it stops before the commit.
-`eval-gate.md` is read from the verification gate below, by whichever command reached it.
+`eval-gate.md` is read from the verification gate below, by whichever command reached it, and
+`latest-gate.md` from the dependency-update step every implementing entry reaches before it.
 
 | Typed keyword                            | Read                                        |
 | ---------------------------------------- | ------------------------------------------- |
@@ -45,6 +46,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 
 ## 2. What every one of them shares
 
+- **The dependency update is asked for, not assumed.** Every implementing entry runs
+  `pnpm josh latest:scope` before it implements and runs `josh latest` only on `required` — the
+  trigger is elapsed time since the last update in this checkout, never a judgement, and the
+  `dependency-update` skill is loaded afterwards exactly as before whenever the update actually ran.
+  `latest-gate.md` is the single source; `kickoff` never reaches it, because it never implements.
 - **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` at the level `pnpm josh review:level` prints
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**
   (`prompts/review.md` → "Review round cap") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
