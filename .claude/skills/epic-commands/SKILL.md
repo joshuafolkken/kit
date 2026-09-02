@@ -6,8 +6,10 @@ description: The procedures for the `josh epic:*` commands that make an epic run
 # The `josh epic:*` commands
 
 These four commands are what turn an epic from a list of issue numbers into something a run can
-execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-plan.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
-skill is the operational procedure, and the two must agree.
+execute unattended. The canonical extended reference is `prompts/collaboration-workflow/` — `epic-bundle.md`, `epic-audit.md` and `cross-repo-epic.md` between them; this
+skill is the operational procedure, and the two must agree. **`epic:plan` is no longer among them**:
+its body is single-sourced here (joshuafolkken/kit#1189, the joshuafolkken/kit#1174 rollout), and
+`prompts/collaboration-workflow/epic-plan.md` is a pointer to this file rather than a second copy.
 
 The workflow keywords themselves — `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` — live in the
 `workflow-commands` skill.
@@ -23,22 +25,39 @@ epic:plan  phase 0 → epic:audit, and fix what it finds (Tier A)
 
 ## `josh epic:plan <E>` — one batch of decisions
 
-Prints every child's number, title, body, labels, `blockedBy` and state as one JSON document.
+Prints every child's number, title, body, labels, `blockedBy` and state as one JSON document. The
+alias is `pnpm josh el <E>`.
 
 Most of the stops an implementation makes could have been answered before it started. Arriving
 scattered is what forces a person to wait through the run; asking per child asks the same question
 several times; and the answers end up only in a conversation nobody can read back.
 
 - **Phase 0 is not optional.** A batch decision made on a plan that contradicts itself has to be made
-  again once the contradiction surfaces.
-- **Triage:** `auto` (Tier A — decide it), `ask` (Tier B/C — collect it), `defer` (out of scope —
-  file it).
+  again once the contradiction surfaces. Run `pnpm josh epic:audit <E>` before phase 1 and let it
+  surface the four things a hand read misses — a dependency cycle, an ordering contradiction, an
+  implicit dependency, and a child no task list tracks. **Fix what it finds as Tier A, without asking,
+  and record the reasoning on the Issue**; only a contradiction that needs a person's judgement joins
+  phase 2's `ask`.
+- **Phase 0 is a step of the procedure, not a confirmation that may be skipped.** An epic whose
+  contradictions surface only once a person says "go find the bugs" has no unattended execution to
+  speak of — the run stalls at the first one, and nobody is watching. That is what phase 0 is for.
+- **Triage** — every decision the plan surfaces goes into one of three classes. **What separates the
+  first two is the margin, not the difficulty**: a class read off how hard a decision feels is what
+  sends an `auto` into phase 2 and doubles the question a person is asked.
+
+  | Class | What it is | What happens to it |
+  | --- | --- | --- |
+  | `auto` | Tier A — one option is clearly better on the merits | Decide it, and record it when the child is implemented |
+  | `ask` | Tier B/C — the top options are close, or the action is irreversible | Collect it for phase 2 |
+  | `defer` | Out of scope for this epic | File it as a follow-up Issue |
 - **Phase 2 is one question for the whole epic**, never one per child.
 - Record each answer in **both** the epic's `## Decisions` and a comment on each child it applies to.
   One without the other leaves either the child's reader without the reasoning or the epic without
   the decision.
 - **Recording a decision removes that child's `needs-decision` label** (Tier A). Without it the child
-  stays parked after the answer arrived.
+  stays parked after the answer arrived. The label-clearing rule itself is defined by
+  `.claude/skills/workflow-commands/epicrun.md` → "park and continue"; what this section adds is the
+  moment it fires — the answer being written down.
 
 ```md
 ## Decisions
