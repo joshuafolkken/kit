@@ -8,6 +8,7 @@ import {
 	STAMP_OTHER_HASH,
 	STAMP_STARTED_AT,
 } from './eval-stamp-fixture'
+import { eval_switch } from './eval-switch'
 import { eval_trigger } from './eval-trigger'
 import { eval_trigger_cli } from './eval-trigger-cli'
 
@@ -22,6 +23,13 @@ const FAILURE_EXIT_CODE = 1
 function given(stamp: EvalStamp | undefined, tree: Record<string, string> | undefined): void {
 	vi.spyOn(eval_stamp, 'read_stamp').mockReturnValue(stamp)
 	vi.spyOn(eval_stamp, 'try_read_tree').mockReturnValue(tree)
+}
+
+// joshuafolkken/kit#1235 made the measurement opt-in, so every reading that is about the *paths*
+// has to say which side of the switch it is on. Spying rather than stubbing the variable keeps these
+// tests independent of whatever the machine running them happens to export.
+function given_measurement(is_enabled: boolean): void {
+	vi.spyOn(eval_switch, 'is_enabled').mockReturnValue(is_enabled)
 }
 
 function silence_output(): void {
@@ -95,6 +103,7 @@ describe('eval_trigger_cli.run_since_eval', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
+		given_measurement(true)
 		given(stamp_of(files), { ...files })
 
 		expect(eval_trigger_cli.run_since_eval([eval_trigger_cli.SINCE_EVAL_FLAG])).toBe(
@@ -122,6 +131,7 @@ describe('eval_trigger_cli.run', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		given_measurement(true)
 		given(stamp_of(files), { ...files })
 
 		await expect(eval_trigger_cli.run([eval_trigger_cli.SINCE_EVAL_FLAG, '--json'])).resolves.toBe(
@@ -162,5 +172,76 @@ describe('eval_trigger_cli.run', () => {
 
 	it('names both readings in its usage line', () => {
 		expect(eval_trigger_cli.USAGE).toContain(eval_trigger_cli.SINCE_EVAL_FLAG)
+	})
+})
+
+// joshuafolkken/kit#1235: the gate asks this command whether to spend five real Claude sessions, so
+// turning the suite off is done here rather than by deleting the step from the procedures — the
+// documents keep describing one gate, and the answer changes in one place.
+const MEASURED_PATH = eval_trigger.MEASURED_PATHS[0] ?? 'CLAUDE.md'
+
+describe('the opt-in switch, at the branch reading', () => {
+	it('answers skip for a measured path while the measurement is off', () => {
+		given_measurement(false)
+
+		expect(eval_trigger_cli.decide_scope([MEASURED_PATH])).toBe(eval_trigger.SKIPPED_SCOPE)
+	})
+
+	// The switch suppresses the run; it does not rewrite what the paths mean. Turning it on has to
+	// give back exactly the answer the trigger always gave.
+	it('decides from the changed paths again once it is on', () => {
+		given_measurement(true)
+
+		expect(eval_trigger_cli.decide_scope([MEASURED_PATH])).toBe(eval_trigger.REQUIRED_SCOPE)
+	})
+
+	// A `skip` explained as "no changed path is one the scenarios can see" would describe a diff
+	// nobody looked at, and send whoever chases it into the trigger set rather than to the switch.
+	it('says the switch is why, not the diff', () => {
+		given_measurement(false)
+
+		expect(eval_trigger_cli.explain_scope([MEASURED_PATH], eval_trigger.SKIPPED_SCOPE)).toBe(
+			eval_switch.DISABLED_REASON,
+		)
+	})
+
+	it('leaves the path-based sentence in place once it is on', () => {
+		given_measurement(true)
+
+		expect(eval_trigger_cli.explain_scope([MEASURED_PATH], eval_trigger.REQUIRED_SCOPE)).toContain(
+			MEASURED_PATH,
+		)
+	})
+})
+
+// The staleness reading is asked by the same gate, so a switch that only reached the branch reading
+// would leave a run measuring again the moment a review touched a distributed document.
+describe('the opt-in switch, at the recorded-run reading', () => {
+	it('answers skip without consulting the record', () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const read_stamp = vi.spyOn(eval_stamp, 'read_stamp')
+
+		given_measurement(false)
+
+		expect(eval_trigger_cli.run_since_eval([eval_trigger_cli.SINCE_EVAL_FLAG])).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+		expect(info).toHaveBeenCalledWith(eval_trigger.SKIPPED_SCOPE)
+		expect(error).toHaveBeenCalledWith(eval_switch.DISABLED_REASON)
+		expect(read_stamp).not.toHaveBeenCalled()
+	})
+
+	// An invocation nobody can read must not be handed the same `skip` a correct one gets: the switch
+	// silences the measurement, never the usage error.
+	it('still refuses an unreadable invocation while off', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		given_measurement(false)
+
+		expect(eval_trigger_cli.run_since_eval([eval_trigger_cli.SINCE_EVAL_FLAG, '--staged'])).toBe(
+			FAILURE_EXIT_CODE,
+		)
+		expect(error).toHaveBeenCalledWith(eval_trigger_cli.USAGE)
 	})
 })

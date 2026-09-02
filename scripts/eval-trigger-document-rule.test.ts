@@ -1,5 +1,6 @@
 import { AI_DOCS, read_repo_file, read_unwrapped } from '#scripts/ai-document-fixture'
 import { eval_report } from '#scripts/eval/eval-report'
+import { eval_switch } from '#scripts/eval/eval-switch'
 import { eval_trigger } from '#scripts/eval/eval-trigger'
 import { describe, expect, it } from 'vitest'
 
@@ -66,6 +67,43 @@ describe('the documented trigger set is the one the command uses', () => {
 
 		for (const glob of eval_trigger.MEASURED_GLOBS) expect(content).toContain(`\`${glob}\``)
 	})
+})
+
+// joshuafolkken/kit#1235: the measurement became opt-in, and a switch nobody documented is a hole
+// rather than a setting — the trigger set below would then describe a decision the command no longer
+// makes, and a reader chasing an unexpected `skip` would look for the defect in the paths.
+describe('the opt-in switch is documented wherever the trigger is', () => {
+	const SWITCH_ON = `${eval_switch.SWITCH_ENV_KEY}=on`
+
+	it.each([SKILL_GATE, EVAL_DOC, COMMAND_DOC])('%s names the way back on', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain(SWITCH_ON)
+	})
+
+	// The default is the half a reader gets wrong on their own: an undocumented unset-means-off reads
+	// as a broken trigger, and an undocumented opt-in reads as a gate that was deleted.
+	it.each([SKILL_GATE, EVAL_DOC, COMMAND_DOC])('%s says it is off by default', (document_path) => {
+		expect(read_unwrapped(document_path).toLowerCase()).toContain('opt-in')
+	})
+
+	// The resident step is the one text a turn with no skill loaded reads, and it used to say the
+	// trigger was decided from the changed paths — which the switch makes untrue. It carries the two
+	// facts that change what a run does: the answer is the command's, and a `skip` it hands back may
+	// mean nothing was measured at all.
+	it.each(AI_DOCS)('%s says the measurement is opt-in', (document_path) => {
+		const content = read_unwrapped(document_path)
+
+		expect(content).toContain(eval_switch.SWITCH_ENV_KEY)
+		expect(content.toLowerCase()).toContain('opt-in')
+	})
+
+	// The suite is still reachable by hand, which is what keeps a `blocked` verdict's baseline and
+	// confirmation readings — and any diagnosis of the scenarios themselves — possible at all.
+	it.each([SKILL_GATE, EVAL_DOC, COMMAND_DOC])(
+		'%s says a person can still run the suite',
+		(document_path) => {
+			expect(read_unwrapped(document_path).toLowerCase()).toContain('still runs')
+		},
+	)
 })
 
 describe('the placement is stated where a run would otherwise fold it into the gate', () => {
