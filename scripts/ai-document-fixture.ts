@@ -136,10 +136,12 @@ function read_rule_surface(document_path: string): string {
 }
 
 // The rule-surface counterpart of `read_unwrapped`, for the same reason: a marker that happens to
-// span a line break would otherwise fail on a reflow that changed nothing. Three suites predate it
-// and still collapse the surface inline (`epic-plan-` / `epic-bundle-` / `epic-audit-document-rule`);
-// migrating them is a change to files no current issue touches, so new suites call this instead of
-// adding a fourth copy and the three are converted the next time one of them is edited.
+// span a line break would otherwise fail on a reflow that changed nothing. Two suites predate it
+// and still collapse the surface inline (`epic-bundle-` / `epic-audit-document-rule`); migrating
+// them is a change to files no current issue touches, so new suites call this instead of adding a
+// third copy and the two are converted the next time one of them is edited —
+// `epic-plan-document-rule` was the third and converted under joshuafolkken/kit#1189, which rewrote
+// it anyway.
 function read_unwrapped_rule_surface(document_path: string): string {
 	return read_rule_surface(document_path).replaceAll(/\s+/gu, ' ')
 }
