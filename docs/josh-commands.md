@@ -1372,6 +1372,8 @@ pnpm josh eval:scope --json       # the scope and the reason, machine-readable
 
 The scope goes to stdout and the reason to stderr, so `$(pnpm josh eval:scope)` reads the scope and a person still sees why.
 
+**The measurement is opt-in, and off unless `JOSH_EVAL` turns it on** ([#1235](https://github.com/joshuafolkken/kit/issues/1235)). Unset — the state of every checkout that was never told about the variable — answers `skip` whatever the diff holds, with a reason line naming the switch rather than the paths, so an unexpected `skip` leads to the switch instead of into the trigger set. `JOSH_EVAL=on pnpm josh eval:scope` restores the table below exactly as it was; `1`, `true` and `yes` read the same, and every other value, including `off`, leaves it off. It gates this command and `--since-eval` with it — never `josh eval` itself, which still runs when a person types it. The command loads `.env` when the file is there, so a checkout that wants the measurement back keeps `JOSH_EVAL=on` on a line of it rather than prefixing every gate; a value set in the environment still wins over the file. The reason it is off, and what a run then owes its completion report: [docs/eval.md](./eval.md) → "When it runs".
+
 **The decision takes no judgement**, exactly as `josh review:level`'s does: the input is the list of changed paths and nothing else. "This edit is only wording" is a judgement made under cost pressure, and cost pressure resolves it toward `skip` at the moment a regression is most likely to ship.
 
 | Any changed path is…                                                                                             | Scope      |

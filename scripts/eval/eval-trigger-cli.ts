@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { path_decision } from '#scripts/josh/path-decision'
 import { eval_stamp } from './eval-stamp'
+import { eval_switch } from './eval-switch'
 import { eval_trigger, type EvalScope } from './eval-trigger'
 
 // `josh eval:scope` — say whether this change has to be measured by `josh eval`
@@ -80,6 +81,28 @@ function since_eval_decision(): Decision {
 	}
 }
 
+// The opt-in switch, applied at the one place both readings pass through (joshuafolkken/kit#1235).
+// Both answer `skip` when the measurement is off, and both say so rather than borrowing the
+// path-based sentence: `no changed path is one the scenarios can see` would describe a diff nobody
+// looked at, and a reader chasing an unexpected `skip` needs the switch named to find it.
+function disabled_decision(): Decision {
+	return { scope: eval_trigger.SKIPPED_SCOPE, reason: eval_switch.DISABLED_REASON }
+}
+
+// The flags are still parsed and a bad one still fails: an invocation nobody can read must not be
+// handed the same `skip` a correct one gets, whichever way the switch is set.
+function decide_scope(paths: ReadonlyArray<string>): EvalScope {
+	if (!eval_switch.is_enabled()) return eval_trigger.SKIPPED_SCOPE
+
+	return eval_trigger.scope_for(paths)
+}
+
+function explain_scope(paths: ReadonlyArray<string>, scope: EvalScope): string {
+	if (!eval_switch.is_enabled()) return eval_switch.DISABLED_REASON
+
+	return format_reason(paths, scope)
+}
+
 // `--staged` alongside `--since-eval` would ask two different questions in one invocation — one of
 // the index, one of a recorded run — so it is refused rather than resolved in the command's favour.
 function run_since_eval(argv: ReadonlyArray<string>): number {
@@ -92,7 +115,7 @@ function run_since_eval(argv: ReadonlyArray<string>): number {
 		return FAILURE_EXIT_CODE
 	}
 
-	const { scope, reason } = since_eval_decision()
+	const { scope, reason } = eval_switch.is_enabled() ? since_eval_decision() : disabled_decision()
 
 	path_decision.print_decision(JSON_KEY, scope, reason, options.is_json)
 
@@ -105,8 +128,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await path_decision.run_path_decision(argv, {
 		usage: USAGE,
 		key: JSON_KEY,
-		decide: (paths) => eval_trigger.scope_for(paths),
-		explain: format_reason,
+		decide: decide_scope,
+		explain: explain_scope,
 	})
 }
 
@@ -115,6 +138,9 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const eval_trigger_cli = {
+	decide_scope,
+	disabled_decision,
+	explain_scope,
 	format_reason,
 	JSON_KEY,
 	main,

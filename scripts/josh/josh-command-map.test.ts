@@ -150,6 +150,16 @@ describe('COMMAND_MAP — tsx_arguments', () => {
 	it('lint command has no tsx_arguments', () => {
 		expect(get_command('lint')?.tsx_arguments).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#1235: the measurement is opt-in, and a person keeps that preference in `.env`
+	// rather than typing it in front of every gate. Without the flag the file is never read and the
+	// command answers `skip` with no complaint — a switch that fails silently in the direction of
+	// doing nothing. The optional form because `.env` need not exist.
+	it('eval:scope command reads .env so the opt-in switch can live there', () => {
+		expect(
+			get_command('eval:scope')?.tsx_arguments?.some((flag) => flag.includes('env-file')),
+		).toBe(true)
+	})
 })
 
 describe('ALIASES — all resolve to valid COMMAND_MAP keys', () => {
