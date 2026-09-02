@@ -17,6 +17,24 @@ The branch diff is what the gate asks about. `--staged` exists for a pre-commit 
 the empty-list rule below bites: an empty index answers `required`, which here costs five real
 sessions rather than `review:level`'s free `medium`.
 
+**The measurement is opt-in, and off unless `JOSH_EVAL` turns it on** (joshuafolkken/kit#1235). With
+the variable unset — the state of every checkout that was never told about it — `eval:scope` answers
+`skip` whatever the diff holds, and the reason line names the switch rather than the paths, so an
+unexpected `skip` leads to the switch instead of into the trigger set. `JOSH_EVAL=on` restores the
+path-based decision below exactly as it was; `1`, `true` and `yes` read the same, and every other
+value, including `off`, leaves it off. The command loads `.env`, so a checkout that wants the
+measurement back keeps the line there rather than prefixing every gate.
+
+- **It was turned off for a measured reason, not a preference.** One run is five real Claude sessions
+  and, on the tree this shipped from, the suite almost never reached `held` — so what the gate bought
+  in practice was a wait on every distributed-document change, which here is most of them. The
+  scenarios' unreliability is its own Issue; this switch is the default while that is open, never a
+  deletion of the gate.
+- **`pnpm josh eval` typed by a person still runs.** The switch gates the trigger, not the suite: a
+  measurement asked for in so many words is taken, which is how the scenarios get diagnosed at all.
+- **Say it in the completion report**, the same way `unmeasured` is reported: the run took no
+  measurement, and no measurement is never reported as `held`.
+
 **The input is the set of changed paths and nothing else.** "This edit is only wording" is a
 judgement made under cost pressure, and cost pressure resolves it toward `skip` exactly when a
 regression is most likely to ship — the same reason `pnpm josh review:level` took the review level

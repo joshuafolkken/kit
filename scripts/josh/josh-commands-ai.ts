@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const AI_COMMANDS: Record<string, CommandEntry> = {
@@ -77,6 +77,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/eval/eval-trigger-cli.ts',
 		description: 'Say whether this change has to be measured by josh eval',
 		category: 'AI tools',
+		// The opt-in switch is a per-machine preference, so `.env` is where a person keeps it
+		// (joshuafolkken/kit#1235). Without this flag `JOSH_EVAL=on` written there is ignored and the
+		// command answers `skip` with no complaint — the silent half of a switch whose safe state is
+		// off. The optional form, because this file need not exist; an environment variable set
+		// inline still wins over it.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */

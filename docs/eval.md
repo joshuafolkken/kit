@@ -54,6 +54,37 @@ pnpm josh eval:scope            # → required | skip ; the reason on stderr
 pnpm josh eval:scope --staged   # about the staged diff
 ```
 
+**The measurement is opt-in, and off unless `JOSH_EVAL` turns it on**
+([#1235](https://github.com/joshuafolkken/kit/issues/1235)). With the variable unset — the state of
+every checkout that was never told about it — `eval:scope` answers `skip` whatever the diff holds,
+and the reason line names the switch rather than the paths, so an unexpected `skip` leads to the
+switch instead of into the trigger set below.
+
+```bash
+JOSH_EVAL=on pnpm josh eval:scope   # decide from the changed paths again
+```
+
+`1`, `true` and `yes` read the same as `on`; every other value, including `off`, leaves it off. Unset
+is off because the quiet default had to cost nothing on a machine that has never heard of the
+variable — an explicit-`off` design would need that line written per machine, in a `.env` that is
+personal and non-committed, before the first run behaved as asked.
+
+**`.env` is where a checkout keeps the answer.** `eval:scope` loads it when it exists, so
+`JOSH_EVAL=on` on a line of that file turns the gate back on for every run in this checkout without
+prefixing anything; a value set in the environment still wins over the file, which is what makes a
+one-off `JOSH_EVAL=on pnpm josh eval:scope` override it. The file is personal and non-committed, so
+turning the measurement on is a per-machine decision rather than one made for everybody.
+
+**Why it is off**: one run is five real Claude sessions, and on the tree this shipped from the suite
+almost never reached `held` — so what the gate bought in practice was a wait, paid on every
+distributed-document change, which in this repository is most of them. The scenarios' unreliability is
+its own Issue; the switch is the default while that one is open, not a deletion of the gate. **A run
+that took no measurement says so in its completion report**, exactly as an `unmeasured` one does.
+
+**`pnpm josh eval` typed by a person still runs**, switch or no switch: it gates the trigger, never
+the suite. A measurement asked for in so many words is taken — which is how the scenarios get
+diagnosed at all, and what a `blocked` verdict's baseline and confirmation readings depend on.
+
 **The input is the set of changed paths and nothing else.** "This edit is only wording" is a judgement
 made under cost pressure, and cost pressure resolves it toward `skip` exactly when a regression is
 most likely to ship — the same reason `josh review:level` took the review level out of an agent's
