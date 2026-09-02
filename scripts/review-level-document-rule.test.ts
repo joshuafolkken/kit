@@ -24,9 +24,14 @@ const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'prompts/collaboration-workflow/plan-comment.md',
 ]
 
-// The same string as COMMAND: what a flow document must contain is the command itself, not a
-// particular sentence around it — the sentence was rewritten once already for a rendering bug.
-const ROUTED_FORM = COMMAND
+// The command itself, not a particular sentence around it — the sentence was rewritten once already
+// for a rendering bug. **Two spellings satisfy the rule since joshuafolkken/kit#1241**: the workflow
+// entry points now name `review:brief`, which prints the level on its first line by reusing
+// `review_level` rather than deciding again, while the resident documents keep naming the level
+// command for a pre-commit review run outside any workflow. What the rule is about — the level comes
+// from a command and never from a typed judgement — is unchanged by which of the two a file names.
+const BRIEF_COMMAND = 'pnpm josh review:brief'
+const ROUTED_FORMS: ReadonlyArray<string> = [COMMAND, BRIEF_COMMAND]
 
 describe('the review level is routed to the command', () => {
 	it.each([...AI_DOCS, REVIEW_PROMPT])('%s names the command', (document_path) => {
@@ -124,7 +129,7 @@ describe.each(FLOW_DOCUMENTS)('%s — reviews at the level the command decides',
 	const content = read_repo_file(document_path)
 
 	it('routes to the command instead of typing a level', () => {
-		expect(content).toContain(ROUTED_FORM)
+		expect(ROUTED_FORMS.some((form) => content.includes(form))).toBe(true)
 	})
 
 	it('types no fixed level of its own', () => {

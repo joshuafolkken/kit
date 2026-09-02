@@ -77,7 +77,7 @@ function since_eval_decision(): Decision {
 
 	return {
 		scope: eval_trigger.scope_for_measured_changes(changed),
-		reason: since_eval_reason(stamp.started_at, changed),
+		reason: since_eval_reason(stamp.taken_at, changed),
 	}
 }
 
