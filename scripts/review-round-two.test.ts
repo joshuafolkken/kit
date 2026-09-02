@@ -81,7 +81,11 @@ describe(`${REVIEW_PROMPT} — the second round is defined`, () => {
 // otherwise re-run the first round and never reach the definition above.
 const CHAIN_RULE_MARKERS: ReadonlyArray<string> = [
 	'second-round verification pass',
-	'scoped to the **fix delta**',
+	// joshuafolkken/kit#1241: the pass used to be described as "scoped to the fix delta" and nothing
+	// handed the delta over, so the scoping was a sentence in a document the forked review agent never
+	// opens. The marker follows the mechanism rather than the description.
+	'which hands over the **fix delta** as the target',
+	'pnpm josh review:brief --round 2',
 	'**not** a second adversarial read of `git diff main`',
 	'The question narrows; the standard does not',
 	SECTION_TITLE,

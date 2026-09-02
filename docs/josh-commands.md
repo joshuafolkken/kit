@@ -1195,6 +1195,34 @@ gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f
 
 The behavior it triggers belongs to the workflow commands rather than to any `josh` subcommand: [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workflow-commands/SKILL.md) → §2z is the single source of the definition.
 
+### `josh review:brief`
+
+Print the whole `/code-review` invocation — the level, what `josh gate` has already proved, and the target ([#1241](https://github.com/joshuafolkken/kit/issues/1241)).
+
+```bash
+pnpm josh review:brief            # round 1; alias: josh rb
+pnpm josh review:brief --round 2  # the verification pass, scoped to the fix delta
+```
+
+Pass the whole output to `/code-review`. The level is on the first line, so `$(pnpm josh review:brief)` still starts with the answer `josh review:level` gives.
+
+**It exists because `/code-review` runs in a forked process that reads none of this repository's documents.** Only the invocation argument reaches it, so a rule written in `prompts/review.md` — "do not re-run what the gate proved", "the second round reads the fix delta" — has nothing to bind to. Measured on [#1240](https://github.com/joshuafolkken/kit/pull/1240): both rounds re-ran the unit suite `josh gate` had just passed, both fumbled the runner (`npx vitest`, then a retry), and round 2 re-read the whole diff — 439 seconds on a seven-file change, with the second round taking 90% of the first.
+
+What the brief carries:
+
+| Part                  | Where it comes from                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| The level             | `josh review:level`, reused rather than decided again                                                      |
+| "Already verified"    | The record `josh gate` writes when all four checks pass, **and only if its digests still match this tree** |
+| The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                |
+| The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed                |
+
+**Only one half is mechanical.** The round-2 target _is_ the scope handed over, so a narrowed round stays narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so whether it obeys is measured rather than assumed.
+
+**It never claims a gate it cannot prove.** The gate's record holds a digest per changed path; if any of them has moved since — or there is no record at all — the brief prints `Not verified` and asserts nothing about lint, the type check, the spell check or the unit tests. Re-run `pnpm josh gate` after applying fixes and the record catches up.
+
+**The round-1 snapshot is what makes `--round 2` mechanical.** The implementation and the review's fixes are uncommitted in the same tree, so `git diff` cannot say which side of the review a change fell on. Round 1 records a digest per changed path; round 2 compares and names exactly the paths that moved. With no snapshot it falls back to the whole change: a missing record must widen a review, never narrow it.
+
 ### `josh review:level`
 
 Print the `/code-review` level this change is reviewed at ([#966](https://github.com/joshuafolkken/kit/issues/966)).

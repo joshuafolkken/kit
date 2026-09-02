@@ -43,6 +43,14 @@ async function status(): Promise<string> {
 	return await exec_git_command_read(['status', '--porcelain'])
 }
 
+// The absolute path every other git command's output is relative to. Asking git rather than reading
+// `process.cwd()` is the whole point: run from a subdirectory, joining a repository-relative path
+// onto the working directory resolves to nothing, and a digest map built that way collapses to
+// "every file absent" — which compares *equal* to another such map (joshuafolkken/kit#1241).
+async function repository_root(): Promise<string> {
+	return await exec_git_command_read(['rev-parse', '--show-toplevel'])
+}
+
 // Both git directories this checkout has, absolute, one per line. In the main work tree they are the
 // same path; in a linked work tree the first is `<repo>/.git/worktrees/<name>` and the second is
 // `<repo>/.git`, and the commit-message file lives under the first. Asking git rather than assuming
@@ -225,6 +233,7 @@ async function add_path(file_path: string): Promise<void> {
 const git_command = {
 	branch,
 	status,
+	repository_root,
 	git_directories,
 	diff_cached,
 	diff_cached_names,

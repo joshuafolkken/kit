@@ -51,9 +51,13 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   trigger is elapsed time since the last update in this checkout, never a judgement, and the
   `dependency-update` skill is loaded afterwards exactly as before whenever the update actually ran.
   `latest-gate.md` is the single source; `kickoff` never reaches it, because it never implements.
-- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` at the level `pnpm josh review:level` prints
+- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` with the brief `pnpm josh review:brief` prints
+  (the level, what the gate has already proved on this exact tree, and the target)
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**,
-  the second one a verification pass over the fixes rather than a second full read of the diff
+  the second one a verification pass over the fixes rather than a second full read of the diff —
+  run it with `pnpm josh review:brief --round 2`, which hands the fix delta over as the **target**
+  rather than only saying so in prose (joshuafolkken/kit#1241): the forked review agent reads none of
+  this repository's documents, so a round narrowed only in prose stays as expensive as the first
   (`prompts/review.md` → "Review round cap" and "The second round is a verification pass, not a second
   full review") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
   answers `required` (`eval-gate.md`). `kickoff` is the exception —

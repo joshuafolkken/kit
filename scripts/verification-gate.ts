@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
 import { GATE_COMMAND } from './josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh/josh-composite-arguments'
+import { review_stamps } from './review/review-stamps'
+import { review_tree } from './review/review-tree'
 import { test_unit_guard } from './test-unit-guard'
 import { type_check_step } from './type-check-step'
 
@@ -136,9 +138,55 @@ function print_gate_summary(failed_labels: ReadonlyArray<string>): void {
 	process.stdout.write(`\n${FAIL_ICON} verification gate failed: ${failed_labels.join(', ')}\n`)
 }
 
+// The record `josh review:brief` reads, written only on a fully green run and only with the tree it
+// was green on (joshuafolkken/kit#1241). `/code-review` runs in a forked process that reads none of
+// this repository's documents, so "the unit tests already passed" reaches it only if the invocation
+// carries it — and it may only carry it if something wrote down that they did, on **this** tree.
+//
+// **Three things withhold the record, and every one of them is the safe direction.** A step that
+// passed *without running* — `test-unit-guard` exits 0 with a notice when vitest is absent or the
+// project has no tests — must not become "the unit tests all passed": the gate keeps that skip
+// visible on the console, and a record erasing it would have the brief tell a review agent not to
+// re-run tests that never ran. A tree that moved while the checks were in flight (the `PostToolUse`
+// formatter, an editor save) is not the tree they read. And a failed write leaves no record at all,
+// which a temp-directory problem must never turn into a red gate.
+//
+// The destination is a parameter so a test can exercise the record without overwriting the one a
+// real run may be relying on — `josh gate` and `josh review:brief` share one path by design.
+async function record_green_gate(
+	results: ReadonlyArray<GateStepResult>,
+	before: Record<string, string>,
+	target?: string,
+): Promise<void> {
+	if (results.some((result) => is_skip_notice(result))) return
+
+	try {
+		const after = await review_tree.read_changed_tree()
+
+		if (JSON.stringify(after) !== JSON.stringify(before)) return
+
+		review_stamps.gate_stamp.write(after, target)
+	} catch {
+		/* no record is the safe answer */
+	}
+}
+
 // Results are printed in declaration order rather than completion order: a gate whose sections move
 // around between runs cannot be read by scrolling to the same place twice.
+// The tree is read **before** the checks start, so what the record claims is the tree they actually
+// read rather than whatever the formatter left behind while they ran (joshuafolkken/kit#1241). A
+// failure here is not the gate's business: no tree means no record, which the brief reports as
+// "not verified".
+async function read_tree_before_checks(): Promise<Record<string, string>> {
+	try {
+		return await review_tree.read_changed_tree()
+	} catch {
+		return {}
+	}
+}
+
 async function run_verification_gate(is_verbose = false): Promise<number> {
+	const before = await read_tree_before_checks()
 	const steps = await build_gate_steps(process.cwd())
 	const results = await Promise.all(steps.map(async (step) => await run_gate_step(step)))
 
@@ -150,7 +198,11 @@ async function run_verification_gate(is_verbose = false): Promise<number> {
 
 	print_gate_summary(failed_labels)
 
-	return failed_labels.length > 0 ? FAIL_EXIT_CODE : 0
+	if (failed_labels.length > 0) return FAIL_EXIT_CODE
+
+	await record_green_gate(results, before)
+
+	return 0
 }
 
 // `josh gate` fans out to four sub-commands and forwards nothing to them, so an appended flag
@@ -194,6 +246,7 @@ const verification_gate = {
 	build_gate_step,
 	build_gate_steps,
 	is_gate_step_failed,
+	record_green_gate,
 	run_gate_command,
 	run_gate_step,
 	run_verification_gate,

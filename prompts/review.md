@@ -28,6 +28,17 @@ pnpm josh review:level            # alias: josh rl
 pnpm josh review:level --staged
 ```
 
+**Inside a workflow, run `pnpm josh review:brief` instead and pass the whole thing to `/code-review`.** It prints the level on its first line and then the rest of what the run already knows: whether `pnpm josh gate` has passed **on this exact tree**, how this project runs its unit suite, and the target — the whole change on round 1, and on `--round 2` only the files the first round's fixes touched.
+
+```bash
+pnpm josh review:brief            # round 1; alias: josh rb
+pnpm josh review:brief --round 2  # the verification pass, scoped to the fix delta
+```
+
+**It exists because `/code-review` runs in a forked process that reads none of this repository's documents** (joshuafolkken/kit#1241). Only the invocation argument reaches it, so a rule written here — "do not re-run what the gate proved", "the second round reads the fix delta" — has no way to bind. Measured on joshuafolkken/kit#1240: both rounds re-ran the unit suite the gate had just passed, both fumbled the runner, and round 2 re-read the whole diff, for 439 seconds on a seven-file change.
+
+**Two halves, and only one of them is mechanical.** The round-2 target _is_ the scope, so a narrowed round is narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so its effect is measured rather than assumed. **The brief never claims a green gate it cannot prove**: with no record, or with one taken before an edit, it prints `Not verified` and asserts nothing.
+
 **The level is decided from the changed paths and nothing else.** "This one is small" is a judgement made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped — the same reason the cross-package interrupt removed its own "does this block?" evaluation. A rule an agent applies from memory is a rule an agent can talk itself out of; one it has to run answers the same way every time.
 
 | Every changed path is…                                                                   | Level    | Rounds                  |
@@ -334,7 +345,7 @@ If either condition is false, you are in **standalone mode** (or the halfrun con
 Before your response (the one containing the review markdown) is sent, run this self-check:
 
 1. Count high/medium-severity findings across all categories.
-2. If **any** high/medium findings exist → fix them in place and run the **second-round verification pass** — `/code-review` at the level `pnpm josh review:level` prints, scoped to the fix delta and asking whether each finding closed, not a second full read of the diff (see "The second round is a verification pass, not a second full review"). Nothing is committed yet, so a round costs no commit, push, or CI run. **Stop at two rounds** — after the second, route each remaining non-High finding through the three-way disposition (see "Review round cap"): fix it in place without starting a new review round, file it, or drop it with a one-line PR note. For a finding that is filed, run `pnpm josh epic:bundle <new>` on it **before this Issue closes** and act on its answer — `add_to_epic` / `create_epic` are Tier A, run the matching `pnpm josh epic` write command without asking; `ask` stops (or parks the child inside an `epicrun`); `none` is a no-op — then continue the pipeline; a standing High blocks the merge but does not authorize a third round. **Do NOT call `followup --merge` yet.**
+2. If **any** high/medium findings exist → fix them in place and run the **second-round verification pass** — `/code-review` with the brief `pnpm josh review:brief --round 2` prints, which hands over the fix delta as the target and asks whether each finding closed, not a second full read of the diff (see "The second round is a verification pass, not a second full review"). Nothing is committed yet, so a round costs no commit, push, or CI run. **Stop at two rounds** — after the second, route each remaining non-High finding through the three-way disposition (see "Review round cap"): fix it in place without starting a new review round, file it, or drop it with a one-line PR note. For a finding that is filed, run `pnpm josh epic:bundle <new>` on it **before this Issue closes** and act on its answer — `add_to_epic` / `create_epic` are Tier A, run the matching `pnpm josh epic` write command without asking; `ask` stops (or parks the child inside an `epicrun`); `none` is a no-op — then continue the pipeline; a standing High blocks the merge but does not authorize a third round. **Do NOT call `followup --merge` yet.**
 3. If **no** high/medium findings exist (Low-only or completely clean) → your response MUST continue the pipeline in tool calls **after** the review markdown, in the same response: `pnpm josh bump minor`, then `pnpm josh git -y "<title> #<N>"`, then the follow-up filing and `pnpm josh epic:bundle` for anything the cap routed to branch 2 — placed here so it runs inside the CI wait — then `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`. **Do NOT end the turn with review markdown as the final assistant text.**
 
 ### Concrete failure pattern to self-recognize
