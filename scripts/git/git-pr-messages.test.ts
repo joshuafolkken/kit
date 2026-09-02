@@ -9,19 +9,28 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('git_pr_messages.display_success_message', () => {
-	it('logs all checks passed message', () => {
-		git_pr_messages.display_success_message()
+describe('git_pr_messages.display_pr_opened_message', () => {
+	it('logs that the pull request is open', () => {
+		git_pr_messages.display_pr_opened_message()
 
-		expect(vi.mocked(console.info)).toHaveBeenCalledWith('✅ All checks passed successfully.')
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith('✅ Pull request opened.')
 	})
-})
 
-describe('git_pr_messages.display_error_message', () => {
-	it('logs PR conflicts message', () => {
-		git_pr_messages.display_error_message()
+	// The message replaces a wait, so it has to say where the wait went (joshuafolkken/kit#1232).
+	it('names the command that waits for the checks and merges', () => {
+		git_pr_messages.display_pr_opened_message()
 
-		expect(vi.mocked(console.info)).toHaveBeenCalledWith('⚠️  PR has conflicts or merge issues.')
+		expect(vi.mocked(console.info)).toHaveBeenCalledWith(
+			'`pnpm josh followup` waits for the checks and merges.',
+		)
+	})
+
+	it('claims nothing about the checks having passed', () => {
+		git_pr_messages.display_pr_opened_message()
+
+		const logged = vi.mocked(console.info).mock.calls.flat().join('\n')
+
+		expect(logged).not.toContain('passed')
 	})
 })
 

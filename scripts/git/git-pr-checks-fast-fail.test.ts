@@ -20,6 +20,8 @@ const CHECKS = 'Checks'
 const UNSTABLE = 'UNSTABLE'
 // What GitHub reports while a check is still running: not CLEAN, so nothing is mergeable yet.
 const UNKNOWN = 'UNKNOWN'
+const DIRTY = 'DIRTY'
+const BLOCKED = 'BLOCKED'
 const CHANGES_REQUESTED = 'CHANGES_REQUESTED'
 const REQUIRED_CHECKS_ENV_VAR = 'JOSH_REQUIRED_CHECKS'
 const REVIEW_FAILURE_MESSAGE = 'PR checks failed (review requested changes).'
@@ -45,6 +47,41 @@ describe('evaluate_pr_state — a failing non-required check ends the wait (#990
 		})
 
 		expect(evaluate_pr_state(snapshot)).toBe('failure')
+	})
+})
+
+// joshuafolkken/kit#1232. `DIRTY` is not CLEAN, so it answered `pending` and the wait ran its whole
+// budget out on a state only a rebase resolves. It is also where the conflict diagnosis that
+// `pnpm josh git` used to carry landed when that command stopped waiting for the checks, so these
+// assertions are what keeps a conflicting pull request from becoming a 32-minute timeout.
+describe('evaluate_pr_state — a conflicting pull request ends the wait (#1232)', () => {
+	it('returns failure when the merge state is DIRTY', () => {
+		expect(evaluate_pr_state(make_pr_snapshot({ merge_state_status: DIRTY }))).toBe('failure')
+	})
+
+	it('names the conflict in the failure message', () => {
+		const snapshot = make_pr_snapshot({ merge_state_status: DIRTY })
+
+		expect(describe_pr_failure(snapshot)).toContain('merge conflict')
+	})
+
+	it('fails on the conflict even while a required check is still pending', () => {
+		const snapshot = make_pr_snapshot({
+			merge_state_status: DIRTY,
+			rollup: [
+				{ name: CODE_RABBIT, status: 'pending' },
+				{ name: SONAR_QUBE, status: 'pending' },
+			],
+		})
+
+		expect(evaluate_pr_state(snapshot)).toBe('failure')
+	})
+
+	// The state GitHub reports while a required check is merely queued, which is every healthy pull
+	// request for its first seconds. Reading it as a conflict is what made the old post-watch reader
+	// unusable at the point `pnpm josh git` now returns.
+	it('leaves BLOCKED pending rather than reading it as a conflict', () => {
+		expect(evaluate_pr_state(make_pr_snapshot({ merge_state_status: BLOCKED }))).toBe('pending')
 	})
 })
 

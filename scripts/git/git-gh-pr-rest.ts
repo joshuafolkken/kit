@@ -16,8 +16,7 @@ import { rest_comment_schema } from './schemas'
 // `number` is required so that a 200 carrying something other than a pull request — a proxy's HTML
 // error page, an API message object — fails the parse rather than passing as a pull request whose
 // every field is missing. `pr_view` would otherwise answer a well-formed JSON object with no state
-// in it, which `git-pr.ts` reads as "the state could not be determined" and `git-conflict.ts` reads
-// as "no conflict".
+// in it, which `git-pr.ts` reads as "the state could not be determined".
 //
 // `mergeable` and `mergeable_state` are served by the single-pull endpoint only — the listing omits
 // both — which is why the branch lookup resolves a number and the reads go back for the detail.
@@ -115,14 +114,18 @@ function is_same_repository_head(pull: RestPull): boolean {
 // The three fields `gh pr view --json mergeable,mergeStateStatus,state` answered with.
 //
 // `mergeable` was a GraphQL enum (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`) and is a nullable boolean
-// in REST; `pr_info_schema` accepts both and `git-conflict.ts` already reads `false` as conflicting,
-// so the boolean passes through as it arrives — including the JSON null GitHub sends while it is
-// still computing, which reads as "not conflicting" exactly as the enum's `UNKNOWN` did.
+// in REST; `pr_info_schema` accepts both, so the boolean passes through as it arrives — including
+// the JSON null GitHub sends while it is still computing.
 //
-// `mergeStateStatus` is upper-cased because that is how `gh` spelled it — `git-conflict.ts`
-// lower-cases before comparing and is indifferent, but the merge-gate snapshot in
-// `git-pr-checks-eval.ts` compares strictly, and one casing across both readers is what keeps that
-// true (joshuafolkken/kit#1028 converts the snapshot itself).
+// **Nothing reads `mergeable` any more** (joshuafolkken/kit#1232 removed `git-conflict.ts`, its only
+// reader, and the conflict verdict comes off `mergeStateStatus` in `git-pr-checks-eval.ts` now). It
+// stays because this function's contract is *the shape `gh pr view --json …` answered with*, not
+// the subset today's callers happen to read — trimming a wire shape to its current readers is what
+// makes the next one look for a field the mapping silently dropped.
+//
+// `mergeStateStatus` is upper-cased because that is how `gh` spelled it, and because the merge-gate
+// snapshot in `git-pr-checks-eval.ts` compares strictly against that spelling
+// (joshuafolkken/kit#1028 converts the snapshot itself).
 function to_pr_info(pull: RestPull): Record<string, unknown> {
 	return {
 		mergeable: pull.mergeable,
