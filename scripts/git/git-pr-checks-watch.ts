@@ -9,11 +9,12 @@ import {
 	type PrStateEvaluator,
 	type ReviewDecisionPredicate,
 } from './git-pr-checks'
-import type { PrEvaluation } from './git-pr-checks-eval'
+import { is_coderabbit_check, is_required_check, type PrEvaluation } from './git-pr-checks-eval'
 import {
 	CHECK_STATUS_FAIL,
 	CHECK_STATUS_PENDING,
 	type PrStateSnapshot,
+	type RollupCheck,
 } from './git-pr-checks-parse'
 
 // The bounded look at a pull request's checks that `gh pr checks <branch> --watch` used to give.
@@ -58,9 +59,42 @@ interface WatchResult {
 // opening the pull request, where GitHub routinely has not attached a single check run yet; failing
 // there would make `pnpm josh git` exit red on a perfectly healthy run. Whether the branch really
 // has no checks is asked once, after the budget runs out — see `pr_checks_watch`.
+
+// Temporary (kit#753): CodeRabbit blocks nothing end to end, so a look-ahead that waits on it waits
+// for something no verdict downstream reads. Its commit status posts `Review queued` within seconds
+// of the pull request opening and stays pending for the whole review — thirteen minutes on PR #1211
+// — so counting it as pending spent the entire two-minute budget on **every** run and then ended in
+// the timeout note, before the merge gate applied kit#753's exemption and merged anyway
+// (joshuafolkken/kit#1217). The name comes from `is_coderabbit_check`, the one predicate the merge
+// gate's exemption is also written in terms of, so the two cannot drift apart.
+//
+// **Only the *pending* reading is dropped.** A CodeRabbit check that has already failed still makes
+// this evaluator answer `failure`, exactly as before; what happens to that answer stays the merge
+// gate's business (`git-pr-followup.ts` swallows it and falls through). The skip covers "has not
+// come back yet" and nothing else.
+//
+// **`JOSH_REQUIRED_CHECKS` takes it back**, exactly as it does for `is_blocking_failure`: a project
+// that has put CodeRabbit back on the required list has said it wants the merge gate to block on it,
+// and a look-ahead that settled without it would then disagree with the gate it looks ahead for.
+function is_awaited_check(check: RollupCheck): boolean {
+	return !is_coderabbit_check(check.name) || is_required_check(check.name)
+}
+
+// **A rollup carrying nothing but CodeRabbit falls back to the whole rollup**, which is the old
+// behavior unchanged rather than a rule of its own. Dropping CodeRabbit from a rollup that holds
+// nothing else would leave the question with no checks to ask about, and the two answers that
+// invites are both wrong: `success` reports a pull request as settled seconds after it opened, since
+// CodeRabbit posts `Review queued` before any workflow has attached a check run, and a flat
+// `pending` sits out the whole budget on a lone CodeRabbit that has already reported.
+//
+// **The order of the questions is the old order**, and it has to be: asking "is anything still
+// pending" before "did anything fail" is what keeps a pull request whose E2E is still running from
+// being called failed by a check that has already gone red.
 function evaluate_checks_settled(snapshot: PrStateSnapshot): PrEvaluation {
-	if (snapshot.rollup.length === 0) return 'pending'
-	if (snapshot.rollup.some((check) => check.status === CHECK_STATUS_PENDING)) return 'pending'
+	const awaited = snapshot.rollup.filter((check) => is_awaited_check(check))
+	const considered = awaited.length === 0 ? snapshot.rollup : awaited
+	if (considered.length === 0) return 'pending'
+	if (considered.some((check) => check.status === CHECK_STATUS_PENDING)) return 'pending'
 
 	return snapshot.rollup.some((check) => check.status === CHECK_STATUS_FAIL) ? 'failure' : 'success'
 }
@@ -133,6 +167,7 @@ export {
 	CHECKS_SETTLED_EVALUATOR,
 	SHOULD_NEVER_READ_REVIEW_DECISION,
 	evaluate_checks_settled,
+	is_awaited_check,
 	describe_checks_failure,
 	PR_CHECKS_WATCH_TIMEOUT_MS,
 	NO_CHECKS_MESSAGE,

@@ -11,6 +11,10 @@ import {
 // rate-limited CodeRabbit reviews never block the merge gate. Re-add it via JOSH_REQUIRED_CHECKS
 // to restore the old behavior. Revert once the fresh-context review subagent (kit#752) replaces it.
 const DEFAULT_REQUIRED_CHECKS = ['SonarQube']
+// The single source of the check name every CodeRabbit exemption is keyed on — the merge gate's
+// `is_unstable_only_from_coderabbit`, the look-ahead's `is_awaited_check`, and the fixtures the two
+// are tested from. A second literal spelling of it anywhere is how one of them silently stops
+// matching after CodeRabbit renames its context (joshuafolkken/kit#1217).
 const CODERABBIT_CHECK_NAME = 'CodeRabbit'
 const REQUIRED_CHECKS_ENV_VAR = 'JOSH_REQUIRED_CHECKS'
 
@@ -207,5 +211,7 @@ export {
 	collect_blocking_failures,
 	describe_pr_failure,
 	REQUIRED_CHECKS,
+	CODERABBIT_CHECK_NAME,
+	is_required_check,
 }
 export type { PrEvaluation }

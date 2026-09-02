@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { CODE_RABBIT, make_pr_snapshot, SONAR_QUBE } from './git-pr-checks-fixture'
 import {
 	build_telegram_input,
 	has_closes_keyword,
 	is_blank_issue_body,
+	log_skip_notes,
 	parse_repo_name,
+	read_coderabbit_skip_notes,
 	type TelegramContext,
 } from './git-pr-followup'
 
@@ -89,5 +92,38 @@ describe('build_telegram_input', () => {
 			issue_url: CONTEXT.issue_url,
 			pr_url: CONTEXT.pr_url,
 		})
+	})
+})
+
+// Temporary (kit#753/kit#1217): a merge that went ahead while CodeRabbit had not come back is the
+// one thing the exemption trades away, so it is stated in `followup`'s own output as well as in the
+// Telegram body.
+describe('the CodeRabbit skip is visible in followup output', () => {
+	it('names the CodeRabbit check that was not passing at merge time', () => {
+		const notes = read_coderabbit_skip_notes(
+			make_pr_snapshot({
+				rollup: [
+					{ name: SONAR_QUBE, status: 'pass' },
+					{ name: CODE_RABBIT, status: 'pending' },
+				],
+			}),
+		)
+
+		expect(notes).toStrictEqual([
+			`CodeRabbit check skipped (kit#753): ${CODE_RABBIT} was pending at merge time`,
+		])
+	})
+
+	it('says nothing when CodeRabbit passed', () => {
+		expect(read_coderabbit_skip_notes(make_pr_snapshot())).toStrictEqual([])
+	})
+
+	it('prints each note to the console', () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		log_skip_notes(['first note', 'second note'])
+
+		expect(info.mock.calls).toStrictEqual([['⏭ first note'], ['⏭ second note']])
+		info.mockRestore()
 	})
 })

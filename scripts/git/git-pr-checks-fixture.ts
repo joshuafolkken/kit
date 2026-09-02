@@ -1,3 +1,4 @@
+import { CODERABBIT_CHECK_NAME } from './git-pr-checks-eval'
 import type { PrStateSnapshot, RollupCheck } from './git-pr-checks-parse'
 
 // The snapshot every PR-check evaluator test starts from: GitHub reporting CLEAN, an approving
@@ -6,7 +7,10 @@ import type { PrStateSnapshot, RollupCheck } from './git-pr-checks-parse'
 // prohibits. `git-pr-checks-e2e-gate.test.ts` deliberately keeps its own builder instead: it states
 // `merge_state_status` on every fixture because that string is the mechanism under test there, and a
 // default would hide it.
-const CODE_RABBIT = 'CodeRabbit'
+// Read from the production constant rather than respelled: a fixture that hard-codes the name keeps
+// passing after the name changes, which is the one way these tests could go green over an exemption
+// that no longer matches anything (joshuafolkken/kit#1217).
+const CODE_RABBIT = CODERABBIT_CHECK_NAME
 const SONAR_QUBE = 'SonarQube'
 const MERGE_STATE_CLEAN = 'CLEAN'
 const REVIEW_APPROVED = 'APPROVED'
