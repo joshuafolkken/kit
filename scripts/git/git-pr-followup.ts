@@ -237,6 +237,16 @@ function read_coderabbit_skip_notes(snapshot: PrStateSnapshot): Array<string> {
 		)
 }
 
+// The skip is printed where the run is being watched, not only carried into the Telegram body it
+// ends up in. A merge that went ahead while CodeRabbit had not come back is the one thing kit#753's
+// exemption trades away, and it used to be invisible in `followup`'s own output
+// (joshuafolkken/kit#1217).
+function log_skip_notes(notes: ReadonlyArray<string>): void {
+	for (const note of notes) {
+		console.info(`⏭ ${note}`)
+	}
+}
+
 async function fetch_telegram_context(input: {
 	branch_name: string
 	issue_number: string | undefined
@@ -278,6 +288,8 @@ async function run_review_checks(
 		is_skip_watch: input.is_skip_watch,
 	})
 	const check_notes = read_coderabbit_skip_notes(snapshot)
+
+	log_skip_notes(check_notes)
 	const comment_notes = await git_pr_coderabbit.handle_coderabbit_findings({
 		branch_name: input.branch_name,
 		ignore_reason: input.coderabbit_ignore_reason,
@@ -335,6 +347,8 @@ export {
 	build_telegram_input,
 	has_closes_keyword,
 	warn_if_missing_closes,
+	read_coderabbit_skip_notes,
+	log_skip_notes,
 }
 export type { FollowupInput }
 export type { TelegramContext } from './git-pr-ai-review'
