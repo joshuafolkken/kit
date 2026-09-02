@@ -1,56 +1,39 @@
 import { animation_helpers, type AnimationOptions } from './animation-helpers'
-import { git_conflict } from './git-conflict'
-import { git_countdown } from './git-countdown'
 import { git_gh_command } from './git-gh-command'
 import type { IssueInfo } from './git-issue'
-import type { WatchResult } from './git-pr-checks-watch'
 import { git_pr_error } from './git-pr-error'
 import { git_pr_messages } from './git-pr-messages'
 import { pr_info_schema } from './schemas'
 
-const WAIT_AFTER_PR_SECONDS = 5
-
-async function create_pr(title: string, body: string): Promise<void> {
+// **Answers the new pull request's URL, and `undefined` when one already existed.** `pr_create`
+// filters its REST response to `.html_url`, so the address is in hand the moment the call returns —
+// which matters now that nothing waits before reporting it (joshuafolkken/kit#1232). `pr_get_url`
+// resolves the branch through the `?head=…` listing, and that listing is eventually consistent: read
+// in the same instant the pull request was created it can answer nothing, and `pr_get_url` folds
+// "not there yet" and "the read failed" into the same `undefined`. The five-second sleep used to
+// cover that gap incidentally.
+async function create_pr(title: string, body: string): Promise<string | undefined> {
 	const config: AnimationOptions<string> = {
 		icon_selector: () => '✅',
 		error_message: 'Failed to create PR',
-		result_formatter: (message) => message,
+		result_formatter: () => 'PR created.',
 	}
 
 	try {
-		await animation_helpers.execute_with_animation(
+		return await animation_helpers.execute_with_animation(
 			'Creating pull request...',
-			async () => {
-				await git_gh_command.pr_create(title, body)
-
-				return 'PR created.'
-			},
+			async () => await git_gh_command.pr_create(title, body),
 			config,
 		)
 	} catch (error) {
 		if (git_pr_error.is_pr_already_exists_error(error)) {
 			git_pr_messages.display_pr_exists_message()
 
-			return
+			return undefined
 		}
 
 		throw error
 	}
-}
-
-async function wait_before_check(): Promise<void> {
-	await git_countdown.wait_for_seconds(
-		WAIT_AFTER_PR_SECONDS,
-		'⏳ Waiting before checking PR status',
-	)
-}
-
-async function watch_pr_checks(branch_name: string): Promise<WatchResult> {
-	console.info('')
-	console.info('📊 Watching PR status checks...')
-	console.info('')
-
-	return await git_gh_command.pr_checks_watch(branch_name)
 }
 
 async function display_pr_url_if_available(branch_name: string): Promise<void> {
@@ -61,50 +44,38 @@ async function display_pr_url_if_available(branch_name: string): Promise<void> {
 	}
 }
 
-async function handle_watch_error(branch_name: string, error: unknown): Promise<never> {
-	await display_pr_url_if_available(branch_name)
-	throw error
-}
+// **This command stops at "the pull request is open"; it does not wait for the checks**
+// (joshuafolkken/kit#1232). It used to sleep five seconds and then watch the rollup on a two-minute
+// budget — measured at 119.8 seconds of one 1555-second run, 7.7% of it — and the answer decided
+// nothing: only `timed_out` was read, and only to pick which message to print. What actually blocks
+// a merge is `pnpm josh followup`, whose `wait_for_pr_success` asks a stricter question (CLEAN merge
+// state, every required check green, no standing change request) and starts that wait from scratch
+// the moment this command returns. So the wait here was the same answer, paid for twice.
+//
+// **The conflict read went with it, and its replacement is not here.** `git-conflict.ts` read
+// `mergeStateStatus` right after the watch reported the checks settled, where `BLOCKED` genuinely
+// meant something. Called at *this* point it would fire on every healthy pull request instead:
+// GitHub reports `BLOCKED` as soon as a required check is queued. The conflict is caught in
+// `git-pr-checks-eval.ts` now, where `DIRTY` ends the wait on its first poll — about ten seconds,
+// against the two minutes this watch took to reach the same conclusion.
+async function report_open_pr(branch_name: string, created_url?: string): Promise<void> {
+	git_pr_messages.display_pr_opened_message()
 
-async function check_and_display_status(branch_name: string): Promise<void> {
-	await git_conflict.check_pr_status_for_errors(branch_name)
-	git_pr_messages.display_success_message()
-	await display_pr_url_if_available(branch_name)
-}
-
-async function handle_timed_out_watch(branch_name: string): Promise<void> {
-	console.info('⏱️ CI still running. Use `pnpm git:followup` to monitor progress.')
-	await display_pr_url_if_available(branch_name)
-}
-
-async function wait_and_check_status(branch_name: string): Promise<void> {
-	await wait_before_check()
-	let watch_result: WatchResult = { timed_out: false }
-
-	try {
-		watch_result = await watch_pr_checks(branch_name)
-	} catch (error) {
-		await handle_watch_error(branch_name, error)
-	}
-
-	if (watch_result.timed_out) {
-		await handle_timed_out_watch(branch_name)
+	if (created_url !== undefined && created_url.length > 0) {
+		git_pr_messages.display_pr_url(created_url)
 
 		return
 	}
 
-	await check_and_display_status(branch_name)
+	await display_pr_url_if_available(branch_name)
 }
 
 const PR_STATE_MERGED = 'MERGED'
 
-async function create_and_check_status(
-	title: string,
-	body: string,
-	branch_name: string,
-): Promise<void> {
-	await create_pr(title, body)
-	await wait_and_check_status(branch_name)
+async function create_and_report(title: string, body: string, branch_name: string): Promise<void> {
+	const created_url = await create_pr(title, body)
+
+	await report_open_pr(branch_name, created_url)
 }
 
 function parse_pr_state(pr_info_json: string): string | undefined {
@@ -143,26 +114,26 @@ async function handle_existing_pr(title: string, body: string, branch_name: stri
 	const pr_state_result = await get_pr_state_safe(branch_name)
 
 	if (is_pr_state_undefined(pr_state_result)) {
-		await wait_and_check_status(branch_name)
+		await report_open_pr(branch_name)
 
 		return
 	}
 
 	if (is_pr_state_merged(pr_state_result)) {
 		git_pr_messages.display_merged_pr_message()
-		await create_and_check_status(title, body, branch_name)
+		await create_and_report(title, body, branch_name)
 
 		return
 	}
 
-	await wait_and_check_status(branch_name)
+	await report_open_pr(branch_name)
 }
 
 async function create(title: string, body: string, branch_name: string): Promise<void> {
 	const has_pr = await git_gh_command.pr_exists(branch_name)
 
 	if (!has_pr) {
-		await create_and_check_status(title, body, branch_name)
+		await create_and_report(title, body, branch_name)
 
 		return
 	}
