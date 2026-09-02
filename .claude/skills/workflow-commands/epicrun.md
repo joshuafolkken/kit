@@ -147,6 +147,85 @@ refusing is the correct answer to a guess.
 **Where no isolated unit exists, run the child in the parent's context.** The hand-off below is what
 covers that case — it is the backstop for delegation being unavailable, not an alternative to it.
 
+## A delegated unit that stopped without reporting
+
+**A unit can be stopped from outside, and a stop leaves no notification behind.** The parent then
+waits on a report that is never coming. Measured on joshuafolkken/kit#1176: one child's unit was
+stopped externally, the loop went on calling that child in progress for **1 h 45 min**, and what
+ended the wait was a person asking whether anything was still moving (joshuafolkken/kit#1212).
+
+**Being slow and having stopped look identical from the parent, and only one of them is survivable.**
+A slow run finishes if it is waited on; a stopped one never does. **Every guard in this file assumes
+the unit is running** — three consecutive failures counts results the unit reports, and the
+eight-hour timeout ends the session rather than the child — so **a unit that is not running trips
+none of them**, which is why an unnoticed stop breaks the premise of unattended execution in a way
+that mere slowness does not.
+
+**So the parent checks rather than waiting — which means it must not be waiting.** **Hand the child to
+the unit without blocking on its return, and poll.** A parent that blocks is waiting for exactly the
+report a stopped unit never makes, so it has no turn in which to run any of the reads below; written
+that way the detection would be present in the document and unreachable in the run, which is
+joshuafolkken/kit#1176 reproduced unchanged. Poll at the loop's polling interval, and run the four
+traces once the unit's output has been unchanged for the silent-unit window —
+`| Silent delegated unit | 30 min |` in the waiting table below.
+
+**Record the baseline when the child is handed over, not at the first check.** Note the path the unit
+writes its transcript or result to, and that file's modification time, at the moment of hand-off. A
+trace that compares against a previous check has nothing to compare against on the first one, and a
+trace that cannot be evaluated makes the conjunction below **unsatisfiable** rather than merely
+uncertain — the detection would then never fire at all.
+
+**The four traces the stopped unit actually left.** Traces 2 and 3 are read **in the checkout the unit
+was given** — this session's own unless the unit was handed a separate work tree, in which case that
+one, and the stash in the recovery below is taken there too. Read them against the parent's checkout
+while the unit worked in a work tree and both come back clean, the stop goes undetected, and the
+stash saves nothing while the half-written work stays in the abandoned tree:
+
+1. **The unit's output has not changed.** The file noted at hand-off carries the same modification
+   time it carried then.
+2. **The checkout is dirty, and nothing was ever opened for the child.** `git status --short` shows
+   uncommitted work while `git branch --list '<N>-*'` and `gh pr list --state all --search '<N> in:body'`
+   find nothing. A child is implemented on the default branch, `pnpm josh git` creates the branch —
+   named for the child's issue number — only at commit time, so a unit that died mid-implementation
+   leaves exactly this. **The branch pattern is what makes the read possible**: there is no branch name
+   to pass to `--head`, since the premise of the trace is that no branch exists. **`--state all` is not
+   optional either** — the default lists open pull requests only, so a child whose PR merged while the
+   parent was polling would read as having opened nothing.
+3. **No process of the child's is alive in that checkout.** Read the command lines rather than the
+   names — `pgrep -laf vitest`, `pgrep -laf playwright`, `pgrep -laf 'josh gate'` — and look for one
+   naming **that checkout's path**. **A bare command-name match is not the test**: several kit
+   projects are meant to run at once (`PORT_SEED` exists for that), so one unrelated watcher anywhere
+   on the machine would hold this trace false forever — and since all four are required, a stopped
+   unit would then never be detected at all.
+4. **The child still carries `in-progress`.** `pnpm josh issue:state <N>` answers `state: OPEN` and
+   lists the label.
+
+**All four together, never any one alone.** Every one of them has an innocent reading by itself — a
+long type check writes no file, a child that has not reached its commit has no branch yet — so acting
+on one would kill a unit that was working. There is no state of a live unit that produces all four at
+once, which is what makes the conjunction the test.
+
+**What follows is what a failed child already gets.** Re-read the child first with
+`pnpm josh issue:state <N>`, in case the unit finished between the traces and this read; then, while
+it is still `state: OPEN` and not carrying `needs-decision`. **A re-read carrying `needs-decision`
+needs nothing from this section** — the unit parked the child and then stopped, so fall through to the
+loop's park branch: leave the label on, count nothing against the consecutive-failure guard, and go
+back to step 1.
+
+1. **Stash the half-finished work** — `git stash push -u -m "epicrun: stopped unit for #<N>"` — and
+   record it on the Issue with `gh api repos/{owner}/{repo}/issues/<N>/comments`, exactly as a paused
+   child's stash is recorded. `-u` is not optional, and the comment is what gets the stash popped.
+2. **Remove `in-progress`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
+   Left on, it holds the whole repository under the per-repository exclusion below.
+3. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
+   naming the four traces that were observed. This is the Guards table's "a failure that is not
+   consecutive parks its child", applied to a child whose unit stopped.
+4. **Go back to step 1 of the loop.**
+
+**It is booked as a failure rather than restarted.** A silent retry re-runs a child whose tree may be
+half-written, and the consecutive-failure guard is the only thing that notices the environment rather
+than the children is at fault — a stall the parent quietly restarts is a stall nothing ever counts.
+
 ## Concurrency: one child per repository, repositories in parallel
 
 Execution state lives on GitHub and nowhere else (`epic:next`, joshuafolkken/kit#860), so **an
@@ -320,6 +399,12 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
    this session afterwards** when the child was delegated — otherwise the parent's checkout never
    receives that merge and the next child starts on a stale default branch.
 
+   **Start the unit without blocking on it, note where it writes and the modification time of that
+   file, and poll.** Blocking on the return leaves the parent with no turn in which to notice that the
+   return is never coming, which is the whole of "A delegated unit that stopped without reporting"
+   above. Poll at the polling interval; run the four traces once that file has been unchanged for the
+   silent-unit window.
+
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
    ```bash
@@ -375,9 +460,17 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
    `in-progress`, which `epic:next` classifies as waiting on time *before* it consults any blocker,
    so it answers `wait` — the loop would poll to the 90-minute stale window and learn nothing.
 
-   Then **ask whether to hand off** — `pnpm josh cost --over 400000`, immediately after the merge and
-   `pnpm josh ms` — and go back to step 1 on `under`, or finish the session on `over` (see
-   "The hand-off" below).
+   Then **write the run's counters into the epic progress comment** — children run, Issues filed,
+   **consecutive failures**, `auto-ok` pickups taken, and the time the run started. This happens at
+   **every** child's merge, not only when something is about to stop: see "The counters live in the
+   conversation" below for why a session that carries on past a compaction loses them otherwise.
+
+   Then **ask whether the hand-off check applies at all** — it does only where **this child ran in
+   this session's own context**, immediately after the merge and `pnpm josh ms`. A child that ran in a
+   delegated unit is not measured: go straight back to step 1. Otherwise ask
+   `pnpm josh cost --over 400000` and go back to step 1 on `under`, or take the hand-off on `over`
+   (see "The hand-off" below). **Never read the condition off `pnpm josh delegate epic-child`** — it is
+   a static policy lookup that answers `delegate` everywhere, so a gate built on it never fires.
 3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
    repository has work but this one does not", which is a wait from here.
 4. **`stop`** — report the parked children and finish.
@@ -475,8 +568,9 @@ list. That difference is deliberate: a person can see the issue is blocked and d
 anyway, and an unattended run has no such judgement to exercise.
 
 **Everything a child gets, a picked-up Issue gets**: the split assessment, the two-layer work
-summary, `josh latest` staying hoisted to the session, park-and-continue, and the
-`pnpm josh cost --over 400000` hand-off check after each merge. One that needs a decision is parked
+summary, `josh latest` staying hoisted to the session, park-and-continue, and the hand-off check after
+each merge — **on the same condition, which is that `pnpm josh delegate epic-child` answered `keep`**;
+where it answers `delegate` a picked-up Issue measures nothing either. One that needs a decision is parked
 exactly as a child is, and the run asks again — and one carrying `needs-human-review` stops the run
 exactly as a child carrying it does, so the pickup does not ask again either.
 
@@ -503,7 +597,10 @@ ran six children in one context, the billed input was 222k per request during th
 linear in the number of children; the k-th child re-reads the wreckage of the k-1 before it on every
 turn.
 
-**So the run hands off when the marginal cost crosses a line, and the line is read, not felt.**
+**So the run reads the marginal cost off a line rather than feeling for it** — and since
+joshuafolkken/kit#1212 it reads that line **only where delegation is unavailable**, and crossing it
+**compacts rather than stops**. Both qualifications are stated in full below; a reader who stops at
+this paragraph would otherwise leave with the rule as it stood before them.
 
 ```bash
 pnpm josh cost --over 400000
@@ -519,7 +616,36 @@ passed explicitly so a run cannot drift it by remembering it wrong.
 
 **その釣り合いは、子 1 件を委譲するようになった今の親のループには当てはまらない。** 親の文脈には要約しか積まれないため、この閾値に達すること自体がまれである。現在の 400,000 は、**委譲が使えない環境で親の文脈が膨らんだ場合の保険**として残っている数字であって、計測が導いた最適値ではない。
 
-`over` and `under` are not the only answers: the command also **exits 1 with empty standard output** when there is no transcript, or no request in it. **Neither is `under`.** Reading "could not measure" as "still cheap" is the same mistake as reading an unreadable comment listing as "no findings" — report that the check could not answer, and hand off at that child.
+**So the check fires only where delegation is unavailable, and what decides that is whether the child
+that just merged actually ran in a delegated unit** — never a judgement about how full the context
+feels.
+
+**It is not `pnpm josh delegate epic-child`'s answer, and wiring it to that would delete the
+insurance rather than condition it.** That command is a static policy lookup: `epic-child` is an entry
+in the enumeration (`scripts/delegation/delegation-policy.ts`), so it answers `delegate` on every
+machine and in every environment, forever — the codeblock above even annotates it `# → delegate`. It
+says whether the step **may** be delegated; this gate needs to know whether it **was**. A gate written
+on the command would never fire once, and the run that most needs the threshold — one in a harness
+with no isolated unit, where the measurement below is +120,000 tokens in a single step — is exactly
+the run that would sail past it.
+
+**The parent already holds the fact.** It either handed the child to an isolated unit or ran it in
+its own context, which is the branch "Where no isolated unit exists, run the child in the parent's
+context" above already makes it take.
+
+| The child that just merged ran | What to ask |
+| --- | --- |
+| in a delegated unit | **Nothing.** The parent's context grew by that child's summary and nothing else |
+| in this session's own context | `pnpm josh cost --over 400000`, exactly as before |
+
+**Asking it while delegation is working measured nothing worth the turn it cost.** Across
+joshuafolkken/kit#1176 the parent's billed input per request went 128,675 at the start to 155,069
+after six delegated children — **4,000 to 5,000 per child**, some fifty children short of the
+threshold — while the one child run in the parent's own context added about 120,000 in a single step,
+to 272,528. **What pushes the figure up is not delegating, and the run asked anyway after every one
+of those merges, every time answering `under` (joshuafolkken/kit#1212).**
+
+`over` and `under` are not the only answers: the command also **exits 1 with empty standard output** when there is no transcript, or no request in it. **Neither is `under`.** Reading "could not measure" as "still cheap" is the same mistake as reading an unreadable comment listing as "no findings" — report that the check could not answer, and take `over`'s branch at that child: compact and continue, or stop where the session cannot continue at all. **What is forbidden is reading it as `under`, not continuing** — since joshuafolkken/kit#1212 `over` itself continues, so an unmeasurable check that stopped the run would stop it where a measured `over` would not.
 
 
 ### When to ask, and what to do
@@ -527,20 +653,62 @@ passed explicitly so a run cannot drift it by remembering it wrong.
 **Ask once per child, immediately after its merge and `pnpm josh ms`** — never mid-child. That
 moment is the only one where nothing is in flight: the PR is merged, the working tree is on the
 default branch and clean, and the epic's state on GitHub is complete. A hand-off taken anywhere else
-would have to carry work that is not written down yet.
+would have to carry work that is not written down yet. **And ask it only where
+`pnpm josh delegate epic-child` answered `keep`** — above.
 
 - **`under`** — go back to step 1 of the loop and run the next child.
-- **`over`** — finish the session. Post the epic progress comment naming what merged and what
-  remains, send a **`confirmation`** Telegram with the resume command in its body — a hand-off waits
-  for the person to type the next command, which is what `confirmation` means; `completion` would
-  announce an epic that has not completed — and stop with:
+- **`over`** — **go back to step 1 and run the next child. Do not ask the person to retype the
+  command.** Post the epic progress comment naming what merged and what remains, so the reading is on
+  the record, and continue. **A session that compacts is safe for this workflow**, because nothing is
+  carried in the conversation (below): the next child comes from `epic:next`, the order from the epic
+  body and the content from the child Issue, so a summarized session answers all three exactly as a
+  fresh one does — and answers them without the roughly 70,000 tokens a fresh session spends
+  rewriting its resident documents and re-reading the epic, and without discarding a warm prompt
+  cache. **Retyping was never the cheaper of the two**; it was the only one written down. The run's
+  counters are already in that comment, written there at every child's merge — "The counters live in
+  the conversation" below.
+- **`over`, where the session cannot continue at all** — it cannot compact and its context is
+  exhausted, or the environment says the session is ending. **The escape route stays exactly as it
+  was**: finish the session. Post the epic progress comment, send a **`confirmation`** Telegram with
+  the resume command in its body — a hand-off waits for the person to type the next command, which is
+  what `confirmation` means; `completion` would announce an epic that has not completed — and stop
+  with:
 
   > Please run `epicrun #<E>` to continue this epic in a fresh session.
 
   **報告は完了報告の書式で書かない。** 区切りは完了でも park でも失敗でもない**第 4 の停止**であり、専用の書式が `prompts/collaboration-workflow/report-format.md` →「区切りの報告（完了報告と区別する・必須）」にある。`原因 / 対応 / 結果` の 3 行は使わない — それは finished なランの形であり、epic はまだ終わっていない。書くのは 4 つ、**終わったこと / 残っていること / 止めた理由 / 次に打つコマンド**である。Telegram 本文も同じ書式で書く。
 
-**This is not a failure and not a park.** No child needs a decision; the run is simply cheaper to
-continue elsewhere. `needs-decision` is not applied, nothing is stashed, and no Issue is filed.
+**The hand-off report belongs to the stop, not to the reading.** A run that answered `over` and
+carried on has not stopped, so it writes no hand-off report — the four lines say what is left for
+somebody to pick up, and there is nobody to pick it up while the same session is still running. The
+epic progress comment is the record in that case. `report-format.md` → "区切りの報告" states the same
+boundary from the format's side.
+
+**This is not a failure and not a park** — neither branch of `over` is. No child needs a decision; the
+run is either cheaper to continue after a compaction or unable to continue at all. `needs-decision`
+is not applied, nothing is stashed, and no Issue is filed.
+
+### The counters live in the conversation
+
+**Write the run's counters into the epic progress comment at every child's merge, and read them back
+after a compaction.** Every guard in the Guards table is counted in the conversation and nowhere else
+— children run, Issues filed, **consecutive failures**, `auto-ok` pickups taken, and the time the run
+started.
+
+**It is every merge and not only an `over` reading, because a compaction is not something the run
+chooses.** It happens under context pressure, at whatever moment the pressure arrives — mid-child as
+readily as at a merge — so counters persisted only where the run expected to stop are counters that a
+compaction takes anyway. While `over` ended the session this cost nothing: the counters died with a
+session that was over. A session that carries on loses them mid-run.
+
+**The consecutive-failure count is the one that matters**, because it is what the stopped-unit section
+above leans on to notice that the environment rather than the children is at fault. Lost, a run keeps
+feeding children into a broken environment and never reaches three.
+
+**This is not what "Nothing is carried in the conversation" denies.** That sentence is about the state
+a *next session* needs — which child, in what order, what it is — and all of it is on GitHub. The
+counters are about *this* run's own guards, they were never on GitHub, and nothing needed them to be
+until a session could outlive its own context.
 
 ### What carries over, and where it lives
 
@@ -646,6 +814,7 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null 
 | Setting | Value | Why |
 | --- | --- | --- |
 | Polling interval | 60 s | A child's `fullrun` takes minutes; a shorter poll only spends API quota. |
+| Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. A working unit rewrites its transcript continuously, so half an hour of no movement is not a slow child; it is a child whose average end-to-end time on joshuafolkken/kit#1176 was 31 min producing nothing at all. Past it, run the four traces above and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Longer than any single child has taken; past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget (joshuafolkken/kit#863). A failed publish never appears. |
 | Whole run | 8 h | An unattended run that has not finished overnight needs a person, not more waiting. |
@@ -777,11 +946,18 @@ end naming what was merged, what was parked and why, and what was filed.
 3. `epic:next` reports `error` — a cyclic or contradictory graph.
 4. A guard above was reached.
 5. A timeout above elapsed.
-6. `pnpm josh cost --over 400000` answered `over` just after a child merged — the run is cheaper to
-   continue in a fresh session, and the resume command is in the report. This is the one stopping
-   condition that is not a problem: nothing is parked, nothing is filed, and the epic is unchanged.
+6. `pnpm josh cost --over 400000` answered `over` just after a child merged **and this session cannot
+   continue** — it cannot compact and its context is exhausted. The run is then cheaper to continue in
+   a fresh session, and the resume command is in the report. This is the one stopping condition that
+   is not a problem: nothing is parked, nothing is filed, and the epic is unchanged. **`over` on its
+   own is no longer on this list** — the run compacts and carries on, because the state it would hand
+   over lives on GitHub either way (joshuafolkken/kit#1212).
 
 **A child that needs a decision is not on this list.** It is parked, and the run continues.
+
+**Neither is a delegated unit that stopped without reporting.** That child is booked as a failure and
+parked, and the loop goes on to the next one; only the consecutive-failure guard above can turn it
+into a stop.
 
 ---
 
