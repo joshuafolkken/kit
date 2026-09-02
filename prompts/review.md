@@ -4,6 +4,8 @@ This document is the **single source of truth** for reviewing a diff. The implem
 
 **Default hypothesis: this diff contains at least one non-trivial issue.** Your job is not to confirm the implementation is correct — it is to find the issue. Work through each category assuming the code is wrong until you can prove otherwise. Do not declare a category clean unless you have actively tried to break it.
 
+**In the second round that hypothesis is aimed at the fix delta, not at the whole diff again.** Applied twice to one diff it returns new findings whether or not the code changed, because returning none is what it rules out — see "The second round is a verification pass, not a second full review" below.
+
 ---
 
 ## When to run
@@ -12,6 +14,8 @@ This document is the **single source of truth** for reviewing a diff. The implem
 - **Workflow review step** (same session, inline): the last stage of the verification gate in `fullrun` / `halfrun` / `queue`, before `pnpm josh bump minor` and the commit — scope: `git diff main`
 
 Re-run after applying fixes until **no high or medium findings remain — or until two reviews have run in total — the first one included — whichever comes first.** Low findings may be acknowledged and skipped with a reason. The cap is spelled out below and it is not optional.
+
+**The re-run is not this review a second time.** The second round is a **verification pass over the fixes** — its scope, its question, its categories and its output all differ from the first round's. Definition: "The second round is a verification pass, not a second full review" below.
 
 ---
 
@@ -44,6 +48,42 @@ pnpm josh review:level --staged
 The severity rule above is not a stopping condition on its own. Every fix creates new surface, and a review whose scope is the whole change finds something in it — so the loop is bounded by how much new code the fixes produce, which is unbounded.
 
 This is measured, not theorized. On joshuafolkken/kit#854 four rounds produced 18 findings; on joshuafolkken/kit#855 two rounds produced 19. Almost none of them was a repeat: each round found new things, and many of those were about code the **previous round's fix** had just written. One fix replaced a line-based check with a proximity window, and the next two rounds each found a new defect in that window. Another moved a rule into a skill, and a later round moved it back. Two rounds of that is diligence; a third is the review chasing its own tail.
+
+### The second round is a verification pass, not a second full review
+
+**The second round asks a different question from the first.** Until joshuafolkken/kit#1219 it asked the same one — read the whole diff adversarially — inside a document whose opening line forbids declaring anything clean without proof. Read one diff twice under that instruction and the two readings return different findings whether or not the code changed, because returning none is what the instruction rules out. So a Medium stood at the second round even where the fixes were sufficient, and the three-way disposition below had to be run every single time.
+
+**What changes is the question, never the standard.** A confirmed High still blocks the merge whatever the round count, the cap is still two rounds, and every rule below applies to this pass unchanged.
+
+|                | The first round                    | The second round                                                                                                                                                               |
+| -------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Scope**      | `git diff main` — the whole change | the **fix delta**: what the first round's fixes wrote, plus the call sites of any signature they changed                                                                       |
+| **Question**   | "review this change"               | "did each first-round finding actually close, and did the fix itself introduce a defect?"                                                                                      |
+| **Categories** | all nine                           | category 1 (Bug risks & logic errors), plus the categories the fix delta actually touches — i18n only if a fix added a user-visible string, Tests only if a fix changed a test |
+| **Output**     | the full template                  | one line per first-round finding with its resolution, then any new finding **inside the fix delta**                                                                            |
+
+Template for the second round:
+
+```md
+### First-round findings
+
+1. `src/foo.ts:42` (was high) — resolved — <how the fix closes it>
+2. `src/bar.ts:8` (was medium) — **not resolved** (medium) — <what still stands>
+
+### New findings in the fix delta
+
+- `src/foo.ts:47` (medium) — <problem> — <fix>
+
+### Summary
+
+<counts by severity across both sections, and overall go/no-go>
+```
+
+**A first-round finding the fix did not close is still a finding, at its original severity.** The pass narrows what is read, not what counts — an unresolved High blocks exactly as it did in the first round.
+
+**This is a generalization of a rule already written, not a relaxation of one.** Branch 1 of the three-way disposition below already states that **a fix-in-place never starts a new review round** — so the document has already accepted that a fix does not oblige anyone to read the whole diff again. The second round applies that same reasoning to the rest of the fixes: what has to be read is what the fix wrote, and re-reading the code no fix touched is what manufactures the artificial findings above.
+
+**It converges because the fix delta shrinks.** Each round's fixes are smaller than the last, so the scope is monotonically decreasing — which the whole-diff scope never was, and which is why the cap had to bound the loop from outside rather than the loop ending on its own.
 
 ### Three-way disposition after the cap
 
@@ -86,6 +126,8 @@ The cap is deliberately mechanical rather than a judgement call, because judgeme
 ## Review output format
 
 Output every category below with an explicit verdict. Do **not** omit categories.
+
+**This is the first round's format.** The second round is a verification pass and has its own, narrower one — see "The second round is a verification pass, not a second full review" above.
 
 For each finding:
 
@@ -143,6 +185,8 @@ No issues
 ---
 
 ## Review categories (must all be checked)
+
+All nine are checked in the first round. **The second round checks category 1 plus the categories its fix delta actually touches** — the verification pass above, which is the only thing that narrows this list.
 
 ### 1. Bug risks & logic errors
 
@@ -243,7 +287,7 @@ If either condition is false, you are in **standalone mode** (or the halfrun con
 Before your response (the one containing the review markdown) is sent, run this self-check:
 
 1. Count high/medium-severity findings across all categories.
-2. If **any** high/medium findings exist → fix them in place and re-run `/code-review` at the level `pnpm josh review:level` prints. Nothing is committed yet, so a round costs no commit, push, or CI run. **Stop at two rounds** — after the second, route each remaining non-High finding through the three-way disposition (see "Review round cap"): fix it in place without starting a new review round, file it, or drop it with a one-line PR note. For a finding that is filed, run `pnpm josh epic:bundle <new>` on it **before this Issue closes** and act on its answer — `add_to_epic` / `create_epic` are Tier A, run the matching `pnpm josh epic` write command without asking; `ask` stops (or parks the child inside an `epicrun`); `none` is a no-op — then continue the pipeline; a standing High blocks the merge but does not authorize a third round. **Do NOT call `followup --merge` yet.**
+2. If **any** high/medium findings exist → fix them in place and run the **second-round verification pass** — `/code-review` at the level `pnpm josh review:level` prints, scoped to the fix delta and asking whether each finding closed, not a second full read of the diff (see "The second round is a verification pass, not a second full review"). Nothing is committed yet, so a round costs no commit, push, or CI run. **Stop at two rounds** — after the second, route each remaining non-High finding through the three-way disposition (see "Review round cap"): fix it in place without starting a new review round, file it, or drop it with a one-line PR note. For a finding that is filed, run `pnpm josh epic:bundle <new>` on it **before this Issue closes** and act on its answer — `add_to_epic` / `create_epic` are Tier A, run the matching `pnpm josh epic` write command without asking; `ask` stops (or parks the child inside an `epicrun`); `none` is a no-op — then continue the pipeline; a standing High blocks the merge but does not authorize a third round. **Do NOT call `followup --merge` yet.**
 3. If **no** high/medium findings exist (Low-only or completely clean) → your response MUST continue the pipeline in tool calls **after** the review markdown, in the same response: `pnpm josh bump minor`, then `pnpm josh git -y "<title> #<N>"`, then `pnpm josh followup "<title> #<N>" --merge --notify-message "..."`. **Do NOT end the turn with review markdown as the final assistant text.**
 
 ### Concrete failure pattern to self-recognize
