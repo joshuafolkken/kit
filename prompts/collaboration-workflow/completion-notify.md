@@ -1,105 +1,24 @@
 ## Step 5: PR結果確認 + 完了通知（別スクリプト）
 
-`pnpm josh git` の後に、別スクリプト `pnpm josh followup` を実行する。
+**この規則の単一ソースは [`.claude/skills/workflow-commands/followup.md`](../../.claude/skills/workflow-commands/followup.md) である。** ここに本文を複製しない（「クローン禁止・単一ソース化」の適用。joshuafolkken/kit#1174 のパイロットに続く横展開 joshuafolkken/kit#1187）。
 
-`pnpm josh followup` の主な動作:
+`residency.md` が定めるとおり、CI 待ちから完了通知・マージまでの手順は `fullrun` / `queue` が始まった後にだけ効くので、手順本体は skill 側に置く。かつては同じ内容の日本語全文がここにも重複しており、さらに [`operating-rules.md`](./operating-rules.md) の「Auto-merge（default for `fullrun`）」「`completion` 通知は `pnpm josh followup` 経由のみ」の 2 節にも同じ規則が 3 度目として書かれていた。
 
-- Cloudflare / CodeRabbit / SonarQube の結果確認（Required チェックのみ待機。CodeQL 等の non-required チェックは待たない）
-- CodeRabbit 指摘の未対応検出（必要なら理由コメント投稿）
-- AI レビューコメントのスキャン（Claude Review / CodeRabbit サマリコメント）。CI ステータスとは独立に実行する。ブロッカー該当コメントが残っている場合は `confirmation` Telegram 通知を送り非ゼロ終了する（`--ai-review-ignore-reason` を渡した場合のみ PR にスキップ理由コメントを投稿して続行）
-- Issue への完了通知投稿（Issue body が空なら body を編集、既にあればコメント追加）
-- Telegram 通知: 成功時のみ `task_type=completion`（✅）を自動送信する。CI 失敗や例外は単に再スローされるだけで、Telegram 通知は出さない。**`completion` 通知は必ずこの自動送信経路を使うこと。`pnpm josh notify --task-type completion ...` を手動で呼び出してはならない**（詳細は下記「`completion` 通知は `pnpm josh followup` 経由のみ」を参照）
-- 失敗の Telegram 通知は AI ツールが **最終的に復旧を諦めた** と判断したときに限り、手動で 1 回だけ送る: `pnpm josh notify --task-type failure --issue-url "<issue-url>" --body "<理由と未解決点>"`（再試行ごとに送らない）
+**`operating-rules.md` には宣言文を置かなかった。** joshuafolkken/kit#1186 が決めたとおり、1 ファイルに複数の話題があるときは節を話題ファイルへ切り出してから縮小する — 指し先の検出（冒頭の宣言文）も「指し先は引用されない」規則もファイル単位で効くため、`operating-rules.md` に宣言文を置けば「指示されていない行動は取らない」「git index を勝手に変更しない」「overrides の保護」に対する正当な引用がそのまま違反として検出されるからである。
 
-主なオプション:
+**ただし本 Issue では、切り出し用の新しい話題ファイルを作らなかった。** その 2 節が属する話題（`followup` と auto-merge）の話題ファイルは既にこのファイルとして存在し、同じ変更でそれ自体が指し先になる。だから 2 節の本文は手順書へ直接畳み込み、`operating-rules.md` には手順書を指す 1 節だけを残した。新規に作れば同一話題の指し先が 2 本並び、本文が 1 行も無いファイルを 2 つ索引へ載せることになる。**その話題の指し先が既にあるなら、切り出し先として新しい話題ファイルは要らない** — これが joshuafolkken/kit#1186 の前例に対する本 Issue の追記である。
 
-- `--notify-target`: `issue`（固定。PR への完了報告は行わない）
-- `--notify-message`: Issue への完了コメント本文。`JOSH_SESSION_LANG` の言語（未設定なら `ja`）で、「報告フォーマット」の 2 層構造に従う — 先頭に `Cause: / Fix: / Result:` の 3 行（各 1 文、専門用語・ファイル名なし）、続けて `Details:` 以下に変更点の箇条書き。`Added ... / Changed ...` だけの羅列にしない
-- `--coderabbit-ignore-reason`: 未対応を残す場合の理由コメント
-- `--ai-review-ignore-reason`: AI レビュー（Claude Review / CodeRabbit サマリ）の未対応ブロッカーを残す場合の理由コメント
-- `--issue-number`: Issue 番号（または位置引数に `"<title> #<number>"`）
+なお auto-merge 節のうち「deny は実装であって規則ではない」の 1 文だけは手順書へ移していない。あれは deny 一覧の話題に属し、`operating-rules.md` の「指示されていない行動は取らない」が持ち続ける規則なので、**節をまたいで移しただけでファイルは変わっていない**。
 
-例1: 基本（`fullrun` ではマージも込み）
+参照文書だけにあったのは、`pnpm josh followup` が `pnpm josh git` の**後に走る別スクリプト**であること、Required チェックのみ待機して CodeQL などの non-required は待たないこと、Issue への完了報告は body が空なら body を編集し既にあればコメントを足すこと、Telegram は成功時のみ自動送信で CI 失敗や例外では通知が出ないこと、`failure` 通知は復旧を最終的に諦めたときに手で 1 回だけ送ること、オプション一覧（`--notify-target` は `issue` 固定で PR への完了報告はしない、`--notify-message` の 2 層書式、2 種の ignore-reason、`--issue-number`）と 4 つの実行例である。いずれも縮小の前に手順書へ畳み込み済みである。
 
-```bash
-pnpm josh followup "<issue-title> #<issue-number>" \
-  --merge \
-  --notify-message "Implemented <title>
-Cause: <why this was needed, in one plain sentence>
-Fix: <what was changed, in one plain sentence>
-Result: <what is different for the user now>
+手順書に置かれている内容:
 
-Details:
-- Added ...
-- Changed ..."
-```
-
-例2: CodeRabbit 未対応理由あり
-
-```bash
-pnpm josh followup "<issue-title> #<issue-number>" \
-  --merge \
-  --notify-message "Implemented <title>
-Cause: ...
-Fix: ...
-Result: ...
-
-Details:
-- Added ...
-- Fixed ..." \
-  --coderabbit-ignore-reason "仕様上この指摘は該当しないため"
-```
-
-例3: AI レビュー（Claude Review）の未対応ブロッカー理由あり
-
-```bash
-pnpm josh followup "<issue-title> #<issue-number>" \
-  --merge \
-  --notify-message "Implemented <title>
-Cause: ...
-Fix: ...
-Result: ...
-
-Details:
-- Added ...
-- Fixed ..." \
-  --ai-review-ignore-reason "該当指摘は別 Issue #123 で追跡中のため"
-```
-
-例4: マージなし（`kickoff` 後や手動マージが必要な場合）
-
-```bash
-pnpm josh followup "<issue-title> #<issue-number>" \
-  --notify-message "Implemented <title>
-Cause: ...
-Fix: ...
-Result: ...
-
-Details:
-- Added ..."
-```
-
-### AI レビューコメントのスキャン（Claude Review / CodeRabbit サマリ）
-
-`pnpm josh followup` は CI 完了後、`repos/{owner}/{repo}/issues/{N}/comments`（REST）で取得した PR のトップレベルコメントをスキャンし、AI レビュアーが残した未対応の指摘を検出する。**CI がオールグリーンでも、AI レビュアーのブロッカー指摘が残っていれば完了しない**。
-
-**一時措置（kit#753）**: CodeRabbit のレビューが遅い間、CodeRabbit は全経路で非ブロッキングになっている — 既定の必須チェックから除外（`JOSH_REQUIRED_CHECKS` で復元可）、`Actionable comments posted: N` は情報ログへ格下げ、未解決の行コメントも理由なしで通過する。スキップした事実はコンソールと完了 Telegram 本文に記録される。Claude Review のブロッカー動作は従来どおり。kit#752 と併せて元に戻す。
-
-- ブロッカー判定ヒューリスティック（保守的・構造ベース／NLP は使わない）:
-  - **Claude Review**（`author.login = claude`）: 本文に `### Issues` / `### Problem` / `#### Logic bug` / `### 1. ...` などの番号付き指摘見出しを含む
-  - **CodeRabbit**（`author.login = coderabbitai` / `coderabbitai[bot]`）: 本文に `Actionable comments posted: N` を含み `N > 0`。レート制限通知（`rate limited by coderabbit.ai` / `Rate limit exceeded`）や `No actionable comments` は無視する
-- ブロッカーが残っていて `--ai-review-ignore-reason` が未指定の場合: `confirmation` Telegram 通知を送り、非ゼロで終了する。指摘を修正してから再実行するか、意図的に無視する理由を渡す
-- `--ai-review-ignore-reason "<reason>"` を渡した場合: 無視理由コメントを PR に投稿したうえで完了通知まで進める（`--coderabbit-ignore-reason` と同じ流れ）
-- **コメント一覧そのものを読めなかった場合は、ブロッカーが残っている場合と同じ扱いにする。** レート制限・認証失効・通信断はいずれも「指摘が無かった」ではなく「指摘が無かったことを誰も確認していない」であり、以前はすべて空の一覧として通過していた（joshuafolkken/kit#973）。`confirmation` Telegram 通知を送って非ゼロ終了し、読める状態で再実行する。`--ai-review-ignore-reason` はここでも通過を許す — 人が見たという意味は同じだからである。ただしその場合、スキャンを迂回した事実が完了通知の監査ノートに残る
-- **CodeRabbit の行コメント一覧が読めなかった場合はブロックしない。** kit#753 により CodeRabbit はそもそもマージをブロックしないため、読めなかったことだけがブロック理由になるのは筋が通らない。警告を出し、完了通知の監査ノートに残す。なお PR 番号自体を解決できなかった場合もこちらの「読めなかった」に含まれる — 上のトップレベルコメント走査は PR 番号を解決しない
-
-### 設定ファイル更新の確認（`pnpm josh followup` 実行中）
-
-`pnpm josh followup` が CI ステータスチェックの処理を完了した後、`git diff main...HEAD` で PR に `josh sync` が管理・配布するファイル（`playwright.config.ts`、`.github/workflows/ci.yml` など）への変更が含まれていないかを確認する。管理設定ファイルが更新されている場合は、次のコミットの前に停止して `confirmation` Telegram 通知を送る:
-
-```bash
-pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI ステータスチェックが管理設定ファイルの更新を検出\n変更内容を確認してから次のステップに進んでください'
-```
-
-- ユーザーから明示的な確認が得られるまで、次のコミット・修正・マージのいずれも行わない
-- このチェックは AI レビューコメントのスキャンとは独立して実行する — 同一の実行中に両方がトリガーされることもある
+- `pnpm josh followup` 1 回が何をどの順で行うか（Required チェック待機 → CodeRabbit 行コメント確認 → AI レビューコメント走査 → Issue への完了報告 → `completion` Telegram → マージ）
+- AI レビューコメントのスキャンとブロッカー判定ヒューリスティック、**コメント一覧そのものを読めなかった場合はブロッカーと同じ扱いにする**こと（joshuafolkken/kit#973）、および CodeRabbit の行コメント一覧だけが例外であること
+- kit#753 / kit#752 による CodeRabbit 非ブロッキングの暫定措置と、その revert 条件
+- `josh sync` が管理・配布する設定ファイルが PR に含まれていたときの確認停止
+- **auto-merge が `fullrun` の既定であり、`fullrun` と打つこと自体がマージの承認である**こと。**CI がオールグリーンでも未対応の AI レビュー指摘があるならマージしない**こと。CodeRabbit のレート制限は指摘ではないこと、指摘を反射的にバイパスしないこと、マージ経路が `followup` のものであってエージェントのものではないこと、マージ戦略・ブランチ削除・失敗時の扱い、マージ後の `pnpm josh ms`
+- **`completion` 通知は `pnpm josh followup` 経由のみ**であり、`pnpm josh notify --task-type completion` を手で打たないこと（手動 CLI は PR URL を自動で埋めない）。`pnpm josh notify` は `planning` / `confirmation` / `kickoff_retry` / `failure` 専用であること
+- **`pnpm josh followup` は前景で実行し、`&` でバックグラウンドにしない**こと。CI 待ち時間の予算と、ツール呼び出しの上限に当たったときの対処
+- 完了時にプロジェクトのバージョンが最終行に印字され、完了 Telegram にも入ること

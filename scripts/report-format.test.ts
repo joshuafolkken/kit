@@ -7,6 +7,9 @@ import {
 	WORKFLOW_PROMPT,
 } from './ai-document-fixture'
 
+// The single source of the `--notify-message` shape since joshuafolkken/kit#1187.
+const FOLLOWUP_SKILL = '.claude/skills/workflow-commands/followup.md'
+
 // The report format lives in five places (three AI docs, the workflow prompt, the hook).
 // Updating only one of them leaves the AI with contradicting instructions, so assert per marker.
 const OVERVIEW_MARKERS: ReadonlyArray<string> = [
@@ -152,11 +155,19 @@ describe('report format — canonical reference in the workflow prompt', () => {
 		expect(raw).not.toContain('今こうなっている: <1文')
 	})
 
+	// The `--notify-message` examples the markers pin left the canonical prompt in
+	// joshuafolkken/kit#1187, which single-sourced Step 5 into `followup.md`. Re-pointed at that one
+	// file rather than at the whole rule surface: `fullrun.md`, `halfrun.md` and `queue.md` all quote
+	// the same four lines inline, so a surface read would stay green with every example deleted from
+	// the single source — the loss this assertion exists to catch. The language sentence stays pinned
+	// on the prompt itself, because that half did not move.
 	it('routes the completion body through the session language while restructuring it', () => {
-		const raw = read_repo_file(WORKFLOW_PROMPT)
+		const skill = read_repo_file(FOLLOWUP_SKILL)
 
-		expect(raw).toContain('言語は「出力の言語（`JOSH_SESSION_LANG`）」に従う')
-		for (const marker of COMPLETION_MARKERS) expect(raw).toContain(marker)
+		expect(read_repo_file(WORKFLOW_PROMPT)).toContain(
+			'言語は「出力の言語（`JOSH_SESSION_LANG`）」に従う',
+		)
+		for (const marker of COMPLETION_MARKERS) expect(skill).toContain(marker)
 	})
 })
 

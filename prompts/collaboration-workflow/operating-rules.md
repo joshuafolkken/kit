@@ -13,23 +13,9 @@
 - 修正できなかった場合: `--notify-message` に失敗チェック名・原因・未解決である旨を記載する。**完了コメントに失敗を隠してはならない**
 - ユーザーへの報告も失敗の事実を正直に伝える（「成功」として扱わない）
 
-### Auto-merge（default for `fullrun`）
+### auto-merge と `completion` 通知（本文は手順書にある）
 
-`fullrun` / `fullrun new` の既定動作として、`pnpm josh followup --merge` が CI 待機・AI レビュー確認・完了通知・マージをまとめて行う。ユーザーが `fullrun` を実行した時点で、マージまで含めて承認されたものとみなす（追加キーワードは不要）。**マージ成功後は必ず `pnpm josh ms`（= デフォルトブランチへ checkout + `git pull`）を実行して、作業ツリーをデフォルトブランチ + 取り込み済みのマージコミットに戻す。`fullrun` / `fullrun new` / `queue` は常にデフォルトブランチ上で終了する。**
-
-```bash
-pnpm josh followup "<title> #<N>" --merge --notify-message "..."
-pnpm josh ms
-```
-
-- **マージ完了後の `pnpm josh ms` は必須**: `pnpm josh followup --merge` は作業ツリーをマージ済みフィーチャーブランチに残したまま終了する。`pnpm josh ms` を続けて実行することでデフォルトブランチに戻り、マージコミットを取り込んだ最新状態になる。マージ自体が失敗した場合（ワークフローが既に停止している場合）はスキップしてよい
-- **AI レビュー指摘は自動チェック**: `pnpm josh followup --merge` は CI グリーン後に AI レビュアーの指摘をスキャンする。ブロッカーが残っていれば `confirmation` 通知を送って非ゼロで終了する（マージされない）。指摘を修正して `pnpm josh followup --merge` を再実行する。**CI がオールグリーンでも、未対応の AI レビュー指摘があるならマージしない**
-- **CodeRabbit のレート制限はマージを止めない**: CodeRabbit のコメントが rate limit 警告のみ（本文に `rate limited by coderabbit.ai` または `Rate limit exceeded` を含む）で実体のあるレビューが無い場合、または最新 commit に対して CodeRabbit のコメントが一切無い場合は、**レート制限切れとみなしてマージへ進む**
-- **CodeRabbit 指摘は反射的にバイパスしない**: CodeRabbit が実体ある指摘を出した場合、まず指摘内容が正しいかを検証する。例: `pnpm/action-setup@<sha> # v6.0.8` のような GitHub Actions の SHA pin について「タグと一致しない」と指摘された場合、CodeRabbit は `gh api repos/<owner>/<repo>/git/ref/tags/v6.0.8` を実行している可能性が高い。これは **annotated tag-object SHA** を返すが、GitHub Actions の pin に使うのは **commit SHA**。`gh api repos/<owner>/<repo>/commits/<tag> --jq '.sha'` で確認し、これが pin と一致するなら偽陽性。その場合は検証根拠を `--coderabbit-ignore-reason "<検証コマンドと出力>"` に明記してバイパスする
-- **マージ戦略**: 内部で pull request のマージエンドポイントを `merge_method` 付きで叩く（`gh pr merge` は GraphQL を通るためクラウドセッションでは 403 になる、joshuafolkken/kit#1029）。既定は merge commit。**この経路は `followup` のものであってエージェントのものではない** — `.claude/settings.json` は `gh pr merge` に加え、joshuafolkken/kit#1062 以降は同じマージの `gh api` 表記（`Bash(gh api *pulls/*/merge*)`）と `gh api graphql` 表記も拒否する。`followup` は node スクリプト内部から gh を起動するため影響を受けない。**ただし deny は実装であって規則ではない** — パターンが取りこぼす綴りを禁じているのは本節の規則のほうである。リポジトリが `allow_squash_merge` / `allow_rebase_merge` のみを許可している場合はそれに合わせる（`gh api repos/<owner>/<repo> --jq '{allow_merge_commit, allow_squash_merge, allow_rebase_merge}'` で確認）
-- **ブランチ削除**: `--delete-branch` は既定で付けない。ブランチ削除は別途ユーザーが指示する
-- **失敗時の対応**: branch protection 未達・コンフリクトなどでマージが拒否された場合は、原因を報告して停止する。フラグを変えて再試行したり保護をバイパスしたりしない
-- **マージをスキップしたい場合**: `pnpm josh followup` に `--no-merge` フラグを渡すか、`kickoff`（planning のみ）を使うか、同じターンで明示的に "do not merge" と伝える。`fullrun` の外では勝手に `gh pr merge` を実行してはならない
+**auto-merge（`fullrun` の既定）と `completion` 通知の本文は、[`.claude/skills/workflow-commands/followup.md`](../../.claude/skills/workflow-commands/followup.md) にある。** かつてはこのファイルにも「Auto-merge（default for `fullrun`）」「`completion` 通知は `pnpm josh followup` 経由のみ」の 2 節として全文が重複していたが、joshuafolkken/kit#1187 で手順書へ単一ソース化した。`fullrun` と打つこと自体がマージの承認であること、CI がオールグリーンでも未対応の AI レビュー指摘があればマージしないこと、マージ後の `pnpm josh ms`、`completion` Telegram を手で打たないこと、`pnpm josh followup` を前景で実行することは、いずれもそこが単一ソースである。
 
 ### 明示的な起動が必須（MANDATORY）
 
@@ -44,10 +30,10 @@ pnpm josh ms
 
 PR マージ・ブランチ削除・force push・共有ブランチへの push・外部通知の追加送信・リポジトリ設定の変更など、**共有状態に影響する操作はその場でユーザーに明示指示されたものだけ実行する**。
 
-- `fullrun` の auto-merge は上記のとおり `fullrun` の指示自体に含まれるため許可される。それ以外の状況で勝手にマージしてはならない
+- `fullrun` の auto-merge は `fullrun` の指示自体に含まれるため許可される（本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)）。それ以外の状況で勝手にマージしてはならない
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
 - 「チェックが全部 green だから次のステップに進む」は承認ではない
-- **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `deny`（`Bash(gh pr merge*)`）で機械的に遮断されている。** `fullrun` の auto-merge は `pnpm josh followup --merge` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけである
+- **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `deny`（`Bash(gh pr merge*)`）で機械的に遮断されている。** `fullrun` の auto-merge は `pnpm josh followup --merge` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけである。**ただし deny は実装であって規則ではない** — パターンが取りこぼす綴りを禁じているのは本節の規則のほうである
 - **同じ規則が禁じる force push とブランチ削除も deny に載っている**（joshuafolkken/kit#1062）。`Bash(git push *--force*)` / `Bash(git push * -f)` はフラグを引数の後ろに書いた綴りを、`Bash(git push *--delete*)` / `Bash(git branch -d*)` / `Bash(git branch -D*)` / `Bash(gh api *DELETE*git/refs/heads/*)` はブランチ削除を止める。**それでも deny は規則より狭い** — `git -C` を前置した綴り、短縮フラグをまとめた綴り（`git push -uf`）は全エントリを素通りし、ルール文字列は `:` をリテラルとして照合できないため `git push origin :branch` も拒否されない。**「マージ経路は deny が保証している」とは読まないこと**
 - **共有状態に影響する操作（このセクションの対象＝Tier C）は迷ったら確認する。** 確認のコストは低いが、意図しない操作の巻き戻しは高コスト
 - ただしこの「迷ったら確認」は Tier C に限る。**可逆な実装・設計判断（Tier A）は別ルール**（CLAUDE.md「Decision autonomy」の3層ポリシー）に従い、明確に優位な選択肢は確認せず自動で選んで記録する — 本当に甲乙つけがたい（Tier B）ときだけ確認する。下記「意思決定の自律ポリシー」を参照
@@ -97,14 +83,6 @@ AI ツール（Opus / Gemini / Cursor）が判断の分岐で止まりすぎる�
 
 - Issue 駆動ワークフロー内（`kickoff` / `halfrun` / `fullrun` / `queue`）: `gh api repos/{owner}/{repo}/issues/<N>/comments -f body="..."` で、採用案・不採用の代替案・なぜ採用案が明確に優位かを記載する
 - Issue が存在しない会話タスク: 同じ内容を「Auto-decided: `<choice>` over `<alt>` because `<reason>`」の1行として応答に明示する
-
-### `completion` 通知は `pnpm josh followup` 経由のみ
-
-`task_type=completion`（✅）の Telegram 通知は `pnpm josh followup` が自動送信する経路のみを使う。`pnpm josh notify --task-type completion ...` を手動で実行してはならない。
-
-- 理由: 手動 CLI では `--pr-url` を明示しない限り PR URL が欠落する。`pnpm josh followup` は内部で `repos/{owner}/{repo}/pulls/{N}`（REST）から PR URL を取得して必ず付与するため、通知から PR リンクが消える事故を防げる
-- 初回 PR 作成時・フォローアップコミット（CodeRabbit 指摘対応や再レビュー対応）・ブランチ再 push のいずれでも、完了を通知したいときは `pnpm josh followup "<title> #<issue-number>" --merge --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` を再実行する（通知はマージ直前に送られる）
-- `pnpm josh notify` は `planning` / `confirmation` / `kickoff_retry` / `failure` の 4 タスクタイプ専用。`completion` には使わない
 
 ### 確認待ちで停止するときの Telegram 通知（`confirmation`）
 

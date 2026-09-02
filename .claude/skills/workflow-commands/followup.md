@@ -4,6 +4,123 @@ Everything between a green CI and a merged PR: what `followup` scans for, the tw
 a run, how auto-merge is authorized, and the Telegram notifications. `fullrun` and `queue` both end
 here; `halfrun` never reaches this file, because it stops before the commit.
 
+This file is the single source of the rule. `prompts/collaboration-workflow/completion-notify.md` is
+a pointer to it (joshuafolkken/kit#1187 rollout of the joshuafolkken/kit#1174 pattern), and the two
+sections it also replaced — "Auto-merge（default for `fullrun`）" and "`completion` 通知は
+`pnpm josh followup` 経由のみ" — were cut out of
+`prompts/collaboration-workflow/operating-rules.md`, which keeps its other operating rules and is
+still cited for them.
+
+## Where it sits — Step 5, after `pnpm josh git`
+
+`pnpm josh followup` is a **separate script run after `pnpm josh git`**, not a stage inside it. The
+commit and the pull request come first; this is everything after them.
+
+What one invocation does, in order:
+
+- **Waits for the CI status checks — the required ones only.** A non-required check (CodeQL, Workers
+  Builds) is never waited on, so a run does not hang on a check that cannot block the merge. **A
+  non-required check that failed is still reported to the user**, per
+  `prompts/collaboration-workflow/operating-rules.md` → "CI チェック失敗時の対応", which stays there
+  because it is about honest reporting rather than about this command.
+- **Checks unresolved CodeRabbit line comments**, posting the ignore-reason comment when one is
+  supplied.
+- **Scans the AI reviewers' top-level comments** — the section below, run independently of CI status.
+- **Sends the `completion` Telegram (✅) itself**, once every gate above has passed. A CI failure or
+  an exception is re-thrown as-is with **no** Telegram sent — so a silent run is a failed run, never
+  a quiet success. **It fires before the merge, not after it**: a merge rejected by a branch
+  protection or a conflict leaves the ✅ already sent, so never read a received completion Telegram
+  as proof the pull request merged. Read what the command printed.
+- **Merges** — unless `--no-merge` was passed. **Merging is the default**, and `--merge` is a
+  deprecated no-op kept for compatibility: passing nothing merges just the same. `--no-merge` is the
+  only thing that stops it.
+- **Posts the completion report to the Issue**, after the merge: it **edits the Issue body when the
+  body is empty, and adds a comment when it already has content**. The report never goes to the pull
+  request. A run that stopped at the merge therefore has no Issue comment, and the missing comment —
+  not a missing Telegram — is what a failed merge looks like from GitHub.
+- **Closes the epics the Issue completes**, on a merged run only.
+
+A `failure` Telegram is sent **by hand, exactly once**, and only when the agent has finally given up
+recovering — never once per retry:
+
+```bash
+pnpm josh notify --task-type failure --issue-url "<issue-url>" --body "<the reason and what is unresolved>"
+```
+
+### The options
+
+| Option | What it is |
+| --- | --- |
+| `--no-merge` | **The only flag that stops the merge.** Merging is the default; `--merge` is a deprecated no-op |
+| `--notify-target` | `pr` \| `issue` \| `both`, defaulting to `issue`. **Keep the default** — the workflow puts no completion report on the pull request |
+| `--notify-message` | The completion comment body, in the `JOSH_SESSION_LANG` language (`ja` when unset), in the two-layer report shape: three lines of `Cause: / Fix: / Result:` first, one plain sentence each with no jargon or file names, then the changes as bullets under `Details:`. **Not a bare list of `Added … / Changed …`** |
+| `--coderabbit-ignore-reason` | The reason comment for leaving CodeRabbit line comments unresolved |
+| `--ai-review-ignore-reason` | The reason comment for leaving an AI-review blocker (Claude Review / a CodeRabbit summary) unresolved |
+| `--issue-number` | The Issue number — or give it positionally as `"<title> #<number>"` |
+
+Example 1 — the basic form (`fullrun` includes the merge):
+
+```bash
+pnpm josh followup "<issue-title> #<issue-number>" \
+  --merge \
+  --notify-message "Implemented <title>
+Cause: <why this was needed, in one plain sentence>
+Fix: <what was changed, in one plain sentence>
+Result: <what is different for the user now>
+
+Details:
+- Added ...
+- Changed ..."
+```
+
+Example 2 — with a CodeRabbit ignore reason:
+
+```bash
+pnpm josh followup "<issue-title> #<issue-number>" \
+  --merge \
+  --notify-message "Implemented <title>
+Cause: ...
+Fix: ...
+Result: ...
+
+Details:
+- Added ...
+- Fixed ..." \
+  --coderabbit-ignore-reason "<why the finding does not apply>"
+```
+
+Example 3 — with an AI-review (Claude Review) blocker ignore reason:
+
+```bash
+pnpm josh followup "<issue-title> #<issue-number>" \
+  --merge \
+  --notify-message "Implemented <title>
+Cause: ...
+Fix: ...
+Result: ...
+
+Details:
+- Added ...
+- Fixed ..." \
+  --ai-review-ignore-reason "<tracked in issue #123>"
+```
+
+Example 4 — no merge (after a `kickoff`, or when the merge is done by hand). **`--no-merge` is not
+decoration here**: leave it out and this command merges, because merging is what `followup` does
+unless told otherwise.
+
+```bash
+pnpm josh followup "<issue-title> #<issue-number>" \
+  --no-merge \
+  --notify-message "Implemented <title>
+Cause: ...
+Fix: ...
+Result: ...
+
+Details:
+- Added ..."
+```
+
 ## AI reviewer comment scan (automatic in `pnpm josh followup`)
 
 `pnpm josh followup` scans top-level PR comments from AI reviewers (Claude Review, CodeRabbit summary comments) **independently of CI status**. This scan runs after CI is green and after the existing CodeRabbit line-comment check. The goal is to ensure substantive findings posted by AI reviewers _after_ CI goes green are not silently shipped.
@@ -49,7 +166,7 @@ pnpm josh ms
 - If the merge fails (e.g. branch protections not met, conflicts), report the reason and stop — do not retry with different flags or bypass protections.
 - **If the user wants to skip the merge step**, use `kickoff` (plan-only) or explicitly say "do not merge" / "do not auto-merge" in the same turn. In that case, pass `--no-merge` to `pnpm josh followup`. Outside a `fullrun` invocation, never run `gh pr merge` on your own.
 
-See `prompts/collaboration-workflow/operating-rules.md` → "Auto-merge（default for `fullrun`）" for the portable, cross-AI version of this rule.
+The portable, cross-AI wording of this section used to sit in `prompts/collaboration-workflow/operating-rules.md` as well; it is single-sourced here now (joshuafolkken/kit#1187).
 
 ## Completion notifications: always via `pnpm josh followup`
 
