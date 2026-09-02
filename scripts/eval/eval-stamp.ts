@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { eval_trigger } from './eval-trigger'
 
@@ -18,17 +19,18 @@ import { eval_trigger } from './eval-trigger'
 
 const STAMP_PREFIX = 'josh-eval-stamp-'
 
-interface EvalStamp {
-	started_at: string
-	files: Record<string, string>
-}
+// The payload, its validation, the guarded read and the comparison are
+// `#scripts/josh/file-map-stamp`'s since joshuafolkken/kit#1241 — `josh review:brief` keeps two more
+// records of exactly this shape, and a second copy of them would let the three drift. Those in turn
+// build on `#scripts/josh/stamp-file`, which has held the path, the symlink defense and the
+// ownership check since joshuafolkken/kit#1215. **What stays here is the one thing that differs: which
+// tree is read.**
+type EvalStamp = FileMapStamp
 
-// The path, the guarded write and the guarded read are `#scripts/josh/stamp-file`'s since
-// joshuafolkken/kit#1215 — `josh latest:scope` keeps the same kind of record, and a second copy of
-// the symlink and ownership defenses would let the two drift. What stays here is the payload and the
-// question asked of it.
+const access = file_map_stamp.create(STAMP_PREFIX)
+
 function stamp_path(): string {
-	return stamp_file.stamp_path(STAMP_PREFIX)
+	return access.stamp_path()
 }
 
 function is_directory(relative: string): boolean {
@@ -80,58 +82,20 @@ function try_read_tree(
 	}
 }
 
-// The destination is a parameter so a test can exercise the round trip without overwriting the
-// record a real run may be relying on — the two commands share one path by design, and a suite that
-// wrote to it would be a second writer nobody declared. A failed write leaves no record, and no
-// record answers `required`, which is the safe direction.
+// A failed write leaves no record, and no record answers `required`, which is the safe direction.
 function write_stamp(target: string = stamp_path()): string {
-	const stamp: EvalStamp = { started_at: new Date().toISOString(), files: read_tree() }
-
-	return stamp_file.write_stamp(target, stamp)
+	return access.write(read_tree(), target)
 }
 
-// Takes `unknown` rather than the declared field type, because the declared type is an assertion
-// over whatever was on disk: the file is written by one command and read by another, and a truncated
-// or hand-edited one has to answer "no record" rather than reach the comparison as a lie.
-function is_file_map(value: unknown): value is Record<string, string> {
-	if (typeof value !== 'object' || value === null) return false
-
-	return Object.values(value).every((entry) => typeof entry === 'string')
-}
-
-function parse_stamp(raw: string): EvalStamp | undefined {
-	const { started_at, files } = JSON.parse(raw) as Partial<EvalStamp>
-
-	if (typeof started_at !== 'string' || !is_file_map(files)) return undefined
-
-	return { started_at, files }
-}
-
-// `undefined` rather than a throw or an empty record: "there is no record" and "the record says
-// nothing changed" are the two answers this module exists to keep apart, and only the first of them
-// is a reason to measure again. A planted record would answer `skip` and suppress the re-measure the
-// check exists to force, which is why the read is the guarded one in `stamp-file`.
 function read_stamp(source: string = stamp_path()): EvalStamp | undefined {
-	const raw = stamp_file.read_stamp_text(source)
-
-	if (raw === undefined) return undefined
-
-	try {
-		return parse_stamp(raw)
-	} catch {
-		return undefined
-	}
+	return access.read(source)
 }
 
 // Every path here is a measured one by construction — the tree is walked from the trigger's own list
 // — so an empty result is the positive fact "nothing the scenarios can see has changed", never an
 // unread diff. That is the distinction `eval_trigger.scope_for_measured_changes` is named for.
-function changed_since(stamp: EvalStamp, tree: Record<string, string>): Array<string> {
-	const names = new Set([...Object.keys(stamp.files), ...Object.keys(tree)])
-
-	return [...names]
-		.filter((name) => stamp.files[name] !== tree[name])
-		.toSorted((left, right) => left.localeCompare(right))
+function changed_since(stamp: EvalStamp, tree: Record<string, string>): ReadonlyArray<string> {
+	return file_map_stamp.changed_since(stamp, tree)
 }
 
 const eval_stamp = {

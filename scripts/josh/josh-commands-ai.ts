@@ -63,6 +63,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print the /code-review level this change is reviewed at',
 		category: 'AI tools',
 	},
+	'review:brief': {
+		script: 'scripts/review/review-brief-cli.ts',
+		description:
+			'Print the whole /code-review invocation: level, what the gate already proved, target',
+		category: 'AI tools',
+	},
 	delegate: {
 		script: 'scripts/delegation/delegation-cli.ts',
 		description: 'Say whether a run step may go to a cheaper execution tier',

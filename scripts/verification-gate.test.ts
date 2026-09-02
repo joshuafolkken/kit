@@ -131,10 +131,19 @@ describe('run_verification_gate', () => {
 
 	// A step that aborts its siblings would leave the same one-failure-per-round-trip behavior in
 	// place under a concurrent name.
+	// Counted by which sub-command was spawned rather than by how many spawns there were: since
+	// joshuafolkken/kit#1241 the gate also reads the changed tree through git, so a bare call count
+	// would drift with every reading the gate takes for its own bookkeeping.
 	it('runs every check even when the first one fails', async () => {
 		await run_capturing([FAIL, PASS, PASS, PASS])
 
-		expect(mocked_execa).toHaveBeenCalledTimes(GATE_STEPS.length)
+		const check_calls = mocked_execa.mock.calls.filter(([, arguments_]) =>
+			GATE_STEPS.some(
+				(step) => step_command(step) === (arguments_ as ReadonlyArray<string>).at(-1),
+			),
+		)
+
+		expect(check_calls).toHaveLength(GATE_STEPS.length)
 	})
 
 	// Concurrent processes writing as they go would interleave; the buffered output is what makes

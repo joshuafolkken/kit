@@ -12,7 +12,7 @@ const STAMP_HASH = 'a1b2c3'
 const STAMP_OTHER_HASH = 'd4e5f6'
 
 function stamp_of(files: Record<string, string>): EvalStamp {
-	return { started_at: STAMP_STARTED_AT, files }
+	return { taken_at: STAMP_STARTED_AT, files }
 }
 
 export { STAMP_DOCUMENT, STAMP_HASH, STAMP_OTHER_HASH, STAMP_STARTED_AT, stamp_of }

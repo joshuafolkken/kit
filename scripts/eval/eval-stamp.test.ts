@@ -151,7 +151,7 @@ describe('eval_stamp.write_stamp and read_stamp', () => {
 	it('answers with no record when the file is json of the wrong shape', () => {
 		const target = path.join(scratch, 'wrong-shape.json')
 
-		writeFileSync(target, JSON.stringify({ started_at: STAMP_STARTED_AT }))
+		writeFileSync(target, JSON.stringify({ taken_at: STAMP_STARTED_AT }))
 
 		expect(eval_stamp.read_stamp(target)).toBeUndefined()
 	})
