@@ -133,10 +133,10 @@ describe('evaluate_checks_settled — the weaker question the watch asks', () =>
 		expect(evaluate_checks_settled(ONE_FAILING)).toBe('failure')
 	})
 
-	// **An empty rollup keeps waiting rather than failing.** `git-pr.ts` starts the watch five seconds
-	// after opening the pull request, where GitHub routinely has not attached a check run yet — failing
-	// there would make `pnpm josh git` exit red on a healthy run. Whether the branch really has no
-	// checks is asked once, after the budget runs out.
+	// **An empty rollup keeps waiting rather than failing.** `followup` starts the watch right after
+	// the pull request is opened, where GitHub routinely has not attached a check run yet — failing
+	// there would end a healthy run red. Whether the branch really has no checks is asked once, after
+	// the budget runs out.
 	it('keeps waiting on a branch whose checks have not appeared yet', () => {
 		expect(evaluate_checks_settled(EMPTY_SNAPSHOT)).toBe('pending')
 	})
@@ -258,7 +258,7 @@ describe('pr_checks_watch — the WatchResult contract', () => {
 	})
 
 	// Running out the budget is the answer `timed_out` carries, exactly as the killed `gh` process
-	// was: `git-pr.ts` prints "CI still running" rather than failing the run.
+	// was: `git-pr-followup.ts` discards it and falls through to its own poll rather than failing.
 	it('reports a timeout when the poll runs out', async () => {
 		wait.mockRejectedValue(new Error(PR_CHECKS_TIMEOUT_MESSAGE))
 		stub_rollup([{ name: E2E }])

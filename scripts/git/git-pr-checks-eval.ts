@@ -32,6 +32,9 @@ function parse_required_checks(): ReadonlyArray<string> {
 const REQUIRED_CHECKS = parse_required_checks()
 const MERGE_STATE_CLEAN = 'CLEAN'
 const MERGE_STATE_UNSTABLE = 'UNSTABLE'
+// What GitHub reports for a pull request that conflicts with its base. It is the one merge state
+// that no amount of waiting resolves, so it ends the wait rather than polling through it.
+const MERGE_STATE_DIRTY = 'DIRTY'
 const REVIEW_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
 // GitHub reports a check-suite job as `<App> / <Job>` (e.g. `CodeRabbit / Review`). A required
 // check name matches that suite when it is the `<App>` segment, so the required-check list stays the
@@ -40,6 +43,7 @@ const CHECK_SUITE_SEPARATOR = ' / '
 const FAILURE_MESSAGE_PREFIX = 'PR checks failed'
 const FAILURE_REASON_REVIEW = 'review requested changes'
 const FAILURE_REASON_CHECKS = 'failed checks'
+const FAILURE_REASON_CONFLICT = 'merge conflict'
 
 type PrEvaluation = 'success' | 'pending' | 'failure'
 
@@ -69,13 +73,32 @@ function is_review_blocked(review_decision: string | undefined): boolean {
 	return review_decision === REVIEW_CHANGES_REQUESTED
 }
 
+// **A conflicting pull request ends the wait instead of polling through it**
+// (joshuafolkken/kit#1232). `DIRTY` is not CLEAN, so it used to answer `pending` and run the whole
+// 32-minute budget out on a state that resolves only when a person rebases — ending in a timeout
+// that named no cause. This is also where the conflict diagnosis `pnpm josh git` used to carry
+// landed: that command read `mergeStateStatus` after its own two-minute watch, and now returns as
+// soon as the pull request is open, so the first poll here is what reports a conflict — about ten
+// seconds against that two minutes.
+//
+// **`BLOCKED` is deliberately not here.** GitHub reports it while a required check is merely queued,
+// which is every healthy pull request for its first seconds. The old reader treated it as a conflict
+// safely only because it ran after the checks had settled; there is no equivalent moment on this
+// path, and a green-but-`BLOCKED` pull request (branch protection requiring a review, which this
+// repository does not set) therefore reaches the timeout rather than a named failure.
+function is_merge_conflict(merge_state_status: string | undefined): boolean {
+	return merge_state_status === MERGE_STATE_DIRTY
+}
+
 // A required check whose status is `fail` is by definition a rollup entry that
 // `collect_blocking_failures` already names, so the required list needs no condition of its own
 // here — see `is_blocking_failure`.
 function evaluate_failure_state(input: {
 	review_decision: string | undefined
 	failed_checks: ReadonlyArray<string>
+	merge_state_status: string | undefined
 }): PrEvaluation | undefined {
+	if (is_merge_conflict(input.merge_state_status)) return 'failure'
 	if (is_review_blocked(input.review_decision)) return 'failure'
 	if (input.failed_checks.length > 0) return 'failure'
 
@@ -139,6 +162,7 @@ function is_mergeable_state(snapshot: PrStateSnapshot): boolean {
 // something actionable without opening the pull request (joshuafolkken/kit#990).
 function collect_failure_reasons(snapshot: PrStateSnapshot): Array<string> {
 	const reasons: Array<string> = []
+	if (is_merge_conflict(snapshot.merge_state_status)) reasons.push(FAILURE_REASON_CONFLICT)
 	if (is_review_blocked(snapshot.review_decision)) reasons.push(FAILURE_REASON_REVIEW)
 	const failed = collect_blocking_failures(snapshot)
 	if (failed.length > 0) reasons.push(`${FAILURE_REASON_CHECKS}: ${failed.join(', ')}`)
@@ -158,6 +182,7 @@ function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 	const failure = evaluate_failure_state({
 		review_decision: snapshot.review_decision,
 		failed_checks: collect_blocking_failures(snapshot),
+		merge_state_status: snapshot.merge_state_status,
 	})
 
 	if (failure !== undefined) return failure

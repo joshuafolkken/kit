@@ -6,18 +6,6 @@ vi.mock('./animation-helpers', () => ({
 	},
 }))
 
-vi.mock('./git-conflict', () => ({
-	git_conflict: {
-		check_pr_status_for_errors: vi.fn(),
-	},
-}))
-
-vi.mock('./git-countdown', () => ({
-	git_countdown: {
-		wait_for_seconds: vi.fn(),
-	},
-}))
-
 vi.mock('./git-gh-command', () => ({
 	git_gh_command: {
 		pr_exists: vi.fn(),
@@ -36,8 +24,7 @@ vi.mock('./git-pr-error', () => ({
 
 vi.mock('./git-pr-messages', () => ({
 	git_pr_messages: {
-		display_success_message: vi.fn(),
-		display_error_message: vi.fn(),
+		display_pr_opened_message: vi.fn(),
 		display_pr_url: vi.fn(),
 		display_pr_exists_message: vi.fn(),
 		display_merged_pr_message: vi.fn(),
@@ -46,15 +33,16 @@ vi.mock('./git-pr-messages', () => ({
 
 const { git_pr } = await import('./git-pr')
 const { git_gh_command } = await import('./git-gh-command')
-const { git_conflict } = await import('./git-conflict')
+const { git_pr_messages } = await import('./git-pr-messages')
+const { git_pr_error } = await import('./git-pr-error')
 const { animation_helpers } = await import('./animation-helpers')
-const { git_countdown } = await import('./git-countdown')
 
 const BRANCH = 'test-branch'
 const PR_TITLE = 'Test title'
 const PR_BODY = 'Test body'
 const FAKE_ISSUE_COMMIT = 'My feature #42'
 const FAKE_PR_URL = 'https://github.com/owner/repo/pull/1'
+const CREATED_PR_URL = 'https://github.com/owner/repo/pull/2'
 const FAKE_ISSUE_INFO = {
 	title: 'My feature',
 	number: '42',
@@ -68,16 +56,11 @@ beforeEach(() => {
 	vi.mocked(animation_helpers.execute_with_animation).mockImplementation(
 		async (_label: string, action: () => Promise<unknown>) => await action(),
 	)
-	vi.mocked(git_gh_command.pr_create).mockResolvedValue('')
-	vi.mocked(git_countdown.wait_for_seconds).mockResolvedValue()
+	vi.mocked(git_gh_command.pr_create).mockResolvedValue(CREATED_PR_URL)
 	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(FAKE_PR_URL)
 })
 
 describe('git_pr.create_with_issue_info — build_body behavior', () => {
-	beforeEach(() => {
-		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: true })
-	})
-
 	it('passes only closes #N when no extra_body supplied', async () => {
 		await git_pr.create_with_issue_info(FAKE_ISSUE_INFO)
 
@@ -97,21 +80,68 @@ describe('git_pr.create_with_issue_info — build_body behavior', () => {
 	})
 })
 
-describe('git_pr.create — post-watch conflict check behavior', () => {
-	it('skips conflict check when watch times out', async () => {
-		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: true })
-
+// joshuafolkken/kit#1232. The command used to sleep five seconds and then watch the rollup on a
+// two-minute budget, and `pnpm josh followup` started the same wait over the moment it returned.
+// These assertions pin that the wait is gone from every path, not only the freshly-created one.
+describe('git_pr.create — returns as soon as the pull request is open', () => {
+	it('does not watch the checks after creating the PR', async () => {
 		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
 
-		expect(vi.mocked(git_conflict.check_pr_status_for_errors)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
 	})
 
-	it('calls conflict check when watch completes without timeout', async () => {
-		vi.mocked(git_gh_command.pr_checks_watch).mockResolvedValue({ timed_out: false })
-		vi.mocked(git_conflict.check_pr_status_for_errors).mockResolvedValue()
+	it('does not watch the checks when a PR is already open on the branch', async () => {
+		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
+		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'OPEN' }))
 
 		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
 
-		expect(vi.mocked(git_conflict.check_pr_status_for_errors)).toHaveBeenCalledWith(BRANCH)
+		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_gh_command.pr_create)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_pr_messages.display_pr_opened_message)).toHaveBeenCalledOnce()
+	})
+
+	it('does not watch the checks when the branch PR is already merged', async () => {
+		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
+		vi.mocked(git_gh_command.pr_view).mockResolvedValue(JSON.stringify({ state: 'MERGED' }))
+
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+
+		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_gh_command.pr_create)).toHaveBeenCalledWith(PR_TITLE, PR_BODY)
+	})
+
+	it('does not watch the checks when the PR state cannot be read', async () => {
+		vi.mocked(git_gh_command.pr_exists).mockResolvedValue(true)
+		vi.mocked(git_gh_command.pr_view).mockResolvedValue('')
+
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+
+		expect(vi.mocked(git_gh_command.pr_checks_watch)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_pr_messages.display_pr_opened_message)).toHaveBeenCalledOnce()
+	})
+})
+
+// The five-second sleep that is gone was also what let the `?head=…` listing catch up, and that
+// listing is eventually consistent — so where the reported URL comes from is now load-bearing
+// (joshuafolkken/kit#1232).
+describe('git_pr.create — where the reported URL comes from', () => {
+	it('reports the URL the create call answered with, without re-reading it', async () => {
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+
+		expect(vi.mocked(git_pr_messages.display_pr_url)).toHaveBeenCalledWith(CREATED_PR_URL)
+		expect(vi.mocked(git_gh_command.pr_get_url)).not.toHaveBeenCalled()
+	})
+
+	// Nothing was created on this path, so there is no answer to carry — the branch lookup is the
+	// only source, and by then the pull request has existed long enough for the listing to hold it.
+	it('falls back to the branch lookup when the PR already exists', async () => {
+		vi.mocked(git_pr_error.is_pr_already_exists_error).mockReturnValueOnce(true)
+		vi.mocked(git_gh_command.pr_create).mockRejectedValueOnce(new Error('already exists'))
+
+		await git_pr.create(PR_TITLE, PR_BODY, BRANCH)
+
+		expect(vi.mocked(git_pr_messages.display_pr_exists_message)).toHaveBeenCalledOnce()
+		expect(vi.mocked(git_pr_messages.display_pr_url)).toHaveBeenCalledWith(FAKE_PR_URL)
 	})
 })

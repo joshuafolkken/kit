@@ -46,7 +46,7 @@ describe('to_pr_info', () => {
 
 	// `mergeStateStatus` is upper-cased because `git-pr-checks-eval.ts` compares strictly against the
 	// spelling `gh` used; `mergeable` is REST's nullable boolean, which `pr_info_schema` accepts and
-	// `git-conflict.ts` already reads `false` as conflicting.
+	// passes through as it arrives (joshuafolkken/kit#1232 left it with no reader — see `to_pr_info`).
 	it('answers the three fields under the names gh gave them', () => {
 		expect(info_of(PULL)).toStrictEqual({
 			mergeable: false,

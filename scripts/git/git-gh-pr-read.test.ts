@@ -108,7 +108,7 @@ describe('the branch to pull request number resolution', () => {
 // The two answers the *display* reads deliberately fold together, asserted side by side.
 // `require_pr_number` and `pr_exists` tell them apart (joshuafolkken/kit#1048,
 // joshuafolkken/kit#1043); every reader below answers its own empty value for both, which is the
-// contract `gh pr view` had and the one `git-conflict.ts` and the two comment readers are written
+// contract `gh pr view` had and the one `git-pr.ts` and the two comment readers are written
 // against.
 describe.each([
 	{

@@ -22,10 +22,13 @@ import {
 // **`--watch` is a streaming call and REST has no counterpart** — it holds the connection open and
 // redraws a table as each check settles, which no sequence of `gh api` requests reproduces
 // (joshuafolkken/kit#1022). What it is *used* for does have one: `git-pr-followup.ts` discards its
-// result entirely and `git-pr.ts` reads only `timed_out`, so the answer both callers need is "did
-// the checks settle within two minutes", which the poll loop in `git-pr-checks.ts` already computes.
-// No new loop is written here; this is that loop with a two-minute budget
-// (joshuafolkken/kit#1028).
+// result entirely, so the answer its one caller needs is "did the checks settle within two minutes",
+// which the poll loop in `git-pr-checks.ts` already computes. No new loop is written here; this is
+// that loop with a two-minute budget (joshuafolkken/kit#1028).
+//
+// **`git-pr.ts` was the second caller until joshuafolkken/kit#1232.** It read only `timed_out`, and
+// `followup` restarted the same wait the moment it returned — so the watch there was the same answer
+// waited for twice, and `pnpm josh git` now returns as soon as the pull request is open.
 //
 // **What is lost is the live table.** `gh` printed each check's name and state as it changed; the
 // poll prints `Checking PR status… (n/N)` instead. The trade is accepted because the display was
@@ -49,16 +52,16 @@ interface WatchResult {
 // `evaluate_pr_state` answers `success` only for a pull request that is *mergeable*: `CLEAN` merge
 // state, every required check green, no change request standing. `gh pr checks --watch` knew nothing
 // about any of that — it waited for the checks and exited non-zero if one failed. Handing the watch
-// the merge gate's verdict would break both callers on a repository that requires an approving
-// review, where `mergeable_state` is `blocked`: the watch could never succeed, `git-pr.ts` would
-// print "CI still running" over a green build, and a standing change request would make
-// `pnpm josh git` exit non-zero on something the old watch ignored outright.
+// the merge gate's verdict would break it on a repository that requires an approving review, where
+// `mergeable_state` is `blocked`: the watch could never succeed, so it would report "CI still
+// running" over a green build, and a standing change request would end it non-zero on something the
+// old watch ignored outright.
 //
 // **An empty rollup is `pending`, not `failure`** — deliberately, and it is the one place the watch
-// answers differently on the first poll than at the end. `git-pr.ts` starts this five seconds after
-// opening the pull request, where GitHub routinely has not attached a single check run yet; failing
-// there would make `pnpm josh git` exit red on a perfectly healthy run. Whether the branch really
-// has no checks is asked once, after the budget runs out — see `pr_checks_watch`.
+// answers differently on the first poll than at the end. `followup` starts this right after the
+// pull request is opened, where GitHub routinely has not attached a single check run yet; failing
+// there would end the run red on a perfectly healthy one. Whether the branch really has no checks is
+// asked once, after the budget runs out — see `pr_checks_watch`.
 
 // Temporary (kit#753): CodeRabbit blocks nothing end to end, so a look-ahead that waits on it waits
 // for something no verdict downstream reads. Its commit status posts `Review queued` within seconds
@@ -143,8 +146,8 @@ async function fail_when_no_checks(branch_name: string): Promise<void> {
 
 // Running out the budget is the answer `timed_out` carries, exactly as the killed `gh` process was.
 // Everything else — a failing check, an unreadable read, a branch with no checks — is rethrown, which
-// is what the two callers already handle: `git-pr.ts` shows the pull request URL and gives up on the
-// wait, `git-pr-followup.ts` swallows it and falls through to its own poll.
+// is what the caller already handles: `git-pr-followup.ts` swallows it and falls through to its own
+// poll.
 async function pr_checks_watch(branch_name: string): Promise<WatchResult> {
 	try {
 		await watch_until_settled(branch_name)

@@ -193,7 +193,7 @@ async function pr_get_body(branch_name: string): Promise<string | undefined> {
 }
 
 // The empty string means "there is nothing to read" — a branch with no pull request, or a read that
-// failed. `git-pr.ts` and `git-conflict.ts` both check the length before parsing.
+// failed. `git-pr.ts` checks the length before parsing.
 async function pr_view(branch_name: string): Promise<string> {
 	const pull = await read_pull_of_branch(branch_name)
 	if (pull === undefined) return ''
