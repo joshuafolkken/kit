@@ -171,9 +171,14 @@ describe('the split lost nothing', () => {
 
 	// One body sentence from each of four different original sections, each verified absent from the
 	// index — a marker the index also carries would pass however empty the topic file became.
+	//
+	// The sample taken from the `epicrun` section was replaced under joshuafolkken/kit#1188. Its body
+	// moved into `.claude/skills/workflow-commands/epicrun.md` and the topic file became a pointer,
+	// which this suite deliberately does not read — so sampling it would have asserted the opposite
+	// of what the suite is for. A sentence from a topic that still holds a body took its place.
 	it.each([
 		'9. 検証ゲート（`CLAUDE.md` の Completion gate）を実行する',
-		'そのため `epicrun #<N>` の実行中に前提 Issue または分割が判明しても、**停止しない**。',
+		'**(1) ラベルはセッション言語に訳す。**',
 		'overrides に設定された制約は、**セキュリティ・互換性・動作保証のために意図的に追加されたもの**である。',
 	])('keeps %j in a topic file, not only in the index', (marker) => {
 		expect(topics).toContain(marker)

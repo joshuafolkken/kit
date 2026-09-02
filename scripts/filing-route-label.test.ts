@@ -81,18 +81,15 @@ describe('the workflow-command filing copies name their route label', () => {
 	})
 })
 
-// The canonical extended references must agree with the skill copies above (each of those files
-// declares that the two must match). Wiring only the operational layer would leave the declared
-// source of truth saying children and prerequisites file unlabeled — the same drift in mirror image.
-// The bare-issue epicrun path is a canonical filing site; pin the labels it names so the canonical
-// and operational layers cannot diverge (joshuafolkken/kit#1083). The split assessment and the
-// mid-run prerequisite are the exceptions: joshuafolkken/kit#1174 and joshuafolkken/kit#1185
-// single-sourced their bodies into the skill, so only the skill copy carries the filing command and
-// each canonical topic file is a pointer with none of its own.
-const WORKFLOW_ROOT = 'prompts/collaboration-workflow'
+// This list once held the canonical topic files, which had to agree with the skill copies above:
+// wiring only the operational layer would have left the declared source of truth saying children and
+// prerequisites file unlabeled. **Single-sourcing removed the second layer rather than the check.**
+// joshuafolkken/kit#1174, #1185 and #1188 moved the split assessment, the mid-run prerequisite and
+// `epicrun` into their skills, so those topic files are pointers with no filing command to assert
+// against — and `epicrun.md`'s two rows would now be byte-identical to rows in
+// `OPERATIONAL_FILING_DOCS`, asserting the same labels against the same file twice. What remains
+// here is the one filing site that is not an entry-point procedure.
 const CANONICAL_FILING_DOCS: ReadonlyArray<{ doc: string; label: string }> = [
-	{ doc: `${WORKFLOW_ROOT}/epicrun.md`, label: SPLIT_ROUTE_LABEL },
-	{ doc: `${WORKFLOW_ROOT}/epicrun.md`, label: TIER_A_ROUTE_LABEL },
 	{ doc: `${SKILL_ROOT}/split-assessment.md`, label: SPLIT_ROUTE_LABEL },
 ]
 
