@@ -1,4 +1,5 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
+import { time_corpus } from './time-corpus'
 import { time_github, type GhReader } from './time-github'
 import { time_instant } from './time-instant'
 import type { CategoryTotals, TimeReport } from './time-report'
@@ -245,18 +246,31 @@ async function read_children(
 	}
 }
 
-// One child at a time rather than all of them at once. Each report walks every transcript in the
-// project and pages the pull-request listing, so running seven of those concurrently multiplies both
-// the memory held and the requests in flight to answer a question nobody is waiting on.
+// One child at a time rather than all of them at once. Each report pages the pull-request listing,
+// so running seven of those concurrently multiplies the requests in flight to answer a question
+// nobody is waiting on.
+//
+// **The transcript half is read once for the whole batch** (joshuafolkken/kit#1284). It used to be
+// read inside each child's report, which meant this loop walked the same 669 files eleven times for
+// an eleven-child epic and threw away all but one issue's spans each time. The walk is
+// `time-corpus.ts`'s and attributes one pass to every child, so what is left here is the paging that
+// really is per child.
 async function build_children(
 	numbers: ReadonlyArray<number>,
 	cwd: string,
 	read: GhReader,
 ): Promise<Array<ChildTiming>> {
+	const found = time_corpus.collect_for_issues(cwd, numbers)
 	const rows: Array<ChildTiming> = []
 
+	// `found` holds an entry for every number asked about — an issue no transcript mentions is
+	// present with an empty result rather than absent, which `time-corpus.test.ts` pins. A miss would
+	// therefore be a broken invariant rather than a normal case, and `build_run_report` answers one by
+	// walking the corpus for that child: slower than this is meant to be, never wrong.
 	for (const issue_number of numbers) {
-		rows.push(to_timing(issue_number, await time_run.build_run_report(issue_number, cwd, read)))
+		const report = await time_run.build_run_report(issue_number, cwd, read, found.get(issue_number))
+
+		rows.push(to_timing(issue_number, report))
 	}
 
 	return rows
