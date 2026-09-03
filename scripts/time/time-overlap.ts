@@ -14,6 +14,8 @@ import type { Span } from './time-spans'
 // is that the four shares still add up to the elapsed time — the one thing that makes two runs
 // comparable.
 
+const NO_DURATION = 0
+
 interface Interval {
 	started_ms: number
 	ended_ms: number
@@ -86,36 +88,111 @@ function trim(span: Span, covered: ReadonlyArray<Interval>): Array<Span> {
 	}))
 }
 
+const SAME_INSTANT = 0
+
+// Delegated spans in timeline order — earliest start first, the shorter of two spans starting
+// together first, and the label last. The order is what decides which unit keeps a minute two units
+// shared, so it is derived from the spans rather than left as the order the transcript directory
+// happened to list the unit files in. **The label is what makes that true of two units with the very
+// same interval**: without it the comparator answers equal, the sort is stable, and the survivor is
+// whichever file had the older mtime.
+// Compared by code point rather than `localeCompare`, whose collation is the runtime's: two units
+// whose labels differ only in case or punctuation would otherwise sort one way here and the other
+// on a machine with a different `LANG`, and the loser of this comparison is the one trimmed away.
+function compare_labels(left: string, right: string): number {
+	if (left === right) return SAME_INSTANT
+
+	return left < right ? -1 : 1
+}
+
+function compare_spans(left: Span, right: Span): number {
+	const started = to_interval(left).started_ms - to_interval(right).started_ms
+
+	if (started !== SAME_INSTANT) return started
+	if (left.ended_ms !== right.ended_ms) return left.ended_ms - right.ended_ms
+
+	return compare_labels(left.label, right.label)
+}
+
+function in_timeline_order(spans: ReadonlyArray<Span>): Array<Span> {
+	return [...spans].toSorted(compare_spans)
+}
+
+// A span of no duration covers nothing and is covered by nothing, so it is passed through rather
+// than trimmed. `uncovered_parts` answers `[]` for a target with no length, and dropping such a span
+// would leave a transcript's minute totals right while its `turn_count` and every `call_count`
+// silently shrank — two transcript lines really can share a millisecond.
+//
+// **Both sides of the subtraction go through this**, parent spans included. Trimming the parent
+// directly would drop its zero-duration spans exactly when the session happened to have a
+// `subagents/` directory, so one transcript's turn count would depend on whether it delegated.
+function reconciled(span: Span, covered: ReadonlyArray<Interval>): Array<Span> {
+	return span.duration_ms === NO_DURATION ? [span] : trim(span, covered)
+}
+
+// What a set of spans covers. **A span of no duration is left out**: the walk emits the gap in front
+// of every interval it consumes, so a zero-length one cuts the span enclosing it in two at that
+// instant — the minutes still right, one parent tool call reported as two.
+function covering_intervals(spans: ReadonlyArray<Span>): Array<Interval> {
+	return spans.filter((span) => span.duration_ms !== NO_DURATION).map((span) => to_interval(span))
+}
+
+// The delegated spans with their own overlaps removed: each is kept whole except where an earlier
+// one already covers it. Their union is unchanged, so what is subtracted from the parent below is
+// exactly what is added back.
+//
+// **Keeping every unit's span whole was the defect** (joshuafolkken/kit#1287). One session running
+// two units *at the same time* had the shared wall clock counted once per unit while the parent's
+// bracketing span was trimmed by both, so the four shares exceeded the elapsed time — the invariant
+// this module's header says it exists to hold. `epicrun` and `queue` run their children one at a
+// time, so the shape appears the moment concurrent delegation does rather than today.
+//
+// **Which unit keeps a shared minute has no true answer** — both units really did run in it — so the
+// requirement is only that the total is right and that the answer never depends on the order the
+// transcripts were read in.
+function without_self_overlap(delegated: ReadonlyArray<Span>): Array<Span> {
+	const kept: Array<Span> = []
+	const covered: Array<Interval> = []
+
+	for (const span of in_timeline_order(delegated)) {
+		const parts = reconciled(span, covered)
+
+		kept.push(...parts)
+		covered.push(...covering_intervals(parts))
+	}
+
+	return kept
+}
+
 // The parent's spans and its delegated units', joined without counting the shared wall clock twice.
 //
 // **The unit's spans are kept whole and the parent's are reduced**, never the other way round. The
 // unit is the detail — model wait, each tool, each `pnpm josh <cmd>` — and the parent holds one
 // undifferentiated `Agent` span across the same minutes. Keeping the parent's instead would report
 // a delegated child as a single tool call, which is what listing only the parent already did.
+// "Whole" means whole against the parent: units that overlap *each other* are reconciled first, by
+// `without_self_overlap` above.
 //
 // **With no delegated span this is the identity**, which is the whole of the "a run that never
 // delegated is unaffected" guarantee: a project with no `subagents/` directory produces an empty
 // `delegated`, and the parent's spans come back untouched rather than round-tripped through the
-// subtraction.
+// subtraction. Sequential delegation is untouched for the same reason: units that overlap nothing
+// come back out of the reconciliation exactly as they went in.
 //
-// **Two cases this does not resolve, both recorded rather than silently assumed away.** One session
-// running two units *at the same time* has each unit's spans counted whole while the parent's
-// bracketing spans are trimmed by both, so the shares can exceed the window — `epicrun` and `queue`
-// run their children one at a time, so this is a shape the workflow does not currently produce. And
-// a resumed transcript that copies a parent's `Agent` span into a session with no units of its own
-// keeps that copy whole while the original is trimmed away, and the two no longer share a span key,
-// so the cross-transcript dedupe cannot collapse them. Deciding which of the two copies the units
-// belong to is a judgement rather than an oversight; both are filed as follow-ups to
-// joshuafolkken/kit#1285.
+// **The other overlap without a parent-unit relation is not resolved here**, because it is not an
+// overlap of intervals at all: a resumed transcript copies a parent's `Agent` span into a second
+// session, and the copy has to be assigned to one session *before* this subtraction runs.
+// `time-duplicate.ts` is where that assignment is made, and why it cannot be a fold afterwards.
 function resolve_delegated(
 	parent: ReadonlyArray<Span>,
 	delegated: ReadonlyArray<Span>,
 ): Array<Span> {
 	if (delegated.length === 0) return [...parent]
 
-	const covered = delegated.map((span) => to_interval(span))
+	const resolved = without_self_overlap(delegated)
+	const covered = covering_intervals(resolved)
 
-	return [...parent.flatMap((span) => trim(span, covered)), ...delegated]
+	return [...parent.flatMap((span) => reconciled(span, covered)), ...resolved]
 }
 
 const time_overlap = {

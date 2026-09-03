@@ -1,24 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { time_overlap } from './time-overlap'
-import type { Span } from './time-spans'
+import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
-const MINUTE_MS = 60_000
-
-function span(label: string, ended_minute: number, duration_minutes: number): Span {
-	return {
-		category: 'tool',
-		label,
-		josh_command: '',
-		marker: 'none',
-		branch: 'main',
-		ended_ms: ended_minute * MINUTE_MS,
-		duration_ms: duration_minutes * MINUTE_MS,
-	}
-}
-
-function total_ms(spans: ReadonlyArray<Span>): number {
-	return spans.reduce((sum, one) => sum + one.duration_ms, 0)
-}
+const { MINUTE_MS, span, total_span_ms: total_ms } = fixture
 
 describe('time_overlap.uncovered_ms', () => {
 	// The property the whole join rests on. `followup --merge` waits for CI inside a Bash tool span
@@ -86,6 +70,85 @@ describe('time_overlap.resolve_delegated', () => {
 		const resolved = time_overlap.resolve_delegated([span('Agent', 10, 10)], delegated)
 
 		expect(resolved.filter((one) => one.label !== 'Agent')).toStrictEqual(delegated)
+	})
+})
+
+// One session running two units at the same time. Each unit's spans were kept whole while the
+// parent's bracketing span was trimmed by both, so the shared wall clock was counted once per unit
+// and the four shares exceeded the elapsed time (joshuafolkken/kit#1287). `epicrun` and `queue` run
+// their children one at a time, so the shape arrives with concurrent delegation rather than today.
+describe('time_overlap.resolve_delegated — units that overlap each other', () => {
+	it('counts wall clock two concurrent units share once', () => {
+		const resolved = time_overlap.resolve_delegated(
+			[span('Agent', 10, 10)],
+			[span('Read', 10, 10), span('Edit', 8, 6)],
+		)
+
+		expect(total_ms(resolved)).toBe(10 * MINUTE_MS)
+	})
+
+	// `Read` covers minutes 0→6 and `Edit` runs 4→10, so four minutes of `Edit` are its own.
+	it('keeps the part of a later unit the earlier one does not cover', () => {
+		const resolved = time_overlap.resolve_delegated([], [span('Read', 6, 6), span('Edit', 10, 6)])
+
+		expect(resolved.map((one) => [one.label, one.duration_ms])).toStrictEqual([
+			['Read', 6 * MINUTE_MS],
+			['Edit', 4 * MINUTE_MS],
+		])
+	})
+
+	// Which unit keeps a shared minute has no true answer, so the requirement is that the answer never
+	// depends on the order the transcript directory happened to list the unit files in.
+	it('does not depend on the order the unit transcripts were read in', () => {
+		const units = [span('Read', 6, 6), span('Edit', 10, 6)]
+		const forward = time_overlap.resolve_delegated([], units)
+
+		expect(time_overlap.resolve_delegated([], units.toReversed())).toStrictEqual(forward)
+	})
+
+	// The guarantee joshuafolkken/kit#1285 fixed and this must not disturb: units that overlap nothing
+	// come back out of the reconciliation exactly as they went in.
+	it('leaves sequential units untouched', () => {
+		const units = [span('Read', 4, 4), span('Edit', 6, 2)]
+
+		expect(time_overlap.resolve_delegated([], units)).toStrictEqual(units)
+	})
+
+	// Two units with the very same interval leave the comparator no instant to separate them, and a
+	// stable sort then makes the survivor whichever transcript file had the older mtime.
+	it('keeps the same unit when two share an interval exactly', () => {
+		const units = [span('Read', 6, 6), span('Edit', 6, 6)]
+		const forward = time_overlap.resolve_delegated([], units)
+
+		expect(time_overlap.resolve_delegated([], units.toReversed())).toStrictEqual(forward)
+	})
+})
+
+// Two transcript lines really can share a millisecond, and a span of no duration is what that
+// produces. It covers nothing and is covered by nothing, so it has to survive on both sides of the
+// subtraction — and it must not cut anything in half.
+describe('time_overlap.resolve_delegated — spans of no duration', () => {
+	it('keeps a delegated span of no duration rather than trimming it away', () => {
+		const resolved = time_overlap.resolve_delegated([], [span('Read', 4, 4), span('Edit', 2, 0)])
+
+		expect(resolved.map((one) => one.label)).toContain('Edit')
+	})
+
+	// The parent half, which is the common one: without it a transcript's turn count would depend on
+	// whether the session happened to have a `subagents/` directory.
+	it('keeps a parent span of no duration when the session delegated', () => {
+		const parent = [span('Mark', 5, 0), span('Bash: git', 9, 2)]
+		const resolved = time_overlap.resolve_delegated(parent, [span('Read', 3, 3)])
+
+		expect(resolved.map((one) => one.label)).toContain('Mark')
+	})
+
+	// The walk emits the gap in front of every interval it consumes, so an instant with no length
+	// reports one parent tool call as two with the minutes still adding up.
+	it('does not split the span that encloses a delegated instant in two', () => {
+		const resolved = time_overlap.resolve_delegated([span('Agent', 10, 10)], [span('Mark', 5, 0)])
+
+		expect(resolved.filter((one) => one.label === 'Agent')).toHaveLength(1)
 	})
 })
 

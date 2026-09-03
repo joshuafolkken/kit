@@ -131,6 +131,32 @@ describe('time_corpus.collect_issue_spans on a delegated run', () => {
 	})
 })
 
+// The two overlaps that have no parent-unit relation to resolve them (joshuafolkken/kit#1287). Both
+// break the guarantee the arithmetic exists for: the shares stop reconstructing the elapsed time.
+describe('time_corpus.collect_issue_spans on transcripts that overlap without a parent-unit relation', () => {
+	// One session running two units at once. Each unit's spans were kept whole, so the wall clock they
+	// shared was counted once per unit while the parent's bracketing span was trimmed by both.
+	it('counts wall clock two concurrent units of one session share once', () => {
+		write_session('parent', fixture.delegating_lines())
+		write_unit('parent', 'agent-a1', fixture.issue_lines(0))
+		write_unit('parent', 'agent-a2', fixture.concurrent_lines())
+
+		expect(fixture.total_span_ms(collect().spans)).toBe(THREE_MINUTES_MS)
+	})
+
+	// Resume or fork copies the earlier lines into a new transcript, and the copy has no `subagents/`
+	// of its own. The original's `Agent` span is trimmed away by the units that cover it while the copy
+	// survives whole, and the trim changed the key the two would have been folded by — so three minutes
+	// were reported as six.
+	it('counts a resumed copy of the parent wait once, beside the units that cover it', () => {
+		write_session('parent', fixture.delegating_lines())
+		write_unit('parent', 'agent-a1', fixture.issue_lines(0))
+		write_session('resumed', fixture.delegating_lines())
+
+		expect(fixture.total_span_ms(collect().spans)).toBe(THREE_MINUTES_MS)
+	})
+})
+
 // The whole point of the module: an epic of N children reads the corpus once, not N times
 // (joshuafolkken/kit#1284).
 function count_reads(issue_numbers: ReadonlyArray<number>): number {
