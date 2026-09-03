@@ -24,23 +24,47 @@ const FILE_C = 'c.ts'
 const EDITED = 'edited'
 const VERIFIED = 'Already verified'
 const NOT_VERIFIED = 'Not verified'
+const RUNNING = 'Running now'
+// The second record's own timestamp, so a test can tell which of the two a line was composed from.
+const STARTED_AT = '2026-09-03T02:00:00.000Z'
 
-function stamp_of(files: Record<string, string>): FileMapStamp {
+type Tree = Record<string, string>
+
+function stamp_of(files: Tree): FileMapStamp {
 	return { taken_at: TAKEN_AT, files }
+}
+
+// A marker asserts a live process, so the fixture carries this one: without a pid the reader answers
+// "not running", which is the stale case rather than the running one.
+function started_stamp_of(files: Tree): FileMapStamp {
+	return { taken_at: STARTED_AT, files, pid: process.pid }
+}
+
+// A pid above every platform's ceiling, so the liveness probe can only report it gone. Reusing a real
+// one that has exited would be a race against the operating system reassigning it.
+const DEAD_PID = 2_147_483_646
+
+function stale_stamp_of(files: Tree): FileMapStamp {
+	return { taken_at: STARTED_AT, files, pid: DEAD_PID }
 }
 
 function compose(input: {
 	round: number
 	tree: Record<string, string>
 	gate?: FileMapStamp
+	in_flight?: FileMapStamp
 	round_one?: FileMapStamp
 }): string {
 	return review_brief.compose({
 		level: LEVEL,
 		round: input.round,
 		tree: input.tree,
-		stamps: { gate: input.gate, round_one: input.round_one },
+		stamps: { gate: input.gate, in_flight: input.in_flight, round_one: input.round_one },
 	})
+}
+
+function gate_line(input: { gate?: FileMapStamp; in_flight?: FileMapStamp }, tree: Tree): string {
+	return review_brief.gate_line({ gate: input.gate, in_flight: input.in_flight }, tree)
 }
 
 describe('review_brief.compose — the level stays first', () => {
@@ -59,7 +83,7 @@ describe('review_brief.gate_line — never claims a gate that did not run on thi
 	const tree = { [FILE_A]: 'x', [FILE_B]: 'y' }
 
 	it('claims green when the stamp covers exactly this tree', () => {
-		const line = review_brief.gate_line(stamp_of(tree), tree)
+		const line = gate_line({ gate: stamp_of(tree) }, tree)
 
 		expect(line).toContain(VERIFIED)
 		expect(line).toContain(TAKEN_AT)
@@ -68,20 +92,84 @@ describe('review_brief.gate_line — never claims a gate that did not run on thi
 	// The whole reason the record carries digests: a gate that passed before the fixes says nothing
 	// about the tree the review is about to read.
 	it('refuses to claim green when a file changed after the gate', () => {
-		const line = review_brief.gate_line(stamp_of(tree), { ...tree, [FILE_A]: EDITED })
+		const line = gate_line({ gate: stamp_of(tree) }, { ...tree, [FILE_A]: EDITED })
 
 		expect(line).toContain(NOT_VERIFIED)
 		expect(line).not.toContain(VERIFIED)
 	})
 
 	it('refuses to claim green when a file was added after the gate', () => {
-		expect(review_brief.gate_line(stamp_of(tree), { ...tree, [FILE_C]: 'new' })).toContain(
+		expect(gate_line({ gate: stamp_of(tree) }, { ...tree, [FILE_C]: 'new' })).toContain(
 			NOT_VERIFIED,
 		)
 	})
 
 	it('refuses to claim green when there is no record at all', () => {
-		expect(review_brief.gate_line(undefined, tree)).toContain(NOT_VERIFIED)
+		expect(gate_line({}, tree)).toContain(NOT_VERIFIED)
+	})
+})
+
+// joshuafolkken/kit#1242: the gate and the review are started together, so at the moment the brief is
+// composed the checks are usually still running. Without a third state that is indistinguishable from
+// "no gate was ever run", and the review agent re-runs the unit suite the gate is running beside it —
+// the exact cost joshuafolkken/kit#1241 had just removed.
+describe('review_brief.gate_line — a gate still running is its own state', () => {
+	const tree = { [FILE_A]: 'x', [FILE_B]: 'y' }
+
+	it('says a gate is running when the marker covers exactly this tree', () => {
+		const line = gate_line({ in_flight: started_stamp_of(tree) }, tree)
+
+		expect(line).toContain(RUNNING)
+		expect(line).toContain(STARTED_AT)
+	})
+
+	// The distinction the whole state exists for. A gate that has not finished has no result, so the
+	// sentence forbids the re-run without asserting a pass — and a reader scanning for "verified"
+	// must not find it here.
+	it('claims no result while the gate is running', () => {
+		const line = gate_line({ in_flight: started_stamp_of(tree) }, tree)
+
+		expect(line).not.toContain(VERIFIED)
+		expect(line).toContain('Nothing here claims any of them are green')
+	})
+
+	// A marker left behind by a gate that ended before these edits describes a different tree, and the
+	// safe answer is the same one a stale green stamp gets.
+	it('falls back to not-verified when the marker predates an edit', () => {
+		const line = gate_line({ in_flight: started_stamp_of(tree) }, { ...tree, [FILE_A]: EDITED })
+
+		expect(line).toContain(NOT_VERIFIED)
+		expect(line).not.toContain(RUNNING)
+	})
+
+	// A proven result outranks a running one. The tree has not moved, so the green stamp is still true
+	// and a second gate over it can only reach the same answer.
+	it('prefers a matching green stamp over a running gate', () => {
+		const line = gate_line({ gate: stamp_of(tree), in_flight: started_stamp_of(tree) }, tree)
+
+		expect(line).toContain(VERIFIED)
+		expect(line).not.toContain(RUNNING)
+	})
+
+	it('reaches the composed brief', () => {
+		expect(compose({ round: 1, tree, in_flight: started_stamp_of(tree) })).toContain(RUNNING)
+	})
+
+	// `josh gate` clears the marker in a `finally`, and a `finally` does not run when the gate is
+	// killed — Ctrl-C, Stop, SIGTERM. The file is then left behind describing the very tree it was
+	// reading, so the digests still match and only the process is gone; believed on the digests alone
+	// the brief would report a gate running for as long as nobody edits that tree.
+	it('falls back to not-verified when the marker outlived the gate that wrote it', () => {
+		const line = gate_line({ in_flight: stale_stamp_of(tree) }, tree)
+
+		expect(line).toContain(NOT_VERIFIED)
+		expect(line).not.toContain(RUNNING)
+	})
+
+	// A record written before the pid existed cannot be checked for liveness, so it is read as stale
+	// rather than trusted — the same direction every other missing record takes.
+	it('falls back to not-verified when the marker carries no process at all', () => {
+		expect(gate_line({ in_flight: stamp_of(tree) }, tree)).toContain(NOT_VERIFIED)
 	})
 })
 
