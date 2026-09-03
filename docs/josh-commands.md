@@ -37,7 +37,7 @@ Each block's header names the command that ran, not only the check, because the 
 
 **Three of the four checks read a cache, so a second run only looks at what changed** ([#1256](https://github.com/joshuafolkken/kit/issues/1256)). eslint has had one from the start; the spell check now runs `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`, and the type check — **on a project that falls through to `pnpm josh check`**, which is kit itself and any plain TypeScript project — `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`. Together those two went from 6.9s and 3.6s of CPU to 1.9s and 0.9s. On a project whose type check resolves to a toolkit command (`josh-app check:ci`, below) that step is app-kit's or game-kit's to cache, so three of the four checks are cached here and two of the four there. **Neither cache needs an invalidation rule of its own**: `tsc` stores the compiler options in the build-info file and re-checks everything when they differ, and `cspell` stores a content hash of every config and dictionary file it loaded, so editing `tsconfig.json` or `cspell.config.yaml` invalidates what it should — measured at 3.3s and a full 845-file rescan respectively, against 1.0s and 0.8s warm. CI restores only the eslint cache (`Setup ESLint cache` in `.github/workflows/ci.yml`, keyed on the lockfile and the eslint config); the other two start every run cold, which is why neither needs a cache-busting key there. The three cache files — `.eslintcache`, `.tsbuildinfo`, `.cspellcache` — are in the `.gitignore` `josh sync` merges into a consumer project, which also keeps them out of `prettier --check .`. **They are named in the distributed `cspell/index.yaml` `ignorePaths` as well**, and not only left to `useGitignore`: the flags that write them arrive with the package, while the `.gitignore` entries arrive on the consumer's next `josh sync`, so a consumer that upgraded and ran `pnpm josh gate` first had `josh cspell:dot` spell-check the build-info file `josh check` had just written — 125 issues, with nothing misspelled in the tree.
 
-**That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat.
+**That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat. **The unit check that loop repeats is [`josh test:related`](#josh-testrelated)**, which runs the tests related to the changed files instead of all of them ([#1257](https://github.com/joshuafolkken/kit/issues/1257)); the gate itself keeps running `josh test:unit` over the whole suite.
 
 **Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent or the project has no tests, and a gate that ran zero tests must not look like one that ran them all), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
 
@@ -138,6 +138,43 @@ present, it runs `vitest run` as usual.
 ```bash
 pnpm josh test:unit
 ```
+
+### `josh test:related`
+
+Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits ([#1257](https://github.com/joshuafolkken/kit/issues/1257)).
+
+```bash
+pnpm josh test:related                     # alias: josh tr
+pnpm josh test:related scripts/thing.ts    # narrow by the given files instead
+pnpm josh test:related --silent            # flags are forwarded to vitest
+```
+
+**A forwarded flag that takes a value is written `--flag=value`.** Anything not starting with `-` is read as a file to narrow by, so `--reporter verbose` would hand `verbose` to the narrowing — which then reports `verbose` as an argument it could not use and runs the **whole** suite — and a valueless `--reporter` to vitest; `--reporter=verbose` reaches vitest whole. An argument that is not a file this can relate a test to is named on the console rather than dropped, so a typo is visible instead of being answered with "nothing to narrow by".
+
+The changed files are the branch diff plus the untracked files beside it — the same reading `josh review:level`, `josh eval:scope` and `josh review:brief` decide from, so what this narrows by is what those commands call the change. The set is then handed to `vitest related`, which runs every test file whose module graph reaches one of them. Measured warm on kit: 384 files and 6,616 tests in 13.9s (110s of CPU) for the whole suite, against 31 files and 566 tests in 2.4s (7.9s of CPU) for a one-file change — and 110s of CPU is 84% of everything the gate's four checks spend.
+
+**It prints what it narrowed by before it runs**, so a scoped run is never read as a whole one:
+
+```
+josh test:related: 2 changed file(s) — running only the tests related to them.
+  - scripts/test-related.ts
+  - scripts/test-related-scope.ts
+```
+
+**It is added in front of the whole suite, never in place of it.** A test that breaks without importing what changed — a marker suite reading a document, a fixture compared against a generated file — is invisible to a module graph. The verification gate therefore still runs `josh test:unit` over everything before the commit, and that full run is what a merge rests on.
+
+**Two things make it fall back to the whole suite rather than run nothing**, and the printed line says which happened:
+
+| What happened                                                                     | What runs                                                    |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| The changed files could not be read (no repository, a failing git)                | The whole suite — `the changed files could not be read`      |
+| Nothing changed, or no changed file is one a test can import (a `.md`, a `.yaml`) | The whole suite — `no changed file is one a test can import` |
+
+The two are separate answers on purpose: an empty list is a change this cannot narrow by, an unreadable one is a change nobody read, and collapsing them would hide the second. A deleted path is dropped from the set for the same reason — it counts towards a narrowed run while contributing no test to it.
+
+A narrowed run can still match no test file — a new module nothing imports yet is the usual case. vitest prints `No test files found` and exits 0, which the gate's full run answers for a few minutes later.
+
+Like `josh test:unit`, it skips gracefully (exit 0) when `vitest` is not installed or the project has no test files, and says so naming itself.
 
 ### `josh test:e2e`
 

@@ -9,6 +9,7 @@ words:
   - dedup
   - keepalive
   - refspec
+  - pathspec
   - issuecomment
   - frontmatter
   - toolkits

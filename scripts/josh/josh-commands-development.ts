@@ -79,6 +79,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run unit tests with Vitest (skips when absent or no test files)',
 		category: 'Development',
 	},
+	'test:related': {
+		script: 'scripts/test-related.ts',
+		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
+		category: 'Development',
+	},
 	'test:watch': {
 		shell: [...PE, 'vitest', 'watch'],
 		description: 'Run unit tests in watch mode',
