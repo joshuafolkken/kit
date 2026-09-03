@@ -6,6 +6,11 @@ words:
   # cspell's dictionaries do not derive one from the other.
   - rescan
   - rescanned
+  # The shell builtins `josh time` walks past when it names the command a Bash call actually ran
+  # (joshuafolkken/kit#1267). They reach no distributed file, so they stay in this local list.
+  - pushd
+  - popd
+  - subshell
   - dedup
   - keepalive
   - refspec

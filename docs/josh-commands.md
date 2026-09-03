@@ -1455,6 +1455,46 @@ Context composition (blocks written to this session's transcript; estimated exce
 
 **Nothing is ever silently zero.** An absent transcript exits non-zero and says where it looked — for every scope, `--all` and `--issue` included; a scope with no requests attributed says so in words rather than printing a table of zeroes; a model the price table does not know is reported as unpriced and the total is labelled a floor; and lines that could not be read are counted and printed. Locally generated `<synthetic>` assistant messages are skipped — they were never sent to the API, so counting them would inflate the request count.
 
+### `josh time`
+
+Report where a run's wall clock went, read from the same transcripts `josh cost` prices ([#1267](https://github.com/joshuafolkken/kit/issues/1267)).
+
+```bash
+pnpm josh time                  # the newest session — the run that just finished; alias: josh tm
+pnpm josh time --session <id>   # one named session
+pnpm josh time --json           # the same figures, machine-readable
+```
+
+Every issue filed to make `fullrun` faster has come out of a **hand measurement**: the session record restored by eye, a throwaway script written for that one run, and a classification that differed from the last one. `josh cost` reads what a run was billed and there was nothing on the other axis, so "did that change make a run shorter?" had no answer anyone could compare across two runs.
+
+```
+session ae2f13dc-fb54-4add-943e-64976ff44f08 — 73.3 min elapsed
+
+Where the wall clock went:
+  model wait              24.2 min   33.0%
+  tool execution          20.3 min   27.6%
+  human wait              28.8 min   39.4%
+
+By tool (descending):
+  Bash: pnpm               7.8 min   15 call(s)
+  Skill                    5.7 min   4 call(s)
+  Edit                     1.7 min   34 call(s)
+  …
+
+By josh command (descending):
+  josh gate                5.9 min   14 call(s)
+  josh followup            1.7 min   1 call(s)
+  …
+```
+
+**The partition is by gap, not by pair.** Every span is the interval between two consecutive dated lines, classified by the **later** one: a span ending at an assistant line is model wait, one ending at a tool result is that tool's execution, one ending at a typed prompt is human wait. So the three shares reconstruct the elapsed time **exactly**, and a reader can check them instead of trusting them. Pairing each `tool_use` with its own `tool_result` instead would double-count parallel calls and leave the shares summing to more than the run took — which is the property that makes two runs comparable.
+
+**One run is not a sample.** [#1262](https://github.com/joshuafolkken/kit/issues/1262) recorded "tool execution 59% / model 39%" from a single hand-measured run; three real sessions measured by this command put tool execution at 25–40% and human wait at 17–44%. All three of the sessions [#1267](https://github.com/joshuafolkken/kit/issues/1267) restored by hand reproduce here to within 0.4 points.
+
+**A Bash call is bundled under the command it actually runs.** Taking the literal first word put `Bash: cd` at the top of every table — 82 calls and 12.1 minutes of one measured session, naming the one part of the command that did no work — so the chain is split into segments and each segment walked **word by word** past its `VAR=…` assignments and its wrappers (`time`, `env`, `sudo`) to the command position. A segment that only navigates (`cd`, `export`, `source`) runs nothing and yields no name, and a call nothing could be named for stays under the bare `Bash` rather than under the word that was rejected. `pnpm josh <cmd>` invocations get a second table of their own, keyed by subcommand and read **only at a segment's command position** — searched loosely, `git commit -m "ran pnpm josh gate"` was charged to `josh gate`, and this repository's own commit messages name subcommands constantly.
+
+**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row.
+
 ### `josh eval`
 
 Run the agent rule-compliance scenarios and report how many held.

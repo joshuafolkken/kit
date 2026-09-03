@@ -138,6 +138,26 @@ function read_raw(file: SessionFile): string {
 	return read_text(file.path) ?? ''
 }
 
+// What to say when the discovery above found nothing. It lives here rather than in either command
+// because both `josh cost` and `josh time` reach it, and a second copy would drift the moment one of
+// them learned something about where transcripts live (joshuafolkken/kit#1267). The message, not the
+// printing: each command owns its own streams and exit code.
+//
+// **The directory is passed in, not resolved here.** The whole point of the message is to name where
+// the command looked, so it has to be the same string the search used — resolving it a second time
+// can name a directory that was never searched.
+//
+// "No transcript was found" and "this run cost nothing" are different answers, and only one of them
+// is ever true — which is why neither command may report an empty corpus as a zero.
+function missing_message(directory: string, session_id: string | undefined): Array<string> {
+	if (session_id !== undefined) return [`No transcript named ${session_id} under ${directory}`]
+
+	return [
+		`No transcripts found under ${directory}`,
+		'Claude Code writes them per project; run this from the project it ran in.',
+	]
+}
+
 const cost_transcript = {
 	TRANSCRIPT_EXTENSION,
 	project_slug,
@@ -146,6 +166,7 @@ const cost_transcript = {
 	tally,
 	read_session,
 	read_raw,
+	missing_message,
 }
 
 export type { SessionFile, SessionUsage }
