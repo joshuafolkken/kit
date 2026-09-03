@@ -64,6 +64,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",
 		category: 'AI tools',
 	},
+	time: {
+		script: 'scripts/time/time-cli.ts',
+		description: "Report where a run's wall clock went: model wait, tool execution, human wait",
+		category: 'AI tools',
+	},
 	'review:level': {
 		script: 'scripts/review/review-level-cli.ts',
 		description: 'Print the /code-review level this change is reviewed at',
