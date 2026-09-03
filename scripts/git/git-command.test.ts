@@ -69,6 +69,35 @@ describe('the path listings turn git path quoting off', () => {
 	)
 })
 
+// joshuafolkken/kit#1257: `git diff --name-only` answers for the whole tree in root-relative paths,
+// and `git ls-files --others` answers for the current directory in cwd-relative ones. Read from a
+// subdirectory the two halves of one change therefore disagreed, and a caller joining them onto the
+// repository root resolved a new file to a path that does not exist — or to a different file with
+// the same tail.
+describe('the diff listings pin the paths to the repository root', () => {
+	it.each(['diff_main_names', 'diff_cached_names'] as const)(
+		'%s asks git to ignore diff.relative',
+		async (name) => {
+			const { git_command } = await import('./git-command')
+
+			await git_command[name]()
+
+			expect(execa_mock.state.last_arguments).toContain('--no-relative')
+		},
+	)
+})
+
+describe('git_command.untracked_names', () => {
+	it('asks for the whole tree in repository-root-relative paths', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.untracked_names()
+
+		expect(execa_mock.state.last_arguments).toContain('--full-name')
+		expect(execa_mock.state.last_arguments).toContain(':/')
+	})
+})
+
 describe('git_command.diff_cached', () => {
 	it(SUCCEEDS_TEST, async () => {
 		execa_mock.state.stdout = DIFF_OUTPUT

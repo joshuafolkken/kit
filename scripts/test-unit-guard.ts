@@ -51,8 +51,12 @@ function has_unit_tests(project_directory: string): boolean {
 	return matches.length > 0
 }
 
-async function run_vitest(extra_arguments: ReadonlyArray<string>): Promise<number> {
-	const result = await execa(PNPM, ['exec', 'vitest', 'run', ...extra_arguments], {
+// The whole vitest invocation after the binary, not just the flags: `josh test:related` runs
+// `vitest related <files> --run` where this command runs `vitest run`, and the two must not grow
+// two copies of the guard, the spawn or the skip notice around that one difference
+// (joshuafolkken/kit#1257).
+async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<number> {
+	const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments], {
 		stdio: 'inherit',
 		reject: false,
 	})
@@ -60,18 +64,41 @@ async function run_vitest(extra_arguments: ReadonlyArray<string>): Promise<numbe
 	return result.exitCode ?? FAIL_EXIT_CODE
 }
 
-async function run_guarded_unit(
+// The label names the command the notice is printed for, so a skipped scoped run says
+// `josh test:related` rather than reporting itself as the full suite. `SKIP_MARKER` is unchanged
+// either way: the gate reads that word, never the label.
+const UNIT_COMMAND_LABEL = 'test:unit'
+
+// `announcement` is printed only on the branch that actually spawns vitest. A caller that wrote it
+// itself would claim a run before this guard had decided there would be one — the same "a passing
+// step did not actually run" ambiguity `SKIP_MARKER` exists for, reintroduced one layer up
+// (joshuafolkken/kit#1257).
+async function run_guarded_vitest(
 	project_directory: string,
-	extra_arguments: ReadonlyArray<string>,
+	vitest_arguments: ReadonlyArray<string>,
+	command_label: string = UNIT_COMMAND_LABEL,
+	announcement?: string,
 ): Promise<number> {
 	const is_installed = is_vitest_installed(project_directory)
 	const has_tests = has_unit_tests(project_directory)
 	const action = resolve_guard_action(is_installed, has_tests)
-	if (action === 'run') return await run_vitest(extra_arguments)
 
-	console.info(`josh test:unit: ${SKIP_REASONS[action]} ${SKIP_MARKER} vitest unit tests.`)
+	if (action === 'run') {
+		if (announcement !== undefined) process.stdout.write(`${announcement}\n`)
+
+		return await run_vitest(vitest_arguments)
+	}
+
+	console.info(`josh ${command_label}: ${SKIP_REASONS[action]} ${SKIP_MARKER} vitest unit tests.`)
 
 	return 0
+}
+
+async function run_guarded_unit(
+	project_directory: string,
+	extra_arguments: ReadonlyArray<string>,
+): Promise<number> {
+	return await run_guarded_vitest(project_directory, ['run', ...extra_arguments])
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -87,6 +114,7 @@ const test_unit_guard = {
 	is_vitest_installed,
 	has_unit_tests,
 	run_guarded_unit,
+	run_guarded_vitest,
 }
 
 export type { GuardAction }

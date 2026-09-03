@@ -101,6 +101,13 @@ async function diff_main(file_path: string): Promise<string> {
 // so the quoting is turned off at the source all three readers share (joshuafolkken/kit#907).
 const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
 
+// Repository-root-relative paths, whatever the checkout is configured to prefer. `diff.relative` is
+// a per-repository setting a person may have turned on for their own reading, and with it `git diff
+// --name-only` run from a subdirectory prints cwd-relative paths — which every caller of this
+// reading then joins onto the repository root (joshuafolkken/kit#1257). The flag pins the spelling
+// at the source rather than leaving each caller to discover the configuration.
+const NO_RELATIVE_PATHS = '--no-relative'
+
 async function diff_main_names(): Promise<string> {
 	const default_branch = await get_default_branch()
 
@@ -108,24 +115,44 @@ async function diff_main_names(): Promise<string> {
 		...NO_PATH_QUOTING,
 		'diff',
 		NAME_ONLY_FLAG,
+		NO_RELATIVE_PATHS,
 		default_branch,
 		'--',
 	])
 }
 
 async function diff_cached_names(): Promise<string> {
-	return await exec_git_command_read([...NO_PATH_QUOTING, 'diff', '--cached', NAME_ONLY_FLAG])
+	return await exec_git_command_read([
+		...NO_PATH_QUOTING,
+		'diff',
+		'--cached',
+		NAME_ONLY_FLAG,
+		NO_RELATIVE_PATHS,
+	])
 }
 
 // Files git is not tracking yet. `git diff` never lists them, so a classifier built on the diff
 // alone sees a change that adds a whole new module as an empty one — which is how a run adding new
 // code could have been handed a reduced review level (joshuafolkken/kit#966).
+//
+// **`--full-name` and the `:/` pathspec are what make this reading agree with the diff beside it**
+// (joshuafolkken/kit#1257). `git diff --name-only` prints repository-root-relative paths for the
+// whole tree wherever it is run; `git ls-files --others` prints *cwd*-relative paths and lists only
+// what is below cwd. Read from a subdirectory, the two halves of `changed_paths` therefore came
+// back in two different coordinate systems, and every caller that resolves a path against the
+// repository root — `review-tree`, `josh test:related` — turned a new file into one that does not
+// exist, or, where the same tail exists elsewhere in the tree, into a different file entirely. The
+// pathspec restores the whole tree; the flag restores the root-relative spelling.
+const WHOLE_TREE_PATHSPEC = ':/'
+
 async function untracked_names(): Promise<string> {
 	return await exec_git_command_read([
 		...NO_PATH_QUOTING,
 		'ls-files',
 		'--others',
 		'--exclude-standard',
+		'--full-name',
+		WHOLE_TREE_PATHSPEC,
 	])
 }
 

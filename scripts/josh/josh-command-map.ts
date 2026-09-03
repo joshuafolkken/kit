@@ -40,6 +40,7 @@ const ALIASES: Record<string, string> = {
 	sd: 'cspell:dot',
 	t: 'test',
 	tu: 'test:unit',
+	tr: 'test:related',
 	tw: 'test:watch',
 	tui: 'test:ui',
 	te: 'test:e2e',

@@ -123,6 +123,44 @@ describe('test_unit_guard.run_guarded_unit — skip paths', () => {
 	})
 })
 
+// joshuafolkken/kit#1257: `josh test:related` prints what it narrowed by, and printing it before
+// this guard has decided there will be a run would announce a run that never happens.
+describe('test_unit_guard.run_guarded_vitest — the announcement', () => {
+	const ANNOUNCEMENT = 'narrowed to 2 files'
+	const RELATED_LABEL = 'test:related'
+
+	it('is withheld when the guard skips', async () => {
+		const write_spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await test_unit_guard.run_guarded_vitest(
+			ctx.project_directory,
+			['run'],
+			RELATED_LABEL,
+			ANNOUNCEMENT,
+		)
+
+		expect(write_spy).not.toHaveBeenCalled()
+	})
+
+	it('is printed when vitest is about to run', async () => {
+		add_vitest_package()
+		add_unit_file(UNIT_FILE)
+		mocked_execa.mockResolvedValue(fake_result(0))
+		const write_spy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		await test_unit_guard.run_guarded_vitest(
+			ctx.project_directory,
+			['run'],
+			RELATED_LABEL,
+			ANNOUNCEMENT,
+		)
+
+		expect(write_spy).toHaveBeenCalledWith(`${ANNOUNCEMENT}\n`)
+	})
+})
+
 describe('test_unit_guard.run_guarded_unit — run path', () => {
 	beforeEach(() => {
 		add_vitest_package()
