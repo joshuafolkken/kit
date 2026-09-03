@@ -1,4 +1,5 @@
 import { execa, execaSync } from 'execa'
+import { has_timed_out } from './git-execa-error'
 import { check_gh_installed } from './git-gh-check'
 
 const BODY_FROM_STDIN = '-'
@@ -75,14 +76,11 @@ function has_stdout_field(error: unknown): error is Error & { stdout: string } {
 	return error instanceof Error && 'stdout' in error && typeof error.stdout === 'string'
 }
 
-// execa marks a spawn it killed on the timeout, which is the only reliable way to tell one from any
-// other non-zero exit — gh writes nothing of its own when it is killed.
-function has_timed_out_field(error: unknown): error is Error & { timedOut: boolean } {
-	return error instanceof Error && 'timedOut' in error && typeof error.timedOut === 'boolean'
-}
-
+// `has_timed_out` is shared with the push transport rather than restated here: execa marks a spawn
+// it killed the same way whichever binary was spawned, and `git push` gained a budget of its own in
+// joshuafolkken/kit#1251.
 function to_timeout_prefix(error: unknown): string {
-	return has_timed_out_field(error) && error.timedOut ? `${GH_REQUEST_TIMEOUT_MESSAGE}: ` : ''
+	return has_timed_out(error) ? `${GH_REQUEST_TIMEOUT_MESSAGE}: ` : ''
 }
 
 function to_error_message(error: unknown): string {

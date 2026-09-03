@@ -1,6 +1,7 @@
 import { execa } from 'execa'
 import { git_utilities } from './constants'
-import { get_exit_code } from './git-execa-error'
+import { create_spawn_error, get_exit_code } from './git-execa-error'
+import { git_push_transport } from './git-push-transport'
 
 async function exec_git_command_read(arguments_: Array<string>): Promise<string> {
 	const git_cmd = git_utilities.get_git_command_for_spawn()
@@ -10,13 +11,6 @@ async function exec_git_command_read(arguments_: Array<string>): Promise<string>
 	const { stdout } = await execa(git_cmd, arguments_) // NOSONAR
 
 	return stdout.trimEnd()
-}
-
-function create_spawn_error(command: string, exit_code: number | undefined): Error {
-	const exit_code_string = exit_code === undefined ? 'unknown' : String(exit_code)
-	const error_message = `git ${command} exited with code ${exit_code_string}`
-
-	return new Error(error_message, { cause: { exit_code: exit_code_string } })
 }
 
 async function exec_git_command_with_output(
@@ -188,13 +182,17 @@ function is_upstream_not_set_error(error: unknown): boolean {
 	return cause !== undefined && is_exit_code_128(cause)
 }
 
+// Both pushes go through `git_push_transport` rather than `exec_git_command_with_output`, which is
+// what gives them a timeout and an SSH keepalive the local git commands beside them do not need
+// (joshuafolkken/kit#1251). The thrown error keeps the same `cause.exit_code` shape, so the 128
+// fallback below reads it exactly as it did.
 async function push_with_upstream(branch_name: string): Promise<void> {
-	await exec_git_command_with_output('push', ['--set-upstream', 'origin', branch_name])
+	await git_push_transport.push(['--set-upstream', 'origin', branch_name])
 }
 
 async function push(): Promise<void> {
 	try {
-		await exec_git_command_with_output('push', [])
+		await git_push_transport.push([])
 	} catch (error) {
 		if (is_upstream_not_set_error(error)) {
 			const current_branch = await branch()
