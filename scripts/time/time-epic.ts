@@ -5,6 +5,7 @@ import { time_instant } from './time-instant'
 import { time_pull_index } from './time-pull-index'
 import type { CategoryTotals, TimeReport } from './time-report'
 import { time_run } from './time-run'
+import { time_spans } from './time-spans'
 
 // A whole `epicrun`, child by child (joshuafolkken/kit#1271).
 //
@@ -101,7 +102,7 @@ const NO_TREND: EpicTrend = {
 // CI wait, a transcript with no merge is a run that did not finish, and neither is a child that was
 // never started here.
 function status_of(report: TimeReport): ChildStatus {
-	const has_spans = report.span_count > NONE
+	const has_spans = time_spans.has_transcript_data(report.span_count)
 
 	if (report.has_ci_data) return has_spans ? MEASURED : NO_TRANSCRIPT
 
@@ -300,7 +301,9 @@ function to_epic_report(
 		children: ordered,
 		total_ms: total_elapsed_ms(ordered),
 		categories: total_categories(ordered),
-		has_transcript_data: ordered.some((row) => row.report.span_count > NONE),
+		has_transcript_data: ordered.some((row) =>
+			time_spans.has_transcript_data(row.report.span_count),
+		),
 		has_ci_data: ordered.some((row) => row.report.has_ci_data),
 		timed_count: ordered.length - count_status(ordered, NOT_RUN),
 		measured_count: count_status(ordered, MEASURED),
