@@ -20,7 +20,6 @@ const NO_CHILDREN =
 	'the epic body tracks no children as task-list rows, so there is nothing to time'
 const NO_TREND_LINE = '  not enough children recorded a turn to say whether it is rising'
 const NO_TRANSCRIPT_SHARES = 'CI wait only — no session transcript is attributed to this child'
-const NOT_MEASURED = 'not measured'
 
 // The share column of a child's row: the same four categories the batch total prints, in minutes,
 // so a long child can be read against the batch without opening `--json`.
@@ -84,14 +83,16 @@ function child_lines(report: EpicTimeReport): Array<string> {
 
 // **A share nobody read says so rather than totalling zero.** The batch totals are a sum over the
 // children, so a half no child contributed sums to `0.0 min` — which reads as "the batch spent no
-// time waiting on the model" when the truth is that no transcript was read at all.
+// time waiting on the model" when the truth is that no transcript was read at all. The row itself is
+// `time_report.unmeasured_row`, shared with the run scope since joshuafolkken/kit#1295 so one word
+// and one column rule answer this question at both scales.
 function category_row(
 	label: string,
 	duration_ms: number,
 	is_known: boolean,
 	total_ms: number,
 ): string {
-	if (!is_known) return time_report.format_columns(label, '', NOT_MEASURED)
+	if (!is_known) return time_report.unmeasured_row(label)
 
 	return time_report.format_row(label, duration_ms, time_report.format_share(duration_ms, total_ms))
 }
@@ -99,10 +100,10 @@ function category_row(
 function category_lines(report: EpicTimeReport): Array<string> {
 	const { categories, total_ms, has_transcript_data } = report
 	const rows: Array<[string, number, boolean]> = [
-		['model wait', categories.model_ms, has_transcript_data],
-		['tool execution', categories.tool_ms, has_transcript_data],
-		['human wait', categories.human_ms, has_transcript_data],
-		['CI wait', categories.ci_ms, report.has_ci_data],
+		[time_report.MODEL_LABEL, categories.model_ms, has_transcript_data],
+		[time_report.TOOL_LABEL, categories.tool_ms, has_transcript_data],
+		[time_report.HUMAN_LABEL, categories.human_ms, has_transcript_data],
+		[time_report.CI_LABEL, categories.ci_ms, report.has_ci_data],
 	]
 
 	return [

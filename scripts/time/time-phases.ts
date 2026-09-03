@@ -74,14 +74,15 @@ const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 
 // Neither is a boundary marker, so neither can fail to be found: `other` is the remainder, and `wait`
 // is read off the span's own category. A run nobody waited on genuinely waited zero minutes, which is
-// the one answer `not detected` must not be given for.
+// the one answer `not detected` must not be given for — so these two are detected whenever a
+// transcript was read at all, rather than on a marker.
 //
-// **`wait` is detected on exactly the terms the `human wait` category row is printed on**, which is
-// unconditionally — so a run with no transcript attributed shows `0.0 min` in both, and the two agree.
-// Withholding the phase there while the category above it still printed a zero would make one report
-// contradict itself, which is worse than the shared imprecision; whether *either* should be withheld
-// when nothing was read is a question about the whole table and predates this phase.
-const ALWAYS_DETECTED_PHASES: ReadonlySet<PhaseName> = new Set([WAIT_PHASE, OTHER_PHASE])
+// **They are withheld on exactly the terms the three transcript category rows are**
+// (joshuafolkken/kit#1295) — no span read at all. `wait` printing `0.0 min` where nothing was read
+// asserts that nobody waited, and the run that produces it is the one a reader is least able to check.
+// Keying both halves off the same criterion is also what keeps `wait` equal to the `human wait`
+// category row: the two are withheld together or printed together, never one of each.
+const SPAN_BACKED_PHASES: ReadonlySet<PhaseName> = new Set([WAIT_PHASE, OTHER_PHASE])
 
 const GATE_COMMAND = 'josh gate'
 const NO_DURATION = 0
@@ -132,6 +133,7 @@ interface Detection {
 	windows: Windows
 	totals: ReadonlyMap<PhaseName, number>
 	has_ci_data: boolean
+	has_transcript_data: boolean
 }
 
 function started_ms(span: Span): number {
@@ -295,13 +297,14 @@ function totals_of(spans: ReadonlyArray<Span>, windows: Windows): Map<PhaseName,
 	return totals
 }
 
-// `wait` and `other` are always detected because neither rests on a marker, and `ci` is detected
-// exactly when the GitHub half was read — the same flag the CI category row is withheld on, so the
-// two halves of the report cannot disagree about whether a merge was seen.
+// Each of the three rests on a different half being present rather than on a marker: `ci` on the
+// GitHub half, `wait` and `other` on the transcript half — the same two flags the matching category
+// rows are withheld on, so the two halves of the report cannot disagree about what was read.
 function is_marker_detected(phase: PhaseName, found: Detection): boolean {
 	if (phase === CI_PHASE) return found.has_ci_data
+	if (SPAN_BACKED_PHASES.has(phase)) return found.has_transcript_data
 
-	return ALWAYS_DETECTED_PHASES.has(phase) || found.totals.has(phase)
+	return found.totals.has(phase)
 }
 
 function is_detected(phase: PhaseName, found: Detection): boolean {
@@ -326,6 +329,7 @@ function build_phases(input: PhaseInput): Array<PhaseTotal> {
 		windows,
 		totals: totals_of(input.spans, windows),
 		has_ci_data: input.has_ci_data,
+		has_transcript_data: time_spans.has_transcript_data(input.spans.length),
 	}
 
 	return PHASE_ORDER.map((phase) => ({
