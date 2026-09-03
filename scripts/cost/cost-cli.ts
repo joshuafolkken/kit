@@ -204,14 +204,17 @@ function optional_measurement(
 	return { measurement: build_measurement(cwd, file, session) }
 }
 
-// One session — the newest by default, which is "the run that just finished".
+// One session — the newest by default, which is "the run that just finished". Which of the listing
+// that is is `cost_transcript`'s to say, because a delegated unit is part of a run rather than a run
+// of its own and it writes the newer file whenever a session delegates (joshuafolkken/kit#1285).
 //
 // Its missing counts are the session's own, never the corpus's. A malformed line in some unrelated
 // session is not missing data about *this* one, and reporting it as such attributes a defect to the
 // wrong run — the same misreading, one level up, that this command exists to stop.
 function report_session(corpus: Corpus, cwd: string): CostReport | undefined {
-	const [session] = corpus.sessions
-	const [file] = corpus.files
+	const index = cost_transcript.latest_own_index(corpus.files)
+	const session = corpus.sessions[index]
+	const file = corpus.files[index]
 
 	if (session === undefined || file === undefined) return undefined
 

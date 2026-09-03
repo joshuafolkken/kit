@@ -1,6 +1,7 @@
 import { cost_attribute } from '#scripts/cost/cost-attribute'
-import { cost_transcript } from '#scripts/cost/cost-transcript'
+import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
+import { time_overlap, type Interval } from './time-overlap'
 import { time_report, type LabelTotal, type TimeReport } from './time-report'
 import { time_spans, type Span } from './time-spans'
 
@@ -19,47 +20,8 @@ import { time_spans, type Span } from './time-spans'
 const MS_PER_MINUTE = 60_000
 const NO_SESSIONS = 0
 
-interface Interval {
-	started_ms: number
-	ended_ms: number
-}
-
-interface Walk {
-	cursor: number
-	uncovered: number
-}
-
-// One covered interval consumed. Every quantity is clamped into `[cursor, limit]` before it is used,
-// so the walk is monotone with no branches: an interval entirely behind the cursor contributes zero,
-// one past the limit contributes zero, and an overlapping one contributes only the gap in front of
-// it.
-function advance(walk: Walk, interval: Interval, limit: number): Walk {
-	const start = Math.min(Math.max(interval.started_ms, walk.cursor), limit)
-	const end = Math.min(Math.max(interval.ended_ms, walk.cursor), limit)
-
-	return { cursor: end, uncovered: walk.uncovered + (start - walk.cursor) }
-}
-
-// How much of `target` no interval in `covered` overlaps.
-//
-// **This subtraction is what keeps the four shares summing to the elapsed time.** `followup --merge`
-// waits for CI *inside* a Bash tool span, so most of a pull request's open→merge window is already
-// counted as tool execution; adding that window whole would report it twice and leave the shares
-// adding up to more than the run took — the one property that makes two runs comparable.
-function uncovered_ms(target: Interval, covered: ReadonlyArray<Interval>): number {
-	if (target.ended_ms <= target.started_ms) return 0
-
-	const sorted = [...covered].toSorted((left, right) => left.started_ms - right.started_ms)
-	let walk: Walk = { cursor: target.started_ms, uncovered: 0 }
-
-	for (const interval of sorted) walk = advance(walk, interval, target.ended_ms)
-
-	return walk.uncovered + (target.ended_ms - walk.cursor)
-}
-
-function to_interval(span: Span): Interval {
-	return { started_ms: span.ended_ms - span.duration_ms, ended_ms: span.ended_ms }
-}
+// The subtraction both halves of this file need — the CI wait below and the delegated units above —
+// is `time-overlap.ts`'s, so the same arithmetic answers both rather than being written twice.
 
 // A session that never wrote a line on the issue's branch can contribute nothing, because the
 // fill-forward walk only ever carries a branch that session actually declared. So the test is exact
@@ -88,8 +50,8 @@ function span_key(span: Span): string {
 
 // One session's spans folded in, answering whether it contributed anything the run had not already
 // counted. **That answer is what `session_count` is, and it is not the number of files**: a resumed
-// transcript is a copy of an earlier one, so counting files would print `2 session(s)` beside a span
-// total that correctly counted those spans once — the note contradicting the arithmetic beside it.
+// transcript is a copy of an earlier one, so counting files would print `2 transcript(s)` beside a
+// span total that correctly counted those spans once — the note contradicting the arithmetic.
 function absorb(seen: Map<string, Span>, spans: ReadonlyArray<Span>): boolean {
 	const before = seen.size
 
@@ -114,18 +76,80 @@ function values_of(seen: ReadonlyMap<string, Span>): Array<Span> {
 	return unique
 }
 
+// One session's transcripts: its own, and the delegated units it ran (joshuafolkken/kit#1285).
+//
+// **The two are kept apart because they overlap.** A session that delegates holds one `Agent` tool
+// span for the whole time the unit runs, and the unit's transcript records those same minutes as the
+// work it did; folding them together counts that wall clock twice and leaves the four shares adding
+// up to more than the run took.
+interface Collected {
+	own: Map<string, Span>
+	delegated: Map<string, Span>
+}
+
+// Two structures, because the grouping and the counting ask different questions. The subtraction is
+// per session; whether a transcript contributed anything is about the whole run, and a resumed
+// transcript is a copy of an earlier one whichever session it sits under.
+interface Collector {
+	by_session: Map<string, Collected>
+	counted: Map<string, Span>
+}
+
+// **Grouped by the session a transcript belongs with, not pooled.** A unit's work overlaps the wait
+// of the session that delegated it and nothing else, so subtracting every unit's interval from every
+// session's spans would delete real work: two sessions attributed to one issue can run at the same
+// wall clock — a batch in the background while someone works interactively — and the interactive
+// session's spans would fall inside a foreign unit's window and vanish with no note.
+function group_for(by_session: Map<string, Collected>, file: SessionFile): Collected {
+	const owner = cost_transcript.owning_session_id(file)
+	const found = by_session.get(owner) ?? { own: new Map(), delegated: new Map() }
+
+	by_session.set(owner, found)
+
+	return found
+}
+
+// One transcript folded into the collection it belongs to, answering whether it contributed anything
+// the run had not already counted. Where a file's spans go is the only thing its origin decides.
+function absorb_file(collector: Collector, file: SessionFile, issue_number: number): boolean {
+	const spans = session_spans(cost_transcript.read_raw(file), issue_number)
+	const group = group_for(collector.by_session, file)
+
+	absorb(file.is_delegated ? group.delegated : group.own, spans)
+
+	return absorb(collector.counted, spans)
+}
+
+// Each session's spans resolved against its own units, then folded together under the same key — a
+// resumed transcript is a copy, and a run spanning sessions must not count it twice.
+//
+// `resolve_delegated` is the identity for a session that delegated nothing, which is why a run that
+// never delegated reports exactly as it did before.
+function resolved_spans(by_session: ReadonlyMap<string, Collected>): Array<Span> {
+	const seen = new Map<string, Span>()
+
+	for (const [, collected] of by_session) {
+		const resolved = time_overlap.resolve_delegated(
+			values_of(collected.own),
+			values_of(collected.delegated),
+		)
+
+		absorb(seen, resolved)
+	}
+
+	return values_of(seen)
+}
+
 function collect_issue_spans(cwd: string, issue_number: number): IssueSpans {
 	const files = cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd))
-	const seen = new Map<string, Span>()
+	const collector: Collector = { by_session: new Map(), counted: new Map() }
 	let session_count = 0
 
 	for (const file of files) {
-		const spans = session_spans(cost_transcript.read_raw(file), issue_number)
-
-		if (absorb(seen, spans)) session_count += 1
+		if (absorb_file(collector, file, issue_number)) session_count += 1
 	}
 
-	return { spans: values_of(seen), session_count }
+	return { spans: resolved_spans(collector.by_session), session_count }
 }
 
 // Clamped at zero, because GitHub really does stamp a check as completed a fraction of a second
@@ -189,12 +213,18 @@ function pull_note(search: PullSearch, issue_number: number): string {
 	return `PR #${String(pull.number)} merged`
 }
 
+// **`transcript(s)`, not `session(s)`** (joshuafolkken/kit#1285). The count is of transcripts that
+// contributed, and a delegated unit is one of those while being part of a run rather than a run of
+// its own — so an `epicrun` child would read `5 session(s)` for what everything else in this change
+// calls one run. Counting only the sessions' own would be worse still: a child implemented entirely
+// in a unit would then read `0`, and `span_note` would deny the transcript whose spans are printed
+// beneath it.
 function span_note(found: IssueSpans, issue_number: number): string {
 	if (found.session_count === NO_SESSIONS) {
 		return `no session transcript is attributed to issue #${String(issue_number)}`
 	}
 
-	return `${String(found.session_count)} session(s)`
+	return `${String(found.session_count)} transcript(s)`
 }
 
 function window_note(window: Interval, elapsed_ms: number): Array<string> {
@@ -237,9 +267,9 @@ async function gather(
 	}
 
 	const checks = to_check_rows(await time_github.list_check_runs(pull.head_sha, read))
-	const ci_ms = uncovered_ms(
+	const ci_ms = time_overlap.uncovered_ms(
 		{ started_ms: pull.created_ms, ended_ms: merged_ms },
-		found.spans.map((span) => to_interval(span)),
+		found.spans.map((span) => time_overlap.to_interval(span)),
 	)
 
 	return { issue_number, found, search, checks, ci_ms }
@@ -306,7 +336,6 @@ async function build_latest_run_report(
 }
 
 const time_run = {
-	uncovered_ms,
 	session_spans,
 	collect_issue_spans,
 	issue_of,
@@ -314,5 +343,5 @@ const time_run = {
 	build_latest_run_report,
 }
 
-export type { Interval, IssueSpans }
+export type { IssueSpans }
 export { time_run }

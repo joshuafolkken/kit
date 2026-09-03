@@ -33,6 +33,21 @@ function sessions_in(home: string): ReturnType<typeof cost_transcript.list_sessi
 	return cost_transcript.list_sessions(cost_transcript.transcript_directory(CWD, home))
 }
 
+// A delegated unit's transcript, written where Claude Code writes one: a `subagents` directory
+// under the session that delegated it, rather than beside that session's own file.
+function write_unit(home: string, session_name: string, agent_name: string): void {
+	const directory = cost_transcript.unit_directory(
+		cost_transcript.transcript_directory(CWD, home),
+		session_name,
+	)
+
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(
+		path.join(directory, `${agent_name}${cost_transcript.TRANSCRIPT_EXTENSION}`),
+		usage_line('unit', 3),
+	)
+}
+
 describe('cost_transcript.project_slug', () => {
 	it('turns a working directory into the slug Claude Code names the folder with', () => {
 		expect(cost_transcript.project_slug(CWD)).toBe('-Users-someone-Development-kit')
@@ -74,6 +89,72 @@ describe('cost_transcript.list_sessions', () => {
 
 		expect(cost_transcript.list_sessions(absent)).toStrictEqual([])
 	})
+
+	// `epicrun` and `queue` run each child in a delegated unit, and `gate-fix` / `survey` delegate one
+	// step of a run. The unit writes to `<session-id>/subagents/`, so a listing of the project
+	// directory alone finds the parent waiting and none of the work (joshuafolkken/kit#1285).
+	it('finds a delegated unit transcript in the session subdirectory', () => {
+		const home = make_home(usage_line('r1', 5))
+
+		write_unit(home, 'one', 'agent-a1')
+
+		expect(sessions_in(home)).toHaveLength(2)
+	})
+
+	// The unit is part of a run rather than a run of its own, and both readers need to know which it
+	// is: `josh time` must not count a unit's work twice against the parent's wait for it, and
+	// `josh cost`'s no-argument scope means the session, not one of its units.
+	it('marks a delegated unit as such and a session as not', () => {
+		const home = make_home(usage_line('r1', 5))
+
+		write_unit(home, 'one', 'agent-a1')
+
+		const found = sessions_in(home)
+
+		expect(found.filter((file) => file.is_delegated)).toHaveLength(1)
+		expect(found.filter((file) => !file.is_delegated)).toHaveLength(1)
+	})
+
+	// An agent id alone reads as a session of its own, and `--session` has to be able to name a unit
+	// unambiguously.
+	it('qualifies a unit id with the session that delegated it', () => {
+		const home = make_home(usage_line('r1', 5))
+
+		write_unit(home, 'one', 'agent-a1')
+
+		const unit = sessions_in(home).find((file) => file.is_delegated)
+
+		expect(unit?.session_id).toBe('one/agent-a1')
+	})
+
+	// The guarantee for a project that never delegated: nothing about its listing changes.
+	it('lists only the session file when no unit directory exists', () => {
+		const found = sessions_in(make_home(usage_line('r1', 5)))
+
+		expect(found.map((file) => file.session_id)).toStrictEqual(['one'])
+	})
+})
+
+// Which of a listing `josh cost` means by "the run that just finished". The unit almost always
+// writes the newer file — the parent is waiting while it works — so the head of the listing would
+// answer a no-argument run with one child of a batch.
+describe('cost_transcript.latest_own_index', () => {
+	const own = { session_id: 'a', path: 'a', modified_ms: 2, is_delegated: false }
+	const unit = { session_id: 'a/agent-1', path: 'b', modified_ms: 3, is_delegated: true }
+
+	it('skips a delegated unit that sorted ahead of the session', () => {
+		expect(cost_transcript.latest_own_index([unit, own])).toBe(1)
+	})
+
+	it('takes the head when every transcript is a session of its own', () => {
+		expect(cost_transcript.latest_own_index([own, own])).toBe(0)
+	})
+
+	// `--session <parent>/agent-<id>` narrows the listing to one unit, and answering "no transcript"
+	// for a transcript that was found would refuse a scope the user named.
+	it('falls back to a unit when the listing holds nothing else', () => {
+		expect(cost_transcript.latest_own_index([unit])).toBe(0)
+	})
 })
 
 describe('cost_transcript.read_session', () => {
@@ -90,6 +171,7 @@ describe('cost_transcript.read_session', () => {
 			session_id: 'x',
 			path: path.join(tmpdir(), 'cost-absent-file'),
 			modified_ms: 0,
+			is_delegated: false,
 		}
 		const first = cost_transcript.read_session(missing)
 		const second = cost_transcript.read_session(missing)
