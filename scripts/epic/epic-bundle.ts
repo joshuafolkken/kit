@@ -19,6 +19,11 @@ interface BacklogIssue {
 	number: number
 	repo: string
 	body: string
+	// Optional because nothing in this module reads it: the strong signals below are references and
+	// recorded dependencies, and a title resemblance is deliberately not one of them. It rides on the
+	// same listing for `issue:scout`, whose duplicate search is the one thing that does compare titles
+	// (joshuafolkken/kit#1252), and is absent on an issue read one at a time by reference.
+	title?: string
 	// The epic tracking it, when one does. An issue belongs to at most one epic, because that is what
 	// a task list can express.
 	epic?: number

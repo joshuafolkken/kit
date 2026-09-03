@@ -1,5 +1,9 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { capped_listing_outcome, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
+import {
+	capped_listing_outcome,
+	listing_of,
+	listing_outcome,
+} from '#scripts/git/git-gh-issue-list-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
@@ -260,6 +264,47 @@ describe('epic_bundle_cli.fetch_epics — a listing the paging cut short', () =>
 		} finally {
 			spy.mockRestore()
 		}
+	})
+})
+
+// The backlog listing carries titles since joshuafolkken/kit#1252, and a caller may ask for it without
+// the per-issue relation reads. Nothing in this command's own answer changes — which is what makes the
+// option safe, and what makes it worth pinning here rather than only where the new caller lives.
+describe('epic_bundle_cli.fetch_backlog — the title and the relations', () => {
+	const TITLE = 'Stop the gate re-running after every edit'
+
+	async function fetched(options?: { include_relations?: boolean }): Promise<unknown> {
+		vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(
+			listing_of([{ number: 1, title: TITLE, body: '' }]),
+		)
+
+		return await epic_bundle_cli.fetch_backlog(REPO, new Map(), new Set(), options)
+	}
+
+	it('carries each row title into the backlog issue', async () => {
+		const backlog = await fetched()
+
+		expect(backlog).toMatchObject({ issues: [{ number: 1, title: TITLE }] })
+	})
+
+	it('reads no relations when the caller asks for none', async () => {
+		const relations = vi
+			.spyOn(git_gh_command, 'issue_get_state_and_relations')
+			.mockResolvedValue(undefined)
+
+		await fetched({ include_relations: false })
+
+		expect(relations).not.toHaveBeenCalled()
+	})
+
+	it('still reads them by default', async () => {
+		const relations = vi
+			.spyOn(git_gh_command, 'issue_get_state_and_relations')
+			.mockResolvedValue(undefined)
+
+		await fetched()
+
+		expect(relations).toHaveBeenCalled()
 	})
 })
 

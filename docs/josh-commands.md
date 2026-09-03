@@ -853,6 +853,36 @@ The state is printed as `OPEN` / `CLOSED` / `MERGED`, not as REST's lower-case `
 - `--repo <owner/repo>` reads a child in another repository, which a cross-repository epic needs. Its state is a GitHub fact, so no checkout there is required.
 - **A non-zero exit is never a state.** A number that resolves to nothing prints `does not resolve`; a read that failed — a rate limit, expired auth, a dropped connection — prints `could not read` and says explicitly that this is not "the issue is open". `gh issue view` exited non-zero with an empty stdout for both, and a loop reading that as "not CLOSED" reports a child as failed because nobody could reach GitHub.
 
+### `josh issue:scout`
+
+Before an issue is filed, answer the two questions every `new` entry point asks first: has this already been filed, and which epic does it belong to ([#1252](https://github.com/joshuafolkken/kit/issues/1252)).
+
+```bash
+pnpm josh issue:scout "Stop the gate re-running after every edit"                      # alias: josh isc
+pnpm josh issue:scout "<title>" --body "follows on from #1246"
+```
+
+```
+Duplicates: 1 candidate(s) — read these before filing.
+  #1249  0.71  Report a distributed document's remaining resident budget at edit time, not at the gate (epic #1153)
+Epic: Add it to the epic that already tracks a related issue (Tier A — do it).
+  Target epic: #1153
+  Related: #1246
+```
+
+Both answers were assembled by hand before this existed, and differently every time. A measured `fullrun new` spent **7 minutes 32 seconds — 22% of the run** listing open epics, fetching each one's children, reading a body and running six duplicate searches before implementation began; the session that measured it then filed work two open issues already covered, one of them filed **three minutes earlier by another session**. The same two answers now take about four seconds.
+
+- **The duplicate half compares titles**, as a token overlap: the words each title uses, without the ones every title carries. Two issues about one job are written weeks apart by different sessions and share vocabulary rather than word order — which is what rules out whole-string edit distance and the maintained packages built on it. Bodies are not compared: they are written in the session language, and a token overlap over Japanese prose measures nothing.
+- **The whole open listing is scored, with no prefix and no early exit.** The issue this search exists to catch is the one another session filed minutes ago, and where that one sits in the listing is the single thing nobody controls.
+- **A weak match is not reported.** A candidate has to share at least two significant words _and_ clear a similarity of `0.35`; below that the answer is `none`, because a list nobody trusts is read once and skipped afterwards — the failure this command exists to end rather than reproduce. At most five are shown, and the headline says `N of M` when more cleared the bar than fit — a cap that reported the shown count as the found count would state a truncation as a complete answer.
+- **An epic is never a duplicate candidate**, and the epic tracking one _is_ printed beside it. A container reported as "already filed as #E" sends the caller to run an epic that has no implementation of its own; the epic beside a candidate is the other thing being asked — where similar work already lives.
+- **The epic half needs a number to work from, and says so when it has none.** Its signals are prose references and recorded dependencies, so a title-only draft gives it nothing to decide from and it prints `Epic: not asked` rather than "file it standalone" — a scan reported as empty where none was possible is the confident wrong answer every other gap line here exists to prevent. Pass `--body "…#<N>…"` when the work follows an existing issue; otherwise the epic printed beside a duplicate is the placement answer.
+- **A summary that names an epic outright is answered with that epic.** `epic:bundle` excludes an epic from its candidate pool — a container is not a sibling — so `--body "part of epic #1153"` reaches `none` on its own and would be told to file standalone with the epic it named never mentioned. A person naming the epic is the strongest signal there is, the same thing `into <target>` means, so it is reported ahead of whatever the candidate search concluded.
+- **The epic half is [`josh epic:bundle`](#josh-epicbundle)'s decision, called rather than restated** — the same strong signals, the same Tier A / Tier B branch. Only two things differ, and both follow from the subject not existing yet: `none` prints "file it standalone" rather than "an epic already tracks it", which a draft cannot be, and the `blocked-by` relations are not read at all. A draft has no number, so no recorded dependency can name it and it declares none of its own — the reads cannot change either half of the answer, and skipping them takes one request per open issue off the command a run makes before every filing.
+- **A reference the open listing cannot show is still read**, exactly as `epic:bundle` reads it ([#947](https://github.com/joshuafolkken/kit/issues/947)): a draft's summary naming a parent that merged minutes ago is the ordinary case, not the exception.
+- **It does not replace `epic:bundle`, which still runs after the filing.** This one answers about an issue that does not exist yet, from a title; that one answers about an issue that does, from its number and its recorded relations. A run makes both calls.
+- The listing's own cuts are reported the same way, so `none` is never quietly an assertion about data that never arrived.
+
 ### `josh epic`
 
 Create the epic issue that tracks a batch of child issues from one split, from the child issue numbers.

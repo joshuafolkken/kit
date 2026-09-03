@@ -477,6 +477,53 @@ it never discovers one.
 This section is the single source of the rule; `prompts/collaboration-workflow/prerequisite-issue.md`
 is a pointer to it (joshuafolkken/kit#1185 rollout of the joshuafolkken/kit#1174 pattern).
 
+## 2e. Before filing a new Issue — `pnpm josh issue:scout`
+
+**Every `new` entry point asks two questions before it files, and one command answers both.** Run it
+the moment the title exists and **before** the `gh api … issues` call that creates the Issue:
+
+```bash
+pnpm josh issue:scout "<title>"                                   # alias: josh isc
+pnpm josh issue:scout "<title>" --body "<one-line summary, citing #N where the work follows one>"
+```
+
+**Both answers were assembled by hand before this existed, and differently every time.** A measured
+`fullrun new` spent **7 minutes 32 seconds — 22% of the run** listing epics, fetching their children
+and running six duplicate searches before implementation started, and then filed work that two open
+issues already covered — one of them filed **three minutes earlier by another session**
+(joshuafolkken/kit#1252). The same two answers now take about four seconds, and they are the same two
+answers every time rather than whatever that run's search happened to cover.
+
+- **`Duplicates:` is read, not skimmed.** Open each candidate. When one covers the same work, **do not
+  file**: send a `confirmation` Telegram and stop with the command to run against the existing Issue —
+  "Please run `fullrun #<existing>` to execute this Issue." A second Issue for work already tracked is
+  what this step exists to prevent, and it is invisible afterwards. When none of them covers it, say
+  so in one line and carry on filing.
+- **`none` is an answer.** The command reports no candidate rather than the closest miss, so a `none`
+  is a scan that found nothing — not a scan that was not run.
+- **`Epic:` front-loads the placement.** Its recommendation is `epic:bundle`'s, which makes
+  `add_to_epic` / `create_epic` Tier A and `ask` a stop, in exactly the reading §2a's `into <target>`
+  suffix would have given by hand. Where the user typed `into <target>`, that naming wins — it is a
+  person naming the epic explicitly — and the scout's epic line is then confirmation rather than a
+  decision.
+- **`Epic: not asked` is not `Epic: none`.** The epic half decides from the issue numbers the summary
+  names, so a title-only call gives it nothing and it says so rather than answering "file it
+  standalone". **Pass `--body` whenever the work follows an existing Issue** — one line citing `#N` is
+  enough, and naming the epic itself (`part of epic #<E>`) is answered with that epic. Without one,
+  the epic printed beside a duplicate candidate is the placement answer.
+- **It does not replace `epic:bundle`, which still runs after the filing.** This one answers about an
+  Issue that does not exist yet, from a title; that one answers about an Issue that does, from its
+  number and its recorded relations, and its answer can differ once the Issue is real. Both calls
+  happen — the scout before the `issues` call, `epic:bundle` after it.
+- **A `#N` entry point does not run it.** `fullrun #N` / `halfrun #N` / `kickoff #N` are handed an
+  Issue that already exists, so there is nothing to file and nothing to be a duplicate of.
+- **The split path files each child through the same step** — a split is several filings, and each one
+  can duplicate something already open. The epic itself is not scouted: it is created over children
+  that were, and `epic:bundle` is what places it afterwards.
+
+Full behavior, the thresholds and why the duplicate half compares titles rather than bodies:
+`docs/josh-commands.md` → "`josh issue:scout`".
+
 ## 3. What stays resident, and what is read from here
 
 **A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**
