@@ -43,8 +43,10 @@ project.inlang/cache/
 *storybook.log
 storybook-static
 
-# ESLint cache
+# Verification gate caches (josh lint / josh check / josh cspell:dot)
 .eslintcache
+.tsbuildinfo
+.cspellcache
 
 # Bundle analysis
 stats-client.html

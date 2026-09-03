@@ -11,6 +11,18 @@ ignorePaths:
   # published them to npm until joshuafolkken/kit#1107 and linted them until joshuafolkken/kit#1112.
   # `**/` rather than a root anchor, because a monorepo puts a package's work trees under it.
   - '**/.claude/worktrees/**'
+  # joshuafolkken/kit#1256: the verification gate's own cache files. `useGitignore` above covers
+  # them in this repository, but the flags that write them ship in the same package version as this
+  # file while the matching `.gitignore` entries only reach a consumer on its next `josh sync` — so
+  # a consumer that upgrades and runs `pnpm josh gate` first has `josh cspell:dot` read whatever the
+  # other checks just wrote: measured at 125 spelling issues from one build-info file, with nothing
+  # misspelled in the tree. Naming them here makes the exclusion independent of that ordering. The
+  # build-info file appears only where the type check falls through to `josh check`; a project whose
+  # type check resolves to `josh-app check:ci` never writes one, and `.eslintcache` is written
+  # everywhere.
+  - '**/.eslintcache'
+  - '**/.tsbuildinfo'
+  - '**/.cspellcache'
   - '**/.gitignore'
   - '**/pnpm-lock.yaml'
   - '**/.vscode/**'
