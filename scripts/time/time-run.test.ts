@@ -1,19 +1,17 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { time_corpus } from './time-corpus'
 import type { GhReader } from './time-github'
 import { time_report, type TimeReport } from './time-report'
 import { time_run } from './time-run'
+import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
-const CWD = '/Users/someone/Development/kit'
-const MINUTE_MS = 60_000
-const ISSUE = 1268
-const BRANCH = '1268-measure-a-run'
-// What `issue_lines` spends, and so what the same three minutes must still total once the parent's
-// wait for the unit that spent them is folded in.
-const THREE_MINUTES_MS = 3 * MINUTE_MS
+// The transcript fixtures are `time-transcript-fixture.ts`'s, shared with the suite that covers the
+// walk itself: what a session file looks like is one statement, not one per suite.
+const { CWD, MINUTE_MS, ISSUE, BRANCH, at, ms, issue_lines } = fixture
 const SHA = 'abc123'
 
 const state = { home: '' }
@@ -29,102 +27,8 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-function at(minute: number): string {
-	return new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString()
-}
-
-function ms(minute: number): number {
-	return Date.parse(at(minute))
-}
-
-function prompt_line(minute: number, branch: string): string {
-	return JSON.stringify({
-		type: 'user',
-		timestamp: at(minute),
-		gitBranch: branch,
-		message: { content: 'go' },
-	})
-}
-
-function call_line(minute: number, branch: string): string {
-	return JSON.stringify({
-		type: 'assistant',
-		timestamp: at(minute),
-		gitBranch: branch,
-		message: { content: [{ type: 'tool_use', name: 'Read', id: 'a' }] },
-	})
-}
-
-function result_line(minute: number, branch: string): string {
-	return JSON.stringify({
-		type: 'user',
-		timestamp: at(minute),
-		gitBranch: branch,
-		message: { content: [{ type: 'tool_result', tool_use_id: 'a', content: 'ok' }] },
-	})
-}
-
 function write_session(name: string, lines: ReadonlyArray<string>): void {
-	const directory = path.join(state.home, cost_transcript.project_slug(CWD))
-
-	mkdirSync(directory, { recursive: true })
-	writeFileSync(
-		path.join(directory, `${name}${cost_transcript.TRANSCRIPT_EXTENSION}`),
-		lines.join('\n'),
-	)
-}
-
-// A delegated unit's transcript, which Claude Code writes to a subdirectory of the session that
-// delegated it rather than beside that session's own file.
-function write_unit(session_name: string, agent_name: string, lines: ReadonlyArray<string>): void {
-	const directory = cost_transcript.unit_directory(
-		path.join(state.home, cost_transcript.project_slug(CWD)),
-		session_name,
-	)
-
-	mkdirSync(directory, { recursive: true })
-	writeFileSync(
-		path.join(directory, `${agent_name}${cost_transcript.TRANSCRIPT_EXTENSION}`),
-		lines.join('\n'),
-	)
-}
-
-// The parent's whole view of a delegated child: one `Agent` span covering minutes 0→3, which is the
-// same wall clock the unit's transcript below records as the work it did.
-function delegating_lines(): Array<string> {
-	return [
-		JSON.stringify({
-			type: 'assistant',
-			timestamp: at(0),
-			gitBranch: BRANCH,
-			message: { content: [{ type: 'tool_use', name: 'Agent', id: 'g' }] },
-		}),
-		JSON.stringify({
-			type: 'user',
-			timestamp: at(3),
-			gitBranch: BRANCH,
-			message: { content: [{ type: 'tool_result', tool_use_id: 'g', content: 'done' }] },
-		}),
-	]
-}
-
-// A second session working the same issue over the same three minutes, with span instants the unit's
-// do not share — otherwise the cross-session dedupe collapses the two and the case says nothing.
-function concurrent_lines(): Array<string> {
-	return [prompt_line(0, BRANCH), call_line(2, BRANCH), result_line(3, BRANCH)]
-}
-
-function total_span_ms(spans: ReadonlyArray<{ duration_ms: number }>): number {
-	return spans.reduce((sum, one) => sum + one.duration_ms, 0)
-}
-
-// Minutes 0→1 model wait, 1→3 tool execution, all on the issue's branch.
-function issue_lines(offset: number): Array<string> {
-	return [
-		prompt_line(offset, BRANCH),
-		call_line(offset + 1, BRANCH),
-		result_line(offset + 3, BRANCH),
-	]
+	fixture.write_session(state.home, name, lines)
 }
 
 interface GhScript {
@@ -155,98 +59,6 @@ function merged_pull(created: number, merged: number): string {
 function open_pull(created: number): string {
 	return pull_body(created, 'null')
 }
-
-describe('time_run.collect_issue_spans', () => {
-	// A run is not a session: the `fullrun` for issue #1256 ran in a different one from the session
-	// that reported it, so a command reading one transcript reports half a run.
-	it('adds up every session attributed to the issue', () => {
-		write_session('one', issue_lines(0))
-		write_session('two', issue_lines(10))
-
-		const found = time_run.collect_issue_spans(CWD, ISSUE)
-
-		expect(found.session_count).toBe(2)
-		expect(found.spans).toHaveLength(4)
-	})
-
-	it('leaves out a session that never touched the issue', () => {
-		const elsewhere = '999-elsewhere'
-
-		write_session('one', issue_lines(0))
-		write_session('other', [
-			prompt_line(0, elsewhere),
-			call_line(1, elsewhere),
-			result_line(3, elsewhere),
-		])
-
-		expect(time_run.collect_issue_spans(CWD, ISSUE).session_count).toBe(1)
-	})
-
-	// Resuming or forking a session copies the earlier lines into a new file. Counted twice, a run
-	// spanning sessions reports time nobody spent.
-	it('counts a span copied into a resumed transcript once', () => {
-		write_session('one', issue_lines(0))
-		write_session('resumed', [...issue_lines(0), call_line(5, BRANCH), result_line(6, BRANCH)])
-
-		// The first session contributes two spans and the resumed one four, two of which are the
-		// copies. Counted naively that is six; the run really spent four.
-		expect(time_run.collect_issue_spans(CWD, ISSUE).spans).toHaveLength(4)
-	})
-
-	// A session that contributed only copies is not a session the note may count: `2 session(s)`
-	// beside a span total that correctly counted those spans once is the note contradicting the
-	// arithmetic printed beside it.
-	it('does not count a transcript that was purely a copy of another', () => {
-		write_session('one', issue_lines(0))
-		write_session('copy', issue_lines(0))
-
-		expect(time_run.collect_issue_spans(CWD, ISSUE).session_count).toBe(1)
-	})
-
-	// The fill-forward walk is `cost_attribute`'s and is reused, not copied: work done on the default
-	// branch before `josh git` created the branch still belongs to the issue.
-	it('claims the work done on the default branch before the branch existed', () => {
-		write_session('one', [prompt_line(0, 'main'), call_line(1, 'main'), result_line(3, BRANCH)])
-
-		expect(time_run.collect_issue_spans(CWD, ISSUE).spans).toHaveLength(2)
-	})
-})
-
-describe('time_run.collect_issue_spans on a delegated run', () => {
-	// `epicrun` runs every child in a delegated unit, and the unit's transcript is written to a
-	// subdirectory of the session that delegated it. Listing only the session files reported epic
-	// #1272's four merged children as "CI wait only" (joshuafolkken/kit#1285).
-	it('reads a delegated unit transcript, not only the session that delegated it', () => {
-		write_unit('parent', 'agent-a1', issue_lines(0))
-
-		expect(time_run.collect_issue_spans(CWD, ISSUE).spans).toHaveLength(2)
-	})
-
-	// The parent holds one `Agent` span for the whole time the unit runs. Concatenated, the two
-	// readings count those minutes twice and the four shares stop summing to the elapsed time.
-	it('does not count the parent wait and the unit work as separate wall clock', () => {
-		write_session('parent', delegating_lines())
-		write_unit('parent', 'agent-a1', issue_lines(0))
-
-		const found = time_run.collect_issue_spans(CWD, ISSUE)
-
-		expect(total_span_ms(found.spans)).toBe(THREE_MINUTES_MS)
-	})
-
-	// A unit's work overlaps the wait of the session that delegated it and nothing else. Two sessions
-	// attributed to one issue can run at the same wall clock — a batch in the background while someone
-	// works interactively — and pooling every unit's interval would delete the second session's real
-	// spans without a word.
-	it('does not subtract one session units from another session own spans', () => {
-		write_session('parent', delegating_lines())
-		write_unit('parent', 'agent-a1', issue_lines(0))
-		write_session('other', concurrent_lines())
-
-		const found = time_run.collect_issue_spans(CWD, ISSUE)
-
-		expect(total_span_ms(found.spans)).toBe(2 * THREE_MINUTES_MS)
-	})
-})
 
 // The pull request every case below shares: opened at minute 2, merged at minute 8.
 const MERGED_SCRIPT: GhScript = { pull_body: merged_pull(2, 8) }
@@ -439,5 +251,32 @@ describe('time_run.build_latest_run_report', () => {
 		)
 
 		expect(report).toBeUndefined()
+	})
+})
+
+// The batch's way in: a caller measuring several issues has already walked the corpus once for all
+// of them, and handing this one its slice is what stops the walk repeating per child
+// (joshuafolkken/kit#1284).
+describe('time_run.build_run_report — spans the caller already collected', () => {
+	it('reads no transcript of its own when it is given them', async () => {
+		write_session('one', issue_lines(0))
+
+		const collected = time_corpus.collect_issue_spans(CWD, ISSUE)
+		const read = vi.spyOn(cost_transcript, 'read_raw')
+		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT), collected)
+
+		expect(read).not.toHaveBeenCalled()
+		expect(report.span_count).toBe(2)
+	})
+
+	// The default is what `--issue` does, so leaving the argument out must still walk the directory.
+	it('walks the directory itself when it is given none', async () => {
+		write_session('one', issue_lines(0))
+
+		const read = vi.spyOn(cost_transcript, 'read_raw')
+		const report = await report_of(MERGED_SCRIPT)
+
+		expect(read).toHaveBeenCalled()
+		expect(report.span_count).toBe(2)
 	})
 })
