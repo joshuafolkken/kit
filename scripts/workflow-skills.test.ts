@@ -26,6 +26,10 @@ import {
 // resident — so all three are asserted here rather than left to the section that moved.
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands'
 const DEPENDENCY_SKILL = '.claude/skills/dependency-update'
+// The canonical topic file for the residency criterion. Named directly rather than reached through
+// `WORKFLOW_PROMPT`, which answers with the whole concatenated corpus: an assertion about where the
+// ceiling policy is argued has to fail when it is argued somewhere else.
+const RESIDENCY_TOPIC = 'prompts/collaboration-workflow/residency.md'
 
 // Long enough that it says when to read the skill rather than merely naming it — the description is
 // what an agent matches the situation against, so a one-liner ships a skill nothing ever opens.
@@ -60,6 +64,17 @@ const RESIDENT_HEADROOM_BYTES = 2000
 // the equality below on a constant bump that touched no document at all.
 const EFFECTIVE_CEILING_BYTES = RESIDENT_CEILING_BYTES - RESIDENT_HEADROOM_BYTES
 const EFFECTIVE_CEILING_TOKENS = cost_tokens.ascii_bytes_to_tokens(EFFECTIVE_CEILING_BYTES)
+// joshuafolkken/kit#1275: what `CLAUDE.md` had left under the effective ceiling once the procedures
+// were already out — 30 bytes — was enough to pass the ceiling and not enough to write one sentence
+// with. Returning the label mapping, the worked before-and-after pair and a handful of rationales to
+// their pointers recovered 3,047 bytes.
+//
+// This is a floor under that recovery, not a second budget. It is set well below the 3,047 so the
+// next few resident rules are unaffected — spending the recovery on rules is what it was recovered
+// for — while a wholesale re-inlining of what went back to the pointers, which costs three times
+// this, fails here by name instead of silently returning the document to 30 bytes of headroom.
+const RE_INLINE_GUARD_HEADROOM_BYTES = 1000
+
 // A symbol rather than a letter, so a long run of it is not a word the spell check has to know.
 const TWO_BYTE_CHAR = '±'
 const THREE_BYTE_CHAR_BYTES = 3
@@ -258,19 +273,64 @@ describe('the residency list says what it covers', () => {
 	})
 })
 
-describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (document_path) => {
+// joshuafolkken/kit#1275: "do not raise the ceiling" was written as a flat prohibition, so on the
+// day recovery genuinely runs out there is no procedure for moving it and the cheapest move left is
+// deleting an unpinned sentence — the failure this whole criterion exists to prevent. The conditions
+// that would justify a raise are now written down, and pinned so they survive the
+// joshuafolkken/kit#1193 consistency sweep.
+describe('the ceiling can be raised, but only against written conditions', () => {
+	it.each([
+		'### 上限を引き上げてよい条件（反証条件）',
+		'**「引き上げない」は絶対の禁止ではなく、反証可能な既定である。**',
+		'**枯れたことは主張ではなく測定で示す**',
+		'**非対称なリスクがあるので、迷ったら回収を選ぶ。**',
+		'**引き上げは Tier C として扱う。**',
+		// The Tier C half protects the budget by naming its constants, so a rename made here and not
+		// there leaves the rule guarding a name nothing uses. All three are named because whichever
+		// one is actually binding is the one somebody will want to loosen.
+		'RESIDENT_CEILING_BYTES',
+		'RESIDENT_HEADROOM_BYTES',
+		'RE_INLINE_GUARD_HEADROOM_BYTES',
+	])('states the rule for raising the ceiling: %j', (marker) => {
+		expect(read_unwrapped(RESIDENCY_TOPIC)).toContain(marker)
+	})
+})
+
+describe.each(AI_DOCS)('%s — stays inside the resident budget', (document_path) => {
 	const content = read_repo_file(document_path)
 
+	// joshuafolkken/kit#1275: this used to assert only `< EFFECTIVE_CEILING_BYTES`, and it passed at
+	// 30 bytes of headroom — the state the reserve exists to prevent rather than the state it
+	// permits, since the next resident rule then pays for itself out of whichever neighboring
+	// sentence no marker pinned. The guard floor is asserted in its place rather than beside it:
+	// being over the ceiling is being under the floor as well, so a second assertion could never
+	// fail on its own, and two tests for one condition report the same defect twice.
 	it('stays under the resident ceiling, with room left to write the next rule', () => {
-		expect(Buffer.byteLength(content, 'utf8')).toBeLessThan(EFFECTIVE_CEILING_BYTES)
+		const headroom = EFFECTIVE_CEILING_BYTES - Buffer.byteLength(content, 'utf8')
+
+		expect(headroom).toBeGreaterThan(RE_INLINE_GUARD_HEADROOM_BYTES)
 	})
 
-	// The same ceiling read in the unit the bill arrives in. It is not a second, looser guard: for
+	// The same budget read in the unit the bill arrives in. It is not a second, looser guard: for
 	// ASCII it fails on exactly the same edit the byte assertion does, and for anything denser it
-	// fails earlier — which is the case the byte ceiling cannot see.
+	// fails earlier — which is the case the byte budget cannot see.
+	//
+	// The guard floor is converted rather than reused as a byte count, for the reason the ceiling
+	// itself is: reserving 1,000 *tokens* would be reserving three times the bytes. Held only in
+	// bytes, the reserve would not exist in this unit at all, and a wide-character-dense document
+	// could pass here at one token of margin — the zero-headroom state joshuafolkken/kit#1275 exists
+	// to prevent, reached through the door the byte assertion cannot see.
 	it('stays under the resident ceiling measured in tokens', () => {
-		expect(cost_tokens.estimate(content)).toBeLessThan(EFFECTIVE_CEILING_TOKENS)
+		const headroom = EFFECTIVE_CEILING_TOKENS - cost_tokens.estimate(content)
+
+		expect(headroom).toBeGreaterThan(
+			cost_tokens.ascii_bytes_to_tokens(RE_INLINE_GUARD_HEADROOM_BYTES),
+		)
 	})
+})
+
+describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (document_path) => {
+	const content = read_repo_file(document_path)
 
 	it.each([WORKFLOW_SKILL, DEPENDENCY_SKILL])('names %s', (skill_directory) => {
 		expect(content).toContain(skill_directory)
