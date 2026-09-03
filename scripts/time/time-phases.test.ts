@@ -30,16 +30,19 @@ function detected(phases: ReadonlyArray<PhaseTotal>, phase: PhaseName): boolean 
 	return phases.find((total) => total.phase === phase)?.is_detected === true
 }
 
-// One whole run, in the order a `fullrun` walks it.
+// One whole run, in the order a `fullrun` walks it: the edit, the gate, the fix the gate demanded,
+// the review, the fix the review demanded, then the pull request and the merge.
 const RUN: ReadonlyArray<Span> = [
 	span(0, 2),
 	span(2, 1, { marker: time_markers.PLAN_MARKER, label: 'Bash: gh' }),
 	span(3, 4, { marker: time_markers.EDIT_MARKER, label: 'Edit' }),
 	span(7, 3, { label: 'Read' }),
 	span(10, 5, { josh_command: 'josh gate', label: PNPM_LABEL }),
-	span(15, 6, { marker: time_markers.REVIEW_MARKER, label: 'Skill' }),
-	span(21, 2, { josh_command: 'josh git', label: PNPM_LABEL }),
-	span(23, 7, { josh_command: 'josh followup', label: PNPM_LABEL }),
+	span(15, 2, { marker: time_markers.EDIT_MARKER, label: 'Edit' }),
+	span(17, 6, { marker: time_markers.REVIEW_MARKER, label: 'Skill' }),
+	span(23, 1, { marker: time_markers.EDIT_MARKER, label: 'Edit' }),
+	span(24, 2, { josh_command: 'josh git', label: PNPM_LABEL }),
+	span(26, 7, { josh_command: 'josh followup', label: PNPM_LABEL }),
 ]
 
 describe('time_phases.build_phases — classification', () => {
@@ -85,6 +88,47 @@ describe('time_phases.build_phases — classification', () => {
 	})
 })
 
+// The window joshuafolkken/kit#1281 added: a run does not stop editing at its first gate, and with
+// `implement` ending there every later fix fell into `other`.
+describe('time_phases.build_phases — the rework window', () => {
+	it('runs rework from the first gate to the pull request', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
+
+		expect(minutes_of(phases, time_phases.REWORK_PHASE)).toBe(3)
+	})
+
+	// Closing rework at the review instead would send the fix the review itself demanded back into
+	// `other` — the same defect one stage further along.
+	it('keeps a fix made after the review in rework rather than in other', () => {
+		const spans = [
+			span(0, 1, { marker: time_markers.EDIT_MARKER }),
+			span(1, 2, { josh_command: 'josh gate' }),
+			span(3, 4, { marker: time_markers.REVIEW_MARKER }),
+			span(7, 5, { marker: time_markers.EDIT_MARKER }),
+			span(12, 1, { josh_command: 'josh git' }),
+		]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect([
+			minutes_of(phases, time_phases.REWORK_PHASE),
+			minutes_of(phases, time_phases.OTHER_PHASE),
+		]).toEqual([5, 0])
+	})
+
+	// A `halfrun` stops before the commit, so no pull request is ever opened. Everything it fixed
+	// after its gate is still rework, and closing the window at nothing would have lost it again.
+	it('runs rework to the end of what was measured when no pull request was opened', () => {
+		const spans = [
+			span(0, 1, { marker: time_markers.EDIT_MARKER }),
+			span(1, 2, { josh_command: 'josh gate' }),
+			span(3, 4),
+		]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect(minutes_of(phases, time_phases.REWORK_PHASE)).toBe(4)
+	})
+})
+
 describe('time_phases.build_phases — the total is preserved', () => {
 	it('keeps an interval belonging to no phase as other', () => {
 		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
@@ -98,6 +142,16 @@ describe('time_phases.build_phases — the total is preserved', () => {
 		const total = phases.reduce((sum, entry) => sum + entry.duration_ms, 0)
 
 		expect(total).toBe(12 * MINUTE_MS)
+	})
+
+	// Splitting a window in two must not create or lose a minute: every span still lands in exactly
+	// one phase, which is what keeps two runs comparable.
+	it('still reconstructs a whole run exactly once rework has taken its share', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
+		const total = phases.reduce((sum, entry) => sum + entry.duration_ms, 0)
+		const measured = RUN.reduce((sum, entry) => sum + entry.duration_ms, 0)
+
+		expect(total).toBe(measured)
 	})
 
 	it('holds a span that matches no marker in other rather than dropping it', () => {
@@ -122,8 +176,18 @@ describe('time_phases.build_phases — detection', () => {
 			detected(phases, time_phases.PLAN_PHASE),
 			detected(phases, time_phases.IMPLEMENT_PHASE),
 			detected(phases, time_phases.GATE_PHASE),
+			detected(phases, time_phases.REWORK_PHASE),
 			detected(phases, time_phases.REVIEW_PHASE),
-		]).toEqual([true, true, true, true])
+		]).toEqual([true, true, true, true, true])
+	})
+
+	// A run that never gated never reached rework, which is a different answer from having reworked
+	// for no time at all — the distinction `not detected` exists to keep.
+	it('reports rework as not detected when no gate ran', () => {
+		const spans = [span(0, 2), span(2, 6, { marker: time_markers.EDIT_MARKER })]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect(detected(phases, time_phases.REWORK_PHASE)).toBe(false)
 	})
 
 	it('detects the CI phase only where the GitHub half was read', () => {
