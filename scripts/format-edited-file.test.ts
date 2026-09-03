@@ -4,11 +4,15 @@ import path from 'node:path'
 import { resolve_local_bin } from '#scripts/local-bin'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
+	ESLINT_DAEMON,
 	format_edited_file,
+	is_start_failure,
 	parse_edited_path,
 	plan_commands,
+	plan_daemon_restart,
 	relative_to_root,
-	resolve_invocation,
+	resolve_invocations,
+	select_invocation,
 	type CommandRunner,
 	type FormatCommand,
 } from './format-edited-file'
@@ -42,6 +46,10 @@ function payload_for(file_path: string): string {
 	})
 }
 
+// What a formatter that ran and had nothing to say returns, so a test runner reads as "this route
+// worked" and no fallback is attempted.
+const RAN_CLEANLY = { exit_code: 0, did_write_stdout: false }
+
 function eslint_failing_runner(runs: Array<string>): CommandRunner {
 	return async (command) => {
 		await Promise.resolve()
@@ -49,6 +57,8 @@ function eslint_failing_runner(runs: Array<string>): CommandRunner {
 		if (command.bin === ESLINT) throw new Error('spawn ENOENT')
 
 		runs.push(command.bin)
+
+		return RAN_CLEANLY
 	}
 }
 
@@ -62,6 +72,8 @@ function recording_runner(runs: Array<string>): CommandRunner {
 		runs.push(command.bin)
 
 		await Promise.resolve()
+
+		return RAN_CLEANLY
 	}
 }
 
@@ -169,8 +181,77 @@ describe('relative_to_root', () => {
 	})
 })
 
-describe('resolve_invocation', () => {
-	const command = { bin: 'prettier', command_arguments: ['--write', 'app.ts'] }
+// The startup route is where this hook's time went: one cold `eslint --fix` on a single TypeScript
+// file measured 1.70s of a 2.50s hook, against 0.08s through the warm daemon. These assert the
+// choice itself — which of the three routes is taken, and that the two slower ones still answer for
+// a project that has no daemon installed (joshuafolkken/kit#1259).
+describe('select_invocation — the startup route', () => {
+	const eslint_command = { bin: ESLINT, command_arguments: ['--fix', 'app.ts'] }
+	const daemon_cli = path.join(path.sep, 'pkg', 'eslint_d', 'bin', 'eslint_d.js')
+	const shim = path.join(path.sep, 'repo', 'node_modules', '.bin', ESLINT)
+
+	// Run with this process's own node rather than the CLI file directly: the daemon entry is a
+	// plain `.js` with no execute bit of its own.
+	it('runs the daemon CLI with the current node binary when one is installed', () => {
+		expect(select_invocation(eslint_command, { daemon_cli, shim })).toStrictEqual({
+			bin: process.execPath,
+			command_arguments: [daemon_cli, '--fix', 'app.ts'],
+		})
+	})
+
+	it('falls back to the local shim when no daemon is installed', () => {
+		expect(select_invocation(eslint_command, { daemon_cli: undefined, shim })).toStrictEqual({
+			bin: shim,
+			command_arguments: ['--fix', 'app.ts'],
+		})
+	})
+
+	it('falls back to pnpm exec when neither route resolves', () => {
+		const routes = { daemon_cli: undefined, shim: undefined }
+
+		expect(select_invocation(eslint_command, routes)).toStrictEqual({
+			bin: 'pnpm',
+			command_arguments: ['exec', ESLINT, '--fix', 'app.ts'],
+		})
+	})
+})
+
+// Resolving the daemon on disk is not the same as it starting: a blocked loopback bind or a store
+// it cannot write into leaves it exiting non-zero with nothing on stdout. The slower route has to
+// stay reachable, or the hook stops fixing anything with eslint wherever the daemon cannot run.
+describe('resolve_invocations — the fallback behind the daemon', () => {
+	const eslint_command = { bin: ESLINT, command_arguments: ['--fix', 'app.ts'] }
+
+	it('offers the slower route behind the daemon one', () => {
+		const invocations = resolve_invocations(eslint_command, TEST_DIRECTORY)
+
+		expect(invocations.length).toBeGreaterThanOrEqual(1)
+		expect(invocations.at(-1)?.bin).not.toBe(process.execPath)
+	})
+
+	it.each([
+		['a formatter reporting problems it could not fix', { exit_code: 1, did_write_stdout: true }],
+		['a formatter that had nothing to say', { exit_code: 0, did_write_stdout: false }],
+	])('does not read %s as a start failure', (_label, outcome) => {
+		expect(is_start_failure(outcome)).toBe(false)
+	})
+
+	it('reads a non-zero exit with no output as a start failure', () => {
+		expect(is_start_failure({ exit_code: 1, did_write_stdout: false })).toBe(true)
+	})
+})
+
+describe('resolve_invocations', () => {
+	const command = { bin: PRETTIER, command_arguments: ['--write', 'app.ts'] }
+
+	// prettier costs a fraction of what eslint does, so it has no daemon route to take — a second
+	// warm process would buy little and double what can go stale.
+	it('never takes the daemon route for prettier', () => {
+		const invocations = resolve_invocations(command, path.join(TEST_DIRECTORY, 'no-bins'))
+
+		expect(invocations).toHaveLength(1)
+		expect(invocations[0]?.bin).not.toBe(process.execPath)
+	})
 
 	// Written under the name the resolver asks for rather than a literal: on Windows the shim carries
 	// a `.cmd` suffix, and a fixture hard-coding the bare name would fail there for no real reason.
@@ -178,15 +259,42 @@ describe('resolve_invocation', () => {
 		const shim_name = path.basename(resolve_local_bin(TEST_DIRECTORY, command.bin))
 		const shim = write_fixture('node_modules', '.bin', shim_name)
 
-		expect(resolve_invocation(command, TEST_DIRECTORY).bin).toBe(shim)
+		expect(resolve_invocations(command, TEST_DIRECTORY)[0]?.bin).toBe(shim)
 	})
 
 	// Output is ignored, so a missing shim would make the hook a silent no-op rather than a slow one.
 	it('falls back to pnpm exec when the shim is missing', () => {
-		const invocation = resolve_invocation(command, path.join(TEST_DIRECTORY, 'no-bins'))
+		const [invocation] = resolve_invocations(command, path.join(TEST_DIRECTORY, 'no-bins'))
 
-		expect(invocation.bin).toBe('pnpm')
-		expect(invocation.command_arguments).toStrictEqual(['exec', 'prettier', '--write', 'app.ts'])
+		expect(invocation?.bin).toBe('pnpm')
+		expect(invocation?.command_arguments).toStrictEqual(['exec', PRETTIER, '--write', 'app.ts'])
+	})
+})
+
+// ESLint cache-busts the config entry file alone; the rule modules it imports stay in the daemon's
+// module registry, so an edit to one of them would be linted against for as long as the daemon lives.
+describe('plan_daemon_restart', () => {
+	const CONFIG_ENTRY = 'eslint.config.js'
+
+	it.each([
+		['a rule module the config imports', ['eslint', 'rules', 'naming.js']],
+		['the flat config entry itself', [CONFIG_ENTRY]],
+	])('restarts the daemon after an edit to %s', (_label, segments) => {
+		const plan = plan_daemon_restart(path.join(TEST_DIRECTORY, ...segments), TEST_DIRECTORY)
+
+		expect(plan).toStrictEqual([{ bin: ESLINT_DAEMON, command_arguments: ['restart'] }])
+	})
+
+	it.each([
+		['an ordinary source file', ['src', 'app.ts']],
+		['a file whose name merely starts the same way', ['eslint.config.backup.js']],
+		// A session can carry additional working directories, and another checkout's config belongs
+		// to that tree's daemon rather than this one's.
+		['a config in another checkout', ['..', 'elsewhere', CONFIG_ENTRY]],
+	])('leaves the daemon alone after an edit to %s', (_label, segments) => {
+		expect(
+			plan_daemon_restart(path.join(TEST_DIRECTORY, ...segments), TEST_DIRECTORY),
+		).toStrictEqual([])
 	})
 })
 

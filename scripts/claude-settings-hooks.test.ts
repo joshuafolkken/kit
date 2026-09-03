@@ -15,10 +15,13 @@ const GITIGNORE_PATH = fileURLToPath(new URL('../.gitignore', import.meta.url))
 // what prettier and eslint made of it was a whole-project run. The command has to stay a `josh`
 // subcommand: a shell one-liner here would be a second copy of the logic in every consumer.
 const FORMAT_HOOK_COMMAND = 'pnpm josh format:edited'
-// Derived from the script's own per-formatter bound rather than written as a number: raising that
-// bound has to raise the declared budget with it, or the harness kills a run the script still
-// considers healthy. Two formatters, plus a process-startup allowance.
-const FORMATTER_RUNS = 2
+// Derived from the script's own per-spawn bound rather than written as a number: raising that bound
+// has to raise the declared budget with it, or the harness kills a run the script still considers
+// healthy — and it lands at a moment the script did not choose, possibly inside `prettier --write`.
+// The count is the worst-case *run*, not the number of formatters (joshuafolkken/kit#1259): an edit
+// to an eslint config input plans eslint, prettier and `eslint_d restart`, and eslint and the
+// restart each carry a second route behind the daemon that is tried when it fails to start.
+const FORMATTER_RUNS = 5
 const STARTUP_ALLOWANCE_SECONDS = 10
 const MS_PER_SECOND = 1000
 const MINIMUM_HOOK_TIMEOUT_SECONDS =
