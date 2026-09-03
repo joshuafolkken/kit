@@ -69,6 +69,14 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   rather than saying nothing: `josh gate` writes a marker for as long as it runs, so the review agent
   is told not to run the unit suite the gate is running beside it — **and that sentence claims no
   result**, because a gate that has not finished has none to claim (joshuafolkken/kit#1242).
+  **That gate is started once per run, not once per edit** (joshuafolkken/kit#1246): while implementing,
+  re-run the **single check by name** — `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh test:unit`,
+  or the project's own type check — never the whole gate —
+  ten gate runs cost 8.2 minutes of a 49.1-minute run, six of them answered by one check. Which of the
+  two to run is decided by whether the review has started, never by how large the edit was — and once
+  the gate is running beside the review, a later fix makes its result stale rather than sending the run
+  back to a single check. The table is `prompts/review.md` → "The gate runs beside this review, not in
+  front of it".
   **The rule-compliance measurement is read after the review and before the commit, never inside
   `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval` is five
   real Claude sessions. **It is *started* when the review starts, because neither writes to the

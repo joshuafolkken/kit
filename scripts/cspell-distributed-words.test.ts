@@ -46,6 +46,10 @@ const DISTRIBUTED_FILES: ReadonlyArray<string> = [
 // skill added later from re-opening the gap.
 const DISTRIBUTED_DIRECTORIES: ReadonlyArray<string> = init_logic.get_ai_copy_directories()
 
+// Six times the suite default, which is what a scan measured at ten seconds needs to stay a signal
+// about spelling rather than about how busy the machine was.
+const SCAN_TIMEOUT_MS = 60_000
+
 // cspell takes a glob for a directory; the existence check above takes the directory itself.
 const DISTRIBUTED_GLOBS: ReadonlyArray<string> = DISTRIBUTED_DIRECTORIES.map(
 	(directory) => `${directory}/**`,
@@ -75,7 +79,19 @@ describe('files distributed by josh init / josh sync', () => {
 
 	// Fails the moment a distributed document gains a term that only kit's private word list
 	// knows — exactly the state that broke every consumer on 1.44.0.
-	it('spells every word through the distributed dictionary alone', () => {
-		expect(collect_unknown_words([...DISTRIBUTED_FILES, ...DISTRIBUTED_GLOBS])).toEqual([])
-	})
+	//
+	// **The budget is its own, not the suite's** (joshuafolkken/kit#1246). This one test spawns a
+	// whole cspell process over every distributed file and skill directory, and that set grows with
+	// the distribution: at the 10-second default it took 10.09s inside `pnpm josh gate`, where three
+	// other CPU-heavy checks run beside it, while passing on its own. Timing out there reports a
+	// spelling failure that is not one — and it fails on whichever change happens to add the next
+	// distributed paragraph, which is the least informative moment possible. Nothing about the
+	// assertion is relaxed; only the wall-clock it is allowed to take.
+	it(
+		'spells every word through the distributed dictionary alone',
+		() => {
+			expect(collect_unknown_words([...DISTRIBUTED_FILES, ...DISTRIBUTED_GLOBS])).toEqual([])
+		},
+		SCAN_TIMEOUT_MS,
+	)
 })
