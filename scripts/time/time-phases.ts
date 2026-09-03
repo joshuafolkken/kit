@@ -12,19 +12,28 @@ import type { Span } from './time-spans'
 // **Two shapes of phase, and the difference is not cosmetic.** `gate`, `review`, `pr` and `merge`
 // are the spans of a recognizable command, so they are collected wherever they fall — which is what
 // keeps the gate correct now that it is *started beside* the review rather than in front of it, and
-// a sequential state machine could not have expressed that overlap. `plan` and `implement` name no
-// single command, so they are windows between two markers.
+// a sequential state machine could not have expressed that overlap. `plan`, `implement` and
+// `rework` name no single command, so they are windows between two markers.
 //
 // **`other` is the remainder, and it is kept rather than discarded.** Every span lands in exactly
 // one phase and the CI share is disjoint from all of them by construction, so the phases still
 // reconstruct the elapsed time exactly — the property that makes two runs comparable, and the one a
 // breakdown that quietly dropped its leftovers would have broken.
+//
+// **`rework` is the second window, and it exists because `implement` ends at the first gate**
+// (joshuafolkken/kit#1281). A real run is edit → gate → fix what it caught → gate again → review →
+// fix what *that* caught, so with one window everything past the first gate fell into `other` —
+// 35.7% of the documented sample run, against 3.0 minutes of `implement`. The totals still
+// reconstructed elapsed time exactly, so it was never an arithmetic defect; it under-reported
+// implementation to the one question the breakdown exists to answer.
 
-type PhaseName = 'plan' | 'implement' | 'gate' | 'review' | 'pr' | 'ci' | 'merge' | 'other'
+type PhaseName =
+	'plan' | 'implement' | 'gate' | 'rework' | 'review' | 'pr' | 'ci' | 'merge' | 'other'
 
 const PLAN_PHASE: PhaseName = 'plan'
 const IMPLEMENT_PHASE: PhaseName = 'implement'
 const GATE_PHASE: PhaseName = 'gate'
+const REWORK_PHASE: PhaseName = 'rework'
 const REVIEW_PHASE: PhaseName = 'review'
 const PR_PHASE: PhaseName = 'pr'
 const CI_PHASE: PhaseName = 'ci'
@@ -37,6 +46,7 @@ const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 	PLAN_PHASE,
 	IMPLEMENT_PHASE,
 	GATE_PHASE,
+	REWORK_PHASE,
 	REVIEW_PHASE,
 	PR_PHASE,
 	CI_PHASE,
@@ -79,6 +89,14 @@ interface Windows {
 	plan_end_ms: number | undefined
 	implement_start_ms: number | undefined
 	implement_end_ms: number
+	// Where `implement` closed, read a second time as where `rework` opens. `undefined` means no gate
+	// ran **after implementation opened** — a resumed session that gated the previous issue before this
+	// one's first edit has one in its transcript and still answers `undefined`, exactly as `implement`
+	// already refuses that gate as its own boundary. It is the only state in which the two differ:
+	// `implement_end_ms` then falls back to the end of what was measured, and `rework` is reported as
+	// never having been reached rather than as zero minutes long.
+	rework_start_ms: number | undefined
+	rework_end_ms: number
 }
 
 interface Detection {
@@ -139,15 +157,32 @@ function plan_end_of(spans: ReadonlyArray<Span>, start_ms: number | undefined): 
 	return first_by(spans, is_plan_marker)?.ended_ms
 }
 
-// The first gate that starts after implementation opened, falling back to the end of what was
-// measured when none did. **Taking the first gate outright inverted the window**: a resumed session
-// that gated the previous issue, or a baseline run before any edit, closed it before it opened, and
-// every implementation span then fell out of a phase still reported as detected — a confident
-// `0.0 min` in exactly the place `is_detected` exists to keep honest.
-function implement_end_of(spans: ReadonlyArray<Span>, start_ms: number | undefined): number {
+// The first gate that starts after implementation opened. **Taking the first gate outright inverted
+// the window**: a resumed session that gated the previous issue, or a baseline run before any edit,
+// closed it before it opened, and every implementation span then fell out of a phase still reported
+// as detected — a confident `0.0 min` in exactly the place `is_detected` exists to keep honest.
+function first_gate_of(
+	spans: ReadonlyArray<Span>,
+	start_ms: number | undefined,
+): number | undefined {
 	const gate = first_by(spans, (span) => is_gate(span) && is_after(span, start_ms))
 
-	return gate === undefined ? run_end_ms(spans) : started_ms(gate)
+	return gate === undefined ? undefined : started_ms(gate)
+}
+
+// **Rework closes where the pull request opens, not where the review starts.** Closing it at the
+// review would send every fix the review itself demanded straight back into `other` — the same
+// defect one stage further along, since a `fullrun` fixes what round one found and then re-reviews.
+// `josh git` / `josh pr` is the first instant the run demonstrably stopped changing code, and it is
+// a command name rather than a duration, so the boundary does not move when a run gets faster.
+// Falling back to the end of what was measured covers a run that stopped before its pull request.
+function rework_end_of(spans: ReadonlyArray<Span>, start_ms: number | undefined): number {
+	const opened = first_by(
+		spans,
+		(span) => command_phase(span) === PR_PHASE && is_after(span, start_ms),
+	)
+
+	return opened === undefined ? run_end_ms(spans) : started_ms(opened)
 }
 
 // The first instant the run had demonstrably moved past planning. **The first edit is not enough on
@@ -167,20 +202,28 @@ function work_start_of(spans: ReadonlyArray<Span>, edit: Span | undefined): numb
 function build_windows(spans: ReadonlyArray<Span>): Windows {
 	const edit = first_by(spans, (span) => span.marker === time_markers.EDIT_MARKER)
 	const implement_start_ms = edit === undefined ? undefined : started_ms(edit)
+	const rework_start_ms = first_gate_of(spans, implement_start_ms)
 
 	return {
 		plan_end_ms: plan_end_of(spans, work_start_of(spans, edit)),
 		implement_start_ms,
-		implement_end_ms: implement_end_of(spans, implement_start_ms),
+		implement_end_ms: rework_start_ms ?? run_end_ms(spans),
+		rework_start_ms,
+		rework_end_ms: rework_end_of(spans, rework_start_ms),
 	}
 }
 
-function is_implementing(span: Span, windows: Windows): boolean {
-	const { implement_start_ms } = windows
+// Half-open, and classified by where a span *starts*, so one interval cannot be charged to two
+// windows. `undefined` is the window that never opened — a run with no edit, or one with no gate —
+// which is not the same answer as a window that opened and stayed empty.
+//
+// One test for both windows rather than one each: implementation and rework are the same question
+// asked about two pairs of instants, and two copies of it would drift apart the first time one
+// changed.
+function is_within(span: Span, start_ms: number | undefined, end_ms: number): boolean {
+	if (start_ms === undefined) return false
 
-	if (implement_start_ms === undefined) return false
-
-	return started_ms(span) >= implement_start_ms && started_ms(span) < windows.implement_end_ms
+	return started_ms(span) >= start_ms && started_ms(span) < end_ms
 }
 
 function is_planning(span: Span, windows: Windows): boolean {
@@ -189,10 +232,14 @@ function is_planning(span: Span, windows: Windows): boolean {
 	return plan_end_ms !== undefined && span.ended_ms <= plan_end_ms
 }
 
-// The order the two are tested in does not matter: `plan_end_of` accepts no marker that closes after
-// implementation opens, so the windows are disjoint by construction rather than by assumption.
+// The order the three are tested in does not matter. Implementation and rework meet at the first
+// gate and never overlap, and `plan_end_of` accepts no marker that closes after implementation
+// opens — so the windows are disjoint by construction rather than by assumption.
 function window_phase(span: Span, windows: Windows): PhaseName {
-	if (is_implementing(span, windows)) return IMPLEMENT_PHASE
+	const { implement_start_ms, implement_end_ms, rework_start_ms, rework_end_ms } = windows
+
+	if (is_within(span, implement_start_ms, implement_end_ms)) return IMPLEMENT_PHASE
+	if (is_within(span, rework_start_ms, rework_end_ms)) return REWORK_PHASE
 
 	return is_planning(span, windows) ? PLAN_PHASE : OTHER_PHASE
 }
@@ -227,6 +274,7 @@ function is_detected(phase: PhaseName, found: Detection): boolean {
 
 	if (phase === PLAN_PHASE) return windows.plan_end_ms !== undefined
 	if (phase === IMPLEMENT_PHASE) return windows.implement_start_ms !== undefined
+	if (phase === REWORK_PHASE) return windows.rework_start_ms !== undefined
 
 	return is_marker_detected(phase, found)
 }
@@ -257,6 +305,7 @@ const time_phases = {
 	PLAN_PHASE,
 	IMPLEMENT_PHASE,
 	GATE_PHASE,
+	REWORK_PHASE,
 	REVIEW_PHASE,
 	PR_PHASE,
 	CI_PHASE,
