@@ -1472,19 +1472,29 @@ Every issue filed to make `fullrun` faster has come out of a **hand measurement*
 session ae2f13dc-fb54-4add-943e-64976ff44f08 — 73.3 min elapsed
 
 Where the wall clock went:
-  model wait              24.2 min   33.0%
-  tool execution          20.3 min   27.6%
-  human wait              28.8 min   39.4%
+  model wait               24.2 min   33.0%
+  tool execution           20.3 min   27.6%
+  human wait               28.8 min   39.4%
+
+By phase (in run order):
+  plan                     32.4 min   44.2%
+  implement                 3.0 min   4.0%
+  gate                      3.8 min   5.2%
+  review                    5.7 min   7.8%
+  pr                        0.6 min   0.8%
+  ci                                  not detected
+  merge                     1.7 min   2.3%
+  other                    26.1 min   35.7%
 
 By tool (descending):
-  Bash: pnpm               7.8 min   15 call(s)
-  Skill                    5.7 min   4 call(s)
-  Edit                     1.7 min   34 call(s)
+  Bash: pnpm                7.0 min   12 call(s)
+  Skill                     5.7 min   4 call(s)
+  Edit                      1.7 min   34 call(s)
   …
 
 By josh command (descending):
-  josh gate                5.9 min   14 call(s)
-  josh followup            1.7 min   1 call(s)
+  josh gate                 3.8 min   4 call(s)
+  josh followup             1.7 min   1 call(s)
   …
 ```
 
@@ -1493,6 +1503,10 @@ By josh command (descending):
 **One run is not a sample.** [#1262](https://github.com/joshuafolkken/kit/issues/1262) recorded "tool execution 59% / model 39%" from a single hand-measured run; three real sessions measured by this command put tool execution at 25–40% and human wait at 17–44%. All three of the sessions [#1267](https://github.com/joshuafolkken/kit/issues/1267) restored by hand reproduce here to within 0.4 points.
 
 **A Bash call is bundled under the command it actually runs.** Taking the literal first word put `Bash: cd` at the top of every table — 82 calls and 12.1 minutes of one measured session, naming the one part of the command that did no work — so the chain is split into segments and each segment walked **word by word** past its `VAR=…` assignments and its wrappers (`time`, `env`, `sudo`) to the command position. A segment that only navigates (`cd`, `export`, `source`) runs nothing and yields no name, and a call nothing could be named for stays under the bare `Bash` rather than under the word that was rejected. `pnpm josh <cmd>` invocations get a second table of their own, keyed by subcommand and read **only at a segment's command position** — searched loosely, `git commit -m "ran pnpm josh gate"` was charged to `josh gate`, and this repository's own commit messages name subcommands constantly.
+
+**The per-tool totals say which command is slow; the phase breakdown says which _stage_ is long** ([#1269](https://github.com/joshuafolkken/kit/issues/1269)). Every issue filed to make `fullrun` faster has been about a stage — one review round instead of two, the gate started beside the review — and [#1262](https://github.com/joshuafolkken/kit/issues/1262)'s split rationale ("verification commands 465s / code review 326s / edits and format hook 143s / CI wait and merge 125s") was one run classified by hand. **The boundaries are decided from recognizable commands, never from how long an interval was**: `gate`, `pr` and `merge` are the spans of `pnpm josh gate` / `josh git` / `josh pr` / `josh followup`, read off the same subcommand name the josh table is keyed by rather than detected a second time; `review` is the `code-review` skill call, which carries the whole review because the skill runs it and hands back the findings; `plan` runs from the start to the plan comment posted to the Issue, and `implement` from the first edit to the first gate. A boundary guessed from durations would move whenever a run got faster, which is the one thing a measurement meant to compare two runs must not do.
+
+`gate` and `review` **overlap on purpose** — the gate is started beside the review rather than in front of it — so the command's own phase wins over whichever window its span sits in; a sequential reading would charge the gate to the review and hide exactly what the change was for. Anything belonging to no phase is kept as **`other`** rather than discarded, so the phases still reconstruct the elapsed time exactly, and a phase whose marker never appeared prints **`not detected`** rather than `0.0 min` — "did not run" and "this transcript could not be read for it" are different answers, and a measured zero asserts the first when only the second may be true. `--json` carries the same breakdown, `is_detected` included.
 
 **A run is measured from its `fullrun` invocation to the merge, and neither source can say that alone** ([#1268](https://github.com/joshuafolkken/kit/issues/1268)). The transcript stops at the last line anyone wrote, so PR #1263's `createdAt 08:57:20Z → mergedAt 09:00:32Z` — 3 minutes 12 seconds of CI wait and merge — appears in no session file; GitHub has no timestamp for the planning, implementation, gate and review that precede the pull request. And **one run is not one session**: a scan of the 25 most recent transcripts barely finds the branch for issue #1256, because that `fullrun` ran in a different one. So `--issue <N>` joins the two on the issue number — every session attributed to it by branch through `cost_attribute`, unchanged and not copied, plus the pull request's `created_at`, each check-run and `merged_at` from `gh api`.
 

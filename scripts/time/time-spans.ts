@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { json_value } from '#scripts/json-value'
 import { z } from 'zod'
 import { time_instant } from './time-instant'
+import { time_markers, type PhaseMarker } from './time-markers'
 
 // Turning a session transcript into timed spans (joshuafolkken/kit#1267).
 //
@@ -100,13 +101,22 @@ const HUMAN_CATEGORY: SpanCategory = 'human'
 
 // What a tool span is labelled with. `josh_command` is empty for everything that is not a
 // `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
+//
+// `marker` names the workflow boundary the call is, for the phase breakdown that slices the same
+// spans by stage (joshuafolkken/kit#1269). It is carried here rather than re-derived later because
+// the tool's *input* is what decides it, and a span keeps no input — only the label read off it.
 interface ToolCall {
 	label: string
 	josh_command: string
+	marker: PhaseMarker
 }
 
-const NO_CALL: ToolCall = { label: '', josh_command: '' }
-const UNKNOWN_CALL: ToolCall = { label: UNKNOWN_TOOL, josh_command: '' }
+const NO_CALL: ToolCall = { label: '', josh_command: '', marker: time_markers.NO_MARKER }
+const UNKNOWN_CALL: ToolCall = {
+	label: UNKNOWN_TOOL,
+	josh_command: '',
+	marker: time_markers.NO_MARKER,
+}
 
 // `ended_ms` is the absolute instant the span closed, so `[ended_ms - duration_ms, ended_ms]` is the
 // interval it occupied. A duration alone cannot say *when*, and two things need that: the CI wait,
@@ -219,11 +229,17 @@ function josh_command_of(command: string): string {
 }
 
 function to_tool_call(name: string, input: unknown): ToolCall {
-	if (name !== cost_blocks.BASH_TOOL) return { label: name, josh_command: '' }
+	if (name !== cost_blocks.BASH_TOOL) {
+		return { label: name, josh_command: '', marker: time_markers.tool_marker(name, input) }
+	}
 
 	const command = bash_command(input)
 
-	return { label: bash_label(command), josh_command: josh_command_of(command) }
+	return {
+		label: bash_label(command),
+		josh_command: josh_command_of(command),
+		marker: time_markers.bash_marker(command),
+	}
 }
 
 function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
@@ -339,6 +355,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		category: event.category,
 		label: event.label,
 		josh_command: event.josh_command,
+		marker: event.marker,
 		branch: event.branch,
 		ended_ms: event.timestamp_ms,
 		duration_ms: event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms),
