@@ -5,6 +5,7 @@ import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'
+import { time_epic, type EpicTimeReport } from './time-epic'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
 
@@ -129,6 +130,27 @@ describe('time_cli.parse_options', () => {
 	})
 })
 
+describe('time_cli.parse_options — the epic scope', () => {
+	it('reads --epic as a number', () => {
+		expect(time_cli.parse_options(['--epic', '1272'])).toMatchObject({
+			epic: 1272,
+			is_json: false,
+		})
+	})
+
+	// The same rule `--issue` follows: a flag that was given but did not parse is a refusal, never a
+	// silent fall back to the most recent run.
+	it('refuses an --epic that is not a positive whole number', () => {
+		expect(time_cli.parse_options(['--epic', 'abc'])).toBeUndefined()
+		expect(time_cli.parse_options(['--epic', '0'])).toBeUndefined()
+	})
+
+	it('refuses --epic beside another scope', () => {
+		expect(time_cli.parse_options(['--epic', '1', '--issue', '2'])).toBeUndefined()
+		expect(time_cli.parse_options(['--epic', '1', '--session', 'abc'])).toBeUndefined()
+	})
+})
+
 describe('time_cli.pick_session', () => {
 	it('finds a named session', () => {
 		write_session()
@@ -192,7 +214,7 @@ describe('time_cli.run — refusals', () => {
 
 	it('names the mistake when both scopes were given', async () => {
 		expect(await time_cli.run(['--issue', '1', '--session', 'a'], CWD)).toBe(1)
-		expect(errors()).toContain(time_cli.BOTH_SCOPES)
+		expect(errors()).toContain(time_cli.ONE_SCOPE)
 	})
 })
 
@@ -204,6 +226,7 @@ const RUN_REPORT: TimeReport = {
 	ended_at: at(8),
 	elapsed_ms: 8 * MINUTE_MS,
 	span_count: 2,
+	turn_count: 1,
 	categories: { model_ms: MINUTE_MS, tool_ms: 2 * MINUTE_MS, human_ms: 0, ci_ms: 5 * MINUTE_MS },
 	has_ci_data: true,
 	notes: ['1 session(s)'],
@@ -243,6 +266,64 @@ describe('time_cli.run — one run', () => {
 	// grammar instead of the mistake helps nobody who wrote it that way.
 	it('names the both-scopes mistake in the equals form too', async () => {
 		expect(await time_cli.run(['--issue=1', '--session=abc'], CWD)).toBe(1)
-		expect(errors()).toContain(time_cli.BOTH_SCOPES)
+		expect(errors()).toContain(time_cli.ONE_SCOPE)
+	})
+})
+
+const EPIC = 1272
+const EPIC_SCOPE = `epic #${String(EPIC)}`
+
+const EPIC_REPORT: EpicTimeReport = {
+	scope: EPIC_SCOPE,
+	epic_number: EPIC,
+	children: [
+		{ issue_number: ISSUE, status: 'measured', ms_per_turn: MINUTE_MS, report: RUN_REPORT },
+	],
+	total_ms: 8 * MINUTE_MS,
+	categories: RUN_REPORT.categories,
+	has_transcript_data: true,
+	has_ci_data: true,
+	timed_count: 1,
+	measured_count: 1,
+	unmeasured_count: 0,
+	trend: { is_comparable: false, first_ms_per_turn: 0, last_ms_per_turn: 0, child_count: 1 },
+	notes: [],
+}
+
+describe('time_cli.run — one epic', () => {
+	it('reports the batch child by child under --epic', async () => {
+		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(EPIC_REPORT)
+
+		expect(await time_cli.run(['--epic', String(EPIC)], CWD)).toBe(0)
+		expect(output()).toContain(EPIC_SCOPE)
+		expect(output()).toContain(`#${String(ISSUE)}`)
+	})
+
+	// The acceptance criterion the whole scope exists for: `--json` carries per child what `--issue`
+	// carries for one run, breakdown included, rather than only the batch's headline figures.
+	it('carries each child’s own breakdown under --json', async () => {
+		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(EPIC_REPORT)
+		await time_cli.run(['--epic', String(EPIC), '--json'], CWD)
+
+		expect(JSON.parse(output())).toMatchObject({
+			scope: EPIC_SCOPE,
+			children: [
+				{
+					issue_number: ISSUE,
+					status: 'measured',
+					report: { categories: { ci_ms: 5 * MINUTE_MS }, phases: [] },
+				},
+			],
+		})
+	})
+
+	// An unreadable epic is a failure, not an empty batch: reporting "0 children" would assert
+	// something nobody established.
+	it('fails rather than reporting an empty batch when the epic could not be read', async () => {
+		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(undefined)
+
+		expect(await time_cli.run(['--epic', String(EPIC)], CWD)).toBe(1)
+		expect(errors()).toContain(time_cli.NO_EPIC)
+		expect(output()).toBe('')
 	})
 })

@@ -20,19 +20,27 @@ rule in `CLAUDE.md` is unchanged, and `diag` is not one of the keywords it gover
 | --- | --- | --- |
 | `diag` / `diag fullrun` | The most recently merged run | `pnpm josh time --json` |
 | `diag #<N>` | Issue `#N`'s whole run, from the `fullrun` invocation to the merge | `pnpm josh time --issue <N> --json` |
-| `diag epicrun` / `diag #<E>` where `#<E>` is an epic | Every merged child of the epic, one call each | `pnpm josh time --issue <child> --json` per child |
+| `diag epicrun` / `diag #<E>` where `#<E>` is an epic | Every child of the epic, in execution order | `pnpm josh time --epic <E> --json` |
 
 An epic is measured child by child because a run is measured from its `fullrun` invocation to its
-merge, and an `epicrun` is several of those. Read the children with
-`pnpm josh epic:plan <E>` — **after reading `.claude/skills/epic-commands/SKILL.md`, which
-`CLAUDE.md` requires before any `epic:*` command** — and measure the merged ones; a child that never
-merged has no run to report and is named as unmeasured rather than counted as zero.
+merge, and an `epicrun` is several of those. **One call does the whole batch**
+([#1271](https://github.com/joshuafolkken/kit/issues/1271)): `--epic` enumerates the children from
+the epic body itself, orders them by when they actually ran, and carries each child's own report
+under `children[]` — so there is no loop to write and no list of numbers to assemble first. It also
+prints the **model wait per turn** of each child and the direction across them, which is the one
+figure a `--issue` call per child could never produce.
+
+**Read the four child states before quoting a figure.** `not run`, `no transcript` (merged, but no
+session transcript attributed — only the CI wait is known) and `not merged` are not durations of
+zero, and the batch totals withhold any half no child contributed to. A child named in one of those
+states is reported as unmeasured, never counted as zero.
 
 ## 1. Measure with `pnpm josh time`, never by hand
 
 ```bash
 pnpm josh time --json               # alias: josh tm
 pnpm josh time --issue <N> --json
+pnpm josh time --epic <E> --json
 ```
 
 **Never write a script to read the transcripts, and never restore the timings by eye.** That is what

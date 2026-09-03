@@ -63,6 +63,16 @@ describe('time_report.build_report — categories', () => {
 		expect(report.started_at).toBe(new Date(MINUTE_MS).toISOString())
 		expect(report.ended_at).toBe(new Date(21 * MINUTE_MS).toISOString())
 	})
+
+	// One turn per model span, which is what a per-turn figure is divided by
+	// (joshuafolkken/kit#1271). Counted here rather than by each caller, because the spans are gone
+	// by the time a caller holds a report.
+	it('counts one turn per model span, and no others', () => {
+		const report = build(MIXED)
+
+		expect(report.turn_count).toBe(1)
+		expect(report.span_count).toBe(MIXED.length)
+	})
 })
 
 describe('time_report.build_report — per-label totals', () => {

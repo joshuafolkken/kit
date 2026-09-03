@@ -18,6 +18,7 @@ import { time_instant } from './time-instant'
 
 const PULLS_PATH = 'repos/{owner}/{repo}/pulls'
 const CHECK_RUNS_PATH = 'repos/{owner}/{repo}/commits'
+const ISSUES_PATH = 'repos/{owner}/{repo}/issues'
 const PAGE_SIZE = 100
 
 // Five pages, 500 pull requests. **A cap rather than `--paginate`**, because the question is always
@@ -45,6 +46,8 @@ const CHECK_RUN_SCHEMA = z.object({
 })
 
 const CHECK_RUNS_SCHEMA = z.object({ check_runs: z.array(CHECK_RUN_SCHEMA).nullish() })
+
+const ISSUE_SCHEMA = z.object({ body: z.string().nullish() })
 
 // A pull request as this command needs it. `merged_ms` is `undefined` for one that is still open —
 // never `0`, which would read as "merged at the epoch" and silently produce a negative CI wait.
@@ -257,10 +260,32 @@ async function list_check_runs(
 	}
 }
 
+// One issue's body — the epic's task list, for the batch scope (joshuafolkken/kit#1271). What is
+// done with it belongs to `git-epic-parse.ts`, which is the one reader of a task list; this only
+// fetches the text.
+//
+// **`undefined` is "the read failed", and an issue with an empty body answers `''`.** Collapsing the
+// two would report an unauthenticated `gh` as an epic that tracks no children — a definite answer
+// nobody established, which is the distinction this module keeps everywhere else.
+async function read_issue_body(
+	issue_number: number,
+	read: GhReader = read_gh,
+): Promise<string | undefined> {
+	try {
+		const text = await read(`${ISSUES_PATH}/${String(issue_number)}`)
+		const parsed = ISSUE_SCHEMA.safeParse(json_value.parse_or_undefined(text))
+
+		return parsed.success ? (parsed.data.body ?? '') : undefined
+	} catch {
+		return undefined
+	}
+}
+
 const time_github = {
 	MAX_PAGES,
 	PAGE_SIZE,
 	read_gh,
+	read_issue_body,
 	parse_page,
 	parse_pulls,
 	parse_check_runs,
