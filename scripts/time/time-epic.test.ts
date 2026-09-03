@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { time_corpus } from './time-corpus'
 import { time_epic, type ChildTiming, type EpicTimeReport } from './time-epic'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
@@ -65,12 +66,15 @@ function timing_of(input: ReportInput): ChildTiming {
 
 const ROW_101 = '- [x] #101'
 const ROW_102 = '- [x] #102'
+const ROW_103 = '- [x] #103'
 const OPEN_ROW_101 = '- [ ] #101'
 const FENCE = '```'
 
 function body_of(rows: ReadonlyArray<string>): string {
 	return ['## Progress', '', ...rows].join('\n')
 }
+
+type MockedRunReport = MockInstance<typeof time_run.build_run_report>
 
 async function unparseable(): Promise<string> {
 	return '<html>403</html>'
@@ -89,10 +93,14 @@ afterEach(() => {
 
 // The children are stubbed rather than measured: what is under test here is the aggregation, and a
 // real report would need a transcript directory this test has no business writing.
-function stub_children(reports: ReadonlyMap<number, TimeReport>): void {
-	vi.spyOn(time_run, 'build_run_report').mockImplementation(
-		async (issue_number: number) => reports.get(issue_number) ?? report_of({ issue_number }),
-	)
+// Returns the spy, so a case can also assert what each child was handed rather than only what came
+// back from it.
+function stub_children(reports: ReadonlyMap<number, TimeReport>): MockedRunReport {
+	return vi
+		.spyOn(time_run, 'build_run_report')
+		.mockImplementation(
+			async (issue_number: number) => reports.get(issue_number) ?? report_of({ issue_number }),
+		)
 }
 
 // Every read the aggregation makes goes through one `GhReader`, so a test hands it a function and
@@ -269,6 +277,39 @@ describe('time_epic.build_epic_report — the batch', () => {
 		expect(report.total_ms).toBe(2 * MINUTE_MS)
 		expect(report.children.at(-1)?.status).toBe(time_epic.NOT_RUN)
 		expect(report.notes.join('\n')).toContain('not run')
+	})
+})
+
+// The batch reads the transcript corpus once and attributes that one pass to every child. It used
+// to read it inside each child's report, so an eleven-child epic walked 669 files eleven times
+// (joshuafolkken/kit#1284).
+describe('time_epic.build_epic_report — one transcript pass for the whole batch', () => {
+	it('collects the corpus once however many children the epic tracks', async () => {
+		// Stubbed rather than called through: the real walk resolves against `homedir()`, and this
+		// suite never redirects that — on a machine that happens to have a transcript directory for
+		// `CWD`, calling through would read that person's own sessions.
+		const collect = vi.spyOn(time_corpus, 'collect_for_issues').mockReturnValue(new Map())
+
+		stub_children(new Map())
+		await batch_of(body_of([ROW_101, ROW_102, ROW_103]))
+
+		expect(collect).toHaveBeenCalledTimes(1)
+		expect(collect).toHaveBeenCalledWith(CWD, [101, 102, 103])
+	})
+
+	// Each child is still measured against its own slice: one pass must not become one shared answer.
+	it('hands each child the slice collected for its own issue', async () => {
+		const spans = new Map([
+			[101, { spans: [], session_count: 1 }],
+			[102, { spans: [], session_count: 2 }],
+		])
+
+		vi.spyOn(time_corpus, 'collect_for_issues').mockReturnValue(spans)
+		const build = stub_children(new Map())
+
+		await batch_of(PAIR_BODY)
+
+		expect(build.mock.calls.map((call) => call[3])).toEqual([spans.get(101), spans.get(102)])
 	})
 })
 
