@@ -22,12 +22,25 @@ function span(start_minute: number, minutes: number, extra: Partial<Span> = {}):
 	}
 }
 
+// A span that closes at a typed prompt — the interval nobody was at the keyboard for. It carries no
+// tool name and no marker, exactly as `time-spans.ts` writes one, so a test cannot accidentally rest
+// on a combination a transcript never produces.
+function waited(start_minute: number, minutes: number): Span {
+	return span(start_minute, minutes, { category: time_spans.HUMAN_CATEGORY })
+}
+
 function minutes_of(phases: ReadonlyArray<PhaseTotal>, phase: PhaseName): number {
 	return (phases.find((total) => total.phase === phase)?.duration_ms ?? 0) / MINUTE_MS
 }
 
 function detected(phases: ReadonlyArray<PhaseTotal>, phase: PhaseName): boolean {
 	return phases.find((total) => total.phase === phase)?.is_detected === true
+}
+
+// What every reconstruction test compares against: the phases must still add up to the elapsed time,
+// whichever window a span was moved out of.
+function total_ms(phases: ReadonlyArray<PhaseTotal>): number {
+	return phases.reduce((sum, entry) => sum + entry.duration_ms, 0)
 }
 
 // One whole run, in the order a `fullrun` walks it: the edit, the gate, the fix the gate demanded,
@@ -129,6 +142,76 @@ describe('time_phases.build_phases — the rework window', () => {
 	})
 })
 
+// joshuafolkken/kit#1290: a window collects intervals, and waiting for a person is an interval — so
+// every window phase used to report how long somebody waited alongside how long its stage took.
+describe('time_phases.build_phases — the wait phase', () => {
+	it('keeps a wait inside the implementation window out of implement', () => {
+		const spans = [span(0, 3, { marker: time_markers.EDIT_MARKER }), waited(3, 8)]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect([
+			minutes_of(phases, time_phases.IMPLEMENT_PHASE),
+			minutes_of(phases, time_phases.WAIT_PHASE),
+		]).toEqual([3, 8])
+	})
+
+	// The `halfrun` case the issue was filed for: no pull request is opened, so the rework window runs
+	// to the end of what was measured — and what a `halfrun` does at that end is wait for a person.
+	it('keeps the trailing wait of a run that opened no pull request out of rework', () => {
+		const spans = [
+			span(0, 1, { marker: time_markers.EDIT_MARKER }),
+			span(1, 2, { josh_command: 'josh gate' }),
+			span(3, 2),
+			waited(5, 20),
+		]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect([
+			minutes_of(phases, time_phases.REWORK_PHASE),
+			minutes_of(phases, time_phases.WAIT_PHASE),
+		]).toEqual([2, 20])
+	})
+
+	it('keeps a wait before the plan comment out of plan', () => {
+		const spans = [
+			waited(0, 9),
+			span(9, 1, { marker: time_markers.PLAN_MARKER }),
+			span(10, 2, { marker: time_markers.EDIT_MARKER }),
+		]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect([
+			minutes_of(phases, time_phases.PLAN_PHASE),
+			minutes_of(phases, time_phases.WAIT_PHASE),
+		]).toEqual([1, 9])
+	})
+})
+
+describe('time_phases.build_phases — the wait phase outside the windows', () => {
+	// A wait belonging to no window used to land in the remainder, where it is hidden behind whatever
+	// else fell there. A run that stalls on a person is a fact about the run.
+	it('names a wait that belongs to no window rather than leaving it in other', () => {
+		const spans = [waited(0, 6), span(6, 2)]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect([
+			minutes_of(phases, time_phases.WAIT_PHASE),
+			minutes_of(phases, time_phases.OTHER_PHASE),
+		]).toEqual([6, 2])
+	})
+
+	// Every delegated child of an `epicrun` is this run: nobody was at the keyboard, so the honest
+	// answer is a measured zero rather than the `not detected` a missing boundary marker earns.
+	it('reports a run nobody waited on as zero rather than as not detected', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
+
+		expect([
+			minutes_of(phases, time_phases.WAIT_PHASE),
+			detected(phases, time_phases.WAIT_PHASE),
+		]).toEqual([0, true])
+	})
+})
+
 describe('time_phases.build_phases — the total is preserved', () => {
 	it('keeps an interval belonging to no phase as other', () => {
 		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
@@ -139,26 +222,56 @@ describe('time_phases.build_phases — the total is preserved', () => {
 	it('sums to the elapsed time the spans and the CI share account for', () => {
 		const spans = [span(0, 5), span(5, 4, { marker: time_markers.EDIT_MARKER })]
 		const phases = time_phases.build_phases({ spans, ci_ms: 3 * MINUTE_MS, has_ci_data: true })
-		const total = phases.reduce((sum, entry) => sum + entry.duration_ms, 0)
 
-		expect(total).toBe(12 * MINUTE_MS)
+		expect(total_ms(phases)).toBe(12 * MINUTE_MS)
+	})
+
+	it('holds a span that matches no marker in other rather than dropping it', () => {
+		const phases = time_phases.build_phases({ spans: [span(0, 9)], ...NO_CI })
+
+		expect(minutes_of(phases, time_phases.OTHER_PHASE)).toBe(9)
 	})
 
 	// Splitting a window in two must not create or lose a minute: every span still lands in exactly
 	// one phase, which is what keeps two runs comparable.
 	it('still reconstructs a whole run exactly once rework has taken its share', () => {
 		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
-		const total = phases.reduce((sum, entry) => sum + entry.duration_ms, 0)
 		const measured = RUN.reduce((sum, entry) => sum + entry.duration_ms, 0)
 
-		expect(total).toBe(measured)
+		expect(total_ms(phases)).toBe(measured)
+	})
+})
+
+describe('time_phases.build_phases — the total survives the wait phase', () => {
+	// Moving the waiting out of the windows must not lose it: whatever leaves a window lands in `wait`,
+	// which is the condition joshuafolkken/kit#1290 was filed under.
+	it('still reconstructs a run whose waiting was taken out of the windows', () => {
+		const spans = [
+			span(0, 3, { marker: time_markers.EDIT_MARKER }),
+			waited(3, 4),
+			span(7, 2, { josh_command: 'josh gate' }),
+			waited(9, 5),
+		]
+		const phases = time_phases.build_phases({ spans, ci_ms: 2 * MINUTE_MS, has_ci_data: true })
+
+		expect(total_ms(phases)).toBe(16 * MINUTE_MS)
 	})
 
-	it('holds a span that matches no marker in other rather than dropping it', () => {
-		const spans = [span(0, 9)]
+	// The invariant the phase table is cross-checked against: every human span goes to `wait` and
+	// nothing else does, so the row equals the human-wait category the same report prints above it.
+	it('gives the wait phase exactly the human category total', () => {
+		const spans = [
+			waited(0, 3),
+			span(3, 1, { marker: time_markers.EDIT_MARKER }),
+			span(4, 2, { josh_command: 'josh gate' }),
+			waited(6, 6),
+		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
+		const human_minutes = spans
+			.filter((entry) => entry.category === time_spans.HUMAN_CATEGORY)
+			.reduce((sum, entry) => sum + entry.duration_ms / MINUTE_MS, 0)
 
-		expect(minutes_of(phases, time_phases.OTHER_PHASE)).toBe(9)
+		expect(minutes_of(phases, time_phases.WAIT_PHASE)).toBe(human_minutes)
 	})
 })
 

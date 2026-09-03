@@ -1,5 +1,5 @@
 import { time_markers } from './time-markers'
-import type { Span } from './time-spans'
+import { time_spans, type Span } from './time-spans'
 
 // Cutting the same elapsed time by workflow phase rather than by what was waited on
 // (joshuafolkken/kit#1269).
@@ -26,9 +26,25 @@ import type { Span } from './time-spans'
 // 35.7% of the documented sample run, against 3.0 minutes of `implement`. The totals still
 // reconstructed elapsed time exactly, so it was never an arithmetic defect; it under-reported
 // implementation to the one question the breakdown exists to answer.
+//
+// **A window collects intervals, and waiting for a person is an interval** (joshuafolkken/kit#1290).
+// So every window phase used to charge itself the time nobody was at the keyboard: the documented
+// sample run is 39.4% human wait, and `plan`'s 32.4 minutes carried much of it. `rework` shows it
+// most reliably, because its window falls back to the end of what was measured when no pull request
+// was opened and the archetypal run that opens none is a `halfrun`, which stops after the gate and
+// waits for a person **by specification** — so exactly where the fallback applies, the wait is
+// charged to `rework` in full and the row reports how long somebody waited rather than how long the
+// rework took.
+//
+// **`wait` is a phase of its own rather than a share of `other`.** A run that stalls on a person is
+// a fact about the run, and folding it into the remainder hides it behind whatever else landed
+// there. Every human span carries `NO_CALL` — the closing event is a typed prompt, which names no
+// tool — so none of them was ever in a command phase, and moving all of them here leaves `gate`,
+// `review`, `pr` and `merge` untouched while making `wait` equal to the human-wait category exactly.
+// That equality is the invariant, and it is what lets the two halves of the report cross-check.
 
 type PhaseName =
-	'plan' | 'implement' | 'gate' | 'rework' | 'review' | 'pr' | 'ci' | 'merge' | 'other'
+	'plan' | 'implement' | 'gate' | 'rework' | 'review' | 'pr' | 'ci' | 'merge' | 'wait' | 'other'
 
 const PLAN_PHASE: PhaseName = 'plan'
 const IMPLEMENT_PHASE: PhaseName = 'implement'
@@ -38,10 +54,11 @@ const REVIEW_PHASE: PhaseName = 'review'
 const PR_PHASE: PhaseName = 'pr'
 const CI_PHASE: PhaseName = 'ci'
 const MERGE_PHASE: PhaseName = 'merge'
+const WAIT_PHASE: PhaseName = 'wait'
 const OTHER_PHASE: PhaseName = 'other'
 
-// Run order, which is the order they are printed in. `other` is last because it is a remainder
-// rather than a stage anything passes through.
+// Run order, which is the order they are printed in. `wait` and `other` come last because neither is
+// a stage anything passes through: one is time spent between the stages, the other the remainder.
 const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 	PLAN_PHASE,
 	IMPLEMENT_PHASE,
@@ -51,8 +68,20 @@ const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 	PR_PHASE,
 	CI_PHASE,
 	MERGE_PHASE,
+	WAIT_PHASE,
 	OTHER_PHASE,
 ]
+
+// Neither is a boundary marker, so neither can fail to be found: `other` is the remainder, and `wait`
+// is read off the span's own category. A run nobody waited on genuinely waited zero minutes, which is
+// the one answer `not detected` must not be given for.
+//
+// **`wait` is detected on exactly the terms the `human wait` category row is printed on**, which is
+// unconditionally — so a run with no transcript attributed shows `0.0 min` in both, and the two agree.
+// Withholding the phase there while the category above it still printed a zero would make one report
+// contradict itself, which is worse than the shared imprecision; whether *either* should be withheld
+// when nothing was read is a question about the whole table and predates this phase.
+const ALWAYS_DETECTED_PHASES: ReadonlySet<PhaseName> = new Set([WAIT_PHASE, OTHER_PHASE])
 
 const GATE_COMMAND = 'josh gate'
 const NO_DURATION = 0
@@ -244,7 +273,13 @@ function window_phase(span: Span, windows: Windows): PhaseName {
 	return is_planning(span, windows) ? PLAN_PHASE : OTHER_PHASE
 }
 
+// **Waiting is decided before anything else, because it is not work.** A human span closes at a
+// typed prompt and so carries no command, which means the tests below would have sent every one of
+// them to a window or to `other` — and a window that collects them stops answering how long its
+// stage took.
 function span_phase(span: Span, windows: Windows): PhaseName {
+	if (span.category === time_spans.HUMAN_CATEGORY) return WAIT_PHASE
+
 	return command_phase(span) ?? window_phase(span, windows)
 }
 
@@ -260,13 +295,13 @@ function totals_of(spans: ReadonlyArray<Span>, windows: Windows): Map<PhaseName,
 	return totals
 }
 
-// `other` is always detected because it is the remainder rather than a marker, and `ci` is detected
+// `wait` and `other` are always detected because neither rests on a marker, and `ci` is detected
 // exactly when the GitHub half was read — the same flag the CI category row is withheld on, so the
 // two halves of the report cannot disagree about whether a merge was seen.
 function is_marker_detected(phase: PhaseName, found: Detection): boolean {
 	if (phase === CI_PHASE) return found.has_ci_data
 
-	return phase === OTHER_PHASE || found.totals.has(phase)
+	return ALWAYS_DETECTED_PHASES.has(phase) || found.totals.has(phase)
 }
 
 function is_detected(phase: PhaseName, found: Detection): boolean {
@@ -310,6 +345,7 @@ const time_phases = {
 	PR_PHASE,
 	CI_PHASE,
 	MERGE_PHASE,
+	WAIT_PHASE,
 	OTHER_PHASE,
 	build_phases,
 }
