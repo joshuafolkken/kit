@@ -1,4 +1,11 @@
-import { ESLINT_CACHE_FLAGS, GATE_COMMAND, PE, type CommandEntry } from './josh-command-types'
+import {
+	CSPELL_CACHE_FLAGS,
+	ESLINT_CACHE_FLAGS,
+	GATE_COMMAND,
+	PE,
+	TS_CACHE_FLAGS,
+	type CommandEntry,
+} from './josh-command-types'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const DEV_COMMANDS: Record<string, CommandEntry> = {
@@ -29,7 +36,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		shell: [
 			'sh',
 			'-c',
-			'pnpm exec prettier --write . && pnpm exec eslint . --fix --cache --cache-strategy content',
+			`pnpm exec prettier --write . && pnpm exec eslint . --fix ${ESLINT_CACHE_FLAGS.join(' ')}`,
 		],
 		description: 'Format code with prettier and eslint',
 		category: 'Development',
@@ -63,7 +70,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 	},
 	'cspell:dot': {
-		shell: [...PE, 'cspell', '.', '--dot'],
+		shell: [...PE, 'cspell', '.', '--dot', ...CSPELL_CACHE_FLAGS],
 		description: 'Run spell check including dotfiles',
 		category: 'Development',
 	},
@@ -99,7 +106,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		argument_targets: ['test:unit', 'test:e2e'],
 	},
 	check: {
-		shell: [...PE, 'tsc', '--noEmit'],
+		shell: [...PE, 'tsc', '--noEmit', ...TS_CACHE_FLAGS],
 		description: 'Type-check TypeScript project',
 		category: 'Development',
 	},

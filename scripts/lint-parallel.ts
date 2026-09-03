@@ -1,9 +1,14 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { buffered_process, FAIL_EXIT_CODE } from './buffered-process'
+import { ESLINT_CACHE_FLAGS } from './josh/josh-command-types'
 
 const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
-const ESLINT_ARGS = ['exec', 'eslint', '.', '--cache', '--cache-strategy', 'content'] as const
+// This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
+// cache flags come from the same constant the ignore rules are asserted against
+// (joshuafolkken/kit#1256). A copy here would keep writing the old location the day that constant
+// moves, with every test still green.
+const ESLINT_ARGS = ['exec', 'eslint', '.', ...ESLINT_CACHE_FLAGS] as const
 
 async function run_lint_parallel_checks(): Promise<number> {
 	const [prettier, eslint] = await Promise.all([
@@ -28,4 +33,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_lint_parallel_checks()
 }
 
-export { run_lint_parallel_checks }
+export { ESLINT_ARGS, run_lint_parallel_checks }
