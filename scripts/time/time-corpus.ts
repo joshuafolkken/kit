@@ -1,5 +1,6 @@
 import { cost_attribute } from '#scripts/cost/cost-attribute'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { time_duplicate, type SessionSpans } from './time-duplicate'
 import { time_overlap } from './time-overlap'
 import { time_spans, type Span } from './time-spans'
 
@@ -40,14 +41,6 @@ function may_mention_issue(text: string, issue_number: number): boolean {
 	return text.includes(`"${String(issue_number)}-`)
 }
 
-// Resuming or forking a session copies the earlier lines into a new transcript file, so one span can
-// appear in several — `cost-cli.ts` measured 152 such duplicated requests in this repository's own
-// transcripts. Per-session reading does not see them, and a run spanning sessions would count that
-// time twice.
-function span_key(span: Span): string {
-	return [span.ended_ms, span.duration_ms, span.category, span.label].join('|')
-}
-
 // One session's spans folded in, answering whether it contributed anything the run had not already
 // counted. **That answer is what `session_count` is, and it is not the number of files**: a resumed
 // transcript is a copy of an earlier one, so counting files would print `2 transcript(s)` beside a
@@ -55,7 +48,7 @@ function span_key(span: Span): string {
 function absorb(seen: Map<string, Span>, spans: ReadonlyArray<Span>): boolean {
 	const before = seen.size
 
-	for (const span of spans) seen.set(span_key(span), span)
+	for (const span of spans) seen.set(time_duplicate.span_key(span), span)
 
 	return seen.size > before
 }
@@ -76,23 +69,17 @@ function values_of(seen: ReadonlyMap<string, Span>): Array<Span> {
 	return unique
 }
 
-// One session's transcripts: its own, and the delegated units it ran (joshuafolkken/kit#1285).
-//
-// **The two are kept apart because they overlap.** A session that delegates holds one `Agent` tool
-// span for the whole time the unit runs, and the unit's transcript records those same minutes as the
-// work it did; folding them together counts that wall clock twice and leaves the four shares adding
-// up to more than the run took.
-interface Collected {
-	own: Map<string, Span>
-	delegated: Map<string, Span>
-}
+// One session's transcripts — its own and the delegated units it ran — is `SessionSpans`
+// (joshuafolkken/kit#1285). It is declared beside the assignment that reads it rather than here,
+// because deciding which session a duplicated span belongs to is the only thing that needs to know
+// the shape has two halves.
 
 // One issue's accumulation across the whole walk. Two structures, because the grouping and the
 // counting ask different questions: the subtraction is per session, whether a transcript contributed
 // anything is about the whole run, and a resumed transcript is a copy of an earlier one whichever
 // session it sits under.
 interface Collector {
-	by_session: Map<string, Collected>
+	by_session: Map<string, SessionSpans>
 	counted: Map<string, Span>
 	session_count: number
 }
@@ -106,7 +93,7 @@ function new_collector(): Collector {
 // session's spans would delete real work: two sessions attributed to one issue can run at the same
 // wall clock — a batch in the background while someone works interactively — and the interactive
 // session's spans would fall inside a foreign unit's window and vanish with no note.
-function group_for(by_session: Map<string, Collected>, file: SessionFile): Collected {
+function group_for(by_session: Map<string, SessionSpans>, file: SessionFile): SessionSpans {
 	const owner = cost_transcript.owning_session_id(file)
 	const found = by_session.get(owner) ?? { own: new Map(), delegated: new Map() }
 
@@ -128,12 +115,19 @@ function absorb_spans(collector: Collector, file: SessionFile, spans: ReadonlyAr
 // Each session's spans resolved against its own units, then folded together under the same key — a
 // resumed transcript is a copy, and a run spanning sessions must not count it twice.
 //
+// **The assignment comes first, and the fold afterwards is not a substitute for it**
+// (joshuafolkken/kit#1287). A duplicate the subtraction has already trimmed on one side no longer
+// shares a span key with the copy on the other, so a fold placed after `resolve_delegated` can no
+// longer see that the two are the same minutes. `assign_duplicates` decides which session each
+// duplicate is counted under while the keys still match; the fold below stays for the keys the
+// subtraction leaves alike.
+//
 // `resolve_delegated` is the identity for a session that delegated nothing, which is why a run that
 // never delegated reports exactly as it did before.
-function resolved_spans(by_session: ReadonlyMap<string, Collected>): Array<Span> {
+function resolved_spans(by_session: ReadonlyMap<string, SessionSpans>): Array<Span> {
 	const seen = new Map<string, Span>()
 
-	for (const [, collected] of by_session) {
+	for (const [, collected] of time_duplicate.assign_duplicates(by_session)) {
 		const resolved = time_overlap.resolve_delegated(
 			values_of(collected.own),
 			values_of(collected.delegated),
