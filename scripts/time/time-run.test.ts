@@ -5,6 +5,8 @@ import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_corpus } from './time-corpus'
 import type { GhReader } from './time-github'
+import { time_pull_fixture } from './time-pull-fixture'
+import { time_pull_index } from './time-pull-index'
 import { time_report, type TimeReport } from './time-report'
 import { time_run } from './time-run'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
@@ -12,6 +14,9 @@ import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 // The transcript fixtures are `time-transcript-fixture.ts`'s, shared with the suite that covers the
 // walk itself: what a session file looks like is one statement, not one per suite.
 const { CWD, MINUTE_MS, ISSUE, BRANCH, at, ms, issue_lines } = fixture
+// Which reads count as the pull-request listing is `time-pull-fixture.ts`'s, shared with the suites
+// that assert the same count on the walk itself.
+const { pulls_asked } = time_pull_fixture
 const SHA = 'abc123'
 
 const state = { home: '' }
@@ -241,7 +246,7 @@ describe('time_run.build_latest_run_report', () => {
 		expect(report?.scope).toBe(`issue #${String(ISSUE)}`)
 		// One pulls listing and one check-run read. Resolving the issue and then searching for its
 		// pull request again would page the same listing a second time.
-		expect(asked.filter((request_path) => request_path.includes('pulls'))).toHaveLength(1)
+		expect(pulls_asked(asked)).toHaveLength(1)
 	})
 
 	it('answers nothing when nothing merged carries an issue branch', async () => {
@@ -254,29 +259,49 @@ describe('time_run.build_latest_run_report', () => {
 	})
 })
 
-// The batch's way in: a caller measuring several issues has already walked the corpus once for all
-// of them, and handing this one its slice is what stops the walk repeating per child
-// (joshuafolkken/kit#1284).
-describe('time_run.build_run_report — spans the caller already collected', () => {
+// The batch's way in: a caller measuring several issues has already walked the corpus and paged the
+// pull-request listing once for all of them, and handing this one its slices is what stops both
+// repeating per child (joshuafolkken/kit#1284 and joshuafolkken/kit#1292).
+describe('time_run.build_run_report — sources the caller already collected', () => {
 	it('reads no transcript of its own when it is given them', async () => {
 		write_session('one', issue_lines(0))
 
 		const collected = time_corpus.collect_issue_spans(CWD, ISSUE)
 		const read = vi.spyOn(cost_transcript, 'read_raw')
-		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT), collected)
+		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT), {
+			found: collected,
+			search: undefined,
+		})
 
 		expect(read).not.toHaveBeenCalled()
 		expect(report.span_count).toBe(2)
 	})
 
-	// The default is what `--issue` does, so leaving the argument out must still walk the directory.
-	it('walks the directory itself when it is given none', async () => {
+	// The listing half: given the child's search result, the report must not page the listing again.
+	it('pages no pull-request listing of its own when it is given the search', async () => {
 		write_session('one', issue_lines(0))
 
+		const asked: Array<string> = []
+		const search = await time_pull_index.pull_for_issue(ISSUE, reader(MERGED_SCRIPT))
+		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT, asked), {
+			found: undefined,
+			search,
+		})
+
+		expect(pulls_asked(asked)).toHaveLength(0)
+		expect(report.has_ci_data).toBe(true)
+	})
+
+	// The default is what `--issue` does, so leaving the argument out must still read both halves.
+	it('reads both halves itself when it is given neither', async () => {
+		write_session('one', issue_lines(0))
+
+		const asked: Array<string> = []
 		const read = vi.spyOn(cost_transcript, 'read_raw')
-		const report = await report_of(MERGED_SCRIPT)
+		const report = await time_run.build_run_report(ISSUE, CWD, reader(MERGED_SCRIPT, asked))
 
 		expect(read).toHaveBeenCalled()
+		expect(pulls_asked(asked)).toHaveLength(1)
 		expect(report.span_count).toBe(2)
 	})
 })

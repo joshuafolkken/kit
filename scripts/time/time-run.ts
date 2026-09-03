@@ -2,6 +2,7 @@ import { cost_attribute } from '#scripts/cost/cost-attribute'
 import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
 import { time_overlap, type Interval } from './time-overlap'
+import { time_pull_index } from './time-pull-index'
 import { time_report, type LabelTotal, type TimeReport } from './time-report'
 import type { Span } from './time-spans'
 
@@ -171,21 +172,36 @@ function to_report(facts: RunFacts): TimeReport {
 	return { ...report, notes: [...notes, ...window_note(window, report.elapsed_ms)] }
 }
 
+// What a batch caller has already read for this child, so neither source is read once per child
+// (joshuafolkken/kit#1284 for the transcripts, joshuafolkken/kit#1292 for the pull-request listing).
+//
+// **Both halves are present keys whose value may be `undefined`, rather than optional keys.** Under
+// `exactOptionalPropertyTypes` an optional key rejects an explicit `undefined`, and a `Map#get` miss
+// is exactly that — so the caller would need a shim per field to hand over what it collected.
+interface RunSources {
+	found: IssueSpans | undefined
+	search: PullSearch | undefined
+}
+
+// What `--issue` passes: nothing was collected, so both halves are read here.
+const NO_SOURCES: RunSources = { found: undefined, search: undefined }
+
 // One issue's whole run. Never throws for a missing half: an issue with no pull request, an open
 // one, a listing that could not be read, and a run with no transcript each report what is known and
 // say what is not.
 //
-// **`found` is the batch's way in, and its default is what `--issue` does** (joshuafolkken/kit#1284).
-// A caller measuring several issues has already walked the transcript directory once for all of
-// them, and passing that slice in is what stops the walk repeating per child; a caller measuring one
-// passes nothing and the walk happens here, exactly as it always did.
+// **`sources` is the batch's way in, and its default is what `--issue` does.** A caller measuring
+// several issues has already walked the transcript directory and paged the pull-request listing once
+// for all of them, and passing those slices in is what stops both repeating per child; a caller
+// measuring one passes nothing and both reads happen here, exactly as they always did.
 async function build_run_report(
 	issue_number: number,
 	cwd: string,
 	read: GhReader = time_github.read_gh,
-	found: IssueSpans = time_corpus.collect_issue_spans(cwd, issue_number),
+	sources: RunSources = NO_SOURCES,
 ): Promise<TimeReport> {
-	const search = await time_github.pull_for_branch_prefix(issue_number, read)
+	const search = sources.search ?? (await time_pull_index.pull_for_issue(issue_number, read))
+	const found = sources.found ?? time_corpus.collect_issue_spans(cwd, issue_number)
 
 	return to_report(await gather(issue_number, found, read, search))
 }
@@ -224,4 +240,5 @@ const time_run = {
 	build_latest_run_report,
 }
 
+export type { RunSources }
 export { time_run }

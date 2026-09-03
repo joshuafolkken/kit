@@ -177,80 +177,102 @@ function to_found(pull: PullSummary): PullSearch {
 // any candidate at all, which is right for a branch match and wrong for a merge: the listing is
 // sorted by update time, so a pull request merged yesterday and commented on today sits above the
 // one merged an hour ago, and the newest merge falls to page two (joshuafolkken/kit#1279).
-interface PullChoice {
-	best: PullSummary | undefined
+//
+// **The candidate is a type parameter, because a batch's candidate is not one pull request**
+// (joshuafolkken/kit#1292). An epic's children are all answered from this same listing, so what is
+// carried across pages there is the index built so far — and writing that as a second walk would
+// page the same listing twice in two slightly different ways.
+interface PullFold<Candidate> {
+	best: Candidate
 	is_certain: boolean
 }
 
-// Which row of a page answers the question, given what the pages before it offered. A chooser
-// rather than a predicate, because the two lookups below differ in more than a test: one wants the
-// first branch that matches, the other the *latest* merge across every page read — and
-// `Array#find` cannot express the second.
-type PullChooser = (pulls: ReadonlyArray<PullSummary>, best: PullSummary | undefined) => PullChoice
+// Which rows of a page answer the question, given what the pages before it offered. A fold rather
+// than a predicate, because the lookups differ in more than a test: one wants the *latest* merge
+// across every page read, another every issue an epic asked about — and `Array#find` cannot express
+// either.
+type PullFolder<Candidate> = (
+	pulls: ReadonlyArray<PullSummary>,
+	best: Candidate,
+) => PullFold<Candidate>
 
-// The answer once the walk has settled — either the chooser proved it, or the listing ended, which
-// proves it just as well because there is nothing left to beat it. An empty-handed walk falls
-// through to `NOT_FOUND`, the "there is none" this module keeps apart from the other two.
-function to_settled(best: PullSummary | undefined): PullSearch {
-	return best === undefined ? NOT_FOUND : to_found(best)
+// The single-pull instantiation, named because it is what the merge lookup below folds with.
+type PullChoice = PullFold<PullSummary | undefined>
+type PullChooser = PullFolder<PullSummary | undefined>
+
+// How the walk ended, carried out rather than turned into an answer inside it. **The three "not
+// found" reasons are properties of the walk, not of a candidate**, and a batch needs them after the
+// fact: one walk answers many issues, and each issue that went unresolved inherits the same ending.
+type WalkEnd = 'settled' | 'ended' | 'capped' | 'failed'
+
+const WALK_SETTLED: WalkEnd = 'settled'
+const WALK_ENDED: WalkEnd = 'ended'
+const WALK_CAPPED: WalkEnd = 'capped'
+const WALK_FAILED: WalkEnd = 'failed'
+
+interface PullWalk<Candidate> {
+	best: Candidate
+	end: WalkEnd
 }
 
 // One page at a time, and the next one only if this one left the answer open. Written as a walk
 // forward rather than as parallel requests because the answer is almost always certain on the first
 // page: firing five to discard four spends someone's rate limit to save nothing.
-async function find_from_page(
+//
+// **The cap is reported, never answered.** Handing the best unproven candidate back as though the
+// walk had settled would be indistinguishable from a proven one, so `time-run.ts` would print an
+// older merge as "the run that just finished" with no sign that 500 rows were read without settling
+// it. `WALK_CAPPED` is what makes the caller say "not found among the 500 most recently updated"
+// instead, which is the true sentence.
+async function walk_from_page<Candidate>(
 	page: number,
-	choose: PullChooser,
+	fold: PullFolder<Candidate>,
 	read: GhReader,
-	best: PullSummary | undefined,
-): Promise<PullSearch> {
+	best: Candidate,
+): Promise<PullWalk<Candidate>> {
 	const read_page = await read_pulls_page(page, read)
 
-	if (read_page === undefined) return FAILED
+	if (read_page === undefined) return { best, end: WALK_FAILED }
 
-	const choice = choose(read_page.pulls, best)
+	const folded = fold(read_page.pulls, best)
 
-	if (choice.is_certain) return to_settled(choice.best)
-	if (read_page.row_count < PAGE_SIZE) return to_settled(choice.best)
+	if (folded.is_certain) return { best: folded.best, end: WALK_SETTLED }
+	if (read_page.row_count < PAGE_SIZE) return { best: folded.best, end: WALK_ENDED }
+	if (page >= MAX_PAGES) return { best: folded.best, end: WALK_CAPPED }
 
-	// **The cap is not an answer, and a candidate it could not prove is not one either.** Returning
-	// the best unproven merge here would be indistinguishable from a proven one — `to_found` sets the
-	// same two flags — so `time-run.ts` would print an older merge as "the run that just finished"
-	// with no sign that 500 rows were read without settling it. `CAPPED` is what makes the caller say
-	// "not found among the 500 most recently updated" instead, which is the true sentence.
-	if (page >= MAX_PAGES) return CAPPED
-
-	return await find_from_page(page + 1, choose, read, choice.best)
+	return await walk_from_page(page + 1, fold, read, folded.best)
 }
 
-// The walk over the listing that `choose` answers from. Both lookups below are this walk with a
-// different chooser; writing them separately would page the same listing twice in two slightly
-// different ways.
+// The walk over the listing that `fold` answers from. Every lookup in this command is this walk with
+// a different fold — the merge below, and the per-issue index in `time-pull-index.ts`.
+async function walk_pulls<Candidate>(
+	fold: PullFolder<Candidate>,
+	read: GhReader,
+	best: Candidate,
+): Promise<PullWalk<Candidate>> {
+	return await walk_from_page(FIRST_PAGE, fold, read, best)
+}
+
+// The three answers that are not a pull request, read off how the walk ended rather than decided
+// again by each caller. `WALK_ENDED` proves an absence as well as `WALK_SETTLED` does, because with
+// the listing exhausted there is nothing left that could have matched.
+function absent_search(end: WalkEnd): PullSearch {
+	if (end === WALK_FAILED) return FAILED
+	if (end === WALK_CAPPED) return CAPPED
+
+	return NOT_FOUND
+}
+
+function to_search(walk: PullWalk<PullSummary | undefined>): PullSearch {
+	if (walk.best === undefined || walk.end === WALK_FAILED || walk.end === WALK_CAPPED) {
+		return absent_search(walk.end)
+	}
+
+	return to_found(walk.best)
+}
+
 async function find_pull(choose: PullChooser, read: GhReader): Promise<PullSearch> {
-	return await find_from_page(FIRST_PAGE, choose, read, undefined)
-}
-
-// A branch match is certain the moment it is found: `josh git` names one branch after one issue, so
-// no later page can offer a better answer. **Nothing is carried across a page here** — the walk
-// returns as soon as `is_certain` is true, so this chooser only ever sees an empty hand, and reading
-// a carried candidate would suggest an accumulation that cannot happen. This is the certainty that
-// was implicit in the old protocol, and saying it out loud is what keeps the request count unchanged.
-function branch_choice(pulls: ReadonlyArray<PullSummary>, prefix: string): PullChoice {
-	const found = pulls.find((pull) => pull.branch.startsWith(prefix))
-
-	return { best: found, is_certain: found !== undefined }
-}
-
-// The pull request that closes an issue, found by its head branch. `josh git` names a branch
-// `<N>-<slug>`, so the branch is the link — the same fact `cost_attribute.issue_from_branch` reads
-// on the transcript side, which is why both halves of a run agree on which issue they belong to.
-async function pull_for_branch_prefix(
-	issue_number: number,
-	read: GhReader = read_gh,
-): Promise<PullSearch> {
-	const prefix = `${String(issue_number)}-`
-
-	return await find_pull((pulls) => branch_choice(pulls, prefix), read)
+	return to_search(await walk_pulls(choose, read, undefined))
 }
 
 // The latest merge on a page, not the first merged row on it. **The listing is sorted by update
@@ -381,11 +403,25 @@ const time_github = {
 	pulls_page_path,
 	newest_merged,
 	newest_merged_choice,
+	FAILED_SEARCH: FAILED,
+	absent_search,
+	to_found,
+	walk_pulls,
 	find_pull,
-	pull_for_branch_prefix,
 	latest_merged_pull,
 	list_check_runs,
 }
 
-export type { CheckRun, GhReader, PullChoice, PullSearch, PullsPage, PullSummary }
+export type {
+	CheckRun,
+	GhReader,
+	PullChoice,
+	PullFold,
+	PullFolder,
+	PullSearch,
+	PullsPage,
+	PullSummary,
+	PullWalk,
+	WalkEnd,
+}
 export { time_github }
