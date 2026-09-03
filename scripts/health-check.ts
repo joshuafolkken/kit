@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { execa } from 'execa'
+import { ESLINT_CACHE_FLAGS, TS_CACHE_FLAGS } from './josh/josh-command-types'
 
 const PNPM = 'pnpm'
 const LABEL_WIDTH = 12
@@ -23,12 +24,15 @@ interface CheckResult {
 
 const CHECKS: ReadonlyArray<HealthCheckDefinition> = [
 	{ label: 'prettier', cmd: PNPM, cmd_args: ['exec', 'prettier', '--check', '.'] },
+	// The cache flags come from the command map rather than being spelled again here: `josh health`
+	// and `josh gate` run the same two tools, and a copy that drifts pays the full uncached scan
+	// this file is meant to report on quickly (joshuafolkken/kit#1256).
 	{
 		label: 'eslint',
 		cmd: PNPM,
-		cmd_args: ['exec', 'eslint', '.', '--cache', '--cache-strategy', 'content'],
+		cmd_args: ['exec', 'eslint', '.', ...ESLINT_CACHE_FLAGS],
 	},
-	{ label: 'type check', cmd: PNPM, cmd_args: ['exec', 'tsc', '--noEmit'] },
+	{ label: 'type check', cmd: PNPM, cmd_args: ['exec', 'tsc', '--noEmit', ...TS_CACHE_FLAGS] },
 	{ label: 'security', cmd: PNPM, cmd_args: ['audit'], warn_on_fail: true },
 	{ label: 'outdated', cmd: PNPM, cmd_args: ['outdated'], warn_on_fail: true },
 ]

@@ -1,0 +1,90 @@
+import { readFileSync } from 'node:fs'
+import { package_path } from '#scripts/init/init-paths'
+import { ESLINT_ARGS } from '#scripts/lint-parallel'
+import { yaml_config_fixture } from '#scripts/yaml-config-fixture'
+import { describe, expect, it } from 'vitest'
+import { COMMAND_MAP } from './josh-command-map'
+import {
+	CSPELL_CACHE_FLAGS,
+	ESLINT_CACHE_FLAGS,
+	GATE_CACHE_FILES,
+	TS_CACHE_FLAGS,
+} from './josh-command-types'
+
+// joshuafolkken/kit#1256: the type check and the spell check used to rescan the whole tree on every
+// run. What makes them incremental is a flag on the command definition and an ignore rule naming the
+// file that flag writes, and neither half fails visibly on its own: drop the flag and the gate is
+// merely slow again, drop the ignore rule and a multi-hundred-kilobyte cache file is committed —
+// or, worse, spell-checked, which is a red gate with nothing misspelled in the tree.
+const GITIGNORE_PATHS: ReadonlyArray<string> = ['.gitignore', 'templates/gitignore']
+// The distributed dictionary. A consumer's `.gitignore` only gains the patterns on its next
+// `josh sync`, while the flags that write the files arrive with the package itself, so the
+// exclusion cannot rest on `useGitignore` alone.
+const DISTRIBUTED_CSPELL_CONFIG = 'cspell/index.yaml'
+
+interface CspellConfig {
+	ignorePaths?: Array<string>
+}
+
+// Joined rather than compared element-wise: `--tsBuildInfoFile` and `.tsbuildinfo` are a flag and
+// its value, and a membership check passes on an order that would make `tsc` read `--incremental`
+// as the file name.
+function command_line_of(command_name: string): string {
+	return (COMMAND_MAP[command_name]?.shell ?? []).join(' ')
+}
+
+function read_ignore_lines(relative_path: string): Array<string> {
+	return readFileSync(package_path(relative_path), 'utf8')
+		.split('\n')
+		.map((line) => line.trim())
+}
+
+function read_cspell_ignore_paths(): Array<string> {
+	const config = yaml_config_fixture.load_yaml_config(DISTRIBUTED_CSPELL_CONFIG) as CspellConfig
+
+	return config.ignorePaths ?? []
+}
+
+describe('verification gate cache flags', () => {
+	it('type-checks incrementally into a named build-info file', () => {
+		expect(command_line_of('check')).toContain(TS_CACHE_FLAGS.join(' '))
+	})
+
+	it('spell-checks from a content-addressed cache at a named location', () => {
+		expect(command_line_of('cspell:dot')).toContain(CSPELL_CACHE_FLAGS.join(' '))
+	})
+
+	it('keeps the eslint cache the other two were modelled on', () => {
+		expect(command_line_of('lint:eslint')).toContain(ESLINT_CACHE_FLAGS.join(' '))
+	})
+
+	// `josh lint` runs `lint-parallel.ts`, never the `lint:eslint` map entry, so asserting only the
+	// entry above would stay green while the gate's own lint step wrote a cache nothing ignores.
+	it('runs the gate lint step through the same eslint cache', () => {
+		expect(ESLINT_ARGS.join(' ')).toContain(ESLINT_CACHE_FLAGS.join(' '))
+	})
+
+	it('formats through the same eslint cache the lint check uses', () => {
+		expect(command_line_of('format')).toContain(ESLINT_CACHE_FLAGS.join(' '))
+	})
+})
+
+describe('verification gate cache files stay out of the repository', () => {
+	for (const relative_path of GITIGNORE_PATHS) {
+		it(`${relative_path} ignores every cache the gate writes`, () => {
+			const lines = read_ignore_lines(relative_path)
+
+			for (const cache_file of GATE_CACHE_FILES) {
+				expect(lines, `${relative_path} does not ignore ${cache_file}`).toContain(cache_file)
+			}
+		})
+	}
+
+	it(`${DISTRIBUTED_CSPELL_CONFIG} excludes them without waiting for a josh sync`, () => {
+		const ignore_paths = read_cspell_ignore_paths()
+
+		for (const cache_file of GATE_CACHE_FILES) {
+			expect(ignore_paths, `${cache_file} is not excluded`).toContain(`**/${cache_file}`)
+		}
+	})
+})

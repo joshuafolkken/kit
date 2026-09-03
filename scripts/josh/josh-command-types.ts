@@ -31,7 +31,48 @@ interface CommandEntry {
 const GATE_COMMAND = 'gate'
 
 const PE = ['pnpm', 'exec'] as const
-const ESLINT_CACHE_FLAGS = ['--cache', '--cache-strategy', 'content'] as const
+
+// joshuafolkken/kit#1256: three of the gate's four checks keep a content-addressed cache, so a
+// second run reads only what changed. eslint had one from the start; the type check and the spell
+// check rescanned the whole tree every time, which cost 10.5s of CPU against 2.8s cached.
+//
+// Neither cache needs an invalidation rule of its own. `tsc` records the compiler options inside
+// the build-info file and re-checks everything when they differ, and `cspell` records a content
+// hash of every config and dictionary file it loaded as that entry's dependency — so editing
+// `tsconfig.json` or `cspell.config.yaml` invalidates what it should. CI restores only the eslint
+// cache (`.github/workflows/ci.yml` → "Setup ESLint cache"); the other two start every run cold.
+//
+// Every location is passed explicitly rather than left to the tool's default, eslint's included:
+// the ignore rules have to name the same paths, and a constant that merely copies a default is
+// wrong the moment the default moves without anything failing. `GATE_CACHE_FILES` is what the
+// ignore rules are asserted against — `.gitignore` (which `useGitignore` also makes the spell
+// check's exclusion) and the distributed `cspell/index.yaml`, which does not wait for a
+// `josh sync` to reach a consumer.
+const ESLINT_CACHE_FILE = '.eslintcache'
+const TS_BUILD_INFO_FILE = '.tsbuildinfo'
+const CSPELL_CACHE_FILE = '.cspellcache'
+const GATE_CACHE_FILES: ReadonlyArray<string> = [
+	ESLINT_CACHE_FILE,
+	TS_BUILD_INFO_FILE,
+	CSPELL_CACHE_FILE,
+]
+
+// `--cache --cache-strategy content` is one convention rather than two coincidences: cspell adopted
+// eslint's spelling for its own cache flags, so the pair is single-sourced here.
+const CONTENT_CACHE_FLAGS = ['--cache', '--cache-strategy', 'content'] as const
+const CACHE_LOCATION_FLAG = '--cache-location'
+const ESLINT_CACHE_FLAGS = [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, ESLINT_CACHE_FILE] as const
+const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
+const CSPELL_CACHE_FLAGS = [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, CSPELL_CACHE_FILE] as const
 
 export type { CommandCategory, CommandEntry }
-export { ENV_FILE_FLAGS, ESLINT_CACHE_FLAGS, GATE_COMMAND, OPTIONAL_ENV_FILE_FLAGS, PE }
+export {
+	CSPELL_CACHE_FLAGS,
+	ENV_FILE_FLAGS,
+	ESLINT_CACHE_FLAGS,
+	GATE_CACHE_FILES,
+	GATE_COMMAND,
+	OPTIONAL_ENV_FILE_FLAGS,
+	PE,
+	TS_CACHE_FLAGS,
+}

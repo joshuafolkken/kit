@@ -130,24 +130,24 @@ The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries ba
 
 ### Available `pnpm josh` subcommands
 
-| Command              | Runs                                                  |
-| -------------------- | ----------------------------------------------------- |
-| `lint`               | `pnpm lint:prettier && pnpm lint:eslint`              |
-| `lint:prettier`      | `prettier --check .`                                  |
-| `lint:eslint`        | `eslint . --cache --cache-strategy content`           |
-| `format`             | `pnpm format:prettier && pnpm format:eslint`          |
-| `format:prettier`    | `prettier --write .`                                  |
-| `format:eslint`      | `eslint . --fix --cache --cache-strategy content`     |
-| `cspell`             | `cspell lint ...`                                     |
-| `cspell:dot`         | `pnpm cspell . --dot`                                 |
-| `test:unit`          | `vitest run` (skips when vitest or test files absent) |
-| `lefthook:install`   | `lefthook install`                                    |
-| `lefthook:uninstall` | `lefthook uninstall`                                  |
-| `lefthook:commit`    | `lefthook run pre-commit`                             |
-| `lefthook:push`      | `lefthook run pre-push`                               |
-| `main:sync`          | `git checkout main && git pull`                       |
-| `main:merge`         | `git pull origin main`                                |
-| `check`              | `pnpm exec tsc --noEmit`                              |
+| Command              | Runs                                                                            |
+| -------------------- | ------------------------------------------------------------------------------- |
+| `lint`               | `pnpm lint:prettier && pnpm lint:eslint`                                        |
+| `lint:prettier`      | `prettier --check .`                                                            |
+| `lint:eslint`        | `eslint . --cache --cache-strategy content`                                     |
+| `format`             | `pnpm format:prettier && pnpm format:eslint`                                    |
+| `format:prettier`    | `prettier --write .`                                                            |
+| `format:eslint`      | `eslint . --fix --cache --cache-strategy content`                               |
+| `cspell`             | `cspell lint ...`                                                               |
+| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache` |
+| `test:unit`          | `vitest run` (skips when vitest or test files absent)                           |
+| `lefthook:install`   | `lefthook install`                                                              |
+| `lefthook:uninstall` | `lefthook uninstall`                                                            |
+| `lefthook:commit`    | `lefthook run pre-commit`                                                       |
+| `lefthook:push`      | `lefthook run pre-push`                                                         |
+| `main:sync`          | `git checkout main && git pull`                                                 |
+| `main:merge`         | `git pull origin main`                                                          |
+| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                     |
 
 SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
 

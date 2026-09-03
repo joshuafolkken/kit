@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # What the gate's caches exist to stop it doing (joshuafolkken/kit#1256). Both forms are needed:
+  # cspell's dictionaries do not derive one from the other.
+  - rescan
+  - rescanned
   - dedup
   - keepalive
   - refspec
