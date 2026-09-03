@@ -11,6 +11,9 @@ const CWD = '/Users/someone/Development/kit'
 const MINUTE_MS = 60_000
 const ISSUE = 1268
 const BRANCH = '1268-measure-a-run'
+// What `issue_lines` spends, and so what the same three minutes must still total once the parent's
+// wait for the unit that spent them is folded in.
+const THREE_MINUTES_MS = 3 * MINUTE_MS
 const SHA = 'abc123'
 
 const state = { home: '' }
@@ -71,6 +74,50 @@ function write_session(name: string, lines: ReadonlyArray<string>): void {
 	)
 }
 
+// A delegated unit's transcript, which Claude Code writes to a subdirectory of the session that
+// delegated it rather than beside that session's own file.
+function write_unit(session_name: string, agent_name: string, lines: ReadonlyArray<string>): void {
+	const directory = cost_transcript.unit_directory(
+		path.join(state.home, cost_transcript.project_slug(CWD)),
+		session_name,
+	)
+
+	mkdirSync(directory, { recursive: true })
+	writeFileSync(
+		path.join(directory, `${agent_name}${cost_transcript.TRANSCRIPT_EXTENSION}`),
+		lines.join('\n'),
+	)
+}
+
+// The parent's whole view of a delegated child: one `Agent` span covering minutes 0→3, which is the
+// same wall clock the unit's transcript below records as the work it did.
+function delegating_lines(): Array<string> {
+	return [
+		JSON.stringify({
+			type: 'assistant',
+			timestamp: at(0),
+			gitBranch: BRANCH,
+			message: { content: [{ type: 'tool_use', name: 'Agent', id: 'g' }] },
+		}),
+		JSON.stringify({
+			type: 'user',
+			timestamp: at(3),
+			gitBranch: BRANCH,
+			message: { content: [{ type: 'tool_result', tool_use_id: 'g', content: 'done' }] },
+		}),
+	]
+}
+
+// A second session working the same issue over the same three minutes, with span instants the unit's
+// do not share — otherwise the cross-session dedupe collapses the two and the case says nothing.
+function concurrent_lines(): Array<string> {
+	return [prompt_line(0, BRANCH), call_line(2, BRANCH), result_line(3, BRANCH)]
+}
+
+function total_span_ms(spans: ReadonlyArray<{ duration_ms: number }>): number {
+	return spans.reduce((sum, one) => sum + one.duration_ms, 0)
+}
+
 // Minutes 0→1 model wait, 1→3 tool execution, all on the issue's branch.
 function issue_lines(offset: number): Array<string> {
 	return [
@@ -108,41 +155,6 @@ function merged_pull(created: number, merged: number): string {
 function open_pull(created: number): string {
 	return pull_body(created, 'null')
 }
-
-describe('time_run.uncovered_ms', () => {
-	// The property the whole join rests on. `followup --merge` waits for CI inside a Bash tool span
-	// that is already counted, so adding the pull request's window whole would count it twice and
-	// leave the four shares summing to more than the run took.
-	it('subtracts the part of the window a span already covers', () => {
-		const uncovered = time_run.uncovered_ms({ started_ms: 0, ended_ms: 10 }, [
-			{ started_ms: 2, ended_ms: 6 },
-		])
-
-		expect(uncovered).toBe(6)
-	})
-
-	it('merges overlapping and out-of-order covers rather than double-subtracting', () => {
-		const uncovered = time_run.uncovered_ms({ started_ms: 0, ended_ms: 10 }, [
-			{ started_ms: 4, ended_ms: 8 },
-			{ started_ms: 2, ended_ms: 6 },
-		])
-
-		expect(uncovered).toBe(4)
-	})
-
-	it('ignores a cover that lies entirely outside the window', () => {
-		const uncovered = time_run.uncovered_ms({ started_ms: 10, ended_ms: 20 }, [
-			{ started_ms: 0, ended_ms: 5 },
-			{ started_ms: 40, ended_ms: 50 },
-		])
-
-		expect(uncovered).toBe(10)
-	})
-
-	it('answers zero for a window with no length', () => {
-		expect(time_run.uncovered_ms({ started_ms: 5, ended_ms: 5 }, [])).toBe(0)
-	})
-})
 
 describe('time_run.collect_issue_spans', () => {
 	// A run is not a session: the `fullrun` for issue #1256 ran in a different one from the session
@@ -197,6 +209,42 @@ describe('time_run.collect_issue_spans', () => {
 		write_session('one', [prompt_line(0, 'main'), call_line(1, 'main'), result_line(3, BRANCH)])
 
 		expect(time_run.collect_issue_spans(CWD, ISSUE).spans).toHaveLength(2)
+	})
+})
+
+describe('time_run.collect_issue_spans on a delegated run', () => {
+	// `epicrun` runs every child in a delegated unit, and the unit's transcript is written to a
+	// subdirectory of the session that delegated it. Listing only the session files reported epic
+	// #1272's four merged children as "CI wait only" (joshuafolkken/kit#1285).
+	it('reads a delegated unit transcript, not only the session that delegated it', () => {
+		write_unit('parent', 'agent-a1', issue_lines(0))
+
+		expect(time_run.collect_issue_spans(CWD, ISSUE).spans).toHaveLength(2)
+	})
+
+	// The parent holds one `Agent` span for the whole time the unit runs. Concatenated, the two
+	// readings count those minutes twice and the four shares stop summing to the elapsed time.
+	it('does not count the parent wait and the unit work as separate wall clock', () => {
+		write_session('parent', delegating_lines())
+		write_unit('parent', 'agent-a1', issue_lines(0))
+
+		const found = time_run.collect_issue_spans(CWD, ISSUE)
+
+		expect(total_span_ms(found.spans)).toBe(THREE_MINUTES_MS)
+	})
+
+	// A unit's work overlaps the wait of the session that delegated it and nothing else. Two sessions
+	// attributed to one issue can run at the same wall clock — a batch in the background while someone
+	// works interactively — and pooling every unit's interval would delete the second session's real
+	// spans without a word.
+	it('does not subtract one session units from another session own spans', () => {
+		write_session('parent', delegating_lines())
+		write_unit('parent', 'agent-a1', issue_lines(0))
+		write_session('other', concurrent_lines())
+
+		const found = time_run.collect_issue_spans(CWD, ISSUE)
+
+		expect(total_span_ms(found.spans)).toBe(2 * THREE_MINUTES_MS)
 	})
 })
 
