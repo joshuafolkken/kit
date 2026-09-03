@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
+import { time_markers } from './time-markers'
+import { time_spans, type Span } from './time-spans'
 
 // The transcript files the timing tests measure, written once rather than in each test file
 // (joshuafolkken/kit#1284).
@@ -135,6 +137,21 @@ function total_span_ms(spans: ReadonlyArray<{ duration_ms: number }>): number {
 	return spans.reduce((sum, one) => sum + one.duration_ms, 0)
 }
 
+// One tool span, named and placed on the minute grid, for the suites that test the arithmetic rather
+// than the reading. Here rather than beside each of them because two suites now assert against spans
+// built exactly this way, and a builder that drifted would let them disagree about what a span is.
+function span(label: string, ended_minute: number, duration_minutes: number): Span {
+	return {
+		category: time_spans.TOOL_CATEGORY,
+		label,
+		josh_command: '',
+		marker: time_markers.NO_MARKER,
+		branch: 'main',
+		ended_ms: ended_minute * MINUTE_MS,
+		duration_ms: duration_minutes * MINUTE_MS,
+	}
+}
+
 const time_transcript_fixture = {
 	CWD,
 	MINUTE_MS,
@@ -153,6 +170,7 @@ const time_transcript_fixture = {
 	write_session,
 	write_unit,
 	total_span_ms,
+	span,
 }
 
 export { time_transcript_fixture }
