@@ -19,13 +19,21 @@ The four are independent and share no mutable state, so nothing is gained by run
 The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
 ```
-✔ lint (pnpm josh lint)
-✗ check (pnpm josh-app check:ci)
+✔ lint (pnpm josh lint) 9.0s
+✗ check (pnpm josh-app check:ci) 4.6s
 …
-✗ verification gate failed: lint, cspell
+✗ verification gate failed: lint, cspell (23.0s)
+```
+
+or, on a green one:
+
+```
+✔ verification gate passed (4 checks) in 23.0s.
 ```
 
 Each block's header names the command that ran, not only the check, because the type check's command is resolved per project (below). Re-run a single check while fixing by copying the command from its header; the other three are always `pnpm josh lint`, `pnpm josh cspell:dot` and `pnpm josh test:unit`. The exit code is `1` when any check failed, `0` otherwise.
+
+**Every header ends with how long that check took, and the summary with how long the gate took** ([#1248](https://github.com/joshuafolkken/kit/issues/1248)). The total is wall-clock for the command, not the sum of the four — they run concurrently, so a sum would report about three times what you waited. Read the four against it: 9.0s, 4.6s, 3.1s and 15.4s against a total of 23.0s says the fan-out is working and the unit suite is the long pole; the same four against 80s says the machine was contended rather than any one check being slow. Without those numbers the figure quoted above had to be re-measured by hand every time it was questioned — twice on [#1153](https://github.com/joshuafolkken/kit/issues/1153) alone, which is what put the timing in the output rather than in a stopwatch around it.
 
 **That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat.
 

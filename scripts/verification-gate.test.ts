@@ -362,3 +362,51 @@ describe('run_gate_command — the verbose flag', () => {
 		}
 	})
 })
+
+// joshuafolkken/kit#1248: the gate said which check failed and never how long anything took, so
+// "which of the four is the long pole" could only be answered by timing each one by hand outside
+// the command — which is how the same figure came to be re-measured by hand twice on #1153.
+// No quantifier at all, so there is nothing for `sonarjs/super-linear-regex` to backtrack over:
+// every duration this formatter emits ends `<digit>.<digit>s`, whatever its magnitude, and this
+// pattern asks only whether a line carries one. The three patterns below keep `\d+` because a
+// literal prefix anchors them.
+const DURATION_PATTERN = /\d\.\ds/u
+const RESULT_ICONS: ReadonlyArray<string> = ['✔', '✗']
+// The summary line, counted alongside the four check headers.
+const SUMMARY_LINE_COUNT = 1
+
+function result_lines(text: string): Array<string> {
+	return text.split('\n').filter((line) => RESULT_ICONS.some((icon) => line.startsWith(icon)))
+}
+
+describe('run_verification_gate — how long each check took', () => {
+	it('puts a duration on every check header and on the summary', async () => {
+		const [, text] = await run_capturing(ALL_PASS)
+		const lines = result_lines(text)
+
+		expect(lines).toHaveLength(GATE_STEPS.length + SUMMARY_LINE_COUNT)
+		for (const line of lines) expect(line).toMatch(DURATION_PATTERN)
+	})
+
+	// The header's first job is naming the one command to re-run while fixing, so the duration goes
+	// behind it rather than between the label and the command.
+	it('keeps the duration behind the command the header names', async () => {
+		const [, text] = await run_capturing(ALL_PASS)
+
+		expect(text).toMatch(/check \(pnpm josh-app check:ci\) \d+\.\ds/u)
+	})
+
+	it('reports the total on a passing gate', async () => {
+		const [, text] = await run_capturing(ALL_PASS)
+
+		expect(text).toMatch(/verification gate passed \(\d+ checks\) in \d+\.\ds\./u)
+	})
+
+	// The failing summary names every failing check first and takes the total after them: a reader
+	// scanning for what broke must not have to step over a number to find it.
+	it('reports the total on a failing gate, after the checks it names', async () => {
+		const [, text] = await run_capturing([FAIL, PASS, FAIL, PASS])
+
+		expect(text).toMatch(/verification gate failed: lint, cspell \(\d+\.\ds\)/u)
+	})
+})
