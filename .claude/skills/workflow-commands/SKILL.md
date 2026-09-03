@@ -612,7 +612,10 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   allowed/prohibited table and the reasoning are at
   `prompts/collaboration-workflow/file-edits.md`; what stays resident is the instruction and the
   criterion that decides it — whether the command carries the replacement wholesale, not which tool
-  was used (joshuafolkken/kit#1150).
+  was used (joshuafolkken/kit#1150). **The same criterion binds the Edit itself**: rewriting a whole
+  file to fix the three lines a review named carries the replacement wholesale exactly as a heredoc
+  does, so the resident instruction covers it in one clause and the three cases that justify writing
+  a file whole stay at the pointer (joshuafolkken/kit#1260).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in

@@ -20,9 +20,23 @@ const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/file-edits.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
 const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/${SKILL_ENTRY_FILE}`
 const SUITE_PATH = 'scripts/inline-edit-rule.test.ts'
-// The three figures the issue was filed on. Quotable enough to be the first thing pasted back into
+// The figures the two issues were filed on. Quotable enough to be the first thing pasted back into
 // an always-loaded document, which is what makes them the marker for "the reasoning stayed put".
-const MEASUREMENTS: ReadonlyArray<string> = ['79,317', '81.7%', '30.2%']
+// The last two are joshuafolkken/kit#1260's: one `fullrun #1251` turn spent 11,104 output tokens
+// rewriting two files wholesale after a review, and another 3,282 — about 2 minutes 45 seconds of generation
+// at that run's ~87 tokens/second, to reproduce lines that already existed.
+const WHOLE_FILE_MEASUREMENTS: ReadonlyArray<string> = ['11,104', '3,282']
+const MEASUREMENTS: ReadonlyArray<string> = ['79,317', '81.7%', '30.2%', ...WHOLE_FILE_MEASUREMENTS]
+
+// The interpreter forms used to be listed resident as well. They are the rule's worked examples, and
+// the pointer's verdict table already rules on every one of them, so joshuafolkken/kit#1260 moved
+// them down rather than deleting them — which is what paid for the whole-file clause without the
+// resident document growing. Asserted absent so a re-inline is caught by name, not only by bytes.
+const INTERPRETER_FORMS: ReadonlyArray<string> = [
+	"`python3 - <<'PY'`",
+	'`node -e`',
+	"`cat > file <<'EOF'`",
+]
 
 // Every sentence here changes what an agent does. Drop the first and the prohibition is gone; drop
 // the criterion and it reads as a ban on a named tool, which a `node -e` or a `tee` heredoc walks
@@ -35,12 +49,34 @@ describe.each(AI_DOCS)('%s — keeps the file-editing prohibition resident', (do
 		'An edit that targets a region of an existing file is made with the Edit tool',
 		"**The criterion is whether the command carries the replacement wholesale, not the tool's name**",
 		'a short `sed -i` substitution is smaller than an Edit and stays allowed',
+		// joshuafolkken/kit#1260's half. Without it the rule reads as a prohibition on a transport,
+		// and a whole-file rewrite through the Edit tool satisfies every word of it.
+		// The carve-out rides along: this rule is resident precisely because the pointer is the
+		// document an agent has not read, so an unqualified "never" would stop a new file being
+		// written at all — the `sed -i` half of the same sentence carries its exception for the
+		// same reason.
+		'never widen the Edit to a file you are not replacing',
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 
 	it('routes to the canonical topic file', () => {
 		expect(content).toContain(`\`${CANONICAL}\``)
+	})
+
+	it('routes the whole-file question to that same file rather than a second one', () => {
+		expect(content).toContain(`whole-file cases are in \`${CANONICAL}\``)
+	})
+
+	// The examples went to the pointer to pay for the clause above. Resident again, they cost the
+	// budget back and the ceiling suite would then be satisfied by deleting some unpinned neighbor.
+	// Searched over the same two targets the measurement assertion below uses, and for the same
+	// reason: the residency lists are where a moved-out example is likeliest to be pasted back, and
+	// a check scoped to `CLAUDE.md` alone would pass with it sitting in either.
+	it.each(INTERPRETER_FORMS)('leaves the interpreter form %j at the pointer', (form) => {
+		expect(read_unwrapped_rule_surface(document_path)).not.toContain(form)
+		expect(read_unwrapped(RESIDENCY)).not.toContain(form)
+		expect(read_unwrapped(CANONICAL)).toContain(form)
 	})
 
 	// A resident rule is a trigger plus a pointer. The measured breakdown is what makes the rule
@@ -85,6 +121,38 @@ describe(`${CANONICAL} — carries the criterion and the reasoning`, () => {
 	})
 })
 
+// joshuafolkken/kit#1260. The rule the resident clause routes to: a partial edit is the default, and
+// a whole file is written only to replace the file. It lives in this file rather than beside the
+// review procedure because it is the *scope* half of the subject whose *transport* half is already
+// here — two homes for one subject is the clone `CLAUDE.md` prohibits, and the sentence it grew out
+// of ("Edit を使ったから安全 も成り立たない") was already in this file.
+describe(`${CANONICAL} — makes the partial edit the default`, () => {
+	const content = read_unwrapped(CANONICAL)
+
+	it.each([
+		'### 編集は指摘された箇所だけを対象にする（全文書き直しの条件）',
+		'**既定は部分編集である。**',
+		'**ファイルを全文書いてよいのは、ファイルそのものを置き換える意図があるときだけである。**',
+		// Without the three cases the rule reads as "never write a file whole", which stops a new
+		// file being created at all.
+		'**新規ファイルの作成**',
+		'**ファイル全体の作り直し**',
+		'**部分編集のほうが大きくなる場合**',
+		// Why the loss grows as the finding shrinks — the point a reader has to be able to reconstruct.
+		'**レビュー指摘の修正がこの規則の主戦場である。**',
+		'**指摘が局所的であるほど、全文書き直しとの差は開く。**',
+	])('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+
+	// The measured evidence belongs here, at the pointer — the assertions above only say the rule is
+	// stated, and a rule nobody can check the cost of is the first one argued back out.
+	it('carries the measured cost of the whole-file rewrites', () => {
+		expect(content).toContain('joshuafolkken/kit#1251 のランで実測した値')
+		for (const measurement of WHOLE_FILE_MEASUREMENTS) expect(content).toContain(measurement)
+	})
+})
+
 // The carve-out is the part that can be followed straight into a corrupted file: `sed` substitutes
 // on every matching line, succeeds on zero matches, and its `-i` argument differs between BSD and
 // GNU — and this document ships to consumers on both.
@@ -116,6 +184,10 @@ describe('the residency lists name the file-editing prohibition', () => {
 	it.each([
 		"**The prohibition on carrying a file's new text inside a shell command** — an edit happens on any turn at all",
 		'there is no skill that a run loads *before* editing',
+		// The whole-file half is the same entry, not a second one: it fires on the same turns and
+		// routes to the same pointer, so a list that gave it a row of its own would be claiming two
+		// rules where the criterion sees one.
+		'**The same criterion binds the Edit itself**',
 		SUITE_PATH,
 	])('the workflow skill states %j', (marker) => {
 		expect(read_unwrapped(WORKFLOW_SKILL_ENTRY)).toContain(marker)
@@ -124,6 +196,7 @@ describe('the residency lists name the file-editing prohibition', () => {
 	it.each([
 		'- **編集後の本文をコマンドに載せない禁止**',
 		'**編集の直前にロードされる skill は存在しない**',
+		'**Edit 自体を全文へ広げる形も同じ規則の一部である**',
 		SUITE_PATH,
 	])('the canonical residency file states %j', (marker) => {
 		// `residency.md` directly, never the concatenated corpus `WORKFLOW_PROMPT` reads: the pointer
