@@ -33,14 +33,69 @@ const NO_SNAPSHOT_LINE = `No round-1 snapshot was recorded, so the fix delta can
 const EMPTY_DELTA_LINE =
 	'The fix delta is empty — nothing changed since round 1, so there is nothing for a verification pass to read.'
 
+const NOT_VERIFIED_LINE =
+	'Not verified: `pnpm josh gate` has not passed on this exact tree. Nothing here claims lint, the type check, the spell check or the unit tests are green.'
+
 // Named so the caller and the test agree on the sentence without either restating it: a brief that
 // says the gate passed when it did not is the one failure this whole record exists to prevent.
-function gate_line(stamp: FileMapStamp | undefined, tree: Record<string, string>): string {
-	if (stamp === undefined || file_map_stamp.changed_since(stamp, tree).length > 0) {
-		return 'Not verified: `pnpm josh gate` has not passed on this exact tree. Nothing here claims lint, the type check, the spell check or the unit tests are green.'
-	}
+//
+// The stamp comes back rather than a boolean so the caller reaches `taken_at` on a value it has
+// already narrowed — a record that does not describe this tree has no timestamp worth printing, and
+// the two answers should not be reachable through the same variable.
+function matching_stamp(
+	stamp: FileMapStamp | undefined,
+	tree: Record<string, string>,
+): FileMapStamp | undefined {
+	if (stamp === undefined || file_map_stamp.changed_since(stamp, tree).length > 0) return undefined
 
-	return `Already verified — do not re-run these:\n- lint, the type check, the spell check and the unit tests all passed on this exact tree at ${stamp.taken_at} (\`pnpm josh gate\`).`
+	return stamp
+}
+
+function verified_line(taken_at: string): string {
+	return `Already verified — do not re-run these:\n- lint, the type check, the spell check and the unit tests all passed on this exact tree at ${taken_at} (\`pnpm josh gate\`).`
+}
+
+// **The in-flight sentence claims no result, and that is the point** (joshuafolkken/kit#1242). The
+// gate and this review are started together, so the honest thing to say is that a gate is running —
+// not that it passed. What it forbids is re-running the unit suite, which is wasted whether the gate
+// ends green or red, and it names who joins the result so the reader knows the check is not being
+// skipped.
+function in_flight_line(taken_at: string): string {
+	return `Running now — do not re-run these:\n- \`pnpm josh gate\` started against this exact tree at ${taken_at} and has not recorded a result. Lint, the type check, the spell check and the unit tests are being run beside this review; the run joins that result before it commits, and it is that result — never one you produce here — that gates the merge. Nothing here claims any of them are green.`
+}
+
+// **The marker asserts a live process, so matching the tree is not enough.** `josh gate` clears it in
+// a `finally`, and a `finally` does not run when the gate is killed — Ctrl-C, Stop, SIGTERM — so an
+// interrupted gate leaves the file on disk with the tree it was reading still intact. Believed on the
+// digests alone it would say a gate is running for as long as nobody edits that tree, about a process
+// that no longer exists: exactly the state the record must never describe. The written `pid` is what
+// separates the two, and a marker with none is read as not running, which falls back to `Not verified`.
+function live_marker(
+	stamp: FileMapStamp | undefined,
+	tree: Record<string, string>,
+): FileMapStamp | undefined {
+	const matched = matching_stamp(stamp, tree)
+
+	if (matched === undefined || !file_map_stamp.is_process_alive(matched.pid)) return undefined
+
+	return matched
+}
+
+// Green first: a matching gate stamp is a proven result, and a gate running beside it can only be a
+// second one over the same unverified tree.
+function gate_line(
+	stamps: { gate: FileMapStamp | undefined; in_flight: FileMapStamp | undefined },
+	tree: Record<string, string>,
+): string {
+	const green = matching_stamp(stamps.gate, tree)
+
+	if (green !== undefined) return verified_line(green.taken_at)
+
+	const running = live_marker(stamps.in_flight, tree)
+
+	if (running !== undefined) return in_flight_line(running.taken_at)
+
+	return NOT_VERIFIED_LINE
 }
 
 function format_paths(paths: ReadonlyArray<string>): string {
@@ -68,11 +123,17 @@ function round_two_block(snapshot: FileMapStamp | undefined, tree: Record<string
 	return `${ROUND_TWO_HEADING}\n${taken}\n${round_two_target(delta)}\n${ROUND_TWO_QUESTION}`
 }
 
+interface BriefStamps {
+	gate: FileMapStamp | undefined
+	in_flight: FileMapStamp | undefined
+	round_one: FileMapStamp | undefined
+}
+
 interface BriefInput {
 	level: string
 	round: number
 	tree: Record<string, string>
-	stamps: { gate: FileMapStamp | undefined; round_one: FileMapStamp | undefined }
+	stamps: BriefStamps
 }
 
 const SECOND_ROUND = 2
@@ -89,7 +150,7 @@ function compose(input: BriefInput): string {
 	return [
 		input.level,
 		'',
-		gate_line(input.stamps.gate, input.tree),
+		gate_line(input.stamps, input.tree),
 		TEST_COMMAND_LINE,
 		'',
 		target_block(input),
@@ -100,7 +161,11 @@ const review_brief = {
 	compose,
 	EMPTY_DELTA_LINE,
 	gate_line,
+	in_flight_line,
+	live_marker,
+	matching_stamp,
 	NO_SNAPSHOT_LINE,
+	NOT_VERIFIED_LINE,
 	ROUND_TWO_HEADING,
 	ROUND_TWO_QUESTION,
 	round_two_block,
@@ -109,5 +174,5 @@ const review_brief = {
 	WHOLE_CHANGE_TARGET,
 }
 
-export type { BriefInput }
+export type { BriefInput, BriefStamps }
 export { review_brief }

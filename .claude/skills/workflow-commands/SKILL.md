@@ -51,8 +51,8 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   trigger is elapsed time since the last update in this checkout, never a judgement, and the
   `dependency-update` skill is loaded afterwards exactly as before whenever the update actually ran.
   `latest-gate.md` is the single source; `kickoff` never reaches it, because it never implements.
-- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → `pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) → `/code-review` with the brief `pnpm josh review:brief` prints
-  (the level, what the gate has already proved on this exact tree, and the target)
+- **The verification gate**, in this order: refactor per `prompts/refactoring.md` → **`pnpm josh gate` (lint, type check, spell check and unit tests, run concurrently) is *started* when the review starts, and *joined* before the commit** — the same treatment `josh eval` already gets below, and for the same reason: neither the gate nor the review writes to the working tree, so paying for them one after the other is pure waiting (joshuafolkken/kit#1242, measured at 187 seconds of a 1623-second run) → `/code-review` with the brief `pnpm josh review:brief` prints
+  (the level, what the gate has already proved **or is still proving** on this exact tree, and the target)
   on `git diff main`, iterating until no high/medium findings remain — **at most two reviews in total**,
   the second one a verification pass over the fixes rather than a second full read of the diff —
   run it with `pnpm josh review:brief --round 2`, which hands the fix delta over as the **target**
@@ -62,6 +62,13 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   full review") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
   answers `required` (`eval-gate.md`). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
+  **Joining the gate is a step, not a formality — there is no path to a commit on a gate nobody read.**
+  Read what the gate printed before `pnpm josh bump minor`; a red one is fixed and re-run **whatever
+  the review concluded**, and because that fix is uncommitted like every other, it lands in the
+  round-2 fix delta and is reviewed with the rest. While the checks are in flight the brief says so
+  rather than saying nothing: `josh gate` writes a marker for as long as it runs, so the review agent
+  is told not to run the unit suite the gate is running beside it — **and that sentence claims no
+  result**, because a gate that has not finished has none to claim (joshuafolkken/kit#1242).
   **The rule-compliance measurement is read after the review and before the commit, never inside
   `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval` is five
   real Claude sessions. **It is *started* when the review starts, because neither writes to the

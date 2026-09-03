@@ -185,10 +185,66 @@ async function read_tree_before_checks(): Promise<Record<string, string>> {
 	}
 }
 
+// The marker that says a gate is running on this tree right now (joshuafolkken/kit#1242). The gate
+// and `/code-review` are started together — neither writes to the working tree — so by the time
+// `josh review:brief` composes the invocation the checks are usually still in flight. Without this
+// record that state reads as "no gate was ever run", and the review agent runs the unit suite the
+// gate is running beside it.
+//
+// **Both halves swallow their failure, and for the same reason `record_green_gate` does**: the
+// marker is a convenience for the next command and nothing about it may reach the gate's verdict. A
+// marker that could not be written costs a brief that says `Not verified`, which is the safe
+// direction; one that could not be cleared costs a brief that says a gate is running when none is —
+// which still claims no result, and which the next gate overwrites.
+function mark_gate_running(before: Record<string, string>, target?: string): void {
+	try {
+		review_stamps.in_flight_stamp.write(before, target)
+	} catch {
+		/* no marker is the safe answer */
+	}
+}
+
+function clear_gate_running(target?: string): void {
+	try {
+		review_stamps.in_flight_stamp.remove(target)
+	} catch {
+		/* the next gate overwrites it */
+	}
+}
+
+// `finally`, so the marker is cleared on a red gate and a thrown check alike. A marker that outlived
+// its gate would tell the next brief to wait for a result nobody is going to produce.
+//
+// The work is a parameter rather than inlined so the clearing can be exercised against a thunk that
+// throws — running the real fan-out to prove a `finally` would cost a full gate per assertion, and
+// the branch under test is the one the real fan-out is least likely to take.
+async function with_gate_marker<T>(
+	before: Record<string, string>,
+	run: () => Promise<T>,
+	target?: string,
+): Promise<T> {
+	mark_gate_running(before, target)
+
+	try {
+		return await run()
+	} finally {
+		clear_gate_running(target)
+	}
+}
+
+async function run_marked_gate_steps(
+	before: Record<string, string>,
+): Promise<ReadonlyArray<GateStepResult>> {
+	return await with_gate_marker(before, async () => {
+		const steps = await build_gate_steps(process.cwd())
+
+		return await Promise.all(steps.map(async (step) => await run_gate_step(step)))
+	})
+}
+
 async function run_verification_gate(is_verbose = false): Promise<number> {
 	const before = await read_tree_before_checks()
-	const steps = await build_gate_steps(process.cwd())
-	const results = await Promise.all(steps.map(async (step) => await run_gate_step(step)))
+	const results = await run_marked_gate_steps(before)
 
 	for (const result of results) print_gate_step(result, is_verbose)
 
@@ -245,8 +301,12 @@ const verification_gate = {
 	VERBOSE_FLAG,
 	build_gate_step,
 	build_gate_steps,
+	clear_gate_running,
 	is_gate_step_failed,
+	mark_gate_running,
 	record_green_gate,
+	run_marked_gate_steps,
+	with_gate_marker,
 	run_gate_command,
 	run_gate_step,
 	run_verification_gate,

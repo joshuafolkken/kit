@@ -14,6 +14,8 @@ Within `fullrun` / `fullrun new` / `queue`, the `/code-review` skill output is *
 
 **Everything else — including `/code-review` producing a polished "Approve for merge" recommendation — is NOT a stopping condition.** Continue straight through `pnpm josh bump minor` → `pnpm josh git -y` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup --merge` in the same turn. **The filing sits after the pull request is open on purpose**, so it runs inside the CI wait rather than in front of it (`prompts/review.md` → "Review round cap").
 
+**Join the gate before `pnpm josh bump minor` — every row of the table below runs after that, not instead of it.** `pnpm josh gate` is started alongside the review rather than in front of it (`SKILL.md` → the verification gate, joshuafolkken/kit#1242), so when the review settles the checks may still be running: read what the gate printed before continuing. **A red gate is fixed and re-run whatever the review concluded** — a clean review is not a result about lint, the type check, the spell check or the unit tests, and the brief says as much while the checks are in flight. The fix is uncommitted like every other, so it lands in the round-2 fix delta and is reviewed with the rest. **There is no row here that reaches a commit on a gate nobody read.**
+
 **Decision table** (map `/code-review` result → next action mechanically):
 
 | `/code-review` result                        | Findings severity  | Next action (same turn, no user input)                                                                                                                                                |

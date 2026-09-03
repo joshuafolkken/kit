@@ -1210,16 +1210,19 @@ Pass the whole output to `/code-review`. The level is on the first line, so `$(p
 
 What the brief carries:
 
-| Part                  | Where it comes from                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| The level             | `josh review:level`, reused rather than decided again                                                      |
-| "Already verified"    | The record `josh gate` writes when all four checks pass, **and only if its digests still match this tree** |
-| The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                |
-| The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed                |
+| Part                  | Where it comes from                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| The level             | `josh review:level`, reused rather than decided again                                                         |
+| "Already verified"    | The record `josh gate` writes when all four checks pass, **and only if its digests still match this tree**    |
+| "Running now"         | The marker `josh gate` keeps for as long as its checks run, **and only if its digests still match this tree** |
+| The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                   |
+| The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed                   |
 
 **Only one half is mechanical.** The round-2 target _is_ the scope handed over, so a narrowed round stays narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so whether it obeys is measured rather than assumed.
 
 **It never claims a gate it cannot prove.** The gate's record holds a digest per changed path; if any of them has moved since — or there is no record at all — the brief prints `Not verified` and asserts nothing about lint, the type check, the spell check or the unit tests. Re-run `pnpm josh gate` after applying fixes and the record catches up.
+
+**A gate still running is its own answer** ([#1242](https://github.com/joshuafolkken/kit/issues/1242)). The workflow starts `josh gate` alongside the review rather than in front of it — the two read the same tree and neither writes to it — so at the moment the brief is composed the checks have usually not finished. `josh gate` keeps a marker for as long as it runs and clears it on the way out, green or red, and the brief prints `Running now`: **no result is claimed**, the review agent is told not to run the unit suite the gate is running beside it, and the run joins the gate's own result before committing. Without this state a running gate is indistinguishable from one that never ran, and the review re-runs everything — the cost [#1241](https://github.com/joshuafolkken/kit/issues/1241) had just removed.
 
 **The round-1 snapshot is what makes `--round 2` mechanical.** The implementation and the review's fixes are uncommitted in the same tree, so `git diff` cannot say which side of the review a change fell on. Round 1 records a digest per changed path; round 2 compares and names exactly the paths that moved. With no snapshot it falls back to the whole change: a missing record must widen a review, never narrow it.
 

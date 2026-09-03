@@ -11,8 +11,10 @@ import { review_tree } from './review-tree'
 //
 // `josh review:level` still answers the level and is unchanged; this command reuses it rather than
 // deciding again, so the two can never disagree. What it adds is everything else the forked review
-// agent cannot find out for itself: whether the gate has passed on this tree, how this project runs
-// its unit tests, and — on round 2 — which files the first round's fixes touched.
+// agent cannot find out for itself: whether the gate has passed **or is running** on this tree
+// (joshuafolkken/kit#1242 — the two are started together, so "still running" is the usual answer at
+// this point), how this project runs its unit tests, and — on round 2 — which files the first
+// round's fixes touched.
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:brief [--round <1|2>]'
@@ -72,6 +74,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const tree = await review_tree.read_changed_tree(paths)
 	const stamps = {
 		gate: review_stamps.gate_stamp.read(),
+		in_flight: review_stamps.in_flight_stamp.read(),
 		round_one: review_stamps.round_one_stamp.read(),
 	}
 

@@ -60,6 +60,14 @@ function write_stamp(target: string, payload: unknown): string {
 	return target
 }
 
+// The counterpart to `write_stamp`, for a record that means something only while it exists — the
+// in-flight gate marker `josh gate` clears when its checks finish (joshuafolkken/kit#1242). `force`
+// makes an absent path a success, because "there is no record" is the state the caller wanted; and
+// `rmSync` removes a symlink rather than following it, the same reason the write unlinks first.
+function remove_stamp(target: string): void {
+	rmSync(target, { force: true })
+}
+
 // The read side of the write's problem. A record is trusted to say something is still current, so a
 // planted one suppresses the work the check exists to force. `lstatSync` reports the link rather than
 // what it points at, and it throws where the path is simply absent — both of which are "no record".
@@ -91,6 +99,7 @@ const stamp_file = {
 	digest,
 	is_own_regular_file,
 	read_stamp_text,
+	remove_stamp,
 	stamp_path,
 	write_stamp,
 }
