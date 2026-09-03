@@ -1463,6 +1463,7 @@ Report where a run's wall clock went, read from the same transcripts `josh cost`
 pnpm josh time                  # the most recently merged run — the fullrun that just finished; alias: josh tm
 pnpm josh time --issue <number> # one issue's whole run, from the fullrun invocation to the merge
 pnpm josh time --session <id>   # one named session on its own
+pnpm josh time --epic <number>  # a whole epicrun, child by child, with the per-turn trend across them
 pnpm josh time --json           # the same figures, machine-readable
 ```
 
@@ -1526,7 +1527,32 @@ Where the wall clock went:
 
 **Two sessions with a gap between them leave time that belonged to nobody.** The header states what was accounted for — the sum of the four shares — and a gap of a minute or more between the wall window and that sum is named in a note rather than charged to the run.
 
-**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the two flags that pick a scope. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row.
+**`--epic <E>` measures a whole batch, child by child** ([#1271](https://github.com/joshuafolkken/kit/issues/1271)). An `epicrun` is several `fullrun`s, so every slow stage is paid once per child — and which child was long, and whether the run got slower as it went, had no answer that did not start with running `--issue` by hand for each number in the epic body. The children are enumerated by the **epic body parser** (`scripts/git/git-epic-parse.ts`), the one reader of a task list, and each child is measured by exactly the code `--issue` uses; a second enumeration would disagree with `epic:next` about what the batch is, and a second measurement would disagree with `--issue` about what a run took.
+
+```
+epic #1262 — 7 child(ren), 5 timed, 338.8 min elapsed
+  2 child(ren) have nothing measured and are reported as "not run" — each row says why
+  3 child(ren) merged with no session transcript attributed, so only their CI wait is known
+
+By child (in execution order):
+  #1257                   128.9 min   model 18.7 min / tool 4.2 min / human 106.0 min / CI 0.0 min
+  #1256                     3.2 min   CI wait only — no session transcript is attributed to this child
+  #1260                   200.2 min   model 13.8 min / tool 4.8 min / human 181.5 min / CI 0.0 min
+  #1261                               not run
+      no session transcript is attributed to issue #1261
+      no pull request found for issue #1261 among the 500 most recently updated — the CI wait is unknown
+
+Model wait per turn (in execution order):
+  #1257                       5.1 s
+  #1260                       9.9 s
+  rising 94% across 2 children
+```
+
+**The per-turn trend is the point of the batch scope, not a decoration.** [#1153](https://github.com/joshuafolkken/kit/issues/1153) measured one context's token cost growing — `$0.257` per request on a 463-request run against `$0.108` on a 16-request one — and nothing said whether the same growth shows up in _time_. Model wait divided by the run's turns is that measurement, printed per child and compared across the batch. **Execution order is when each child ran**, read from what was measured rather than from the order the body lists them: an epic's rows are written before the batch starts, and a child can run out of that order or not at all.
+
+**A child is reported in four states, and three of them are not a duration of zero.** `not run` is a child nothing was measured for; `no transcript` is one that merged with no session transcript attributed, so only its CI wait is known and the three transcript shares are **withheld** rather than printed as `0.0 min`; `not merged` is a run that did not finish; only the fourth is fully measured. The batch totals follow the same rule one level up — a half no child contributed to prints `not measured`, not a summed zero. **A row whose merge was not read carries the child's own notes beneath it**, because `not run` covers "the batch never reached it" and "the pull request listing could not be read" alike, and a status printed alone would report a rate-limited `gh` as an idle batch. `--json` carries each child's whole report, phase breakdown included, exactly as `--issue` carries one run's.
+
+**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the flags that pick a scope, and naming more than one of `--issue` / `--session` / `--epic` is refused rather than answered silently. An epic that could not be read exits non-zero too — an epic that tracks no children is a real, empty answer and says so instead. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row.
 
 ### `josh eval`
 

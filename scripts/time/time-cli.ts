@@ -2,6 +2,8 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { time_epic } from './time-epic'
+import { time_epic_report } from './time-epic-report'
 import { time_report, type TimeReport } from './time-report'
 import { time_run } from './time-run'
 import { time_spans } from './time-spans'
@@ -15,42 +17,46 @@ import { time_spans } from './time-spans'
 //
 // **The default scope is a run, not a session** (joshuafolkken/kit#1268). A `fullrun` is measured
 // from its invocation to the merge, which spans sessions and reaches past the last transcript line;
-// `--session <id>` still reports one session on its own.
+// `--session <id>` still reports one session on its own, and `--epic <number>` reports a whole
+// `epicrun` child by child (joshuafolkken/kit#1271).
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
-const USAGE = 'Usage: josh time [--issue <number>] [--session <id>] [--json]'
+const USAGE = 'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--json]'
 const NO_MERGED_RUN =
 	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
-const BOTH_SCOPES = 'Give --issue or --session, not both: they name different things.'
+const ONE_SCOPE = 'Give one of --issue, --session or --epic: they name different things.'
+const NO_EPIC =
+	'The epic could not be read, so there is no batch to report on. Check the number, and that gh is authenticated.'
 
+// Every scope is a present key whose value may be `undefined`, rather than a key that is absent.
+// Under `exactOptionalPropertyTypes` an optional key rejects `{ session: undefined }`, so one shim
+// per field would be needed to build this — three near-identical functions differing only in the key
+// they name, which is the duplication a third scope would have made unmistakable.
 interface Options {
-	session?: string
-	issue?: number
+	session: string | undefined
+	issue: number | undefined
+	epic: number | undefined
 	is_json: boolean
-}
-
-// `exactOptionalPropertyTypes` rejects `{ session: undefined }`, so an absent flag contributes no
-// key at all rather than an undefined one — the idiom `cost-cli.ts` uses for the same reason.
-function optional_session(session: string | undefined): { session?: string } {
-	return session === undefined ? {} : { session }
-}
-
-function optional_issue(issue: number | undefined): { issue?: number } {
-	return issue === undefined ? {} : { issue }
 }
 
 const PARSE_ARGS_OPTIONS = {
 	session: { type: 'string' },
 	issue: { type: 'string' },
+	epic: { type: 'string' },
 	json: { type: 'boolean', default: false },
 } as const
 
-// Only a positive number is an issue, the rule `cost-cli.ts` states: a non-positive value would
-// collide with `cost_attribute`'s unattributed sentinel and report that bucket as though it were an
-// issue's run.
-function to_issue(raw: string | undefined): number | undefined {
+// The flags that name a scope, in both the spelling `parseArgs` reports and the spelling a person
+// types. One list, so a fourth scope cannot be added to the parser and forgotten by the refusal.
+const SCOPE_KEYS = ['issue', 'session', 'epic'] as const
+const SCOPE_FLAGS = SCOPE_KEYS.map((key) => `--${key}`)
+
+// Only a positive number is an issue number, the rule `cost-cli.ts` states: a non-positive value
+// would collide with `cost_attribute`'s unattributed sentinel and report that bucket as though it
+// were an issue's run. An epic is named the same way, so both go through this.
+function to_number(raw: string | undefined): number | undefined {
 	if (raw === undefined) return undefined
 
 	const parsed = Number(raw)
@@ -58,16 +64,32 @@ function to_issue(raw: string | undefined): number | undefined {
 	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
 }
 
-// A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
-// quietly become "report the most recent run instead". Naming both scopes at once is refused too —
-// they are different questions, and answering one of them silently is the wrong of the two.
-function is_refused(
-	values: { issue?: string; session?: string },
-	issue: number | undefined,
-): boolean {
-	if (issue === undefined) return values.issue !== undefined
+interface RawValues {
+	issue?: string
+	session?: string
+	epic?: string
+}
 
-	return values.session !== undefined
+// A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
+// quietly become "report the most recent run instead".
+function is_unparsed(raw: string | undefined, parsed: number | undefined): boolean {
+	return raw !== undefined && parsed === undefined
+}
+
+function named_scopes(values: RawValues): number {
+	return SCOPE_KEYS.filter((key) => values[key] !== undefined).length
+}
+
+// Naming more than one scope is refused too — they are different questions, and answering one of
+// them silently is the wrong of the two.
+function is_refused(
+	values: RawValues,
+	issue: number | undefined,
+	epic: number | undefined,
+): boolean {
+	if (is_unparsed(values.issue, issue) || is_unparsed(values.epic, epic)) return true
+
+	return named_scopes(values) > 1
 }
 
 // An unknown flag is a refusal rather than a default: a misspelled `--session` must not quietly
@@ -75,11 +97,12 @@ function is_refused(
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	try {
 		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
-		const issue = to_issue(values.issue)
+		const issue = to_number(values.issue)
+		const epic = to_number(values.epic)
 
-		if (is_refused(values, issue)) return undefined
+		if (is_refused(values, issue, epic)) return undefined
 
-		return { ...optional_session(values.session), ...optional_issue(issue), is_json: values.json }
+		return { session: values.session, issue, epic, is_json: values.json }
 	} catch {
 		return undefined
 	}
@@ -93,9 +116,9 @@ function has_flag(argv: ReadonlyArray<string>, name: string): boolean {
 
 // Why the options were refused, so the message names the mistake rather than only the grammar.
 function usage_lines(argv: ReadonlyArray<string>): Array<string> {
-	const has_both = has_flag(argv, '--issue') && has_flag(argv, '--session')
+	const named = SCOPE_FLAGS.filter((flag) => has_flag(argv, flag)).length
 
-	return has_both ? [BOTH_SCOPES] : [USAGE]
+	return named > 1 ? [ONE_SCOPE] : [USAGE]
 }
 
 function pick_session(cwd: string, session_id: string): SessionFile | undefined {
@@ -122,10 +145,15 @@ function build_session_report(file: SessionFile): TimeReport {
 	)
 }
 
+// The one place a report reaches stdout, whichever scope produced it. `--json` prints the whole
+// record, so a scope that carries more than the text table shows — an epic's per-child breakdown —
+// needs nothing of its own here.
+function print_scope(payload: unknown, text: () => string, is_json: boolean): void {
+	console.info(is_json ? JSON.stringify(payload, undefined, JSON_INDENT) : text())
+}
+
 function print_report(report: TimeReport, is_json: boolean): void {
-	console.info(
-		is_json ? JSON.stringify(report, undefined, JSON_INDENT) : time_report.format_report(report),
-	)
+	print_scope(report, () => time_report.format_report(report), is_json)
 }
 
 function run_session(session_id: string, cwd: string, is_json: boolean): number {
@@ -166,6 +194,31 @@ async function run_issue(
 	return 0
 }
 
+// An epic's whole batch, child by child. A failure here is the epic itself being unreadable — a
+// child with no run of its own is reported as `not run` inside the table rather than failing it.
+async function run_epic(epic_number: number, cwd: string, is_json: boolean): Promise<number> {
+	const report = await time_epic.build_epic_report(epic_number, cwd)
+
+	if (report === undefined) {
+		console.error(NO_EPIC)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	print_scope(report, () => time_epic_report.format_epic_report(report), is_json)
+
+	return 0
+}
+
+async function dispatch(options: Options, cwd: string): Promise<number> {
+	const { session, epic, is_json } = options
+
+	if (session !== undefined) return run_session(session, cwd, is_json)
+	if (epic !== undefined) return await run_epic(epic, cwd, is_json)
+
+	return await run_issue(options.issue, cwd, is_json)
+}
+
 async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
 	const options = parse_options(argv)
 
@@ -175,11 +228,7 @@ async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Pr
 		return FAILURE_EXIT_CODE
 	}
 
-	const { session } = options
-
-	if (session !== undefined) return run_session(session, cwd, options.is_json)
-
-	return await run_issue(options.issue, cwd, options.is_json)
+	return await dispatch(options, cwd)
 }
 
 // `process.exitCode` rather than `process.exit()`: the report is written with `console.info`, and
@@ -192,7 +241,8 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const time_cli = {
 	USAGE,
 	NO_MERGED_RUN,
-	BOTH_SCOPES,
+	NO_EPIC,
+	ONE_SCOPE,
 	parse_options,
 	pick_session,
 	report_empty,
