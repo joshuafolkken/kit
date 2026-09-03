@@ -241,6 +241,9 @@ importers:
       eslint-plugin-unicorn:
         specifier: ^74.0.0
         version: 74.0.0(eslint@10.9.1(supports-color@10.2.2))
+      eslint_d:
+        specifier: ^15.0.3
+        version: 15.0.3
       execa:
         specifier: ^10.0.1
         version: 10.0.1
@@ -1826,6 +1829,11 @@ packages:
     peerDependenciesMeta:
       jiti:
         optional: true
+
+  eslint_d@15.0.3:
+    resolution: {integrity: sha512-bCS3HTNhIZLTaOXmJ7Xp63itEfwGWjmHfZh5CtvCZ2Re4UVOSwSZTdvOiqMQ7ceXDGJDgty3HlL3fCfFH/Rl6g==}
+    engines: {node: '>=22'}
+    hasBin: true
 
   esm-env@1.2.2:
     resolution: {integrity: sha512-Epxrv+Nr/CaL4ZcFGPJIYLWFom+YeV1DqMLHJoEd9SYRxNbaFruBwfEX/kkHUJf55j2+TUbmDcmuilbP1TmXHA==}
@@ -4304,6 +4312,14 @@ snapshots:
       optionator: 0.9.4
     transitivePeerDependencies:
       - supports-color
+
+  eslint_d@15.0.3:
+    dependencies:
+      debug: 4.4.3(supports-color@10.2.2)
+      eslint: 10.9.1(supports-color@10.2.2)
+      supports-color: 10.2.2
+    transitivePeerDependencies:
+      - jiti
 
   esm-env@1.2.2: {}
 

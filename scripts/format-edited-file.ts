@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
-import { resolve_local_bin } from '#scripts/local-bin'
+import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
 import { execa } from 'execa'
 import { z } from 'zod'
 
@@ -57,19 +57,62 @@ const PRETTIER_ARGUMENTS: ReadonlyArray<string> = ['--write', '--ignore-unknown'
 // nothing to say about it, and a non-zero exit here would be reported as a failed hook.
 const ESLINT_BIN = 'eslint'
 const ESLINT_ARGUMENTS: ReadonlyArray<string> = ['--fix', '--no-error-on-unmatched-pattern']
-// A formatter that hangs would hold the edit's turn open, so each one is bounded. The number is far
-// beyond what formatting one file takes, so reaching it means something is already wrong — which
-// matters because `prettier --write` rewrites in place and any kill can leave the file truncated.
-// The hook entry in `.claude/settings.json` declares a longer budget than both runs together, so
-// this bound is the one that fires first and the kill is at least at a moment this file chose.
-const PROCESS_TIMEOUT_MS = 25_000
+// eslint is what this hook spends its time on, and almost none of it is the file: measured on this
+// repository, one `eslint --fix` on a single TypeScript file takes 1.70s of a 2.50s hook, and a
+// second lint inside the same process takes 0.13s. The 1.6s difference is the flat config, its
+// plugins and the type-aware program, rebuilt from nothing on every edit. `eslint_d` keeps one warm
+// eslint — the *project's* own eslint, held to that by `ESLINT_D_MISS=fail` below rather than by
+// hope — behind a socket and forwards the same arguments to it, which is why the fixed output is
+// identical rather than merely similar. The config entry file is re-read per request; the modules it
+// imports are not, which `plan_daemon_restart` below is the answer to. The daemon exits after 15
+// minutes of inactivity (joshuafolkken/kit#1259).
+const ESLINT_DAEMON = 'eslint_d'
+const DAEMON_RESTART = 'restart'
+// The two shapes a flat config is built from here and in every consumer of this kit: the root
+// `eslint.config.*` entry, and the rule modules under `eslint/` that it imports.
+const ESLINT_CONFIG_DIR = 'eslint'
+const ESLINT_CONFIG_ENTRY = /^eslint\.config\.[cm]?[jt]s$/u
+// A formatter that hangs would hold the edit's turn open, so each spawn is bounded. The bound has
+// to be read against the *worst-case run* rather than one spawn: an edit to a config input plans
+// eslint, prettier and `eslint_d restart`, and the first and last each have a second route behind
+// the daemon — five spawns. The hook entry in `.claude/settings.json` declares 90 seconds, so the
+// per-spawn bound must leave five of them under it, or the harness kill lands first and lands at a
+// moment this file did not choose — possibly inside `prettier --write`, which rewrites in place and
+// can leave the file truncated. 15s × 5 = 75s. It is still two orders of magnitude beyond the 0.84s
+// a warm run takes, so reaching it means something is already wrong.
+const PROCESS_TIMEOUT_MS = 15_000
+
+// Where this file sits inside the kit package. `eslint_d` is kit's dependency rather than the
+// consumer's, and pnpm writes a `node_modules/.bin` shim only for a project's *direct* dependencies,
+// so a consumer's project root cannot see it and this directory can.
+const MODULE_DIRECTORY = path.dirname(fileURLToPath(import.meta.url))
 
 interface FormatCommand {
 	bin: string
 	command_arguments: ReadonlyArray<string>
 }
 
-type CommandRunner = (command: FormatCommand, project_root: string) => Promise<void>
+// The three ways this hook can reach a formatter, fastest first — a warm daemon, the project's own
+// shim, then `pnpm exec`. Each later route exists because the one before it can be absent, so a
+// project without the daemon behaves exactly as it did before it was introduced. Both fields are
+// declared rather than optional: `exactOptionalPropertyTypes` makes an absent key and an explicit
+// `undefined` different types, and every caller here computes the value rather than omitting it.
+interface BinRoutes {
+	daemon_cli: string | undefined
+	shim: string | undefined
+}
+
+// What one spawn answered. The exit code alone cannot say whether a formatter ran, because
+// `eslint --fix` exits non-zero whenever something it could not fix remains — its ordinary outcome
+// on a half-written file. Pairing it with "did anything reach stdout" is what separates the two:
+// eslint prints the problems it is exiting non-zero about, while a daemon that could not start
+// prints its reason to stderr and leaves stdout empty.
+interface CommandOutcome {
+	exit_code: number
+	did_write_stdout: boolean
+}
+
+type CommandRunner = (command: FormatCommand, project_root: string) => Promise<CommandOutcome>
 
 function parse_edited_path(raw_payload: string): string | undefined {
 	try {
@@ -138,25 +181,126 @@ function plan_commands(file_path: string, project_root: string): ReadonlyArray<F
 	return commands
 }
 
-// The local shim when it is there, `pnpm exec` when it is not. A workspace sub-package keeps its
-// binaries somewhere other than the root's `node_modules/.bin`, and with output ignored a missing
-// shim would otherwise make the hook a permanent silent no-op rather than a slower one.
-function resolve_invocation(command: FormatCommand, project_root: string): FormatCommand {
-	const shim = resolve_local_bin(project_root, command.bin)
+// The daemon when it is installed, the local shim when it is there, `pnpm exec` when neither is. A
+// workspace sub-package keeps its binaries somewhere other than the root's `node_modules/.bin`, and
+// with output ignored a missing shim would otherwise make the hook a permanent silent no-op rather
+// than a slower one. Kept pure and separate from the disk lookups so the choice itself is what the
+// unit tests read.
+function select_invocation(command: FormatCommand, routes: BinRoutes): FormatCommand {
+	if (routes.daemon_cli !== undefined) {
+		return {
+			bin: process.execPath,
+			command_arguments: [routes.daemon_cli, ...command.command_arguments],
+		}
+	}
 
-	if (existsSync(shim)) return { bin: shim, command_arguments: command.command_arguments }
+	if (routes.shim !== undefined) {
+		return { bin: routes.shim, command_arguments: command.command_arguments }
+	}
 
 	return { bin: PNPM, command_arguments: ['exec', command.bin, ...command.command_arguments] }
 }
 
-async function run_command(command: FormatCommand, project_root: string): Promise<void> {
-	const invocation = resolve_invocation(command, project_root)
+// Only eslint has a daemon here. prettier costs 0.21s against eslint's 1.70s, so a second warm
+// process would buy little and double what can go stale. `eslint_d` itself is in the set because the
+// restart below is addressed to the daemon rather than to a formatter.
+const DAEMON_BINS: ReadonlySet<string> = new Set([ESLINT_BIN, ESLINT_DAEMON])
 
-	await execa(invocation.bin, [...invocation.command_arguments], {
+function resolve_daemon_cli(bin: string, project_root: string): string | undefined {
+	if (!DAEMON_BINS.has(bin)) return undefined
+
+	return (
+		resolve_package_bin(MODULE_DIRECTORY, ESLINT_DAEMON, ESLINT_DAEMON) ??
+		resolve_package_bin(project_root, ESLINT_DAEMON, ESLINT_DAEMON)
+	)
+}
+
+// Only the config *entry file* is re-read per request: ESLint cache-busts `eslint.config.js` by
+// appending its mtime to the import URL, and the modules that file imports carry no such query, so a
+// long-lived daemon keeps the rule modules it loaded first. Edit `eslint/rules/naming-convention.js`
+// and then any source file, and it would be auto-fixed against the pre-edit rules for as long as the
+// daemon lives — an author testing a rule change would read that as the rule being broken. Restarting
+// after an edit to a config input is what makes the whole config current, not just its first file.
+function is_eslint_config_input(relative_path: string): boolean {
+	return (
+		relative_path.split(path.sep)[0] === ESLINT_CONFIG_DIR ||
+		ESLINT_CONFIG_ENTRY.test(relative_path)
+	)
+}
+
+function plan_daemon_restart(
+	file_path: string,
+	project_root: string,
+): ReadonlyArray<FormatCommand> {
+	const relative = relative_to_root(project_root, file_path)
+
+	if (relative === undefined || !is_eslint_config_input(relative)) return []
+	if (resolve_daemon_cli(ESLINT_DAEMON, project_root) === undefined) return []
+
+	return [{ bin: ESLINT_DAEMON, command_arguments: [DAEMON_RESTART] }]
+}
+
+// The routes to try, fastest first. The second entry is the one that has always been here, and it
+// is what a project with no daemon runs directly — resolving the daemon is not the same as it
+// starting, so the slower route stays reachable rather than being replaced.
+function resolve_invocations(
+	command: FormatCommand,
+	project_root: string,
+): ReadonlyArray<FormatCommand> {
+	const shim = resolve_local_bin(project_root, command.bin)
+	const routes: BinRoutes = {
+		daemon_cli: resolve_daemon_cli(command.bin, project_root),
+		shim: existsSync(shim) ? shim : undefined,
+	}
+	const without_daemon = select_invocation(command, { ...routes, daemon_cli: undefined })
+
+	if (routes.daemon_cli === undefined) return [without_daemon]
+
+	return [select_invocation(command, routes), without_daemon]
+}
+
+// A daemon that resolved on disk can still fail to start — a blocked loopback bind, a watch-limit
+// refusal, a read-only store it cannot write its own config into — and it says so on stderr while
+// exiting non-zero with nothing on stdout. `ESLINT_D_MISS=fail` below lands in the same shape.
+// Without this the hook would silently stop fixing anything with eslint wherever the daemon cannot
+// run, which is the "permanent silent no-op rather than a slower one" the shim fallback exists to
+// prevent, reintroduced one level up.
+function is_start_failure(outcome: CommandOutcome): boolean {
+	return outcome.exit_code !== 0 && !outcome.did_write_stdout
+}
+
+// `cwd` is not decoration: the daemon runs each request under the cwd of the process that forwarded
+// it, so it is what decides which eslint installation and which flat config answer.
+// `ESLINT_D_MISS=fail` refuses the bundled eslint the daemon would otherwise fall back to when the
+// project's own is not resolvable — the hook must format with the project's eslint or not at all,
+// and a refusal here is a start failure, which the caller retries on the slower route.
+async function spawn_invocation(
+	invocation: FormatCommand,
+	project_root: string,
+): Promise<CommandOutcome> {
+	const result = await execa(invocation.bin, [...invocation.command_arguments], {
 		reject: false,
-		stdio: 'ignore',
+		cwd: project_root,
+		env: { ESLINT_D_MISS: 'fail' },
+		stdout: 'pipe',
+		stderr: 'ignore',
 		timeout: PROCESS_TIMEOUT_MS,
 	})
+
+	return { exit_code: result.exitCode ?? 1, did_write_stdout: result.stdout.length > 0 }
+}
+
+// One planned command, tried down its routes. A route is retried only when the one before it failed
+// to start — never when the formatter itself reported problems, which is its normal way of exiting.
+async function run_command(command: FormatCommand, project_root: string): Promise<CommandOutcome> {
+	let outcome: CommandOutcome = { exit_code: 0, did_write_stdout: false }
+
+	for (const invocation of resolve_invocations(command, project_root)) {
+		outcome = await spawn_invocation(invocation, project_root)
+		if (!is_start_failure(outcome)) return outcome
+	}
+
+	return outcome
 }
 
 // Nothing here reports failure. A `PostToolUse` hook runs after the edit has landed, so a formatter
@@ -171,7 +315,12 @@ async function format_edited_file(
 
 	if (file_path === undefined) return
 
-	for (const command of plan_commands(file_path, project_root)) {
+	const plan = [
+		...plan_commands(file_path, project_root),
+		...plan_daemon_restart(file_path, project_root),
+	]
+
+	for (const command of plan) {
 		try {
 			await runner(command, project_root)
 		} catch {
@@ -199,10 +348,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 export {
 	format_edited_file,
+	is_start_failure,
 	parse_edited_path,
 	plan_commands,
+	plan_daemon_restart,
 	relative_to_root,
-	resolve_invocation,
+	resolve_invocations,
+	select_invocation,
+	ESLINT_DAEMON,
 	PROCESS_TIMEOUT_MS,
 }
-export type { CommandRunner, FormatCommand }
+export type { BinRoutes, CommandOutcome, CommandRunner, FormatCommand }
