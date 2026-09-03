@@ -249,3 +249,44 @@ describe('time_spans.parse_timeline — josh attribution', () => {
 		])
 	})
 })
+
+// The branch is what attributes a span to an issue, and the absolute end is what lets the CI wait be
+// subtracted from the pull request's window rather than added on top of it
+// (joshuafolkken/kit#1268).
+function on_branch(minute: number, branch: string): string {
+	return JSON.stringify({
+		type: ASSISTANT,
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'text', text: 'hello' }] },
+	})
+}
+
+const ISSUE_BRANCH = '1268-measure'
+
+describe('time_spans.parse_timeline — branch and instant', () => {
+	it('carries the branch of the line that closed the span', () => {
+		const lines = [on_branch(0, 'main'), on_branch(1, ISSUE_BRANCH)].join('\n')
+		const { spans } = time_spans.parse_timeline(lines)
+
+		expect(spans.map((span) => span.branch)).toEqual([ISSUE_BRANCH])
+	})
+
+	it('records the instant the span ended, so its interval can be reconstructed', () => {
+		const { spans } = time_spans.parse_timeline(TURN)
+		const intervals = spans.map((span) => [span.ended_ms - span.duration_ms, span.ended_ms])
+
+		expect(intervals[0]).toEqual([Date.parse(at(0)), Date.parse(at(1))])
+		expect(intervals.at(-1)).toEqual([Date.parse(at(3)), Date.parse(at(4))])
+	})
+
+	// A line written before any branch existed is not dated to one: the fill-forward walk in
+	// `cost_attribute` is what carries a branch backwards, and inventing one here would take that
+	// decision away from it.
+	it('leaves a line with no branch empty rather than guessing one', () => {
+		const { spans } = time_spans.parse_timeline(TURN)
+		const branches = spans.map((span) => span.branch)
+
+		expect(branches).toEqual(['', '', '', ''])
+	})
+})

@@ -1,6 +1,7 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { json_value } from '#scripts/json-value'
 import { z } from 'zod'
+import { time_instant } from './time-instant'
 
 // Turning a session transcript into timed spans (joshuafolkken/kit#1267).
 //
@@ -82,8 +83,14 @@ const MESSAGE_SCHEMA = z.object({ content: CONTENT_SCHEMA.nullish() })
 const LINE_SCHEMA = z.object({
 	type: z.string().nullish(),
 	timestamp: z.string().nullish(),
+	// The branch the line was written on, which is where the issue number lives — `josh git` names a
+	// branch `<N>-<slug>`. Read here rather than re-parsed by a second reader so `josh time --issue`
+	// and `josh cost --issue` answer from the same field (joshuafolkken/kit#1268).
+	gitBranch: z.string().nullish(),
 	message: MESSAGE_SCHEMA.nullish(),
 })
+
+const UNKNOWN_BRANCH = ''
 
 type SpanCategory = 'model' | 'tool' | 'human'
 
@@ -101,9 +108,18 @@ interface ToolCall {
 const NO_CALL: ToolCall = { label: '', josh_command: '' }
 const UNKNOWN_CALL: ToolCall = { label: UNKNOWN_TOOL, josh_command: '' }
 
+// `ended_ms` is the absolute instant the span closed, so `[ended_ms - duration_ms, ended_ms]` is the
+// interval it occupied. A duration alone cannot say *when*, and two things need that: the CI wait,
+// which is the part of the PR-open→merge window no span covers (joshuafolkken/kit#1268), and the
+// phase breakdown that slices the same array by boundary (joshuafolkken/kit#1269).
+//
+// `branch` rides along for the same reason `cost-usage.ts` carries it on a record: it is what
+// `cost_attribute` reads to decide which issue the span belongs to.
 interface Span extends ToolCall {
 	category: SpanCategory
 	duration_ms: number
+	ended_ms: number
+	branch: string
 }
 
 interface Block {
@@ -117,11 +133,13 @@ interface Block {
 interface TranscriptLine {
 	type: string
 	timestamp_ms: number
+	branch: string
 	blocks: Array<Block>
 }
 
 interface TimelineEvent extends ToolCall {
 	timestamp_ms: number
+	branch: string
 	category: SpanCategory
 }
 
@@ -228,20 +246,19 @@ function to_blocks(
 		: content.map((block) => to_block(block))
 }
 
-function timestamp_of(raw: string | null | undefined): number | undefined {
-	const parsed = Date.parse(raw ?? '')
-
-	return Number.isNaN(parsed) ? undefined : parsed
-}
-
 // A line without a parseable timestamp is dropped rather than dated: it has no place on a timeline,
 // and inventing one would move every span around it.
 function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined {
-	const timestamp_ms = timestamp_of(data.timestamp)
+	const timestamp_ms = time_instant.parse_instant(data.timestamp)
 
 	if (timestamp_ms === undefined) return undefined
 
-	return { type: data.type ?? '', timestamp_ms, blocks: to_blocks(data.message?.content) }
+	return {
+		type: data.type ?? '',
+		timestamp_ms,
+		branch: data.gitBranch ?? UNKNOWN_BRANCH,
+		blocks: to_blocks(data.message?.content),
+	}
 }
 
 function parse_line(line: string): TranscriptLine | undefined {
@@ -275,27 +292,28 @@ function result_block(line: TranscriptLine): Block | undefined {
 	return line.blocks.find((block) => block.type === cost_blocks.TOOL_RESULT_TYPE)
 }
 
+// One line's contribution to the timeline, with the two fields every event carries read from the
+// line in one place. Written once rather than spelled out at each of the three return sites, which
+// is what let `branch` be added without a fourth chance to forget it.
+function event_of(line: TranscriptLine, category: SpanCategory, call: ToolCall): TimelineEvent {
+	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, ...call }
+}
+
 // A user line is one of two things, and only its blocks tell them apart: a tool result the harness
 // wrote back, or a person typing.
 function user_event(line: TranscriptLine, calls: ReadonlyMap<string, ToolCall>): TimelineEvent {
 	const result = result_block(line)
 
-	if (result === undefined) {
-		return { timestamp_ms: line.timestamp_ms, category: HUMAN_CATEGORY, ...NO_CALL }
-	}
+	if (result === undefined) return event_of(line, HUMAN_CATEGORY, NO_CALL)
 
-	const call = calls.get(result.result_id) ?? UNKNOWN_CALL
-
-	return { timestamp_ms: line.timestamp_ms, category: TOOL_CATEGORY, ...call }
+	return event_of(line, TOOL_CATEGORY, calls.get(result.result_id) ?? UNKNOWN_CALL)
 }
 
 function to_event(
 	line: TranscriptLine,
 	calls: ReadonlyMap<string, ToolCall>,
 ): TimelineEvent | undefined {
-	if (line.type === ASSISTANT_TYPE) {
-		return { timestamp_ms: line.timestamp_ms, category: MODEL_CATEGORY, ...NO_CALL }
-	}
+	if (line.type === ASSISTANT_TYPE) return event_of(line, MODEL_CATEGORY, NO_CALL)
 
 	return line.type === USER_TYPE ? user_event(line, calls) : undefined
 }
@@ -313,11 +331,16 @@ function to_events(
 		.toSorted((left, right) => left.timestamp_ms - right.timestamp_ms)
 }
 
+// The span is named by the event that *closes* it, so the branch is that event's too: the work the
+// interval paid for is the work the later line records, and taking the opening line's branch would
+// attribute the first span after a `josh git` to whatever preceded the branch.
 function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 	return events.slice(1).map((event, index) => ({
 		category: event.category,
 		label: event.label,
 		josh_command: event.josh_command,
+		branch: event.branch,
+		ended_ms: event.timestamp_ms,
 		duration_ms: event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms),
 	}))
 }

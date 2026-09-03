@@ -1457,11 +1457,12 @@ Context composition (blocks written to this session's transcript; estimated exce
 
 ### `josh time`
 
-Report where a run's wall clock went, read from the same transcripts `josh cost` prices ([#1267](https://github.com/joshuafolkken/kit/issues/1267)).
+Report where a run's wall clock went, read from the same transcripts `josh cost` prices ([#1267](https://github.com/joshuafolkken/kit/issues/1267)) and, for the part no transcript records, from GitHub ([#1268](https://github.com/joshuafolkken/kit/issues/1268)).
 
 ```bash
-pnpm josh time                  # the newest session — the run that just finished; alias: josh tm
-pnpm josh time --session <id>   # one named session
+pnpm josh time                  # the most recently merged run — the fullrun that just finished; alias: josh tm
+pnpm josh time --issue <number> # one issue's whole run, from the fullrun invocation to the merge
+pnpm josh time --session <id>   # one named session on its own
 pnpm josh time --json           # the same figures, machine-readable
 ```
 
@@ -1493,7 +1494,25 @@ By josh command (descending):
 
 **A Bash call is bundled under the command it actually runs.** Taking the literal first word put `Bash: cd` at the top of every table — 82 calls and 12.1 minutes of one measured session, naming the one part of the command that did no work — so the chain is split into segments and each segment walked **word by word** past its `VAR=…` assignments and its wrappers (`time`, `env`, `sudo`) to the command position. A segment that only navigates (`cd`, `export`, `source`) runs nothing and yields no name, and a call nothing could be named for stays under the bare `Bash` rather than under the word that was rejected. `pnpm josh <cmd>` invocations get a second table of their own, keyed by subcommand and read **only at a segment's command position** — searched loosely, `git commit -m "ran pnpm josh gate"` was charged to `josh gate`, and this repository's own commit messages name subcommands constantly.
 
-**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row.
+**A run is measured from its `fullrun` invocation to the merge, and neither source can say that alone** ([#1268](https://github.com/joshuafolkken/kit/issues/1268)). The transcript stops at the last line anyone wrote, so PR #1263's `createdAt 08:57:20Z → mergedAt 09:00:32Z` — 3 minutes 12 seconds of CI wait and merge — appears in no session file; GitHub has no timestamp for the planning, implementation, gate and review that precede the pull request. And **one run is not one session**: a scan of the 25 most recent transcripts barely finds the branch for issue #1256, because that `fullrun` ran in a different one. So `--issue <N>` joins the two on the issue number — every session attributed to it by branch through `cost_attribute`, unchanged and not copied, plus the pull request's `created_at`, each check-run and `merged_at` from `gh api`.
+
+```
+issue #1257 — 128.9 min elapsed
+  1 session(s)
+  PR #1264 merged
+
+Where the wall clock went:
+  model wait               18.7 min   14.5%
+  tool execution            4.2 min    3.2%
+  human wait              106.0 min   82.3%
+  CI wait                   0.0 min    0.0%
+```
+
+**CI wait is the part of the open→merge window no span already covers**, not the window itself. `followup --merge` waits for CI _inside_ a Bash tool span that is already counted, so adding the window whole would count it twice and leave the four shares summing to more than the run took — the property that makes two runs comparable. Where the run sat watching its own merge, the honest figure is therefore near zero, and the 3 minutes PR #1263 spent unattended is the case the category exists for. The per-check table is informational for the same reason the categories are not: CI jobs run in parallel, so their durations overlap and are never summed into a share.
+
+**Two sessions with a gap between them leave time that belonged to nobody.** The header states what was accounted for — the sum of the four shares — and a gap of a minute or more between the wall window and that sum is named in a note rather than charged to the run.
+
+**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the two flags that pick a scope. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row.
 
 ### `josh eval`
 

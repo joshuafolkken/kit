@@ -86,4 +86,21 @@ describe('cost_attribute.records_for_issue', () => {
 
 		expect(records.map((entry) => entry.request_id)).toStrictEqual(['pre', ISSUE_BRANCH])
 	})
+
+	// `josh time` attributes timed spans through this same walk (joshuafolkken/kit#1268). The
+	// alternative was a second copy of the fill-forward rule over a different element type, and the
+	// drift between the two would make `josh cost --issue` and `josh time --issue` disagree about
+	// which issue a run belonged to.
+	it('attributes anything carrying a branch, not only a usage record', () => {
+		const spans = [
+			{ branch: 'main', tag: 'pre' },
+			{ branch: ISSUE_BRANCH, tag: 'on-branch' },
+			{ branch: NEXT_BRANCH, tag: 'after' },
+		]
+
+		expect(cost_attribute.records_for_issue(spans, 962).map((span) => span.tag)).toStrictEqual([
+			'pre',
+			'on-branch',
+		])
+	})
 })
