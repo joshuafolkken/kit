@@ -8,7 +8,9 @@ import { time_spans, type Span, type SpanCategory, type Timeline } from './time-
 // sessions' arrays before calling this. Neither needs a second aggregator.
 
 const MS_PER_MINUTE = 60_000
+const MS_PER_SECOND = 1000
 const MINUTE_DECIMALS = 1
+const SECOND_DECIMALS = 1
 const PERCENT_SCALE = 100
 const PERCENT_DECIMALS = 1
 const MAX_ROWS = 15
@@ -45,6 +47,11 @@ interface TimeReport {
 	ended_at: string
 	elapsed_ms: number
 	span_count: number
+	// How many model spans the run has — one per assistant turn, which is what a per-turn figure is
+	// divided by (joshuafolkken/kit#1271). Carried on the report rather than recomputed by each caller,
+	// because the spans are gone by the time a caller holds one: an epic aggregation reads several
+	// runs' reports and has no access to the arrays they were built from.
+	turn_count: number
 	categories: CategoryTotals
 	// Whether the GitHub half was read at all. A session report has no pull request, so printing a
 	// `CI wait 0.0 min` row there would assert a measurement nobody made.
@@ -75,10 +82,12 @@ interface ReportInput {
 	by_check: ReadonlyArray<LabelTotal>
 }
 
+function of_category(spans: ReadonlyArray<Span>, category: SpanCategory): Array<Span> {
+	return spans.filter((span) => span.category === category)
+}
+
 function category_ms(spans: ReadonlyArray<Span>, category: SpanCategory): number {
-	return spans
-		.filter((span) => span.category === category)
-		.reduce((sum, span) => sum + span.duration_ms, 0)
+	return of_category(spans, category).reduce((sum, span) => sum + span.duration_ms, 0)
 }
 
 // An empty label is not a bucket. Every span carries a category, but only tool spans carry a tool
@@ -132,6 +141,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		ended_at: to_iso(input.ended_ms),
 		elapsed_ms: categories.model_ms + categories.tool_ms + categories.human_ms + ci_ms,
 		span_count: spans.length,
+		turn_count: of_category(spans, time_spans.MODEL_CATEGORY).length,
 		categories,
 		has_ci_data: input.has_ci_data,
 		notes: [...input.notes],
@@ -159,6 +169,12 @@ function build_report(session_id: string, timeline: Timeline): TimeReport {
 
 function format_minutes(duration_ms: number): string {
 	return `${(duration_ms / MS_PER_MINUTE).toFixed(MINUTE_DECIMALS)} min`
+}
+
+// Seconds rather than minutes for a per-turn figure: one turn is tens of seconds, and `0.1 min` is
+// too coarse to show the rise across a batch that this scale exists to make visible.
+function format_seconds(duration_ms: number): string {
+	return `${(duration_ms / MS_PER_SECOND).toFixed(SECOND_DECIMALS)} s`
 }
 
 function format_share(part: number, whole: number): string {
@@ -271,7 +287,12 @@ const time_report = {
 	build_from_spans,
 	build_report,
 	format_minutes,
+	format_seconds,
 	format_share,
+	// Exported so the epic aggregation lays its rows out through this same function rather than a
+	// second copy of the widths: two column rules would drift apart the first time one of them changed.
+	format_columns,
+	format_row,
 	format_empty,
 	format_report,
 }
