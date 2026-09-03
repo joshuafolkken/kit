@@ -1,9 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolve_local_bin } from '#scripts/local-bin'
-import { package_bin_schema, package_version_schema } from '#scripts/schemas'
+import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
+import { package_version_schema } from '#scripts/schemas'
 import { resolve_spawn_exit } from '#scripts/spawn-exit'
 import { execaSync } from 'execa'
 import {
@@ -18,7 +17,7 @@ import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arg
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
-const TSX_MANIFEST = 'tsx/package.json'
+const TSX_PACKAGE = 'tsx'
 const PACKAGE_JSON = 'package.json'
 
 interface TsxRunner {
@@ -52,34 +51,12 @@ function resolve_tsx_executable(): string {
 	return candidates.find(existsSync) ?? TSX_BIN
 }
 
-function read_tsx_bin_entry(manifest_path: string): string | undefined {
-	const { bin } = package_bin_schema.parse(JSON.parse(readFileSync(manifest_path, 'utf8')))
-
-	return typeof bin === 'string' ? bin : bin?.[TSX_BIN]
-}
-
-// pnpm's generated `node_modules/.bin/tsx` shim hardcodes the absolute store path of the tsx
-// version present when it was written. After a tsx bump the old store entry is pruned but the
-// nested shim is not regenerated, so spawning it dies with MODULE_NOT_FOUND. Locating the CLI
-// entry through tsx's own manifest at runtime never consults that stale artifact.
-function resolve_tsx_cli_from(base_directory: string): string | undefined {
-	try {
-		const resolve_from = createRequire(path.join(base_directory, PACKAGE_JSON))
-		const manifest_path = resolve_from.resolve(TSX_MANIFEST)
-		const bin_entry = read_tsx_bin_entry(manifest_path)
-		if (bin_entry === undefined) return undefined
-
-		const cli_entry = path.join(path.dirname(manifest_path), bin_entry)
-
-		return existsSync(cli_entry) ? cli_entry : undefined
-	} catch {
-		return undefined
-	}
-}
-
+// Locating the CLI entry through tsx's own manifest never consults pnpm's generated shim, which
+// hardcodes a store path a later bump prunes. The resolution itself is `resolve_package_bin` —
+// shared with the format hook's eslint route rather than written twice (joshuafolkken/kit#1259).
 function resolve_tsx_cli_entry(): string | undefined {
 	for (const base_directory of [PACKAGE_DIR, process.cwd()]) {
-		const cli_entry = resolve_tsx_cli_from(base_directory)
+		const cli_entry = resolve_package_bin(base_directory, TSX_PACKAGE, TSX_BIN)
 		if (cli_entry !== undefined) return cli_entry
 	}
 
