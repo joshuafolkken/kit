@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { time_corpus } from './time-corpus'
 import { time_epic, type ChildTiming, type EpicTimeReport } from './time-epic'
+import { time_pull_fixture } from './time-pull-fixture'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
 
@@ -104,14 +105,32 @@ function stub_children(reports: ReadonlyMap<number, TimeReport>): MockedRunRepor
 }
 
 // Every read the aggregation makes goes through one `GhReader`, so a test hands it a function and
-// never a network. The epic body is the only thing read here; each child's own report is stubbed.
-function reader_of(body: string): (path: string) => Promise<string> {
+// never a network. Two paths reach it: the epic body, and the pull-request listing the batch pages
+// once for the whole batch (joshuafolkken/kit#1292). The listing defaults to an empty page, which
+// ends the walk in one request; a case that asserts what each child was handed scripts a real page
+// instead, because two children given the same empty answer cannot tell per-child routing from a
+// single shared result.
+const EMPTY_PAGE = '[]'
+
+function reader_of(
+	body: string,
+	asked: Array<string> = [],
+	pulls_body: string = EMPTY_PAGE,
+): (path: string) => Promise<string> {
 	return async (path: string) => {
+		asked.push(path)
+
+		if (path.includes('pulls')) return pulls_body
+
 		expect(path).toContain(`issues/${String(EPIC)}`)
 
 		return JSON.stringify({ body })
 	}
 }
+
+// Which reads count as the pull-request listing is `time-pull-fixture.ts`'s, shared with the suites
+// that assert the same count one level down.
+const { pulls_asked, raw_pull, EXHAUSTED_SEARCH } = time_pull_fixture
 
 describe('time_epic.status_of', () => {
 	// The acceptance criterion: a child that never ran is not a child that took no time.
@@ -309,7 +328,60 @@ describe('time_epic.build_epic_report — one transcript pass for the whole batc
 
 		await batch_of(PAIR_BODY)
 
-		expect(build.mock.calls.map((call) => call[3])).toEqual([spans.get(101), spans.get(102)])
+		expect(build.mock.calls.map((call) => call[3]?.found)).toEqual([spans.get(101), spans.get(102)])
+	})
+})
+
+// The same duplication, one data source over: the listing was paged once per child, and the two
+// children of epic #1272 with no pull request read all five pages each to establish it
+// (joshuafolkken/kit#1292).
+async function pulls_asked_for(rows: ReadonlyArray<string>): Promise<Array<string>> {
+	const asked: Array<string> = []
+
+	vi.spyOn(time_corpus, 'collect_for_issues').mockReturnValue(new Map())
+	stub_children(new Map())
+	await time_epic.build_epic_report(EPIC, CWD, reader_of(body_of(rows), asked))
+
+	return pulls_asked(asked)
+}
+
+describe('time_epic.build_epic_report — one pull-request walk for the whole batch', () => {
+	it('costs the same listing requests for three children as for one', async () => {
+		const three = await pulls_asked_for([ROW_101, ROW_102, ROW_103])
+
+		vi.restoreAllMocks()
+
+		const one = await pulls_asked_for([ROW_101])
+
+		expect(three).toHaveLength(one.length)
+		expect(three).toHaveLength(1)
+	})
+
+	// One walk must not become one shared answer: each child is still handed the result found for its
+	// own issue number. **The page holds a different pull request for each child on purpose** — given
+	// two children the same empty answer, handing every child `searches.get(numbers[0])` would pass
+	// this too, which is the regression it exists to catch.
+	it('hands each child the pull request found for its own issue', async () => {
+		vi.spyOn(time_corpus, 'collect_for_issues').mockReturnValue(new Map())
+		const build = stub_children(new Map())
+		const page = JSON.stringify([raw_pull(11, '101-a'), raw_pull(22, '102-b')])
+
+		await time_epic.build_epic_report(EPIC, CWD, reader_of(PAIR_BODY, [], page))
+
+		expect(build.mock.calls.map((call) => call[3]?.search?.pull?.number)).toEqual([11, 22])
+	})
+
+	// And a child the walk found nothing for is told so, rather than inheriting a sibling's answer.
+	it('tells a child with no pull request that the listing held none', async () => {
+		vi.spyOn(time_corpus, 'collect_for_issues').mockReturnValue(new Map())
+		const build = stub_children(new Map())
+
+		await batch_of(PAIR_BODY)
+
+		expect(build.mock.calls.map((call) => call[3]?.search)).toEqual([
+			EXHAUSTED_SEARCH,
+			EXHAUSTED_SEARCH,
+		])
 	})
 })
 

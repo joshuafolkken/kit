@@ -2,6 +2,7 @@ import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { time_corpus } from './time-corpus'
 import { time_github, type GhReader } from './time-github'
 import { time_instant } from './time-instant'
+import { time_pull_index } from './time-pull-index'
 import type { CategoryTotals, TimeReport } from './time-report'
 import { time_run } from './time-run'
 
@@ -246,29 +247,39 @@ async function read_children(
 	}
 }
 
-// One child at a time rather than all of them at once. Each report pages the pull-request listing,
-// so running seven of those concurrently multiplies the requests in flight to answer a question
-// nobody is waiting on.
+// One child at a time rather than all of them at once, and **both shared sources read once for the
+// whole batch before the loop starts** — the transcripts by joshuafolkken/kit#1284, the pull-request
+// listing by joshuafolkken/kit#1292.
 //
-// **The transcript half is read once for the whole batch** (joshuafolkken/kit#1284). It used to be
-// read inside each child's report, which meant this loop walked the same 669 files eleven times for
-// an eleven-child epic and threw away all but one issue's spans each time. The walk is
-// `time-corpus.ts`'s and attributes one pass to every child, so what is left here is the paging that
-// really is per child.
+// Each of the two used to be read inside each child's report. The transcript walk read the same 669
+// files eleven times for an eleven-child epic; the listing was paged thirteen times for the thirteen
+// children of epic #1272, and the two children with no pull request read all five pages each to
+// establish it — 21 requests where 5 answer every child. Neither second read could differ from the
+// first: the files do not change while the command runs, and the 500 rows are the same rows.
+//
+// What is left per child is the check-run read, which really is per child: it is keyed on that
+// child's own head sha, so there is no shared listing to lift it out of. Sequential for the reason
+// this comment began with — running thirteen of those at once multiplies the requests in flight to
+// answer a question nobody is waiting on.
 async function build_children(
 	numbers: ReadonlyArray<number>,
 	cwd: string,
 	read: GhReader,
 ): Promise<Array<ChildTiming>> {
 	const found = time_corpus.collect_for_issues(cwd, numbers)
+	const searches = await time_pull_index.pulls_for_issues(numbers, read)
 	const rows: Array<ChildTiming> = []
 
-	// `found` holds an entry for every number asked about — an issue no transcript mentions is
-	// present with an empty result rather than absent, which `time-corpus.test.ts` pins. A miss would
-	// therefore be a broken invariant rather than a normal case, and `build_run_report` answers one by
-	// walking the corpus for that child: slower than this is meant to be, never wrong.
+	// Both maps hold an entry for every number asked about — an issue no transcript mentions and one
+	// with no pull request are present with their own empty answer rather than absent, which
+	// `time-corpus.test.ts` and `time-pull-index.test.ts` pin. A miss would therefore be a broken
+	// invariant rather than a normal case, and `build_run_report` answers one by reading that half
+	// itself: slower than this is meant to be, never wrong.
 	for (const issue_number of numbers) {
-		const report = await time_run.build_run_report(issue_number, cwd, read, found.get(issue_number))
+		const report = await time_run.build_run_report(issue_number, cwd, read, {
+			found: found.get(issue_number),
+			search: searches.get(issue_number),
+		})
 
 		rows.push(to_timing(issue_number, report))
 	}
