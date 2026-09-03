@@ -16,10 +16,16 @@ const LABEL_WIDTH = 24
 // short one's rather than pushing the share out by a character.
 const MINUTES_WIDTH = 9
 
+// `ci_ms` is the fourth share (joshuafolkken/kit#1268): the part of the pull request's
+// open→merge window that no transcript span covers. Disjoint from the other three by construction,
+// so the four still reconstruct the elapsed time exactly — the property that makes two runs
+// comparable, and the one a naive "add the PR window" would have broken, since `followup --merge`
+// waits for CI *inside* a tool span that is already counted.
 interface CategoryTotals {
 	model_ms: number
 	tool_ms: number
 	human_ms: number
+	ci_ms: number
 }
 
 interface LabelTotal {
@@ -29,14 +35,37 @@ interface LabelTotal {
 }
 
 interface TimeReport {
-	session_id: string
+	// What was measured: `session <id>` for one session, `issue #<N>` for a whole run. A label rather
+	// than a session id, because a run spans sessions and has no single one to name.
+	scope: string
 	started_at: string
 	ended_at: string
 	elapsed_ms: number
 	span_count: number
 	categories: CategoryTotals
+	// Whether the GitHub half was read at all. A session report has no pull request, so printing a
+	// `CI wait 0.0 min` row there would assert a measurement nobody made.
+	has_ci_data: boolean
+	// Whatever the reader has to know to read the figures correctly — how many sessions contributed,
+	// which pull request, an unmerged one, an issue with no pull request at all. Printed under the
+	// heading rather than swallowed: an unknown is reported, never rendered as a zero.
+	notes: Array<string>
 	by_tool: Array<LabelTotal>
 	by_josh_command: Array<LabelTotal>
+	by_check: Array<LabelTotal>
+}
+
+// Everything `build_from_spans` needs. A record rather than seven positional parameters, which the
+// four-parameter limit forbids anyway and which no reader could keep in order.
+interface ReportInput {
+	scope: string
+	spans: ReadonlyArray<Span>
+	started_ms: number
+	ended_ms: number
+	ci_ms: number
+	has_ci_data: boolean
+	notes: ReadonlyArray<string>
+	by_check: ReadonlyArray<LabelTotal>
 }
 
 function category_ms(spans: ReadonlyArray<Span>, category: SpanCategory): number {
@@ -76,23 +105,48 @@ function to_iso(timestamp_ms: number): string {
 	return timestamp_ms === 0 ? '' : new Date(timestamp_ms).toISOString()
 }
 
-function build_report(session_id: string, timeline: Timeline): TimeReport {
-	const { spans } = timeline
+// **Elapsed is the sum of the four shares, not the window's length.** For one session the two are
+// the same, because its spans tile its window exactly. For a run they are not: two sessions with a
+// day between them leave real time that belonged to nobody, and counting it as elapsed would report
+// a run as a day long. So the header states what was accounted for, and `started_at` / `ended_at`
+// still carry the wall window a reader can check it against.
+function build_from_spans(input: ReportInput): TimeReport {
+	const { spans, ci_ms } = input
+	const categories = {
+		model_ms: category_ms(spans, time_spans.MODEL_CATEGORY),
+		tool_ms: category_ms(spans, time_spans.TOOL_CATEGORY),
+		human_ms: category_ms(spans, time_spans.HUMAN_CATEGORY),
+		ci_ms,
+	}
 
 	return {
-		session_id,
-		started_at: to_iso(timeline.started_ms),
-		ended_at: to_iso(timeline.ended_ms),
-		elapsed_ms: timeline.ended_ms - timeline.started_ms,
+		scope: input.scope,
+		started_at: to_iso(input.started_ms),
+		ended_at: to_iso(input.ended_ms),
+		elapsed_ms: categories.model_ms + categories.tool_ms + categories.human_ms + ci_ms,
 		span_count: spans.length,
-		categories: {
-			model_ms: category_ms(spans, time_spans.MODEL_CATEGORY),
-			tool_ms: category_ms(spans, time_spans.TOOL_CATEGORY),
-			human_ms: category_ms(spans, time_spans.HUMAN_CATEGORY),
-		},
+		categories,
+		has_ci_data: input.has_ci_data,
+		notes: [...input.notes],
 		by_tool: totals_by(spans, (span) => span.label),
 		by_josh_command: totals_by(spans, (span) => span.josh_command),
+		by_check: [...input.by_check],
 	}
+}
+
+// One session, which is the shape `josh time --session` reports. It has no GitHub half, so the CI
+// share is zero and the row is withheld rather than printed as a measured zero.
+function build_report(session_id: string, timeline: Timeline): TimeReport {
+	return build_from_spans({
+		scope: `session ${session_id}`,
+		spans: timeline.spans,
+		started_ms: timeline.started_ms,
+		ended_ms: timeline.ended_ms,
+		ci_ms: 0,
+		has_ci_data: false,
+		notes: [],
+		by_check: [],
+	})
 }
 
 function format_minutes(duration_ms: number): string {
@@ -109,6 +163,14 @@ function format_row(label: string, duration_ms: number, suffix: string): string 
 	return `  ${label.padEnd(LABEL_WIDTH)}${format_minutes(duration_ms).padStart(MINUTES_WIDTH)}   ${suffix}`
 }
 
+function ci_line(report: TimeReport): Array<string> {
+	if (!report.has_ci_data) return []
+
+	const { ci_ms } = report.categories
+
+	return [format_row('CI wait', ci_ms, format_share(ci_ms, report.elapsed_ms))]
+}
+
 function category_lines(report: TimeReport): Array<string> {
 	const { categories, elapsed_ms } = report
 
@@ -116,6 +178,7 @@ function category_lines(report: TimeReport): Array<string> {
 		format_row('model wait', categories.model_ms, format_share(categories.model_ms, elapsed_ms)),
 		format_row('tool execution', categories.tool_ms, format_share(categories.tool_ms, elapsed_ms)),
 		format_row('human wait', categories.human_ms, format_share(categories.human_ms, elapsed_ms)),
+		...ci_line(report),
 	]
 }
 
@@ -139,30 +202,40 @@ function total_lines(heading: string, rows: ReadonlyArray<LabelTotal>): Array<st
 
 // A table of zeroes reads as "this run took no time", which is never true. A session with no timed
 // line says so in words instead — the same answer `cost_report.format_empty` gives.
+function note_lines(notes: ReadonlyArray<string>): Array<string> {
+	return notes.map((note) => `  ${note}`)
+}
+
+// The sentence names no particular transcript, because a run scope reaches here when no transcript
+// was found at all — "this transcript has fewer" would then be about a file nobody located.
 function format_empty(report: TimeReport): string {
 	return [
-		`session ${report.session_id} — no timed lines`,
+		`${report.scope} — no timed lines`,
+		...note_lines(report.notes),
 		'',
-		'A span needs two dated lines to sit between. This transcript has fewer, so there is no',
-		'elapsed time to divide up.',
+		'A span needs two dated lines to sit between, and nothing read here has a pair. So there is',
+		'no elapsed time to divide up.',
 	].join('\n')
 }
 
 function format_report(report: TimeReport): string {
-	if (report.span_count === 0) return format_empty(report)
+	if (report.span_count === 0 && report.categories.ci_ms === 0) return format_empty(report)
 
 	return [
-		`session ${report.session_id} — ${format_minutes(report.elapsed_ms)} elapsed`,
+		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
+		...note_lines(report.notes),
 		'',
 		'Where the wall clock went:',
 		...category_lines(report),
 		...total_lines('By tool (descending):', report.by_tool),
 		...total_lines('By josh command (descending):', report.by_josh_command),
+		...total_lines('By CI check (descending, jobs overlap):', report.by_check),
 	].join('\n')
 }
 
 const time_report = {
 	MAX_ROWS,
+	build_from_spans,
 	build_report,
 	format_minutes,
 	format_share,
@@ -170,5 +243,5 @@ const time_report = {
 	format_report,
 }
 
-export type { CategoryTotals, LabelTotal, TimeReport }
+export type { CategoryTotals, LabelTotal, ReportInput, TimeReport }
 export { time_report }

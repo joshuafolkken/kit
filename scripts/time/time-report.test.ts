@@ -7,7 +7,14 @@ const SESSION = 'abcd1234'
 const PNPM_LABEL = 'Bash: pnpm'
 
 function span(category: Span['category'], minutes: number, label = '', josh_command = ''): Span {
-	return { category, label, josh_command, duration_ms: minutes * MINUTE_MS }
+	return {
+		category,
+		label,
+		josh_command,
+		branch: 'main',
+		ended_ms: 0,
+		duration_ms: minutes * MINUTE_MS,
+	}
 }
 
 function timeline(spans: ReadonlyArray<Span>): Timeline {
@@ -19,6 +26,11 @@ function timeline(spans: ReadonlyArray<Span>): Timeline {
 function build(spans: ReadonlyArray<Span>): ReturnType<typeof time_report.build_report> {
 	return time_report.build_report(SESSION, timeline(spans))
 }
+
+const RUN_SCOPE = 'issue #1268'
+const SESSION_NOTE = '2 session(s)'
+const CI_ROW = 'CI wait'
+const CATEGORY_HEADING = 'Where the wall clock went'
 
 const MIXED = [
 	span(time_spans.MODEL_CATEGORY, 4),
@@ -34,6 +46,7 @@ describe('time_report.build_report — categories', () => {
 			model_ms: 4 * MINUTE_MS,
 			tool_ms: 6 * MINUTE_MS,
 			human_ms: 10 * MINUTE_MS,
+			ci_ms: 0,
 		})
 	})
 
@@ -115,7 +128,55 @@ describe('time_report.format_report', () => {
 		const text = time_report.format_report(build([]))
 
 		expect(text).toContain('no timed lines')
-		expect(text).not.toContain('Where the wall clock went')
+		expect(text).not.toContain(CATEGORY_HEADING)
+	})
+})
+
+function run_report(
+	spans: ReadonlyArray<Span>,
+	ci_ms: number,
+): ReturnType<typeof time_report.build_from_spans> {
+	return time_report.build_from_spans({
+		scope: RUN_SCOPE,
+		spans,
+		started_ms: 0,
+		ended_ms: 30 * MINUTE_MS,
+		ci_ms,
+		has_ci_data: true,
+		notes: [SESSION_NOTE],
+		by_check: [{ label: 'unit', duration_ms: 2 * MINUTE_MS, call_count: 1 }],
+	})
+}
+
+// The fourth share exists only where a pull request was read. A session report has none, and
+// printing `CI wait 0.0 min` there would assert a measurement nobody made.
+describe('time_report.build_from_spans — the CI share', () => {
+	it('adds the CI wait to the elapsed time rather than to a category', () => {
+		const report = run_report(MIXED, 5 * MINUTE_MS)
+
+		expect(report.categories.ci_ms).toBe(5 * MINUTE_MS)
+		expect(report.elapsed_ms).toBe(25 * MINUTE_MS)
+	})
+
+	it('prints the CI row, the notes and the check table', () => {
+		const text = time_report.format_report(run_report(MIXED, 5 * MINUTE_MS))
+
+		expect(text).toContain(RUN_SCOPE)
+		expect(text).toContain(CI_ROW)
+		expect(text).toContain(SESSION_NOTE)
+		expect(text).toContain('By CI check (descending, jobs overlap):')
+	})
+
+	it('withholds the CI row from a session report, which measured none', () => {
+		expect(time_report.format_report(build(MIXED))).not.toContain(CI_ROW)
+	})
+
+	// A run whose transcripts are all missing still has a measured CI wait, and reporting that as
+	// "no timed lines" would throw away the one figure GitHub did answer.
+	it('reports a run with no spans but a known CI wait', () => {
+		const text = time_report.format_report(run_report([], MINUTE_MS))
+
+		expect(text).toContain(CATEGORY_HEADING)
 	})
 })
 
