@@ -18,6 +18,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			"Print one issue's state and labels, in the spelling the documents compare against",
 		category: 'AI tools',
 	},
+	'issue:scout': {
+		script: 'scripts/issue/issue-scout-cli.ts',
+		description:
+			'Before filing: say whether an issue like this exists and which epic it belongs to',
+		category: 'AI tools',
+	},
 	epic: {
 		script: 'scripts-ai/epic.ts',
 		description: 'Create an epic issue from its child issue numbers',

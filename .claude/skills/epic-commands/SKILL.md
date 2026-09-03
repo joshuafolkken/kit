@@ -223,6 +223,14 @@ hundred of them, never pay it.
 
 Bundling is reversible; merging epics is not, which is the one branch that asks.
 
+**Its sibling runs before the filing, not after it: `pnpm josh issue:scout "<title>"`.** That command
+answers the same epic question for an issue that does not exist yet — this decision, called rather
+than restated — and beside it the one thing this one deliberately refuses: whether the work has
+already been filed, from a title comparison (joshuafolkken/kit#1252). **Both run**, and neither
+replaces the other: the scout is what a `new` entry point asks before `gh api … issues`, and
+`epic:bundle` is what it asks afterwards, from the real number and the relations recorded against it.
+Full behavior: `docs/josh-commands.md` → "`josh issue:scout`".
+
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies` —
 on an addition as much as on a new epic. Without it the batch survives and the reason for it does
 not. An order **nobody declared is not invented**.

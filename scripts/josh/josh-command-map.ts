@@ -80,6 +80,7 @@ const ALIASES: Record<string, string> = {
 	pp: 'prep',
 	is: 'issue',
 	ist: 'issue:state',
+	isc: 'issue:scout',
 	ep: 'epic',
 	ec: 'epic:check',
 	en: 'epic:next',

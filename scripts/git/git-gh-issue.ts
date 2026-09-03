@@ -3,6 +3,10 @@ import { git_gh_issue_read } from './git-gh-issue-read'
 import { git_gh_issue_write } from './git-gh-issue-write'
 
 const NUMBER_AND_BODY_FIELDS = 'number,body'
+// The backlog scan's fields. The title rides along because the pre-filing scan compares titles
+// (joshuafolkken/kit#1252) and it costs nothing: the same listing request already carries it, so the
+// two consumers share one read rather than each making their own.
+const NUMBER_TITLE_AND_BODY_FIELDS = 'number,title,body'
 // The fields every listing that is *ranked* asks for: `createdAt` to order by and `labels` to
 // exclude by. Shared by the next-issues display and the `auto-ok` pickup, which rank identically.
 const SUMMARY_FIELDS = 'number,title,labels,createdAt'
@@ -42,11 +46,11 @@ async function issue_list_recent(limit: number): Promise<IssueListOutcome> {
 	return await issue_list_open({ json_fields: SUMMARY_FIELDS, limit })
 }
 
-// Every open issue with its body. Used by `epic:bundle` to scan the backlog; a search with an empty
-// term is not a listing, and asking `gh` for one produced a partial and arbitrary answer
-// (joshuafolkken/kit#873).
+// Every open issue with its title and body. Used by `epic:bundle` to scan the backlog and by
+// `issue:scout` to compare titles before one is filed; a search with an empty term is not a listing,
+// and asking `gh` for one produced a partial and arbitrary answer (joshuafolkken/kit#873).
 async function issue_list_open_bodies(limit: number): Promise<IssueListOutcome> {
-	return await issue_list_open({ json_fields: NUMBER_AND_BODY_FIELDS, limit })
+	return await issue_list_open({ json_fields: NUMBER_TITLE_AND_BODY_FIELDS, limit })
 }
 
 // Open issues whose body mentions `term`. Used by `epic:audit` to find an issue that names an epic

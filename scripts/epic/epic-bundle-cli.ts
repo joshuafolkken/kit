@@ -29,7 +29,11 @@ const USAGE = 'Usage: josh epic:bundle <issue-number>'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the backlog cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
 
-const backlog_schema = z.object({ number: z.number(), body: z.string().nullable() })
+const epic_schema = z.object({ number: z.number(), body: z.string().nullable() })
+// The backlog listing asks for the title too (joshuafolkken/kit#1252). Kept apart from the epic
+// listing's schema rather than made optional on one: the epic listing does not ask for the field, and
+// a schema that tolerates its absence everywhere would let a missing title pass unnoticed here.
+const backlog_schema = epic_schema.extend({ title: z.string().nullable() })
 
 // Which epic tracks each issue, from the epics' own task lists. An issue belongs to at most one,
 // because that is what a task list can express.
@@ -116,13 +120,14 @@ interface FetchedBacklog {
 // One listing row as the bundler reads it. Split from the fetch so that function stays a list of
 // requests rather than a request list plus a row mapping.
 function to_backlog_issue(
-	row: { number: number; body?: string | null },
+	row: { number: number; title?: string | null; body?: string | null },
 	context: { repo: string; epics: Map<number, number>; epic_numbers: ReadonlySet<number> },
 	blocked_by: ReadonlyArray<IssueReference>,
 ): BacklogIssue {
 	return {
 		number: row.number,
 		repo: context.repo,
+		title: row.title ?? '',
 		body: row.body ?? '',
 		blocked_by,
 		is_epic: context.epic_numbers.has(row.number),
@@ -130,10 +135,32 @@ function to_backlog_issue(
 	}
 }
 
+// What a caller does not need read for it. `issue:scout` asks about an issue that does not exist yet:
+// it has no number, so no recorded dependency can name it and it declares none of its own — the
+// relation reads cannot change its answer, and skipping them takes one request per open issue off the
+// command a run makes before every filing (joshuafolkken/kit#1252). `epic:bundle` leaves it unset and
+// reads them exactly as before.
+interface BacklogOptions {
+	include_relations?: boolean
+}
+
+// The relations, or an empty list each when the caller asked for none. Every issue still gets a row,
+// so the index alignment `fetch_backlog` relies on holds either way.
+async function read_relations(
+	numbers: ReadonlyArray<number>,
+	repo: string,
+	options: BacklogOptions | undefined,
+): Promise<Array<Array<IssueReference> | undefined>> {
+	if (options?.include_relations === false) return numbers.map(() => [])
+
+	return await fetch_relations(numbers, repo)
+}
+
 async function fetch_backlog(
 	repo: string,
 	epics: Map<number, number>,
 	epic_numbers: ReadonlySet<number> = new Set(epics.values()),
+	options?: BacklogOptions,
 ): Promise<FetchedBacklog> {
 	const { json, is_capped } = await git_gh_command.issue_list_open_bodies(BACKLOG_LIMIT)
 	// A failed listing is not an empty backlog. Reported rather than degraded into one, which would
@@ -142,9 +169,10 @@ async function fetch_backlog(
 	// Same reason as `fetch_epics`: an unparseable listing is not an empty backlog.
 	const rows = parse_json_array_or_undefined(json, backlog_schema)
 	if (rows === undefined) return { issues: [], unreadable: [], is_readable: false }
-	const relations = await fetch_relations(
+	const relations = await read_relations(
 		rows.map((row) => row.number),
 		repo,
+		options,
 	)
 
 	return {
@@ -196,7 +224,7 @@ async function fetch_epics(): Promise<FetchedEpics | undefined> {
 	if (json === undefined) return undefined
 	// Not `parse_json_array_safe`: it answers `[]` for a response that is not JSON at all, which is
 	// indistinguishable from "no epics are open" — the silent absence this whole rule is about.
-	const rows = parse_json_array_or_undefined(json, backlog_schema)
+	const rows = parse_json_array_or_undefined(json, epic_schema)
 	if (rows === undefined) return undefined
 
 	return {
@@ -252,7 +280,7 @@ function format_decision(
 }
 
 // The open backlog and the epics tracking it, read once.
-async function read_backlog(repo: string): Promise<FetchedBacklog> {
+async function read_backlog(repo: string, options?: BacklogOptions): Promise<FetchedBacklog> {
 	const open_epics = await fetch_epics()
 
 	if (open_epics === undefined) {
@@ -266,7 +294,7 @@ async function read_backlog(repo: string): Promise<FetchedBacklog> {
 	const epic_numbers = new Set(open_epics.epics.map((epic) => epic.number))
 
 	return {
-		...(await fetch_backlog(repo, epics, epic_numbers)),
+		...(await fetch_backlog(repo, epics, epic_numbers, options)),
 		has_epic_list: true,
 		epic_cutoff: open_epics.cutoff,
 		context: { repo, epics, epic_numbers },
