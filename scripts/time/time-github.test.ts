@@ -12,21 +12,36 @@ interface RawPull {
 	number: number
 	created_at: string
 	merged_at: string
+	updated_at: string
 	head: { ref: string; sha: string }
 }
 
-function raw_pull(pull_number: number, branch: string, merged_at: string = MERGED): RawPull {
-	return { number: pull_number, created_at: CREATED, merged_at, head: { ref: branch, sha: SHA } }
+// `updated_at` defaults to the merge instant, which is what GitHub sends for a pull request nothing
+// has touched since it merged. A fixture that wants the awkward case — merged long ago, commented
+// on today — says so by passing both.
+function raw_pull(
+	pull_number: number,
+	branch: string,
+	merged_at: string = MERGED,
+	updated_at: string = merged_at,
+): RawPull {
+	return {
+		number: pull_number,
+		created_at: CREATED,
+		merged_at,
+		updated_at,
+		head: { ref: branch, sha: SHA },
+	}
 }
 
 // An open pull request carries a JSON `null`, which is what GitHub sends and what the schema's
 // `nullish` exists for. Written as text rather than as a `null` literal so the fixture states the
 // wire format instead of a language value.
 function raw_json(pull_number: number, branch: string, merged_at: string): string {
-	return `{"number":${String(pull_number)},"created_at":"${CREATED}","merged_at":"${merged_at}","head":{"ref":"${branch}","sha":"${SHA}"}}`
+	return `{"number":${String(pull_number)},"created_at":"${CREATED}","merged_at":"${merged_at}","updated_at":"${merged_at}","head":{"ref":"${branch}","sha":"${SHA}"}}`
 }
 
-const OPEN_PULL_ROW = `{"number":2,"created_at":"${CREATED}","merged_at":null,"head":{"ref":"2-open","sha":"${SHA}"}}`
+const OPEN_PULL_ROW = `{"number":2,"created_at":"${CREATED}","merged_at":null,"updated_at":"${CREATED}","head":{"ref":"2-open","sha":"${SHA}"}}`
 const OPEN_PULL_JSON = `[${OPEN_PULL_ROW}]`
 // The open one first, so a lookup that took the first row rather than the first *merged* row would
 // answer with a pull request that has no merge instant at all.
@@ -81,7 +96,7 @@ const TIME_BRANCH = '1267-time'
 const TIME_PULL_JSON = JSON.stringify([raw_pull(1277, TIME_BRANCH)])
 
 describe('time_github.parse_pulls', () => {
-	it('reads the number, branch, head sha and both timestamps', () => {
+	it('reads the number, branch, head sha and every timestamp', () => {
 		expect(time_github.parse_pulls(TIME_PULL_JSON)).toEqual([
 			{
 				number: 1277,
@@ -89,6 +104,7 @@ describe('time_github.parse_pulls', () => {
 				head_sha: SHA,
 				created_ms: Date.parse(CREATED),
 				merged_ms: Date.parse(MERGED),
+				updated_ms: Date.parse(MERGED),
 			},
 		])
 	})
@@ -179,6 +195,105 @@ describe('time_github.pull_for_branch_prefix — paging', () => {
 
 		expect(found.pull?.number).toBe(7)
 		expect(asked).toHaveLength(2)
+	})
+
+	// The other user of the shared walk, unchanged by the certainty protocol: a branch match is
+	// settled the moment it is found, so a match on a full first page still costs one request.
+	it('stops on the page that holds the branch, without reading the next', async () => {
+		const asked: Array<string> = []
+		const pages = [[...filled_page().slice(1), raw_pull(7, ISSUE_BRANCH)], filled_page()]
+		const found = await time_github.pull_for_branch_prefix(ISSUE, reader(pages, asked))
+
+		expect(found.pull?.number).toBe(7)
+		expect(asked).toHaveLength(1)
+	})
+})
+
+// Merged days ago, so a page that holds it is not the page holding the newest merge.
+const OLD_MERGE = '2026-09-01T00:00:00Z'
+// Touched after the newest merge — a comment, a label, a bot push.
+const UPDATED_TODAY = '2026-09-03T12:00:00Z'
+// Touched before it, which is what lets a page prove nothing newer follows.
+const QUIET_UPDATE = '2026-09-03T08:00:00Z'
+const NEWEST_PULL = 500
+const NEWEST_BRANCH = '1279-newest'
+const QUIET_PULL_BASE = 600
+
+// A full page of pull requests updated after the newest merge. One of them merged days ago, so the
+// walk used to take it as the answer and stop here.
+function busy_page(): Array<RawPull> {
+	return PAGE_INDICES.map((index) =>
+		raw_pull(index + 1, `${String(index + 1)}-busy`, OLD_MERGE, UPDATED_TODAY),
+	)
+}
+
+// The page the newest merge actually sits on: nothing on it was touched after that merge.
+function merge_page(): Array<RawPull> {
+	const quiet = PAGE_INDICES.slice(1).map((index) =>
+		raw_pull(QUIET_PULL_BASE + index, `${String(index)}-quiet`, OLD_MERGE, QUIET_UPDATE),
+	)
+
+	return [raw_pull(NEWEST_PULL, NEWEST_BRANCH), ...quiet]
+}
+
+describe('time_github.latest_merged_pull — paging', () => {
+	// The failure this walk was rewritten for (joshuafolkken/kit#1279): a page of pull requests
+	// updated since the newest merge pushes it to page two, and page one holds an older merge that
+	// used to look like an answer.
+	it('walks past a page whose oldest update is newer than the merge found on it', async () => {
+		const asked: Array<string> = []
+		const found = await time_github.latest_merged_pull(
+			reader([busy_page(), merge_page(), busy_page()], asked),
+		)
+
+		expect(found.pull?.number).toBe(NEWEST_PULL)
+		expect(asked).toHaveLength(2)
+	})
+
+	// ...and the ordinary case did not get more expensive for it. One page proves itself, and the
+	// second is never requested — the whole reason for proving the stop rather than always reading
+	// every page.
+	it('asks for one page when that page proves no later merge can be newer', async () => {
+		const asked: Array<string> = []
+		const found = await time_github.latest_merged_pull(reader([merge_page(), busy_page()], asked))
+
+		expect(found.pull?.number).toBe(NEWEST_PULL)
+		expect(asked).toHaveLength(1)
+	})
+
+	// A candidate the cap cut short is not an answer. Reported as one it would be indistinguishable
+	// from a proven merge, and `pnpm josh time` would print an older run as "the run that just
+	// finished" with no sign that 500 rows were read without settling it.
+	it('reports the cap rather than a merge it could not prove is the newest', async () => {
+		const asked: Array<string> = []
+		const pages = Array.from({ length: time_github.MAX_PAGES + 1 }, () => busy_page())
+		const found = await time_github.latest_merged_pull(reader(pages, asked))
+
+		expect(found).toEqual({ pull: undefined, is_exhausted: false, is_failed: false })
+		expect(asked).toHaveLength(time_github.MAX_PAGES)
+	})
+
+	// The listing ending is a proof of its own: with no page left, the best merge seen is the newest
+	// there is, so a short page settles the question even when no page proved it on its own.
+	it('settles on the best merge when the listing ends before the cap', async () => {
+		const asked: Array<string> = []
+		const tail = [raw_pull(NEWEST_PULL, NEWEST_BRANCH, MERGED, UPDATED_TODAY)]
+		const found = await time_github.latest_merged_pull(reader([busy_page(), tail], asked))
+
+		expect(found.pull?.number).toBe(NEWEST_PULL)
+		expect(asked).toHaveLength(2)
+	})
+})
+
+describe('time_github.newest_merged_choice', () => {
+	// A merged pull request always carries `updated_at >= merged_at`, so a page whose oldest update
+	// has fallen below the best merge settles the question and one that has not cannot.
+	it('is certain only once the page has settled below the best merge', () => {
+		const busy = time_github.parse_pulls(JSON.stringify(busy_page()))
+		const quiet = time_github.parse_pulls(JSON.stringify(merge_page()))
+
+		expect(time_github.newest_merged_choice(busy, undefined).is_certain).toBe(false)
+		expect(time_github.newest_merged_choice(quiet, undefined).is_certain).toBe(true)
 	})
 })
 
