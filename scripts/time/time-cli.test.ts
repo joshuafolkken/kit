@@ -207,6 +207,7 @@ const RUN_REPORT: TimeReport = {
 	categories: { model_ms: MINUTE_MS, tool_ms: 2 * MINUTE_MS, human_ms: 0, ci_ms: 5 * MINUTE_MS },
 	has_ci_data: true,
 	notes: ['1 session(s)'],
+	phases: [],
 	by_tool: [],
 	by_josh_command: [],
 	by_check: [],
