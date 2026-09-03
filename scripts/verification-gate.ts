@@ -1,6 +1,9 @@
 #!/usr/bin/env tsx
+import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { bounded_pool } from './bounded-pool'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
+import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { GATE_COMMAND } from './josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh/josh-composite-arguments'
 import { review_stamps } from './review/review-stamps'
@@ -9,10 +12,14 @@ import { test_unit_guard } from './test-unit-guard'
 import { type_check_step } from './type-check-step'
 
 // joshuafolkken/kit#914: the completion gate's four checks are independent and share no mutable
-// state, yet every entry point ran them one after another — 31s serial against a 13s longest step,
-// paid again on every `epicrun` child, every `/code-review` fix and every `halfrun` stop. Worse
-// than the seconds: a serial gate reports one failure at a time, so a tree with a lint error and a
-// type error costs two full round trips to discover.
+// state, yet every entry point ran them one after another — paid again on every `epicrun` child,
+// every `/code-review` fix and every `halfrun` stop. Worse than the seconds: a serial gate reports
+// one failure at a time, so a tree with a lint error and a type error costs two full round trips to
+// discover.
+//
+// The margin has narrowed as the checks gained caches and is re-measured rather than repeated: on
+// this repository today, 19.1s back to back against 15.1s together (joshuafolkken/kit#1258). How
+// many run at once, and how wide the unit suite fans out, are `gate-plan.ts`'s to decide.
 //
 // Each step shells out to the `josh` sub-command that already defines it, rather than repeating the
 // underlying tool invocations here — one definition per check, in `josh-commands-development.ts`.
@@ -35,31 +42,36 @@ interface GateStepResult extends BufferedProcessResult {
 }
 
 const JOSH = 'josh'
-const TYPE_CHECK_LABEL = 'check'
-
-interface GateCheck {
-	label: string
-	// The `josh` sub-command that defines the check, and the one an appended argument belongs to.
-	target: string
-}
-
-// The four checks, in the order their output is printed.
-const GATE_CHECKS: ReadonlyArray<GateCheck> = [
-	{ label: 'lint', target: 'lint' },
-	{ label: TYPE_CHECK_LABEL, target: 'check' },
-	{ label: 'cspell', target: 'cspell:dot' },
-	{ label: 'test:unit', target: 'test:unit' },
-]
+const { GATE_CHECKS, TYPE_CHECK_LABEL, UNIT_LABEL } = gate_plan
 
 const GATE_TARGETS: ReadonlyArray<string> = GATE_CHECKS.map((check) => check.target)
 const STEP_COUNT = String(GATE_CHECKS.length)
 
+// vitest's own flag, appended to the sub-command rather than set in `vitest.config.ts`: the config
+// is one project's, and the number this carries is a property of the machine the gate is running
+// on (joshuafolkken/kit#1258). `josh test:unit` forwards what it is given straight to
+// `vitest run`, so nothing between here and vitest has to know about it.
+const UNIT_WORKER_FLAG = '--maxWorkers'
+
+function unit_worker_args(check: GateCheck, plan: GatePlan): ReadonlyArray<string> {
+	if (check.label !== UNIT_LABEL || plan.unit_worker_cap === undefined) return []
+
+	return [`${UNIT_WORKER_FLAG}=${String(plan.unit_worker_cap)}`]
+}
+
 // Only the type check is resolved per project (joshuafolkken/kit#934) — a SvelteKit project
 // type-checks through its own toolkit, not through `tsc --noEmit`. Resolving inside the step keeps
 // the probe concurrent with the other three checks rather than delaying every one of them.
-async function build_gate_step(check: GateCheck, start_directory: string): Promise<GateStep> {
+async function build_gate_step(
+	check: GateCheck,
+	start_directory: string,
+	plan: GatePlan = gate_plan.resolve_gate_plan(),
+): Promise<GateStep> {
 	if (check.label !== TYPE_CHECK_LABEL) {
-		return { label: check.label, command_args: [JOSH, check.target] }
+		return {
+			label: check.label,
+			command_args: [JOSH, check.target, ...unit_worker_args(check, plan)],
+		}
 	}
 
 	return {
@@ -68,9 +80,12 @@ async function build_gate_step(check: GateCheck, start_directory: string): Promi
 	}
 }
 
-async function build_gate_steps(start_directory: string): Promise<ReadonlyArray<GateStep>> {
+async function build_gate_steps(
+	start_directory: string,
+	plan: GatePlan = gate_plan.resolve_gate_plan(),
+): Promise<ReadonlyArray<GateStep>> {
 	return await Promise.all(
-		GATE_CHECKS.map(async (check) => await build_gate_step(check, start_directory)),
+		GATE_CHECKS.map(async (check) => await build_gate_step(check, start_directory, plan)),
 	)
 }
 
@@ -257,22 +272,49 @@ async function with_gate_marker<T>(
 	}
 }
 
+// `bounded_pool` rather than a bare `Promise.all`, so the plan's `concurrency` is what decides how
+// many run at once (joshuafolkken/kit#1258). **The all-failures-in-one-pass property survives the
+// change** because no check ever rejects: `buffered_process` reports a non-zero exit as a value, so
+// the pool's first-failure abort — written for callers that spawn real Claude sessions — never
+// fires here and every queued check still runs. Results come back in input order however they
+// finished, which is what keeps the printed sections in declaration order.
 async function run_marked_gate_steps(
 	before: Record<string, string>,
+	plan: GatePlan,
 ): Promise<ReadonlyArray<GateStepResult>> {
 	return await with_gate_marker(before, async () => {
-		const steps = await build_gate_steps(process.cwd())
+		const steps = await build_gate_steps(process.cwd(), plan)
 
-		return await Promise.all(steps.map(async (step) => await run_gate_step(step)))
+		return await bounded_pool.bounded_map(
+			steps,
+			plan.concurrency,
+			async (step) => await run_gate_step(step),
+		)
 	})
+}
+
+// The plan goes above the checks rather than beside the summary: it is what the durations under it
+// are read against, and a reader who scrolls to the failing check has already passed it.
+//
+// The core count is read once and handed to both calls. Letting each default to
+// `availableParallelism()` would be two independent reads, and a quota changed between them prints
+// a core count the plan was not derived from — the one misreading this line exists to prevent.
+function announce_gate_plan(): GatePlan {
+	const available_cores = availableParallelism()
+	const plan = gate_plan.resolve_gate_plan(available_cores)
+
+	process.stdout.write(`${gate_plan.format_gate_plan(plan, available_cores)}\n`)
+
+	return plan
 }
 
 async function run_verification_gate(is_verbose = false): Promise<number> {
 	// Started before the tree read, so the total is what the caller waited for rather than what the
 	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
 	const started_at = performance.now()
+	const plan = announce_gate_plan()
 	const before = await read_tree_before_checks()
-	const results = await run_marked_gate_steps(before)
+	const results = await run_marked_gate_steps(before, plan)
 
 	for (const result of results) print_gate_step(result, is_verbose)
 
@@ -326,6 +368,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 const verification_gate = {
+	UNIT_WORKER_FLAG,
 	VERBOSE_FLAG,
 	build_gate_step,
 	build_gate_steps,

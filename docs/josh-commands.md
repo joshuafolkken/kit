@@ -14,11 +14,24 @@ Run the completion gate's four checks — lint, type check, spell check and unit
 pnpm josh gate
 ```
 
-The four are independent and share no mutable state, so nothing is gained by running them one after another. Measured in kit: 13s (lint), 5s (type check), 2s (spell check) and 11s (unit tests) come to 31s in sequence and about 13s together.
+The four are independent and share no mutable state, so nothing is gained by running them one after another. Measured in kit on an Apple M3 Pro with warm caches, the four run back to back take **19.1s** and together **15.1s** — a median of three interleaved runs each ([#1258](https://github.com/joshuafolkken/kit/issues/1258)).
+
+**How many run at once, and how wide the unit suite fans out, are read off the machine rather than fixed at four** ([#1258](https://github.com/joshuafolkken/kit/issues/1258)). The first line of every run says what was decided:
+
+```
+plan: 4 of 4 checks at once, test:unit at 7 workers (11 cores)
+```
+
+The plan comes from one table in `scripts/gate-plan.ts`, where each check declares the cores it holds for as long as it runs — measured as CPU-seconds ÷ wall-seconds with the check run alone: lint 2.1, type check 1.7, spell check 1.3, unit tests 8.5. Three things follow from those numbers.
+
+- **The unit suite is the only check worth sizing.** It accounts for 107 of the gate's 122 CPU-seconds on its own, because vitest opens one worker per core while the other three are one or two processes each. It is handed `--maxWorkers=<cores − 4>` — the cores the other three do not hold — which keeps the gate's total demand at the size of the machine instead of about 1.3× it. Measured: no change in wall time beyond run-to-run noise, and 5–6% less CPU burned (101s against 107s). The flag needs vitest 2.1 or newer, which every project this package supports is far past.
+- **A machine smaller than the one it was measured on is left alone.** The cap applies from 11 cores up and nowhere below, because four reserved cores are half an eight-core machine against a third of the measured one, and one measurement says nothing about whether the reservation still pays there. Extrapolating it downward is what would hurt: the suite takes 11.7s at eight workers and 16.7s at four, so a rule that handed an eight-core machine four workers would pin the longest check at the slow end of a curve nobody measured there. Below the line vitest keeps sizing its own pool — the behavior `josh gate` had before the plan existed — and a four-core CI runner is far below it, so CI runs exactly as it did.
+- **Below four cores the checks queue instead of fighting.** The three reserving checks want four cores between them, so a three-core machine runs two checks at a time and a two-core machine one. **Every check still runs and every failure is still reported in one pass** — narrowing the plan changes the order, never the set.
 
 The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
 ```
+plan: 4 of 4 checks at once, test:unit at 7 workers (11 cores)
 ✔ lint (pnpm josh lint) 9.0s
 ✗ check (pnpm josh-app check:ci) 4.6s
 …

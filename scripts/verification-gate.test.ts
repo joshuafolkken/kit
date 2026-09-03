@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AI_DOCS, read_repo_file } from './ai-document-fixture'
+import { gate_plan, type GatePlan } from './gate-plan'
 import { test_unit_guard } from './test-unit-guard'
 import type { GateStep } from './verification-gate'
 
@@ -151,10 +151,13 @@ describe('run_verification_gate', () => {
 	// Anchored on the section headers rather than the bodies: joshuafolkken/kit#967 stopped printing
 	// a passing check's body, and the property being asserted — sections in declaration order, so a
 	// reader can scroll to the same place twice — is about the headers.
+	// The label alone is not the anchor: the plan line joshuafolkken/kit#1258 prints above the checks
+	// carries `checks` and `test:unit` in its own prose, so a bare `indexOf(label)` finds the plan
+	// rather than the header it is meant to be about.
 	it('prints each check as one block, in declaration order', async () => {
 		const [, output] = await run_capturing(ALL_PASS)
 
-		const positions = GATE_STEPS.map((step) => output.indexOf(step.label))
+		const positions = GATE_STEPS.map((step) => output.indexOf(`${step.label} (pnpm`))
 
 		expect(positions).toEqual([...positions].toSorted((left, right) => left - right))
 		expect(positions.every((position) => position >= 0)).toBe(true)
@@ -211,25 +214,8 @@ describe('run_gate_command', () => {
 	})
 })
 
-// joshuafolkken/kit#914: the command only saves a round trip if the documents that define the gate
-// actually route to it. A command shipped while every entry point still lists the four serial steps
-// is a command nobody runs.
-describe('the gate command is what the documents tell an AI to run', () => {
-	const GATE_COMMAND = 'pnpm josh gate'
-
-	it.each(AI_DOCS)('names the command in the completion gate of %s', (document_name) => {
-		expect(read_repo_file(document_name)).toContain(GATE_COMMAND)
-	})
-
-	it.each([
-		'.claude/skills/workflow-commands/SKILL.md',
-		'.claude/skills/workflow-commands/fullrun.md',
-		'.claude/skills/workflow-commands/halfrun.md',
-		'.claude/skills/workflow-commands/queue.md',
-	])('names the command in the gate description of %s', (skill_path) => {
-		expect(read_repo_file(skill_path)).toContain(GATE_COMMAND)
-	})
-})
+// The documents that must route an AI to this command are asserted in
+// `gate-command-document-rule.test.ts`, which needs none of the scaffolding above.
 
 // joshuafolkken/kit#967: a passing check's body is never read — the summary line already says the
 // gate passed — and it lands in the conversation to be re-read on every later turn. A failing
@@ -281,47 +267,35 @@ describe('run_verification_gate — what it prints', () => {
 	})
 })
 
-describe('run_verification_gate — a check that passed without running', () => {
-	// A check that passed *without running* still has to say so: `test-unit-guard` exits 0 with a
-	// notice when vitest is absent, and suppressing it made a gate that ran zero tests print exactly
-	// what a full one prints.
-	it('prints the notice of a check that passed without running', async () => {
-		mock_steps(ALL_PASS)
-		mocked_execa.mockImplementation((async () =>
-			fake_result(
-				PASS,
-				`josh test:unit: vitest is not installed ${test_unit_guard.SKIP_MARKER} vitest unit tests.`,
-			)) as unknown as ExecaImplementation)
-		const stdout = capture_stdout()
+// Two passing cases keep their body, and the two were asserted by two copies of the same block.
+// A check that passed *without running* — `test-unit-guard` exits 0 with a notice when vitest is
+// absent — must not print what a full run prints. And `lint-parallel` runs eslint without
+// `--max-warnings 0`, so a check can exit 0 with warnings in it, which suppressing would hide
+// behind a green gate.
+const SKIP_NOTICE = `josh test:unit: vitest is not installed ${test_unit_guard.SKIP_MARKER} vitest unit tests.`
+const WARNING_NOTICE = 'src/a.ts:1:1  warning  Unexpected console statement'
 
-		try {
-			await verification_gate.run_verification_gate()
+async function run_printing(body: string): Promise<string> {
+	mock_steps(ALL_PASS)
+	mocked_execa.mockImplementation((async () =>
+		fake_result(PASS, body)) as unknown as ExecaImplementation)
+	const stdout = capture_stdout()
 
-			expect(stdout.text()).toContain(test_unit_guard.SKIP_MARKER)
-		} finally {
-			stdout.restore()
-		}
-	})
-})
+	try {
+		await verification_gate.run_verification_gate()
 
-// `lint-parallel` runs eslint without `--max-warnings 0`, so a check can exit 0 with warnings in it.
-// Suppressing those would let the gate report "passed" with the warnings invisible.
-describe('run_verification_gate — a check that passed with warnings', () => {
-	it('prints the body of a passing check whose output carries a warning', async () => {
-		const notice = 'src/a.ts:1:1  warning  Unexpected console statement'
+		return stdout.text()
+	} finally {
+		stdout.restore()
+	}
+}
 
-		mock_steps(ALL_PASS)
-		mocked_execa.mockImplementation((async () =>
-			fake_result(PASS, notice)) as unknown as ExecaImplementation)
-		const stdout = capture_stdout()
-
-		try {
-			await verification_gate.run_verification_gate()
-
-			expect(stdout.text()).toContain(notice)
-		} finally {
-			stdout.restore()
-		}
+describe('run_verification_gate — a passing check with something to say', () => {
+	it.each([
+		['passed without running', SKIP_NOTICE],
+		['passed with warnings', WARNING_NOTICE],
+	])('prints the body of a check that %s', async (_case, body) => {
+		expect(await run_printing(body)).toContain(body)
 	})
 })
 
@@ -408,5 +382,67 @@ describe('run_verification_gate — how long each check took', () => {
 		const [, text] = await run_capturing([FAIL, PASS, FAIL, PASS])
 
 		expect(text).toMatch(/verification gate failed: lint, cspell \(\d+\.\ds\)/u)
+	})
+})
+
+// joshuafolkken/kit#1258: the plan decides how many checks run at once and how wide the unit suite
+// fans out. `gate-plan.test.ts` owns the numbers; what is asserted here is that the gate obeys them.
+const JOSH = 'josh'
+const UNIT_CAP = 7
+const NARROWEST_CONCURRENCY = 1
+const CAPPED_PLAN: GatePlan = { concurrency: GATE_STEPS.length, unit_worker_cap: UNIT_CAP }
+const UNCAPPED_PLAN: GatePlan = { concurrency: GATE_STEPS.length, unit_worker_cap: undefined }
+// The narrowest plan any machine produces. Everything still has to run.
+const SERIAL_PLAN: GatePlan = { concurrency: NARROWEST_CONCURRENCY, unit_worker_cap: undefined }
+
+function unit_step_args(steps: ReadonlyArray<GateStep>): ReadonlyArray<string> | undefined {
+	return steps.find((step) => step.label === gate_plan.UNIT_LABEL)?.command_args
+}
+
+describe('the gate follows the plan', () => {
+	it('hands the unit suite the worker cap the plan resolved', async () => {
+		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, CAPPED_PLAN)
+
+		expect(unit_step_args(steps)).toEqual([
+			JOSH,
+			gate_plan.UNIT_LABEL,
+			`${verification_gate.UNIT_WORKER_FLAG}=${String(UNIT_CAP)}`,
+		])
+	})
+
+	// The cap is the unit suite's alone: the other three are one or two processes each and have no
+	// worker pool for the flag to mean anything to.
+	it('appends nothing to the checks the cap is not about', async () => {
+		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, CAPPED_PLAN)
+		const others = steps.filter((step) => step.label !== gate_plan.UNIT_LABEL)
+
+		for (const step of others) {
+			expect(step.command_args).not.toContain(verification_gate.UNIT_WORKER_FLAG)
+		}
+	})
+
+	it('leaves the unit command bare when the plan caps nothing', async () => {
+		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, UNCAPPED_PLAN)
+
+		expect(unit_step_args(steps)).toEqual([JOSH, gate_plan.UNIT_LABEL])
+	})
+
+	// The whole point of the gate is that one failure never hides the other three. Narrowing the
+	// plan queues the checks; it must not drop them, which a pool that aborted on the first failure
+	// would do.
+	it('runs every check even at the narrowest plan, and even after one fails', async () => {
+		mock_steps([FAIL, PASS, PASS, PASS])
+
+		const results = await verification_gate.run_marked_gate_steps({}, SERIAL_PLAN)
+
+		expect(results.map((result) => result.label)).toEqual(GATE_STEPS.map((step) => step.label))
+	})
+
+	// Anchored at the start of the output rather than merely before the first header: the plan is
+	// what the durations under it are read against, so it goes above them, not beside the summary.
+	it('prints the plan above the checks it explains', async () => {
+		const [, text] = await run_capturing(ALL_PASS)
+
+		expect(text).toMatch(/^plan: \d+ of \d+ checks at once, /u)
 	})
 })
