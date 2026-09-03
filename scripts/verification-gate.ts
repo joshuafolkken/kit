@@ -118,24 +118,49 @@ function should_print_body(result: GateStepResult, is_verbose: boolean): boolean
 	return is_skip_notice(result) || has_warnings(result)
 }
 
+// Seconds to one decimal, which is the resolution the answer is read at: the question a gate's
+// timing answers is "which of the four is the long pole", and no check is ever separated from
+// another by less than a tenth of a second (joshuafolkken/kit#1248).
+const MS_PER_SECOND = 1000
+const SECONDS_DECIMALS = 1
+
+function format_seconds(elapsed_ms: number): string {
+	return `${(elapsed_ms / MS_PER_SECOND).toFixed(SECONDS_DECIMALS)}s`
+}
+
+// The duration goes at the **end** of the header, after the command. The header's first job is
+// naming the one command to re-run while fixing (`docs/josh-commands.md` → `josh gate`), and a
+// number spliced in front of it would push that name out of the place a reader scans for it.
 function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
 	const icon = is_gate_step_failed(result) ? FAIL_ICON : PASS_ICON
 
-	process.stdout.write(`\n${icon} ${result.label} (pnpm ${result.command})\n`)
+	process.stdout.write(
+		`\n${icon} ${result.label} (pnpm ${result.command}) ${format_seconds(result.elapsed_ms)}\n`,
+	)
 
 	if (should_print_body(result, is_verbose) && result.output) {
 		process.stdout.write(`${result.output}\n`)
 	}
 }
 
-function print_gate_summary(failed_labels: ReadonlyArray<string>): void {
+// The total is wall-clock for the whole command, not the sum of the four — they run concurrently,
+// so a sum would report about three times what the caller waited. It is what the four are read
+// against: four checks at 9s, 5s, 3s and 15s against a total of 23s says the fan-out is working,
+// and the same four against 80s says the machine was contended rather than any check being slow.
+function print_gate_summary(failed_labels: ReadonlyArray<string>, elapsed_ms: number): void {
+	const total = format_seconds(elapsed_ms)
+
 	if (failed_labels.length === 0) {
-		process.stdout.write(`\n${PASS_ICON} verification gate passed (${STEP_COUNT} checks).\n`)
+		process.stdout.write(
+			`\n${PASS_ICON} verification gate passed (${STEP_COUNT} checks) in ${total}.\n`,
+		)
 
 		return
 	}
 
-	process.stdout.write(`\n${FAIL_ICON} verification gate failed: ${failed_labels.join(', ')}\n`)
+	process.stdout.write(
+		`\n${FAIL_ICON} verification gate failed: ${failed_labels.join(', ')} (${total})\n`,
+	)
 }
 
 // The record `josh review:brief` reads, written only on a fully green run and only with the tree it
@@ -243,6 +268,9 @@ async function run_marked_gate_steps(
 }
 
 async function run_verification_gate(is_verbose = false): Promise<number> {
+	// Started before the tree read, so the total is what the caller waited for rather than what the
+	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
+	const started_at = performance.now()
 	const before = await read_tree_before_checks()
 	const results = await run_marked_gate_steps(before)
 
@@ -252,7 +280,7 @@ async function run_verification_gate(is_verbose = false): Promise<number> {
 		.filter((result) => is_gate_step_failed(result))
 		.map((result) => result.label)
 
-	print_gate_summary(failed_labels)
+	print_gate_summary(failed_labels, performance.now() - started_at)
 
 	if (failed_labels.length > 0) return FAIL_EXIT_CODE
 

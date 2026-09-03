@@ -64,26 +64,38 @@ describe('run_buffered_process', () => {
 
 		const result = await buffered_process.run_buffered_process(['josh', 'lint'])
 
-		expect(result).toEqual({ output: 'output', exit_code: 0 })
+		expect(result.output).toBe('output')
+		expect(result.exit_code).toBe(0)
+	})
+
+	// The duration is measured here rather than by each caller, so it has to arrive with every
+	// result. Asserted as a finite non-negative number rather than against a threshold: the stub
+	// resolves immediately, and a monotonic clock is the whole reason a lower bound of zero holds
+	// (joshuafolkken/kit#1248).
+	it('reports how long the child ran', async () => {
+		mock_execa()
+
+		const result = await buffered_process.run_buffered_process(['josh', 'lint'])
+
+		expect(Number.isFinite(result.elapsed_ms)).toBe(true)
+		expect(result.elapsed_ms).toBeGreaterThanOrEqual(0)
 	})
 })
 
+// The parameter is narrowed to the one field the function reads, so these carry the exit code and
+// nothing else — a caller asking "did this fail" has no output or duration to hand over.
 describe('is_process_failed', () => {
 	it('treats a zero exit code as success', () => {
-		expect(buffered_process.is_process_failed({ output: '', exit_code: 0 })).toBe(false)
+		expect(buffered_process.is_process_failed({ exit_code: 0 })).toBe(false)
 	})
 
 	it('treats a non-zero exit code as failure', () => {
-		expect(buffered_process.is_process_failed({ output: '', exit_code: FAILING_EXIT_CODE })).toBe(
-			true,
-		)
+		expect(buffered_process.is_process_failed({ exit_code: FAILING_EXIT_CODE })).toBe(true)
 	})
 
 	// execa reports `undefined` when the process was killed by a signal — including the timeout
 	// above, which is exactly the case that must not read as a pass.
 	it('treats a signal-terminated process as failure', () => {
-		expect(buffered_process.is_process_failed({ output: '', exit_code: SIGNAL_EXIT_CODE })).toBe(
-			true,
-		)
+		expect(buffered_process.is_process_failed({ exit_code: SIGNAL_EXIT_CODE })).toBe(true)
 	})
 })

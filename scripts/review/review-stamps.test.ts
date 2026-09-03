@@ -51,8 +51,12 @@ function use_temporary_directory(prefix: string): () => string {
 	return () => directory
 }
 
+// The duration is carried by every result but read by none of the stamp logic, so a fixed value
+// keeps these fixtures deterministic without pretending to have measured anything.
+const UNUSED_ELAPSED_MS = 0
+
 function step(label: string, output: string): GateStepResult {
-	return { label, command: `josh ${label}`, output, exit_code: 0 }
+	return { label, command: `josh ${label}`, output, exit_code: 0, elapsed_ms: UNUSED_ELAPSED_MS }
 }
 
 const PASSED: ReadonlyArray<GateStepResult> = [step('lint', 'ok')]
