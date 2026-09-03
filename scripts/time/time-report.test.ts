@@ -114,7 +114,7 @@ describe('time_report.format_report', () => {
 	it('prints the three categories with their share of the elapsed time', () => {
 		const text = time_report.format_report(build(MIXED))
 
-		expect(text).toContain('model wait')
+		expect(text).toContain(time_report.MODEL_LABEL)
 		expect(text).toContain('20.0%')
 		expect(text).toContain('50.0%')
 	})
@@ -190,6 +190,54 @@ describe('time_report.build_from_spans — the CI share', () => {
 		const text = time_report.format_report(run_report([], MINUTE_MS))
 
 		expect(text).toContain(CATEGORY_HEADING)
+	})
+})
+
+// **The three transcript shares are an unknown there, not a zero** (joshuafolkken/kit#1295). Nothing
+// was read, so `model wait 0.0 min` beside `CI wait 1.0 min 100.0%` reads as a run that spent its
+// whole length in CI — the measured zero standing in for an unknown this table exists to prevent.
+const TRANSCRIPT_ROWS = [time_report.MODEL_LABEL, time_report.TOOL_LABEL, time_report.HUMAN_LABEL]
+const WHOLE_SHARE = '100.0%'
+
+// The state under test: a merged pull request whose session transcripts could not be attributed, so
+// the CI wait is the only half that was read.
+function unread(): string {
+	return time_report.format_report(run_report([], MINUTE_MS))
+}
+
+describe('time_report.format_report — a run with no transcript read', () => {
+	it('withholds each transcript share instead of printing a zero', () => {
+		const rows = unread()
+			.split('\n')
+			.filter((line) => TRANSCRIPT_ROWS.some((label) => line.includes(label)))
+
+		expect(rows).toHaveLength(TRANSCRIPT_ROWS.length)
+		expect(rows.every((line) => line.includes(time_report.NOT_MEASURED))).toBe(true)
+		expect(rows.some((line) => line.includes('0.0 min'))).toBe(false)
+	})
+
+	// The CI wait is the one half that *was* read, so it keeps its figure and its share — the printed
+	// arithmetic still reconstructs the elapsed time rather than being withheld along with the rest.
+	it('keeps the CI row it did measure', () => {
+		expect(unread()).toContain(time_report.format_row(CI_ROW, MINUTE_MS, WHOLE_SHARE))
+	})
+
+	// The `wait` phase and the `human wait` category are the same quantity read two ways, so they are
+	// withheld together — the cross-check joshuafolkken/kit#1290 left the report resting on.
+	it('withholds the wait phase alongside the human wait category', () => {
+		expect(unread()).toContain(
+			time_report.format_columns(time_phases.WAIT_PHASE, '', time_report.NOT_DETECTED),
+		)
+	})
+
+	// A run whose transcript *was* read and simply waited on nobody keeps its measured zero: "nothing
+	// was read" and "read, and genuinely zero" are the two answers this row has to keep apart.
+	it('still prints a measured zero where the transcript was read', () => {
+		const spans = [span(time_spans.MODEL_CATEGORY, 4), span(time_spans.TOOL_CATEGORY, 6)]
+		const text = time_report.format_report(run_report(spans, MINUTE_MS))
+
+		expect(text).toContain(time_report.format_row(time_report.HUMAN_LABEL, 0, '0.0%'))
+		expect(text).not.toContain(time_report.NOT_MEASURED)
 	})
 })
 

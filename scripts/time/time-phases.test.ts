@@ -312,11 +312,32 @@ describe('time_phases.build_phases — detection', () => {
 			detected(without, time_phases.CI_PHASE),
 		]).toEqual([true, false])
 	})
+})
 
-	it('always reports other, because it is a remainder rather than a marker', () => {
-		const phases = time_phases.build_phases({ spans: [], ...NO_CI })
+// `wait` and `other` rest on no marker, so they are detected on the transcript half being present
+// rather than on anything having landed in them (joshuafolkken/kit#1295).
+describe('time_phases.build_phases — the two span-backed phases', () => {
+	// A run whose transcript was read genuinely spent that long in each — zero included. `RUN` leaves
+	// both empty and both still count as measured.
+	it('reports wait and other as detected on a transcript that left them empty', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
 
-		expect(detected(phases, time_phases.OTHER_PHASE)).toBe(true)
+		expect([
+			detected(phases, time_phases.WAIT_PHASE),
+			detected(phases, time_phases.OTHER_PHASE),
+		]).toEqual([true, true])
+	})
+
+	// **The one state in which they are not measured at all** (joshuafolkken/kit#1295): no span was
+	// read, so `0.0 min` would assert that nobody waited and that nothing fell outside the stages —
+	// two claims the run made no measurement for.
+	it('withholds wait and other when no span was read', () => {
+		const phases = time_phases.build_phases({ spans: [], ci_ms: MINUTE_MS, has_ci_data: true })
+
+		expect([
+			detected(phases, time_phases.WAIT_PHASE),
+			detected(phases, time_phases.OTHER_PHASE),
+		]).toEqual([false, false])
 	})
 })
 

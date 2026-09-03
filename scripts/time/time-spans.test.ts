@@ -333,3 +333,15 @@ describe('time_spans.parse_timeline — the phase marker', () => {
 		expect(marker_of([prompt(0), assistant_text(1)])).toBe(time_markers.NO_MARKER)
 	})
 })
+
+// The one criterion every scope withholds a transcript figure on (joshuafolkken/kit#1295), so the run
+// report, its phase table and the epic aggregation cannot answer it three different ways.
+describe('time_spans.has_transcript_data', () => {
+	it('answers no for a run nothing was read for', () => {
+		expect(time_spans.has_transcript_data(0)).toBe(false)
+	})
+
+	it('answers yes as soon as one span was read', () => {
+		expect(time_spans.has_transcript_data(1)).toBe(true)
+	})
+})

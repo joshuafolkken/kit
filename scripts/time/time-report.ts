@@ -19,7 +19,19 @@ const LABEL_WIDTH = 24
 // short one's rather than pushing the share out by a character.
 const MINUTES_WIDTH = 9
 const NOT_DETECTED = 'not detected'
+// The category table's answer, kept apart from the phase table's `not detected` because the two
+// tables ask different questions: a phase is about a marker, a category about whether the half it
+// sums was read at all. One word per table, and both already in use — the epic scope has printed
+// `not measured` for its own category rows since joshuafolkken/kit#1271.
+const NOT_MEASURED = 'not measured'
 const PHASE_HEADING = 'By phase (in run order):'
+// The category labels, shared with the epic scope's table rather than spelled out in each. The two
+// tables answer the same question at two scales, so a label renamed in one and not the other is a
+// report that disagrees with itself — which is the defect joshuafolkken/kit#1295 was filed for.
+const MODEL_LABEL = 'model wait'
+const TOOL_LABEL = 'tool execution'
+const HUMAN_LABEL = 'human wait'
+const CI_LABEL = 'CI wait'
 
 // `ci_ms` is the fourth share (joshuafolkken/kit#1268): the part of the pull request's
 // open→merge window that no transcript span covers. Disjoint from the other three by construction,
@@ -193,6 +205,14 @@ function format_row(label: string, duration_ms: number, suffix: string): string 
 	return format_columns(label, format_minutes(duration_ms), suffix)
 }
 
+// **A share nobody read says so rather than totalling zero.** The duration column is left empty
+// because there is no duration — not a short one — which is the same shape an undetected phase and a
+// child that never ran already print. Exported so the epic scope lays this row out through the one function
+// rather than a second copy of the word and the widths.
+function unmeasured_row(label: string): string {
+	return format_columns(label, '', NOT_MEASURED)
+}
+
 // **A phase whose marker never appeared says so rather than printing `0.0 min`.** "Did not run" and
 // "this transcript could not be read for it" are different answers, and a measured zero asserts the
 // first when only the second may be true. The words go in the share column with the duration column
@@ -214,16 +234,27 @@ function ci_line(report: TimeReport): Array<string> {
 
 	const { ci_ms } = report.categories
 
-	return [format_row('CI wait', ci_ms, format_share(ci_ms, report.elapsed_ms))]
+	return [format_row(CI_LABEL, ci_ms, format_share(ci_ms, report.elapsed_ms))]
+}
+
+// **The three transcript shares are withheld together when no span was read** (joshuafolkken/kit#1295).
+// A run whose transcript could not be attributed totals zero in all three because nothing was read,
+// not because nothing happened — and `CI wait 3.2 min 100.0%` directly beneath three `0.0 min` rows
+// reads as a run that spent its whole length in CI. The criterion is `time_spans.has_transcript_data`,
+// the same one the epic scope withholds its own category rows on and the `wait` phase is detected on.
+function transcript_row(report: TimeReport, label: string, duration_ms: number): string {
+	if (!time_spans.has_transcript_data(report.span_count)) return unmeasured_row(label)
+
+	return format_row(label, duration_ms, format_share(duration_ms, report.elapsed_ms))
 }
 
 function category_lines(report: TimeReport): Array<string> {
-	const { categories, elapsed_ms } = report
+	const { categories } = report
 
 	return [
-		format_row('model wait', categories.model_ms, format_share(categories.model_ms, elapsed_ms)),
-		format_row('tool execution', categories.tool_ms, format_share(categories.tool_ms, elapsed_ms)),
-		format_row('human wait', categories.human_ms, format_share(categories.human_ms, elapsed_ms)),
+		transcript_row(report, MODEL_LABEL, categories.model_ms),
+		transcript_row(report, TOOL_LABEL, categories.tool_ms),
+		transcript_row(report, HUMAN_LABEL, categories.human_ms),
 		...ci_line(report),
 	]
 }
@@ -283,7 +314,12 @@ function format_report(report: TimeReport): string {
 const time_report = {
 	MAX_ROWS,
 	NOT_DETECTED,
+	NOT_MEASURED,
 	PHASE_HEADING,
+	MODEL_LABEL,
+	TOOL_LABEL,
+	HUMAN_LABEL,
+	CI_LABEL,
 	build_from_spans,
 	build_report,
 	format_minutes,
@@ -293,6 +329,7 @@ const time_report = {
 	// second copy of the widths: two column rules would drift apart the first time one of them changed.
 	format_columns,
 	format_row,
+	unmeasured_row,
 	format_empty,
 	format_report,
 }
