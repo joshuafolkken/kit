@@ -32,6 +32,8 @@ SECURITY.md         tsconfig.sonar.json
 .claude/skills/verify-ui/   (directory)
 .claude/skills/workflow-commands/   (directory)
 .claude/skills/dependency-update/   (directory)
+.claude/skills/epic-commands/   (directory)
+.claude/skills/diag/   (directory)
 ```
 
 > **GitHub Actions workflows are single-sourced by the kit.** Every consumer-facing workflow

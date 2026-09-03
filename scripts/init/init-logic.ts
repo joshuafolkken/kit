@@ -113,6 +113,10 @@ const AI_COPY_DIRECTORIES: ReadonlyArray<string> = [
 	// joshuafolkken/kit#873: the `josh epic:*` procedures left the always-loaded documents for the
 	// same reason, and the documents now route to this skill instead of carrying them.
 	'.claude/skills/epic-commands',
+	// joshuafolkken/kit#1270: reading `josh time`'s output and deciding what to cut was pasted in as
+	// a prompt every time, so the wording drifted and with it the analysis. The procedure is a skill
+	// the shorthand table routes to, like every other one here.
+	'.claude/skills/diag',
 ]
 
 const PROMPTS_PACKAGE_PREFIX = 'node_modules/@joshuafolkken/kit/prompts/'
