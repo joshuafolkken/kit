@@ -2,6 +2,13 @@ import type { UsageRecord } from './cost-usage'
 
 // Which Issue a request belongs to (joshuafolkken/kit#962).
 //
+// **The walk is keyed on the branch and nothing else**, which is why its input is `BranchBearing`
+// rather than `UsageRecord` (joshuafolkken/kit#1268). `josh time` attributes *spans* to an issue by
+// exactly this rule, and the alternative to widening the parameter was a second copy of the
+// fill-forward walk over a different element type — the clone `CLAUDE.md` prohibits, in the one
+// place where a drift between the two would make `josh cost --issue` and `josh time --issue`
+// disagree about which issue a run belonged to.
+//
 // The transcript records `gitBranch` on every line, and `josh git` names a branch `<N>-<slug>`, so
 // the branch is where the Issue number is. What makes the mapping less than direct is that a child
 // is implemented on the **default branch** — `josh git` only creates the branch at commit time — so
@@ -18,6 +25,11 @@ const ISSUE_BRANCH_PATTERN = /^(\d+)-/u
 // mistaken for one, and one value used throughout removes the `undefined` juggling that each fill
 // direction would otherwise repeat.
 const UNATTRIBUTED_KEY = -1
+
+// Everything the attribution reads. `UsageRecord` satisfies it, and so does a timed span.
+interface BranchBearing {
+	branch: string
+}
 
 function issue_from_branch(branch: string): number {
 	const matched = ISSUE_BRANCH_PATTERN.exec(branch)
@@ -49,7 +61,7 @@ function pick(own: number, next: number | undefined, previous: number | undefine
 	return previous ?? UNATTRIBUTED_KEY
 }
 
-function attribute(records: ReadonlyArray<UsageRecord>): Array<number> {
+function attribute(records: ReadonlyArray<BranchBearing>): Array<number> {
 	const declared = records.map((record) => issue_from_branch(record.branch))
 	const next = fill(declared, true)
 	const previous = fill(declared, false)
@@ -80,10 +92,13 @@ function group_by_issue(records: ReadonlyArray<UsageRecord>): Array<IssueGroup> 
 		.map(([issue, bucket]) => ({ issue, records: bucket }))
 }
 
-function records_for_issue(
-	records: ReadonlyArray<UsageRecord>,
+// One issue's slice of a session's items, whatever the items are. Generic for the same reason
+// `attribute` is: `josh time` filters spans through it, and a second copy narrowed to spans would
+// be the fill-forward rule written twice.
+function records_for_issue<Item extends BranchBearing>(
+	records: ReadonlyArray<Item>,
 	issue_number: number,
-): Array<UsageRecord> {
+): Array<Item> {
 	const issues = attribute(records)
 
 	return records.filter((_record, index) => issues[index] === issue_number)
@@ -98,5 +113,5 @@ const cost_attribute = {
 	records_for_issue,
 }
 
-export type { IssueGroup }
+export type { BranchBearing, IssueGroup }
 export { cost_attribute }
