@@ -16,6 +16,10 @@ import { stamp_file } from './stamp-file'
 interface FileMapStamp {
 	taken_at: string
 	files: Record<string, string>
+	// The process that wrote it. Only a record whose meaning is "this is happening **now**" needs it —
+	// the in-flight gate marker (joshuafolkken/kit#1242). The other two assert a completed past fact,
+	// which stays true however long the file sits there, so they carry it and never read it.
+	pid?: number
 }
 
 // Takes `unknown` rather than the declared field type, because the declared type is an assertion
@@ -27,12 +31,32 @@ function is_file_map(value: unknown): value is Record<string, string> {
 	return Object.values(value).every((entry) => typeof entry === 'string')
 }
 
+// A `pid` that is not a number is dropped rather than rejected: the two records that never read one
+// were written without it before joshuafolkken/kit#1242, and a reader that needs it treats its
+// absence as "not running", which is the safe direction anyway.
 function parse_stamp(raw: string): FileMapStamp | undefined {
-	const { taken_at, files } = JSON.parse(raw) as Partial<FileMapStamp>
+	const { taken_at, files, pid } = JSON.parse(raw) as Partial<FileMapStamp>
 
 	if (typeof taken_at !== 'string' || !is_file_map(files)) return undefined
+	if (typeof pid !== 'number') return { taken_at, files }
 
-	return { taken_at, files }
+	return { taken_at, files, pid }
+}
+
+// `signal 0` runs every permission check and delivers nothing, so it is the standard liveness probe:
+// it throws `ESRCH` where the process is gone. `EPERM` means it exists but belongs to someone else,
+// which cannot happen for a record this process wrote into its own temp path — and answering "not
+// running" there is the safe direction regardless.
+function is_process_alive(pid: number | undefined): boolean {
+	if (pid === undefined) return false
+
+	try {
+		process.kill(pid, 0)
+
+		return true
+	} catch {
+		return false
+	}
 }
 
 // Every path in either map is one the caller's reader chose, so an empty result is the positive fact
@@ -49,6 +73,9 @@ interface FileMapStampAccess {
 	stamp_path: () => string
 	write: (files: Record<string, string>, target?: string) => string
 	read: (source?: string) => FileMapStamp | undefined
+	// For a record whose meaning is its existence rather than its contents — the in-flight gate marker
+	// (joshuafolkken/kit#1242). A record nobody removes would go on asserting a gate that ended.
+	remove: (target?: string) => void
 }
 
 // `undefined` rather than a throw or an empty record: "there is no record" and "the record says
@@ -78,12 +105,26 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 	return {
 		stamp_path: resolve,
 		write: (files, target = resolve()) =>
-			stamp_file.write_stamp(target, { taken_at: new Date().toISOString(), files }),
+			stamp_file.write_stamp(target, {
+				taken_at: new Date().toISOString(),
+				files,
+				pid: process.pid,
+			}),
 		read: (source = resolve()) => read_at(source),
+		remove: (target = resolve()) => {
+			stamp_file.remove_stamp(target)
+		},
 	}
 }
 
-const file_map_stamp = { changed_since, create, is_file_map, parse_stamp, read_at }
+const file_map_stamp = {
+	changed_since,
+	create,
+	is_file_map,
+	is_process_alive,
+	parse_stamp,
+	read_at,
+}
 
 export type { FileMapStamp, FileMapStampAccess }
 export { file_map_stamp }

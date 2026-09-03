@@ -28,7 +28,7 @@ pnpm josh review:level            # alias: josh rl
 pnpm josh review:level --staged
 ```
 
-**Inside a workflow, run `pnpm josh review:brief` instead and pass the whole thing to `/code-review`.** It prints the level on its first line and then the rest of what the run already knows: whether `pnpm josh gate` has passed **on this exact tree**, how this project runs its unit suite, and the target — the whole change on round 1, and on `--round 2` only the files the first round's fixes touched.
+**Inside a workflow, run `pnpm josh review:brief` instead and pass the whole thing to `/code-review`.** It prints the level on its first line and then the rest of what the run already knows: whether `pnpm josh gate` has passed — or is running right now — **on this exact tree**, how this project runs its unit suite, and the target — the whole change on round 1, and on `--round 2` only the files the first round's fixes touched.
 
 ```bash
 pnpm josh review:brief            # round 1; alias: josh rb
@@ -38,6 +38,22 @@ pnpm josh review:brief --round 2  # the verification pass, scoped to the fix del
 **It exists because `/code-review` runs in a forked process that reads none of this repository's documents** (joshuafolkken/kit#1241). Only the invocation argument reaches it, so a rule written here — "do not re-run what the gate proved", "the second round reads the fix delta" — has no way to bind. Measured on joshuafolkken/kit#1240: both rounds re-ran the unit suite the gate had just passed, both fumbled the runner, and round 2 re-read the whole diff, for 439 seconds on a seven-file change.
 
 **Two halves, and only one of them is mechanical.** The round-2 target _is_ the scope, so a narrowed round is narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so its effect is measured rather than assumed. **The brief never claims a green gate it cannot prove**: with no record, or with one taken before an edit, it prints `Not verified` and asserts nothing.
+
+### The gate runs beside this review, not in front of it
+
+**`pnpm josh gate` is started when the review starts and joined before the commit** (joshuafolkken/kit#1242). The two read the same tree and neither writes to it, so running them one after the other was pure waiting — 187 seconds of a 1623-second run, measured on joshuafolkken/kit#1240. It is the treatment `josh eval` already gets, for the same stated reason.
+
+**So the brief has three states, not two**, and the middle one is the usual answer while a review is being composed:
+
+| The record says                           | The brief prints   | What it means                                                                                 |
+| ----------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| A green gate covers this exact tree       | `Already verified` | Lint, the type check, the spell check and the unit tests passed. Do not re-run them           |
+| A gate is running against this exact tree | `Running now`      | **No result is being claimed.** Do not re-run the unit suite; the run joins the gate's result |
+| Neither                                   | `Not verified`     | Nothing is claimed about any of the four checks                                               |
+
+**`Running now` forbids a re-run without asserting a pass, and the distinction is the whole point.** A gate that has not finished has no result to report, so the sentence says what is true — a gate was started on this tree at a named time and has not recorded a result — and names who reads that result. Re-running the unit suite here is wasted whether the gate ends green or red.
+
+**Joining is a step of the run, not a formality.** A red gate is fixed and re-run **whatever this review concluded** — a clean review says nothing about lint or the unit tests — and the fix is uncommitted like every other, so it lands in the round-2 fix delta and is reviewed with the rest. There is no path from here to a commit on a gate nobody read.
 
 **The level is decided from the changed paths and nothing else.** "This one is small" is a judgement made under cost pressure, and cost pressure resolves it toward "small" exactly when a defect is most likely to be shipped — the same reason the cross-package interrupt removed its own "does this block?" evaluation. A rule an agent applies from memory is a rule an agent can talk itself out of; one it has to run answers the same way every time.
 
