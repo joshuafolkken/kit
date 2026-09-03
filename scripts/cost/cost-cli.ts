@@ -355,16 +355,12 @@ function print_reports(reports: ReadonlyArray<CostReport>, is_json: boolean): vo
 }
 
 // An empty corpus is reported, never priced at zero. "No transcript was found" and "this run was
-// free" are different answers, and only one of them is ever true.
+// free" are different answers, and only one of them is ever true. The wording is
+// `cost_transcript`'s, so `josh time` says the same thing about the same directory.
 function report_empty(cwd: string, session_id: string | undefined): number {
 	const directory = cost_transcript.transcript_directory(cwd)
 
-	if (session_id === undefined) {
-		console.error(`No transcripts found under ${directory}`)
-		console.error('Claude Code writes them per project; run this from the project it ran in.')
-	} else {
-		console.error(`No transcript named ${session_id} under ${directory}`)
-	}
+	for (const line of cost_transcript.missing_message(directory, session_id)) console.error(line)
 
 	return FAILURE_EXIT_CODE
 }
