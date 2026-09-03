@@ -1,3 +1,4 @@
+import { time_phases, type PhaseTotal } from './time-phases'
 import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
 
 // Aggregating timed spans into the report a person reads (joshuafolkken/kit#1267).
@@ -15,6 +16,8 @@ const LABEL_WIDTH = 24
 // Wide enough for a three-digit run (`335.4 min`), so a long session's rows stay in column with a
 // short one's rather than pushing the share out by a character.
 const MINUTES_WIDTH = 9
+const NOT_DETECTED = 'not detected'
+const PHASE_HEADING = 'By phase (in run order):'
 
 // `ci_ms` is the fourth share (joshuafolkken/kit#1268): the part of the pull request's
 // open→merge window that no transcript span covers. Disjoint from the other three by construction,
@@ -50,6 +53,10 @@ interface TimeReport {
 	// which pull request, an unmerged one, an issue with no pull request at all. Printed under the
 	// heading rather than swallowed: an unknown is reported, never rendered as a zero.
 	notes: Array<string>
+	// The same elapsed time cut by workflow stage rather than by what was waited on
+	// (joshuafolkken/kit#1269). Every span lands in exactly one phase and the CI share is its own, so
+	// these sum to `elapsed_ms` — `other` is what keeps that true rather than being discarded.
+	phases: Array<PhaseTotal>
 	by_tool: Array<LabelTotal>
 	by_josh_command: Array<LabelTotal>
 	by_check: Array<LabelTotal>
@@ -128,6 +135,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		categories,
 		has_ci_data: input.has_ci_data,
 		notes: [...input.notes],
+		phases: time_phases.build_phases({ spans, ci_ms, has_ci_data: input.has_ci_data }),
 		by_tool: totals_by(spans, (span) => span.label),
 		by_josh_command: totals_by(spans, (span) => span.josh_command),
 		by_check: [...input.by_check],
@@ -159,8 +167,30 @@ function format_share(part: number, whole: number): string {
 	return `${((part / whole) * PERCENT_SCALE).toFixed(PERCENT_DECIMALS)}%`
 }
 
+// The one place the three columns are laid out, so a row carrying words instead of a duration lines
+// up with the rows that carry one rather than overrunning the numeric column.
+function format_columns(label: string, minutes: string, suffix: string): string {
+	return `  ${label.padEnd(LABEL_WIDTH)}${minutes.padStart(MINUTES_WIDTH)}   ${suffix}`
+}
+
 function format_row(label: string, duration_ms: number, suffix: string): string {
-	return `  ${label.padEnd(LABEL_WIDTH)}${format_minutes(duration_ms).padStart(MINUTES_WIDTH)}   ${suffix}`
+	return format_columns(label, format_minutes(duration_ms), suffix)
+}
+
+// **A phase whose marker never appeared says so rather than printing `0.0 min`.** "Did not run" and
+// "this transcript could not be read for it" are different answers, and a measured zero asserts the
+// first when only the second may be true. The words go in the share column with the duration column
+// left empty, because there is no duration — not a short one.
+function phase_line(phase: PhaseTotal, elapsed_ms: number): string {
+	if (!phase.is_detected) return format_columns(phase.phase, '', NOT_DETECTED)
+
+	return format_row(phase.phase, phase.duration_ms, format_share(phase.duration_ms, elapsed_ms))
+}
+
+function phase_lines(report: TimeReport): Array<string> {
+	if (report.phases.length === 0) return []
+
+	return ['', PHASE_HEADING, ...report.phases.map((phase) => phase_line(phase, report.elapsed_ms))]
 }
 
 function ci_line(report: TimeReport): Array<string> {
@@ -227,6 +257,7 @@ function format_report(report: TimeReport): string {
 		'',
 		'Where the wall clock went:',
 		...category_lines(report),
+		...phase_lines(report),
 		...total_lines('By tool (descending):', report.by_tool),
 		...total_lines('By josh command (descending):', report.by_josh_command),
 		...total_lines('By CI check (descending, jobs overlap):', report.by_check),
@@ -235,6 +266,8 @@ function format_report(report: TimeReport): string {
 
 const time_report = {
 	MAX_ROWS,
+	NOT_DETECTED,
+	PHASE_HEADING,
 	build_from_spans,
 	build_report,
 	format_minutes,

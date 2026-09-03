@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { time_markers } from './time-markers'
 import { time_spans, type Span } from './time-spans'
 
 const ASSISTANT = 'assistant'
@@ -288,5 +289,47 @@ describe('time_spans.parse_timeline — branch and instant', () => {
 		const branches = spans.map((span) => span.branch)
 
 		expect(branches).toEqual(['', '', '', ''])
+	})
+})
+
+function marker_of(lines: ReadonlyArray<string>): string {
+	const { spans } = time_spans.parse_timeline(lines.join('\n'))
+
+	return spans.at(-1)?.marker ?? ''
+}
+
+// The phase boundary is decided from the call's *input*, which a span does not keep — so it is read
+// here, where the input is still in hand, and carried on the span (joshuafolkken/kit#1269).
+describe('time_spans.parse_timeline — the phase marker', () => {
+	it('carries the edit marker of the call the span closed', () => {
+		const lines = [assistant_text(0), tool_use(1, 'Edit', 'tool-1'), tool_result(2, 'tool-1')]
+
+		expect(marker_of(lines)).toBe(time_markers.EDIT_MARKER)
+	})
+
+	it('carries the review marker of a code-review skill call', () => {
+		const input = { skill: 'code-review', args: 'medium' }
+		const lines = [
+			assistant_text(0),
+			tool_use(1, 'Skill', 'tool-1', input),
+			tool_result(2, 'tool-1'),
+		]
+
+		expect(marker_of(lines)).toBe(time_markers.REVIEW_MARKER)
+	})
+
+	it('carries the plan marker of the Bash call that posted the plan', () => {
+		const command = 'gh api repos/{owner}/{repo}/issues/1269/comments -f body="the plan"'
+		const lines = [
+			assistant_text(0),
+			tool_use(1, 'Bash', 'tool-1', { command }),
+			tool_result(2, 'tool-1'),
+		]
+
+		expect(marker_of(lines)).toBe(time_markers.PLAN_MARKER)
+	})
+
+	it('leaves a span that closed no tool call unmarked', () => {
+		expect(marker_of([prompt(0), assistant_text(1)])).toBe(time_markers.NO_MARKER)
 	})
 })

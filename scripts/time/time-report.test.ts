@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { time_markers } from './time-markers'
+import { time_phases } from './time-phases'
 import { time_report } from './time-report'
 import { time_spans, type Span, type Timeline } from './time-spans'
 
@@ -11,6 +13,7 @@ function span(category: Span['category'], minutes: number, label = '', josh_comm
 		category,
 		label,
 		josh_command,
+		marker: time_markers.NO_MARKER,
 		branch: 'main',
 		ended_ms: 0,
 		duration_ms: minutes * MINUTE_MS,
@@ -177,6 +180,46 @@ describe('time_report.build_from_spans — the CI share', () => {
 		const text = time_report.format_report(run_report([], MINUTE_MS))
 
 		expect(text).toContain(CATEGORY_HEADING)
+	})
+})
+
+describe('time_report — the phase breakdown', () => {
+	it('prints the phases under their own heading', () => {
+		const text = time_report.format_report(build(MIXED))
+
+		expect(text).toContain(time_report.PHASE_HEADING)
+		expect(text).toContain(time_phases.GATE_PHASE)
+	})
+
+	// A measured zero would assert that the phase did not run, which is the one thing the transcript
+	// cannot say when its boundary marker never appeared.
+	it('prints a phase whose marker never appeared as not detected', () => {
+		const text = time_report.format_report(build(MIXED))
+
+		// Laid out through the same three columns as a measured row, so the words sit where the share
+		// would rather than overrunning the duration column.
+		expect(text).toContain(
+			`  ${time_phases.PLAN_PHASE}${' '.repeat(32)}${time_report.NOT_DETECTED}`,
+		)
+	})
+
+	it('gives a detected phase its share of the elapsed time', () => {
+		const text = time_report.format_report(build(MIXED))
+
+		expect(text).toContain('3.0 min   15.0%')
+	})
+
+	it('carries the same breakdown into the machine-readable report', () => {
+		const { phases } = build(MIXED)
+
+		expect(phases.map((phase) => phase.phase)).toEqual([...time_phases.PHASE_ORDER])
+	})
+
+	it('reconstructs the elapsed time from the phases alone', () => {
+		const report = run_report(MIXED, 5 * MINUTE_MS)
+		const total = report.phases.reduce((sum, phase) => sum + phase.duration_ms, 0)
+
+		expect(total).toBe(report.elapsed_ms)
 	})
 })
 
