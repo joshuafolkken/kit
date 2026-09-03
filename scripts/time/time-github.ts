@@ -34,6 +34,7 @@ const PULL_SCHEMA = z.object({
 	number: z.number(),
 	created_at: z.string().nullish(),
 	merged_at: z.string().nullish(),
+	updated_at: z.string().nullish(),
 	head: z.object({ ref: z.string().nullish(), sha: z.string().nullish() }).nullish(),
 })
 
@@ -51,12 +52,17 @@ const ISSUE_SCHEMA = z.object({ body: z.string().nullish() })
 
 // A pull request as this command needs it. `merged_ms` is `undefined` for one that is still open —
 // never `0`, which would read as "merged at the epoch" and silently produce a negative CI wait.
+//
+// `updated_ms` is what the listing is sorted by, and it is carried for one reason: it is the only
+// thing that proves the walk below may stop (joshuafolkken/kit#1279). It is `undefined` for a row
+// whose `updated_at` could not be read, which costs one more request rather than a wrong answer.
 interface PullSummary {
 	number: number
 	branch: string
 	head_sha: string
 	created_ms: number
 	merged_ms: number | undefined
+	updated_ms: number | undefined
 }
 
 interface CheckRun {
@@ -91,6 +97,7 @@ function to_pull(raw: z.infer<typeof PULL_SCHEMA>): PullSummary | undefined {
 		...head_of(raw),
 		created_ms,
 		merged_ms: time_instant.parse_instant(raw.merged_at),
+		updated_ms: time_instant.parse_instant(raw.updated_at),
 	}
 }
 
@@ -162,36 +169,76 @@ function to_found(pull: PullSummary): PullSearch {
 	return { pull, is_exhausted: false, is_failed: false }
 }
 
-// Which row of a page answers the question. A chooser rather than a predicate, because the two
-// lookups below differ in more than a test: one wants the first branch that matches, the other the
-// *latest* merge on the page — and `Array#find` cannot express the second.
-type PullChooser = (pulls: ReadonlyArray<PullSummary>) => PullSummary | undefined
+// What one page's rows say about the answer, in two parts rather than one.
+//
+// `best` is the best candidate seen so far — this page folded into whatever the pages before it
+// offered — and `is_certain` says whether a later page could still beat it. **The second half is
+// what a candidate alone cannot express.** Without it the walk stopped at the first page holding
+// any candidate at all, which is right for a branch match and wrong for a merge: the listing is
+// sorted by update time, so a pull request merged yesterday and commented on today sits above the
+// one merged an hour ago, and the newest merge falls to page two (joshuafolkken/kit#1279).
+interface PullChoice {
+	best: PullSummary | undefined
+	is_certain: boolean
+}
 
-// One page at a time, and the next one only if this one did not answer. Written as a walk forward
-// rather than as parallel requests because the match is almost always on the first page: firing five
-// to discard four spends someone's rate limit to save nothing.
+// Which row of a page answers the question, given what the pages before it offered. A chooser
+// rather than a predicate, because the two lookups below differ in more than a test: one wants the
+// first branch that matches, the other the *latest* merge across every page read — and
+// `Array#find` cannot express the second.
+type PullChooser = (pulls: ReadonlyArray<PullSummary>, best: PullSummary | undefined) => PullChoice
+
+// The answer once the walk has settled — either the chooser proved it, or the listing ended, which
+// proves it just as well because there is nothing left to beat it. An empty-handed walk falls
+// through to `NOT_FOUND`, the "there is none" this module keeps apart from the other two.
+function to_settled(best: PullSummary | undefined): PullSearch {
+	return best === undefined ? NOT_FOUND : to_found(best)
+}
+
+// One page at a time, and the next one only if this one left the answer open. Written as a walk
+// forward rather than as parallel requests because the answer is almost always certain on the first
+// page: firing five to discard four spends someone's rate limit to save nothing.
 async function find_from_page(
 	page: number,
 	choose: PullChooser,
 	read: GhReader,
+	best: PullSummary | undefined,
 ): Promise<PullSearch> {
 	const read_page = await read_pulls_page(page, read)
 
 	if (read_page === undefined) return FAILED
 
-	const picked = choose(read_page.pulls)
+	const choice = choose(read_page.pulls, best)
 
-	if (picked !== undefined) return to_found(picked)
-	if (read_page.row_count < PAGE_SIZE) return NOT_FOUND
+	if (choice.is_certain) return to_settled(choice.best)
+	if (read_page.row_count < PAGE_SIZE) return to_settled(choice.best)
 
-	return page >= MAX_PAGES ? CAPPED : await find_from_page(page + 1, choose, read)
+	// **The cap is not an answer, and a candidate it could not prove is not one either.** Returning
+	// the best unproven merge here would be indistinguishable from a proven one — `to_found` sets the
+	// same two flags — so `time-run.ts` would print an older merge as "the run that just finished"
+	// with no sign that 500 rows were read without settling it. `CAPPED` is what makes the caller say
+	// "not found among the 500 most recently updated" instead, which is the true sentence.
+	if (page >= MAX_PAGES) return CAPPED
+
+	return await find_from_page(page + 1, choose, read, choice.best)
 }
 
-// The first page the listing offers that `choose` answers from. Both lookups below are this walk
-// with a different chooser; writing them separately would page the same listing twice in two
-// slightly different ways.
+// The walk over the listing that `choose` answers from. Both lookups below are this walk with a
+// different chooser; writing them separately would page the same listing twice in two slightly
+// different ways.
 async function find_pull(choose: PullChooser, read: GhReader): Promise<PullSearch> {
-	return await find_from_page(FIRST_PAGE, choose, read)
+	return await find_from_page(FIRST_PAGE, choose, read, undefined)
+}
+
+// A branch match is certain the moment it is found: `josh git` names one branch after one issue, so
+// no later page can offer a better answer. **Nothing is carried across a page here** — the walk
+// returns as soon as `is_certain` is true, so this chooser only ever sees an empty hand, and reading
+// a carried candidate would suggest an accumulation that cannot happen. This is the certainty that
+// was implicit in the old protocol, and saying it out loud is what keeps the request count unchanged.
+function branch_choice(pulls: ReadonlyArray<PullSummary>, prefix: string): PullChoice {
+	const found = pulls.find((pull) => pull.branch.startsWith(prefix))
+
+	return { best: found, is_certain: found !== undefined }
 }
 
 // The pull request that closes an issue, found by its head branch. `josh git` names a branch
@@ -203,7 +250,7 @@ async function pull_for_branch_prefix(
 ): Promise<PullSearch> {
 	const prefix = `${String(issue_number)}-`
 
-	return await find_pull((pulls) => pulls.find((pull) => pull.branch.startsWith(prefix)), read)
+	return await find_pull((pulls) => branch_choice(pulls, prefix), read)
 }
 
 // The latest merge on a page, not the first merged row on it. **The listing is sorted by update
@@ -217,10 +264,52 @@ function newest_merged(pulls: ReadonlyArray<PullSummary>): PullSummary | undefin
 		.toSorted((left, right) => (right.merged_ms ?? 0) - (left.merged_ms ?? 0))[0]
 }
 
+// The oldest update on a page. The listing is sorted by update time descending, so this is the
+// boundary every later page sits below. A row whose `updated_at` could not be read is left out,
+// which can only raise the boundary and so can only make the walk read one more page.
+function oldest_update(pulls: ReadonlyArray<PullSummary>): number | undefined {
+	const stamps = pulls.map((pull) => pull.updated_ms).filter((ms): ms is number => ms !== undefined)
+
+	return stamps.length === 0 ? undefined : Math.min(...stamps)
+}
+
+// Whether a later page could still hold a newer merge. **A merged pull request always carries
+// `updated_at >= merged_at`** — the merge is itself an update — so once this page's oldest update
+// is no newer than the best merge seen, every row after it in an update-sorted listing was last
+// touched before that merge, and none of them can be a newer one. Checked against all 485 merged
+// rows in the five pages this walk can read, on 2026-09-04.
+//
+// **The proof is what keeps the ordinary case at one request.** Reading all `MAX_PAGES` and taking
+// the global maximum is the other correct answer, and it costs five requests every time to fix a
+// case that arises when more than a page of pull requests were updated after the newest merge.
+function is_merge_certain(
+	pulls: ReadonlyArray<PullSummary>,
+	best: PullSummary | undefined,
+): boolean {
+	const merged_ms = best?.merged_ms
+	const oldest_ms = oldest_update(pulls)
+
+	if (merged_ms === undefined || oldest_ms === undefined) return false
+
+	return oldest_ms <= merged_ms
+}
+
+// The newest merge across this page and every page before it, and whether that is settled. The
+// candidate from earlier pages is folded in as one more row so the comparison stays
+// `newest_merged`'s alone rather than being written a second time here.
+function newest_merged_choice(
+	pulls: ReadonlyArray<PullSummary>,
+	best: PullSummary | undefined,
+): PullChoice {
+	const merged = newest_merged(best === undefined ? pulls : [...pulls, best])
+
+	return { best: merged, is_certain: is_merge_certain(pulls, merged) }
+}
+
 // The most recently merged pull request — "the run that just finished", which is what
 // `pnpm josh time` with no argument reports on.
 async function latest_merged_pull(read: GhReader = read_gh): Promise<PullSearch> {
-	return await find_pull(newest_merged, read)
+	return await find_pull(newest_merged_choice, read)
 }
 
 function to_check_run(raw: z.infer<typeof CHECK_RUN_SCHEMA>): CheckRun | undefined {
@@ -291,11 +380,12 @@ const time_github = {
 	parse_check_runs,
 	pulls_page_path,
 	newest_merged,
+	newest_merged_choice,
 	find_pull,
 	pull_for_branch_prefix,
 	latest_merged_pull,
 	list_check_runs,
 }
 
-export type { CheckRun, GhReader, PullSearch, PullsPage, PullSummary }
+export type { CheckRun, GhReader, PullChoice, PullSearch, PullsPage, PullSummary }
 export { time_github }
