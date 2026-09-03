@@ -57,10 +57,13 @@ const SELF_CORRECTION_MARKERS: ReadonlyArray<string> = [
 	'This half carries no workaround risk',
 ]
 
+// joshuafolkken/kit#1275 returned the two headed sub-bullets to the canonical section and left the
+// resident copy stating both boundaries in one sentence. What each boundary *says* is still pinned
+// resident, because that is what changes an agent's behavior; the headings that introduced them are
+// already pinned on the canonical by "separates self-correction from consultation and from Tier C"
+// below, so the trim is a move rather than a deletion.
 const BOUNDARY_MARKERS: ReadonlyArray<string> = [
-	'Boundary against "Distinguish consultation from execution":',
 	'never acting on a goal statement',
-	'Boundary against Tier C (restated):',
 	'stay Tier C **even when you caused the problem**',
 ]
 

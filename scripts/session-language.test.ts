@@ -29,7 +29,9 @@ const EXCEPTION_MARKERS: ReadonlyArray<string> = [
 	'**fixed strings emitted by the scripts**',
 	// A completion comment is artifact prose whose structure is labelled — leaving the labels
 	// English would ship a half-translated body, which reads worse than either language alone.
-	'the `Cause` / `Fix` / `Result` labels inside a completion comment are translated by this same mapping',
+	// joshuafolkken/kit#1275 moved the label mapping itself to the pointer, so what is pinned
+	// resident is the instruction that those three labels are translated, not the table doing it.
+	"a completion report's `Cause` / `Fix` / `Result`, is written in the session language",
 ]
 
 // Every workflow definition carries its own language clause, and the AI reads those while running
