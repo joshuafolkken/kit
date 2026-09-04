@@ -6,7 +6,7 @@ const josh_mock = vi.hoisted(() => {
 		format_help_return: '',
 	}
 
-	return { state, UNKNOWN_PREFIX: 'Unknown command: ' }
+	return { state, UNKNOWN_PREFIX: 'Unknown command: ', UNKNOWN_COMMAND_EXIT_CODE: -1 }
 })
 
 vi.mock('./josh-logic', () => ({
@@ -14,19 +14,25 @@ vi.mock('./josh-logic', () => ({
 		format_help: (): string => josh_mock.state.format_help_return,
 		format_unknown_command: (cmd: string): string =>
 			`${josh_mock.UNKNOWN_PREFIX}${cmd}\n\n${josh_mock.state.format_help_return}`,
-		run_command: (_cmd: string, _arguments: Array<string>): number =>
+		// The real one answers with a promise, because a script the dispatcher runs in its own
+		// process is awaited rather than spawned (joshuafolkken/kit#1342).
+		run_command: async (_cmd: string, _arguments: Array<string>): Promise<number> =>
 			josh_mock.state.run_command_return,
 	},
+	UNKNOWN_COMMAND_EXIT_CODE: josh_mock.UNKNOWN_COMMAND_EXIT_CODE,
 }))
 
 const PROCESS_EXIT_CALLED = 'process.exit called'
 const HELP_OUTPUT = 'help output'
 const ARGV_BASE = ['node', 'josh.ts']
 const UNKNOWN_CMD = 'not-a-command'
+const FAILURE_EXIT_CODE = 1
 const ORIGINAL_ARGV = process.argv
+const ORIGINAL_EXIT_CODE = process.exitCode
 
 beforeEach(() => {
 	vi.resetModules()
+	process.exitCode = ORIGINAL_EXIT_CODE
 	vi.spyOn(process, 'exit').mockImplementation(() => {
 		throw new Error(PROCESS_EXIT_CALLED)
 	})
@@ -39,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	process.argv = ORIGINAL_ARGV
+	process.exitCode = ORIGINAL_EXIT_CODE
 	vi.restoreAllMocks()
 })
 
@@ -66,7 +73,7 @@ describe('josh.ts — help command', () => {
 
 describe('josh.ts — unknown command', () => {
 	beforeEach(() => {
-		josh_mock.state.run_command_return = -1
+		josh_mock.state.run_command_return = josh_mock.UNKNOWN_COMMAND_EXIT_CODE
 		process.argv = [...ARGV_BASE, UNKNOWN_CMD]
 	})
 
@@ -93,21 +100,28 @@ describe('josh.ts — unknown command', () => {
 	})
 })
 
+// joshuafolkken/kit#1342: a script command now writes its output through this process, and
+// `process.exit` truncates a piped stdout at its buffer size — losing the failure summary
+// `scripts/verification-gate.ts` writes last. The code is recorded and node exits on its own.
 describe('josh.ts — command with non-zero exit code', () => {
-	it('calls process.exit when command returns non-zero exit code', async () => {
-		josh_mock.state.run_command_return = 1
-		process.argv = [...ARGV_BASE, 'lint']
-
-		await expect(import('./josh')).rejects.toThrow(PROCESS_EXIT_CALLED)
-	})
-})
-
-describe('josh.ts — command with zero exit code', () => {
-	it('does not call process.exit when command succeeds', async () => {
+	it('records the exit code without calling process.exit', async () => {
+		josh_mock.state.run_command_return = FAILURE_EXIT_CODE
 		process.argv = [...ARGV_BASE, 'lint']
 
 		await import('./josh')
 
+		expect(process.exitCode).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(process.exit)).not.toHaveBeenCalled()
+	})
+})
+
+describe('josh.ts — command with zero exit code', () => {
+	it('leaves the exit code untouched when the command succeeds', async () => {
+		process.argv = [...ARGV_BASE, 'lint']
+
+		await import('./josh')
+
+		expect(process.exitCode).toBe(ORIGINAL_EXIT_CODE)
 		expect(vi.mocked(console.error)).not.toHaveBeenCalled()
 	})
 })

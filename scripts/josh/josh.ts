@@ -1,4 +1,4 @@
-import { josh_logic } from './josh-logic'
+import { josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
 
 const ARGV_OFFSET = 2
 
@@ -20,7 +20,21 @@ function handle_unknown(cmd: string): never {
 	process.exit(1)
 }
 
-function main(): void {
+// `process.exit` truncates a piped stdout at its buffer size, and since joshuafolkken/kit#1342 the
+// output at risk is the script's own — `scripts/verification-gate.ts` writes its per-check blocks
+// and its failure summary through this process, and sets `process.exitCode` rather than exiting for
+// exactly that reason. Recording the code and letting node exit when the loop drains keeps every
+// byte, and it leaves the last word with a script that finishes work after module evaluation
+// returns. It is a function of its own so the assignment does not sit after an `await` in `main`,
+// where `require-atomic-updates` reads any write to `process` as a possible race.
+function record_exit_code(exit_code: number): void {
+	if (exit_code !== 0) process.exitCode = exit_code
+}
+
+// `run_command` answers with a number for a shell command and a promise for a script it runs in
+// this same process (joshuafolkken/kit#1342); `await` covers both, and the argv slice is taken
+// before it because the in-process branch replaces `process.argv` with the script's own.
+async function main(): Promise<void> {
 	const cmd = process.argv[ARGV_OFFSET]
 
 	if (!cmd || HELP_COMMANDS.has(cmd)) {
@@ -30,10 +44,11 @@ function main(): void {
 	}
 
 	const subcommand_arguments = process.argv.slice(ARGV_OFFSET + 1)
-	const exit_code = josh_logic.run_command(cmd, subcommand_arguments)
+	const exit_code = await josh_logic.run_command(cmd, subcommand_arguments)
 
-	if (exit_code === -1) handle_unknown(cmd)
-	if (exit_code !== 0) process.exit(exit_code)
+	if (exit_code === UNKNOWN_COMMAND_EXIT_CODE) handle_unknown(cmd)
+
+	record_exit_code(exit_code)
 }
 
-main()
+await main()
