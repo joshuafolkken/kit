@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'
 import { time_epic, type EpicTimeReport } from './time-epic'
+import { time_failures } from './time-failures'
 import type { LabelTotal, TimeReport } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
@@ -47,6 +48,8 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		by_tool: rows(TOOL_ROWS, 'tool'),
 		by_josh_command: rows(JOSH_ROWS, 'josh'),
 		by_check: rows(JOSH_ROWS, 'check'),
+
+		failures: { ...time_failures.NO_FAILURES },
 	}
 }
 

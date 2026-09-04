@@ -30,6 +30,8 @@ function span(start_minute: number, minutes: number, extra: Partial<Span> = {}):
 		josh_command: '',
 		marker: time_markers.NO_MARKER,
 		branch: 'main',
+		call_id: '',
+		outcome: time_spans.UNKNOWN_OUTCOME,
 		is_continuation: false,
 		ended_ms: (start_minute + minutes) * MINUTE_MS,
 		duration_ms: minutes * MINUTE_MS,

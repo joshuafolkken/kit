@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { time_failures } from './time-failures'
 import { time_phases } from './time-phases'
 import { time_report } from './time-report'
 import { time_span_fixture } from './time-span-fixture'
@@ -221,12 +222,18 @@ describe('time_report.format_report — a run with no transcript read', () => {
 
 	// A run whose transcript *was* read and simply waited on nobody keeps its measured zero: "nothing
 	// was read" and "read, and genuinely zero" are the two answers this row has to keep apart.
+	//
+	// **The three category rows are named rather than the word searched for anywhere in the report**
+	// (joshuafolkken/kit#1309): the failure block withholds on its own criterion — whether any call's
+	// outcome was readable — so a bare `not.toContain` here would fail on a block this case says
+	// nothing about, and the row it is actually about would stop being checked.
 	it('still prints a measured zero where the transcript was read', () => {
 		const spans = [span(time_spans.MODEL_CATEGORY, 4), span(time_spans.TOOL_CATEGORY, 6)]
 		const text = time_report.format_report(run_report(spans, MINUTE_MS))
+		const labels = [time_report.MODEL_LABEL, time_report.TOOL_LABEL, time_report.HUMAN_LABEL]
 
 		expect(text).toContain(time_report.format_row(time_report.HUMAN_LABEL, 0, '0.0%'))
-		expect(text).not.toContain(time_report.NOT_MEASURED)
+		expect(labels.some((label) => text.includes(time_report.unmeasured_row(label)))).toBe(false)
 	})
 })
 
@@ -383,5 +390,34 @@ describe('time_report.format_share', () => {
 describe('time_report.format_minutes', () => {
 	it('prints milliseconds as minutes to one decimal', () => {
 		expect(time_report.format_minutes(90 * 1000)).toBe('1.5 min')
+	})
+})
+
+// The rework block (joshuafolkken/kit#1309). The aggregation itself is `time-failures.test.ts`'s;
+// what is asserted here is that the report reaches it with the run's own call count and tool share,
+// and withholds the rows rather than printing zeroes where no outcome was readable.
+describe('time_report.format_report — the failure re-runs', () => {
+	const { outcome_span } = time_span_fixture
+
+	it('prints the failure block with the run figures behind it', () => {
+		const text = time_report.format_report(
+			build([
+				outcome_span(1, time_spans.FAILED_OUTCOME, PNPM_LABEL, 'josh gate'),
+				outcome_span(2, time_spans.OK_OUTCOME, PNPM_LABEL, 'josh gate'),
+			]),
+		)
+
+		expect(text).toContain(time_failures.HEADING)
+		expect(text).toContain('of 2 call(s)')
+		expect(text).toContain('50.0% of tool execution')
+	})
+
+	// Every span of `MIXED` came from a transcript that reported no outcome, so a zero here would
+	// assert that the run failed nothing — which is not what was read.
+	it('withholds the figures where no outcome could be read', () => {
+		const text = time_report.format_report(build(MIXED))
+
+		expect(text).toContain(time_failures.HEADING)
+		expect(text).toContain(`re-run after failure${' '.repeat(13)}   ${time_report.NOT_MEASURED}`)
 	})
 })
