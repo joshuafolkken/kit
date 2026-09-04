@@ -30,6 +30,13 @@ const FIXTURE_HOUR = 0
 // after that. Named because three files assert against the totals they produce.
 const CALL_MINUTE = 1
 const RESULT_MINUTE = 3
+// The minute grid one `turn_lines` group occupies: the calls on the first, their results on the
+// second.
+const TURN_MINUTES = 2
+// How many turns a density fixture holds — comfortably past `time_density.MIN_ROUND_TRIPS`, so a case
+// about the density is never answered by the sample-size guard instead. Named here rather than in
+// each suite because three of them assert against the round-trip count it produces.
+const DENSITY_TURNS = 12
 // The minute a concurrent session's call lands on — inside the same window, on an instant the
 // delegated unit's spans do not share, so the cross-session dedupe cannot collapse the two.
 const CONCURRENT_CALL_MINUTE = 2
@@ -102,6 +109,42 @@ function concurrent_lines(branch: string = BRANCH): Array<string> {
 	]
 }
 
+// The same assistant line, tagged with the message it belongs to (joshuafolkken/kit#1329). Claude
+// Code writes one line per content block and repeats the message id on each, which is what lets a
+// turn's calls be counted exactly. `call_line` above stays untagged: every existing caller measures
+// spans, where the id plays no part, and giving each of them a distinct one would say nothing.
+function turn_call_line(minute: number, message_id: string, id: string): string {
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: at(minute),
+		gitBranch: BRANCH,
+		message: { id: message_id, content: [{ type: 'tool_use', name: 'Read', id }] },
+	})
+}
+
+// One turn: `calls` tool calls issued together under one message id, then their results.
+function turn_lines(turn: number, calls: number): Array<string> {
+	const minute = turn * TURN_MINUTES + 1
+	const ids = Array.from(
+		{ length: calls },
+		(_unused, index) => `t${String(turn)}-c${String(index)}`,
+	)
+
+	return [
+		...ids.map((id) => turn_call_line(minute, `msg-${String(turn)}`, id)),
+		...ids.map((id) => result_line(minute + 1, BRANCH, id)),
+	]
+}
+
+// A whole stretch of identical turns, which is what the live-density reading is measured against: at
+// `calls` of 1 the density is 1.00 and every turn is its own round trip, at 3 it is 3.00 over a third
+// as many.
+function density_text(turns: number, calls: number): string {
+	const groups = Array.from({ length: turns }, (_unused, turn) => turn_lines(turn, calls))
+
+	return [prompt_line(0, BRANCH), ...groups.flat()].join('\n')
+}
+
 function project_directory(home: string): string {
 	return path.join(home, cost_transcript.project_slug(CWD))
 }
@@ -158,12 +201,16 @@ const time_transcript_fixture = {
 	MINUTE_MS,
 	ISSUE,
 	BRANCH,
+	DENSITY_TURNS,
 	THREE_MINUTES_MS,
 	at,
 	ms,
 	prompt_line,
 	call_line,
 	result_line,
+	turn_call_line,
+	turn_lines,
+	density_text,
 	issue_lines,
 	delegating_lines,
 	concurrent_lines,

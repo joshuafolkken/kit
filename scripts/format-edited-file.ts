@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
 import { execa } from 'execa'
 import { z } from 'zod'
+import { time_density_hook } from './time/time-density-hook'
 
 // Claude Code hands a `PostToolUse` hook the tool call as JSON on stdin; for `Edit` and `Write` the
 // edited path is `tool_input.file_path`. Everything else in the payload is ignored, and a payload
@@ -331,6 +332,35 @@ async function format_edited_file(
 	}
 }
 
+// The one hook event this file is wired to, and the value the envelope below has to name.
+const HOOK_EVENT_NAME = 'PostToolUse'
+
+// The live round-trip density line, riding this hook rather than one of its own
+// (joshuafolkken/kit#1329) — a `PostToolUse` matcher covering every tool would add a process start to
+// all ~250 calls of a run.
+//
+// **A `PostToolUse` hook's plain stdout never reaches the model**; only `additionalContext` inside
+// the documented envelope does, which is why the line cannot simply be printed. `undefined` when
+// there is nothing to say, so the ordinary edit writes nothing at all to stdout and the payload the
+// harness parses stays empty.
+function density_envelope(raw_payload: string): string | undefined {
+	const notice = time_density_hook.density_notice(raw_payload)
+
+	if (notice === undefined) return undefined
+
+	return JSON.stringify({
+		hookSpecificOutput: { hookEventName: HOOK_EVENT_NAME, additionalContext: notice },
+	})
+}
+
+// Nothing at all reaches stdout on the ordinary edit, so what the harness parses stays empty unless
+// there is something to say.
+function write_density_envelope(raw_payload: string): void {
+	const envelope = density_envelope(raw_payload)
+
+	if (envelope !== undefined) process.stdout.write(`${envelope}\n`)
+}
+
 // Run from a terminal there is no payload coming, and waiting for one looks like a hang.
 function report_no_payload(): void {
 	process.stderr.write(
@@ -342,11 +372,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	if (process.stdin.isTTY) {
 		report_no_payload()
 	} else {
-		await format_edited_file(await text(process.stdin), run_command, process.cwd())
+		const payload = await text(process.stdin)
+
+		// Written before the formatters run: it costs milliseconds against their second, and a hook
+		// killed at its timeout would otherwise lose the line along with the formatting.
+		write_density_envelope(payload)
+		await format_edited_file(payload, run_command, process.cwd())
 	}
 }
 
 export {
+	density_envelope,
 	format_edited_file,
 	is_start_failure,
 	parse_edited_path,
