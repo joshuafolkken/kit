@@ -15,7 +15,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	'issue:state': {
 		script: 'scripts/issue/issue-state-cli.ts',
 		description:
-			"Print one issue's state and labels, in the spelling the documents compare against",
+			"Print each issue's state and labels, in the spelling the documents compare against",
 		category: 'AI tools',
 	},
 	'issue:scout': {

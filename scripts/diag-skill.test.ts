@@ -89,9 +89,20 @@ describe(`${SKILL_PATH} — keeps already-filed issues in the ranking`, () => {
 	// lowercase string reports an in-progress issue as un-started — and the table then tells someone
 	// to start a run that is already going.
 	it.each([
-		'**Read the state from `pnpm josh issue:state <N>`, never by parsing `gh` output yourself.**',
+		'**Read the state from `pnpm josh issue:state <N> [<N> ...]`, never by parsing `gh` output yourself —',
 		'the `labels:` line is compared case-insensitively',
 	])('reads issue state through the command: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// joshuafolkken/kit#1302: the table reads a state per row, and one call per row paid a process
+	// start and a round trip each. Reading them in one call is only safe while each block names its
+	// own number — a number that produced no state prints none, so position cannot be trusted.
+	it.each([
+		"pass the whole table's numbers in one call",
+		'**Attribute each block by its `issue:` line, never by position.**',
+		'pnpm josh issue:state 1262 1222 1176',
+	])('reads the whole table in one call: %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
 
