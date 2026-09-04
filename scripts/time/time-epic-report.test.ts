@@ -62,8 +62,10 @@ function report_of(input: ChildInput): TimeReport {
 		has_ci_data: halves.has_ci_data,
 		notes: [],
 		phases: [],
+		segments: [],
 		by_tool: [],
 		by_josh_command: [],
+		by_invocation: [],
 		by_check: [],
 
 		failures: { ...time_failures.NO_FAILURES },

@@ -1598,11 +1598,11 @@ pnpm josh time                  # the most recently merged run — the fullrun t
 pnpm josh time --issue <number> # one issue's whole run, from the fullrun invocation to the merge
 pnpm josh time --session <id>   # one named session on its own
 pnpm josh time --epic <number>  # a whole epicrun, child by child, with the per-turn trend across them
-pnpm josh time --top <rows>     # cap the per-tool and per-josh-command tables at <rows> each
+pnpm josh time --top <rows>     # cap the per-tool, per-josh-command, segment and per-invocation tables at <rows> each
 pnpm josh time --json           # the same figures, machine-readable
 ```
 
-**`--top <rows>` caps the two tables a reader ranks off, and says what it withheld** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). `--json` carries every row of `by_tool` and `by_josh_command` by default, and an epic pays for both once per child — which is what `diag` reads whole every time it measures a batch. The cap is applied to the record both renderings are made from, so it means the same thing with and without `--json`, and a cut table adds a note — `by_tool: showing the top 5 of 34 rows — 29 withheld by --top` — because a table that silently stops at five reads as though the rest were zero. **Without the flag the output is unchanged, byte for byte**: `josh time` is used for hand investigation as well as by `diag`, and a call that wants the tail must not have been narrowed underneath it. It narrows those two tables only — the four shares, the phases, the round trips and the per-CI-check table are whatever they were — and a non-positive or unparsable value is refused rather than read as "carry every row". `by_check` is left uncapped on purpose: its rows are one per CI job, so cutting them would hide a check rather than a tail.
+**`--top <rows>` caps the two tables a reader ranks off, and says what it withheld** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). `--json` carries every row of `by_tool` and `by_josh_command` by default, and an epic pays for both once per child — which is what `diag` reads whole every time it measures a batch. The cap is applied to the record both renderings are made from, so it means the same thing with and without `--json`, and a cut table adds a note — `by_tool: showing the top 5 of 34 rows — 29 withheld by --top` — because a table that silently stops at five reads as though the rest were zero. **Without the flag the output is unchanged, byte for byte**: `josh time` is used for hand investigation as well as by `diag`, and a call that wants the tail must not have been narrowed underneath it. It narrows the row tables only — the four shares, the phases, the round trips and the per-CI-check table are whatever they were — and a non-positive or unparsable value is refused rather than read as "carry every row". `by_check` is left uncapped on purpose: its rows are one per CI job, so cutting them would hide a check rather than a tail. Since [#1311](https://github.com/joshuafolkken/kit/issues/1311) the `segments` and `by_invocation` tables are cut by the same flag and noted the same way — both grow with the length of the run rather than with the number of distinct commands, which is the unbounded growth the cap exists for — and a capped `segments` no longer sums to the elapsed time, which is exactly what its note says.
 
 Every issue filed to make `fullrun` faster has come out of a **hand measurement**: the session record restored by eye, a throwaway script written for that one run, and a classification that differed from the last one. `josh cost` reads what a run was billed and there was nothing on the other axis, so "did that change make a run shorter?" had no answer anyone could compare across two runs.
 
@@ -1654,6 +1654,27 @@ By josh command (descending):
 ```
 
 **The partition is by gap, not by pair.** Every span is the interval between two consecutive dated lines, classified by the **later** one: a span ending at an assistant line is model wait, one ending at a tool result is that tool's execution, one ending at a typed prompt is human wait. So the three shares reconstruct the elapsed time **exactly**, and a reader can check them instead of trusting them. Pairing each `tool_use` with its own `tool_result` instead would double-count parallel calls and leave the shares summing to more than the run took — which is the property that makes two runs comparable.
+
+**The same elapsed time is also read along the run, not only as totals** ([#1311](https://github.com/joshuafolkken/kit/issues/1311)). A phase row says the gate cost 3.8 minutes and cannot say whether its four runs sat together or were spread across the hour, and `josh gate 4 call(s)` is the same row whether the four were even or whether the last took three times the first — which is what the hand-built reports these tables replace did say. **A segment is a maximal stretch of the run in one phase**, named by the phase that spent the most of it and by the busiest command inside it; a phase change lasting under half a minute is absorbed rather than given a row of its own, because a real run alternates — a gate call, the turn that read it, another gate call — and a strict reading yields dozens of rows nobody can read. **The absorbed time is still counted**: every span lands in exactly one segment, so the segments reconstruct the same total the phases do, less the CI share no span covers. **The per-invocation table lists each call's own duration in run order**, for commands called more than once only — one duration is what the per-command table already printed — and the two fragments of a call that bracketed a delegated unit are rejoined by the id they share rather than counted as two calls. The two blocks, on the run of [#1309](https://github.com/joshuafolkken/kit/issues/1309) rather than on the session above:
+
+```
+Segments (in run order):
+  18:05:18 → 18:12:09       6.9 min   pre-run · Bash: python3
+  18:12:09 → 18:13:05       0.9 min   setup · Bash: pnpm
+  18:13:05 → 18:18:50       5.8 min   implement · Edit
+  18:18:50 → 18:23:38       4.8 min   review · Skill
+  18:23:38 → 18:28:43       5.1 min   rework · Bash: pnpm
+  18:28:43 → 18:29:26       0.7 min   pr · Bash: pnpm
+  …
+
+Per invocation (repeated commands):
+  Skill                     8.8 min   2 call(s): 276.6 s, 248.8 s
+  josh git                  1.0 min   3 call(s): 23.2 s, 7.5 s, 28.1 s
+  josh gate                 0.6 min   4 call(s): 1.7 s, 17.1 s, 16.6 s, 2.2 s
+  …
+```
+
+**`josh gate` is four short calls there because the gate is started in the background** and the span measures the call that launched it, not the checks it ran — the same reason that run's `gate` phase is 1.6% of it. **A row here is not the same total as the row of the same name in `By tool`**, and deliberately: a `pnpm josh <cmd>` call is keyed by its subcommand, exactly as in the per-`josh <cmd>` table, so `Bash: pnpm` totals 5.1 minutes above and 0.2 here — what is left of it once the `josh` calls have their own rows.
 
 **The round-trip block counts what a duration cannot see** ([#1304](https://github.com/joshuafolkken/kit/issues/1304)). Once the verification commands were cut, a run's wall clock stopped being set by how long the tools ran and started being set by **how many times it stopped to wait for one**: on `fullrun #1295` the read-only `Bash` calls and the `Edit` calls together executed for about 54 seconds while the turns they sat in cost 600–850. So the report prints the calls, the **round trips** they were issued in — one per group of calls a single turn issued together — and the density between them. A run that batches nothing has as many round trips as calls, and below **1.50 calls per round trip** the block says so in a line rather than leaving the reader to divide. The four runs it was set from measured 1.13, 1.04, 1.03 and 1.00. Cutting the count is [`turn-batching.md`](https://github.com/joshuafolkken/kit/blob/main/prompts/collaboration-workflow/turn-batching.md); this only reports it.
 

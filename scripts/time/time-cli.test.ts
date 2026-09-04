@@ -255,8 +255,10 @@ const RUN_REPORT: TimeReport = {
 	has_ci_data: true,
 	notes: ['1 session(s)'],
 	phases: [],
+	segments: [],
 	by_tool: [],
 	by_josh_command: [],
+	by_invocation: [],
 	by_check: [],
 	failures: { ...time_failures.NO_FAILURES },
 }

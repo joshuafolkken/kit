@@ -1,5 +1,6 @@
 import type { ChildTiming, EpicTimeReport } from './time-epic'
-import type { LabelTotal, TimeReport } from './time-report'
+import type { TimeReport } from './time-report'
+import type { Segment } from './time-segments'
 
 // Capping the per-tool and per-`josh <cmd>` tables a report carries (joshuafolkken/kit#1301).
 //
@@ -25,6 +26,16 @@ import type { LabelTotal, TimeReport } from './time-report'
 // job, a dozen at most, and capping them would hide a check rather than a tail.
 const TOOL_TABLE = 'by_tool'
 const JOSH_TABLE = 'by_josh_command'
+// The two tables joshuafolkken/kit#1311 added. Both grow with the run rather than with the number of
+// distinct commands — a long run has a segment per stretch and a row per repeated command — which is
+// exactly the unbounded growth this cap exists for.
+//
+// **A capped `segments` no longer sums to the elapsed time, and the note is what says so.** The
+// reconciliation is a property of the report as it was built, and `--top` is a cut made for the
+// reader's sake at the moment of printing — the same trade `by_tool` already makes against
+// `tool execution`.
+const SEGMENT_TABLE = 'segments'
+const INVOCATION_TABLE = 'by_invocation'
 // The tail every truncation note ends with, so a renderer that has to tell one apart from the notes
 // beside it matches this rather than a phrase it spells out for itself.
 const WITHHELD_SUFFIX = 'withheld by --top'
@@ -46,17 +57,36 @@ function is_truncation_note(note: string): boolean {
 
 // The note is pushed rather than returned so a caller can cut both tables into one list of notes;
 // two returned optionals would have to be filtered and concatenated at every call site.
-function cap_table(
+function cap_table<Row>(
 	table: string,
-	rows: ReadonlyArray<LabelTotal>,
+	rows: ReadonlyArray<Row>,
 	cap: number,
 	notes: Array<string>,
-): Array<LabelTotal> {
+): Array<Row> {
 	if (rows.length <= cap) return [...rows]
 
 	notes.push(truncation_note(table, cap, rows.length))
 
 	return rows.slice(0, cap)
+}
+
+// **A timeline is cut by length, never by position** (joshuafolkken/kit#1311). Every other table here
+// is already sorted descending, so taking the first `cap` rows *is* taking the heaviest. The segment
+// table is in run order, where the same slice keeps the earliest stretches and drops the pull request,
+// the CI wait and the merge — and `diag` calls with a fixed `--top 5`, so it would rank candidates
+// against a timeline that ends before the half it is looking for while reading as complete. So the
+// longest segments are kept, and then put back in run order: the rows are a sample of the run rather
+// than its opening.
+function cap_segments(
+	rows: ReadonlyArray<Segment>,
+	cap: number,
+	notes: Array<string>,
+): Array<Segment> {
+	const longest = rows.toSorted((left, right) => right.duration_ms - left.duration_ms)
+
+	return cap_table(SEGMENT_TABLE, longest, cap, notes).toSorted(
+		(left, right) => left.started_ms - right.started_ms,
+	)
 }
 
 // **No cap means the very object that was built.** The acceptance criterion is that an uncapped
@@ -66,10 +96,14 @@ function cap_report(report: TimeReport, cap: number | undefined): TimeReport {
 	if (cap === undefined) return report
 
 	const notes = [...report.notes]
-	const by_tool = cap_table(TOOL_TABLE, report.by_tool, cap, notes)
-	const by_josh_command = cap_table(JOSH_TABLE, report.by_josh_command, cap, notes)
+	const capped = {
+		by_tool: cap_table(TOOL_TABLE, report.by_tool, cap, notes),
+		by_josh_command: cap_table(JOSH_TABLE, report.by_josh_command, cap, notes),
+		segments: cap_segments(report.segments, cap, notes),
+		by_invocation: cap_table(INVOCATION_TABLE, report.by_invocation, cap, notes),
+	}
 
-	return { ...report, by_tool, by_josh_command, notes }
+	return { ...report, ...capped, notes }
 }
 
 function cap_child(timing: ChildTiming, cap: number): ChildTiming {
@@ -88,6 +122,8 @@ function cap_epic_report(report: EpicTimeReport, cap: number | undefined): EpicT
 const time_row_cap = {
 	TOOL_TABLE,
 	JOSH_TABLE,
+	SEGMENT_TABLE,
+	INVOCATION_TABLE,
 	truncation_note,
 	is_truncation_note,
 	cap_report,
