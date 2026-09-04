@@ -6,6 +6,7 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'
 import { time_epic, type EpicTimeReport } from './time-epic'
+import { time_failures } from './time-failures'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
 
@@ -257,6 +258,7 @@ const RUN_REPORT: TimeReport = {
 	by_tool: [],
 	by_josh_command: [],
 	by_check: [],
+	failures: time_failures.NO_FAILURES,
 }
 
 describe('time_cli.run — one run', () => {

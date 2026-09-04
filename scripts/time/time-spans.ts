@@ -76,6 +76,10 @@ const BLOCK_SCHEMA = z.object({
 
 	tool_use_id: z.string().nullish(),
 	input: z.unknown().nullish(),
+	// Whether the harness wrote this result back as a failure (joshuafolkken/kit#1309). Present on a
+	// `tool_result` block and on nothing else, and absent even there for the tools that never report
+	// one — which is why it is read as three answers rather than as a boolean with a default.
+	is_error: z.boolean().nullish(),
 })
 
 const CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
@@ -103,6 +107,19 @@ type SpanCategory = 'model' | 'tool' | 'human'
 const MODEL_CATEGORY: SpanCategory = 'model'
 const TOOL_CATEGORY: SpanCategory = 'tool'
 const HUMAN_CATEGORY: SpanCategory = 'human'
+
+// How the call this span paid for came back (joshuafolkken/kit#1309).
+//
+// **Three answers rather than two.** `unknown` is not a polite `ok`: a fifth of the tool results in
+// the transcripts measured carry no `is_error` at all — a file read, an answered question — and
+// folding those into `ok` would report a run as having failed nothing when nothing was read. It is
+// also what a model span and a human span carry, since neither is a call and neither has an outcome
+// to have.
+type SpanOutcome = 'ok' | 'failed' | 'unknown'
+
+const OK_OUTCOME: SpanOutcome = 'ok'
+const FAILED_OUTCOME: SpanOutcome = 'failed'
+const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
 
 // What a tool span is labelled with. `josh_command` is empty for everything that is not a
 // `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
@@ -132,6 +149,10 @@ const UNKNOWN_CALL: ToolCall = {
 // `cost_attribute` reads to decide which issue the span belongs to.
 interface Span extends ToolCall {
 	category: SpanCategory
+	// How the call came back, read off the `is_error` the harness wrote on its result
+	// (joshuafolkken/kit#1309). Carried on the span for the same reason `marker` is: the result block
+	// is gone by the time anything aggregates, and only the label read off it survives.
+	outcome: SpanOutcome
 	duration_ms: number
 	ended_ms: number
 	branch: string
@@ -149,6 +170,9 @@ interface Block {
 	id: string
 	result_id: string
 	input: unknown
+	// `undefined` where the block carried no `is_error` field, which is a different fact from
+	// `false`: one is a tool that reports no outcome, the other a call that succeeded.
+	is_error: boolean | undefined
 }
 
 interface TranscriptLine {
@@ -166,6 +190,7 @@ interface TimelineEvent extends ToolCall {
 	timestamp_ms: number
 	branch: string
 	category: SpanCategory
+	outcome: SpanOutcome
 }
 
 // The whole session: when it started, when it ended, and what it spent the interval on.
@@ -257,14 +282,22 @@ function to_tool_call(name: string, input: unknown): ToolCall {
 	}
 }
 
-function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
+// The four string fields, defaulted together and apart from the two that are not strings. Split out
+// so neither half carries every `??` in the block: read as one function the defaulting alone reached
+// the complexity limit, and the next field added would have had to be squeezed in beside them.
+function block_names(
+	raw: z.infer<typeof BLOCK_SCHEMA>,
+): Pick<Block, 'type' | 'name' | 'id' | 'result_id'> {
 	return {
 		type: raw.type ?? '',
 		name: raw.name ?? '',
 		id: raw.id ?? '',
 		result_id: raw.tool_use_id ?? '',
-		input: raw.input,
 	}
+}
+
+function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
+	return { ...block_names(raw), input: raw.input, is_error: raw.is_error ?? undefined }
 }
 
 // A user turn written as a bare string carries no blocks, which is exactly right: it is a prompt,
@@ -335,8 +368,22 @@ function result_block(line: TranscriptLine): Block | undefined {
 // One line's contribution to the timeline, with the two fields every event carries read from the
 // line in one place. Written once rather than spelled out at each of the three return sites, which
 // is what let `branch` be added without a fourth chance to forget it.
-function event_of(line: TranscriptLine, category: SpanCategory, call: ToolCall): TimelineEvent {
-	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, ...call }
+function event_of(
+	line: TranscriptLine,
+	category: SpanCategory,
+	call: ToolCall,
+	outcome: SpanOutcome = UNKNOWN_OUTCOME,
+): TimelineEvent {
+	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, outcome, ...call }
+}
+
+// A result that carried no `is_error` is `unknown` rather than `ok`: the tools that report no
+// outcome — a file read, an answered question — would otherwise be counted as calls that succeeded,
+// and a run whose whole transcript was written by them would report a measured zero failures.
+function outcome_of(result: Block): SpanOutcome {
+	if (result.is_error === undefined) return UNKNOWN_OUTCOME
+
+	return result.is_error ? FAILED_OUTCOME : OK_OUTCOME
 }
 
 // A user line is one of two things, and only its blocks tell them apart: a tool result the harness
@@ -346,7 +393,9 @@ function user_event(line: TranscriptLine, calls: ReadonlyMap<string, ToolCall>):
 
 	if (result === undefined) return event_of(line, HUMAN_CATEGORY, NO_CALL)
 
-	return event_of(line, TOOL_CATEGORY, calls.get(result.result_id) ?? UNKNOWN_CALL)
+	const call = calls.get(result.result_id) ?? UNKNOWN_CALL
+
+	return event_of(line, TOOL_CATEGORY, call, outcome_of(result))
 }
 
 function to_event(
@@ -381,6 +430,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		josh_command: event.josh_command,
 		marker: event.marker,
 		branch: event.branch,
+		outcome: event.outcome,
 		is_continuation: false,
 		ended_ms: event.timestamp_ms,
 		duration_ms: event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms),
@@ -418,6 +468,9 @@ const time_spans = {
 	MODEL_CATEGORY,
 	TOOL_CATEGORY,
 	HUMAN_CATEGORY,
+	OK_OUTCOME,
+	FAILED_OUTCOME,
+	UNKNOWN_OUTCOME,
 	NO_MESSAGE_ID,
 	UNKNOWN_TOOL,
 	bash_label,
@@ -427,5 +480,5 @@ const time_spans = {
 	parse_timeline,
 }
 
-export type { Block, Span, SpanCategory, Timeline, TranscriptLine }
+export type { Block, Span, SpanCategory, SpanOutcome, Timeline, TranscriptLine }
 export { time_spans }

@@ -27,12 +27,17 @@ function tool_use(minute: number, name: string, id: string, input: unknown = {})
 	})
 }
 
-function tool_result(minute: number, id: string): string {
+// `is_error` is left off entirely when none was given, because that is the third case a transcript
+// actually holds: the tools that report no outcome write the field nowhere rather than writing
+// `false` (joshuafolkken/kit#1309).
+function tool_result(minute: number, id: string, is_error?: boolean): string {
+	const result = { type: 'tool_result', tool_use_id: id, content: 'done' }
+
 	return JSON.stringify({
 		type: USER,
 		timestamp: at(minute),
 
-		message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'done' }] },
+		message: { content: [is_error === undefined ? result : { ...result, is_error }] },
 	})
 }
 
@@ -361,5 +366,35 @@ describe('time_spans.parse_line — the assistant message a line belongs to', ()
 
 	it('leaves a line written without one ungrouped', () => {
 		expect(time_spans.parse_line(prompt(0))?.message_id).toBe(time_spans.NO_MESSAGE_ID)
+	})
+})
+
+// The three answers a result can give about how its call came back (joshuafolkken/kit#1309). `false`
+// and absent are different facts — a call that succeeded, and a tool that reports no outcome — and
+// reading the second as the first would report a run as having failed nothing when nothing was read.
+function outcome_after(is_error?: boolean): string {
+	const lines = [tool_use(0, 'Read', 'tool-1'), tool_result(1, 'tool-1', is_error)].join('\n')
+
+	return time_spans.parse_timeline(lines).spans[0]?.outcome ?? ''
+}
+
+describe('time_spans.parse_timeline — how a call came back', () => {
+	it('reads a result the harness marked as an error as a failed call', () => {
+		expect(outcome_after(true)).toBe(time_spans.FAILED_OUTCOME)
+	})
+
+	it('reads a result marked not an error as a call that succeeded', () => {
+		expect(outcome_after(false)).toBe(time_spans.OK_OUTCOME)
+	})
+
+	it('leaves a result that carried no outcome unknown rather than calling it a success', () => {
+		expect(outcome_after()).toBe(time_spans.UNKNOWN_OUTCOME)
+	})
+
+	// Neither is a call, so neither has an outcome to have.
+	it('leaves the model and human waits unknown', () => {
+		const { spans } = time_spans.parse_timeline([assistant_text(0), prompt(5)].join('\n'))
+
+		expect(spans.every((one) => one.outcome === time_spans.UNKNOWN_OUTCOME)).toBe(true)
 	})
 })

@@ -154,6 +154,11 @@ const time_round_trips = {
 	count_calls,
 	count_round_trips,
 	format_density,
+	// Exported since joshuafolkken/kit#1309, so the failure aggregation orders a run's spans through
+	// the one function that already knows why they need it — a second `toSorted` beside it would be
+	// the clone `CLAUDE.md` prohibits, and the seam it guards (a delegated unit's spans appended
+	// after the parent's) is not one a second copy would keep remembering.
+	in_time_order,
 	is_below_floor,
 	issuing_model_ms,
 	per_round_trip,

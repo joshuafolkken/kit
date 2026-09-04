@@ -1,5 +1,5 @@
 import { time_markers } from './time-markers'
-import type { Span } from './time-spans'
+import { time_spans, type Span, type SpanOutcome } from './time-spans'
 
 // A span built by category, for the suites that measure how spans are *classified* rather than when
 // they happened (joshuafolkken/kit#1304).
@@ -26,12 +26,30 @@ function span(
 		josh_command,
 		marker: time_markers.NO_MARKER,
 		branch: 'main',
+		outcome: time_spans.UNKNOWN_OUTCOME,
 		is_continuation: false,
 		ended_ms: 0,
 		duration_ms: minutes * MINUTE_MS,
 	}
 }
 
-const time_span_fixture = { MINUTE_MS, span }
+// The same span with an outcome and a position on the clock, for the suites that measure rework
+// (joshuafolkken/kit#1309). A re-run is decided from the order the calls went out in, so a case about
+// one has to say *when* each span sat — which the builder above deliberately does not, because every
+// case it was written for reads a list of durations.
+function outcome_span(
+	end_minute: number,
+	outcome: SpanOutcome,
+	label: string,
+	josh_command = '',
+): Span {
+	return {
+		...span(time_spans.TOOL_CATEGORY, DEFAULT_MINUTES, label, josh_command),
+		outcome,
+		ended_ms: end_minute * MINUTE_MS,
+	}
+}
+
+const time_span_fixture = { MINUTE_MS, span, outcome_span }
 
 export { time_span_fixture }
