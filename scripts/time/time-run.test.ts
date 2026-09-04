@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { time_checks } from './time-checks'
 import { time_corpus } from './time-corpus'
 import type { GhReader } from './time-github'
 import { time_pull_fixture } from './time-pull-fixture'
@@ -81,11 +82,29 @@ async function report_of(script: GhScript): Promise<TimeReport> {
 	return await time_run.build_run_report(ISSUE, CWD, reader(script))
 }
 
-function checks_body(name: string, started: number, completed: number): string {
-	return JSON.stringify({
-		check_runs: [{ name, started_at: at(started), completed_at: at(completed) }],
-	})
+const SUCCESS = 'success'
+const SKIPPED = 'skipped'
+const UNIT = 'unit'
+const CODERABBIT = 'CodeRabbit'
+const E2E = 'E2E'
+
+function check_run(name: string, conclusion: string, started: number, completed: number): object {
+	return { name, conclusion, started_at: at(started), completed_at: at(completed) }
 }
+
+function checks_body(name: string, started: number, completed: number): string {
+	return JSON.stringify({ check_runs: [check_run(name, SUCCESS, started, completed)] })
+}
+
+// The pull request every case here merges at minute 8, so these three jobs sit on both sides of that
+// merge: `unit` finishes right at it, `CodeRabbit` two minutes after it, and `E2E` never ran.
+const SPANNING_CHECKS = JSON.stringify({
+	check_runs: [
+		check_run(UNIT, SUCCESS, 3, 8),
+		check_run(CODERABBIT, SUCCESS, 4, 10),
+		check_run(E2E, SKIPPED, 3, 3),
+	],
+})
 
 describe('time_run.build_run_report — the four shares', () => {
 	it('adds the merge tail no transcript records as the CI wait', async () => {
@@ -122,9 +141,16 @@ describe('time_run.build_run_report — the CI check table', () => {
 	it('names each CI job with its own duration', async () => {
 		write_session('one', issue_lines(0))
 
-		const report = await report_of({ ...MERGED_SCRIPT, checks_body: checks_body('unit', 3, 7) })
+		const report = await report_of({ ...MERGED_SCRIPT, checks_body: checks_body(UNIT, 3, 7) })
 
-		expect(report.by_check).toEqual([{ label: 'unit', duration_ms: 4 * MINUTE_MS, call_count: 1 }])
+		expect(report.by_check).toEqual([
+			{
+				label: UNIT,
+				duration_ms: 4 * MINUTE_MS,
+				conclusion: SUCCESS,
+				merge_gap_ms: -MINUTE_MS,
+			},
+		])
 	})
 
 	// GitHub really does stamp a check as completed before it started — `Notify Auto Tag` on PR #1277
@@ -134,7 +160,35 @@ describe('time_run.build_run_report — the CI check table', () => {
 
 		const report = await report_of({ ...MERGED_SCRIPT, checks_body: checks_body('notify', 7, 6) })
 
-		expect(report.by_check).toEqual([{ label: 'notify', duration_ms: 0, call_count: 1 }])
+		expect(report.by_check[0]?.duration_ms).toBe(0)
+	})
+})
+
+// The Issue's own case, end to end: the merge instant this file already reads is what tells the three
+// rows apart, and the report is where the two halves meet (joshuafolkken/kit#1310).
+describe('time_run.build_run_report — a check set that spans the merge', () => {
+	it('measures each check against the merge instant', async () => {
+		write_session('one', issue_lines(0))
+
+		const report = await report_of({ ...MERGED_SCRIPT, checks_body: SPANNING_CHECKS })
+		const gaps = report.by_check.map((check) => [check.label, check.merge_gap_ms])
+
+		expect(gaps).toEqual([
+			[CODERABBIT, 2 * MINUTE_MS],
+			[UNIT, 0],
+			[E2E, -5 * MINUTE_MS],
+		])
+	})
+
+	it('names the last check to finish before the merge rather than the longest one', async () => {
+		write_session('one', issue_lines(0))
+
+		const report = await report_of({ ...MERGED_SCRIPT, checks_body: SPANNING_CHECKS })
+		const text = time_report.format_report(report)
+
+		expect(text).toContain(`${time_checks.MERGE_WAIT_PREFIX} ${UNIT}`)
+		expect(text).toContain(`success · finished 2.0 min ${time_checks.AFTER_MERGE_NOTE}`)
+		expect(text).toContain(`skipped · ${time_checks.SKIPPED_NOTE}`)
 	})
 })
 

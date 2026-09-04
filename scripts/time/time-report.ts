@@ -1,3 +1,4 @@
+import { time_checks, type CheckTotal } from './time-checks'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
 import { time_phases, type PhaseTotal } from './time-phases'
@@ -60,6 +61,15 @@ interface LabelTotal {
 	call_count: number
 }
 
+// What every table's rows have in common, so the one renderer below lays out the per-tool totals and
+// the per-check rows alike rather than acquiring a second copy of the cap, the overflow note and the
+// widths (joshuafolkken/kit#1310). What differs between them is the third column, which is the
+// function each caller passes.
+interface RowTotal {
+	label: string
+	duration_ms: number
+}
+
 interface TimeReport {
 	// What was measured: `session <id>` for one session, `issue #<N>` for a whole run. A label rather
 	// than a session id, because a run spans sessions and has no single one to name.
@@ -103,7 +113,9 @@ interface TimeReport {
 	phases: Array<PhaseTotal>
 	by_tool: Array<LabelTotal>
 	by_josh_command: Array<LabelTotal>
-	by_check: Array<LabelTotal>
+	// One row per CI job, carrying what it concluded and how far its finish sat from the merge
+	// (joshuafolkken/kit#1310). Built by `time-checks.ts`, which is also what renders the third column.
+	by_check: Array<CheckTotal>
 	// How much of the run was doing something a second time because it failed the first
 	// (joshuafolkken/kit#1309). Carried on the report rather than recomputed by the renderer, because
 	// the spans are gone by the time anything holds a report — and so `--json` carries the figures
@@ -122,7 +134,7 @@ interface ReportInput {
 	ci_ms: number
 	has_ci_data: boolean
 	notes: ReadonlyArray<string>
-	by_check: ReadonlyArray<LabelTotal>
+	by_check: ReadonlyArray<CheckTotal>
 }
 
 function of_category(spans: ReadonlyArray<Span>, category: SpanCategory): Array<Span> {
@@ -374,22 +386,32 @@ function category_lines(report: TimeReport): Array<string> {
 // row *there ever was* would be false beside a `--top` above this display cap — and the report would
 // then contradict its own truncation note. What was cut from the record, if anything, is said in
 // `notes`; what is cut from this table is said here.
-function overflow_line(rows: ReadonlyArray<LabelTotal>): Array<string> {
-	if (rows.length <= MAX_ROWS) return []
+function overflow_line(row_count: number): Array<string> {
+	if (row_count <= MAX_ROWS) return []
 
 	return [
-		`  … and ${String(rows.length - MAX_ROWS)} more (--json carries every row this report holds)`,
+		`  … and ${String(row_count - MAX_ROWS)} more (--json carries every row this report holds)`,
 	]
 }
 
-function total_lines(heading: string, rows: ReadonlyArray<LabelTotal>): Array<string> {
+// What the per-tool and per-`josh <cmd>` tables put in their third column: how many calls the row
+// totals. The check table answers something else entirely, which is why the column is a parameter.
+function call_suffix(row: LabelTotal): string {
+	return `${String(row.call_count)} call(s)`
+}
+
+function total_lines<Row extends RowTotal>(
+	heading: string,
+	rows: ReadonlyArray<Row>,
+	suffix_of: (row: Row) => string,
+): Array<string> {
 	if (rows.length === 0) return []
 
 	const shown = rows
 		.slice(0, MAX_ROWS)
-		.map((row) => format_row(row.label, row.duration_ms, `${String(row.call_count)} call(s)`))
+		.map((row) => format_row(row.label, row.duration_ms, suffix_of(row)))
 
-	return ['', heading, ...shown, ...overflow_line(rows)]
+	return ['', heading, ...shown, ...overflow_line(rows.length)]
 }
 
 // A table of zeroes reads as "this run took no time", which is never true. A session with no timed
@@ -426,9 +448,10 @@ function format_report(report: TimeReport): string {
 			report.tool_call_count,
 			report.categories.tool_ms,
 		),
-		...total_lines('By tool (descending):', report.by_tool),
-		...total_lines('By josh command (descending):', report.by_josh_command),
-		...total_lines('By CI check (descending, jobs overlap):', report.by_check),
+		...total_lines('By tool (descending):', report.by_tool, call_suffix),
+		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
+		...total_lines(time_checks.CHECK_HEADING, report.by_check, time_checks.check_suffix),
+		...time_checks.merge_wait_lines(report.by_check),
 	].join('\n')
 }
 
