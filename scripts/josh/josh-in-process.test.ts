@@ -117,6 +117,19 @@ function read_script(script: string): string {
 	return readFileSync(path.join(PACKAGE_DIR, script), 'utf8')
 }
 
+// On a line of its own, not merely somewhere in the file: this very file quotes the guard in prose,
+// and a script that documented it without executing it would otherwise pass while never running.
+const LINE_COMMENT_PREFIX = '//'
+
+function has_canonical_guard(source: string): boolean {
+	return source
+		.split('\n')
+		.some(
+			(line) =>
+				!line.trimStart().startsWith(LINE_COMMENT_PREFIX) && line.includes(CANONICAL_MAIN_GUARD),
+		)
+}
+
 describe('every command routed in-process still runs its own main', () => {
 	it('routes more than one command in-process', () => {
 		expect(IN_PROCESS_SCRIPTS.length).toBeGreaterThan(1)
@@ -128,7 +141,7 @@ describe('every command routed in-process still runs its own main', () => {
 	})
 
 	it.each(GUARDED_SCRIPTS)('%s guards on the argv the dispatcher sets', (script) => {
-		expect(read_script(script)).toContain(CANONICAL_MAIN_GUARD)
+		expect(has_canonical_guard(read_script(script))).toBe(true)
 	})
 
 	it.each(UNCONDITIONAL_SCRIPTS)('%s detects no entry point, so it always runs', (script) => {
@@ -143,7 +156,13 @@ describe('every command routed in-process still runs its own main', () => {
 // no-op: its main would never run and the command would answer 0 having done nothing.
 // `josh-command-types.ts` records that `GATE_COMMAND` was moved out of `verification-gate.ts` to
 // keep exactly that from happening, and until now nothing asserted it.
-const IMPORT_PATTERN = /from\s+'([^']+)'/gu
+// Both spellings that put a module in the registry: `… from '…'`, which covers imports and
+// re-exports alike, and a bare side-effect `import '…'` on a line of its own — missed, the walk
+// would report a graph that is short of exactly the file this test is looking for.
+const IMPORT_PATTERNS: ReadonlyArray<RegExp> = [
+	/from[ \t]+'([^']+)'/gu,
+	/^[ \t]*import[ \t]+'([^']+)'/gmu,
+]
 const SUBPATH_PREFIX = '#scripts/'
 const TS_SUFFIX = '.ts'
 const RELATIVE_PREFIX = '.'
@@ -165,16 +184,22 @@ function resolve_import(specifier: string, from_file: string): string | undefine
 	return resolved.endsWith(TS_SUFFIX) ? resolved : `${resolved}${TS_SUFFIX}`
 }
 
-function read_imports(file: string): Array<string> {
-	const imports: Array<string> = []
+function resolve_matches(source: string, pattern: RegExp, file: string): Array<string> {
+	const resolved: Array<string> = []
 
-	for (const [, specifier] of readFileSync(file, 'utf8').matchAll(IMPORT_PATTERN)) {
-		const resolved = resolve_import(specifier ?? '', file)
+	for (const [, specifier] of source.matchAll(pattern)) {
+		const target = resolve_import(specifier ?? '', file)
 
-		if (resolved !== undefined && existsSync(resolved)) imports.push(resolved)
+		if (target !== undefined && existsSync(target)) resolved.push(target)
 	}
 
-	return imports
+	return resolved
+}
+
+function read_imports(file: string): Array<string> {
+	const source = readFileSync(file, 'utf8')
+
+	return IMPORT_PATTERNS.flatMap((pattern) => resolve_matches(source, pattern, file))
 }
 
 function walk_imports(file: string, seen: Set<string>): void {
