@@ -76,6 +76,10 @@ const BLOCK_SCHEMA = z.object({
 
 	tool_use_id: z.string().nullish(),
 	input: z.unknown().nullish(),
+	// Whether the harness wrote this result back as a failure (joshuafolkken/kit#1309). Present on a
+	// `tool_result` block and on nothing else, and absent even there for the tools that never report
+	// one — which is why it is read as three answers rather than as a boolean with a default.
+	is_error: z.boolean().nullish(),
 })
 
 const CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
@@ -104,6 +108,34 @@ const MODEL_CATEGORY: SpanCategory = 'model'
 const TOOL_CATEGORY: SpanCategory = 'tool'
 const HUMAN_CATEGORY: SpanCategory = 'human'
 
+// How the call this span paid for came back (joshuafolkken/kit#1309).
+//
+// **Three answers rather than two.** `unknown` is not a polite `ok`: a fifth of the tool results in
+// the transcripts measured carry no `is_error` at all — a file read, an answered question — and
+// folding those into `ok` would report a run as having failed nothing when nothing was read. It is
+// also what a model span and a human span carry, since neither is a call and neither has an outcome
+// to have.
+type SpanOutcome = 'ok' | 'failed' | 'unknown'
+
+const OK_OUTCOME: SpanOutcome = 'ok'
+const FAILED_OUTCOME: SpanOutcome = 'failed'
+const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
+
+// What the result closing a span says about the call it belongs to, beyond the label read off the
+// call itself. Two fields rather than one because both are answers about the *result* line and
+// neither can be recovered from a span afterwards.
+//
+// **`call_id` is what makes two fragments of one call identifiable as one call.** A span bracketing a
+// delegated unit comes back from `time_overlap.trim` as a head and a tail, and the two are told apart
+// from a *different* call of the same tool only by this id — a label cannot do it, because two
+// `Task` calls issued in the same turn share one.
+interface ResultFacts {
+	call_id: string
+	outcome: SpanOutcome
+}
+
+const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
+
 // What a tool span is labelled with. `josh_command` is empty for everything that is not a
 // `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
 //
@@ -130,7 +162,9 @@ const UNKNOWN_CALL: ToolCall = {
 //
 // `branch` rides along for the same reason `cost-usage.ts` carries it on a record: it is what
 // `cost_attribute` reads to decide which issue the span belongs to.
-interface Span extends ToolCall {
+// The two `ResultFacts` fields are carried for the same reason `marker` is: the result block is gone
+// by the time anything aggregates, and only what was read off it survives.
+interface Span extends ToolCall, ResultFacts {
 	category: SpanCategory
 	duration_ms: number
 	ended_ms: number
@@ -149,6 +183,9 @@ interface Block {
 	id: string
 	result_id: string
 	input: unknown
+	// `undefined` where the block carried no `is_error` field, which is a different fact from
+	// `false`: one is a tool that reports no outcome, the other a call that succeeded.
+	is_error: boolean | undefined
 }
 
 interface TranscriptLine {
@@ -162,7 +199,7 @@ interface TranscriptLine {
 	blocks: Array<Block>
 }
 
-interface TimelineEvent extends ToolCall {
+interface TimelineEvent extends ToolCall, ResultFacts {
 	timestamp_ms: number
 	branch: string
 	category: SpanCategory
@@ -257,14 +294,22 @@ function to_tool_call(name: string, input: unknown): ToolCall {
 	}
 }
 
-function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
+// The four string fields, defaulted together and apart from the two that are not strings. Split out
+// so neither half carries every `??` in the block: read as one function the defaulting alone reached
+// the complexity limit, and the next field added would have had to be squeezed in beside them.
+function block_names(
+	raw: z.infer<typeof BLOCK_SCHEMA>,
+): Pick<Block, 'type' | 'name' | 'id' | 'result_id'> {
 	return {
 		type: raw.type ?? '',
 		name: raw.name ?? '',
 		id: raw.id ?? '',
 		result_id: raw.tool_use_id ?? '',
-		input: raw.input,
 	}
+}
+
+function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
+	return { ...block_names(raw), input: raw.input, is_error: raw.is_error ?? undefined }
 }
 
 // A user turn written as a bare string carries no blocks, which is exactly right: it is a prompt,
@@ -335,8 +380,26 @@ function result_block(line: TranscriptLine): Block | undefined {
 // One line's contribution to the timeline, with the two fields every event carries read from the
 // line in one place. Written once rather than spelled out at each of the three return sites, which
 // is what let `branch` be added without a fourth chance to forget it.
-function event_of(line: TranscriptLine, category: SpanCategory, call: ToolCall): TimelineEvent {
-	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, ...call }
+function event_of(
+	line: TranscriptLine,
+	category: SpanCategory,
+	call: ToolCall,
+	result: ResultFacts = NO_RESULT,
+): TimelineEvent {
+	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, ...result, ...call }
+}
+
+// A result that carried no `is_error` is `unknown` rather than `ok`: the tools that report no
+// outcome — a file read, an answered question — would otherwise be counted as calls that succeeded,
+// and a run whose whole transcript was written by them would report a measured zero failures.
+function outcome_of(result: Block): SpanOutcome {
+	if (result.is_error === undefined) return UNKNOWN_OUTCOME
+
+	return result.is_error ? FAILED_OUTCOME : OK_OUTCOME
+}
+
+function facts_of(result: Block): ResultFacts {
+	return { call_id: result.result_id, outcome: outcome_of(result) }
 }
 
 // A user line is one of two things, and only its blocks tell them apart: a tool result the harness
@@ -346,7 +409,9 @@ function user_event(line: TranscriptLine, calls: ReadonlyMap<string, ToolCall>):
 
 	if (result === undefined) return event_of(line, HUMAN_CATEGORY, NO_CALL)
 
-	return event_of(line, TOOL_CATEGORY, calls.get(result.result_id) ?? UNKNOWN_CALL)
+	const call = calls.get(result.result_id) ?? UNKNOWN_CALL
+
+	return event_of(line, TOOL_CATEGORY, call, facts_of(result))
 }
 
 function to_event(
@@ -381,6 +446,8 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		josh_command: event.josh_command,
 		marker: event.marker,
 		branch: event.branch,
+		call_id: event.call_id,
+		outcome: event.outcome,
 		is_continuation: false,
 		ended_ms: event.timestamp_ms,
 		duration_ms: event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms),
@@ -418,6 +485,9 @@ const time_spans = {
 	MODEL_CATEGORY,
 	TOOL_CATEGORY,
 	HUMAN_CATEGORY,
+	OK_OUTCOME,
+	FAILED_OUTCOME,
+	UNKNOWN_OUTCOME,
 	NO_MESSAGE_ID,
 	UNKNOWN_TOOL,
 	bash_label,
@@ -427,5 +497,5 @@ const time_spans = {
 	parse_timeline,
 }
 
-export type { Block, Span, SpanCategory, Timeline, TranscriptLine }
+export type { Block, ResultFacts, Span, SpanCategory, SpanOutcome, Timeline, TranscriptLine }
 export { time_spans }

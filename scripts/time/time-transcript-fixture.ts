@@ -190,6 +190,8 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		josh_command: '',
 		marker: time_markers.NO_MARKER,
 		branch: 'main',
+		call_id: '',
+		outcome: time_spans.UNKNOWN_OUTCOME,
 		is_continuation: false,
 		ended_ms: ended_minute * MINUTE_MS,
 		duration_ms: duration_minutes * MINUTE_MS,

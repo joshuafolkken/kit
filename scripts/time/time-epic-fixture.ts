@@ -1,5 +1,6 @@
 import { expect } from 'vitest'
 import { time_epic, type EpicTimeReport } from './time-epic'
+import { time_failures } from './time-failures'
 import type { TimeReport } from './time-report'
 
 // What the epic-aggregation suites read, written once rather than in each test file
@@ -41,12 +42,22 @@ const ZERO_COUNTS = {
 	model_ms_per_round_trip: 0,
 }
 
-type Breakdown = Pick<TimeReport, 'notes' | 'phases' | 'by_tool' | 'by_josh_command' | 'by_check'>
+type Breakdown = Pick<
+	TimeReport,
+	'notes' | 'phases' | 'by_tool' | 'by_josh_command' | 'by_check' | 'failures'
+>
 
 // Fresh arrays per report rather than one shared set: a case that appends to a report's notes would
 // otherwise be appending to every other report the fixture ever built.
 function empty_breakdown(): Breakdown {
-	return { notes: [], phases: [], by_tool: [], by_josh_command: [], by_check: [] }
+	return {
+		notes: [],
+		phases: [],
+		by_tool: [],
+		by_josh_command: [],
+		by_check: [],
+		failures: { ...time_failures.NO_FAILURES },
+	}
 }
 
 // A report shaped like the one `time_run` hands back, with only the fields the aggregation reads

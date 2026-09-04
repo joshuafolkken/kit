@@ -1,3 +1,5 @@
+import { time_failures, type FailureTotals } from './time-failures'
+import { time_format } from './time-format'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_round_trips } from './time-round-trips'
 import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
@@ -8,23 +10,14 @@ import { time_spans, type Span, type SpanCategory, type Timeline } from './time-
 // breakdown slices the same array by boundary, and an epic aggregation concatenates several
 // sessions' arrays before calling this. Neither needs a second aggregator.
 
-const MS_PER_MINUTE = 60_000
-const MS_PER_SECOND = 1000
-const MINUTE_DECIMALS = 1
-const SECOND_DECIMALS = 1
-const PERCENT_SCALE = 100
-const PERCENT_DECIMALS = 1
 const MAX_ROWS = 15
-const LABEL_WIDTH = 24
-// Wide enough for a three-digit run (`335.4 min`), so a long session's rows stay in column with a
-// short one's rather than pushing the share out by a character.
-const MINUTES_WIDTH = 9
 const NOT_DETECTED = 'not detected'
-// The category table's answer, kept apart from the phase table's `not detected` because the two
-// tables ask different questions: a phase is about a marker, a category about whether the half it
-// sums was read at all. One word per table, and both already in use — the epic scope has printed
-// `not measured` for its own category rows since joshuafolkken/kit#1271.
-const NOT_MEASURED = 'not measured'
+// The column and number formatting moved to `time-format.ts` when the failure block became a third
+// renderer sharing it (joshuafolkken/kit#1309). It is re-exported below under the names it always
+// had, so `time-epic-report.ts` and `time-run.ts` keep laying their rows out through one set of
+// widths rather than acquiring a second.
+const { format_minutes, format_seconds, format_share, format_columns, format_row, unmeasured_row } =
+	time_format
 const PHASE_HEADING = 'By phase (in run order):'
 const ROUND_TRIP_HEADING = 'Round trips:'
 const CALLS_LABEL = 'tool calls'
@@ -111,6 +104,12 @@ interface TimeReport {
 	by_tool: Array<LabelTotal>
 	by_josh_command: Array<LabelTotal>
 	by_check: Array<LabelTotal>
+	// How much of the run was doing something a second time because it failed the first
+	// (joshuafolkken/kit#1309). Carried on the report rather than recomputed by the renderer, because
+	// the spans are gone by the time anything holds a report — and so `--json` carries the figures
+	// without a second walk. **The epic scope does not aggregate it yet**: `time-epic.ts` sums the
+	// categories alone, so `josh time --epic` prints no rework block.
+	failures: FailureTotals
 }
 
 // Everything `build_from_spans` needs. A record rather than seven positional parameters, which the
@@ -238,6 +237,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		by_tool: totals_by(spans, (span) => span.label),
 		by_josh_command: totals_by(spans, (span) => span.josh_command),
 		by_check: [...input.by_check],
+		failures: time_failures.build_failures(spans),
 	}
 }
 
@@ -254,40 +254,6 @@ function build_report(session_id: string, timeline: Timeline): TimeReport {
 		notes: [],
 		by_check: [],
 	})
-}
-
-function format_minutes(duration_ms: number): string {
-	return `${(duration_ms / MS_PER_MINUTE).toFixed(MINUTE_DECIMALS)} min`
-}
-
-// Seconds rather than minutes for a per-turn figure: one turn is tens of seconds, and `0.1 min` is
-// too coarse to show the rise across a batch that this scale exists to make visible.
-function format_seconds(duration_ms: number): string {
-	return `${(duration_ms / MS_PER_SECOND).toFixed(SECOND_DECIMALS)} s`
-}
-
-function format_share(part: number, whole: number): string {
-	if (whole === 0) return 'n/a'
-
-	return `${((part / whole) * PERCENT_SCALE).toFixed(PERCENT_DECIMALS)}%`
-}
-
-// The one place the three columns are laid out, so a row carrying words instead of a duration lines
-// up with the rows that carry one rather than overrunning the numeric column.
-function format_columns(label: string, minutes: string, suffix: string): string {
-	return `  ${label.padEnd(LABEL_WIDTH)}${minutes.padStart(MINUTES_WIDTH)}   ${suffix}`
-}
-
-function format_row(label: string, duration_ms: number, suffix: string): string {
-	return format_columns(label, format_minutes(duration_ms), suffix)
-}
-
-// **A share nobody read says so rather than totalling zero.** The duration column is left empty
-// because there is no duration — not a short one — which is the same shape an undetected phase and a
-// child that never ran already print. Exported so the epic scope lays this row out through the one function
-// rather than a second copy of the word and the widths.
-function unmeasured_row(label: string): string {
-	return format_columns(label, '', NOT_MEASURED)
 }
 
 // **A phase whose marker never appeared says so rather than printing `0.0 min`.** "Did not run" and
@@ -455,6 +421,11 @@ function format_report(report: TimeReport): string {
 		...category_lines(report),
 		...phase_lines(report),
 		...round_trip_lines(report),
+		...time_failures.failure_lines(
+			report.failures,
+			report.tool_call_count,
+			report.categories.tool_ms,
+		),
 		...total_lines('By tool (descending):', report.by_tool),
 		...total_lines('By josh command (descending):', report.by_josh_command),
 		...total_lines('By CI check (descending, jobs overlap):', report.by_check),
@@ -464,7 +435,7 @@ function format_report(report: TimeReport): string {
 const time_report = {
 	MAX_ROWS,
 	NOT_DETECTED,
-	NOT_MEASURED,
+	NOT_MEASURED: time_format.NOT_MEASURED,
 	PHASE_HEADING,
 	ROUND_TRIP_HEADING,
 	CALLS_LABEL,

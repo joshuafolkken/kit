@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { time_epic, type ChildTiming, type EpicTimeReport } from './time-epic'
 import { time_epic_report } from './time-epic-report'
+import { time_failures } from './time-failures'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
 
@@ -64,6 +65,8 @@ function report_of(input: ChildInput): TimeReport {
 		by_tool: [],
 		by_josh_command: [],
 		by_check: [],
+
+		failures: { ...time_failures.NO_FAILURES },
 	}
 }
 
