@@ -22,10 +22,11 @@ import { time_spans, type Span, type SpanOutcome } from './time-spans'
 // there and in one chain here.
 //
 // **What this cannot see, stated plainly.** The outcome is the harness's `is_error`, which reports
-// the *tool call*, not the command inside it. `pnpm josh gate 2>&1 | tail -40` exits with `tail`'s
-// status, so a red gate read through a pipe comes back `ok` and its re-run is invisible here. That
-// is a property of how the call was written rather than of this measurement, and the figures below
-// are therefore a floor on the rework a run did, never a ceiling.
+// the *tool call*, not the command inside it — plus, since joshuafolkken/kit#1361, the failure line a
+// josh command printed, which is what recovers a check whose exit status a pipeline threw away
+// (`pnpm josh gate 2>&1 | tail -40` exits with `tail`'s status). Everything outside that — a
+// non-josh command inside a pipeline, and a body the harness truncated past its failure line — is
+// still invisible, so the figures below remain a floor on the rework a run did, never a ceiling.
 
 // A call whose result carried no outcome at all — a file read, an answered question — and the
 // running totals it contributes to nothing but this count.
