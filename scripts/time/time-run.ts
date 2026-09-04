@@ -104,15 +104,64 @@ function span_note(found: IssueSpans, issue_number: number): string {
 	return `${String(found.session_count)} transcript(s)`
 }
 
+// The phrase the overlap note is recognized by, written once so a renderer that has to let the note
+// through matches this rather than a sentence it spells out for itself — the shape `time_row_cap`
+// already uses for its truncation note.
+const OVERLAP_MARK = 'wall clock concurrent sessions shared'
+
+// **Whether a note is the overlap one.** `--epic` prints a child's notes only where the GitHub half
+// is missing, which is never true of a completed child — so without a way to name this note it is
+// invisible in exactly the scope whose child rows and batch total carry the inflated figure
+// (joshuafolkken/kit#1330).
+function is_overlap_note(note: string): boolean {
+	return note.includes(OVERLAP_MARK)
+}
+
+// Time inside the wall window that no span accounts for: two sessions with a gap between them.
+function idle_note(gap_ms: number, span_ms: number): string {
+	const gap = time_report.format_minutes(gap_ms)
+
+	return `${gap} of the ${time_report.format_minutes(span_ms)} window is between sessions and belongs to nobody`
+}
+
+// The other direction, which used to be silent (joshuafolkken/kit#1330): the shares total *more* than
+// the window they sit in, because two sessions attributed to one issue ran at the same wall clock.
+//
+// **It is reported rather than subtracted**, and that is not a smaller fix. Both sessions really did
+// work in the minutes they shared, so there is no unit whose span could be trimmed the way a
+// delegated one's is — which is why `time-corpus.ts` groups spans per session and refuses to pool
+// their intervals: subtracting one session's from another's deletes real work with no note.
+//
+// **So the note names the denominator too.** Every category and phase percentage is taken against
+// the accounted total, and once that total exceeds the window a reader who assumes the window is the
+// denominator is ranking the phases against a number the report never used.
+//
+// **The sentence names no direction**, because the run scope prints it above the tables and `--epic`
+// prints it indented under the child's row — "the shares below" would send an `--epic` reader looking
+// beneath it for shares that sit on the line above.
+//
+// The excess is derived from the same two quantities the sentence prints rather than passed in, so
+// it can never name some third figure. Each of the three is rounded to a tenth on its own, so the
+// printed excess can sit a tenth off the difference of the printed pair — `--issue 1299` prints
+// `77.6`, `49.9` and `27.6`. The arithmetic is exact and the display is not; subtracting the rounded
+// pair instead would make the sentence self-consistent by printing an excess nobody measured.
+function overlap_note(span_ms: number, elapsed_ms: number): string {
+	const accounted = time_report.format_minutes(elapsed_ms)
+	const shared = `${time_report.format_minutes(elapsed_ms - span_ms)} of it ${OVERLAP_MARK}`
+
+	return `the shares total ${accounted} over a ${time_report.format_minutes(span_ms)} window — ${shared}, and every share and phase percentage is of the ${accounted}`
+}
+
+// **The two directions are one question asked with the sign kept.** Only the first was answered
+// before, so a run whose sessions overlapped read exactly like one whose sessions did not.
 function window_note(window: Interval, elapsed_ms: number): Array<string> {
 	const span_ms = window.ended_ms - window.started_ms
-	const gap_ms = span_ms - elapsed_ms
+	const idle_ms = span_ms - elapsed_ms
 
-	if (gap_ms < MS_PER_MINUTE) return []
+	if (idle_ms >= MS_PER_MINUTE) return [idle_note(idle_ms, span_ms)]
+	if (elapsed_ms - span_ms >= MS_PER_MINUTE) return [overlap_note(span_ms, elapsed_ms)]
 
-	return [
-		`${time_report.format_minutes(gap_ms)} of the ${time_report.format_minutes(span_ms)} window is between sessions and belongs to nobody`,
-	]
+	return []
 }
 
 // Everything the two reads produced, before it becomes a report. Split out so `build_run_report`
@@ -235,6 +284,7 @@ async function build_latest_run_report(
 }
 
 const time_run = {
+	is_overlap_note,
 	issue_of,
 	build_run_report,
 	build_latest_run_report,
