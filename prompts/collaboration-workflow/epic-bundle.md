@@ -37,7 +37,7 @@
 
 **3 段は CI 待ちの中で実行する。コミットの前ではない。** PR を開くフロー（`fullrun` / `queue` / `epicrun`）では `pnpm josh git -y` の後・`pnpm josh followup --merge` の前に置く。PR を開かないフロー（`halfrun`、ワークフロー外のコミット前セルフレビュー）では、隠れる先の CI が無いので振り分けが決まった時点で実行する。**期限は変わらない** — 現在の Issue が閉じるのはマージ時点であり、マージするのは `followup` なので、どの段も親が open のうちに終わる。第 2 段が要求しているのはそれだけである。変わるのは秒が誰のものかだけで、実測では `epic:bundle` 43 秒・`epic --add` 18 秒（joshuafolkken/kit#1229）に対し、joshuafolkken/kit#1238 の `followup --merge` は 122 秒のうち 78 秒を CI の完了待ちに費やしている（joshuafolkken/kit#1239）。
 
-**これは「レビューを CI と並走させる」ではない。** joshuafolkken/kit#1216 の (b) は不採用と決定済みであり、却下の理由は規則ではなく仕組みである — あちらは**コードを変える作業**を CI と重ねるため、修正を push するたびに CI がやり直しになり、重ねた分をそのまま払い戻す。起票はコードを 1 行も変えないので、走っている CI がそのまま使える。**1 周目のレビュー**はコミットの前のままで、「コミット前セルフレビュー」は書き換えていない。**2 周目だけは CI と並走する**（joshuafolkken/kit#1261）— 同じ仕組みを逆から読んだ結果であり、2 周目は fix delta しか読まず、通常はコードを 1 行も変えない。変えた場合は同一ブランチへの追加コミット 1 つと CI のやり直し 1 回を払う。単一ソースは `prompts/review.md` → "The pull request opens between the rounds, so CI runs beside round 2"。
+**これは「レビューを CI と並走させる」ではない。**（ここで言うレビューは 1 周目のことであり、2 周目については下の段落で別に扱う。） joshuafolkken/kit#1216 の (b) は不採用と決定済みであり、却下の理由は規則ではなく仕組みである — あちらは**コードを変える作業**を CI と重ねるため、修正を push するたびに CI がやり直しになり、重ねた分をそのまま払い戻す。起票はコードを 1 行も変えないので、走っている CI がそのまま使える。**1 周目のレビュー**はコミットの前のままで、「コミット前セルフレビュー」は書き換えていない。**2 周目だけは CI と並走する**（joshuafolkken/kit#1261）— 同じ仕組みを逆から読んだ結果であり、2 周目は fix delta しか読まず、通常はコードを 1 行も変えない。変えた場合は同一ブランチへの追加コミット 1 つと CI のやり直し 1 回を払う。単一ソースは `prompts/review.md` → "The pull request opens between the rounds, so CI runs beside round 2"。
 
 1. 残指摘を後追い Issue として起票し、現在の Issue を参照する
 2. **現在の Issue が閉じる前に** `pnpm josh epic:bundle <新規>` を実行する。候補探索は open Issue しか読まないため、親が閉じた後では恒久的に `none` になる（joshuafolkken/kit#947）
