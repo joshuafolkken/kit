@@ -184,18 +184,23 @@ function check_body(started_at: string, completed_at: string): string {
 	})
 }
 
+const EMPTY_CHECKS = { runs: [], is_failed: false }
+
 describe('time_github.list_check_runs', () => {
 	it('reads each job with its own start, finish and conclusion', async () => {
-		const runs = await time_github.list_check_runs(SHA, body_reader(check_body(CREATED, MERGED)))
+		const list = await time_github.list_check_runs(SHA, body_reader(check_body(CREATED, MERGED)))
 
-		expect(runs).toEqual([
-			{
-				name: CHECK_NAME,
-				conclusion: CONCLUSION,
-				started_ms: Date.parse(CREATED),
-				completed_ms: Date.parse(MERGED),
-			},
-		])
+		expect(list).toEqual({
+			runs: [
+				{
+					name: CHECK_NAME,
+					conclusion: CONCLUSION,
+					started_ms: Date.parse(CREATED),
+					completed_ms: Date.parse(MERGED),
+				},
+			],
+			is_failed: false,
+		})
 	})
 
 	// GitHub sends `null` for a job whose outcome it has no word for. **An empty conclusion is that
@@ -203,19 +208,46 @@ describe('time_github.list_check_runs', () => {
 	// one that passed (joshuafolkken/kit#1310).
 	it('carries an absent conclusion through as empty rather than inventing one', async () => {
 		const body = `{"check_runs":[{"name":"${CHECK_NAME}","conclusion":null,"started_at":"${CREATED}","completed_at":"${MERGED}"}]}`
-		const runs = await time_github.list_check_runs(SHA, body_reader(body))
+		const list = await time_github.list_check_runs(SHA, body_reader(body))
 
-		expect(runs[0]?.conclusion).toBe('')
+		expect(list.runs[0]?.conclusion).toBe('')
 	})
 
-	// A job still running has no finish, and dating one would invent a duration.
+	// A job still running has no finish, and dating one would invent a duration. The read itself
+	// succeeded, so this is an empty list and not a failure.
 	it('drops a job that has not finished', async () => {
 		const body = `{"check_runs":[{"name":"e2e","started_at":"${CREATED}","completed_at":null}]}`
 
-		expect(await time_github.list_check_runs(SHA, body_reader(body))).toEqual([])
+		expect(await time_github.list_check_runs(SHA, body_reader(body))).toEqual(EMPTY_CHECKS)
 	})
 
 	it('asks nothing at all without a head sha', async () => {
-		expect(await time_github.list_check_runs('', refuse)).toEqual([])
+		expect(await time_github.list_check_runs('', refuse)).toEqual(EMPTY_CHECKS)
+	})
+})
+
+// The acceptance criterion of joshuafolkken/kit#1352's second symptom: a rate limit, a timeout and an
+// expired credential all arrive through one `catch`, and answering them with an empty list reports
+// "GitHub recorded no checks for this run" — a definite answer nobody established.
+describe('time_github.list_check_runs — a read that was refused', () => {
+	it('separates a refused read from a run that really had no checks', async () => {
+		const refused = await time_github.list_check_runs(SHA, refuse)
+		const empty = await time_github.list_check_runs(SHA, body_reader('{"check_runs":[]}'))
+
+		expect(refused).toEqual({ runs: [], is_failed: true })
+		expect(empty).toEqual(EMPTY_CHECKS)
+	})
+
+	// `gh` exits 0 with a body the schema rejects on a shape change or an error object, so laundering
+	// that into an empty list is the same silence as swallowing a 403. The error object is the case
+	// that reaches this in practice, and it needs `check_runs` to be required rather than nullish —
+	// optional, it parses as a body that simply omitted the key.
+	it.each([
+		['a wrongly typed check list', '{"check_runs":"nope"}'],
+		['a rate-limit error object', '{"message":"API rate limit exceeded","documentation_url":"x"}'],
+	])('treats %s as a failed read', async (_name: string, body: string) => {
+		const list = await time_github.list_check_runs(SHA, body_reader(body))
+
+		expect(list.is_failed).toBe(true)
 	})
 })

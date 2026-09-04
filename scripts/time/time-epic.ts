@@ -155,6 +155,11 @@ function notes_of(rows: ReadonlyArray<RunTiming>, external_count: number): Array
 			time_batch.count_status(rows, time_batch.NOT_RUN),
 			'have nothing measured and are reported as "not run" — each row says why',
 		),
+		// Separate from the count above, and never folded into it: that one is about children with
+		// nothing to measure, this one about a measurement that broke. A batch reporting the second as
+		// the first is what let a regression print a plausible table and exit 0
+		// (joshuafolkken/kit#1352).
+		...count_note(time_batch.count_status(rows, time_batch.FAILED), time_batch.FAILED_NOTE_TAIL),
 		...count_note(
 			time_batch.count_status(rows, time_batch.NO_TRANSCRIPT),
 			'merged with no session transcript attributed, so only their CI wait is known',
@@ -220,9 +225,11 @@ function to_epic_report(
 			time_spans.has_transcript_data(row.report.span_count),
 		),
 		has_ci_data: ordered.some((row) => row.report.has_ci_data),
-		timed_count: ordered.length - time_batch.count_status(ordered, time_batch.NOT_RUN),
+		// A child whose report failed to build is no more timed than one the batch never reached, so
+		// both counts ask `count_untimed` rather than naming `not run` alone.
+		timed_count: ordered.length - time_batch.count_untimed(ordered),
 		measured_count: time_batch.count_status(ordered, time_batch.MEASURED),
-		unmeasured_count: time_batch.count_status(ordered, time_batch.NOT_RUN),
+		unmeasured_count: time_batch.count_untimed(ordered),
 		trend: trend_of(ordered),
 		notes: notes_of(ordered, external_count),
 	}

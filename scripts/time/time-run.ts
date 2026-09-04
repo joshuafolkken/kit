@@ -106,6 +106,30 @@ function is_overlap_note(note: string): boolean {
 	return note.includes(OVERLAP_MARK)
 }
 
+// The phrase the refused-check note is recognized by, written once for the same reason `OVERLAP_MARK`
+// is: `--epic` prints a child's notes only where the GitHub half is missing, and a child whose check
+// read was refused *did* read its merge — so without a name for this note it is invisible in exactly
+// the scope where the empty table has no other explanation (joshuafolkken/kit#1352).
+const CHECK_READ_MARK = 'the CI check list could not be read'
+
+function is_check_read_note(note: string): boolean {
+	return note.includes(CHECK_READ_MARK)
+}
+
+// **An empty check table and a refused check read print identically, and only one of them is a
+// measurement.** `ci_ms` comes from the pull request's own stamps, so the run stays measured and every
+// figure stays right; what is missing is the per-check table alone, and saying nothing there reports a
+// rate-limited `gh` as a run GitHub recorded no checks for.
+function check_note(is_failed: boolean, issue_number: number): Array<string> {
+	if (!is_failed) return []
+
+	const scope = `for issue #${String(issue_number)}`
+
+	return [
+		`${CHECK_READ_MARK} ${scope} — the per-check table is empty for that reason, not because there were no checks`,
+	]
+}
+
 // Time inside the wall window that no span accounts for: two sessions with a gap between them.
 function idle_note(gap_ms: number, span_ms: number): string {
 	const gap = time_report.format_minutes(gap_ms)
@@ -160,6 +184,9 @@ interface RunFacts {
 	found: IssueSpans
 	search: PullSearch
 	checks: Array<CheckTotal>
+	// Whether the check-run read was refused rather than answered with nothing. Carried beside the
+	// rows because an empty `checks` is both answers and only one of them is a measurement.
+	is_check_read_failed: boolean
 	ci_ms: number
 }
 
@@ -177,19 +204,17 @@ async function gather(
 	const merged_ms = pull?.merged_ms
 
 	if (pull === undefined || merged_ms === undefined) {
-		return { issue_number, found, search, checks: [], ci_ms: 0 }
+		return { issue_number, found, search, checks: [], is_check_read_failed: false, ci_ms: 0 }
 	}
 
-	const checks = time_checks.build_check_totals(
-		await time_github.list_check_runs(pull.head_sha, read),
-		merged_ms,
-	)
+	const list = await time_github.list_check_runs(pull.head_sha, read)
+	const checks = time_checks.build_check_totals(list.runs, merged_ms)
 	const ci_ms = time_overlap.uncovered_ms(
 		{ started_ms: pull.created_ms, ended_ms: merged_ms },
 		found.spans.map((span) => time_overlap.to_interval(span)),
 	)
 
-	return { issue_number, found, search, checks, ci_ms }
+	return { issue_number, found, search, checks, is_check_read_failed: list.is_failed, ci_ms }
 }
 
 // **`has_ci_data` is whether a merge was actually read, not whether an issue scope was asked for.**
@@ -198,7 +223,11 @@ async function gather(
 function to_report(facts: RunFacts): TimeReport {
 	const { found, search } = facts
 	const window = window_of(found.spans, search.pull)
-	const notes = [span_note(found, facts.issue_number), pull_note(search, facts.issue_number)]
+	const notes = [
+		span_note(found, facts.issue_number),
+		pull_note(search, facts.issue_number),
+		...check_note(facts.is_check_read_failed, facts.issue_number),
+	]
 	const report = time_report.build_from_spans({
 		scope: `issue #${String(facts.issue_number)}`,
 		spans: found.spans,
@@ -277,6 +306,7 @@ async function build_latest_run_report(
 
 const time_run = {
 	is_overlap_note,
+	is_check_read_note,
 	issue_of,
 	build_run_report,
 	build_latest_run_report,

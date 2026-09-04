@@ -26,6 +26,8 @@ const BRIEF_MS = 1
 // keeping the one before it.
 const UNREADABLE = SECOND_CHILD
 const GH_FAILURE = 'gh: not authenticated'
+// The Issue's own scenario: a regression inside the report construction, not a read that was refused.
+const CODE_FAILURE = 'to_report is not a function'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -112,14 +114,47 @@ describe('time_epic.build_epic_report — one child that could not be read', () 
 
 	// And the child that failed is reported as unmeasured with the reason, never as a run that took no
 	// time — the distinction the whole module keeps.
-	it('reports the child that threw as "not run", carrying the reason', async () => {
+	it('reports the child that threw as "failed", carrying the reason', async () => {
 		stub_one_failing_child()
 
 		const report = await batch_of(body_of(TRIO_ROWS))
 		const failed = report.children.find((child) => child.issue_number === UNREADABLE)
 
-		expect(failed?.status).toBe(time_batch.NOT_RUN)
+		expect(failed?.status).toBe(time_batch.FAILED)
 		expect(failed?.report.elapsed_ms).toBe(0)
 		expect(failed?.report.notes.join('\n')).toContain(GH_FAILURE)
+	})
+})
+
+// joshuafolkken/kit#1352's first symptom. `build_run_report` reports a *missing half* in words rather
+// than throwing, so reaching the catch means the code broke — and folding that into `not run` made a
+// regression that threw for every child print a table of plausible rows, a note reading "N child(ren)
+// have nothing measured", and exit code 0.
+describe('time_epic.build_epic_report — a report that could not be built', () => {
+	// The two answers side by side, which is the only way to see that they are told apart: one child
+	// the batch legitimately found nothing for, one whose measurement threw.
+	it('separates a child whose report threw from one the batch found nothing for', async () => {
+		stub_child_runs(async (issue_number: number) => {
+			if (issue_number === UNREADABLE) throw new TypeError(CODE_FAILURE)
+
+			return report_of({ issue_number, span_count: 0, has_ci_data: false })
+		})
+
+		const report = await batch_of(body_of(TRIO_ROWS))
+		const statuses = report.children.map((child) => child.status)
+
+		expect(statuses).toEqual([time_batch.NOT_RUN, time_batch.FAILED, time_batch.NOT_RUN])
+	})
+
+	// The counts and the note a reader actually sees: a failure is neither timed nor merely absent, and
+	// the batch says so in its own sentence rather than under the "nothing measured" one.
+	it('counts the failed child apart from the children with nothing to measure', async () => {
+		stub_one_failing_child()
+
+		const report = await batch_of(body_of(TRIO_ROWS))
+
+		expect(report.timed_count).toBe(TRIO.length - 1)
+		expect(report.unmeasured_count).toBe(1)
+		expect(report.notes.join('\n')).toContain('the report itself failed to build')
 	})
 })

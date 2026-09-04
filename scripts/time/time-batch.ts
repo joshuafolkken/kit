@@ -23,7 +23,7 @@ import { time_spans } from './time-spans'
 const NO_TURNS = 0
 const NONE = 0
 
-// What was known about one run, in four states rather than two.
+// What was known about one run, in five states rather than two.
 //
 // **None of the three that are not `measured` is a duration of zero.** A run the batch never reached,
 // one whose pull request never merged, and one that merged with no session transcript attributed to
@@ -31,12 +31,20 @@ const NONE = 0
 // keep them apart. The third is the one measured on epic #1272: four children merged, each with a
 // real CI wait, and not one line of transcript attributed to any of them — a row reading
 // `model 0.0 min` would have asserted a measurement nobody made.
-type RunStatus = 'measured' | 'no transcript' | 'not merged' | 'not run'
+//
+// **The fifth is not about the run at all** (joshuafolkken/kit#1352). `failed` says the measurement
+// itself broke, where the four above say what there was to measure. It is kept apart from `not run`
+// because `build_run_report` reports a *missing half* in words rather than throwing — so reaching the
+// catch below means the code did, and folding that into `not run` made a regression indistinguishable
+// from a batch that had simply not been started: every row plausible, the note reading "N child(ren)
+// have nothing measured", and the exit code 0.
+type RunStatus = 'measured' | 'no transcript' | 'not merged' | 'not run' | 'failed'
 
 const MEASURED: RunStatus = 'measured'
 const NO_TRANSCRIPT: RunStatus = 'no transcript'
 const NOT_MERGED: RunStatus = 'not merged'
 const NOT_RUN: RunStatus = 'not run'
+const FAILED: RunStatus = 'failed'
 
 interface RunTiming {
 	issue_number: number
@@ -94,8 +102,9 @@ function to_timing(issue_number: number, report: TimeReport): RunTiming {
 // that wait.
 //
 // The same 8 the two `epic-bundle` readers use for their own `gh` reads, and bounded for the same
-// reason: an unbounded fan-out is what turns a rate limit into a wrong answer, because
-// `list_check_runs` reports a refused read as an empty check list rather than as an error.
+// reason: an unbounded fan-out is what turns a rate limit into a wrong answer. Since
+// joshuafolkken/kit#1352 a refused check read at least *says* so rather than answering with an empty
+// check list, which makes the wrong answer visible — it does not make the burst any less likely.
 //
 // **What it bounds is the whole run report, not only the check-run read**, and the difference matters
 // on the fallback path: handed a `sources` half that is missing, `build_run_report` reads that half
@@ -107,9 +116,9 @@ const CHECK_RUN_CONCURRENCY = 8
 // than throwing, so reaching here means the read itself broke — and one broken run must not discard
 // the siblings that were measured. `bounded_map` raises the first failure and returns nothing, which
 // for a nine-run batch would be eight measurements thrown away for the ninth, so the catch belongs in
-// the worker rather than around the pool. The row lands as `not run` carrying the reason, which is
-// the `not run` this module already documents: "a run the batch never reached *and* one whose pull
-// request could not be read at all, and each row carries its own note saying which".
+// the worker rather than around the pool. The row lands as `failed` carrying the reason —
+// deliberately not `not run`, which is the ordinary answer for a run the batch never reached
+// (joshuafolkken/kit#1352).
 function failed_report(issue_number: number, error: unknown): TimeReport {
 	const reason = error instanceof Error ? error.message : String(error)
 
@@ -125,6 +134,18 @@ function failed_report(issue_number: number, error: unknown): TimeReport {
 	})
 }
 
+// **The status is set rather than derived, because nothing in the report can carry it.** A report
+// built from no spans and no merge is indistinguishable from a child the batch never reached, so
+// `status_of` would answer `not run` — the very conflation joshuafolkken/kit#1352 was filed for. The
+// catch above stays unconditional either way: narrowing it and re-throwing would hand the failure to
+// `bounded_map`, which raises the first one and returns nothing, and eight measured siblings would go
+// with it.
+function failed_timing(issue_number: number, error: unknown): RunTiming {
+	const report = failed_report(issue_number, error)
+
+	return { issue_number, status: FAILED, ms_per_turn: ms_per_turn_of(report), report }
+}
+
 async function build_one(
 	issue_number: number,
 	cwd: string,
@@ -137,7 +158,7 @@ async function build_one(
 			await time_run.build_run_report(issue_number, cwd, read, sources),
 		)
 	} catch (error) {
-		return to_timing(issue_number, failed_report(issue_number, error))
+		return failed_timing(issue_number, error)
 	}
 }
 
@@ -190,6 +211,23 @@ function count_status(rows: ReadonlyArray<RunTiming>, status: RunStatus): number
 	return rows.filter((row) => row.status === status).length
 }
 
+// The two statuses with no duration to print. Asked rather than compared against each one at the call
+// site, so both batch renderers — and both scopes' counts — pick up a sixth status by it being named
+// here rather than by each of them remembering to.
+function has_duration(timing: RunTiming): boolean {
+	return timing.status !== NOT_RUN && timing.status !== FAILED
+}
+
+function count_untimed(rows: ReadonlyArray<RunTiming>): number {
+	return rows.filter((row) => !has_duration(row)).length
+}
+
+// The sentence both scopes say about a `failed` row, written once for the same reason `count_note`'s
+// guard is shared: an epic and a set of runs are counting different things, but this exclusion is the
+// same fact about both, and a drift would leave the two scopes describing one status differently.
+const FAILED_NOTE_TAIL =
+	'could not be measured because the report itself failed to build — each row says why, and the command exits non-zero'
+
 // A count of nothing is not a note. **The unit is a parameter because the two scopes count different
 // things** — an epic counts children, a set of runs counts runs and the merged pull requests it left
 // out — and writing the guard twice for that one word is the duplication `CLAUDE.md` prohibits, in
@@ -205,10 +243,14 @@ const time_batch = {
 	NO_TRANSCRIPT,
 	NOT_MERGED,
 	NOT_RUN,
+	FAILED,
+	FAILED_NOTE_TAIL,
 	status_of,
 	ms_per_turn_of,
 	to_timing,
 	count_status,
+	has_duration,
+	count_untimed,
 	count_note,
 	build_timings,
 }

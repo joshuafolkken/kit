@@ -30,6 +30,9 @@ const HALVES = new Map<RunTiming['status'], Halves>([
 	[time_batch.NO_TRANSCRIPT, { span_count: 0, has_ci_data: true }],
 	[time_batch.NOT_MERGED, { span_count: 2, has_ci_data: false }],
 	[time_batch.NOT_RUN, { span_count: 0, has_ci_data: false }],
+	// A report the batch built for a child whose measurement threw: no spans, no merge — which is why
+	// the status has to be carried rather than derived (joshuafolkken/kit#1352).
+	[time_batch.FAILED, { span_count: 0, has_ci_data: false }],
 ])
 
 const MEASURED_HALVES: Halves = { span_count: 2, has_ci_data: true }
@@ -78,7 +81,9 @@ function child_of(input: ChildInput): RunTiming {
 
 	return {
 		issue_number: input.issue_number,
-		status: time_batch.status_of(report),
+		// The batch carries `failed` rather than deriving it, so the fixture honors an explicit status
+		// too — `HALVES` is what keeps the report from contradicting whichever one is asked for.
+		status: input.status ?? time_batch.status_of(report),
 		ms_per_turn: report.span_count === 0 ? undefined : time_batch.ms_per_turn_of(report),
 		report,
 	}
@@ -104,9 +109,9 @@ function epic_of(
 		categories: time_epic.total_categories(children),
 		has_transcript_data: children.some((child) => child.report.span_count > 0),
 		has_ci_data: children.some((child) => child.report.has_ci_data),
-		timed_count: children.filter((child) => child.status !== time_batch.NOT_RUN).length,
+		timed_count: children.filter((child) => time_batch.has_duration(child)).length,
 		measured_count: children.filter((child) => child.status === time_batch.MEASURED).length,
-		unmeasured_count: children.filter((child) => child.status === time_batch.NOT_RUN).length,
+		unmeasured_count: time_batch.count_untimed(children),
 		trend: time_epic.trend_of(children),
 		notes: [...notes],
 	}
@@ -135,6 +140,9 @@ const READ_FAILED_NOTE = 'the pull request listing could not be read for issue #
 // What the run scope writes for a child whose two sessions ran at the same wall clock.
 const OVERLAP_NOTE =
 	'the shares total 20.0 min over a 12.0 min window — 8.0 min of it wall clock concurrent sessions shared, and every share and phase percentage is of the 20.0 min'
+// What the run scope writes for a child whose merge was read but whose check list was not.
+const CHECK_READ_NOTE =
+	'the CI check list could not be read for issue #101 — the per-check table is empty for that reason, not because there were no checks'
 
 function line_with(text: string, needle: string): string {
 	return text.split('\n').find((line) => line.includes(needle)) ?? ''
@@ -226,6 +234,31 @@ describe('time_epic_report.format_epic_report — why a child is short of a meas
 		// case by matching nothing.
 		expect(time_run.is_overlap_note(OVERLAP_NOTE)).toBe(true)
 		expect(text).toContain(OVERLAP_NOTE)
+	})
+
+	// The second exception, and the one joshuafolkken/kit#1352's second symptom turns on: a child whose
+	// check read was refused *did* read its merge, so the `has_ci_data` filter hid the one sentence
+	// saying its empty per-check table is a refusal rather than a run with no checks.
+	it('prints the refused-check note under a fully measured row', () => {
+		const noted = { ...FIRST_CHILD, report: { ...FIRST_CHILD.report, notes: [CHECK_READ_NOTE] } }
+		const text = time_epic_report.format_epic_report(epic_of([noted]))
+
+		expect(time_run.is_check_read_note(CHECK_READ_NOTE)).toBe(true)
+		expect(text).toContain(CHECK_READ_NOTE)
+	})
+})
+
+// A child whose report could not be built at all. `not run` is what it printed before, which is the
+// answer for a child the batch never reached — a plausible row for a broken measurement.
+describe('time_epic_report.format_epic_report — a report that failed to build', () => {
+	it('prints the child as “failed” rather than as one that was never run', () => {
+		const failed = child_of({ issue_number: 107, status: time_batch.FAILED })
+		const text = time_epic_report.format_epic_report(epic_of([FIRST_CHILD, failed]))
+		const child_row = line_with(text, '#107')
+
+		expect(child_row).toContain(time_batch.FAILED)
+		expect(child_row).not.toContain(time_batch.NOT_RUN)
+		expect(child_row).not.toContain(ZERO_MINUTES)
 	})
 })
 

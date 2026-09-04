@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { time_batch, type RunTiming } from './time-batch'
 import { time_epic } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_last } from './time-last'
@@ -237,8 +238,18 @@ async function run_issue(issue: number | undefined, cwd: string, output: Output)
 	return 0
 }
 
-// An epic's whole batch, child by child. A failure here is the epic itself being unreadable — a
-// child with no run of its own is reported as `not run` inside the table rather than failing it.
+// **A batch holding a row whose report failed to build exits non-zero, and still prints the table**
+// (joshuafolkken/kit#1352). The rows that *were* measured are what the command is run for, so
+// withholding them would trade one silent failure for another; what must not happen is a regression
+// that makes every row throw exiting 0 beneath a table of plausible `not run` lines. A child the batch
+// simply never reached is not this — that is an ordinary answer, and it keeps the exit code at 0.
+function exit_code_of(rows: ReadonlyArray<RunTiming>): number {
+	return time_batch.count_status(rows, time_batch.FAILED) === 0 ? 0 : FAILURE_EXIT_CODE
+}
+
+// An epic's whole batch, child by child. Two things fail here: the epic itself being unreadable, and
+// — since joshuafolkken/kit#1352 — a child whose report could not be built. A child with no run of
+// its own is neither: it is reported as `not run` inside the table and keeps the exit code at 0.
 async function run_epic(epic_number: number, cwd: string, output: Output): Promise<number> {
 	const report = await time_epic.build_epic_report(epic_number, cwd)
 
@@ -252,12 +263,13 @@ async function run_epic(epic_number: number, cwd: string, output: Output): Promi
 
 	print_scope(capped, () => time_epic_report.format_epic_report(capped), output.is_json)
 
-	return 0
+	return exit_code_of(report.children)
 }
 
-// The last N merged runs as a distribution. A failure here is that no merged run could be resolved at
-// all — a run that merged with no transcript attributed is reported as such inside the table rather
-// than failing it, exactly as an epic's child is.
+// The last N merged runs as a distribution. Two things fail here: no merged run could be resolved at
+// all, and — since joshuafolkken/kit#1352 — a run whose report could not be built. A run that merged
+// with no transcript attributed is neither: it is reported as such inside the table, exactly as an
+// epic's child is, and keeps the exit code at 0.
 async function run_last(count: number, cwd: string, output: Output): Promise<number> {
 	const report = await time_last.build_last_report(count, cwd)
 
@@ -271,7 +283,7 @@ async function run_last(count: number, cwd: string, output: Output): Promise<num
 
 	print_scope(capped, () => time_last_report.format_last_report(capped), output.is_json)
 
-	return 0
+	return exit_code_of(report.runs)
 }
 
 async function dispatch(options: Options, cwd: string): Promise<number> {
