@@ -18,6 +18,10 @@ words:
   - pushd
   - popd
   - subshell
+  # How a session that never calls `Edit` or `Write` rewrites a file — the mode the density hook's
+  # matcher was widened to reach (joshuafolkken/kit#1337). Named in `docs/` and in a test file,
+  # neither of which `josh sync` copies, so it stays in this local list.
+  - heredocs
   - dedup
   - keepalive
   - refspec

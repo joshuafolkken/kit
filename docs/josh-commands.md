@@ -162,18 +162,22 @@ pnpm josh format:eslint    # eslint only
 
 ### `josh format:edited`
 
-Format the single file an agent just edited. It is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `PostToolUse` event for the `Edit` and `Write` tools, and Claude Code pipes the tool call to it as JSON on stdin. The command reads `tool_input.file_path` out of that payload and runs `eslint --fix` and then `prettier --write` on that path alone.
+Format the single file an agent just edited, and carry the live round-trip density line. It is not run by hand: `.claude/settings.json`, which this package distributes, wires it to Claude Code's `PostToolUse` event for the `Edit`, `Write` and `Bash` tools, and Claude Code pipes the tool call to it as JSON on stdin. The command reads `tool_input.file_path` out of that payload and runs `eslint --fix` and then `prettier --write` on that path alone.
 
 ```json
 "PostToolUse": [
 	{
-		"matcher": "Edit|Write",
+		"matcher": "Edit|Write|Bash",
 		"hooks": [{ "type": "command", "command": "pnpm josh format:edited", "timeout": 90 }]
 	}
 ]
 ```
 
-The matcher is the plain alternation rather than an anchored regex on purpose: Claude Code treats a matcher built only from letters, digits, `_`, `-`, spaces, `,` and `|` as an exact list of tool names, and reads anything else as an unanchored regular expression. `Edit|Write` therefore names two tools, while `^(Edit|Write)$` would depend on the regex path being available.
+The matcher is the plain alternation rather than an anchored regex on purpose: Claude Code treats a matcher built only from letters, digits, `_`, `-`, spaces, `,` and `|` as an exact list of tool names, and reads anything else as an unanchored regular expression. `Edit|Write|Bash` therefore names three tools, while `^(Edit|Write|Bash)$` would depend on the regex path being available.
+
+**Adding `Bash` is what makes that choice load-bearing, because `Bash` is a prefix of `BashOutput` and the two forms fail in opposite directions.** Should the plain alternation be read as a regex after all, it is unanchored, so `Bash` also matches `BashOutput`: a few extra spawns while a background command is polled, and nothing worse — that payload names no file either, so the formatting half stays a no-op and the density line stays correct. Should the anchored form be read as an exact list, it matches no tool whose name is literally `^(Edit|Write|Bash)$`, which is none — the hook silently stops running and takes the formatting with it. A bounded overspend beats a silent no-op, so the list form stays.
+
+**`Bash` is named for the density line, not for formatting.** A shell payload names a command rather than a file, so the formatting half is a no-op for it and never guesses which path a `sed` line rewrote. Why the tool is in the matcher at all is under the density line below.
 
 **Why a subcommand rather than a shell one-liner in the settings file.** The settings file is copied verbatim into every consumer, so an inline command would be a second copy of this logic in each of them, un-upgradable and untested. As a subcommand the wiring stays one line and the behavior is single-sourced here.
 
@@ -193,7 +197,13 @@ Only paths that prettier has an opinion about are touched (`.ts`, `.tsx`, `.js`,
 
 **It also tells the run how often it is stopping to wait for a tool.** `josh time` has measured a run's round-trip density since [#1304](https://github.com/joshuafolkken/kit/issues/1304), and warns below 1.50 calls per round trip — but only once the run has ended, which is why run #1299 could go on issuing a single call in 159 of its 172 tool-issuing turns with the norm already shipped as prose in `CLAUDE.md`. This hook carries the same number back while there is still a turn left to change ([#1329](https://github.com/joshuafolkken/kit/issues/1329)). It reads the last 256 KB of the transcript Claude Code names in the hook payload, computes the density with the very function `josh time` reports — not a second copy of it — and counts the calls the newest assistant message issued by grouping the transcript lines that share its id, rather than guessing turn boundaries from the gaps between calls.
 
-One line comes back, and only when all four of these hold: the window holds at least ten round trips, the run is under the floor, the turn that just ran issued a single call, and five minutes have passed since the last line. It leaves through `hookSpecificOutput.additionalContext`, because a `PostToolUse` hook's plain stdout never reaches the model — so an ordinary edit still writes nothing at all to stdout. **The measurement rides this hook rather than one of its own**: a `PostToolUse` matcher covering every tool would put a process start in front of all ~250 calls of a run to say something on a handful of them, and editing is where the signal belongs — `Edit` was run #1299's most-called tool at 65 calls, almost all of them alone in their turn. Measured on this repository, the reading adds 1.6 ms at the median to a hook that takes about 0.9 s, which is inside its own run-to-run variance.
+One line comes back, and only when all four of these hold: the window holds at least ten round trips, the run is under the floor, the turn that just ran issued a single call, and five minutes have passed since the last line. It leaves through `hookSpecificOutput.additionalContext`, because a `PostToolUse` hook's plain stdout never reaches the model — so an ordinary edit still writes nothing at all to stdout. **The measurement rides this hook rather than one of its own**: a matcher covering every tool would put a process start in front of all ~250 calls of a run to say something on a handful of them. Measured on this repository, the reading adds 1.6 ms at the median to a hook that takes about 0.9 s, which is inside its own run-to-run variance.
+
+**`Bash` was added to the matcher because the hook was missing the runs the line is for** ([#1337](https://github.com/joshuafolkken/kit/issues/1337)). Riding the edit hook was chosen on run #1299, where `Edit` was the most-called tool at 65 calls — but that run does not represent how these sessions work now. Of the ten most recent in this checkout, **seven called `Edit` and `Write` zero times**: they edit through `sed` and heredocs, and they are the same sessions measured at 1.00–1.31 against the 1.50 floor. The mechanism reached none of them.
+
+The widening was decided on measurement rather than on the obvious repair of naming every tool. One hook run is **0.53 s** here and about 0.4 s in a consumer, and essentially all of it is process startup — a payload naming no transcript costs the same as one that reads 256 KB of it, so bailing out before the read saves nothing measurable. `Bash` accounts for **88–100% of every call** in the seven sessions that were unreachable, so naming it alone reaches every one of them, at 4–67 s per run. Naming every tool on top of that would cost only 0–8 s more across the same ten sessions — the argument against it is not the money but that it buys no reach at all, while putting a process start in front of the read-only calls this hook has nothing to say about. The 256 KB window still holds 23–34 round trips in those sessions, comfortably past the ten the line requires, so it fires rather than merely arriving.
+
+**The matcher decides how often the check runs; the four conditions above decide how often anything is said.** Widening it does not raise the ceiling of one line per five minutes — it moves runs that were emitting none toward the ceiling that was already specified, at roughly 65 tokens a line.
 
 ### `josh cspell`
 

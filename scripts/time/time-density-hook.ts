@@ -7,10 +7,17 @@ import { time_density } from './time-density'
 // of it, and remember when the line was last emitted.
 //
 // **It rides the hook that already runs, and adds no second one.** `.claude/settings.json` wires
-// `pnpm josh format:edited` to `PostToolUse` for `Edit` and `Write`; a matcher covering every tool
-// would put a process start in front of all ~250 calls of a run to say something on a handful of
-// them. Editing is also where the signal belongs — `Edit` was the most-called tool of run #1299 at
-// 65 calls, almost all of them alone in their turn.
+// `pnpm josh format:edited` to `PostToolUse` for `Edit`, `Write` and `Bash`; a matcher covering every
+// tool would put a process start in front of all ~250 calls of a run to say something on a handful of
+// them.
+//
+// **`Bash` is in that list because the edit half was measured missing its audience**
+// (joshuafolkken/kit#1337). Riding the edit hook was chosen on run #1299, where `Edit` was the
+// most-called tool at 65 calls — and that run no longer represents how these sessions work. Of the
+// ten most recent in this checkout, **seven called `Edit` and `Write` zero times**: they edit through
+// `sed` instead, and they are the same sessions measured at 1.00–1.31 against the 1.50 floor, so the
+// line was reaching none of the runs it exists for. `Bash` is 88–100% of their calls, which is why
+// naming it alone reaches all of them and the read-only tools stay off the hook.
 //
 // **Nothing here may fail.** A `PostToolUse` hook runs after the edit has landed and cannot undo it,
 // so a transcript that is missing, unreadable or not JSON at all ends as "no line", exactly as
