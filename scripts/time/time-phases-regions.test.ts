@@ -151,6 +151,45 @@ describe('time_phases.build_phases — the workflow start floors the windows', (
 	})
 })
 
+// The two boundaries the floor was missing when it was first applied to three of the five. It is one
+// root, so they sit together: a floor applied to some of the searches is the same defect surviving
+// in whichever one was left out.
+describe('time_phases.build_phases — the floor reaches every boundary', () => {
+	// A session that merged the previous issue carries that `josh followup`. Without the floor it
+	// closes this run before it opens, and every unphased span answers `post-run` while `setup` and
+	// `wrapup` print a detected `0.0 min`.
+	it('ignores a merge that ran before the workflow opened', () => {
+		const spans = [
+			span(0, 1, { josh_command: MERGE_COMMAND }),
+			span(1, 1, { marker: time_markers.WORKFLOW_MARKER }),
+			span(2, 3),
+			span(5, 2, { marker: time_markers.EDIT_MARKER }),
+		]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect([
+			minutes_of(phases, time_phases.SETUP_PHASE),
+			detected(phases, time_phases.POST_RUN_PHASE),
+		]).toEqual([4, false])
+	})
+
+	// Planning is tested before the regions, so a plan-shaped comment from before the run would
+	// charge the whole pre-run stretch to this run's planning.
+	it('ignores a plan comment posted before the workflow opened', () => {
+		const spans = [
+			span(0, 3, { marker: time_markers.PLAN_MARKER }),
+			span(3, 1, { marker: time_markers.WORKFLOW_MARKER }),
+			span(4, 2, { marker: time_markers.EDIT_MARKER }),
+		]
+		const phases = time_phases.build_phases({ spans, ...NO_CI })
+
+		expect([
+			detected(phases, time_phases.PLAN_PHASE),
+			minutes_of(phases, time_phases.PRE_RUN_PHASE),
+		]).toEqual([false, 3])
+	})
+})
+
 describe('time_phases.build_phases — the regions preserve the totals', () => {
 	// Splitting the remainder four ways must not create or lose a minute, exactly as splitting off
 	// `rework` and `wait` before it must not.

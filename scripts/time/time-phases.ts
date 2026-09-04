@@ -272,9 +272,20 @@ function ends_before(span: Span, start_ms: number | undefined): boolean {
 // and a run whose Issue body was already filled posts no plan comment at all — so the earliest match
 // in such a run sits near the *end*, and everything in front of it would be reported as planning.
 // The condition is also what makes the two windows provably disjoint rather than assumed to be.
-function plan_end_of(spans: ReadonlyArray<Span>, start_ms: number | undefined): number | undefined {
+//
+// **And it has to open after the workflow did**, for the same reason every other boundary takes that
+// floor: a plan-shaped comment written before the keyword was typed sets this ahead of the run, and
+// because planning is tested before the regions, the whole pre-run stretch is then reported as this
+// run's planning while `pre-run` prints a detected `0.0 min` beside it.
+function plan_end_of(
+	spans: ReadonlyArray<Span>,
+	start_ms: number | undefined,
+	floor_ms: number | undefined,
+): number | undefined {
 	const is_plan_marker = (span: Span): boolean =>
-		span.marker === time_markers.PLAN_MARKER && ends_before(span, start_ms)
+		span.marker === time_markers.PLAN_MARKER &&
+		is_after(span, floor_ms) &&
+		ends_before(span, start_ms)
 
 	return first_by(spans, is_plan_marker)?.ended_ms
 }
@@ -306,9 +317,17 @@ function pr_open_of(spans: ReadonlyArray<Span>, start_ms: number | undefined): n
 
 // Where the run stopped being the run. The last merge command's *end* rather than a start, because
 // the merge is work the run did and only what follows it is not.
-function merge_end_of(spans: ReadonlyArray<Span>): number | undefined {
+//
+// **It takes the same floor every other boundary does.** A session that merged the previous issue
+// before this run opened has that `josh followup` in its transcript, and without the floor it closes
+// this run before it starts — every unphased span then answers `post-run`, leaving `setup` and
+// `wrapup` at `0.0 min` and still detected.
+function merge_end_of(
+	spans: ReadonlyArray<Span>,
+	floor_ms: number | undefined,
+): number | undefined {
 	const ends = spans
-		.filter((span) => command_phase(span) === MERGE_PHASE)
+		.filter((span) => command_phase(span) === MERGE_PHASE && is_after(span, floor_ms))
 		.map((span) => span.ended_ms)
 
 	return ends.length === 0 ? undefined : Math.max(...ends)
@@ -340,8 +359,10 @@ function work_start_of(
 // made by whatever the session was doing first would open `implement` ahead of the run — swallowing
 // the whole preceding stretch, reporting `setup` as an empty window that was detected, and leaving
 // `pre-run` at `0.0 min` beside it. The gate and the pull request take the same floor for the same
-// reason, through `?? workflow_start_ms` where their own opening boundary was never found. With no
-// workflow marker at all the floor is `undefined` and every search is exactly what it was.
+// reason, through `?? workflow_start_ms` where their own opening boundary was never found, and so do
+// the plan comment and the merge — **all five, because a floor applied to some of them is the same
+// defect surviving in whichever one was left out**. With no workflow marker at all the floor is
+// `undefined` and every search is exactly what it was.
 // Where a window closes when the boundary that should have closed it was never found: the end of
 // what was measured. Both windows that have such a fallback take it from here, so "a `halfrun` runs
 // its window to the end" is one rule rather than two that could come to disagree.
@@ -359,14 +380,14 @@ function build_windows(spans: ReadonlyArray<Span>): Windows {
 
 	return {
 		workflow_start_ms,
-		plan_end_ms: plan_end_of(spans, work_start_ms),
+		plan_end_ms: plan_end_of(spans, work_start_ms, workflow_start_ms),
 		work_start_ms,
 		implement_start_ms,
 		implement_end_ms: window_end_of(rework_start_ms, spans),
 		rework_start_ms,
 		rework_end_ms: window_end_of(pr_open_ms, spans),
 		pr_open_ms,
-		merge_end_ms: merge_end_of(spans),
+		merge_end_ms: merge_end_of(spans, workflow_start_ms),
 	}
 }
 
