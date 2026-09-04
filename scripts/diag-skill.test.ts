@@ -44,11 +44,27 @@ describe(`${SKILL_PATH} — carries the four steps`, () => {
 	// The measurement is the one thing the skill must not reimplement: a second reader of the
 	// transcripts is a second classification, which is exactly what makes two runs incomparable.
 	it.each([
-		'pnpm josh time --json',
-		'pnpm josh time --issue <N> --json',
+		'pnpm josh time --top 5 --json',
+		'pnpm josh time --issue <N> --top 5 --json',
 		'**Never write a script to read the transcripts, and never restore the timings by eye.**',
 		'It does not measure anything itself.',
 	])('defers the measurement to josh time: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#1301. `--json` carried every row of the per-tool and per-`josh <cmd>` tables, and
+// an epic pays for both once per child — 47.7 KB at nine children, and more than double that by
+// eighteen — all of it read into the context for the handful of rows this skill actually ranks. The
+// cap is part of the call, so the markers pin the flag *and* the two readings that keep a capped
+// table from being mistaken for a complete one.
+describe(`${SKILL_PATH} — caps the two tables it ranks off`, () => {
+	it.each([
+		'**`--top 5` is part of the call, not a nicety**',
+		'**A cut table says so, and that note is not a zero.**',
+		'**Never read a capped table as the whole of what ran.**',
+		'**Drop the flag when the tail is the question.**',
+	])('states %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
 })

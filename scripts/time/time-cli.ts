@@ -5,6 +5,7 @@ import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript
 import { time_epic } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_report, type TimeReport } from './time-report'
+import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
 import { time_spans } from './time-spans'
 
@@ -23,7 +24,8 @@ import { time_spans } from './time-spans'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
-const USAGE = 'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--json]'
+const USAGE =
+	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--top <rows>] [--json]'
 const NO_MERGED_RUN =
 	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
 const ONE_SCOPE = 'Give one of --issue, --session or --epic: they name different things.'
@@ -38,13 +40,22 @@ interface Options {
 	session: string | undefined
 	issue: number | undefined
 	epic: number | undefined
+	// How many rows of the per-tool and per-`josh <cmd>` tables to carry, or `undefined` for all of
+	// them (joshuafolkken/kit#1301). It is not a scope: it narrows whichever scope was asked for.
+	top: number | undefined
 	is_json: boolean
 }
+
+// What `print_scope` needs to know, which is how to render and how much to carry — never which scope
+// produced the payload. Kept as a slice of `Options` rather than a second pair of parameters, so a
+// third output-shaping flag reaches every scope by being added once.
+type Output = Pick<Options, 'top' | 'is_json'>
 
 const PARSE_ARGS_OPTIONS = {
 	session: { type: 'string' },
 	issue: { type: 'string' },
 	epic: { type: 'string' },
+	top: { type: 'string' },
 	json: { type: 'boolean', default: false },
 } as const
 
@@ -68,6 +79,15 @@ interface RawValues {
 	issue?: string
 	session?: string
 	epic?: string
+	top?: string
+}
+
+// The three flags that carry a number, parsed. Grouped so the refusal below asks one question of one
+// record rather than growing a parameter per flag past the four-parameter limit.
+interface ParsedNumbers {
+	issue: number | undefined
+	epic: number | undefined
+	top: number | undefined
 }
 
 // A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
@@ -82,12 +102,11 @@ function named_scopes(values: RawValues): number {
 
 // Naming more than one scope is refused too — they are different questions, and answering one of
 // them silently is the wrong of the two.
-function is_refused(
-	values: RawValues,
-	issue: number | undefined,
-	epic: number | undefined,
-): boolean {
-	if (is_unparsed(values.issue, issue) || is_unparsed(values.epic, epic)) return true
+// `--top 0` and `--top abc` are refused on the same rule the scope numbers are: a cap that did not
+// parse must not quietly become "carry every row", which is the opposite of what was asked for.
+function is_refused(values: RawValues, parsed: ParsedNumbers): boolean {
+	if (is_unparsed(values.issue, parsed.issue) || is_unparsed(values.epic, parsed.epic)) return true
+	if (is_unparsed(values.top, parsed.top)) return true
 
 	return named_scopes(values) > 1
 }
@@ -97,12 +116,15 @@ function is_refused(
 function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	try {
 		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
-		const issue = to_number(values.issue)
-		const epic = to_number(values.epic)
+		const parsed = {
+			issue: to_number(values.issue),
+			epic: to_number(values.epic),
+			top: to_number(values.top),
+		}
 
-		if (is_refused(values, issue, epic)) return undefined
+		if (is_refused(values, parsed)) return undefined
 
-		return { session: values.session, issue, epic, is_json: values.json }
+		return { session: values.session, ...parsed, is_json: values.json }
 	} catch {
 		return undefined
 	}
@@ -152,16 +174,22 @@ function print_scope(payload: unknown, text: () => string, is_json: boolean): vo
 	console.info(is_json ? JSON.stringify(payload, undefined, JSON_INDENT) : text())
 }
 
-function print_report(report: TimeReport, is_json: boolean): void {
-	print_scope(report, () => time_report.format_report(report), is_json)
+// **The cap is applied to the record both outputs are made from, not to one of them.** Printing the
+// whole report as JSON while the text table showed a capped one would make `--top` mean two different
+// things depending on `--json`, and the note that says how many rows were withheld rides in `notes`,
+// which both renderings already print.
+function print_report(report: TimeReport, output: Output): void {
+	const capped = time_row_cap.cap_report(report, output.top)
+
+	print_scope(capped, () => time_report.format_report(capped), output.is_json)
 }
 
-function run_session(session_id: string, cwd: string, is_json: boolean): number {
+function run_session(session_id: string, cwd: string, output: Output): number {
 	const file = pick_session(cwd, session_id)
 
 	if (file === undefined) return report_empty(cwd, session_id)
 
-	print_report(build_session_report(file), is_json)
+	print_report(build_session_report(file), output)
 
 	return 0
 }
@@ -176,11 +204,7 @@ async function build(issue: number | undefined, cwd: string): Promise<TimeReport
 	return await time_run.build_run_report(issue, cwd)
 }
 
-async function run_issue(
-	issue: number | undefined,
-	cwd: string,
-	is_json: boolean,
-): Promise<number> {
+async function run_issue(issue: number | undefined, cwd: string, output: Output): Promise<number> {
 	const report = await build(issue, cwd)
 
 	if (report === undefined) {
@@ -189,14 +213,14 @@ async function run_issue(
 		return FAILURE_EXIT_CODE
 	}
 
-	print_report(report, is_json)
+	print_report(report, output)
 
 	return 0
 }
 
 // An epic's whole batch, child by child. A failure here is the epic itself being unreadable — a
 // child with no run of its own is reported as `not run` inside the table rather than failing it.
-async function run_epic(epic_number: number, cwd: string, is_json: boolean): Promise<number> {
+async function run_epic(epic_number: number, cwd: string, output: Output): Promise<number> {
 	const report = await time_epic.build_epic_report(epic_number, cwd)
 
 	if (report === undefined) {
@@ -205,18 +229,20 @@ async function run_epic(epic_number: number, cwd: string, is_json: boolean): Pro
 		return FAILURE_EXIT_CODE
 	}
 
-	print_scope(report, () => time_epic_report.format_epic_report(report), is_json)
+	const capped = time_row_cap.cap_epic_report(report, output.top)
+
+	print_scope(capped, () => time_epic_report.format_epic_report(capped), output.is_json)
 
 	return 0
 }
 
 async function dispatch(options: Options, cwd: string): Promise<number> {
-	const { session, epic, is_json } = options
+	const { session, epic } = options
 
-	if (session !== undefined) return run_session(session, cwd, is_json)
-	if (epic !== undefined) return await run_epic(epic, cwd, is_json)
+	if (session !== undefined) return run_session(session, cwd, options)
+	if (epic !== undefined) return await run_epic(epic, cwd, options)
 
-	return await run_issue(options.issue, cwd, is_json)
+	return await run_issue(options.issue, cwd, options)
 }
 
 async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
