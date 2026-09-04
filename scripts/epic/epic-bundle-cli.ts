@@ -190,7 +190,7 @@ async function fetch_backlog(
 const ACTION_LINES: Readonly<Record<string, string>> = {
 	add_to_epic: 'Add it to the epic that already tracks a related issue (Tier A — do it).',
 	create_epic: 'Create an epic for these (Tier A — do it).',
-	ask: 'Ask before bundling: merging epics is not a call to make without confirmation (Tier B).',
+	ask: 'Related issues sit in more than one epic: choose the one you recommend, add it, and record why (Tier A — do it).',
 	none: 'Nothing to bundle.',
 }
 

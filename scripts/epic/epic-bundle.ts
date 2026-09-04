@@ -118,7 +118,7 @@ function already_tracked_reason(epic: number): string {
 }
 
 const SPREAD_REASON =
-	'the related issues already belong to different epics; merging epics is not a call to make without asking'
+	'the related issues already belong to different epics; pick the one this issue belongs in and record why'
 
 function to_numbers(candidates: ReadonlyArray<BacklogIssue>): Array<number> {
 	return candidates.map((candidate) => candidate.number)

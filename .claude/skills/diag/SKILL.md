@@ -160,7 +160,8 @@ pnpm josh issue:scout "<title>" --body "<one line, citing the issue this follows
 - **Pass `--body`.** The epic half decides from the issue numbers the summary names, so a title-only
   call answers `Epic: not asked`, which is not `Epic: none`.
 - **`Epic:` is the placement**, and `add_to_epic` / `create_epic` are Tier A: execute them with
-  `pnpm josh epic --add` / `pnpm josh epic`, never by hand-editing an epic body. `ask` stops.
+  `pnpm josh epic --add` / `pnpm josh epic`, never by hand-editing an epic body. `ask` is Tier A too —
+  choose the epic you recommend and record why.
 - Filing is Tier A only for a first-party target — an owner equal to this repository's. A
   third-party tracker is Tier C and is not written to here (`CLAUDE.md` → "Third-party repositories
   are Tier C").
