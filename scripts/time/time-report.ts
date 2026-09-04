@@ -29,6 +29,9 @@ const PHASE_HEADING = 'By phase (in run order):'
 const ROUND_TRIP_HEADING = 'Round trips:'
 const CALLS_LABEL = 'tool calls'
 const TRIPS_LABEL = 'round trips'
+// What one of those trips cost. The label says `cost` rather than `elapsed` because the row is read
+// as a unit price — the thing a proposed cut is multiplied by (joshuafolkken/kit#1307).
+const COST_LABEL = 'cost per round trip'
 // The unit the density and its floor are both quoted in, written once so the row and the warning
 // beneath it cannot come to name it differently.
 const PER_ROUND_TRIP = 'calls per round trip'
@@ -84,6 +87,15 @@ interface TimeReport {
 	// aggregation reads several runs' reports.
 	tool_call_count: number
 	round_trip_count: number
+	// What one round trip cost, and how much of that was the model composing the turn that issued it
+	// (joshuafolkken/kit#1307). The counts above say how often a run went round; only these say what
+	// cutting one of them is worth, which is what lets the round trips be *ranked* against the slowest
+	// command rather than merely noticed beside it. **Neither is a share of `elapsed_ms`** — both are
+	// built from the issuing model time and the tool execution alone, so the price stays what a round
+	// trip costs rather than what the run did while one was outstanding. Zero where there was no round
+	// trip to divide by — the withheld answer the counts themselves give, never a measured zero.
+	ms_per_round_trip: number
+	model_ms_per_round_trip: number
 	categories: CategoryTotals
 	// Whether the GitHub half was read at all. A session report has no pull request, so printing a
 	// `CI wait 0.0 min` row there would assert a measurement nobody made.
@@ -158,43 +170,71 @@ function to_iso(timestamp_ms: number): string {
 	return timestamp_ms === 0 ? '' : new Date(timestamp_ms).toISOString()
 }
 
-// **Elapsed is the sum of the four shares, not the window's length.** For one session the two are
-// the same, because its spans tile its window exactly. For a run they are not: two sessions with a
-// day between them leave real time that belonged to nobody, and counting it as elapsed would report
-// a run as a day long. So the header states what was accounted for, and `started_at` / `ended_at`
-// still carry the wall window a reader can check it against.
-// The two counts the round-trip block reads, taken together because they are one question asked at
-// two grains: how many calls, and how many times the run stopped for them.
-function round_trip_totals(
-	spans: ReadonlyArray<Span>,
-): Pick<TimeReport, 'round_trip_count' | 'tool_call_count'> {
+function category_totals(spans: ReadonlyArray<Span>, ci_ms: number): CategoryTotals {
 	return {
-		tool_call_count: time_round_trips.count_calls(spans),
-		round_trip_count: time_round_trips.count_round_trips(spans),
-	}
-}
-
-function build_from_spans(input: ReportInput): TimeReport {
-	const { spans, ci_ms } = input
-	const categories = {
 		model_ms: category_ms(spans, time_spans.MODEL_CATEGORY),
 		tool_ms: category_ms(spans, time_spans.TOOL_CATEGORY),
 		human_ms: category_ms(spans, time_spans.HUMAN_CATEGORY),
 		ci_ms,
 	}
+}
+
+// The four figures a reader takes as counts rather than durations: how many spans were read, how many
+// turns they sat in, how many calls went out, and how many times the run stopped for them. Grouped
+// because the last two are one question asked at two grains, and the first two are what the report
+// already divided per-turn figures by.
+function span_counts(
+	spans: ReadonlyArray<Span>,
+): Pick<TimeReport, 'span_count' | 'turn_count' | 'tool_call_count' | 'round_trip_count'> {
+	return {
+		span_count: spans.length,
+		turn_count: of_category(spans, time_spans.MODEL_CATEGORY).length,
+		tool_call_count: time_round_trips.count_calls(spans),
+		round_trip_count: time_round_trips.count_round_trips(spans),
+	}
+}
+
+// **The price of one round trip — the half that turns the count into a saving one can rank**
+// (joshuafolkken/kit#1307). **The numerator is what a round trip is made of, not the run's whole
+// elapsed time**: the model time of the turns that issued the trips, plus the tool execution they
+// waited on. Human wait and CI wait are in neither, because a round trip does not cause them and a
+// price that folded them in would be multiplied out as a saving and then counted a second time
+// against the `wait` and `ci` rows of the very table it was carried into.
+function per_round_trip_costs(
+	spans: ReadonlyArray<Span>,
+	tool_ms: number,
+	round_trip_count: number,
+): Pick<TimeReport, 'ms_per_round_trip' | 'model_ms_per_round_trip'> {
+	const model_ms = time_round_trips.issuing_model_ms(spans)
+
+	return {
+		ms_per_round_trip: time_round_trips.per_round_trip(model_ms + tool_ms, round_trip_count),
+		model_ms_per_round_trip: time_round_trips.per_round_trip(model_ms, round_trip_count),
+	}
+}
+
+// **Elapsed is the sum of the four shares, not the window's length.** For one session the two are
+// the same, because its spans tile its window exactly. For a run they are not: two sessions with a
+// day between them leave real time that belonged to nobody, and counting it as elapsed would report
+// a run as a day long. So the header states what was accounted for, and `started_at` / `ended_at`
+// still carry the wall window a reader can check it against.
+function build_from_spans(input: ReportInput): TimeReport {
+	const { spans, ci_ms, has_ci_data } = input
+	const categories = category_totals(spans, ci_ms)
+	const elapsed_ms = categories.model_ms + categories.tool_ms + categories.human_ms + ci_ms
+	const counts = span_counts(spans)
 
 	return {
 		scope: input.scope,
 		started_at: to_iso(input.started_ms),
 		ended_at: to_iso(input.ended_ms),
-		elapsed_ms: categories.model_ms + categories.tool_ms + categories.human_ms + ci_ms,
-		span_count: spans.length,
-		turn_count: of_category(spans, time_spans.MODEL_CATEGORY).length,
-		...round_trip_totals(spans),
+		elapsed_ms,
+		...counts,
+		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
 		categories,
-		has_ci_data: input.has_ci_data,
+		has_ci_data,
 		notes: [...input.notes],
-		phases: time_phases.build_phases({ spans, ci_ms, has_ci_data: input.has_ci_data }),
+		phases: time_phases.build_phases({ spans, ci_ms, has_ci_data }),
 		by_tool: totals_by(spans, (span) => span.label),
 		by_josh_command: totals_by(spans, (span) => span.josh_command),
 		by_check: [...input.by_check],
@@ -286,13 +326,30 @@ function density_text(density: number): string {
 	return `${time_round_trips.format_density(density)} ${PER_ROUND_TRIP}`
 }
 
+// **A count nobody priced cannot be ranked** (joshuafolkken/kit#1307). Forty round trips is a
+// number; forty at twelve seconds each is eight minutes, which is what a proposed cut is weighed
+// against the slowest command with. The model share rides in the suffix because it is the part
+// batching actually removes — a tool's own execution is paid whichever turn it is issued from.
+//
+// **Withheld on the density, not on a second test of its own.** A density of zero means there was no
+// round trip to divide by, so the unit price has nothing behind it either — deciding that twice would
+// let the two rows come to disagree about what was measured.
+function cost_line(report: TimeReport, density: number): string {
+	if (density === NO_DENSITY) return format_columns(COST_LABEL, '', NO_CALLS)
+
+	const model_cost = `${MODEL_LABEL} ${format_seconds(report.model_ms_per_round_trip)}`
+
+	return format_columns(COST_LABEL, format_seconds(report.ms_per_round_trip), model_cost)
+}
+
 function measured_round_trip_lines(report: TimeReport): Array<string> {
 	const { tool_call_count, round_trip_count, turn_count } = report
-	const density = time_round_trips.calls_per_round_trip(tool_call_count, round_trip_count)
+	const density = time_round_trips.per_round_trip(tool_call_count, round_trip_count)
 
 	return [
 		format_columns(CALLS_LABEL, String(tool_call_count), `over ${String(turn_count)} turn(s)`),
 		format_columns(TRIPS_LABEL, String(round_trip_count), density_text(density)),
+		cost_line(report, density),
 		...batching_warning_lines(density),
 	]
 }
@@ -304,7 +361,9 @@ function round_trip_lines(report: TimeReport): Array<string> {
 	const heading = ['', ROUND_TRIP_HEADING]
 
 	if (!time_spans.has_transcript_data(report.span_count)) {
-		return [...heading, unmeasured_row(CALLS_LABEL), unmeasured_row(TRIPS_LABEL)]
+		const rows = [CALLS_LABEL, TRIPS_LABEL, COST_LABEL].map((label) => unmeasured_row(label))
+
+		return [...heading, ...rows]
 	}
 
 	return [...heading, ...measured_round_trip_lines(report)]
@@ -401,6 +460,7 @@ const time_report = {
 	ROUND_TRIP_HEADING,
 	CALLS_LABEL,
 	TRIPS_LABEL,
+	COST_LABEL,
 	PER_ROUND_TRIP,
 	NO_CALLS,
 	BATCHING_WARNING,
