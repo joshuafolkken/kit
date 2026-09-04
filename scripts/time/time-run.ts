@@ -136,6 +136,10 @@ function idle_note(gap_ms: number, span_ms: number): string {
 // the accounted total, and once that total exceeds the window a reader who assumes the window is the
 // denominator is ranking the phases against a number the report never used.
 //
+// **The sentence names no direction**, because the run scope prints it above the tables and `--epic`
+// prints it indented under the child's row — "the shares below" would send an `--epic` reader looking
+// beneath it for shares that sit on the line above.
+//
 // The excess is derived from the same two quantities the sentence prints rather than passed in, so
 // it can never name some third figure. Each of the three is rounded to a tenth on its own, so the
 // printed excess can sit a tenth off the difference of the printed pair — `--issue 1299` prints
@@ -145,7 +149,7 @@ function overlap_note(span_ms: number, elapsed_ms: number): string {
 	const accounted = time_report.format_minutes(elapsed_ms)
 	const shared = `${time_report.format_minutes(elapsed_ms - span_ms)} of it ${OVERLAP_MARK}`
 
-	return `the shares below total ${accounted} over a ${time_report.format_minutes(span_ms)} window — ${shared}, and every share and phase percentage is of the ${accounted}`
+	return `the shares total ${accounted} over a ${time_report.format_minutes(span_ms)} window — ${shared}, and every share and phase percentage is of the ${accounted}`
 }
 
 // **The two directions are one question asked with the sign kept.** Only the first was answered

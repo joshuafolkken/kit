@@ -128,7 +128,7 @@ const FLAT_LINE = 'flat across 2 children'
 const READ_FAILED_NOTE = 'the pull request listing could not be read for issue #106'
 // What the run scope writes for a child whose two sessions ran at the same wall clock.
 const OVERLAP_NOTE =
-	'the shares below total 20.0 min over a 12.0 min window — 8.0 min of it wall clock concurrent sessions shared, and every share and phase percentage is of the 20.0 min'
+	'the shares total 20.0 min over a 12.0 min window — 8.0 min of it wall clock concurrent sessions shared, and every share and phase percentage is of the 20.0 min'
 
 function line_with(text: string, needle: string): string {
 	return text.split('\n').find((line) => line.includes(needle)) ?? ''
