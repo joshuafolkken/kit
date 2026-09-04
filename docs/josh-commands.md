@@ -1784,6 +1784,73 @@ By CI check (descending by median, jobs overlap):
 
 **Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the flags that pick a scope, and naming more than one of `--issue` / `--session` / `--epic` / `--last` is refused rather than answered silently. `--last` with no merged run to resolve exits non-zero too, rather than printing a distribution of zeroes. An epic that could not be read exits non-zero too — an epic that tracks no children is a real, empty answer and says so instead. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row unless `--top <rows>` asks for fewer, which says how many it withheld in a note rather than stopping silently.
 
+### `josh layers`
+
+List the checks that run in more than one verification layer, read from this project's own
+configuration.
+
+```bash
+pnpm josh layers          # alias: josh ly
+pnpm josh layers --json   # every row, for a script or another report
+pnpm josh layers --root <path>
+```
+
+```
+Verification layers — 5 read: gate, pre-commit, commit-msg, pre-push, ci
+
+  Repeated across layers
+  cspell                   3 layers   gate (project) · pre-commit (staged) · ci (project)
+  eslint                   3 layers   gate (project) · pre-commit (staged) · ci (project)
+  prettier                 3 layers   gate (project) · pre-commit (staged) · ci (project)
+  type-check               3 layers   gate (project) · pre-commit (project) · ci (project)
+  unit-tests               3 layers   gate (project) · pre-push (project) · ci (project)
+  dependency-audit         2 layers   pre-push (project) · ci (project)
+  dependency-install       2 layers   pre-push (project) · ci (project)
+
+  One layer only
+  branch-guard              1 layer   pre-commit (project)
+  …
+```
+
+**It is not part of `josh time`, and that is a design decision rather than an omission**
+(joshuafolkken/kit#1313, under epic joshuafolkken/kit#1315). `josh time` reads Claude Code's session
+transcripts, and this repetition is invisible there in principle: a hook's seconds are buried inside
+`josh git`'s 33–39 seconds, and CI's appear only as a per-check duration with nothing to compare
+them against. Saying which check runs in which layer needs the configuration files, which is a
+different reading of a different source.
+
+**Nothing here is written down as today's answer.** The four sources are re-read on every run: the
+gate's checks come from `gate-plan.ts`, which is `josh gate`'s own declaration of what it runs;
+`lefthook.yml` is followed through its `extends` list, so the kit-internal file and the distributed
+`lefthook/base.yml` are both read; every hook section carrying `commands` or `setup` becomes a
+layer, so a hook added tomorrow is picked up without editing anything; and CI is every job of every
+workflow a **pull request** triggers — a `push`-only workflow runs after the merge and is not
+something a run waits for.
+
+**The scope column is what says how much of a repeat is really the same work.** A hook command
+carrying one of lefthook's file-list placeholders — `{staged_files}`, `{push_files}`, `{files}` —
+sees only the files the hook handed it and is reported as `staged`; everything else, `{all_files}`
+included, is `project`. That is how kit's pre-commit `tsc --noEmit` shows up as a whole-project type
+check sitting beside four staged-only ones.
+
+**Not every repeated row is a check to remove**, which is the other half of reporting rather than
+deciding. `dependency-install` repeats between the pre-push `setup` and CI's install step and is
+supposed to: `lefthook/base.yml` records at length (joshuafolkken/kit#813) why that barrier exists.
+The row is there because it is real repeated work, not because it is a candidate.
+
+**`--root` points the hook and workflow readers at another checkout; the gate layer still comes from
+the `josh` that is running.** That is the right answer wherever `josh layers` is run inside the
+project it is reporting on — the installed kit _is_ that project's gate — and it is worth knowing
+before reading a report produced by pointing kit's own checkout at somewhere else.
+
+**A `josh` sub-command it cannot resolve is reported, not dropped.** The name appears in an
+`unresolved josh commands:` note, so a hook rewired to a new target surfaces as a name to classify
+rather than vanishing out of the table with nothing to say it had.
+
+**It reports and changes nothing.** Which repeats are worth removing is a decision about what a hook
+should guard — a red pre-push suite still catches what a local gate was never run for — so this
+command puts the list in front of whoever makes that decision and stops there.
+
 ### `josh eval`
 
 Run the agent rule-compliance scenarios and report how many held.
