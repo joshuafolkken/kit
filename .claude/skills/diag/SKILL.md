@@ -111,6 +111,46 @@ un-started issue is usually the highest-priority action in the table** — it ne
 only a run — and a table that hides it reports the backlog as emptier than it is and re-proposes the
 same work a week later.
 
+**Enumerate the backlog before ranking it — never from memory.** The rule above says an un-started
+issue usually ranks highest and said nothing about how to find one, so the candidate set came from
+whatever that session happened to remember: the 2026-09-04 run left #1226, #1170, #1095 and #1102 out
+of its table, and a report written by hand from the same run carried all four
+(joshuafolkken/kit#1308). One listing, run every time, is what makes two `diag` reports comparable at
+all.
+
+```bash
+gh api --paginate "repos/{owner}/{repo}/issues?state=open&per_page=100" \
+  --jq '.[] | select(.pull_request | not) | "\(.number)\t\(.title)"'
+```
+
+- **It lists every open issue, and that breadth is the point.** `select(.pull_request | not)` drops
+  the pull requests the REST issues endpoint returns beside them, and nothing else is filtered here.
+  `--paginate` reads to the end on purpose — a listing that stopped early is the miss this step
+  exists to prevent — at one request per hundred rows, which that endpoint counts issues and open
+  pull requests together for. It is `gh api` rather than `gh issue list` because that one goes
+  through GraphQL, which a cloud session is refused — the same reason `pnpm josh issue:state` exists.
+- **It is the one GitHub call this skill makes by hand, and that is deliberate.** No `josh` command
+  enumerates a whole backlog: `issue:state` reads issues you already have the numbers for, and the
+  prohibition printed beside it is about deciding `OPEN` / `in-progress` by eye rather than about
+  listing. kit's own code does not repeat the call either — `scripts/git/git-gh-issue-list.ts`
+  single-sources this same endpoint for its callers, so a command that one day replaces the line
+  above is built on that helper rather than as a second copy of it.
+- **An epic's child is an ordinary issue and appears on its own row.** #1170 sat inside epic #1153
+  and is in this listing exactly as an unattached issue is, so there is no second enumeration to run
+  for the children. **An epic is an issue too** — #1095 and #1102 are rows of their own; rank an epic
+  where its children are the work, and never drop a row for being one. The one thing the listing does
+  not reach is a child in **another** repository, written `owner/repo#N` in an epic body. `gh api`
+  takes no repository flag, so name that repository in the path itself —
+  `repos/<owner>/<name>/issues?state=open&per_page=100` — exactly as
+  `pnpm josh issue:state <N> --repo <owner/repo>` names it for the state read.
+- **It enumerates; it does not read state.** The listing says which issues exist, and
+  `pnpm josh issue:state` below says what state each one is in — never classify a row from the number
+  and title this prints.
+- **Narrow by reading the titles, then say what you narrowed to.** Report how many open issues the
+  listing returned and which numbers you carried into the table. That one line is what lets a later
+  reader re-run the command above and see whether a row was missed — the check this step exists to
+  make possible.
+
 | State | What the row prints |
 | --- | --- |
 | Un-filed | The proposal, and the estimated saving. Go to step 4 |
@@ -122,6 +162,10 @@ same work a week later.
 and pass the whole table's numbers in one call.** One call per row costs a process start and a round
 trip each, about 1.6 seconds a row, so a five-row table spent about eight seconds on nothing but its
 states; one call reads them all at once (joshuafolkken/kit#1302).
+
+**Pass the numbers the enumeration above kept**, plus any issue step 2 re-measured — that one has
+shipped, so a `state=open` listing never carries it and the `Done` row would go unfilled. A row whose
+state was never read cannot be placed in the table above at all.
 
 ```bash
 pnpm josh issue:state 1262 1222 1176
