@@ -1,8 +1,10 @@
 import { time_checks, type CheckTotal } from './time-checks'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
+import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_round_trips } from './time-round-trips'
+import { time_segments, type Segment } from './time-segments'
 import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
 
 // Aggregating timed spans into the report a person reads (joshuafolkken/kit#1267).
@@ -11,12 +13,14 @@ import { time_spans, type Span, type SpanCategory, type Timeline } from './time-
 // breakdown slices the same array by boundary, and an epic aggregation concatenates several
 // sessions' arrays before calling this. Neither needs a second aggregator.
 
-const MAX_ROWS = 15
 const NOT_DETECTED = 'not detected'
 // The column and number formatting moved to `time-format.ts` when the failure block became a third
 // renderer sharing it (joshuafolkken/kit#1309). It is re-exported below under the names it always
 // had, so `time-epic-report.ts` and `time-run.ts` keep laying their rows out through one set of
 // widths rather than acquiring a second.
+// `MAX_ROWS` and its overflow note moved there too when the segment and per-invocation tables became
+// the fourth and fifth renderers needing them (joshuafolkken/kit#1311): both are imported *by* this
+// file, so neither could reach back for a cap that lived here.
 const { format_minutes, format_seconds, format_share, format_columns, format_row, unmeasured_row } =
 	time_format
 const PHASE_HEADING = 'By phase (in run order):'
@@ -111,8 +115,16 @@ interface TimeReport {
 	// (joshuafolkken/kit#1269). Every span lands in exactly one phase and the CI share is its own, so
 	// these sum to `elapsed_ms` — `other` is what keeps that true rather than being discarded.
 	phases: Array<PhaseTotal>
+	// The same elapsed time again, this time as the stretches it was spent in rather than as totals
+	// (joshuafolkken/kit#1311). Every span lands in exactly one segment, so these sum to the three
+	// transcript shares — the phase table's total without the CI share, which no span covers.
+	segments: Array<Segment>
 	by_tool: Array<LabelTotal>
 	by_josh_command: Array<LabelTotal>
+	// One row per command that was called more than once, carrying each call's own duration
+	// (joshuafolkken/kit#1311). The two tables above say what a command cost in total; only this says
+	// whether its calls were getting longer.
+	by_invocation: Array<InvocationTotal>
 	// One row per CI job, carrying what it concluded and how far its finish sat from the merge
 	// (joshuafolkken/kit#1310). Built by `time-checks.ts`, which is also what renders the third column.
 	by_check: Array<CheckTotal>
@@ -246,8 +258,10 @@ function build_from_spans(input: ReportInput): TimeReport {
 		has_ci_data,
 		notes: [...input.notes],
 		phases: time_phases.build_phases({ spans, ci_ms, has_ci_data }),
+		segments: time_segments.build_segments(spans),
 		by_tool: totals_by(spans, (span) => span.label),
 		by_josh_command: totals_by(spans, (span) => span.josh_command),
+		by_invocation: time_invocations.build_invocations(spans),
 		by_check: [...input.by_check],
 		failures: time_failures.build_failures(spans),
 	}
@@ -377,23 +391,6 @@ function category_lines(report: TimeReport): Array<string> {
 	]
 }
 
-// Capped, because a long run touches thirty-odd distinct leading commands and a table that long is
-// read by nobody. `--json` carries every row this report holds, so the display cap costs a caller
-// nothing.
-//
-// **The parenthetical says "this report" rather than "them all"** (joshuafolkken/kit#1301): since
-// `--top` can cut the record itself before either rendering, a promise that `--json` carries every
-// row *there ever was* would be false beside a `--top` above this display cap — and the report would
-// then contradict its own truncation note. What was cut from the record, if anything, is said in
-// `notes`; what is cut from this table is said here.
-function overflow_line(row_count: number): Array<string> {
-	if (row_count <= MAX_ROWS) return []
-
-	return [
-		`  … and ${String(row_count - MAX_ROWS)} more (--json carries every row this report holds)`,
-	]
-}
-
 // What the per-tool and per-`josh <cmd>` tables put in their third column: how many calls the row
 // totals. The check table answers something else entirely, which is why the column is a parameter.
 function call_suffix(row: LabelTotal): string {
@@ -408,10 +405,10 @@ function total_lines<Row extends RowTotal>(
 	if (rows.length === 0) return []
 
 	const shown = rows
-		.slice(0, MAX_ROWS)
+		.slice(0, time_format.MAX_ROWS)
 		.map((row) => format_row(row.label, row.duration_ms, suffix_of(row)))
 
-	return ['', heading, ...shown, ...overflow_line(rows.length)]
+	return ['', heading, ...shown, ...time_format.overflow_line(rows.length)]
 }
 
 // A table of zeroes reads as "this run took no time", which is never true. A session with no timed
@@ -442,6 +439,7 @@ function format_report(report: TimeReport): string {
 		'Where the wall clock went:',
 		...category_lines(report),
 		...phase_lines(report),
+		...time_segments.segment_lines(report.segments),
 		...round_trip_lines(report),
 		...time_failures.failure_lines(
 			report.failures,
@@ -450,13 +448,14 @@ function format_report(report: TimeReport): string {
 		),
 		...total_lines('By tool (descending):', report.by_tool, call_suffix),
 		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
+		...time_invocations.invocation_lines(report.by_invocation),
 		...total_lines(time_checks.CHECK_HEADING, report.by_check, time_checks.check_suffix),
 		...time_checks.merge_wait_lines(report.by_check),
 	].join('\n')
 }
 
 const time_report = {
-	MAX_ROWS,
+	MAX_ROWS: time_format.MAX_ROWS,
 	NOT_DETECTED,
 	NOT_MEASURED: time_format.NOT_MEASURED,
 	PHASE_HEADING,

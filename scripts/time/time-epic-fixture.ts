@@ -44,7 +44,14 @@ const ZERO_COUNTS = {
 
 type Breakdown = Pick<
 	TimeReport,
-	'notes' | 'phases' | 'by_tool' | 'by_josh_command' | 'by_check' | 'failures'
+	| 'notes'
+	| 'phases'
+	| 'by_tool'
+	| 'by_josh_command'
+	| 'segments'
+	| 'by_invocation'
+	| 'by_check'
+	| 'failures'
 >
 
 // Fresh arrays per report rather than one shared set: a case that appends to a report's notes would
@@ -53,8 +60,10 @@ function empty_breakdown(): Breakdown {
 	return {
 		notes: [],
 		phases: [],
+		segments: [],
 		by_tool: [],
 		by_josh_command: [],
+		by_invocation: [],
 		by_check: [],
 		failures: { ...time_failures.NO_FAILURES },
 	}

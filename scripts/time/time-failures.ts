@@ -1,3 +1,4 @@
+import { time_command_key } from './time-command-key'
 import { time_format } from './time-format'
 import { time_round_trips } from './time-round-trips'
 import { time_spans, type Span, type SpanOutcome } from './time-spans'
@@ -51,27 +52,14 @@ const HEADING = 'Failure re-runs:'
 const FAILED_LABEL = 'failed calls'
 const RERUN_LABEL = 're-run after failure'
 const UNREADABLE_SUFFIX = 'outcome unreadable'
-// The key a call the transcript could not name gets. It is never looked up, so no two of them meet.
-const UNCHAINED_KEY = ''
 const NONE = 0
 
-// What a repeat is judged the same as. The josh subcommand where there is one, because `Bash: pnpm`
-// alone would put `josh gate` and `josh lint` in one chain and call the second a re-run of the first.
-//
-// **A call the transcript could not name is in no chain at all.** `time_spans` labels a result whose
-// `tool_use` line was never written `unknown`, and every such call would otherwise share one key — so
-// a failed unmatched call would arm it and the next unmatched call, a different tool entirely, would
-// be charged as its re-run. It is still *counted*: it failed, and the count is about the run rather
-// than about any one command. `UNCHAINED_KEY` is what `state_of` reads to leave it out of the chain.
-//
-// **A coarse label chains more than a command.** `Read` and `Bash: git` are one key each, so a failed
-// read of a missing path followed by an unrelated read is counted as rework. That is the same
-// granularity `by_tool` already reports at, and narrowing it would need the call's input, which a span
-// does not keep.
+// What a repeat is judged the same as — `time-command-key.ts`'s rule, shared with the per-invocation
+// listing since joshuafolkken/kit#1311 rather than restated here. An unnamed call is in no chain at
+// all: it is still *counted*, because it failed and the count is about the run rather than about any
+// one command, but `did_command_fail` reads the empty key and leaves it out of the chain.
 function key_of(span: Span): string {
-	if (span.label === time_spans.UNKNOWN_TOOL) return UNCHAINED_KEY
-
-	return span.josh_command === '' ? span.label : span.josh_command
+	return time_command_key.command_key(span)
 }
 
 function is_tool(span: Span): boolean {
@@ -123,7 +111,7 @@ interface Chain {
 // Asked here rather than in the loop, so the unnamed call stays inside the counts and outside the
 // chain — the pair of answers it needs.
 function did_command_fail(chain: Chain, key: string): boolean {
-	if (key === UNCHAINED_KEY) return false
+	if (key === time_command_key.UNNAMED_KEY) return false
 
 	return chain.failed_commands.get(key) === true
 }

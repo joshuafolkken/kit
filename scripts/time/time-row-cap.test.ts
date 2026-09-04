@@ -3,9 +3,11 @@ import type { CheckTotal } from './time-checks'
 import { time_cli } from './time-cli'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
+import type { InvocationTotal } from './time-invocations'
 import type { LabelTotal, TimeReport } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
+import type { Segment } from './time-segments'
 
 // The cap as a module and as the flag that reaches it, in one suite (joshuafolkken/kit#1301). The
 // command tests sit here rather than in `time-cli.test.ts` so the tables a cut report is built from
@@ -18,6 +20,10 @@ const EPIC = 1262
 const CWD = '/Users/someone/Development/kit'
 const TOOL_ROWS = 5
 const JOSH_ROWS = 3
+// The two tables joshuafolkken/kit#1311 added, sized between the other two so a cap equal to one of
+// them still cuts the others — which is what the boundary case below reads.
+const SEGMENT_ROWS = 4
+const INVOCATION_ROWS = 3
 const CAP = 2
 const SESSION_NOTE = '1 session(s)'
 const WITHHELD = 'withheld by --top'
@@ -41,6 +47,38 @@ function check_rows(count: number): Array<CheckTotal> {
 	}))
 }
 
+// The segment table is in run order rather than descending, so the cut has to rank the rows itself.
+// The **last** segment is the longest here, which is what makes the assertion below meaningful: a cut
+// that took the first rows would drop exactly the end of the run `diag` ranks the merge against.
+const LONG_SEGMENT_MINUTES = 3
+
+function segment_rows(count: number): Array<Segment> {
+	return Array.from({ length: count }, (_unused, index) => ({
+		phase: 'implement' as const,
+		started_ms: index * MINUTE_MS,
+		ended_ms: (index + 1) * MINUTE_MS,
+		duration_ms: (index === count - 1 ? LONG_SEGMENT_MINUTES : 1) * MINUTE_MS,
+		lead_label: `segment-${String(index)}`,
+	}))
+}
+
+// What a cut of `CAP` keeps: the longest segment, and the first of the rows tied behind it, put back
+// in the order the run made them.
+function kept_segments(): Array<Segment> {
+	const all = segment_rows(SEGMENT_ROWS)
+
+	return all.filter((row) => row.lead_label === 'segment-0' || row.lead_label === 'segment-3')
+}
+
+function invocation_rows(count: number): Array<InvocationTotal> {
+	return Array.from({ length: count }, (_unused, index) => ({
+		label: `call-${String(index)}`,
+		duration_ms: (count - index) * MINUTE_MS,
+		call_count: 2,
+		durations_ms: [MINUTE_MS, MINUTE_MS],
+	}))
+}
+
 function report(notes: ReadonlyArray<string> = []): TimeReport {
 	return {
 		scope: `issue #${String(ISSUE)}`,
@@ -57,8 +95,10 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		has_ci_data: false,
 		notes: [...notes],
 		phases: [],
+		segments: segment_rows(SEGMENT_ROWS),
 		by_tool: rows(TOOL_ROWS, 'tool'),
 		by_josh_command: rows(JOSH_ROWS, 'josh'),
+		by_invocation: invocation_rows(INVOCATION_ROWS),
 		by_check: check_rows(JOSH_ROWS),
 
 		failures: { ...time_failures.NO_FAILURES },
@@ -88,6 +128,17 @@ function tool_note(kept: number): string {
 	return time_row_cap.truncation_note(time_row_cap.TOOL_TABLE, kept, TOOL_ROWS)
 }
 
+// Every note a cut of `CAP` produces, in the order the tables are cut — written once so the two
+// suites below assert against the same list rather than two that could drift apart.
+function all_notes(kept: number): Array<string> {
+	return [
+		tool_note(kept),
+		time_row_cap.truncation_note(time_row_cap.JOSH_TABLE, kept, JOSH_ROWS),
+		time_row_cap.truncation_note(time_row_cap.SEGMENT_TABLE, kept, SEGMENT_ROWS),
+		time_row_cap.truncation_note(time_row_cap.INVOCATION_TABLE, kept, INVOCATION_ROWS),
+	]
+}
+
 describe('time_row_cap.cap_report — no cap', () => {
 	// The acceptance criterion the option is written around: a call that names no cap has to produce
 	// exactly what the command produced before this module existed.
@@ -102,6 +153,8 @@ describe('time_row_cap.cap_report — no cap', () => {
 
 		expect(capped.by_tool).toHaveLength(TOOL_ROWS)
 		expect(capped.by_josh_command).toHaveLength(JOSH_ROWS)
+		expect(capped.segments).toHaveLength(SEGMENT_ROWS)
+		expect(capped.by_invocation).toHaveLength(INVOCATION_ROWS)
 		expect(capped.notes).toEqual([SESSION_NOTE])
 	})
 })
@@ -114,16 +167,21 @@ describe('time_row_cap.cap_report — a cap that cuts', () => {
 		expect(capped.by_josh_command.map((row) => row.label)).toEqual(['josh-0', 'josh-1'])
 	})
 
+	// The segment table is the run's own order, so a cut has to rank before it slices — otherwise the
+	// end of the run goes, which is the half `diag` reads the merge and the CI wait out of.
+	it('keeps the longest segments, in run order, and the heaviest invocation rows', () => {
+		const capped = time_row_cap.cap_report(report(), CAP)
+
+		expect(capped.segments.map((row) => row.lead_label)).toEqual(['segment-0', 'segment-3'])
+		expect(capped.by_invocation.map((row) => row.label)).toEqual(['call-0', 'call-1'])
+	})
+
 	// A table that silently stops at N reads as "the rest were zero", which is the misreading the
 	// whole report withholds its unmeasured rows to prevent.
 	it('says how many rows it withheld, per table', () => {
 		const capped = time_row_cap.cap_report(report([SESSION_NOTE]), CAP)
 
-		expect(capped.notes).toEqual([
-			SESSION_NOTE,
-			tool_note(CAP),
-			time_row_cap.truncation_note(time_row_cap.JOSH_TABLE, CAP, JOSH_ROWS),
-		])
+		expect(capped.notes).toEqual([SESSION_NOTE, ...all_notes(CAP)])
 		expect(capped.notes[1]).toContain(`3 ${WITHHELD}`)
 	})
 
@@ -144,7 +202,7 @@ describe('time_row_cap.cap_report — a cap that cuts', () => {
 })
 
 describe('time_row_cap.cap_report — a cap above the row count', () => {
-	it('withholds nothing and adds no note when the cap exceeds both tables', () => {
+	it('withholds nothing and adds no note when the cap exceeds every table', () => {
 		const capped = time_row_cap.cap_report(report([SESSION_NOTE]), TOOL_ROWS + 1)
 
 		expect(capped.by_tool).toHaveLength(TOOL_ROWS)
@@ -153,12 +211,16 @@ describe('time_row_cap.cap_report — a cap above the row count', () => {
 	})
 
 	// The boundary: a cap equal to the row count keeps every row, so saying rows were withheld there
-	// would be a note about nothing.
-	it('adds no note for the table whose length equals the cap', () => {
+	// would be a note about nothing. `JOSH_ROWS` is `INVOCATION_ROWS` too, so two tables sit on it.
+	it('adds no note for the tables whose length equals the cap', () => {
 		const capped = time_row_cap.cap_report(report(), JOSH_ROWS)
 
 		expect(capped.by_josh_command).toHaveLength(JOSH_ROWS)
-		expect(capped.notes).toEqual([tool_note(JOSH_ROWS)])
+		expect(capped.by_invocation).toHaveLength(INVOCATION_ROWS)
+		expect(capped.notes).toEqual([
+			tool_note(JOSH_ROWS),
+			time_row_cap.truncation_note(time_row_cap.SEGMENT_TABLE, JOSH_ROWS, SEGMENT_ROWS),
+		])
 	})
 })
 
@@ -228,7 +290,9 @@ describe('josh time --top — one run', () => {
 		expect(JSON.parse(output())).toMatchObject({
 			by_tool: rows(TOOL_ROWS, 'tool').slice(0, CAP),
 			by_josh_command: rows(JOSH_ROWS, 'josh').slice(0, CAP),
-			notes: [SESSION_NOTE, tool_note(CAP), expect.stringContaining(WITHHELD)],
+			segments: kept_segments(),
+			by_invocation: invocation_rows(INVOCATION_ROWS).slice(0, CAP),
+			notes: [SESSION_NOTE, ...all_notes(CAP)],
 		})
 	})
 

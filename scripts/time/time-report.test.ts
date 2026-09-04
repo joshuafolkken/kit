@@ -1,36 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { time_failures } from './time-failures'
+import { time_invocations } from './time-invocations'
 import { time_phases } from './time-phases'
 import { time_report } from './time-report'
+import { time_report_fixture } from './time-report-fixture'
+import { time_segments } from './time-segments'
 import { time_span_fixture } from './time-span-fixture'
-import { time_spans, type Span, type Timeline } from './time-spans'
+import { time_spans } from './time-spans'
 
-const { MINUTE_MS, span } = time_span_fixture
-const SESSION = 'abcd1234'
-const PNPM_LABEL = 'Bash: pnpm'
-
-function timeline(spans: ReadonlyArray<Span>): Timeline {
-	const elapsed = spans.reduce((sum, entry) => sum + entry.duration_ms, 0)
-
-	return { started_ms: MINUTE_MS, ended_ms: MINUTE_MS + elapsed, spans: [...spans] }
-}
-
-function build(spans: ReadonlyArray<Span>): ReturnType<typeof time_report.build_report> {
-	return time_report.build_report(SESSION, timeline(spans))
-}
-
-const RUN_SCOPE = 'issue #1268'
-const SESSION_NOTE = '2 session(s)'
+const { MINUTE_MS, MIXED, PNPM_LABEL, RUN_SCOPE, SESSION_NOTE, build, run_report } =
+	time_report_fixture
+const { span } = time_span_fixture
 const CI_ROW = 'CI wait'
 const CATEGORY_HEADING = 'Where the wall clock went'
-
-const MIXED = [
-	span(time_spans.MODEL_CATEGORY, 4),
-	span(time_spans.TOOL_CATEGORY, 3, PNPM_LABEL, 'josh gate'),
-	span(time_spans.TOOL_CATEGORY, 2, 'Read'),
-	span(time_spans.TOOL_CATEGORY, 1, PNPM_LABEL, 'josh lint'),
-	span(time_spans.HUMAN_CATEGORY, 10),
-]
 
 describe('time_report.build_report — categories', () => {
 	it('totals each of the three categories', () => {
@@ -133,29 +115,6 @@ describe('time_report.format_report', () => {
 		expect(text).not.toContain(CATEGORY_HEADING)
 	})
 })
-
-function run_report(
-	spans: ReadonlyArray<Span>,
-	ci_ms: number,
-): ReturnType<typeof time_report.build_from_spans> {
-	return time_report.build_from_spans({
-		scope: RUN_SCOPE,
-		spans,
-		started_ms: 0,
-		ended_ms: 30 * MINUTE_MS,
-		ci_ms,
-		has_ci_data: true,
-		notes: [SESSION_NOTE],
-		by_check: [
-			{
-				label: 'unit',
-				duration_ms: 2 * MINUTE_MS,
-				conclusion: 'success',
-				merge_gap_ms: -MINUTE_MS,
-			},
-		],
-	})
-}
 
 // The fourth share exists only where a pull request was read. A session report has none, and
 // printing `CI wait 0.0 min` there would assert a measurement nobody made.
@@ -426,5 +385,39 @@ describe('time_report.format_report — the failure re-runs', () => {
 
 		expect(text).toContain(time_failures.HEADING)
 		expect(text).toContain(`re-run after failure${' '.repeat(13)}   ${time_report.NOT_MEASURED}`)
+	})
+})
+
+// joshuafolkken/kit#1311. The two blocks that read the same elapsed time along the run rather than
+// as totals: where each stretch of it went, and what each call of a repeated command cost.
+describe('time_report.format_report — the timeline blocks', () => {
+	const { outcome_span } = time_span_fixture
+
+	it('prints the segments and each call of a repeated command', () => {
+		const text = time_report.format_report(
+			build([
+				outcome_span(2, time_spans.OK_OUTCOME, PNPM_LABEL, 'josh gate'),
+				outcome_span(5, time_spans.OK_OUTCOME, PNPM_LABEL, 'josh gate'),
+			]),
+		)
+
+		expect(text).toContain(time_segments.HEADING)
+		expect(text).toContain(time_invocations.HEADING)
+		expect(text).toContain('2 call(s): 60.0 s, 60.0 s')
+	})
+
+	// The third acceptance criterion, read at the level of the whole report: the segments are the same
+	// elapsed time as the phases, less the CI share, which no transcript span covers.
+	it('reconstructs the transcript half of the elapsed time from the segments alone', () => {
+		const report = run_report(MIXED, 5 * MINUTE_MS)
+		const total = report.segments.reduce((sum, segment) => sum + segment.duration_ms, 0)
+
+		expect(total).toBe(report.elapsed_ms - report.categories.ci_ms)
+	})
+
+	// A run that called nothing twice has no comparison to make, and a heading over an empty table
+	// would report that the question was asked and came back blank.
+	it('leaves the per-invocation block out where no command repeated', () => {
+		expect(time_report.format_report(build(MIXED))).not.toContain(time_invocations.HEADING)
 	})
 })
