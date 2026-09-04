@@ -69,6 +69,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: "Report where a run's wall clock went: model wait, tool execution, human wait",
 		category: 'AI tools',
 	},
+	layers: {
+		script: 'scripts/layers/layers-cli.ts',
+		description: 'List the checks that run in more than one verification layer',
+		category: 'AI tools',
+	},
 	'review:level': {
 		script: 'scripts/review/review-level-cli.ts',
 		description: 'Print the /code-review level this change is reviewed at',

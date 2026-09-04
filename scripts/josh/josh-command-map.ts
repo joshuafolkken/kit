@@ -93,6 +93,7 @@ const ALIASES: Record<string, string> = {
 	ao: 'auto-ok:next',
 	co: 'cost',
 	tm: 'time',
+	ly: 'layers',
 	rl: 'review:level',
 	rb: 'review:brief',
 	dg: 'delegate',

@@ -47,6 +47,10 @@ words:
   - myorg
   - myrepo
   - ncurc
+  # The `tsc --noEmit` flag, folded to lower case: `josh layers` matches its tool signatures
+  # against a lowercased command line, so the pattern cannot keep the camel case that would let
+  # the spell checker split it (joshuafolkken/kit#1313).
+  - noemit
   - unstub
   - appleboy
   - vercel
