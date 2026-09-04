@@ -1,7 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { time_distribution } from '#scripts/time/time-distribution'
 import { bench_guard } from './bench-guard'
 import { bench_report, type BenchReport } from './bench-report'
 import { bench_run } from './bench-run'
@@ -84,11 +83,10 @@ function print_report(report: BenchReport, options: Options): void {
 
 // **A report of nothing but `not measured` rows exits non-zero.** The command's whole product is the
 // figures, so a run that produced none has failed at what it was asked to do — and a `--json`
-// consumer reading success off the exit code would take an empty report for an answer.
+// consumer reading success off the exit code would take an empty report for an answer. The count is
+// the report's own, so the exit code and the heading cannot come to disagree about what was measured.
 function exit_code_for(report: BenchReport): number {
-	const measured = report.rows.filter((row) => time_distribution.is_measured(row.cold))
-
-	return measured.length === 0 ? FAILURE_EXIT_CODE : 0
+	return bench_report.measured_count(report) === 0 ? FAILURE_EXIT_CODE : 0
 }
 
 async function report_or_usage(options: Options): Promise<number> {

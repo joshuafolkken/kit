@@ -32,44 +32,67 @@ function clear_caches(target: BenchTarget, root: string): ReadonlyArray<string> 
 	return caches
 }
 
-// **A failed reading shows why it failed.** Its figure is excluded from the row, so without this the
-// user is left with `2 reading(s) exited non-zero, excluded` and nothing to act on — and the usual
-// cause is a genuinely red check that wants fixing before anything is measured at all.
-async function run_target(
-	target: BenchTarget,
-): Promise<{ elapsed_ms: number; is_failed: boolean }> {
-	const result = await buffered_process.run_buffered_process([JOSH, target.name, ...target.flags])
-	const is_failed = buffered_process.is_process_failed(result)
-
-	if (is_failed && result.output) process.stderr.write(result.output)
-
-	return { elapsed_ms: result.elapsed_ms, is_failed }
+interface TargetRun {
+	elapsed_ms: number
+	is_failed: boolean
+	// The child's own output, carried rather than written here: a red check fails both phases of every
+	// cycle, so printing at this level would dump the same transcript six times for `--repeat 3`.
+	output: string
 }
 
-async function take_reading(target: BenchTarget, root: string): Promise<BenchReading> {
+async function run_target(target: BenchTarget): Promise<TargetRun> {
+	const result = await buffered_process.run_buffered_process([JOSH, target.name, ...target.flags])
+
+	return {
+		elapsed_ms: result.elapsed_ms,
+		is_failed: buffered_process.is_process_failed(result),
+		output: result.output,
+	}
+}
+
+// One cycle, and the first failing transcript it produced. **The guard is asked here rather than once
+// at start-up**: a default run is minutes long and clears a target's caches before every cold reading,
+// so a gate started by a hook after the first check would otherwise be walked straight into.
+async function take_reading(
+	target: BenchTarget,
+	root: string,
+): Promise<{ reading: BenchReading; failure_output: string }> {
 	bench_guard.assert_no_gate()
 	clear_caches(target, root)
 
 	const cold = await run_target(target)
 	const warm = await run_target(target)
+	const failed = [cold, warm].find((phase) => phase.is_failed)
 
 	return {
-		cold_ms: cold.elapsed_ms,
-		warm_ms: warm.elapsed_ms,
-		is_failed: cold.is_failed || warm.is_failed,
+		reading: {
+			cold_ms: cold.elapsed_ms,
+			warm_ms: warm.elapsed_ms,
+			is_failed: failed !== undefined,
+		},
+		failure_output: failed?.output ?? '',
 	}
 }
 
+// **A failed reading shows why it failed, once.** Its figure is excluded from the row, so without any
+// transcript the user is left with `2 reading(s) exited non-zero, excluded` and nothing to act on —
+// and the usual cause is a genuinely red check that wants fixing before anything is measured at all.
 async function measure_target(
 	target: BenchTarget,
 	repetitions: number,
 	root: string,
 ): Promise<BenchSample> {
 	const readings: Array<BenchReading> = []
+	let failure_output = ''
 
 	for (let round = 0; round < repetitions; round += 1) {
-		readings.push(await take_reading(target, root))
+		const taken = await take_reading(target, root)
+
+		readings.push(taken.reading)
+		if (failure_output === '') failure_output = taken.failure_output
 	}
+
+	if (failure_output !== '') process.stderr.write(failure_output)
 
 	return { target: target.name, caches: bench_targets.clearable_caches(target), readings }
 }
@@ -102,6 +125,9 @@ async function measure_targets(
 	return samples
 }
 
-const bench_run = { clear_caches, measure_target, measure_targets, residue_notes }
+// `take_reading` is exported so the guard's **call site** can be tested rather than only the
+// predicate beside it: the defect this feature's review found was a guard checked once at start-up,
+// and a suite that exercised `bench-guard.ts` alone would have stayed green through it.
+const bench_run = { clear_caches, measure_target, measure_targets, residue_notes, take_reading }
 
 export { bench_run }

@@ -53,9 +53,12 @@ interface BenchReport {
 	notes: ReadonlyArray<string>
 }
 
+// **Both medians are guarded, not just the divisor.** A zero on either side makes the ratio an
+// artefact of the clock rather than a measurement — and a zero cold median renders as
+// `Infinity× slower`, which is worse than no answer.
 function speedup_of(cold: Distribution, warm: Distribution): number | undefined {
 	if (!time_distribution.is_measured(cold) || !time_distribution.is_measured(warm)) return undefined
-	if (warm.median_ms === 0) return undefined
+	if (warm.median_ms === 0 || cold.median_ms === 0) return undefined
 
 	return cold.median_ms / warm.median_ms
 }
@@ -156,9 +159,17 @@ function format_row(row: BenchRow): string {
 	)
 }
 
+// **The heading counts what was measured, not what was attempted.** A run on a red tree renders every
+// row as `not measured` and exits non-zero; a heading counting rows would still announce two commands
+// measured, contradicting both the body and the exit code. The predicate is the one the exit code
+// uses, so the two cannot come to disagree.
+function measured_count(report: BenchReport): number {
+	return report.rows.filter((row) => time_distribution.is_measured(row.cold)).length
+}
+
 function format_report(report: BenchReport): Array<string> {
 	return [
-		`Cold and warm cost — ${String(report.rows.length)} command(s) measured`,
+		`Cold and warm cost — ${String(measured_count(report))} command(s) measured`,
 		'',
 		...report.rows.slice(0, time_format.MAX_ROWS).map((row) => format_row(row)),
 		...time_format.overflow_line(report.rows.length),
@@ -167,7 +178,7 @@ function format_report(report: BenchReport): Array<string> {
 	]
 }
 
-const bench_report = { build_report, build_row, format_report, speedup_of }
+const bench_report = { build_report, build_row, format_report, measured_count, speedup_of }
 
 export type { BenchReading, BenchReport, BenchRow, BenchSample }
 export { bench_report }

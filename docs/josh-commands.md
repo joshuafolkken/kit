@@ -1917,7 +1917,8 @@ the operating system's page cache and run-to-run noise, and the row is labelled 
 rather than presenting the difference as a cache effect.
 
 **A reading whose command exited non-zero is excluded from the figures and counted**, and its output
-is written to stderr so the red check is visible rather than only tallied. A check that stops at its
+is written to stderr once per target — not once per phase per cycle — so the red check is visible
+rather than only tallied. A check that stops at its
 first error has measured how long it took to find that error, not what the check costs; averaging it
 in is how a red tree comes to look like a cache win. A target whose every reading failed prints
 `not measured`, never a zero — and **a report in which nothing at all was measured exits non-zero**,
