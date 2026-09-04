@@ -74,6 +74,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'List the checks that run in more than one verification layer',
 		category: 'AI tools',
 	},
+	bench: {
+		script: 'scripts/bench/bench-cli.ts',
+		description: 'Measure what a verification command costs with its cache cold and warm',
+		category: 'AI tools',
+	},
 	'review:level': {
 		script: 'scripts/review/review-level-cli.ts',
 		description: 'Print the /code-review level this change is reviewed at',

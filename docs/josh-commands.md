@@ -1851,6 +1851,90 @@ rather than vanishing out of the table with nothing to say it had.
 should guard — a red pre-push suite still catches what a local gate was never run for — so this
 command puts the list in front of whoever makes that decision and stops there.
 
+### `josh bench`
+
+Measure what a verification command costs with its cache cold and with it warm, by running it twice.
+
+```bash
+pnpm josh bench                      # alias: josh bn — the four gate checks
+pnpm josh bench gate                 # the whole gate, all three caches cleared
+pnpm josh bench lint --repeat 3      # three cycles, the median of each phase
+pnpm josh bench --json               # every row, for a script or another report
+```
+
+```
+Cold and warm cost — 4 command(s) measured
+
+  lint                      128.4 s   warm 2.9 s · 44.3× faster · cleared .eslintcache
+  test:unit                  18.2 s   warm 18.0 s · 1.0× faster · no cache cleared
+  cspell:dot                  8.4 s   warm 1.4 s · 6.0× faster · cleared .cspellcache
+  check                       3.8 s   warm 1.4 s · 2.7× faster · cleared .tsbuildinfo
+```
+
+**It is not part of `josh time`, and that is a design decision rather than an omission**
+([#1314](https://github.com/joshuafolkken/kit/issues/1314), under epic
+[#1315](https://github.com/joshuafolkken/kit/issues/1315)). `josh time` reads Claude Code's session
+transcripts and reports what a past run took; a transcript records one reading of a command in
+whatever cache state that run happened to be in, so the difference between a cold and a warm one
+exists nowhere in it. The answer has to be measured, which is a different act on a different source
+— the same judgement `josh layers` was split out on.
+
+**Cold is produced, not assumed.** One cycle per target is: remove that target's caches, run it, run
+it again. The second run reads the caches the first one wrote, so the pair is a measurement rather
+than a claim about the state the checkout was in when you typed the command.
+
+**The clearing is defined per target.** `josh lint` writes only the eslint cache, so measuring it
+clears only that — clearing all three first would report a cold type check and a cold spell check as
+part of the lint's own cost. `josh bench gate` clears all three, because the gate writes all three.
+
+**The gate is measured with `--force`, and without it that row would be a fiction.** `josh gate`
+reuses a green result recorded on an unedited tree ([#1328](https://github.com/joshuafolkken/kit/issues/1328)),
+so the warm reading — taken seconds after a green cold one, with nothing edited in between — would be
+the skip notice rather than a run, and a green record already on disk would skip both readings. The
+flag is what makes the pair a measurement, and the gate accepts it precisely because a person may know
+something outside the tree moved, which is exactly what this command has just done to its caches.
+
+**Nothing outside the gate's own cache files is ever removed, and nothing survives the run.** The
+removable set is `GATE_CACHE_FILES` in `scripts/josh/josh-command-types.ts` — the gate's own
+declaration of what it writes — and every entry of it is git-ignored and spell-check-excluded, which
+`scripts/josh/gate-cache-flags.test.ts` already asserts. So a run changes no tracked file and leaves
+nothing in `git status`; the warm run rewrites each cleared cache before the command exits, and a
+cache that did not come back is reported in a note rather than left silent. The edit hook's
+`.eslintcache.edit` is **not** in that set and is refused outright: a second writer on that file is
+[#1332](https://github.com/joshuafolkken/kit/issues/1332) exactly.
+
+**A gate running on this tree stops the command before it removes anything, and the question is asked
+again before every clearing.** `josh gate` is started beside `/code-review` and holds its three caches
+open for the whole of it, so clearing them mid-flight would corrupt the run paying for them. A default
+run is minutes long and clears a target's caches before each cold reading, so a check once at start-up
+would walk straight into a gate a hook or another session started after it; once a gate is running the
+readings are void anyway, and the run stops rather than finishing with figures nobody can use. The
+in-flight marker carries the gate's pid, so one left behind by a killed process blocks nothing.
+
+**A command that keeps no cache says so.** `josh test:unit` declares none — vitest's cache lives under
+`node_modules`, and emptying that is a reinstall rather than a cold run — so its two readings measure
+the operating system's page cache and run-to-run noise, and the row is labelled `no cache cleared`
+rather than presenting the difference as a cache effect.
+
+**A reading whose command exited non-zero is excluded from the figures and counted**, and its output
+is written to stderr so the red check is visible rather than only tallied. A check that stops at its
+first error has measured how long it took to find that error, not what the check costs; averaging it
+in is how a red tree comes to look like a cache win. A target whose every reading failed prints
+`not measured`, never a zero — and **a report in which nothing at all was measured exits non-zero**,
+so a `--json` consumer cannot read success off an empty answer.
+
+**A ratio below one is printed as a slowdown.** The figure is cold ÷ warm, and on a target that clears
+no cache noise routinely puts the warm reading above the cold one; `0.9× faster` would assert a cache
+win the measurement contradicts, so the row says `1.1× slower` instead.
+
+**`--repeat` takes the median, not the mean**, for the reason every timing table in this package does:
+one reading interrupted by a background build moves a mean of three by seconds and a median not at
+all. It is capped at 9 — one cycle of the default set is already two runs of every gate check, and a
+cold lint alone is measured in minutes.
+
+**The whole gate is left out of the default set**, since it is the sum of the four checks and
+measuring both would double the wall clock to print the same seconds twice. Name it to get it.
+
 ### `josh eval`
 
 Run the agent rule-compliance scenarios and report how many held.

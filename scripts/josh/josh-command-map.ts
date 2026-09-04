@@ -94,6 +94,7 @@ const ALIASES: Record<string, string> = {
 	co: 'cost',
 	tm: 'time',
 	ly: 'layers',
+	bn: 'bench',
 	rl: 'review:level',
 	rb: 'review:brief',
 	dg: 'delegate',
