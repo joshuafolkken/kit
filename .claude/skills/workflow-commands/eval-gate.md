@@ -59,7 +59,11 @@ The trigger set is derived from what the eval sandbox copies, not restated: `CLA
 ## Where it sits — started with the review, read after it
 
 **Start `pnpm josh eval` in the background when `/code-review` starts, and read its verdict once the
-review has converged — before `pnpm josh bump minor`, and never inside `pnpm josh gate`.** Two
+review has converged — before `pnpm josh followup --merge`, and never inside `pnpm josh gate`.** The
+anchor is the merge rather than the commit because the commit now sits between the two review rounds
+(joshuafolkken/kit#1261), and `blocked` has always stopped the merge rather than the commit — reading
+it before `pnpm josh bump minor` would mean reading it before the review had converged, which is the
+one thing this placement exists to prevent. Two
 reasons keep it out of the gate, each sufficient: the gate re-runs on every fix round and on every
 `epicrun` child, and one `josh eval` is five real Claude sessions; and the review rewrites the very
 prose being measured, so a verdict *read* before the review converges is a verdict about a draft.
