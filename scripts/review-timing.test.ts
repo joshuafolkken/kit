@@ -109,7 +109,14 @@ describe('review timing — prompts', () => {
 		expect(raw).toContain('before `pnpm josh bump minor` and the commit')
 		// The auto-continue section states the same timing a second time, in the context the
 		// review skill actually runs in; the two halves of the file must not disagree.
-		expect(raw).toContain('neither a commit nor a PR exists yet')
+		//
+		// joshuafolkken/kit#1261 moved the commit between the rounds, so a pull request now exists
+		// during round 2 and the mode check can no longer read its absence as a signal — nor its
+		// presence, which is the half that would newly go wrong. The marker asserts the symmetric
+		// sentence rather than the old one-sided one.
+		expect(raw).toContain(
+			'**Neither the presence nor the absence of a pull request is a signal about the mode**',
+		)
 		for (const marker of RETIRED_MARKERS) expect(raw).not.toContain(marker)
 	})
 

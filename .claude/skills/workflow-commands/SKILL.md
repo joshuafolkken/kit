@@ -65,7 +65,16 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   **Joining the gate is a step, not a formality — there is no path to a commit on a gate nobody read.**
   Read what the gate printed before `pnpm josh bump minor`; a red one is fixed and re-run **whatever
   the review concluded**, and because that fix is uncommitted like every other, it lands in the
-  round-2 fix delta and is reviewed with the rest. While the checks are in flight the brief says so
+  round-2 fix delta and is reviewed with the rest.
+  **Where a second round is coming, the pull request opens between the two** (joshuafolkken/kit#1261):
+  once round 1's fixes are in, run `pnpm josh bump minor` → `pnpm josh gate` → join → `pnpm josh git -y`,
+  and then run round 2 beside the CI that commit started. **The bump goes in front of that gate**, so the
+  one the commit rests on covers the exact tree it carries and round 2's brief still reads
+  `Already verified` — taken before the bump it reads `Not verified`, and the review agent re-runs the
+  unit suite the gate had just passed. A finding round 2 fixes in place is a follow-up commit on the same
+  branch — its own `pnpm josh gate` join, **no second `bump`**, and CI re-runs on it. `prompts/review.md` →
+  "The pull request opens between the rounds, so CI runs beside round 2" is the single source; a clean
+  round 1 has no second round and its order is unchanged. While the checks are in flight the brief says so
   rather than saying nothing: `josh gate` writes a marker for as long as it runs, so the review agent
   is told not to run the unit suite the gate is running beside it — **and that sentence claims no
   result**, because a gate that has not finished has none to claim (joshuafolkken/kit#1242).
@@ -80,9 +89,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   the gate is running beside the review, a later fix makes its result stale rather than sending the run
   back to a single check. The table is `prompts/review.md` → "The gate runs beside this review, not in
   front of it".
-  **The rule-compliance measurement is read after the review and before the commit, never inside
-  `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval` is five
-  real Claude sessions. **It is *started* when the review starts, because neither writes to the
+  **The rule-compliance measurement is read after the review and before `pnpm josh followup --merge`,
+  never inside `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval`
+  is five real Claude sessions. The anchor is the merge rather than the commit because the commit now
+  sits between the rounds, and `blocked` has always stopped the merge rather than the commit
+  (joshuafolkken/kit#1261). **It is *started* when the review starts, because neither writes to the
   working tree**, and `pnpm josh eval:scope --since-eval` afterwards says whether the review moved a
   measured path and the run has to be repeated (joshuafolkken/kit#1152) — a stale result is never
   reported. Its last line is the verdict — `blocked` stops the merge, `unmeasured` does
