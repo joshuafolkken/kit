@@ -1,53 +1,20 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'
-import { time_epic, type EpicTimeReport } from './time-epic'
-import { time_failures } from './time-failures'
-import type { TimeReport } from './time-report'
+import { time_cli_fixture } from './time-cli-fixture'
 import { time_run } from './time-run'
 
-const CWD = '/Users/someone/Development/kit'
+// The console capture, the temporary transcript home and the one run report are
+// `time-cli-fixture.ts`'s, shared with the suite that covers the two batch scopes
+// (joshuafolkken/kit#1312).
+const { CWD, MINUTE_MS, ISSUE, RUN_SCOPE, RUN_REPORT, at, output, errors } = time_cli_fixture
+
+time_cli_fixture.capture_console()
+
 const SESSION = 'session-one'
-const MINUTE_MS = 60_000
-const ISSUE = 1268
-
-// Mutated properties rather than reassigned bindings, so `beforeEach` never assigns to a top-level
-// variable from inside a function — the idiom `cost-cli.test.ts` uses for the same reason.
-const state = { home: '', printed: [] as Array<string>, errors: [] as Array<string> }
-
-function capture(message: unknown): void {
-	state.printed.push(String(message))
-}
-
-function capture_error(message: unknown): void {
-	state.errors.push(String(message))
-}
-
-// The whole discovery path is `cost_transcript`'s, so redirecting its one directory function is what
-// points the command at a temporary home. That it works at all is the acceptance criterion the Issue
-// states: a second copy of the slug rule would ignore this and read the real transcripts.
-beforeEach(() => {
-	state.home = mkdtempSync(path.join(tmpdir(), 'time-cli-'))
-	state.printed = []
-	state.errors = []
-	vi.spyOn(console, 'info').mockImplementation(capture)
-	vi.spyOn(console, 'error').mockImplementation(capture_error)
-	vi.spyOn(cost_transcript, 'transcript_directory').mockImplementation((cwd: string) =>
-		path.join(state.home, cost_transcript.project_slug(cwd)),
-	)
-})
-
-afterEach(() => {
-	vi.restoreAllMocks()
-})
-
-function at(minute: number): string {
-	return new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString()
-}
 
 function prompt_line(minute: number): string {
 	return JSON.stringify({ type: 'user', timestamp: at(minute), message: { content: 'go' } })
@@ -71,21 +38,13 @@ function result_line(minute: number): string {
 }
 
 function write_session(): void {
-	const directory = path.join(state.home, cost_transcript.project_slug(CWD))
+	const directory = path.join(time_cli_fixture.home(), cost_transcript.project_slug(CWD))
 
 	mkdirSync(directory, { recursive: true })
 	writeFileSync(
 		path.join(directory, `${SESSION}${cost_transcript.TRANSCRIPT_EXTENSION}`),
 		[prompt_line(0), call_line(1), result_line(3)].join('\n'),
 	)
-}
-
-function output(): string {
-	return state.printed.join('\n')
-}
-
-function errors(): string {
-	return state.errors.join('\n')
 }
 
 describe('josh time registration', () => {
@@ -171,6 +130,32 @@ describe('time_cli.parse_options — the epic scope', () => {
 	})
 })
 
+describe('time_cli.parse_options — the last-N scope', () => {
+	it('reads --last as a number', () => {
+		expect(time_cli.parse_options(['--last', '5'])).toMatchObject({ last: 5, is_json: false })
+	})
+
+	// The same rule every numeric flag follows. `--last 0` is refused rather than read as "every run":
+	// a distribution over no run is not a smaller answer, it is none.
+	it('refuses a --last that is not a positive whole number', () => {
+		expect(time_cli.parse_options(['--last', 'abc'])).toBeUndefined()
+		expect(time_cli.parse_options(['--last', '0'])).toBeUndefined()
+	})
+
+	it('refuses --last beside another scope', () => {
+		expect(time_cli.parse_options(['--last', '5', '--epic', '1'])).toBeUndefined()
+		expect(time_cli.parse_options(['--last', '5', '--issue', '2'])).toBeUndefined()
+	})
+
+	// The row cap narrows whichever scope was asked for, so it is read beside this one too.
+	it('reads --top beside it rather than instead of it', () => {
+		expect(time_cli.parse_options(['--last', '5', '--top', '5'])).toMatchObject({
+			last: 5,
+			top: 5,
+		})
+	})
+})
+
 describe('time_cli.pick_session', () => {
 	it('finds a named session', () => {
 		write_session()
@@ -238,31 +223,6 @@ describe('time_cli.run — refusals', () => {
 	})
 })
 
-const RUN_SCOPE = `issue #${String(ISSUE)}`
-
-const RUN_REPORT: TimeReport = {
-	scope: RUN_SCOPE,
-	started_at: at(0),
-	ended_at: at(8),
-	elapsed_ms: 8 * MINUTE_MS,
-	span_count: 2,
-	turn_count: 1,
-	tool_call_count: 1,
-	round_trip_count: 1,
-	ms_per_round_trip: 3 * MINUTE_MS,
-	model_ms_per_round_trip: MINUTE_MS,
-	categories: { model_ms: MINUTE_MS, tool_ms: 2 * MINUTE_MS, human_ms: 0, ci_ms: 5 * MINUTE_MS },
-	has_ci_data: true,
-	notes: ['1 session(s)'],
-	phases: [],
-	segments: [],
-	by_tool: [],
-	by_josh_command: [],
-	by_invocation: [],
-	by_check: [],
-	failures: { ...time_failures.NO_FAILURES },
-}
-
 describe('time_cli.run — one run', () => {
 	it('reports the issue scope under --issue', async () => {
 		vi.spyOn(time_run, 'build_run_report').mockResolvedValue(RUN_REPORT)
@@ -294,63 +254,5 @@ describe('time_cli.run — one run', () => {
 	it('names the both-scopes mistake in the equals form too', async () => {
 		expect(await time_cli.run(['--issue=1', '--session=abc'], CWD)).toBe(1)
 		expect(errors()).toContain(time_cli.ONE_SCOPE)
-	})
-})
-
-const EPIC = 1272
-const EPIC_SCOPE = `epic #${String(EPIC)}`
-
-const EPIC_REPORT: EpicTimeReport = {
-	scope: EPIC_SCOPE,
-	epic_number: EPIC,
-	children: [
-		{ issue_number: ISSUE, status: 'measured', ms_per_turn: MINUTE_MS, report: RUN_REPORT },
-	],
-	total_ms: 8 * MINUTE_MS,
-	categories: RUN_REPORT.categories,
-	has_transcript_data: true,
-	has_ci_data: true,
-	timed_count: 1,
-	measured_count: 1,
-	unmeasured_count: 0,
-	trend: { is_comparable: false, first_ms_per_turn: 0, last_ms_per_turn: 0, child_count: 1 },
-	notes: [],
-}
-
-describe('time_cli.run — one epic', () => {
-	it('reports the batch child by child under --epic', async () => {
-		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(EPIC_REPORT)
-
-		expect(await time_cli.run(['--epic', String(EPIC)], CWD)).toBe(0)
-		expect(output()).toContain(EPIC_SCOPE)
-		expect(output()).toContain(`#${String(ISSUE)}`)
-	})
-
-	// The acceptance criterion the whole scope exists for: `--json` carries per child what `--issue`
-	// carries for one run, breakdown included, rather than only the batch's headline figures.
-	it('carries each child’s own breakdown under --json', async () => {
-		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(EPIC_REPORT)
-		await time_cli.run(['--epic', String(EPIC), '--json'], CWD)
-
-		expect(JSON.parse(output())).toMatchObject({
-			scope: EPIC_SCOPE,
-			children: [
-				{
-					issue_number: ISSUE,
-					status: 'measured',
-					report: { categories: { ci_ms: 5 * MINUTE_MS }, phases: [] },
-				},
-			],
-		})
-	})
-
-	// An unreadable epic is a failure, not an empty batch: reporting "0 children" would assert
-	// something nobody established.
-	it('fails rather than reporting an empty batch when the epic could not be read', async () => {
-		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(undefined)
-
-		expect(await time_cli.run(['--epic', String(EPIC)], CWD)).toBe(1)
-		expect(errors()).toContain(time_cli.NO_EPIC)
-		expect(output()).toBe('')
 	})
 })

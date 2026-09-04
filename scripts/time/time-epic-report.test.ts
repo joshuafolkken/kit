@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { time_epic, type ChildTiming, type EpicTimeReport } from './time-epic'
+import { time_batch, type RunTiming } from './time-batch'
+import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_failures } from './time-failures'
 import type { TimeReport } from './time-report'
@@ -10,7 +11,7 @@ const EPIC = 1272
 
 interface ChildInput {
 	issue_number: number
-	status?: ChildTiming['status']
+	status?: RunTiming['status']
 	elapsed_minutes?: number
 	model_minutes?: number
 	turn_count?: number
@@ -24,16 +25,16 @@ interface Halves {
 	has_ci_data: boolean
 }
 
-const HALVES = new Map<ChildTiming['status'], Halves>([
-	[time_epic.MEASURED, { span_count: 2, has_ci_data: true }],
-	[time_epic.NO_TRANSCRIPT, { span_count: 0, has_ci_data: true }],
-	[time_epic.NOT_MERGED, { span_count: 2, has_ci_data: false }],
-	[time_epic.NOT_RUN, { span_count: 0, has_ci_data: false }],
+const HALVES = new Map<RunTiming['status'], Halves>([
+	[time_batch.MEASURED, { span_count: 2, has_ci_data: true }],
+	[time_batch.NO_TRANSCRIPT, { span_count: 0, has_ci_data: true }],
+	[time_batch.NOT_MERGED, { span_count: 2, has_ci_data: false }],
+	[time_batch.NOT_RUN, { span_count: 0, has_ci_data: false }],
 ])
 
 const MEASURED_HALVES: Halves = { span_count: 2, has_ci_data: true }
 const DEFAULTS = {
-	status: time_epic.MEASURED,
+	status: time_batch.MEASURED,
 	elapsed_minutes: 10,
 	model_minutes: 1,
 	turn_count: 1,
@@ -72,18 +73,18 @@ function report_of(input: ChildInput): TimeReport {
 	}
 }
 
-function child_of(input: ChildInput): ChildTiming {
+function child_of(input: ChildInput): RunTiming {
 	const report = report_of(input)
 
 	return {
 		issue_number: input.issue_number,
-		status: time_epic.status_of(report),
-		ms_per_turn: report.span_count === 0 ? undefined : time_epic.ms_per_turn_of(report),
+		status: time_batch.status_of(report),
+		ms_per_turn: report.span_count === 0 ? undefined : time_batch.ms_per_turn_of(report),
 		report,
 	}
 }
 
-function total_of(children: ReadonlyArray<ChildTiming>): number {
+function total_of(children: ReadonlyArray<RunTiming>): number {
 	let total = 0
 
 	for (const child of children) total += child.report.elapsed_ms
@@ -92,7 +93,7 @@ function total_of(children: ReadonlyArray<ChildTiming>): number {
 }
 
 function epic_of(
-	children: ReadonlyArray<ChildTiming>,
+	children: ReadonlyArray<RunTiming>,
 	notes: ReadonlyArray<string> = [],
 ): EpicTimeReport {
 	return {
@@ -103,9 +104,9 @@ function epic_of(
 		categories: time_epic.total_categories(children),
 		has_transcript_data: children.some((child) => child.report.span_count > 0),
 		has_ci_data: children.some((child) => child.report.has_ci_data),
-		timed_count: children.filter((child) => child.status !== time_epic.NOT_RUN).length,
-		measured_count: children.filter((child) => child.status === time_epic.MEASURED).length,
-		unmeasured_count: children.filter((child) => child.status === time_epic.NOT_RUN).length,
+		timed_count: children.filter((child) => child.status !== time_batch.NOT_RUN).length,
+		measured_count: children.filter((child) => child.status === time_batch.MEASURED).length,
+		unmeasured_count: children.filter((child) => child.status === time_batch.NOT_RUN).length,
 		trend: time_epic.trend_of(children),
 		notes: [...notes],
 	}
@@ -124,8 +125,8 @@ const SECOND_CHILD = child_of({
 	turn_count: 4,
 })
 const MEASURED_PAIR = [FIRST_CHILD, SECOND_CHILD]
-const NEVER_RUN_CHILD = child_of({ issue_number: 103, status: time_epic.NOT_RUN })
-const MERGED_ONLY_CHILD = child_of({ issue_number: 104, status: time_epic.NO_TRANSCRIPT })
+const NEVER_RUN_CHILD = child_of({ issue_number: 103, status: time_batch.NOT_RUN })
+const MERGED_ONLY_CHILD = child_of({ issue_number: 104, status: time_batch.NO_TRANSCRIPT })
 const ZERO_MINUTES = '0.0 min'
 const SAMPLE_NOTE = '1 child(ren) x'
 const NO_TREND_TEXT = 'not enough children recorded a turn'
@@ -170,7 +171,7 @@ describe('time_epic_report.format_epic_report — what was not measured', () => 
 		const text = time_epic_report.format_epic_report(epic_of([FIRST_CHILD, NEVER_RUN_CHILD]))
 		const child_row = line_with(text, '#103')
 
-		expect(child_row).toContain(time_epic.NOT_RUN)
+		expect(child_row).toContain(time_batch.NOT_RUN)
 		expect(child_row).not.toContain(ZERO_MINUTES)
 	})
 
@@ -199,7 +200,7 @@ describe('time_epic_report.format_epic_report — why a child is short of a meas
 	// `not run` covers "the batch never reached it" and "the pull request listing could not be read"
 	// alike, so the child's own note is what tells them apart — and it has to reach the table.
 	it('prints the child’s own note under a row that is short of a measurement', () => {
-		const child = child_of({ issue_number: 106, status: time_epic.NOT_RUN })
+		const child = child_of({ issue_number: 106, status: time_batch.NOT_RUN })
 		const noted = { ...child, report: { ...child.report, notes: [READ_FAILED_NOTE] } }
 		const text = time_epic_report.format_epic_report(epic_of([noted]))
 

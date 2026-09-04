@@ -1,4 +1,6 @@
-import type { ChildTiming, EpicTimeReport } from './time-epic'
+import type { RunTiming } from './time-batch'
+import type { EpicTimeReport } from './time-epic'
+import type { LastTimeReport } from './time-last'
 import type { TimeReport } from './time-report'
 import type { Segment } from './time-segments'
 
@@ -106,7 +108,7 @@ function cap_report(report: TimeReport, cap: number | undefined): TimeReport {
 	return { ...report, ...capped, notes }
 }
 
-function cap_child(timing: ChildTiming, cap: number): ChildTiming {
+function cap_run(timing: RunTiming, cap: number): RunTiming {
 	return { ...timing, report: cap_report(timing.report, cap) }
 }
 
@@ -116,7 +118,18 @@ function cap_child(timing: ChildTiming, cap: number): ChildTiming {
 function cap_epic_report(report: EpicTimeReport, cap: number | undefined): EpicTimeReport {
 	if (cap === undefined) return report
 
-	return { ...report, children: report.children.map((child) => cap_child(child, cap)) }
+	return { ...report, children: report.children.map((child) => cap_run(child, cap)) }
+}
+
+// A set of runs carries no unbounded table of its own either — the four category rows, the fifteen
+// phase rows and one row per CI job are all bounded by the vocabulary rather than by the length of a
+// run — so the cap reaches the runs, exactly as it reaches an epic's children. **The check
+// distribution is deliberately left uncapped** for the reason `by_check` is: its rows are one per CI
+// job, and cutting them would hide a check rather than a tail (joshuafolkken/kit#1312).
+function cap_last_report(report: LastTimeReport, cap: number | undefined): LastTimeReport {
+	if (cap === undefined) return report
+
+	return { ...report, runs: report.runs.map((run) => cap_run(run, cap)) }
 }
 
 const time_row_cap = {
@@ -128,6 +141,7 @@ const time_row_cap = {
 	is_truncation_note,
 	cap_report,
 	cap_epic_report,
+	cap_last_report,
 }
 
 export { time_row_cap }

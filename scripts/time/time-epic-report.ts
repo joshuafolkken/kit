@@ -1,4 +1,6 @@
-import { time_epic, type ChildTiming, type EpicTimeReport, type EpicTrend } from './time-epic'
+import { time_batch, type RunTiming } from './time-batch'
+import type { EpicTimeReport, EpicTrend } from './time-epic'
+import { time_format } from './time-format'
 import { time_report } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
@@ -8,6 +10,8 @@ import { time_run } from './time-run'
 // Split from `time-epic.ts` so the aggregation stays arithmetic and this stays layout, and it lays
 // its rows out through `time_report.format_columns` rather than a second set of widths — one column
 // rule, so an epic's table lines up with a run's.
+
+const { note_lines } = time_format
 
 const PERCENT_SCALE = 100
 const PERCENT_DECIMALS = 0
@@ -30,8 +34,8 @@ const NO_TRANSCRIPT_SHARES = 'CI wait only — no session transcript is attribut
 // model, tool and human totals are zero because nothing was read, not because nothing happened, and
 // printing `model 0.0 min` there is exactly the measured zero standing in for an unknown that the
 // status exists to prevent.
-function child_shares(timing: ChildTiming): string {
-	if (timing.status === time_epic.NO_TRANSCRIPT) return NO_TRANSCRIPT_SHARES
+function child_shares(timing: RunTiming): string {
+	if (timing.status === time_batch.NO_TRANSCRIPT) return NO_TRANSCRIPT_SHARES
 
 	const { categories, has_ci_data } = timing.report
 	const parts = [
@@ -47,10 +51,10 @@ function child_shares(timing: ChildTiming): string {
 // **A child that was never run prints its status where a duration would go, not `0.0 min`.** The
 // duration column is left empty because there is no duration — not a short one — which is the same
 // answer, in the same shape, that an undetected phase already gives.
-function child_line(timing: ChildTiming): string {
+function child_line(timing: RunTiming): string {
 	const label = `#${String(timing.issue_number)}`
 
-	if (timing.status === time_epic.NOT_RUN) {
+	if (timing.status === time_batch.NOT_RUN) {
 		return time_report.format_columns(label, '', timing.status)
 	}
 
@@ -79,7 +83,7 @@ function child_line(timing: ChildTiming): string {
 // without it. Every completed child has `has_ci_data`, which is to say the filter above hides it
 // from exactly the rows that carry the inflated number. The idle note stays behind the filter: time
 // that belonged to nobody leaves the row's own figure correct.
-function child_notes(timing: ChildTiming): Array<string> {
+function child_notes(timing: RunTiming): Array<string> {
 	const notes = timing.report.notes.filter((note) => !time_row_cap.is_truncation_note(note))
 
 	if (!timing.report.has_ci_data) return notes
@@ -87,11 +91,11 @@ function child_notes(timing: ChildTiming): Array<string> {
 	return notes.filter((note) => time_run.is_overlap_note(note))
 }
 
-function child_note_lines(timing: ChildTiming): Array<string> {
+function child_note_lines(timing: RunTiming): Array<string> {
 	return child_notes(timing).map((note) => `      ${note}`)
 }
 
-function child_block(timing: ChildTiming): Array<string> {
+function child_block(timing: RunTiming): Array<string> {
 	return [child_line(timing), ...child_note_lines(timing)]
 }
 
@@ -157,7 +161,7 @@ function direction_line(trend: EpicTrend): string {
 // One row per child that recorded a turn, so the shape of the change is visible rather than only its
 // endpoints — two children rising 40% and four children flat but for a slow last one read the same
 // from a single ratio.
-function per_turn_line(timing: ChildTiming): Array<string> {
+function per_turn_line(timing: RunTiming): Array<string> {
 	const { ms_per_turn } = timing
 
 	if (ms_per_turn === undefined) return []
@@ -177,10 +181,6 @@ function trend_lines(report: EpicTimeReport): Array<string> {
 	const tail = report.trend.is_comparable ? direction_line(report.trend) : NO_TREND_LINE
 
 	return ['', TREND_HEADING, ...rows, tail]
-}
-
-function note_lines(notes: ReadonlyArray<string>): Array<string> {
-	return notes.map((note) => `  ${note}`)
 }
 
 // `timed`, not `measured`: the headline count is the children something was measured for, and how
