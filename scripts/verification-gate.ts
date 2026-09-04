@@ -5,7 +5,7 @@ import { bounded_pool } from './bounded-pool'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { gate_skip } from './gate-skip'
-import { git_command } from './git/git-command'
+import { gate_tree, type GateTree } from './gate-tree'
 import type { FileMapStamp } from './josh/file-map-stamp'
 import { GATE_COMMAND } from './josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh/josh-composite-arguments'
@@ -223,31 +223,6 @@ async function record_green_gate(
 	}
 }
 
-// The commit the tree map is a diff against, read beside the map itself. A failure here is not the
-// gate's business either: no base means no record and no reuse, which is the same safe direction an
-// unreadable tree already takes.
-async function read_base_before_checks(): Promise<string | undefined> {
-	try {
-		return await git_command.default_branch_commit()
-	} catch {
-		return undefined
-	}
-}
-
-// Results are printed in declaration order rather than completion order: a gate whose sections move
-// around between runs cannot be read by scrolling to the same place twice.
-// The tree is read **before** the checks start, so what the record claims is the tree they actually
-// read rather than whatever the formatter left behind while they ran (joshuafolkken/kit#1241). A
-// failure here is not the gate's business: no tree means no record, which the brief reports as
-// "not verified".
-async function read_tree_before_checks(): Promise<Record<string, string>> {
-	try {
-		return await review_tree.read_changed_tree()
-	} catch {
-		return {}
-	}
-}
-
 // The marker that says a gate is running on this tree right now (joshuafolkken/kit#1242). The gate
 // and `/code-review` are started together — neither writes to the working tree — so by the time
 // `josh review:brief` composes the invocation the checks are usually still in flight. Without this
@@ -349,13 +324,6 @@ interface GateOptions {
 	marker_path?: string
 }
 
-// The tree the checks read and the commit it is a diff against, carried together because neither
-// answers anything alone (joshuafolkken/kit#1328).
-interface GateTree {
-	files: Record<string, string>
-	base: string | undefined
-}
-
 // The plan line is printed by the checked path alone. A run that announced a four-way fan-out and
 // then skipped would be describing something that never happened, and the skip's own line already
 // says everything there is to say about a gate that started no process.
@@ -390,18 +358,11 @@ function reusable_stamp(tree: GateTree, options: GateOptions): FileMapStamp | un
 	return gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
 }
 
-// The two readings are independent, so they are started together rather than one after the other.
-async function read_gate_tree(): Promise<GateTree> {
-	const [files, base] = await Promise.all([read_tree_before_checks(), read_base_before_checks()])
-
-	return { files, base }
-}
-
 async function run_verification_gate(options: GateOptions = {}): Promise<number> {
 	// Started before the tree read, so the total is what the caller waited for rather than what the
 	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
 	const started_at = performance.now()
-	const tree = await read_gate_tree()
+	const tree = await gate_tree.read_gate_tree()
 	const reusable = reusable_stamp(tree, options)
 
 	if (reusable === undefined) return await run_checked_gate(tree, options, started_at)
@@ -475,5 +436,5 @@ const verification_gate = {
 	run_verification_gate,
 }
 
-export type { GateOptions, GateStep, GateStepResult, GateTree }
+export type { GateOptions, GateStep, GateStepResult }
 export { GATE_TARGETS, verification_gate }

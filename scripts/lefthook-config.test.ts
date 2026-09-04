@@ -126,6 +126,26 @@ describe('lefthook/base.yml pre-push dependency barrier (kit#813)', () => {
 	})
 })
 
+// kit#1334: the hook ran the whole unit suite 40 seconds after `josh gate` had printed it green on
+// the same tree. The wrapper is what can read that record; a bare `vitest run` has nothing to read
+// it with, which is the state this pair of assertions exists to keep the config out of.
+describe('lefthook/base.yml pre-push unit command (kit#1334)', () => {
+	const test_unit = PRE_PUSH_HOOK?.commands?.['test-unit']
+	const run = test_unit?.run ?? ''
+
+	it('defines a test-unit pre-push command', () => {
+		expect(test_unit).toBeDefined()
+	})
+
+	it('delegates to the josh wrapper that can reuse a recorded green gate', () => {
+		expect(run).toContain('josh pre-push-unit')
+	})
+
+	it('does not invoke vitest through a bare pnpm exec', () => {
+		expect(run).not.toContain('pnpm exec vitest')
+	})
+})
+
 describe('lefthook/base.yml pre-push parallel (kit#676)', () => {
 	// Enabled in kit#676 after auditing every active consumer: each has at most one
 	// preview-owning pre-push command (app-kit's unified `verify`, or a single `test-e2e`),
