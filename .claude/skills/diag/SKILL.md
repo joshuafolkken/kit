@@ -61,6 +61,12 @@ Read from the JSON, in this order:
   measured zero. Never rank a phase you did not measure. `wait` and `other` rest on no marker, so
   they are `false` only where no span was read — the same state the three transcript shares are
   withheld in.
+- **the round trips** — `tool_call_count` and `round_trip_count`, and the density between them
+  (joshuafolkken/kit#1304). Once the verification commands were cut, this is what sets a run's floor:
+  the tools themselves run for well under a minute while the turns they sit in cost ten times that.
+  **A density near 1.00 is the finding, not a detail** — it says independent calls went out one per
+  turn, and the printed block says so in a line. It rests on the same transcript the three shares do,
+  so a scope with `span_count: 0` measured none of it either
 - **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost
 
 ## 2. Say whether the last speedup actually worked

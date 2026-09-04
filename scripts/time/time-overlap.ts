@@ -67,6 +67,8 @@ function uncovered_ms(target: Interval, covered: ReadonlyArray<Interval>): numbe
 	)
 }
 
+const FIRST_PART = 0
+
 function to_interval(span: Span): Interval {
 	return { started_ms: span.ended_ms - span.duration_ms, ended_ms: span.ended_ms }
 }
@@ -75,14 +77,20 @@ function to_interval(span: Span): Interval {
 // before the call, and the result read after it.
 //
 // **A span covered in the middle comes back as two**, each at its real instants, rather than as one
-// span whose duration was shrunk. The price is that a call bracketing a unit is counted twice in the
-// per-tool table's `call_count`; the alternative prices the same fragment at the wrong minute, which
-// the CI wait and the reported start of the run both read.
+// span whose duration was shrunk. The alternative prices the same fragment at the wrong minute,
+// which the CI wait and the reported start of the run both read.
+//
+// **Every fragment after the first is marked a continuation** (joshuafolkken/kit#1304). The two
+// fragments are one call, so a counter of calls — the per-tool table's `call_count`, and the
+// round-trip block — skips them; the price used to be paid by counting a bracketing call twice
+// there, which read as a run that made more calls than it did. Durations are unaffected: both
+// fragments are real intervals and both are summed.
 //
 // A span left with nothing yields nothing, rather than a row saying a call took no time.
 function trim(span: Span, covered: ReadonlyArray<Interval>): Array<Span> {
-	return uncovered_parts(to_interval(span), covered).map((part) => ({
+	return uncovered_parts(to_interval(span), covered).map((part, index) => ({
 		...span,
+		is_continuation: index > FIRST_PART,
 		ended_ms: part.ended_ms,
 		duration_ms: part.ended_ms - part.started_ms,
 	}))
