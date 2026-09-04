@@ -47,13 +47,25 @@ function write_unit(session: string, agent: string, lines: ReadonlyArray<string>
 interface GhScript {
 	pull_body: string
 	checks_body?: string
+	// The check-run read refused while the listing still answers, which is what a rate limit looks like
+	// from here: the two are separate requests (joshuafolkken/kit#1352).
+	is_checks_refused?: boolean
+}
+
+const CHECK_RUNS_MARK = 'check-runs'
+const GH_REFUSAL = 'gh: 403'
+
+function checks_of(script: GhScript): string {
+	if (script.is_checks_refused === true) throw new Error(GH_REFUSAL)
+
+	return script.checks_body ?? '{}'
 }
 
 function reader(script: GhScript, asked: Array<string> = []): GhReader {
 	return async (request_path: string) => {
 		asked.push(request_path)
 
-		if (request_path.includes('check-runs')) return script.checks_body ?? '{}'
+		if (request_path.includes(CHECK_RUNS_MARK)) return checks_of(script)
 
 		return script.pull_body
 	}
@@ -164,6 +176,30 @@ describe('time_run.build_run_report — the CI check table', () => {
 	})
 })
 
+// joshuafolkken/kit#1352's second symptom: the merge was read, so the row stays measured and `ci_ms`
+// stays right — the only visible difference is an empty per-check table, which reads as a run GitHub
+// recorded no checks for.
+describe('time_run.build_run_report — a check read that was refused', () => {
+	it('says the check list could not be read rather than printing an empty table', async () => {
+		write_session('one', issue_lines(0))
+
+		const report = await report_of({ ...MERGED_SCRIPT, is_checks_refused: true })
+
+		expect(report.by_check).toEqual([])
+		expect(report.has_ci_data).toBe(true)
+		expect(report.notes.some((note) => time_run.is_check_read_note(note))).toBe(true)
+	})
+
+	// The guarantee the note is not allowed to cost: a run whose checks really were empty says nothing.
+	it('says nothing where the read succeeded and there were no checks', async () => {
+		write_session('one', issue_lines(0))
+
+		const report = await report_of({ ...MERGED_SCRIPT, checks_body: '{"check_runs":[]}' })
+
+		expect(report.notes.some((note) => time_run.is_check_read_note(note))).toBe(false)
+	})
+})
+
 // The Issue's own case, end to end: the merge instant this file already reads is what tells the three
 // rows apart, and the report is where the two halves meet (joshuafolkken/kit#1310).
 describe('time_run.build_run_report — a check set that spans the merge', () => {
@@ -193,7 +229,7 @@ describe('time_run.build_run_report — a check set that spans the merge', () =>
 })
 
 async function refuse(): Promise<string> {
-	throw new Error('gh: 403')
+	throw new Error(GH_REFUSAL)
 }
 
 // The category rows are indented and padded to a fixed width, so the row reads `  CI wait   …`

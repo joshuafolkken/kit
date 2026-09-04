@@ -2,8 +2,7 @@ import { time_batch, type RunTiming } from './time-batch'
 import type { EpicTimeReport, EpicTrend } from './time-epic'
 import { time_format } from './time-format'
 import { time_report } from './time-report'
-import { time_row_cap } from './time-row-cap'
-import { time_run } from './time-run'
+import { time_row_notes } from './time-row-notes'
 
 // The text an epic's batch is read as (joshuafolkken/kit#1271).
 //
@@ -54,49 +53,20 @@ function child_shares(timing: RunTiming): string {
 function child_line(timing: RunTiming): string {
 	const label = `#${String(timing.issue_number)}`
 
-	if (timing.status === time_batch.NOT_RUN) {
+	if (!time_batch.has_duration(timing)) {
 		return time_report.format_columns(label, '', timing.status)
 	}
 
 	return time_report.format_row(label, timing.report.elapsed_ms, child_shares(timing))
 }
 
-// **Why a child's GitHub half is missing, in its own words.** `not run` is one status covering
-// several facts the run scope keeps carefully apart — no pull request exists, none was found within
-// the page budget, and *the listing could not be read at all* — and a batch that printed only the
-// status would report a rate-limited `gh` as a batch that never reached its children. The sentences
-// are `time-run.ts`'s own, carried up rather than restated, so the two scopes cannot disagree about
-// what was and was not established.
-//
-// Printed only where **no merge was read**, which is exactly where the row cannot say why: a child
-// whose merge *was* read already carries its answer in the share column, and repeating its notes
-// beneath would bury the rows that have something to add.
-//
-// **A `--top` truncation note is not one of them** (joshuafolkken/kit#1301). It is about the per-tool
-// and per-`josh <cmd>` tables, which this rendering does not print at all, and an unmerged child has
-// both a populated table and no CI data — so without the filter it would land in exactly the block
-// that exists to say why the GitHub half is missing.
-//
-// **The overlap note is the one exception, and it is not about the GitHub half at all**
-// (joshuafolkken/kit#1330). It says the child's own minutes double-count wall clock two of its
-// sessions shared, so the row's figure — and the batch total it is summed into — cannot be read
-// without it. Every completed child has `has_ci_data`, which is to say the filter above hides it
-// from exactly the rows that carry the inflated number. The idle note stays behind the filter: time
-// that belonged to nobody leaves the row's own figure correct.
-function child_notes(timing: RunTiming): Array<string> {
-	const notes = timing.report.notes.filter((note) => !time_row_cap.is_truncation_note(note))
-
-	if (!timing.report.has_ci_data) return notes
-
-	return notes.filter((note) => time_run.is_overlap_note(note))
-}
-
-function child_note_lines(timing: RunTiming): Array<string> {
-	return child_notes(timing).map((note) => `      ${note}`)
-}
-
+// **Which of a child's own notes reach the table is `time-row-notes.ts`'s** (joshuafolkken/kit#1352).
+// The selection was this file's until `--last` needed the same answer, and a second copy of it is
+// where the two batch scopes come to say different things about the same run. The idle note stays
+// behind its filter for the reason recorded there: time that belonged to nobody leaves the row's own
+// figure correct.
 function child_block(timing: RunTiming): Array<string> {
-	return [child_line(timing), ...child_note_lines(timing)]
+	return [child_line(timing), ...time_row_notes.note_lines(timing)]
 }
 
 function child_lines(report: EpicTimeReport): Array<string> {

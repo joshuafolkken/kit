@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { time_batch } from './time-batch'
 import { time_cli } from './time-cli'
 import { time_cli_fixture } from './time-cli-fixture'
 import { time_distribution } from './time-distribution'
@@ -88,6 +89,54 @@ describe('time_cli.run — one epic', () => {
 		expect(await time_cli.run(['--epic', String(EPIC)], CWD)).toBe(1)
 		expect(errors()).toContain(time_cli.NO_EPIC)
 		expect(output()).toBe('')
+	})
+})
+
+// A child whose report could not be built at all. The row is `failed` rather than `not run`, which is
+// what the exit code below is read off (joshuafolkken/kit#1352).
+const FAILED_ROW = { ...MEASURED_ROW, status: time_batch.FAILED } as const
+const FAILED_EPIC: EpicTimeReport = {
+	...EPIC_REPORT,
+	children: [{ ...FAILED_ROW }],
+	timed_count: 0,
+	measured_count: 0,
+	unmeasured_count: 1,
+}
+const FAILED_LAST: LastTimeReport = {
+	...LAST_REPORT,
+	runs: [{ ...FAILED_ROW }],
+	measured_count: 0,
+	unmeasured_count: 1,
+}
+
+// The acceptance criterion of the Issue's first symptom: a regression that made every child throw
+// printed a plausible table and exited 0, so nothing downstream could tell the run from a good one.
+describe('time_cli.run — a batch holding a report that failed to build', () => {
+	it('exits non-zero under --epic and still prints the table', async () => {
+		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(FAILED_EPIC)
+
+		expect(await time_cli.run(['--epic', String(EPIC)], CWD)).toBe(1)
+		expect(output()).toContain(time_batch.FAILED)
+	})
+
+	it('exits non-zero under --last too', async () => {
+		vi.spyOn(time_last, 'build_last_report').mockResolvedValue(FAILED_LAST)
+
+		expect(await time_cli.run([LAST_FLAG, String(LAST_COUNT)], CWD)).toBe(1)
+		expect(output()).toContain(time_batch.FAILED)
+	})
+
+	// A child the batch never reached is an ordinary answer and must not fail the command — otherwise
+	// every epic with an unstarted child would exit non-zero.
+	it('keeps exiting zero for a child the batch simply never reached', async () => {
+		const not_run: EpicTimeReport = {
+			...FAILED_EPIC,
+			children: [{ ...MEASURED_ROW, status: time_batch.NOT_RUN }],
+		}
+
+		vi.spyOn(time_epic, 'build_epic_report').mockResolvedValue(not_run)
+
+		expect(await time_cli.run(['--epic', String(EPIC)], CWD)).toBe(0)
 	})
 })
 

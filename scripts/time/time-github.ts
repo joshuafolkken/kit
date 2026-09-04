@@ -51,7 +51,12 @@ const CHECK_RUN_SCHEMA = z.object({
 	completed_at: z.string().nullish(),
 })
 
-const CHECK_RUNS_SCHEMA = z.object({ check_runs: z.array(CHECK_RUN_SCHEMA).nullish() })
+// **`check_runs` is required, not `nullish`** (joshuafolkken/kit#1352). GitHub sends it on every
+// successful answer, so the only bodies that lack it are the ones this schema exists to reject — an
+// error object like `{"message":"API rate limit exceeded"}`, which `gh` hands back having exited 0.
+// Left optional, that body parsed and answered "this run had no checks", which is the same laundering
+// as swallowing a 403. `nullable` stays, because a null is still an answer.
+const CHECK_RUNS_SCHEMA = z.object({ check_runs: z.array(CHECK_RUN_SCHEMA).nullable() })
 
 const ISSUE_SCHEMA = z.object({ body: z.string().nullish() })
 
@@ -68,6 +73,21 @@ interface PullSummary {
 	created_ms: number
 	merged_ms: number | undefined
 	updated_ms: number | undefined
+}
+
+// What a check-run read produced, in two states rather than one (joshuafolkken/kit#1352).
+//
+// **A refused read is not an empty check list.** A rate limit, a timeout and expired credentials all
+// arrive through the same `catch`, and answering them with `[]` reports "GitHub recorded no checks
+// for this run" — a definite answer nobody established. The CI wait itself is measured from the pull
+// request's own stamps, so the figures stay right and the row stays `measured`: the only visible
+// difference is an empty per-check table, which is exactly why nothing said the read had failed.
+//
+// The shape is `PullSearch.is_failed`'s deliberately: the listing walk already draws this distinction,
+// and a second spelling of it is how the two reads come to disagree about what a failure looks like.
+interface CheckRunList {
+	runs: ReadonlyArray<CheckRun>
+	is_failed: boolean
 }
 
 interface CheckRun {
@@ -362,32 +382,46 @@ function to_check_run(raw: z.infer<typeof CHECK_RUN_SCHEMA>): CheckRun | undefin
 	return { name: raw.name ?? '', conclusion: raw.conclusion ?? '', started_ms, completed_ms }
 }
 
-function parse_check_runs(text: string): Array<CheckRun> {
+// `undefined` is a body that did not parse, which is a failed read rather than an empty page — the
+// same rule `parse_page` states for the pull listing. A shape change or an error object comes back
+// through `gh` exiting 0, so laundering it into an empty list is indistinguishable from swallowing a
+// 403. A body that parses and holds no completed job really is an empty list, and answers `[]`.
+function parse_check_runs(text: string): Array<CheckRun> | undefined {
 	const parsed = CHECK_RUNS_SCHEMA.safeParse(json_value.parse_or_undefined(text))
 
-	if (!parsed.success) return []
+	if (!parsed.success) return undefined
 
 	return (parsed.data.check_runs ?? [])
 		.map((raw) => to_check_run(raw))
 		.filter((run): run is CheckRun => run !== undefined)
 }
 
+// Safe to share because `runs` is read-only: neither constant can acquire a row from one caller and
+// hand it to the next.
+const NO_CHECKS: CheckRunList = { runs: [], is_failed: false }
+const FAILED_CHECKS: CheckRunList = { runs: [], is_failed: true }
+
+async function read_check_runs(head_sha: string, read: GhReader): Promise<CheckRunList> {
+	try {
+		const runs = parse_check_runs(
+			await read(`${CHECK_RUNS_PATH}/${head_sha}/check-runs?per_page=${String(PAGE_SIZE)}`),
+		)
+
+		return runs === undefined ? FAILED_CHECKS : { runs, is_failed: false }
+	} catch {
+		return FAILED_CHECKS
+	}
+}
+
 // Each CI job's own start and finish, for the per-check table. **These overlap each other** — the
 // jobs run in parallel — so they are reported as durations and never summed into a share; the CI
 // wait itself is measured from the pull request's own window in `time-run.ts`.
-async function list_check_runs(
-	head_sha: string,
-	read: GhReader = read_gh,
-): Promise<Array<CheckRun>> {
-	if (head_sha === '') return []
+//
+// No head sha is not a failure: nothing was asked, so there is nothing that could have been refused.
+async function list_check_runs(head_sha: string, read: GhReader = read_gh): Promise<CheckRunList> {
+	if (head_sha === '') return NO_CHECKS
 
-	try {
-		return parse_check_runs(
-			await read(`${CHECK_RUNS_PATH}/${head_sha}/check-runs?per_page=${String(PAGE_SIZE)}`),
-		)
-	} catch {
-		return []
-	}
+	return await read_check_runs(head_sha, read)
 }
 
 // One issue's body — the epic's task list, for the batch scope (joshuafolkken/kit#1271). What is
@@ -434,6 +468,7 @@ const time_github = {
 
 export type {
 	CheckRun,
+	CheckRunList,
 	GhReader,
 	PullChoice,
 	PullFold,
