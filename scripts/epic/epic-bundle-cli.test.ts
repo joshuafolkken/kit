@@ -4,7 +4,7 @@ import {
 	listing_of,
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
 
@@ -296,39 +296,50 @@ describe('epic_bundle_cli.fetch_epics — a listing the paging cut short', () =>
 // The backlog listing carries titles since joshuafolkken/kit#1252, and a caller may ask for it without
 // the per-issue relation reads. Nothing in this command's own answer changes — which is what makes the
 // option safe, and what makes it worth pinning here rather than only where the new caller lives.
+// What one `fetched()` call hands back: the answer, and the relation-read spy the cases assert on.
+interface Fetched {
+	backlog: unknown
+	relations: MockInstance<typeof git_gh_command.issue_get_state_and_relations>
+}
+
 describe('epic_bundle_cli.fetch_backlog — the title and the relations', () => {
 	const TITLE = 'Stop the gate re-running after every edit'
 
-	async function fetched(options?: { include_relations?: boolean }): Promise<unknown> {
+	// Both reads are mocked here, and the relation spy is handed back rather than made per case
+	// (joshuafolkken/kit#1353). The relation read is on by default, so the case that mocked only the
+	// listing called through to a live `gh api` against real issues — 768ms where its siblings took
+	// 0–1ms, and a 10-second timeout in CI that had nothing to do with the change under test. Handing
+	// the spy back rather than leaving each case to make its own is what keeps that from coming back:
+	// a case cannot forget a mock it is given, and no case ends up spying a second time on a property
+	// this helper has already spied.
+	async function fetched(options?: { include_relations?: boolean }): Promise<Fetched> {
 		vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(
 			listing_of([{ number: 1, title: TITLE, body: '' }]),
 		)
+		const relations = vi
+			.spyOn(git_gh_command, 'issue_get_state_and_relations')
+			.mockResolvedValue(undefined)
 
-		return await epic_bundle_cli.fetch_backlog(REPO, new Map(), new Set(), options)
+		return {
+			backlog: await epic_bundle_cli.fetch_backlog(REPO, new Map(), new Set(), options),
+			relations,
+		}
 	}
 
 	it('carries each row title into the backlog issue', async () => {
-		const backlog = await fetched()
+		const { backlog } = await fetched()
 
 		expect(backlog).toMatchObject({ issues: [{ number: 1, title: TITLE }] })
 	})
 
 	it('reads no relations when the caller asks for none', async () => {
-		const relations = vi
-			.spyOn(git_gh_command, 'issue_get_state_and_relations')
-			.mockResolvedValue(undefined)
-
-		await fetched({ include_relations: false })
+		const { relations } = await fetched({ include_relations: false })
 
 		expect(relations).not.toHaveBeenCalled()
 	})
 
 	it('still reads them by default', async () => {
-		const relations = vi
-			.spyOn(git_gh_command, 'issue_get_state_and_relations')
-			.mockResolvedValue(undefined)
-
-		await fetched()
+		const { relations } = await fetched()
 
 		expect(relations).toHaveBeenCalled()
 	})
