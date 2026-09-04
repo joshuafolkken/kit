@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { time_epic, type ChildTiming, type EpicTimeReport } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import type { TimeReport } from './time-report'
+import { time_run } from './time-run'
 
 const MINUTE_MS = 60_000
 const EPIC = 1272
@@ -125,6 +126,9 @@ const SAMPLE_NOTE = '1 child(ren) x'
 const NO_TREND_TEXT = 'not enough children recorded a turn'
 const FLAT_LINE = 'flat across 2 children'
 const READ_FAILED_NOTE = 'the pull request listing could not be read for issue #106'
+// What the run scope writes for a child whose two sessions ran at the same wall clock.
+const OVERLAP_NOTE =
+	'the shares below total 20.0 min over a 12.0 min window — 8.0 min of it wall clock concurrent sessions shared, and every share and phase percentage is of the 20.0 min'
 
 function line_with(text: string, needle: string): string {
 	return text.split('\n').find((line) => line.includes(needle)) ?? ''
@@ -203,6 +207,19 @@ describe('time_epic_report.format_epic_report — why a child is short of a meas
 		const text = time_epic_report.format_epic_report(epic_of([noted]))
 
 		expect(text).not.toContain(READ_FAILED_NOTE)
+	})
+
+	// The one note that is not about the GitHub half: it says the child's own minutes double-count
+	// wall clock two of its sessions shared. Every completed child has `has_ci_data`, so the filter
+	// above hid it from exactly the rows carrying the inflated figure (joshuafolkken/kit#1330).
+	it('prints the overlap note under a fully measured row', () => {
+		const noted = { ...FIRST_CHILD, report: { ...FIRST_CHILD.report, notes: [OVERLAP_NOTE] } }
+		const text = time_epic_report.format_epic_report(epic_of([noted]))
+
+		// Asserted here so a fixture that stopped being an overlap note fails rather than passing the
+		// case by matching nothing.
+		expect(time_run.is_overlap_note(OVERLAP_NOTE)).toBe(true)
+		expect(text).toContain(OVERLAP_NOTE)
 	})
 })
 
