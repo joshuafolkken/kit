@@ -10,9 +10,9 @@ import { AI_DOCS, read_repo_file, read_unwrapped, WORKFLOW_PROMPT } from './ai-d
 // closed three minutes later) against #911 (same route, command was run, Issue was added).
 //
 // The markers pin the parts a reword loses first: that filing alone is not finished, the write
-// command each Tier A answer needs (`epic:bundle` itself writes nothing), that `ask` stops outside an
-// `epicrun` and parks inside one, that the bundle has to run before the parent closes, and that a
-// `none` printed after a truncation warning is not an answer.
+// command each Tier A answer needs (`epic:bundle` itself writes nothing), that `ask` is decided and
+// recorded rather than stopping or parking, that the bundle has to run before the parent closes, and
+// that a `none` printed after a truncation warning is not an answer.
 
 const REVIEW_PROMPT = 'prompts/review.md'
 const SKILL_ROOT = '.claude/skills/workflow-commands'
@@ -63,9 +63,12 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'`pnpm josh epic --add <E> <new>`',
 	'`pnpm josh epic "<title>" <new> <other> [--ordered]`',
 	'never a hand edit of the epic body',
-	// `ask` stopping is correct everywhere except inside an `epicrun`, which parks instead of
-	// stopping — without the carve-out one Tier B answer halts the whole batch.
-	'**Inside an `epicrun`, park the child with `needs-decision` and continue**',
+	// joshuafolkken/kit#1339: `ask` used to stop a run and park a child inside an `epicrun`, which
+	// halted a whole batch over where a follow-up Issue was filed while its implementation was
+	// finished and its pull request mergeable. Placing an issue is reversible in one `epic --add`, so
+	// the answer is decided and recorded instead — and the record is what a reword loses first.
+	'**This does not stop a run and does not park a child**',
+	'record the decision** — what was taken, what was rejected, why, and the date',
 	// Order matters: the candidate search reads open issues only, so bundling after the parent
 	// closes reproduces exactly the failure this rule exists to prevent.
 	'**before the current Issue closes.**',
@@ -144,7 +147,10 @@ const WORKFLOW_PROMPT_MARKERS: ReadonlyArray<string> = [
 	'`pnpm josh epic:bundle <新規>` を実行する',
 	'**`epic:bundle` は推奨するだけで何も書き込まない**',
 	'`pnpm josh epic --add <E> <新規>`',
-	'**`epicrun` 中はバッチを止めず、その子に `needs-decision` を付けて park する**',
+	// joshuafolkken/kit#1339: the canonical prompt carried the park too, so leaving it here would have
+	// the extended reference contradict the skills the moment either is reread.
+	'停止もせず park もしない**',
+	'所属先を選ぶことは epic の統合ではない',
 	'**現在の Issue が閉じる前に** `pnpm josh epic:bundle <新規>` を実行する',
 	'**逆に、実行せずに起票だけで終えると、指摘は落ちるのではなく永久に park される。**',
 	'**差は、コマンドを打ったかどうかだけだった**',
@@ -269,7 +275,11 @@ describe.each(FILING_SKILLS)('%s — states the step where the filing happens', 
 		BUNDLE_COMMAND,
 		TIER_A_ANSWER,
 		'before this Issue closes',
-		'parks the child inside an `epicrun`',
+		// joshuafolkken/kit#1339: `ask` no longer stops a run or parks a child. What each skill has to
+		// carry now is the pair that replaced it — the choice and the record — because a skill that
+		// keeps only the choice authorizes an unattended decision nobody can audit afterwards.
+		'`ask` is Tier A too',
+		"record the decision on both the new Issue and that epic's `## Decisions`",
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
