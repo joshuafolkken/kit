@@ -230,21 +230,27 @@ describe('time_phases.build_phases — the total survives the wait phase', () =>
 		expect(total_ms(phases)).toBe(16 * MINUTE_MS)
 	})
 
-	// The invariant the phase table is cross-checked against: every human span goes to `wait` and
-	// nothing else does, so the row equals the human-wait category the same report prints above it.
-	it('gives the wait phase exactly the human category total', () => {
+	// The invariant that replaced the old `wait` ≡ human equality (joshuafolkken/kit#1331): every human
+	// span goes to one of the two wait rows and nothing else does, so the *pair* equals the human-wait
+	// category the same report prints above it. The first wait here falls outside the run, so the
+	// assertion would fail against either row alone.
+	it('gives the two wait phases exactly the human category total between them', () => {
 		const spans = [
 			waited(0, 3),
-			span(3, 1, { marker: time_markers.EDIT_MARKER }),
-			span(4, 2, { josh_command: GATE_COMMAND }),
-			waited(6, 6),
+			span(3, 1, { marker: time_markers.WORKFLOW_MARKER }),
+			span(4, 1, { marker: time_markers.EDIT_MARKER }),
+			span(5, 2, { josh_command: GATE_COMMAND }),
+			waited(7, 6),
 		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
 		const human_minutes = spans
 			.filter((entry) => entry.category === time_spans.HUMAN_CATEGORY)
 			.reduce((sum, entry) => sum + entry.duration_ms / MINUTE_MS, 0)
 
-		expect(minutes_of(phases, time_phases.WAIT_PHASE)).toBe(human_minutes)
+		expect(
+			minutes_of(phases, time_phases.WAIT_PHASE) +
+				minutes_of(phases, time_phases.WAIT_OUTSIDE_PHASE),
+		).toBe(human_minutes)
 	})
 })
 
@@ -287,30 +293,34 @@ describe('time_phases.build_phases — detection', () => {
 	})
 })
 
-// `wait` and `other` rest on no marker, so they are detected on the transcript half being present
-// rather than on anything having landed in them (joshuafolkken/kit#1295).
-describe('time_phases.build_phases — the two span-backed phases', () => {
+// The two wait rows and `other` rest on no marker, so they are detected on the transcript half being
+// present rather than on anything having landed in them (joshuafolkken/kit#1295). `wait-outside`
+// joins them rather than resting on the run's edges (joshuafolkken/kit#1331): the two are withheld
+// together or printed together, which is what keeps their sum checkable against the category row.
+describe('time_phases.build_phases — the three span-backed phases', () => {
 	// A run whose transcript was read genuinely spent that long in each — zero included. `RUN` leaves
-	// both empty and both still count as measured.
-	it('reports wait and other as detected on a transcript that left them empty', () => {
+	// all three empty and all three still count as measured.
+	it('reports the wait rows and other as detected on a transcript that left them empty', () => {
 		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
 
 		expect([
 			detected(phases, time_phases.WAIT_PHASE),
+			detected(phases, time_phases.WAIT_OUTSIDE_PHASE),
 			detected(phases, time_phases.OTHER_PHASE),
-		]).toEqual([true, true])
+		]).toEqual([true, true, true])
 	})
 
 	// **The one state in which they are not measured at all** (joshuafolkken/kit#1295): no span was
 	// read, so `0.0 min` would assert that nobody waited and that nothing fell outside the stages —
 	// two claims the run made no measurement for.
-	it('withholds wait and other when no span was read', () => {
+	it('withholds the wait rows and other when no span was read', () => {
 		const phases = time_phases.build_phases({ spans: [], ci_ms: MINUTE_MS, has_ci_data: true })
 
 		expect([
 			detected(phases, time_phases.WAIT_PHASE),
+			detected(phases, time_phases.WAIT_OUTSIDE_PHASE),
 			detected(phases, time_phases.OTHER_PHASE),
-		]).toEqual([false, false])
+		]).toEqual([false, false, false])
 	})
 })
 

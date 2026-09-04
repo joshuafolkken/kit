@@ -1,4 +1,26 @@
 import { time_markers } from './time-markers'
+import {
+	CI_PHASE,
+	COMMAND_PHASES,
+	GATE_COMMAND,
+	GATE_PHASE,
+	IMPLEMENT_PHASE,
+	MERGE_PHASE,
+	OTHER_PHASE,
+	PHASE_ORDER,
+	PLAN_PHASE,
+	POST_RUN_PHASE,
+	PR_PHASE,
+	PRE_RUN_PHASE,
+	REVIEW_PHASE,
+	REWORK_PHASE,
+	SETUP_PHASE,
+	SPAN_BACKED_PHASES,
+	WAIT_OUTSIDE_PHASE,
+	WAIT_PHASE,
+	WRAPUP_PHASE,
+	type PhaseName,
+} from './time-phase-names'
 import { time_spans, type Span } from './time-spans'
 
 // Cutting the same elapsed time by workflow phase rather than by what was waited on
@@ -40,8 +62,22 @@ import { time_spans, type Span } from './time-spans'
 // a fact about the run, and folding it into the remainder hides it behind whatever else landed
 // there. Every human span carries `NO_CALL` — the closing event is a typed prompt, which names no
 // tool — so none of them was ever in a command phase, and moving all of them here leaves `gate`,
-// `review`, `pr` and `merge` untouched while making `wait` equal to the human-wait category exactly.
-// That equality is the invariant, and it is what lets the two halves of the report cross-check.
+// `review`, `pr` and `merge` untouched.
+//
+// **`wait` is then cut at the run's own edges, exactly as the remainder already was**
+// (joshuafolkken/kit#1331). Measured on three merged `fullrun`s it was 29–49% of the run and the
+// single largest phase in one of them, and that one row held two different things: time the run
+// stalled on a person, which a proposal can cut, and time the session was idle before the keyword
+// was typed or after the merge, which is not the run's at all. It is the distinction
+// joshuafolkken/kit#1299 drew for `other`, never drawn here only because `wait` was pinned to the
+// category total — so the largest row in the table was the one nothing could be proposed against.
+//
+// **The invariant that replaces that pin: `wait` + `wait-outside` equals the human-wait category
+// exactly.** No other phase can take a human span and neither row can take anything else, so the
+// *sum* is what the two halves of the report are now cross-checked against. The two are detected on
+// one criterion — `has_transcript_data`, which is the one `wait` already had — so they are withheld
+// together or printed together: a report printing one and withholding the other could not be
+// cross-checked at all, which is the property this split preserves rather than spends.
 //
 // **`setup`, `wrapup`, `pre-run` and `post-run` are the remainder cut into the regions it was made
 // of** (joshuafolkken/kit#1299). `other` prints with `is_detected: true`, so it ranked as a measured
@@ -68,87 +104,11 @@ import { time_spans, type Span } from './time-spans'
 //
 // **The four take only what was already `other`, so no existing phase moves.** They are tested
 // after the command phases and after the three windows, which is what makes this change a
-// subdivision of one row rather than a reclassification — and `wait` keeps every human span,
-// including the ones outside the run, because the invariant above is what the two halves of the
-// report are cross-checked against.
+// subdivision of one row rather than a reclassification. **The two boundaries they rest on are what
+// `wait` is now cut at too** — a human span is charged to `wait-outside` rather than to `pre-run` or
+// `post-run`, so those two keep reporting work and the waiting stays in a row of its own.
 
-type PhaseName =
-	| 'plan'
-	| 'setup'
-	| 'implement'
-	| 'gate'
-	| 'rework'
-	| 'review'
-	| 'pr'
-	| 'wrapup'
-	| 'ci'
-	| 'merge'
-	| 'wait'
-	| 'pre-run'
-	| 'post-run'
-	| 'other'
-
-const PLAN_PHASE: PhaseName = 'plan'
-const SETUP_PHASE: PhaseName = 'setup'
-const IMPLEMENT_PHASE: PhaseName = 'implement'
-const GATE_PHASE: PhaseName = 'gate'
-const REWORK_PHASE: PhaseName = 'rework'
-const REVIEW_PHASE: PhaseName = 'review'
-const PR_PHASE: PhaseName = 'pr'
-const WRAPUP_PHASE: PhaseName = 'wrapup'
-const CI_PHASE: PhaseName = 'ci'
-const MERGE_PHASE: PhaseName = 'merge'
-const WAIT_PHASE: PhaseName = 'wait'
-const PRE_RUN_PHASE: PhaseName = 'pre-run'
-const POST_RUN_PHASE: PhaseName = 'post-run'
-const OTHER_PHASE: PhaseName = 'other'
-
-// Run order, which is the order they are printed in — by where a phase *opens*, so `wrapup` sits
-// beside the pull request it starts at rather than after the merge it runs beside. `wait`, the two
-// outside-the-run rows and `other` come last because none is a stage anything passes through: one is
-// time spent between the stages, two are time that was not the run's at all, and the last is the
-// remainder.
-const PHASE_ORDER: ReadonlyArray<PhaseName> = [
-	PLAN_PHASE,
-	SETUP_PHASE,
-	IMPLEMENT_PHASE,
-	GATE_PHASE,
-	REWORK_PHASE,
-	REVIEW_PHASE,
-	PR_PHASE,
-	WRAPUP_PHASE,
-	CI_PHASE,
-	MERGE_PHASE,
-	WAIT_PHASE,
-	PRE_RUN_PHASE,
-	POST_RUN_PHASE,
-	OTHER_PHASE,
-]
-
-// Neither is a boundary marker, so neither can fail to be found: `other` is the remainder, and `wait`
-// is read off the span's own category. A run nobody waited on genuinely waited zero minutes, which is
-// the one answer `not detected` must not be given for — so these two are detected whenever a
-// transcript was read at all, rather than on a marker.
-//
-// **They are withheld on exactly the terms the three transcript category rows are**
-// (joshuafolkken/kit#1295) — no span read at all. `wait` printing `0.0 min` where nothing was read
-// asserts that nobody waited, and the run that produces it is the one a reader is least able to check.
-// Keying both halves off the same criterion is also what keeps `wait` equal to the `human wait`
-// category row: the two are withheld together or printed together, never one of each.
-const SPAN_BACKED_PHASES: ReadonlySet<PhaseName> = new Set([WAIT_PHASE, OTHER_PHASE])
-
-const GATE_COMMAND = 'josh gate'
 const NO_DURATION = 0
-
-// The `pnpm josh <cmd>` names `time-spans.ts` already reads off a Bash call, mapped to the phase
-// each one *is*. Read from that field rather than re-detected here, so what counts as a gate run is
-// one rule and not two.
-const COMMAND_PHASES = new Map<string, PhaseName>([
-	[GATE_COMMAND, GATE_PHASE],
-	['josh git', PR_PHASE],
-	['josh pr', PR_PHASE],
-	['josh followup', MERGE_PHASE],
-])
 
 interface PhaseTotal {
 	phase: PhaseName
@@ -475,12 +435,25 @@ function window_phase(span: Span, windows: Windows): PhaseName {
 	return unphased_phase(span, windows)
 }
 
+// Which of the two wait rows a human span belongs to, read off the same `outside_phase` the regions
+// use — one rule for "which side of the run is this on", never two that could come to disagree.
+//
+// **A wait is placed by where it started, exactly as every other span is** (joshuafolkken/kit#1331).
+// A session idle across the keyword — a human span opening before the workflow marker and closing at
+// the prompt that typed it — is charged wholly to `wait-outside`. Splitting the interval at the
+// boundary is the one thing that would stop every span landing in exactly one phase, which is what
+// makes the phases reconstruct the elapsed time; and the reading is the true one for that case
+// anyway, since nobody was waiting on a run that had not started.
+function wait_phase(span: Span, windows: Windows): PhaseName {
+	return outside_phase(span, windows) === undefined ? WAIT_PHASE : WAIT_OUTSIDE_PHASE
+}
+
 // **Waiting is decided before anything else, because it is not work.** A human span closes at a
 // typed prompt and so carries no command, which means the tests below would have sent every one of
 // them to a window or to `other` — and a window that collects them stops answering how long its
 // stage took.
 function span_phase(span: Span, windows: Windows): PhaseName {
-	if (span.category === time_spans.HUMAN_CATEGORY) return WAIT_PHASE
+	if (span.category === time_spans.HUMAN_CATEGORY) return wait_phase(span, windows)
 
 	return command_phase(span) ?? window_phase(span, windows)
 }
@@ -497,8 +470,8 @@ function totals_of(spans: ReadonlyArray<Span>, windows: Windows): Map<PhaseName,
 	return totals
 }
 
-// Each of the three rests on a different half being present rather than on a marker: `ci` on the
-// GitHub half, `wait` and `other` on the transcript half — the same two flags the matching category
+// Each of the four rests on a half being present rather than on a marker: `ci` on the GitHub half,
+// the two wait rows and `other` on the transcript half — the same two flags the matching category
 // rows are withheld on, so the two halves of the report cannot disagree about what was read.
 function is_marker_detected(phase: PhaseName, found: Detection): boolean {
 	if (phase === CI_PHASE) return found.has_ci_data
@@ -573,11 +546,14 @@ const time_phases = {
 	CI_PHASE,
 	MERGE_PHASE,
 	WAIT_PHASE,
+	WAIT_OUTSIDE_PHASE,
 	PRE_RUN_PHASE,
 	POST_RUN_PHASE,
 	OTHER_PHASE,
 	build_phases,
 }
 
-export type { PhaseInput, PhaseName, PhaseTotal }
+export type { PhaseInput, PhaseTotal }
 export { time_phases }
+
+export { type PhaseName } from './time-phase-names'

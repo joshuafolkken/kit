@@ -210,8 +210,9 @@ describe('time_report.format_report — a run with no transcript read', () => {
 		expect(unread()).toContain(time_report.format_row(CI_ROW, MINUTE_MS, WHOLE_SHARE))
 	})
 
-	// The `wait` phase and the `human wait` category are the same quantity read two ways, so they are
-	// withheld together — the cross-check joshuafolkken/kit#1290 left the report resting on.
+	// The two wait phases and the `human wait` category are the same quantity read two ways — a sum
+	// since joshuafolkken/kit#1331 split `wait` at the run's edges — so they are withheld together,
+	// the cross-check joshuafolkken/kit#1290 left the report resting on.
 	it('withholds the wait phase alongside the human wait category', () => {
 		expect(unread()).toContain(
 			time_report.format_columns(time_phases.WAIT_PHASE, '', time_report.NOT_DETECTED),

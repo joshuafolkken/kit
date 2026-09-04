@@ -61,15 +61,18 @@ Read from the JSON, in this order:
   is an unknown rather than a measurement — the printed table says so with `not measured`. Ranking a
   stage off them there is ranking an unknown
 - **the phase breakdown** — `plan` / `setup` / `implement` / `gate` / `rework` / `review` / `pr` /
-  `wrapup` / `ci` / `merge` / `wait` / `pre-run` / `post-run` / `other`, which says which *stage* is
-  long where the per-tool table says which *command* is slow. **`pre-run` and `post-run` are not
-  stages and are never ranked** (joshuafolkken/kit#1299): they are what the branch attribution swept
-  in from before the run opened and after it merged, so a cut proposed against either would cut a
-  different piece of work. `setup` and `wrapup` are the run's own, and both can be ranked.
+  `wrapup` / `ci` / `merge` / `wait` / `wait-outside` / `pre-run` / `post-run` / `other`, which says
+  which *stage* is long where the per-tool table says which *command* is slow. **`pre-run`,
+  `post-run` and `wait-outside` are not stages and are never ranked** (joshuafolkken/kit#1299,
+  joshuafolkken/kit#1331): they are what the branch attribution swept in from before the run opened
+  and after it merged, so a cut proposed against any of them would cut a different piece of work —
+  and `wait-outside` is the same sweep's share of the waiting, which is why `wait` alone is the row
+  a stop-reducing proposal is measured against. `setup` and `wrapup` are the run's own, and both can
+  be ranked.
 - **`is_detected` per phase** — a phase that never appeared prints `not detected`, and that is not a
-  measured zero. Never rank a phase you did not measure. `wait` and `other` rest on no marker, so
-  they are `false` only where no span was read — the same state the three transcript shares are
-  withheld in.
+  measured zero. Never rank a phase you did not measure. `wait`, `wait-outside` and `other` rest on
+  no marker, so they are `false` only where no span was read — the same state the three transcript
+  shares are withheld in.
 - **the round trips** — `tool_call_count` and `round_trip_count`, and the density between them
   (joshuafolkken/kit#1304). Once the verification commands were cut, this is what sets a run's floor:
   the tools themselves run for well under a minute while the turns they sit in cost ten times that.
