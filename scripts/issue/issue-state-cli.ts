@@ -65,7 +65,15 @@ interface IssueReport {
 // `absent` and "given but with nothing usable after it" are different answers. Falling back to the
 // session's repository on the second would print a confident state for a *different* issue of the
 // same number, which is the exact misread the `--repo` argument exists to prevent.
-type RepoFlag = { kind: 'absent' } | { kind: 'named'; repo: string } | { kind: 'incomplete' }
+//
+// A named flag carries the argv positions it actually occupied, never the token text it matched
+// (joshuafolkken/kit#1355). Removing tokens by value removes every token that happens to look like
+// one of them — a second `--repo`, a repeated `owner/repo` — and a token removed is a token nobody
+// is told about, which is the whole failure this file refuses elsewhere.
+type RepoFlag =
+	| { kind: 'absent' }
+	| { kind: 'named'; repo: string; consumed: ReadonlyArray<number> }
+	| { kind: 'incomplete' }
 
 // Both spellings gh itself accepts. `--repo=owner/repo` falling through to the separate-word branch
 // would read as no repository at all, which is the fall back to the session's repository above.
@@ -76,7 +84,9 @@ function read_inline_repo(argv: ReadonlyArray<string>): RepoFlag | undefined {
 
 	const repo = inline.slice(INLINE_REPO_FLAG.length)
 
-	return repo.length === 0 ? { kind: 'incomplete' } : { kind: 'named', repo }
+	if (repo.length === 0) return { kind: 'incomplete' }
+
+	return { kind: 'named', repo, consumed: [argv.indexOf(inline)] }
 }
 
 function read_separate_repo(argv: ReadonlyArray<string>): RepoFlag {
@@ -84,22 +94,23 @@ function read_separate_repo(argv: ReadonlyArray<string>): RepoFlag {
 
 	if (index === -1) return { kind: 'absent' }
 
-	const repo = argv[index + 1]
+	const value_index = index + 1
+	const repo = argv[value_index]
 
 	if (repo === undefined || repo.startsWith(FLAG_PREFIX)) return { kind: 'incomplete' }
 
-	return { kind: 'named', repo }
+	return { kind: 'named', repo, consumed: [index, value_index] }
 }
 
 function read_repo_flag(argv: ReadonlyArray<string>): RepoFlag {
 	return read_inline_repo(argv) ?? read_separate_repo(argv)
 }
 
-// The repository's own token, in either spelling, so it can never be read as the issue number.
-function is_repo_token(argument: string, repo_flag: RepoFlag): boolean {
-	if (repo_flag.kind !== 'named') return false
-
-	return argument === repo_flag.repo || argument === `${INLINE_REPO_FLAG}${repo_flag.repo}`
+// The argv positions the repository flag occupied, and nothing else. Everything outside this set was
+// offered as an issue number, whatever it looks like — so a flag nobody recognizes reaches the check
+// below and refuses the call instead of vanishing from it (joshuafolkken/kit#1355).
+function consumed_indices(repo_flag: RepoFlag): ReadonlySet<number> {
+	return new Set(repo_flag.kind === 'named' ? repo_flag.consumed : [])
 }
 
 function parse_request(argv: ReadonlyArray<string>): StateRequest | undefined {
@@ -107,17 +118,22 @@ function parse_request(argv: ReadonlyArray<string>): StateRequest | undefined {
 
 	if (repo_flag.kind === 'incomplete') return undefined
 
-	// The repository is read first so its value is never mistaken for an issue number, and the flags
-	// go with it — what remains is everything the caller offered as an issue number.
-	const rest = argv.filter(
-		(argument) => !is_repo_token(argument, repo_flag) && !argument.startsWith(FLAG_PREFIX),
-	)
+	// The repository is read first, flag word and value together, so neither is ever mistaken for an
+	// issue number — and nothing else is removed here. Every remaining token is one the caller offered
+	// as an issue number, whatever it looks like.
+	const consumed = consumed_indices(repo_flag)
+	const rest = argv.filter((_argument, index) => !consumed.has(index))
 	const numbers = rest.filter((argument) => ISSUE_NUMBER_PATTERN.test(argument))
 
 	// A token that is not a number refuses the whole invocation rather than being dropped. Dropping
 	// it answers fewer numbers than were asked for and still exits zero — and with one number left,
 	// the surviving block prints in the single-number shape, so nothing in the output says a number
 	// went unanswered. `#1262` copied out of a `diag` table is exactly that token.
+	//
+	// An unrecognized flag reaches this same check rather than a lenient one of its own
+	// (joshuafolkken/kit#1355). `--rep=owner/repo` used to be discarded for starting with a dash, so
+	// the call fell back to the session's repository and printed a confident state for a *different*
+	// repository's issue of that number — the misread `incomplete` already exists to prevent.
 	if (numbers.length === 0 || numbers.length !== rest.length) return undefined
 
 	// In the order they were typed, with a repeat dropped: repeating a number would spend a second
