@@ -130,6 +130,12 @@ interface Span extends ToolCall {
 	duration_ms: number
 	ended_ms: number
 	branch: string
+	// Whether this span is the *remainder* of a call whose middle was given to a delegated unit, cut
+	// out by `time_overlap.trim` (joshuafolkken/kit#1304). One call comes back as two spans there, so
+	// anything counting calls rather than intervals has to skip the second — the round-trip block and
+	// the per-tool table's `call_count` both do. Every span the transcript itself yields is `false`;
+	// only the subtraction sets it.
+	is_continuation: boolean
 }
 
 interface Block {
@@ -357,6 +363,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		josh_command: event.josh_command,
 		marker: event.marker,
 		branch: event.branch,
+		is_continuation: false,
 		ended_ms: event.timestamp_ms,
 		duration_ms: event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms),
 	}))

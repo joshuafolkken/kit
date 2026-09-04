@@ -52,6 +52,8 @@ function report_of(input: ChildInput): TimeReport {
 		elapsed_ms: elapsed_minutes * MINUTE_MS,
 		span_count: halves.span_count,
 		turn_count,
+		tool_call_count: 0,
+		round_trip_count: 0,
 		categories: { model_ms, tool_ms: MINUTE_MS, human_ms: MINUTE_MS, ci_ms: MINUTE_MS },
 		has_ci_data: halves.has_ci_data,
 		notes: [],

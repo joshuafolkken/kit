@@ -592,7 +592,8 @@ Within that scope, every rule that passes the test is resident in full, and a ma
 each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most of them,
 `scripts/verify-ui-skill.test.ts` for the UI gate,
 `scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step, and
-`scripts/inline-edit-rule.test.ts` for the file-editing prohibition:
+`scripts/inline-edit-rule.test.ts` for the file-editing prohibition, and
+`scripts/turn-batching-rule.test.ts` for the one-turn instruction:
 
 - **Explicit invocation required** — it decides whether a workflow starts at all, so it binds on the
   turn the user types the keyword, which is before anything here has been read.
@@ -627,6 +628,12 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   file to fix the three lines a review named carries the replacement wholesale exactly as a heredoc
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
+- **The instruction to put independent calls in one turn** — a tool call happens on any turn at all
+  and no skill is loaded before one, so this passes the criterion for the same reason the
+  prohibition above does, and binds at the same moment. What stays resident is the trigger and the
+  criterion that decides it — whether this call's input needs another call's result, not what kind of
+  call it is. The measured cost, the mechanisms that were rejected and how `pnpm josh time` reports
+  the result are at `prompts/collaboration-workflow/turn-batching.md` (joshuafolkken/kit#1304).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in
