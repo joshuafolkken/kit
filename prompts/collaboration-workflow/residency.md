@@ -12,7 +12,7 @@
 
 **範囲の外にある常駐規則はこの一覧に載らないのが正常である。** 命名規約、品質上限、Code Change Rules、Package-First などには移す先が存在せず、判定基準が問う「skill がロードされていないターンでも効くか」という問い自体が成り立たない。一覧に無いことは欠落ではない（joshuafolkken/kit#955）。
 
-範囲の中で yes になる規則は次で全部であり、いずれも 3 文書すべてに残っていることをマーカーテストが表明している（大半は `scripts/workflow-skills.test.ts`、UI 検証ゲートは `scripts/verify-ui-skill.test.ts`、後追い起票は `scripts/review-followup-bundle-document-rule.test.ts`、ファイル編集の禁止は `scripts/inline-edit-rule.test.ts`）。
+範囲の中で yes になる規則は次で全部であり、いずれも 3 文書すべてに残っていることをマーカーテストが表明している（大半は `scripts/workflow-skills.test.ts`、UI 検証ゲートは `scripts/verify-ui-skill.test.ts`、後追い起票は `scripts/review-followup-bundle-document-rule.test.ts`、ファイル編集の禁止は `scripts/inline-edit-rule.test.ts`、ターン内バッチングは `scripts/turn-batching-rule.test.ts`）。
 
 - **明示起動の必須**（「指示されていない行動は取らない」）— そもそもワークフローを開始してよいかを決める規則なので、ユーザーがキーワードを打った瞬間、つまり skill を読むより前に効く必要がある
 - **停止時の `confirmation` 通知** — これを要する停止の大半（別パッケージ起因の割り込み、Tier C の確認）は、ワークフローのキーワードが一度も打たれていないターンで起きる
@@ -22,6 +22,7 @@
 - **レビュー上限後の後追い起票の手順** — 起票して `epic:bundle` で EPIC へ繋ぎ直すところまで。コミット前セルフレビューはワークフローの外でも回るので、そこで起票された Issue も同じように孤児になる。完全な手順は `prompts/review.md` →「Review round cap」にある
 - **`josh epic:*` のうちコマンドの外側で効く 3 件** — 決定の記録による `needs-decision` の解除、`epic:audit` の指摘を直すのが Tier A であること、別リポジトリの EPIC を `owner/repo#N` で参照すること。いずれも `epic:*` コマンドを走らせていないターン（Issue を起票した直後、決定を書いた瞬間）に効く
 - **編集後の本文をコマンドに載せない禁止** — ファイル編集はどのターンでも起き、**編集の直前にロードされる skill は存在しない**。オンデマンド側に置くとこの規則は一度も発火せず、書いたのに削除したのと同じ振る舞いになる。実測値・可否表・根拠は [`file-edits.md`](./file-edits.md) にあり、常駐に残すのは指示と判断基準（「本文を丸ごと運ぶか」であってツール名ではない）だけである（joshuafolkken/kit#1150）。**Edit 自体を全文へ広げる形も同じ規則の一部である** — 数行の指摘に対する全文書き直しは、ツールを替えただけで同じコストを払っている。常駐にはその禁止の一句だけを置き、全文を書いてよい 3 条件は同じ指し先にある（joshuafolkken/kit#1260）
+- **独立した呼び出しを同じターンに載せる規則** — ツールの呼び出しもどのターンでも起き、**呼び出しの直前にロードされる skill は存在しない**。上の禁止と同じ理由で、同じ場面（編集の直前）で同時に効く。常駐に残すのはトリガと判断基準（「依存の有無」であって呼び出しの種類ではない）だけで、実測値・却下した機構案・ゲートを弱めない条件は [`turn-batching.md`](./turn-batching.md) にある（joshuafolkken/kit#1304）
 
 no になり skill 側に本体を置くものの例:
 

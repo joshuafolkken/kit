@@ -1,4 +1,5 @@
 import { time_phases, type PhaseTotal } from './time-phases'
+import { time_round_trips } from './time-round-trips'
 import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
 
 // Aggregating timed spans into the report a person reads (joshuafolkken/kit#1267).
@@ -25,6 +26,18 @@ const NOT_DETECTED = 'not detected'
 // `not measured` for its own category rows since joshuafolkken/kit#1271.
 const NOT_MEASURED = 'not measured'
 const PHASE_HEADING = 'By phase (in run order):'
+const ROUND_TRIP_HEADING = 'Round trips:'
+const CALLS_LABEL = 'tool calls'
+const TRIPS_LABEL = 'round trips'
+// The unit the density and its floor are both quoted in, written once so the row and the warning
+// beneath it cannot come to name it differently.
+const PER_ROUND_TRIP = 'calls per round trip'
+// What the trips row says instead of a density when there were no round trips to divide by.
+const NO_CALLS = 'no tool call to divide'
+const NO_DENSITY = 0
+// The one sentence the threshold exists to produce. It names what is not happening rather than the
+// number, because the number is already in the row above it.
+const BATCHING_WARNING = 'independent calls are going out one per turn'
 // The category labels, shared with the epic scope's table rather than spelled out in each. The two
 // tables answer the same question at two scales, so a label renamed in one and not the other is a
 // report that disagrees with itself — which is the defect joshuafolkken/kit#1295 was filed for.
@@ -64,6 +77,13 @@ interface TimeReport {
 	// because the spans are gone by the time a caller holds one: an epic aggregation reads several
 	// runs' reports and has no access to the arrays they were built from.
 	turn_count: number
+	// How many tool calls the run made, and how many times it stopped to wait for their results
+	// (joshuafolkken/kit#1304). The two differ exactly by batching: calls issued together in one turn
+	// are one round trip, and a run that batches nothing has as many round trips as calls. Carried on
+	// the report for the same reason `turn_count` is — the spans are gone by the time an epic
+	// aggregation reads several runs' reports.
+	tool_call_count: number
+	round_trip_count: number
 	categories: CategoryTotals
 	// Whether the GitHub half was read at all. A session report has no pull request, so printing a
 	// `CI wait 0.0 min` row there would assert a measurement nobody made.
@@ -105,15 +125,20 @@ function category_ms(spans: ReadonlyArray<Span>, category: SpanCategory): number
 // An empty label is not a bucket. Every span carries a category, but only tool spans carry a tool
 // name, and only a Bash span running `pnpm josh <cmd>` carries a command — printing the rest under
 // a blank row would invent a total nobody measured.
-function accumulate(totals: Map<string, LabelTotal>, label: string, duration_ms: number): void {
+//
+// **A continuation adds its duration and not a call** (joshuafolkken/kit#1304). One call bracketing a
+// delegated unit comes back from `time_overlap.trim` as two spans; both intervals are real and both
+// are summed, but counting both as calls reported a run as having made more than it did — and left
+// this table disagreeing with the round-trip block, which counts the same calls.
+function accumulate(totals: Map<string, LabelTotal>, label: string, span: Span): void {
 	if (label === '') return
 
 	const existing = totals.get(label) ?? { label, duration_ms: 0, call_count: 0 }
 
 	totals.set(label, {
 		label,
-		duration_ms: existing.duration_ms + duration_ms,
-		call_count: existing.call_count + 1,
+		duration_ms: existing.duration_ms + span.duration_ms,
+		call_count: existing.call_count + (span.is_continuation ? 0 : 1),
 	})
 }
 
@@ -121,7 +146,7 @@ function totals_by(spans: ReadonlyArray<Span>, key_of: (span: Span) => string): 
 	const totals = new Map<string, LabelTotal>()
 	const rows: Array<LabelTotal> = []
 
-	for (const span of spans) accumulate(totals, key_of(span), span.duration_ms)
+	for (const span of spans) accumulate(totals, key_of(span), span)
 	// Drained with a loop rather than a spread: `Iterator#toArray` is not in this project's TS lib,
 	// and the spread form the linter would otherwise demand does not type-check.
 	for (const [, row] of totals) rows.push(row)
@@ -138,6 +163,17 @@ function to_iso(timestamp_ms: number): string {
 // day between them leave real time that belonged to nobody, and counting it as elapsed would report
 // a run as a day long. So the header states what was accounted for, and `started_at` / `ended_at`
 // still carry the wall window a reader can check it against.
+// The two counts the round-trip block reads, taken together because they are one question asked at
+// two grains: how many calls, and how many times the run stopped for them.
+function round_trip_totals(
+	spans: ReadonlyArray<Span>,
+): Pick<TimeReport, 'round_trip_count' | 'tool_call_count'> {
+	return {
+		tool_call_count: time_round_trips.count_calls(spans),
+		round_trip_count: time_round_trips.count_round_trips(spans),
+	}
+}
+
 function build_from_spans(input: ReportInput): TimeReport {
 	const { spans, ci_ms } = input
 	const categories = {
@@ -154,6 +190,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		elapsed_ms: categories.model_ms + categories.tool_ms + categories.human_ms + ci_ms,
 		span_count: spans.length,
 		turn_count: of_category(spans, time_spans.MODEL_CATEGORY).length,
+		...round_trip_totals(spans),
 		categories,
 		has_ci_data: input.has_ci_data,
 		notes: [...input.notes],
@@ -227,6 +264,50 @@ function phase_lines(report: TimeReport): Array<string> {
 	if (report.phases.length === 0) return []
 
 	return ['', PHASE_HEADING, ...report.phases.map((phase) => phase_line(phase, report.elapsed_ms))]
+}
+
+// The threshold's whole output. Printed only when the density is under the floor, because a run that
+// batches has nothing to say here and a line that appears every time is one nobody reads.
+function batching_warning_lines(density: number): Array<string> {
+	if (!time_round_trips.is_below_floor(density)) return []
+
+	const floor = time_round_trips.format_density(time_round_trips.CALLS_PER_ROUND_TRIP_FLOOR)
+
+	return [`  ⚠ ${BATCHING_WARNING} (floor ${floor} ${PER_ROUND_TRIP})`]
+}
+
+// **A transcript that was read but called no tool has no density, and says so.** The division
+// answers `0` there, which is the same value an unread transcript produces — printing it as
+// `0.00 calls per round trip` would report the worst possible batching for a scope that did no
+// batching to grade.
+function density_text(density: number): string {
+	if (density === NO_DENSITY) return NO_CALLS
+
+	return `${time_round_trips.format_density(density)} ${PER_ROUND_TRIP}`
+}
+
+function measured_round_trip_lines(report: TimeReport): Array<string> {
+	const { tool_call_count, round_trip_count, turn_count } = report
+	const density = time_round_trips.calls_per_round_trip(tool_call_count, round_trip_count)
+
+	return [
+		format_columns(CALLS_LABEL, String(tool_call_count), `over ${String(turn_count)} turn(s)`),
+		format_columns(TRIPS_LABEL, String(round_trip_count), density_text(density)),
+		...batching_warning_lines(density),
+	]
+}
+
+// **A run whose transcript was not read has no round trips to report, and says so** — the same
+// answer, on the same criterion, that the three category shares already give. A count of `0` here
+// would read as a run that called no tool at all, which is never true of a run that merged.
+function round_trip_lines(report: TimeReport): Array<string> {
+	const heading = ['', ROUND_TRIP_HEADING]
+
+	if (!time_spans.has_transcript_data(report.span_count)) {
+		return [...heading, unmeasured_row(CALLS_LABEL), unmeasured_row(TRIPS_LABEL)]
+	}
+
+	return [...heading, ...measured_round_trip_lines(report)]
 }
 
 function ci_line(report: TimeReport): Array<string> {
@@ -305,6 +386,7 @@ function format_report(report: TimeReport): string {
 		'Where the wall clock went:',
 		...category_lines(report),
 		...phase_lines(report),
+		...round_trip_lines(report),
 		...total_lines('By tool (descending):', report.by_tool),
 		...total_lines('By josh command (descending):', report.by_josh_command),
 		...total_lines('By CI check (descending, jobs overlap):', report.by_check),
@@ -316,6 +398,12 @@ const time_report = {
 	NOT_DETECTED,
 	NOT_MEASURED,
 	PHASE_HEADING,
+	ROUND_TRIP_HEADING,
+	CALLS_LABEL,
+	TRIPS_LABEL,
+	PER_ROUND_TRIP,
+	NO_CALLS,
+	BATCHING_WARNING,
 	MODEL_LABEL,
 	TOOL_LABEL,
 	HUMAN_LABEL,

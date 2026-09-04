@@ -36,6 +36,7 @@
 | 最新優先・fix-forward（pin-back は最終手段）                                   | [`latest-first.md`](./collaboration-workflow/latest-first.md)                           |
 | 恒久ルールは MEMORY ではなくプロンプト／ドキュメントに書く                     | [`durable-rules.md`](./collaboration-workflow/durable-rules.md)                         |
 | ファイル編集はコマンド本文に本文を載せない                                     | [`file-edits.md`](./collaboration-workflow/file-edits.md)                               |
+| 独立した呼び出しは同じターンに載せる                                           | [`turn-batching.md`](./collaboration-workflow/turn-batching.md)                         |
 | 委譲 — 機械的な工程を安価な実行単位へ回す                                      | [`delegation.md`](./collaboration-workflow/delegation.md)                               |
 | `josh eval` をいつ回すか（配布物の変更を測る）                                 | [`eval-gate.md`](./collaboration-workflow/eval-gate.md)                                 |
 | 依存更新（`josh latest`）をいつ回すか                                          | [`latest-gate.md`](./collaboration-workflow/latest-gate.md)                             |

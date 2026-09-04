@@ -1495,6 +1495,11 @@ By phase (in run order):
   wait                     28.8 min   39.4%
   other                     4.4 min   6.0%
 
+Round trips:
+  tool calls                    104   over 153 turn(s)
+  round trips                   104   1.00 calls per round trip
+  ⚠ independent calls are going out one per turn (floor 1.50 calls per round trip)
+
 By tool (descending):
   Bash: pnpm                7.0 min   12 call(s)
   Skill                     5.7 min   4 call(s)
@@ -1508,6 +1513,8 @@ By josh command (descending):
 ```
 
 **The partition is by gap, not by pair.** Every span is the interval between two consecutive dated lines, classified by the **later** one: a span ending at an assistant line is model wait, one ending at a tool result is that tool's execution, one ending at a typed prompt is human wait. So the three shares reconstruct the elapsed time **exactly**, and a reader can check them instead of trusting them. Pairing each `tool_use` with its own `tool_result` instead would double-count parallel calls and leave the shares summing to more than the run took — which is the property that makes two runs comparable.
+
+**The round-trip block counts what a duration cannot see** ([#1304](https://github.com/joshuafolkken/kit/issues/1304)). Once the verification commands were cut, a run's wall clock stopped being set by how long the tools ran and started being set by **how many times it stopped to wait for one**: on `fullrun #1295` the read-only `Bash` calls and the `Edit` calls together executed for about 54 seconds while the turns they sat in cost 600–850. So the report prints the calls, the **round trips** they were issued in — one per group of calls a single turn issued together — and the density between them. A run that batches nothing has as many round trips as calls, and below **1.50 calls per round trip** the block says so in a line rather than leaving the reader to divide. The four runs it was set from measured 1.13, 1.04, 1.03 and 1.00. Cutting the count is [`turn-batching.md`](https://github.com/joshuafolkken/kit/blob/main/prompts/collaboration-workflow/turn-batching.md); this only reports it.
 
 **One run is not a sample.** [#1262](https://github.com/joshuafolkken/kit/issues/1262) recorded "tool execution 59% / model 39%" from a single hand-measured run; three real sessions measured by this command put tool execution at 25–40% and human wait at 17–44%. All three of the sessions [#1267](https://github.com/joshuafolkken/kit/issues/1267) restored by hand reproduce here to within 0.4 points.
 

@@ -44,6 +44,8 @@ function report_of(input: ReportInput): TimeReport {
 		elapsed_ms: is_timed ? model_ms + MINUTE_MS : 0,
 		span_count,
 		turn_count,
+		tool_call_count: 0,
+		round_trip_count: 0,
 		categories: { model_ms, tool_ms: MINUTE_MS, human_ms: 0, ci_ms: 0 },
 		has_ci_data,
 		notes: [],

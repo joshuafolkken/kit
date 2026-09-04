@@ -1,24 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { time_markers } from './time-markers'
 import { time_phases } from './time-phases'
 import { time_report } from './time-report'
+import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span, type Timeline } from './time-spans'
 
-const MINUTE_MS = 60_000
+const { MINUTE_MS, span } = time_span_fixture
 const SESSION = 'abcd1234'
 const PNPM_LABEL = 'Bash: pnpm'
-
-function span(category: Span['category'], minutes: number, label = '', josh_command = ''): Span {
-	return {
-		category,
-		label,
-		josh_command,
-		marker: time_markers.NO_MARKER,
-		branch: 'main',
-		ended_ms: 0,
-		duration_ms: minutes * MINUTE_MS,
-	}
-}
 
 function timeline(spans: ReadonlyArray<Span>): Timeline {
 	const elapsed = spans.reduce((sum, entry) => sum + entry.duration_ms, 0)
@@ -278,6 +266,67 @@ describe('time_report — the phase breakdown', () => {
 		const total = report.phases.reduce((sum, phase) => sum + phase.duration_ms, 0)
 
 		expect(total).toBe(report.elapsed_ms)
+	})
+})
+
+// joshuafolkken/kit#1304. `MIXED` is one turn issuing three calls at once, which is the shape the
+// rule asks for; `SERIAL` is the same work one call per turn, which is the shape every run measured
+// on that issue actually had.
+const SERIAL = [
+	span(time_spans.MODEL_CATEGORY, 1),
+	span(time_spans.TOOL_CATEGORY, 1, PNPM_LABEL),
+	span(time_spans.MODEL_CATEGORY, 1),
+	span(time_spans.TOOL_CATEGORY, 1, PNPM_LABEL),
+]
+const DENSITY_SUFFIX = time_report.PER_ROUND_TRIP
+
+describe('time_report.format_report — the round-trip block', () => {
+	it('reports the calls, the trips they were issued in and the turns they sat in', () => {
+		const text = time_report.format_report(build(MIXED))
+
+		expect(text).toContain(time_report.ROUND_TRIP_HEADING)
+		expect(text).toContain(`3.00 ${DENSITY_SUFFIX}`)
+		expect(text).toContain('over 1 turn(s)')
+	})
+
+	it('leaves a run that batched its calls unflagged', () => {
+		expect(time_report.format_report(build(MIXED))).not.toContain(time_report.BATCHING_WARNING)
+	})
+
+	it('flags a run that issued one call per turn', () => {
+		const text = time_report.format_report(build(SERIAL))
+
+		expect(text).toContain(`1.00 ${DENSITY_SUFFIX}`)
+		expect(text).toContain(time_report.BATCHING_WARNING)
+	})
+
+	it('carries both counts into the machine-readable report', () => {
+		const report = build(MIXED)
+
+		expect(report.tool_call_count).toBe(3)
+		expect(report.round_trip_count).toBe(1)
+	})
+
+	// The division answers `0` for a transcript that was read and called no tool, which is the same
+	// value an unread one produces. Printed as a density it would grade a scope that did no batching
+	// to grade.
+	it('says there was nothing to divide rather than printing a density of zero', () => {
+		const text = time_report.format_report(build([span(time_spans.MODEL_CATEGORY, 1)]))
+
+		expect(text).toContain(time_report.NO_CALLS)
+		expect(text).not.toContain(DENSITY_SUFFIX)
+		expect(text).not.toContain(time_report.BATCHING_WARNING)
+	})
+
+	// The same criterion the three category shares are withheld on (joshuafolkken/kit#1295): a run
+	// whose transcript was not read has no round trips, and `0` there reads as a run that called no
+	// tool at all rather than as one nobody measured.
+	it('says the counts were not measured where no span was read', () => {
+		const text = time_report.format_report(run_report([], MINUTE_MS))
+
+		expect(text).toContain(time_report.CALLS_LABEL)
+		expect(text).toContain(time_report.TRIPS_LABEL)
+		expect(text).not.toContain(DENSITY_SUFFIX)
 	})
 })
 
