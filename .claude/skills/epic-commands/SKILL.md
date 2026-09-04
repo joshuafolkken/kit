@@ -217,11 +217,23 @@ hundred of them, never pay it.
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
 | Already a child of an epic | Add to **that** epic; do not create a second | A |
-| Spread across **different** epics | **Stop and ask** | **B** |
+| Spread across **different** epics | **Choose the one you recommend, add to it, and record why** | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
 
-Bundling is reversible; merging epics is not, which is the one branch that asks.
+**Placing an issue is not merging epics, and reading it as one is what used to stop runs.** Bundling
+is reversible — one `epic --add` moves an issue to a different epic — so choosing between two
+candidate epics is Tier A: take the one you recommend, and write the decision (what was taken, what
+was rejected, why, and the date) on **both** the issue and the epic's `## Decisions`. **Merging two
+epics is a different action, and nothing here proposes it**: this verdict fires whenever related
+issues sit in different epics, which includes an epic and its own parent — joshuafolkken/kit#1079
+records three such false positives, one of which stopped a whole batch over an issue whose
+implementation was finished and whose pull request was mergeable. Stop only where the two epics are
+genuinely too close to separate, which is the toss-up Tier B is for and is rare.
+
+**The decision record is what pays for the autonomy.** Skipping it is not a shortcut past a
+formality — it is the half that makes an unattended choice auditable, and without it the run has
+simply taken a decision nobody can find afterwards.
 
 **Its sibling runs before the filing, not after it: `pnpm josh issue:scout "<title>"`.** That command
 answers the same epic question for an issue that does not exist yet — this decision, called rather

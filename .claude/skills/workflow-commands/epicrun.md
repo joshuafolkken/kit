@@ -777,6 +777,14 @@ Then return to step 1. The other children are unaffected unless they depend on t
 is still filed immediately and unconditionally (Tier A for a first-party target), and a workaround
 is still forbidden. What changes is the blast radius: the child waits, the run continues.
 
+**A placement choice is not one of the things this run may not decide.** `epic:bundle`'s `ask` — the
+issues related to a newly filed one sitting in more than one epic — is Tier A: choose the epic you
+recommend, add it with `pnpm josh epic --add <E> <N> --after <M>`, and record the decision on both
+the new Issue and that epic's `## Decisions`. Parked instead, it stopped a batch over an Issue whose
+implementation was finished, whose review had converged and whose pull request was mergeable — the
+only open question being where a follow-up Issue was filed (joshuafolkken/kit#1339). What remains a
+park is a genuine toss-up between two epics that are equally apt, and that is rare.
+
 **Removing the label is Tier A — do it without asking.** When the decision is recorded (joshuafolkken/kit#862
 writes it to the epic's `## Decisions`), remove the label and re-run `epicrun`; the state is on
 GitHub, so the run picks up where it left off.

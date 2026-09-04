@@ -80,6 +80,32 @@ describe('epic_bundle_cli.format_decision — the headline', () => {
 	})
 })
 
+// joshuafolkken/kit#1339: `ask` used to print "not a call to make without confirmation (Tier B)",
+// which told a run to stop over a placement one `epic --add` reverses. **Both lines are asserted,
+// because the reason prints directly under the headline**: the first version of this change left the
+// reason saying "merging epics is not a call to make without asking" beneath a headline that now says
+// Tier A, so the command contradicted itself in its own two lines of output.
+describe('epic_bundle_cli — the `ask` verdict', () => {
+	const decision: BundleDecision = { action: 'ask', epics: [10, 20], candidates: [2], reason: 'r' }
+
+	it('tells the reader to choose and record rather than to stop', () => {
+		expect(render(decision, issue(1))).toContain(action_line('ask'))
+		expect(action_line('ask')).toContain('Tier A — do it')
+		expect(action_line('ask')).not.toContain('Tier B')
+	})
+
+	it('gives a reason that agrees with the headline', () => {
+		const spread = epic_bundle.decide_bundle(issue(1, { body: 'refers to #2 and #3' }), [
+			issue(2, { epic: 10 }),
+			issue(3, { epic: 20 }),
+		])
+
+		expect(spread.action).toBe('ask')
+		expect(spread.reason).not.toContain('without asking')
+		expect(spread.reason).toContain('record why')
+	})
+})
+
 // joshuafolkken/kit#947: the referenced-issue read is the second half of the fix, and its failure
 // mode is the one the whole Issue is about — a read that did not happen must not arrive as "no
 // relation found". `warn_about_gaps` is what keeps it visible, so the wiring is asserted here rather
