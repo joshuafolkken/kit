@@ -33,6 +33,10 @@ const NOT_MEASURED = 'not measured'
 // need it** (joshuafolkken/kit#1311). Those two cannot import `time-report.ts`, which imports them —
 // and a second cap beside a second renderer is exactly the drift this file was split out to prevent.
 const MAX_ROWS = 15
+// What separates the facts inside one row's third column — a check's conclusion from its outcome
+// note, a distribution's range from its sample count. Written once so two renderers of the same
+// report cannot come to punctuate their suffixes differently (joshuafolkken/kit#1312).
+const SUFFIX_SEPARATOR = ' · '
 
 // **The parenthetical says "this report" rather than "them all"** (joshuafolkken/kit#1301): since
 // `--top` can cut the record itself before either rendering, a promise that `--json` carries every row
@@ -80,8 +84,16 @@ function unmeasured_row(label: string): string {
 	return format_columns(label, '', NOT_MEASURED)
 }
 
+// The indent a report's notes sit under, beneath its heading. Written once because three renderers
+// print them — the run scope, the epic scope and the distribution — and a fourth copy is how two
+// tables of one command would come to indent the same sentence differently (joshuafolkken/kit#1312).
+function note_lines(notes: ReadonlyArray<string>): Array<string> {
+	return notes.map((note) => `  ${note}`)
+}
+
 const time_format = {
 	MAX_ROWS,
+	SUFFIX_SEPARATOR,
 	NOT_MEASURED,
 	overflow_line,
 	format_minutes,
@@ -90,6 +102,7 @@ const time_format = {
 	format_columns,
 	format_row,
 	unmeasured_row,
+	note_lines,
 }
 
 export { time_format }

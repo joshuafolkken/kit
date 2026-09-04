@@ -1598,6 +1598,7 @@ pnpm josh time                  # the most recently merged run — the fullrun t
 pnpm josh time --issue <number> # one issue's whole run, from the fullrun invocation to the merge
 pnpm josh time --session <id>   # one named session on its own
 pnpm josh time --epic <number>  # a whole epicrun, child by child, with the per-turn trend across them
+pnpm josh time --last <runs>    # the last <runs> merged runs as a distribution — min, median and max per phase and per check
 pnpm josh time --top <rows>     # cap the per-tool, per-josh-command, segment and per-invocation tables at <rows> each
 pnpm josh time --json           # the same figures, machine-readable
 ```
@@ -1753,7 +1754,35 @@ Model wait per turn (in execution order):
 
 **A child is reported in four states, and three of them are not a duration of zero.** `not run` is a child nothing was measured for; `no transcript` is one that merged with no session transcript attributed, so only its CI wait is known and the three transcript shares are **withheld** rather than printed as `0.0 min`; `not merged` is a run that did not finish; only the fourth is fully measured. The batch totals follow the same rule one level up — a half no child contributed to prints `not measured`, not a summed zero. **A row whose merge was not read carries the child's own notes beneath it**, because `not run` covers "the batch never reached it" and "the pull request listing could not be read" alike, and a status printed alone would report a rate-limited `gh` as an idle batch. `--json` carries each child's whole report, phase breakdown included, exactly as `--issue` carries one run's.
 
-**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the flags that pick a scope, and naming more than one of `--issue` / `--session` / `--epic` is refused rather than answered silently. An epic that could not be read exits non-zero too — an epic that tracks no children is a real, empty answer and says so instead. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row unless `--top <rows>` asks for fewer, which says how many it withheld in a note rather than stopping silently.
+**`--last <N>` reports the last N merged runs as a distribution, because one run is not a sample** ([#1312](https://github.com/joshuafolkken/kit/issues/1312)). [`diag`](https://github.com/joshuafolkken/kit/blob/main/.claude/skills/diag/SKILL.md) already required that a verdict rest on more than one reading, and nothing here could produce the spread that asks for: the 2026-09-04 measurement ran `--issue` five times by hand, lined the rows up in an editor, and still left two verdicts as "cannot tell" with no way to say whether the cause was variance or too few readings. The runs are the N most recently **merged** pull requests whose head branch names an issue — the rule `pnpm josh time` with no argument already resolves "the run that just finished" by, extended from one run to N — and each is measured by exactly the code `--issue` and `--epic` use, so no scope can report a different figure for the same run. **Min, median and max rather than a mean and a deviation**: the question is whether an effect is larger than the spread, and three endpoints answer it without assuming a distribution five readings could never establish. The median goes in the duration column and the range beside it, with the **sample count** at the end — which is the point of the whole table:
+
+```
+the last 9 merged run(s) — 9 of 9 fully measured
+
+By run (newest merge first):
+  #1311                    40.9 min   measured
+  #1310                    25.8 min   measured
+  …
+
+Where the wall clock went (median, then min – max):
+  model wait               14.6 min   9.7 min – 23.6 min · 9 run(s)
+  tool execution           13.3 min   10.0 min – 17.4 min · 9 run(s)
+
+By phase (in run order, median, then min – max):
+  plan                                not measured
+  implement                 5.2 min   1.1 min – 14.5 min · 9 run(s)
+  review                    5.7 min   3.8 min – 8.8 min · 9 run(s)
+  …
+
+By CI check (descending by median, jobs overlap):
+  Checks                    1.5 min   1.4 min – 1.6 min · 9 run(s)
+  SonarQube                 1.5 min   1.4 min – 1.8 min · 9 run(s)
+  …
+```
+
+**A reading nobody could take is excluded, never counted as zero** — the property the whole scope rests on. A phase absent from two of five runs is **three samples and says so**, so a row is never dragged toward zero by the runs that never reached that stage; a phase no run detected prints `not measured` exactly as it does for one run; and a run that merged with **no session transcript attributed** is left out of the transcript-side rows entirely, with a note saying how many were excluded and why — it still contributes its CI wait, because that half _was_ read. The run list under the heading is what makes the sample checkable: a distribution whose readings nobody can name is not one a reader can verify. `--top` reaches each run's own tables exactly as it reaches an epic's children, and the distribution tables themselves are left uncapped for the reason `by_check` is — their rows are bounded by the vocabulary rather than by the length of a run. **Nothing about the measurement is new**: the runs are chosen here and measured by the same fan-out `--epic` goes through, so a second reading of a run cannot exist to disagree with the first.
+
+**Nothing is ever silently zero**, as on the cost side. An absent transcript exits non-zero and says where it looked; a transcript with fewer than two dated lines says it has no timed lines rather than printing a table of zeroes. An issue with no pull request, one whose pull request is still open, and one no transcript is attributed to each say so in a note and print what _is_ known — and where no merge was read at all, the CI row is **withheld** rather than printed as a measured `0.0 min` beside a note saying it is unknown. The pull-request lookup answers in three states, not two: found, definitely absent, and _not found among the 500 most recently updated_ — and a read that failed (an unauthenticated or rate-limited `gh`) says so rather than being reported as proof that no pull request exists. `pnpm josh time` with nothing merged to report on exits non-zero and names the flags that pick a scope, and naming more than one of `--issue` / `--session` / `--epic` / `--last` is refused rather than answered silently. `--last` with no merged run to resolve exits non-zero too, rather than printing a distribution of zeroes. An epic that could not be read exits non-zero too — an epic that tracks no children is a real, empty answer and says so instead. The text tables are capped at 15 rows and say how many they withheld; `--json` carries every row unless `--top <rows>` asks for fewer, which says how many it withheld in a note rather than stopping silently.
 
 ### `josh eval`
 

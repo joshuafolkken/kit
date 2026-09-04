@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { time_batch, type RunTiming } from './time-batch'
 import { time_corpus } from './time-corpus'
-import { time_epic, type ChildTiming } from './time-epic'
+import { time_epic } from './time-epic'
 import { time_epic_fixture, type ReportInput } from './time-epic-fixture'
 import { time_pull_fixture } from './time-pull-fixture'
 import type { TimeReport } from './time-report'
@@ -12,13 +13,13 @@ const { CWD, MINUTE_MS, EPIC, ROW_101, ROW_102, ROW_103, OPEN_ROW_101, FENCE, PA
 	time_epic_fixture
 const { report_of, body_of, reader_of, batch_of } = time_epic_fixture
 
-function timing_of(input: ReportInput): ChildTiming {
+function timing_of(input: ReportInput): RunTiming {
 	const report = report_of(input)
 
 	return {
 		issue_number: input.issue_number,
-		status: time_epic.status_of(report),
-		ms_per_turn: time_epic.ms_per_turn_of(report),
+		status: time_batch.status_of(report),
+		ms_per_turn: time_batch.ms_per_turn_of(report),
 		report,
 	}
 }
@@ -56,43 +57,9 @@ function stub_children(reports: ReadonlyMap<number, TimeReport>): MockedRunRepor
 // that assert the same count one level down.
 const { pulls_asked, raw_pull, EXHAUSTED_SEARCH } = time_pull_fixture
 
-describe('time_epic.status_of', () => {
-	// The acceptance criterion: a child that never ran is not a child that took no time.
-	it('calls a child with no spans and no merge "not run"', () => {
-		const report = report_of({ issue_number: 1, has_ci_data: false, span_count: 0 })
-
-		expect(time_epic.status_of(report)).toBe(time_epic.NOT_RUN)
-	})
-
-	it('separates a run that never merged from one that did', () => {
-		const open = report_of({ issue_number: 1, has_ci_data: false, span_count: 4 })
-
-		expect(time_epic.status_of(open)).toBe(time_epic.NOT_MERGED)
-		expect(time_epic.status_of(report_of({ issue_number: 1 }))).toBe(time_epic.MEASURED)
-	})
-
-	// Measured on epic #1272 itself: children that merged with a real CI wait and not one line of
-	// transcript attributed. Calling that `measured` would print `model 0.0 min` for a model wait
-	// nobody read.
-	it('separates a merge with no transcript from a fully measured run', () => {
-		const merged_only = report_of({ issue_number: 1, span_count: 0 })
-
-		expect(time_epic.status_of(merged_only)).toBe(time_epic.NO_TRANSCRIPT)
-	})
-})
-
-describe('time_epic.ms_per_turn_of', () => {
-	it('divides model wait by the turns it was spread over', () => {
-		const report = report_of({ issue_number: 1, model_ms: 4 * MINUTE_MS, turn_count: 4 })
-
-		expect(time_epic.ms_per_turn_of(report)).toBe(MINUTE_MS)
-	})
-
-	// Never `0`: "no turn was recorded" and "each turn was instant" are different answers.
-	it('answers undefined rather than zero for a run with no turn', () => {
-		expect(time_epic.ms_per_turn_of(report_of({ issue_number: 1, turn_count: 0 }))).toBeUndefined()
-	})
-})
+// `status_of` and `ms_per_turn_of` moved to `time-batch.test.ts` with the module they belong to
+// (joshuafolkken/kit#1312): `--last` classifies its runs by the same four answers, so a suite beside
+// one of the two callers would leave the other's reading uncovered.
 
 describe('time_epic.in_execution_order', () => {
 	it('orders children by when they ran, not by the order the body lists them', () => {
@@ -206,7 +173,7 @@ describe('time_epic.build_epic_report — the batch', () => {
 
 		expect(report.unmeasured_count).toBe(1)
 		expect(report.total_ms).toBe(2 * MINUTE_MS)
-		expect(report.children.at(-1)?.status).toBe(time_epic.NOT_RUN)
+		expect(report.children.at(-1)?.status).toBe(time_batch.NOT_RUN)
 		expect(report.notes.join('\n')).toContain('not run')
 	})
 })

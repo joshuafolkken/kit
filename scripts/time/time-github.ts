@@ -304,25 +304,35 @@ function oldest_update(pulls: ReadonlyArray<PullSummary>): number | undefined {
 	return stamps.length === 0 ? undefined : Math.min(...stamps)
 }
 
-// Whether a later page could still hold a newer merge. **A merged pull request always carries
-// `updated_at >= merged_at`** — the merge is itself an update — so once this page's oldest update
-// is no newer than the best merge seen, every row after it in an update-sorted listing was last
-// touched before that merge, and none of them can be a newer one. Checked against all 485 merged
-// rows in the five pages this walk can read, on 2026-09-04.
+// Whether a later page could still hold a merge newer than `merged_ms`. **A merged pull request
+// always carries `updated_at >= merged_at`** — the merge is itself an update — so once this page's
+// oldest update is no newer than the merge asked about, every row after it in an update-sorted
+// listing was last touched before that merge, and none of them can be a newer one. Checked against
+// all 485 merged rows in the five pages this walk can read, on 2026-09-04.
 //
 // **The proof is what keeps the ordinary case at one request.** Reading all `MAX_PAGES` and taking
 // the global maximum is the other correct answer, and it costs five requests every time to fix a
 // case that arises when more than a page of pull requests were updated after the newest merge.
-function is_merge_certain(
+//
+// **The merge instant is the parameter rather than a candidate**, because the two callers hold
+// different candidates: the lookup below settles on one pull request, while `--last N` settles on the
+// *oldest* of the N it is keeping — a later page cannot beat that one either (joshuafolkken/kit#1312).
+function is_past_merge_boundary(
 	pulls: ReadonlyArray<PullSummary>,
-	best: PullSummary | undefined,
+	merged_ms: number | undefined,
 ): boolean {
-	const merged_ms = best?.merged_ms
 	const oldest_ms = oldest_update(pulls)
 
 	if (merged_ms === undefined || oldest_ms === undefined) return false
 
 	return oldest_ms <= merged_ms
+}
+
+function is_merge_certain(
+	pulls: ReadonlyArray<PullSummary>,
+	best: PullSummary | undefined,
+): boolean {
+	return is_past_merge_boundary(pulls, best?.merged_ms)
 }
 
 // The newest merge across this page and every page before it, and whether that is settled. The
@@ -412,6 +422,7 @@ const time_github = {
 	pulls_page_path,
 	newest_merged,
 	newest_merged_choice,
+	is_past_merge_boundary,
 	FAILED_SEARCH: FAILED,
 	absent_search,
 	to_found,

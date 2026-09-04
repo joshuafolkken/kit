@@ -40,7 +40,7 @@ const MERGE_WAIT_SUFFIX = 'the last check to finish before it'
 const LAST_TO_FINISH_NOTE = 'was the last check to finish,'
 const BEFORE_MERGE_SUFFIX = 'before the merge — the merge itself waited on something else'
 const NO_BLOCKING_CHECK = 'no check finished before the merge — none of these is what it waited on'
-const SEPARATOR = ' · '
+const SEPARATOR = time_format.SUFFIX_SEPARATOR
 const NO_DURATION = 0
 const AT_THE_MERGE = 0
 // How close the merge has to follow the last check for the merge to be said to have waited on it.

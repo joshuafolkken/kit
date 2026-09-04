@@ -41,6 +41,7 @@ states is reported as unmeasured, never counted as zero.
 pnpm josh time --top 5 --json               # alias: josh tm
 pnpm josh time --issue <N> --top 5 --json
 pnpm josh time --epic <E> --top 5 --json
+pnpm josh time --last <N> --top 5 --json    # the spread across the last N merged runs
 ```
 
 **`--top 5` is part of the call, not a nicety** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). Without it the JSON carries every row of the per-tool and per-`josh <cmd>` tables, and an epic pays for both once per child — epic #1262 measured 47.7 KB at 9 children and had more than doubled by 18. What this skill ranks off those tables is the handful of rows at the top, so the tail is read into the context and never used. Everything else the steps below quote — the four shares, every phase, the round trips and their price — is unaffected: the cap reaches the **row tables** and nothing else.
@@ -105,8 +106,13 @@ with both figures beside it.
 
 - **Compare the same phase, not the totals.** Human wait swamps everything and moves for reasons no
   change controls, so a run that got slower overall can still carry a phase that halved.
-- **One run is not a sample.** Where two runs disagree, say so rather than picking the one that
-  supports the change.
+- **One run is not a sample, and there is a call that says so with figures**
+  ([#1312](https://github.com/joshuafolkken/kit/issues/1312)). `pnpm josh time --last <N> --top 5 --json`
+  reports the last N merged runs as a min/median/max per phase and per CI check, with the **sample
+  count** on every row — so "the effect is smaller than the spread" and "there were not enough
+  readings to tell" become two different sentences instead of one shrug. Take it before writing a
+  verdict that rests on two runs; where two runs still disagree, say so rather than picking the one
+  that supports the change.
 - **"Cannot tell" is an answer.** A phase that is `not detected` in either run, or a run with no
   merge read, cannot support a verdict, and reporting one anyway is how a speedup that did nothing
   keeps its reputation.

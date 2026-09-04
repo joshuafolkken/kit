@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { time_batch } from './time-batch'
 import { time_corpus } from './time-corpus'
-import { time_epic } from './time-epic'
 import { time_epic_fixture } from './time-epic-fixture'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
@@ -118,7 +118,7 @@ describe('time_epic.build_epic_report — one child that could not be read', () 
 		const report = await batch_of(body_of(TRIO_ROWS))
 		const failed = report.children.find((child) => child.issue_number === UNREADABLE)
 
-		expect(failed?.status).toBe(time_epic.NOT_RUN)
+		expect(failed?.status).toBe(time_batch.NOT_RUN)
 		expect(failed?.report.elapsed_ms).toBe(0)
 		expect(failed?.report.notes.join('\n')).toContain(GH_FAILURE)
 	})
