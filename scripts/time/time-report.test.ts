@@ -280,6 +280,12 @@ const SERIAL = [
 ]
 const DENSITY_SUFFIX = time_report.PER_ROUND_TRIP
 
+// The one row a case is about, so an assertion cannot pass on a word another row happens to carry —
+// `no tool call to divide` is printed by the trips row and the cost row alike.
+function line_of(text: string, label: string): string {
+	return text.split('\n').find((row) => row.includes(label)) ?? ''
+}
+
 describe('time_report.format_report — the round-trip block', () => {
 	it('reports the calls, the trips they were issued in and the turns they sat in', () => {
 		const text = time_report.format_report(build(MIXED))
@@ -306,14 +312,50 @@ describe('time_report.format_report — the round-trip block', () => {
 		expect(report.tool_call_count).toBe(3)
 		expect(report.round_trip_count).toBe(1)
 	})
+})
 
+// joshuafolkken/kit#1307. The counts above say how often a run went round; these say what one of
+// those trips cost, which is what a proposed cut is multiplied by.
+describe('time_report.format_report — the price of a round trip', () => {
+	// `MIXED` is one turn of 4 minutes issuing three calls that run for 6, and then a 10-minute human
+	// wait. The single round trip is priced at the 10 minutes it was made of; the wait is nobody's
+	// round trip and stays out of the numerator.
+	it('prices one round trip beside the counts', () => {
+		const text = time_report.format_report(build(MIXED))
+
+		expect(line_of(text, time_report.COST_LABEL)).toContain('600.0 s')
+		expect(line_of(text, time_report.COST_LABEL)).toContain(`${time_report.MODEL_LABEL} 240.0 s`)
+	})
+
+	it('carries the unit price into the machine-readable report', () => {
+		const report = build(MIXED)
+
+		expect(report.ms_per_round_trip).toBe(10 * MINUTE_MS)
+		expect(report.model_ms_per_round_trip).toBe(4 * MINUTE_MS)
+	})
+
+	// A run's elapsed time includes what nobody's round trip caused, so a price built from it would be
+	// multiplied out as a saving and then counted again against the `wait` row of the same table.
+	it('keeps the human wait out of the price', () => {
+		const report = build(MIXED)
+
+		expect(report.elapsed_ms).toBe(20 * MINUTE_MS)
+		expect(report.ms_per_round_trip).toBeLessThan(report.elapsed_ms)
+	})
+})
+
+// The block's three rows are withheld together, on one criterion each, because a measured zero in
+// any of them asserts something nobody established: no batching to grade, or no tool called at all.
+describe('time_report.format_report — the round-trip block withholds rather than zeroes', () => {
 	// The division answers `0` for a transcript that was read and called no tool, which is the same
 	// value an unread one produces. Printed as a density it would grade a scope that did no batching
-	// to grade.
-	it('says there was nothing to divide rather than printing a density of zero', () => {
-		const text = time_report.format_report(build([span(time_spans.MODEL_CATEGORY, 1)]))
+	// to grade, and printed as a price it would report a run whose every turn was instantaneous.
+	it('says there was nothing to divide rather than printing a density or a price of zero', () => {
+		const report = build([span(time_spans.MODEL_CATEGORY, 1)])
+		const text = time_report.format_report(report)
 
-		expect(text).toContain(time_report.NO_CALLS)
+		expect(report.ms_per_round_trip).toBe(0)
+		expect(line_of(text, time_report.COST_LABEL)).toContain(time_report.NO_CALLS)
 		expect(text).not.toContain(DENSITY_SUFFIX)
 		expect(text).not.toContain(time_report.BATCHING_WARNING)
 	})
@@ -321,11 +363,12 @@ describe('time_report.format_report — the round-trip block', () => {
 	// The same criterion the three category shares are withheld on (joshuafolkken/kit#1295): a run
 	// whose transcript was not read has no round trips, and `0` there reads as a run that called no
 	// tool at all rather than as one nobody measured.
-	it('says the counts were not measured where no span was read', () => {
+	it('says the counts and the price were not measured where no span was read', () => {
 		const text = time_report.format_report(run_report([], MINUTE_MS))
 
 		expect(text).toContain(time_report.CALLS_LABEL)
 		expect(text).toContain(time_report.TRIPS_LABEL)
+		expect(line_of(text, time_report.COST_LABEL)).toContain(time_report.NOT_MEASURED)
 		expect(text).not.toContain(DENSITY_SUFFIX)
 	})
 })

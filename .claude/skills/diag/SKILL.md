@@ -71,7 +71,20 @@ Read from the JSON, in this order:
   **A density near 1.00 is the finding, not a detail** — it says independent calls went out one per
   turn, and the printed block says so in a line. It rests on the same transcript the three shares do,
   so a scope with `span_count: 0` measured none of it either
-- **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost
+- **the price of one round trip** — `ms_per_round_trip`, with `model_ms_per_round_trip` beside it
+  (joshuafolkken/kit#1307). The counts above say how *often* a run went round; this says what one of
+  them is worth, and **without it the round trips cannot enter step 3's table at all** — that table
+  ranks by minutes saved per run, and a count is not minutes. Multiply the price by the trips a
+  proposed change would remove, and rank the product against the phases. **The model share is the
+  part batching actually removes**, because a tool's own execution is paid whichever turn it was
+  issued from. **The price is not a share of `elapsed_ms`** — human wait, CI wait and the turns that
+  called nothing are all outside it, so the product can be ranked beside the `wait` and `ci` rows
+  without counting the same minutes twice. It is withheld rather than zeroed where there was no round
+  trip to divide by
+- **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost. **Rank a tool by
+  its round trips as well as its duration**: a tool called thirty times one call per turn costs thirty
+  round trips at the price above, which is routinely larger than the seconds the calls themselves ran
+  for — the reading that was missed before the price was reported
 
 ## 2. Say whether the last speedup actually worked
 

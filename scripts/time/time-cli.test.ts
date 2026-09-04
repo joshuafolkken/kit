@@ -229,6 +229,8 @@ const RUN_REPORT: TimeReport = {
 	turn_count: 1,
 	tool_call_count: 1,
 	round_trip_count: 1,
+	ms_per_round_trip: 3 * MINUTE_MS,
+	model_ms_per_round_trip: MINUTE_MS,
 	categories: { model_ms: MINUTE_MS, tool_ms: 2 * MINUTE_MS, human_ms: 0, ci_ms: 5 * MINUTE_MS },
 	has_ci_data: true,
 	notes: ['1 session(s)'],

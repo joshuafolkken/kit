@@ -46,6 +46,8 @@ function report_of(input: ReportInput): TimeReport {
 		turn_count,
 		tool_call_count: 0,
 		round_trip_count: 0,
+		ms_per_round_trip: 0,
+		model_ms_per_round_trip: 0,
 		categories: { model_ms, tool_ms: MINUTE_MS, human_ms: 0, ci_ms: 0 },
 		has_ci_data,
 		notes: [],
