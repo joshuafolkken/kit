@@ -21,7 +21,8 @@ ignorePaths:
   # type check resolves to `josh-app check:ci` never writes one, and `.eslintcache` is written
   # everywhere.
   # joshuafolkken/kit#1332: the edit hook's own eslint cache, written wherever the hook runs. It is
-  # separate from `.eslintcache` above so that a hook run cannot delete or prune the gate's copy.
+  # separate from `.eslintcache` above so that a hook run cannot delete the gate's copy, or overwrite
+  # it while the gate is linting the whole tree beside the review.
   - '**/.eslintcache'
   - '**/.eslintcache.edit'
   - '**/.tsbuildinfo'
