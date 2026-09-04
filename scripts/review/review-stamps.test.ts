@@ -60,10 +60,6 @@ function step(label: string, output: string): GateStepResult {
 }
 
 const PASSED: ReadonlyArray<GateStepResult> = [step('lint', 'ok')]
-// eslint runs without `--max-warnings 0`, so a check can exit 0 with something to read in it.
-const WARNED: ReadonlyArray<GateStepResult> = [
-	step('lint', 'src/a.ts:1:1  warning  Unexpected console statement'),
-]
 const SKIPPED: ReadonlyArray<GateStepResult> = [
 	step('lint', 'ok'),
 	step('test:unit', `josh test:unit: no tests ${test_unit_guard.SKIP_MARKER} vitest unit tests.`),
@@ -169,15 +165,12 @@ describe('verification_gate.record_green_gate — withholds the record rather th
 		expect(review_stamps.gate_stamp.read(target())).toBeUndefined()
 	})
 
-	// joshuafolkken/kit#1328: the record is now *reused* rather than the checks being re-run, and the
-	// reuse prints no check bodies. A warning recorded as an unqualified green would therefore be
-	// printed once and never again on that tree — the same failure as hiding a skip, which is the
-	// reason `has_warnings` exists at all.
-	it('writes nothing when a step passed with warnings', async () => {
-		await verification_gate.record_green_gate(WARNED, {}, target())
-
-		expect(review_stamps.gate_stamp.read(target())).toBeUndefined()
-	})
+	// joshuafolkken/kit#1328 added a fourth withholding — a check that passed *with warnings*, since
+	// the reuse prints no check bodies and a warning recorded as an unqualified green would be printed
+	// once and never again on that tree. It is asserted in `gate-skip.test.ts` rather than here: these
+	// two cases pass their guard a `before` the real tree reading disagrees with, so the second guard
+	// withholds the record whatever the first one decides, and a third case of that shape would look
+	// like a regression test without being one.
 })
 
 // joshuafolkken/kit#1242: the marker is what lets `josh review:brief` say "a gate is running" instead

@@ -67,13 +67,14 @@ const STAMP_PATH = path.join(tmpdir(), `josh-gate-skip-stamp-${SUITE_KEY}.json`)
 const MARKER_PATH = path.join(tmpdir(), `josh-gate-skip-marker-${SUITE_KEY}.json`)
 
 // Which check ran is `verification-gate.test.ts`'s subject; here every one passes and what is counted
-// is how many were started at all.
-function pass_every_check(): void {
-	mocked_execa.mockImplementation(as_execa_implementation(async () => fake_result(PASS, '')))
+// is how many were started at all. The body matters in one case only — a check that passed with
+// something to say must leave no record behind.
+function pass_every_check(body = ''): void {
+	mocked_execa.mockImplementation(as_execa_implementation(async () => fake_result(PASS, body)))
 }
 
-async function run_gate(is_forced = false): Promise<[number, string]> {
-	pass_every_check()
+async function run_gate(is_forced = false, body = ''): Promise<[number, string]> {
+	pass_every_check(body)
 	const stdout = capture_stdout()
 
 	try {
@@ -249,6 +250,17 @@ describe('run_verification_gate — the record a green run leaves behind', () =>
 
 		expect(check_count()).toBe(NOTHING_RAN)
 	})
+
+	// The skip prints no check bodies, so a record taken from a run that had something to say would
+	// make those lines disappear from every later run over the same tree. Asserted here rather than
+	// beside `record_green_gate`'s other withholdings, because only here is the tree reading mocked:
+	// with the real one the maps disagree and the record is withheld for that reason instead, so the
+	// guard under test could be deleted and the assertion would still hold.
+	it('is withheld from a run whose checks had something to say', async () => {
+		await run_gate(false, 'src/a.ts:1:1  warning  Unexpected console statement')
+
+		expect(review_stamps.gate_stamp.read(STAMP_PATH)).toBeUndefined()
+	})
 })
 
 describe('run_gate_command — the force flag', () => {
@@ -278,7 +290,10 @@ describe('run_gate_command — the force flag', () => {
 		})
 
 		try {
-			await verification_gate.run_gate_command([FORWARDED_FLAG])
+			await verification_gate.run_gate_command([FORWARDED_FLAG], {
+				stamp_path: STAMP_PATH,
+				marker_path: MARKER_PATH,
+			})
 
 			expect(stderr.join('')).toContain(verification_gate.ACCEPTED_FLAGS.join(' '))
 		} finally {
