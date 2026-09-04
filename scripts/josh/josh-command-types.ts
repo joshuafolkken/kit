@@ -44,8 +44,8 @@ const PE = ['pnpm', 'exec'] as const
 //
 // Every location is passed explicitly rather than left to the tool's default, eslint's included:
 // the ignore rules have to name the same paths, and a constant that merely copies a default is
-// wrong the moment the default moves without anything failing. `GATE_CACHE_FILES` is what the
-// ignore rules are asserted against — `.gitignore` (which `useGitignore` also makes the spell
+// wrong the moment the default moves without anything failing. `IGNORED_CACHE_FILES` below is what
+// the ignore rules are asserted against — `.gitignore` (which `useGitignore` also makes the spell
 // check's exclusion) and the distributed `cspell/index.yaml`, which does not wait for a
 // `josh sync` to reach a consumer.
 const ESLINT_CACHE_FILE = '.eslintcache'
@@ -57,11 +57,34 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = [
 	CSPELL_CACHE_FILE,
 ]
 
+// joshuafolkken/kit#1332: the `PostToolUse` edit hook runs eslint too, and ESLint *deletes* the file
+// at `--cache-location` whenever it is started without `--cache` — so every single edit wiped the
+// cache the gate had just filled, and both gates of run joshuafolkken/kit#1326 paid a cold lint
+// (59.4s and 54.5s, against 3.0s warm). The hook is given a location of its own rather than the
+// gate's because the two run at the same time: `josh gate` lints the whole tree beside the review
+// while this hook fires on every edit, and each eslint run rewrites its cache file whole from the
+// copy it loaded at start-up — so two writers silently discard each other's entries. A file of its
+// own makes the hook structurally unable to degrade the cache this exists to protect.
+//
+// **Pruning is not the reason**, though it reads like one: `file-entry-cache` defaults `noPrune` to
+// true, and a single-file run against the gate's full cache was measured byte-identical, so a shared
+// file would keep the entries that run never visited.
+const ESLINT_EDIT_CACHE_FILE = '.eslintcache.edit'
+// What the ignore rules are asserted against: every cache file this package writes, wherever it is
+// written from. The gate's three plus the edit hook's — a cache file that is not ignored is
+// committed, or spell-checked, which is a red gate with nothing misspelled in the tree.
+const IGNORED_CACHE_FILES: ReadonlyArray<string> = [...GATE_CACHE_FILES, ESLINT_EDIT_CACHE_FILE]
+
 // `--cache --cache-strategy content` is one convention rather than two coincidences: cspell adopted
 // eslint's spelling for its own cache flags, so the pair is single-sourced here.
 const CONTENT_CACHE_FLAGS = ['--cache', '--cache-strategy', 'content'] as const
 const CACHE_LOCATION_FLAG = '--cache-location'
 const ESLINT_CACHE_FLAGS = [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, ESLINT_CACHE_FILE] as const
+const ESLINT_EDIT_CACHE_FLAGS = [
+	...CONTENT_CACHE_FLAGS,
+	CACHE_LOCATION_FLAG,
+	ESLINT_EDIT_CACHE_FILE,
+] as const
 const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
 const CSPELL_CACHE_FLAGS = [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, CSPELL_CACHE_FILE] as const
 
@@ -70,8 +93,9 @@ export {
 	CSPELL_CACHE_FLAGS,
 	ENV_FILE_FLAGS,
 	ESLINT_CACHE_FLAGS,
-	GATE_CACHE_FILES,
+	ESLINT_EDIT_CACHE_FLAGS,
 	GATE_COMMAND,
+	IGNORED_CACHE_FILES,
 	OPTIONAL_ENV_FILE_FLAGS,
 	PE,
 	TS_CACHE_FLAGS,

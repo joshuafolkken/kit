@@ -43,8 +43,10 @@ project.inlang/cache/
 *storybook.log
 storybook-static
 
-# Verification gate caches (josh lint / josh check / josh cspell:dot)
+# Verification gate caches (josh lint / josh check / josh cspell:dot), plus the edit hook's own
+# eslint cache (josh format:edited), which is kept apart from the gate's on purpose
 .eslintcache
+.eslintcache.edit
 .tsbuildinfo
 .cspellcache
 
