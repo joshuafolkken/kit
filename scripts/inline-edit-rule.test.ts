@@ -169,7 +169,8 @@ describe(`${CANONICAL} — guards the \`sed -i\` carve-out`, () => {
 		// The pattern side is where the escaping actually bites in a repository of prose.
 		'**危ないのはむしろパターン側**',
 		"BSD / macOS は `sed -i '' 's/…/…/' file`、GNU / Linux は `sed -i 's/…/…/' file`",
-		// A Bash edit fires no `PostToolUse` hook, and `format:edited` reads its path from stdin.
+		// A Bash edit does fire the hook since joshuafolkken/kit#1337, but its payload names a command
+		// rather than a path — so nothing is formatted, and `format:edited` still reads only stdin.
 		'**`format:edited` は手で呼べない**',
 		'**4 条件のどれかが面倒に見えたら、そこが Edit を使う場所である。**',
 	])('states the precondition %j', (marker) => {

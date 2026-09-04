@@ -81,6 +81,18 @@ function recording_runner(runs: Array<string>): CommandRunner {
 	}
 }
 
+// What Claude Code hands this hook after a shell call, which the matcher covers since
+// joshuafolkken/kit#1337: a command, and no edited path anywhere in the payload. The command edits a
+// file on purpose — an agent working through `sed` is the mode the widening was measured against,
+// and nothing here may start formatting a path it had to guess at.
+function shell_payload(transcript_path?: string): string {
+	return JSON.stringify({
+		tool_name: 'Bash',
+		tool_input: { command: `sed -i '' s/a/b/ app.ts` },
+		transcript_path,
+	})
+}
+
 // The density hook's throttle records, which live in the shared temp directory rather than under
 // `TEST_DIRECTORY` — so removing that directory does not take them with it.
 const DENSITY_TRANSCRIPTS = new Set<string>()
@@ -323,10 +335,17 @@ describe('format_edited_file', () => {
 		expect(runs).toStrictEqual([ESLINT, PRETTIER])
 	})
 
-	it('runs nothing when the payload carries no path', async () => {
+	// The second row is the one the widened matcher added (joshuafolkken/kit#1337): this hook now runs
+	// after every shell call too, and a shell payload names a command rather than a file. Formatting
+	// has nothing to do there, and doing it anyway would mean guessing which path a `sed` line
+	// rewrote.
+	it.each([
+		['the payload carries no path', '{}'],
+		['the payload is a shell call', shell_payload()],
+	])('runs nothing when %s', async (_label, raw_payload) => {
 		const runs: Array<string> = []
 
-		await format_edited_file('{}', recording_runner(runs), TEST_DIRECTORY)
+		await format_edited_file(raw_payload, recording_runner(runs), TEST_DIRECTORY)
 
 		expect(runs).toStrictEqual([])
 	})
@@ -396,5 +415,15 @@ describe('density_envelope', () => {
 		const payload = payload_for(write_fixture('plain.ts'))
 
 		expect(density_envelope(payload)).toBeUndefined()
+	})
+
+	// The reach joshuafolkken/kit#1337 bought: 7 of the 10 most recent sessions in this checkout never
+	// called `Edit` or `Write` once, so widening the matcher to `Bash` is what puts the line in front
+	// of them. It works only because the reading takes `transcript_path` and never the edited path —
+	// which is a claim about this file, and so is asserted here rather than left to be inferred.
+	it('writes the line for a shell payload naming no edited file', () => {
+		const payload = shell_payload(transcript_for('shell-density'))
+
+		expect(density_envelope(payload)).toBeDefined()
 	})
 })

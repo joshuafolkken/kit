@@ -38,6 +38,13 @@ function format_matchers(): ReadonlyArray<HookMatcher> {
 	)
 }
 
+// The tools the formatting hook's matchers name, read the way Claude Code reads them: an exact list
+// separated by `|`. Split rather than a substring test, because `BashOutput` contains `Bash` — a
+// matcher that had drifted to the wrong tool would satisfy a `includes` check for the right one.
+function matched_tools(): ReadonlySet<string> {
+	return new Set(format_matchers().flatMap((entry) => entry.matcher.split('|')))
+}
+
 function format_handlers(): ReadonlyArray<HookHandler> {
 	return format_matchers()
 		.flatMap((entry) => entry.hooks)
@@ -51,10 +58,28 @@ describe('.claude/settings.json — post-edit formatting hook', () => {
 		expect(matchers.length).toBeGreaterThan(0)
 	})
 
-	it.each(['Edit', 'Write'])('covers the %s tool', (tool_name) => {
-		const is_covered = format_matchers().some((entry) => entry.matcher.includes(tool_name))
+	// `Bash` joined the two edit tools in joshuafolkken/kit#1337. The live density line rides this
+	// hook, and 7 of the 10 most recent sessions in this checkout never called `Edit` or `Write` once
+	// — they edit through `sed` instead, and they are exactly the sessions measured under the floor at
+	// 1.00–1.31. `Bash` is 88–100% of every one of their calls, so naming it reaches all of them,
+	// while naming every tool would buy no further reach and put a process start in front of the
+	// read-only calls this hook has nothing to say about.
+	it.each(['Edit', 'Write', 'Bash'])('covers the %s tool', (tool_name) => {
+		expect(matched_tools().has(tool_name)).toBe(true)
+	})
 
-		expect(is_covered).toBe(true)
+	// Claude Code reads a matcher built only from letters, digits, `_`, `-`, spaces, `,` and `|` as an
+	// exact list of tool names, and anything else as an unanchored regular expression. Since `Bash`
+	// joined the list that difference decides a real case, because `Bash` is a prefix of `BashOutput`:
+	// read as a regex the list form catches that tool too — a few spare spawns and nothing worse —
+	// while an anchored `^(Edit|Write|Bash)$` read as a *list* names no existing tool at all and the
+	// hook silently stops running. This pins the form whose failure is the bounded one.
+	it('names its tools as an exact list rather than a regular expression', () => {
+		const matchers = format_matchers().map((entry) => entry.matcher)
+
+		expect(matchers.length).toBeGreaterThan(0)
+
+		for (const matcher of matchers) expect(matcher).toMatch(/^[\w\-, |]+$/u)
 	})
 
 	it('formats through the josh subcommand rather than an inline shell copy', () => {
