@@ -112,6 +112,45 @@ describe(`${SKILL_PATH} — keeps already-filed issues in the ranking`, () => {
 	})
 })
 
+// joshuafolkken/kit#1308. The rule above says an un-started issue usually ranks highest and said
+// nothing about how to find one, so the candidate set came from whatever the session remembered —
+// the 2026-09-04 run left #1226, #1170, #1095 and #1102 out of its table while a report written by
+// hand from the same run carried all four. The enumeration is one command now, and this suite pins
+// it plus the two readings a listing of every open issue depends on.
+describe(`${SKILL_PATH} — enumerates the backlog rather than recalling it`, () => {
+	it.each([
+		'**Enumerate the backlog before ranking it — never from memory.**',
+		'gh api --paginate "repos/{owner}/{repo}/issues?state=open&per_page=100"',
+		'select(.pull_request | not)',
+		'**It is the one GitHub call this skill makes by hand, and that is deliberate.**',
+		'scripts/git/git-gh-issue-list.ts',
+	])('names the one listing every report runs: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// An epic and its children are ordinary issues, so one flat listing reaches both. Saying so is
+	// what stops a reader concluding that a child inside an epic body needs its own enumeration, or
+	// that an epic is a container rather than a row.
+	it.each([
+		"**An epic's child is an ordinary issue and appears on its own row.**",
+		'**An epic is an issue too**',
+		'**A foreign repository is named in the path, never by a flag.**',
+		'`repos/<owner>/<name>/issues?state=open&per_page=100`',
+	])('places an epic and its children in the same listing: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// The listing prints a number and a title; the state comes from the command. Reporting what the
+	// listing returned and what survived the narrowing is what makes a later miss detectable at all.
+	it.each([
+		'**It enumerates; it does not read state.**',
+		'**Narrow by reading the titles, then say what you narrowed to.**',
+		'**Pass the numbers the enumeration above kept**',
+	])('checks the enumerated numbers through issue:state: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
 // `diag` is analysis. It sits in the shorthand table because that is where an agent looks up a typed
 // keyword, not because it starts anything — and a reader who concludes otherwise gets a run nobody
 // invoked, which is the one thing the explicit-invocation rule exists to prevent.
