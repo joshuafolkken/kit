@@ -69,6 +69,8 @@ Each block's header names the command that ran, not only the check, because the 
 - **An empty changed map**, which is never evidence. Straight after `git switch main && git pull` the map is empty, and an empty map compares equal to any other empty map. `epicrun` runs exactly that pair of commands between children. Refusing costs nothing: a tree with no changed file is not where a run spends its gate time.
 - **`pnpm josh gate --force`**, for when something outside the tree changed and you know it — a `pnpm install`, a toolchain bump, a cache thrown away.
 
+**The pre-push hook reads the same record through the same decision** ([#1334](https://github.com/joshuafolkken/kit/issues/1334)) — see [`josh pre-push-unit`](#josh-pre-push-unit), which adds one condition of its own because a push carries `HEAD` where this record describes the working tree.
+
 ```bash
 pnpm josh gate --verbose   # every check's output, passing ones included
 pnpm josh gate --force     # run the four checks even on a tree already recorded green
@@ -894,6 +896,34 @@ It exists because secretlint resolves from the **consumer** project — `josh in
 When secretlint **is** installed the scan runs as normal and its exit code is forwarded, so a detected secret still blocks the commit. Skipping is safe as a fallback because the scan is defense in depth ahead of GitHub push protection and PR-time scanners, not the only gate.
 
 The wrapper owns the CLI flags: `--no-glob` is always passed, because lefthook substitutes literal paths and a SvelteKit route directory such as `(app)` or `[id]` would otherwise reach secretlint's glob engine as a pattern. Secret masking and the `.gitignore` cascade are both on by default in secretlint v13, so no flag is needed for either.
+
+### `josh pre-push-unit`
+
+Run the unit suite for the pre-push hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green ([#1334](https://github.com/joshuafolkken/kit/issues/1334)). Wired in by `lefthook/base.yml` as the pre-push `test-unit` command; it replaces the bare `pnpm exec vitest run` that hook used to carry.
+
+```bash
+pnpm josh pre-push-unit                    # alias: josh ppu
+JOSH_PRE_PUSH_FORCE=1 git push             # run the suite even on a tree recorded green
+```
+
+Measured on [#1326](https://github.com/joshuafolkken/kit/issues/1326): `pnpm josh git -y` took 40 seconds, 15.9 of them this suite — started 40 seconds after `pnpm josh gate` had printed all four checks green on the same tree, with nothing edited in between. The record existed; the hook was the one reader that never looked at it.
+
+**Which pushes that saving reaches is decided by where the last gate ran.** `josh bump` rewrites `package.json` immediately before the commit, so a run whose gate finished _before_ the bump leaves a record that does not cover the pushed tree, and this hook runs the whole suite exactly as it did — the safe direction, and not a regression. The saving lands where a gate ran after the last edit to the tree, which in the workflow's own order (`bump` → `gate` → `josh git -y`) is the common case.
+
+**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply here unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, an advanced default branch, an empty map, a missing record and a red gate (which writes none) each run the whole suite exactly as before. A hook that answered that question differently from the gate beside it would be two commands disagreeing about one tree.
+
+**One condition is added on top, and it only ever narrows.** A commit changes nothing outside the checkout; a push puts code where CI and other people read it, so an unverified commit reaching the remote is the failure this must not have. The gate's record describes the **working tree**, and a push carries **HEAD** — the same thing only while nothing is uncommitted. So the reuse also requires `git status --porcelain` to be empty, untracked files included: commit half of a green tree and the map still matches while the commit being pushed is a tree no check has read. `josh git` commits before it pushes, which is exactly the state that satisfies this; anything else, including a status that could not be read at all, runs the suite.
+
+The output claims the result rather than the omission, because a line reading "unit tests skipped" is indistinguishable from "not verified" while the push it precedes goes on to the remote:
+
+```
+✔ this tree is already green — the unit tests passed on it at 2026-09-04T06:32:02.592Z (`pnpm josh gate`), and this push carries that same tree.
+  Reusing that result; nothing was re-run. `JOSH_PRE_PUSH_FORCE=1 git push` runs them anyway.
+```
+
+The escape hatch is an environment variable rather than the gate's `--force` flag because the hook's command line belongs to `lefthook/base.yml` — nobody types this invocation, so a flag would be unreachable at the moment it is wanted. `pnpm josh audit`, the hook's other command, is untouched: the gate does not run it, so it is not a duplicate of anything.
+
+When the suite does run it goes through the same guard [`josh test:unit`](#josh-testunit) uses, so a project with no vitest or no test files prints a skip notice instead of failing the push.
 
 ### `josh hook:install`
 

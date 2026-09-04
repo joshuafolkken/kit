@@ -17,6 +17,11 @@ const HOOKS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Git hook: scan staged files for secrets',
 		category: 'Git hooks',
 	},
+	'pre-push-unit': {
+		script: 'scripts/pre-push-unit.ts',
+		description: 'Git hook: run unit tests, reusing a green gate recorded on the pushed tree',
+		category: 'Git hooks',
+	},
 	'hook:install': {
 		shell: [...PE, 'lefthook', 'install'],
 		description: 'Install git hooks',

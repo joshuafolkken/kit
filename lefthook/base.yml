@@ -90,8 +90,16 @@ pre-push:
     audit:
       run: pnpm josh audit
 
+    # Routed through `josh pre-push-unit` rather than a bare `pnpm exec vitest run` so the hook can
+    # read the record `pnpm josh gate` leaves behind (kit#1334). A green gate writes down the digest
+    # of every changed file it passed on and the commit that map is a diff against; where that record
+    # covers the tree this push carries — and the working tree is clean, so the tree and the commit
+    # are the same thing — the suite is not run again. Measured: 15.9s of a 40s `josh git -y`, spent
+    # 40 seconds after the same tree went green. Anything else runs the whole suite exactly as before,
+    # and `JOSH_PRE_PUSH_FORCE=1 git push` runs it regardless. A push whose last gate ran before
+    # `josh bump` rewrote package.json is one of those "anything else" cases, not a regression.
     test-unit:
-      run: pnpm exec vitest run
+      run: pnpm josh pre-push-unit
 
   fail_text: |
     🚫 Push blocked due to test failures or audit issues
