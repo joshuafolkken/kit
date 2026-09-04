@@ -10,8 +10,16 @@ import { json_value } from '#scripts/json-value'
 //
 // **Only the boundaries `josh_command` cannot already express live here.** `gate`, `pr` and `merge`
 // are `pnpm josh <cmd>` invocations that `time-spans.ts` already names, and re-detecting them here
-// would be a second rule for the same thing. What is left is three: the plan comment, the first
-// edit, and the code-review invocation.
+// would be a second rule for the same thing. What is left is four: the plan comment, the first
+// edit, the code-review invocation, and the instant the workflow itself opened.
+//
+// **The workflow boundary has two spellings, and both are the same marker** (joshuafolkken/kit#1299).
+// A run is not a session: the transcript attributed to an issue reaches back into whatever the
+// session was doing before the keyword was typed, so without a marker for "the run starts here"
+// that earlier conversation is measured as part of it. Loading the `workflow-commands` skill is the
+// first act of every entry point, and writing the `in-progress` label is the first act every one of
+// them performs on GitHub — so the earliest of the two is taken and neither is required, which is
+// what keeps a delegated unit (whose parent loaded the skill) and a resumed run measurable.
 //
 // **The code-review skill call carries the review's whole duration**, so it is a marker rather than
 // a window boundary: measured on this repository's own transcripts, the `Skill` call for
@@ -19,12 +27,13 @@ import { json_value } from '#scripts/json-value'
 // and hands back the finding list. A window from the invocation to the next command would instead
 // swallow whatever the run did afterwards.
 
-type PhaseMarker = 'none' | 'plan' | 'edit' | 'review'
+type PhaseMarker = 'none' | 'plan' | 'edit' | 'review' | 'workflow'
 
 const NO_MARKER: PhaseMarker = 'none'
 const PLAN_MARKER: PhaseMarker = 'plan'
 const EDIT_MARKER: PhaseMarker = 'edit'
 const REVIEW_MARKER: PhaseMarker = 'review'
+const WORKFLOW_MARKER: PhaseMarker = 'workflow'
 
 // Writing a new file opens implementation exactly as changing an existing one does, so both count.
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
@@ -32,6 +41,14 @@ const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 const SKILL_TOOL = 'Skill'
 const SKILL_KEY = 'skill'
 const REVIEW_SKILL = 'code-review'
+const WORKFLOW_SKILL = 'workflow-commands'
+
+// The two skill calls that are boundaries, keyed by name. A map rather than a second `if`, so a
+// third boundary skill is a row and not another branch through the same function.
+const SKILL_MARKERS = new Map<string, PhaseMarker>([
+	[REVIEW_SKILL, REVIEW_MARKER],
+	[WORKFLOW_SKILL, WORKFLOW_MARKER],
+])
 
 // **The `repos/` prefix is what makes this the API path and not any mention of an issue.** Matching a
 // bare `issues/<N>` alongside a `body=` charged the plan boundary to
@@ -49,6 +66,14 @@ const BODY_FIELD_PATTERN = /\bbody=/u
 const ISSUE_COMMENT_PATTERN = /\bgh\s+issue\s+comment\b/u
 const BODY_FLAG_PATTERN = /--body(?:-file)?\b/u
 
+// **The add form, not the label's name anywhere in the command.** The prerequisite branch removes the
+// same label with `-X DELETE …/labels/in-progress`, which is a run ending its hold on an issue rather
+// than opening one — matched loosely, that call would move the run's start to somewhere near its end.
+// The API path is required alongside it for the reason the plan boundary requires one: a command that
+// merely quotes the flag, which this repository's own issue bodies do, is not the call.
+const ISSUE_LABELS_PATTERN = /repos\/\S+\/issues\/\d+\/labels\b/u
+const IN_PROGRESS_FIELD = 'labels[]=in-progress'
+
 function skill_name(input: unknown): string {
 	if (!json_value.is_record(input)) return ''
 
@@ -62,7 +87,7 @@ function tool_marker(name: string, input: unknown): PhaseMarker {
 	if (EDIT_TOOLS.has(name)) return EDIT_MARKER
 	if (name !== SKILL_TOOL) return NO_MARKER
 
-	return skill_name(input) === REVIEW_SKILL ? REVIEW_MARKER : NO_MARKER
+	return SKILL_MARKERS.get(skill_name(input)) ?? NO_MARKER
 }
 
 function is_api_body_write(command: string): boolean {
@@ -73,13 +98,20 @@ function is_issue_comment(command: string): boolean {
 	return ISSUE_COMMENT_PATTERN.test(command) && BODY_FLAG_PATTERN.test(command)
 }
 
-// A Bash call's boundary, read from the command it runs. Only one is detected here — writing a body
-// to an issue — because the rest of what Bash marks is already a `pnpm josh <cmd>` name.
+function is_in_progress_label(command: string): boolean {
+	return ISSUE_LABELS_PATTERN.test(command) && command.includes(IN_PROGRESS_FIELD)
+}
+
+// A Bash call's boundary, read from the command it runs. Two are detected here — writing a body to
+// an issue, and labelling one `in-progress` — because the rest of what Bash marks is already a
+// `pnpm josh <cmd>` name.
 //
 // **Which of those writes is the plan is not decided here**: the completion comment and an
 // auto-decision log take the same shape, so `time-phases.ts` accepts only a marker that closes
-// before the first edit.
+// before the first edit. The label carries no body, so the two tests cannot both match one command.
 function bash_marker(command: string): PhaseMarker {
+	if (is_in_progress_label(command)) return WORKFLOW_MARKER
+
 	return is_api_body_write(command) || is_issue_comment(command) ? PLAN_MARKER : NO_MARKER
 }
 
@@ -88,6 +120,7 @@ const time_markers = {
 	PLAN_MARKER,
 	EDIT_MARKER,
 	REVIEW_MARKER,
+	WORKFLOW_MARKER,
 	tool_marker,
 	bash_marker,
 }
