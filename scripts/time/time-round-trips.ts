@@ -94,13 +94,16 @@ const NO_TOTALS: IssuingTotals = { pending_ms: 0, issuing_ms: 0 }
 // A turn's model time is charged to a round trip only when that turn went on to open one. **The run's
 // whole model wait is a different quantity**: a turn that called no tool — the answer that ends a
 // reply, the turn that stops to wait for a person — composed nothing a batching change could remove,
-// and folding it in prices every round trip above what cutting one actually returns. Pending time is
-// dropped rather than carried at anything that is not a tool span, because a human wait is exactly
-// the case where the turn before it issued nothing.
+// and folding it in prices every round trip above what cutting one actually returns.
+//
+// **Opening a round trip is the only thing that keeps pending time**; everything else drops it. The
+// third branch is not only the human wait it was written for: a continuation — the tail of a call
+// whose middle went to a delegated unit — opens no round trip, and carrying pending across it would
+// charge the subagent's closing answer to the *parent's* next trip. A session seam does the same,
+// since `time_corpus` concatenates one session's spans after another's with nothing in between.
 function fold_issuing(totals: IssuingTotals, span: Span, is_opener: boolean): IssuingTotals {
 	if (is_model(span)) return { ...totals, pending_ms: totals.pending_ms + span.duration_ms }
 	if (is_opener) return { pending_ms: 0, issuing_ms: totals.issuing_ms + totals.pending_ms }
-	if (is_tool(span)) return totals
 
 	return { ...totals, pending_ms: 0 }
 }

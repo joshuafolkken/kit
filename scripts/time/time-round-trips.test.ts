@@ -106,6 +106,16 @@ describe('time_round_trips.issuing_model_ms', () => {
 	it('charges nothing where no round trip was opened', () => {
 		expect(time_round_trips.issuing_model_ms([MODEL, HUMAN])).toBe(0)
 	})
+
+	// A call whose middle went to a delegated unit: the lead, the unit's own work ending in the
+	// subagent's closing turn, the tail that opens no round trip, and then the parent's next call.
+	// Carrying the pending time across that tail would charge the subagent's answer to the parent's
+	// next trip — the over-pricing this whole function exists to remove, one level down.
+	it("does not carry a delegated unit's answer past the tail of the call that bracketed it", () => {
+		const spans = [MODEL, TOOL, MODEL, CONTINUATION, MODEL, TOOL]
+
+		expect(time_round_trips.issuing_model_ms(spans)).toBe(2 * time_span_fixture.MINUTE_MS)
+	})
 })
 
 describe('time_round_trips.per_round_trip', () => {
