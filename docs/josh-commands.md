@@ -50,7 +50,7 @@ Each block's header names the command that ran, not only the check, because the 
 
 **Three of the four checks read a cache, so a second run only looks at what changed** ([#1256](https://github.com/joshuafolkken/kit/issues/1256)). eslint has had one from the start; the spell check now runs `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`, and the type check — **on a project that falls through to `pnpm josh check`**, which is kit itself and any plain TypeScript project — `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`. Together those two went from 6.9s and 3.6s of CPU to 1.9s and 0.9s. On a project whose type check resolves to a toolkit command (`josh-app check:ci`, below) that step is app-kit's or game-kit's to cache, so three of the four checks are cached here and two of the four there. **Neither cache needs an invalidation rule of its own**: `tsc` stores the compiler options in the build-info file and re-checks everything when they differ, and `cspell` stores a content hash of every config and dictionary file it loaded, so editing `tsconfig.json` or `cspell.config.yaml` invalidates what it should — measured at 3.3s and a full 845-file rescan respectively, against 1.0s and 0.8s warm. CI restores only the eslint cache (`Setup ESLint cache` in `.github/workflows/ci.yml`, keyed on the lockfile and the eslint config); the other two start every run cold, which is why neither needs a cache-busting key there. The three cache files — `.eslintcache`, `.tsbuildinfo`, `.cspellcache` — are in the `.gitignore` `josh sync` merges into a consumer project, which also keeps them out of `prettier --check .`. **They are named in the distributed `cspell/index.yaml` `ignorePaths` as well**, and not only left to `useGitignore`: the flags that write them arrive with the package, while the `.gitignore` entries arrive on the consumer's next `josh sync`, so a consumer that upgraded and ran `pnpm josh gate` first had `josh cspell:dot` spell-check the build-info file `josh check` had just written — 125 issues, with nothing misspelled in the tree.
 
-**That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat. **The unit check that loop repeats is [`josh test:related`](#josh-testrelated)**, which runs the tests related to the changed files instead of all of them ([#1257](https://github.com/joshuafolkken/kit/issues/1257)); the gate itself keeps running `josh test:unit` over the whole suite.
+**That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat. **Two of the checks that loop repeats are scoped**: [`josh lint:related`](#josh-lintrelated) checks only the changed files ([#1298](https://github.com/joshuafolkken/kit/issues/1298)) and [`josh test:related`](#josh-testrelated) runs only the tests related to them ([#1257](https://github.com/joshuafolkken/kit/issues/1257)); the gate itself keeps running `josh lint` and `josh test:unit` over everything.
 
 **Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent or the project has no tests, and a gate that ran zero tests must not look like one that ran them all), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
 
@@ -94,6 +94,42 @@ Check code with prettier and eslint.
 pnpm josh lint
 pnpm josh lint:prettier   # prettier only
 pnpm josh lint:eslint     # eslint only
+```
+
+### `josh lint:related`
+
+Check only the files the change touched — the lint check an implementation loop repeats between edits ([#1298](https://github.com/joshuafolkken/kit/issues/1298)).
+
+```bash
+pnpm josh lint:related                     # alias: josh lr
+pnpm josh lint:related scripts/thing.ts    # narrow by the given files instead
+```
+
+**It is added in front of the whole tree, never in place of it.** `josh gate` keeps running `josh lint` over everything before the commit: a formatting or lint rule can be broken by a file the change never named — a shared config, a generated snapshot — and only the whole-tree run sees that. What the narrowing replaces is the repeat calls in between. Measured with `pnpm josh time` across four runs, those cost 47–188 seconds each, and 188 of them were 18% of one 1,043-second implementation phase.
+
+The changed files are the branch diff plus the untracked files beside it — the same reading `josh review:level`, `josh eval:scope`, `josh review:brief` and [`josh test:related`](#josh-testrelated) decide from, so what this narrows by is what those commands call the change. Prettier is given the whole narrowed list with `--ignore-unknown`, so a file it has no parser for is skipped rather than failing the run; eslint is given the same list with `--no-warn-ignored`, so a changed `.md` or an ignored file does not bury the findings in warnings. Eslint's cache is shared with the gate's on purpose — it keeps an entry per file and leaves the entries a run did not visit alone, so a narrowed run warms the cache the whole-tree run reads instead of invalidating it.
+
+**It prints what it narrowed by before it runs**, so a scoped run is never read as a whole one:
+
+```
+josh lint:related: 2 changed file(s) — checking only them.
+  - scripts/thing.ts
+  - docs/thing.md
+```
+
+**Both fallbacks end at the whole tree, and each says which one it was.** A narrowed run that checked nothing would report success, so the two are never silent and never merged into one message:
+
+```
+josh lint:related: the changed files could not be read — checking the whole tree instead.
+josh lint:related: no changed file is one prettier or eslint reads — checking the whole tree instead.
+```
+
+A path given as an argument that this cannot use — one the tree no longer holds, or one neither linter reads — is named on the console rather than dropped, so a typo is visible instead of being answered with a whole-tree run nobody asked for.
+
+**Flags are named rather than forwarded**, which is where this differs from [`josh test:related`](#josh-testrelated): that command has one child to forward to, this one has two that take different flags — `--fix` means something to eslint and nothing to `prettier --check`. A flag is reported as ignored instead of being sent to both or dropped in silence:
+
+```
+josh lint:related: ignored — prettier and eslint take different flags: --fix
 ```
 
 ### `josh format`

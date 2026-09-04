@@ -10,10 +10,16 @@ const PRETTIER_ARGS = ['exec', 'prettier', '--check', '.'] as const
 // moves, with every test still green.
 const ESLINT_ARGS = ['exec', 'eslint', '.', ...ESLINT_CACHE_FLAGS] as const
 
-async function run_lint_parallel_checks(): Promise<number> {
+// The two checks are run from here whether they were pointed at the whole tree or at one change's
+// files, so `josh lint:related` reaches prettier and eslint through the same buffering, the same
+// "one failure does not abort the other" reading, and the same exit code (joshuafolkken/kit#1298).
+async function run_lint_checks(
+	prettier_args: ReadonlyArray<string>,
+	eslint_args: ReadonlyArray<string>,
+): Promise<number> {
 	const [prettier, eslint] = await Promise.all([
-		buffered_process.run_buffered_process(PRETTIER_ARGS),
-		buffered_process.run_buffered_process(ESLINT_ARGS),
+		buffered_process.run_buffered_process(prettier_args),
+		buffered_process.run_buffered_process(eslint_args),
 	])
 
 	if (prettier.output) process.stdout.write(prettier.output)
@@ -22,6 +28,10 @@ async function run_lint_parallel_checks(): Promise<number> {
 	return buffered_process.is_process_failed(prettier) || buffered_process.is_process_failed(eslint)
 		? FAIL_EXIT_CODE
 		: 0
+}
+
+async function run_lint_parallel_checks(): Promise<number> {
+	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS)
 }
 
 // `process.exitCode` rather than `process.exit()`: both reports are buffered and written here in
@@ -33,4 +43,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_lint_parallel_checks()
 }
 
-export { ESLINT_ARGS, run_lint_parallel_checks }
+const lint_parallel = { run_lint_checks, run_lint_parallel_checks }
+
+export { ESLINT_ARGS, lint_parallel }

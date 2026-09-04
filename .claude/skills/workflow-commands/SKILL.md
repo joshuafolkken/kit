@@ -79,7 +79,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   is told not to run the unit suite the gate is running beside it — **and that sentence claims no
   result**, because a gate that has not finished has none to claim (joshuafolkken/kit#1242).
   **That gate is started once per run, not once per edit** (joshuafolkken/kit#1246): while implementing,
-  re-run the **single check by name** — `pnpm josh lint`, `pnpm josh cspell:dot`, `pnpm josh test:related`,
+  re-run the **single check by name** — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`,
   or the project's own type check — never the whole gate —
   **the unit check there is the scoped one**: `pnpm josh test:related` runs the tests the changed
   files reach and falls back to the whole suite when it cannot narrow, while `pnpm josh test:unit`
