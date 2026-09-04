@@ -13,7 +13,7 @@ import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 // The transcript fixtures are `time-transcript-fixture.ts`'s, shared with the suite that covers the
 // walk itself: what a session file looks like is one statement, not one per suite.
-const { CWD, MINUTE_MS, ISSUE, BRANCH, at, ms, issue_lines } = fixture
+const { CWD, MINUTE_MS, ISSUE, BRANCH, THREE_MINUTES_MS, at, ms, issue_lines } = fixture
 // Which reads count as the pull-request listing is `time-pull-fixture.ts`'s, shared with the suites
 // that assert the same count on the walk itself.
 const { pulls_asked } = time_pull_fixture
@@ -34,6 +34,13 @@ afterEach(() => {
 
 function write_session(name: string, lines: ReadonlyArray<string>): void {
 	fixture.write_session(state.home, name, lines)
+}
+
+// A delegated unit's transcript, which Claude Code writes under the session that delegated it. The
+// overlap cases below need one, because a session that delegates is exactly the shape whose spans
+// already go through the subtraction — and the excess they measure is the part it cannot reach.
+function write_unit(session: string, agent: string, lines: ReadonlyArray<string>): void {
+	fixture.write_unit(state.home, session, agent, lines)
 }
 
 interface GhScript {
@@ -230,6 +237,59 @@ describe('time_run.build_run_report — a missing transcript half', () => {
 
 		expect(report.elapsed_ms).toBe(6 * MINUTE_MS)
 		expect(report.notes.join(NOTE_SEPARATOR)).toContain('belongs to nobody')
+	})
+})
+
+// How many notes a run carries before either window note: one for the transcripts, one for the pull
+// request. Named so the case that asserts nothing was added says what it is counting.
+const BASE_NOTE_COUNT = 2
+
+// The other direction of the same question (joshuafolkken/kit#1330). Two sessions attributed to one
+// issue really can run at the same wall clock, and neither's spans may be trimmed away — both worked
+// in the minutes they shared, which is why `time-corpus.ts` groups them per session rather than
+// pooling their intervals. So the shares total more than the window, and until this was said the
+// header read as a run twice as long as the window printed beside it: `--issue 1299` reported
+// 77.6 min over a window of 49.9.
+// A session that delegates a unit, and a second session working the same three minutes. The
+// parent/unit half is subtracted as usual; the second session's spans are what is left over.
+function write_overlapping_run(): void {
+	write_session('parent', fixture.delegating_lines())
+	write_unit('parent', 'agent-a1', fixture.issue_lines(0))
+	write_session('other', fixture.concurrent_lines())
+}
+
+describe('time_run.build_run_report — transcripts that overlap in wall clock', () => {
+	it('detects the excess when the shares total more than the window they sit in', async () => {
+		write_overlapping_run()
+
+		const report = await report_of(NO_PULL_SCRIPT)
+
+		// Six minutes of shares over a three-minute window: three of them are counted twice.
+		expect(report.elapsed_ms).toBe(2 * THREE_MINUTES_MS)
+		expect(report.notes.join(NOTE_SEPARATOR)).toContain('3.0 min of it wall clock concurrent')
+	})
+
+	// The percentages are taken against the accounted total, so a reader who assumes the window is the
+	// denominator is ranking the phases against a number the report never used.
+	it('names the denominator every share and phase percentage is taken against', async () => {
+		write_overlapping_run()
+
+		const report = await report_of(NO_PULL_SCRIPT)
+
+		expect(report.notes.join(NOTE_SEPARATOR)).toContain(
+			'every share and phase percentage is of the 6.0 min',
+		)
+	})
+
+	// The guarantee the note is not allowed to cost: a run whose sessions did not overlap reports
+	// exactly what it reported before, note for note.
+	it('says nothing where the window and the shares already agree', async () => {
+		write_session('one', issue_lines(0))
+
+		const report = await report_of(NO_PULL_SCRIPT)
+
+		expect(report.elapsed_ms).toBe(Date.parse(report.ended_at) - Date.parse(report.started_at))
+		expect(report.notes).toHaveLength(BASE_NOTE_COUNT)
 	})
 })
 

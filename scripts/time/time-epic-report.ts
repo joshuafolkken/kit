@@ -1,6 +1,7 @@
 import { time_epic, type ChildTiming, type EpicTimeReport, type EpicTrend } from './time-epic'
 import { time_report } from './time-report'
 import { time_row_cap } from './time-row-cap'
+import { time_run } from './time-run'
 
 // The text an epic's batch is read as (joshuafolkken/kit#1271).
 //
@@ -71,12 +72,23 @@ function child_line(timing: ChildTiming): string {
 // and per-`josh <cmd>` tables, which this rendering does not print at all, and an unmerged child has
 // both a populated table and no CI data — so without the filter it would land in exactly the block
 // that exists to say why the GitHub half is missing.
-function child_note_lines(timing: ChildTiming): Array<string> {
-	if (timing.report.has_ci_data) return []
+//
+// **The overlap note is the one exception, and it is not about the GitHub half at all**
+// (joshuafolkken/kit#1330). It says the child's own minutes double-count wall clock two of its
+// sessions shared, so the row's figure — and the batch total it is summed into — cannot be read
+// without it. Every completed child has `has_ci_data`, which is to say the filter above hides it
+// from exactly the rows that carry the inflated number. The idle note stays behind the filter: time
+// that belonged to nobody leaves the row's own figure correct.
+function child_notes(timing: ChildTiming): Array<string> {
+	const notes = timing.report.notes.filter((note) => !time_row_cap.is_truncation_note(note))
 
-	return timing.report.notes
-		.filter((note) => !time_row_cap.is_truncation_note(note))
-		.map((note) => `      ${note}`)
+	if (!timing.report.has_ci_data) return notes
+
+	return notes.filter((note) => time_run.is_overlap_note(note))
+}
+
+function child_note_lines(timing: ChildTiming): Array<string> {
+	return child_notes(timing).map((note) => `      ${note}`)
 }
 
 function child_block(timing: ChildTiming): Array<string> {
