@@ -411,18 +411,12 @@ function total_lines<Row extends RowTotal>(
 	return ['', heading, ...shown, ...time_format.overflow_line(rows.length)]
 }
 
-// A table of zeroes reads as "this run took no time", which is never true. A session with no timed
-// line says so in words instead — the same answer `cost_report.format_empty` gives.
-function note_lines(notes: ReadonlyArray<string>): Array<string> {
-	return notes.map((note) => `  ${note}`)
-}
-
 // The sentence names no particular transcript, because a run scope reaches here when no transcript
 // was found at all — "this transcript has fewer" would then be about a file nobody located.
 function format_empty(report: TimeReport): string {
 	return [
 		`${report.scope} — no timed lines`,
-		...note_lines(report.notes),
+		...time_format.note_lines(report.notes),
 		'',
 		'A span needs two dated lines to sit between, and nothing read here has a pair. So there is',
 		'no elapsed time to divide up.',
@@ -434,7 +428,7 @@ function format_report(report: TimeReport): string {
 
 	return [
 		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
-		...note_lines(report.notes),
+		...time_format.note_lines(report.notes),
 		'',
 		'Where the wall clock went:',
 		...category_lines(report),

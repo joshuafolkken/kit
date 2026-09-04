@@ -4,6 +4,8 @@ import { parseArgs } from 'node:util'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
 import { time_epic } from './time-epic'
 import { time_epic_report } from './time-epic-report'
+import { time_last } from './time-last'
+import { time_last_report } from './time-last-report'
 import { time_report, type TimeReport } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
@@ -25,12 +27,14 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
 const USAGE =
-	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--top <rows>] [--json]'
+	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--top <rows>] [--json]'
 const NO_MERGED_RUN =
 	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
-const ONE_SCOPE = 'Give one of --issue, --session or --epic: they name different things.'
+const ONE_SCOPE = 'Give one of --issue, --session, --epic or --last: they name different things.'
 const NO_EPIC =
 	'The epic could not be read, so there is no batch to report on. Check the number, and that gh is authenticated.'
+const NO_RUNS =
+	'No merged run could be resolved, so there is no distribution to report. Check that the repository has merged pull requests whose branches name an issue, and that gh is authenticated.'
 
 // Every scope is a present key whose value may be `undefined`, rather than a key that is absent.
 // Under `exactOptionalPropertyTypes` an optional key rejects `{ session: undefined }`, so one shim
@@ -40,6 +44,9 @@ interface Options {
 	session: string | undefined
 	issue: number | undefined
 	epic: number | undefined
+	// How many of the most recently merged runs to report the distribution across
+	// (joshuafolkken/kit#1312). A scope like the three above, and refused alongside them.
+	last: number | undefined
 	// How many rows of the per-tool and per-`josh <cmd>` tables to carry, or `undefined` for all of
 	// them (joshuafolkken/kit#1301). It is not a scope: it narrows whichever scope was asked for.
 	top: number | undefined
@@ -55,13 +62,14 @@ const PARSE_ARGS_OPTIONS = {
 	session: { type: 'string' },
 	issue: { type: 'string' },
 	epic: { type: 'string' },
+	last: { type: 'string' },
 	top: { type: 'string' },
 	json: { type: 'boolean', default: false },
 } as const
 
 // The flags that name a scope, in both the spelling `parseArgs` reports and the spelling a person
-// types. One list, so a fourth scope cannot be added to the parser and forgotten by the refusal.
-const SCOPE_KEYS = ['issue', 'session', 'epic'] as const
+// types. One list, so a fifth scope cannot be added to the parser and forgotten by the refusal.
+const SCOPE_KEYS = ['issue', 'session', 'epic', 'last'] as const
 const SCOPE_FLAGS = SCOPE_KEYS.map((key) => `--${key}`)
 
 // Only a positive number is an issue number, the rule `cost-cli.ts` states: a non-positive value
@@ -79,21 +87,31 @@ interface RawValues {
 	issue?: string
 	session?: string
 	epic?: string
+	last?: string
 	top?: string
 }
 
-// The three flags that carry a number, parsed. Grouped so the refusal below asks one question of one
+// The four flags that carry a number, parsed. Grouped so the refusal below asks one question of one
 // record rather than growing a parameter per flag past the four-parameter limit.
 interface ParsedNumbers {
 	issue: number | undefined
 	epic: number | undefined
+	last: number | undefined
 	top: number | undefined
 }
+
+// Every flag whose value is a number, listed once so a fifth one is refused when it does not parse
+// by being added here rather than by being remembered in the condition below.
+const NUMBER_KEYS = ['issue', 'epic', 'last', 'top'] as const
 
 // A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
 // quietly become "report the most recent run instead".
 function is_unparsed(raw: string | undefined, parsed: number | undefined): boolean {
 	return raw !== undefined && parsed === undefined
+}
+
+function has_unparsed(values: RawValues, parsed: ParsedNumbers): boolean {
+	return NUMBER_KEYS.some((key) => is_unparsed(values[key], parsed[key]))
 }
 
 function named_scopes(values: RawValues): number {
@@ -104,9 +122,9 @@ function named_scopes(values: RawValues): number {
 // them silently is the wrong of the two.
 // `--top 0` and `--top abc` are refused on the same rule the scope numbers are: a cap that did not
 // parse must not quietly become "carry every row", which is the opposite of what was asked for.
+// `--last 0` goes the same way: a distribution over no run is not a smaller answer, it is none.
 function is_refused(values: RawValues, parsed: ParsedNumbers): boolean {
-	if (is_unparsed(values.issue, parsed.issue) || is_unparsed(values.epic, parsed.epic)) return true
-	if (is_unparsed(values.top, parsed.top)) return true
+	if (has_unparsed(values, parsed)) return true
 
 	return named_scopes(values) > 1
 }
@@ -119,6 +137,7 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 		const parsed = {
 			issue: to_number(values.issue),
 			epic: to_number(values.epic),
+			last: to_number(values.last),
 			top: to_number(values.top),
 		}
 
@@ -236,11 +255,31 @@ async function run_epic(epic_number: number, cwd: string, output: Output): Promi
 	return 0
 }
 
+// The last N merged runs as a distribution. A failure here is that no merged run could be resolved at
+// all — a run that merged with no transcript attributed is reported as such inside the table rather
+// than failing it, exactly as an epic's child is.
+async function run_last(count: number, cwd: string, output: Output): Promise<number> {
+	const report = await time_last.build_last_report(count, cwd)
+
+	if (report === undefined) {
+		console.error(NO_RUNS)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const capped = time_row_cap.cap_last_report(report, output.top)
+
+	print_scope(capped, () => time_last_report.format_last_report(capped), output.is_json)
+
+	return 0
+}
+
 async function dispatch(options: Options, cwd: string): Promise<number> {
-	const { session, epic } = options
+	const { session, epic, last } = options
 
 	if (session !== undefined) return run_session(session, cwd, options)
 	if (epic !== undefined) return await run_epic(epic, cwd, options)
+	if (last !== undefined) return await run_last(last, cwd, options)
 
 	return await run_issue(options.issue, cwd, options)
 }
@@ -268,6 +307,7 @@ const time_cli = {
 	USAGE,
 	NO_MERGED_RUN,
 	NO_EPIC,
+	NO_RUNS,
 	ONE_SCOPE,
 	parse_options,
 	pick_session,

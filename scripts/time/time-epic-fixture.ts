@@ -1,6 +1,8 @@
 import { expect } from 'vitest'
+import type { CheckTotal } from './time-checks'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
+import type { PhaseTotal } from './time-phases'
 import type { TimeReport } from './time-report'
 
 // What the epic-aggregation suites read, written once rather than in each test file
@@ -29,6 +31,10 @@ interface ReportInput {
 	turn_count?: number
 	span_count?: number
 	has_ci_data?: boolean
+	// The two breakdowns a distribution is taken across (joshuafolkken/kit#1312). Absent for every
+	// epic case, which reads neither — so a report built without them is exactly what it always was.
+	phases?: ReadonlyArray<PhaseTotal>
+	by_check?: ReadonlyArray<CheckTotal>
 }
 
 const DEFAULTS = { model_ms: MINUTE_MS, turn_count: 1, span_count: 2, has_ci_data: true }
@@ -69,6 +75,14 @@ function empty_breakdown(): Breakdown {
 	}
 }
 
+function breakdown_of(input: ReportInput): Breakdown {
+	return {
+		...empty_breakdown(),
+		phases: [...(input.phases ?? [])],
+		by_check: [...(input.by_check ?? [])],
+	}
+}
+
 // A report shaped like the one `time_run` hands back, with only the fields the aggregation reads
 // varied. Building it through `time_report.build_from_spans` would need spans these tests have no
 // use for.
@@ -91,7 +105,7 @@ function report_of(input: ReportInput): TimeReport {
 		...ZERO_COUNTS,
 		categories: { model_ms, tool_ms: MINUTE_MS, human_ms: 0, ci_ms: 0 },
 		has_ci_data,
-		...empty_breakdown(),
+		...breakdown_of(input),
 	}
 }
 
