@@ -96,6 +96,15 @@ describe('lint_related.run_related_lint — what it is told to narrow by', () =>
 		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
 	})
 
+	// Round 2 of joshuafolkken/kit#1298: without this, a refactor that drops the call discards
+	// `--fix` again with the whole suite still green.
+	it('names a flag it did not forward, because the two linters take different ones', async () => {
+		await lint_related.run_related_lint(['--fix'])
+
+		expect(written_output()).toContain('--fix')
+		expect(eslint_arguments()).not.toContain('--fix')
+	})
+
 	it('names an argument it could not use instead of silently checking everything', async () => {
 		await lint_related.run_related_lint([path.join('scripts', MISSING_FILE)])
 

@@ -126,6 +126,12 @@ josh lint:related: no changed file is one prettier or eslint reads — checking 
 
 A path given as an argument that this cannot use — one the tree no longer holds, or one neither linter reads — is named on the console rather than dropped, so a typo is visible instead of being answered with a whole-tree run nobody asked for.
 
+**Flags are named rather than forwarded**, which is where this differs from [`josh test:related`](#josh-testrelated): that command has one child to forward to, this one has two that take different flags — `--fix` means something to eslint and nothing to `prettier --check`. A flag is reported as ignored instead of being sent to both or dropped in silence:
+
+```
+josh lint:related: ignored — prettier and eslint take different flags: --fix
+```
+
 ### `josh format`
 
 Format code with prettier and eslint.
