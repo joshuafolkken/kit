@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { bounded_pool } from './bounded-pool'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
+import { gate_skip } from './gate-skip'
+import { git_command } from './git/git-command'
+import type { FileMapStamp } from './josh/file-map-stamp'
 import { GATE_COMMAND } from './josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh/josh-composite-arguments'
 import { review_stamps } from './review/review-stamps'
@@ -183,31 +186,51 @@ function print_gate_summary(failed_labels: ReadonlyArray<string>, elapsed_ms: nu
 // this repository's documents, so "the unit tests already passed" reaches it only if the invocation
 // carries it — and it may only carry it if something wrote down that they did, on **this** tree.
 //
-// **Three things withhold the record, and every one of them is the safe direction.** A step that
+// **Four things withhold the record, and every one of them is the safe direction.** A step that
 // passed *without running* — `test-unit-guard` exits 0 with a notice when vitest is absent or the
 // project has no tests — must not become "the unit tests all passed": the gate keeps that skip
 // visible on the console, and a record erasing it would have the brief tell a review agent not to
-// re-run tests that never ran. A tree that moved while the checks were in flight (the `PostToolUse`
-// formatter, an editor save) is not the tree they read. And a failed write leaves no record at all,
-// which a temp-directory problem must never turn into a red gate.
+// re-run tests that never ran. A step that passed **with warnings** is withheld for the same reason
+// one place further on (joshuafolkken/kit#1328): since the record is now reused instead of the checks
+// being re-run, a warning printed once would never be printed again on that tree, and `has_warnings`
+// exists precisely because hiding one is the same failure as hiding a skip. A tree that moved while
+// the checks were in flight (the `PostToolUse` formatter, an editor save) is not the tree they read.
+// And a failed write leaves no record at all, which a temp-directory problem must never turn into a
+// red gate.
 //
 // The destination is a parameter so a test can exercise the record without overwriting the one a
 // real run may be relying on — `josh gate` and `josh review:brief` share one path by design.
+function has_nothing_to_say(result: GateStepResult): boolean {
+	return !is_skip_notice(result) && !has_warnings(result)
+}
+
 async function record_green_gate(
 	results: ReadonlyArray<GateStepResult>,
 	before: Record<string, string>,
 	target?: string,
+	base?: string,
 ): Promise<void> {
-	if (results.some((result) => is_skip_notice(result))) return
+	if (results.some((result) => !has_nothing_to_say(result))) return
 
 	try {
 		const after = await review_tree.read_changed_tree()
 
 		if (JSON.stringify(after) !== JSON.stringify(before)) return
 
-		review_stamps.gate_stamp.write(after, target)
+		review_stamps.gate_stamp.write(after, target, base)
 	} catch {
 		/* no record is the safe answer */
+	}
+}
+
+// The commit the tree map is a diff against, read beside the map itself. A failure here is not the
+// gate's business either: no base means no record and no reuse, which is the same safe direction an
+// unreadable tree already takes.
+async function read_base_before_checks(): Promise<string | undefined> {
+	try {
+		return await git_command.default_branch_commit()
+	} catch {
+		return undefined
 	}
 }
 
@@ -281,16 +304,21 @@ async function with_gate_marker<T>(
 async function run_marked_gate_steps(
 	before: Record<string, string>,
 	plan: GatePlan,
+	marker_path?: string,
 ): Promise<ReadonlyArray<GateStepResult>> {
-	return await with_gate_marker(before, async () => {
-		const steps = await build_gate_steps(process.cwd(), plan)
+	return await with_gate_marker(
+		before,
+		async () => {
+			const steps = await build_gate_steps(process.cwd(), plan)
 
-		return await bounded_pool.bounded_map(
-			steps,
-			plan.concurrency,
-			async (step) => await run_gate_step(step),
-		)
-	})
+			return await bounded_pool.bounded_map(
+				steps,
+				plan.concurrency,
+				async (step) => await run_gate_step(step),
+			)
+		},
+		marker_path,
+	)
 }
 
 // The plan goes above the checks rather than beside the summary: it is what the durations under it
@@ -308,15 +336,38 @@ function announce_gate_plan(): GatePlan {
 	return plan
 }
 
-async function run_verification_gate(is_verbose = false): Promise<number> {
-	// Started before the tree read, so the total is what the caller waited for rather than what the
-	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
-	const started_at = performance.now()
-	const plan = announce_gate_plan()
-	const before = await read_tree_before_checks()
-	const results = await run_marked_gate_steps(before, plan)
+// `stamp_path` is one option rather than a read path and a write path, because it is one record: the
+// green gate this run may reuse is the green gate this run would write. A test that planted a record
+// somewhere and let the run record its own elsewhere would be exercising a pair the real command does
+// not have. `marker_path` is the in-flight marker's counterpart, and it exists for the same reason
+// the other destinations are parameters: this suite runs *inside* `pnpm josh gate`, so a test writing
+// to the shared marker would clear the live gate's own.
+interface GateOptions {
+	is_verbose?: boolean
+	is_forced?: boolean
+	stamp_path?: string
+	marker_path?: string
+}
 
-	for (const result of results) print_gate_step(result, is_verbose)
+// The tree the checks read and the commit it is a diff against, carried together because neither
+// answers anything alone (joshuafolkken/kit#1328).
+interface GateTree {
+	files: Record<string, string>
+	base: string | undefined
+}
+
+// The plan line is printed by the checked path alone. A run that announced a four-way fan-out and
+// then skipped would be describing something that never happened, and the skip's own line already
+// says everything there is to say about a gate that started no process.
+async function run_checked_gate(
+	tree: GateTree,
+	options: GateOptions,
+	started_at: number,
+): Promise<number> {
+	const plan = announce_gate_plan()
+	const results = await run_marked_gate_steps(tree.files, plan, options.marker_path)
+
+	for (const result of results) print_gate_step(result, options.is_verbose ?? false)
 
 	const failed_labels = results
 		.filter((result) => is_gate_step_failed(result))
@@ -326,7 +377,36 @@ async function run_verification_gate(is_verbose = false): Promise<number> {
 
 	if (failed_labels.length > 0) return FAIL_EXIT_CODE
 
-	await record_green_gate(results, before)
+	await record_green_gate(results, tree.files, options.stamp_path, tree.base)
+
+	return 0
+}
+
+// `--force` is answered here rather than inside `gate_skip`, so the module stays about what the
+// record can prove and this one stays about what the caller asked for.
+function reusable_stamp(tree: GateTree, options: GateOptions): FileMapStamp | undefined {
+	if (options.is_forced === true) return undefined
+
+	return gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
+}
+
+// The two readings are independent, so they are started together rather than one after the other.
+async function read_gate_tree(): Promise<GateTree> {
+	const [files, base] = await Promise.all([read_tree_before_checks(), read_base_before_checks()])
+
+	return { files, base }
+}
+
+async function run_verification_gate(options: GateOptions = {}): Promise<number> {
+	// Started before the tree read, so the total is what the caller waited for rather than what the
+	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
+	const started_at = performance.now()
+	const tree = await read_gate_tree()
+	const reusable = reusable_stamp(tree, options)
+
+	if (reusable === undefined) return await run_checked_gate(tree, options, started_at)
+
+	process.stdout.write(`${gate_skip.format_skip(reusable.taken_at)}\n`)
 
 	return 0
 }
@@ -335,28 +415,38 @@ async function run_verification_gate(is_verbose = false): Promise<number> {
 // would vanish exactly the way it does behind an `sh -c` composite — a run that looks configured
 // and is not. The composite guard only inspects `shell` entries, so a `script` entry that fans out
 // has to refuse for itself; the message comes from that guard so the two read identically.
-// `--verbose` is consumed here rather than forwarded, which is why it does not fall foul of the
-// refusal above: the refusal exists because a forwarded flag vanishes into the sub-commands, and a
-// flag the gate reads itself never reaches them. Every other argument is still refused.
+// `--verbose` and `--force` are consumed here rather than forwarded, which is why they do not fall
+// foul of the refusal above: the refusal exists because a forwarded flag vanishes into the
+// sub-commands, and a flag the gate reads itself never reaches them. Every other argument is still
+// refused.
 const VERBOSE_FLAG = '--verbose'
+const ACCEPTED_FLAGS: ReadonlyArray<string> = [VERBOSE_FLAG, gate_skip.FORCE_FLAG]
 
-async function run_gate_command(extra_arguments: ReadonlyArray<string>): Promise<number> {
-	const is_verbose = extra_arguments.includes(VERBOSE_FLAG)
-	const unknown = extra_arguments.filter((argument) => argument !== VERBOSE_FLAG)
+// The flags are the caller's, the destinations are the run's, so the two are merged here rather than
+// letting an option override a flag the user typed.
+async function run_gate_command(
+	extra_arguments: ReadonlyArray<string>,
+	options: GateOptions = {},
+): Promise<number> {
+	const unknown = extra_arguments.filter((argument) => !ACCEPTED_FLAGS.includes(argument))
 
 	if (unknown.length > 0) {
-		// The shared refusal, plus the arguments it is actually about. `--verbose` is accepted, so the
-		// bare "takes no extra arguments" would send a reader to drop the one flag that works.
+		// The shared refusal, plus the arguments it is actually about. Two flags are accepted, so the
+		// bare "takes no extra arguments" would send a reader to drop the ones that work.
 		process.stderr.write(
 			`${composite_arguments.format_rejection(GATE_COMMAND, GATE_TARGETS)}\n` +
 				`  refused: ${unknown.join(' ')}\n` +
-				`  accepted here: ${VERBOSE_FLAG}\n`,
+				`  accepted here: ${ACCEPTED_FLAGS.join(' ')}\n`,
 		)
 
 		return USAGE_ERROR_EXIT_CODE
 	}
 
-	return await run_verification_gate(is_verbose)
+	return await run_verification_gate({
+		...options,
+		is_verbose: extra_arguments.includes(VERBOSE_FLAG),
+		is_forced: extra_arguments.includes(gate_skip.FORCE_FLAG),
+	})
 }
 
 // `process.exitCode` rather than `process.exit()`: the gate's output is buffered per step and
@@ -368,6 +458,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 const verification_gate = {
+	ACCEPTED_FLAGS,
 	UNIT_WORKER_FLAG,
 	VERBOSE_FLAG,
 	build_gate_step,
@@ -378,10 +469,11 @@ const verification_gate = {
 	record_green_gate,
 	run_marked_gate_steps,
 	with_gate_marker,
+	run_checked_gate,
 	run_gate_command,
 	run_gate_step,
 	run_verification_gate,
 }
 
-export type { GateStep, GateStepResult }
+export type { GateOptions, GateStep, GateStepResult, GateTree }
 export { GATE_TARGETS, verification_gate }

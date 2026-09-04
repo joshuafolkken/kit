@@ -54,16 +54,32 @@ Each block's header names the command that ran, not only the check, because the 
 
 **Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent or the project has no tests, and a gate that ran zero tests must not look like one that ran them all), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
 
-```bash
-pnpm josh gate --verbose   # every check's output, passing ones included
+**A tree the gate was already green on is not checked again** ([#1328](https://github.com/joshuafolkken/kit/issues/1328)). Every green run records the digest of each changed file it passed on — the record `josh review:brief` reads to print `Already verified` ([#1241](https://github.com/joshuafolkken/kit/issues/1241)). The gate now reads it back at start-up, and where nothing that record covers has moved it prints the recorded result and exits 0 without starting a process:
+
+```
+✔ this tree is already green — lint, the type check, the spell check and the unit tests all passed on it at 2026-09-04T05:31:12.004Z (`pnpm josh gate`).
+  Reusing that result; nothing was re-run. `pnpm josh gate --force` runs the four checks anyway.
 ```
 
-`--verbose` is the exception to the refusal below: the gate consumes it itself rather than forwarding it, so it cannot vanish into a sub-command the way a forwarded flag would. Every other argument is still refused, and the refusal names both the arguments it rejected and the one flag it accepts:
+**This is reuse of a result, not a check dropped**: the bytes the skip answers for are the bytes the record was written from, compared one by one. Five things send the gate back to the four checks, and the last two are what the design turns on — **a file map is a diff, so everything it says stays true while the branch it is measured against moves underneath it.**
+
+- **No record** — including after a red gate, and after a green one that had something to print (a check that passed with warnings, or one that passed without running), neither of which writes one. So the re-verification that follows a fix always runs, and a warning is never made invisible by a run that reuses a result instead of printing it.
+- **A file either side covers has moved, appeared or gone.** The comparison unions both key sets, so a new untracked file refuses the skip exactly as an edited one does.
+- **The default branch moved**, even with the map byte-identical. Fetch an advanced `main` and rebase onto it and the same files still differ by the same digests, over a working tree whose every other file has been replaced by code no check has read. The record pins the commit it was taken against, and both halves have to match.
+- **An empty changed map**, which is never evidence. Straight after `git switch main && git pull` the map is empty, and an empty map compares equal to any other empty map. `epicrun` runs exactly that pair of commands between children. Refusing costs nothing: a tree with no changed file is not where a run spends its gate time.
+- **`pnpm josh gate --force`**, for when something outside the tree changed and you know it — a `pnpm install`, a toolchain bump, a cache thrown away.
+
+```bash
+pnpm josh gate --verbose   # every check's output, passing ones included
+pnpm josh gate --force     # run the four checks even on a tree already recorded green
+```
+
+`--verbose` and `--force` are the exceptions to the refusal below: the gate consumes them itself rather than forwarding them, so they cannot vanish into a sub-command the way a forwarded flag would. Every other argument is still refused, and the refusal names both the arguments it rejected and the flags it accepts:
 
 ```
 josh gate takes no extra arguments — pass them to josh lint or josh check or josh cspell:dot or josh test:unit instead
   refused: --workers=1
-  accepted here: --verbose
+  accepted here: --verbose --force
 ```
 
 **The type check follows the application layer.** Three of the four checks are always the `josh` sub-command of the same name. The type check is not: a SvelteKit project type-checks with `svelte-check` behind `svelte-kit sync`, and `tsc --noEmit` there both misses every `.svelte` type error and fails on a clean checkout where `./$types` has not been generated. So the step is asked of the project's own toolkit:

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_plan, type GatePlan } from './gate-plan'
+import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
 import { test_unit_guard } from './test-unit-guard'
 import type { GateStep } from './verification-gate'
 
@@ -25,21 +26,12 @@ const GATE_STEPS = await verification_gate.build_gate_steps(PROJECT_ROOT)
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
 const PASS = 0
 const FAIL = 1
 const ALL_PASS: ReadonlyArray<number> = [PASS, PASS, PASS, PASS]
-const FORWARDED_FLAG = '--workers=1'
 const REFUSAL_MESSAGE = 'josh gate takes no extra arguments'
 
-// execa's resolved Result is a large interface; the gate only reads `all` and `exitCode`, so a
-// minimal stub is bridged through `unknown`.
-function fake_result(exit_code: number, output: string): ExecaResult {
-	const result = { all: output, exitCode: exit_code }
-
-	return result as unknown as ExecaResult
-}
+const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
 
 function step_command(step: GateStep): string {
 	return step.command_args.at(-1) ?? ''
@@ -49,12 +41,8 @@ function step_output(step: GateStep): string {
 	return `output of ${step_command(step)}`
 }
 
-type ExecaImplementation = Parameters<typeof mocked_execa.mockImplementation>[0]
-
 // The step whose command matches the call decides the result, so the mock does not depend on the
-// order `Promise.all` happens to start the four processes in. execa's real return type is a
-// promise carrying IPC methods the gate never touches, so the implementation is bridged through
-// `unknown` the same way `fake_result` is.
+// order `Promise.all` happens to start the four processes in.
 function mock_steps(exit_codes: ReadonlyArray<number>): void {
 	async function fake_execa(_file: unknown, arguments_: unknown): Promise<ExecaResult> {
 		const sub_command = (arguments_ as ReadonlyArray<string>).at(-1) ?? ''
@@ -63,23 +51,7 @@ function mock_steps(exit_codes: ReadonlyArray<number>): void {
 		return fake_result(exit_codes[index] ?? PASS, `output of ${sub_command}`)
 	}
 
-	mocked_execa.mockImplementation(fake_execa as unknown as ExecaImplementation)
-}
-
-function capture_stdout(): { text: () => string; restore: () => void } {
-	const chunks: Array<string> = []
-	const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-		chunks.push(String(chunk))
-
-		return true
-	})
-
-	return {
-		text: (): string => chunks.join(''),
-		restore: (): void => {
-			spy.mockRestore()
-		},
-	}
+	mocked_execa.mockImplementation(as_execa_implementation(fake_execa))
 }
 
 async function run_capturing(
@@ -90,7 +62,7 @@ async function run_capturing(
 	const stdout = capture_stdout()
 
 	try {
-		const code = await verification_gate.run_verification_gate(is_verbose)
+		const code = await verification_gate.run_verification_gate({ is_verbose })
 
 		return [code, stdout.text()]
 	} finally {
@@ -277,8 +249,7 @@ const WARNING_NOTICE = 'src/a.ts:1:1  warning  Unexpected console statement'
 
 async function run_printing(body: string): Promise<string> {
 	mock_steps(ALL_PASS)
-	mocked_execa.mockImplementation((async () =>
-		fake_result(PASS, body)) as unknown as ExecaImplementation)
+	mocked_execa.mockImplementation(as_execa_implementation(async () => fake_result(PASS, body)))
 	const stdout = capture_stdout()
 
 	try {
