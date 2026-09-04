@@ -94,7 +94,7 @@ Read from the JSON, in this order:
 - **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost. **Rank a tool by
   its round trips as well as its duration**: a tool called thirty times one call per turn costs thirty
   round trips at the price above, which is routinely larger than the seconds the calls themselves ran
-  for — the reading that was missed before the price was reported. These are the two tables `--top`
+  for — the reading that was missed before the price was reported. These are two of the four tables `--top`
   caps, so read the `notes` line beside them before saying a command is absent from the run
 
 ## 2. Say whether the last speedup actually worked
