@@ -1,62 +1,16 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { time_corpus } from './time-corpus'
-import { time_epic, type ChildTiming, type EpicTimeReport } from './time-epic'
+import { time_epic, type ChildTiming } from './time-epic'
+import { time_epic_fixture, type ReportInput } from './time-epic-fixture'
 import { time_pull_fixture } from './time-pull-fixture'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
 
-const CWD = '/Users/someone/Development/kit'
-const MINUTE_MS = 60_000
-const EPIC = 1272
-
-function at(minute: number): string {
-	return new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString()
-}
-
-interface ReportInput {
-	issue_number: number
-	start_minute?: number
-	model_ms?: number
-	turn_count?: number
-	span_count?: number
-	has_ci_data?: boolean
-}
-
-const DEFAULTS = { model_ms: MINUTE_MS, turn_count: 1, span_count: 2, has_ci_data: true }
-
-// A report shaped like the one `time_run` hands back, with only the fields the aggregation reads
-// varied. Building it through `time_report.build_from_spans` would need spans this test has no use
-// for.
-function report_of(input: ReportInput): TimeReport {
-	const { issue_number, start_minute, model_ms, turn_count, span_count, has_ci_data } = {
-		...DEFAULTS,
-		...input,
-	}
-
-	const is_timed = span_count > 0 || has_ci_data
-
-	return {
-		scope: `issue #${String(issue_number)}`,
-		started_at: start_minute === undefined ? '' : at(start_minute),
-		ended_at: start_minute === undefined ? '' : at(start_minute + 1),
-		// A child nothing was read for really does elapse nothing, so the fixture cannot assert a total
-		// that the aggregation could never produce.
-		elapsed_ms: is_timed ? model_ms + MINUTE_MS : 0,
-		span_count,
-		turn_count,
-		tool_call_count: 0,
-		round_trip_count: 0,
-		ms_per_round_trip: 0,
-		model_ms_per_round_trip: 0,
-		categories: { model_ms, tool_ms: MINUTE_MS, human_ms: 0, ci_ms: 0 },
-		has_ci_data,
-		notes: [],
-		phases: [],
-		by_tool: [],
-		by_josh_command: [],
-		by_check: [],
-	}
-}
+// The report, body and reader fixtures are `time-epic-fixture.ts`'s, shared with the suite that
+// covers how the batch drives its children (joshuafolkken/kit#1300).
+const { CWD, MINUTE_MS, EPIC, ROW_101, ROW_102, ROW_103, OPEN_ROW_101, FENCE, PAIR_BODY } =
+	time_epic_fixture
+const { report_of, body_of, reader_of, batch_of } = time_epic_fixture
 
 function timing_of(input: ReportInput): ChildTiming {
 	const report = report_of(input)
@@ -67,16 +21,6 @@ function timing_of(input: ReportInput): ChildTiming {
 		ms_per_turn: time_epic.ms_per_turn_of(report),
 		report,
 	}
-}
-
-const ROW_101 = '- [x] #101'
-const ROW_102 = '- [x] #102'
-const ROW_103 = '- [x] #103'
-const OPEN_ROW_101 = '- [ ] #101'
-const FENCE = '```'
-
-function body_of(rows: ReadonlyArray<string>): string {
-	return ['## Progress', '', ...rows].join('\n')
 }
 
 type MockedRunReport = MockInstance<typeof time_run.build_run_report>
@@ -106,30 +50,6 @@ function stub_children(reports: ReadonlyMap<number, TimeReport>): MockedRunRepor
 		.mockImplementation(
 			async (issue_number: number) => reports.get(issue_number) ?? report_of({ issue_number }),
 		)
-}
-
-// Every read the aggregation makes goes through one `GhReader`, so a test hands it a function and
-// never a network. Two paths reach it: the epic body, and the pull-request listing the batch pages
-// once for the whole batch (joshuafolkken/kit#1292). The listing defaults to an empty page, which
-// ends the walk in one request; a case that asserts what each child was handed scripts a real page
-// instead, because two children given the same empty answer cannot tell per-child routing from a
-// single shared result.
-const EMPTY_PAGE = '[]'
-
-function reader_of(
-	body: string,
-	asked: Array<string> = [],
-	pulls_body: string = EMPTY_PAGE,
-): (path: string) => Promise<string> {
-	return async (path: string) => {
-		asked.push(path)
-
-		if (path.includes('pulls')) return pulls_body
-
-		expect(path).toContain(`issues/${String(EPIC)}`)
-
-		return JSON.stringify({ body })
-	}
 }
 
 // Which reads count as the pull-request listing is `time-pull-fixture.ts`'s, shared with the suites
@@ -254,18 +174,6 @@ describe('time_epic.read_children', () => {
 		expect(await time_epic.read_children(EPIC, unparseable)).toBeUndefined()
 	})
 })
-
-const PAIR_BODY = body_of([ROW_101, ROW_102])
-
-// The report, or a failure. Assertions then read `report.x` rather than `report?.x`, which is not
-// only shorter: an optional chain would let every one of them pass against an `undefined` report.
-async function batch_of(body: string): Promise<EpicTimeReport> {
-	const report = await time_epic.build_epic_report(EPIC, CWD, reader_of(body))
-
-	if (report === undefined) throw new Error('the epic could not be read')
-
-	return report
-}
 
 describe('time_epic.build_epic_report — the batch', () => {
 	it('reports every child, its total and its trend, in execution order', async () => {

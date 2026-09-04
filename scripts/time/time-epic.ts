@@ -1,10 +1,11 @@
+import { bounded_pool } from '#scripts/bounded-pool'
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { time_corpus } from './time-corpus'
 import { time_github, type GhReader } from './time-github'
 import { time_instant } from './time-instant'
 import { time_pull_index } from './time-pull-index'
-import type { CategoryTotals, TimeReport } from './time-report'
-import { time_run } from './time-run'
+import { time_report, type CategoryTotals, type TimeReport } from './time-report'
+import { time_run, type RunSources } from './time-run'
 import { time_spans } from './time-spans'
 
 // A whole `epicrun`, child by child (joshuafolkken/kit#1271).
@@ -248,9 +249,9 @@ async function read_children(
 	}
 }
 
-// One child at a time rather than all of them at once, and **both shared sources read once for the
-// whole batch before the loop starts** — the transcripts by joshuafolkken/kit#1284, the pull-request
-// listing by joshuafolkken/kit#1292.
+// A few children at a time rather than all of them at once, and **both shared sources read once for
+// the whole batch before the fan-out starts** — the transcripts by joshuafolkken/kit#1284, the
+// pull-request listing by joshuafolkken/kit#1292.
 //
 // Each of the two used to be read inside each child's report. The transcript walk read the same 669
 // files eleven times for an eleven-child epic; the listing was paged thirteen times for the thirteen
@@ -259,9 +260,63 @@ async function read_children(
 // first: the files do not change while the command runs, and the 500 rows are the same rows.
 //
 // What is left per child is the check-run read, which really is per child: it is keyed on that
-// child's own head sha, so there is no shared listing to lift it out of. Sequential for the reason
-// this comment began with — running thirteen of those at once multiplies the requests in flight to
-// answer a question nobody is waiting on.
+// child's own head sha, so there is no shared listing to lift it out of. It used to be waited on one
+// child at a time, which made the command's wall clock proportional to how many children the epic
+// happens to track — measured at 0.84 seconds a child, nearly half of a nine-child epic's 16.6
+// seconds (joshuafolkken/kit#1300). The children do not depend on one another, so nothing was being
+// ordered by that wait.
+//
+// The same 8 the two `epic-bundle` readers use for their own `gh` reads, and bounded for the same
+// reason: an unbounded fan-out is what turns a rate limit into a wrong answer, because
+// `list_check_runs` reports a refused read as an empty check list rather than as an error.
+//
+// **What it bounds is the whole child report, not only the check-run read**, and the difference
+// matters on the fallback path: handed a `sources` half that is missing, `build_run_report` reads
+// that half itself — a transcript walk, or a five-page pull listing. That is the case the width is
+// smallest for, since eight of those at once is the burst this bound exists to keep off GitHub. The
+// maps below hold an entry for every number asked about, so the fallback is a broken invariant
+// rather than a normal case; the width is chosen for it anyway.
+const CHECK_RUN_CONCURRENCY = 8
+
+// A child whose report could not be built at all. `build_run_report` reports a *missing half* rather
+// than throwing, so reaching here means the read itself broke — and one broken child must not
+// discard the siblings that were measured. `bounded_map` raises the first failure and returns
+// nothing, which for a nine-child epic would be eight measurements thrown away for the ninth, so the
+// catch belongs in the worker rather than around the pool. The row lands as `not run` carrying the
+// reason, which is the `not run` this module already documents: "a child the batch never reached
+// *and* one whose pull request could not be read at all, and each row carries its own note saying
+// which".
+function failed_report(issue_number: number, error: unknown): TimeReport {
+	const reason = error instanceof Error ? error.message : String(error)
+
+	return time_report.build_from_spans({
+		scope: `issue #${String(issue_number)}`,
+		spans: [],
+		started_ms: 0,
+		ended_ms: 0,
+		ci_ms: 0,
+		has_ci_data: false,
+		notes: [`issue #${String(issue_number)} could not be measured: ${reason}`],
+		by_check: [],
+	})
+}
+
+async function build_child(
+	issue_number: number,
+	cwd: string,
+	read: GhReader,
+	sources: RunSources,
+): Promise<ChildTiming> {
+	try {
+		return to_timing(
+			issue_number,
+			await time_run.build_run_report(issue_number, cwd, read, sources),
+		)
+	} catch (error) {
+		return to_timing(issue_number, failed_report(issue_number, error))
+	}
+}
+
 async function build_children(
 	numbers: ReadonlyArray<number>,
 	cwd: string,
@@ -269,23 +324,26 @@ async function build_children(
 ): Promise<Array<ChildTiming>> {
 	const found = time_corpus.collect_for_issues(cwd, numbers)
 	const searches = await time_pull_index.pulls_for_issues(numbers, read)
-	const rows: Array<ChildTiming> = []
 
 	// Both maps hold an entry for every number asked about — an issue no transcript mentions and one
 	// with no pull request are present with their own empty answer rather than absent, which
 	// `time-corpus.test.ts` and `time-pull-index.test.ts` pin. A miss would therefore be a broken
 	// invariant rather than a normal case, and `build_run_report` answers one by reading that half
 	// itself: slower than this is meant to be, never wrong.
-	for (const issue_number of numbers) {
-		const report = await time_run.build_run_report(issue_number, cwd, read, {
-			found: found.get(issue_number),
-			search: searches.get(issue_number),
-		})
-
-		rows.push(to_timing(issue_number, report))
-	}
-
-	return rows
+	//
+	// **`bounded_map` returns in input order however the children finished**, which is what keeps the
+	// rows the epic body's rather than the network's: `in_execution_order` sorts by measured start and
+	// is stable, so completion order would otherwise decide where every child with no measured start
+	// ends up.
+	return await bounded_pool.bounded_map(
+		numbers,
+		CHECK_RUN_CONCURRENCY,
+		async (issue_number) =>
+			await build_child(issue_number, cwd, read, {
+				found: found.get(issue_number),
+				search: searches.get(issue_number),
+			}),
+	)
 }
 
 function to_epic_report(
