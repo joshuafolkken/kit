@@ -139,10 +139,12 @@ gh api --paginate "repos/{owner}/{repo}/issues?state=open&per_page=100" \
   and is in this listing exactly as an unattached issue is, so there is no second enumeration to run
   for the children. **An epic is an issue too** — #1095 and #1102 are rows of their own; rank an epic
   where its children are the work, and never drop a row for being one. The one thing the listing does
-  not reach is a child in **another** repository, written `owner/repo#N` in an epic body. `gh api`
-  takes no repository flag, so name that repository in the path itself —
-  `repos/<owner>/<name>/issues?state=open&per_page=100` — exactly as
-  `pnpm josh issue:state <N> --repo <owner/repo>` names it for the state read.
+  not reach is a child in **another** repository, written `owner/repo#N` in an epic body.
+- **A foreign repository is named in the path, never by a flag.** `gh api` takes none, so the call
+  becomes `repos/<owner>/<name>/issues?state=open&per_page=100`. Its rows then need a state call of
+  their own: `pnpm josh issue:state <N> --repo <owner/repo>` applies that repository to **every**
+  number in the call, so a foreign row batched in with this repository's is answered for whichever
+  issue happens to carry the same number there.
 - **It enumerates; it does not read state.** The listing says which issues exist, and
   `pnpm josh issue:state` below says what state each one is in — never classify a row from the number
   and title this prints.

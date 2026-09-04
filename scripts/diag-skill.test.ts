@@ -134,7 +134,7 @@ describe(`${SKILL_PATH} — enumerates the backlog rather than recalling it`, ()
 	it.each([
 		"**An epic's child is an ordinary issue and appears on its own row.**",
 		'**An epic is an issue too**',
-		'`owner/repo#N` in an epic body',
+		'**A foreign repository is named in the path, never by a flag.**',
 		'`repos/<owner>/<name>/issues?state=open&per_page=100`',
 	])('places an epic and its children in the same listing: %j', (marker) => {
 		expect(read_skill()).toContain(marker)
