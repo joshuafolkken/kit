@@ -2,6 +2,9 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # What `josh lint:related` calls a file the two linters read (joshuafolkken/kit#1298), matching
+  # the "relatable" the sibling unit narrowing already uses for a file a test can import.
+  - lintable
   # What the gate's caches exist to stop it doing (joshuafolkken/kit#1256). Both forms are needed:
   # cspell's dictionaries do not derive one from the other.
   - rescan

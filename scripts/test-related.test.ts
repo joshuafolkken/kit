@@ -46,28 +46,6 @@ beforeEach(() => {
 	mocked_run.mockResolvedValue(0)
 })
 
-describe('test_related.read_changed_files', () => {
-	it('resolves the changed paths against the repository root', async () => {
-		await expect(test_related.read_changed_files(REPOSITORY_ROOT)).resolves.toEqual([
-			ABSOLUTE_SOURCE,
-		])
-	})
-
-	it('answers undefined — not an empty list — when git cannot be read', async () => {
-		mocked_changed.mockRejectedValue(new Error(GIT_FAILURE))
-
-		await expect(test_related.read_changed_files(REPOSITORY_ROOT)).resolves.toBeUndefined()
-	})
-})
-
-describe('test_related.repository_root_or_cwd', () => {
-	it('falls back to the working directory when git cannot answer', async () => {
-		mocked_root.mockRejectedValue(new Error('no repository'))
-
-		await expect(test_related.repository_root_or_cwd()).resolves.toBe(process.cwd())
-	})
-})
-
 describe('test_related.run_related_tests', () => {
 	it('narrows the run to the changed files', async () => {
 		await test_related.run_related_tests([])

@@ -4,7 +4,8 @@ vi.mock('execa', () => ({
 	execa: vi.fn(),
 }))
 
-const { run_lint_parallel_checks } = await import('./lint-parallel')
+const { lint_parallel } = await import('./lint-parallel')
+const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
 
@@ -28,7 +29,20 @@ beforeEach(() => {
 	vi.clearAllMocks()
 })
 
+const WHOLE_TREE = '.'
+
 describe('run_lint_parallel_checks', () => {
+	// joshuafolkken/kit#1298 made the runner take its targets, so the whole-tree call is what keeps
+	// `josh lint` and the gate reading everything rather than one change's files.
+	it('points both linters at the whole tree', async () => {
+		mock_exit_codes(0, 0)
+
+		await run_lint_parallel_checks()
+
+		expect(mocked_execa.mock.calls[0]?.[1]).toContain(WHOLE_TREE)
+		expect(mocked_execa.mock.calls[1]?.[1]).toContain(WHOLE_TREE)
+	})
+
 	it('returns 0 when both prettier and eslint pass', async () => {
 		mock_exit_codes(0, 0)
 
@@ -47,5 +61,21 @@ describe('run_lint_parallel_checks', () => {
 		const code = await run_lint_parallel_checks()
 
 		expect(code).toBe(1)
+	})
+})
+
+describe('run_lint_checks', () => {
+	const TARGET = 'scripts/thing.ts'
+
+	it('runs the targets it was given instead of the whole tree', async () => {
+		const prettier_args = ['exec', 'prettier', '--check', TARGET]
+		const eslint_args = ['exec', 'eslint', TARGET]
+
+		mock_exit_codes(0, 0)
+
+		await run_lint_checks(prettier_args, eslint_args)
+
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(prettier_args)
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(eslint_args)
 	})
 })
