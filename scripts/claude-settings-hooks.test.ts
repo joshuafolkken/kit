@@ -38,11 +38,20 @@ function format_matchers(): ReadonlyArray<HookMatcher> {
 	)
 }
 
-// The tools the formatting hook's matchers name, read the way Claude Code reads them: an exact list
-// separated by `|`. Split rather than a substring test, because `BashOutput` contains `Bash` — a
-// matcher that had drifted to the wrong tool would satisfy a `includes` check for the right one.
+// The separators the exact-list form admits — `|` and `,`, with any surrounding space trimmed off.
+// Splitting on `|` alone would read the equally valid `"Edit, Write, Bash"` as one tool named
+// `Edit, Write, Bash` and fail every case below on a settings file that is correct.
+const TOOL_SEPARATORS = /[|,]/u
+
+// The tools the formatting hook's matchers name, read the way Claude Code reads them: an exact list.
+// Split rather than a substring test, because `BashOutput` contains `Bash` — a matcher that had
+// drifted to the wrong tool would satisfy an `includes` check for the right one.
 function matched_tools(): ReadonlySet<string> {
-	return new Set(format_matchers().flatMap((entry) => entry.matcher.split('|')))
+	return new Set(
+		format_matchers().flatMap((entry) =>
+			entry.matcher.split(TOOL_SEPARATORS).map((tool) => tool.trim()),
+		),
+	)
 }
 
 function format_handlers(): ReadonlyArray<HookHandler> {
