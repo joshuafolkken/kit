@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { layer_report, type LayerReport } from './layer-report'
@@ -19,6 +20,7 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
 const USAGE = 'Usage: josh layers [--root <path>] [--json]'
+const NO_ROOT = 'No such directory. --root names the checkout to read, and nothing was read there.'
 
 interface Options {
 	root: string
@@ -57,11 +59,24 @@ function print_report(options: Options): number {
 	return 0
 }
 
+// Both readers answer "nothing here" for a path they cannot open, which is the right answer for a
+// project with no CI and the wrong one for a mistyped `--root`: without this, a typo'd sibling
+// checkout prints a confident report of one layer and no repeats at all.
+function is_missing_root(root: string): boolean {
+	return !existsSync(root)
+}
+
 function run(argv: ReadonlyArray<string>): number {
 	const options = parse_options(argv)
 
 	if (options === undefined) {
 		console.error(USAGE)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	if (is_missing_root(options.root)) {
+		console.error(`${NO_ROOT} (${options.root})`)
 
 		return FAILURE_EXIT_CODE
 	}

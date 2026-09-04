@@ -70,12 +70,24 @@ function nested_jobs(job: Record<string, unknown>): ReadonlyArray<unknown> {
 	return layer_yaml.as_array(layer_yaml.as_record(job[GROUP_KEY])?.[JOBS_KEY]) ?? []
 }
 
-function job_steps(layer: string, entries: ReadonlyArray<unknown>): Array<LayerStep> {
+// The depth guard the `extends` walk gets from its `seen` set. A YAML anchor can make a `jobs`
+// sequence reference itself, and js-yaml hands back the cyclic object rather than refusing it — so
+// without a floor here a hand-written anchor crashes the whole command on a stack overflow, in the
+// one module that is otherwise defensive about every input it is given.
+const MAX_JOB_DEPTH = 10
+
+function job_steps(
+	layer: string,
+	entries: ReadonlyArray<unknown>,
+	depth: number = MAX_JOB_DEPTH,
+): Array<LayerStep> {
+	if (depth <= 0) return []
+
 	return entries.flatMap((value, index) => {
 		const job = layer_yaml.as_record(value) ?? {}
 		const own = command_step(layer, job_name(job, index), job)
 
-		return [...(own === undefined ? [] : [own]), ...job_steps(layer, nested_jobs(job))]
+		return [...(own === undefined ? [] : [own]), ...job_steps(layer, nested_jobs(job), depth - 1)]
 	})
 }
 
@@ -114,6 +126,12 @@ function read_document(from_path: string): HookDocument | undefined {
 	return { path: from_path, content }
 }
 
+// Named rather than written inline as `!seen.has(entry)`: `Set.prototype.difference`, which the
+// inline form would be rewritten to, is not in this project's TypeScript lib target.
+function is_unread(entry: string, seen: ReadonlySet<string>): boolean {
+	return !seen.has(entry)
+}
+
 // The entry document and everything it extends, each read at most once so a cyclic `extends` pair
 // cannot loop. A path that cannot be read contributes nothing rather than stopping the walk: a
 // consumer whose `extends` names a file it has not installed yet still gets a report of the rest.
@@ -121,7 +139,10 @@ function collect_documents(
 	paths: ReadonlyArray<string>,
 	seen: ReadonlySet<string>,
 ): Array<HookDocument> {
-	const fresh = paths.filter((entry) => !seen.has(entry))
+	// De-duplicated within this level as well as against `seen`: two documents extending the same
+	// base, or one `extends` list naming a file twice, would otherwise be read and expanded twice
+	// and put duplicate entries in every `steps` array of `--json`.
+	const fresh = [...new Set(paths)].filter((entry) => is_unread(entry, seen))
 	if (fresh.length === 0) return []
 
 	const documents = fresh

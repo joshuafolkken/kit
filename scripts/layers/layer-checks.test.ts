@@ -61,6 +61,10 @@ describe('layer_checks — expanding a josh sub-command', () => {
 		expect(checks_of('pnpm josh lint')).toStrictEqual(['eslint', 'prettier'])
 	})
 
+	it('expands a target written as one of josh own aliases', () => {
+		expect(checks_of('pnpm josh ga')).toStrictEqual(checks_of('pnpm josh gate'))
+	})
+
 	it('expands a shell-backed target through its own argv in the command map', () => {
 		expect(checks_of('pnpm josh check')).toStrictEqual([TYPE_CHECK])
 	})

@@ -52,7 +52,9 @@ describe('layer_hooks — reading lefthook commands', () => {
 	it('reads the setup block, so a hook-level install is a step like any other', () => {
 		expect(step_named(PRE_PUSH, 'setup')?.command).toBe('pnpm install')
 	})
+})
 
+describe('layer_hooks — the shapes a hook section can take', () => {
 	it('marks a command carrying any lefthook file-list placeholder as staged', () => {
 		const steps = layer_hooks.hook_steps_from_yaml(
 			`${PRE_PUSH}:\n  commands:\n    a:\n      run: pnpm exec eslint ${PUSH_FILES}\n`,
@@ -77,6 +79,12 @@ describe('layer_hooks — reading lefthook commands', () => {
 		expect(steps.map((step) => step.step)).toStrictEqual(['lint', 'spell'])
 	})
 
+	it('survives a jobs list that references itself through a YAML anchor', () => {
+		const cyclic = `${PRE_COMMIT}:\n  jobs: &loop\n    - name: a\n      run: pnpm exec eslint .\n    - name: g\n      group:\n        jobs: *loop\n`
+
+		expect(() => layer_hooks.hook_steps_from_yaml(cyclic)).not.toThrow()
+	})
+
 	it('reads no steps from an unparseable document instead of throwing', () => {
 		expect(layer_hooks.hook_steps_from_yaml('pre-commit: [')).toStrictEqual([])
 	})
@@ -94,6 +102,18 @@ describe('layer_hooks — following extends', () => {
 		const resolved = layer_hooks.extends_paths('extends:\n  - ./a/b.yml\n', '/repo/lefthook.yml')
 
 		expect(resolved).toStrictEqual(['/repo/a/b.yml'])
+	})
+
+	it('reads a file named twice in extends only once', () => {
+		const root = write_extending_tree()
+
+		writeFileSync(
+			path.join(root, layer_hooks.LEFTHOOK_ENTRY),
+			`extends:\n  - ${BASE_RELATIVE}\n  - ${BASE_RELATIVE}\n`,
+		)
+		const names = layer_hooks.read_hook_steps(root).map((step) => step.step)
+
+		expect(names.filter((name) => name === TYPE_CHECK)).toHaveLength(1)
 	})
 
 	it('reads nothing where the entry document is absent', () => {

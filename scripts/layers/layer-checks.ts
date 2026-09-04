@@ -1,5 +1,5 @@
 import { gate_plan } from '#scripts/gate-plan'
-import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 
 // What a command line actually checks, read from the command itself (joshuafolkken/kit#1313).
@@ -104,10 +104,16 @@ function match_signatures(command: string): Array<string> {
 
 // Every token that directly follows a bare `josh`, which covers `josh gate`, `pnpm josh gate` and
 // the `sh -c "pnpm josh a && pnpm josh b"` composites alike.
+//
+// **Expanded through `ALIASES` first**, because a hook may be written with one: `pnpm josh ga` is
+// `josh gate`, and without this the whole gate expansion disappears from the tables and the target
+// is reported as a name nobody can classify.
 function josh_targets(command: string): Array<string> {
 	const tokens = command.split(/\s+/u).filter((token) => token.length > 0)
 
-	return tokens.filter((_, index) => tokens[index - PREVIOUS_TOKEN_OFFSET] === JOSH_TOKEN)
+	return tokens
+		.filter((_, index) => tokens[index - PREVIOUS_TOKEN_OFFSET] === JOSH_TOKEN)
+		.map((token) => ALIASES[token] ?? token)
 }
 
 // The command lines a target stands for: the gate's four checks, or a shell-backed entry's own argv.

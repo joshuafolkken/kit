@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -62,5 +62,16 @@ describe('layer_ci — what a step contributes', () => {
 		mkdirSync(path.join(root, layer_ci.WORKFLOW_DIRECTORY, 'trap.yml'), { recursive: true })
 
 		expect(layer_ci.read_ci_steps(root)).toStrictEqual([])
+	})
+
+	it('reads a workflow reached through a symlink, which is a file by another name', () => {
+		const root = mkdtempSync(path.join(tmpdir(), 'layer-link-'))
+		const workflows = path.join(root, layer_ci.WORKFLOW_DIRECTORY)
+
+		mkdirSync(workflows, { recursive: true })
+		writeFileSync(path.join(root, 'real.yml'), layer_fixture.PULL_REQUEST_WORKFLOW)
+		symlinkSync(path.join(root, 'real.yml'), path.join(workflows, 'ci.yml'))
+
+		expect(layer_ci.read_ci_steps(root).length).toBeGreaterThan(0)
 	})
 })

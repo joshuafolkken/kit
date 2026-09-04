@@ -83,11 +83,12 @@ function ci_steps_from_yaml(workflow: string, content: string): Array<LayerStep>
 }
 
 // `withFileTypes`, so a *directory* named `something.yml` is not handed to the reader below as if
-// it were a workflow.
+// it were a workflow. The guard is `!isDirectory()` rather than `isFile()`, which would also drop a
+// symlinked workflow — a real file, reached through a name.
 function workflow_files(root: string): Array<string> {
 	try {
 		return readdirSync(path.join(root, WORKFLOW_DIRECTORY), { withFileTypes: true })
-			.filter((entry) => entry.isFile())
+			.filter((entry) => !entry.isDirectory())
 			.map((entry) => entry.name)
 			.filter((name) => WORKFLOW_SUFFIXES.some((suffix) => name.endsWith(suffix)))
 	} catch {

@@ -70,6 +70,15 @@ describe('josh layers — the command line', () => {
 		errors.mockRestore()
 	})
 
+	it('refuses a root that does not exist rather than reporting no repeats at all', () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const code = layers_cli.run(['--root', path.join(tmpdir(), 'layers-not-here')])
+
+		errors.mockRestore()
+
+		expect(code).toBe(1)
+	})
+
 	it('prints the report as text by default', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
