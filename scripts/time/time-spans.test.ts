@@ -345,3 +345,21 @@ describe('time_spans.has_transcript_data', () => {
 		expect(time_spans.has_transcript_data(1)).toBe(true)
 	})
 })
+
+// Claude Code writes one line per content block and repeats the assistant message's id on each, so a
+// turn's calls can only be counted by grouping on it (joshuafolkken/kit#1329).
+describe('time_spans.parse_line — the assistant message a line belongs to', () => {
+	it('carries the message id every line of one turn repeats', () => {
+		const line = JSON.stringify({
+			type: ASSISTANT,
+			timestamp: at(0),
+			message: { id: 'msg-1', content: [{ type: 'tool_use', name: 'Read', id: 'a' }] },
+		})
+
+		expect(time_spans.parse_line(line)?.message_id).toBe('msg-1')
+	})
+
+	it('leaves a line written without one ungrouped', () => {
+		expect(time_spans.parse_line(prompt(0))?.message_id).toBe(time_spans.NO_MESSAGE_ID)
+	})
+})
