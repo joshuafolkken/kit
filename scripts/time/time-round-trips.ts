@@ -58,11 +58,24 @@ function count_calls(spans: ReadonlyArray<Span>): number {
 	return spans.filter((span) => is_tool(span) && !span.is_continuation).length
 }
 
+// **A continuation never opens one either.** The tail of a call whose middle went to a delegated
+// unit sits after that unit's spans, and the last of those is the subagent's own turn — a model
+// span — so the tail would otherwise read as a fresh call issued alone. Counting it that way moves
+// the density in *both* wrong directions at once, one call fewer over one trip more, which is how a
+// turn that batched and delegated could print the warning meant for a turn that did neither.
+function opens_round_trip(spans: ReadonlyArray<Span>, index: number): boolean {
+	const span = spans[index]
+
+	if (span === undefined || !is_tool(span) || span.is_continuation) return false
+
+	return !is_tool_at(spans, index - 1)
+}
+
 // One per group of adjacent tool spans: the first tool span after anything that is not one.
 function count_round_trips(spans: ReadonlyArray<Span>): number {
 	const ordered = in_time_order(spans)
 
-	return ordered.filter((span, index) => is_tool(span) && !is_tool_at(ordered, index - 1)).length
+	return ordered.filter((_span, index) => opens_round_trip(ordered, index)).length
 }
 
 // **Zero round trips is not a density of zero.** A scope whose transcript was never read has no

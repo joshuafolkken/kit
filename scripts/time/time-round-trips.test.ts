@@ -46,6 +46,13 @@ describe('time_round_trips.count_round_trips', () => {
 	it('counts none where no tool was called', () => {
 		expect(time_round_trips.count_round_trips([MODEL, HUMAN])).toBe(0)
 	})
+
+	// A delegating turn, in the order `in_time_order` puts it: the call's leading fragment, the unit's
+	// own work — whose last span is the subagent's turn — and then the call's tail. The tail is not a
+	// second call, so it does not open a second round trip either.
+	it('does not open a round trip on the tail of a call split around a delegated unit', () => {
+		expect(time_round_trips.count_round_trips([MODEL, TOOL, MODEL, CONTINUATION])).toBe(1)
+	})
 })
 
 // A run's spans do not arrive in time order: `time_overlap.resolve_delegated` appends the delegated
