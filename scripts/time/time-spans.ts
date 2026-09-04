@@ -79,7 +79,11 @@ const BLOCK_SCHEMA = z.object({
 })
 
 const CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
-const MESSAGE_SCHEMA = z.object({ content: CONTENT_SCHEMA.nullish() })
+// `id` is the assistant *message* the line belongs to, and Claude Code writes one line per content
+// block — a turn that thought and then issued two calls is three lines carrying one id
+// (joshuafolkken/kit#1329). Anything asking "how many calls did that turn make" therefore has to
+// group by this field; counting one line's blocks answers one, whatever the turn actually did.
+const MESSAGE_SCHEMA = z.object({ id: z.string().nullish(), content: CONTENT_SCHEMA.nullish() })
 
 const LINE_SCHEMA = z.object({
 	type: z.string().nullish(),
@@ -92,6 +96,7 @@ const LINE_SCHEMA = z.object({
 })
 
 const UNKNOWN_BRANCH = ''
+const NO_MESSAGE_ID = ''
 
 type SpanCategory = 'model' | 'tool' | 'human'
 
@@ -150,6 +155,10 @@ interface TranscriptLine {
 	type: string
 	timestamp_ms: number
 	branch: string
+	// The assistant message this line is one block of, or `''` where the line carries none — a user
+	// line, or an assistant line written without an id. The empty string is never treated as a group:
+	// every line lacking an id would otherwise fall into one bucket spanning the whole file.
+	message_id: string
 	blocks: Array<Block>
 }
 
@@ -268,6 +277,15 @@ function to_blocks(
 		: content.map((block) => to_block(block))
 }
 
+// The two fields read off `message`, taken together because they are one reading: an assistant turn
+// is written as one line per content block with the message's id repeated on each, so the id is what
+// says which blocks belonged to the same turn.
+function message_fields(
+	message: z.infer<typeof MESSAGE_SCHEMA> | null | undefined,
+): Pick<TranscriptLine, 'message_id' | 'blocks'> {
+	return { message_id: message?.id ?? NO_MESSAGE_ID, blocks: to_blocks(message?.content) }
+}
+
 // A line without a parseable timestamp is dropped rather than dated: it has no place on a timeline,
 // and inventing one would move every span around it.
 function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined {
@@ -279,7 +297,7 @@ function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined 
 		type: data.type ?? '',
 		timestamp_ms,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
-		blocks: to_blocks(data.message?.content),
+		...message_fields(data.message),
 	}
 }
 
@@ -396,9 +414,11 @@ function has_transcript_data(span_count: number): boolean {
 }
 
 const time_spans = {
+	ASSISTANT_TYPE,
 	MODEL_CATEGORY,
 	TOOL_CATEGORY,
 	HUMAN_CATEGORY,
+	NO_MESSAGE_ID,
 	UNKNOWN_TOOL,
 	bash_label,
 	has_transcript_data,
@@ -407,5 +427,5 @@ const time_spans = {
 	parse_timeline,
 }
 
-export type { Span, SpanCategory, Timeline }
+export type { Block, Span, SpanCategory, Timeline, TranscriptLine }
 export { time_spans }

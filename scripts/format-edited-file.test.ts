@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { resolve_local_bin } from '#scripts/local-bin'
 import { afterAll, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import {
+	density_envelope,
 	ESLINT_DAEMON,
 	format_edited_file,
 	is_start_failure,
@@ -16,6 +18,8 @@ import {
 	type CommandRunner,
 	type FormatCommand,
 } from './format-edited-file'
+import { time_density_hook } from './time/time-density-hook'
+import { time_transcript_fixture } from './time/time-transcript-fixture'
 
 // Under the OS temp directory for the reason yaml-config-fixture.test.ts gives: several suites here
 // assert on the repository's own file listing, so a fixture left at the package root would break
@@ -77,7 +81,15 @@ function recording_runner(runs: Array<string>): CommandRunner {
 	}
 }
 
+// The density hook's throttle records, which live in the shared temp directory rather than under
+// `TEST_DIRECTORY` — so removing that directory does not take them with it.
+const DENSITY_TRANSCRIPTS = new Set<string>()
+
 afterAll(() => {
+	for (const transcript of DENSITY_TRANSCRIPTS) {
+		rmSync(time_density_hook.notice_path(transcript), { force: true })
+	}
+
 	rmSync(TEST_DIRECTORY, { recursive: true, force: true })
 })
 
@@ -338,5 +350,51 @@ describe('format_edited_file', () => {
 		await expect(
 			format_edited_file(payload_for(file_path), failing_runner, TEST_DIRECTORY),
 		).resolves.toBeUndefined()
+	})
+})
+
+// The live round-trip density line rides this hook rather than one of its own
+// (joshuafolkken/kit#1329). A `PostToolUse` hook's plain stdout never reaches the model, so the line
+// has to leave through the documented envelope — and an ordinary edit must still write nothing.
+describe('density_envelope', () => {
+	const ONE_CALL = 1
+	// Parsed rather than string-matched, and through a schema rather than a type assertion: what the
+	// harness reads is JSON, so a test that only found the words in the text would pass on output the
+	// harness could not parse at all.
+	const envelope_schema = z.object({
+		hookSpecificOutput: z.object({
+			hookEventName: z.string(),
+			additionalContext: z.string(),
+		}),
+	})
+
+	// The throttle record is keyed on the transcript and lands outside `TEST_DIRECTORY`, so it is
+	// removed by name here rather than left to the suite's own teardown.
+	function transcript_for(name: string): string {
+		const target = path.join(TEST_DIRECTORY, `${name}.jsonl`)
+		const turns = time_transcript_fixture.DENSITY_TURNS
+
+		writeFileSync(target, time_transcript_fixture.density_text(turns, ONE_CALL), 'utf8')
+		DENSITY_TRANSCRIPTS.add(target)
+
+		return target
+	}
+
+	it('wraps the line in the PostToolUse envelope the harness reads', () => {
+		const payload = JSON.stringify({ transcript_path: transcript_for('density') })
+		const written = density_envelope(payload)
+
+		expect(written).toBeDefined()
+
+		const envelope = envelope_schema.parse(JSON.parse(written ?? ''))
+
+		expect(envelope.hookSpecificOutput.hookEventName).toBe('PostToolUse')
+		expect(envelope.hookSpecificOutput.additionalContext).toContain('calls per round trip')
+	})
+
+	it('writes nothing for the edit payload that carries no transcript', () => {
+		const payload = payload_for(write_fixture('plain.ts'))
+
+		expect(density_envelope(payload)).toBeUndefined()
 	})
 })
