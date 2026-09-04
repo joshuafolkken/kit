@@ -1,48 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { time_markers } from './time-markers'
-import { time_phases, type PhaseName, type PhaseTotal } from './time-phases'
+import { time_phase_fixture } from './time-phase-fixture'
+import { time_phases } from './time-phases'
 import { time_spans, type Span } from './time-spans'
 
-const MINUTE_MS = 60_000
-const NO_CI = { ci_ms: 0, has_ci_data: false }
+// The timeline builder is `time-phase-fixture.ts`'s, shared with the region suites that joined this
+// module in joshuafolkken/kit#1299. The whole run below stays here, because it is a timeline of bare
+// minute positions and the magic-number rule is switched off for test files only.
+
+const { MINUTE_MS, NO_CI, GATE_COMMAND, PR_COMMAND, MERGE_COMMAND } = time_phase_fixture
+const { span, waited, minutes_of, detected, total_ms } = time_phase_fixture
+
 const PNPM_LABEL = 'Bash: pnpm'
-
-// Positioned by start minute so a test reads as a timeline rather than as a list of durations: the
-// windows are decided from when a span sits, and a helper that only carried lengths could not say.
-function span(start_minute: number, minutes: number, extra: Partial<Span> = {}): Span {
-	return {
-		category: time_spans.TOOL_CATEGORY,
-		label: '',
-		josh_command: '',
-		marker: time_markers.NO_MARKER,
-		branch: 'main',
-		is_continuation: false,
-		ended_ms: (start_minute + minutes) * MINUTE_MS,
-		duration_ms: minutes * MINUTE_MS,
-		...extra,
-	}
-}
-
-// A span that closes at a typed prompt — the interval nobody was at the keyboard for. It carries no
-// tool name and no marker, exactly as `time-spans.ts` writes one, so a test cannot accidentally rest
-// on a combination a transcript never produces.
-function waited(start_minute: number, minutes: number): Span {
-	return span(start_minute, minutes, { category: time_spans.HUMAN_CATEGORY })
-}
-
-function minutes_of(phases: ReadonlyArray<PhaseTotal>, phase: PhaseName): number {
-	return (phases.find((total) => total.phase === phase)?.duration_ms ?? 0) / MINUTE_MS
-}
-
-function detected(phases: ReadonlyArray<PhaseTotal>, phase: PhaseName): boolean {
-	return phases.find((total) => total.phase === phase)?.is_detected === true
-}
-
-// What every reconstruction test compares against: the phases must still add up to the elapsed time,
-// whichever window a span was moved out of.
-function total_ms(phases: ReadonlyArray<PhaseTotal>): number {
-	return phases.reduce((sum, entry) => sum + entry.duration_ms, 0)
-}
 
 // One whole run, in the order a `fullrun` walks it: the edit, the gate, the fix the gate demanded,
 // the review, the fix the review demanded, then the pull request and the merge.
@@ -51,12 +20,12 @@ const RUN: ReadonlyArray<Span> = [
 	span(2, 1, { marker: time_markers.PLAN_MARKER, label: 'Bash: gh' }),
 	span(3, 4, { marker: time_markers.EDIT_MARKER, label: 'Edit' }),
 	span(7, 3, { label: 'Read' }),
-	span(10, 5, { josh_command: 'josh gate', label: PNPM_LABEL }),
+	span(10, 5, { josh_command: GATE_COMMAND, label: PNPM_LABEL }),
 	span(15, 2, { marker: time_markers.EDIT_MARKER, label: 'Edit' }),
 	span(17, 6, { marker: time_markers.REVIEW_MARKER, label: 'Skill' }),
 	span(23, 1, { marker: time_markers.EDIT_MARKER, label: 'Edit' }),
-	span(24, 2, { josh_command: 'josh git', label: PNPM_LABEL }),
-	span(26, 7, { josh_command: 'josh followup', label: PNPM_LABEL }),
+	span(24, 2, { josh_command: PR_COMMAND, label: PNPM_LABEL }),
+	span(26, 7, { josh_command: MERGE_COMMAND, label: PNPM_LABEL }),
 ]
 
 describe('time_phases.build_phases — classification', () => {
@@ -78,6 +47,9 @@ describe('time_phases.build_phases — classification', () => {
 		expect(minutes_of(phases, time_phases.IMPLEMENT_PHASE)).toBe(7)
 	})
 
+	// The command phases and the three windows are decided before the regions joshuafolkken/kit#1299
+	// cut out of the remainder, so a subdivision of that remainder cannot reach into one — the
+	// property that makes the change a split of one row rather than a reshuffle of the table.
 	it('collects the gate, review, pr and merge commands into their own phases', () => {
 		const phases = time_phases.build_phases({ spans: RUN, ...NO_CI })
 
@@ -94,7 +66,7 @@ describe('time_phases.build_phases — classification', () => {
 	it('charges a gate run that overlaps the review to the gate', () => {
 		const spans = [
 			span(0, 4, { marker: time_markers.REVIEW_MARKER }),
-			span(1, 2, { josh_command: 'josh gate' }),
+			span(1, 2, { josh_command: GATE_COMMAND }),
 		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
 
@@ -116,10 +88,10 @@ describe('time_phases.build_phases — the rework window', () => {
 	it('keeps a fix made after the review in rework rather than in other', () => {
 		const spans = [
 			span(0, 1, { marker: time_markers.EDIT_MARKER }),
-			span(1, 2, { josh_command: 'josh gate' }),
+			span(1, 2, { josh_command: GATE_COMMAND }),
 			span(3, 4, { marker: time_markers.REVIEW_MARKER }),
 			span(7, 5, { marker: time_markers.EDIT_MARKER }),
-			span(12, 1, { josh_command: 'josh git' }),
+			span(12, 1, { josh_command: PR_COMMAND }),
 		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
 
@@ -134,7 +106,7 @@ describe('time_phases.build_phases — the rework window', () => {
 	it('runs rework to the end of what was measured when no pull request was opened', () => {
 		const spans = [
 			span(0, 1, { marker: time_markers.EDIT_MARKER }),
-			span(1, 2, { josh_command: 'josh gate' }),
+			span(1, 2, { josh_command: GATE_COMMAND }),
 			span(3, 4),
 		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
@@ -161,7 +133,7 @@ describe('time_phases.build_phases — the wait phase', () => {
 	it('keeps the trailing wait of a run that opened no pull request out of rework', () => {
 		const spans = [
 			span(0, 1, { marker: time_markers.EDIT_MARKER }),
-			span(1, 2, { josh_command: 'josh gate' }),
+			span(1, 2, { josh_command: GATE_COMMAND }),
 			span(3, 2),
 			waited(5, 20),
 		]
@@ -250,7 +222,7 @@ describe('time_phases.build_phases — the total survives the wait phase', () =>
 		const spans = [
 			span(0, 3, { marker: time_markers.EDIT_MARKER }),
 			waited(3, 4),
-			span(7, 2, { josh_command: 'josh gate' }),
+			span(7, 2, { josh_command: GATE_COMMAND }),
 			waited(9, 5),
 		]
 		const phases = time_phases.build_phases({ spans, ci_ms: 2 * MINUTE_MS, has_ci_data: true })
@@ -264,7 +236,7 @@ describe('time_phases.build_phases — the total survives the wait phase', () =>
 		const spans = [
 			waited(0, 3),
 			span(3, 1, { marker: time_markers.EDIT_MARKER }),
-			span(4, 2, { josh_command: 'josh gate' }),
+			span(4, 2, { josh_command: GATE_COMMAND }),
 			waited(6, 6),
 		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
@@ -357,9 +329,9 @@ describe('time_phases.build_phases — the window boundaries', () => {
 	// reported as detected — a confident zero where the flag exists to prevent one.
 	it('ignores a gate that ran before the first edit when closing the window', () => {
 		const spans = [
-			span(0, 2, { josh_command: 'josh gate' }),
+			span(0, 2, { josh_command: GATE_COMMAND }),
 			span(2, 5, { marker: time_markers.EDIT_MARKER }),
-			span(7, 3, { josh_command: 'josh gate' }),
+			span(7, 3, { josh_command: GATE_COMMAND }),
 		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
 
@@ -383,7 +355,7 @@ describe('time_phases.build_phases — the window boundaries', () => {
 	// covering nearly the whole of it.
 	it('bounds planning by the first command phase when no edit was recorded', () => {
 		const spans = [
-			span(0, 4, { josh_command: 'josh gate' }),
+			span(0, 4, { josh_command: GATE_COMMAND }),
 			span(4, 3, { marker: time_markers.PLAN_MARKER }),
 		]
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
