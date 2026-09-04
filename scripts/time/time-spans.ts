@@ -3,6 +3,7 @@ import { json_value } from '#scripts/json-value'
 import { z } from 'zod'
 import { time_instant } from './time-instant'
 import { time_markers, type PhaseMarker } from './time-markers'
+import { time_reported_failure } from './time-reported-failure'
 
 // Turning a session transcript into timed spans (joshuafolkken/kit#1267).
 //
@@ -80,6 +81,10 @@ const BLOCK_SCHEMA = z.object({
 	// `tool_result` block and on nothing else, and absent even there for the tools that never report
 	// one — which is why it is read as three answers rather than as a boolean with a default.
 	is_error: z.boolean().nullish(),
+	// What the call printed. Read only to recover the outcome a pipeline threw away
+	// (joshuafolkken/kit#1361): it is kept as flattened text rather than as blocks, because that is
+	// the whole of what `time-reported-failure.ts` asks of it.
+	content: z.unknown().nullish(),
 })
 
 const CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
@@ -186,6 +191,10 @@ interface Block {
 	// `undefined` where the block carried no `is_error` field, which is a different fact from
 	// `false`: one is a tool that reports no outcome, the other a call that succeeded.
 	is_error: boolean | undefined
+	// Whether the body carried a line opening with josh's failure icon — the one bit of it anything
+	// reads (joshuafolkken/kit#1361). The text itself is deliberately not kept: a field holding it
+	// would retain every byte the session's tools printed for the length of the parse.
+	has_failure_line: boolean
 }
 
 interface TranscriptLine {
@@ -309,7 +318,12 @@ function block_names(
 }
 
 function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
-	return { ...block_names(raw), input: raw.input, is_error: raw.is_error ?? undefined }
+	return {
+		...block_names(raw),
+		input: raw.input,
+		is_error: raw.is_error ?? undefined,
+		has_failure_line: time_reported_failure.has_failure_line(raw.content),
+	}
 }
 
 // A user turn written as a bare string carries no blocks, which is exactly right: it is a prompt,
@@ -392,14 +406,24 @@ function event_of(
 // A result that carried no `is_error` is `unknown` rather than `ok`: the tools that report no
 // outcome — a file read, an answered question — would otherwise be counted as calls that succeeded,
 // and a run whose whole transcript was written by them would report a measured zero failures.
-function outcome_of(result: Block): SpanOutcome {
+//
+// **What the command said outranks what the harness recorded, in one direction only**
+// (joshuafolkken/kit#1361). A josh check run inside a pipeline exits with the pipe's status, so the
+// harness writes `is_error: false` over a red gate; the failure line the command printed is the only
+// surviving evidence, and it is read *before* the field. The reverse never happens — a call the
+// harness marked failed is failed whatever it printed.
+function outcome_of(result: Block, call: ToolCall): SpanOutcome {
+	if (time_reported_failure.is_reported_failure(call.josh_command, result.has_failure_line)) {
+		return FAILED_OUTCOME
+	}
+
 	if (result.is_error === undefined) return UNKNOWN_OUTCOME
 
 	return result.is_error ? FAILED_OUTCOME : OK_OUTCOME
 }
 
-function facts_of(result: Block): ResultFacts {
-	return { call_id: result.result_id, outcome: outcome_of(result) }
+function facts_of(result: Block, call: ToolCall): ResultFacts {
+	return { call_id: result.result_id, outcome: outcome_of(result, call) }
 }
 
 // A user line is one of two things, and only its blocks tell them apart: a tool result the harness
@@ -411,7 +435,7 @@ function user_event(line: TranscriptLine, calls: ReadonlyMap<string, ToolCall>):
 
 	const call = calls.get(result.result_id) ?? UNKNOWN_CALL
 
-	return event_of(line, TOOL_CATEGORY, call, facts_of(result))
+	return event_of(line, TOOL_CATEGORY, call, facts_of(result, call))
 }
 
 function to_event(

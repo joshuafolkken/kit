@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
+import { status_icons } from '#scripts/status-icons'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { derive_versions_endpoint } from '#scripts/version/version-command-config'
 import { version_targets } from '#scripts/version/version-targets'
@@ -124,7 +125,9 @@ async function await_publish(target_version: string, is_skipped: boolean): Promi
 		return true
 	}
 
-	console.error(`✗ ${target_version} did not become available: ${result.state}.`)
+	console.error(
+		`${status_icons.FAIL_ICON} ${target_version} did not become available: ${result.state}.`,
+	)
 	console.error('No consumer was touched.')
 
 	return false

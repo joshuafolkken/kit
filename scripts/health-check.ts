@@ -2,11 +2,12 @@
 import { fileURLToPath } from 'node:url'
 import { execa } from 'execa'
 import { ESLINT_CACHE_FLAGS, TS_CACHE_FLAGS } from './josh/josh-command-types'
+import { status_icons } from './status-icons'
 
 const PNPM = 'pnpm'
 const LABEL_WIDTH = 12
 const FAIL_EXIT_CODE = 1
-const STATUS_ICONS = { pass: '✔', warn: '⚠', fail: '✗' } as const
+const STATUS_ICONS = { pass: '✔', warn: '⚠', fail: status_icons.FAIL_ICON } as const
 
 interface HealthCheckDefinition {
 	label: string
