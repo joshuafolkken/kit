@@ -71,8 +71,13 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   and then run round 2 beside the CI that commit started. **The bump goes in front of that gate**, so the
   one the commit rests on covers the exact tree it carries and round 2's brief still reads
   `Already verified` — taken before the bump it reads `Not verified`, and the review agent re-runs the
-  unit suite the gate had just passed. A finding round 2 fixes in place is a follow-up commit on the same
-  branch — its own `pnpm josh gate` join, **no second `bump`**, and CI re-runs on it. `prompts/review.md` →
+  unit suite the gate had just passed. **A finding round 2 fixes in place is pushed before its gate**
+  (joshuafolkken/kit#1326): the single check the fix reaches, then a follow-up commit on the same
+  branch (**no second `bump`**), then its own `pnpm josh gate` **joined before `pnpm josh followup --merge`**
+  — so the CI that commit re-runs has the gate beside it rather than in front of it. A red gate there is
+  fixed, re-checked with the same single check and pushed again; the superseded cycle is cancelled by
+  `ci.yml`'s concurrency group, and the merge still waits on the head commit's checks
+  (`prompts/review.md` → "The round-2 fix commit is pushed before its gate"). `prompts/review.md` →
   "The pull request opens between the rounds, so CI runs beside round 2" is the single source; a clean
   round 1 has no second round and its order is unchanged. While the checks are in flight the brief says so
   rather than saying nothing: `josh gate` writes a marker for as long as it runs, so the review agent
