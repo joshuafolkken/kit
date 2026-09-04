@@ -15,6 +15,10 @@ const SECOND = 202
 const GATE = 'gate'
 const EXCLUSION_NOTE =
 	'1 run(s) merged with no session transcript attributed, so only their CI wait is known — they are excluded from the elapsed and transcript-side rows as unmeasured rather than counted as zero'
+// The two sentences a run carries for itself: why its report could not be built at all, and why its
+// per-check table is empty (joshuafolkken/kit#1352).
+const FAILURE_NOTE = `issue #${String(FIRST)} could not be measured: gh: not authenticated`
+const CHECK_READ_NOTE = `the CI check list could not be read for issue #${String(FIRST)} — the per-check table is empty for that reason, not because there were no checks`
 
 function timing(issue_number: number, span_count: number): RunTiming {
 	return time_batch.to_timing(issue_number, report_of({ issue_number, span_count }))
@@ -131,5 +135,41 @@ describe('time_last_report.format_last_report — the runs it was read from', ()
 
 	it('says how many of the runs were fully measured', () => {
 		expect(lines_of(report)[0]).toContain('1 of 2 fully measured')
+	})
+})
+
+// The notes `time-run.ts` writes per run reach this table too (joshuafolkken/kit#1352). Without them
+// a run whose report failed to build printed `failed` and nothing saying how, and a refused check
+// read left the check rows quietly short of a sample.
+//
+// `has_ci_data` is one of the two halves a status is decided from, so a fixture states it rather than
+// letting the report contradict the status it claims: a failed report read no merge at all.
+function noted(
+	status: RunTiming['status'],
+	notes: ReadonlyArray<string>,
+	has_ci_data = true,
+): LastTimeReport {
+	const base = time_batch.to_timing(
+		FIRST,
+		report_of({ issue_number: FIRST, span_count: 0, has_ci_data }),
+	)
+
+	return report_with({
+		runs: [{ ...base, status, report: { ...base.report, notes: [...notes] } }],
+	})
+}
+
+describe('time_last_report.format_last_report — a run’s own notes', () => {
+	it('prints the reason under a run whose report could not be built', () => {
+		const failed = noted(time_batch.FAILED, [FAILURE_NOTE], false)
+
+		expect(line_with(failed, FAILURE_NOTE)).toContain(FAILURE_NOTE)
+	})
+
+	// The merge was read, so the row stays measured — the note is the only sign the read was refused.
+	it('prints the refused-check note under a fully measured run', () => {
+		const refused = noted(time_batch.MEASURED, [CHECK_READ_NOTE])
+
+		expect(line_with(refused, CHECK_READ_NOTE)).toContain(CHECK_READ_NOTE)
 	})
 })

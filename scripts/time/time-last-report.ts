@@ -3,6 +3,7 @@ import { time_distribution, type LabeledDistribution } from './time-distribution
 import { time_format } from './time-format'
 import type { LastTimeReport } from './time-last'
 import { time_report } from './time-report'
+import { time_row_notes } from './time-row-notes'
 
 // The text a set of runs is read as (joshuafolkken/kit#1312).
 //
@@ -79,11 +80,19 @@ function check_lines(report: LastTimeReport): Array<string> {
 function run_line(timing: RunTiming): string {
 	const label = `#${String(timing.issue_number)}`
 
-	if (timing.status === time_batch.NOT_RUN) {
+	if (!time_batch.has_duration(timing)) {
 		return time_report.format_columns(label, '', timing.status)
 	}
 
 	return time_report.format_row(label, timing.report.elapsed_ms, timing.status)
+}
+
+// **A run's own notes go under its row, the selection shared with `--epic`**
+// (joshuafolkken/kit#1352). Without them a run whose report failed to build printed `failed` and
+// nothing else — the status said the measurement broke and no line said how — and a refused
+// check-run read left the `By CI check` rows quietly short of a sample with nothing saying why.
+function run_block(timing: RunTiming): Array<string> {
+	return [run_line(timing), ...time_row_notes.note_lines(timing)]
 }
 
 // Printed even for a single run, because the list is what says *which* runs the figures above came
@@ -91,7 +100,7 @@ function run_line(timing: RunTiming): string {
 function run_lines(report: LastTimeReport): Array<string> {
 	if (report.runs.length === NONE) return []
 
-	return ['', RUN_HEADING, ...report.runs.map((timing) => run_line(timing))]
+	return ['', RUN_HEADING, ...report.runs.flatMap((timing) => run_block(timing))]
 }
 
 function elapsed_lines(report: LastTimeReport): Array<string> {

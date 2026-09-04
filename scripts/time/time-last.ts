@@ -212,6 +212,9 @@ function notes_of(
 			time_batch.count_status(runs, time_batch.NOT_RUN),
 			'could not be measured at all and are excluded — each row carries its own reason',
 		),
+		// The measurement broke rather than finding nothing, which is never an ordinary answer for a run
+		// that merged — so it is counted apart from the row above (joshuafolkken/kit#1352).
+		...count_note(time_batch.count_status(runs, time_batch.FAILED), time_batch.FAILED_NOTE_TAIL),
 	]
 }
 

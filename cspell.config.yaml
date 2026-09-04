@@ -13,6 +13,11 @@ words:
   # stays in this local list because it reaches no distributed file; the `wrapup` beside it in the
   # same change does, so that one is in `cspell/index.yaml` instead.
   - unphased
+  # What `time-batch.ts` calls a batch row with no duration to print — a run the batch never reached,
+  # and one whose report could not be built at all (joshuafolkken/kit#1352). `unstarted` is the word
+  # its counterpart uses for the first of those alone. Neither reaches a distributed file.
+  - untimed
+  - unstarted
   # The shell builtins `josh time` walks past when it names the command a Bash call actually ran
   # (joshuafolkken/kit#1267). They reach no distributed file, so they stay in this local list.
   - pushd
