@@ -121,6 +121,21 @@ const OK_OUTCOME: SpanOutcome = 'ok'
 const FAILED_OUTCOME: SpanOutcome = 'failed'
 const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
 
+// What the result closing a span says about the call it belongs to, beyond the label read off the
+// call itself. Two fields rather than one because both are answers about the *result* line and
+// neither can be recovered from a span afterwards.
+//
+// **`call_id` is what makes two fragments of one call identifiable as one call.** A span bracketing a
+// delegated unit comes back from `time_overlap.trim` as a head and a tail, and the two are told apart
+// from a *different* call of the same tool only by this id — a label cannot do it, because two
+// `Task` calls issued in the same turn share one.
+interface ResultFacts {
+	call_id: string
+	outcome: SpanOutcome
+}
+
+const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
+
 // What a tool span is labelled with. `josh_command` is empty for everything that is not a
 // `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
 //
@@ -147,12 +162,10 @@ const UNKNOWN_CALL: ToolCall = {
 //
 // `branch` rides along for the same reason `cost-usage.ts` carries it on a record: it is what
 // `cost_attribute` reads to decide which issue the span belongs to.
-interface Span extends ToolCall {
+// The two `ResultFacts` fields are carried for the same reason `marker` is: the result block is gone
+// by the time anything aggregates, and only what was read off it survives.
+interface Span extends ToolCall, ResultFacts {
 	category: SpanCategory
-	// How the call came back, read off the `is_error` the harness wrote on its result
-	// (joshuafolkken/kit#1309). Carried on the span for the same reason `marker` is: the result block
-	// is gone by the time anything aggregates, and only the label read off it survives.
-	outcome: SpanOutcome
 	duration_ms: number
 	ended_ms: number
 	branch: string
@@ -186,11 +199,10 @@ interface TranscriptLine {
 	blocks: Array<Block>
 }
 
-interface TimelineEvent extends ToolCall {
+interface TimelineEvent extends ToolCall, ResultFacts {
 	timestamp_ms: number
 	branch: string
 	category: SpanCategory
-	outcome: SpanOutcome
 }
 
 // The whole session: when it started, when it ended, and what it spent the interval on.
@@ -372,9 +384,9 @@ function event_of(
 	line: TranscriptLine,
 	category: SpanCategory,
 	call: ToolCall,
-	outcome: SpanOutcome = UNKNOWN_OUTCOME,
+	result: ResultFacts = NO_RESULT,
 ): TimelineEvent {
-	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, outcome, ...call }
+	return { timestamp_ms: line.timestamp_ms, branch: line.branch, category, ...result, ...call }
 }
 
 // A result that carried no `is_error` is `unknown` rather than `ok`: the tools that report no
@@ -386,6 +398,10 @@ function outcome_of(result: Block): SpanOutcome {
 	return result.is_error ? FAILED_OUTCOME : OK_OUTCOME
 }
 
+function facts_of(result: Block): ResultFacts {
+	return { call_id: result.result_id, outcome: outcome_of(result) }
+}
+
 // A user line is one of two things, and only its blocks tell them apart: a tool result the harness
 // wrote back, or a person typing.
 function user_event(line: TranscriptLine, calls: ReadonlyMap<string, ToolCall>): TimelineEvent {
@@ -395,7 +411,7 @@ function user_event(line: TranscriptLine, calls: ReadonlyMap<string, ToolCall>):
 
 	const call = calls.get(result.result_id) ?? UNKNOWN_CALL
 
-	return event_of(line, TOOL_CATEGORY, call, outcome_of(result))
+	return event_of(line, TOOL_CATEGORY, call, facts_of(result))
 }
 
 function to_event(
@@ -430,6 +446,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		josh_command: event.josh_command,
 		marker: event.marker,
 		branch: event.branch,
+		call_id: event.call_id,
 		outcome: event.outcome,
 		is_continuation: false,
 		ended_ms: event.timestamp_ms,
@@ -480,5 +497,5 @@ const time_spans = {
 	parse_timeline,
 }
 
-export type { Block, Span, SpanCategory, SpanOutcome, Timeline, TranscriptLine }
+export type { Block, ResultFacts, Span, SpanCategory, SpanOutcome, Timeline, TranscriptLine }
 export { time_spans }

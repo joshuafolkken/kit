@@ -103,25 +103,44 @@ describe('time_failures.build_failures — what belongs to one chain', () => {
 })
 
 // One call bracketing a delegated unit comes back from `time_overlap.trim` as a head and a tail, and
-// the two halves need opposite answers: the tail's time is the call's, its count is not.
+// the two halves need opposite answers: the tail's time is the call's, its count is not. The fixture
+// keys a call by the minute it closes on, so a tail is written by taking its head's id.
+function tail_of(head: Span, end_minute: number, minutes = 1): Span {
+	return {
+		...head,
+		is_continuation: true,
+		ended_ms: end_minute * MINUTE_MS,
+		duration_ms: minutes * MINUTE_MS,
+	}
+}
+
 describe('time_failures.build_failures — a call split around a delegated unit', () => {
 	// **Charging only the head** would price the re-run at seconds while the minutes it really took
 	// stay in the `tool execution` the share is quoted against.
 	it('charges the whole of a re-run whose middle went to a delegated unit', () => {
-		const tail = { ...gate(9, OK_OUTCOME), is_continuation: true, duration_ms: 5 * MINUTE_MS }
-		const totals = time_failures.build_failures([
-			gate(1, FAILED_OUTCOME),
-			gate(2, OK_OUTCOME),
-			tail,
-		])
+		const rerun = gate(2, OK_OUTCOME)
+		const spans = [gate(1, FAILED_OUTCOME), rerun, tail_of(rerun, 9, 5)]
 
-		expect(totals.rerun_ms).toBe(6 * MINUTE_MS)
+		expect(time_failures.build_failures(spans).rerun_ms).toBe(6 * MINUTE_MS)
 	})
 
 	it('counts that continuation as part of the call rather than as a second one', () => {
-		const tail = { ...gate(9, FAILED_OUTCOME), is_continuation: true }
+		const head = gate(1, FAILED_OUTCOME)
 
-		expect(time_failures.build_failures([gate(1, FAILED_OUTCOME), tail]).failed_call_count).toBe(1)
+		expect(time_failures.build_failures([head, tail_of(head, 9)]).failed_call_count).toBe(1)
+	})
+
+	// **Two calls of one command can be open at once** — two delegating calls issued in a single turn,
+	// which the turn-batching rule encourages — and their heads and tails interleave. `first` is the
+	// command's opening attempt, so neither of its fragments is rework; `second` follows that failure,
+	// so both of its are. A chain keyed by command instead of by call would let `second`'s decision
+	// reach `first`'s tail and bill three minutes for two minutes of rework.
+	it('bills each tail by its own head, not by whichever call was walked last', () => {
+		const first = gate(1, FAILED_OUTCOME)
+		const second = gate(2, OK_OUTCOME)
+		const spans = [first, second, tail_of(first, 8), tail_of(second, 9)]
+
+		expect(time_failures.build_failures(spans).rerun_ms).toBe(2 * MINUTE_MS)
 	})
 })
 

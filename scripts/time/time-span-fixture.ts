@@ -26,6 +26,7 @@ function span(
 		josh_command,
 		marker: time_markers.NO_MARKER,
 		branch: 'main',
+		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,
 		is_continuation: false,
 		ended_ms: 0,
@@ -45,6 +46,10 @@ function outcome_span(
 ): Span {
 	return {
 		...span(time_spans.TOOL_CATEGORY, DEFAULT_MINUTES, label, josh_command),
+		// The minute a call closes on is unique within a case, so it doubles as the call's id and no
+		// case has to invent one. A test about the two fragments of a single call overrides the tail's
+		// to match its head, which is exactly the thing that makes them one call.
+		call_id: String(end_minute),
 		outcome,
 		ended_ms: end_minute * MINUTE_MS,
 	}

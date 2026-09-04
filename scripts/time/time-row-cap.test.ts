@@ -49,7 +49,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		by_josh_command: rows(JOSH_ROWS, 'josh'),
 		by_check: rows(JOSH_ROWS, 'check'),
 
-		failures: time_failures.NO_FAILURES,
+		failures: { ...time_failures.NO_FAILURES },
 	}
 }
 

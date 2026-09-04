@@ -66,7 +66,7 @@ function report_of(input: ChildInput): TimeReport {
 		by_josh_command: [],
 		by_check: [],
 
-		failures: time_failures.NO_FAILURES,
+		failures: { ...time_failures.NO_FAILURES },
 	}
 }
 

@@ -258,7 +258,7 @@ const RUN_REPORT: TimeReport = {
 	by_tool: [],
 	by_josh_command: [],
 	by_check: [],
-	failures: time_failures.NO_FAILURES,
+	failures: { ...time_failures.NO_FAILURES },
 }
 
 describe('time_cli.run — one run', () => {

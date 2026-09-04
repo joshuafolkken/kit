@@ -104,51 +104,67 @@ function accumulate(totals: FailureTotals, span: Span, is_rerun: boolean): Failu
 	}
 }
 
-// What one command's chain remembers between its calls: whether the last one failed — which is what
-// makes the next a re-run — and whether the call now in progress is itself one, so its continuation
-// tail is charged the same way its head was.
-interface KeyState {
-	did_fail: boolean
-	is_rerun: boolean
+// **The chain is two records, kept apart because they are keyed differently.** `failed_commands`
+// remembers, per command, whether its last call failed — which is what makes the next call a re-run.
+// `rerun_calls` remembers which *calls* were re-runs, keyed by the call id a continuation shares with
+// its head, so a tail is charged the way its own head was.
+//
+// **Keying the second one by command would be wrong, and quietly.** Two `Task` calls issued in one
+// turn — which the turn-batching rule actively encourages — are both split by `time_overlap.trim`, so
+// the walk is `A head, B head, …, A tail, B tail` with one label between them. A per-command slot is
+// overwritten by `B head` before `A tail` reads it, and the tail — the fragment that carries the
+// minutes — is then billed by B's decision instead of its own.
+interface Chain {
+	failed_commands: Map<string, boolean>
+	rerun_calls: Set<string>
 }
 
-const NEW_KEY: KeyState = { did_fail: false, is_rerun: false }
+// A call nothing could name is in no command chain: a failure of one is never answered by the next.
+// Asked here rather than in the loop, so the unnamed call stays inside the counts and outside the
+// chain — the pair of answers it needs.
+function did_command_fail(chain: Chain, key: string): boolean {
+	if (key === UNCHAINED_KEY) return false
 
-// A call nothing could name starts fresh every time, so a failure of one is never answered by the
-// next. Deciding it here rather than in the loop keeps the unnamed call inside the counts and outside
-// the chain, which is the pair of answers it needs.
-function state_of(states: ReadonlyMap<string, KeyState>, key: string): KeyState {
-	if (key === UNCHAINED_KEY) return NEW_KEY
-
-	return states.get(key) ?? NEW_KEY
+	return chain.failed_commands.get(key) === true
 }
 
-// A failure arms its key and the next call of that key answers it, whatever that call's own outcome
-// was. So a command that failed twice before passing contributes two re-runs — the second attempt and
-// the third — rather than one, which is what the wasted time actually was.
-function next_state(state: KeyState, span: Span): KeyState {
-	if (span.is_continuation) return state
+// A failure arms its command and the next call of that command answers it, whatever that call's own
+// outcome was. So a command that failed twice before passing contributes two re-runs — the second
+// attempt and the third — rather than one, which is what the wasted time actually was.
+function is_rerun_span(chain: Chain, span: Span): boolean {
+	if (span.is_continuation) return chain.rerun_calls.has(span.call_id)
 
-	return { did_fail: span.outcome === time_spans.FAILED_OUTCOME, is_rerun: state.did_fail }
+	return did_command_fail(chain, key_of(span))
+}
+
+// Only a head writes: a continuation is the same call, and re-recording it would answer its own
+// command's next call with the outcome that call already answered.
+function record(chain: Chain, span: Span, is_rerun: boolean): void {
+	if (span.is_continuation) return
+
+	chain.failed_commands.set(key_of(span), span.outcome === time_spans.FAILED_OUTCOME)
+	if (is_rerun) chain.rerun_calls.add(span.call_id)
 }
 
 // **Ordered before it is walked, not assumed ordered.** One session's spans arrive in time order; a
 // run's do not — a delegated unit's are appended after the parent's, and `time_corpus` concatenates
-// one session after another. Walked in array order, a failure in one session would arm a key that the
-// next session's first call then answers as a re-run.
+// one session after another. Walked in array order, a failure in one session would arm a command that
+// the next session's first call then answers as a re-run.
 function build_failures(spans: ReadonlyArray<Span>): FailureTotals {
-	const states = new Map<string, KeyState>()
+	const chain: Chain = {
+		failed_commands: new Map<string, boolean>(),
+		rerun_calls: new Set<string>(),
+	}
 	let totals = { ...NO_FAILURES }
 
 	// A loop rather than `reduce`, which this project's lint config forbids.
 	for (const span of time_round_trips.in_time_order(spans)) {
 		if (!is_tool(span)) continue
 
-		const key = key_of(span)
-		const state = next_state(state_of(states, key), span)
+		const is_rerun = is_rerun_span(chain, span)
 
-		states.set(key, state)
-		totals = accumulate(totals, span, state.is_rerun)
+		record(chain, span, is_rerun)
+		totals = accumulate(totals, span, is_rerun)
 	}
 
 	return totals
