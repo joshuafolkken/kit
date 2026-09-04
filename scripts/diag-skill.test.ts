@@ -53,6 +53,21 @@ describe(`${SKILL_PATH} — carries the four steps`, () => {
 	})
 })
 
+// joshuafolkken/kit#1307. The round-trip *count* reached the report first, and a count cannot be
+// ranked in a table ordered by minutes saved — which is how the 2026-09-04 run left round-trip
+// reduction off its candidate table entirely. So the step that reads the JSON has to name the unit
+// price, not only the two counts it is divided from.
+describe(`${SKILL_PATH} — reads the price of a round trip, not only the count`, () => {
+	it.each([
+		'**the price of one round trip**',
+		'`ms_per_round_trip`',
+		'`model_ms_per_round_trip`',
+		"without it the round trips cannot enter step 3's table at all",
+	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
 // The correction the issue was edited to make. A ranked list that drops what is already filed
 // reports the backlog as emptier than it is, and an un-started issue that ranks high is usually the
 // cheapest action there is — it needs a run, not a filing.

@@ -85,14 +85,47 @@ describe('time_round_trips.count_calls', () => {
 	})
 })
 
-describe('time_round_trips.calls_per_round_trip', () => {
-	it('divides the calls by the trips they were issued in', () => {
-		expect(time_round_trips.calls_per_round_trip(4, 2)).toBe(2)
+// A turn that ends in a reply rather than a call: its model time bought no round trip, so batching
+// could never give it back. The last model span here is followed by a human wait, which is exactly
+// the shape of a run stopping to answer.
+const ANSWERED = [MODEL, MODEL, TOOL, MODEL, HUMAN]
+
+describe('time_round_trips.issuing_model_ms', () => {
+	// Both model spans issued a round trip, so both are charged: one turn batched three calls and the
+	// next issued one.
+	it('charges the model time of every turn that opened a round trip', () => {
+		expect(time_round_trips.issuing_model_ms(BATCHED)).toBe(2 * time_span_fixture.MINUTE_MS)
 	})
 
-	// Nothing was read, so there is no density — dividing would assert a measurement nobody took.
+	// The two spans before the call are one turn's composition and are charged; the one after it went
+	// to an answer, and charging it would price each round trip above what cutting one returns.
+	it('leaves out the model time of a turn that called nothing', () => {
+		expect(time_round_trips.issuing_model_ms(ANSWERED)).toBe(2 * time_span_fixture.MINUTE_MS)
+	})
+
+	it('charges nothing where no round trip was opened', () => {
+		expect(time_round_trips.issuing_model_ms([MODEL, HUMAN])).toBe(0)
+	})
+})
+
+describe('time_round_trips.per_round_trip', () => {
+	it('divides the calls by the trips they were issued in', () => {
+		expect(time_round_trips.per_round_trip(4, 2)).toBe(2)
+	})
+
+	// The same divisor priced in milliseconds (joshuafolkken/kit#1307): ten minutes of run over four
+	// round trips is two and a half minutes each, which is the figure a proposed cut is multiplied by.
+	it('prices one round trip from a duration and the trips it was spread over', () => {
+		expect(time_round_trips.per_round_trip(10 * time_span_fixture.MINUTE_MS, 4)).toBe(
+			2.5 * time_span_fixture.MINUTE_MS,
+		)
+	})
+
+	// Nothing was read, so there is no density and no price — dividing would assert a measurement
+	// nobody took, in whichever unit the numerator carried.
 	it('answers zero rather than dividing by no round trips', () => {
-		expect(time_round_trips.calls_per_round_trip(0, 0)).toBe(0)
+		expect(time_round_trips.per_round_trip(0, 0)).toBe(0)
+		expect(time_round_trips.per_round_trip(10 * time_span_fixture.MINUTE_MS, 0)).toBe(0)
 	})
 })
 

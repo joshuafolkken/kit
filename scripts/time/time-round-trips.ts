@@ -28,6 +28,10 @@ function is_tool(span: Span): boolean {
 	return span.category === time_spans.TOOL_CATEGORY
 }
 
+function is_model(span: Span): boolean {
+	return span.category === time_spans.MODEL_CATEGORY
+}
+
 function started_ms(span: Span): number {
 	return span.ended_ms - span.duration_ms
 }
@@ -78,13 +82,57 @@ function count_round_trips(spans: ReadonlyArray<Span>): number {
 	return ordered.filter((_span, index) => opens_round_trip(ordered, index)).length
 }
 
-// **Zero round trips is not a density of zero.** A scope whose transcript was never read has no
-// calls and no trips, and dividing there would assert a measurement nobody took — the report
-// withholds the row on the same criterion it withholds the three category shares on.
-function calls_per_round_trip(call_count: number, round_trip_count: number): number {
+// The two running totals `fold_issuing` carries: the model time seen since the last thing that was
+// not a model span, and the model time already charged to a round trip.
+interface IssuingTotals {
+	pending_ms: number
+	issuing_ms: number
+}
+
+const NO_TOTALS: IssuingTotals = { pending_ms: 0, issuing_ms: 0 }
+
+// A turn's model time is charged to a round trip only when that turn went on to open one. **The run's
+// whole model wait is a different quantity**: a turn that called no tool — the answer that ends a
+// reply, the turn that stops to wait for a person — composed nothing a batching change could remove,
+// and folding it in prices every round trip above what cutting one actually returns. Pending time is
+// dropped rather than carried at anything that is not a tool span, because a human wait is exactly
+// the case where the turn before it issued nothing.
+function fold_issuing(totals: IssuingTotals, span: Span, is_opener: boolean): IssuingTotals {
+	if (is_model(span)) return { ...totals, pending_ms: totals.pending_ms + span.duration_ms }
+	if (is_opener) return { pending_ms: 0, issuing_ms: totals.issuing_ms + totals.pending_ms }
+	if (is_tool(span)) return totals
+
+	return { ...totals, pending_ms: 0 }
+}
+
+// The model time that actually issued the round trips — the numerator of the price the report
+// prints, and the share of it a batching change removes (joshuafolkken/kit#1307).
+function issuing_model_ms(spans: ReadonlyArray<Span>): number {
+	const ordered = in_time_order(spans)
+	let totals = NO_TOTALS
+
+	// A loop rather than `reduce`, which this project's lint config forbids — `totals_by` in
+	// `time-report.ts` drains its map the same way.
+	for (const [index, span] of ordered.entries()) {
+		totals = fold_issuing(totals, span, opens_round_trip(ordered, index))
+	}
+
+	return totals.issuing_ms
+}
+
+// What one round trip cost, in whatever unit the numerator carries: calls, for the density the floor
+// above is quoted in, and milliseconds for the price joshuafolkken/kit#1307 added. **One divisor with
+// one guard, rather than a second copy per unit** — the two are the same question about the same
+// denominator, and a guard written into only one of them would print, in the unit that lacked it,
+// exactly the measurement the other withholds.
+//
+// **Zero round trips is not a cost of zero.** A scope whose transcript was never read has no calls
+// and no trips, and dividing there would assert a measurement nobody took — the report withholds the
+// rows on the same criterion it withholds the three category shares on.
+function per_round_trip(total: number, round_trip_count: number): number {
 	if (round_trip_count === NONE) return NONE
 
-	return call_count / round_trip_count
+	return total / round_trip_count
 }
 
 function format_density(density: number): string {
@@ -100,11 +148,12 @@ function is_below_floor(density: number): boolean {
 
 const time_round_trips = {
 	CALLS_PER_ROUND_TRIP_FLOOR,
-	calls_per_round_trip,
 	count_calls,
 	count_round_trips,
 	format_density,
 	is_below_floor,
+	issuing_model_ms,
+	per_round_trip,
 }
 
 export { time_round_trips }
