@@ -466,10 +466,14 @@ SECURITY.md         tsconfig.sonar.json
 > to announce in the release notes rather than something sync cleans up.
 >
 > **The same file wires the post-edit formatter.** Its `PostToolUse` hook runs
-> `pnpm josh format:edited` after every `Edit` and `Write`, formatting the one file that changed
-> instead of leaving an agent to run a whole-project lint to see what a single edit looked like. It
-> reaches a consumer the same way the deny list does, and `docs/josh-commands.md` documents what the
-> command does and why it never fails.
+> `pnpm josh format:edited` after every `Edit`, `Write` and `Bash`, formatting the one file that
+> changed instead of leaving an agent to run a whole-project lint to see what a single edit looked
+> like. `Bash` is in that list for the live round-trip density line the same hook carries, not for
+> formatting — a shell payload names a command rather than a file, and seven of the ten most recent
+> sessions in this checkout never called `Edit` or `Write` once, so on the narrower matcher the line
+> reached none of them (joshuafolkken/kit#1337). It reaches a consumer the same way the deny list
+> does, and `docs/josh-commands.md` documents what the command does, why the matcher names exactly
+> those three tools, and why it never fails.
 >
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
 > turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
