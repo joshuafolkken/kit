@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { CheckTotal } from './time-checks'
 import { time_cli } from './time-cli'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
@@ -29,6 +30,17 @@ function rows(count: number, prefix: string): Array<LabelTotal> {
 	}))
 }
 
+// The check table carries a conclusion and a merge offset instead of a call count, and the cap is
+// asserted to leave it alone — so it is built here in that shape rather than as a tool row.
+function check_rows(count: number): Array<CheckTotal> {
+	return Array.from({ length: count }, (_unused, index) => ({
+		label: `check-${String(index)}`,
+		duration_ms: (count - index) * MINUTE_MS,
+		conclusion: 'success',
+		merge_gap_ms: -MINUTE_MS,
+	}))
+}
+
 function report(notes: ReadonlyArray<string> = []): TimeReport {
 	return {
 		scope: `issue #${String(ISSUE)}`,
@@ -47,7 +59,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		phases: [],
 		by_tool: rows(TOOL_ROWS, 'tool'),
 		by_josh_command: rows(JOSH_ROWS, 'josh'),
-		by_check: rows(JOSH_ROWS, 'check'),
+		by_check: check_rows(JOSH_ROWS),
 
 		failures: { ...time_failures.NO_FAILURES },
 	}
