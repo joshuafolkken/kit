@@ -19,6 +19,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check code with prettier and eslint',
 		category: 'Development',
 	},
+	'lint:related': {
+		script: 'scripts/lint-related.ts',
+		description: 'Check only the changed files with prettier and eslint (whole tree on fallback)',
+		category: 'Development',
+	},
 	'lint:prettier': {
 		shell: [...PE, 'prettier', '--check', '.'],
 		description: 'Check formatting with prettier',

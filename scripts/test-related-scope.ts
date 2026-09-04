@@ -1,4 +1,10 @@
 import path from 'node:path'
+import {
+	changed_file_scope,
+	type ChangedFileScope,
+	type ScopeInputs,
+	type ScopeVocabulary,
+} from './changed-file-scope'
 
 // joshuafolkken/kit#1257: the unit suite always ran whole. Measured warm on kit, that is 384 files
 // and 6,616 tests — 13.9s wall and 110s of CPU, 84% of everything the four gate checks spend, and
@@ -10,17 +16,13 @@ import path from 'node:path'
 // generated file — is invisible to a module graph, so the verification gate keeps running
 // `josh test:unit` over everything before the commit.
 //
-// The decision is here, apart from the process that acts on it, because the one thing it must never
-// do is answer "nothing to run" quietly. An empty narrowed set and an unreadable change list both
-// end at the full suite, and each says which of the two it was.
+// The decision this file makes is which extensions vitest can walk a module graph back from, and
+// what to print about it. Everything the decision shares with `josh lint:related` — reading the
+// change, dropping what the tree no longer holds, and the two fallbacks — is
+// `changed-file-scope.ts`, so the two commands cannot drift apart about what "changed" means
+// (joshuafolkken/kit#1298).
 
-type ScopeMode = 'all' | 'related'
-
-interface RelatedScope {
-	mode: ScopeMode
-	files: ReadonlyArray<string>
-	reason: string
-}
+type RelatedScope = ChangedFileScope
 
 // The extensions vitest can walk a module graph back from. A changed `.md`, `.yaml` or `.json` is
 // dropped rather than passed through: `vitest related` would match no test file for it, and a run
@@ -37,19 +39,20 @@ const RELATABLE_EXTENSIONS: ReadonlySet<string> = new Set([
 	'.svelte',
 ])
 
-const UNREADABLE_REASON = 'the changed files could not be read'
+const { UNREADABLE_REASON } = changed_file_scope
 const NOTHING_RELATABLE_REASON = 'no changed file is one a test can import'
 
 // The command this narrowing belongs to, defined once: the guard prints it when it skips, and the
 // line below prints it in front of every decision.
 const COMMAND_NAME = 'test:related'
 const COMMAND_LABEL = `josh ${COMMAND_NAME}`
-const FALLBACK_SUFFIX = 'running the full unit suite instead'
-const RELATED_SUFFIX = 'running only the tests related to them'
+const { LISTED_FILE_LIMIT } = changed_file_scope
 
-// Long enough to read a normal change at a glance, short enough that a branch-wide diff does not
-// bury the line that says what is about to run.
-const LISTED_FILE_LIMIT = 10
+const VOCABULARY: ScopeVocabulary = {
+	label: COMMAND_LABEL,
+	fallback_suffix: 'running the full unit suite instead',
+	narrowed_suffix: 'running only the tests related to them',
+}
 
 const RUN_FLAG = '--run'
 const RELATED_SUBCOMMAND = 'related'
@@ -59,52 +62,28 @@ function is_relatable(file_path: string): boolean {
 	return RELATABLE_EXTENSIONS.has(path.extname(file_path))
 }
 
-// A path the change lists but the tree no longer holds — deleted, or renamed away — has no module
-// either. Left in, it would count towards the narrowed set while contributing no test to it, which
-// is how a run of zero tests reports success.
+// The three inputs that make the shared narrowing this command's, handed over as one value so the
+// CLI and the two functions below cannot disagree about any of them.
+function scope_inputs(is_present: (file_path: string) => boolean): ScopeInputs {
+	return { is_present, is_selectable: is_relatable, nothing_reason: NOTHING_RELATABLE_REASON }
+}
+
 function select_related_files(
 	paths: ReadonlyArray<string>,
 	is_present: (file_path: string) => boolean,
 ): Array<string> {
-	return paths.filter((file_path) => is_relatable(file_path) && is_present(file_path))
+	return changed_file_scope.select_files(paths, scope_inputs(is_present))
 }
 
-function all_scope(reason: string): RelatedScope {
-	return { mode: 'all', files: [], reason }
-}
-
-// `undefined` and `[]` are deliberately different inputs. The first says the change could not be
-// read — git failed, or there is no repository — and the second says it was read and held nothing
-// this can narrow by. Both end at the full suite; only the printed reason differs, and a caller
-// that collapsed them would lose the distinction the fallback is judged by.
 function resolve_scope(
 	paths: ReadonlyArray<string> | undefined,
 	is_present: (file_path: string) => boolean,
 ): RelatedScope {
-	if (paths === undefined) return all_scope(UNREADABLE_REASON)
-
-	const files = select_related_files(paths, is_present)
-
-	if (files.length === 0) return all_scope(NOTHING_RELATABLE_REASON)
-
-	return { mode: 'related', files, reason: `${String(files.length)} changed file(s)` }
+	return changed_file_scope.resolve_scope(paths, scope_inputs(is_present))
 }
 
-function format_file_list(files: ReadonlyArray<string>, root: string): string {
-	const listed = files.slice(0, LISTED_FILE_LIMIT).map((file) => `  - ${path.relative(root, file)}`)
-	const hidden = files.length - listed.length
-
-	if (hidden > 0) listed.push(`  … and ${String(hidden)} more`)
-
-	return listed.join('\n')
-}
-
-// What makes the narrowing readable rather than merely applied: the line names which branch was
-// taken, why, and — when it narrowed — every file it narrowed by.
 function describe_scope(scope: RelatedScope, root: string): string {
-	if (scope.mode === 'all') return `${COMMAND_LABEL}: ${scope.reason} — ${FALLBACK_SUFFIX}.`
-
-	return `${COMMAND_LABEL}: ${scope.reason} — ${RELATED_SUFFIX}.\n${format_file_list(scope.files, root)}`
+	return changed_file_scope.describe_scope(scope, root, VOCABULARY)
 }
 
 // `--run` is what keeps `vitest related` out of watch mode; the `run` sub-command already implies it
@@ -127,9 +106,11 @@ const related_scope = {
 	describe_scope,
 	is_relatable,
 	resolve_scope,
+	scope_inputs,
 	select_related_files,
 	vitest_arguments,
 }
 
-export type { RelatedScope, ScopeMode }
+export type { ScopeMode } from './changed-file-scope'
+export type { RelatedScope }
 export { related_scope }
