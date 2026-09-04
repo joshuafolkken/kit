@@ -40,8 +40,13 @@ const PULL_SCHEMA = z.object({
 
 const PULLS_SCHEMA = z.array(PULL_SCHEMA)
 
+// `conclusion` is what GitHub calls the check's outcome — `success`, `failure`, `skipped`,
+// `cancelled`, `neutral`, `timed_out`. It is `null` until the run completes, and this module only
+// keeps completed runs, so an empty one here means GitHub sent no outcome at all rather than that the
+// job is still going (joshuafolkken/kit#1310).
 const CHECK_RUN_SCHEMA = z.object({
 	name: z.string().nullish(),
+	conclusion: z.string().nullish(),
 	started_at: z.string().nullish(),
 	completed_at: z.string().nullish(),
 })
@@ -67,6 +72,10 @@ interface PullSummary {
 
 interface CheckRun {
 	name: string
+	// The outcome GitHub reported, empty where it reported none. Carried as the raw string rather than
+	// as a parsed enum: a conclusion this code has never heard of still has to reach the reader, and a
+	// narrowing schema would drop the whole row for it.
+	conclusion: string
 	started_ms: number
 	completed_ms: number
 }
@@ -340,7 +349,7 @@ function to_check_run(raw: z.infer<typeof CHECK_RUN_SCHEMA>): CheckRun | undefin
 
 	if (started_ms === undefined || completed_ms === undefined) return undefined
 
-	return { name: raw.name ?? '', started_ms, completed_ms }
+	return { name: raw.name ?? '', conclusion: raw.conclusion ?? '', started_ms, completed_ms }
 }
 
 function parse_check_runs(text: string): Array<CheckRun> {

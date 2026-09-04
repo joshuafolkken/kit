@@ -146,7 +146,14 @@ function run_report(
 		ci_ms,
 		has_ci_data: true,
 		notes: [SESSION_NOTE],
-		by_check: [{ label: 'unit', duration_ms: 2 * MINUTE_MS, call_count: 1 }],
+		by_check: [
+			{
+				label: 'unit',
+				duration_ms: 2 * MINUTE_MS,
+				conclusion: 'success',
+				merge_gap_ms: -MINUTE_MS,
+			},
+		],
 	})
 }
 

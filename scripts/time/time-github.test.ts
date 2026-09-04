@@ -176,17 +176,36 @@ describe('time_github.newest_merged', () => {
 
 const CHECK_NAME = 'unit'
 
+const CONCLUSION = 'success'
+
 function check_body(started_at: string, completed_at: string): string {
-	return JSON.stringify({ check_runs: [{ name: CHECK_NAME, started_at, completed_at }] })
+	return JSON.stringify({
+		check_runs: [{ name: CHECK_NAME, conclusion: CONCLUSION, started_at, completed_at }],
+	})
 }
 
 describe('time_github.list_check_runs', () => {
-	it('reads each job with its own start and finish', async () => {
+	it('reads each job with its own start, finish and conclusion', async () => {
 		const runs = await time_github.list_check_runs(SHA, body_reader(check_body(CREATED, MERGED)))
 
 		expect(runs).toEqual([
-			{ name: CHECK_NAME, started_ms: Date.parse(CREATED), completed_ms: Date.parse(MERGED) },
+			{
+				name: CHECK_NAME,
+				conclusion: CONCLUSION,
+				started_ms: Date.parse(CREATED),
+				completed_ms: Date.parse(MERGED),
+			},
 		])
+	})
+
+	// GitHub sends `null` for a job whose outcome it has no word for. **An empty conclusion is that
+	// answer, never a substitute one**: reading it as `success` would report a check nobody graded as
+	// one that passed (joshuafolkken/kit#1310).
+	it('carries an absent conclusion through as empty rather than inventing one', async () => {
+		const body = `{"check_runs":[{"name":"${CHECK_NAME}","conclusion":null,"started_at":"${CREATED}","completed_at":"${MERGED}"}]}`
+		const runs = await time_github.list_check_runs(SHA, body_reader(body))
+
+		expect(runs[0]?.conclusion).toBe('')
 	})
 
 	// A job still running has no finish, and dating one would invent a duration.

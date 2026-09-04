@@ -1,9 +1,10 @@
 import { cost_attribute } from '#scripts/cost/cost-attribute'
+import { time_checks, type CheckTotal } from './time-checks'
 import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
 import { time_overlap, type Interval } from './time-overlap'
 import { time_pull_index } from './time-pull-index'
-import { time_report, type LabelTotal, type TimeReport } from './time-report'
+import { time_report, type TimeReport } from './time-report'
 import type { Span } from './time-spans'
 
 // One `fullrun`, from the invocation to the merge (joshuafolkken/kit#1268).
@@ -29,21 +30,9 @@ const NO_SESSIONS = 0
 // for eleven children rather than eleven times — and there is no second collection path that could
 // answer `--issue` differently from the batch it belongs to.
 
-// Clamped at zero, because GitHub really does stamp a check as completed a fraction of a second
-// before it started — measured on PR #1277, whose `Notify Auto Tag` printed as `-0.0 min`. A
-// negative duration is a clock artefact, not a measurement, and it sorts to the bottom of a table
-// where a reader reads it as a real figure.
-function to_check_rows(
-	runs: ReadonlyArray<{ name: string; started_ms: number; completed_ms: number }>,
-): Array<LabelTotal> {
-	return runs
-		.map((run) => ({
-			label: run.name,
-			duration_ms: Math.max(0, run.completed_ms - run.started_ms),
-			call_count: 1,
-		}))
-		.toSorted((left, right) => right.duration_ms - left.duration_ms)
-}
+// **The per-check rows are `time-checks.ts`'s** (joshuafolkken/kit#1310). Each one needs the merge
+// instant as well as its own stamps — a check that finished after the merge never held it up — and
+// that instant is read here, so what this file does with the check list is hand both to one builder.
 
 // The wall window the accounted time sits inside: the earliest thing either source knows about, and
 // the latest. Printed so a reader can check the shares against something rather than trust them.
@@ -170,7 +159,7 @@ interface RunFacts {
 	issue_number: number
 	found: IssueSpans
 	search: PullSearch
-	checks: Array<LabelTotal>
+	checks: Array<CheckTotal>
 	ci_ms: number
 }
 
@@ -191,7 +180,10 @@ async function gather(
 		return { issue_number, found, search, checks: [], ci_ms: 0 }
 	}
 
-	const checks = to_check_rows(await time_github.list_check_runs(pull.head_sha, read))
+	const checks = time_checks.build_check_totals(
+		await time_github.list_check_runs(pull.head_sha, read),
+		merged_ms,
+	)
 	const ci_ms = time_overlap.uncovered_ms(
 		{ started_ms: pull.created_ms, ended_ms: merged_ms },
 		found.spans.map((span) => time_overlap.to_interval(span)),
