@@ -1792,7 +1792,6 @@ configuration.
 ```bash
 pnpm josh layers          # alias: josh ly
 pnpm josh layers --json   # every row, for a script or another report
-pnpm josh layers --root <path>
 ```
 
 ```
@@ -1838,10 +1837,11 @@ deciding. `dependency-install` repeats between the pre-push `setup` and CI's ins
 supposed to: `lefthook/base.yml` records at length (joshuafolkken/kit#813) why that barrier exists.
 The row is there because it is real repeated work, not because it is a candidate.
 
-**`--root` points the hook and workflow readers at another checkout; the gate layer still comes from
-the `josh` that is running.** That is the right answer wherever `josh layers` is run inside the
-project it is reporting on — the installed kit _is_ that project's gate — and it is worth knowing
-before reading a report produced by pointing kit's own checkout at somewhere else.
+**It reports on the working directory, and there is deliberately no flag naming another checkout.**
+A file system path taken off the command line and handed straight to `readdir` / `readFile` is a
+traversal waiting for a wrong argument, and what such a flag bought was a diagnostic convenience —
+the command's use is "which checks repeat in the project I am in", where the installed kit _is_
+that project's gate.
 
 **A `josh` sub-command it cannot resolve is reported, not dropped.** The name appears in an
 `unresolved josh commands:` note, so a hook rewired to a new target surfaces as a name to classify

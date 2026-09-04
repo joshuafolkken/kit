@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { layer_report, type LayerReport } from './layer-report'
@@ -19,11 +18,9 @@ import { layer_sources } from './layer-sources'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
-const USAGE = 'Usage: josh layers [--root <path>] [--json]'
-const NO_ROOT = 'No such directory. --root names the checkout to read, and nothing was read there.'
+const USAGE = 'Usage: josh layers [--json]'
 
 interface Options {
-	root: string
 	is_json: boolean
 }
 
@@ -31,22 +28,28 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	try {
 		const { values } = parseArgs({
 			args: [...argv],
-			options: { root: { type: 'string' }, json: { type: 'boolean' } },
+			options: { json: { type: 'boolean' } },
 			strict: true,
 		})
 
-		return { root: values.root ?? process.cwd(), is_json: values.json === true }
+		return { is_json: values.json === true }
 	} catch {
 		return undefined
 	}
 }
 
+// **The checkout is the working directory, and there is deliberately no flag to point it
+// elsewhere.** Reporting on another checkout was only ever a diagnostic convenience — the command's
+// use is "which checks repeat in the project I am in" — and paying for it meant taking a file
+// system path off the command line and handing it straight to `readdir` / `readFile`, which is a
+// path traversal waiting for a wrong argument. The parameter stays on this function so the tests
+// can point it at a fixture tree; nothing on the command line reaches it.
 function build(root: string): LayerReport {
 	return layer_report.build_report(layer_sources.read_layer_steps(root))
 }
 
 function print_report(options: Options): number {
-	const report = build(options.root)
+	const report = build(process.cwd())
 
 	if (options.is_json) {
 		console.info(JSON.stringify(report, undefined, JSON_INDENT))
@@ -59,24 +62,11 @@ function print_report(options: Options): number {
 	return 0
 }
 
-// Both readers answer "nothing here" for a path they cannot open, which is the right answer for a
-// project with no CI and the wrong one for a mistyped `--root`: without this, a typo'd sibling
-// checkout prints a confident report of one layer and no repeats at all.
-function is_missing_root(root: string): boolean {
-	return !existsSync(root)
-}
-
 function run(argv: ReadonlyArray<string>): number {
 	const options = parse_options(argv)
 
 	if (options === undefined) {
 		console.error(USAGE)
-
-		return FAILURE_EXIT_CODE
-	}
-
-	if (is_missing_root(options.root)) {
-		console.error(`${NO_ROOT} (${options.root})`)
 
 		return FAILURE_EXIT_CODE
 	}

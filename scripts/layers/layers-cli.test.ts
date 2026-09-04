@@ -70,19 +70,21 @@ describe('josh layers — the command line', () => {
 		errors.mockRestore()
 	})
 
-	it('refuses a root that does not exist rather than reporting no repeats at all', () => {
+	// There is no flag naming a checkout, deliberately: a file system path taken off the command
+	// line and handed to `readdir` is a traversal waiting for a wrong argument, and the flag bought
+	// only a diagnostic convenience the tests get from `build` directly.
+	it('takes no path from the command line', () => {
 		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-		const code = layers_cli.run(['--root', path.join(tmpdir(), 'layers-not-here')])
 
+		expect(layers_cli.run(['--root', write_project()])).toBe(1)
+		expect(errors).toHaveBeenCalledWith(layers_cli.USAGE)
 		errors.mockRestore()
-
-		expect(code).toBe(1)
 	})
 
 	it('prints the report as text by default', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		expect(layers_cli.run(['--root', write_project()])).toBe(0)
+		expect(layers_cli.run([])).toBe(0)
 		expect(info.mock.calls[0]?.[0]).toContain('Verification layers')
 		info.mockRestore()
 	})
@@ -90,7 +92,7 @@ describe('josh layers — the command line', () => {
 	it('prints the whole report as JSON under --json', () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		layers_cli.run(['--root', write_project(), '--json'])
+		layers_cli.run(['--json'])
 		const printed: unknown = JSON.parse(String(info.mock.calls[0]?.[0]))
 
 		info.mockRestore()
