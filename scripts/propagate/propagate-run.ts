@@ -1,3 +1,4 @@
+import { status_icons } from '#scripts/status-icons'
 import type { PropagateTarget } from './propagate-targets'
 
 // Running the per-consumer sequence, and reporting what happened to every consumer.
@@ -143,7 +144,7 @@ function has_failure(results: ReadonlyArray<TargetResult>): boolean {
 
 const OUTCOME_ICONS: Readonly<Record<RunOutcome, string>> = {
 	propagated: '✓',
-	failed: '✗',
+	failed: status_icons.FAIL_ICON,
 	skipped: '–',
 }
 

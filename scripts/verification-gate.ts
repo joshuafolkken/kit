@@ -11,6 +11,7 @@ import { GATE_COMMAND } from './josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh/josh-composite-arguments'
 import { review_stamps } from './review/review-stamps'
 import { review_tree } from './review/review-tree'
+import { status_icons } from './status-icons'
 import { test_unit_guard } from './test-unit-guard'
 import { type_check_step } from './type-check-step'
 
@@ -28,7 +29,7 @@ import { type_check_step } from './type-check-step'
 // underlying tool invocations here — one definition per check, in `josh-commands-development.ts`.
 
 const PASS_ICON = '✔'
-const FAIL_ICON = '✗'
+const { FAIL_ICON } = status_icons
 // `process.argv` is [runner, script, ...arguments].
 const FIRST_ARGUMENT_INDEX = 2
 
