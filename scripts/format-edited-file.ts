@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { resolve_local_bin, resolve_package_bin } from '#scripts/local-bin'
 import { execa } from 'execa'
 import { z } from 'zod'
+import { ESLINT_EDIT_CACHE_FLAGS } from './josh/josh-command-types'
 import { time_density_hook } from './time/time-density-hook'
 
 // Claude Code hands a `PostToolUse` hook the tool call as JSON on stdin; for `Edit` and `Write` the
@@ -56,8 +57,20 @@ const PRETTIER_BIN = 'prettier'
 const PRETTIER_ARGUMENTS: ReadonlyArray<string> = ['--write', '--ignore-unknown']
 // `--no-error-on-unmatched-pattern` covers a file the eslint config does not cover: the hook has
 // nothing to say about it, and a non-zero exit here would be reported as a failed hook.
+//
+// The cache flags are not here to make the hook faster — they are here to stop it destroying the
+// gate's cache (joshuafolkken/kit#1332). ESLint started *without* `--cache` deletes the file at
+// `--cache-location`, so this hook wiped `.eslintcache` on every edit and the gate's lint ran cold
+// every time. Passing them points that deletion, and the hook's own reads and writes, at a location
+// of its own — its own rather than the gate's because the two run concurrently, and each eslint run
+// rewrites its cache file whole from the copy it loaded at start-up. `ESLINT_EDIT_CACHE_FLAGS` is
+// single-sourced beside the gate's so the two locations cannot drift into being the same file.
 const ESLINT_BIN = 'eslint'
-const ESLINT_ARGUMENTS: ReadonlyArray<string> = ['--fix', '--no-error-on-unmatched-pattern']
+const ESLINT_ARGUMENTS: ReadonlyArray<string> = [
+	'--fix',
+	'--no-error-on-unmatched-pattern',
+	...ESLINT_EDIT_CACHE_FLAGS,
+]
 // eslint is what this hook spends its time on, and almost none of it is the file: measured on this
 // repository, one `eslint --fix` on a single TypeScript file takes 1.70s of a 2.50s hook, and a
 // second lint inside the same process takes 0.13s. The 1.6s difference is the flat config, its

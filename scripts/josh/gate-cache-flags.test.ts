@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { package_path } from '#scripts/init/init-paths'
+import { plan_commands } from '#scripts/format-edited-file'
+import { PACKAGE_DIR, package_path } from '#scripts/init/init-paths'
 import { ESLINT_ARGS } from '#scripts/lint-parallel'
 import { yaml_config_fixture } from '#scripts/yaml-config-fixture'
 import { describe, expect, it } from 'vitest'
@@ -7,7 +8,8 @@ import { COMMAND_MAP } from './josh-command-map'
 import {
 	CSPELL_CACHE_FLAGS,
 	ESLINT_CACHE_FLAGS,
-	GATE_CACHE_FILES,
+	ESLINT_EDIT_CACHE_FLAGS,
+	IGNORED_CACHE_FILES,
 	TS_CACHE_FLAGS,
 } from './josh-command-types'
 
@@ -21,6 +23,9 @@ const GITIGNORE_PATHS: ReadonlyArray<string> = ['.gitignore', 'templates/gitigno
 // `josh sync`, while the flags that write the files arrive with the package itself, so the
 // exclusion cannot rest on `useGitignore` alone.
 const DISTRIBUTED_CSPELL_CONFIG = 'cspell/index.yaml'
+// A file that really is in the repository and really is one the edit hook formats, so `plan_commands`
+// below answers with the command the hook would run rather than with nothing.
+const HOOK_SOURCE = 'scripts/format-edited-file.ts'
 
 interface CspellConfig {
 	ignorePaths?: Array<string>
@@ -69,12 +74,39 @@ describe('verification gate cache flags', () => {
 	})
 })
 
-describe('verification gate cache files stay out of the repository', () => {
+// joshuafolkken/kit#1332: the `PostToolUse` edit hook runs eslint too, and ESLint started *without*
+// `--cache` deletes whatever sits at `--cache-location` — so every single edit destroyed the cache
+// the gate had just filled, and both gates of a run then paid a cold lint (59.4s and 54.5s, against
+// 3.0s warm). Two things have to hold, and neither implies the other: the hook has to pass the flags
+// at all, and it has to pass a location that is not the gate's — the two run concurrently, and each
+// eslint run rewrites its cache file whole from the copy it loaded at start-up, so a shared file
+// would have the two writers silently discarding each other's entries.
+describe('the edit hook keeps off the cache the gate reads', () => {
+	// Read off the command the hook actually builds rather than off the constant it builds it from,
+	// and joined rather than compared by membership: a flag and its value are a pair, and a membership
+	// check passes on an order that would make eslint read `--cache-strategy` as the location. The
+	// edited path is required to follow them, so the flags cannot drift apart from the file they
+	// govern.
+	it('lints an edited file through a cache of its own', () => {
+		const edited_path = package_path(HOOK_SOURCE)
+		const [eslint_command] = plan_commands(edited_path, PACKAGE_DIR)
+
+		expect(eslint_command?.command_arguments.join(' ')).toContain(
+			`${ESLINT_EDIT_CACHE_FLAGS.join(' ')} ${edited_path}`,
+		)
+	})
+
+	it('never names the cache file the gate writes', () => {
+		expect(ESLINT_EDIT_CACHE_FLAGS.at(-1)).not.toBe(ESLINT_CACHE_FLAGS.at(-1))
+	})
+})
+
+describe('cache files stay out of the repository', () => {
 	for (const relative_path of GITIGNORE_PATHS) {
-		it(`${relative_path} ignores every cache the gate writes`, () => {
+		it(`${relative_path} ignores every cache this package writes`, () => {
 			const lines = read_ignore_lines(relative_path)
 
-			for (const cache_file of GATE_CACHE_FILES) {
+			for (const cache_file of IGNORED_CACHE_FILES) {
 				expect(lines, `${relative_path} does not ignore ${cache_file}`).toContain(cache_file)
 			}
 		})
@@ -83,7 +115,7 @@ describe('verification gate cache files stay out of the repository', () => {
 	it(`${DISTRIBUTED_CSPELL_CONFIG} excludes them without waiting for a josh sync`, () => {
 		const ignore_paths = read_cspell_ignore_paths()
 
-		for (const cache_file of GATE_CACHE_FILES) {
+		for (const cache_file of IGNORED_CACHE_FILES) {
 			expect(ignore_paths, `${cache_file} is not excluded`).toContain(`**/${cache_file}`)
 		}
 	})
