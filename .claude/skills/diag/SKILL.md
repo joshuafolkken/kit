@@ -118,20 +118,44 @@ same work a week later.
 | In progress | `#N` and that it is in progress. Do not propose running it again |
 | Done | The verdict from step 2 — whether it worked, with both figures |
 
-**Read the state from `pnpm josh issue:state <N>`, never by parsing `gh` output yourself.**
+**Read the state from `pnpm josh issue:state <N> [<N> ...]`, never by parsing `gh` output yourself —
+and pass the whole table's numbers in one call.** One call per row costs a process start and a round
+trip each, about 1.6 seconds a row, so a five-row table spent about eight seconds on nothing but its
+states; one call reads them all at once (joshuafolkken/kit#1302).
 
 ```bash
-pnpm josh issue:state <N>
+pnpm josh issue:state 1262 1222 1176
+# issue: 1262
 # state: OPEN
 # labels: in-progress, route:split
 # human_review: no
+#
+# issue: 1222
+# state: CLOSED
+# labels: (none)
+# human_review: no
+#
+# issue: 1176
+# state: OPEN
+# labels: route:split
+# human_review: no
 ```
+
+**Attribute each block by its `issue:` line, never by position.** A number that produced no state
+prints no block, so counting blocks off against the numbers you passed misreads every row after the
+gap. A single number is unchanged — the three lines below, with no `issue:` heading — which is the
+form `.claude/skills/workflow-commands/SKILL.md` §2z reads.
+
+**Pass bare numbers, not the `#N` the table prints.** A token carrying the `#` refuses the whole
+call with the usage line rather than being dropped from it — which is the answer you want, since a
+dropped number would leave the report shorter than the table with nothing saying so.
 
 It is the command because `gh issue view --json state` goes through GraphQL, which a cloud session
 is refused, and because the `OPEN` / `CLOSED` casing rule then lives in one place rather than in
 prose. Map its output to the table above: `CLOSED` is **done**; `OPEN` carrying `in-progress` is
 **in progress**; `OPEN` without it is **filed, not started**. A number that `does not resolve`, or a
-read that answers `could not read`, is reported as unknown — `could not read` is a failed read,
+read that answers `could not read`, is reported as unknown — both name the number they are about, so
+a mixed call still says which row it could not answer for, and `could not read` is a failed read,
 never "the issue is open".
 
 **Matching `in-progress` is yours to do, and the `labels:` line is compared case-insensitively —

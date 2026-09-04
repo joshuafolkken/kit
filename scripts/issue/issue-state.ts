@@ -26,6 +26,12 @@ const LABELS_LABEL = 'labels: '
 const HUMAN_REVIEW_LABEL_LINE = 'human_review: '
 const YES = 'yes'
 const NO = 'no'
+// The number a block belongs to, printed above it when several were asked for
+// (joshuafolkken/kit#1302). A block carries its own number rather than being matched by position,
+// because a batch read drops the numbers that resolve to nothing — a `diag` table mixes closed
+// issues and numbers that never existed — and a positional reading then attributes every block
+// after the gap to the wrong issue.
+const ISSUE_LABEL = 'issue: '
 
 const HUMAN_REVIEW_LABELS: ReadonlySet<string> = new Set([NEEDS_HUMAN_REVIEW_LABEL])
 
@@ -80,13 +86,23 @@ function format_issue_state(state: IssueState): string {
 	return `${STATE_LABEL}${state.state}\n${LABELS_LABEL}${format_labels(state.labels)}\n${human_review}`
 }
 
+// The same three lines, under the number they belong to. Kept as a separate function rather than a
+// flag on the one above, so the single-number report has no branch that could ever prepend a fourth
+// line to it: `.claude/skills/workflow-commands/SKILL.md` §2z and `.claude/skills/diag/SKILL.md`
+// read those three verbatim, and §2z's `needs-human-review` stop is decided from them.
+function format_attributed_issue_state(issue_number: string, state: IssueState): string {
+	return `${ISSUE_LABEL}${issue_number}\n${format_issue_state(state)}`
+}
+
 const issue_state = {
 	NO_LABELS,
 	STATE_LABEL,
 	LABELS_LABEL,
 	HUMAN_REVIEW_LABEL_LINE,
+	ISSUE_LABEL,
 	parse_issue_state,
 	format_issue_state,
+	format_attributed_issue_state,
 }
 
 export type { IssueState }
