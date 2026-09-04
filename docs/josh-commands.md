@@ -240,6 +240,15 @@ present, it runs `vitest run` as usual.
 pnpm josh test:unit
 ```
 
+**A unit test that reaches GitHub fails the run.** In kit's own checkout `vitest.config.ts` arms a
+`globalSetup` guard (`scripts/test-network-guard.ts`) that puts a recording `gh` in front of the real
+one on `PATH`; if anything spawned it, the run ends with the invocations listed and a non-zero exit
+([#1353](https://github.com/joshuafolkken/kit/issues/1353)). The failure it exists for is invisible
+otherwise — a test that calls through still **passes**, just slowly and against whatever GitHub
+happens to answer, which is how one such test reached the 10-second test timeout in CI. The fix is
+always in the test: mock the read it forgot. An unreadable record is reported as a failure too rather
+than as "no violations", because a guard that cannot answer must not claim the run was clean.
+
 ### `josh test:related`
 
 Run only the unit tests related to the files the change touched — the unit check an implementation loop repeats between edits ([#1257](https://github.com/joshuafolkken/kit/issues/1257)).

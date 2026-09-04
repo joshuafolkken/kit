@@ -45,6 +45,11 @@ beforeEach(() => {
 	// Stubbed rather than left to call through: a regression of a gate would otherwise spawn a live
 	// `gh api` from the unit suite instead of failing cleanly.
 	vi.spyOn(auto_merge_setting, 'report_auto_merge_section').mockReturnValue('enabled')
+	// The same reason, for the other report — and here it was not a hypothetical regression: the four
+	// cases that drive `doctor.main()` without naming this report spawned a live
+	// `gh api …/automated-security-fixes` on every run (joshuafolkken/kit#1353). A case that asserts
+	// on the report spies again and reads its own spy, exactly as the auto-merge one above does.
+	vi.spyOn(security_updates, 'report_security_updates_section').mockReturnValue('enabled')
 	// The repository name is resolved as the report's argument, so it is evaluated even when the
 	// report itself is stubbed — without this the suite would spawn a real `gh repo view`.
 	vi.spyOn(gh_spawn, 'get_repo_name_with_owner_within').mockReturnValue(REPO)
