@@ -458,6 +458,19 @@ function span_phase(span: Span, windows: Windows): PhaseName {
 	return command_phase(span) ?? window_phase(span, windows)
 }
 
+// Each span's phase, in the order they were handed over (joshuafolkken/kit#1311). The segment listing
+// cuts the run wherever this answer changes, so it *reads* the classification rather than restating
+// it — one rule for which phase a span belongs to, never two that could come to disagree about where
+// implementation ended.
+//
+// **The windows are built from the whole array, not from the slice a caller happens to hold.** A
+// boundary is the earliest span matching it, so classifying a subset would move every window.
+function classify(spans: ReadonlyArray<Span>): Array<PhaseName> {
+	const windows = build_windows(spans)
+
+	return spans.map((span) => span_phase(span, windows))
+}
+
 function totals_of(spans: ReadonlyArray<Span>, windows: Windows): Map<PhaseName, number> {
 	const totals = new Map<PhaseName, number>()
 
@@ -551,6 +564,7 @@ const time_phases = {
 	POST_RUN_PHASE,
 	OTHER_PHASE,
 	build_phases,
+	classify,
 }
 
 export type { PhaseInput, PhaseTotal }

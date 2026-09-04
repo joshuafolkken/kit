@@ -43,7 +43,9 @@ pnpm josh time --issue <N> --top 5 --json
 pnpm josh time --epic <E> --top 5 --json
 ```
 
-**`--top 5` is part of the call, not a nicety** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). Without it the JSON carries every row of the per-tool and per-`josh <cmd>` tables, and an epic pays for both once per child — epic #1262 measured 47.7 KB at 9 children and had more than doubled by 18. What this skill ranks off those two tables is the handful of rows at the top, so the tail is read into the context and never used. Everything else the steps below quote — the four shares, every phase, the round trips and their price — is unaffected: the cap reaches those two tables and nothing else.
+**`--top 5` is part of the call, not a nicety** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). Without it the JSON carries every row of the per-tool and per-`josh <cmd>` tables, and an epic pays for both once per child — epic #1262 measured 47.7 KB at 9 children and had more than doubled by 18. What this skill ranks off those tables is the handful of rows at the top, so the tail is read into the context and never used. Everything else the steps below quote — the four shares, every phase, the round trips and their price — is unaffected: the cap reaches the **row tables** and nothing else.
+
+**Four tables are capped, not two** ([#1311](https://github.com/joshuafolkken/kit/issues/1311)): `by_tool` and `by_josh_command`, plus `segments` — the run read as timed stretches — and `by_invocation`, each call of a command that ran more than once. **`segments` is the one whose cut is not a tail.** The table is in run order, so the cap keeps the **longest** five stretches and puts them back in that order rather than keeping the first five and losing the merge; five rows are therefore a sample of the run and never its shape. **Read a segment listing as evidence about the stretches it names, never about the ones between them** — and where the shape of the run is itself the question, drop the flag and say that you did, exactly as for a thin per-tool tail.
 
 - **A cut table says so, and that note is not a zero.** The report's `notes` carry `by_tool: showing the top 5 of 34 rows — 29 withheld by --top`, which is the same distinction between *withheld* and *measured as nothing* that `span_count: 0` and `not detected` make elsewhere here. **Never read a capped table as the whole of what ran.**
 - **Drop the flag when the tail is the question.** A run whose cost is spread thin across many commands rather than concentrated in a few is exactly the case five rows cannot show; re-run the same call without `--top` and say that you did.
@@ -92,7 +94,7 @@ Read from the JSON, in this order:
 - **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost. **Rank a tool by
   its round trips as well as its duration**: a tool called thirty times one call per turn costs thirty
   round trips at the price above, which is routinely larger than the seconds the calls themselves ran
-  for — the reading that was missed before the price was reported. These are the two tables `--top`
+  for — the reading that was missed before the price was reported. These are two of the four tables `--top`
   caps, so read the `notes` line beside them before saying a command is absent from the run
 
 ## 2. Say whether the last speedup actually worked

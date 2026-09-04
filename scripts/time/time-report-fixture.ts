@@ -1,0 +1,89 @@
+import { time_report, type TimeReport } from './time-report'
+import { time_span_fixture } from './time-span-fixture'
+import { time_spans, type Span, type Timeline } from './time-spans'
+
+// The report a suite measures the rendering of, for the suites that read what `format_report` prints
+// (joshuafolkken/kit#1311).
+//
+// It moved out of `time-report.test.ts` when the segment and per-invocation blocks joined it and the
+// file passed its length limit — the same seam `time-phase-fixture.ts` was cut along, and for the
+// same reason: a second copy of the run beside the second suite is the clone `CLAUDE.md` prohibits,
+// in the one place a drift would make two suites disagree about what the report was built from.
+//
+// **`time-span-fixture.ts` stays where it is and is used here.** That one builds *a span*; this one
+// builds *a report* out of several, which is the question these suites ask.
+
+const { MINUTE_MS, span } = time_span_fixture
+const SESSION = 'abcd1234'
+const PNPM_LABEL = 'Bash: pnpm'
+const RUN_SCOPE = 'issue #1268'
+const SESSION_NOTE = '2 session(s)'
+
+// The lengths `MIXED` is made of, named because a fixture is not a test file and the magic-number
+// rule applies to it — the reason `time-phase-fixture.ts` left its own whole-run timeline behind
+// rather than moving positions that have no names to give.
+const MODEL_MINUTES = 4
+const GATE_MINUTES = 3
+const READ_MINUTES = 2
+const LINT_MINUTES = 1
+const WAIT_MINUTES = 10
+// The run window `run_report` reports inside, and how long its one CI check took.
+const WINDOW_MINUTES = 30
+const CHECK_MINUTES = 2
+
+// One turn issuing three calls at once, with a person waited on at the end: every category present,
+// and two different `josh` commands so the per-command table has more than one row.
+const MIXED: ReadonlyArray<Span> = [
+	span(time_spans.MODEL_CATEGORY, MODEL_MINUTES),
+	span(time_spans.TOOL_CATEGORY, GATE_MINUTES, PNPM_LABEL, 'josh gate'),
+	span(time_spans.TOOL_CATEGORY, READ_MINUTES, 'Read'),
+	span(time_spans.TOOL_CATEGORY, LINT_MINUTES, PNPM_LABEL, 'josh lint'),
+	span(time_spans.HUMAN_CATEGORY, WAIT_MINUTES),
+]
+
+function timeline(spans: ReadonlyArray<Span>): Timeline {
+	const elapsed = spans.reduce((sum, entry) => sum + entry.duration_ms, 0)
+
+	return { started_ms: MINUTE_MS, ended_ms: MINUTE_MS + elapsed, spans: [...spans] }
+}
+
+// One session, which is what `--session` reports: no pull request, so no CI share.
+function build(spans: ReadonlyArray<Span>): TimeReport {
+	return time_report.build_report(SESSION, timeline(spans))
+}
+
+// One run, which is what `--issue` reports: the GitHub half was read, so the CI share and the check
+// table are present and the fourth row is printed rather than withheld.
+function run_report(spans: ReadonlyArray<Span>, ci_ms: number): TimeReport {
+	return time_report.build_from_spans({
+		scope: RUN_SCOPE,
+		spans,
+		started_ms: 0,
+		ended_ms: WINDOW_MINUTES * MINUTE_MS,
+		ci_ms,
+		has_ci_data: true,
+		notes: [SESSION_NOTE],
+		by_check: [
+			{
+				label: 'unit',
+				duration_ms: CHECK_MINUTES * MINUTE_MS,
+				conclusion: 'success',
+				merge_gap_ms: -MINUTE_MS,
+			},
+		],
+	})
+}
+
+const time_report_fixture = {
+	MINUTE_MS,
+	MIXED,
+	PNPM_LABEL,
+	RUN_SCOPE,
+	SESSION,
+	SESSION_NOTE,
+	build,
+	run_report,
+	timeline,
+}
+
+export { time_report_fixture }

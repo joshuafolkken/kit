@@ -25,6 +25,27 @@ const MINUTES_WIDTH = 9
 // table's `not detected` because the two ask different questions: a phase is about a marker, this is
 // about whether anything was read to measure.
 const NOT_MEASURED = 'not measured'
+// How many rows of a table any of these reports prints. Capped, because a long run touches thirty-odd
+// distinct leading commands and a table that long is read by nobody. `--json` carries every row the
+// report holds, so the display cap costs a caller nothing.
+//
+// **It moved here when the segment and per-invocation tables became the fourth and fifth renderers to
+// need it** (joshuafolkken/kit#1311). Those two cannot import `time-report.ts`, which imports them —
+// and a second cap beside a second renderer is exactly the drift this file was split out to prevent.
+const MAX_ROWS = 15
+
+// **The parenthetical says "this report" rather than "them all"** (joshuafolkken/kit#1301): since
+// `--top` can cut the record itself before either rendering, a promise that `--json` carries every row
+// *there ever was* would be false beside a `--top` above this display cap — and the report would then
+// contradict its own truncation note. What was cut from the record, if anything, is said in `notes`;
+// what is cut from a table is said here.
+function overflow_line(row_count: number): Array<string> {
+	if (row_count <= MAX_ROWS) return []
+
+	return [
+		`  … and ${String(row_count - MAX_ROWS)} more (--json carries every row this report holds)`,
+	]
+}
 
 function format_minutes(duration_ms: number): string {
 	return `${(duration_ms / MS_PER_MINUTE).toFixed(MINUTE_DECIMALS)} min`
@@ -60,7 +81,9 @@ function unmeasured_row(label: string): string {
 }
 
 const time_format = {
+	MAX_ROWS,
 	NOT_MEASURED,
+	overflow_line,
 	format_minutes,
 	format_seconds,
 	format_share,
