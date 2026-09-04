@@ -42,33 +42,86 @@ import { time_spans, type Span } from './time-spans'
 // tool — so none of them was ever in a command phase, and moving all of them here leaves `gate`,
 // `review`, `pr` and `merge` untouched while making `wait` equal to the human-wait category exactly.
 // That equality is the invariant, and it is what lets the two halves of the report cross-check.
+//
+// **`setup`, `wrapup`, `pre-run` and `post-run` are the remainder cut into the regions it was made
+// of** (joshuafolkken/kit#1299). `other` prints with `is_detected: true`, so it ranked as a measured
+// block nobody could propose a cut against — 19–63% of each of the four runs that filed the issue,
+// larger in every one of them than the biggest named phase. Measured across six merged runs it is
+// two stretches and almost nothing else: before the first edit, and after the pull request opened.
+// So each becomes a window like `implement` and `rework`, decided from boundary markers in exactly
+// the same way, and `other` is left as the genuine remainder rather than as the place four different
+// answers were pooled.
+//
+// **`pre-run` and `post-run` are what a run *is not*, and they are the reason the other two are
+// readable.** A run is not a session: spans are attributed to an issue by branch, filled forward
+// before the branch exists and backward after the merge, so a session that ran a `diag` before the
+// keyword was typed and filed the next issue after the merge contributes both to this run. One
+// measured run charged 9.9 minutes of a following conversation to itself. Naming that separates
+// "the run spent this" from "this was attributed to the run", which is the difference between a cut
+// worth proposing and one that would change nothing.
+//
+// **They are two rows rather than one `outside`, because they rest on two different boundaries.** A
+// `halfrun` has a workflow marker and no merge; a delegated unit whose parent loaded the skill has
+// the merge and no marker. One row detected on either would print `0.0 min` as a measurement for
+// whichever half it never checked — the confident zero `is_detected` exists to prevent, in the phase
+// added to stop exactly that kind of claim.
+//
+// **The four take only what was already `other`, so no existing phase moves.** They are tested
+// after the command phases and after the three windows, which is what makes this change a
+// subdivision of one row rather than a reclassification — and `wait` keeps every human span,
+// including the ones outside the run, because the invariant above is what the two halves of the
+// report are cross-checked against.
 
 type PhaseName =
-	'plan' | 'implement' | 'gate' | 'rework' | 'review' | 'pr' | 'ci' | 'merge' | 'wait' | 'other'
+	| 'plan'
+	| 'setup'
+	| 'implement'
+	| 'gate'
+	| 'rework'
+	| 'review'
+	| 'pr'
+	| 'wrapup'
+	| 'ci'
+	| 'merge'
+	| 'wait'
+	| 'pre-run'
+	| 'post-run'
+	| 'other'
 
 const PLAN_PHASE: PhaseName = 'plan'
+const SETUP_PHASE: PhaseName = 'setup'
 const IMPLEMENT_PHASE: PhaseName = 'implement'
 const GATE_PHASE: PhaseName = 'gate'
 const REWORK_PHASE: PhaseName = 'rework'
 const REVIEW_PHASE: PhaseName = 'review'
 const PR_PHASE: PhaseName = 'pr'
+const WRAPUP_PHASE: PhaseName = 'wrapup'
 const CI_PHASE: PhaseName = 'ci'
 const MERGE_PHASE: PhaseName = 'merge'
 const WAIT_PHASE: PhaseName = 'wait'
+const PRE_RUN_PHASE: PhaseName = 'pre-run'
+const POST_RUN_PHASE: PhaseName = 'post-run'
 const OTHER_PHASE: PhaseName = 'other'
 
-// Run order, which is the order they are printed in. `wait` and `other` come last because neither is
-// a stage anything passes through: one is time spent between the stages, the other the remainder.
+// Run order, which is the order they are printed in — by where a phase *opens*, so `wrapup` sits
+// beside the pull request it starts at rather than after the merge it runs beside. `wait`, the two
+// outside-the-run rows and `other` come last because none is a stage anything passes through: one is
+// time spent between the stages, two are time that was not the run's at all, and the last is the
+// remainder.
 const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 	PLAN_PHASE,
+	SETUP_PHASE,
 	IMPLEMENT_PHASE,
 	GATE_PHASE,
 	REWORK_PHASE,
 	REVIEW_PHASE,
 	PR_PHASE,
+	WRAPUP_PHASE,
 	CI_PHASE,
 	MERGE_PHASE,
 	WAIT_PHASE,
+	PRE_RUN_PHASE,
+	POST_RUN_PHASE,
 	OTHER_PHASE,
 ]
 
@@ -116,7 +169,16 @@ interface PhaseInput {
 // `undefined` means the marker never appeared, which is the phase's "not detected" answer. A
 // sentinel instant would be indistinguishable from a real one at the epoch.
 interface Windows {
+	// Where the workflow itself opened — the `workflow-commands` skill call or the `in-progress`
+	// label, whichever came first. `undefined` means the transcript carried neither, in which case
+	// nothing can be said to have happened before the run and `pre-run` reports itself as
+	// undetected rather than as empty. It is also the floor every other boundary search takes.
+	workflow_start_ms: number | undefined
 	plan_end_ms: number | undefined
+	// The first instant the run had demonstrably moved past preparing, which is where `setup` closes.
+	// The same instant `plan_end_of` is bounded by, held rather than recomputed so the two cannot
+	// come to disagree about where preparation ended.
+	work_start_ms: number | undefined
 	implement_start_ms: number | undefined
 	implement_end_ms: number
 	// Where `implement` closed, read a second time as where `rework` opens. `undefined` means no gate
@@ -127,6 +189,15 @@ interface Windows {
 	// never having been reached rather than as zero minutes long.
 	rework_start_ms: number | undefined
 	rework_end_ms: number
+	// Where the pull request opened, which is where `wrapup` starts. It is `rework_end_ms` read a
+	// second time, and the two differ in exactly the state that matters: no pull request leaves this
+	// `undefined` — so `wrapup` is reported as never reached — while `rework_end_ms` falls back to the
+	// end of what was measured, which is the `halfrun` case rework already handles.
+	pr_open_ms: number | undefined
+	// Where the merge command finished, which is where `post-run` opens. The **last** one rather
+	// than the first: `followup` exits non-zero on an AI-review blocker and is re-run, and taking the
+	// first would charge the fixes between the two attempts to what came after the run.
+	merge_end_ms: number | undefined
 }
 
 interface Detection {
@@ -148,8 +219,28 @@ function first_by(spans: ReadonlyArray<Span>, is_match: (span: Span) => boolean)
 		.toSorted((left, right) => started_ms(left) - started_ms(right))[0]
 }
 
+// When the earliest matching span opened, or `undefined` for no match at all — the shape every
+// boundary below is. Written once because "find it, then read its start" is the same two lines at
+// each of them, and a copy per boundary is where one of them comes to read `ended_ms` instead.
+function first_start_of(
+	spans: ReadonlyArray<Span>,
+	is_match: (span: Span) => boolean,
+): number | undefined {
+	const found = first_by(spans, is_match)
+
+	return found === undefined ? undefined : started_ms(found)
+}
+
 function is_gate(span: Span): boolean {
 	return span.josh_command === GATE_COMMAND
+}
+
+function is_edit(span: Span): boolean {
+	return span.marker === time_markers.EDIT_MARKER
+}
+
+function is_workflow(span: Span): boolean {
+	return span.marker === time_markers.WORKFLOW_MARKER
 }
 
 function run_end_ms(spans: ReadonlyArray<Span>): number {
@@ -196,9 +287,7 @@ function first_gate_of(
 	spans: ReadonlyArray<Span>,
 	start_ms: number | undefined,
 ): number | undefined {
-	const gate = first_by(spans, (span) => is_gate(span) && is_after(span, start_ms))
-
-	return gate === undefined ? undefined : started_ms(gate)
+	return first_start_of(spans, (span) => is_gate(span) && is_after(span, start_ms))
 }
 
 // **Rework closes where the pull request opens, not where the review starts.** Closing it at the
@@ -206,14 +295,23 @@ function first_gate_of(
 // defect one stage further along, since a `fullrun` fixes what round one found and then re-reviews.
 // `josh git` / `josh pr` is the first instant the run demonstrably stopped changing code, and it is
 // a command name rather than a duration, so the boundary does not move when a run gets faster.
-// Falling back to the end of what was measured covers a run that stopped before its pull request.
-function rework_end_of(spans: ReadonlyArray<Span>, start_ms: number | undefined): number {
-	const opened = first_by(
+// `undefined` is a run that stopped before its pull request; rework falls back to the end of what
+// was measured there, and `wrapup` reports that it was never reached.
+function pr_open_of(spans: ReadonlyArray<Span>, start_ms: number | undefined): number | undefined {
+	return first_start_of(
 		spans,
 		(span) => command_phase(span) === PR_PHASE && is_after(span, start_ms),
 	)
+}
 
-	return opened === undefined ? run_end_ms(spans) : started_ms(opened)
+// Where the run stopped being the run. The last merge command's *end* rather than a start, because
+// the merge is work the run did and only what follows it is not.
+function merge_end_of(spans: ReadonlyArray<Span>): number | undefined {
+	const ends = spans
+		.filter((span) => command_phase(span) === MERGE_PHASE)
+		.map((span) => span.ended_ms)
+
+	return ends.length === 0 ? undefined : Math.max(...ends)
 }
 
 // The first instant the run had demonstrably moved past planning. **The first edit is not enough on
@@ -221,8 +319,15 @@ function rework_end_of(spans: ReadonlyArray<Span>, start_ms: number | undefined)
 // marker at all, and with no bound the guard above accepts any plan-shaped call anywhere, so that
 // run's *completion* comment closed a planning phase covering nearly the whole of it. The first
 // command phase is the second bound, and either one alone answers the question the guard asks.
-function work_start_of(spans: ReadonlyArray<Span>, edit: Span | undefined): number | undefined {
-	const command = first_by(spans, (span) => command_phase(span) !== undefined)
+function work_start_of(
+	spans: ReadonlyArray<Span>,
+	edit: Span | undefined,
+	floor_ms: number | undefined,
+): number | undefined {
+	const command = first_by(
+		spans,
+		(span) => command_phase(span) !== undefined && is_after(span, floor_ms),
+	)
 	const marks = [edit, command]
 		.filter((span): span is Span => span !== undefined)
 		.map((span) => started_ms(span))
@@ -230,17 +335,38 @@ function work_start_of(spans: ReadonlyArray<Span>, edit: Span | undefined): numb
 	return marks.length === 0 ? undefined : Math.min(...marks)
 }
 
+// **Every boundary below is searched for at or after the workflow opened, and that floor is not
+// cosmetic.** The spans attributed to an issue reach back before the keyword was typed, so an edit
+// made by whatever the session was doing first would open `implement` ahead of the run — swallowing
+// the whole preceding stretch, reporting `setup` as an empty window that was detected, and leaving
+// `pre-run` at `0.0 min` beside it. The gate and the pull request take the same floor for the same
+// reason, through `?? workflow_start_ms` where their own opening boundary was never found. With no
+// workflow marker at all the floor is `undefined` and every search is exactly what it was.
+// Where a window closes when the boundary that should have closed it was never found: the end of
+// what was measured. Both windows that have such a fallback take it from here, so "a `halfrun` runs
+// its window to the end" is one rule rather than two that could come to disagree.
+function window_end_of(start_ms: number | undefined, spans: ReadonlyArray<Span>): number {
+	return start_ms ?? run_end_ms(spans)
+}
+
 function build_windows(spans: ReadonlyArray<Span>): Windows {
-	const edit = first_by(spans, (span) => span.marker === time_markers.EDIT_MARKER)
+	const workflow_start_ms = first_start_of(spans, is_workflow)
+	const edit = first_by(spans, (span) => is_edit(span) && is_after(span, workflow_start_ms))
 	const implement_start_ms = edit === undefined ? undefined : started_ms(edit)
-	const rework_start_ms = first_gate_of(spans, implement_start_ms)
+	const rework_start_ms = first_gate_of(spans, implement_start_ms ?? workflow_start_ms)
+	const work_start_ms = work_start_of(spans, edit, workflow_start_ms)
+	const pr_open_ms = pr_open_of(spans, rework_start_ms ?? workflow_start_ms)
 
 	return {
-		plan_end_ms: plan_end_of(spans, work_start_of(spans, edit)),
+		workflow_start_ms,
+		plan_end_ms: plan_end_of(spans, work_start_ms),
+		work_start_ms,
 		implement_start_ms,
-		implement_end_ms: rework_start_ms ?? run_end_ms(spans),
+		implement_end_ms: window_end_of(rework_start_ms, spans),
 		rework_start_ms,
-		rework_end_ms: rework_end_of(spans, rework_start_ms),
+		rework_end_ms: window_end_of(pr_open_ms, spans),
+		pr_open_ms,
+		merge_end_ms: merge_end_of(spans),
 	}
 }
 
@@ -263,16 +389,69 @@ function is_planning(span: Span, windows: Windows): boolean {
 	return plan_end_ms !== undefined && span.ended_ms <= plan_end_ms
 }
 
-// The order the three are tested in does not matter. Implementation and rework meet at the first
-// gate and never overlap, and `plan_end_of` accepts no marker that closes after implementation
-// opens — so the windows are disjoint by construction rather than by assumption.
+// The two comparisons every region below is: a span's start against one boundary that may not have
+// been found. Written once because four copies of "is it defined, and is the start on this side of
+// it" is where one of them comes to read `ended_ms`, or to answer `true` for a boundary that was
+// never found — which is the region silently swallowing the whole run.
+//
+// **An undefined boundary answers `false`, never "everything".** A run whose transcript carried no
+// workflow marker has nothing before it rather than everything before it.
+function starts_before(span: Span, boundary_ms: number | undefined): boolean {
+	return boundary_ms !== undefined && started_ms(span) < boundary_ms
+}
+
+function starts_at_or_after(span: Span, boundary_ms: number | undefined): boolean {
+	return boundary_ms !== undefined && started_ms(span) >= boundary_ms
+}
+
+// Whether the span sits outside the run at all, and on which side. `undefined` is "inside", which is
+// what the two regions below presuppose — so this is asked first.
+//
+// **`post-run` opens at the merge *command's* end, not at the merge instant GitHub records.** The
+// merge happens inside a `josh followup` span that is already counted, so the command's end is the
+// last thing the transcript can be read for — and `josh ms` and the report the run writes afterwards
+// are charged here with whatever followed them. That is the deliberate half of the trade, measured
+// at under a minute against the 9.9 minutes of a *following* conversation that `wrapup` would
+// otherwise have reported as this run's own work.
+function outside_phase(span: Span, windows: Windows): PhaseName | undefined {
+	if (starts_before(span, windows.workflow_start_ms)) return PRE_RUN_PHASE
+
+	return starts_at_or_after(span, windows.merge_end_ms) ? POST_RUN_PHASE : undefined
+}
+
+// The two regions inside the run, and then the remainder that is genuinely one.
+//
+// `setup` is everything before the run had demonstrably started working — reading the issue,
+// normalizing its title, `git switch main && git pull`, the dependency-update question, and the
+// turns spent settling the approach. `wrapup` is everything after the pull request opened: the
+// second review round's fixes, the follow-up filing and its bundle, and the completion summary.
+//
+// **`wrapup` runs to the end of what was measured when the pull request never merged**, exactly as
+// `rework` runs to it when none was opened: with no merge command there is no boundary to close it
+// at, so a run reported here as still open has whatever followed it charged to `wrapup`. `post-run`
+// says so in its own row by printing `not detected`.
+function inside_phase(span: Span, windows: Windows): PhaseName {
+	if (starts_before(span, windows.work_start_ms)) return SETUP_PHASE
+
+	return starts_at_or_after(span, windows.pr_open_ms) ? WRAPUP_PHASE : OTHER_PHASE
+}
+
+function unphased_phase(span: Span, windows: Windows): PhaseName {
+	return outside_phase(span, windows) ?? inside_phase(span, windows)
+}
+
+// The order the three windows are tested in does not matter. Implementation and rework meet at the
+// first gate and never overlap, and `plan_end_of` accepts no marker that closes after implementation
+// opens — so the windows are disjoint by construction rather than by assumption. What follows them
+// is a subdivision of the remainder and never takes a span from one of them.
 function window_phase(span: Span, windows: Windows): PhaseName {
 	const { implement_start_ms, implement_end_ms, rework_start_ms, rework_end_ms } = windows
 
 	if (is_within(span, implement_start_ms, implement_end_ms)) return IMPLEMENT_PHASE
 	if (is_within(span, rework_start_ms, rework_end_ms)) return REWORK_PHASE
+	if (is_planning(span, windows)) return PLAN_PHASE
 
-	return is_planning(span, windows) ? PLAN_PHASE : OTHER_PHASE
+	return unphased_phase(span, windows)
 }
 
 // **Waiting is decided before anything else, because it is not work.** A human span closes at a
@@ -307,14 +486,35 @@ function is_marker_detected(phase: PhaseName, found: Detection): boolean {
 	return found.totals.has(phase)
 }
 
+// The one boundary each window phase is detected on, which is `undefined` exactly when this
+// transcript could not be read for it. A table rather than a branch per phase: seven of them ask the
+// identical question of a different field, and seven copies of it is where one comes to ask it of
+// the wrong one.
+//
+// **`pre-run` and `post-run` have a row each because they have a boundary each.** Detecting one row
+// on either of the two would print `0.0 min` as a measurement for whichever half was never checked —
+// and a run has exactly one of them missing far more often than none: a `halfrun` never merges, and
+// a delegated unit never loads the skill its parent did.
+const WINDOW_BOUNDARIES = new Map<PhaseName, keyof Windows>([
+	[PLAN_PHASE, 'plan_end_ms'],
+	[SETUP_PHASE, 'work_start_ms'],
+	[IMPLEMENT_PHASE, 'implement_start_ms'],
+	[REWORK_PHASE, 'rework_start_ms'],
+	[WRAPUP_PHASE, 'pr_open_ms'],
+	[PRE_RUN_PHASE, 'workflow_start_ms'],
+	[POST_RUN_PHASE, 'merge_end_ms'],
+])
+
+// `undefined` for a phase this table has nothing to say about, which is what hands it on to the
+// marker-backed test rather than answering `false` for it.
+function is_window_detected(phase: PhaseName, windows: Windows): boolean | undefined {
+	const boundary = WINDOW_BOUNDARIES.get(phase)
+
+	return boundary === undefined ? undefined : windows[boundary] !== undefined
+}
+
 function is_detected(phase: PhaseName, found: Detection): boolean {
-	const { windows } = found
-
-	if (phase === PLAN_PHASE) return windows.plan_end_ms !== undefined
-	if (phase === IMPLEMENT_PHASE) return windows.implement_start_ms !== undefined
-	if (phase === REWORK_PHASE) return windows.rework_start_ms !== undefined
-
-	return is_marker_detected(phase, found)
+	return is_window_detected(phase, found.windows) ?? is_marker_detected(phase, found)
 }
 
 // The CI share is not a span total: it is the part of the pull request's open→merge window no
@@ -342,14 +542,18 @@ function build_phases(input: PhaseInput): Array<PhaseTotal> {
 const time_phases = {
 	PHASE_ORDER,
 	PLAN_PHASE,
+	SETUP_PHASE,
 	IMPLEMENT_PHASE,
 	GATE_PHASE,
 	REWORK_PHASE,
 	REVIEW_PHASE,
 	PR_PHASE,
+	WRAPUP_PHASE,
 	CI_PHASE,
 	MERGE_PHASE,
 	WAIT_PHASE,
+	PRE_RUN_PHASE,
+	POST_RUN_PHASE,
 	OTHER_PHASE,
 	build_phases,
 }

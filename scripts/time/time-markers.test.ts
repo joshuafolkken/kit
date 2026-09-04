@@ -19,9 +19,15 @@ describe('time_markers.tool_marker', () => {
 		)
 	})
 
-	it('leaves another skill unmarked, so loading a workflow is not read as a review', () => {
+	it('leaves another skill unmarked, so loading one is not read as a review', () => {
+		expect(time_markers.tool_marker('Skill', { skill: 'verify-ui' })).toBe(time_markers.NO_MARKER)
+	})
+
+	// The first act of every entry point, and the earliest instant a transcript can be read for "the
+	// run starts here". Without it the conversation that preceded the keyword is measured as the run's.
+	it('marks the workflow-commands skill as the instant the run opened', () => {
 		expect(time_markers.tool_marker('Skill', { skill: 'workflow-commands' })).toBe(
-			time_markers.NO_MARKER,
+			time_markers.WORKFLOW_MARKER,
 		)
 	})
 
@@ -67,10 +73,10 @@ describe('time_markers.bash_marker — what is not a plan comment', () => {
 		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
 	})
 
-	it('leaves the in-progress label call unmarked', () => {
+	it('reads the in-progress label call as the workflow boundary rather than as a plan', () => {
 		const command = `gh api ${ISSUE_PATH}/labels -f 'labels[]=in-progress'`
 
-		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
+		expect(time_markers.bash_marker(command)).toBe(time_markers.WORKFLOW_MARKER)
 	})
 
 	it('leaves a notification unmarked even though it names an issue and a body', () => {
@@ -88,6 +94,28 @@ describe('time_markers.bash_marker — what is not a plan comment', () => {
 
 	it('leaves filing a new issue unmarked, because the plan is written after it', () => {
 		const command = 'gh api repos/{owner}/{repo}/issues -f title="A title" -f body="A body"'
+
+		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
+	})
+})
+
+// The prerequisite branch removes this label to stop `epic:next` classifying a paused issue as
+// waiting on time. Matched loosely, that call would move the run's start to somewhere near its end.
+describe('time_markers.bash_marker — what is not the workflow boundary', () => {
+	it('leaves removing the in-progress label unmarked', () => {
+		const command = `gh api -X DELETE ${ISSUE_PATH}/labels/in-progress`
+
+		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
+	})
+
+	it('leaves a command that merely quotes the field unmarked', () => {
+		const command = String.raw`gh api ${ISSUE_PATH}/comments --jq '.[].body' | grep "labels\[\]=in-progress"`
+
+		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
+	})
+
+	it('leaves labelling with something else unmarked', () => {
+		const command = `gh api ${ISSUE_PATH}/labels -f 'labels[]=needs-decision'`
 
 		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
 	})
