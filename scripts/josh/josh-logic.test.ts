@@ -8,6 +8,7 @@ import {
 	josh_logic,
 	resolve_alias,
 	resolve_tsx_executable,
+	UNKNOWN_COMMAND_EXIT_CODE,
 } from './josh-logic'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -275,13 +276,17 @@ describe('josh_logic.spawn_script — default_script_arguments injection', () =>
 	})
 })
 
+// Reported through a promise since joshuafolkken/kit#1342, where a script command the dispatcher
+// can evaluate in its own process is awaited rather than spawned.
 describe('josh_logic.run_command', () => {
-	it('returns -1 for an unknown command', () => {
-		expect(josh_logic.run_command('not-a-real-command', [])).toBe(-1)
+	it('reports the unknown-command code for an unknown command', async () => {
+		await expect(josh_logic.run_command('not-a-real-command', [])).resolves.toBe(
+			UNKNOWN_COMMAND_EXIT_CODE,
+		)
 	})
 
-	it('returns -1 for inherited prototype keys like constructor', () => {
-		expect(josh_logic.run_command('constructor', [])).toBe(-1)
+	it('reports the unknown-command code for inherited prototype keys like constructor', async () => {
+		await expect(josh_logic.run_command('constructor', [])).resolves.toBe(UNKNOWN_COMMAND_EXIT_CODE)
 	})
 })
 

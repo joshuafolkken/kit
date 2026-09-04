@@ -2,6 +2,18 @@
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal.
 
+## How a command runs
+
+Most commands are a TypeScript file under `scripts/`; the rest are a shell line the dispatcher spawns. **In kit's own checkout the dispatcher evaluates a script command in its own process** rather than starting a second TypeScript runtime for it ([#1342](https://github.com/joshuafolkken/kit/issues/1342)). Measured on 2026-09-04, medians of five: `pnpm josh port dev` went from **0.55s to 0.38s**, and `pnpm josh format:edited` — the command the edit hook runs 60–90 times in a single run — from **0.55s to 0.39s**. About **0.17s** comes off every script command, which is 15–20 seconds of a run that makes roughly a hundred of them.
+
+Three things decide whether a command takes that route, and none of them is a judgement:
+
+- **The dispatcher has to be running from TypeScript source.** That is kit's own `pnpm josh`. A consumer's `josh` bin is the bundled `dist/josh.js` under plain node, which cannot evaluate `scripts/*.ts` at all, so **every consumer keeps the spawning path exactly as it was**.
+- **The command must not need node flags of its own.** `doctor`, `latest:scope`, `followup`, `notify` and `eval:scope` each pass `--env-file`, which has to be in force before the script's first line; those five keep a process of their own. Each runs at most a few times per run, so none of them is where the cost accumulated.
+- **A shell command has no script to import** and is spawned as before.
+
+**A new josh script keeps the canonical main guard**, `process.argv[1] === fileURLToPath(import.meta.url)`, or none at all. The dispatcher sets `process.argv` to what the spawned process would have had, so a guard written any other way would import cleanly, run nothing and answer 0 — a `josh gate` that passes without running a check. `scripts/josh/josh-in-process.test.ts` asserts the shape for every command that takes this route.
+
 ## Development
 
 These commands replace the corresponding `package.json` scripts. Consumer projects no longer need to add them manually.
