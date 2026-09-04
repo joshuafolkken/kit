@@ -47,6 +47,21 @@ describe('time_density.last_turn_calls', () => {
 	it('reports nothing for a transcript with no assistant line at all', () => {
 		expect(time_density.last_turn_calls(prompt_line(0, BRANCH))).toBe(0)
 	})
+
+	// A transcript caught mid-append truncates the newest turn. Dropping that line the way an
+	// unparseable *leading* line is dropped would read a batched turn as a single call and warn it.
+	it('reports nothing when the tail was caught mid-append', () => {
+		const whole = turn_lines(0, THREE_CALLS).join('\n')
+
+		expect(time_density.last_turn_calls(whole)).toBe(THREE_CALLS)
+		expect(time_density.last_turn_calls(whole.slice(0, -MID_LINE_OFFSET))).toBe(0)
+	})
+
+	it('reads a transcript whose final line is properly terminated', () => {
+		const terminated = `${turn_lines(0, THREE_CALLS).join('\n')}\n`
+
+		expect(time_density.last_turn_calls(terminated)).toBe(THREE_CALLS)
+	})
 })
 
 describe('time_density.read_window', () => {

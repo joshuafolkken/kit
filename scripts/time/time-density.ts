@@ -44,6 +44,18 @@ interface DensityReading {
 	turn_calls: number
 }
 
+// **A tail whose final line does not parse is not read at all.** That is the shape a transcript
+// caught mid-append has, and the line it truncates belongs to the *newest* turn — the one the count
+// is about. Dropping the torn line the way an unparseable leading line is dropped would read a turn
+// of `[thinking, tool_use, tool_use]` as one call and warn a turn that batched, which is the advice
+// inverted. Withholding is the only answer that cannot be wrong. The leading line is a different
+// case: it belongs to a turn already long past, and no count is taken from it.
+function has_whole_tail(text: string): boolean {
+	const last = text.split('\n').findLast((line) => line.trim() !== '')
+
+	return last !== undefined && time_spans.parse_line(last) !== undefined
+}
+
 function assistant_lines(text: string): Array<TranscriptLine> {
 	return text
 		.split('\n')
@@ -59,6 +71,8 @@ function assistant_lines(text: string): Array<TranscriptLine> {
 // A line written without an id is left ungrouped for the same reason — every such line shares the
 // empty string, and a bucket spanning the whole file would answer with the window's total.
 function last_turn_calls(text: string): number {
+	if (!has_whole_tail(text)) return NONE
+
 	const lines = assistant_lines(text)
 	const message_id = lines.at(-1)?.message_id
 

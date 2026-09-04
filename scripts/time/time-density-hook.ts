@@ -14,10 +14,9 @@ import { time_density } from './time-density'
 //
 // **Nothing here may fail.** A `PostToolUse` hook runs after the edit has landed and cannot undo it,
 // so a transcript that is missing, unreadable or not JSON at all ends as "no line", exactly as
-// `format-edited-file.ts` treats a formatter it could not start. A transcript whose *last* line was
-// caught mid-append is the one case that does not end there: that line is dropped like any other
-// unparseable one, and the reading then describes the turn before it — a line about a turn one older
-// than the newest, never a wrong one about the newest.
+// `format-edited-file.ts` treats a formatter it could not start. A transcript caught mid-append ends
+// there too: `time_density.last_turn_calls` withholds the count when the tail's final line does not
+// parse, because that line belongs to the turn the count is about.
 
 // How much of the transcript's end is read. The file grows to several megabytes over a long run —
 // 4.7 MB and 2,712 lines for the largest in this checkout — and reading all of it on every edit would
@@ -30,7 +29,9 @@ const FILE_START = 0
 // the checkout, a session started — or cleared — within the interval of the previous one's line would
 // inherit that silence through its opening stretch, which is the part of a run where the correction
 // is worth the most. Keying on the transcript path also gives a delegated child its own budget, which
-// is right for the same reason: it is a run of its own.
+// is right for the same reason: it is a run of its own. The cost is one small record per session left
+// in the temp directory rather than one per checkout reused — reaped with everything else there, and
+// cheaper than the silence the shared key bought.
 const NOTICE_PREFIX = 'josh-density-notice-'
 // No record means nothing has been said yet, and the caller compares `now - this`. Zero makes that
 // difference enormous, which is the answer wanted: the first eligible edit of a run emits.
@@ -94,11 +95,18 @@ function last_notice_ms(source: string): number {
 // a second hook running in the same session, a sticky temp directory, or a path another account owns
 // each throw. Swallowed here rather than by the outer guard, which would discard the notice that had
 // already been computed and silence exactly what `last_notice_ms` promises never to silence.
+//
+// **What this trades for is stated at its worst, not at its mildest.** A transient collision costs
+// one extra line; a write that fails for the whole session — an unwritable temp directory, a path
+// another account owns — arms nothing ever, so the interval is not stretched but gone, and the line
+// lands on every single-call edit turn of the run. That is still the better direction: an agent that
+// reads the same line repeatedly has been told something true, while one silenced by a temp-file
+// permission has been told nothing at all and cannot tell.
 function arm_throttle(target: string, now_ms: number): void {
 	try {
 		stamp_file.write_stamp(target, { notified_at_ms: now_ms })
 	} catch {
-		// One extra line later is the failure this trades for; a silenced one is not acceptable.
+		// Deliberately empty — see above.
 	}
 }
 
