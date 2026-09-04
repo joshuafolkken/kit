@@ -272,6 +272,7 @@ async function build_last_report(
 }
 
 const time_last = {
+	shortfall_notes,
 	transcript_reports,
 	category_rows,
 	phase_rows,

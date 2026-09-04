@@ -96,12 +96,21 @@ function page_runs(pulls: ReadonlyArray<PullSummary>): RunPick {
 }
 
 // How many of the branchless merges could have been in the answer: those merged no earlier than the
-// oldest run kept. With nothing kept there is no cutoff and every one of them counts, which is the
-// only reading available when the walk resolved no run at all.
+// oldest run kept. With no cutoff every one of them counts.
 function skipped_within(stamps: ReadonlyArray<number>, cutoff_ms: number | undefined): number {
 	if (cutoff_ms === undefined) return stamps.length
 
 	return stamps.filter((merged_ms) => merged_ms >= cutoff_ms).length
+}
+
+// **There is a cutoff only where the request was filled.** With fewer runs than asked for there were
+// unfilled slots, so every branchless merge the walk passed really was a candidate for one of them —
+// and the oldest run kept is not a boundary any of them failed to clear. Nothing kept at all is the
+// same case, which is why one test covers both.
+function cutoff_of(runs: ReadonlyArray<MergedRun>, count: number): number | undefined {
+	if (runs.length < count) return undefined
+
+	return runs.at(-1)?.merged_ms
 }
 
 // **One row per issue, the newest merge winning.** A reverted change and its revert are two merged
@@ -168,7 +177,7 @@ async function select_last_runs(
 
 	return {
 		runs,
-		skipped_count: skipped_within(skipped_ms, runs.at(-1)?.merged_ms),
+		skipped_count: skipped_within(skipped_ms, cutoff_of(runs, count)),
 		end: walk.end,
 	}
 }
@@ -177,6 +186,7 @@ const time_last_select = {
 	page_runs,
 	newest_per_issue,
 	skipped_within,
+	cutoff_of,
 	pick_folder,
 	select_last_runs,
 }

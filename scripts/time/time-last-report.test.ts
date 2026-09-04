@@ -77,6 +77,32 @@ describe('time_last_report.format_last_report — a row nobody could sample', ()
 	})
 })
 
+describe('time_last_report.format_last_report — which tables are display-capped', () => {
+	const OVER_CAP = time_format.MAX_ROWS + 1
+	const rows = Array.from({ length: OVER_CAP }, (_, index) =>
+		time_distribution.labeled(`row-${String(index)}`, [MINUTE_MS]),
+	)
+
+	function labels_in(report: LastTimeReport): Array<string> {
+		return lines_of(report).filter((line) => line.includes('row-'))
+	}
+
+	// `--issue`'s own phase table prints whole, and `PHASE_ORDER` holds exactly 15 names — so a cap
+	// here would drop a phase from one scope and not the other the moment a sixteenth is added.
+	it('prints the phase table whole', () => {
+		expect(labels_in(report_with({ phases: rows }))).toHaveLength(OVER_CAP)
+	})
+
+	// The check table is the one that grows with whatever CI is configured to run, so it takes the same
+	// display cap and overflow note every other table in the command prints through.
+	it('caps the check table and says how many it withheld', () => {
+		const capped = report_with({ checks: rows })
+
+		expect(labels_in(capped)).toHaveLength(time_format.MAX_ROWS)
+		expect(line_with(capped, 'and 1 more')).toContain('--json carries every row')
+	})
+})
+
 describe('time_last_report.format_last_report — the runs it was read from', () => {
 	const report = report_with({})
 

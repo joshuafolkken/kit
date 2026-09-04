@@ -79,6 +79,18 @@ describe('time_last_select.select_last_runs — which runs it takes', () => {
 		expect(selection.skipped_count).toBe(NONE)
 	})
 
+	// With fewer runs than asked for there were unfilled slots, so every branchless merge the walk
+	// passed really was a candidate for one of them.
+	it('counts every branchless merge when the request could not be filled', async () => {
+		const old_unnamed = raw_pull(9, UNNAMED_BRANCH, at(FILLER_HOUR))
+		const selection = await select([[NEWEST, old_unnamed]], THREE)
+
+		expect(selection.runs.map((run) => run.issue_number)).toEqual([201])
+		expect(selection.skipped_count).toBe(1)
+	})
+})
+
+describe('time_last_select.select_last_runs — the rows it collapses', () => {
 	// A revert and the change it reverts are two merged pull requests naming one issue, and both
 	// halves of that issue's measurement are the same — so counting both would report one run twice.
 	it('keeps one row per issue, the newest merge winning', async () => {

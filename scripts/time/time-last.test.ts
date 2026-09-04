@@ -3,6 +3,7 @@ import type { CheckTotal } from './time-checks'
 import { time_corpus } from './time-corpus'
 import { time_epic_fixture } from './time-epic-fixture'
 import { time_last, type LastTimeReport } from './time-last'
+import type { MergedRun, RunSelection } from './time-last-select'
 import type { PhaseTotal } from './time-phases'
 import { time_pull_fixture, type RawPull } from './time-pull-fixture'
 import { time_report, type TimeReport } from './time-report'
@@ -45,6 +46,24 @@ const PAGE: Array<RawPull> = [
 	merged_pull(2, SECOND, MIDDLE_HOUR),
 	merged_pull(3, THIRD, OLDEST_HOUR),
 ]
+
+// A selected run, for the note cases that never reach the fan-out.
+function run_of(index: number): MergedRun {
+	const pull = PAGE[index] ?? PAGE[0]
+
+	return {
+		issue_number: ISSUES[index] ?? FIRST,
+		merged_ms: 0,
+		pull: {
+			number: pull?.number ?? 1,
+			branch: '',
+			head_sha: '',
+			created_ms: 0,
+			merged_ms: 0,
+			updated_ms: 0,
+		},
+	}
+}
 
 function gate_phase(minutes: number): PhaseTotal {
 	return { phase: GATE, duration_ms: minutes * MINUTE_MS, is_detected: minutes > 0 }
@@ -193,6 +212,35 @@ describe('time_last.build_last_report — a run whose record could not be read',
 		expect(report.notes.join('\n')).toContain(
 			'excluded from the elapsed and transcript-side rows as unmeasured',
 		)
+	})
+})
+
+function selection_of(found: number, end: RunSelection['end']): RunSelection {
+	return {
+		runs: Array.from({ length: found }, (_, index) => run_of(index)),
+		skipped_count: 0,
+		end,
+	}
+}
+
+describe('time_last.shortfall_notes', () => {
+	// A failed read is reported even at the full count, because what it costs is the claim rather than
+	// the count — but "5 of the 5 asked for" reads as a no-op beside the warning.
+	it('drops the count clause when the request was filled despite the failed read', () => {
+		const note = time_last.shortfall_notes(RUN_COUNT, selection_of(RUN_COUNT, 'failed')).join('')
+
+		expect(note).toContain('may not be the most recent merges')
+		expect(note).not.toContain('asked for')
+	})
+
+	it('keeps the count clause when the failed read also came up short', () => {
+		const note = time_last.shortfall_notes(RUN_COUNT, selection_of(1, 'failed')).join('')
+
+		expect(note).toContain(`1 of the ${String(RUN_COUNT)} asked for`)
+	})
+
+	it('says nothing at all when the request was filled and the listing was read', () => {
+		expect(time_last.shortfall_notes(RUN_COUNT, selection_of(RUN_COUNT, 'settled'))).toEqual([])
 	})
 })
 
