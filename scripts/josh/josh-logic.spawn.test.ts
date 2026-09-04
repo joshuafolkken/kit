@@ -82,32 +82,34 @@ describe('josh_logic.run_command — composite commands reject extra arguments',
 		vi.restoreAllMocks()
 	})
 
-	it('refuses to run josh test when a flag was appended', () => {
-		expect(josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])).toBe(USAGE_ERROR_EXIT_CODE)
+	it('refuses to run josh test when a flag was appended', async () => {
+		await expect(josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])).resolves.toBe(
+			USAGE_ERROR_EXIT_CODE,
+		)
 	})
 
 	// The whole point is that the flag never silently reaches a run: nothing may be spawned.
-	it('spawns nothing when the arguments are refused', () => {
-		josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])
+	it('spawns nothing when the arguments are refused', async () => {
+		await josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])
 
 		expect(execa_sync_mock).not.toHaveBeenCalled()
 	})
 
-	it('prints where the arguments belong', () => {
-		josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])
+	it('prints where the arguments belong', async () => {
+		await josh_logic.run_command(TEST_CMD, [WORKERS_FLAG])
 
 		expect(vi.mocked(console.error)).toHaveBeenCalledWith(expect.stringContaining('josh test:unit'))
 		expect(vi.mocked(console.error)).toHaveBeenCalledWith(expect.stringContaining('josh test:e2e'))
 	})
 
-	it('still runs josh test unchanged when no arguments were appended', () => {
-		expect(josh_logic.run_command(TEST_CMD, [])).toBe(0)
+	it('still runs josh test unchanged when no arguments were appended', async () => {
+		await expect(josh_logic.run_command(TEST_CMD, [])).resolves.toBe(0)
 		expect(execa_sync_mock).toHaveBeenCalledOnce()
 	})
 
 	// `t` is the alias for `test`; the guard resolves it first, so the alias cannot slip past.
-	it('applies the refusal to the aliased form as well', () => {
-		expect(josh_logic.run_command('t', [WORKERS_FLAG])).toBe(USAGE_ERROR_EXIT_CODE)
+	it('applies the refusal to the aliased form as well', async () => {
+		await expect(josh_logic.run_command('t', [WORKERS_FLAG])).resolves.toBe(USAGE_ERROR_EXIT_CODE)
 		expect(execa_sync_mock).not.toHaveBeenCalled()
 	})
 })

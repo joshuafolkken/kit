@@ -13,12 +13,17 @@ import {
 	type CommandEntry,
 } from './josh-command-map'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
+import { josh_in_process } from './josh-in-process'
 
 const COLUMN_WIDTH = 26
 const ALIAS_PAD_WIDTH = 2
 const TSX_BIN = 'tsx'
 const TSX_PACKAGE = 'tsx'
 const PACKAGE_JSON = 'package.json'
+// Not an exit code the shell ever sees: `josh.ts` reads it as "no such command" and answers with
+// the listing on stderr. It is named because `run_command` now reports through a promise, where a
+// bare `-1` is one step further from the check that reads it.
+const UNKNOWN_COMMAND_EXIT_CODE = -1
 
 interface TsxRunner {
 	executable: string
@@ -168,24 +173,43 @@ function run_shell_command(shell: ReadonlyArray<string>, extra: Array<string>): 
 	return resolve_spawn_exit(executable, result)
 }
 
-function run_script_entry(entry: CommandEntry, subcommand_arguments: Array<string>): number {
+function spawn_script_entry(
+	entry: CommandEntry,
+	script_path: string,
+	script_arguments: ReadonlyArray<string>,
+): number {
 	const runner = resolve_tsx_runner()
-	const script_arguments = [
+
+	return spawn_script(runner.executable, [
 		...runner.leading_arguments,
 		...(entry.tsx_arguments ?? []),
-		path.join(PACKAGE_DIR, entry.script ?? ''),
-		...(entry.default_script_arguments ?? []),
-		...subcommand_arguments,
-	]
-
-	return spawn_script(runner.executable, script_arguments)
+		script_path,
+		...script_arguments,
+	])
 }
 
-function run_command(cmd: string, subcommand_arguments: Array<string>): number {
+// Only the in-process branch is genuinely asynchronous; the spawning one answers the moment the
+// child exits. Both are reported as a promise so every caller has one shape to handle, and
+// `josh.ts` awaits it either way (joshuafolkken/kit#1342).
+async function run_script_entry(
+	entry: CommandEntry,
+	subcommand_arguments: Array<string>,
+): Promise<number> {
+	const script_path = path.join(PACKAGE_DIR, entry.script ?? '')
+	const script_arguments = [...(entry.default_script_arguments ?? []), ...subcommand_arguments]
+
+	if (josh_in_process.can_run_in_process(entry, import.meta.url)) {
+		return await josh_in_process.run_in_process(script_path, script_arguments)
+	}
+
+	return spawn_script_entry(entry, script_path, script_arguments)
+}
+
+async function run_command(cmd: string, subcommand_arguments: Array<string>): Promise<number> {
 	const resolved = resolve_alias(cmd)
 	const entry = Object.hasOwn(COMMAND_MAP, resolved) ? COMMAND_MAP[resolved] : undefined
 
-	if (!entry) return -1
+	if (!entry) return UNKNOWN_COMMAND_EXIT_CODE
 
 	const rejection = composite_arguments.reject_extra_arguments(
 		resolved,
@@ -201,7 +225,7 @@ function run_command(cmd: string, subcommand_arguments: Array<string>): number {
 
 	if (entry.shell) return run_shell_command(entry.shell, subcommand_arguments)
 
-	return run_script_entry(entry, subcommand_arguments)
+	return await run_script_entry(entry, subcommand_arguments)
 }
 
 const josh_logic = {
@@ -217,4 +241,10 @@ export { ALIASES, COMMAND_MAP } from './josh-command-map'
 export type { TsxRunner }
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
-export { josh_logic, resolve_alias, resolve_tsx_executable, resolve_tsx_runner }
+export {
+	josh_logic,
+	resolve_alias,
+	resolve_tsx_executable,
+	resolve_tsx_runner,
+	UNKNOWN_COMMAND_EXIT_CODE,
+}
