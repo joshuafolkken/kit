@@ -106,3 +106,23 @@ describe('issue_state — the human-review line', () => {
 		expect(lines[2]).toBe(REVIEW_YES)
 	})
 })
+
+// joshuafolkken/kit#1302: with several numbers read in one call, a block says which number it
+// belongs to instead of being matched by its position — a batch prints no block for a number that
+// resolves to nothing, and a positional reading then attributes every block after the gap wrongly.
+describe('issue_state.format_attributed_issue_state', () => {
+	it('names the number above the three lines it already printed', () => {
+		const report = issue_state.format_attributed_issue_state('1302', {
+			state: OPEN_STATE,
+			labels: [IN_PROGRESS],
+			is_human_review: false,
+		})
+
+		expect(report.split('\n')).toEqual([
+			'issue: 1302',
+			`state: ${OPEN_STATE}`,
+			`labels: ${IN_PROGRESS}`,
+			REVIEW_NO,
+		])
+	})
+})

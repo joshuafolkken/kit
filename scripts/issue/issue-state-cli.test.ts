@@ -13,9 +13,16 @@ const { issue_state_cli } = await import('./issue-state-cli')
 const SUCCESS = 0
 const FAILURE = 1
 const ISSUE = '1054'
+const OTHER_ISSUE = '1302'
 const CLOSED_JSON = '{"state":"CLOSED","labels":[{"name":"in-progress"}]}'
+const OPEN_JSON = '{"state":"OPEN","labels":[]}'
 const REPO = 'owner/repo'
 const READ_CLOSED = { kind: 'read', json: CLOSED_JSON }
+const READ_OPEN = { kind: 'read', json: OPEN_JSON }
+// The one-number report, spelled out rather than composed from the formatter: this is the shape
+// `.claude/skills/workflow-commands/SKILL.md` §2z and `.claude/skills/diag/SKILL.md` read verbatim,
+// so a test that built it the same way the code does would agree with any change to either.
+const SINGLE_REPORT = 'state: CLOSED\nlabels: in-progress\nhuman_review: no'
 
 beforeEach(() => {
 	classified_mock.mockReset()
@@ -27,13 +34,34 @@ beforeEach(() => {
 
 describe('issue_state_cli.parse_request', () => {
 	it('reads the issue number from a bare argument', () => {
-		expect(issue_state_cli.parse_request([ISSUE])).toEqual({ issue_number: ISSUE })
+		expect(issue_state_cli.parse_request([ISSUE])).toEqual({ issue_numbers: [ISSUE] })
 	})
 
 	it('reads the repository a cross-repository child lives in', () => {
 		expect(issue_state_cli.parse_request([ISSUE, '--repo', REPO])).toEqual({
-			issue_number: ISSUE,
+			issue_numbers: [ISSUE],
 			repo: REPO,
+		})
+	})
+
+	// joshuafolkken/kit#1302: the order they were typed in is the order the report prints them in,
+	// which is the order the caller wrote its own table in.
+	it('keeps every number given, in the order they were typed', () => {
+		expect(issue_state_cli.parse_request([OTHER_ISSUE, ISSUE])).toEqual({
+			issue_numbers: [OTHER_ISSUE, ISSUE],
+		})
+	})
+
+	// A dropped token answers fewer numbers than were asked for and still exits zero, and with one
+	// number left the surviving block prints in the single-number shape — so nothing in the output
+	// says a number went unanswered. `#1262` copied out of a `diag` table is exactly that token.
+	it('refuses the whole call when a token is not an issue number', () => {
+		expect(issue_state_cli.parse_request([`#${ISSUE}`, OTHER_ISSUE])).toBeUndefined()
+	})
+
+	it('reads a repeated number once', () => {
+		expect(issue_state_cli.parse_request([ISSUE, OTHER_ISSUE, ISSUE])).toEqual({
+			issue_numbers: [ISSUE, OTHER_ISSUE],
 		})
 	})
 
@@ -115,12 +143,89 @@ describe('issue_state_cli.parse_request — a repository named but not given', (
 	})
 })
 
+// Answers each number with a read of its own, so a test about attribution cannot pass on the order
+// the blocks happen to come out in.
+function answer_closed_then_open(): void {
+	classified_mock.mockImplementation(async (issue_number: string) =>
+		issue_number === ISSUE ? READ_CLOSED : READ_OPEN,
+	)
+}
+
+// joshuafolkken/kit#1302: several numbers in one call. A `diag` table reads a state per row, and one
+// process start plus one round trip per row is what made five rows cost about eight seconds.
+describe('issue_state_cli.run — several numbers in one call', () => {
+	// The load-bearing half: §2z's `needs-human-review` stop and the `diag` skill both read the three
+	// lines of a one-number report verbatim, so the batch may not add a fourth line to that case.
+	it('prints a one-number report exactly as it did before', async () => {
+		classified_mock.mockResolvedValue(READ_CLOSED)
+
+		expect(await issue_state_cli.run([ISSUE])).toBe(SUCCESS)
+		expect(info_mock).toHaveBeenCalledWith(SINGLE_REPORT)
+	})
+
+	it('attributes each block to its own number', async () => {
+		answer_closed_then_open()
+
+		expect(await issue_state_cli.run([ISSUE, OTHER_ISSUE])).toBe(SUCCESS)
+		expect(info_mock).toHaveBeenCalledWith(
+			expect.stringContaining(`issue: ${ISSUE}\nstate: CLOSED`),
+		)
+		expect(info_mock).toHaveBeenCalledWith(
+			expect.stringContaining(`issue: ${OTHER_ISSUE}\nstate: OPEN`),
+		)
+	})
+
+	it('reports every number from one process, in one printed report', async () => {
+		answer_closed_then_open()
+
+		await issue_state_cli.run([ISSUE, OTHER_ISSUE])
+
+		expect(classified_mock).toHaveBeenCalledTimes(2)
+		expect(info_mock).toHaveBeenCalledTimes(1)
+	})
+
+	it('passes the named repository through for every number', async () => {
+		classified_mock.mockResolvedValue(READ_CLOSED)
+
+		await issue_state_cli.run([ISSUE, OTHER_ISSUE, '--repo', REPO])
+
+		expect(classified_mock).toHaveBeenCalledWith(ISSUE, issue_state_cli.STATE_FIELDS, REPO)
+		expect(classified_mock).toHaveBeenCalledWith(OTHER_ISSUE, issue_state_cli.STATE_FIELDS, REPO)
+	})
+})
+
+// A `diag` table mixes closed issues, open ones and numbers quoted from prose that resolve to
+// nothing. A batch that gave up on the whole call for one of those would answer nothing at all.
+describe('issue_state_cli.run — a number that produced no state among several', () => {
+	it('keeps the other numbers when one does not resolve', async () => {
+		classified_mock.mockImplementation(async (issue_number: string) =>
+			issue_number === ISSUE ? { kind: 'missing' } : READ_OPEN,
+		)
+
+		expect(await issue_state_cli.run([ISSUE, OTHER_ISSUE])).toBe(FAILURE)
+		expect(info_mock).toHaveBeenCalledWith(expect.stringContaining(`issue: ${OTHER_ISSUE}`))
+		expect(error_mock).toHaveBeenCalledWith(expect.stringContaining(`#${ISSUE} does not resolve`))
+	})
+
+	// The two failure kinds stay apart in a batch: a gap is retried, an answer about the number is not.
+	it('keeps a failed read apart from a number that resolves to nothing', async () => {
+		classified_mock.mockImplementation(async (issue_number: string) =>
+			issue_number === ISSUE ? { kind: 'unreadable' } : READ_OPEN,
+		)
+
+		expect(await issue_state_cli.run([ISSUE, OTHER_ISSUE])).toBe(FAILURE)
+		expect(error_mock).toHaveBeenCalledWith(
+			expect.stringContaining(`could not read issue #${ISSUE}`),
+		)
+	})
+})
+
 // gh accepts both spellings, and the inline one reaching the separate-word branch would read as no
 // repository at all — the same fall back to the session's repository the flag exists to prevent.
 describe('issue_state_cli.parse_request — the inline --repo=<owner/repo> spelling', () => {
 	it('reads the repository from a single token', () => {
 		expect(issue_state_cli.parse_request([ISSUE, `--repo=${REPO}`])).toEqual({
-			issue_number: ISSUE,
+			issue_numbers: [ISSUE],
 			repo: REPO,
 		})
 	})
