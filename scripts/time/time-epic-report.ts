@@ -1,5 +1,6 @@
 import { time_epic, type ChildTiming, type EpicTimeReport, type EpicTrend } from './time-epic'
 import { time_report } from './time-report'
+import { time_row_cap } from './time-row-cap'
 
 // The text an epic's batch is read as (joshuafolkken/kit#1271).
 //
@@ -65,10 +66,17 @@ function child_line(timing: ChildTiming): string {
 // Printed only where **no merge was read**, which is exactly where the row cannot say why: a child
 // whose merge *was* read already carries its answer in the share column, and repeating its notes
 // beneath would bury the rows that have something to add.
+//
+// **A `--top` truncation note is not one of them** (joshuafolkken/kit#1301). It is about the per-tool
+// and per-`josh <cmd>` tables, which this rendering does not print at all, and an unmerged child has
+// both a populated table and no CI data — so without the filter it would land in exactly the block
+// that exists to say why the GitHub half is missing.
 function child_note_lines(timing: ChildTiming): Array<string> {
 	if (timing.report.has_ci_data) return []
 
-	return timing.report.notes.map((note) => `      ${note}`)
+	return timing.report.notes
+		.filter((note) => !time_row_cap.is_truncation_note(note))
+		.map((note) => `      ${note}`)
 }
 
 function child_block(timing: ChildTiming): Array<string> {

@@ -400,11 +400,20 @@ function category_lines(report: TimeReport): Array<string> {
 }
 
 // Capped, because a long run touches thirty-odd distinct leading commands and a table that long is
-// read by nobody. `--json` carries every row, so the cap costs a caller nothing.
+// read by nobody. `--json` carries every row this report holds, so the display cap costs a caller
+// nothing.
+//
+// **The parenthetical says "this report" rather than "them all"** (joshuafolkken/kit#1301): since
+// `--top` can cut the record itself before either rendering, a promise that `--json` carries every
+// row *there ever was* would be false beside a `--top` above this display cap — and the report would
+// then contradict its own truncation note. What was cut from the record, if anything, is said in
+// `notes`; what is cut from this table is said here.
 function overflow_line(rows: ReadonlyArray<LabelTotal>): Array<string> {
 	if (rows.length <= MAX_ROWS) return []
 
-	return [`  … and ${String(rows.length - MAX_ROWS)} more (--json carries them all)`]
+	return [
+		`  … and ${String(rows.length - MAX_ROWS)} more (--json carries every row this report holds)`,
+	]
 }
 
 function total_lines(heading: string, rows: ReadonlyArray<LabelTotal>): Array<string> {

@@ -130,6 +130,25 @@ describe('time_cli.parse_options', () => {
 	})
 })
 
+// The row cap narrows whichever scope was asked for rather than naming one, so it is read beside a
+// scope and never counted as a second one (joshuafolkken/kit#1301).
+describe('time_cli.parse_options — the row cap', () => {
+	it('reads --top as a number, beside a scope rather than instead of one', () => {
+		expect(time_cli.parse_options(['--issue', '1268', '--top', '5'])).toEqual({
+			issue: 1268,
+			top: 5,
+			is_json: false,
+		})
+	})
+
+	// A cap that did not parse must not quietly become "carry every row", which is the opposite of
+	// what was asked for.
+	it('refuses a --top that is not a positive whole number', () => {
+		expect(time_cli.parse_options(['--top', 'abc'])).toBeUndefined()
+		expect(time_cli.parse_options(['--top', '0'])).toBeUndefined()
+	})
+})
+
 describe('time_cli.parse_options — the epic scope', () => {
 	it('reads --epic as a number', () => {
 		expect(time_cli.parse_options(['--epic', '1272'])).toMatchObject({

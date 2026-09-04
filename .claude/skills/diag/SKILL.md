@@ -18,9 +18,9 @@ rule in `CLAUDE.md` is unchanged, and `diag` is not one of the keywords it gover
 
 | Typed | What it measures | The call |
 | --- | --- | --- |
-| `diag` / `diag fullrun` | The most recently merged run | `pnpm josh time --json` |
-| `diag #<N>` | Issue `#N`'s whole run, from the `fullrun` invocation to the merge | `pnpm josh time --issue <N> --json` |
-| `diag epicrun` / `diag #<E>` where `#<E>` is an epic | Every child of the epic, in execution order | `pnpm josh time --epic <E> --json` |
+| `diag` / `diag fullrun` | The most recently merged run | `pnpm josh time --top 5 --json` |
+| `diag #<N>` | Issue `#N`'s whole run, from the `fullrun` invocation to the merge | `pnpm josh time --issue <N> --top 5 --json` |
+| `diag epicrun` / `diag #<E>` where `#<E>` is an epic | Every child of the epic, in execution order | `pnpm josh time --epic <E> --top 5 --json` |
 
 An epic is measured child by child because a run is measured from its `fullrun` invocation to its
 merge, and an `epicrun` is several of those. **One call does the whole batch**
@@ -38,10 +38,15 @@ states is reported as unmeasured, never counted as zero.
 ## 1. Measure with `pnpm josh time`, never by hand
 
 ```bash
-pnpm josh time --json               # alias: josh tm
-pnpm josh time --issue <N> --json
-pnpm josh time --epic <E> --json
+pnpm josh time --top 5 --json               # alias: josh tm
+pnpm josh time --issue <N> --top 5 --json
+pnpm josh time --epic <E> --top 5 --json
 ```
+
+**`--top 5` is part of the call, not a nicety** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). Without it the JSON carries every row of the per-tool and per-`josh <cmd>` tables, and an epic pays for both once per child — epic #1262 measured 47.7 KB at 9 children and had more than doubled by 18. What this skill ranks off those two tables is the handful of rows at the top, so the tail is read into the context and never used. Everything else the steps below quote — the four shares, every phase, the round trips and their price — is unaffected: the cap reaches those two tables and nothing else.
+
+- **A cut table says so, and that note is not a zero.** The report's `notes` carry `by_tool: showing the top 5 of 34 rows — 29 withheld by --top`, which is the same distinction between *withheld* and *measured as nothing* that `span_count: 0` and `not detected` make elsewhere here. **Never read a capped table as the whole of what ran.**
+- **Drop the flag when the tail is the question.** A run whose cost is spread thin across many commands rather than concentrated in a few is exactly the case five rows cannot show; re-run the same call without `--top` and say that you did.
 
 **Never write a script to read the transcripts, and never restore the timings by eye.** That is what
 the command replaced, and a second reader is a second classification — the one thing a measurement
@@ -84,7 +89,8 @@ Read from the JSON, in this order:
 - **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost. **Rank a tool by
   its round trips as well as its duration**: a tool called thirty times one call per turn costs thirty
   round trips at the price above, which is routinely larger than the seconds the calls themselves ran
-  for — the reading that was missed before the price was reported
+  for — the reading that was missed before the price was reported. These are the two tables `--top`
+  caps, so read the `notes` line beside them before saying a command is absent from the run
 
 ## 2. Say whether the last speedup actually worked
 
