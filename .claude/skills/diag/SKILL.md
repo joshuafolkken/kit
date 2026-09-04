@@ -44,6 +44,8 @@ pnpm josh time --epic <E> --top 5 --json
 pnpm josh time --last <N> --top 5 --json    # the spread across the last N merged runs
 ```
 
+**One reading is not `josh time`'s, and asking it for one is how the repetition stays invisible** ([#1313](https://github.com/joshuafolkken/kit/issues/1313)). Which checks run in more than one verification layer — `josh gate`, the pre-commit hook, the pre-push hook, CI — cannot be read from a session transcript at all: a hook's seconds are buried inside `josh git`'s, and CI's appear only as a per-check duration with nothing to compare them against. Run `pnpm josh layers` (alias `josh ly`) when a candidate is about removing work rather than about overlapping it; it reads the configuration files and re-derives the answer, so it stays true when a hook changes. It measures no seconds, so a row it produces is ranked below in step 3 on what the repeated check costs in `josh time`'s own tables.
+
 **`--top 5` is part of the call, not a nicety** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). Without it the JSON carries every row of the per-tool and per-`josh <cmd>` tables, and an epic pays for both once per child — epic #1262 measured 47.7 KB at 9 children and had more than doubled by 18. What this skill ranks off those tables is the handful of rows at the top, so the tail is read into the context and never used. Everything else the steps below quote — the four shares, every phase, the round trips and their price — is unaffected: the cap reaches the **row tables** and nothing else.
 
 **Four tables are capped, not two** ([#1311](https://github.com/joshuafolkken/kit/issues/1311)): `by_tool` and `by_josh_command`, plus `segments` — the run read as timed stretches — and `by_invocation`, each call of a command that ran more than once. **`segments` is the one whose cut is not a tail.** The table is in run order, so the cap keeps the **longest** five stretches and puts them back in that order rather than keeping the first five and losing the merge; five rows are therefore a sample of the run and never its shape. **Read a segment listing as evidence about the stretches it names, never about the ones between them** — and where the shape of the run is itself the question, drop the flag and say that you did, exactly as for a thin per-tool tail.
@@ -259,4 +261,6 @@ pnpm josh issue:scout "<title>" --body "<one line, citing the issue this follows
 
 - It does not implement anything, and it opens no pull request.
 - It does not run `fullrun` / `epicrun` on what it ranks. It prints the command; the person types it.
-- It does not measure anything itself. Every figure in its report came out of `pnpm josh time`.
+- It does not measure anything itself. Every figure in its report came out of `pnpm josh time`, and
+  the one thing no transcript records — which check runs in more than one verification layer — came
+  out of `pnpm josh layers`, which reads the configuration files and measures no seconds either.
