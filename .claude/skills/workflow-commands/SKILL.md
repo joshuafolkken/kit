@@ -79,7 +79,12 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   `ci.yml`'s concurrency group, and the merge still waits on the head commit's checks
   (`prompts/review.md` → "The round-2 fix commit is pushed before its gate"). `prompts/review.md` →
   "The pull request opens between the rounds, so CI runs beside round 2" is the single source; a clean
-  round 1 has no second round and its order is unchanged. While the checks are in flight the brief says so
+  round 1 has no second round and its order is unchanged.
+  **A clean second round is not a turn boundary either**: the turn that reads it issues
+  `pnpm josh followup --merge`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a
+  turn of its own — the 19 seconds of dead air joshuafolkken/kit#1333 measured between the two
+  (`prompts/review.md` → "A clean second round issues the merge in the same turn", the single source).
+  While the checks are in flight the brief says so
   rather than saying nothing: `josh gate` writes a marker for as long as it runs, so the review agent
   is told not to run the unit suite the gate is running beside it — **and that sentence claims no
   result**, because a gate that has not finished has none to claim (joshuafolkken/kit#1242).
