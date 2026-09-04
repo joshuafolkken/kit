@@ -234,3 +234,48 @@ describe('issue_state_cli.parse_request — the inline --repo=<owner/repo> spell
 		expect(issue_state_cli.parse_request([ISSUE, '--repo='])).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#1355: a token starting with a dash used to be discarded before the numeric check
+// ever saw it, so a misspelled inline flag fell back to the session's repository and printed a
+// confident state for a *different* repository's issue of the same number.
+describe('issue_state_cli.parse_request — a flag nobody recognizes', () => {
+	// One character short of the inline spelling, which is what makes it a typo rather than a
+	// different argument: the value is right there and still nothing reads it.
+	const MISSPELLED_INLINE_REPO = `--rep=${REPO}`
+
+	it('refuses a misspelled inline repository flag rather than dropping it', () => {
+		expect(issue_state_cli.parse_request([ISSUE, MISSPELLED_INLINE_REPO])).toBeUndefined()
+	})
+
+	it('refuses a flag that is not a repository flag at all', () => {
+		expect(issue_state_cli.parse_request([ISSUE, '--json'])).toBeUndefined()
+	})
+
+	// The flag word is now recognized by name instead of by its dash, so it must still be removed
+	// wherever it was typed — before the numbers as readily as after them.
+	it('still reads the separate spelling when the flag comes before the number', () => {
+		expect(issue_state_cli.parse_request(['--repo', REPO, ISSUE])).toEqual({
+			issue_numbers: [ISSUE],
+			repo: REPO,
+		})
+	})
+
+	// The flag is consumed by the argv positions it occupied, not by the text it matched, so a second
+	// copy of a token the flag already used is still a token nobody read — and it refuses the call
+	// rather than vanishing from it.
+	it('refuses a stray repository flag beside the inline spelling', () => {
+		expect(issue_state_cli.parse_request([ISSUE, `--repo=${REPO}`, '--repo'])).toBeUndefined()
+	})
+
+	it('refuses a repeated repository value beside the separate spelling', () => {
+		expect(issue_state_cli.parse_request([ISSUE, '--repo', REPO, REPO])).toBeUndefined()
+	})
+
+	// The same treatment joshuafolkken/kit#1302 gave a non-numeric token: the whole call is refused
+	// with the usage, and nothing is read — never a partial answer that exits zero.
+	it('prints the usage and reads nothing when a flag is unrecognized', async () => {
+		expect(await issue_state_cli.run([ISSUE, MISSPELLED_INLINE_REPO])).toBe(FAILURE)
+		expect(error_mock).toHaveBeenCalledWith(issue_state_cli.USAGE)
+		expect(classified_mock).not.toHaveBeenCalled()
+	})
+})
