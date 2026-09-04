@@ -17,7 +17,6 @@ const TEMP_PREFIX = 'josh-network-guard-'
 // shell syntax error that records nothing (review round 1 of joshuafolkken/kit#1353).
 const APOSTROPHE_PREFIX = "josh-network-guard-o'brien-"
 const API_ARGUMENTS = ['api', 'repos/joshuafolkken/kit/issues/1']
-const LOG_FILE_NAME = 'calls.log'
 const ONE_CALL = 'gh api one'
 const ANOTHER_CALL = 'gh api two'
 const VERSION_CALL = 'gh --version'
@@ -40,14 +39,14 @@ afterEach(() => {
 	directories.length = 0
 })
 
-// A guard installed in a directory of its own, answering with the log the shim will write to.
-function armed_log(prefix: string = TEMP_PREFIX): string {
+// A guard installed in a directory of its own, answering with that directory — the one thing every
+// call takes, since the shim and its record both live inside it.
+function armed_directory(prefix: string = TEMP_PREFIX): string {
 	const directory = temporary_directory(prefix)
-	const log_file = path.join(directory, LOG_FILE_NAME)
 
-	test_network_guard.install_shim(directory, log_file)
+	test_network_guard.install_shim(directory)
 
-	return log_file
+	return directory
 }
 
 interface ShimRun {
@@ -56,18 +55,18 @@ interface ShimRun {
 	log: string
 }
 
-function shim_of(log_file: string): string {
-	return path.join(path.dirname(log_file), test_network_guard.SHIM_NAME)
+function shim_of(directory: string): string {
+	return path.join(directory, test_network_guard.SHIM_NAME)
 }
 
 function run_shim(prefix: string = TEMP_PREFIX): ShimRun {
-	const log_file = armed_log(prefix)
-	const result = execaSync(shim_of(log_file), API_ARGUMENTS, { reject: false })
+	const directory = armed_directory(prefix)
+	const result = execaSync(shim_of(directory), API_ARGUMENTS, { reject: false })
 
 	return {
 		exit_code: result.exitCode,
 		stderr: result.stderr,
-		log: readFileSync(log_file, 'utf8'),
+		log: readFileSync(test_network_guard.log_in(directory), 'utf8'),
 	}
 }
 
@@ -103,28 +102,28 @@ describe('test_network_guard — what the shim does when it is spawned', () => {
 
 describe('test_network_guard.disarm — the three answers it has to tell apart', () => {
 	it('throws when a call was recorded', () => {
-		const log_file = armed_log()
+		const directory = armed_directory()
 
-		execaSync(shim_of(log_file), API_ARGUMENTS, { reject: false })
+		execaSync(shim_of(directory), API_ARGUMENTS, { reject: false })
 
 		expect(() => {
-			test_network_guard.disarm(log_file)
+			test_network_guard.disarm(directory)
 		}).toThrow(test_network_guard.VIOLATION_HEADING)
 	})
 
 	it('says nothing when the run made no call', () => {
 		expect(() => {
-			test_network_guard.disarm(armed_log())
+			test_network_guard.disarm(armed_directory())
 		}).not.toThrow()
 	})
 
 	// The failure mode the whole guard exists to avoid: an unreadable record must not read as "no
 	// violations", or the guard reports clean about a run it knows nothing about.
 	it('throws rather than passing when its own record cannot be read', () => {
-		const missing = path.join(temporary_directory(), 'never-written.log')
+		const never_armed = temporary_directory()
 
 		expect(() => {
-			test_network_guard.disarm(missing)
+			test_network_guard.disarm(never_armed)
 		}).toThrow(test_network_guard.UNREADABLE_LOG_HEADING)
 	})
 })
@@ -135,7 +134,7 @@ describe('test_network_guard.arm — what the workers inherit', () => {
 		const directory = temporary_directory()
 
 		try {
-			test_network_guard.arm(directory, path.join(directory, LOG_FILE_NAME))
+			test_network_guard.arm(directory)
 
 			expect(process.env['PATH']).toBe(`${directory}${path.delimiter}${original ?? ''}`)
 		} finally {

@@ -43,7 +43,7 @@ const GUARD_DIRECTORY = path.join(
 	'.cache',
 	`unit-network-guard-${String(process.pid)}`,
 )
-const LOG_FILE = path.join(GUARD_DIRECTORY, 'gh-calls.log')
+const LOG_NAME = 'gh-calls.log'
 // The binary being stood in for. Single-sourced because it is two things at once: the file name that
 // has to shadow the real one on `PATH`, and the word each recorded line starts with.
 const SHIM_NAME = 'gh'
@@ -102,15 +102,22 @@ function describe_violations(calls: ReadonlyArray<string>): string {
 	return [VIOLATION_HEADING, ...lines].join('\n')
 }
 
+// One armed guard is one directory holding both the shim and its record, so the directory is the
+// only thing any of the calls below take. Derived rather than passed alongside it: a `disarm` given
+// a log file that lived somewhere else would recursively delete whatever directory that was in.
+function log_in(directory: string): string {
+	return path.join(directory, LOG_NAME)
+}
+
 // The shim, written where it will be spawned from. Shared with this module's own test rather than
 // re-written there: a test that builds its own copy proves that copy works and says nothing about
 // the one the suite actually runs behind.
-function install_shim(directory: string = GUARD_DIRECTORY, log_file: string = LOG_FILE): string {
+function install_shim(directory: string = GUARD_DIRECTORY): string {
 	const shim_file = path.join(directory, SHIM_NAME)
 
 	mkdirSync(directory, { recursive: true })
-	writeFileSync(log_file, '')
-	writeFileSync(shim_file, shim_script(log_file))
+	writeFileSync(log_in(directory), '')
+	writeFileSync(shim_file, shim_script(log_in(directory)))
 	chmodSync(shim_file, SHIM_MODE)
 
 	return shim_file
@@ -127,31 +134,27 @@ function read_log(log_file: string): string | undefined {
 	}
 }
 
-function recorded_calls(log_file: string = LOG_FILE): Array<string> {
-	return calls_of(read_log(log_file) ?? '')
-}
-
 // `globalSetup` runs before any worker is forked, so the workers inherit this `PATH` and every `gh`
 // they spawn — directly or through a CLI subprocess of their own — resolves to the shim.
-function arm(directory: string = GUARD_DIRECTORY, log_file: string = LOG_FILE): void {
-	install_shim(directory, log_file)
+function arm(directory: string = GUARD_DIRECTORY): void {
+	install_shim(directory)
 	process.env['PATH'] = `${directory}${path.delimiter}${process.env['PATH'] ?? ''}`
 }
 
 // Thrown rather than logged: a warning on a suite that already exited 0 is a warning nobody reads,
 // which is the state joshuafolkken/kit#1353 was filed from. The directory goes either way, so a
 // failing run does not leave the next one reading its records.
-function disarm(log_file: string = LOG_FILE): void {
-	const log_text = read_log(log_file)
+function disarm(directory: string = GUARD_DIRECTORY): void {
+	const log_text = read_log(log_in(directory))
 
 	try {
-		if (log_text === undefined) throw new Error(`${UNREADABLE_LOG_HEADING} ${log_file}`)
+		if (log_text === undefined) throw new Error(`${UNREADABLE_LOG_HEADING} ${log_in(directory)}`)
 
 		const calls = calls_of(log_text)
 
 		if (calls.length > 0) throw new Error(describe_violations(calls))
 	} finally {
-		rmSync(path.dirname(log_file), { recursive: true, force: true })
+		rmSync(directory, { recursive: true, force: true })
 	}
 }
 
@@ -165,7 +168,6 @@ function setup(): () => void {
 const test_network_guard = {
 	BLOCKED_MESSAGE,
 	GUARD_DIRECTORY,
-	LOG_FILE,
 	SHIM_NAME,
 	UNREADABLE_LOG_HEADING,
 	VIOLATION_HEADING,
@@ -174,7 +176,7 @@ const test_network_guard = {
 	describe_violations,
 	disarm,
 	install_shim,
-	recorded_calls,
+	log_in,
 	shim_script,
 }
 

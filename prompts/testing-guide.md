@@ -125,7 +125,7 @@ When fixing bugs where tests leave data behind (or similar persistent state):
 
 - **A unit test must not reach the network.** Mock every read that leaves the process — a `gh` call, an HTTP request, a CLI subprocess that makes one
 - **Mock the whole read, not the first half of it.** A helper that stubs one call and leaves a second one on its default calls through, and the test still **passes** — slower, and against whatever the remote answers. That is how joshuafolkken/kit#1353 reached a 10-second timeout in CI on a change that had nothing to do with it
-- In kit's own checkout `vitest.config.ts` arms a guard that fails the run and lists whatever spawned `gh` (`docs/josh-commands.md` → `josh test:unit`). Elsewhere the rule holds without one
+- In kit's own checkout `vitest.config.ts` arms a guard that fails the run and lists the `gh` invocations it recorded — the commands, not the test that made them, which the command text is usually enough to find (`docs/josh-commands.md` → `josh test:unit`). Elsewhere the rule holds without one
 
 ---
 
