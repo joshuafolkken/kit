@@ -20,6 +20,13 @@ interface FileMapStamp {
 	// the in-flight gate marker (joshuafolkken/kit#1242). The other two assert a completed past fact,
 	// which stays true however long the file sits there, so they carry it and never read it.
 	pid?: number
+	// The commit the file map is defined against (joshuafolkken/kit#1328). Every reader of these
+	// records computes its map as a diff against the default branch, so **the map alone does not
+	// describe a tree**: fetch an advanced default branch and rebase onto it, and every digest can stay
+	// identical while the rest of the working tree is replaced by code no check has read. Only a reader
+	// that acts on the record — `josh gate`, which reuses a green result instead of re-running it —
+	// needs the guarantee, so it is the one that writes and compares this.
+	base?: string
 }
 
 // Takes `unknown` rather than the declared field type, because the declared type is an assertion
@@ -31,16 +38,24 @@ function is_file_map(value: unknown): value is Record<string, string> {
 	return Object.values(value).every((entry) => typeof entry === 'string')
 }
 
-// A `pid` that is not a number is dropped rather than rejected: the two records that never read one
-// were written without it before joshuafolkken/kit#1242, and a reader that needs it treats its
-// absence as "not running", which is the safe direction anyway.
+// An optional field of the wrong type is dropped rather than rejected: the records that never read
+// one were written without it before joshuafolkken/kit#1242 and joshuafolkken/kit#1328, and every
+// reader treats an absent field as the safe answer — "not running" for a `pid`, "cannot be reused"
+// for a `base`. Spread rather than assigned, because `exactOptionalPropertyTypes` makes an explicit
+// `undefined` a different thing from an absent key.
+function optional_fields(pid: unknown, base: unknown): Partial<FileMapStamp> {
+	return {
+		...(typeof pid === 'number' && { pid }),
+		...(typeof base === 'string' && { base }),
+	}
+}
+
 function parse_stamp(raw: string): FileMapStamp | undefined {
-	const { taken_at, files, pid } = JSON.parse(raw) as Partial<FileMapStamp>
+	const { taken_at, files, pid, base } = JSON.parse(raw) as Partial<FileMapStamp>
 
 	if (typeof taken_at !== 'string' || !is_file_map(files)) return undefined
-	if (typeof pid !== 'number') return { taken_at, files }
 
-	return { taken_at, files, pid }
+	return { taken_at, files, ...optional_fields(pid, base) }
 }
 
 // `signal 0` runs every permission check and delivers nothing, so it is the standard liveness probe:
@@ -71,7 +86,9 @@ function changed_since(stamp: FileMapStamp, tree: Record<string, string>): Reado
 
 interface FileMapStampAccess {
 	stamp_path: () => string
-	write: (files: Record<string, string>, target?: string) => string
+	// `base` is written by the one record that is acted on rather than merely reported —
+	// joshuafolkken/kit#1328's green-gate reuse. The others omit it and are unaffected.
+	write: (files: Record<string, string>, target?: string, base?: string) => string
 	read: (source?: string) => FileMapStamp | undefined
 	// For a record whose meaning is its existence rather than its contents — the in-flight gate marker
 	// (joshuafolkken/kit#1242). A record nobody removes would go on asserting a gate that ended.
@@ -104,11 +121,14 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 
 	return {
 		stamp_path: resolve,
-		write: (files, target = resolve()) =>
+		// `base` goes into the payload undefined and all — `JSON.stringify` drops an undefined value,
+		// so a caller that has no base writes exactly the record it wrote before this field existed.
+		write: (files, target = resolve(), base?: string) =>
 			stamp_file.write_stamp(target, {
 				taken_at: new Date().toISOString(),
 				files,
 				pid: process.pid,
+				base,
 			}),
 		read: (source = resolve()) => read_at(source),
 		remove: (target = resolve()) => {

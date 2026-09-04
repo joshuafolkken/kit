@@ -108,6 +108,14 @@ const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
 // at the source rather than leaving each caller to discover the configuration.
 const NO_RELATIVE_PATHS = '--no-relative'
 
+// The commit the default branch points at. Every "changed" reading below is a diff against that
+// branch, so a set of changed paths — or a map of their digests — means nothing without it: fetch an
+// advanced default branch and rebase onto it, and each digest can stay identical while the rest of
+// the tree is replaced by code no check has read (joshuafolkken/kit#1328).
+async function default_branch_commit(): Promise<string> {
+	return await exec_git_command_read(['rev-parse', await get_default_branch()])
+}
+
 async function diff_main_names(): Promise<string> {
 	const default_branch = await get_default_branch()
 
@@ -263,6 +271,7 @@ const git_command = {
 	diff_cached,
 	diff_cached_names,
 	diff_main,
+	default_branch_commit,
 	diff_main_names,
 	untracked_names,
 	get_default_branch,
