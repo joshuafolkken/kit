@@ -6,6 +6,7 @@ import { time_epic_report } from './time-epic-report'
 import { time_failures } from './time-failures'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
+import { time_tool_turns } from './time-tool-turns'
 
 const MINUTE_MS = 60_000
 const EPIC = 1272
@@ -61,6 +62,7 @@ function report_of(input: ChildInput): TimeReport {
 		turn_count,
 		tool_call_count: 0,
 		round_trip_count: 0,
+		...time_tool_turns.NO_TURN_SPLIT,
 		ms_per_round_trip: 0,
 		model_ms_per_round_trip: 0,
 		categories: { model_ms, tool_ms: MINUTE_MS, human_ms: MINUTE_MS, ci_ms: MINUTE_MS },

@@ -70,6 +70,31 @@ describe('time_round_trips.count_round_trips — ordering', () => {
 	})
 })
 
+// joshuafolkken/kit#1385. The per-tool counts are read off these groups, so the grouping and the
+// count have to be the same walk — a second one beside it is where the two would come to disagree
+// about what a round trip is.
+describe('time_round_trips.group_round_trips', () => {
+	it('returns one group per round trip, holding the calls that turn issued', () => {
+		expect(time_round_trips.group_round_trips(BATCHED).map((trip) => trip.length)).toEqual([3, 1])
+	})
+
+	it('agrees with the count it is the length of', () => {
+		for (const spans of [BATCHED, SERIAL, OUT_OF_ORDER, [TOOL, HUMAN, TOOL], [MODEL, HUMAN]]) {
+			expect(time_round_trips.group_round_trips(spans)).toHaveLength(
+				time_round_trips.count_round_trips(spans),
+			)
+		}
+	})
+
+	// One call bracketing a delegated unit comes back as two spans, and the tail is not a call. A group
+	// holding it would report the turn as having issued one more than it did.
+	it('leaves the tail of a split call out of every group', () => {
+		const trips = time_round_trips.group_round_trips([MODEL, TOOL, MODEL, CONTINUATION])
+
+		expect(trips.map((trip) => trip.length)).toEqual([1])
+	})
+})
+
 describe('time_round_trips.count_calls', () => {
 	// The call count is what the two shapes agree on; the round trips are what they differ by, which
 	// is the whole reason both are reported rather than one.

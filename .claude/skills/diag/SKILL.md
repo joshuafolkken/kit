@@ -96,6 +96,13 @@ Read from the JSON, in this order:
   **A density near 1.00 is the finding, not a detail** — it says independent calls went out one per
   turn, and the printed block says so in a line. It rests on the same transcript the three shares do,
   so a scope with `span_count: 0` measured none of it either
+- **how many turns the density is made of** — `batched_turn_count` and `single_call_turn_count`
+  ([#1385](https://github.com/joshuafolkken/kit/issues/1385)). They sum to `round_trip_count`, and a
+  density of 1.07 over 101 round trips can be 7 turns of two calls against 94 single-call ones, or 3
+  turns issuing three and four calls against 98 — the same number over two differently-shaped runs,
+  and the second has a third as much batching to build on. Quote the pair beside the density rather
+  than the density alone.
+  Withheld with the block they are printed in, so `span_count: 0` reports them unmeasured too
 - **the price of one round trip** — `ms_per_round_trip`, with `model_ms_per_round_trip` beside it
   (joshuafolkken/kit#1307). The counts above say how *often* a run went round; this says what one of
   them is worth, and **without it the round trips cannot enter step 3's table at all** — that table
@@ -118,7 +125,17 @@ Read from the JSON, in this order:
 - **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost. **Rank a tool by
   its round trips as well as its duration**: a tool called thirty times one call per turn costs thirty
   round trips at the price above, which is routinely larger than the seconds the calls themselves ran
-  for — the reading that was missed before the price was reported. These are two of the four tables `--top`
+  for — the reading that was missed before the price was reported. Since
+  [#1385](https://github.com/joshuafolkken/kit/issues/1385) each `by_tool` row carries that reading
+  rather than leaving it to be inferred: `round_trip_count` beside `call_count`, and
+  `alone_in_turn_count` for the calls that were the only one in their turn. **Name the tool to batch,
+  never the density.** A row reading `Edit — 39 call(s) · 39 round trip(s) · 39 alone` is the
+  candidate; "the density is 1.07" is not one, and a proposal written from the density alone is what
+  three consecutive runs failed to move. Multiply that row's alone count by
+  `model_ms_per_round_trip` to rank it, and check it against `recoverable_round_trips` — the bundling
+  block says how many of those turns could actually have been one. `by_josh_command` carries neither
+  count on purpose: a `josh` subcommand is a `Bash` call under another name, so its round trips are
+  already the `Bash` row's. These are two of the four tables `--top`
   caps, so read the `notes` line beside them before saying a command is absent from the run
 
 ## 2. Say whether the last speedup actually worked

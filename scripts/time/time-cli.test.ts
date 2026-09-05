@@ -197,7 +197,17 @@ describe('time_cli.run — one session', () => {
 		await time_cli.run(['--session', SESSION, '--json'], CWD)
 
 		expect(JSON.parse(output())).toMatchObject({
-			by_tool: [{ label: 'Read', duration_ms: 2 * MINUTE_MS, call_count: 1 }],
+			by_tool: [
+				{
+					label: 'Read',
+					duration_ms: 2 * MINUTE_MS,
+					call_count: 1,
+					// The two counts joshuafolkken/kit#1385 added, asserted here so `--json` is known to carry
+					// them: `diag` reads the JSON and never the printed table.
+					round_trip_count: 1,
+					alone_in_turn_count: 1,
+				},
+			],
 		})
 	})
 })

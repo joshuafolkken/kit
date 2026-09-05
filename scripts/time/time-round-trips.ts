@@ -75,11 +75,52 @@ function opens_round_trip(spans: ReadonlyArray<Span>, index: number): boolean {
 	return !is_tool_at(spans, index - 1)
 }
 
+// The calls of one round trip, as the walk below accumulates them.
+interface TripWalk {
+	trips: Array<Array<Span>>
+	// The trip currently open, or `undefined` where the span just seen closed one. A group of adjacent
+	// tool spans headed by a continuation opens none — `opens_round_trip` refuses it — so its calls
+	// find no open trip and are attributed to nothing rather than to the trip before them.
+	open: Array<Span> | undefined
+}
+
+function step_trip(walk: TripWalk, span: Span, is_opener: boolean): void {
+	if (!is_tool(span)) {
+		walk.open = undefined
+
+		return
+	}
+
+	if (is_opener) {
+		walk.open = []
+		walk.trips.push(walk.open)
+	}
+
+	if (!span.is_continuation) walk.open?.push(span)
+}
+
+// **A round trip as the calls it carried, rather than as a count** (joshuafolkken/kit#1385). The count
+// is what this returns the length of, so the two cannot come to disagree about what a round trip is —
+// which is the whole point of asking here rather than grouping the spans a second time next door.
+//
+// A continuation is in no group: `count_calls` already refuses to count it as a call, and a group that
+// held it would report the tail of one call as a second one made in that turn.
+function group_round_trips(spans: ReadonlyArray<Span>): Array<ReadonlyArray<Span>> {
+	const ordered = in_time_order(spans)
+	const walk: TripWalk = { trips: [], open: undefined }
+
+	// A loop rather than `reduce`, which this project's lint config forbids — `fold_issuing` below
+	// drains its spans the same way.
+	for (const [index, span] of ordered.entries()) {
+		step_trip(walk, span, opens_round_trip(ordered, index))
+	}
+
+	return walk.trips
+}
+
 // One per group of adjacent tool spans: the first tool span after anything that is not one.
 function count_round_trips(spans: ReadonlyArray<Span>): number {
-	const ordered = in_time_order(spans)
-
-	return ordered.filter((_span, index) => opens_round_trip(ordered, index)).length
+	return group_round_trips(spans).length
 }
 
 // The two running totals `fold_issuing` carries: the model time seen since the last thing that was
@@ -154,6 +195,9 @@ const time_round_trips = {
 	count_calls,
 	count_round_trips,
 	format_density,
+	// Exported since joshuafolkken/kit#1385, so the per-tool counts are read off the very groups this
+	// module counts rather than off a second grouping beside them.
+	group_round_trips,
 	// Exported since joshuafolkken/kit#1309, so the failure aggregation orders a run's spans through
 	// the one function that already knows why they need it — a second `toSorted` beside it would be
 	// the clone `CLAUDE.md` prohibits, and the seam it guards (a delegated unit's spans appended
