@@ -148,6 +148,78 @@ Read from the JSON, in this order:
   the listing is empty and withheld rather than zero. And a `segments` table the `--top` cap cut: the
   review rows are normally among the longest five and survive it while the short `pr` row between them
   does not, so **re-read without the flag before calling any of these states the run's shape**
+- **what the round-2 disposition cost — the extra commit and the CI cycle behind it**
+  ([#1403](https://github.com/joshuafolkken/kit/issues/1403)). `prompts/review.md` → "Three-way
+  disposition after the cap" gives a finding still standing after round 2 three exits — fix it in
+  place, file it, or drop it with a one-line PR note — and **only the first pushes a second commit**,
+  which runs CI once more — and that second cycle is the one the merge command sits on, the gate
+  beside it having finished first (`prompts/review.md` → "The round-2 fix commit is pushed before its
+  gate, so its CI runs beside it"). That choice is made on every
+  two-round run and its price has never appeared in a report, so joshuafolkken/kit#1382 — which asks
+  whether to cut it — cannot be decided: its acceptance condition is the serial cost **and the
+  frequency** across several runs, and this row is the instrument that produces both.
+  **The detector is a `pr` segment *after* the round-2 `review` row.** The pair is
+  identified first, by the rule above: the `pr` row *between* the two rounds is the pull request
+  opening, and a *second* one after the later `review` row is the fix commit. On run #1399 the tail
+  reads `review 259.9 s · wrapup 37.7 s · pr 34.5 s · merge 177.1 s`, and that third row is the commit
+  this prices. **`by_invocation` corroborates it in both directions, and neither answer is read
+  without it**: `josh git — 2 call(s)` beside a second `pr` row, and **no `josh git` row at all**
+  beside a run reported as not having one — a command called once is filtered out of that table, so
+  its absence is what one commit looks like there.
+  **Read both from uncapped output, always.** `--top 5` keeps the longest five of each, and the `pr`
+  rows are short: on run #1399 they were 43.2 s and 34.5 s against a `merge` of 177.1 s and two
+  `review` rows of 260 s, so the default call drops the evidence for both halves of this reading — and
+  an absence the cap produced is not a measurement.
+  **A `pr` group under `MIN_SEGMENT_MS` (30 s) is absorbed rather than printed, and run #1399's was
+  34.5 s.** A fix commit five seconds shorter than that one therefore leaves exactly the shape the
+  negative answer is written from, which is why that answer rests on `by_invocation` rather than on
+  `segments` alone. **Where the two disagree — no second `pr` row beside two `josh git` calls — the
+  answer is `could not tell`, never the negative.**
+  **A second `pr` row is not proof the commit was round 2's.** A commit pushed to repair a red CI or a
+  red gate lands in the same place and reads identically, so the price would be charged to a
+  disposition that did not buy it. Read the report's `failures` over that stretch first: a failure
+  chain there means the cycle was bought by the failure, and the row says so instead of pricing it
+  here.
+  **Sum exactly four stretches, and print each one beside the total** — the four
+  [#1403](https://github.com/joshuafolkken/kit/issues/1403) enumerated, each with one source. **The
+  second `josh git`** and **the last `josh gate`** are that row's own entries in
+  `by_invocation.durations_ms`: the commit the fix pushed, and the gate that then ran beside its CI.
+  **The second CI cycle is the `ci` phase minus `categories.ci_ms`, never the phase whole.** The phase
+  is the sum of the two, and the category share is the part of the open→merge window *no* span covers
+  — time no transcript span was attributed to, which is not the same thing as the merge command
+  waiting on a cycle — so quoting the phase whole prices unattributed time as an extra cycle.
+  The remainder is what the report already prints in words:
+  `1.4 min of the merge command was waiting on CI`. **The single check the fix reached** has two
+  readings and no third: the last entry of that check's `by_invocation` row where it ran more than
+  once, and `single_checks.duration_ms` where the run issued exactly one single check all told —
+  **a check called once has no `by_invocation` row**, which is this component's ordinary case rather
+  than its exception. Where neither holds, **report the check as unattributed and the total as a lower
+  bound**; never estimate it. Run #1399, in run order — check 4.4 s, `josh git` 27.0 s, `josh gate`
+  17.4 s, CI 84.0 s — totals **132.8 s, 11.1% of a 1,198.1 s run**, the check 4.4 s of it against
+  128.4 s for the other three.
+  **The sum is a re-reading of rows already in the tables, never minutes to add to the run.** All four
+  are already counted once — three in tool execution, the fourth in the `ci` phase — so the line
+  prices a decision and does not lengthen the run it was read from.
+  **That remainder is an *extra* cycle only where the detector fired.** It is the CI the merge command
+  sat on, and a clean round 2 has one cycle that can be partly serial too — so the same figure means
+  "the second cycle" here and "the only cycle" there. Never quote it as an extra cycle on a run whose
+  second commit was not found.
+  **The fix's own editing time stays out of the sum.** The `wrapup` stretch between round 2 and the
+  second commit — 37.7 s on run #1399 — is what the finding cost to resolve, and filing it as a
+  follow-up Issue costs writing time too. What the three-way choice buys is the verification cycle, so
+  that is what this prices.
+  **Three answers, and only one of them is a number.** A second `pr` row after round 2, with
+  `josh git — 2 call(s)` beside it, is **occurred**, reported with the sum. No second `pr` row **and**
+  no `josh git` row at all is **did not occur** — a round 2 that found nothing to fix in place,
+  **never reported as 0 minutes**. Everything else is **could not tell**: the two evidences
+  disagreeing, a pair that could not be identified in the first place — any of the five states above —
+  a listing read with `--top`, `ci` reading `not detected`, or a `failures` chain that makes the
+  second commit someone else's. Report it as such rather than resolving it either way.
+  **Frequency comes from `--last <N>`, by applying this detector per run.**
+  `pnpm josh time --last <N> --json` carries every run's whole report under `runs[]`, so the three
+  answers counted across that set are the frequency joshuafolkken/kit#1382 asks for. Drop `--top`
+  there for the reason above, and **report the three counts rather than a rate** — a set whose runs
+  were mostly `could not tell` has no rate worth quoting
 - **the round trips** — `tool_call_count` and `round_trip_count`, and the density between them
   (joshuafolkken/kit#1304). Once the verification commands were cut, this is what sets a run's floor:
   the tools themselves run for well under a minute while the turns they sit in cost ten times that.
