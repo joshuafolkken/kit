@@ -1,5 +1,6 @@
 import { time_batch, type RunTiming } from './time-batch'
 import { time_distribution, type Distribution, type LabeledDistribution } from './time-distribution'
+import { time_format } from './time-format'
 import { time_github, type GhReader, type PullSearch } from './time-github'
 import { time_last_select, type RunSelection } from './time-last-select'
 import { PHASE_ORDER, type PhaseName } from './time-phase-names'
@@ -25,6 +26,9 @@ import { time_spans } from './time-spans'
 // than pulling every one of them toward zero.
 
 const NONE = 0
+// The unit both pull-request exclusions count in — the branchless merges and the collapsed
+// duplicates. Named once so the two notes cannot come to say it differently.
+const PULL_UNIT = 'merged pull request(s)'
 
 interface LastTimeReport {
 	scope: string
@@ -38,6 +42,12 @@ interface LastTimeReport {
 	// Runs left out of the transcript-side figures because nothing was read for them. Never a count of
 	// runs that took no time.
 	unmeasured_count: number
+	// The merges folded into a run already kept (joshuafolkken/kit#1365). **It rides on the report
+	// rather than only in the sentence**, because `--json` is what a later reading is built from: a
+	// consumer counting `runs` otherwise has no way to tell a set of five runs read from five merges
+	// from one read from six, which is the same thing the note exists to say in words. Both are built
+	// from this one field, so the two surfaces cannot come to disagree.
+	collapsed_pulls: Array<number>
 	elapsed: Distribution
 	categories: Array<LabeledDistribution>
 	phases: Array<LabeledDistribution>
@@ -190,7 +200,34 @@ function shortfall_notes(requested: number, selection: RunSelection): Array<stri
 function skipped_note(count: number): Array<string> {
 	const tail = 'name no issue in their head branch, so they are not runs and are left out'
 
-	return time_batch.count_note(count, 'merged pull request(s)', tail)
+	return time_batch.count_note(count, PULL_UNIT, tail)
+}
+
+// **The numbers are in the sentence because the rows are labelled by issue.** A reader who sees only
+// a count cannot find either end of the pair; the pull request number reaches both.
+//
+// **Capped at the number every other listing in this command is capped at**, so one convention covers
+// the tables and this line — a revert-heavy window would otherwise print a single sentence as long as
+// the listing it walked. The cap is about a line of text and not about the answer: `collapsed_pulls`
+// on the report stays complete, which is where a reader who wants all of them looks.
+function listed_pulls(pulls: ReadonlyArray<number>): string {
+	const shown = pulls.slice(0, time_format.MAX_ROWS).map((pull) => `#${String(pull)}`)
+	const hidden = pulls.length - shown.length
+
+	if (hidden === NONE) return shown.join(', ')
+
+	return `${shown.join(', ')} and ${String(hidden)} more`
+}
+
+// **The last exclusion `--last` used to make in silence** (joshuafolkken/kit#1365). A revert and the
+// change it reverts are two merges of one issue and one run, so the older one leaves no row and no
+// count — and a set called "the last 5" could be built from six merges with nothing saying so, which
+// is the one place the design's own rule was not applied. Phrased through `count_note` like every
+// other exclusion here, so the scope says `left out`, `excluded` and `collapsed` in one voice.
+function collapsed_note(pulls: ReadonlyArray<number>): Array<string> {
+	const tail = `name the same issue as a run already kept and were collapsed into it (${listed_pulls(pulls)})`
+
+	return time_batch.count_note(pulls.length, PULL_UNIT, tail)
 }
 
 // **The two exclusions are named separately, and neither reads as a zero.** A run that merged with no
@@ -204,6 +241,7 @@ function notes_of(
 	return [
 		...shortfall_notes(requested, selection),
 		...skipped_note(selection.skipped_count),
+		...collapsed_note(selection.collapsed_pulls),
 		...count_note(
 			time_batch.count_status(runs, time_batch.NO_TRANSCRIPT),
 			'merged with no session transcript attributed, so only their CI wait is known — they are excluded from the elapsed and transcript-side rows as unmeasured rather than counted as zero',
@@ -235,6 +273,7 @@ function to_report(
 		runs: [...runs],
 		measured_count,
 		unmeasured_count: runs.length - measured_count,
+		collapsed_pulls: [...selection.collapsed_pulls],
 		elapsed: time_distribution.build(transcript_reports(runs).map((report) => report.elapsed_ms)),
 		categories: category_rows(runs),
 		phases: phase_rows(runs),
@@ -276,6 +315,7 @@ async function build_last_report(
 
 const time_last = {
 	shortfall_notes,
+	collapsed_note,
 	transcript_reports,
 	category_rows,
 	phase_rows,
