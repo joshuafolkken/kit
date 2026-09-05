@@ -7,7 +7,11 @@ import { status_icons } from './status-icons'
 const PNPM = 'pnpm'
 const LABEL_WIDTH = 12
 const FAIL_EXIT_CODE = 1
-const STATUS_ICONS = { pass: '✔', warn: '⚠', fail: status_icons.FAIL_ICON } as const
+const STATUS_ICONS = {
+	pass: status_icons.PASS_ICON,
+	warn: '⚠',
+	fail: status_icons.FAIL_ICON,
+} as const
 
 interface HealthCheckDefinition {
 	label: string

@@ -7,12 +7,18 @@
 // A detector matching a character the emitter is free to change on its own is a detector that goes
 // quiet without failing, so the character is declared once here and both ends import it.
 //
-// **Only the failure icon is shared.** `josh propagate` opens its success line with `✓` where the
-// gate uses `✔`, and unifying those would change what two commands print in order to tidy a
-// constant — a decision about output, not about single-sourcing. Nothing reads the success icon.
+// **`josh propagate`'s `✓` is still its own.** It opens its success line with `✓` where the gate and
+// the health check use `✔`, and unifying those would change what a command prints in order to tidy a
+// constant — a decision about output, not about single-sourcing.
+//
+// **The success icon is read too since joshuafolkken/kit#1374.** `josh-verdict.ts` reads the gate's
+// `✔ verification gate passed` line to tell a green gate from the third-party warning bodies it
+// forwards, so the pass icon is now under the same rule the failure icon has been under: declared
+// once, imported by the printer and the reader alike.
 
 const FAIL_ICON = '✗'
+const PASS_ICON = '✔'
 
-const status_icons = { FAIL_ICON }
+const status_icons = { FAIL_ICON, PASS_ICON }
 
 export { status_icons }
