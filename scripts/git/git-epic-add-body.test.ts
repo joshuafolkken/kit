@@ -4,6 +4,9 @@ import { git_epic_parse } from './git-epic-parse'
 
 const DEPENDENCIES_HEADING = '## Dependencies'
 const PROGRESS_HEADING = '## Progress'
+const DECISIONS_HEADING = '## Decisions'
+const STRAY_DECLARATION_MESSAGE = 'outside the `Dependencies` section'
+const SECOND_CHAIN = '#101 -> #102'
 const BLANK = ''
 const ORDERED_CHAIN = '#890 -> #891 -> #892'
 const UNORDERED_LITERAL = 'None — the children are independent; any execution order works.'
@@ -59,6 +62,28 @@ function error_of(outcome: RewriteOutcome): string {
 	if ('body' in outcome) throw new Error('expected a refusal')
 
 	return outcome.error
+}
+
+// A body carrying a declaration-shaped line outside the `Dependencies` section, which the rewrite
+// refuses rather than editing.
+function stray_error(stray_line: string): string {
+	const body = [
+		DEPENDENCIES_HEADING,
+		BLANK,
+		ORDERED_CHAIN,
+		BLANK,
+		'## Notes',
+		BLANK,
+		stray_line,
+		BLANK,
+		PROGRESS_HEADING,
+		BLANK,
+		ROW_890,
+		ROW_891,
+		ROW_892,
+	].join('\n')
+
+	return error_of(rewrite({ body, chains_after: [...APPENDED_CHAINS, [101, 102]] }))
 }
 
 describe('git_epic_add_body.rewrite_body — the task list', () => {
@@ -150,7 +175,7 @@ describe('git_epic_add_body.rewrite_body — what it leaves alone', () => {
 			chains_after: [...APPENDED_CHAINS, [890, 891]],
 		})
 
-		expect(error_of(outcome)).toContain('outside the `Dependencies` section')
+		expect(error_of(outcome)).toContain(STRAY_DECLARATION_MESSAGE)
 	})
 })
 
@@ -160,7 +185,7 @@ describe('git_epic_add_body.rewrite_body — several declaration lines', () => {
 			DEPENDENCIES_HEADING,
 			BLANK,
 			ORDERED_CHAIN,
-			'#101 -> #102',
+			SECOND_CHAIN,
 			BLANK,
 			PROGRESS_HEADING,
 			BLANK,
@@ -218,5 +243,82 @@ describe('git_epic_add_body.rewrite_body — locating the section', () => {
 		const body = body_of(rewrite({ body: headless, additions: [103], chains_after: [] }))
 
 		expect(git_epic_parse.parse_task_list_issue_numbers(body)).toStrictEqual([101, 103])
+	})
+})
+
+// joshuafolkken/kit#1350: the decision record is folded into the body edit the insertion already
+// makes, so it costs no round trip — and it goes in *before* the declaration work, which is what puts
+// it under the same guards.
+describe('git_epic_add_body.rewrite_body — the decision record', () => {
+	const REASON_LINE = '- 理由: 主題が同じ'
+	const RECORD = ['### Where #894 goes', BLANK, REASON_LINE].join('\n')
+	const CHAIN_RECORD = ['### note', '#890 -> #894'].join('\n')
+
+	it('writes the record and the declaration in one body', () => {
+		const body = body_of(rewrite({ decision: RECORD }))
+
+		expect(body).toContain(DECISIONS_HEADING)
+		expect(body).toContain(REASON_LINE)
+		expect(git_epic_parse.parse_dependency_chains(body)).toStrictEqual([[890, 891, 892, 894]])
+	})
+
+	it('still tracks the new child', () => {
+		const body = body_of(rewrite({ decision: RECORD }))
+
+		expect(git_epic_parse.parse_task_list_issue_numbers(body)).toStrictEqual([890, 891, 892, 894])
+	})
+
+	// The record reaches the stray-declaration guard because it is folded in first. Appended after the
+	// rewrite it would be written unchecked, and `epic:next` would read the line as part of the order.
+	it('refuses a record whose line is nothing but a chain', () => {
+		const outcome = rewrite({ decision: CHAIN_RECORD })
+
+		expect(error_of(outcome)).toContain(STRAY_DECLARATION_MESSAGE)
+	})
+
+	it('leaves the body exactly as it was when no record is given', () => {
+		expect(body_of(rewrite({}))).toBe(body_of(rewrite({ decision: undefined })))
+	})
+})
+
+// joshuafolkken/kit#1350: `find_section_range` now ends a section at the next heading of the same or a
+// higher level, so a declaration beneath a `###` subheading inside `## Dependencies` is part of that
+// section rather than a stray line outside it. Pinned because the rewrite's refusal depends on it.
+describe('git_epic_add_body.rewrite_body — a subheading inside Dependencies', () => {
+	const SUBHEADING = '### the declared order'
+	const WITH_SUBHEADING = [
+		DEPENDENCIES_HEADING,
+		BLANK,
+		SUBHEADING,
+		ORDERED_CHAIN,
+		BLANK,
+		PROGRESS_HEADING,
+		BLANK,
+		ROW_890,
+		ROW_891,
+		ROW_892,
+	].join('\n')
+
+	it('rewrites the declaration rather than refusing it as stray', () => {
+		const body = body_of(rewrite({ body: WITH_SUBHEADING }))
+
+		expect(git_epic_parse.parse_dependency_chains(body)).toStrictEqual([[890, 891, 892, 894]])
+		expect(body).toContain(SUBHEADING)
+	})
+})
+
+// joshuafolkken/kit#1350: the refusal names the declaration it found, re-rendered from the numbers it
+// parsed to rather than echoed back — the body is fetched from GitHub and may carry a caller's record
+// file, so a raw line would put content this code never read into the console.
+describe('git_epic_add_body.rewrite_body — the stray-declaration message', () => {
+	it('names the chain as the parser read it, not as it was written', () => {
+		const error = stray_error('-   #101   ->   #102')
+
+		expect(error).toContain(SECOND_CHAIN)
+		expect(error).toContain(STRAY_DECLARATION_MESSAGE)
+	})
+
+	it('names the unordered sentence for the branch that parses to no chain', () => {
+		expect(stray_error(UNORDERED_LITERAL)).toContain(UNORDERED_LITERAL)
 	})
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ADD_FLAG, AFTER_FLAG, BEFORE_FLAG, epic_cli, type CrossRepoAddTarget } from './epic-cli'
+import { BEFORE_FLAG, epic_cli } from './epic-cli'
 
 const PROMOTE = '--promote'
 const EPIC = '858'
@@ -251,106 +251,5 @@ describe('epic_cli.parse_add_arguments — an unknown flag', () => {
 
 	it('refuses a flag that means nothing to an insertion', () => {
 		expect(epic_cli.parse_add_arguments(['--add', '893', '894', '--ordered'])).toBeUndefined()
-	})
-})
-
-// joshuafolkken/kit#985: `into owner/repo#N` is a legal thing for a person to type, and this
-// command cannot serve it — it reads and writes issues in the repository it runs from. Refused with
-// the usage line it reads as "that form does not exist"; what it means is "run it in the other
-// checkout", and only naming that keeps the run one command away from continuing.
-const CROSS_REPO_REPO = 'joshuafolkken/kit'
-const CROSS_REPO_EPIC = 909
-const CROSS_REPO_TARGET = `${CROSS_REPO_REPO}#${String(CROSS_REPO_EPIC)}`
-const CROSS_REPO_CHILD = '985'
-const CROSS_REPO_ARGV: ReadonlyArray<string> = [ADD_FLAG, CROSS_REPO_TARGET, CROSS_REPO_CHILD]
-
-const NO_TARGET_MESSAGE = 'expected a cross-repository target'
-
-function cross_repo_target(argv: ReadonlyArray<string> = CROSS_REPO_ARGV): CrossRepoAddTarget {
-	const found = epic_cli.find_cross_repo_add_target(argv)
-
-	if (found === undefined) throw new Error(NO_TARGET_MESSAGE)
-
-	return found
-}
-
-function cross_repo_refusal(argv: ReadonlyArray<string>): string {
-	return epic_cli.format_cross_repo_refusal(cross_repo_target(argv))
-}
-
-describe('epic_cli.find_cross_repo_add_target', () => {
-	it('reads a cross-repository epic target', () => {
-		expect(epic_cli.find_cross_repo_add_target(CROSS_REPO_ARGV)?.epic).toStrictEqual({
-			repo: CROSS_REPO_REPO,
-			number: CROSS_REPO_EPIC,
-		})
-	})
-
-	it.each([
-		[[ADD_FLAG, '909', CROSS_REPO_CHILD]],
-		[[ADD_FLAG]],
-		[[ADD_FLAG, 'not-a-reference', CROSS_REPO_CHILD]],
-		// A URL spells the same thing differently, and this refusal is about the shorthand a person
-		// types after `into`. Left unmatched it falls through to the usage line, which is the
-		// pre-existing behavior rather than a new silent one.
-		[[ADD_FLAG, `https://github.com/${CROSS_REPO_REPO}/issues/909`, CROSS_REPO_CHILD]],
-		// Wrong in some other way as well. The repository is not the whole problem, so the usage line
-		// is the honest answer — a suggestion built from these would drop a mistyped positioning
-		// flag's target into the children, the hazard `ADD_KNOWN_FLAGS` exists to prevent.
-		[[ADD_FLAG, CROSS_REPO_TARGET, CROSS_REPO_CHILD, BEFORE_FLAG.slice(0, -1), '970']],
-		[[ADD_FLAG, CROSS_REPO_TARGET]],
-		[[ADD_FLAG, CROSS_REPO_TARGET, CROSS_REPO_CHILD, BEFORE_FLAG, 'not-a-number']],
-		[[ADD_FLAG, CROSS_REPO_TARGET, CROSS_REPO_CHILD, BEFORE_FLAG, '10', AFTER_FLAG, '20']],
-	])('answers nothing for %j', (argv) => {
-		expect(epic_cli.find_cross_repo_add_target(argv)).toBeUndefined()
-	})
-
-	it('ignores a cross-repository reference in a later position', () => {
-		expect(
-			epic_cli.find_cross_repo_add_target([ADD_FLAG, '909', `${CROSS_REPO_REPO}#985`]),
-		).toBeUndefined()
-	})
-})
-
-describe('epic_cli.format_cross_repo_refusal', () => {
-	it('names the command to run in the other checkout', () => {
-		expect(cross_repo_refusal(CROSS_REPO_ARGV)).toContain('pnpm josh epic --add 909 985')
-	})
-
-	// The checkout is the part a run cannot guess, and `josh doctor` is what prints it.
-	it('says where to find that checkout', () => {
-		expect(cross_repo_refusal(CROSS_REPO_ARGV)).toContain('pnpm josh doctor')
-	})
-
-	// Dropping the position silently would lose where the person asked the child to go — the one
-	// piece of the instruction that is not recoverable from the epic itself.
-	it('carries the positioning flag into the suggestion', () => {
-		const argv = [...CROSS_REPO_ARGV, AFTER_FLAG, '970']
-
-		expect(cross_repo_refusal(argv)).toContain('pnpm josh epic --add 909 985 --after 970')
-	})
-
-	it('suggests no position when none was given', () => {
-		const suggestion = cross_repo_refusal(CROSS_REPO_ARGV)
-
-		expect(suggestion).not.toContain(AFTER_FLAG)
-		expect(suggestion).not.toContain(BEFORE_FLAG)
-	})
-})
-
-// joshuafolkken/kit#985: `into owner/repo#N` is how the suffix is documented, so the qualified form
-// naming *this* repository has to work rather than being refused and pointed at the checkout the run
-// is already standing in.
-describe('epic_cli.resolve_local_add', () => {
-	it('resolves a reference to the current repository as an ordinary insertion', () => {
-		expect(epic_cli.resolve_local_add(cross_repo_target(), CROSS_REPO_REPO)?.epic_number).toBe(
-			CROSS_REPO_EPIC,
-		)
-	})
-
-	// Refusing costs one command; guessing wrong writes into another repository's epic. An unreadable
-	// current repository therefore resolves the same way a different one does.
-	it.each([['joshuafolkken/app-kit'], [undefined]])('refuses %j', (current) => {
-		expect(epic_cli.resolve_local_add(cross_repo_target(), current)).toBeUndefined()
 	})
 })

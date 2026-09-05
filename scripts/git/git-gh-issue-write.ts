@@ -65,6 +65,14 @@ async function issue_comment(issue_number: string, body: string): Promise<string
 	})
 }
 
+// The same comment, counted rather than thrown. `josh epic --add --decision-file` posts one per child
+// **after** the epic body already carries the record, so a refused comment costs that child's copy and
+// nothing else — an exception there would leave the caller unable to tell a landed insertion from one
+// that wrote nothing (joshuafolkken/kit#1350).
+async function issue_try_comment(issue_number: string, body: string): Promise<boolean> {
+	return await did_write_succeed(async () => await issue_comment(issue_number, body))
+}
+
 // `gh issue close --comment` posted the comment and closed the issue in one call; REST splits them.
 // **The comment goes first**, which is what keeps the return value meaning what it meant: a `false`
 // then says "the issue is still open" in *both* failure branches, because the state change is the
@@ -245,6 +253,7 @@ async function issue_remove_blocked_by(issue_number: string, blocker: string): P
 const git_gh_issue_write = {
 	issue_edit_body,
 	issue_comment,
+	issue_try_comment,
 	issue_close,
 	label_ensure,
 	issue_create_request,

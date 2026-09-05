@@ -104,6 +104,25 @@ describe('issue_comment', () => {
 	})
 })
 
+// joshuafolkken/kit#1350: `epic --add --decision-file` posts one comment per child *after* the epic
+// body already carries the record, so a refused comment costs that child's copy and nothing else.
+describe('issue_try_comment', () => {
+	it('posts the same comment and answers true', async () => {
+		const is_posted = await git_gh_issue_write.issue_try_comment(ISSUE_NUMBER, MULTILINE_BODY)
+
+		expect(is_posted).toBe(true)
+		expect(first_request().path).toBe(COMMENTS_PATH)
+	})
+
+	it('answers false rather than throwing when the write is refused', async () => {
+		mocked_api.mockRejectedValue(new Error(WRITE_FAILED))
+
+		await expect(git_gh_issue_write.issue_try_comment(ISSUE_NUMBER, MULTILINE_BODY)).resolves.toBe(
+			false,
+		)
+	})
+})
+
 describe('issue_close', () => {
 	it('posts the comment first, then patches the state to closed', async () => {
 		const is_closed = await git_gh_issue_write.issue_close(ISSUE_NUMBER, CLOSE_COMMENT)

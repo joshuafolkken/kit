@@ -1,6 +1,7 @@
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { git_epic_add_body } from './git-epic-add-body'
 import { git_epic_chains, type InsertPosition } from './git-epic-chains'
+import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse, type DependencyLink } from './git-epic-parse'
 import { format_dependency_link, to_issue_reference } from './git-epic-reference'
 import { EPIC_LABEL } from './issue-labels'
@@ -23,6 +24,10 @@ interface PlanInput {
 	// The epic's own repository — what a declared bare number names. Needed since
 	// joshuafolkken/kit#1126 made a recorded relation carry the repository it lives in.
 	repo: string
+	// The decision record `--decision-file` supplied, or `undefined` for an insertion that records
+	// none. It reaches the body rewrite rather than being posted separately, so the epic half of the
+	// record rides on the body edit the insertion already makes (joshuafolkken/kit#1350).
+	decision?: string | undefined
 }
 
 interface AddPlan {
@@ -171,6 +176,7 @@ function to_plan(context: {
 		body: context.input.body ?? '',
 		additions: context.additions,
 		chains_after: context.chains_after,
+		decision: context.input.decision,
 	})
 	if ('error' in rewritten) return { error: rewritten.error }
 
@@ -187,8 +193,15 @@ function to_plan(context: {
 	}
 }
 
-// Every refusal, in the order a reader needs them: is this an epic, is there anything to add, and do
-// the body and the relations already agree.
+// A decision record that cannot be written is refused here rather than dropped: `--decision-file` was
+// given because the record has to exist, so writing the insertion without it would report success for
+// half the job (joshuafolkken/kit#1350). `undefined` is "none was asked for", which is not a refusal.
+function find_decision_error(decision: string | undefined): string | undefined {
+	return decision === undefined ? undefined : git_epic_decision.find_decision_error(decision)
+}
+
+// Every refusal, in the order a reader needs them: is this an epic, is there anything to add, do the
+// body and the relations already agree, and can the decision record be written.
 function find_input_error(
 	input: PlanInput,
 	tracked: ReadonlyArray<number>,
@@ -201,7 +214,8 @@ function find_input_error(
 			input.position,
 			tracked,
 		) ??
-		find_relation_error(git_epic_chains.links_of(chains_before), input.recorded, input.repo)
+		find_relation_error(git_epic_chains.links_of(chains_before), input.recorded, input.repo) ??
+		find_decision_error(input.decision)
 	)
 }
 
