@@ -62,6 +62,16 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   full review") → `pnpm josh eval:scope`, and `pnpm josh eval` when it
   answers `required` (`eval-gate.md`). `kickoff` is the exception —
   it never implements, so it never reaches the gate.
+  **Whether that second round is due at all is `pnpm josh review:round2 --round-1-closed`'s answer,
+  never a judgement** (joshuafolkken/kit#1433): `skip` on the two arms it names — round 1 wrote no fix
+  code, or every path it fixed is inert — and `required` on everything else, the flag absent included.
+  **Ask it once round 1's fixes are in and _before_ `pnpm josh bump minor`**: the bump rewrites
+  `package.json`, which is not inert, so a delta taken after it contains that write and no arm can
+  ever fire. **A `skip` does not carry the clean-first-round row's second half** — round 1 edited the
+  tree, so the first gate's result is stale and `pnpm josh gate` re-runs after the bump exactly as it
+  would have. The skip is recorded on the Issue, inside the CI wait beside the follow-up filing, so
+  the condition stays auditable; `prompts/review.md` → "When round 2 is skipped entirely, and when it
+  is not" is the single source.
   **Joining the gate is a step, not a formality — there is no path to a commit on a gate nobody read.**
   Read what the gate printed before `pnpm josh bump minor`; a red one is fixed and re-run **whatever
   the review concluded**, and because that fix is uncommitted like every other, it lands in the
