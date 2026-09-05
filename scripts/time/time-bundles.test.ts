@@ -6,11 +6,23 @@ import { time_spans, type Span } from './time-spans'
 const MODEL = time_span_fixture.span(time_spans.MODEL_CATEGORY)
 const HUMAN = time_span_fixture.span(time_spans.HUMAN_CATEGORY)
 const PRICE = { round_trip_count: 6, model_ms_per_round_trip: 8800 }
+// The assistant message a turn's spans all carry (joshuafolkken/kit#1406).
+const TURN = 'msg-1'
 
 // One call of a single-call turn. The two fields the grouping reads are the two `time-bundle-call.ts`
 // puts on the span; everything else about it is the shared fixture's.
 function call(targets: Array<string>, is_bundleable = true): Span {
 	return { ...time_span_fixture.span(time_spans.TOOL_CATEGORY), is_bundleable, targets }
+}
+
+// The same call, tagged with the turn that issued it (joshuafolkken/kit#1406).
+function call_of(message_id: string, target: string): Span {
+	return { ...call([target]), message_id }
+}
+
+// A turn that composed and then issued one call, which is the pair the walk reads as one round trip.
+function turn_of(message_id: string, target: string): Array<Span> {
+	return [{ ...MODEL, message_id }, call_of(message_id, target)]
 }
 
 describe('time_bundles.build_bundles — what counts as a sequence', () => {
@@ -49,6 +61,46 @@ describe('time_bundles.build_bundles — what counts as a sequence', () => {
 	it('breaks a sequence at the tail of a call split around a delegated unit', () => {
 		const tail = { ...call(['b.ts']), is_continuation: true }
 		const spans = [MODEL, call(['a.ts']), MODEL, tail, MODEL, call(['c.ts'])]
+
+		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#1406. Claude Code writes each `tool_use` block as its own assistant line and the
+// harness returns each result as it arrives, so a turn's calls reach the timeline separated by that
+// turn's own model spans. Read as several single-call turns, a turn that had already batched was
+// offered back as a sequence that could have been bundled — which is where run #1399's whole
+// `recoverable round trips 8` came from.
+describe('time_bundles.build_bundles — a turn told apart by its message id', () => {
+	it('breaks a sequence at a batched turn whose calls arrived one at a time', () => {
+		const thinking = { ...MODEL, message_id: TURN }
+		const spans = [
+			thinking,
+			call_of(TURN, 'a.ts'),
+			thinking,
+			call_of(TURN, 'b.ts'),
+			thinking,
+			call_of(TURN, 'c.ts'),
+			MODEL,
+		]
+
+		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(0)
+	})
+
+	// The counterpart, so the rule above cannot pass by refusing every sequence: three turns of one
+	// call each, told apart by their ids rather than by adjacency.
+	it('still reads three single-call turns carrying their own ids as one sequence', () => {
+		const spans = [...turn_of('m1', 'a.ts'), ...turn_of('m2', 'b.ts'), ...turn_of('m3', 'c.ts')]
+
+		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(2)
+	})
+
+	// `time_overlap.trim` copies the head's fields onto the tail, so the tail carries the very message
+	// the turn was issuing from. Read as that turn still issuing calls, it would skip the flush that
+	// says a delegated unit ran in between.
+	it('breaks a sequence at a tail carrying the message id of the turn it interrupted', () => {
+		const tail = { ...call_of(TURN, 'b.ts'), is_continuation: true }
+		const spans = [call_of(TURN, 'a.ts'), tail, ...turn_of('m2', 'c.ts')]
 
 		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(0)
 	})

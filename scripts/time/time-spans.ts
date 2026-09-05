@@ -1,12 +1,12 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
-import { json_value } from '#scripts/json-value'
-import { z } from 'zod'
 import { time_bundle_call } from './time-bundle-call'
-import { time_instant } from './time-instant'
 import { time_markers, type PhaseMarker } from './time-markers'
 import { time_reported_failure } from './time-reported-failure'
 import { time_shell } from './time-shell'
 import { time_single_check } from './time-single-check'
+import { time_transcript_line, type Block, type TranscriptLine } from './time-transcript-line'
+
+const { NO_MESSAGE_ID, parse_line } = time_transcript_line
 
 // Turning a session transcript into timed spans (joshuafolkken/kit#1267).
 //
@@ -14,10 +14,11 @@ import { time_single_check } from './time-single-check'
 // clock went. Discovery and reading are `cost-transcript.ts`'s and are reused rather than copied;
 // what is here is the arithmetic, which has no counterpart on the cost side.
 //
-// **The block reader is not `cost-blocks.ts` and could not have been.** That module flattens every
-// line into one list of blocks for a token estimate, dropping the `id` / `tool_use_id` pair a call
-// is matched to its result by and the line boundary a timestamp belongs to. Both are the whole
-// input here. Its three type constants are imported rather than restated.
+// **Reading one line is `time-transcript-line.ts`'s** since joshuafolkken/kit#1406, when this file
+// passed its length limit — the schemas, the two records a line yields and the parse that produces
+// them. `NO_MESSAGE_ID` and `parse_line` are re-exported below under the names they always had, so
+// the move changed no call site. `cost_blocks`' three type constants are still imported rather than
+// restated.
 //
 // **The partition is by gap, not by pair.** Every span is the interval between two consecutive
 // events, classified by the *later* one: a span ending at an assistant line is model wait, one
@@ -30,43 +31,6 @@ import { time_single_check } from './time-single-check'
 const ASSISTANT_TYPE = 'assistant'
 const USER_TYPE = 'user'
 const UNKNOWN_TOOL = 'unknown'
-
-const BLOCK_SCHEMA = z.object({
-	type: z.string().nullish(),
-	name: z.string().nullish(),
-	id: z.string().nullish(),
-
-	tool_use_id: z.string().nullish(),
-	input: z.unknown().nullish(),
-	// Whether the harness wrote this result back as a failure (joshuafolkken/kit#1309). Present on a
-	// `tool_result` block and on nothing else, and absent even there for the tools that never report
-	// one — which is why it is read as three answers rather than as a boolean with a default.
-	is_error: z.boolean().nullish(),
-	// What the call printed. Read only to recover the outcome a pipeline threw away
-	// (joshuafolkken/kit#1361): it is kept as flattened text rather than as blocks, because that is
-	// the whole of what `time-reported-failure.ts` asks of it.
-	content: z.unknown().nullish(),
-})
-
-const CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
-// `id` is the assistant *message* the line belongs to, and Claude Code writes one line per content
-// block — a turn that thought and then issued two calls is three lines carrying one id
-// (joshuafolkken/kit#1329). Anything asking "how many calls did that turn make" therefore has to
-// group by this field; counting one line's blocks answers one, whatever the turn actually did.
-const MESSAGE_SCHEMA = z.object({ id: z.string().nullish(), content: CONTENT_SCHEMA.nullish() })
-
-const LINE_SCHEMA = z.object({
-	type: z.string().nullish(),
-	timestamp: z.string().nullish(),
-	// The branch the line was written on, which is where the issue number lives — `josh git` names a
-	// branch `<N>-<slug>`. Read here rather than re-parsed by a second reader so `josh time --issue`
-	// and `josh cost --issue` answer from the same field (joshuafolkken/kit#1268).
-	gitBranch: z.string().nullish(),
-	message: MESSAGE_SCHEMA.nullish(),
-})
-
-const UNKNOWN_BRANCH = ''
-const NO_MESSAGE_ID = ''
 
 type SpanCategory = 'model' | 'tool' | 'human'
 
@@ -118,6 +82,11 @@ const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
 // runs of one verification check are the same call only if they named the same files, and the files
 // are in the input — so `josh_command` alone cannot say, and nothing downstream could recover it.
 // `time-single-check.ts` decides it.
+//
+// `message_id` is the fifth, and it is the one that says which *turn* a call belongs to
+// (joshuafolkken/kit#1406). It is read off the line the `tool_use` block sat on rather than off the
+// result that closes the span, because a `tool_result` line carries no message id at all — so a span
+// that did not keep it here could never be attributed to the turn that issued it.
 interface ToolCall {
 	label: string
 	josh_command: string
@@ -125,6 +94,7 @@ interface ToolCall {
 	marker: PhaseMarker
 	is_bundleable: boolean
 	targets: ReadonlyArray<string>
+	message_id: string
 }
 
 const NO_CALL: ToolCall = {
@@ -132,6 +102,7 @@ const NO_CALL: ToolCall = {
 	josh_command: '',
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
+	message_id: NO_MESSAGE_ID,
 	...time_bundle_call.not_bundleable(),
 }
 const UNKNOWN_CALL: ToolCall = {
@@ -139,6 +110,7 @@ const UNKNOWN_CALL: ToolCall = {
 	josh_command: '',
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
+	message_id: NO_MESSAGE_ID,
 	...time_bundle_call.not_bundleable(),
 }
 
@@ -164,32 +136,6 @@ interface Span extends ToolCall, ResultFacts {
 	is_continuation: boolean
 }
 
-interface Block {
-	type: string
-	name: string
-	id: string
-	result_id: string
-	input: unknown
-	// `undefined` where the block carried no `is_error` field, which is a different fact from
-	// `false`: one is a tool that reports no outcome, the other a call that succeeded.
-	is_error: boolean | undefined
-	// Whether the body carried a line opening with josh's failure icon — the one bit of it anything
-	// reads (joshuafolkken/kit#1361). The text itself is deliberately not kept: a field holding it
-	// would retain every byte the session's tools printed for the length of the parse.
-	has_failure_line: boolean
-}
-
-interface TranscriptLine {
-	type: string
-	timestamp_ms: number
-	branch: string
-	// The assistant message this line is one block of, or `''` where the line carries none — a user
-	// line, or an assistant line written without an id. The empty string is never treated as a group:
-	// every line lacking an id would otherwise fall into one bucket spanning the whole file.
-	message_id: string
-	blocks: Array<Block>
-}
-
 interface TimelineEvent extends ToolCall, ResultFacts {
 	timestamp_ms: number
 	branch: string
@@ -203,13 +149,14 @@ interface Timeline {
 	spans: Array<Span>
 }
 
-function to_tool_call(name: string, input: unknown): ToolCall {
+function to_tool_call(name: string, input: unknown, message_id: string): ToolCall {
 	if (name !== cost_blocks.BASH_TOOL) {
 		return {
 			label: name,
 			josh_command: '',
 			check_key: time_single_check.NO_CHECK,
 			marker: time_markers.tool_marker(name, input),
+			message_id,
 			...time_bundle_call.tool_facts(name, input),
 		}
 	}
@@ -222,79 +169,27 @@ function to_tool_call(name: string, input: unknown): ToolCall {
 		josh_command,
 		check_key: time_single_check.check_key(josh_command, command),
 		marker: time_markers.bash_marker(command),
+		message_id,
 		...time_bundle_call.bash_facts(command),
 	}
-}
-
-// The four string fields, defaulted together and apart from the two that are not strings. Split out
-// so neither half carries every `??` in the block: read as one function the defaulting alone reached
-// the complexity limit, and the next field added would have had to be squeezed in beside them.
-function block_names(
-	raw: z.infer<typeof BLOCK_SCHEMA>,
-): Pick<Block, 'type' | 'name' | 'id' | 'result_id'> {
-	return {
-		type: raw.type ?? '',
-		name: raw.name ?? '',
-		id: raw.id ?? '',
-		result_id: raw.tool_use_id ?? '',
-	}
-}
-
-function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
-	return {
-		...block_names(raw),
-		input: raw.input,
-		is_error: raw.is_error ?? undefined,
-		has_failure_line: time_reported_failure.has_failure_line(raw.content),
-	}
-}
-
-// A user turn written as a bare string carries no blocks, which is exactly right: it is a prompt,
-// and a prompt has no tool result to match.
-function to_blocks(
-	content: string | Array<z.infer<typeof BLOCK_SCHEMA>> | null | undefined,
-): Array<Block> {
-	return typeof content === 'string' || content === null || content === undefined
-		? []
-		: content.map((block) => to_block(block))
-}
-
-// The two fields read off `message`, taken together because they are one reading: an assistant turn
-// is written as one line per content block with the message's id repeated on each, so the id is what
-// says which blocks belonged to the same turn.
-function message_fields(
-	message: z.infer<typeof MESSAGE_SCHEMA> | null | undefined,
-): Pick<TranscriptLine, 'message_id' | 'blocks'> {
-	return { message_id: message?.id ?? NO_MESSAGE_ID, blocks: to_blocks(message?.content) }
-}
-
-// A line without a parseable timestamp is dropped rather than dated: it has no place on a timeline,
-// and inventing one would move every span around it.
-function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined {
-	const timestamp_ms = time_instant.parse_instant(data.timestamp)
-
-	if (timestamp_ms === undefined) return undefined
-
-	return {
-		type: data.type ?? '',
-		timestamp_ms,
-		branch: data.gitBranch ?? UNKNOWN_BRANCH,
-		...message_fields(data.message),
-	}
-}
-
-function parse_line(line: string): TranscriptLine | undefined {
-	const parsed = LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
-
-	return parsed.success ? to_line(parsed.data) : undefined
 }
 
 // Identified calls only. A `tool_use` written without an `id` would otherwise be registered under
 // the empty string, where the next result that carries no `tool_use_id` would match it and be
 // labelled with an unrelated tool — a wrong name where `UNKNOWN_TOOL` is the honest one.
-function tool_use_blocks(lines: ReadonlyArray<TranscriptLine>): Array<Block> {
+// A `tool_use` block with the assistant message it was written under, which is the turn that issued
+// it (joshuafolkken/kit#1406). The pair is kept rather than the block alone because the id lives on
+// the *line* and the flatten below is where it would otherwise be lost.
+interface IssuedCall {
+	block: Block
+	message_id: string
+}
+
+function tool_use_blocks(lines: ReadonlyArray<TranscriptLine>): Array<IssuedCall> {
 	return lines.flatMap((line) =>
-		line.blocks.filter((block) => block.type === cost_blocks.TOOL_USE_TYPE && block.id !== ''),
+		line.blocks
+			.filter((block) => block.type === cost_blocks.TOOL_USE_TYPE && block.id !== '')
+			.map((block) => ({ block, message_id: line.message_id })),
 	)
 }
 
@@ -302,7 +197,10 @@ function tool_use_blocks(lines: ReadonlyArray<TranscriptLine>): Array<Block> {
 // first because a result can arrive many lines after the call that issued it.
 function collect_calls(lines: ReadonlyArray<TranscriptLine>): Map<string, ToolCall> {
 	return new Map(
-		tool_use_blocks(lines).map((block) => [block.id, to_tool_call(block.name, block.input)]),
+		tool_use_blocks(lines).map(({ block, message_id }) => [
+			block.id,
+			to_tool_call(block.name, block.input, message_id),
+		]),
 	)
 }
 
@@ -365,7 +263,13 @@ function to_event(
 	line: TranscriptLine,
 	calls: ReadonlyMap<string, ToolCall>,
 ): TimelineEvent | undefined {
-	if (line.type === ASSISTANT_TYPE) return event_of(line, MODEL_CATEGORY, NO_CALL)
+	// **A model span carries the message its own line belongs to**, which is what makes a turn
+	// countable: Claude Code writes one line per content block and repeats the id on each, so the
+	// lines are what a naive count sees and the id is what says how many turns they were
+	// (joshuafolkken/kit#1406).
+	if (line.type === ASSISTANT_TYPE) {
+		return event_of(line, MODEL_CATEGORY, { ...NO_CALL, message_id: line.message_id })
+	}
 
 	return line.type === USER_TYPE ? user_event(line, calls) : undefined
 }
@@ -395,6 +299,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		marker: event.marker,
 		is_bundleable: event.is_bundleable,
 		targets: event.targets,
+		message_id: event.message_id,
 		branch: event.branch,
 		call_id: event.call_id,
 		outcome: event.outcome,
@@ -449,5 +354,7 @@ const time_spans = {
 	parse_timeline,
 }
 
-export type { Block, ResultFacts, Span, SpanCategory, SpanOutcome, Timeline, TranscriptLine }
+export type { ResultFacts, Span, SpanCategory, SpanOutcome, Timeline }
 export { time_spans }
+
+export { type Block, type TranscriptLine } from './time-transcript-line'
