@@ -1616,11 +1616,12 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 
 **A step earns its place by naming how a wrong result is caught**, by something that runs in the parent tier and costs less than redoing the step. "Unlikely to be wrong" does not qualify, and most candidates fail here: a notification body, a decision-log comment and a status read all ship their mistakes with nothing left to disagree with them. `--list` shows those as rejected with the reason rather than omitting them, so the next person to propose one finds the answer instead of re-deriving it.
 
-| Step         | Delegatable because                                                                                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `gate-fix`   | `pnpm josh gate` is re-run; a wrong fix fails it again and the failure names the file                                                                                                |
-| `epic-child` | the parent reads the child's state from GitHub rather than from the summary, so a child reported done but not merged is still open — the failure shows instead of the loop moving on |
-| `survey`     | the reported locations are checked directly; a fabricated or missed one does not survive one `grep` of what it claimed                                                               |
+| Step            | Delegatable because                                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `gate-fix`      | `pnpm josh gate` is re-run; a wrong fix fails it again and the failure names the file                                                                                                |
+| `epic-child`    | the parent reads the child's state from GitHub rather than from the summary, so a child reported done but not merged is still open — the failure shows instead of the loop moving on |
+| `survey`        | the reported locations are checked directly; a fabricated or missed one does not survive one `grep` of what it claimed                                                               |
+| `investigation` | the parent opens the cited lines; a conclusion those lines do not support fails there, and reading a handful of cited regions costs far less than redoing the reading                |
 
 **These were considered and kept**, so the next person to propose one finds the reason instead of re-deriving it. `pnpm josh delegate <step>` answers `kept deliberately` for these, distinguishing them from a step that is merely unlisted:
 
@@ -1633,6 +1634,8 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 | `design`           | the cost of a wrong design is paid by every step after it                               |
 | `split-assessment` | a missed split widens one Issue into a batch nobody authorized                          |
 | `review`           | the review is the last thing between a defect and a merge; a cheaper one finds less     |
+
+**`investigation` is the only row that carries a threshold, and the threshold is 3 files, and it is a count, not a forecast** ([#1426](https://github.com/joshuafolkken/kit/issues/1426)). The third file the run will not edit is where the pre-implementation reading goes to a unit of its own; two stay in the main line, because delegating costs two extra main-line turns — about 18 seconds at the 8.8 s of model wait per turn measured on run #1406 — while one subject file of that run's average size is re-sent on every remaining turn and the turns following its large reads ran 43–72 s against that same 8.8 s average. What comes back is the conclusion plus the `file:line` citations that support it, never the file text; a throwaway probe script is written, run and deleted inside the unit. **It is not `survey`, and it is not `diagnosis`**: `survey` reports where something appears and is checked by one `grep`, while a root cause stays with the main line. The rule is `.claude/skills/workflow-commands/SKILL.md` → "2b. Delegating a step to a cheaper tier".
 
 **The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step of a run, or one whole child of a batch ([#984](https://github.com/joshuafolkken/kit/issues/984)). Both are rows of the one enumeration above rather than two mechanisms, which is why `epic-child` is answered by this same command. **One row covers both batch entry points**: an epic's child under `epicrun` and one issue of a `queue` are the same unit — same brief, same summary, same `pnpm josh issue:state` verifier — so the queue was wired to this row rather than given one of its own ([#1149](https://github.com/joshuafolkken/kit/issues/1149)).
 
