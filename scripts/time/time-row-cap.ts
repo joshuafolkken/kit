@@ -2,6 +2,7 @@ import type { RunTiming } from './time-batch'
 import type { EpicTimeReport } from './time-epic'
 import type { LastTimeReport } from './time-last'
 import type { TimeReport } from './time-report'
+import type { ReworkTotals } from './time-rework'
 import type { Segment } from './time-segments'
 
 // Capping the per-tool and per-`josh <cmd>` tables a report carries (joshuafolkken/kit#1301).
@@ -38,6 +39,11 @@ const JOSH_TABLE = 'by_josh_command'
 // `tool execution`.
 const SEGMENT_TABLE = 'segments'
 const INVOCATION_TABLE = 'by_invocation'
+// The table joshuafolkken/kit#1387 added, and the only one nested inside another field. It grows with
+// the number of distinct files a run edited rather than with the vocabulary — sessions in this project
+// reach sixty — which is the same unbounded growth the cap exists for. **It is ordered dropped-first,
+// so taking the first `cap` rows takes the findings**, exactly as the descending tables do.
+const REWORK_TABLE = 'rework.files'
 // The tail every truncation note ends with, so a renderer that has to tell one apart from the notes
 // beside it matches this rather than a phrase it spells out for itself.
 const WITHHELD_SUFFIX = 'withheld by --top'
@@ -91,6 +97,13 @@ function cap_segments(
 	)
 }
 
+// **The counts beside the rows are left alone.** `dropped_count` and `outside_file_count` are totals
+// over what was measured, not sums of the printed rows — the same relation `by_tool`'s rows have to the
+// `tool execution` share a capped table no longer adds up to.
+function cap_rework(rework: ReworkTotals, cap: number, notes: Array<string>): ReworkTotals {
+	return { ...rework, files: cap_table(REWORK_TABLE, rework.files, cap, notes) }
+}
+
 // **No cap means the very object that was built.** The acceptance criterion is that an uncapped
 // report is byte-identical to what the command printed before this existed, and returning a copy
 // would satisfy it only for as long as nobody added a field this module forgot to carry.
@@ -103,6 +116,7 @@ function cap_report(report: TimeReport, cap: number | undefined): TimeReport {
 		by_josh_command: cap_table(JOSH_TABLE, report.by_josh_command, cap, notes),
 		segments: cap_segments(report.segments, cap, notes),
 		by_invocation: cap_table(INVOCATION_TABLE, report.by_invocation, cap, notes),
+		rework: cap_rework(report.rework, cap, notes),
 	}
 
 	return { ...report, ...capped, notes }
@@ -137,6 +151,7 @@ const time_row_cap = {
 	JOSH_TABLE,
 	SEGMENT_TABLE,
 	INVOCATION_TABLE,
+	REWORK_TABLE,
 	truncation_note,
 	is_truncation_note,
 	cap_report,

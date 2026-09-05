@@ -230,7 +230,16 @@ function size_of(files: ReadonlyArray<PullFile>): DiffSize {
 	}
 }
 
+// **A scope with no pull request classifies nothing, so every count is zero rather than a total.** With
+// no root there is nothing to relativize against, which would put every edited path "outside the work
+// tree" — and `outside_file_count` is read as its own signal, so a `--session --json` payload would
+// report a run's whole edit list as scratch work. The block is not printed there either way; this is
+// what keeps the record honest for the reader who takes it from `--json`.
 function build_rework(spans: ReadonlyArray<Span>, diff: DiffFacts): ReworkTotals {
+	if (diff.state === DIFF_ABSENT) {
+		return { ...NO_REWORK, is_measured: time_spans.has_transcript_data(spans.length) }
+	}
+
 	const frame = {
 		paths: new Set(diff.files.map((file) => file.path)),
 		root: root_of(diff.root),

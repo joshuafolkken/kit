@@ -232,6 +232,13 @@ describe('time_rework.rework_lines — what it withholds', () => {
 		expect(line_of(unread_lines(), DROPPED_PATH)).toContain(time_rework.UNKNOWN_SUFFIX)
 	})
 
+	// The row above asserts a *substring*, and the relative spelling is a substring of the absolute one —
+	// so it would pass unchanged if the refused path ever stopped relativizing. This is the assertion
+	// that fails when it does.
+	it('still prints a repository-relative path where the diff was refused', () => {
+		expect(line_of(unread_lines(), NAKED_ROOT)).toBe('')
+	})
+
 	it('withholds the file table when no span was read', () => {
 		const lines = time_rework.rework_lines(totals_of([]))
 
@@ -243,10 +250,21 @@ describe('time_rework.rework_lines — what it withholds', () => {
 
 		expect(line_of(lines, time_rework.EDITED_LABEL)).toContain(time_rework.NO_EDITS)
 	})
+})
 
-	it('prints no block at all for a scope that never had a pull request', () => {
+describe('time_rework — a scope that never had a pull request', () => {
+	it('prints no block at all', () => {
 		const totals = totals_of(run_spans(), time_rework.NO_DIFF)
 
 		expect(time_rework.rework_lines(totals)).toEqual([])
+	})
+
+	// **`--json` is not suppressed with the block**, so the record such a scope carries has to be zero
+	// rather than "every edited file was outside the tree" — with no root, nothing was classified.
+	it('counts nothing outside the tree, because nothing was classified', () => {
+		const totals = totals_of(run_spans(), time_rework.NO_DIFF)
+
+		expect(totals.outside_file_count).toBe(0)
+		expect(totals.is_measured).toBe(true)
 	})
 })
