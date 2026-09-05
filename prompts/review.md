@@ -356,6 +356,7 @@ Actively try to break the changed code before concluding it is correct.
 - **`export default`** — `import/no-default-export` is `error` project-wide (`eslint/rules/import.js`), switched off only for `*.d.ts` in `eslint/base.js`.
 - **Individually named exports of function declarations, and of consts that are not `UPPER_CASE`** — `no-restricted-syntax` in `eslint/rules/code-quality.js`. **Its selector exempts `ArrowFunctionExpression`**, so `export const helper = (s: string): string => s` passes it; that gap is a reader's job, below.
 - **File names** — kebab-case through `unicorn/filename-case`.
+- **The `*.spec.ts` / `*.spec.js` suffix, and a top-level `tests/` directory** — `eslint/rules/test-filename.js`, wired into `eslint/base.js` itself since joshuafolkken/kit#1233, so it holds in kit and in every project built on that base config. **A trailing block switching `no-restricted-syntax` off is what can still take it away** — kit's own `eslint.config.js` does exactly that for its hand-written `.js` modules and re-states the two bans after it — so read a diff that adds one as a gate defect, per the last paragraph of this category. What the rule does not see is below.
 - **Magic numbers** — `@typescript-eslint/no-magic-numbers`; **`any`, unused vars, floating promises and explicit param and return types** — `eslint/rules/typescript.js` and `eslint/rules/promise.js`.
 - **Identical functions and repeated string literals** — `eslint/rules/sonarjs.js`.
 - **Every quality limit below.**
@@ -370,7 +371,7 @@ Actively try to break the changed code before concluding it is correct.
 - **A name that satisfies the convention and says the wrong thing** — `naming-convention` checks the shape, never the meaning. An `is_` prefix on a function that returns a parsed value passes lint and misleads every caller.
 - **Grouping and layout** — a namespace object that collects unrelated functions, or a file whose contents no longer match what its name says. Structure is not something lint judges.
 - **Svelte semantics** — `$state` reassignment, `Props` as an interface name, restricted DOM manipulation, and `PascalCase.svelte` / `PascalCase.svelte.ts` file names where the project's lint does not cover them.
-- **Test file names and placement** — `eslint/rules/test-filename.js` bans `*.spec.ts` / `*.spec.js` and a top-level `tests/` directory **in a project that wires it in**. kit exports that rule for consumers and does not apply it to itself (joshuafolkken/kit#1233), so in this repository both patterns are a reader's check. Colocation beyond those two is a reader's check everywhere: a test that avoids both and still sits away from the code it exercises is not something the rule sees.
+- **Test placement beyond the two banned patterns** — the ban above decides the `*.spec.ts` / `*.spec.js` suffix and the top-level `tests/` directory, and nothing else. Colocation itself is what it cannot see: a test that avoids both and still sits in a directory away from the code it exercises lints clean, and so does an `*.e2e.ts` placed outside `src/routes/**`.
 
 **A gate finding that got through is still a finding.** If lint could have caught something and did not — a disabled rule, an ignored path, an `// eslint-disable` the change added — say so. That is a defect in the gate, and no other step is looking at it.
 

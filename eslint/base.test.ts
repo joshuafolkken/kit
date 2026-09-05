@@ -224,3 +224,63 @@ describe('create_base_config — nested checkouts', () => {
 		expect(await linter.isPathIgnored(SOURCE_FILE)).toBe(false)
 	})
 })
+
+const RESTRICTED_SYNTAX_RULE = 'no-restricted-syntax'
+const SPEC_BAN_FRAGMENT = 'the *.spec.ts / *.spec.js suffix is forbidden'
+const CENTRALIZED_TESTS_BAN_FRAGMENT = 'A top-level tests/ directory is forbidden'
+const PROBE_SOURCE = 'export const PROBE = 1\n'
+
+// joshuafolkken/kit#1233: asserted by running the repository's own config over a virtual file
+// rather than by matching a glob, because the claim is that the ban reaches kit itself — which a
+// block-shape assertion cannot show, since `eslint.config.js` may still switch the rule off after
+// the base config sets it. The `.ts` cases are the load-bearing ones: they are the names the
+// documents actually forbid, and they are the ones that report a tsconfig parse error instead of
+// the rule's own message when the ban is wired without `disableTypeChecked`.
+async function restricted_syntax_messages(file_path: string): Promise<Array<string>> {
+	const linter = new ESLint({ cwd: REPO_ROOT })
+	const [result] = await linter.lintText(PROBE_SOURCE, { filePath: file_path })
+
+	return (result?.messages ?? [])
+		.filter((message) => message.ruleId === RESTRICTED_SYNTAX_RULE)
+		.map((message) => message.message)
+}
+
+describe('create_base_config — the *.spec ban (issue #1233)', () => {
+	it('flags a *.spec.ts file outside the tsconfig project, with the rule message', async () => {
+		const messages = await restricted_syntax_messages('src/lib/probe.spec.ts')
+
+		expect(messages).toHaveLength(1)
+		expect(messages[0]).toContain(SPEC_BAN_FRAGMENT)
+	})
+
+	it('flags a *.spec.js file too', async () => {
+		await expect(restricted_syntax_messages('src/lib/probe.spec.js')).resolves.toHaveLength(1)
+	})
+
+	// `eslint/*.js` is one of the directories whose trailing block switches `no-restricted-syntax`
+	// off for the export-convention selectors; the ban has to survive that.
+	it('flags a *.spec.js under a directory that relaxes no-restricted-syntax', async () => {
+		await expect(restricted_syntax_messages('eslint/probe.spec.js')).resolves.toHaveLength(1)
+	})
+
+	it('leaves the canonical *.test.ts name alone', async () => {
+		await expect(restricted_syntax_messages('scripts/probe.test.ts')).resolves.toEqual([])
+	})
+})
+
+describe('create_base_config — the top-level tests/ ban (issue #1233)', () => {
+	it('flags a tests/*.ts file with the rule message, not a tsconfig parse error', async () => {
+		const messages = await restricted_syntax_messages('tests/probe.ts')
+
+		expect(messages).toHaveLength(1)
+		expect(messages[0]).toContain(CENTRALIZED_TESTS_BAN_FRAGMENT)
+	})
+
+	it('flags a tests/*.js file too', async () => {
+		await expect(restricted_syntax_messages('tests/probe.js')).resolves.toHaveLength(1)
+	})
+
+	it('does not flag a nested tests/ path (only the top-level directory)', async () => {
+		await expect(restricted_syntax_messages('src/lib/tests/probe.js')).resolves.toEqual([])
+	})
+})

@@ -23,6 +23,11 @@ const GATE_PREMISE_MARKERS: ReadonlyArray<string> = [
 	// the first draft moved four unenforced conventions into "settled" and one enforced one out.
 	'each one verified against the rule that enforces it, never assumed',
 	'`import/no-default-export` is `error` project-wide',
+	// joshuafolkken/kit#1233 moved this pair out of the reader-only list by wiring the rule into
+	// `eslint/base.js`, so the entry is pinned on the settled side together with the one thing that
+	// can still undo it — a trailing block switching `no-restricted-syntax` off.
+	'wired into `eslint/base.js` itself since joshuafolkken/kit#1233',
+	'**A trailing block switching `no-restricted-syntax` off is what can still take it away**',
 ]
 
 // What no rule in this configuration decides. The arrow-function pair is the load-bearing entry:
@@ -39,10 +44,10 @@ const READER_ONLY_MARKERS: ReadonlyArray<string> = [
 	'**Duplication that is not identical**',
 	'**A name that satisfies the convention and says the wrong thing**',
 	'**Svelte semantics**',
-	// The rule exists and is exported, but kit never wires it into its own config, so "lint enforces
-	// this" is true for a consumer and false here — joshuafolkken/kit#1233 decides which way to fix it.
-	'**Test file names and placement**',
-	'kit exports that rule for consumers and does not apply it to itself (joshuafolkken/kit#1233)',
+	// What survives of the old "Test file names and placement" entry. joshuafolkken/kit#1233 wired the
+	// rule into kit's own config, so the two banned patterns are settled above; colocation itself
+	// still is not, and dropping this line would leave the category silent about it.
+	'**Test placement beyond the two banned patterns**',
 	// A settled rule that did not fire is the one gate defect nothing downstream looks at.
 	'**A gate finding that got through is still a finding.**',
 ]
@@ -63,6 +68,9 @@ const PRESERVED_LIMIT_MARKERS: ReadonlyArray<string> = [
 // beside the new one, and the reviewer picks.
 const RETIRED_MARKERS: ReadonlyArray<string> = [
 	'Verify **every** rule below. These are non-standard, so call out any violation.',
+	// joshuafolkken/kit#1233: the claim this sentence made is no longer true, and left standing it
+	// would send a reviewer to re-check by hand what lint now fails.
+	'kit exports that rule for consumers and does not apply it to itself',
 ]
 
 describe(`${REVIEW_PROMPT} — category 4 assumes the gate`, () => {
