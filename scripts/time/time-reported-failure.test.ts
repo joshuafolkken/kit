@@ -159,8 +159,10 @@ describe("a gate body carrying another tool's output", () => {
 
 		expect(time_reported_failure.has_failure_line(inherited)).toBe(true)
 	})
+})
 
-	// The guard that keeps this from being a guess: only josh's output is written by this repository.
+// The guard that keeps this from being a guess: only josh's output is written by this repository.
+describe('the guard that confines the reading to josh output', () => {
 	it('ignores a failure line in a call that ran no josh command', () => {
 		expect(time_reported_failure.is_reported_failure('', true)).toBe(false)
 	})
