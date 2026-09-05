@@ -4,13 +4,20 @@ import { read_unwrapped } from './ai-document-fixture'
 // joshuafolkken/kit#1305: epic #1222 merged two measures aimed at the review — joshuafolkken/kit#1219
 // redefined the second round's question, joshuafolkken/kit#1241 fixed the mechanism that carries that
 // question into the forked review agent — and the `review` phase's wall clock did not move. Measuring
-// 20 merged runs with `pnpm josh time` says why: the phase *is* the agent's two invocations, and
-// round 1's duration is uncorrelated with the size of the diff it reads (r = 0.05 across a 7.7×
-// range). So narrowing what a round reads is ruled out as a speed measure by measurement.
+// merged runs with `pnpm josh time` found no support for the assumption both rest on, that a round's
+// cost follows the size of what it is asked to read.
+//
+// **This comment states no figure, and that is deliberate.** The canonical section owns them, and a
+// number copied here would be updated by nobody: a re-measurement moves `prompts/review.md` and the
+// markers below with it, while a copy in a comment stays green at the retired value — the same
+// staleness the `DIAG_FORBIDDEN_FIGURES` suite exists to prevent one file further along. It states
+// no verdict either, for the same reason the section stops short of one: at its sample the result
+// rules out a strong relationship rather than a real one, so a further proposal is asked to say why
+// the data does not reach it, not refused.
 //
 // The conclusion is pinned rather than left as prose because its whole job is to survive until the
 // next reader asks the same question. Un-pinned, it is the kind of paragraph a later trim deletes
-// for being a digression — and the proposal it rules out is then re-derived from the same tables,
+// for being a digression — and the proposal it qualifies is then re-derived from the same tables,
 // which is exactly the loop that produced #1305.
 const REVIEW_PROMPT = 'prompts/review.md'
 const DIAG_SKILL = '.claude/skills/diag/SKILL.md'
@@ -88,7 +95,21 @@ const DIAG_MARKERS: ReadonlyArray<string> = [
 // copy them is not enforcement — this is. Re-measuring #1305 updates `prompts/review.md` and its
 // markers above; if a copy had been left here, the skill would keep quoting the retired number with
 // nothing failing.
-const DIAG_FORBIDDEN_FIGURES: ReadonlyArray<string> = ['r = 0.05', '262.5', '7.7×', 'n = 9']
+//
+// **Every entry is a string that occurs verbatim in `prompts/review.md`**, which is the only form a
+// copy could take. Guarding a spelling the source does not use protects nothing while reading as
+// though it did — so each one below is written exactly as the canonical section writes it, and a
+// figure re-worded there is re-worded here in the same edit.
+const DIAG_FORBIDDEN_FIGURES: ReadonlyArray<string> = [
+	'r = 0.05',
+	'±0.65',
+	'n = 9',
+	'262.5 s',
+	'171 s',
+	'140 s',
+	'136 to 1053',
+	'177 to 396',
+]
 
 describe(`${DIAG_SKILL} — the ranker is pointed at it`, () => {
 	const content = read_unwrapped(DIAG_SKILL)
