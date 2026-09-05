@@ -25,6 +25,8 @@ const COMMAND = 'pnpm josh delegate'
 const KEPT_DELIBERATELY = 'kept deliberately'
 // `epic-child`'s verifier, named the same way wherever it is asserted.
 const STATE_READ = 'pnpm josh issue:state'
+// The case title shared by the marker-presence suites below.
+const CARRIES_CASE = 'carries %j'
 
 describe.each(RULE_DOCS)('%s — routes the decision to the command', (document_path) => {
 	const content = read_repo_file(document_path)
@@ -293,7 +295,7 @@ describe(`${QUEUE_SKILL} — what the parent keeps when the issue is delegated`,
 		'a non-zero exit is not `OPEN`',
 		// One stop, one Telegram: the unit already notified the pause it stopped for.
 		'Do not send a second `confirmation` Telegram',
-	])('carries %j', (marker) => {
+	])(CARRIES_CASE, (marker) => {
 		expect(unwrapped).toContain(marker)
 	})
 
@@ -320,6 +322,41 @@ describe(`${QUEUE_SKILL} — what the parent keeps when the issue is delegated`,
 			expect(unwrapped).toContain(marker)
 		},
 	)
+})
+
+// joshuafolkken/kit#1426: the pre-implementation reading is delegated too, and its threshold is a
+// number both rule documents have to carry. A document that stated the line without the number leaves
+// the count to judgement, which is the one thing this whole rule refuses — and one that omitted the
+// return shape would have a unit hand back the file text, which puts the cost back where it was.
+const INVESTIGATION_ISSUE = '1426'
+const THRESHOLD_SENTENCE = `the threshold is ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files, and it is a count, not a forecast`
+
+describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (document_path) => {
+	const unwrapped = read_unwrapped(document_path)
+
+	// Asserted as one sentence so the numeral is pinned to the constant rather than to a bare `3`,
+	// which occurs throughout both documents in unrelated prose.
+	it('gives the threshold as the number the command prints', () => {
+		expect(unwrapped.toLowerCase()).toContain(THRESHOLD_SENTENCE)
+	})
+
+	it.each(['never the file text', 'probe script', 'it is not `survey`, and it is not `diagnosis`'])(
+		CARRIES_CASE,
+		(marker) => {
+			expect(unwrapped.toLowerCase()).toContain(marker.toLowerCase())
+		},
+	)
+
+	// The verdict command prints the verifier, so a document that named it as the source of the count
+	// sends an agent to a call that answers without one — and back to judging the count.
+	it('sends the reader to the listing for the count, not to the verdict command', () => {
+		expect(unwrapped).toContain(`${COMMAND} --list`)
+		expect(unwrapped).not.toContain(`${COMMAND} investigation prints it`)
+	})
+
+	it('names the origin', () => {
+		expect(read_repo_file(document_path)).toContain(INVESTIGATION_ISSUE)
+	})
 })
 
 // joshuafolkken/kit#1183: the canonical topic file is a pointer to the skill single source, not a

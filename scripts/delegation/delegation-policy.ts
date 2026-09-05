@@ -23,6 +23,15 @@ interface DelegatableStep {
 	verifier: string
 }
 
+// Where the pre-implementation reading stops being cheaper in the main line (joshuafolkken/kit#1426).
+//
+// **A count, not a forecast.** The reads are counted as they are made rather than predicted before
+// the investigation starts, so nothing here rests on guessing how large it will be. Two files the run
+// will not edit stay in the main line, because delegating costs two extra main-line turns — one to
+// write the brief, one to read the result, about 18 seconds at run #1406's measured 8.8 s of model
+// wait per turn — and below the threshold that round trip costs more than carrying the text.
+const INVESTIGATION_FILE_THRESHOLD = 3
+
 // The enumeration. Short on purpose: every entry had to name a verifier, and most candidates could
 // not (below).
 const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
@@ -46,6 +55,17 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		does: 'read across many files and report where something appears — every reference to a symbol, which documents carry a marker',
 		verifier:
 			'the reported locations are checked directly; a fabricated or missed location does not survive one `grep` of what it claimed',
+	},
+	{
+		name: 'investigation',
+		// Not `survey`: that row reports *where* something appears and is checked by one `grep`, while
+		// this one reports *how the subject works* and is checked by opening the lines it cited. The two
+		// verifiers differ, so widening `survey` would put both in one field and lose the boundary below.
+		// **No ordinal.** `${N}rd` would print `1rd` for any other threshold, past a test that only looks
+		// for the numeral, so the count is phrased as a plain "N or more".
+		does: `read the Issue's subject to find out how it currently works — once ${String(INVESTIGATION_FILE_THRESHOLD)} or more files the run will not edit have to be read — and return the conclusion plus the \`file:line\` citations that support it, never the file text, which would put the cost back where it was. A throwaway probe script is written, run and deleted inside the unit, which returns its output alone`,
+		verifier:
+			'the parent opens the cited lines; a conclusion those lines do not support fails there, and reading a handful of cited regions costs far less than redoing the reading. The unit reports what the code does and never what to change — deciding that is `diagnosis`, which stays kept, so a unit returning a root cause would be delegating the rejected row under this name',
 	},
 ]
 
@@ -119,6 +139,7 @@ function reason_for(name: string): string {
 
 const delegation_policy = {
 	DELEGATE_VERDICT,
+	INVESTIGATION_FILE_THRESHOLD,
 	KEEP_VERDICT,
 	DELEGATABLE_STEPS,
 	REJECTED_STEPS,
