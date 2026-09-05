@@ -67,12 +67,22 @@ async function run_qualified_addition(found: CrossRepoAddTarget): Promise<number
 	return FAILURE_EXIT_CODE
 }
 
-// Why an insertion could not be read. A qualified target is answered on its own terms; anything else
-// gets the requirements and the usage line.
+// Why an insertion could not be read. A qualified target is answered on its own terms; an unusable
+// `--decision-file` path is named, because the generic line below would send the person after the epic
+// number and the positioning flag when what went missing is the record path a shell expanded to
+// nothing (joshuafolkken/kit#1350); anything else gets the requirements and the usage line.
 async function refuse_addition(argv: ReadonlyArray<string>): Promise<number> {
 	const qualified = epic_cli.find_cross_repo_add_target(argv)
 
 	if (qualified !== undefined) return await run_qualified_addition(qualified)
+
+	if (epic_cli.is_decision_path_unusable(argv)) {
+		console.error(
+			`✖ \`--decision-file\` needs exactly one readable path (\`-\` reads stdin); nothing was written.\n${USAGE}`,
+		)
+
+		return FAILURE_EXIT_CODE
+	}
 
 	console.error(
 		`✖ An epic number, at least one child issue number, and at most one valid \`--before\` / \`--after\` target are required.\n${USAGE}`,

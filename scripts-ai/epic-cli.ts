@@ -213,6 +213,14 @@ function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
 	return value === undefined || is_flag(value)
 }
 
+// Whether *this* is why the insertion could not be read, so the refusal can say so. Without it the
+// caller prints the generic requirements line, and a shell that expanded `--decision-file $REC` to
+// nothing is answered with "an epic number and at least one child issue number are required" — advice
+// about the part the person got right.
+function is_decision_path_unusable(argv: ReadonlyArray<string>): boolean {
+	return is_value_unusable(argv, DECISION_FLAG)
+}
+
 function read_add_subject(
 	argv: ReadonlyArray<string>,
 ): { epic_number: number; children: Array<number> } | undefined {
@@ -225,7 +233,7 @@ function read_add_subject(
 }
 
 function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefined {
-	if (has_unknown_flag(argv) || is_value_unusable(argv, DECISION_FLAG)) return undefined
+	if (has_unknown_flag(argv) || is_decision_path_unusable(argv)) return undefined
 	const subject = read_add_subject(argv)
 	if (subject === undefined) return undefined
 	const outcome = parse_position(argv)
@@ -342,6 +350,7 @@ const epic_cli = {
 	is_promotion,
 	is_addition,
 	find_cross_repo_add_target,
+	is_decision_path_unusable,
 	resolve_local_add,
 	format_cross_repo_refusal,
 	parse_add_arguments,

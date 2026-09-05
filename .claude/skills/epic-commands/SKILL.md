@@ -58,11 +58,13 @@ several times; and the answers end up only in a conversation nobody can read bac
   child joins the epic goes through `pnpm josh epic --add … --decision-file` — the `epic:bundle` section
   below is that flag's single source. Phase 2's answers are about children the epic **already tracks**,
   which that flag cannot serve: an insertion with nothing to add is refused outright. Until
-  joshuafolkken/kit#1162 adds an entry point for already-tracked children, write the child comments with `gh issue comment` and
-  put the epic's `## Decisions` entry in with the **next** `--add --decision-file` on that epic, naming
-  every child it covers. **Say in the report that the epic half is still pending** — the entry going
-  unwritten is exactly how two of the four most recent placements in joshuafolkken/kit#1262 ended up with
-  a child comment and nothing on the epic.
+  joshuafolkken/kit#1162 adds an entry point for already-tracked children, write the child comments with
+  `gh issue comment` on each child the answer applies to, and **say in the report that the epic's
+  `## Decisions` entry is still pending** — the entry going unwritten is exactly how two of the four most
+  recent placements in joshuafolkken/kit#1262 ended up with a child comment and nothing on the epic.
+  **Do not carry it on the next unrelated `--add --decision-file`**: that call posts the record as a
+  comment on the child it is *inserting*, so a decision about `#A` and `#B` would arrive on `#C`, which
+  has nothing to do with it — and `#A` and `#B` would still get nothing from that call.
 - **Recording a decision removes that child's `needs-decision` label** (Tier A). Without it the child
   stays parked after the answer arrived. The label-clearing rule itself is defined by
   `.claude/skills/workflow-commands/epicrun.md` → "park and continue"; what this section adds is the

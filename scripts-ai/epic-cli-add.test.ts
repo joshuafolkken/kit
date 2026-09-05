@@ -175,3 +175,23 @@ describe('epic_cli.format_cross_repo_refusal — the decision file', () => {
 		expect(cross_repo_refusal(CROSS_REPO_ARGV)).not.toContain('decision record')
 	})
 })
+
+// The refusal has to name itself: read as the generic requirements line, a shell that expanded the
+// record path to nothing sends the person after the epic number they got right.
+describe('epic_cli.is_decision_path_unusable', () => {
+	it.each([
+		[[ADD_FLAG, '893', '894', DECISION_FLAG]],
+		[[ADD_FLAG, '893', '894', DECISION_FLAG, AFTER_FLAG, '891']],
+		[[ADD_FLAG, '893', '894', DECISION_FLAG, 'a.md', DECISION_FLAG, 'b.md']],
+	])('answers true for %j', (argv) => {
+		expect(epic_cli.is_decision_path_unusable(argv)).toBe(true)
+	})
+
+	it.each([
+		[[ADD_FLAG, '893', '894', DECISION_FLAG, 'why.md']],
+		[[ADD_FLAG, '893', '894', DECISION_FLAG, '-']],
+		[[ADD_FLAG, '893', '894']],
+	])('answers false for %j', (argv) => {
+		expect(epic_cli.is_decision_path_unusable(argv)).toBe(false)
+	})
+})
