@@ -47,6 +47,7 @@ storybook-static
 # eslint cache (josh format:edited), which is kept apart from the gate's on purpose
 .eslintcache
 .eslintcache.edit
+.eslintcache.related
 .tsbuildinfo
 .cspellcache
 

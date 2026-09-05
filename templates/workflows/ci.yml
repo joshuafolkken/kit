@@ -137,7 +137,13 @@ jobs:
         with:
           path: |
             .eslintcache
-          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.ts') }}
+          # joshuafolkken/kit#1347: the config inputs are `.js`, and the glob used to name `.ts` — which
+          # in `eslint/` is only the test files. So a rule edit left the key unchanged while a test edit
+          # busted it, the exact inverse of what invalidates a cache entry. The fingerprint in
+          # `eslint/config-fingerprint.js` now invalidates the entries themselves; this key has to move
+          # with it, or a rule edit would restore a cache whose every entry is stale, lint cold, and
+          # save nothing back under the key it already hit — a cold lint on every later run.
+          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}
           restore-keys: |
             ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-eslint-cache-
