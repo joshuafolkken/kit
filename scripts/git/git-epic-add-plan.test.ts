@@ -326,3 +326,37 @@ describe('git_epic_add_plan.build_plan — a child with no order yet', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#1350: a record that cannot be written is refused before anything reaches GitHub,
+// because `--decision-file` was given precisely because the record has to exist.
+describe('git_epic_add_plan.build_plan — the decision record', () => {
+	const REASON_LINE = '- 理由: 主題が同じ'
+	const RECORD = ['### Where #894 goes', BLANK, REASON_LINE].join('\n')
+	const CHAIN_LINE = '#890 -> #894'
+	const CHAIN_RECORD = ['- 経緯: なし', CHAIN_LINE].join('\n')
+
+	it('writes the record into the epic body it hands back', () => {
+		const built = plan_of(plan({ decision: RECORD }))
+
+		expect(built.body).toContain('## Decisions')
+		expect(built.body).toContain(REASON_LINE)
+	})
+
+	it('refuses a record that says nothing, and hands back no body', () => {
+		expect(error_of(plan({ decision: '  \n' }))).toContain('empty')
+	})
+
+	it('refuses a record carrying a bare dependency chain', () => {
+		expect(error_of(plan({ decision: CHAIN_RECORD }))).toContain('Line 2')
+	})
+
+	// The refusals above must not fire before the ones that were already there: an insertion into a
+	// non-epic is wrong whatever the record says.
+	it('reports a non-epic target rather than the record', () => {
+		expect(error_of(plan({ labels: [], decision: '  ' }))).toContain('is not an epic')
+	})
+
+	it('leaves the plan exactly as it was when no record is given', () => {
+		expect(plan_of(plan({})).body).toBe(plan_of(plan({ decision: undefined })).body)
+	})
+})
