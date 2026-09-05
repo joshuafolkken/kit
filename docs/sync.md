@@ -475,6 +475,21 @@ SECURITY.md         tsconfig.sonar.json
 > does, and `docs/josh-commands.md` documents what the command does, why the matcher names exactly
 > those three tools, and why it never fails.
 >
+> **And it wires the batching guard, on the earlier side of the same event pair.** A `PreToolUse` hook
+> runs `pnpm josh batch:guard` before every `Bash` call, refusing the one that would make a third
+> consecutive single-call turn (joshuafolkken/kit#1390). It is on the earlier event for the reason the
+> formatter is on the later one: by `PostToolUse` the round trip has already been spent, and describing
+> it there is what the density line above already does — measured at 1.10–1.12 calls per round trip
+> across the three runs after that line shipped, against a 1.50 floor. **It names `Bash` alone, unlike
+> the formatter**, because it must never refuse a write: Claude Code denies one call of a turn and runs
+> the rest, so a refused edit would leave its siblings applied and itself not. Within `Bash` the
+> mutation words already exclude every `pnpm josh` command, commit and Issue write, and the script
+> excludes the edit tools on top of the matcher, plus `sed`, `tee`, `dd` or a `>` anywhere in the line —
+> a matcher is settings a consumer can widen, and the guarantee has to hold whatever the wiring says.
+> `JOSH_BATCH_GUARD=off` in the environment or in `.env` switches it off without editing the settings
+> file. `docs/josh-commands.md` carries the conditions, what the guard
+> cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
+>
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
 > turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
 > blocked only for the agent: the user runs `git add` in their own terminal unchanged. A permanent
