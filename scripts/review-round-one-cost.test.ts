@@ -139,6 +139,13 @@ const FORBIDDEN_FIGURES: ReadonlyArray<string> = [
 	'12 of 22 adjacent pairs',
 	'2,800 changed lines',
 	'376.5 s, 273.6 s and 214.4 s',
+	// The rest of the coefficients and the fit's own precision. A coefficient is the exact class of
+	// figure this suite keeps single-sourced, so leaving the rank correlation and the standard error
+	// out would reproduce the retired-number failure one figure along.
+	'rank correlation of **0.66**',
+	'standard error of 0.029',
+	'residual spread 56 s',
+	'58 s on the largest run of the set and 2 s on the smallest',
 	// The pair this record retired. Quoted as live anywhere, it refuses a proposal on evidence that
 	// no longer exists — the failure the command doc was already carrying.
 	'r = 0.05',
@@ -157,6 +164,21 @@ describe(`${DIAG_SKILL} — the ranker is pointed at the round-1 record`, () => 
 	it.each(DIAG_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
+})
+
+// The command doc quotes the heading verbatim as the place to read the figure it no longer prints, so
+// it needs the presence half as much as the two skills do. **Without it, renaming the section leaves
+// this document pointing at a heading that does not exist and every suite green** — `SECTION_TITLE`
+// moves with the rename, the absence guard is unaffected, and nothing else reads this file.
+describe(`${COMMAND_DOC} — the retired coefficient is replaced by the pointer`, () => {
+	const content = read_unwrapped(COMMAND_DOC)
+
+	it.each([SECTION_TITLE, 'round 1 against churn was re-measured at a larger sample'])(
+		'states %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
 })
 
 // The split assessment is the other place the proposal is re-derived, and the more likely one: its
