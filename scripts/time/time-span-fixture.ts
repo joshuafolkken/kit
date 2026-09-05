@@ -24,6 +24,7 @@ function span(
 		category,
 		label,
 		josh_command,
+		check_key: '',
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		targets: [],

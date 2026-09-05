@@ -43,6 +43,7 @@ function span(start_minute: number, minutes: number, extra: Partial<Span> = {}):
 		category: time_spans.TOOL_CATEGORY,
 		label: '',
 		josh_command: '',
+		check_key: '',
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		targets: [],

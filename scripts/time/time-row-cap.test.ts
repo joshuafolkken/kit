@@ -11,6 +11,7 @@ import { time_rework } from './time-rework'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
 import type { Segment } from './time-segments'
+import { time_single_checks } from './time-single-checks'
 import { time_tool_turns } from './time-tool-turns'
 
 // The cap as a module and as the flag that reaches it, in one suite (joshuafolkken/kit#1301). The
@@ -112,6 +113,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
+		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
 		rework: { ...time_rework.NO_REWORK },
 		failures: { ...time_failures.NO_FAILURES },
 	}
