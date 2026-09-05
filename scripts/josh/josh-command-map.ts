@@ -31,6 +31,7 @@ const ALIASES: Record<string, string> = {
 	ga: 'gate',
 	l: 'lint',
 	lr: 'lint:related',
+	ln: 'lines',
 	lp: 'lint:prettier',
 	le: 'lint:eslint',
 	f: 'format',

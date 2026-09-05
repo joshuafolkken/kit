@@ -24,6 +24,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check only the changed files with prettier and eslint (whole tree on fallback)',
 		category: 'Development',
 	},
+	lines: {
+		script: 'scripts/lines/lines-command.ts',
+		description: "Print a file's code lines against the max-lines limit and the headroom left",
+		category: 'Development',
+	},
 	'lint:prettier': {
 		shell: [...PE, 'prettier', '--check', '.'],
 		description: 'Check formatting with prettier',
