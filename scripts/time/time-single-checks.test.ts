@@ -115,8 +115,9 @@ describe('build_single_checks — what answered nothing new', () => {
 	})
 })
 
-// Two repeats issued in one turn are one stop, so pricing both would promise back model time no
-// change removes — the over-report this block leans away from everywhere else.
+// A call issued beside another is one the run stopped for anyway, so removing it leaves the stop
+// where it was — pricing it would promise back model time no change removes, the over-report this
+// block leans away from everywhere else.
 describe('build_single_checks — the round trips a repeat cost', () => {
 	const batched: ReadonlyArray<Span> = [
 		check(0),
@@ -126,12 +127,18 @@ describe('build_single_checks — the round trips a repeat cost', () => {
 		check(4, OTHER_KEY),
 	]
 
-	it('counts both calls as repeats that answered nothing new', () => {
+	it('counts both calls of a batched turn as repeats that answered nothing new', () => {
 		expect(totals_of(batched).unchanged_count).toBe(2)
 	})
 
-	it('bills the two of them one round trip between them', () => {
-		expect(totals_of(batched).unchanged_trip_count).toBe(1)
+	it('bills neither of them a round trip, since removing either leaves the stop', () => {
+		expect(totals_of(batched).unchanged_trip_count).toBe(0)
+	})
+
+	it('bills a repeat that was the only call in its turn', () => {
+		const alone = totals_of([thinking(0), check(1), thinking(2), check(3)])
+
+		expect(alone.unchanged_trip_count).toBe(1)
 	})
 })
 

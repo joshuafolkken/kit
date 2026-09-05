@@ -1,7 +1,7 @@
 import type { TripPrice } from './time-bundles'
 import { time_format } from './time-format'
 import { time_phases, type PhaseName } from './time-phases'
-import { time_placed } from './time-placed'
+import { time_placed, type Placed } from './time-placed'
 import { time_single_check } from './time-single-check'
 import { time_spans, type Span } from './time-spans'
 
@@ -11,9 +11,9 @@ import { time_spans, type Span } from './time-spans'
 // `CLAUDE.md` has said **one gate per run, not one per edit** since joshuafolkken/kit#1246, and the
 // single checks are what that rule sends an implementation loop to instead. Nothing measured whether
 // the loop then repeated *them*. Run #1379 issued eight single checks — 45.9 seconds of tool time,
-// six of them in the fix phase, each its own round trip — with `josh test:related` and
-// `josh lint:related` each called twice on the same arguments, and 18.1 seconds after the last one
-// `josh gate` ran all four checks over the same tree.
+// six of them in the fix phase, each its own round trip — three of which repeated an earlier call on
+// the same arguments, and 18.1 seconds after the last one `josh gate` ran all four checks over the
+// same tree.
 //
 // **The line this counts against is the narrow one, and it is stated in `prompts/review.md` →
 // "A single check answers once per tree".** A check run after an edit is feedback and is not counted
@@ -79,14 +79,12 @@ const NO_SINGLE_CHECKS: SingleCheckTotals = {
 	is_measured: false,
 }
 
-// The walk's four pieces: the running totals, every signature the run has issued, the subset of those
-// whose last answer still describes the tree, and whether the span just walked was a tool span — which
-// is what says whether the next call opened a round trip or shared one.
+// The walk's three pieces: the running totals, every signature the run has issued, and the subset of
+// those whose last answer still describes the tree.
 interface Walk {
 	totals: SingleCheckTotals
 	seen: Set<string>
 	answered: Set<string>
-	is_after_tool: boolean
 }
 
 function empty_totals(is_measured: boolean): SingleCheckTotals {
@@ -114,22 +112,22 @@ function keeps_answer(span: Span): boolean {
 	return span.is_continuation && span.check_key !== time_single_check.NO_CHECK
 }
 
-function count_repeat(walk: Walk, span: Span, is_own_trip: boolean): void {
+function count_repeat(walk: Walk, span: Span, is_alone: boolean): void {
 	if (walk.seen.has(span.check_key)) walk.totals.repeat_count += ONE
 	if (!walk.answered.has(span.check_key)) return
 
 	walk.totals.unchanged_count += ONE
 	walk.totals.unchanged_ms += span.duration_ms
-	if (is_own_trip) walk.totals.unchanged_trip_count += ONE
+	if (is_alone) walk.totals.unchanged_trip_count += ONE
 }
 
 function count_check(
 	walk: Walk,
 	span: Span,
 	phase: PhaseName | undefined,
-	is_own_trip: boolean,
+	is_alone: boolean,
 ): void {
-	count_repeat(walk, span, is_own_trip)
+	count_repeat(walk, span, is_alone)
 
 	walk.totals.call_count += ONE
 	walk.totals.duration_ms += span.duration_ms
@@ -139,21 +137,27 @@ function count_check(
 	walk.answered.add(span.check_key)
 }
 
-// **A call opens a round trip when the span before it was not a tool span**, which is the rule
-// `time-round-trips.ts` counts trips by — one per group of adjacent tool spans. Read here rather than
-// asked of that module because the answer is needed mid-walk, per call, and it is the same rule.
-function step(walk: Walk, span: Span, phase: PhaseName | undefined): void {
-	const is_own_trip = !walk.is_after_tool
-
-	walk.is_after_tool = span.category === time_spans.TOOL_CATEGORY
-
+function step(walk: Walk, span: Span, phase: PhaseName | undefined, is_alone: boolean): void {
 	if (is_check(span)) {
-		count_check(walk, span, phase, is_own_trip)
+		count_check(walk, span, phase, is_alone)
 
 		return
 	}
 
 	if (!keeps_answer(span)) walk.answered.clear()
+}
+
+function is_tool_at(entries: ReadonlyArray<Placed>, index: number): boolean {
+	return entries[index]?.span.category === time_spans.TOOL_CATEGORY
+}
+
+// **Whether removing this call would save a round trip, which is "alone in its trip" and not "first
+// in it".** A round trip is a group of adjacent tool spans (`time-round-trips.ts`), so a call issued
+// beside another is one the run stopped for anyway — taking it out leaves the stop where it was.
+// Reading the first of a group as its own trip billed exactly that, which is the over-report this
+// block leans away from everywhere else.
+function is_alone_in_trip(entries: ReadonlyArray<Placed>, index: number): boolean {
+	return !is_tool_at(entries, index - ONE) && !is_tool_at(entries, index + ONE)
 }
 
 // **Ordered before it is walked, and `time-placed.ts` is what does both.** A run's spans do not
@@ -166,12 +170,14 @@ function build_single_checks(spans: ReadonlyArray<Span>): SingleCheckTotals {
 		totals: empty_totals(time_spans.has_transcript_data(spans.length)),
 		seen: new Set<string>(),
 		answered: new Set<string>(),
-		is_after_tool: false,
 	}
+	const entries = time_placed.placed_spans(spans)
 
 	// A loop rather than `reduce`: the walk carries three pieces and mutates them, the shape
 	// `time-bundles.ts` uses for the same reason.
-	for (const entry of time_placed.placed_spans(spans)) step(walk, entry.span, entry.phase)
+	for (const [index, entry] of entries.entries()) {
+		step(walk, entry.span, entry.phase, is_alone_in_trip(entries, index))
+	}
 
 	return walk.totals
 }
