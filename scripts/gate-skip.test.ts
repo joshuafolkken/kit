@@ -1,6 +1,3 @@
-import { rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
@@ -55,16 +52,20 @@ const NOTHING_RAN = 0
 const CHANGED_FILE = 'scripts/gate-skip.ts'
 const CHANGED_TREE: Record<string, string> = { [CHANGED_FILE]: 'digest-one' }
 const MOVED_TREE: Record<string, string> = { [CHANGED_FILE]: 'digest-two' }
+// A tree the version bump is already in, which is what keeps joshuafolkken/kit#1437's ordering refusal
+// out of the one case below that needs the four checks to run over a record that cannot be reused.
+const PACKAGE_JSON = 'package.json'
+const BUMPED_TREE: Record<string, string> = { ...CHANGED_TREE, [PACKAGE_JSON]: 'digest-version' }
 const EMPTY_TREE: Record<string, string> = {}
 const BASE = 'a1b2c3d4'
 const ADVANCED_BASE = 'e5f6a7b8'
 
-// Paths of this suite's own. `josh gate` and `josh review:brief` share both records by design, and
-// this suite runs *inside* `pnpm josh gate` — a test writing to the shared marker would clear the
-// live gate's own, which is the record telling the review beside it not to re-run the unit suite.
-const SUITE_KEY = String(process.pid)
-const STAMP_PATH = path.join(tmpdir(), `josh-gate-skip-stamp-${SUITE_KEY}.json`)
-const MARKER_PATH = path.join(tmpdir(), `josh-gate-skip-marker-${SUITE_KEY}.json`)
+// Records of this suite's own. `josh gate` and `josh review:brief` share both by design, and this
+// suite runs *inside* `pnpm josh gate` — a test writing to the shared marker would clear the live
+// gate's own, which is the record telling the review beside it not to re-run the unit suite. The pair
+// is built by `gate_test_fixture.suite_records`, which every gate suite now shares.
+const RECORDS = gate_test_fixture.suite_records('skip')
+const { clear: clear_records, marker_path: MARKER_PATH, stamp_path: STAMP_PATH } = RECORDS
 
 // Which check ran is `verification-gate.test.ts`'s subject; here every one passes and what is counted
 // is how many were started at all. The body matters in one case only — a check that passed with
@@ -100,16 +101,12 @@ function check_count(): number {
 
 beforeEach(() => {
 	vi.clearAllMocks()
-	rmSync(STAMP_PATH, { force: true })
-	rmSync(MARKER_PATH, { force: true })
+	clear_records()
 	repository.tree = CHANGED_TREE
 	repository.base = BASE
 })
 
-afterEach(() => {
-	rmSync(STAMP_PATH, { force: true })
-	rmSync(MARKER_PATH, { force: true })
-})
+afterEach(clear_records)
 
 describe('reusable_green_gate', () => {
 	it('reuses the record when neither the files nor the base moved', () => {
@@ -205,7 +202,11 @@ describe('run_verification_gate — a tree the record cannot speak for', () => {
 		expect(text).toContain('verification gate passed')
 	})
 
+	// The tree carries the version bump, so joshuafolkken/kit#1437's ordering refusal is not in play and
+	// this stays a question about the record alone: a gate run *before* an owed bump is refused rather
+	// than run, and that branch is `gate-bump-order.test.ts`'s subject.
 	it('runs all four checks when a file has moved since the record', async () => {
+		repository.tree = BUMPED_TREE
 		record_green(MOVED_TREE, BASE)
 
 		await run_gate()

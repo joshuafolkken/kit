@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
 import { josh_verdict } from './josh-verdict'
@@ -34,6 +34,11 @@ const REFUSAL_MESSAGE = 'josh gate takes no extra arguments'
 
 const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
 
+// This suite mocks execa but not the tree, so every green run here used to write the green-gate record
+// for the *real* working tree — and the next `pnpm josh gate` would have skipped its four checks on the
+// strength of it (joshuafolkken/kit#1328). The destinations exist as options for exactly this reason.
+const RECORDS = gate_test_fixture.suite_records('fan-out')
+
 function step_command(step: GateStep): string {
 	return step.command_args.at(-1) ?? ''
 }
@@ -63,7 +68,7 @@ async function run_capturing(
 	const stdout = capture_stdout()
 
 	try {
-		const code = await verification_gate.run_verification_gate({ is_verbose })
+		const code = await verification_gate.run_verification_gate({ is_verbose, ...RECORDS })
 
 		return [code, stdout.text()]
 	} finally {
@@ -73,7 +78,10 @@ async function run_capturing(
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	RECORDS.clear()
 })
+
+afterEach(RECORDS.clear)
 
 describe('run_verification_gate', () => {
 	it('returns 0 when every check passes', async () => {
@@ -180,7 +188,7 @@ describe('run_gate_command', () => {
 		const stdout = capture_stdout()
 
 		try {
-			expect(await verification_gate.run_gate_command([])).toBe(0)
+			expect(await verification_gate.run_gate_command([], RECORDS)).toBe(0)
 		} finally {
 			stdout.restore()
 		}
@@ -254,7 +262,7 @@ async function run_printing(body: string): Promise<string> {
 	const stdout = capture_stdout()
 
 	try {
-		await verification_gate.run_verification_gate()
+		await verification_gate.run_verification_gate(RECORDS)
 
 		return stdout.text()
 	} finally {
@@ -277,7 +285,9 @@ describe('run_gate_command — the verbose flag', () => {
 		const stdout = capture_stdout()
 
 		try {
-			expect(await verification_gate.run_gate_command([verification_gate.VERBOSE_FLAG])).toBe(0)
+			expect(
+				await verification_gate.run_gate_command([verification_gate.VERBOSE_FLAG], RECORDS),
+			).toBe(0)
 			for (const output of every_step_output()) expect(stdout.text()).toContain(output)
 		} finally {
 			stdout.restore()
