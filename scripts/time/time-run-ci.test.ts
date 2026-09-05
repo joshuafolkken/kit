@@ -19,7 +19,7 @@ time_run_fixture.use_transcript_home()
 
 const MERGE_CALL_ID = 'merge-1'
 const UNIT = 'unit'
-const UNREAD_MARK = 'could not be read'
+const UNREAD_MARK = 'the CI cycles could not be read'
 const HEAD_COMMIT = `[{"sha":"${SHA}"}]`
 
 // The run sits in `josh followup` from minute 4 to minute 8; the cycle it pushed runs 5 → 7, so the

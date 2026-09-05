@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { time_ci, type CiInput } from './time-ci'
-import type { CheckRunList, PullSummary } from './time-github'
+import { time_github, type CheckRunList, type PullSummary } from './time-github'
 import { time_phase_fixture } from './time-phase-fixture'
 
 // joshuafolkken/kit#1384: the CI windows a run's wall clock is attributed from. The reads are faked
@@ -12,6 +12,8 @@ const { MINUTE_MS, span } = time_phase_fixture
 const HEAD_SHA = 'aaaa1111'
 const OTHER_SHA = 'bbbb2222'
 const PULL_NUMBER = 7
+
+const RATE_LIMIT_BODY = '{"message":"rate limited"}'
 
 const OPENED_MS = 0
 const MERGED_MS = 60 * MINUTE_MS
@@ -38,6 +40,11 @@ const HEAD_CHECKS = list(run('unit', 40 * MINUTE_MS, 45 * MINUTE_MS))
 // What each faked read answered, so a test can assert the head commit cost no request at all.
 interface Faked {
 	paths: Array<string>
+	// **How many reads were open at once, at the most.** The recorded order says nothing about this:
+	// `Promise.all` over the same shas records the same order, because each read reaches its request
+	// before its first suspension — so a guard written on `paths` alone passes on the fan-out it was
+	// written to reject.
+	flight: { open: number; peak: number }
 	input: CiInput
 }
 
@@ -56,19 +63,31 @@ function checks_body(started_minute: number, ended_minute: number): string {
 
 function faked(bodies: Record<string, string>, shas: ReadonlyArray<string> = [HEAD_SHA]): Faked {
 	const paths: Array<string> = []
+	const flight = { open: 0, peak: 0 }
 	const commits = JSON.stringify(shas.map((sha) => ({ sha })))
 
 	return {
 		paths,
+		flight,
 		input: {
 			pull: PULL,
 			merged_ms: MERGED_MS,
 			spans: [],
 			head: HEAD_CHECKS,
+			// The `await` is what makes the counter mean something: it suspends, so a second read
+			// issued before this one resolves is visible as a peak of two.
 			read: async (path: string) => {
 				paths.push(path)
+				flight.open += 1
+				flight.peak = Math.max(flight.peak, flight.open)
 
-				return path.includes('/commits?') ? commits : (bodies[path] ?? '')
+				const body = await Promise.resolve(
+					path.includes('/commits?') ? commits : (bodies[path] ?? ''),
+				)
+
+				flight.open -= 1
+
+				return body
 			},
 		},
 	}
@@ -161,10 +180,7 @@ describe('time_ci.build_facts — a read that could not answer', () => {
 	})
 
 	it('reports unmeasured where one commit check read was refused', async () => {
-		const fake = faked({ [checks_path(OTHER_SHA)]: '{"message":"rate limited"}' }, [
-			OTHER_SHA,
-			HEAD_SHA,
-		])
+		const fake = faked({ [checks_path(OTHER_SHA)]: RATE_LIMIT_BODY }, [OTHER_SHA, HEAD_SHA])
 		const facts = await time_ci.build_facts(fake.input)
 
 		expect(facts.has_windows).toBe(false)
@@ -199,13 +215,35 @@ describe('time_ci.build_facts — the request budget', () => {
 		expect(fake.paths).toEqual([COMMITS_PATH])
 	})
 
-	// One request per commit, in order — the fan-out that would sit inside `time-batch.ts`'s pool of
-	// eight run reports and multiply its bound by the commit count.
+	// One read open at a time — the fan-out that would otherwise sit inside `time-batch.ts`'s pool of
+	// eight run reports and multiply its bound by the commit count. **The peak is what proves it**: the
+	// recorded order is the same either way.
 	it('reads the commits one at a time', async () => {
 		const fake = faked({}, [OTHER_SHA, HEAD_SHA])
 
 		await time_ci.build_facts(fake.input)
 
+		expect(fake.flight.peak).toBe(1)
 		expect(fake.paths).toEqual([COMMITS_PATH, checks_path(OTHER_SHA)])
+	})
+
+	// One unread commit already fixes the answer at "could not measure", and the read that failed is
+	// usually a rate limit — which every further request would deepen for the siblings still to come.
+	it('stops reading at the first refusal', async () => {
+		const shas = [OTHER_SHA, HEAD_SHA, OTHER_SHA]
+		const fake = faked({ [checks_path(OTHER_SHA)]: RATE_LIMIT_BODY }, shas)
+
+		await time_ci.build_facts(fake.input)
+
+		expect(fake.paths).toEqual([COMMITS_PATH, checks_path(OTHER_SHA)])
+	})
+})
+
+// The single-page commit listing cannot tell a full page from a truncated one, and what saves it is
+// that a truncated page holds `PAGE_SIZE` rows — past the cap, so such a listing is reported
+// unmeasured. That safety is a relation between two constants, so it is asserted rather than implied.
+describe('time_ci.MAX_COMMITS', () => {
+	it('stays under the page size the commit listing is read with', () => {
+		expect(time_ci.MAX_COMMITS).toBeLessThan(time_github.PAGE_SIZE)
 	})
 })

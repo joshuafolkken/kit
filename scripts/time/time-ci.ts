@@ -38,6 +38,11 @@ const NO_DURATION = 0
 // and `--epic` measures a whole batch of them. **Passing it is reported as unmeasured rather than
 // silently truncated**: a subset of the cycles is not the wait, and a figure built from one is worse
 // than no figure.
+//
+// **It is also what makes the single-page commit listing safe.** `list_pull_commits` reads one page
+// and cannot tell a full page from a truncated one — but a truncated page carries `PAGE_SIZE` rows,
+// which is past this cap, so such a listing is reported unmeasured rather than read as complete. The
+// guarantee is `MAX_COMMITS < PAGE_SIZE`, asserted in this module's suite rather than left implied.
 const MAX_COMMITS = 10
 
 // The CI half of a run, in the states a read of it has.
@@ -106,6 +111,19 @@ interface CycleRead {
 	is_failed: boolean
 }
 
+// A commit that ran no check has no cycle at all, so it contributes no window rather than an empty
+// one. Kept apart from the walk above so that walk answers one question — did every read answer? —
+// and this one answers the other.
+function windows_of(lists: ReadonlyArray<CheckRunList>, bounds: Interval): Array<Interval> {
+	return lists
+		.map((list) => cycle_window(list.runs, bounds))
+		.filter((window): window is Interval => window !== undefined)
+}
+
+// A listing this measurement will not read: past the cap, refused, or abandoned partway.
+// **Nothing further is fetched for it.**
+const UNREAD_CYCLES: CycleRead = { windows: [], is_failed: true }
+
 // **A commit with no readable check-runs yields no window, and a refused read yields a flag.** Those
 // are two different answers: a commit that ran nothing really has no cycle, while a rate-limited read
 // says nothing at all about what ran.
@@ -115,27 +133,27 @@ interface CycleRead {
 // gives — an unbounded fan-out turns a rate limit into a wrong answer. A `Promise.all` here would
 // multiply that eight by the commit count, and a throttled read does not fail loudly: it clears
 // `has_windows`, and every affected child's `ci` phase silently becomes `not detected`.
+//
+// **The first refusal ends the walk.** One unread commit already fixes the answer at "could not
+// measure", so every further request buys nothing — and the request that fails is usually a rate
+// limit, which the remaining nine would deepen for the siblings still to be measured.
 async function read_cycles(
 	shas: ReadonlyArray<string>,
 	input: CiInput,
 	bounds: Interval,
 ): Promise<CycleRead> {
-	const windows: Array<Interval> = []
-	let is_failed = false
+	const lists: Array<CheckRunList> = []
 
 	for (const sha of shas) {
 		const list = await checks_of(sha, input)
-		const window = cycle_window(list.runs, bounds)
 
-		is_failed ||= list.is_failed
-		if (window !== undefined) windows.push(window)
+		if (list.is_failed) return UNREAD_CYCLES
+
+		lists.push(list)
 	}
 
-	return { windows, is_failed }
+	return { windows: windows_of(lists, bounds), is_failed: false }
 }
-
-// A listing this measurement will not read: past the cap, or refused. **Nothing is fetched for it.**
-const UNREAD_CYCLES: CycleRead = { windows: [], is_failed: true }
 
 // **The cap is applied before the reads, not after them.** Slicing the listing and deciding
 // afterwards spent ten requests on a pull request whose answer was already going to be "could not
