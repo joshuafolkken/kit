@@ -6,6 +6,7 @@ import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
+import { josh_verdict } from './josh-verdict'
 import type { FileMapStamp } from './josh/file-map-stamp'
 import { GATE_COMMAND } from './josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh/josh-composite-arguments'
@@ -28,8 +29,7 @@ import { type_check_step } from './type-check-step'
 // Each step shells out to the `josh` sub-command that already defines it, rather than repeating the
 // underlying tool invocations here — one definition per check, in `josh-commands-development.ts`.
 
-const PASS_ICON = '✔'
-const { FAIL_ICON } = status_icons
+const { FAIL_ICON, PASS_ICON } = status_icons
 // `process.argv` is [runner, script, ...arguments].
 const FIRST_ARGUMENT_INDEX = 2
 
@@ -170,16 +170,12 @@ function print_gate_summary(failed_labels: ReadonlyArray<string>, elapsed_ms: nu
 	const total = format_seconds(elapsed_ms)
 
 	if (failed_labels.length === 0) {
-		process.stdout.write(
-			`\n${PASS_ICON} verification gate passed (${STEP_COUNT} checks) in ${total}.\n`,
-		)
+		process.stdout.write(`\n${josh_verdict.format_gate_passed(STEP_COUNT, total)}\n`)
 
 		return
 	}
 
-	process.stdout.write(
-		`\n${FAIL_ICON} verification gate failed: ${failed_labels.join(', ')} (${total})\n`,
-	)
+	process.stdout.write(`\n${josh_verdict.format_gate_failed(failed_labels.join(', '), total)}\n`)
 }
 
 // The record `josh review:brief` reads, written only on a fully green run and only with the tree it

@@ -9,13 +9,38 @@ import { time_spans } from './time-spans'
 
 const MINUTE_MS = 60_000
 const GATE_COMMAND = 'pnpm josh gate 2>&1 | tail -40'
-const GATE_FAILED_BODY = [
-	'',
-	'✗ lint (pnpm josh lint) 4.2s',
-	'✗ verification gate failed: lint',
-].join('\n')
+const LINT_STEP_FAILED = '✗ lint (pnpm josh lint) 4.2s'
+const GATE_FAILED_BODY = ['', LINT_STEP_FAILED, '✗ verification gate failed: lint'].join('\n')
 const GATE_PASSED_BODY = '\n✔ verification gate passed (4 checks) in 15.1s.'
 const JOSH_GATE = 'josh gate'
+
+// joshuafolkken/kit#1374: a green gate forwards the body of a step that skipped or passed with
+// warnings, and that body is written by eslint, svelte-check, vitest or cspell — formats this
+// repository does not own. One of them opening a line with the failure icon used to make the whole
+// call a failure, which charged the next gate run as rework.
+const THIRD_PARTY_WARNING = ['', '✗ src/app.svelte:12:3', '  1 warning found', ''].join('\n')
+const GREEN_GATE_FORWARDING_WARNING = [
+	'',
+	'✔ lint (pnpm josh lint) 4.2s',
+	THIRD_PARTY_WARNING,
+	GATE_PASSED_BODY,
+].join('\n')
+const RED_GATE_FORWARDING_WARNING = [
+	'',
+	LINT_STEP_FAILED,
+	THIRD_PARTY_WARNING,
+	'✗ verification gate failed: lint (15.1s)',
+].join('\n')
+// `josh health` and `josh propagate` state no overall verdict, so their failure rows are still read
+// from the icon exactly as before — the half of the acceptance criteria a per-command pattern list
+// would have dropped.
+const HEALTH_FAILED_BODY = ['', '  ✔ prettier    ', '  ✗ eslint      ', ''].join('\n')
+const PROPAGATE_FAILED_BODY = [
+	'',
+	'  ✓ joshuafolkken/app-kit  propagated',
+	'  ✗ joshuafolkken/game-kit  the verification gate failed',
+	'',
+].join('\n')
 
 function at(minute: number): string {
 	return new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString()
@@ -86,6 +111,54 @@ describe('reading a failure line out of what a josh command printed', () => {
 	it('leaves a green gate alone', () => {
 		expect(time_reported_failure.has_failure_line(GATE_PASSED_BODY)).toBe(false)
 	})
+})
+
+// The command's own verdict outranks the lines it forwarded (joshuafolkken/kit#1374).
+describe("a gate body carrying another tool's output", () => {
+	// The first acceptance criterion of joshuafolkken/kit#1374.
+	it('leaves a green gate alone when it forwarded a third-party line opening with the icon', () => {
+		expect(time_reported_failure.has_failure_line(GREEN_GATE_FORWARDING_WARNING)).toBe(false)
+	})
+
+	it('still reads a red gate that forwarded the same body', () => {
+		expect(time_reported_failure.has_failure_line(RED_GATE_FORWARDING_WARNING)).toBe(true)
+	})
+
+	// The second: a josh command that states no verdict is read from the icon exactly as before.
+	it('still finds the failure row of a josh command that prints no verdict', () => {
+		expect(time_reported_failure.has_failure_line(HEALTH_FAILED_BODY)).toBe(true)
+		expect(time_reported_failure.has_failure_line(PROPAGATE_FAILED_BODY)).toBe(true)
+	})
+
+	// The floor the fallback preserves: a body truncated past the verdict is read as it was before.
+	it('falls back to the icon when the verdict line was truncated away', () => {
+		const truncated = RED_GATE_FORWARDING_WARNING.split('\n').slice(0, 2).join('\n')
+
+		expect(time_reported_failure.has_failure_line(truncated)).toBe(true)
+	})
+
+	// One call may run the gate twice; a red one followed by a green one is still a call that failed.
+	it('keeps the failure when one body carries both verdicts', () => {
+		const both = [RED_GATE_FORWARDING_WARNING, GATE_PASSED_BODY].join('\n')
+
+		expect(time_reported_failure.has_failure_line(both)).toBe(true)
+	})
+
+	// A green verdict speaks for what it summarized, not for whatever ran after it. `command_segment`
+	// labels a chain by its first segment, so both commands' output arrives under `josh gate`.
+	it('still reads a failure printed after a green verdict by the next command in the chain', () => {
+		const chained = [GREEN_GATE_FORWARDING_WARNING, HEALTH_FAILED_BODY].join('\n')
+
+		expect(time_reported_failure.has_failure_line(chained)).toBe(true)
+	})
+
+	// `josh propagate` runs each consumer's gate with inherited stdio, so a consumer's green verdict
+	// lands above propagate's own per-repository report.
+	it("still reads propagate's report under a consumer gate's inherited verdict", () => {
+		const inherited = [GATE_PASSED_BODY, PROPAGATE_FAILED_BODY].join('\n')
+
+		expect(time_reported_failure.has_failure_line(inherited)).toBe(true)
+	})
 
 	// The guard that keeps this from being a guess: only josh's output is written by this repository.
 	it('ignores a failure line in a call that ran no josh command', () => {
@@ -112,6 +185,17 @@ describe('the outcome a span carries', () => {
 
 	it('leaves a green gate read through the same pipe a success', () => {
 		const lines = [bash_call(0, 'g1', GATE_COMMAND), bash_result(1, 'g1', GATE_PASSED_BODY, false)]
+
+		expect(outcomes_of(lines)).toStrictEqual([time_spans.OK_OUTCOME])
+	})
+
+	// joshuafolkken/kit#1374: the same pipe, over a green gate that forwarded a warning body of its
+	// own. The re-run charged against this call was the cost of getting it wrong.
+	it('leaves a green gate that forwarded a third-party failure mark a success', () => {
+		const lines = [
+			bash_call(0, 'g1', GATE_COMMAND),
+			bash_result(1, 'g1', GREEN_GATE_FORWARDING_WARNING, false),
+		]
 
 		expect(outcomes_of(lines)).toStrictEqual([time_spans.OK_OUTCOME])
 	})
