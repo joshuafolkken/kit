@@ -157,14 +157,20 @@ function expand_target(target: string): Expansion {
 // left the tables with nothing at all to say it had been read (joshuafolkken/kit#1367). Whatever the
 // expansion did name is kept beside it, since a deeper unclassifiable name is the more specific
 // thing to classify.
+//
+// **Both halves are kept rather than one chosen over the other.** `expand_target` happens to leave
+// `checks` empty on the branch that returns command lines, so picking one half would read the same
+// today — and would silently drop a check the day that stops being true, which is the failure this
+// whole function exists to report.
 function merge_target(target: string, expansion: Expansion, deeper: CommandChecks): CommandChecks {
-	if (expansion.commands.length === 0) {
-		return { checks: expansion.checks, unresolved: expansion.unresolved }
-	}
+	const checks = [...expansion.checks, ...deeper.checks]
+	const unresolved = [...expansion.unresolved, ...deeper.unresolved]
 
-	if (deeper.checks.length > 0) return deeper
+	// A target that expanded to nothing has already named itself in `expansion.unresolved`; only one
+	// that did expand can reach the end of its own walk having named no check at all.
+	if (expansion.commands.length === 0 || checks.length > 0) return { checks, unresolved }
 
-	return { checks: [], unresolved: [target, ...deeper.unresolved] }
+	return { checks, unresolved: [target, ...unresolved] }
 }
 
 // One level of the walk: what these command lines name outright, and what each of their `josh`
