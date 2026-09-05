@@ -41,6 +41,7 @@ words:
   - commondir
   - precheck
   - backlinks
+  - bundleable
   - fromjson
   - dryrun
   - overridability

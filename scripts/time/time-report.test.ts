@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { time_bundles } from './time-bundles'
 import { time_failures } from './time-failures'
 import { time_invocations } from './time-invocations'
 import { time_phases } from './time-phases'
@@ -344,6 +345,27 @@ describe('time_report.format_report — the round-trip block withholds rather th
 		expect(text).toContain(time_report.TRIPS_LABEL)
 		expect(line_of(text, time_report.COST_LABEL)).toContain(time_report.NOT_MEASURED)
 		expect(text).not.toContain(DENSITY_SUFFIX)
+	})
+})
+
+// joshuafolkken/kit#1344. The counts above say how often a run went round and what one trip cost;
+// this says how much of it was avoidable, which is what a mechanism to prevent it is sized against.
+describe('time_report.format_report — the bundling block', () => {
+	it('prints what a run could have batched beside what it did', () => {
+		const text = time_report.format_report(build(MIXED))
+
+		expect(text).toContain(time_bundles.HEADING)
+		expect(text).toContain(time_bundles.RECOVERABLE_LABEL)
+	})
+
+	it('withholds the block where no span was read rather than reporting nothing to recover', () => {
+		const text = time_report.format_report(run_report([], MINUTE_MS))
+
+		expect(line_of(text, time_bundles.RECOVERABLE_LABEL)).toContain(time_report.NOT_MEASURED)
+	})
+
+	it('carries the totals into the machine-readable report', () => {
+		expect(build(MIXED).bundles.is_measured).toBe(true)
 	})
 })
 
