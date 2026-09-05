@@ -400,6 +400,20 @@ function starts_at_or_after(span: Span, boundary_ms: number | undefined): boolea
 // are charged here with whatever followed them. That is the deliberate half of the trade, measured
 // at under a minute against the 9.9 minutes of a *following* conversation that `wrapup` would
 // otherwise have reported as this run's own work.
+//
+// **So `wrapup` and `post-run` meet at one instant: the end of the last `josh followup` span**
+// (joshuafolkken/kit#1428). Everything from the pull request opening to that instant is `wrapup`, and
+// everything starting at or after it is `post-run`. Neither is discarded and neither is the other's
+// remainder — the boundary is a command's end, which the transcript records, rather than a judgement
+// about where the work felt finished.
+//
+// **A hand reading closes the run earlier than this, and the difference is not a disagreement.** A
+// person measuring a run stops at the final report, so what this charges to `post-run` — `josh ms`,
+// the report itself, and whatever the session did next — falls outside their window entirely. Both
+// readings are right about their own window; comparing a hand figure against `elapsed` rather than
+// against the phases that sit inside their window is what makes them look like two measurements of
+// one thing. The other half of that gap was never a boundary question at all: it was a *different
+// session's* minutes being attributed here, which `time-sessions.ts` now separates out.
 function outside_phase(span: Span, windows: Windows): PhaseName | undefined {
 	if (starts_before(span, windows.workflow_start_ms)) return PRE_RUN_PHASE
 

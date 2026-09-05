@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { time_batch, type RunTiming } from './time-batch'
-import { time_corpus } from './time-corpus'
+import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_epic } from './time-epic'
 import { time_epic_fixture, type ReportInput } from './time-epic-fixture'
 import { time_pull_fixture } from './time-pull-fixture'
@@ -178,6 +178,18 @@ describe('time_epic.build_epic_report — the batch', () => {
 	})
 })
 
+// One child's slice of the walk, distinguishable from the next child's by its transcript count alone
+// — the case below asserts which slice each child was handed, not what is in it.
+function issue_spans(session_count: number): IssueSpans {
+	return {
+		spans: [],
+		session_count,
+		excluded: [],
+		is_separated: false,
+		attributed_count: session_count,
+	}
+}
+
 // The batch reads the transcript corpus once and attributes that one pass to every child. It used
 // to read it inside each child's report, so an eleven-child epic walked 669 files eleven times
 // (joshuafolkken/kit#1284).
@@ -198,8 +210,8 @@ describe('time_epic.build_epic_report — one transcript pass for the whole batc
 	// Each child is still measured against its own slice: one pass must not become one shared answer.
 	it('hands each child the slice collected for its own issue', async () => {
 		const spans = new Map([
-			[101, { spans: [], session_count: 1 }],
-			[102, { spans: [], session_count: 2 }],
+			[101, issue_spans(1)],
+			[102, issue_spans(2)],
 		])
 
 		vi.spyOn(time_corpus, 'collect_for_issues').mockReturnValue(spans)

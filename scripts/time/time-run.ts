@@ -9,6 +9,7 @@ import { time_pull_files, type PullFileList } from './time-pull-files'
 import { time_pull_index } from './time-pull-index'
 import { time_report, type TimeReport } from './time-report'
 import { time_rework, type DiffFacts, type DiffState } from './time-rework'
+import { time_sessions, type ExcludedSession } from './time-sessions'
 import type { Span } from './time-spans'
 
 // One `fullrun`, from the invocation to the merge (joshuafolkken/kit#1268).
@@ -95,6 +96,54 @@ function span_note(found: IssueSpans, issue_number: number): string {
 	}
 
 	return `${String(found.session_count)} transcript(s)`
+}
+
+// The two phrases the session-separation notes are recognized by, written once for the reason
+// `OVERLAP_MARK` is: `--epic` prints a child's notes only where the GitHub half is missing, and a
+// *completed* child is exactly where a concurrent session's minutes used to be summed into the row
+// with nothing saying so (joshuafolkken/kit#1428).
+const EXCLUDED_MARK = 'no workflow marker attributes them to this run'
+const NOT_SEPARATED_MARK = 'the run could not be separated from them'
+
+// **Whether a note is one of the two.** They are recognized together because a renderer that lets one
+// through and not the other would print a corrected figure or an inflated one — and no way to tell
+// which.
+function is_session_note(note: string): boolean {
+	return note.includes(EXCLUDED_MARK) || note.includes(NOT_SEPARATED_MARK)
+}
+
+// **The session id and its minutes, never a count alone.** The id is what a reader opens the
+// transcript by, and without the minutes the note says something was removed while hiding how much —
+// which is the shape this whole separation exists to stop the report having.
+function excluded_entry(one: ExcludedSession): string {
+	return `${one.session_id} (${time_report.format_minutes(one.duration_ms)})`
+}
+
+function excluded_note(found: IssueSpans): Array<string> {
+	const { excluded } = found
+
+	if (excluded.length === 0) return []
+
+	const listed = excluded.map((one) => excluded_entry(one)).join(', ')
+
+	return [
+		`${String(excluded.length)} concurrent session(s) left out — ${listed} — ${EXCLUDED_MARK}`,
+	]
+}
+
+// **`0.0 min` excluded and "could not be separated" are different answers, and only one of them is a
+// measurement.** Several sessions with no workflow marker between them is a corpus this command
+// cannot cut, and reporting it as an exclusion of nothing would read as a run nobody shared —
+// precisely the state whose figures are least trustworthy.
+function not_separated_note(found: IssueSpans, issue_number: number): Array<string> {
+	if (found.is_separated || found.attributed_count < time_sessions.AMBIGUOUS_MINIMUM) return []
+
+	const scope = `to issue #${String(issue_number)}`
+	const held = `${NOT_SEPARATED_MARK}, and every figure below still holds all of them`
+
+	return [
+		`${String(found.attributed_count)} sessions are attributed ${scope} and none carries a workflow marker — ${held}`,
+	]
 }
 
 // The phrase the overlap note is recognized by, written once so a renderer that has to let the note
@@ -335,6 +384,8 @@ function to_report(facts: RunFacts): TimeReport {
 	const window = window_of(found.spans, search.pull)
 	const notes = [
 		span_note(found, facts.issue_number),
+		...excluded_note(found),
+		...not_separated_note(found, facts.issue_number),
 		pull_note(search, facts.issue_number),
 		...check_note(facts.is_check_read_failed, facts.issue_number),
 		...cycle_note(facts.ci, facts.issue_number),
@@ -421,6 +472,7 @@ const time_run = {
 	is_overlap_note,
 	is_check_read_note,
 	is_diff_read_note,
+	is_session_note,
 	issue_of,
 	build_run_report,
 	build_latest_run_report,
