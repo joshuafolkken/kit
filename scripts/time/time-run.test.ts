@@ -307,6 +307,46 @@ describe('time_run.build_run_report — transcripts that overlap in wall clock',
 	})
 })
 
+// Which sessions the run's figures were taken from, said out loud (joshuafolkken/kit#1428). A branch
+// belongs to the checkout, so a second session open in the same work tree used to be summed into every
+// figure with nothing saying so.
+describe('time_run.build_run_report — sessions that only shared the checkout', () => {
+	it('names the concurrent session it left out, with its minutes', async () => {
+		write_session('ran', fixture.run_lines(0))
+		write_session('other', fixture.concurrent_lines())
+
+		const report = await report_of(NO_PULL_SCRIPT)
+
+		expect(report.elapsed_ms).toBe(THREE_MINUTES_MS)
+		expect(report.notes.join(NOTE_SEPARATOR)).toContain('1 concurrent session(s) left out')
+		expect(report.notes.join(NOTE_SEPARATOR)).toContain('other (3.0 min)')
+	})
+
+	// `0` excluded and "could not be separated" are different answers, and only one of them is a
+	// measurement — so the second is printed in words rather than as an exclusion of nothing.
+	it('says the run could not be separated rather than reporting nothing excluded', async () => {
+		write_session('one', issue_lines(0))
+		write_session('other', fixture.concurrent_lines())
+
+		const report = await report_of(NO_PULL_SCRIPT)
+		const notes = report.notes.join(NOTE_SEPARATOR)
+
+		expect(notes).toContain('2 sessions are attributed to issue')
+		expect(notes).toContain('the run could not be separated from them')
+		expect(notes).not.toContain('left out')
+	})
+
+	// The guarantee neither note is allowed to cost: a run measured in one session reports exactly what
+	// it reported before, note for note.
+	it('says nothing where one session holds the whole run', async () => {
+		write_session('ran', fixture.run_lines(0))
+
+		const report = await report_of(NO_PULL_SCRIPT)
+
+		expect(report.notes).toHaveLength(BASE_NOTE_COUNT)
+	})
+})
+
 // A merge on a branch that is not `<N>-<slug>` names no issue, and guessing one would report some
 // other run's figures under its number.
 const NON_ISSUE_PULL = `[{"number":1,"created_at":"${at(0)}","merged_at":"${at(1)}","head":{"ref":"renovate/x","sha":"${SHA}"}}]`

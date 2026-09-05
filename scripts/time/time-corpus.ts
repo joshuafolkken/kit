@@ -2,6 +2,7 @@ import { cost_attribute } from '#scripts/cost/cost-attribute'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
 import { time_duplicate, type SessionSpans } from './time-duplicate'
 import { time_overlap } from './time-overlap'
+import { time_sessions, type ExcludedSession } from './time-sessions'
 import { time_spans, type Span } from './time-spans'
 
 // The project's transcripts, read once and attributed to every issue asked about
@@ -56,6 +57,12 @@ function absorb(seen: Map<string, Span>, spans: ReadonlyArray<Span>): boolean {
 interface IssueSpans {
 	spans: Array<Span>
 	session_count: number
+	// The sessions attributed to the issue that no workflow marker says ran it, left out of `spans`
+	// above (joshuafolkken/kit#1428). Empty is both "nothing was concurrent" and "nothing could be
+	// separated", which is why the flag below is carried beside it rather than derived from it.
+	excluded: Array<ExcludedSession>
+	is_separated: boolean
+	attributed_count: number
 }
 
 // Drained with a loop rather than a spread of `Map#values()`: `Iterator#toArray` is not in this
@@ -78,14 +85,19 @@ function values_of(seen: ReadonlyMap<string, Span>): Array<Span> {
 // counting ask different questions: the subtraction is per session, whether a transcript contributed
 // anything is about the whole run, and a resumed transcript is a copy of an earlier one whichever
 // session it sits under.
+//
+// **The transcript count is per session rather than one running total** (joshuafolkken/kit#1428).
+// Summed over every session it is exactly the total it replaced; kept per session, it can be summed
+// over the sessions that survive the separation instead — so `3 transcript(s)` does not stand above
+// spans from two of them.
 interface Collector {
 	by_session: Map<string, SessionSpans>
 	counted: Map<string, Span>
-	session_count: number
+	transcripts: Map<string, number>
 }
 
 function new_collector(): Collector {
-	return { by_session: new Map(), counted: new Map(), session_count: NO_SESSIONS }
+	return { by_session: new Map(), counted: new Map(), transcripts: new Map() }
 }
 
 // **Grouped by the session a transcript belongs with, not pooled.** A unit's work overlaps the wait
@@ -93,8 +105,7 @@ function new_collector(): Collector {
 // session's spans would delete real work: two sessions attributed to one issue can run at the same
 // wall clock — a batch in the background while someone works interactively — and the interactive
 // session's spans would fall inside a foreign unit's window and vanish with no note.
-function group_for(by_session: Map<string, SessionSpans>, file: SessionFile): SessionSpans {
-	const owner = cost_transcript.owning_session_id(file)
+function group_for(by_session: Map<string, SessionSpans>, owner: string): SessionSpans {
 	const found = by_session.get(owner) ?? { own: new Map(), delegated: new Map() }
 
 	by_session.set(owner, found)
@@ -102,14 +113,19 @@ function group_for(by_session: Map<string, SessionSpans>, file: SessionFile): Se
 	return found
 }
 
+function count_transcript(transcripts: Map<string, number>, owner: string): void {
+	transcripts.set(owner, (transcripts.get(owner) ?? NO_SESSIONS) + 1)
+}
+
 // One transcript's contribution to one issue. Where a file's spans go is the only thing its origin
 // decides.
 function absorb_spans(collector: Collector, file: SessionFile, spans: ReadonlyArray<Span>): void {
-	const group = group_for(collector.by_session, file)
+	const owner = cost_transcript.owning_session_id(file)
+	const group = group_for(collector.by_session, owner)
 
 	absorb(file.is_delegated ? group.delegated : group.own, spans)
 
-	if (absorb(collector.counted, spans)) collector.session_count += 1
+	if (absorb(collector.counted, spans)) count_transcript(collector.transcripts, owner)
 }
 
 // Each session's spans resolved against its own units, then folded together under the same key — a
@@ -139,16 +155,45 @@ function resolved_spans(by_session: ReadonlyMap<string, SessionSpans>): Array<Sp
 	return values_of(seen)
 }
 
+// How many transcripts the sessions that survived the separation contributed. **Counted from the
+// kept sessions rather than from the whole walk**, so the note above the report and the spans beneath
+// it are about the same set.
+function transcripts_in(
+	transcripts: ReadonlyMap<string, number>,
+	kept: ReadonlyMap<string, SessionSpans>,
+): number {
+	let count = NO_SESSIONS
+
+	for (const [session_id] of kept) count += transcripts.get(session_id) ?? NO_SESSIONS
+
+	return count
+}
+
+// **The separation runs before the duplicate assignment and the delegated subtraction, not after
+// them** (joshuafolkken/kit#1428). Both of those resolve overlaps *within* a run, and a foreign
+// session's spans are not an overlap to resolve — they are somebody else's work, and leaving them in
+// until the arithmetic has run only means the arithmetic ran over a corpus that was never this run's.
 function to_issue_spans(collector: Collector): IssueSpans {
+	const split = time_sessions.separate(collector.by_session)
+
 	return {
-		spans: resolved_spans(collector.by_session),
-		session_count: collector.session_count,
+		spans: resolved_spans(split.kept),
+		session_count: transcripts_in(collector.transcripts, split.kept),
+		excluded: split.excluded,
+		is_separated: split.is_separated,
+		attributed_count: split.attributed_count,
 	}
 }
 
 // Built per call rather than shared, so no two callers hold the same `spans` array instance.
 function empty_spans(): IssueSpans {
-	return { spans: [], session_count: NO_SESSIONS }
+	return {
+		spans: [],
+		session_count: NO_SESSIONS,
+		excluded: [],
+		is_separated: false,
+		attributed_count: NO_SESSIONS,
+	}
 }
 
 // Which of the issues asked about this transcript can contribute to, paired with what accumulates
