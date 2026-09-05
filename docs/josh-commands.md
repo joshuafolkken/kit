@@ -162,6 +162,30 @@ A path given as an argument that this cannot use — one the tree no longer hold
 josh lint:related: ignored — prettier and eslint take different flags: --fix
 ```
 
+### `josh lines`
+
+Print how many code lines a file already has against the `max-lines` limit, and how many are left.
+
+```bash
+pnpm josh lines scripts/format-edited-file.ts scripts/josh/josh-logic.ts  # alias: josh ln
+```
+
+```
+limit 300 code lines · near from 255
+scripts/format-edited-file.ts  230/300 code lines (76%), 70 to spare
+scripts/josh/josh-logic.ts  179/300 code lines (59%), 121 to spare
+```
+
+**It answers before the writing starts, which is the whole point** ([#1425](https://github.com/joshuafolkken/kit/issues/1425)). `pnpm josh lint` reports the file line limit only once it has been broken — measured by hand on run #1406 (PR #1422, 45.8 minutes), **19.8% of the whole run, 543 seconds, went on reacting to `max-lines` after the implementation was already finished**: five gate runs, four `pnpm josh lint` runs, 115 seconds of tool execution and 353 seconds of model time in between. The splitting was correct work; deciding it after the fact rather than at design time was not. `CLAUDE.md` → Code Change Rules Step 0 is what makes a run consult this, and `prompts/collaboration-workflow/report-format.md` → 「行数予算は編集前に読む」 carries the procedure.
+
+- **`near from` is printed with every report.** "Near the limit" starts at 85% of the limit — 255 of 300, so 45 code lines of headroom, a little under two functions at the 25-line function limit. The boundary is printed rather than left implicit so a reader who sees the advice on one file can tell which side the next one is on.
+- **It never fails on a large file.** The limit is lint's to enforce, and a second command exiting non-zero on the same condition would be a second enforcement point for it — the door to satisfying a limit by counting differently rather than by splitting. A non-zero exit means the argument list was unusable. Nothing here changes the limit.
+- **The count is lint's own, not a second counting method.** `max-lines` runs with `skipBlankLines` and `skipComments`, so it is neither `wc -l` nor anything read off the text ([#1070](https://github.com/joshuafolkken/kit/issues/1070)); this command runs **the same eslint `pnpm josh lint` runs**, with `max-lines` lowered to `max: 0` so the rule reports unconditionally, and prints the number the rule itself reported. The eslint **CLI** is used rather than its in-process API because the two disagree: on eslint 10.10.0 with this repository's config, a file beginning with `#!` counts one line lower through `Linter.verify` / `ESLint#lintFiles` than through the CLI — 300 against the gate's 301 — and every `scripts/*.ts` entry point has a hashbang.
+- **A path with no number says so, and says which kind.** A file eslint ignores, one no configuration covers and one it cannot parse each print `not counted: eslint reports no max-lines for this path`; a path that is not a file at all prints `not counted: no such file`, because it was never sent to eslint and a row quoting eslint's verdict for it would be a claim about a question nobody asked. Neither prints a blank, which would read as zero. **A file eslint _did_ lint and this rule did not fire on has 0 code lines** — a comments-and-blank-lines module, since the counting skips both — and that is reported as `0/300` rather than as "not counted".
+- **Only regular files are read.** A directory is reported as `not counted: no such file` rather than expanded: every path asked about shares one eslint run, and one argument eslint cannot match makes it exit with no JSON at all, which would leave every other path in the call unanswered.
+- The percentage is floored, not rounded, so it can never print `85%` on a file the advice has not warned about.
+- The function limit (25 code lines) is not this command's subject; `pnpm josh lint` reports it.
+
 ### `josh format`
 
 Format code with prettier and eslint.
