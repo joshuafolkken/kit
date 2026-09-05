@@ -1,5 +1,6 @@
 import { version_targets } from '#scripts/version/version-targets'
 import { git_epic_close } from './git-epic-close'
+import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_notify, type GitNotifyConfig } from './git-notify'
@@ -10,6 +11,8 @@ import { CHECK_STATUS_PASS, git_pr_checks_parse, type PrStateSnapshot } from './
 import { git_pr_coderabbit } from './git-pr-coderabbit'
 import { github_issue_url } from './github-issue-url'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
+
+const { STAGE, lap } = git_followup_stages
 
 const CLOSES_PATTERN = /closes\s+#\d+/iu
 // Named so a test can pin the note without restating it (joshuafolkken/kit#999).
@@ -279,14 +282,20 @@ async function notify_completion(
 	)
 }
 
+// The three stages the Issue's own breakdown names as (1), (2) and (3), marked separately because
+// they answer different questions: the check wait is time GitHub took, and the two comment scans are
+// requests this command chose to make.
 async function run_review_checks(
 	input: FollowupInput,
 	context: TelegramContext,
+	log: StageLog,
 ): Promise<Array<string>> {
 	const snapshot = await run_checks({
 		branch_name: input.branch_name,
 		is_skip_watch: input.is_skip_watch,
 	})
+
+	lap(log, STAGE.checks_wait)
 	const check_notes = read_coderabbit_skip_notes(snapshot)
 
 	log_skip_notes(check_notes)
@@ -294,29 +303,30 @@ async function run_review_checks(
 		branch_name: input.branch_name,
 		ignore_reason: input.coderabbit_ignore_reason,
 	})
+
+	lap(log, STAGE.coderabbit_comments)
 	const ai_review_notes = await git_pr_ai_review.handle_ai_review_findings({
 		branch_name: input.branch_name,
 		ignore_reason: input.ai_review_ignore_reason,
 		context,
 	})
 
+	lap(log, STAGE.ai_review_comments)
+
 	return [...check_notes, ...comment_notes, ...ai_review_notes]
 }
 
-async function run(input: FollowupInput): Promise<void> {
-	await warn_if_missing_closes(input.branch_name)
-
-	const context = await fetch_telegram_context({
-		branch_name: input.branch_name,
-		issue_number: input.issue_number,
-	})
-
-	const skip_notes = await run_review_checks(input, context)
-
-	await notify_completion(context, skip_notes)
-
+// Everything after the merge gate opened. Split out of `run_stages` so each half stays inside the
+// per-function line limit, and cut at the notification because that is where the run stops being able
+// to fail safely: the Telegram has gone out and the merge is next.
+async function run_wrapup(
+	input: FollowupInput,
+	context: TelegramContext,
+	log: StageLog,
+): Promise<void> {
 	if (input.should_merge) {
 		await git_gh_command.pr_merge(input.branch_name)
+		lap(log, STAGE.merge)
 	}
 
 	await post_completion_notification({
@@ -326,10 +336,50 @@ async function run(input: FollowupInput): Promise<void> {
 		pr_url: context.pr_url,
 	})
 
+	lap(log, STAGE.completion_comment)
 	await git_epic_close.close_completed_epics({
 		issue_number: input.issue_number,
 		is_merged: input.should_merge,
 	})
+
+	lap(log, STAGE.epic_close)
+}
+
+async function run_stages(input: FollowupInput, log: StageLog): Promise<void> {
+	await warn_if_missing_closes(input.branch_name)
+
+	lap(log, STAGE.closes_check)
+	const context = await fetch_telegram_context({
+		branch_name: input.branch_name,
+		issue_number: input.issue_number,
+	})
+
+	lap(log, STAGE.context)
+	const skip_notes = await run_review_checks(input, context, log)
+
+	await notify_completion(context, skip_notes)
+
+	lap(log, STAGE.telegram)
+	await run_wrapup(input, context, log)
+}
+
+// **The stage block is printed on the way out of every run, failed ones included**
+// (joshuafolkken/kit#1349). A `followup` that exits non-zero on an AI-review blocker or a red check is
+// the invocation whose wait was longest, and one that printed nothing would leave the measurement
+// blind to exactly those. The `catch` marks the lap that was still running so the failing stage is
+// reported rather than dropped, and rethrows unchanged — a silent run is still a failed run.
+async function run(input: FollowupInput): Promise<void> {
+	const log = git_followup_stages.new_log()
+
+	try {
+		await run_stages(input, log)
+	} catch (error) {
+		lap(log, STAGE.interrupted)
+
+		throw error
+	} finally {
+		git_followup_stages.print_stages(log)
+	}
 }
 
 const git_pr_followup = {
