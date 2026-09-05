@@ -111,6 +111,18 @@ function josh_call_line(minute: number, branch: string, command: string, id = CA
 	})
 }
 
+// An `Edit` call naming the file it edits (joshuafolkken/kit#1387). `call_line` above carries no tool
+// input, so every span it writes names no target at all — and a suite measuring which edits reached the
+// merged diff cannot express its subject without one.
+function edit_call_line(minute: number, branch: string, file_path: string, id = CALL_ID): string {
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_use', name: 'Edit', id, input: { file_path } }] },
+	})
+}
+
 // A second session working the same issue over the same three minutes, with span instants the unit's
 // do not share — otherwise the cross-session dedupe collapses the two and the case says nothing.
 function concurrent_lines(branch: string = BRANCH): Array<string> {
@@ -223,6 +235,7 @@ const time_transcript_fixture = {
 	ms,
 	prompt_line,
 	call_line,
+	edit_call_line,
 	josh_call_line,
 	result_line,
 	turn_call_line,

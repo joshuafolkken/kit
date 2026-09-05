@@ -5,8 +5,10 @@ import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
 import type { Interval } from './time-overlap'
 import { time_phases } from './time-phases'
+import { time_pull_files, type PullFileList } from './time-pull-files'
 import { time_pull_index } from './time-pull-index'
 import { time_report, type TimeReport } from './time-report'
+import { time_rework, type DiffFacts, type DiffState } from './time-rework'
 import type { Span } from './time-spans'
 
 // One `fullrun`, from the invocation to the merge (joshuafolkken/kit#1268).
@@ -132,6 +134,30 @@ function check_note(is_failed: boolean, issue_number: number): Array<string> {
 	]
 }
 
+// The phrase the refused-diff note is recognized by, written once for the reason `OVERLAP_MARK` is: a
+// child whose diff read was refused *did* read its merge, so `--epic` and `--last` would print an
+// unexplained `not measured` change size with no sentence saying why (joshuafolkken/kit#1387).
+const DIFF_READ_MARK = 'the merged diff could not be read'
+
+function is_diff_read_note(note: string): boolean {
+	return note.includes(DIFF_READ_MARK)
+}
+
+// **An unread diff and a pull request that changed nothing print differently, and only one of them is a
+// measurement.** Every other figure in the report stays right — the diff is read for the reconciliation
+// alone — so without this the block reads as a run that changed no file and abandoned no edit, which is
+// the one state a refused read cannot support. It is emitted only where a merged pull request was
+// actually asked about: a run with no merge refused nothing, and `pull_note` already says so.
+function diff_note(state: DiffState, issue_number: number): Array<string> {
+	if (state !== time_rework.DIFF_REFUSED) return []
+
+	const scope = `for issue #${String(issue_number)}`
+
+	return [
+		`${DIFF_READ_MARK} ${scope} — the change size and the landed/dropped column say \`not measured\` for that reason, not because nothing changed`,
+	]
+}
+
 // The phrase the withheld-cycle note is recognized by, written once for the reason `OVERLAP_MARK` is.
 const CYCLE_READ_MARK = 'the CI cycles could not be read'
 
@@ -208,32 +234,82 @@ interface RunFacts {
 	// rows because an empty `checks` is both answers and only one of them is a measurement.
 	is_check_read_failed: boolean
 	ci: CiFacts
+	// The merged diff, in the three states a read of it has (joshuafolkken/kit#1387). `refused` is what
+	// the note below is written from; `absent` is an issue with no merged pull request, where nothing was
+	// refused because nothing was asked.
+	diff: DiffFacts
+}
+
+// Everything a merged pull request adds to the facts. Split out of `gather` so that function stays the
+// two-branch answer it always was rather than growing a fetch inside one of them.
+type MergedFacts = Omit<RunFacts, 'issue_number' | 'found' | 'search'>
+
+// What one merged pull request is read with. A record rather than five positional parameters, which
+// the four-parameter limit forbids anyway (joshuafolkken/kit#1387).
+interface MergedInput {
+	pull: PullSummary
+	merged_ms: number
+	found: IssueSpans
+	read: GhReader
+	// The work tree the transcript's absolute paths sit under, which is what makes them comparable with
+	// the diff's repository-relative ones. It is the directory the transcripts were found by, so the two
+	// halves of the reconciliation are keyed on one idea of "this project".
+	cwd: string
+}
+
+function diff_facts(files: PullFileList, cwd: string): DiffFacts {
+	const state = files.is_failed ? time_rework.DIFF_REFUSED : time_rework.DIFF_READ
+
+	return { files: files.files, state, root: cwd }
+}
+
+// **The two reads are issued together rather than one after the other.** Neither needs the other's
+// answer, and a batch scope pays this wait once per child (joshuafolkken/kit#1387). The CI facts do
+// need the check list, so they follow it.
+async function read_merged(input: MergedInput): Promise<MergedFacts> {
+	const { pull, merged_ms, found, read } = input
+	const [list, files] = await Promise.all([
+		time_github.list_check_runs(pull.head_sha, read),
+		time_pull_files.list_pull_files(pull.number, read),
+	])
+	const ci = await time_ci.build_facts({ pull, merged_ms, spans: found.spans, head: list, read })
+
+	return {
+		checks: time_checks.build_check_totals(list.runs, merged_ms),
+		is_check_read_failed: list.is_failed,
+		ci,
+		diff: diff_facts(files, input.cwd),
+	}
+}
+
+// What one run is measured from. A record rather than five positional parameters, which the
+// four-parameter limit forbids anyway — `cwd` joined it when the diff reconciliation needed the work
+// tree the transcript's absolute paths sit under (joshuafolkken/kit#1387).
+interface RunInput {
+	issue_number: number
+	found: IssueSpans
+	read: GhReader
+	search: PullSearch
+	cwd: string
 }
 
 // The pull request is passed in rather than looked up here, because the no-argument path has already
 // found it: resolving it and then searching for it again pages the same listing twice, spends up to
 // ten requests where one would do, and lets the two reads disagree when a pull request merges
 // between them.
-async function gather(
-	issue_number: number,
-	found: IssueSpans,
-	read: GhReader,
-	search: PullSearch,
-): Promise<RunFacts> {
+async function gather(input: RunInput): Promise<RunFacts> {
+	const { issue_number, found, search, read, cwd } = input
 	const { pull } = search
 	const merged_ms = pull?.merged_ms
+	const head = { issue_number, found, search }
 
 	if (pull === undefined || merged_ms === undefined) {
 		const empty = { checks: [], is_check_read_failed: false, ci: time_ci.NO_CI }
 
-		return { issue_number, found, search, ...empty }
+		return { ...head, ...empty, diff: time_rework.NO_DIFF }
 	}
 
-	const list = await time_github.list_check_runs(pull.head_sha, read)
-	const checks = time_checks.build_check_totals(list.runs, merged_ms)
-	const ci = await time_ci.build_facts({ pull, merged_ms, spans: found.spans, head: list, read })
-
-	return { issue_number, found, search, checks, is_check_read_failed: list.is_failed, ci }
+	return { ...head, ...(await read_merged({ pull, merged_ms, found, read, cwd })) }
 }
 
 // **The two CI figures differ by exactly the cycles the merge command sat on, and the note is what
@@ -262,6 +338,7 @@ function to_report(facts: RunFacts): TimeReport {
 		pull_note(search, facts.issue_number),
 		...check_note(facts.is_check_read_failed, facts.issue_number),
 		...cycle_note(facts.ci, facts.issue_number),
+		...diff_note(facts.diff.state, facts.issue_number),
 	]
 	const report = time_report.build_from_spans({
 		scope: `issue #${String(facts.issue_number)}`,
@@ -269,6 +346,7 @@ function to_report(facts: RunFacts): TimeReport {
 		started_ms: window.started_ms,
 		ended_ms: window.ended_ms,
 		ci: facts.ci,
+		diff: facts.diff,
 		notes,
 		by_check: facts.checks,
 	})
@@ -308,7 +386,7 @@ async function build_run_report(
 	const search = sources.search ?? (await time_pull_index.pull_for_issue(issue_number, read))
 	const found = sources.found ?? time_corpus.collect_issue_spans(cwd, issue_number)
 
-	return to_report(await gather(issue_number, found, read, search))
+	return to_report(await gather({ issue_number, found, read, search, cwd }))
 }
 
 function issue_of(pull: PullSummary | undefined): number | undefined {
@@ -334,14 +412,15 @@ async function build_latest_run_report(
 
 	if (issue_number === undefined) return undefined
 
-	return to_report(
-		await gather(issue_number, time_corpus.collect_issue_spans(cwd, issue_number), read, search),
-	)
+	const found = time_corpus.collect_issue_spans(cwd, issue_number)
+
+	return to_report(await gather({ issue_number, found, read, search, cwd }))
 }
 
 const time_run = {
 	is_overlap_note,
 	is_check_read_note,
+	is_diff_read_note,
 	issue_of,
 	build_run_report,
 	build_latest_run_report,
