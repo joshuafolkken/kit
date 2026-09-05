@@ -9,7 +9,9 @@
 //
 // **It holds no timing knowledge at all** — no spans, no categories, no phases. That is what keeps
 // the dependency one-way: `time-report.ts` and `time-failures.ts` both import this, and nothing here
-// imports either of them.
+// imports either of them. **The words two blocks must spell identically are the exception**, and they
+// are here for the reason `NO_CALLS` is: a label printed by two renderers, one of which cannot import
+// the other, has to be written once or the two reports come to disagree about what a row is called.
 
 const MS_PER_MINUTE = 60_000
 const MS_PER_SECOND = 1000
@@ -29,6 +31,16 @@ const NOT_MEASURED = 'not measured'
 // than in `time-report.ts` because two blocks print it — the round-trip price and the bundling block —
 // and `time-bundles.ts` cannot import `time-report.ts`, which imports it (joshuafolkken/kit#1344).
 const NO_CALLS = 'no tool call to divide'
+// The category labels, shared with the epic scope's table and with the round-trip block's price row
+// rather than spelled out in each. The tables answer the same question at three scales, so a label
+// renamed in one and not the others is a report that disagrees with itself — which is the defect
+// joshuafolkken/kit#1295 was filed for. They moved here from `time-report.ts` when the price row
+// became a third printer and its block a module that cannot import that file
+// (joshuafolkken/kit#1385).
+const MODEL_LABEL = 'model wait'
+const TOOL_LABEL = 'tool execution'
+const HUMAN_LABEL = 'human wait'
+const CI_LABEL = 'CI wait'
 // How many rows of a table any of these reports prints. Capped, because a long run touches thirty-odd
 // distinct leading commands and a table that long is read by nobody. `--json` carries every row the
 // report holds, so the display cap costs a caller nothing.
@@ -100,6 +112,10 @@ const time_format = {
 	NO_CALLS,
 	SUFFIX_SEPARATOR,
 	NOT_MEASURED,
+	MODEL_LABEL,
+	TOOL_LABEL,
+	HUMAN_LABEL,
+	CI_LABEL,
 	overflow_line,
 	format_minutes,
 	format_seconds,

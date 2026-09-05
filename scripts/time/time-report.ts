@@ -8,6 +8,13 @@ import { time_phases, type PhaseTotal } from './time-phases'
 import { time_round_trips } from './time-round-trips'
 import { time_segments, type Segment } from './time-segments'
 import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
+import {
+	time_tool_turns,
+	type ToolTurnCounts,
+	type TurnSplit,
+	type TurnTotals,
+} from './time-tool-turns'
+import { time_trips } from './time-trips'
 
 // Aggregating timed spans into the report a person reads (joshuafolkken/kit#1267).
 //
@@ -26,29 +33,12 @@ const NOT_DETECTED = 'not detected'
 const { format_minutes, format_seconds, format_share, format_columns, format_row, unmeasured_row } =
 	time_format
 const PHASE_HEADING = 'By phase (in run order):'
-const ROUND_TRIP_HEADING = 'Round trips:'
-const CALLS_LABEL = 'tool calls'
-const TRIPS_LABEL = 'round trips'
-// What one of those trips cost. The label says `cost` rather than `elapsed` because the row is read
-// as a unit price — the thing a proposed cut is multiplied by (joshuafolkken/kit#1307).
-const COST_LABEL = 'cost per round trip'
-// The unit the density and its floor are both quoted in, written once so the row and the warning
-// beneath it cannot come to name it differently.
-const PER_ROUND_TRIP = 'calls per round trip'
-// What the trips row says instead of a density when there were no round trips to divide by. Read from
-// `time-format.ts` since joshuafolkken/kit#1344, so the bundling block withholds in the same words.
-const { NO_CALLS } = time_format
-const NO_DENSITY = 0
-// The one sentence the threshold exists to produce. It names what is not happening rather than the
-// number, because the number is already in the row above it.
-const BATCHING_WARNING = 'independent calls are going out one per turn'
-// The category labels, shared with the epic scope's table rather than spelled out in each. The two
-// tables answer the same question at two scales, so a label renamed in one and not the other is a
-// report that disagrees with itself — which is the defect joshuafolkken/kit#1295 was filed for.
-const MODEL_LABEL = 'model wait'
-const TOOL_LABEL = 'tool execution'
-const HUMAN_LABEL = 'human wait'
-const CI_LABEL = 'CI wait'
+// The round-trip block moved to `time-trips.ts` when this file passed its length limit
+// (joshuafolkken/kit#1385) — the shape `time-bundles.ts` and `time-failures.ts` already have, where a
+// block owns its own rendering and this file calls one function per block. Its labels are re-exported
+// below under the names they always had. The four category labels went to `time-format.ts` in the same
+// move, because that block's price row prints one of them and cannot import this file.
+const { MODEL_LABEL, TOOL_LABEL, HUMAN_LABEL, CI_LABEL, NO_CALLS } = time_format
 
 // `ci_ms` is the fourth share (joshuafolkken/kit#1268): the part of the pull request's
 // open→merge window that no transcript span covers. Disjoint from the other three by construction,
@@ -68,6 +58,12 @@ interface LabelTotal {
 	call_count: number
 }
 
+// A per-tool row, which carries two counts the per-`josh <cmd>` table does not
+// (joshuafolkken/kit#1385). **The two tables are deliberately different shapes here**: a `josh`
+// subcommand is one `Bash` call under another name, so its round trips are already the `Bash` row's —
+// printing them again would report the same trip twice under two labels in one report.
+type ToolTotal = LabelTotal & ToolTurnCounts
+
 // What every table's rows have in common, so the one renderer below lays out the per-tool totals and
 // the per-check rows alike rather than acquiring a second copy of the cap, the overflow note and the
 // widths (joshuafolkken/kit#1310). What differs between them is the third column, which is the
@@ -77,7 +73,15 @@ interface RowTotal {
 	duration_ms: number
 }
 
-interface TimeReport {
+// `TurnSplit` is inherited rather than restated (joshuafolkken/kit#1385): `batched_turn_count` and
+// `single_call_turn_count` say how the round trips below divided between the turns that issued several
+// calls and the turns that issued one. The density says a run is not batching; only these say how much
+// of the run that verdict rests on — over 101 round trips, 7 turns of two calls against 94 single-call
+// ones and 3 turns issuing three and four calls against 98 both read 1.07, and the second run has
+// less than half as much batching to build on. **Withheld with the block they are printed in**
+// rather than on a test of their own, so `span_count: 0` reports them unmeasured exactly as it reports
+// the counts they sit beside.
+interface TimeReport extends TurnSplit {
 	// What was measured: `session <id>` for one session, `issue #<N>` for a whole run. A label rather
 	// than a session id, because a run spans sessions and has no single one to name.
 	scope: string
@@ -127,7 +131,7 @@ interface TimeReport {
 	// (joshuafolkken/kit#1311). Every span lands in exactly one segment, so these sum to the three
 	// transcript shares — the phase table's total without the CI share, which no span covers.
 	segments: Array<Segment>
-	by_tool: Array<LabelTotal>
+	by_tool: Array<ToolTotal>
 	by_josh_command: Array<LabelTotal>
 	// One row per command that was called more than once, carrying each call's own duration
 	// (joshuafolkken/kit#1311). The two tables above say what a command cost in total; only this says
@@ -246,6 +250,30 @@ function per_round_trip_costs(
 	}
 }
 
+// The six tables a report carries beside its totals. Grouped into one builder so `build_from_spans`
+// stays a list of the run's own figures — every one of these is a walk of the same spans that another
+// module owns, and only `by_tool` needs anything the totals computed.
+type ReportTables = Pick<
+	TimeReport,
+	'phases' | 'segments' | 'by_tool' | 'by_josh_command' | 'by_invocation' | 'by_check'
+>
+
+function report_tables(input: ReportInput, turns: TurnTotals): ReportTables {
+	const { spans } = input
+
+	return {
+		phases: time_phases.build_phases({ spans, ci: input.ci }),
+		segments: time_segments.build_segments(spans),
+		by_tool: time_tool_turns.with_turn_counts(
+			totals_by(spans, (span) => span.label),
+			turns.by_label,
+		),
+		by_josh_command: totals_by(spans, (span) => span.josh_command),
+		by_invocation: time_invocations.build_invocations(spans),
+		by_check: [...input.by_check],
+	}
+}
+
 // **Elapsed is the sum of the four shares, not the window's length.** For one session the two are
 // the same, because its spans tile its window exactly. For a run they are not: two sessions with a
 // day between them leave real time that belonged to nobody, and counting it as elapsed would report
@@ -256,6 +284,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 	const categories = category_totals(spans, ci.ci_ms)
 	const elapsed_ms = categories.model_ms + categories.tool_ms + categories.human_ms + ci.ci_ms
 	const counts = span_counts(spans)
+	const turns = time_tool_turns.build_turns(spans)
 
 	return {
 		scope: input.scope,
@@ -263,17 +292,13 @@ function build_from_spans(input: ReportInput): TimeReport {
 		ended_at: to_iso(input.ended_ms),
 		elapsed_ms,
 		...counts,
+		...turns.split,
 		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
 		bundles: time_bundles.build_bundles(spans),
 		categories,
 		has_ci_data: ci.has_ci_data,
 		notes: [...input.notes],
-		phases: time_phases.build_phases({ spans, ci }),
-		segments: time_segments.build_segments(spans),
-		by_tool: totals_by(spans, (span) => span.label),
-		by_josh_command: totals_by(spans, (span) => span.josh_command),
-		by_invocation: time_invocations.build_invocations(spans),
-		by_check: [...input.by_check],
+		...report_tables(input, turns),
 		failures: time_failures.build_failures(spans),
 	}
 }
@@ -306,69 +331,6 @@ function phase_lines(report: TimeReport): Array<string> {
 	if (report.phases.length === 0) return []
 
 	return ['', PHASE_HEADING, ...report.phases.map((phase) => phase_line(phase, report.elapsed_ms))]
-}
-
-// The threshold's whole output. Printed only when the density is under the floor, because a run that
-// batches has nothing to say here and a line that appears every time is one nobody reads.
-function batching_warning_lines(density: number): Array<string> {
-	if (!time_round_trips.is_below_floor(density)) return []
-
-	const floor = time_round_trips.format_density(time_round_trips.CALLS_PER_ROUND_TRIP_FLOOR)
-
-	return [`  ⚠ ${BATCHING_WARNING} (floor ${floor} ${PER_ROUND_TRIP})`]
-}
-
-// **A transcript that was read but called no tool has no density, and says so.** The division
-// answers `0` there, which is the same value an unread transcript produces — printing it as
-// `0.00 calls per round trip` would report the worst possible batching for a scope that did no
-// batching to grade.
-function density_text(density: number): string {
-	if (density === NO_DENSITY) return NO_CALLS
-
-	return `${time_round_trips.format_density(density)} ${PER_ROUND_TRIP}`
-}
-
-// **A count nobody priced cannot be ranked** (joshuafolkken/kit#1307). Forty round trips is a
-// number; forty at twelve seconds each is eight minutes, which is what a proposed cut is weighed
-// against the slowest command with. The model share rides in the suffix because it is the part
-// batching actually removes — a tool's own execution is paid whichever turn it is issued from.
-//
-// **Withheld on the density, not on a second test of its own.** A density of zero means there was no
-// round trip to divide by, so the unit price has nothing behind it either — deciding that twice would
-// let the two rows come to disagree about what was measured.
-function cost_line(report: TimeReport, density: number): string {
-	if (density === NO_DENSITY) return format_columns(COST_LABEL, '', NO_CALLS)
-
-	const model_cost = `${MODEL_LABEL} ${format_seconds(report.model_ms_per_round_trip)}`
-
-	return format_columns(COST_LABEL, format_seconds(report.ms_per_round_trip), model_cost)
-}
-
-function measured_round_trip_lines(report: TimeReport): Array<string> {
-	const { tool_call_count, round_trip_count, turn_count } = report
-	const density = time_round_trips.per_round_trip(tool_call_count, round_trip_count)
-
-	return [
-		format_columns(CALLS_LABEL, String(tool_call_count), `over ${String(turn_count)} turn(s)`),
-		format_columns(TRIPS_LABEL, String(round_trip_count), density_text(density)),
-		cost_line(report, density),
-		...batching_warning_lines(density),
-	]
-}
-
-// **A run whose transcript was not read has no round trips to report, and says so** — the same
-// answer, on the same criterion, that the three category shares already give. A count of `0` here
-// would read as a run that called no tool at all, which is never true of a run that merged.
-function round_trip_lines(report: TimeReport): Array<string> {
-	const heading = ['', ROUND_TRIP_HEADING]
-
-	if (!time_spans.has_transcript_data(report.span_count)) {
-		const rows = [CALLS_LABEL, TRIPS_LABEL, COST_LABEL].map((label) => unmeasured_row(label))
-
-		return [...heading, ...rows]
-	}
-
-	return [...heading, ...measured_round_trip_lines(report)]
 }
 
 function ci_line(report: TimeReport): Array<string> {
@@ -405,6 +367,17 @@ function category_lines(report: TimeReport): Array<string> {
 // totals. The check table answers something else entirely, which is why the column is a parameter.
 function call_suffix(row: LabelTotal): string {
 	return `${String(row.call_count)} call(s)`
+}
+
+// **What the per-tool table says that the per-`josh <cmd>` table does not** (joshuafolkken/kit#1385):
+// the round trips this tool consumed, and how many of its calls were the only call in their turn. A
+// row reading `40 call(s) · 40 round trip(s) · 40 alone` names the tool to batch, which is the sentence
+// the density one block above could never produce.
+function tool_suffix(row: ToolTotal): string {
+	const trips = `${String(row.round_trip_count)} round trip(s)`
+	const alone = `${String(row.alone_in_turn_count)} alone`
+
+	return [call_suffix(row), trips, alone].join(time_format.SUFFIX_SEPARATOR)
 }
 
 function total_lines<Row extends RowTotal>(
@@ -444,14 +417,14 @@ function format_report(report: TimeReport): string {
 		...category_lines(report),
 		...phase_lines(report),
 		...time_segments.segment_lines(report.segments),
-		...round_trip_lines(report),
+		...time_trips.trip_lines(report),
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_failures.failure_lines(
 			report.failures,
 			report.tool_call_count,
 			report.categories.tool_ms,
 		),
-		...total_lines('By tool (descending):', report.by_tool, call_suffix),
+		...total_lines('By tool (descending):', report.by_tool, tool_suffix),
 		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
 		...time_invocations.invocation_lines(report.by_invocation),
 		...total_lines(time_checks.CHECK_HEADING, report.by_check, time_checks.check_suffix),
@@ -464,13 +437,16 @@ const time_report = {
 	NOT_DETECTED,
 	NOT_MEASURED: time_format.NOT_MEASURED,
 	PHASE_HEADING,
-	ROUND_TRIP_HEADING,
-	CALLS_LABEL,
-	TRIPS_LABEL,
-	COST_LABEL,
-	PER_ROUND_TRIP,
+	// The round-trip block's own names, re-exported so every caller keeps asking one namespace after
+	// the block moved to `time-trips.ts` (joshuafolkken/kit#1385).
+	ROUND_TRIP_HEADING: time_trips.HEADING,
+	CALLS_LABEL: time_trips.CALLS_LABEL,
+	TRIPS_LABEL: time_trips.TRIPS_LABEL,
+	BATCHED_TURNS_LABEL: time_trips.BATCHED_TURNS_LABEL,
+	COST_LABEL: time_trips.COST_LABEL,
+	PER_ROUND_TRIP: time_trips.PER_ROUND_TRIP,
 	NO_CALLS,
-	BATCHING_WARNING,
+	BATCHING_WARNING: time_trips.BATCHING_WARNING,
 	MODEL_LABEL,
 	TOOL_LABEL,
 	HUMAN_LABEL,
@@ -489,5 +465,5 @@ const time_report = {
 	format_report,
 }
 
-export type { CategoryTotals, LabelTotal, ReportInput, TimeReport }
+export type { CategoryTotals, LabelTotal, ReportInput, TimeReport, ToolTotal }
 export { time_report }

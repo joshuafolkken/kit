@@ -5,10 +5,11 @@ import { time_cli } from './time-cli'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import type { InvocationTotal } from './time-invocations'
-import type { LabelTotal, TimeReport } from './time-report'
+import type { TimeReport, ToolTotal } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
 import type { Segment } from './time-segments'
+import { time_tool_turns } from './time-tool-turns'
 
 // The cap as a module and as the flag that reaches it, in one suite (joshuafolkken/kit#1301). The
 // command tests sit here rather than in `time-cli.test.ts` so the tables a cut report is built from
@@ -29,11 +30,15 @@ const CAP = 2
 const SESSION_NOTE = '1 session(s)'
 const WITHHELD = 'withheld by --top'
 
-function rows(count: number, prefix: string): Array<LabelTotal> {
+// Built as a per-tool row, which is `by_tool`'s shape since joshuafolkken/kit#1385 and a superset of
+// `by_josh_command`'s — so one builder still fills both tables rather than acquiring a second.
+function rows(count: number, prefix: string): Array<ToolTotal> {
 	return Array.from({ length: count }, (_unused, index) => ({
 		label: `${prefix}-${String(index)}`,
 		duration_ms: (count - index) * MINUTE_MS,
 		call_count: 1,
+		round_trip_count: 1,
+		alone_in_turn_count: 1,
 	}))
 }
 
@@ -90,6 +95,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		turn_count: 1,
 		tool_call_count: 1,
 		round_trip_count: 1,
+		...time_tool_turns.NO_TURN_SPLIT,
 		ms_per_round_trip: MINUTE_MS,
 		model_ms_per_round_trip: MINUTE_MS,
 		categories: { model_ms: MINUTE_MS, tool_ms: 0, human_ms: 0, ci_ms: 0 },
