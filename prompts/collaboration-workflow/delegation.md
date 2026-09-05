@@ -12,5 +12,6 @@
 - 候補が落ちる理由は 2 つ（検証経路が無い／誤りの波及が大きい）であることと、`kept deliberately` / `kept by default` の区別
 - 機構（どう委譲し失敗をどう露出させるか）と単位（何を委譲するか）を分けること。`epic-child` は 2 つ目の機構ではなく同じ列挙の 1 行であり、`queue` の 1 件も同じ 1 行で走る
 - `epic-child` の検証経路は親が GitHub 上の子の状態を読むことであって、実行単位が返す要約ではないこと
+- 実装前の下調べは「編集しないファイル」の読み取り数が閾値に達したところから委譲し、結論と根拠の `file:line` だけを本流へ返すこと（全文は返さない）。閾値の数値そのものは単一ソース側（`scripts/delegation/delegation-policy.ts` と手順書）にあり、ここには書かない。閾値が予測ではなく数え上げである理由とその実測根拠、使い捨ての検証スクリプトが委譲側で完結すること、`survey`（どこに現れるか／`grep` で検証）と `diagnosis`（却下のまま）との境界
 
 工程の列挙そのものは `scripts/delegation/delegation-policy.ts` が単一ソースで、人が読める形は [`docs/josh-commands.md`](../../docs/josh-commands.md) →「`josh delegate`」にある。

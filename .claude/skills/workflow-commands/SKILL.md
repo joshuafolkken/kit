@@ -144,6 +144,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 - **A prerequisite discovered mid-run is a dependency rather than a park**, at every entry point —
   §2d. It is the third thing a run can discover, beside an upstream defect and a split, and the one
   whose procedure is neither of theirs.
+- **The pre-implementation reading goes to a delegated unit once the count of subject files reaches
+  the threshold §2b names** — §2b →
+  "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
+  subject is delegated, a file this run will edit is read in the main line, and what comes back is
+  the conclusion plus its `file:line` citations rather than the text.
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
   the Issue instead.
@@ -362,8 +367,55 @@ discarded the very thing that made the unit delegatable. The per-entry procedure
 delegated unit"; the enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in
 readable form by `docs/josh-commands.md` → "`josh delegate`".
 
-This section is the single source of the rule; `prompts/collaboration-workflow/delegation.md` is a
-pointer to it (joshuafolkken/kit#1183 rollout of the joshuafolkken/kit#1174 pattern).
+### The pre-implementation reading — what goes to a unit, and from which file
+
+**The investigation in front of an implementation is reading, and reading is what a delegated unit is
+for** (joshuafolkken/kit#1426). Run #1406 (PR #1422) spent **494 seconds — 18.0% of a 45.8-minute run
+— before its first edit**, of which **443 s (89.7%) was model wait and 51 s (10.3%) was tool
+execution**: 40 turns, 43 calls. **The tools cost almost nothing.** What cost was the round trips
+*after* what had been read piled up in the main line — 18 `Read` calls, over 150,000 characters,
+riding in the prompt of every later turn, with the run's four largest waits (72.2 / 51.8 / 44.0 /
+43.4 s) all falling after a large read in its second half against a per-turn average of 8.8 s.
+
+**The line is what the file is for, not how large it is.** Reading to understand the Issue's subject
+goes to the unit; reading a file this run is about to edit stays in the main line, because the main
+line cannot issue an `Edit` against text it does not hold.
+
+**What comes back is the conclusion plus the `file:line` citations that support it — never the file
+text.** Returning the text puts the whole cost back where it was and buys nothing. A throwaway probe
+script is written, run and deleted inside the unit, which returns its output alone.
+
+**The threshold is 3 files, and it is a count, not a forecast: the read that takes the count of files
+the run will not edit up to it is where the reading goes to a unit of its own.** The ones below it stay
+in the main line, and **the unit is not sent back over them** — the brief carries what the main line
+already concluded from them, and the unit reads on from where the count tripped, so nothing is read
+twice and no conclusion rests on a third of the evidence. Delegating costs two extra
+main-line turns — one to write the brief, one to read the result — which at run #1406's measured 8.8 s
+of model wait per turn is about **18 seconds**; the fork's own reading is work that would have been
+paid either way. Against that, one subject file of that run's average size (~8,300 characters, ~2,100
+tokens) is re-sent on every remaining turn, and the run's own second half puts the turns following its
+large reads at 43–72 s against that 8.8 s average. So one file already sits near the break-even and
+three (~25,000 characters, ~6,300 tokens carried) is several times past it, while at one or two the
+brief itself costs about what reading the file would — which is why the number is 3 rather than 1.
+**Counting is what removes the judgement**: the reads are counted as they are made rather than
+predicted before the investigation starts, so a small investigation never trips it and pays no
+overhead at all. The number is derived from run #1406's figures rather than from a controlled
+comparison, and `pnpm josh delegate --list` prints it — the verdict command prints the verifier, so it
+is the listing that carries the count.
+
+**One trigger, deliberately.** A second arm on characters read would need a tie-break against the file
+count, and neither number is measured more precisely than the other — so the character figures above
+are the derivation of the one number and not a second rule.
+
+**It is not `survey`, and it is not `diagnosis`.** `survey` reports *where* something appears and is
+checked by one `grep` of what it claimed; this reports *how the subject works* and is checked by
+opening the lines it cited. `diagnosis` stays **kept**: the unit reports what the code does, and what
+that means and what to change is the main line's, so a unit that returned a root cause would be
+delegating the rejected row under this row's name.
+
+**The whole of §2b — the subsection above included — is the single source of the rule**;
+`prompts/collaboration-workflow/delegation.md` is a pointer to it (joshuafolkken/kit#1183 rollout of
+the joshuafolkken/kit#1174 pattern).
 
 ## 2c. The `owner/repo#` prefix — which repository the run acts on
 
