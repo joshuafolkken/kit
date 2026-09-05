@@ -165,15 +165,22 @@ function newest_per_issue(runs: ReadonlyArray<MergedRun>): IssueFold {
 // `skipped_within` applies to a branchless merge, asked here as issue membership rather than as a
 // merge instant, because a fold is tied to the run it folded into rather than to a boundary.
 //
-// Deduplicated because a listing that shifts mid-walk can hand the same pull request back on two
-// pages, and sorted so the same set of runs always reports the same sentence.
+// **A row is never reported as folded into itself.** A listing paginated by update time can hand the
+// same pull request back on a later page if something touched it mid-walk, and the second copy folds
+// into the first — so without the second filter the command would name a pull request that is sitting
+// in the table as its own duplicate, which is a false reading of the one fact this exists to state.
+// The number set is what catches it; issue membership cannot, because the two copies share an issue.
+//
+// Deduplicated for the same reason, and sorted so the same set of runs always reports the same
+// sentence.
 function collapsed_within(
 	collapsed: ReadonlyArray<MergedRun>,
 	runs: ReadonlyArray<MergedRun>,
 ): Array<number> {
-	const kept = new Set(runs.map((run) => run.issue_number))
+	const issues = new Set(runs.map((run) => run.issue_number))
+	const shown = new Set(runs.map((run) => run.pull.number))
 	const numbers = collapsed
-		.filter((run) => kept.has(run.issue_number))
+		.filter((run) => issues.has(run.issue_number) && !shown.has(run.pull.number))
 		.map((run) => run.pull.number)
 
 	return [...new Set(numbers)].toSorted((left, right) => right - left)

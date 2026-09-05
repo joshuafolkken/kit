@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { time_github } from './time-github'
-import { time_last_select, type RunSelection } from './time-last-select'
+import { time_last_select, type MergedRun, type RunSelection } from './time-last-select'
 import { time_pull_fixture, type RawPull } from './time-pull-fixture'
 
 // Which runs "the last N" are (joshuafolkken/kit#1312).
@@ -133,6 +133,41 @@ describe('time_last_select.select_last_runs — the rows it collapses', () => {
 		const selection = await select([[open, NEWEST]], TWO)
 
 		expect(selection.runs.map((run) => run.issue_number)).toEqual([201])
+	})
+})
+
+function merged_run(pull_number: number, issue_number: number): MergedRun {
+	return {
+		issue_number,
+		merged_ms: NONE,
+		pull: {
+			number: pull_number,
+			branch: `${String(issue_number)}-a-change`,
+			head_sha: '',
+			created_ms: NONE,
+			merged_ms: NONE,
+			updated_ms: NONE,
+		},
+	}
+}
+
+// The guard is asked here rather than through a walk, because reaching it that way needs a page full
+// to its hundred-row ceiling: a short page ends the listing, so nothing can be handed back twice.
+describe('time_last_select.collapsed_within', () => {
+	// A listing paginated by update time hands the same pull request back on a later page when
+	// something touched it mid-walk. The second copy folds into the first, and reporting it would name
+	// a row sitting in the table as its own duplicate — a false reading of the one fact this states.
+	it('does not report a row that is itself in the answer', () => {
+		const kept = merged_run(1, 201)
+
+		expect(time_last_select.collapsed_within([kept], [kept])).toEqual([])
+	})
+
+	it('reports a genuinely different merge of an issue that is in the answer', () => {
+		const kept = merged_run(1, 201)
+		const revert = merged_run(REVERT_PULL, 201)
+
+		expect(time_last_select.collapsed_within([revert], [kept])).toEqual([REVERT_PULL])
 	})
 })
 
