@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { time_model_gaps } from './time-model-gaps'
 import { time_round_trips } from './time-round-trips'
 import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span } from './time-spans'
@@ -115,21 +116,21 @@ describe('time_round_trips.count_calls', () => {
 // the shape of a run stopping to answer.
 const ANSWERED = [MODEL, MODEL, TOOL, MODEL, HUMAN]
 
-describe('time_round_trips.issuing_model_ms', () => {
+describe('time_model_gaps.issuing_model_ms', () => {
 	// Both model spans issued a round trip, so both are charged: one turn batched three calls and the
 	// next issued one.
 	it('charges the model time of every turn that opened a round trip', () => {
-		expect(time_round_trips.issuing_model_ms(BATCHED)).toBe(2 * time_span_fixture.MINUTE_MS)
+		expect(time_model_gaps.issuing_model_ms(BATCHED)).toBe(2 * time_span_fixture.MINUTE_MS)
 	})
 
 	// The two spans before the call are one turn's composition and are charged; the one after it went
 	// to an answer, and charging it would price each round trip above what cutting one returns.
 	it('leaves out the model time of a turn that called nothing', () => {
-		expect(time_round_trips.issuing_model_ms(ANSWERED)).toBe(2 * time_span_fixture.MINUTE_MS)
+		expect(time_model_gaps.issuing_model_ms(ANSWERED)).toBe(2 * time_span_fixture.MINUTE_MS)
 	})
 
 	it('charges nothing where no round trip was opened', () => {
-		expect(time_round_trips.issuing_model_ms([MODEL, HUMAN])).toBe(0)
+		expect(time_model_gaps.issuing_model_ms([MODEL, HUMAN])).toBe(0)
 	})
 
 	// A call whose middle went to a delegated unit: the lead, the unit's own work ending in the
@@ -139,19 +140,19 @@ describe('time_round_trips.issuing_model_ms', () => {
 	it("does not carry a delegated unit's answer past the tail of the call that bracketed it", () => {
 		const spans = [MODEL, TOOL, MODEL, CONTINUATION, MODEL, TOOL]
 
-		expect(time_round_trips.issuing_model_ms(spans)).toBe(2 * time_span_fixture.MINUTE_MS)
+		expect(time_model_gaps.issuing_model_ms(spans)).toBe(2 * time_span_fixture.MINUTE_MS)
 	})
 })
 
 // The stretches the mean above is the mean of (joshuafolkken/kit#1386).
-describe('time_round_trips.issuing_model_gaps', () => {
+describe('time_model_gaps.issuing_model_gaps', () => {
 	// **One stretch per round trip, so the distribution and the mean share a denominator.** A walk that
 	// produced fewer would put the spread above the price the report prints beside it.
 	it('hands back one stretch for every round trip the run made', () => {
-		expect(time_round_trips.issuing_model_gaps(SERIAL)).toHaveLength(
+		expect(time_model_gaps.issuing_model_gaps(SERIAL)).toHaveLength(
 			time_round_trips.count_round_trips(SERIAL),
 		)
-		expect(time_round_trips.issuing_model_gaps(BATCHED)).toHaveLength(
+		expect(time_model_gaps.issuing_model_gaps(BATCHED)).toHaveLength(
 			time_round_trips.count_round_trips(BATCHED),
 		)
 	})
@@ -159,17 +160,17 @@ describe('time_round_trips.issuing_model_gaps', () => {
 	// The mean is defined as the sum of these, rather than folded separately — which is what stops the
 	// two from coming to disagree about what was charged.
 	it('sums to exactly the issuing model time', () => {
-		const total = time_round_trips
+		const total = time_model_gaps
 			.issuing_model_gaps(ANSWERED)
 			.reduce((sum, gap) => sum + gap.duration_ms, 0)
 
-		expect(total).toBe(time_round_trips.issuing_model_ms(ANSWERED))
+		expect(total).toBe(time_model_gaps.issuing_model_ms(ANSWERED))
 	})
 
 	// A round trip opened with nothing pending is a stretch of zero, not a stretch that did not happen:
 	// the leading tool span here had no turn in front of it at all.
 	it('records a round trip nothing preceded as a stretch of zero', () => {
-		const [first] = time_round_trips.issuing_model_gaps([TOOL, MODEL, TOOL])
+		const [first] = time_model_gaps.issuing_model_gaps([TOOL, MODEL, TOOL])
 
 		expect(first?.duration_ms).toBe(0)
 		expect(first?.started_ms).toBe(first?.ended_ms)
@@ -185,10 +186,114 @@ describe('time_round_trips.issuing_model_gaps', () => {
 			{ ...MODEL, ended_ms: 10 * MINUTE_MS },
 			{ ...TOOL, ended_ms: 11 * MINUTE_MS },
 		]
-		const [only] = time_round_trips.issuing_model_gaps(spans)
+		const [only] = time_model_gaps.issuing_model_gaps(spans)
 
 		expect(only?.duration_ms).toBe(2 * MINUTE_MS)
 		expect(only?.ended_ms).toBe(10 * MINUTE_MS)
+	})
+})
+
+// joshuafolkken/kit#1406. Claude Code writes each `tool_use` block as its own assistant line and the
+// harness returns each result as it arrives, so one turn issuing three calls reaches the timeline as
+// `use → result → use → result → use → result` — every call separated from the next by that same
+// turn's own model span.
+const TURN = 'msg-1'
+const NEXT_TURN = 'msg-2'
+
+function in_turn(span: Span, message_id: string): Span {
+	return { ...span, message_id }
+}
+
+const INTERLEAVED = [
+	in_turn(MODEL, TURN),
+	in_turn(TOOL, TURN),
+	in_turn(MODEL, TURN),
+	in_turn(TOOL, TURN),
+	in_turn(MODEL, TURN),
+	in_turn(TOOL, TURN),
+]
+
+describe('time_round_trips.count_round_trips — one turn, whatever order its results arrived in', () => {
+	// The run stopped once, so it made one round trip. Measured on run #1399, which the adjacency rule
+	// read as 47 round trips where the run made 40.
+	it('counts a turn whose calls arrived one at a time as one round trip', () => {
+		expect(time_round_trips.count_round_trips(INTERLEAVED)).toBe(1)
+	})
+
+	it('holds all three calls in that one group', () => {
+		expect(time_round_trips.group_round_trips(INTERLEAVED).map((trip) => trip.length)).toEqual([3])
+	})
+
+	it('opens a round trip where the next call belongs to the next turn', () => {
+		const spans = [
+			in_turn(MODEL, TURN),
+			in_turn(TOOL, TURN),
+			in_turn(MODEL, NEXT_TURN),
+			in_turn(TOOL, NEXT_TURN),
+		]
+
+		expect(time_round_trips.count_round_trips(spans)).toBe(2)
+	})
+
+	// A person typed between the two, so the second turn was composed after an interruption whatever
+	// id the transcript repeated on it.
+	it('reopens a round trip across a human wait', () => {
+		const spans = [in_turn(TOOL, TURN), HUMAN, in_turn(TOOL, TURN)]
+
+		expect(time_round_trips.count_round_trips(spans)).toBe(2)
+	})
+
+	// **The adjacency rule is the fallback, not the definition.** The very same shape carrying no
+	// message id measures exactly as it did before this change, so a transcript that never wrote one
+	// is not silently re-scored to a round trip per call.
+	it('falls back to adjacency where the transcript wrote no message id', () => {
+		// Three calls with nothing to group them by, read exactly as they were before this change.
+		expect(time_round_trips.count_round_trips([MODEL, TOOL, MODEL, TOOL, MODEL, TOOL])).toBe(3)
+	})
+})
+
+describe('time_model_gaps.issuing_model_gaps — a turn that issued several calls', () => {
+	// **One stretch, holding the whole turn's model time.** A round trip is a whole turn, so its price
+	// is everything that turn composed — including what it wrote between its second and third call.
+	// Charging only the part before the first call priced a batched turn below what removing it returns,
+	// and both the bundling and single-check blocks multiply that price out as a saving.
+	it('charges the composing between a turn own calls to the trip it opened', () => {
+		const gaps = time_model_gaps.issuing_model_gaps(INTERLEAVED)
+
+		expect(gaps).toHaveLength(1)
+		expect(time_model_gaps.issuing_model_ms(INTERLEAVED)).toBe(3 * time_span_fixture.MINUTE_MS)
+	})
+
+	// The invariant the distribution and the mean share: still one stretch per round trip, so the spread
+	// cannot come to sit above the price printed beside it.
+	it('still hands back one stretch for every round trip', () => {
+		expect(time_model_gaps.issuing_model_gaps(INTERLEAVED)).toHaveLength(
+			time_round_trips.count_round_trips(INTERLEAVED),
+		)
+	})
+})
+
+describe('time_round_trips.count_turns', () => {
+	// One turn that thought and then issued three calls is seven spans and one turn. Counting the
+	// model spans instead reported run #1399's 41 turns as 79.
+	it('counts one turn per assistant message rather than per model span', () => {
+		expect(time_round_trips.count_turns(INTERLEAVED)).toBe(1)
+	})
+
+	it('counts a turn for each distinct message', () => {
+		const spans = [in_turn(MODEL, TURN), in_turn(TOOL, TURN), in_turn(MODEL, NEXT_TURN)]
+
+		expect(time_round_trips.count_turns(spans)).toBe(2)
+	})
+
+	// A span carrying no id is its own turn: every one of them shares the empty string, and folding
+	// them would report a transcript written without ids as a single turn.
+	it('counts a model span carrying no message id as a turn of its own', () => {
+		expect(time_round_trips.count_turns([MODEL, MODEL, TOOL])).toBe(2)
+	})
+
+	it('counts no turn where nothing but tools and waits were read', () => {
+		expect(time_round_trips.count_turns([TOOL, HUMAN])).toBe(0)
 	})
 })
 

@@ -216,6 +216,7 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		targets: [],
+		message_id: time_spans.NO_MESSAGE_ID,
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,
