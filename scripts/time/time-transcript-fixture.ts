@@ -162,27 +162,61 @@ function concurrent_lines(branch: string = BRANCH): Array<string> {
 // Code writes one line per content block and repeats the message id on each, which is what lets a
 // turn's calls be counted exactly. `call_line` above stays untagged: every existing caller measures
 // spans, where the id plays no part, and giving each of them a distinct one would say nothing.
-function turn_call_line(minute: number, message_id: string, id: string): string {
+// `input` rides along for the suites that need a call to name something (joshuafolkken/kit#1390): the
+// batching guard reads the target off the input, so a case about a call that depends on an earlier one
+// cannot be expressed without it. Defaulted, so every caller predating it writes exactly the line it
+// always did.
+function turn_call_line(
+	minute: number,
+	message_id: string,
+	id: string,
+	input: unknown = {},
+): string {
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp: at(minute),
 		gitBranch: BRANCH,
-		message: { id: message_id, content: [{ type: 'tool_use', name: 'Read', id }] },
+		message: { id: message_id, content: [{ type: 'tool_use', name: 'Read', id, input }] },
 	})
+}
+
+// The two pieces every turn builder below is assembled from, so the minute grid and the id scheme are
+// written once. A drift between them would put a turn's results on a minute its calls do not precede.
+function turn_minute(turn: number): number {
+	return turn * TURN_MINUTES + 1
+}
+
+function call_ids(turn: number, count: number): Array<string> {
+	return Array.from({ length: count }, (_unused, index) => `t${String(turn)}-c${String(index)}`)
 }
 
 // One turn: `calls` tool calls issued together under one message id, then their results.
 function turn_lines(turn: number, calls: number): Array<string> {
-	const minute = turn * TURN_MINUTES + 1
-	const ids = Array.from(
-		{ length: calls },
-		(_unused, index) => `t${String(turn)}-c${String(index)}`,
-	)
+	const ids = call_ids(turn, calls)
 
 	return [
-		...ids.map((id) => turn_call_line(minute, `msg-${String(turn)}`, id)),
-		...ids.map((id) => result_line(minute + 1, BRANCH, id)),
+		...ids.map((id) => turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id)),
+		...ids.map((id) => result_line(turn_minute(turn) + 1, BRANCH, id)),
 	]
+}
+
+// A turn whose calls have gone out and none has come back — the shape a transcript has at the instant
+// a `PreToolUse` hook reads it (joshuafolkken/kit#1390). One call per target, so a case can say which
+// of them a later call would depend on.
+function open_turn_lines(turn: number, targets: ReadonlyArray<string>): Array<string> {
+	return call_ids(turn, targets.length).map((id, index) =>
+		turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id, { file_path: targets[index] }),
+	)
+}
+
+// The same turn, closed by the results that give its calls spans. A span exists only once its result
+// has come back, which is exactly why the open half above is a builder of its own.
+function target_turn_lines(turn: number, targets: ReadonlyArray<string>): Array<string> {
+	const results = call_ids(turn, targets.length).map((id) =>
+		result_line(turn_minute(turn) + 1, BRANCH, id),
+	)
+
+	return [...open_turn_lines(turn, targets), ...results]
 }
 
 // A whole stretch of identical turns, which is what the live-density reading is measured against: at
@@ -268,6 +302,8 @@ const time_transcript_fixture = {
 	skill_call_line,
 	turn_call_line,
 	turn_lines,
+	open_turn_lines,
+	target_turn_lines,
 	density_text,
 	issue_lines,
 	run_lines,

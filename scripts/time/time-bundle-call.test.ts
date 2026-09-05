@@ -93,3 +93,31 @@ describe('time_bundle_call.bash_facts — what a command names', () => {
 		expect(facts.targets).toHaveLength(time_bundle_call.MAX_TARGETS)
 	})
 })
+
+// The entry a caller holding a raw tool invocation uses — a `PreToolUse` payload, which has not had
+// the shell command read out of its input the way `time-spans.ts` has by the time it asks
+// (joshuafolkken/kit#1390).
+describe('time_bundle_call.call_facts', () => {
+	it('unwraps a Bash input before classifying it', () => {
+		const facts = time_bundle_call.call_facts('Bash', { command: `cat ${READ_PATH}` })
+
+		expect(facts).toEqual({ is_bundleable: true, targets: [READ_PATH] })
+	})
+
+	it('refuses a Bash input that writes', () => {
+		const facts = time_bundle_call.call_facts('Bash', { command: 'pnpm josh followup --merge' })
+
+		expect(facts.is_bundleable).toBe(false)
+	})
+
+	it('reads every other tool from its input fields', () => {
+		expect(time_bundle_call.call_facts('Read', { file_path: OTHER_PATH })).toEqual({
+			is_bundleable: true,
+			targets: [OTHER_PATH],
+		})
+	})
+
+	it('refuses a tool nobody classified', () => {
+		expect(time_bundle_call.call_facts('Task', { path: OTHER_PATH }).is_bundleable).toBe(false)
+	})
+})
