@@ -1770,18 +1770,19 @@ Per invocation (repeated commands):
 **A run is measured from its `fullrun` invocation to the merge, and neither source can say that alone** ([#1268](https://github.com/joshuafolkken/kit/issues/1268)). The transcript stops at the last line anyone wrote, so PR #1263's `createdAt 08:57:20Z → mergedAt 09:00:32Z` — 3 minutes 12 seconds of CI wait and merge — appears in no session file; GitHub has no timestamp for the planning, implementation, gate and review that precede the pull request. And **one run is not one session**: a scan of the 25 most recent transcripts barely finds the branch for issue #1256, because that `fullrun` ran in a different one. So `--issue <N>` joins the two on the issue number — every session attributed to it by branch through `cost_attribute`, unchanged and not copied, plus the pull request's `created_at`, each check-run and `merged_at` from `gh api`.
 
 ```
-issue #1257 — 128.9 min elapsed
-  1 session(s)
+issue #1257 — 129.4 min elapsed
+  2 transcript(s)
   PR #1264 merged
+  2.3 min of the merge command was waiting on CI — the phase table charges it to `ci`
 
 Where the wall clock went:
-  model wait               18.7 min   14.5%
-  tool execution            4.2 min    3.2%
-  human wait              106.0 min   82.3%
-  CI wait                   0.0 min    0.0%
+  model wait               34.7 min   26.8%
+  tool execution           24.7 min   19.1%
+  human wait               70.0 min   54.1%
+  CI wait                   0.0 min   0.0%
 ```
 
-**CI wait is the part of the open→merge window no span already covers**, not the window itself. `followup --merge` waits for CI _inside_ a Bash tool span that is already counted, so adding the window whole would count it twice and leave the four shares summing to more than the run took — the property that makes two runs comparable. Where the run sat watching its own merge, the honest figure is therefore near zero, and the 3 minutes PR #1263 spent unattended is the case the category exists for. The per-check table is informational for the same reason the categories are not: CI jobs run in parallel, so their durations overlap and are never summed into a share.
+**CI wait is the part of the open→merge window no span already covers**, not the window itself. `followup --merge` waits for CI _inside_ a Bash tool span that is already counted, so adding the window whole would count it twice and leave the four shares summing to more than the run took — the property that makes two runs comparable. Where the run sat watching its own merge, the honest figure is therefore near zero, and the 3 minutes PR #1263 spent unattended is the case the category exists for. **No row of the two samples on this page still shows that case**, and the reason is [#1285](https://github.com/joshuafolkken/kit/issues/1285) rather than a run that never waited: a delegated unit's own `pnpm josh followup --merge` span now covers the whole open→merge window, so every `CI wait` figure above reads `0.0 min` while the `ci` **phase** beside it does not — the two answer different questions, as the paragraph below says. The per-check table is informational for the same reason the categories are not: CI jobs run in parallel, so their durations overlap and are never summed into a share.
 
 **The `ci` phase and the `CI wait` share answer two different questions** ([#1384](https://github.com/joshuafolkken/kit/issues/1384)). The share is the paragraph above — the part of the window no span covers. The phase adds what the merge command itself sat waiting for: `josh time` reads the check-runs of **every commit of the pull request**, so a run that pushed twice produces one CI window per cycle, and the part of a window that no span _other than `josh followup`_ covers is charged to `ci` and taken off `merge`. A cycle that ran beside the second review round or beside a gate cost the run nothing extra and stays out of it. Measured on PR #1380 — the pull request of the run the sample above is taken from — whose second cycle ran with nothing else in flight: `ci` went from `0.0 min` to **70.3 seconds** of a 116.7-second merge command, and `merge` from 116.7 to 46.4. The two figures therefore differ on any run that watched its own merge, so a note under the heading says by how much: _1.2 min of the merge command was waiting on CI — the phase table charges it to `ci`_. **A negative `merge_gap` is not evidence that the run did not wait**: `followup --merge` waits for the checks, so they always finish before the merge, and reading the sign as an answer is half of why the phase reported zero. Where the commit listing or a commit's check-runs could not be read the phase prints `not detected` rather than `0.0 min` — the same distinction `span_count: 0` makes for the transcript shares, and the false zero that had `diag` rank a CI proposal last as work with no wall clock behind it.
 
@@ -1802,27 +1803,39 @@ It is printed only where a withheld row actually holds time: most withheld phase
 
 **Two sessions with a gap between them leave time that belonged to nobody.** The header states what was accounted for — the sum of the four shares — and a gap of a minute or more between the wall window and that sum is named in a note rather than charged to the run.
 
-**Two sessions running _at once_ make that sum exceed the window, and that is named too** ([#1330](https://github.com/joshuafolkken/kit/issues/1330)). `--issue 1299` reported `77.6 min elapsed` beside a window of 49.9 minutes and said nothing about the difference, so the headline read as a run half again as long as the time it actually occupied, and every phase percentage was a share of the inflated figure. **The excess is reported rather than subtracted**, because there is nothing to subtract: both sessions really worked in the minutes they shared, and the per-session grouping that resolves a delegated unit against its parent exists precisely so one session's intervals are never removed from another's. So a note names the total, the window, how much was counted twice — `the shares total 77.6 min over a 49.9 min window — 27.6 min of it wall clock concurrent sessions shared` — and, because the point of the figure is ranking the phases, the denominator those percentages are taken against. **`--epic` prints it too**, on a child whose merge was read: that filter exists to explain a missing GitHub half, and every completed child passes it, so without the exception the note would be hidden from exactly the rows whose minutes it qualifies — and those minutes are summed into the batch total. A run whose sessions did not overlap prints no such note and is unchanged.
+**Two sessions running _at once_ make that sum exceed the window, and that is named too** ([#1330](https://github.com/joshuafolkken/kit/issues/1330)). `--issue 1299` reported `77.6 min elapsed` beside a window of 49.9 minutes and said nothing about the difference, so the headline read as a run half again as long as the time it actually occupied, and every phase percentage was a share of the inflated figure. **The excess is reported rather than subtracted**, because there is nothing to subtract: both sessions really worked in the minutes they shared, and the per-session grouping that resolves a delegated unit against its parent exists precisely so one session's intervals are never removed from another's. So a note names the total, the window, how much was counted twice — `the shares total 77.6 min over a 49.9 min window — 27.6 min of it wall clock concurrent sessions shared, …` — and, because the point of the figure is ranking the phases, the denominator those percentages are taken against, which is what the `…` above stands in for and the `#1261` row of the `--epic` sample below prints in full. **`--epic` prints it too**, on a child whose merge was read: that filter exists to explain a missing GitHub half, and every completed child passes it, so without the exception the note would be hidden from exactly the rows whose minutes it qualifies — and those minutes are summed into the batch total. A run whose sessions did not overlap prints no such note and is unchanged.
 
-**`--epic <E>` measures a whole batch, child by child** ([#1271](https://github.com/joshuafolkken/kit/issues/1271)). An `epicrun` is several `fullrun`s, so every slow stage is paid once per child — and which child was long, and whether the run got slower as it went, had no answer that did not start with running `--issue` by hand for each number in the epic body. The children are enumerated by the **epic body parser** (`scripts/git/git-epic-parse.ts`), the one reader of a task list, and each child is measured by exactly the code `--issue` uses; a second enumeration would disagree with `epic:next` about what the batch is, and a second measurement would disagree with `--issue` about what a run took.
+**`--epic <E>` measures a whole batch, child by child** ([#1271](https://github.com/joshuafolkken/kit/issues/1271)). An `epicrun` is several `fullrun`s, so every slow stage is paid once per child — and which child was long, and whether the run got slower as it went, had no answer that did not start with running `--issue` by hand for each number in the epic body. The children are enumerated by the **epic body parser** (`scripts/git/git-epic-parse.ts`), the one reader of a task list, and each child is measured by exactly the code `--issue` uses; a second enumeration would disagree with `epic:next` about what the batch is, and a second measurement would disagree with `--issue` about what a run took. **The block below and the `--issue 1257` block above are one measurement read through two invocations** — `pnpm josh time --epic 1262` and the `pnpm josh time --issue 1257` inside it — so the `#1257` row here carries exactly the figures that block prints, and the two can be checked against each other rather than read side by side on trust ([#1399](https://github.com/joshuafolkken/kit/issues/1399)). Its `…` rows are children left out for length, never rows from another run.
 
 ```
-epic #1262 — 7 child(ren), 5 timed, 338.8 min elapsed
-  2 child(ren) have nothing measured and are reported as "not run" — each row says why
-  3 child(ren) merged with no session transcript attributed, so only their CI wait is known
+epic #1262 — 22 child(ren), 13 timed, 1118.7 min elapsed
+  9 child(ren) have nothing measured and are reported as "not run" — each row says why
 
 By child (in execution order):
-  #1257                   128.9 min   model 18.7 min / tool 4.2 min / human 106.0 min / CI 0.0 min
-  #1256                     3.2 min   CI wait only — no session transcript is attributed to this child
-  #1260                   200.2 min   model 13.8 min / tool 4.8 min / human 181.5 min / CI 0.0 min
-  #1261                               not run
-      no session transcript is attributed to issue #1261
-      no pull request found for issue #1261 among the 500 most recently updated — the CI wait is unknown
+  #1257                   129.4 min   model 34.7 min / tool 24.7 min / human 70.0 min / CI 0.0 min
+  #1256                    28.3 min   model 11.6 min / tool 16.7 min / human 0.0 min / CI 0.0 min
+  #1260                   200.2 min   model 29.1 min / tool 15.9 min / human 155.2 min / CI 0.0 min
+  …
+  #1261                   162.4 min   model 48.1 min / tool 32.8 min / human 81.5 min / CI 0.0 min
+      the shares total 162.4 min over a 69.0 min window — 93.4 min of it wall clock concurrent sessions shared, and every share and phase percentage is of the 162.4 min
+  …
+  #1266                               not run
+      no session transcript is attributed to issue #1266
+      no pull request found for issue #1266 among the 500 most recently updated — the CI wait is unknown
+  …
+
+Where the batch's wall clock went:
+  model wait              355.9 min   31.8%
+  tool execution          274.3 min   24.5%
+  human wait              488.5 min   43.7%
+  CI wait                   0.0 min   0.0%
 
 Model wait per turn (in execution order):
-  #1257                       5.1 s
-  #1260                       9.9 s
-  rising 94% across 2 children
+  #1257                       4.7 s
+  #1256                       3.7 s
+  #1260                       7.7 s
+  …
+  rising 46% across 13 children
 ```
 
 **The per-turn trend is the point of the batch scope, not a decoration.** [#1153](https://github.com/joshuafolkken/kit/issues/1153) measured one context's token cost growing — `$0.257` per request on a 463-request run against `$0.108` on a 16-request one — and nothing said whether the same growth shows up in _time_. Model wait divided by the run's turns is that measurement, printed per child and compared across the batch. **Execution order is when each child ran**, read from what was measured rather than from the order the body lists them: an epic's rows are written before the batch starts, and a child can run out of that order or not at all.
