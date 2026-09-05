@@ -153,6 +153,76 @@ describe(`${SKILL_PATH} — reports the review ratio as a signal, never as a cau
 	})
 })
 
+// joshuafolkken/kit#1403. The round cap's three-way disposition is chosen on every two-round run, and
+// picking "fix it in place" buys a second commit and a second CI cycle in front of the merge — on run
+// #1399, 132.8 s of a 1,198.1 s run. `josh time` already carried every one of those figures as separate
+// rows, so a report printed them and connected nothing; joshuafolkken/kit#1382 asks whether to cut that
+// cost and cannot be decided without it. The markers pin the detector and the four sources, because a
+// price line whose components are re-derived each time is one that stops comparing two runs.
+describe(`${SKILL_PATH} — prices the round-2 disposition rather than listing its pieces`, () => {
+	it.each([
+		'- **what the round-2 disposition cost — the extra commit and the CI cycle behind it**',
+		'**The detector is a `pr` segment *after* the round-2 `review` row.**',
+		'**Sum exactly four stretches, and print each one beside the total**',
+		'132.8 s, 11.1% of a 1,198.1 s run**',
+	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// Both `pr` rows of run #1399 were 43.2 s and 34.5 s against a 177.1 s `merge` and two 260 s
+	// `review` rows, so the default `--top 5` call drops the very evidence this reading is built on —
+	// the detector and the second commit's own duration alike. The 30 s flicker rule takes the same row
+	// away for a different reason, which is why `by_invocation` is read beside the segment listing
+	// rather than after it.
+	it.each([
+		'**Read both from uncapped output, always.**',
+		'under `MIN_SEGMENT_MS` (30 s) is absorbed rather than printed',
+		'**`by_invocation` corroborates it in both directions, and neither answer is read',
+	])('reads the evidence the cap and the flicker rule would cut: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// Every way the sum could claim more than it measured. The `ci` phase is `ci_ms + serial_ci_ms`, so
+	// quoting it whole bills unattended waiting as a CI cycle; a check called once has no
+	// `by_invocation` row at all; a commit repairing a red gate lands where a round-2 fix would; and
+	// the editing itself is a cost every exit but "drop it" would have paid.
+	it.each([
+		'**The sum is a re-reading of rows already in the tables, never minutes to add to the run.**',
+		'**The second CI cycle is the `ci` phase minus `categories.ci_ms`, never the phase whole.**',
+		'**a check called once has no `by_invocation` row**',
+		'report the check as unattributed and the total as a lower',
+		'**That remainder is an *extra* cycle only where the detector fired.**',
+		"**A second `pr` row is not proof the commit was round 2's.**",
+		"**The fix's own editing time stays out of the sum.**",
+	])('does not over-read the price: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
+// The other half of joshuafolkken/kit#1403, and the one its acceptance conditions name explicitly: a
+// run whose round 2 fixed nothing has to read as *did not occur*, never as zero minutes — a detector
+// that reports 0 for both cannot produce the frequency #1382 asks for, since every unreadable run
+// would count as one that did not happen.
+describe(`${SKILL_PATH} — separates "did not occur" from zero and from unreadable`, () => {
+	it.each([
+		'**Three answers, and only one of them is a number.**',
+		'no `josh git` row at all is **did not occur**',
+		'never reported as 0',
+		'**could not tell**',
+		'answer is `could not tell`, never the negative.**',
+	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	it.each([
+		'**Frequency comes from `--last <N>`, by applying this detector per run.**',
+		"carries every run's whole report under `runs[]`",
+		'**report the three counts rather than a rate**',
+	])('counts the occurrences across runs: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
 // The correction the issue was edited to make. A ranked list that drops what is already filed
 // reports the backlog as emptier than it is, and an un-started issue that ranks high is usually the
 // cheapest action there is — it needs a run, not a filing.
