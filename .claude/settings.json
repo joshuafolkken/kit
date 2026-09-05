@@ -54,6 +54,18 @@
 				]
 			}
 		],
+		"PreToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "pnpm josh batch:guard",
+						"timeout": 20
+					}
+				]
+			}
+		],
 		"PostToolUse": [
 			{
 				"matcher": "Edit|Write|Bash",

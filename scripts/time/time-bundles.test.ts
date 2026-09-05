@@ -181,3 +181,33 @@ describe('time_bundles.bundle_lines', () => {
 		expect(lines.join('\n')).not.toContain('round trip(s)')
 	})
 })
+
+// The sequence the walk is still inside when the spans run out, which is what the live guard asks for
+// (joshuafolkken/kit#1390). `build_bundles` closes the walk because it prices a run that has ended;
+// this one is deliberately left open.
+describe('time_bundles.open_sequence', () => {
+	it('returns the run of single-call turns the next call would extend', () => {
+		const spans = [MODEL, call(['a.ts']), MODEL, call(['b.ts']), MODEL]
+
+		expect(time_bundles.open_sequence(spans).map((span) => span.targets)).toEqual([
+			['a.ts'],
+			['b.ts'],
+		])
+	})
+
+	// A turn that already batched is the improvement rather than the defect, so nothing before it is
+	// carried across.
+	it('is empty where the last turn issued several calls', () => {
+		const spans = [MODEL, call(['a.ts']), MODEL, call(['b.ts']), call(['c.ts']), MODEL]
+
+		expect(time_bundles.open_sequence(spans)).toEqual([])
+	})
+
+	// A conflicting call starts a new sequence at itself rather than ending the run, because everything
+	// after it may still have been bundleable with it.
+	it('restarts at a call that names a target the sequence already touched', () => {
+		const spans = [MODEL, call(['a.ts']), MODEL, call(['a.ts']), MODEL]
+
+		expect(time_bundles.open_sequence(spans)).toHaveLength(1)
+	})
+})

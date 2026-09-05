@@ -209,6 +209,30 @@ function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 	}
 }
 
+// The sequence the walk is still inside when the spans run out — the trailing run of consecutive
+// single-call bundleable turns (joshuafolkken/kit#1390).
+//
+// **Neither `close_trip` nor `flush` is called, and that is the whole difference from
+// `build_bundles`.** The report closes the walk because it is pricing a run that has ended; a guard
+// reading a transcript mid-flight wants the sequence nothing has ended yet, which is the one the next
+// call would extend. Sharing the walk is what keeps the refusal and the end-of-run figure from ever
+// disagreeing about what a sequence is — a second walk here would be the clone `CLAUDE.md` prohibits,
+// in the one place a drift would refuse a call the report then says was fine.
+//
+// **Leaving `close_trip` out is load-bearing rather than tidy.** The turn being read is still open, and
+// its earlier calls have already come back — so closing the trip here folds the in-flight turn into the
+// sequence as though it were a closed single-call turn. Measured live: the first call of a two-call
+// turn was admitted and the second refused, because the first had returned in between and lengthened
+// the sequence by one. Only a turn boundary may close a trip, and the walk's own `step` is what
+// supplies one.
+function open_sequence(spans: ReadonlyArray<Span>): ReadonlyArray<Span> {
+	const walk = new_walk()
+
+	for (const span of time_round_trips.in_time_order(spans)) step(walk, span)
+
+	return walk.sequence
+}
+
 function sequence_suffix(totals: BundleTotals): string {
 	return `longest ${String(totals.longest_sequence)} turn(s)`
 }
@@ -288,6 +312,8 @@ const time_bundles = {
 	NO_BUNDLES,
 	build_bundles,
 	bundle_lines,
+	open_sequence,
+	shares_target,
 }
 
 export type { BundleTotals, TripPrice }

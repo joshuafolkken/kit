@@ -2,6 +2,7 @@ import {
 	CSPELL_CACHE_FLAGS,
 	ESLINT_CACHE_FLAGS,
 	GATE_COMMAND,
+	OPTIONAL_ENV_FILE_FLAGS,
 	PE,
 	TS_CACHE_FLAGS,
 	type CommandEntry,
@@ -61,6 +62,18 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/format-edited-file.ts',
 		description: 'Claude Code hook: format the file just edited (reads the tool call on stdin)',
 		category: 'Development',
+	},
+	'batch:guard': {
+		script: 'scripts/batch-guard.ts',
+		description:
+			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
+		category: 'Development',
+		// `JOSH_BATCH_GUARD` is a per-machine preference, so `.env` is where a person keeps it — the
+		// same reason `eval:scope` carries this flag (joshuafolkken/kit#1235). Without it, `off` written
+		// there is ignored and the guard goes on refusing with no complaint. **The stake is higher here
+		// than for the measurement**: this switch's safe state is *on*, so the silent half is a hook that
+		// cannot be turned off rather than one that never turns on.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	},
 	cspell: {
 		shell: [

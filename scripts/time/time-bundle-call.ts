@@ -1,5 +1,8 @@
+import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { json_value } from '#scripts/json-value'
 import { time_shell } from './time-shell'
+
+const { BASH_TOOL } = cost_blocks
 
 // What one call has to say about itself before anything can ask whether it could have gone out
 // beside another (joshuafolkken/kit#1344).
@@ -255,10 +258,25 @@ function bash_facts(command: string): BundleFacts {
 	return { is_bundleable: true, targets: targets_in(command) }
 }
 
+// The facts for one call named the way a caller holding a raw tool invocation names it — a tool and
+// its input, with nothing unwrapped yet (joshuafolkken/kit#1390).
+//
+// **It exists so the live guard and the parser cannot disagree about what a call is.** `time-spans.ts`
+// reaches the two functions above directly because it has already read the shell command out of the
+// input for the row's label; a `PreToolUse` payload has no such head start, and a second place
+// remembering that `Bash` is the one tool whose input needs unwrapping is exactly the drift that would
+// let a call be refused as bundleable and then counted as not.
+function call_facts(name: string, input: unknown): BundleFacts {
+	if (name !== BASH_TOOL) return tool_facts(name, input)
+
+	return bash_facts(time_shell.bash_command(input))
+}
+
 const time_bundle_call = {
 	MAX_TARGETS,
 	not_bundleable,
 	bash_facts,
+	call_facts,
 	tool_facts,
 }
 
