@@ -10,6 +10,7 @@ import { time_phases, type PhaseTotal } from './time-phases'
 import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
 import { time_round_trips } from './time-round-trips'
 import { time_segments, type Segment } from './time-segments'
+import { time_single_checks, type SingleCheckTotals } from './time-single-checks'
 import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
 import {
 	time_tool_turns,
@@ -126,6 +127,11 @@ interface TimeReport extends TurnSplit {
 	// avoidable, which is what a mechanism to prevent it would be sized against. Built by
 	// `time-bundles.ts`, which also renders the block — the shape `time-failures.ts` already uses.
 	bundles: BundleTotals
+	// How much of the run went on re-verifying file by file between edits (joshuafolkken/kit#1383).
+	// The block above says how many round trips were avoidable; only this says how many of them asked a
+	// question whose answer the run already had. Built by `time-single-checks.ts`, which also renders
+	// the block — the shape `time-bundles.ts` and `time-failures.ts` already have.
+	single_checks: SingleCheckTotals
 	// Which of the run's edits never reached the merged diff, and how large that diff was
 	// (joshuafolkken/kit#1387). The blocks above measure how a run spent its turns; only this says how
 	// much of the work was thrown away, and how much change the elapsed time bought — without which two
@@ -316,6 +322,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
 		gaps: time_gaps.build_gaps(spans),
 		bundles: time_bundles.build_bundles(spans),
+		single_checks: time_single_checks.build_single_checks(spans),
 		rework: time_rework.build_rework(spans, input.diff),
 		categories,
 		has_ci_data: ci.has_ci_data,
@@ -433,6 +440,7 @@ function format_report(report: TimeReport): string {
 		...time_trips.trip_lines(report),
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
+		...time_single_checks.single_check_lines(report.single_checks, report),
 		...time_failures.failure_lines(failures, tool_call_count, tool_ms),
 		...time_rework.rework_lines(report.rework),
 		...total_lines('By tool (descending):', report.by_tool, tool_suffix),

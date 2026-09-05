@@ -7,6 +7,7 @@ import { time_gaps } from './time-gaps'
 import type { PhaseTotal } from './time-phases'
 import type { TimeReport } from './time-report'
 import { time_rework } from './time-rework'
+import { time_single_checks } from './time-single-checks'
 import { time_tool_turns } from './time-tool-turns'
 
 // What the epic-aggregation suites read, written once rather than in each test file
@@ -64,6 +65,7 @@ type Breakdown = Pick<
 	| 'by_check'
 	| 'gaps'
 	| 'bundles'
+	| 'single_checks'
 	| 'rework'
 	| 'failures'
 >
@@ -81,6 +83,7 @@ function empty_breakdown(): Breakdown {
 		by_check: [],
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
+		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
 		rework: { ...time_rework.NO_REWORK },
 		failures: { ...time_failures.NO_FAILURES },
 	}

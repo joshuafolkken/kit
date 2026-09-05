@@ -5,6 +5,9 @@ words:
   # What `josh lint:related` calls a file the two linters read (joshuafolkken/kit#1298), matching
   # the "relatable" the sibling unit narrowing already uses for a file a test can import.
   - lintable
+  # The shell tokens `time-shell.ts` drops before keying a check by its arguments
+  # (joshuafolkken/kit#1383). The plural is what cspell's dictionaries do not derive.
+  - redirections
   # What the gate's caches exist to stop it doing (joshuafolkken/kit#1256). Both forms are needed:
   # cspell's dictionaries do not derive one from the other.
   - rescan

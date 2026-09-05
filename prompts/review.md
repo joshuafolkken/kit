@@ -91,6 +91,23 @@ pnpm josh review:brief --round 2  # the verification pass, scoped to the fix del
 
 **The round cap below is unchanged**, and so is the rule that a confirmed High blocks regardless of round count.
 
+### A single check answers once per tree
+
+**The table above sends an implementation loop to one check by name and said nothing about running that check again** (joshuafolkken/kit#1383). Measured on the run of joshuafolkken/kit#1379, it then issued eight single checks — 45.9 seconds of tool time, six of them in the fix phase, each its own round trip — and `pnpm josh gate` ran all four checks over the same tree 18.1 seconds after the last one.
+
+**The line is narrow, and only one class of call falls on the wrong side of it.** A check run again _after an edit_ is feedback, however often a run needs it: discarding that would push every mistake to the gate minutes later, and the rework costs more than the checks save. What is forbidden is a repeat of the same command **with the same arguments** over a tree nothing has touched since — the tree it would read is the tree the last answer was about, so the answer is known before the call goes out.
+
+| Since this check last ran | What to run                                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| A file was edited         | The check again, with no cap on how often. This is the feedback the first row of the table above exists for                           |
+| Nothing was edited        | Nothing. The last answer still describes this tree, and a second copy of an answer already in hand is the whole of what the call buys |
+
+**No cap is placed on how many single checks a run makes**, and that is deliberate: a cap is a judgement about how many is too many, and it would forbid a call that had something to find. The unchanged repeat needs no judgement at all — the criterion is mechanical, which is what `pnpm josh review:level` and `pnpm josh latest:scope` are for the same reason.
+
+**`pnpm josh eval:scope` is not one of these calls.** The completion gate prescribes exactly one of it per run, so it is a step of the procedure rather than probing between edits; counting it here would put a required call under a rule about avoidable ones.
+
+**This document carries the rule, and `pnpm josh time` is what says whether it held.** Its `Single checks:` block counts the calls, how many sat in the fix phase, how many repeated an earlier command _and its arguments_, and how many of those had no edit between them. **On the run the issue was filed from, that last figure is zero**: all three repeats there followed an edit, so the estimate the issue carried — two calls definitely removable — does not survive being measured, and what it had found was the batching joshuafolkken/kit#1344 already measures. That is why no mechanism is built here. The one worth building is the reuse `pnpm josh gate` already has (joshuafolkken/kit#1328) and never another warning — joshuafolkken/kit#1344 measured three consecutive runs in which one moved nothing — and it is filed as joshuafolkken/kit#1420, to be built if the measured figure stays non-zero rather than on the assumption that it will.
+
 ### The pull request opens between the rounds, so CI runs beside round 2
 
 **`pnpm josh bump minor` and `pnpm josh git -y` sit between the two review rounds** (joshuafolkken/kit#1261). Measured on joshuafolkken/kit#1251: the second round ran 171 seconds and the CI that followed it ran 98, and through those 98 seconds nothing else in the run was happening. The same reasoning the gate got one section up applies here — the pull request's checks and the verification pass read the same branch, so paying for them one after the other was pure waiting.

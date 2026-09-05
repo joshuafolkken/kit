@@ -99,6 +99,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   the gate is running beside the review, a later fix makes its result stale rather than sending the run
   back to a single check. The table is `prompts/review.md` → "The gate runs beside this review, not in
   front of it".
+  **And a single check answers once per tree** (joshuafolkken/kit#1383): after an edit, run it again —
+  there is no cap on that — but with nothing edited since it last ran on the same arguments, its
+  answer is already in hand and the call buys a second copy of it. `pnpm josh time`'s `Single checks:`
+  block is what says whether the run held to it; the rule is `prompts/review.md` → "A single check
+  answers once per tree".
   **The rule-compliance measurement is read after the review and before `pnpm josh followup --merge`,
   never inside `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval`
   is five real Claude sessions. The anchor is the merge rather than the commit because the commit now
