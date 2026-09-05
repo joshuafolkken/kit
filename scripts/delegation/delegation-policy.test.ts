@@ -1,5 +1,5 @@
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { delegation_cli } from './delegation-cli'
 import { delegation_policy } from './delegation-policy'
 
@@ -8,6 +8,10 @@ const UNLISTED = 'anything-nobody-listed'
 const REVIEW = 'review'
 const EPIC_CHILD = 'epic-child'
 const QUEUE_CHILD = 'queue-child'
+const INVESTIGATION = 'investigation'
+const DIAGNOSIS = 'diagnosis'
+// One title shared by the two rows that each assert their own membership.
+const DELEGATABLE_CASE = 'is delegatable'
 
 // joshuafolkken/kit#969: which steps may run in a cheaper tier is decided by an enumeration, and
 // everything not enumerated is kept. The direction of the default is the whole safety argument — a
@@ -76,7 +80,7 @@ describe('every delegatable step names how a wrong result is caught', () => {
 // verifier that named the summary would be no verifier at all: the thing being checked would be
 // checking itself.
 describe('epic-child is a second unit on the one mechanism', () => {
-	it('is delegatable', () => {
+	it(DELEGATABLE_CASE, () => {
 		expect(delegation_policy.verdict_for(EPIC_CHILD)).toBe(delegation_policy.DELEGATE_VERDICT)
 	})
 
@@ -130,6 +134,75 @@ describe('epic-child is a second unit on the one mechanism', () => {
 		)
 
 		expect(covering.map((step) => step.name)).toStrictEqual([EPIC_CHILD])
+	})
+})
+
+// What `--list` actually writes for one step, captured rather than reconstructed: the row is what an
+// agent reads, and the fields it is built from can carry the number while the printed row does not.
+function listed_row(step_name: string): string | undefined {
+	const written: Array<string> = []
+	const spy = vi.spyOn(console, 'info').mockImplementation((line: string) => {
+		written.push(line)
+	})
+
+	delegation_cli.print_list()
+	spy.mockRestore()
+
+	return written.find((line) => line.includes(step_name))
+}
+
+// joshuafolkken/kit#1426 puts the pre-implementation reading on this same enumeration. It is admitted
+// on the citations it returns — the parent opens them — and it must not swallow `diagnosis`, which is
+// rejected precisely because a wrong root cause produces a fix that passes the gate.
+describe('investigation is the pre-implementation reading', () => {
+	it(DELEGATABLE_CASE, () => {
+		expect(delegation_policy.verdict_for(INVESTIGATION)).toBe(delegation_policy.DELEGATE_VERDICT)
+	})
+
+	// The parent-tier check, and deliberately not the returned prose: a conclusion checking itself is
+	// no verifier at all, which is the same trap `epic-child`'s summary would have been.
+	it('names the citation read as its verifier', () => {
+		expect(delegation_policy.reason_for(INVESTIGATION)).toContain('opens the cited lines')
+	})
+
+	// Returning the text puts the cost back where it was, which is the whole reason the row exists.
+	it('returns the conclusion and its citations, never the file text', () => {
+		const step = delegation_policy.find_step(INVESTIGATION)
+
+		expect(step?.does).toContain('`file:line`')
+		expect(step?.does).toContain('never the file text')
+	})
+
+	it('finishes a throwaway probe script inside the unit', () => {
+		expect(delegation_policy.find_step(INVESTIGATION)?.does).toContain('probe script')
+	})
+
+	// Asserted against what the command actually writes, not against the field the number is
+	// interpolated into: a `does`-only assertion cannot fail for any value of the constant, so it says
+	// nothing about whether an agent asking the command is told the count.
+	it('is printed with its threshold by the listing', () => {
+		expect(listed_row(INVESTIGATION)).toContain(
+			String(delegation_policy.INVESTIGATION_FILE_THRESHOLD),
+		)
+	})
+
+	// The verdict command prints the verifier and not `does`, so the documents must send an agent to the
+	// listing for the count. Named here as well so a verifier rewrite that swallowed the number fails.
+	it('does not put the threshold in the verdict command output', () => {
+		expect(delegation_policy.reason_for(INVESTIGATION)).not.toContain('or more files')
+	})
+
+	// Two files stay in the main line: below the threshold the extra round trip costs more than
+	// carrying the text, so a threshold of 1 would make a small investigation slower rather than faster.
+	it('keeps more than one file in the main line', () => {
+		expect(delegation_policy.INVESTIGATION_FILE_THRESHOLD).toBeGreaterThan(1)
+	})
+
+	// The boundary against the rejected row. A unit that returned a root cause would be delegating
+	// `diagnosis` under this name, and nothing downstream would disagree with it.
+	it('leaves deciding what to change with the main line', () => {
+		expect(delegation_policy.find_step(INVESTIGATION)?.verifier).toContain(`\`${DIAGNOSIS}\``)
+		expect(delegation_policy.verdict_for(DIAGNOSIS)).toBe(delegation_policy.KEEP_VERDICT)
 	})
 })
 
