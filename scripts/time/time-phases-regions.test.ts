@@ -9,7 +9,7 @@ import type { Span } from './time-spans'
 // larger in every one of them than the biggest named phase. It is four regions and a remainder.
 
 const { MINUTE_MS, NO_CI, GATE_COMMAND, PR_COMMAND, MERGE_COMMAND } = time_phase_fixture
-const { span, waited, minutes_of, detected, total_ms } = time_phase_fixture
+const { span, waited, minutes_of, detected, total_ms, with_ci } = time_phase_fixture
 
 // A run with a wait on each side of it and one in the middle — the fixture joshuafolkken/kit#1331's
 // last acceptance criterion asks for. The workflow marker and the merge command are the two edges the
@@ -219,7 +219,7 @@ describe('time_phases.build_phases — the regions preserve the totals', () => {
 			span(13, 1, { josh_command: MERGE_COMMAND }),
 			span(14, 5),
 		]
-		const phases = time_phases.build_phases({ spans, ci_ms: 2 * MINUTE_MS, has_ci_data: true })
+		const phases = time_phases.build_phases({ spans, ...with_ci(2 * MINUTE_MS) })
 
 		expect(total_ms(phases)).toBe(21 * MINUTE_MS)
 	})
@@ -257,8 +257,7 @@ describe('time_phases.build_phases — the wait split at the run edges', () => {
 	it('still reconstructs a run whose waiting was split at the run edges', () => {
 		const phases = time_phases.build_phases({
 			spans: WAITS_AROUND_RUN,
-			ci_ms: 2 * MINUTE_MS,
-			has_ci_data: true,
+			...with_ci(2 * MINUTE_MS),
 		})
 
 		expect(total_ms(phases)).toBe(27 * MINUTE_MS)

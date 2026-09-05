@@ -9,7 +9,7 @@ import { time_spans, type Span } from './time-spans'
 // minute positions and the magic-number rule is switched off for test files only.
 
 const { MINUTE_MS, NO_CI, GATE_COMMAND, PR_COMMAND, MERGE_COMMAND } = time_phase_fixture
-const { span, waited, minutes_of, detected, total_ms } = time_phase_fixture
+const { span, waited, minutes_of, detected, total_ms, with_ci, cycle } = time_phase_fixture
 
 const PNPM_LABEL = 'Bash: pnpm'
 
@@ -194,7 +194,7 @@ describe('time_phases.build_phases — the total is preserved', () => {
 
 	it('sums to the elapsed time the spans and the CI share account for', () => {
 		const spans = [span(0, 5), span(5, 4, { marker: time_markers.EDIT_MARKER })]
-		const phases = time_phases.build_phases({ spans, ci_ms: 3 * MINUTE_MS, has_ci_data: true })
+		const phases = time_phases.build_phases({ spans, ...with_ci(3 * MINUTE_MS) })
 
 		expect(total_ms(phases)).toBe(12 * MINUTE_MS)
 	})
@@ -225,7 +225,7 @@ describe('time_phases.build_phases — the total survives the wait phase', () =>
 			span(7, 2, { josh_command: GATE_COMMAND }),
 			waited(9, 5),
 		]
-		const phases = time_phases.build_phases({ spans, ci_ms: 2 * MINUTE_MS, has_ci_data: true })
+		const phases = time_phases.build_phases({ spans, ...with_ci(2 * MINUTE_MS) })
 
 		expect(total_ms(phases)).toBe(16 * MINUTE_MS)
 	})
@@ -283,11 +283,11 @@ describe('time_phases.build_phases — detection', () => {
 	})
 
 	it('detects the CI phase only where the GitHub half was read', () => {
-		const with_ci = time_phases.build_phases({ spans: RUN, ci_ms: MINUTE_MS, has_ci_data: true })
+		const measured = time_phases.build_phases({ spans: RUN, ...with_ci(MINUTE_MS) })
 		const without = time_phases.build_phases({ spans: RUN, ...NO_CI })
 
 		expect([
-			detected(with_ci, time_phases.CI_PHASE),
+			detected(measured, time_phases.CI_PHASE),
 			detected(without, time_phases.CI_PHASE),
 		]).toEqual([true, false])
 	})
@@ -314,7 +314,7 @@ describe('time_phases.build_phases — the three span-backed phases', () => {
 	// read, so `0.0 min` would assert that nobody waited and that nothing fell outside the stages —
 	// two claims the run made no measurement for.
 	it('withholds the wait rows and other when no span was read', () => {
-		const phases = time_phases.build_phases({ spans: [], ci_ms: MINUTE_MS, has_ci_data: true })
+		const phases = time_phases.build_phases({ spans: [], ...with_ci(MINUTE_MS) })
 
 		expect([
 			detected(phases, time_phases.WAIT_PHASE),
@@ -371,5 +371,74 @@ describe('time_phases.build_phases — the window boundaries', () => {
 		const phases = time_phases.build_phases({ spans, ...NO_CI })
 
 		expect(detected(phases, time_phases.PLAN_PHASE)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#1384: measured on PR #1380, the second CI cycle ran 01:53:38 → 01:55:27 with the
+// run doing nothing but waiting for it, and the merge followed at 01:56:01. `josh time` charged those
+// 109 seconds to `merge` and printed `ci` as zero, which had `diag` rank the issue that would have cut
+// them last — as work with no wall clock behind it.
+describe('time_phases.build_phases — a serialized CI cycle', () => {
+	// The merge span of `RUN` is minutes 26 → 33, so a cycle inside it is one nothing but
+	// `josh followup` was sitting on.
+	it('charges a cycle only the merge command sat on to ci', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...with_ci(0, [cycle(27, 5)]) })
+
+		expect(minutes_of(phases, time_phases.CI_PHASE)).toBe(5)
+	})
+
+	it('takes the same minutes off merge rather than counting them twice', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...with_ci(0, [cycle(27, 5)]) })
+
+		expect(minutes_of(phases, time_phases.MERGE_PHASE)).toBe(2)
+	})
+
+	// The property that makes two runs comparable: what `ci` gains, `merge` loses.
+	it('still reconstructs the elapsed time', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...with_ci(0, [cycle(27, 5)]) })
+
+		expect(total_ms(phases)).toBe(33 * MINUTE_MS)
+	})
+
+	// The category share is the part of the open→merge window no span covers at all, and the cycles
+	// are what the merge command sat on. They are disjoint, so `ci` is their sum.
+	it('adds the serialized cycle to the share no span covers', () => {
+		const phases = time_phases.build_phases({
+			spans: RUN,
+			...with_ci(3 * MINUTE_MS, [cycle(27, 5)]),
+		})
+
+		expect(minutes_of(phases, time_phases.CI_PHASE)).toBe(8)
+	})
+})
+
+// The other half of the same rule: a cycle the run was not merely waiting on is not the run's cost,
+// and a cycle nobody could read is not zero minutes of CI.
+describe('time_phases.build_phases — a CI cycle that cost the run nothing', () => {
+	// The review span of `RUN` is minutes 17 → 23. A cycle running there cost the run nothing extra,
+	// so charging it to `ci` would count those minutes twice.
+	it('leaves a cycle that ran beside other work out of ci', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...with_ci(0, [cycle(17, 6)]) })
+
+		expect(minutes_of(phases, time_phases.CI_PHASE)).toBe(0)
+		expect(minutes_of(phases, time_phases.MERGE_PHASE)).toBe(7)
+	})
+
+	// The pull request span is minutes 24 → 26 and the merge span opens at 26, so half of this cycle
+	// overlapped work and half of it did not.
+	it('counts only the part of a cycle no other span covers', () => {
+		const phases = time_phases.build_phases({ spans: RUN, ...with_ci(0, [cycle(24, 4)]) })
+
+		expect(minutes_of(phases, time_phases.CI_PHASE)).toBe(2)
+	})
+
+	// The acceptance criterion of joshuafolkken/kit#1384's fourth box: a check read that was refused
+	// is not a run that waited no time, and `0.0 min` there is the very zero this change removes.
+	it('reports ci as undetected where the cycles could not be read', () => {
+		const ci = { ci_ms: MINUTE_MS, has_ci_data: true, windows: [cycle(27, 5)], has_windows: false }
+		const phases = time_phases.build_phases({ spans: RUN, ci })
+
+		expect(detected(phases, time_phases.CI_PHASE)).toBe(false)
+		expect(minutes_of(phases, time_phases.MERGE_PHASE)).toBe(7)
 	})
 })

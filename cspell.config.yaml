@@ -18,6 +18,12 @@ words:
   # its counterpart uses for the first of those alone. Neither reaches a distributed file.
   - untimed
   - unstarted
+  # What `time-ci.ts` does with a CI cycle the merge command sat waiting for: it moves from the
+  # `merge` phase to `ci` (joshuafolkken/kit#1384). All three forms are needed — cspell's
+  # dictionaries derive none of them from another — and none reaches a distributed file.
+  - reattribute
+  - reattributed
+  - reattribution
   # The shell builtins `josh time` walks past when it names the command a Bash call actually ran
   # (joshuafolkken/kit#1267). They reach no distributed file, so they stay in this local list.
   - pushd

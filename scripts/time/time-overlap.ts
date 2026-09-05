@@ -67,6 +67,49 @@ function uncovered_ms(target: Interval, covered: ReadonlyArray<Interval>): numbe
 	)
 }
 
+// One interval folded into the disjoint set built so far. Touching or overlapping intervals become
+// one; a gap between them keeps them apart.
+function fold(merged: ReadonlyArray<Interval>, one: Interval): Array<Interval> {
+	const last = merged.at(-1)
+
+	if (last === undefined || one.started_ms > last.ended_ms) return [...merged, one]
+
+	const joined = { started_ms: last.started_ms, ended_ms: Math.max(last.ended_ms, one.ended_ms) }
+
+	return [...merged.slice(0, -1), joined]
+}
+
+// The same wall clock covered once. **Summing a per-window figure over windows that overlap counts
+// the shared minutes twice**, which is the one arithmetic error a CI measurement built from several
+// commits can make on its own (joshuafolkken/kit#1384).
+function union_intervals(intervals: ReadonlyArray<Interval>): Array<Interval> {
+	const sorted = [...intervals].toSorted((left, right) => left.started_ms - right.started_ms)
+	let merged: Array<Interval> = []
+
+	for (const one of sorted) merged = fold(merged, one)
+
+	return merged
+}
+
+// How much of `targets` is covered by `all` and by nothing in `rest` — the wall clock only the
+// intervals `rest` leaves out account for (joshuafolkken/kit#1384).
+//
+// **It is a difference of two uncovered walks rather than a third kind of walk.** What `rest` does
+// not cover is `uncovered_ms(target, rest)`; what *nothing* covers is `uncovered_ms(target, all)`,
+// and that part is already counted elsewhere — so the difference is exactly the part the intervals
+// left out of `rest` hold alone. Written this way, the two answers cannot disagree about what
+// "covered" means, because they are the same function.
+function covered_only_by_ms(
+	targets: ReadonlyArray<Interval>,
+	all: ReadonlyArray<Interval>,
+	rest: ReadonlyArray<Interval>,
+): number {
+	return union_intervals(targets).reduce(
+		(sum, target) => sum + uncovered_ms(target, rest) - uncovered_ms(target, all),
+		0,
+	)
+}
+
 const FIRST_PART = 0
 
 function to_interval(span: Span): Interval {
@@ -205,6 +248,8 @@ function resolve_delegated(
 
 const time_overlap = {
 	uncovered_ms,
+	union_intervals,
+	covered_only_by_ms,
 	to_interval,
 	resolve_delegated,
 }

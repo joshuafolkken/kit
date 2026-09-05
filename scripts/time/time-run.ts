@@ -1,8 +1,10 @@
 import { cost_attribute } from '#scripts/cost/cost-attribute'
 import { time_checks, type CheckTotal } from './time-checks'
+import { time_ci, type CiFacts } from './time-ci'
 import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
-import { time_overlap, type Interval } from './time-overlap'
+import type { Interval } from './time-overlap'
+import { time_phases } from './time-phases'
 import { time_pull_index } from './time-pull-index'
 import { time_report, type TimeReport } from './time-report'
 import type { Span } from './time-spans'
@@ -130,6 +132,24 @@ function check_note(is_failed: boolean, issue_number: number): Array<string> {
 	]
 }
 
+// The phrase the withheld-cycle note is recognized by, written once for the reason `OVERLAP_MARK` is.
+const CYCLE_READ_MARK = 'the CI cycles could not be read'
+
+// **A withheld `ci` row leaves the phase percentages short of the elapsed time, and this is what
+// accounts for the difference** (joshuafolkken/kit#1384). The phase is withheld on the cycles alone,
+// so a run whose commit listing or check-runs could not be read still has a measured `CI wait` share
+// beside a phase table that says `not detected` — two rows a reader would otherwise take for a
+// contradiction, in the one state where neither of them is wrong.
+function cycle_note(ci: CiFacts, issue_number: number): Array<string> {
+	if (!ci.has_ci_data || ci.has_windows) return []
+
+	const scope = `for issue #${String(issue_number)}`
+
+	return [
+		`${CYCLE_READ_MARK} ${scope} — the \`ci\` phase says \`not detected\` for that reason, and the \`CI wait\` share beside it is still measured`,
+	]
+}
+
 // Time inside the wall window that no span accounts for: two sessions with a gap between them.
 function idle_note(gap_ms: number, span_ms: number): string {
 	const gap = time_report.format_minutes(gap_ms)
@@ -187,7 +207,7 @@ interface RunFacts {
 	// Whether the check-run read was refused rather than answered with nothing. Carried beside the
 	// rows because an empty `checks` is both answers and only one of them is a measurement.
 	is_check_read_failed: boolean
-	ci_ms: number
+	ci: CiFacts
 }
 
 // The pull request is passed in rather than looked up here, because the no-argument path has already
@@ -204,17 +224,31 @@ async function gather(
 	const merged_ms = pull?.merged_ms
 
 	if (pull === undefined || merged_ms === undefined) {
-		return { issue_number, found, search, checks: [], is_check_read_failed: false, ci_ms: 0 }
+		const empty = { checks: [], is_check_read_failed: false, ci: time_ci.NO_CI }
+
+		return { issue_number, found, search, ...empty }
 	}
 
 	const list = await time_github.list_check_runs(pull.head_sha, read)
 	const checks = time_checks.build_check_totals(list.runs, merged_ms)
-	const ci_ms = time_overlap.uncovered_ms(
-		{ started_ms: pull.created_ms, ended_ms: merged_ms },
-		found.spans.map((span) => time_overlap.to_interval(span)),
-	)
+	const ci = await time_ci.build_facts({ pull, merged_ms, spans: found.spans, head: list, read })
 
-	return { issue_number, found, search, checks, is_check_read_failed: list.is_failed, ci_ms }
+	return { issue_number, found, search, checks, is_check_read_failed: list.is_failed, ci }
+}
+
+// **The two CI figures differ by exactly the cycles the merge command sat on, and the note is what
+// says so** (joshuafolkken/kit#1384). The `CI wait` category is the part of the open→merge window no
+// span covers, so a run that watched its own merge reads near zero there while the `ci` phase carries
+// the real wait — two numbers a reader would otherwise take for a contradiction.
+function serial_note(report: TimeReport): Array<string> {
+	const phase = report.phases.find((total) => total.phase === time_phases.CI_PHASE)
+	const serial_ms = (phase?.duration_ms ?? 0) - report.categories.ci_ms
+
+	if (serial_ms <= 0) return []
+
+	const spent = time_report.format_minutes(serial_ms)
+
+	return [`${spent} of the merge command was waiting on CI — the phase table charges it to \`ci\``]
 }
 
 // **`has_ci_data` is whether a merge was actually read, not whether an issue scope was asked for.**
@@ -227,19 +261,20 @@ function to_report(facts: RunFacts): TimeReport {
 		span_note(found, facts.issue_number),
 		pull_note(search, facts.issue_number),
 		...check_note(facts.is_check_read_failed, facts.issue_number),
+		...cycle_note(facts.ci, facts.issue_number),
 	]
 	const report = time_report.build_from_spans({
 		scope: `issue #${String(facts.issue_number)}`,
 		spans: found.spans,
 		started_ms: window.started_ms,
 		ended_ms: window.ended_ms,
-		ci_ms: facts.ci_ms,
-		has_ci_data: search.pull?.merged_ms !== undefined,
+		ci: facts.ci,
 		notes,
 		by_check: facts.checks,
 	})
+	const found_notes = [...window_note(window, report.elapsed_ms), ...serial_note(report)]
 
-	return { ...report, notes: [...notes, ...window_note(window, report.elapsed_ms)] }
+	return { ...report, notes: [...notes, ...found_notes] }
 }
 
 // What a batch caller has already read for this child, so neither source is read once per child

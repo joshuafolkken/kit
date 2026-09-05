@@ -186,6 +186,10 @@ function check_body(started_at: string, completed_at: string): string {
 
 const EMPTY_CHECKS = { runs: [], is_failed: false }
 
+// The body `gh` hands back having exited 0 when the request was throttled — the case both read
+// suites below are really about, named once so the two cannot spell it differently.
+const RATE_LIMIT_CASE = 'a rate-limit error object'
+
 describe('time_github.list_check_runs', () => {
 	it('reads each job with its own start, finish and conclusion', async () => {
 		const list = await time_github.list_check_runs(SHA, body_reader(check_body(CREATED, MERGED)))
@@ -244,10 +248,55 @@ describe('time_github.list_check_runs — a read that was refused', () => {
 	// optional, it parses as a body that simply omitted the key.
 	it.each([
 		['a wrongly typed check list', '{"check_runs":"nope"}'],
-		['a rate-limit error object', '{"message":"API rate limit exceeded","documentation_url":"x"}'],
+		[RATE_LIMIT_CASE, '{"message":"API rate limit exceeded","documentation_url":"x"}'],
 	])('treats %s as a failed read', async (_name: string, body: string) => {
 		const list = await time_github.list_check_runs(SHA, body_reader(body))
 
 		expect(list.is_failed).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#1384: a pull request with two commits ran CI twice, and only the head commit's
+// cycle was ever read — so "the second cycle ran serially before the merge" could not be expressed.
+describe('time_github.list_pull_commits', () => {
+	const OTHER_SHA = 'b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0'
+
+	it('reads every commit sha in the order GitHub sent them', async () => {
+		const body = JSON.stringify([{ sha: SHA }, { sha: OTHER_SHA }])
+
+		expect(await time_github.list_pull_commits(1, body_reader(body))).toEqual({
+			shas: [SHA, OTHER_SHA],
+			is_failed: false,
+		})
+	})
+
+	// A listing short one commit is a CI measurement built from a subset of the cycles, and the caller
+	// refuses to produce one of those — so a row this parse cannot read makes the listing unreadable
+	// rather than one commit shorter. The wire format is stated rather than built, because a `null`
+	// sha is what a body of that shape actually carries.
+	it('treats a row carrying no sha as a listing it could not read', async () => {
+		const body = `[{"sha":null},{"sha":"${SHA}"}]`
+		const list = await time_github.list_pull_commits(1, body_reader(body))
+
+		expect(list).toEqual({ shas: [], is_failed: true })
+	})
+
+	// The distinction every read in this module keeps: a refused listing is not a pull request with
+	// no commits, and reporting it as one would report a rate limit as a run whose CI never ran.
+	it.each([
+		['a refused read', undefined],
+		[RATE_LIMIT_CASE, '{"message":"API rate limit exceeded"}'],
+		['a wrongly typed body', '{"commits":[]}'],
+	])('separates %s from an empty listing', async (_name: string, body: string | undefined) => {
+		const read = body === undefined ? refuse : body_reader(body)
+
+		expect(await time_github.list_pull_commits(1, read)).toEqual({ shas: [], is_failed: true })
+	})
+
+	it('reads an empty listing as an answer', async () => {
+		expect(await time_github.list_pull_commits(1, body_reader('[]'))).toEqual({
+			shas: [],
+			is_failed: false,
+		})
 	})
 })

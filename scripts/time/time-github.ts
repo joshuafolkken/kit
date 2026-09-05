@@ -58,6 +58,11 @@ const CHECK_RUN_SCHEMA = z.object({
 // as swallowing a 403. `nullable` stays, because a null is still an answer.
 const CHECK_RUNS_SCHEMA = z.object({ check_runs: z.array(CHECK_RUN_SCHEMA).nullable() })
 
+// One row of a pull request's commit listing. Only the sha is read: the check-runs endpoint is keyed
+// by it, and everything else the row carries — the author, the message, the tree — belongs to a
+// question this command does not ask.
+const COMMITS_SCHEMA = z.array(z.object({ sha: z.string().nullish() }))
+
 const ISSUE_SCHEMA = z.object({ body: z.string().nullish() })
 
 // A pull request as this command needs it. `merged_ms` is `undefined` for one that is still open —
@@ -87,6 +92,20 @@ interface PullSummary {
 // and a second spelling of it is how the two reads come to disagree about what a failure looks like.
 interface CheckRunList {
 	runs: ReadonlyArray<CheckRun>
+	is_failed: boolean
+}
+
+// Every commit a pull request carries, in the two states a read has (joshuafolkken/kit#1384).
+//
+// **A pull request with two commits ran CI twice**, and only the second cycle can have been the one
+// the merge waited on. Reading the head commit alone can therefore produce at most one window, so
+// "the run waited 109 seconds for the cycle it pushed last" was not expressible at all.
+//
+// `is_failed` is `CheckRunList`'s and `PullSearch`'s, deliberately spelled the same: a refused read is
+// not a pull request with no commits, and a third spelling of that distinction is how two of them come
+// to disagree about what a failure looks like.
+interface CommitList {
+	shas: ReadonlyArray<string>
 	is_failed: boolean
 }
 
@@ -414,14 +433,53 @@ async function read_check_runs(head_sha: string, read: GhReader): Promise<CheckR
 }
 
 // Each CI job's own start and finish, for the per-check table. **These overlap each other** — the
-// jobs run in parallel — so they are reported as durations and never summed into a share; the CI
-// wait itself is measured from the pull request's own window in `time-run.ts`.
+// jobs run in parallel — so they are reported as durations and never summed into a share. The window
+// they span is one commit's CI cycle, which `time-ci.ts` builds and the `ci` phase is attributed
+// from; the `CI wait` share is measured from the pull request's own window there too.
 //
 // No head sha is not a failure: nothing was asked, so there is nothing that could have been refused.
 async function list_check_runs(head_sha: string, read: GhReader = read_gh): Promise<CheckRunList> {
 	if (head_sha === '') return NO_CHECKS
 
 	return await read_check_runs(head_sha, read)
+}
+
+const FAILED_COMMITS: CommitList = { shas: [], is_failed: true }
+
+// `undefined` is a body that did not parse, on the same rule `parse_check_runs` states: `gh` hands an
+// error object back having exited 0, and laundering it into an empty commit list reports a
+// rate-limited read as a pull request whose CI never ran.
+//
+// **A row carrying no sha makes the whole listing unreadable rather than being dropped.** Every
+// commit GitHub sends has one, so a row without it is a shape this code does not understand — and a
+// listing short one commit is a CI measurement built from a subset of the cycles, which is exactly
+// what the caller's cap refuses to produce (joshuafolkken/kit#1384).
+function parse_commits(text: string): Array<string> | undefined {
+	const parsed = COMMITS_SCHEMA.safeParse(json_value.parse_or_undefined(text))
+
+	if (!parsed.success) return undefined
+
+	const shas = parsed.data.map((raw) => raw.sha ?? '')
+
+	return shas.includes('') ? undefined : shas
+}
+
+// Every commit of one pull request, oldest first — GitHub's own order, which is the order the CI
+// cycles ran in. One page: a pull request with more than `PAGE_SIZE` commits is not a run this
+// command has anything useful to say about, and the caller caps the reads it makes off this list
+// anyway.
+async function list_pull_commits(
+	pull_number: number,
+	read: GhReader = read_gh,
+): Promise<CommitList> {
+	try {
+		const path = `${PULLS_PATH}/${String(pull_number)}/commits?per_page=${String(PAGE_SIZE)}`
+		const shas = parse_commits(await read(path))
+
+		return shas === undefined ? FAILED_COMMITS : { shas, is_failed: false }
+	} catch {
+		return FAILED_COMMITS
+	}
 }
 
 // One issue's body — the epic's task list, for the batch scope (joshuafolkken/kit#1271). What is
@@ -464,11 +522,14 @@ const time_github = {
 	find_pull,
 	latest_merged_pull,
 	list_check_runs,
+	parse_commits,
+	list_pull_commits,
 }
 
 export type {
 	CheckRun,
 	CheckRunList,
+	CommitList,
 	GhReader,
 	PullChoice,
 	PullFold,

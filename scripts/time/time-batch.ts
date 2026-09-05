@@ -1,4 +1,5 @@
 import { bounded_pool } from '#scripts/bounded-pool'
+import { time_ci } from './time-ci'
 import { time_corpus } from './time-corpus'
 import type { GhReader, PullSearch } from './time-github'
 import { time_pull_index } from './time-pull-index'
@@ -127,8 +128,7 @@ function failed_report(issue_number: number, error: unknown): TimeReport {
 		spans: [],
 		started_ms: 0,
 		ended_ms: 0,
-		ci_ms: 0,
-		has_ci_data: false,
+		ci: time_ci.NO_CI,
 		notes: [`issue #${String(issue_number)} could not be measured: ${reason}`],
 		by_check: [],
 	})
