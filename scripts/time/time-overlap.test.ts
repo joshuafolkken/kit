@@ -179,3 +179,69 @@ describe('time_overlap.resolve_delegated — where the remainder sits', () => {
 		expect(parent_span?.duration_ms).toBe(8 * MINUTE_MS)
 	})
 })
+
+// joshuafolkken/kit#1384: a pull request's CI windows are read per commit, and two commits pushed in
+// quick succession can produce windows that overlap. Summing a per-window figure over those counts
+// the shared minutes twice, which is the one arithmetic error the CI measurement can make alone.
+describe('time_overlap.union_intervals', () => {
+	it('folds overlapping and out-of-order intervals into one', () => {
+		const union = time_overlap.union_intervals([
+			{ started_ms: 4, ended_ms: 8 },
+			{ started_ms: 2, ended_ms: 6 },
+		])
+
+		expect(union).toEqual([{ started_ms: 2, ended_ms: 8 }])
+	})
+
+	it('keeps intervals with a gap between them apart', () => {
+		const union = time_overlap.union_intervals([
+			{ started_ms: 0, ended_ms: 2 },
+			{ started_ms: 5, ended_ms: 7 },
+		])
+
+		expect(union).toEqual([
+			{ started_ms: 0, ended_ms: 2 },
+			{ started_ms: 5, ended_ms: 7 },
+		])
+	})
+
+	it('answers nothing for nothing', () => {
+		expect(time_overlap.union_intervals([])).toEqual([])
+	})
+})
+
+// The arithmetic the `ci` phase is reattributed with: how much of a CI window only the merge command
+// was sitting on. Everything else the run was doing stays where it is, and the part nothing covered
+// at all is already the category share, so both are subtracted out.
+describe('time_overlap.covered_only_by_ms', () => {
+	const WINDOW = [{ started_ms: 0, ended_ms: 10 }]
+
+	it('counts the part only the intervals left out of the rest cover', () => {
+		const all = [{ started_ms: 0, ended_ms: 10 }]
+		const rest = [{ started_ms: 0, ended_ms: 4 }]
+
+		expect(time_overlap.covered_only_by_ms(WINDOW, all, rest)).toBe(6)
+	})
+
+	it('counts nothing where the rest already covers the window', () => {
+		const covers = [{ started_ms: 0, ended_ms: 10 }]
+
+		expect(time_overlap.covered_only_by_ms(WINDOW, covers, covers)).toBe(0)
+	})
+
+	// The part nothing covers is the category share, which is added on its own. Counting it here as
+	// well would report the same wall clock twice.
+	it('leaves out the part nothing covers at all', () => {
+		expect(time_overlap.covered_only_by_ms(WINDOW, [], [])).toBe(0)
+	})
+
+	it('counts two overlapping windows once', () => {
+		const windows = [
+			{ started_ms: 0, ended_ms: 6 },
+			{ started_ms: 4, ended_ms: 10 },
+		]
+		const all = [{ started_ms: 0, ended_ms: 10 }]
+
+		expect(time_overlap.covered_only_by_ms(windows, all, [])).toBe(10)
+	})
+})

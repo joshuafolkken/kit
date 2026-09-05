@@ -1,4 +1,6 @@
+import type { CiFacts } from './time-ci'
 import { time_markers } from './time-markers'
+import { time_overlap } from './time-overlap'
 import {
 	CI_PHASE,
 	COMMAND_PHASES,
@@ -122,8 +124,10 @@ interface PhaseTotal {
 
 interface PhaseInput {
 	spans: ReadonlyArray<Span>
-	ci_ms: number
-	has_ci_data: boolean
+	// The CI half, whole: the category share, the per-commit windows, and whether either was read.
+	// One record rather than a field per figure, because a caller that has some of them and not the
+	// others is a caller that has misread what was measured (joshuafolkken/kit#1384).
+	ci: CiFacts
 }
 
 // `undefined` means the marker never appeared, which is the phase's "not detected" answer. A
@@ -163,7 +167,9 @@ interface Windows {
 interface Detection {
 	windows: Windows
 	totals: ReadonlyMap<PhaseName, number>
-	has_ci_data: boolean
+	ci: CiFacts
+	// The CI the merge command sat waiting for, which `ci` gains and `merge` loses below.
+	serial_ci_ms: number
 	has_transcript_data: boolean
 }
 
@@ -486,8 +492,12 @@ function totals_of(spans: ReadonlyArray<Span>, windows: Windows): Map<PhaseName,
 // Each of the four rests on a half being present rather than on a marker: `ci` on the GitHub half,
 // the two wait rows and `other` on the transcript half — the same two flags the matching category
 // rows are withheld on, so the two halves of the report cannot disagree about what was read.
+// **`ci` needs both halves of its own reading** (joshuafolkken/kit#1384): the merge, and the check
+// windows the serialized wait is measured from. A run whose check-runs could not be read still has a
+// category share, but the phase would be a floor rather than a measurement — and printing it as
+// `0.0 min` is exactly the false zero that had the wait attributed to `merge` in the first place.
 function is_marker_detected(phase: PhaseName, found: Detection): boolean {
-	if (phase === CI_PHASE) return found.has_ci_data
+	if (phase === CI_PHASE) return found.ci.has_ci_data && found.ci.has_windows
 	if (SPAN_BACKED_PHASES.has(phase)) return found.has_transcript_data
 
 	return found.totals.has(phase)
@@ -524,10 +534,38 @@ function is_detected(phase: PhaseName, found: Detection): boolean {
 	return is_window_detected(phase, found.windows) ?? is_marker_detected(phase, found)
 }
 
-// The CI share is not a span total: it is the part of the pull request's open→merge window no
-// transcript span covers, computed by `time-run.ts` and handed in.
-function duration_of(phase: PhaseName, found: Detection, ci_ms: number): number {
-	return phase === CI_PHASE ? ci_ms : (found.totals.get(phase) ?? NO_DURATION)
+// The CI a cycle spent with the run doing nothing else (joshuafolkken/kit#1384).
+//
+// **The merge command's span is left out of the covering set, and that is the whole of the change.**
+// `followup --merge` waits for the checks *inside* a Bash span, so every serialized cycle is covered
+// by one — which is why measuring the cycles against every span answered zero, and why the 109
+// seconds of PR #1380's second cycle read as merge work. Every other span stays in: a cycle that ran
+// beside the review, the round-2 fixes or a person's own wait cost the run nothing extra, and
+// charging it to `ci` would count those minutes twice.
+//
+// **What `ci` gains, `merge` loses**, so the phases still reconstruct the elapsed time exactly. The
+// part is covered by a merge span by construction, so it can never exceed that phase's own total.
+function serial_ci_ms(spans: ReadonlyArray<Span>, windows: Windows, ci: CiFacts): number {
+	if (!ci.has_windows) return NO_DURATION
+
+	const all = spans.map((span) => time_overlap.to_interval(span))
+	const rest = spans
+		.filter((span) => span_phase(span, windows) !== MERGE_PHASE)
+		.map((span) => time_overlap.to_interval(span))
+
+	return time_overlap.covered_only_by_ms(ci.windows, all, rest)
+}
+
+// Neither `ci` nor `merge` is the span total it looks like. `ci` is the part of the open→merge window
+// no span covers **plus** the cycles only the merge command sat on; `merge` is its own spans less that
+// same quantity, so the pair moves without changing what the two of them add up to.
+function duration_of(phase: PhaseName, found: Detection): number {
+	const total = found.totals.get(phase) ?? NO_DURATION
+
+	if (phase === CI_PHASE) return found.ci.ci_ms + found.serial_ci_ms
+	if (phase === MERGE_PHASE) return total - found.serial_ci_ms
+
+	return total
 }
 
 function build_phases(input: PhaseInput): Array<PhaseTotal> {
@@ -535,13 +573,14 @@ function build_phases(input: PhaseInput): Array<PhaseTotal> {
 	const found: Detection = {
 		windows,
 		totals: totals_of(input.spans, windows),
-		has_ci_data: input.has_ci_data,
+		ci: input.ci,
+		serial_ci_ms: serial_ci_ms(input.spans, windows, input.ci),
 		has_transcript_data: time_spans.has_transcript_data(input.spans.length),
 	}
 
 	return PHASE_ORDER.map((phase) => ({
 		phase,
-		duration_ms: duration_of(phase, found, input.ci_ms),
+		duration_ms: duration_of(phase, found),
 		is_detected: is_detected(phase, found),
 	}))
 }

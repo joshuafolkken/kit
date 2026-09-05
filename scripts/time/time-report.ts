@@ -1,5 +1,6 @@
 import { time_bundles, type BundleTotals } from './time-bundles'
 import { time_checks, type CheckTotal } from './time-checks'
+import { time_ci, type CiFacts } from './time-ci'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
 import { time_invocations, type InvocationTotal } from './time-invocations'
@@ -150,8 +151,10 @@ interface ReportInput {
 	spans: ReadonlyArray<Span>
 	started_ms: number
 	ended_ms: number
-	ci_ms: number
-	has_ci_data: boolean
+	// The CI half whole, rather than the share and its flag separately (joshuafolkken/kit#1384): the
+	// phase table reads the per-commit windows as well, and three fields that must agree are three
+	// fields a caller can hand over inconsistently.
+	ci: CiFacts
 	notes: ReadonlyArray<string>
 	by_check: ReadonlyArray<CheckTotal>
 }
@@ -249,9 +252,9 @@ function per_round_trip_costs(
 // a run as a day long. So the header states what was accounted for, and `started_at` / `ended_at`
 // still carry the wall window a reader can check it against.
 function build_from_spans(input: ReportInput): TimeReport {
-	const { spans, ci_ms, has_ci_data } = input
-	const categories = category_totals(spans, ci_ms)
-	const elapsed_ms = categories.model_ms + categories.tool_ms + categories.human_ms + ci_ms
+	const { spans, ci } = input
+	const categories = category_totals(spans, ci.ci_ms)
+	const elapsed_ms = categories.model_ms + categories.tool_ms + categories.human_ms + ci.ci_ms
 	const counts = span_counts(spans)
 
 	return {
@@ -263,9 +266,9 @@ function build_from_spans(input: ReportInput): TimeReport {
 		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
 		bundles: time_bundles.build_bundles(spans),
 		categories,
-		has_ci_data,
+		has_ci_data: ci.has_ci_data,
 		notes: [...input.notes],
-		phases: time_phases.build_phases({ spans, ci_ms, has_ci_data }),
+		phases: time_phases.build_phases({ spans, ci }),
 		segments: time_segments.build_segments(spans),
 		by_tool: totals_by(spans, (span) => span.label),
 		by_josh_command: totals_by(spans, (span) => span.josh_command),
@@ -283,8 +286,7 @@ function build_report(session_id: string, timeline: Timeline): TimeReport {
 		spans: timeline.spans,
 		started_ms: timeline.started_ms,
 		ended_ms: timeline.ended_ms,
-		ci_ms: 0,
-		has_ci_data: false,
+		ci: time_ci.NO_CI,
 		notes: [],
 		by_check: [],
 	})

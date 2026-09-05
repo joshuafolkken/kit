@@ -60,8 +60,7 @@ function run_report(spans: ReadonlyArray<Span>, ci_ms: number): TimeReport {
 		spans,
 		started_ms: 0,
 		ended_ms: WINDOW_MINUTES * MINUTE_MS,
-		ci_ms,
-		has_ci_data: true,
+		ci: { ci_ms, has_ci_data: true, windows: [], has_windows: true },
 		notes: [SESSION_NOTE],
 		by_check: [
 			{

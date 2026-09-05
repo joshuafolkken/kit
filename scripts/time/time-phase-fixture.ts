@@ -1,4 +1,6 @@
+import { time_ci, type CiFacts } from './time-ci'
 import { time_markers } from './time-markers'
+import type { Interval } from './time-overlap'
 import type { PhaseName, PhaseTotal } from './time-phases'
 import { time_spans, type Span } from './time-spans'
 
@@ -13,7 +15,20 @@ import { time_spans, type Span } from './time-spans'
 // one place a drift would make two suites disagree about what a run looks like.
 
 const MINUTE_MS = 60_000
-const NO_CI = { ci_ms: 0, has_ci_data: false }
+// A scope with no pull request at all, which is what most of these suites measure.
+const NO_CI = { ci: time_ci.NO_CI }
+
+// A run whose merge and whose check windows were both read. `windows` defaults to none, which is the
+// state every suite predating joshuafolkken/kit#1384 was written in: a CI share with no cycle to
+// reattribute, so `ci` is the share alone and `merge` keeps its whole span.
+function with_ci(ci_ms: number, windows: ReadonlyArray<Interval> = []): { ci: CiFacts } {
+	return { ci: { ci_ms, has_ci_data: true, windows, has_windows: true } }
+}
+
+// One CI cycle on the same minute clock the spans are positioned on, so a test reads as a timeline.
+function cycle(start_minute: number, minutes: number): Interval {
+	return { started_ms: start_minute * MINUTE_MS, ended_ms: (start_minute + minutes) * MINUTE_MS }
+}
 
 // The three `pnpm josh <cmd>` names a phase is read off, written once so a suite cannot mistype one
 // into a span that then quietly belongs to no command phase at all.
@@ -73,8 +88,10 @@ const time_phase_fixture = {
 	GATE_COMMAND,
 	PR_COMMAND,
 	MERGE_COMMAND,
+	cycle,
 	span,
 	waited,
+	with_ci,
 	minutes_of,
 	detected,
 	total_ms,

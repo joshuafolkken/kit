@@ -97,8 +97,14 @@ const CAPPED_SEARCH: PullSearch = { pull: undefined, is_exhausted: false, is_fai
 // The listing reads among everything a `GhReader` was asked for. Two suites assert on the count —
 // the batch pages it once for every child, and a child handed its result must page it not at all —
 // so which paths count as the listing is one statement rather than one per suite.
+// **The pull-request *listing*, and not everything sitting under `pulls`.** A pull request's own
+// commit listing is `pulls/<number>/commits` (joshuafolkken/kit#1384), so a filter on the word alone
+// counts it too — and the suites that assert the listing was paged exactly once would read a second
+// request that never touched it.
 function pulls_asked(asked: ReadonlyArray<string>): Array<string> {
-	return asked.filter((request_path) => request_path.includes('pulls'))
+	return asked.filter(
+		(request_path) => request_path.includes('pulls') && !request_path.includes('/commits'),
+	)
 }
 
 const time_pull_fixture = {

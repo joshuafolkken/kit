@@ -76,6 +76,16 @@ Read from the JSON, in this order:
   and `wait-outside` is the same sweep's share of the waiting, which is why `wait` alone is the row
   a stop-reducing proposal is measured against. `setup` and `wrapup` are the run's own, and both can
   be ranked.
+- **`ci` is not the `CI wait` share, and it is the row a CI proposal is ranked off**
+  (joshuafolkken/kit#1384). The share is the part of the open→merge window no span covers; the phase
+  adds what the merge command itself sat waiting for, read from the check-runs of **every commit of
+  the pull request** rather than the head one alone. So a run that watched its own merge reads
+  `CI wait 0.0 min` beside a `ci` of real minutes, and the note under the heading says by how much.
+  **`ci: 0` never meant "nobody waited" and now does not read that way either**: it was this exact
+  misreading that ranked joshuafolkken/kit#1226 last as work with no wall clock behind it, when the
+  cycle it would have cut ran 70 seconds of a 117-second merge command. A cycle that ran beside the
+  review or beside a gate is genuinely free and stays out of the row, and where the cycles could not
+  be read the phase says `not detected` rather than zero.
 - **`is_detected` per phase** — a phase that never appeared prints `not detected`, and that is not a
   measured zero. Never rank a phase you did not measure. `wait`, `wait-outside` and `other` rest on
   no marker, so they are `false` only where no span was read — the same state the three transcript
