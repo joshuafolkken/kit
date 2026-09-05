@@ -79,9 +79,13 @@ interface CommandChecks {
 }
 
 // What one `josh` target expands to. **A target expands to further command lines, never straight to
-// another target**, which is what keeps the walk below a plain self-recursion instead of a pair of
-// functions calling each other — `josh gate` becomes four `josh <check>` lines, and a shell-backed
-// target becomes its own argv.
+// another target** — `josh gate` becomes four `josh <check>` lines, and a shell-backed target
+// becomes its own argv.
+//
+// **The walk recurses once per target rather than once per level.** A target that expanded is
+// judged by what its own expansion found, so the walk has to know which target a subtree belongs
+// to; a single flattened recursion loses exactly that, which is how a shell-backed target reaching
+// no check disappeared without a note (joshuafolkken/kit#1367).
 interface Expansion {
 	checks: ReadonlyArray<string>
 	commands: ReadonlyArray<string>
@@ -143,31 +147,57 @@ function expand_target(target: string): Expansion {
 	return { checks: named, commands: [], unresolved: named.length > 0 ? [] : [target] }
 }
 
-// One level of the walk: what these command lines name outright, what their `josh` targets expand
-// to, and whatever the commands *those* expand into name in turn. Both halves of the first two run
-// because they answer for different spellings of the same check — `pnpm exec cspell` in a hook and
-// `josh cspell:dot` in the gate — and the union deduplicates where they overlap.
+// What one target contributes, once its expansion has been walked. A target answered outright by
+// the tables is that answer; one that expanded is whatever the walk below it reached.
+//
+// **An expansion that reached no check at all reports the target's own name.** That is the same
+// staleness guard the declared and named branches already carried, extended to the branch that was
+// missing it: a shell-backed target whose argv names nothing recognizable — `josh hook:commit`, the
+// whole pre-commit run — contributed zero checks *and* zero names, so a hook or CI step running it
+// left the tables with nothing at all to say it had been read (joshuafolkken/kit#1367). Whatever the
+// expansion did name is kept beside it, since a deeper unclassifiable name is the more specific
+// thing to classify.
+function merge_target(target: string, expansion: Expansion, deeper: CommandChecks): CommandChecks {
+	if (expansion.commands.length === 0) {
+		return { checks: expansion.checks, unresolved: expansion.unresolved }
+	}
+
+	if (deeper.checks.length > 0) return deeper
+
+	return { checks: [], unresolved: [target, ...deeper.unresolved] }
+}
+
+// One level of the walk: what these command lines name outright, and what each of their `josh`
+// targets reaches. Both halves run because they answer for different spellings of the same check —
+// `pnpm exec cspell` in a hook and `josh cspell:dot` in the gate — and the union deduplicates where
+// they overlap.
+//
+// **Each target is walked against its own path, not against its siblings'.** `seen` exists to stop
+// a cycle, and once the verdict above reads a target's own subtree, a set shared across siblings
+// would let one target claim a name the next one needed and report that sibling as unclassifiable
+// for it — a false entry in the note, in the one direction this report cannot afford.
 function resolve_commands(
 	commands: ReadonlyArray<string>,
 	seen: ReadonlySet<string>,
 ): CommandChecks {
 	if (commands.length === 0) return EMPTY_CHECKS
 
-	const targets = commands.flatMap((command) => josh_targets(command)).filter((t) => !seen.has(t))
-	const expansions = targets.map((target) => expand_target(target))
-	const next = new Set([...seen, ...targets])
-	const deeper = resolve_commands(
-		expansions.flatMap((expansion) => expansion.commands),
-		next,
+	const targets = unique_sorted(
+		commands.flatMap((command) => josh_targets(command)).filter((t) => !seen.has(t)),
 	)
+	const resolved = targets.map((target) => {
+		const expansion = expand_target(target)
+		const next = new Set([...seen, target])
+
+		return merge_target(target, expansion, resolve_commands(expansion.commands, next))
+	})
 
 	return {
 		checks: [
 			...commands.flatMap((command) => match_signatures(command)),
-			...expansions.flatMap((expansion) => expansion.checks),
-			...deeper.checks,
+			...resolved.flatMap((entry) => entry.checks),
 		],
-		unresolved: [...expansions.flatMap((e) => e.unresolved), ...deeper.unresolved],
+		unresolved: resolved.flatMap((entry) => entry.unresolved),
 	}
 }
 

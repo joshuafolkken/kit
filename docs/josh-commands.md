@@ -1855,7 +1855,12 @@ that project's gate.
 
 **A `josh` sub-command it cannot resolve is reported, not dropped.** The name appears in an
 `unresolved josh commands:` note, so a hook rewired to a new target surfaces as a name to classify
-rather than vanishing out of the table with nothing to say it had.
+rather than vanishing out of the table with nothing to say it had. **Expanding is not resolving**: a
+target that carries its own command line — `josh hook:commit`, which runs the whole pre-commit hook —
+is judged by what that expansion reached, and one that reached no check is reported by name exactly
+like a target nothing knew about (joshuafolkken/kit#1367). Reporting only the names that failed to
+expand would have left the loudest case silent, since a step running the whole of another layer is
+the one worth seeing in a duplication report.
 
 **It reports and changes nothing.** Which repeats are worth removing is a decision about what a hook
 should guard — a red pre-push suite still catches what a local gate was never run for — so this
