@@ -1,5 +1,5 @@
 {
-	"version": "1.318.0",
+	"version": "1.319.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -120,9 +120,9 @@
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
 		"@types/node": "^26.4.1",
 		"@types/semver": "^7.8.0",
-		"cspell": "^10.2.0",
+		"cspell": "^10.2.2",
 		"esbuild": "^0.28.2",
-		"eslint": "^10.9.1",
+		"eslint": "^10.10.0",
 		"lefthook": "^2.1.12",
 		"prettier": "^3.9.6",
 		"prettier-plugin-svelte": "^4.1.1",
@@ -134,7 +134,7 @@
 		"vitest": "^5.0.0"
 	},
 	"dependencies": {
-		"@eslint/compat": "^2.1.0",
+		"@eslint/compat": "^2.1.1",
 		"@eslint/js": "^10.0.1",
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"eslint-config-prettier": "^10.1.8",
