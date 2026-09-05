@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { ENV_FILE_NAME } from '#ports'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import { time_batch_guard } from './time/time-batch-guard'
@@ -14,10 +15,11 @@ import { time_density_hook } from './time/time-density-hook'
 // Three runs measured after that line shipped came in at 1.10–1.12 calls per round trip, unchanged —
 // so what is added here intervenes in the decision instead of reporting on it.
 //
-// **The transcript already holds the turn this call belongs to.** Claude Code writes the assistant
-// message when it arrives, before any of its tools run, so the newest message's `tool_use` count is
-// how many calls *this* turn issued — which is what tells a turn that batched apart from one that did
-// not. Verified against a live session transcript before this was written.
+// **What the transcript holds is the turns already closed, and nothing usable about the one in hand.**
+// Claude Code writes one line per content block and starts the first tool as soon as that block parses,
+// so a turn's later `tool_use` lines do not exist yet — measured on a live session, they arrive 1.4 to
+// 15 seconds afterwards. The decision is therefore made from closed history alone;
+// `time-batch-guard.ts` → "What it cannot know" carries the measurement and what it costs.
 //
 // **Every failure here allows the call.** A missing transcript, a payload that is not JSON, a
 // half-written tail, a temp directory that cannot be written — each of them ends as "no refusal", for
@@ -149,9 +151,29 @@ function deny_envelope(reason: string): string {
 	})
 }
 
+// **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`.** The flag form is what
+// every other command uses, but declaring any `tsx_arguments` disqualifies a command from in-process
+// dispatch (`josh-in-process.ts`) — putting a second ~0.16 s tsx start back in front of every `Bash`
+// call, which is the hot path joshuafolkken/kit#1342 took it off. `process.loadEnvFile` is node's own
+// `--env-file` parser, verified to keep node's precedence: a value already in the environment wins over
+// the file's. A missing or unreadable file is what `--env-file-if-exists` swallows, and so does this.
+//
+// **It runs only on the real hook path**, never inside `batch_refusal`, so a developer's own `.env`
+// cannot decide what the unit tests see.
+function load_environment_file(): void {
+	try {
+		process.loadEnvFile(ENV_FILE_NAME)
+	} catch {
+		// No `.env` beside this project, or one this process may not read. The switch then reads from the
+		// environment alone, which is what it did before any file existed.
+	}
+}
+
 // Nothing at all reaches stdout on the ordinary call, so what the harness parses stays empty unless
 // the call is being refused.
 function write_decision(raw_payload: string): void {
+	load_environment_file()
+
 	const reason = batch_refusal(raw_payload)
 
 	if (reason !== undefined) process.stdout.write(`${deny_envelope(reason)}\n`)
@@ -169,4 +191,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	else write_decision(await text(process.stdin))
 }
 
-export { batch_refusal, deny_envelope, is_enabled, refusal_path, DISABLED_VALUES, SWITCH_ENV_KEY }
+export {
+	batch_refusal,
+	deny_envelope,
+	is_enabled,
+	load_environment_file,
+	refusal_path,
+	DISABLED_VALUES,
+	SWITCH_ENV_KEY,
+}

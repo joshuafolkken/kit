@@ -278,6 +278,9 @@ const time_bundle_call = {
 	bash_facts,
 	call_facts,
 	tool_facts,
+	// Exported for the batching guard's own word scan (joshuafolkken/kit#1390), so the two scanners
+	// cannot come to disagree about where one word of a shell line ends and the next begins.
+	words_of,
 }
 
 export type { BundleFacts }

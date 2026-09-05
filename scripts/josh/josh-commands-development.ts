@@ -2,7 +2,6 @@ import {
 	CSPELL_CACHE_FLAGS,
 	ESLINT_CACHE_FLAGS,
 	GATE_COMMAND,
-	OPTIONAL_ENV_FILE_FLAGS,
 	PE,
 	TS_CACHE_FLAGS,
 	type CommandEntry,
@@ -68,12 +67,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Claude Code hook: refuse a third consecutive single-call turn (reads the tool call on stdin)',
 		category: 'Development',
-		// `JOSH_BATCH_GUARD` is a per-machine preference, so `.env` is where a person keeps it — the
-		// same reason `eval:scope` carries this flag (joshuafolkken/kit#1235). Without it, `off` written
-		// there is ignored and the guard goes on refusing with no complaint. **The stake is higher here
-		// than for the measurement**: this switch's safe state is *on*, so the silent half is a hook that
-		// cannot be turned off rather than one that never turns on.
-		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		// **No `tsx_arguments`, deliberately.** `JOSH_BATCH_GUARD` is a per-machine preference kept in
+		// `.env`, which every other command reads through `OPTIONAL_ENV_FILE_FLAGS` — but declaring any
+		// `tsx_arguments` disqualifies a command from in-process dispatch (`josh-in-process.ts`), and
+		// this one runs before every `Bash` call. That is the hot path joshuafolkken/kit#1342 took a
+		// second ~0.16 s tsx start off. The script calls `process.loadEnvFile` itself instead, which is
+		// node's own `--env-file` parser with node's own precedence.
 	},
 	cspell: {
 		shell: [

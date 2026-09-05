@@ -1,12 +1,13 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
 	batch_refusal,
 	deny_envelope,
 	DISABLED_VALUES,
 	is_enabled,
+	load_environment_file,
 	refusal_path,
 	SWITCH_ENV_KEY,
 } from './batch-guard'
@@ -54,9 +55,12 @@ function payload_of(name: string, text: string = unbatched_text()): string {
 	})
 }
 
-// Assigned rather than deleted: an empty value is not one the disabled list recognizes, so the guard
-// reads as on exactly as it does on a machine that has never heard of the variable.
-afterEach(() => {
+// **Before rather than after each case**: an `afterEach` leaves the *first* case reading whatever the
+// developer exported, and this switch's safe state is on — so a shell with it set to `off` would have
+// turned the suite green on a guard that never fired. Assigned rather than deleted, because an empty
+// value is not one the disabled list recognizes: the guard reads as on, exactly as it does on a machine
+// that has never heard of the variable.
+beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
 })
 
@@ -134,6 +138,16 @@ describe('is_enabled', () => {
 		process.env[SWITCH_ENV_KEY] = 'disable'
 
 		expect(is_enabled()).toBe(true)
+	})
+})
+
+// It runs on the real hook path before anything is read, so the one thing that must be true of it is
+// that a project without a `.env` costs nothing and raises nothing.
+describe('load_environment_file', () => {
+	it('does not throw where there is no env file to load', () => {
+		expect(() => {
+			load_environment_file()
+		}).not.toThrow()
 	})
 })
 

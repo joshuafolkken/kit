@@ -92,10 +92,20 @@ interface GuardedCall {
 // **It is held here rather than at the hook's matcher, which names `Bash` alone.** A matcher is
 // settings a consumer can widen; this is the guarantee, and it has to hold whatever the wiring says.
 const WRITING_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'NotebookEdit'])
-// `sed` is on `time-bundle-call.ts`'s read list deliberately — an in-place edit is what `Edit` does,
-// and a turn may issue several. Excluded outright here rather than tested for `-i`, because a chained
-// line can reach an in-place edit in a segment no leading-word test sees.
-const WRITING_COMMANDS: ReadonlySet<string> = new Set(['sed'])
+// The write words, matched **anywhere in the line rather than as its leading word**. A chain is
+// labelled by its first segment — `cat notes.md && sed -i '' s/a/b/ src/x.ts` reads as `cat` — so the
+// leading word says nothing about what the rest of the line does. That is the same shape, and the same
+// reason, as `time-bundle-call.ts`'s own mutation-word scan, and the tokenizer is reused from there so
+// the two cannot disagree about where a word ends.
+//
+// `sed` is on that module's read list deliberately — an in-place edit is what `Edit` does, and a turn
+// may issue several. Here it is excluded outright rather than tested for `-i`: a read-only `sed` is
+// then never refused, which is a call allowed that could have been refused.
+const WRITING_WORDS: ReadonlySet<string> = new Set(['dd', 'sed', 'tee'])
+// A redirection, tested as a character rather than a token, because `a.json>b.json` needs no spaces
+// around it. It matches a `->` inside a grep pattern too, which again only allows a call that could
+// have been refused — the direction every rule here leans.
+const REDIRECTION = '>'
 
 // One line, and it says four things: what happened, what to do instead, where the rule is written, and
 // what to do when the turn was already batching or the call really is alone. **The last of those is not
@@ -109,11 +119,17 @@ const REASON =
 	`genuinely has nothing to go beside it, reissue it as it was: this fires once per run of ` +
 	`single-call turns and cannot repeat on the call in hand.`
 
+function is_writing_command(command: string): boolean {
+	if (command.includes(REDIRECTION)) return true
+
+	return time_bundle_call.words_of(command).some((word) => WRITING_WORDS.has(word))
+}
+
 function is_writing_call(call: GuardedCall): boolean {
 	if (WRITING_TOOLS.has(call.name)) return true
 	if (call.name !== cost_blocks.BASH_TOOL) return false
 
-	return WRITING_COMMANDS.has(time_shell.leading_word(time_shell.bash_command(call.input)))
+	return is_writing_command(time_shell.bash_command(call.input))
 }
 
 // Whether this call is one the guard could ever refuse, asked before any transcript is read. **The

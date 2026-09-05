@@ -140,6 +140,14 @@ describe('time_batch_guard.is_guarded_call', () => {
 		['a josh command', { name: 'Bash', input: { command: 'pnpm josh gate' } }, false],
 		[EDIT_LABEL, EDIT_CALL, false],
 		[SED_LABEL, IN_PLACE_SED_CALL, false],
+		// A chain is labelled by its first segment, so the leading word alone reads both of these as
+		// reads. Scanning the whole line is what keeps a write out of the set that can be refused.
+		[
+			'a chained in-place sed',
+			{ name: 'Bash', input: { command: `cat notes.md && sed -i '' s/a/b/ ${FRESH_PATH}` } },
+			false,
+		],
+		['a redirection', { name: 'Bash', input: { command: "jq '.x' a.json > b.json" } }, false],
 	])('answers %s with %s', (_label, call, expected) => {
 		expect(time_batch_guard.is_guarded_call(call)).toBe(expected)
 	})

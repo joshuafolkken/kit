@@ -484,9 +484,10 @@ SECURITY.md         tsconfig.sonar.json
 > the formatter**, because it must never refuse a write: Claude Code denies one call of a turn and runs
 > the rest, so a refused edit would leave its siblings applied and itself not. Within `Bash` the
 > mutation words already exclude every `pnpm josh` command, commit and Issue write, and the script
-> excludes the edit tools and `sed` on top of the matcher — a matcher is settings a consumer can widen,
-> and the guarantee has to hold whatever the wiring says. `JOSH_BATCH_GUARD=off` in `.env` switches it
-> off without editing the settings file. `docs/josh-commands.md` carries the conditions, what the guard
+> excludes the edit tools on top of the matcher, plus `sed`, `tee`, `dd` or a `>` anywhere in the line —
+> a matcher is settings a consumer can widen, and the guarantee has to hold whatever the wiring says.
+> `JOSH_BATCH_GUARD=off` in the environment or in `.env` switches it off without editing the settings
+> file. `docs/josh-commands.md` carries the conditions, what the guard
 > cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
 >
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
