@@ -146,12 +146,33 @@ function close_trip(walk: Walk): void {
 	walk.pending = []
 }
 
+// Whether this span is still the turn whose calls are pending. **A turn's calls are separated by its
+// own model spans**, because Claude Code writes one line per content block and the harness returns
+// each result as it arrives (joshuafolkken/kit#1406) — so closing the trip on every model span read
+// one batched turn as several single-call ones and offered it back as a sequence that could have been
+// bundled, which it already was. An absent id matches nothing, leaving the adjacency reading intact
+// for a transcript that wrote none.
+// **A continuation is excluded whatever id it carries.** `time_overlap.trim` copies the head's fields
+// onto the tail, so a delegated unit's bracketing call comes back carrying the very message this turn
+// is issuing from — and read as the same turn it would skip the flush that says the unit ran in
+// between, which is exactly what `is_turn_boundary` below refuses to let a sequence cross.
+function is_same_turn(span: Span, pending: ReadonlyArray<Span>): boolean {
+	const [first] = pending
+
+	if (first === undefined || span.is_continuation) return false
+	if (span.message_id === time_spans.NO_MESSAGE_ID) return false
+
+	return span.message_id === first.message_id
+}
+
 function step(walk: Walk, span: Span): void {
 	if (is_call(span)) {
 		walk.pending.push(span)
 
 		return
 	}
+
+	if (is_same_turn(span, walk.pending)) return
 
 	close_trip(walk)
 	if (!is_turn_boundary(span)) flush(walk)

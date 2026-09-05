@@ -47,6 +47,7 @@ function span(start_minute: number, minutes: number, extra: Partial<Span> = {}):
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		targets: [],
+		message_id: time_spans.NO_MESSAGE_ID,
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,

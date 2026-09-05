@@ -1,8 +1,8 @@
 import { time_distribution, type Distribution } from './time-distribution'
 import { time_format } from './time-format'
+import { time_model_gaps, type ModelGap } from './time-model-gaps'
 import { time_phases, type PhaseName } from './time-phases'
 import { time_placed, type Placed } from './time-placed'
-import { time_round_trips, type ModelGap } from './time-round-trips'
 import { time_spans, type Span } from './time-spans'
 
 // The model wait a run spends per round trip, read as a distribution rather than as a mean
@@ -16,7 +16,7 @@ import { time_spans, type Span } from './time-spans'
 // batching touches one long think.
 //
 // **It is the mean's distribution, not a second measurement.** The stretches come from
-// `time_round_trips.issuing_model_gaps`, which is what `issuing_model_ms` now sums — so the median
+// `time_model_gaps.issuing_model_gaps`, which is what `issuing_model_ms` now sums — so the median
 // here and the price one block above are two readings of one walk, and a scope the price is withheld
 // for is a scope this is withheld for on the same criterion.
 //
@@ -74,7 +74,7 @@ function to_longest(gap: ModelGap, placed: ReadonlyArray<Placed>): LongestGap {
 
 function build_gaps(spans: ReadonlyArray<Span>): GapTotals {
 	const placed = time_placed.placed_spans(spans)
-	const gaps = time_round_trips.issuing_model_gaps(spans)
+	const gaps = time_model_gaps.issuing_model_gaps(spans)
 	const longest = gaps.toSorted((left, right) => right.duration_ms - left.duration_ms)
 
 	return {

@@ -28,6 +28,10 @@ function span(
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		targets: [],
+		// No message id, which is the state every case predating joshuafolkken/kit#1406 was written in:
+		// the round trips are then read by the adjacency fallback exactly as they were. A case about
+		// turns overrides it, which is what makes the two rules testable apart.
+		message_id: time_spans.NO_MESSAGE_ID,
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,

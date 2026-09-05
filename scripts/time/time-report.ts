@@ -5,6 +5,7 @@ import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_invocations, type InvocationTotal } from './time-invocations'
+import { time_model_gaps } from './time-model-gaps'
 import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
@@ -51,6 +52,16 @@ const { MODEL_LABEL, TOOL_LABEL, HUMAN_LABEL, CI_LABEL, NO_CALLS } = time_format
 // so the four still reconstruct the elapsed time exactly — the property that makes two runs
 // comparable, and the one a naive "add the PR window" would have broken, since `followup --merge`
 // waits for CI *inside* a tool span that is already counted.
+//
+// **So the CI a run waited for inside `followup --merge` is in `tool_ms`, and in no other field**
+// (joshuafolkken/kit#1406). It is the merge command's own execution, and `ci_ms` deliberately
+// excludes it — a hand read that saw the phase table's `ci` row beside a `CI wait 0.0 min` category
+// row could take the two for the same quantity and conclude a stretch had gone unmeasured. Nothing
+// is: the phase table charges that stretch to `ci` and subtracts it from `merge`
+// (`time-phases.ts` → `serial_ci_ms`), which moves it between two *phases* and never between
+// categories. `model_ms` is the total duration of every model span, `tool_ms` of every tool span,
+// `human_ms` of every human span — each a sum over spans, so no reattribution in the phase table can
+// reach them.
 interface CategoryTotals {
 	model_ms: number
 	tool_ms: number
@@ -95,10 +106,16 @@ interface TimeReport extends TurnSplit {
 	ended_at: string
 	elapsed_ms: number
 	span_count: number
-	// How many model spans the run has — one per assistant turn, which is what a per-turn figure is
-	// divided by (joshuafolkken/kit#1271). Carried on the report rather than recomputed by each caller,
-	// because the spans are gone by the time a caller holds one: an epic aggregation reads several
-	// runs' reports and has no access to the arrays they were built from.
+	// **How many assistant messages the run's model spans came from**, which is what a per-turn figure
+	// is divided by (joshuafolkken/kit#1271). Carried on the report rather than recomputed by each
+	// caller, because the spans are gone by the time a caller holds one: an epic aggregation reads
+	// several runs' reports and has no access to the arrays they were built from.
+	//
+	// **Not the number of model spans, which is what it used to be** (joshuafolkken/kit#1406). Claude
+	// Code writes one transcript line per content block and repeats the message id on each, so one turn
+	// is as many model spans as it wrote blocks — run #1399's 41 turns were reported as 79. The
+	// definition lives in `time-round-trips.ts` beside the round trip's, since the two are the same
+	// question asked at two grains.
 	turn_count: number
 	// How many tool calls the run made, and how many times it stopped to wait for their results
 	// (joshuafolkken/kit#1304). The two differ exactly by batching: calls issued together in one turn
@@ -251,7 +268,7 @@ function span_counts(
 ): Pick<TimeReport, 'span_count' | 'turn_count' | 'tool_call_count' | 'round_trip_count'> {
 	return {
 		span_count: spans.length,
-		turn_count: of_category(spans, time_spans.MODEL_CATEGORY).length,
+		turn_count: time_round_trips.count_turns(spans),
 		tool_call_count: time_round_trips.count_calls(spans),
 		round_trip_count: time_round_trips.count_round_trips(spans),
 	}
@@ -268,7 +285,7 @@ function per_round_trip_costs(
 	tool_ms: number,
 	round_trip_count: number,
 ): Pick<TimeReport, 'ms_per_round_trip' | 'model_ms_per_round_trip'> {
-	const model_ms = time_round_trips.issuing_model_ms(spans)
+	const model_ms = time_model_gaps.issuing_model_ms(spans)
 
 	return {
 		ms_per_round_trip: time_round_trips.per_round_trip(model_ms + tool_ms, round_trip_count),
