@@ -51,6 +51,10 @@ interface BenchRow {
 interface BenchReport {
 	rows: ReadonlyArray<BenchRow>
 	notes: ReadonlyArray<string>
+	// Whether a gate stopped the run before it finished the targets it was given
+	// (joshuafolkken/kit#1369). Carried on the report rather than only in the exit code, so a `--json`
+	// consumer reads the same fact the console does instead of inferring it from a note's wording.
+	is_interrupted: boolean
 }
 
 // **Both medians are guarded, not just the divisor.** A zero on either side makes the ratio an
@@ -101,10 +105,11 @@ function failure_notes(rows: ReadonlyArray<BenchRow>): Array<string> {
 function build_report(
 	samples: ReadonlyArray<BenchSample>,
 	notes: ReadonlyArray<string> = [],
+	is_interrupted = false,
 ): BenchReport {
 	const rows = samples.map((sample) => build_row(sample)).toSorted(by_cold_cost)
 
-	return { rows, notes: [...notes, ...failure_notes(rows)] }
+	return { rows, notes: [...notes, ...failure_notes(rows)], is_interrupted }
 }
 
 // **A ratio below one is a slowdown and says so.** `speedup_of` is cold ÷ warm, so noise on a target

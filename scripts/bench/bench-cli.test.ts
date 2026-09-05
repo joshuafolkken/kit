@@ -2,6 +2,7 @@ import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { time_distribution } from '#scripts/time/time-distribution'
 import { describe, expect, it } from 'vitest'
 import { bench_cli } from './bench-cli'
+import { bench_interrupt } from './bench-interrupt'
 import type { BenchReport, BenchRow } from './bench-report'
 import { bench_targets } from './bench-targets'
 
@@ -20,8 +21,8 @@ function row(cold_ms: ReadonlyArray<number>): BenchRow {
 	}
 }
 
-function report(rows: ReadonlyArray<BenchRow>): BenchReport {
-	return { rows, notes: [] }
+function report(rows: ReadonlyArray<BenchRow>, is_interrupted = false): BenchReport {
+	return { rows, notes: [], is_interrupted }
 }
 
 describe('josh bench — registration', () => {
@@ -121,5 +122,30 @@ describe('josh bench — a report of nothing is not a success', () => {
 
 	it('fails where there is no row at all', () => {
 		expect(bench_cli.exit_code_for(report([]))).toBe(1)
+	})
+})
+
+// `0` means every target the command was asked for was measured, `1` keeps the meaning it has
+// everywhere in this package — the measurement itself produced nothing usable — and the third value
+// says the figures above it are real but incomplete (joshuafolkken/kit#1369, inside the family
+// joshuafolkken/kit#1352 established).
+describe('josh bench — an interrupted run is told apart from a failed one', () => {
+	it('marks an interruption with neither the success code nor the plain failure one', () => {
+		expect(bench_interrupt.INTERRUPTED_EXIT_CODE).not.toBe(0)
+		expect(bench_interrupt.INTERRUPTED_EXIT_CODE).not.toBe(1)
+	})
+
+	it('marks a run a gate stopped after it had measured something', () => {
+		const partial = report([row([1000]), row([])], true)
+
+		expect(bench_cli.exit_code_for(partial)).toBe(bench_interrupt.INTERRUPTED_EXIT_CODE)
+	})
+
+	// The reason nothing was measured is known and said in the note, which is what makes this an
+	// interruption rather than the empty report the code above it stands for.
+	it('marks a run a gate stopped before its first reading', () => {
+		const nothing = report([row([]), row([])], true)
+
+		expect(bench_cli.exit_code_for(nothing)).toBe(bench_interrupt.INTERRUPTED_EXIT_CODE)
 	})
 })
