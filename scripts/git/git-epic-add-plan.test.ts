@@ -347,7 +347,7 @@ describe('git_epic_add_plan.build_plan — the decision record', () => {
 	})
 
 	it('refuses a record carrying a bare dependency chain', () => {
-		expect(error_of(plan({ decision: CHAIN_RECORD }))).toContain(CHAIN_LINE)
+		expect(error_of(plan({ decision: CHAIN_RECORD }))).toContain('Line 2')
 	})
 
 	// The refusals above must not fire before the ones that were already there: an insertion into a

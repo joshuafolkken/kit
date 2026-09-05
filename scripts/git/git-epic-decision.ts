@@ -16,14 +16,20 @@ import { git_epic_sections, type BodyLines, type SectionRange } from './git-epic
 const DECISIONS_HEADING = '## Decisions'
 const DECISIONS_HEADING_PATTERN = /^#{1,6}[ \t]+Decisions\b/u
 const BLANK_LINE = ''
+// Editors count from one; `find_indices` answers a zero-based index.
+const FIRST_LINE_NUMBER = 1
 
 // A record that says nothing is worse than no record: it satisfies the "was it written" question
 // while leaving the reasoning unrecoverable. Refused before anything is written.
 const EMPTY_RECORD =
 	'The decision record is empty; write the record before recording it, or leave `--decision-file` off.'
 
-function to_declaration_error(line: string): string {
-	return `The decision record declares \`${line}\` on a line of its own, which \`epic:next\` would read as part of the epic's dependency order; wrap it in backticks or reword it.`
+// **The offending line is named, never quoted.** The record is a file the caller handed over, and
+// echoing a line of it into stderr puts arbitrary file content in the console — the leak SonarCloud's
+// `tssecurity:S8689` reports for exactly this path on joshuafolkken/kit#1350. A line number is as
+// actionable, since the author has the file open, and it carries nothing out of it.
+function to_declaration_error(line_number: number): string {
+	return `Line ${String(line_number)} of the decision record is nothing but a dependency chain, which \`epic:next\` would read as part of the epic's dependency order; wrap it in backticks, fence it, or reword it.`
 }
 
 // Whether the record can be written at all. The declaration check is the load-bearing one: a bare
@@ -43,7 +49,7 @@ function find_decision_error(record: string): string | undefined {
 		git_epic_parse.is_declaration_line(line),
 	)
 
-	return found === undefined ? undefined : to_declaration_error((input.lines[found] ?? '').trim())
+	return found === undefined ? undefined : to_declaration_error(found + FIRST_LINE_NUMBER)
 }
 
 // The record as the lines it contributes, with a blank line in front so it never runs into whatever

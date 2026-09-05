@@ -87,10 +87,13 @@ describe('git_epic_decision.find_decision_error', () => {
 	// A bare `#A -> #B` line is parsed as a declaration wherever it sits, so a record quoting an order
 	// on its own line would add a dependency nobody declared — joshuafolkken/kit#1253's failure mode
 	// arriving by a second route.
-	it('refuses a record whose line is nothing but a dependency chain', () => {
+	// The line is named rather than quoted: the record is a file the caller handed over, so echoing a
+	// line of it into stderr would put arbitrary file content in the console.
+	it('refuses a record whose line is nothing but a dependency chain, naming the line number', () => {
 		const refusal = git_epic_decision.find_decision_error(CHAIN_RECORD)
 
-		expect(refusal).toContain(CHAIN_LINE)
+		expect(refusal).toContain('Line 2')
+		expect(refusal).not.toContain(CHAIN_LINE)
 	})
 
 	it('accepts the same order quoted inside a sentence', () => {
