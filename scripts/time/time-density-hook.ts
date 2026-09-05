@@ -2,6 +2,7 @@ import { closeSync, fstatSync, openSync, readSync } from 'node:fs'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import { time_density } from './time-density'
+import { time_hook_transcript } from './time-hook-transcript'
 
 // The disk half of the live density line (joshuafolkken/kit#1329): find the transcript, read enough
 // of it, and remember when the line was last emitted.
@@ -44,17 +45,29 @@ const NOTICE_PREFIX = 'josh-density-notice-'
 // difference enormous, which is the answer wanted: the first eligible edit of a run emits.
 const NEVER_MS = 0
 
-// Only the field this reads. Claude Code hands a `PostToolUse` hook `transcript_path` beside the
-// `tool_input` the formatter half uses, so the session's own file is named rather than searched for —
-// no home-directory walk, and a delegated unit is answered with its own transcript rather than its
-// parent's.
-const payload_schema = z.object({ transcript_path: z.string().min(1).optional() })
+// The two fields this reads. Claude Code hands a `PostToolUse` hook `transcript_path` beside the
+// `tool_input` the formatter half uses, so a file is named rather than searched for — no
+// home-directory walk.
+//
+// **`agent_id` is what makes a delegated unit answerable with its own transcript**
+// (joshuafolkken/kit#1424). The path in the payload is the *parent* session's, whichever agent issued
+// the call, so without this field the line a fork read described the parent's calls per round trip —
+// a number about a run the reader is not in. `time-hook-transcript.ts` carries the derivation.
+const payload_schema = z.object({
+	transcript_path: z.string().min(1).optional(),
+	// **`nullish`, not `optional`.** A payload spelling the absent agent as `null` has to read as "no
+	// fork"; rejected, it would fail `safeParse` for the whole payload and silence the line for every
+	// edit of the main line — the opposite of this module's stated failure direction.
+	agent_id: z.string().nullish(),
+})
 const notice_schema = z.object({ notified_at_ms: z.number() })
 
 function parse_transcript_path(raw_payload: string): string | undefined {
 	const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
 
-	return parsed.success ? parsed.data.transcript_path : undefined
+	if (!parsed.success || parsed.data.transcript_path === undefined) return undefined
+
+	return time_hook_transcript.transcript_of(parsed.data.transcript_path, parsed.data.agent_id)
 }
 
 // The last `max_bytes` of a file, as text. The leading line is usually cut mid-way, which every

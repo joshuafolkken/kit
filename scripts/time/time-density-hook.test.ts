@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { time_density } from './time-density'
 import { time_density_hook } from './time-density-hook'
+import { time_hook_transcript } from './time-hook-transcript'
 import { time_transcript_fixture } from './time-transcript-fixture'
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'density-hook-'))
@@ -16,6 +17,10 @@ const TAIL_SAMPLE_BYTES = 16
 // Longer than the window above, so a read that ignored the window would return something else.
 const LONG_TEXT = '0123456789'.repeat(3)
 const ABSENT_PATH = path.join(WORK_DIRECTORY, 'no-such-session.jsonl')
+// The id Claude Code puts in a forked agent's payload, beside the *parent* session's transcript path.
+const AGENT_ID = 'a313eea340918b8a1'
+// The half of the line every case here recognizes it by.
+const DENSITY_PHRASE = 'calls per round trip'
 
 // A transcript of its own per case, so one case's throttle record never silences another's — the
 // record is keyed on the transcript the payload names. Each one is remembered rather than listed
@@ -68,7 +73,7 @@ describe('time_density_hook.density_notice', () => {
 	it('returns the line for an unbatched run under the floor', () => {
 		const notice = time_density_hook.density_notice(payload_of('unbatched', ONE_CALL), NOW_MS)
 
-		expect(notice).toContain('calls per round trip')
+		expect(notice).toContain(DENSITY_PHRASE)
 	})
 
 	it('returns nothing for a run that batches its calls', () => {
@@ -103,6 +108,32 @@ describe('time_density_hook.density_notice — the throttle', () => {
 
 		expect(time_density_hook.density_notice(first, NOW_MS)).toBeDefined()
 		expect(time_density_hook.density_notice(second, NOW_MS + RECENTLY_MS)).toBeDefined()
+	})
+})
+
+// Inside a fork the payload names the parent session, so the line a forked agent read described the
+// parent's calls per round trip — a number about a run the reader is not in (joshuafolkken/kit#1424).
+describe('time_density_hook.density_notice — a forked agent reads its own transcript', () => {
+	it("reports the fork's density where the parent's would say nothing", () => {
+		const batched = time_transcript_fixture.density_text(ENOUGH_TURNS, THREE_CALLS)
+		const session_path = write_transcript('fork-parent', batched)
+		const fork = time_hook_transcript.fork_path(session_path, AGENT_ID)
+
+		mkdirSync(path.dirname(fork), { recursive: true })
+		writeFileSync(fork, time_transcript_fixture.density_text(ENOUGH_TURNS, ONE_CALL))
+		WRITTEN_TRANSCRIPTS.add(fork)
+
+		const raw = JSON.stringify({ transcript_path: session_path, agent_id: AGENT_ID })
+
+		expect(time_density_hook.density_notice(raw, NOW_MS)).toContain(DENSITY_PHRASE)
+	})
+
+	// A main line that spells its absent agent `null` is a main line, not a fork. Rejected by the schema
+	// instead, the whole payload would fail to parse and the line would never be said again.
+	it('reads the session itself when the agent is spelled null', () => {
+		const raw = time_transcript_fixture.with_null_agent(payload_of('null-agent', ONE_CALL))
+
+		expect(time_density_hook.density_notice(raw, NOW_MS)).toContain(DENSITY_PHRASE)
 	})
 })
 
