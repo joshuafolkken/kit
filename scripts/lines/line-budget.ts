@@ -32,7 +32,8 @@ const MAX_LINES_RULE = 'max-lines'
 // The rule reports when the count is **greater than** `max`, and 0 is the lowest value its own schema
 // accepts — so at `max: 0` every file reports except one whose counted code lines are exactly 0. That
 // is not only the empty file: with `skipBlankLines` and `skipComments` on, a comments-and-blank-lines
-// module counts 0 too. `count_or_zero` below is what keeps that case an answer rather than a shrug.
+// module counts 0 too. `count_or_zero` below is what keeps that case an answer rather than a shrug —
+// and `--no-inline-config` is what keeps a silenced rule from being mistaken for one of those files.
 const PROBE_MAX = 0
 const PROBE_SEVERITY = 'error'
 // The boundary between having headroom and being over the limit. Deliberately *not* `PROBE_MAX`, which
@@ -62,7 +63,12 @@ const PERCENT = 100
 const ESLINT_BIN = 'eslint'
 const PNPM = 'pnpm'
 const PNPM_EXEC = 'exec'
-const FORMAT_FLAGS: ReadonlyArray<string> = ['--format', 'json']
+// `--no-inline-config` is not tidiness: a `/* eslint-disable max-lines */` at the top of a file
+// silences the rule, an inline directive beats the `--rule` override, and the probe would then see no
+// message and read the file as 0 code lines — printing `300 to spare` for a 500-line file, which is
+// the most dangerous direction this report can be wrong in. With inline configuration off, the count
+// is always the rule's own.
+const FORMAT_FLAGS: ReadonlyArray<string> = ['--format', 'json', '--no-inline-config']
 const RULE_FLAG = '--rule'
 // **No `--cache`, and a `--cache-location` all the same.** An eslint run started *without* `--cache`
 // deletes whatever `--cache-location` names, which is how the edit hook once wiped the gate's cache
@@ -240,8 +246,15 @@ function parse_counts(raw_output: string | undefined): ReadonlyMap<string, numbe
 // match — a path that is gone, or a directory whose every entry is ignored — makes it exit with no
 // JSON at all, and because this sends every path in one run to keep the cost at one process start,
 // that single bad argument would leave every *other* path unanswered.
+// `throwIfNoEntry: false` covers a path that is not there and nothing else — an unreadable parent
+// directory raises `EACCES`, which would leave this call with no answer at all rather than one bad
+// row, taking every other path in the same invocation with it.
 function is_lintable_path(file_path: string): boolean {
-	return statSync(file_path, { throwIfNoEntry: false })?.isFile() === true
+	try {
+		return statSync(file_path, { throwIfNoEntry: false })?.isFile() === true
+	} catch {
+		return false
+	}
 }
 
 function lintable_paths(file_paths: ReadonlyArray<string>): ReadonlyArray<string> {

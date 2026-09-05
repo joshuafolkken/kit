@@ -55,13 +55,13 @@ describe('lines_command.rows_for', () => {
 
 	// A mistyped path is never sent to eslint, so a row quoting eslint's verdict for it would be a
 	// claim about a question nobody asked — and the reader would read the typo as a real file.
-	it('says a mistyped path does not exist rather than blaming eslint', () => {
+	it('says a mistyped path is not a file rather than blaming eslint', () => {
 		const rows = lines_command.rows_for(
 			[{ file_path: path.join(PROJECT_ROOT, 'nope.ts'), budget: undefined }],
 			PROJECT_ROOT,
 		)
 
-		expect(rows[0]).toContain(lines_command.NO_SUCH_FILE)
+		expect(rows[0]).toContain(lines_command.NOT_A_FILE)
 	})
 })
 
@@ -69,7 +69,7 @@ describe('lines_command.not_counted_reason', () => {
 	it('blames eslint only for a path that really is there', () => {
 		expect(lines_command.not_counted_reason(import.meta.filename)).toBe(lines_command.NOT_COUNTED)
 		expect(lines_command.not_counted_reason(path.join(PROJECT_ROOT, 'nope.ts'))).toBe(
-			lines_command.NO_SUCH_FILE,
+			lines_command.NOT_A_FILE,
 		)
 	})
 })

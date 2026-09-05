@@ -21,15 +21,17 @@ const ROW_GAP = '  '
 // Why a path carries no number, said in the row rather than left blank — a blank would read as zero
 // code lines, which is the one answer this command must never appear to give.
 //
-// **Two reasons, not one.** A mistyped path is never sent to eslint at all, so reporting eslint's
-// verdict for it would be a claim about a question nobody asked; the reader would read a typo as a
-// real file eslint declined to count. The other reason is eslint's own: a path it ignores, one no
-// configuration covers, and one it could not parse.
-const NO_SUCH_FILE = 'not counted: no such file'
-const NOT_COUNTED = 'not counted: eslint reports no max-lines for this path'
+// **Two reasons, and neither claims more than it knows.** A path that is not a regular file — a typo,
+// or a directory — is never sent to eslint at all, so quoting eslint's verdict for it would answer a
+// question nobody asked, and a reader would take a typo for a real file eslint declined to count. The
+// other reason covers everything that reached the probe without coming back with a number: a path
+// eslint ignores, one no configuration covers, one it could not parse, and a probe that could not run
+// at all. It deliberately does not name eslint, because the last of those is not eslint's doing.
+const NOT_A_FILE = 'not counted: not a regular file'
+const NOT_COUNTED = 'not counted: no line count for this path'
 
 function not_counted_reason(file_path: string): string {
-	return line_budget.is_lintable_path(file_path) ? NOT_COUNTED : NO_SUCH_FILE
+	return line_budget.is_lintable_path(file_path) ? NOT_COUNTED : NOT_A_FILE
 }
 
 function row(relative_path: string, budget: FileBudget['budget'], reason: string): string {
@@ -89,7 +91,7 @@ const lines_command = {
 	row,
 	rows_for,
 	run_lines,
-	NO_SUCH_FILE,
+	NOT_A_FILE,
 	NOT_COUNTED,
 	USAGE,
 }

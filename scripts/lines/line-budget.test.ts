@@ -113,9 +113,23 @@ describe('line_budget.probe_arguments', () => {
 		// A location is named but caching is not asked for: eslint deletes whatever `--cache-location`
 		// points at when `--cache` is absent, and the default is the gate's own `.eslintcache`
 		// (joshuafolkken/kit#1332). It must therefore be somewhere outside the tree.
+		// An inline `/* eslint-disable max-lines */` beats the `--rule` override, so without this flag the
+		// probe would see no message and read a 500-line file as 0 code lines with 300 to spare — the one
+		// direction this report must never be wrong in.
+		expect(probe_args).toContain('--no-inline-config')
 		expect(probe_args).not.toContain('--cache')
 		expect(cache_location).not.toBe('')
 		expect(cache_location.startsWith(root)).toBe(false)
+	})
+})
+
+describe('line_budget.is_lintable_path', () => {
+	it('accepts a regular file and refuses a directory or a path that is gone', () => {
+		const root = make_root()
+
+		expect(line_budget.is_lintable_path(write_source(root, 'real.ts', 2))).toBe(true)
+		expect(line_budget.is_lintable_path(root)).toBe(false)
+		expect(line_budget.is_lintable_path(path.join(root, 'gone.ts'))).toBe(false)
 	})
 })
 
