@@ -19,7 +19,11 @@ const JOSH_GATE = 'josh gate'
 // repository does not own. One of them opening a line with the failure icon used to make the whole
 // call a failure, which charged the next gate run as rework.
 const THIRD_PARTY_WARNING = ['', '✗ src/app.svelte:12:3', '  1 warning found', ''].join('\n')
+// The gate's opening line, printed before any check body exists — what joshuafolkken/kit#1379 reads to
+// tell where the run a verdict summarizes began.
+const GATE_OPENING = 'plan: 4 of 4 checks at once, test:unit at 7 workers (10 cores)'
 const GREEN_GATE_FORWARDING_WARNING = [
+	GATE_OPENING,
 	'',
 	'✔ lint (pnpm josh lint) 4.2s',
 	THIRD_PARTY_WARNING,
@@ -161,6 +165,72 @@ describe("a gate body carrying another tool's output", () => {
 	})
 })
 
+// joshuafolkken/kit#1379: the verdict is bounded on both sides. It summarizes the gate run in front of
+// it, which begins at that run's opening line — not everything the call printed before it.
+describe('a body where a green gate ran after a command that states no verdict', () => {
+	// The first acceptance criterion: `pnpm josh propagate; pnpm josh gate 2>&1 | tail -40` is labelled
+	// `josh propagate` by its first segment, and propagate's rows used to be discarded by the verdict
+	// the *next* command printed.
+	it('still reads the failure rows printed before the gate started', () => {
+		const chained = [PROPAGATE_FAILED_BODY, GREEN_GATE_FORWARDING_WARNING].join('\n')
+
+		expect(time_reported_failure.has_failure_line(chained)).toBe(true)
+	})
+
+	it('reads a health row printed before the gate started', () => {
+		const chained = [HEALTH_FAILED_BODY, GREEN_GATE_FORWARDING_WARNING].join('\n')
+
+		expect(time_reported_failure.has_failure_line(chained)).toBe(true)
+	})
+
+	// The second: the body the green gate forwarded is still silenced, whichever side of it the
+	// earlier command's rows sit on.
+	it("leaves the green gate's own forwarded line alone in the same body", () => {
+		const chained = [PROPAGATE_FAILED_BODY, GREEN_GATE_FORWARDING_WARNING].join('\n')
+
+		expect(time_reported_failure.has_failure_line(chained)).toBe(true)
+		expect(time_reported_failure.has_failure_line(GREEN_GATE_FORWARDING_WARNING)).toBe(false)
+	})
+
+	// Two consumer gates inside one `josh propagate` run: the first consumer's rows sit between one
+	// green verdict and the next gate's opening line, which is exactly the region the bound opens.
+	it("reads every consumer's row, not only the ones after the last verdict", () => {
+		const inherited = [
+			GREEN_GATE_FORWARDING_WARNING,
+			PROPAGATE_FAILED_BODY,
+			GREEN_GATE_FORWARDING_WARNING,
+		].join('\n')
+
+		expect(time_reported_failure.has_failure_line(inherited)).toBe(true)
+	})
+})
+
+// What the bound degrades to where it cannot see the gate's opening line. Both cases keep #1374's
+// false positive closed, which is what the anchor was chosen for.
+describe('a body whose head a pipe truncated away', () => {
+	// The floor this fix is bounded by: with the head of the gate's output cut off the top of a
+	// `tail -40` window there is nothing to say where the run began, so the whole prefix stays silenced.
+	it('falls back to silencing the prefix when the opening line was truncated away', () => {
+		const truncated = [PROPAGATE_FAILED_BODY, GATE_PASSED_BODY].join('\n')
+
+		expect(time_reported_failure.has_failure_line(truncated)).toBe(false)
+	})
+
+	// The shape the bound is anchored on the opening line to survive: `tail` cuts the *head*, so a green
+	// gate whose first check forwarded a long warning body loses that check's header while later headers
+	// and the verdict survive. Anchored on a step header the surviving `✗` would read as printed before
+	// the gate started — #1374's false positive, back through the door this Issue opened.
+	it('leaves a green gate alone when its first step header was cut but a later one survived', () => {
+		const partial = [
+			THIRD_PARTY_WARNING,
+			'✔ cspell (pnpm josh cspell:dot) 3.1s',
+			GATE_PASSED_BODY,
+		].join('\n')
+
+		expect(time_reported_failure.has_failure_line(partial)).toBe(false)
+	})
+})
+
 // The guard that keeps this from being a guess: only josh's output is written by this repository.
 describe('the guard that confines the reading to josh output', () => {
 	it('ignores a failure line in a call that ran no josh command', () => {
@@ -200,6 +270,18 @@ describe('the outcome a span carries', () => {
 		]
 
 		expect(outcomes_of(lines)).toStrictEqual([time_spans.OK_OUTCOME])
+	})
+
+	// joshuafolkken/kit#1379: the call the Issue names, written as an agent types it. `command_segment`
+	// labels the chain `josh propagate`, and the josh guard passes on that name.
+	it('marks a chained call failed on the row printed before the green gate', () => {
+		const chained = [PROPAGATE_FAILED_BODY, GREEN_GATE_FORWARDING_WARNING].join('\n')
+		const lines = [
+			bash_call(0, 'p1', 'pnpm josh propagate; pnpm josh gate 2>&1 | tail -40'),
+			bash_result(1, 'p1', chained, false),
+		]
+
+		expect(outcomes_of(lines)).toStrictEqual([time_spans.FAILED_OUTCOME])
 	})
 
 	// The promotion goes one way only: what the harness marked failed stays failed.

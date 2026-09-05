@@ -1,4 +1,5 @@
 import { availableParallelism } from 'node:os'
+import { josh_verdict } from './josh-verdict'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
 // both derived from the machine rather than fixed at four (joshuafolkken/kit#1258).
@@ -109,6 +110,11 @@ function resolve_gate_plan(available_cores: number = availableParallelism()): Ga
 
 // Printed once per run, so a gate that was slow on someone else's machine can be read without
 // re-deriving the plan from their core count.
+//
+// **The two fragments come from `josh-verdict.ts` since joshuafolkken/kit#1379.** `josh time` matches
+// this line to tell where a gate run's output begins — it is the one line the gate prints before any
+// check body exists — so the printer and the detector build it from the same strings, exactly as they
+// already do for the verdict.
 function format_gate_plan(
 	plan: GatePlan,
 	available_cores: number = availableParallelism(),
@@ -117,9 +123,10 @@ function format_gate_plan(
 		plan.unit_worker_cap === undefined
 			? `${UNIT_LABEL} unrestricted`
 			: `${UNIT_LABEL} at ${String(plan.unit_worker_cap)} workers`
-	const width = `${String(plan.concurrency)} of ${String(GATE_CHECKS.length)} checks at once`
+	const count = `${String(plan.concurrency)} of ${String(GATE_CHECKS.length)}`
+	const width = `${count}${josh_verdict.GATE_OPENING_MARK}`
 
-	return `plan: ${width}, ${cap} (${String(available_cores)} cores)`
+	return `${josh_verdict.GATE_OPENING_PREFIX}${width}, ${cap} (${String(available_cores)} cores)`
 }
 
 const gate_plan = {
