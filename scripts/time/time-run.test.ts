@@ -1,112 +1,36 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import path from 'node:path'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { time_checks } from './time-checks'
 import { time_corpus } from './time-corpus'
-import type { GhReader } from './time-github'
 import { time_pull_fixture } from './time-pull-fixture'
 import { time_pull_index } from './time-pull-index'
-import { time_report, type TimeReport } from './time-report'
+import { time_report } from './time-report'
 import { time_run } from './time-run'
+import { time_run_fixture, type GhScript } from './time-run-fixture'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 // The transcript fixtures are `time-transcript-fixture.ts`'s, shared with the suite that covers the
-// walk itself: what a session file looks like is one statement, not one per suite.
-const { CWD, MINUTE_MS, ISSUE, BRANCH, THREE_MINUTES_MS, at, ms, issue_lines } = fixture
+// walk itself: what a session file looks like is one statement, not one per suite. The scripted `gh`
+// and the temporary transcript home are `time-run-fixture.ts`'s, shared with the CI-cycle suite that
+// measures the same runs (joshuafolkken/kit#1384).
+const { CWD, MINUTE_MS, ISSUE, THREE_MINUTES_MS, at, ms, issue_lines } = fixture
 // Which reads count as the pull-request listing is `time-pull-fixture.ts`'s, shared with the suites
 // that assert the same count on the walk itself.
 const { pulls_asked } = time_pull_fixture
-const SHA = 'abc123'
+const { SHA, SUCCESS, GH_REFUSAL, write_session, write_unit, reader } = time_run_fixture
+const { merged_pull, open_pull, report_of, check_run, checks_body } = time_run_fixture
 
-const state = { home: '' }
-
-beforeEach(() => {
-	state.home = mkdtempSync(path.join(tmpdir(), 'time-run-'))
-	vi.spyOn(cost_transcript, 'transcript_directory').mockImplementation((cwd: string) =>
-		path.join(state.home, cost_transcript.project_slug(cwd)),
-	)
-})
-
-afterEach(() => {
-	vi.restoreAllMocks()
-})
-
-function write_session(name: string, lines: ReadonlyArray<string>): void {
-	fixture.write_session(state.home, name, lines)
-}
-
-// A delegated unit's transcript, which Claude Code writes under the session that delegated it. The
-// overlap cases below need one, because a session that delegates is exactly the shape whose spans
-// already go through the subtraction — and the excess they measure is the part it cannot reach.
-function write_unit(session: string, agent: string, lines: ReadonlyArray<string>): void {
-	fixture.write_unit(state.home, session, agent, lines)
-}
-
-interface GhScript {
-	pull_body: string
-	checks_body?: string
-	// The check-run read refused while the listing still answers, which is what a rate limit looks like
-	// from here: the two are separate requests (joshuafolkken/kit#1352).
-	is_checks_refused?: boolean
-}
-
-const CHECK_RUNS_MARK = 'check-runs'
-const GH_REFUSAL = 'gh: 403'
-
-function checks_of(script: GhScript): string {
-	if (script.is_checks_refused === true) throw new Error(GH_REFUSAL)
-
-	return script.checks_body ?? '{}'
-}
-
-function reader(script: GhScript, asked: Array<string> = []): GhReader {
-	return async (request_path: string) => {
-		asked.push(request_path)
-
-		if (request_path.includes(CHECK_RUNS_MARK)) return checks_of(script)
-
-		return script.pull_body
-	}
-}
-
-// The merge instant is written into the JSON text rather than as a value, because an open pull
-// request carries a wire `null` and the fixture should state the wire format.
-function pull_body(created: number, merged_at: string): string {
-	return `[{"number":1279,"created_at":"${at(created)}","merged_at":${merged_at},"head":{"ref":"${BRANCH}","sha":"${SHA}"}}]`
-}
-
-function merged_pull(created: number, merged: number): string {
-	return pull_body(created, `"${at(merged)}"`)
-}
-
-function open_pull(created: number): string {
-	return pull_body(created, 'null')
-}
+time_run_fixture.use_transcript_home()
 
 // The pull request every case below shares: opened at minute 2, merged at minute 8.
 const MERGED_SCRIPT: GhScript = { pull_body: merged_pull(2, 8) }
 const NO_PULL_SCRIPT: GhScript = { pull_body: '[]' }
 const NOTE_SEPARATOR = '\n'
 
-async function report_of(script: GhScript): Promise<TimeReport> {
-	return await time_run.build_run_report(ISSUE, CWD, reader(script))
-}
-
-const SUCCESS = 'success'
 const SKIPPED = 'skipped'
 const UNIT = 'unit'
 const CODERABBIT = 'CodeRabbit'
 const E2E = 'E2E'
-
-function check_run(name: string, conclusion: string, started: number, completed: number): object {
-	return { name, conclusion, started_at: at(started), completed_at: at(completed) }
-}
-
-function checks_body(name: string, started: number, completed: number): string {
-	return JSON.stringify({ check_runs: [check_run(name, SUCCESS, started, completed)] })
-}
 
 // The pull request every case here merges at minute 8, so these three jobs sit on both sides of that
 // merge: `unit` finishes right at it, `CodeRabbit` two minutes after it, and `E2E` never ran.

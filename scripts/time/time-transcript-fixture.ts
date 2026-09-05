@@ -99,6 +99,18 @@ function delegating_lines(branch: string = BRANCH): Array<string> {
 	]
 }
 
+// A `pnpm josh <cmd>` call, which is what a phase is read off (joshuafolkken/kit#1384). `call_line`
+// above carries no tool input, so every span it writes belongs to no command phase at all — and a
+// suite measuring where the merge command sat cannot express its subject without one.
+function josh_call_line(minute: number, branch: string, command: string, id = CALL_ID): string {
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_use', name: 'Bash', id, input: { command } }] },
+	})
+}
+
 // A second session working the same issue over the same three minutes, with span instants the unit's
 // do not share — otherwise the cross-session dedupe collapses the two and the case says nothing.
 function concurrent_lines(branch: string = BRANCH): Array<string> {
@@ -211,6 +223,7 @@ const time_transcript_fixture = {
 	ms,
 	prompt_line,
 	call_line,
+	josh_call_line,
 	result_line,
 	turn_call_line,
 	turn_lines,
