@@ -86,21 +86,32 @@ const DIAG_MARKERS: ReadonlyArray<string> = [
 ]
 
 // **The guard is on the set-level figures, and on those only.** Every entry below is a number the
-// canonical section computed *over the set of runs* — the three counts, the median, and the four
-// component sums — so re-measuring moves each of them, and a copy in the skill would keep quoting the
-// retired value with this suite still green. Each is written exactly as `prompts/review.md` writes it,
-// which is the only form a copy could take.
+// canonical section computed *over the set of runs* — the three counts, the two medians, the range it
+// spans, the four component sums and the bimodal split's share — so re-measuring moves each of them,
+// and a copy in the skill would keep quoting the retired value with this suite still green.
+//
+// **Each entry is the shortest string only this record produces**, which is what keeps a true failure
+// and a false one apart. A bare component sum qualifies: a four-figure total in seconds is not
+// something another reading arrives at by accident. A count or a percentage does not, so those carry
+// the words the section writes around them.
 //
 // **A single run's own figures are deliberately absent, and the omission is the rule rather than a
 // gap.** #1414's 42.0 s and #1399's 132.8 s are both arithmetic over one merged run, whose durations
 // never change — which is why the skill is allowed to keep run #1399's worked example below its
 // detector, and `diag-skill.test.ts` pins it present. Forbidding a per-run value here would contradict
 // that allowance and fail on a legitimately re-quoted immutable reading.
+//
+// **What this does not catch is a re-worded copy** — `100.2 s median`, or a figure re-derived in the
+// skill's own prose. Nothing string-based can, and the answer to that is the pointer step 3 now
+// carries, which sends a reader to the record instead of to a number.
 const DIAG_FORBIDDEN_FIGURES: ReadonlyArray<string> = [
 	'occurred 6 · did not occur 2 · could not tell 12',
 	'6 of the 8 runs',
 	'median 100.2 s',
 	'median 4.6%',
+	// The range the set spans. It moves on re-measurement exactly as the medians do.
+	'42.0 s to 132.8 s',
+	'1.9% to 11.1%',
 	// The four component sums, and the bimodal split's share of the third.
 	'256.6 s',
 	'182.7 s',
