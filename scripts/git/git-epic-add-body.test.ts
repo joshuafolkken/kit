@@ -6,6 +6,7 @@ const DEPENDENCIES_HEADING = '## Dependencies'
 const PROGRESS_HEADING = '## Progress'
 const DECISIONS_HEADING = '## Decisions'
 const STRAY_DECLARATION_MESSAGE = 'outside the `Dependencies` section'
+const SECOND_CHAIN = '#101 -> #102'
 const BLANK = ''
 const ORDERED_CHAIN = '#890 -> #891 -> #892'
 const UNORDERED_LITERAL = 'None — the children are independent; any execution order works.'
@@ -61,6 +62,28 @@ function error_of(outcome: RewriteOutcome): string {
 	if ('body' in outcome) throw new Error('expected a refusal')
 
 	return outcome.error
+}
+
+// A body carrying a declaration-shaped line outside the `Dependencies` section, which the rewrite
+// refuses rather than editing.
+function stray_error(stray_line: string): string {
+	const body = [
+		DEPENDENCIES_HEADING,
+		BLANK,
+		ORDERED_CHAIN,
+		BLANK,
+		'## Notes',
+		BLANK,
+		stray_line,
+		BLANK,
+		PROGRESS_HEADING,
+		BLANK,
+		ROW_890,
+		ROW_891,
+		ROW_892,
+	].join('\n')
+
+	return error_of(rewrite({ body, chains_after: [...APPENDED_CHAINS, [101, 102]] }))
 }
 
 describe('git_epic_add_body.rewrite_body — the task list', () => {
@@ -162,7 +185,7 @@ describe('git_epic_add_body.rewrite_body — several declaration lines', () => {
 			DEPENDENCIES_HEADING,
 			BLANK,
 			ORDERED_CHAIN,
-			'#101 -> #102',
+			SECOND_CHAIN,
 			BLANK,
 			PROGRESS_HEADING,
 			BLANK,
@@ -281,5 +304,21 @@ describe('git_epic_add_body.rewrite_body — a subheading inside Dependencies', 
 
 		expect(git_epic_parse.parse_dependency_chains(body)).toStrictEqual([[890, 891, 892, 894]])
 		expect(body).toContain(SUBHEADING)
+	})
+})
+
+// joshuafolkken/kit#1350: the refusal names the declaration it found, re-rendered from the numbers it
+// parsed to rather than echoed back — the body is fetched from GitHub and may carry a caller's record
+// file, so a raw line would put content this code never read into the console.
+describe('git_epic_add_body.rewrite_body — the stray-declaration message', () => {
+	it('names the chain as the parser read it, not as it was written', () => {
+		const error = stray_error('-   #101   ->   #102')
+
+		expect(error).toContain(SECOND_CHAIN)
+		expect(error).toContain(STRAY_DECLARATION_MESSAGE)
+	})
+
+	it('names the unordered sentence for the branch that parses to no chain', () => {
+		expect(stray_error(UNORDERED_LITERAL)).toContain(UNORDERED_LITERAL)
 	})
 })

@@ -1,6 +1,6 @@
 import { git_epic_chains, type Chains } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
-import { git_epic_parse } from './git-epic-parse'
+import { git_epic_parse, UNORDERED_DEPENDENCIES } from './git-epic-parse'
 import {
 	format_dependency_link,
 	format_issue_references,
@@ -91,6 +91,22 @@ function replace_declaration(
 		: splice_declaration(lines, { first, dropped: new Set(declarations.slice(1)), rendered })
 }
 
+// The declaration a line names, **re-rendered from the issue numbers it parsed to rather than echoed
+// back**. The message has to name what it found, or the answer "move this line" is unactionable — and
+// the body it comes from is not this process's: it is fetched from GitHub, and since
+// joshuafolkken/kit#1350 it also carries a record file the caller supplied. Echoing a line of either
+// into stderr puts content this code never read in the console, which is what SonarCloud's
+// `tssecurity:S8689` reports for this path. Rendering from the parsed numbers keeps the useful half —
+// the chain, exactly as the parser read it — while what reaches the console is built from integers.
+//
+// The unordered sentence parses to no chain, and its own constant stands in for it: that branch has no
+// numbers to render, and the sentence is a literal this module already shares with the parser.
+function to_safe_declaration(line: string): string {
+	const [rendered] = git_epic_chains.render_chains(git_epic_parse.parse_dependency_chains(line))
+
+	return rendered ?? UNORDERED_DEPENDENCIES
+}
+
 // A declaration-shaped line outside the section is read by `epic:next` as part of the declaration,
 // while the rewrite deliberately will not touch it — so no insertion on this epic can ever produce a
 // consistent body. Named here so the answer is "move this line", not "the order differs".
@@ -102,7 +118,7 @@ function find_stray_declaration(lines: ReadonlyArray<string>): string | undefine
 		(index) => !is_in_range(index, range),
 	)
 
-	return stray === undefined ? undefined : (lines[stray] ?? '').trim()
+	return stray === undefined ? undefined : to_safe_declaration(lines[stray] ?? '')
 }
 
 type BodyOutcome = { body: string } | { error: string }
