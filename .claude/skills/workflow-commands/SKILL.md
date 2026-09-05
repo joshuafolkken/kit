@@ -144,7 +144,8 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 - **A prerequisite discovered mid-run is a dependency rather than a park**, at every entry point —
   §2d. It is the third thing a run can discover, beside an upstream defect and a split, and the one
   whose procedure is neither of theirs.
-- **The pre-implementation reading goes to a delegated unit from the third subject file on** — §2b →
+- **The pre-implementation reading goes to a delegated unit once the count of subject files reaches
+  the threshold §2b names** — §2b →
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
   subject is delegated, a file this run will edit is read in the main line, and what comes back is
   the conclusion plus its `file:line` citations rather than the text.
@@ -384,8 +385,11 @@ line cannot issue an `Edit` against text it does not hold.
 text.** Returning the text puts the whole cost back where it was and buys nothing. A throwaway probe
 script is written, run and deleted inside the unit, which returns its output alone.
 
-**The threshold is 3 files, and it is a count, not a forecast: the third file the run will not edit is
-where the reading goes to a unit of its own.** Two stay in the main line. Delegating costs two extra
+**The threshold is 3 files, and it is a count, not a forecast: the read that takes the count of files
+the run will not edit up to it is where the reading goes to a unit of its own.** The ones below it stay
+in the main line, and **the unit is not sent back over them** — the brief carries what the main line
+already concluded from them, and the unit reads on from where the count tripped, so nothing is read
+twice and no conclusion rests on a third of the evidence. Delegating costs two extra
 main-line turns — one to write the brief, one to read the result — which at run #1406's measured 8.8 s
 of model wait per turn is about **18 seconds**; the fork's own reading is work that would have been
 paid either way. Against that, one subject file of that run's average size (~8,300 characters, ~2,100
@@ -396,7 +400,8 @@ brief itself costs about what reading the file would — which is why the number
 **Counting is what removes the judgement**: the reads are counted as they are made rather than
 predicted before the investigation starts, so a small investigation never trips it and pays no
 overhead at all. The number is derived from run #1406's figures rather than from a controlled
-comparison, and `pnpm josh delegate investigation` prints it.
+comparison, and `pnpm josh delegate --list` prints it — the verdict command prints the verifier, so it
+is the listing that carries the count.
 
 **One trigger, deliberately.** A second arm on characters read would need a tie-break against the file
 count, and neither number is measured more precisely than the other — so the character figures above

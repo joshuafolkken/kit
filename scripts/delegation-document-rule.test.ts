@@ -347,6 +347,13 @@ describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (
 		},
 	)
 
+	// The verdict command prints the verifier, so a document that named it as the source of the count
+	// sends an agent to a call that answers without one — and back to judging the count.
+	it('sends the reader to the listing for the count, not to the verdict command', () => {
+		expect(unwrapped).toContain(`${COMMAND} --list`)
+		expect(unwrapped).not.toContain(`${COMMAND} investigation prints it`)
+	})
+
 	it('names the origin', () => {
 		expect(read_repo_file(document_path)).toContain(INVESTIGATION_ISSUE)
 	})

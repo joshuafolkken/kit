@@ -1,5 +1,5 @@
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { delegation_cli } from './delegation-cli'
 import { delegation_policy } from './delegation-policy'
 
@@ -137,6 +137,20 @@ describe('epic-child is a second unit on the one mechanism', () => {
 	})
 })
 
+// What `--list` actually writes for one step, captured rather than reconstructed: the row is what an
+// agent reads, and the fields it is built from can carry the number while the printed row does not.
+function listed_row(step_name: string): string | undefined {
+	const written: Array<string> = []
+	const spy = vi.spyOn(console, 'info').mockImplementation((line: string) => {
+		written.push(line)
+	})
+
+	delegation_cli.print_list()
+	spy.mockRestore()
+
+	return written.find((line) => line.includes(step_name))
+}
+
 // joshuafolkken/kit#1426 puts the pre-implementation reading on this same enumeration. It is admitted
 // on the citations it returns — the parent opens them — and it must not swallow `diagnosis`, which is
 // rejected precisely because a wrong root cause produces a fix that passes the gate.
@@ -163,12 +177,19 @@ describe('investigation is the pre-implementation reading', () => {
 		expect(delegation_policy.find_step(INVESTIGATION)?.does).toContain('probe script')
 	})
 
-	// The row prints the number, so an agent asking the command is told when the row applies rather
-	// than judging it — the same reason the verdict itself is a command's answer.
-	it('prints the threshold it applies from', () => {
-		expect(delegation_policy.find_step(INVESTIGATION)?.does).toContain(
+	// Asserted against what the command actually writes, not against the field the number is
+	// interpolated into: a `does`-only assertion cannot fail for any value of the constant, so it says
+	// nothing about whether an agent asking the command is told the count.
+	it('is printed with its threshold by the listing', () => {
+		expect(listed_row(INVESTIGATION)).toContain(
 			String(delegation_policy.INVESTIGATION_FILE_THRESHOLD),
 		)
+	})
+
+	// The verdict command prints the verifier and not `does`, so the documents must send an agent to the
+	// listing for the count. Named here as well so a verifier rewrite that swallowed the number fails.
+	it('does not put the threshold in the verdict command output', () => {
+		expect(delegation_policy.reason_for(INVESTIGATION)).not.toContain('or more files')
 	})
 
 	// Two files stay in the main line: below the threshold the extra round trip costs more than
