@@ -18,6 +18,8 @@ const ISSUE = 1268
 const BRANCH = '1268-measure-a-run'
 const CALL_ID = 'a'
 const AGENT_CALL_ID = 'g'
+// The skill whose load `time-markers.ts` reads as the instant a run opens.
+const WORKFLOW_SKILL = 'workflow-commands'
 
 // The day every fixture minute is an offset into. Fixed rather than `Date.now()`, so a failure reads
 // the same on the day it is written and a year later.
@@ -121,6 +123,29 @@ function edit_call_line(minute: number, branch: string, file_path: string, id = 
 		gitBranch: branch,
 		message: { content: [{ type: 'tool_use', name: 'Edit', id, input: { file_path } }] },
 	})
+}
+
+// A `Skill` call, which is what the `workflow` boundary is read off (joshuafolkken/kit#1428). The
+// skill name rides in the tool input, exactly as `time-markers.ts` reads it — so a suite about which
+// session actually ran a run cannot express its subject without one.
+function skill_call_line(minute: number, branch: string, skill: string, id = CALL_ID): string {
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: at(minute),
+		gitBranch: branch,
+		message: { content: [{ type: 'tool_use', name: 'Skill', id, input: { skill } }] },
+	})
+}
+
+// The same three minutes as `issue_lines`, opened by the workflow marker every entry point writes —
+// which is what says this session is the one that ran the issue rather than one that merely had its
+// branch checked out.
+function run_lines(offset: number, branch: string = BRANCH): Array<string> {
+	return [
+		prompt_line(offset, branch),
+		skill_call_line(offset + CALL_MINUTE, branch, WORKFLOW_SKILL),
+		result_line(offset + RESULT_MINUTE, branch),
+	]
 }
 
 // A second session working the same issue over the same three minutes, with span instants the unit's
@@ -240,10 +265,12 @@ const time_transcript_fixture = {
 	edit_call_line,
 	josh_call_line,
 	result_line,
+	skill_call_line,
 	turn_call_line,
 	turn_lines,
 	density_text,
 	issue_lines,
+	run_lines,
 	delegating_lines,
 	concurrent_lines,
 	project_directory,

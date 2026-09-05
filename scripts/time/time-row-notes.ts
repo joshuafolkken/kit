@@ -15,17 +15,20 @@ import { time_run } from './time-run'
 const INDENT_WIDTH = 6
 const INDENT = ' '.repeat(INDENT_WIDTH)
 
-// **The three notes a completed row still prints.** None of them is about the GitHub half being
+// **The four notes a completed row still prints.** None of them is about the GitHub half being
 // missing.
 //
 // The overlap note says the row's own minutes double-count wall clock two of its sessions shared, so
 // the figure — and the batch total it is summed into — cannot be read without it
-// (joshuafolkken/kit#1330). The refused-check note says the empty `By CI check` table is a refusal
+// (joshuafolkken/kit#1330). The session note says which concurrent sessions were left out of the row,
+// or that none of them could be told from the run at all (joshuafolkken/kit#1428) — the same reason
+// the overlap note is kept, one step earlier: it is the sentence that says whether the row's minutes
+// are this run's. The refused-check note says the empty `By CI check` table is a refusal
 // rather than a run GitHub recorded no checks for (joshuafolkken/kit#1352). The refused-diff note says
 // the same of the withheld change size (joshuafolkken/kit#1387). Every completed row has
-// `has_ci_data`, which is to say the filter below hides all three from exactly the rows that carry them.
+// `has_ci_data`, which is to say the filter below hides all four from exactly the rows that carry them.
 function is_kept_note(note: string): boolean {
-	if (time_run.is_overlap_note(note)) return true
+	if (time_run.is_overlap_note(note) || time_run.is_session_note(note)) return true
 
 	return time_run.is_check_read_note(note) || time_run.is_diff_read_note(note)
 }

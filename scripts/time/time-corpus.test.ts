@@ -157,6 +157,54 @@ describe('time_corpus.collect_issue_spans on transcripts that overlap without a 
 	})
 })
 
+// A branch belongs to the checkout rather than to a session, so every session open in one work tree
+// is attributed to whatever issue is checked out — run #1412 read as 145 round trips against a hand
+// count of 56 because a second session was busy with `josh epic` across the same window
+// (joshuafolkken/kit#1428).
+describe('time_corpus.collect_issue_spans on sessions that only shared the checkout', () => {
+	it('leaves a session no workflow marker attributes to the run out of the spans', () => {
+		write_session('ran', fixture.run_lines(0))
+		write_session('other', fixture.concurrent_lines())
+
+		const found = collect()
+
+		expect(fixture.total_span_ms(found.spans)).toBe(THREE_MINUTES_MS)
+		expect(found.excluded.map((one) => one.session_id)).toStrictEqual(['other'])
+	})
+
+	// The note above the report and the spans beneath it have to be about the same set.
+	it('counts only the transcripts of the sessions it kept', () => {
+		write_session('ran', fixture.run_lines(0))
+		write_session('other', fixture.concurrent_lines())
+
+		expect(collect().session_count).toBe(1)
+	})
+
+	// A unit's transcript carries no marker of its own; it is kept because the session that delegated
+	// it does.
+	it('keeps the delegated unit of the session that ran it', () => {
+		write_session('ran', fixture.run_lines(0))
+		write_unit('ran', 'agent-a1', fixture.issue_lines(10))
+		write_session('other', fixture.concurrent_lines())
+
+		expect(fixture.total_span_ms(collect().spans)).toBe(2 * THREE_MINUTES_MS)
+	})
+
+	// Dropping every session would report the run as unmeasured rather than as inflated. `0` excluded
+	// and "could not be separated" are different answers, and `is_separated` is what tells them apart.
+	it('keeps every session when no marker names one of them, and says so', () => {
+		write_session('one', fixture.issue_lines(0))
+		write_session('other', fixture.concurrent_lines())
+
+		const found = collect()
+
+		expect(fixture.total_span_ms(found.spans)).toBe(2 * THREE_MINUTES_MS)
+		expect(found.excluded).toStrictEqual([])
+		expect(found.is_separated).toBe(false)
+		expect(found.attributed_count).toBe(2)
+	})
+})
+
 // The whole point of the module: an epic of N children reads the corpus once, not N times
 // (joshuafolkken/kit#1284).
 function count_reads(issue_numbers: ReadonlyArray<number>): number {
@@ -196,7 +244,13 @@ describe('time_corpus.collect_for_issues — one pass, however many issues', () 
 	it('answers for an issue no transcript mentions rather than omitting it', () => {
 		const found = time_corpus.collect_for_issues(CWD, [UNWORKED_ISSUE])
 
-		expect(found.get(UNWORKED_ISSUE)).toStrictEqual({ spans: [], session_count: 0 })
+		expect(found.get(UNWORKED_ISSUE)).toStrictEqual({
+			spans: [],
+			session_count: 0,
+			excluded: [],
+			is_separated: false,
+			attributed_count: 0,
+		})
 	})
 
 	// An epic whose task list names no issue in this repository asks for nothing, and reading 296 MB
