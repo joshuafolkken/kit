@@ -31,6 +31,7 @@ function report_with(overrides: Partial<LastTimeReport>): LastTimeReport {
 		runs: [timing(FIRST, 2), timing(SECOND, 0)],
 		measured_count: 1,
 		unmeasured_count: 1,
+		collapsed_pulls: [],
 		elapsed: time_distribution.build([2 * MINUTE_MS]),
 		categories: [],
 		phases: [],

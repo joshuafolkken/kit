@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CheckTotal } from './time-checks'
 import { time_corpus } from './time-corpus'
 import { time_epic_fixture } from './time-epic-fixture'
+import { time_format } from './time-format'
 import { time_last, type LastTimeReport } from './time-last'
 import type { MergedRun, RunSelection } from './time-last-select'
 import type { PhaseTotal } from './time-phases'
@@ -25,6 +26,7 @@ const SECOND = 202
 const THIRD = 203
 const ISSUES = [FIRST, SECOND, THIRD]
 const RUN_COUNT = ISSUES.length
+const TWO = 2
 const FIXTURE_YEAR = 2026
 const NEWEST_HOUR = 12
 const MIDDLE_HOUR = 11
@@ -46,6 +48,12 @@ const PAGE: Array<RawPull> = [
 	merged_pull(2, SECOND, MIDDLE_HOUR),
 	merged_pull(3, THIRD, OLDEST_HOUR),
 ]
+
+// A revert of the newest run: a second merge naming an issue already kept, which is one run and not
+// two. Older than every row above it, so the fold keeps the original and absorbs this one.
+const REVERT_PULL = 4
+const REVERT_HOUR = 9
+const REVERTED_PAGE: Array<RawPull> = [...PAGE, merged_pull(REVERT_PULL, FIRST, REVERT_HOUR)]
 
 // A selected run, for the note cases that never reach the fan-out.
 function run_of(index: number): MergedRun {
@@ -119,17 +127,25 @@ function stub_runs(reports: ReadonlyMap<number, TimeReport>): void {
 	)
 }
 
-async function measure(
+async function measure_page(
 	reports: ReadonlyMap<number, TimeReport>,
+	page: ReadonlyArray<RawPull>,
 	asked: Array<string> = [],
 ): Promise<LastTimeReport> {
 	stub_runs(reports)
 
-	const report = await time_last.build_last_report(RUN_COUNT, CWD, reader([PAGE], asked))
+	const report = await time_last.build_last_report(RUN_COUNT, CWD, reader([[...page]], asked))
 
 	if (report === undefined) throw new Error('no run could be resolved')
 
 	return report
+}
+
+async function measure(
+	reports: ReadonlyMap<number, TimeReport>,
+	asked: Array<string> = [],
+): Promise<LastTimeReport> {
+	return await measure_page(reports, PAGE, asked)
 }
 
 // The rows a case asserts on are keyed by label, and the label is what a reader looks the row up by.
@@ -215,10 +231,48 @@ describe('time_last.build_last_report — a run whose record could not be read',
 	})
 })
 
+// The last exclusion the scope made in silence (joshuafolkken/kit#1365): a set of runs read from four
+// merges reported three rows, and nothing in the text or the JSON said the fourth had been folded in.
+describe('time_last.build_last_report — a duplicate merge folded into a run', () => {
+	it('says a merge was collapsed, and names it', async () => {
+		const report = await measure_page(gate_reports([1, 5, 3]), REVERTED_PAGE)
+
+		expect(report.notes.join('\n')).toContain(
+			`1 merged pull request(s) name the same issue as a run already kept and were collapsed into it (#${String(REVERT_PULL)})`,
+		)
+	})
+
+	// `--json` is what a later reading is built from, so the fact has to survive the rendering rather
+	// than living only in a sentence.
+	it('carries the collapsed pull request on the report itself', async () => {
+		const report = await measure_page(gate_reports([1, 5, 3]), REVERTED_PAGE)
+
+		expect(report.collapsed_pulls).toEqual([REVERT_PULL])
+	})
+
+	it('says nothing at all where every run came from a single merge', async () => {
+		const report = await measure(gate_reports([1, 5, 3]))
+
+		expect(report.collapsed_pulls).toEqual([])
+		expect(report.notes.join('\n')).not.toContain('collapsed into it')
+	})
+
+	// A revert-heavy window would otherwise print one sentence as long as the listing it walked. The
+	// cap is on the line of text; `collapsed_pulls` on the report stays complete.
+	it('caps the numbers it lists and says how many it withheld', () => {
+		const many = Array.from({ length: time_format.MAX_ROWS + TWO }, (_, index) => index + 1)
+		const note = time_last.collapsed_note(many).join('')
+
+		expect(note).toContain(`#${String(time_format.MAX_ROWS)} and ${String(TWO)} more`)
+		expect(note).not.toContain(`#${String(time_format.MAX_ROWS + 1)}`)
+	})
+})
+
 function selection_of(found: number, end: RunSelection['end']): RunSelection {
 	return {
 		runs: Array.from({ length: found }, (_, index) => run_of(index)),
 		skipped_count: 0,
+		collapsed_pulls: [],
 		end,
 	}
 }
