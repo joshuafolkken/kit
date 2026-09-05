@@ -39,7 +39,9 @@ const TURN_MINUTES = 2
 // about the density is never answered by the sample-size guard instead. Named here rather than in
 // each suite because three of them assert against the round-trip count it produces.
 const DENSITY_TURNS = 12
-// The `}` a serialized payload ends in, dropped so another field can be appended after the last one.
+// The braces a serialized payload is wrapped in, dropped so another field can be put in front of the
+// ones already there.
+const OPENING_BRACE = 1
 const CLOSING_BRACE = -1
 // The minute a concurrent session's call lands on — inside the same window, on an instant the
 // delegated unit's spans do not share, so the cross-session dedupe cannot collapse the two.
@@ -239,8 +241,15 @@ function density_text(turns: number, calls: number): string {
 //
 // **Shared rather than restated in each suite**: both hook suites need it, and the guard and the
 // density line must not come to disagree about what an absent agent looks like.
+// **The field goes in first and the separator is decided from what is left**, rather than a comma
+// appended after the last field: a payload of `{}` would then yield `{,"agent_id":null}`, which is not
+// JSON at all — and a hook's outer catch makes that indistinguishable from the schema having rejected
+// the payload, so the case would pass or fail for the wrong reason.
 function with_null_agent(payload_json: string): string {
-	return `${payload_json.slice(0, CLOSING_BRACE)},"agent_id":null}`
+	const fields = payload_json.slice(OPENING_BRACE, CLOSING_BRACE).trim()
+	const separator = fields === '' ? '' : ','
+
+	return `{"agent_id":null${separator}${fields}}`
 }
 
 function project_directory(home: string): string {

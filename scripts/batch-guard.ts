@@ -52,7 +52,7 @@ const DISABLED_VALUES: ReadonlyArray<string> = ['off', '0', 'false', 'no']
 // beside a transcript path, so nothing is searched for.
 //
 // **`agent_id` is what makes a delegated unit answerable with its own file** (joshuafolkken/kit#1424).
-// The path in the payload is the *parent* session's whichever agent issued the call, so without this
+// The path in the payload is the *parent* session's, whichever agent issued the call, so without this
 // field the guard judged the parent's frozen timeline and refused nothing at all inside a fork;
 // `time-hook-transcript.ts` carries the measurement and the derivation.
 const payload_schema = z.object({

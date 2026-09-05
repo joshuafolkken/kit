@@ -50,7 +50,7 @@ const NEVER_MS = 0
 // home-directory walk.
 //
 // **`agent_id` is what makes a delegated unit answerable with its own transcript**
-// (joshuafolkken/kit#1424). The path in the payload is the *parent* session's whichever agent issued
+// (joshuafolkken/kit#1424). The path in the payload is the *parent* session's, whichever agent issued
 // the call, so without this field the line a fork read described the parent's calls per round trip —
 // a number about a run the reader is not in. `time-hook-transcript.ts` carries the derivation.
 const payload_schema = z.object({
