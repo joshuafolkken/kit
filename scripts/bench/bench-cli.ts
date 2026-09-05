@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { bench_guard } from './bench-guard'
+import { bench_interrupt } from './bench-interrupt'
 import { bench_report, type BenchReport } from './bench-report'
 import { bench_run } from './bench-run'
 import { bench_targets } from './bench-targets'
@@ -61,14 +62,26 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	}
 }
 
+// **The interruption note goes in front of the residue one**, because it is what explains the rest of
+// the report: rows that are missing, and caches a warm run never reached.
 async function build(options: Options, root: string): Promise<BenchReport | undefined> {
 	const { targets, unknown } = bench_targets.resolve_targets(options.names)
 
 	if (unknown.length > 0 || targets.length === 0) return undefined
 
-	const samples = await bench_run.measure_targets(targets, options.repetitions, root)
+	const measured = await bench_run.measure_targets(targets, options.repetitions, root)
+	const { samples, notes } = bench_interrupt.assemble({
+		target_names: targets.map((target) => target.name),
+		taken: measured.samples,
+		repetitions: options.repetitions,
+		is_interrupted: measured.is_interrupted,
+	})
 
-	return bench_report.build_report(samples, bench_run.residue_notes(samples, root))
+	return bench_report.build_report(
+		samples,
+		[...notes, ...bench_run.residue_notes(samples, root)],
+		measured.is_interrupted,
+	)
 }
 
 function print_report(report: BenchReport, options: Options): void {
@@ -85,10 +98,19 @@ function print_report(report: BenchReport, options: Options): void {
 // figures, so a run that produced none has failed at what it was asked to do — and a `--json`
 // consumer reading success off the exit code would take an empty report for an answer. The count is
 // the report's own, so the exit code and the heading cannot come to disagree about what was measured.
+//
+// **An interruption outranks that count** (joshuafolkken/kit#1369). Both are non-zero, so nothing
+// that only asks whether the run finished changes; what the third value adds is *why* it did not, and
+// a gate holding the caches is the one answer worth retrying later. A run a gate stopped before its
+// first reading is that case too — the reason it measured nothing is known and said in the note.
 function exit_code_for(report: BenchReport): number {
+	if (report.is_interrupted) return bench_interrupt.INTERRUPTED_EXIT_CODE
+
 	return bench_report.measured_count(report) === 0 ? FAILURE_EXIT_CODE : 0
 }
 
+// The refusal is repeated on stderr because the report itself goes to stdout, `--json` included: the
+// note says which targets were left, and this says what to do about it.
 async function report_or_usage(options: Options): Promise<number> {
 	const report = await build(options, process.cwd())
 
@@ -101,11 +123,14 @@ async function report_or_usage(options: Options): Promise<number> {
 
 	print_report(report, options)
 
+	if (report.is_interrupted) console.error(bench_guard.GATE_RUNNING_MESSAGE)
+
 	return exit_code_for(report)
 }
 
-// The guard is asked again before every clearing inside `bench-run.ts`, so a gate started mid-run
-// stops it there; this is the same refusal reaching the exit code rather than a stack trace.
+// The backstop. `bench-run.ts` catches the refusal at the reading that raised it and keeps everything
+// measured before it, so this is reached only by a future call site that raises the same error
+// outside that loop — and a refusal reaching the exit code is still better than a stack trace.
 async function guarded_report(options: Options): Promise<number> {
 	try {
 		return await report_or_usage(options)
@@ -114,7 +139,7 @@ async function guarded_report(options: Options): Promise<number> {
 
 		console.error(bench_guard.GATE_RUNNING_MESSAGE)
 
-		return FAILURE_EXIT_CODE
+		return bench_interrupt.INTERRUPTED_EXIT_CODE
 	}
 }
 

@@ -1926,6 +1926,32 @@ would walk straight into a gate a hook or another session started after it; once
 readings are void anyway, and the run stops rather than finishing with figures nobody can use. The
 in-flight marker carries the gate's pid, so one left behind by a killed process blocks nothing.
 
+**Stopping keeps the readings it already took** ([#1369](https://github.com/joshuafolkken/kit/issues/1369)).
+The abort's rationale is that a reading taken beside a gate measures neither of them, and that does not
+reach backwards: the targets finished _before_ the gate started were measured on a tree nothing else was
+running on. So their rows are printed, the targets the run never reached print `not measured`, and a note
+says the run was interrupted and how many cycles each unfinished target managed — `cycles not finished:
+cspell:dot 0 of 1, test:unit 0 of 1`. Discarding them made a user pay several minutes again because a
+pre-commit hook started a gate thirty seconds ago.
+
+```
+Cold and warm cost — 2 command(s) measured
+
+  lint                      128.4 s   warm 2.9 s · 44.3× faster · cleared .eslintcache
+  check                       3.8 s   warm 1.4 s · 2.7× faster · cleared .tsbuildinfo
+  cspell:dot                          not measured
+  test:unit                           not measured
+
+  interrupted by josh gate starting on this tree; cycles not finished: cspell:dot 0 of 1, test:unit 0 of 1
+```
+
+**An interruption has its own exit code, `2`.** `0` still means every target asked for was measured and
+`1` still means the measurement produced nothing usable, so anything that only asks whether the run
+finished reads non-zero exactly as before; the third value is what lets a caller tell a gate holding the
+caches — worth retrying in a minute — from a red check that wants fixing. It is also on the report
+itself, as `is_interrupted`, so a `--json` consumer reads the fact rather than inferring it from a note's
+wording.
+
 **A command that keeps no cache says so.** `josh test:unit` declares none — vitest's cache lives under
 `node_modules`, and emptying that is a reinstall rather than a cold run — so its two readings measure
 the operating system's page cache and run-to-run noise, and the row is labelled `no cache cleared`
