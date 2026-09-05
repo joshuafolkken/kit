@@ -113,6 +113,15 @@ Read from the JSON, in this order:
   called nothing are all outside it, so the product can be ranked beside the `wait` and `ci` rows
   without counting the same minutes twice. It is withheld rather than zeroed where there was no round
   trip to divide by
+- **the spread that price is a mean of** — `gaps`, and `distribution` inside it
+  ([#1386](https://github.com/joshuafolkken/kit/issues/1386)). The price above says what a round trip
+  cost *typically*; only this says whether the run was slow everywhere or slow once, and the two need
+  opposite fixes. On run #1379 the mean was 8.13 s against a median of 3.8 s and a **maximum of 189 s**
+  — one stretch, 12% of the run, invisible in the mean. **Read `max` and `p90` before proposing a
+  batching change**: a run whose spread is flat is one batching can help, and a run whose spread is one
+  long think is not — `longest` names the phase each stretch was spent in, so the row says where to
+  look. Withheld on the same two criteria as the price beside it — `not measured` where no span was
+  read, `no tool call to divide` where nothing was called
 - **how much of the round-trip count was avoidable** — `bundles`, and `recoverable_round_trips` inside
   it ([#1344](https://github.com/joshuafolkken/kit/issues/1344)). The density says calls went out one
   per turn; only this says how many of them **could have gone out together**, read from the run rather

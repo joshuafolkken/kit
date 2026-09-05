@@ -35,12 +35,6 @@ import type { Span } from './time-spans'
 const HEADING = 'Segments (in run order):'
 const NO_LEAD = ''
 const LEAD_SEPARATOR = ' · '
-const WINDOW_ARROW = ' → '
-// The `HH:MM:SS` slice of an ISO instant. UTC rather than local time, because the report's own
-// `started_at` / `ended_at` already are — a table in one zone beside a header in another is a report
-// that cannot be read against itself.
-const CLOCK_START = 11
-const CLOCK_END = 19
 const NO_DURATION = 0
 
 // Under this, a phase change is a flicker rather than a stretch of the run. Set from the merged runs
@@ -202,10 +196,6 @@ function build_segments(spans: ReadonlyArray<Span>): Array<Segment> {
 	return merged(grouped(placed_spans(spans))).map((group) => to_segment(group))
 }
 
-function clock_of(timestamp_ms: number): string {
-	return new Date(timestamp_ms).toISOString().slice(CLOCK_START, CLOCK_END)
-}
-
 function suffix_of(segment: Segment): string {
 	if (segment.lead_label === NO_LEAD) return segment.phase
 
@@ -213,7 +203,7 @@ function suffix_of(segment: Segment): string {
 }
 
 function segment_row(segment: Segment): string {
-	const window = `${clock_of(segment.started_ms)}${WINDOW_ARROW}${clock_of(segment.ended_ms)}`
+	const window = time_format.format_window(segment.started_ms, segment.ended_ms)
 
 	return time_format.format_row(window, segment.duration_ms, suffix_of(segment))
 }

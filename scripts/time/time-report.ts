@@ -3,6 +3,7 @@ import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
+import { time_gaps, type GapTotals } from './time-gaps'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_round_trips } from './time-round-trips'
@@ -110,6 +111,12 @@ interface TimeReport extends TurnSplit {
 	// trip to divide by — the withheld answer the counts themselves give, never a measured zero.
 	ms_per_round_trip: number
 	model_ms_per_round_trip: number
+	// The same model wait as `model_ms_per_round_trip`, as the spread it was a mean of
+	// (joshuafolkken/kit#1386). The mean above says what a trip cost typically; only this says whether
+	// a run was slow everywhere or slow once — and the two need opposite fixes, since batching removes
+	// many small trips and touches one long think not at all. Built by `time-gaps.ts`, which also
+	// renders the block — the shape `time-bundles.ts` and `time-failures.ts` already have.
+	gaps: GapTotals
 	// How many of those round trips a run need not have made (joshuafolkken/kit#1344). The counts above
 	// say how often the run went round and what one trip was worth; only this says how much of it was
 	// avoidable, which is what a mechanism to prevent it would be sized against. Built by
@@ -294,6 +301,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		...counts,
 		...turns.split,
 		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
+		gaps: time_gaps.build_gaps(spans),
 		bundles: time_bundles.build_bundles(spans),
 		categories,
 		has_ci_data: ci.has_ci_data,
@@ -418,6 +426,7 @@ function format_report(report: TimeReport): string {
 		...phase_lines(report),
 		...time_segments.segment_lines(report.segments),
 		...time_trips.trip_lines(report),
+		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_failures.failure_lines(
 			report.failures,
