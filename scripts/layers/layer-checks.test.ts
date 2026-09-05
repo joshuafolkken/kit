@@ -4,6 +4,8 @@ import { layer_checks } from './layer-checks'
 
 const TYPE_CHECK = 'type-check'
 const UNIT_TESTS = 'unit-tests'
+const GATE_LINE = 'pnpm josh gate'
+const CHECK_LINE = 'pnpm josh check'
 
 function checks_of(command: string): ReadonlyArray<string> {
 	return layer_checks.resolve_command(command).checks
@@ -62,11 +64,11 @@ describe('layer_checks — expanding a josh sub-command', () => {
 	})
 
 	it('expands a target written as one of josh own aliases', () => {
-		expect(checks_of('pnpm josh ga')).toStrictEqual(checks_of('pnpm josh gate'))
+		expect(checks_of('pnpm josh ga')).toStrictEqual(checks_of(GATE_LINE))
 	})
 
 	it('expands a shell-backed target through its own argv in the command map', () => {
-		expect(checks_of('pnpm josh check')).toStrictEqual([TYPE_CHECK])
+		expect(checks_of(CHECK_LINE)).toStrictEqual([TYPE_CHECK])
 	})
 
 	it('follows both targets of a composite sh -c command', () => {
@@ -94,5 +96,36 @@ describe('layer_checks — a josh target that resolves to no check', () => {
 
 	it('unions the tool named outright with what the josh target expands to', () => {
 		expect(checks_of('pnpm josh secretlint-scan {staged_files}')).toStrictEqual(['secret-scan'])
+	})
+})
+
+describe('layer_checks — a josh target whose expansion resolves to no check', () => {
+	it('reports a shell-backed target whose argv reaches no check, instead of dropping the step', () => {
+		const resolved = layer_checks.resolve_command('pnpm josh hook:commit')
+
+		expect(resolved.checks).toStrictEqual([])
+		expect(resolved.unresolved).toStrictEqual(['hook:commit'])
+	})
+
+	it('keeps a shell-backed target that does reach a check out of the note', () => {
+		const resolved = layer_checks.resolve_command(CHECK_LINE)
+
+		expect(resolved.checks).toStrictEqual([TYPE_CHECK])
+		expect(resolved.unresolved).toStrictEqual([])
+	})
+
+	it('keeps a target expanding to further josh targets out of the note', () => {
+		const resolved = layer_checks.resolve_command(GATE_LINE)
+
+		expect(resolved.unresolved).toStrictEqual([])
+	})
+
+	it('walks a target against its own path, so a sibling cannot make it look unresolvable', () => {
+		const resolved = layer_checks.resolve_command(
+			'sh -c pnpm josh test:unit && pnpm josh test:e2e && pnpm josh test',
+		)
+
+		expect(resolved.checks).toStrictEqual(['e2e-tests', UNIT_TESTS])
+		expect(resolved.unresolved).toStrictEqual([])
 	})
 })
