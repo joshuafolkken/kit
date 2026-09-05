@@ -1,5 +1,5 @@
 {
-	"version": "1.325.0",
+	"version": "1.326.0",
 	"name": "@joshuafolkken/kit",
 	"type": "module",
 	"license": "MIT",
@@ -55,6 +55,7 @@
 		"!**/*-fixture.ts"
 	],
 	"imports": {
+		"#eslint/*": "./eslint/*",
 		"#scripts/*": "./scripts/*.ts",
 		"#playwright-config": "./playwright.config.ts",
 		"#ports": "./ports/index.js",
