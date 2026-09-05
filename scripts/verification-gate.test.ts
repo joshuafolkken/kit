@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
+import { josh_verdict } from './josh-verdict'
 import { test_unit_guard } from './test-unit-guard'
 import type { GateStep } from './verification-gate'
 
@@ -353,6 +354,24 @@ describe('run_verification_gate — how long each check took', () => {
 		const [, text] = await run_capturing([FAIL, PASS, FAIL, PASS])
 
 		expect(text).toMatch(/verification gate failed: lint, cspell \(\d+\.\ds\)/u)
+	})
+
+	// joshuafolkken/kit#1374: `josh time` tells a green gate from the third-party warning bodies it
+	// forwards by reading this line, so what the gate prints has to be what the reader matches. The
+	// two are built from one prefix; these assertions are what fails if they ever stop being.
+	it('prints a passing summary the verdict reader recognizes', async () => {
+		const [, text] = await run_capturing(ALL_PASS)
+		const verdicts = text.split('\n').map((line) => josh_verdict.read_verdict(line))
+
+		expect(verdicts).toContain(josh_verdict.PASSED_VERDICT)
+		expect(verdicts).not.toContain(josh_verdict.FAILED_VERDICT)
+	})
+
+	it('prints a failing summary the verdict reader recognizes', async () => {
+		const [, text] = await run_capturing([FAIL, PASS, FAIL, PASS])
+		const verdicts = text.split('\n').map((line) => josh_verdict.read_verdict(line))
+
+		expect(verdicts).toContain(josh_verdict.FAILED_VERDICT)
 	})
 })
 

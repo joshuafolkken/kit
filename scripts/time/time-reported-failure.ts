@@ -1,3 +1,4 @@
+import { josh_verdict } from '#scripts/josh-verdict'
 import { status_icons } from '#scripts/status-icons'
 import { z } from 'zod'
 
@@ -16,6 +17,10 @@ import { z } from 'zod'
 // that reports a per-item result opens the failing one with `status_icons.FAIL_ICON`, so a line
 // beginning with that character in the output of a `pnpm josh <cmd>` call is that command saying it
 // failed. The gate's is `✗ verification gate failed: lint (48.2s)`.
+//
+// **Refined by joshuafolkken/kit#1374**: a command that forwards another tool's output states its own
+// verdict, and that verdict is read first — the bare icon is only consulted where there is none. See
+// `verdict_answer` below and `josh-verdict.ts`.
 //
 // **The outcome is only ever promoted, never lowered.** A call the harness already marked failed
 // stays failed; this answers the two cases the harness got wrong — `ok`, which is the piped gate, and
@@ -80,14 +85,49 @@ function is_failure_line(line: string): boolean {
 	return line.trimStart().startsWith(status_icons.FAIL_ICON)
 }
 
+// **A command's own verdict outranks the lines it forwarded** (joshuafolkken/kit#1374). `josh gate`
+// prints the body of a step that skipped or passed with warnings, and that body belongs to eslint,
+// svelte-check, vitest or cspell — one of them opening a line with the failure icon would otherwise
+// make a *green* gate a failed call, and charge the next gate run as rework. Where a verdict line is
+// present it is the answer; `josh-verdict.ts` carries the reasoning and why the alternative — a
+// per-command list of failure-line patterns — was rejected.
+//
+// **A `passed` verdict speaks only for the lines in front of it.** A body is not one command's: a
+// chained `pnpm josh gate && pnpm josh health` is labelled by its first segment and carries both
+// outputs, and `josh propagate` runs each consumer's gate with inherited stdio, so a consumer's green
+// verdict lands above propagate's own `✗ <repo>` report. Discarding the icon reading for the whole
+// body on the strength of one verdict would silence exactly those, which is the promotion this module
+// exists to make going quiet without failing. A forwarded body is printed *before* the verdict that
+// summarizes it, so what follows the last one belongs to whatever ran next and is still read.
+function is_failed_verdict(line: string): boolean {
+	return josh_verdict.read_verdict(line) === josh_verdict.FAILED_VERDICT
+}
+
+function is_passed_verdict(line: string): boolean {
+	return josh_verdict.read_verdict(line) === josh_verdict.PASSED_VERDICT
+}
+
+// `-1` where no verdict was printed, which makes the slice below the whole body — the fallback for a
+// command that states no verdict at all.
+function lines_after_last_pass(lines: ReadonlyArray<string>): ReadonlyArray<string> {
+	return lines.slice(lines.findLastIndex((line) => is_passed_verdict(line)) + 1)
+}
+
 // **Answered while the body is in hand, and reduced to one bit.** `time-spans.ts` parses a whole
 // session before it aggregates anything, so a field holding each result's text would retain every
 // byte the session's tools printed for the length of the parse — megabytes on an `epicrun`
 // transcript, where before this the bodies were freed line by line.
+//
+// The bare-icon reading stays rather than being replaced: a josh command that prints no verdict of
+// its own — `josh health`, and `josh propagate`, whose own report is a row per consumer — says it
+// failed only in the line it printed, and so does a gate whose body was truncated past its verdict.
+// The figure remains a floor.
 function has_failure_line(content: unknown): boolean {
-	return result_text(content)
-		.split(LINE_SEPARATOR)
-		.some((line) => is_failure_line(line))
+	const lines = result_text(content).split(LINE_SEPARATOR)
+
+	if (lines.some((line) => is_failed_verdict(line))) return true
+
+	return lines_after_last_pass(lines).some((line) => is_failure_line(line))
 }
 
 // **The josh guard is the whole of what keeps this from being a guess.** Any tool's output may
