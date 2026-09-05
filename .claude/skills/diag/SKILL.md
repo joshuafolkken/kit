@@ -194,6 +194,19 @@ un-started issue is usually the highest-priority action in the table** — it ne
 only a run — and a table that hides it reports the backlog as emptier than it is and re-proposes the
 same work a week later.
 
+**A phase whose earlier measurement is recorded is ranked against that record, not from the tables
+alone** ([#1305](https://github.com/joshuafolkken/kit/issues/1305)). A large phase invites a proposal
+every time it is measured, and a `diag` reads this run's tables rather than the record of what an
+earlier one concluded — so the same measure gets re-filed against a phase that has already been
+measured and found not to move. **`review` is the phase that has such a record**, and it is
+`prompts/review.md` → "The narrowing is real in scope and does not show in the wall clock", the
+single source for what was measured and how strongly. **Read it before ranking `review`, and quote no
+figure from it that you have not read there** — the numbers live in that section alone, so a copy
+here is one that goes stale silently. **A proposal it already covers is not forbidden: it is required
+to say why the recorded data does not reach it**, which is a different bar from being refused. **The
+row still appears in the table either way** — a phase measured as immovable is reported as such,
+which is the distinction this note exists to keep.
+
 **Enumerate the backlog before ranking it — never from memory.** The rule above says an un-started
 issue usually ranks highest and said nothing about how to find one, so the candidate set came from
 whatever that session happened to remember: the 2026-09-04 run left #1226, #1170, #1095 and #1102 out
