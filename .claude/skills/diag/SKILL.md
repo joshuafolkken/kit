@@ -155,9 +155,16 @@ Read from the JSON, in this order:
   which runs CI once more — and that second cycle is the one the merge command sits on, the gate
   beside it having finished first (`prompts/review.md` → "The round-2 fix commit is pushed before its
   gate, so its CI runs beside it"). That choice is made on every
-  two-round run and its price has never appeared in a report, so joshuafolkken/kit#1382 — which asks
-  whether to cut it — cannot be decided: its acceptance condition is the serial cost **and the
-  frequency** across several runs, and this row is the instrument that produces both.
+  two-round run, and this row is the instrument that priced it: its acceptance condition was the
+  serial cost **and the frequency** across several runs, and joshuafolkken/kit#1382's answer — both
+  of those, and why the status quo was kept over cutting the cycle — is
+  `prompts/review.md` → "What a round-2 fix-in-place costs, and how often it is paid".
+  **Read that record before proposing a cut here**, on the rule step 3 already applies to the
+  `review` phase: this row produces one run's figures and holds no memory of what an earlier reading
+  concluded, so a proposal it already answers is required to say why the recorded data does not reach
+  it. **The distribution stays there and no part of it is copied here** — what this row keeps below
+  is run #1399's own worked example, which is arithmetic over one immutable run rather than a set
+  that moves every time it is re-measured.
   **The detector is a `pr` segment *after* the round-2 `review` row.** The pair is
   identified first, by the rule above: the `pr` row *between* the two rounds is the pull request
   opening, and a *second* one after the later `review` row is the fix commit. On run #1399 the tail
@@ -342,6 +349,17 @@ silently. **A proposal it already covers is not forbidden: it is required
 to say why the recorded data does not reach it**, which is a different bar from being refused. **The
 row still appears in the table either way** — a phase measured as immovable is reported as such,
 which is the distinction this note exists to keep.
+
+**The `review` phase is not the only recorded reading, and the second one is not about a phase at all**
+([#1382](https://github.com/joshuafolkken/kit/issues/1382)). Step 1's round-2 disposition row prices the
+extra commit and the CI cycle a fix-in-place buys, and `prompts/review.md` → "What a round-2 fix-in-place
+costs, and how often it is paid" records what that came to across a set of runs, how often the detector
+found it, and why the status quo was kept over cutting the cycle. **A proposal to cut that cycle is
+ranked against that record on exactly the terms above** — the row still appears in the table, and it is
+required to say why the recorded distribution does not reach it. **It is not folded into the two sibling
+sections**, because it reads the `ci`, `pr` and `merge` stretches rather than the `review` phase: a
+reader who follows the pointer above alone never arrives at it, which is the miss this paragraph exists
+to prevent.
 
 **Enumerate the backlog before ranking it — never from memory.** The rule above says an un-started
 issue usually ranks highest and said nothing about how to find one, so the candidate set came from
