@@ -35,12 +35,22 @@ import { review_stamps } from './review/review-stamps'
 // one costs a run that cannot verify itself, and only one of those is worth avoiding.
 const PACKAGE_JSON = 'package.json'
 
+// **Matched by basename, because the map's keys are repository-root-relative and this project need not
+// sit at that root.** `review-tree.ts` resolves the git root rather than `cwd()`, so in a monorepo
+// package the bump rewrites `<sub>/package.json` and a bare `'package.json'` lookup would never find
+// it — leaving the bump owed forever and every gate after the first green one refused, the standing
+// false positive this module must not have. A different package's `package.json` matching here only
+// ever reads as "the bump may already be in", which is the silent, cheap direction.
+function is_package_manifest(name: string): boolean {
+	return name === PACKAGE_JSON || name.endsWith(`/${PACKAGE_JSON}`)
+}
+
 // Non-zero, so no run can read a refusal as a gate that passed, and the same code the gate's argument
 // refusal already exits with — both mean "nothing was checked; the call itself is what to fix".
 const REFUSED_EXIT_CODE = 1
 
 function is_bump_owed(files: Record<string, string>): boolean {
-	return files[PACKAGE_JSON] === undefined
+	return Object.keys(files).every((name) => !is_package_manifest(name))
 }
 
 // **Every path the record covers is still changed in this tree**, which is how a record is known to be

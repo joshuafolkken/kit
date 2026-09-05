@@ -89,8 +89,9 @@ Each block's header names the command that ran, not only the check, because the 
 
 ```
 ⚠ nothing was checked — this gate would have been paid for twice.
-  Lint, the type check, the spell check and the unit tests were already green on this branch at 2026-09-05T14:29:41.118Z, the tree has moved since, and this branch still carries no version bump: `pnpm josh bump minor` rewrites `package.json`, so whatever is verified now has to be verified again after it.
-  Run `pnpm josh bump minor` first and then `pnpm josh gate` — one gate instead of two. Where this run will not commit, `pnpm josh gate --force` runs the four checks now.
+  Lint, the type check, the spell check and the unit tests were already green on this branch at 2026-09-05T14:29:41.118Z, the tree has moved since, and this branch still carries no version bump.
+  Where this run will commit: `pnpm josh bump minor` rewrites `package.json`, so whatever is verified now has to be verified again after it — run `pnpm josh bump minor` first and then `pnpm josh gate`, one gate instead of two.
+  Where it will not (`halfrun`, or a `needs-human-review` child — neither ever bumps): `pnpm josh gate --force` runs the four checks now.
 ```
 
 **It refuses rather than warning, because a warning is printed by a command that has already run.** The seconds are spent by the time anyone reads one, and the gate's `call_count` does not move — [#1344](https://github.com/joshuafolkken/kit/issues/1344) measured across three consecutive runs that notices and prose do not change the numbers. **Nothing is narrowed, dropped or reinterpreted**: the first words say nothing was verified, so the output cannot be mistaken for a pass, and it carries neither of the gate's own verdict lines so a re-run after it is not charged as rework ([#1374](https://github.com/joshuafolkken/kit/issues/1374)).

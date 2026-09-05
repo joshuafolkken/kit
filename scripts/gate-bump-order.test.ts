@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { read_repo_file } from './ai-document-fixture'
 import { gate_bump_order } from './gate-bump-order'
 import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
@@ -59,7 +60,9 @@ const BUMP_COMMAND = 'pnpm josh bump minor'
 
 const BEFORE_FIX: Record<string, string> = { [WORK_FILE]: 'digest-one' }
 const AFTER_FIX: Record<string, string> = { [WORK_FILE]: 'digest-two' }
-const AFTER_BUMP: Record<string, string> = { ...AFTER_FIX, [PACKAGE_JSON]: 'digest-version' }
+const VERSION_DIGEST = 'digest-version'
+const AFTER_BUMP: Record<string, string> = { ...AFTER_FIX, [PACKAGE_JSON]: VERSION_DIGEST }
+const NESTED_MANIFEST = `packages/app/${PACKAGE_JSON}`
 const OTHER_FILE = 'scripts/somewhere-else.ts'
 const OTHER_WORK: Record<string, string> = { [OTHER_FILE]: 'digest-three' }
 
@@ -126,6 +129,15 @@ describe('owed_bump_gate — the one shape that pays for two gates', () => {
 		record_green(BEFORE_FIX, BASE)
 
 		expect(owed(AFTER_BUMP, BASE)).toBe(false)
+	})
+
+	// The map's keys are repository-root-relative, so in a monorepo package the bump lands under a
+	// prefix. Matched by basename, or the bump would stay owed forever and every gate after the first
+	// green one would be refused.
+	it('stays silent when the bump landed in a package below the repository root', () => {
+		record_green(BEFORE_FIX, BASE)
+
+		expect(owed({ ...AFTER_FIX, [NESTED_MANIFEST]: VERSION_DIGEST }, BASE)).toBe(false)
 	})
 })
 
@@ -201,6 +213,17 @@ describe('format_refusal', () => {
 		expect(text).not.toContain('verification gate failed')
 		expect(text).not.toContain('verification gate passed')
 	})
+
+	// The command reference prints this message as a sample transcript, and a transcript nothing pins
+	// drifts back to whatever the message used to say — silently, since it is inside a code fence. The
+	// two openers are asserted rather than the whole text: the timestamp is a real run's.
+	it.each(['  Where this run will commit:', '  Where it will not ('])(
+		'is quoted in the command reference, line %j included',
+		(opener) => {
+			expect(text).toContain(opener)
+			expect(read_repo_file('docs/josh-commands.md')).toContain(opener)
+		},
+	)
 })
 
 describe('run_verification_gate — a bump the run still owes', () => {
