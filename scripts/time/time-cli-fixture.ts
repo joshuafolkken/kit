@@ -6,6 +6,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { time_bundles } from './time-bundles'
 import { time_failures } from './time-failures'
 import type { TimeReport } from './time-report'
+import { time_tool_turns } from './time-tool-turns'
 
 // What the `josh time` CLI suites read (joshuafolkken/kit#1312).
 //
@@ -90,6 +91,7 @@ const RUN_REPORT: TimeReport = {
 	turn_count: 1,
 	tool_call_count: 1,
 	round_trip_count: 1,
+	...time_tool_turns.NO_TURN_SPLIT,
 	ms_per_round_trip: TRIP_MINUTES * MINUTE_MS,
 	model_ms_per_round_trip: MINUTE_MS,
 	categories: {

@@ -73,6 +73,14 @@ function run_report(spans: ReadonlyArray<Span>, ci_ms: number): TimeReport {
 	})
 }
 
+// The one row a case is about, so an assertion cannot pass on a word another row happens to carry —
+// `no tool call to divide` is printed by the trips row and the cost row alike. Here rather than in
+// each suite since joshuafolkken/kit#1385, when a second one needed it: a private copy beside the
+// second suite is the clone `CLAUDE.md` prohibits.
+function line_of(text: string, label: string): string {
+	return text.split('\n').find((row) => row.includes(label)) ?? ''
+}
+
 const time_report_fixture = {
 	MINUTE_MS,
 	MIXED,
@@ -81,6 +89,7 @@ const time_report_fixture = {
 	SESSION,
 	SESSION_NOTE,
 	build,
+	line_of,
 	run_report,
 	timeline,
 }

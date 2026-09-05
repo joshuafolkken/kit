@@ -9,7 +9,7 @@ import { time_segments } from './time-segments'
 import { time_span_fixture } from './time-span-fixture'
 import { time_spans } from './time-spans'
 
-const { MINUTE_MS, MIXED, PNPM_LABEL, RUN_SCOPE, SESSION_NOTE, build, run_report } =
+const { MINUTE_MS, MIXED, PNPM_LABEL, RUN_SCOPE, SESSION_NOTE, build, line_of, run_report } =
 	time_report_fixture
 const { span } = time_span_fixture
 const CI_ROW = 'CI wait'
@@ -47,11 +47,15 @@ describe('time_report.build_report — categories', () => {
 	})
 })
 
+// `MIXED` is one turn issuing three calls, so every row of its per-tool table shares the same round
+// trip and none of its calls went out alone (joshuafolkken/kit#1385).
+const ONE_SHARED_TRIP = { round_trip_count: 1, alone_in_turn_count: 0 }
+
 describe('time_report.build_report — per-label totals', () => {
 	it('bundles repeated calls of one label and counts them', () => {
 		expect(build(MIXED).by_tool).toEqual([
-			{ label: PNPM_LABEL, duration_ms: 4 * MINUTE_MS, call_count: 2 },
-			{ label: 'Read', duration_ms: 2 * MINUTE_MS, call_count: 1 },
+			{ label: PNPM_LABEL, duration_ms: 4 * MINUTE_MS, call_count: 2, ...ONE_SHARED_TRIP },
+			{ label: 'Read', duration_ms: 2 * MINUTE_MS, call_count: 1, ...ONE_SHARED_TRIP },
 		])
 	})
 
@@ -254,12 +258,6 @@ const SERIAL = [
 	span(time_spans.TOOL_CATEGORY, 1, PNPM_LABEL),
 ]
 const DENSITY_SUFFIX = time_report.PER_ROUND_TRIP
-
-// The one row a case is about, so an assertion cannot pass on a word another row happens to carry —
-// `no tool call to divide` is printed by the trips row and the cost row alike.
-function line_of(text: string, label: string): string {
-	return text.split('\n').find((row) => row.includes(label)) ?? ''
-}
 
 describe('time_report.format_report — the round-trip block', () => {
 	it('reports the calls, the trips they were issued in and the turns they sat in', () => {

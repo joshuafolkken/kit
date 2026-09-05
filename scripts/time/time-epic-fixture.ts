@@ -5,6 +5,7 @@ import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import type { PhaseTotal } from './time-phases'
 import type { TimeReport } from './time-report'
+import { time_tool_turns } from './time-tool-turns'
 
 // What the epic-aggregation suites read, written once rather than in each test file
 // (joshuafolkken/kit#1300).
@@ -45,6 +46,7 @@ const DEFAULTS = { model_ms: MINUTE_MS, turn_count: 1, span_count: 2, has_ci_dat
 const ZERO_COUNTS = {
 	tool_call_count: 0,
 	round_trip_count: 0,
+	...time_tool_turns.NO_TURN_SPLIT,
 	ms_per_round_trip: 0,
 	model_ms_per_round_trip: 0,
 }
