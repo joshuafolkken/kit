@@ -23,16 +23,22 @@ const SHA = 'abc123'
 // marks cannot match the same path: only the commit *listing* carries a query right after the word.
 const CHECK_RUNS_MARK = 'check-runs'
 const COMMITS_MARK = '/commits?'
+// The merged diff's file listing, which sits under `pulls/<n>/` like the commit listing does
+// (joshuafolkken/kit#1387). Matched on the query so it cannot collide with a path a test writes.
+const FILES_MARK = '/files?'
 const GH_REFUSAL = 'gh: 403'
 
 // One scripted `gh`. Each read has a refusal flag of its own, because they are separate requests and
-// a rate limit hits one of them at a time (joshuafolkken/kit#1352, joshuafolkken/kit#1384).
+// a rate limit hits one of them at a time (joshuafolkken/kit#1352, joshuafolkken/kit#1384,
+// joshuafolkken/kit#1387).
 interface GhScript {
 	pull_body: string
 	checks_body?: string
 	commits_body?: string
+	files_body?: string
 	is_checks_refused?: boolean
 	is_commits_refused?: boolean
+	is_files_refused?: boolean
 }
 
 const state = { home: '' }
@@ -74,15 +80,34 @@ function commits_of(script: GhScript): string {
 	return script.commits_body ?? '[]'
 }
 
+// **The default is an empty listing, not the pull body.** A merged pull request is read for its files
+// on every run now, and letting that request fall through to the listing body would hand the file
+// schema an array of pull requests — a read every existing case would then report as refused.
+function files_of(script: GhScript): string {
+	if (script.is_files_refused === true) throw new Error(GH_REFUSAL)
+
+	return script.files_body ?? '[]'
+}
+
 function reader(script: GhScript, asked: Array<string> = []): GhReader {
 	return async (request_path: string) => {
 		asked.push(request_path)
 
 		if (request_path.includes(CHECK_RUNS_MARK)) return checks_of(script)
 		if (request_path.includes(COMMITS_MARK)) return commits_of(script)
+		if (request_path.includes(FILES_MARK)) return files_of(script)
 
 		return script.pull_body
 	}
+}
+
+// One row of a merged diff, as GitHub writes it.
+function pull_file(filename: string, additions: number, deletions: number): object {
+	return { filename, additions, deletions }
+}
+
+function files_body(files: ReadonlyArray<object>): string {
+	return JSON.stringify(files)
 }
 
 // The merge instant is written into the JSON text rather than as a value, because an open pull
@@ -127,6 +152,8 @@ const time_run_fixture = {
 	report_of,
 	check_run,
 	checks_body,
+	pull_file,
+	files_body,
 }
 
 export type { GhScript }

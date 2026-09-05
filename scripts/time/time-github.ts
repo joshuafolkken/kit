@@ -506,6 +506,11 @@ async function read_issue_body(
 const time_github = {
 	MAX_PAGES,
 	PAGE_SIZE,
+	// Exported so `time-pull-files.ts` builds its path off this one string rather than restating it
+	// (joshuafolkken/kit#1387). That module is this layer's second file, split off because this one sits
+	// at its length limit — not a second route to the API, which is why it reads through `GhReader` and
+	// `read_gh` above rather than reaching for `git_gh_exec` itself.
+	PULLS_PATH,
 	read_gh,
 	read_issue_body,
 	parse_page,

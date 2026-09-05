@@ -6,6 +6,7 @@ import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_phases, type PhaseTotal } from './time-phases'
+import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
 import { time_round_trips } from './time-round-trips'
 import { time_segments, type Segment } from './time-segments'
 import { time_spans, type Span, type SpanCategory, type Timeline } from './time-spans'
@@ -122,6 +123,11 @@ interface TimeReport extends TurnSplit {
 	// avoidable, which is what a mechanism to prevent it would be sized against. Built by
 	// `time-bundles.ts`, which also renders the block — the shape `time-failures.ts` already uses.
 	bundles: BundleTotals
+	// Which of the run's edits never reached the merged diff, and how large that diff was
+	// (joshuafolkken/kit#1387). The blocks above measure how a run spent its turns; only this says how
+	// much of the work was thrown away, and how much change the elapsed time bought — without which two
+	// runs' minutes cannot be compared at all. Built by `time-rework.ts`, which also renders the block.
+	rework: ReworkTotals
 	categories: CategoryTotals
 	// Whether the GitHub half was read at all. A session report has no pull request, so printing a
 	// `CI wait 0.0 min` row there would assert a measurement nobody made.
@@ -166,6 +172,10 @@ interface ReportInput {
 	// phase table reads the per-commit windows as well, and three fields that must agree are three
 	// fields a caller can hand over inconsistently.
 	ci: CiFacts
+	// The merged diff, whole rather than as a file list and a flag: a refused read and a pull request
+	// that changed nothing are two answers, and two fields that must agree are two a caller can hand
+	// over inconsistently (joshuafolkken/kit#1387).
+	diff: DiffFacts
 	notes: ReadonlyArray<string>
 	by_check: ReadonlyArray<CheckTotal>
 }
@@ -303,6 +313,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
 		gaps: time_gaps.build_gaps(spans),
 		bundles: time_bundles.build_bundles(spans),
+		rework: time_rework.build_rework(spans, input.diff),
 		categories,
 		has_ci_data: ci.has_ci_data,
 		notes: [...input.notes],
@@ -320,6 +331,7 @@ function build_report(session_id: string, timeline: Timeline): TimeReport {
 		started_ms: timeline.started_ms,
 		ended_ms: timeline.ended_ms,
 		ci: time_ci.NO_CI,
+		diff: time_rework.NO_DIFF,
 		notes: [],
 		by_check: [],
 	})
@@ -414,8 +426,14 @@ function format_empty(report: TimeReport): string {
 	].join('\n')
 }
 
+// **The failure block's three arguments are read off the report before the list rather than inside
+// it**, which is what keeps this function inside its length limit as blocks are added
+// (joshuafolkken/kit#1387). Each block below is one line, and the page is the order of those lines.
 function format_report(report: TimeReport): string {
 	if (report.span_count === 0 && report.categories.ci_ms === 0) return format_empty(report)
+
+	const { failures, tool_call_count } = report
+	const { tool_ms } = report.categories
 
 	return [
 		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
@@ -428,11 +446,8 @@ function format_report(report: TimeReport): string {
 		...time_trips.trip_lines(report),
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
-		...time_failures.failure_lines(
-			report.failures,
-			report.tool_call_count,
-			report.categories.tool_ms,
-		),
+		...time_failures.failure_lines(failures, tool_call_count, tool_ms),
+		...time_rework.rework_lines(report.rework),
 		...total_lines('By tool (descending):', report.by_tool, tool_suffix),
 		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
 		...time_invocations.invocation_lines(report.by_invocation),

@@ -1,4 +1,5 @@
 import { time_report, type TimeReport } from './time-report'
+import { time_rework, type DiffFacts } from './time-rework'
 import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span, type Timeline } from './time-spans'
 
@@ -31,6 +32,19 @@ const WAIT_MINUTES = 10
 const WINDOW_MINUTES = 30
 const CHECK_MINUTES = 2
 
+// The merged diff `run_report` was measured against (joshuafolkken/kit#1387). One file rather than
+// none, so the change-size rows carry a number a suite can tell apart from the withheld answer — and
+// so the reconciliation has a path to match against.
+const DIFF_ADDITIONS = 12
+const DIFF_DELETIONS = 3
+const DIFF_PATH = 'scripts/time/time-report.ts'
+const DIFF_ROOT = '/Users/someone/Development/kit/'
+const DIFF: DiffFacts = {
+	files: [{ path: DIFF_PATH, additions: DIFF_ADDITIONS, deletions: DIFF_DELETIONS }],
+	state: time_rework.DIFF_READ,
+	root: DIFF_ROOT,
+}
+
 // One turn issuing three calls at once, with a person waited on at the end: every category present,
 // and two different `josh` commands so the per-command table has more than one row.
 const MIXED: ReadonlyArray<Span> = [
@@ -61,6 +75,7 @@ function run_report(spans: ReadonlyArray<Span>, ci_ms: number): TimeReport {
 		started_ms: 0,
 		ended_ms: WINDOW_MINUTES * MINUTE_MS,
 		ci: { ci_ms, has_ci_data: true, windows: [], has_windows: true },
+		diff: DIFF,
 		notes: [SESSION_NOTE],
 		by_check: [
 			{
@@ -83,6 +98,11 @@ function line_of(text: string, label: string): string {
 
 const time_report_fixture = {
 	MINUTE_MS,
+	DIFF,
+	DIFF_ADDITIONS,
+	DIFF_DELETIONS,
+	DIFF_PATH,
+	DIFF_ROOT,
 	MIXED,
 	PNPM_LABEL,
 	RUN_SCOPE,

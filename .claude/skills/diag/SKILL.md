@@ -131,6 +131,23 @@ Read from the JSON, in this order:
   prints. `is_measured: false` withholds it on the same criterion the shares are withheld on, and
   `recoverable_round_trips: 0` on a measured run is a real answer — a run that batched everything
   had nothing to recover, which is not the same as a run nobody could read.
+- **the work that was thrown away, and how much change the run bought** — `rework`
+  ([#1387](https://github.com/joshuafolkken/kit/issues/1387)). Two readings out of one field. `files`
+  names every path the run's `Edit` / `Write` calls touched with its edit count, and `presence` says
+  whether it reached the merged diff — a row reading `scripts/verification-gate.ts — 2 · never reached
+  the merged diff` is a mid-implementation change of approach, which no other block here can see, and a
+  high `edit_count` on a file that *did* land is the same signal at lower confidence. `size` is the
+  merged diff's `changed_file_count` / `additions` / `deletions`, and **without it a run's minutes
+  cannot be compared with another run's at all**: 27 minutes on a 254-line change and 27 on a 4-line one
+  are the same number and not the same run, which is why step 2 quotes it beside the phase it compares.
+  Three withheld states, and none is a zero: `is_measured: false` is a transcript nobody read;
+  `state: "refused"` is a merged diff nobody could read — there every row's `presence` is `unknown` and
+  `dropped_count` stays 0 because nothing was reconciled, never because nothing was dropped; and
+  `state: "absent"` is a scope that never had a pull request, where the block is not printed at all.
+  `outside_file_count` is edits made outside the work tree — a scratchpad script — counted apart rather
+  than reported as work thrown away, so **read it as its own signal and never add it to
+  `dropped_count`**. **The reconciliation under-reports a file rewritten only through the shell**,
+  since `sed -i` is not an `Edit` call; it over-reports nothing
 - **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost. **Rank a tool by
   its round trips as well as its duration**: a tool called thirty times one call per turn costs thirty
   round trips at the price above, which is routinely larger than the seconds the calls themselves ran

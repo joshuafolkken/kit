@@ -7,6 +7,7 @@ import { time_failures } from './time-failures'
 import { time_gaps } from './time-gaps'
 import type { InvocationTotal } from './time-invocations'
 import type { TimeReport, ToolTotal } from './time-report'
+import { time_rework } from './time-rework'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
 import type { Segment } from './time-segments'
@@ -111,6 +112,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
+		rework: { ...time_rework.NO_REWORK },
 		failures: { ...time_failures.NO_FAILURES },
 	}
 }
