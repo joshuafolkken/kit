@@ -86,7 +86,7 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no a
 ### Quality limits
 
 - Function complexity ≤5 · nesting ≤2 · function ≤25 lines · file ≤300 lines · params ≤4 · statements per function ≤10 · cognitive complexity ≤4
-- **Those line counts are code lines, not physical lines.** `max-lines` and `max-lines-per-function` both run with `skipBlankLines` and `skipComments`, so blank lines and comments cost nothing — a thickly-commented file passes the 300 at 453 physical lines. Judge by what `pnpm josh lint` reports, never by `wc -l`. Test files (`*.test.ts` / `*.spec.ts` / `*.e2e.ts`) allow 35 code lines per function instead of 25. Enforcing the physical reading instead would be a reformatting project, not a convention (joshuafolkken/kit#1070).
+- **Those line counts are code lines, not physical lines.** `max-lines` and `max-lines-per-function` both run with `skipBlankLines` and `skipComments`, so blank lines and comments cost nothing — a thickly-commented file passes the 300 at 453 physical lines. Judge by what `pnpm josh lint` reports, never by `wc -l`. Test files (`*.test.ts` / `*.e2e.ts`) allow 35 code lines per function instead of 25. Enforcing the physical reading instead would be a reformatting project, not a convention (joshuafolkken/kit#1070).
 - Magic numbers: extract all literals except `0`, `1`, `-1` to named `UPPER_CASE` constants
 - No `any` · no unused vars · no floating promises · type assertions (`as`) are restricted
 - All function params and return types must be explicitly typed

@@ -121,10 +121,15 @@ const ERROR = 2
 const SOURCE_FILE = 'scripts/josh/josh.ts'
 const TEST_FILE = 'eslint/base.test.ts'
 
-async function resolve_severity(file_path: string, rule_name: string): Promise<unknown> {
+async function resolve_rule_entry(file_path: string, rule_name: string): Promise<unknown> {
 	const linter = new ESLint({ cwd: REPO_ROOT })
 	const config = await linter.calculateConfigForFile(file_path)
-	const entry = (config.rules as RuleMap)[rule_name]
+
+	return (config.rules as RuleMap)[rule_name]
+}
+
+async function resolve_severity(file_path: string, rule_name: string): Promise<unknown> {
+	const entry = await resolve_rule_entry(file_path, rule_name)
 
 	return Array.isArray(entry) ? entry[0] : entry
 }
@@ -229,6 +234,8 @@ const RESTRICTED_SYNTAX_RULE = 'no-restricted-syntax'
 const SPEC_BAN_FRAGMENT = 'the *.spec.ts / *.spec.js suffix is forbidden'
 const CENTRALIZED_TESTS_BAN_FRAGMENT = 'A top-level tests/ directory is forbidden'
 const PROBE_SOURCE = 'export const PROBE = 1\n'
+const SPEC_PROBE_FILE = 'src/lib/probe.spec.ts'
+const TESTS_PROBE_FILE = 'tests/probe.ts'
 
 // joshuafolkken/kit#1233: asserted by running the repository's own config over a virtual file
 // rather than by matching a glob, because the claim is that the ban reaches kit itself — which a
@@ -236,9 +243,12 @@ const PROBE_SOURCE = 'export const PROBE = 1\n'
 // the base config sets it. The `.ts` cases are the load-bearing ones: they are the names the
 // documents actually forbid, and they are the ones that report a tsconfig parse error instead of
 // the rule's own message when the ban is wired without `disableTypeChecked`.
-async function restricted_syntax_messages(file_path: string): Promise<Array<string>> {
+async function restricted_syntax_messages(
+	file_path: string,
+	source = PROBE_SOURCE,
+): Promise<Array<string>> {
 	const linter = new ESLint({ cwd: REPO_ROOT })
-	const [result] = await linter.lintText(PROBE_SOURCE, { filePath: file_path })
+	const [result] = await linter.lintText(source, { filePath: file_path })
 
 	return (result?.messages ?? [])
 		.filter((message) => message.ruleId === RESTRICTED_SYNTAX_RULE)
@@ -247,7 +257,7 @@ async function restricted_syntax_messages(file_path: string): Promise<Array<stri
 
 describe('create_base_config — the *.spec ban (issue #1233)', () => {
 	it('flags a *.spec.ts file outside the tsconfig project, with the rule message', async () => {
-		const messages = await restricted_syntax_messages('src/lib/probe.spec.ts')
+		const messages = await restricted_syntax_messages(SPEC_PROBE_FILE)
 
 		expect(messages).toHaveLength(1)
 		expect(messages[0]).toContain(SPEC_BAN_FRAGMENT)
@@ -270,7 +280,7 @@ describe('create_base_config — the *.spec ban (issue #1233)', () => {
 
 describe('create_base_config — the top-level tests/ ban (issue #1233)', () => {
 	it('flags a tests/*.ts file with the rule message, not a tsconfig parse error', async () => {
-		const messages = await restricted_syntax_messages('tests/probe.ts')
+		const messages = await restricted_syntax_messages(TESTS_PROBE_FILE)
 
 		expect(messages).toHaveLength(1)
 		expect(messages[0]).toContain(CENTRALIZED_TESTS_BAN_FRAGMENT)
@@ -282,5 +292,96 @@ describe('create_base_config — the top-level tests/ ban (issue #1233)', () => 
 
 	it('does not flag a nested tests/ path (only the top-level directory)', async () => {
 		await expect(restricted_syntax_messages('src/lib/tests/probe.js')).resolves.toEqual([])
+	})
+})
+
+// joshuafolkken/kit#1414, symptom 1: flat config replaces a rule's options rather than merging them,
+// so a ban block that set `no-restricted-syntax` on its own silently took `code-quality.js`'s
+// selectors away on exactly the files it applied to. Asserted by linting a banned file that also
+// violates one of those selectors — a config-shape assertion cannot see which entry list wins.
+const FOR_IN_SOURCE =
+	'export const PROBE = { a: 1 }\nfor (const key in PROBE) globalThis.log(key)\n'
+const FOR_IN_FRAGMENT = 'for..in loops iterate over the entire prototype chain'
+const BAN_PLUS_SELECTOR = 2
+
+describe('create_base_config — a banned file keeps the shared selectors (issue #1414)', () => {
+	it('reports the *.spec ban and the code-quality selector on one file', async () => {
+		const messages = await restricted_syntax_messages(SPEC_PROBE_FILE, FOR_IN_SOURCE)
+
+		expect(messages).toHaveLength(BAN_PLUS_SELECTOR)
+		expect(messages.join('\n')).toContain(FOR_IN_FRAGMENT)
+	})
+
+	it('reports the tests/ ban and the code-quality selector on one file', async () => {
+		const messages = await restricted_syntax_messages(TESTS_PROBE_FILE, FOR_IN_SOURCE)
+
+		expect(messages).toHaveLength(BAN_PLUS_SELECTOR)
+		expect(messages.join('\n')).toContain(FOR_IN_FRAGMENT)
+	})
+})
+
+// joshuafolkken/kit#1414, symptom 2: the globs listed `.ts` and `.js` only. The typed source is what
+// makes these load-bearing. The ban blocks name no parser of their own — typescript-eslint's base
+// block installs one with no `files` restriction, which is what reads `.mts` / `.cts` / `.tsx` — so
+// these cases are the assertion that the arrangement holds: narrow that parser, or drop the
+// `disableTypeChecked` carry, and the file reports a parse error instead of the rule's own message.
+const TYPED_PROBE_SOURCE = 'export const PROBE: number = 1\n'
+const TYPED_BAN_FILES = [
+	'src/lib/probe.spec.tsx',
+	'src/lib/probe.spec.mts',
+	'src/lib/probe.spec.cts',
+	'tests/probe.tsx',
+	'tests/probe.mts',
+	'tests/probe.cts',
+]
+const PLAIN_BAN_FILES = [
+	'src/lib/probe.spec.jsx',
+	'src/lib/probe.spec.mjs',
+	'src/lib/probe.spec.cjs',
+	'tests/probe.jsx',
+	'tests/probe.mjs',
+	'tests/probe.cjs',
+]
+
+describe('create_base_config — the bans reach every JS/TS extension (issue #1414)', () => {
+	it.each(TYPED_BAN_FILES)('flags %s with the rule message, not a parse error', async (path) => {
+		const messages = await restricted_syntax_messages(path, TYPED_PROBE_SOURCE)
+
+		expect(messages).toHaveLength(1)
+	})
+
+	it.each(PLAIN_BAN_FILES)('flags %s', async (path) => {
+		await expect(restricted_syntax_messages(path)).resolves.toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#1414, symptom 3: `FILE_PATTERNS.tests` listed `**/*.spec.ts`, so the same config
+// banned a name and handed it the test relaxation. Read back through the linter's own resolution
+// rather than off the block, because what has to hold is which block wins for that file.
+const MAX_LINES_PER_FUNCTION_RULE = 'max-lines-per-function'
+const DEFAULT_LINES_PER_FUNCTION = 25
+const TEST_LINES_PER_FUNCTION = 35
+
+async function resolve_options(file_path: string, rule_name: string): Promise<unknown> {
+	const entry = await resolve_rule_entry(file_path, rule_name)
+
+	return Array.isArray(entry) ? entry[1] : undefined
+}
+
+async function resolved_max_lines_per_function(file_path: string): Promise<unknown> {
+	return await resolve_options(file_path, MAX_LINES_PER_FUNCTION_RULE)
+}
+
+describe('create_base_config — the test relaxation skips the banned name (issue #1414)', () => {
+	it('leaves a *.spec.ts file on the default per-function limit', async () => {
+		await expect(resolved_max_lines_per_function(SPEC_PROBE_FILE)).resolves.toMatchObject({
+			max: DEFAULT_LINES_PER_FUNCTION,
+		})
+	})
+
+	it('still raises it for the canonical *.test.ts name', async () => {
+		await expect(resolved_max_lines_per_function('src/lib/probe.test.ts')).resolves.toMatchObject({
+			max: TEST_LINES_PER_FUNCTION,
+		})
 	})
 })
