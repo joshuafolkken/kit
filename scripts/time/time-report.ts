@@ -1,3 +1,4 @@
+import { time_bundles, type BundleTotals } from './time-bundles'
 import { time_checks, type CheckTotal } from './time-checks'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
@@ -33,8 +34,9 @@ const COST_LABEL = 'cost per round trip'
 // The unit the density and its floor are both quoted in, written once so the row and the warning
 // beneath it cannot come to name it differently.
 const PER_ROUND_TRIP = 'calls per round trip'
-// What the trips row says instead of a density when there were no round trips to divide by.
-const NO_CALLS = 'no tool call to divide'
+// What the trips row says instead of a density when there were no round trips to divide by. Read from
+// `time-format.ts` since joshuafolkken/kit#1344, so the bundling block withholds in the same words.
+const { NO_CALLS } = time_format
 const NO_DENSITY = 0
 // The one sentence the threshold exists to produce. It names what is not happening rather than the
 // number, because the number is already in the row above it.
@@ -103,6 +105,11 @@ interface TimeReport {
 	// trip to divide by — the withheld answer the counts themselves give, never a measured zero.
 	ms_per_round_trip: number
 	model_ms_per_round_trip: number
+	// How many of those round trips a run need not have made (joshuafolkken/kit#1344). The counts above
+	// say how often the run went round and what one trip was worth; only this says how much of it was
+	// avoidable, which is what a mechanism to prevent it would be sized against. Built by
+	// `time-bundles.ts`, which also renders the block — the shape `time-failures.ts` already uses.
+	bundles: BundleTotals
 	categories: CategoryTotals
 	// Whether the GitHub half was read at all. A session report has no pull request, so printing a
 	// `CI wait 0.0 min` row there would assert a measurement nobody made.
@@ -254,6 +261,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		elapsed_ms,
 		...counts,
 		...per_round_trip_costs(spans, categories.tool_ms, counts.round_trip_count),
+		bundles: time_bundles.build_bundles(spans),
 		categories,
 		has_ci_data,
 		notes: [...input.notes],
@@ -435,6 +443,7 @@ function format_report(report: TimeReport): string {
 		...phase_lines(report),
 		...time_segments.segment_lines(report.segments),
 		...round_trip_lines(report),
+		...time_bundles.bundle_lines(report.bundles, report),
 		...time_failures.failure_lines(
 			report.failures,
 			report.tool_call_count,

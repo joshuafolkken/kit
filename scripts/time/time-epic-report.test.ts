@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { time_batch, type RunTiming } from './time-batch'
+import { time_bundles } from './time-bundles'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_failures } from './time-failures'
@@ -72,6 +73,7 @@ function report_of(input: ChildInput): TimeReport {
 		by_invocation: [],
 		by_check: [],
 
+		bundles: { ...time_bundles.NO_BUNDLES },
 		failures: { ...time_failures.NO_FAILURES },
 	}
 }

@@ -96,6 +96,15 @@ Read from the JSON, in this order:
   called nothing are all outside it, so the product can be ranked beside the `wait` and `ci` rows
   without counting the same minutes twice. It is withheld rather than zeroed where there was no round
   trip to divide by
+- **how much of the round-trip count was avoidable** — `bundles`, and `recoverable_round_trips` inside
+  it ([#1344](https://github.com/joshuafolkken/kit/issues/1344)). The density says calls went out one
+  per turn; only this says how many of them **could have gone out together**, read from the run rather
+  than assumed from the floor. **Rank a batching proposal on this, never on the floor arithmetic**:
+  on the run this was built from, bundling every call to 1.50 implied 33 round trips and the measured
+  figure was 25. Multiply it by `model_ms_per_round_trip`, which is what the block's third row already
+  prints. `is_measured: false` withholds it on the same criterion the shares are withheld on, and
+  `recoverable_round_trips: 0` on a measured run is a real answer — a run that batched everything
+  had nothing to recover, which is not the same as a run nobody could read.
 - **the per-tool and per-`josh <cmd>` totals** — where a single command is the cost. **Rank a tool by
   its round trips as well as its duration**: a tool called thirty times one call per turn costs thirty
   round trips at the price above, which is routinely larger than the seconds the calls themselves ran

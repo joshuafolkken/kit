@@ -1,4 +1,5 @@
 import { expect } from 'vitest'
+import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
@@ -57,6 +58,7 @@ type Breakdown = Pick<
 	| 'segments'
 	| 'by_invocation'
 	| 'by_check'
+	| 'bundles'
 	| 'failures'
 >
 
@@ -71,6 +73,7 @@ function empty_breakdown(): Breakdown {
 		by_josh_command: [],
 		by_invocation: [],
 		by_check: [],
+		bundles: { ...time_bundles.NO_BUNDLES },
 		failures: { ...time_failures.NO_FAILURES },
 	}
 }
