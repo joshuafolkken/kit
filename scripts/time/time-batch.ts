@@ -4,6 +4,7 @@ import { time_corpus } from './time-corpus'
 import type { GhReader, PullSearch } from './time-github'
 import { time_pull_index } from './time-pull-index'
 import { time_report, type TimeReport } from './time-report'
+import { time_rework } from './time-rework'
 import { time_run, type RunSources } from './time-run'
 import { time_spans } from './time-spans'
 
@@ -129,6 +130,7 @@ function failed_report(issue_number: number, error: unknown): TimeReport {
 		started_ms: 0,
 		ended_ms: 0,
 		ci: time_ci.NO_CI,
+		diff: time_rework.NO_DIFF,
 		notes: [`issue #${String(issue_number)} could not be measured: ${reason}`],
 		by_check: [],
 	})

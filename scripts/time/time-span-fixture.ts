@@ -57,6 +57,13 @@ function outcome_span(
 	}
 }
 
-const time_span_fixture = { MINUTE_MS, span, outcome_span }
+// One file edit, which is what the diff reconciliation reads (joshuafolkken/kit#1387). The path rides
+// on `targets`, exactly as `time-bundle-call.ts` writes it at parse time — a case about an edit that
+// never landed cannot be expressed by the builders above, neither of which carries a target.
+function edit_span(label: string, target: string): Span {
+	return { ...span(time_spans.TOOL_CATEGORY, DEFAULT_MINUTES, label), targets: [target] }
+}
+
+const time_span_fixture = { MINUTE_MS, span, outcome_span, edit_span }
 
 export { time_span_fixture }

@@ -7,6 +7,7 @@ import { time_bundles } from './time-bundles'
 import { time_failures } from './time-failures'
 import { time_gaps } from './time-gaps'
 import type { TimeReport } from './time-report'
+import { time_rework } from './time-rework'
 import { time_tool_turns } from './time-tool-turns'
 
 // What the `josh time` CLI suites read (joshuafolkken/kit#1312).
@@ -111,6 +112,7 @@ const RUN_REPORT: TimeReport = {
 	by_check: [],
 	gaps: { ...time_gaps.NO_GAPS },
 	bundles: { ...time_bundles.NO_BUNDLES },
+	rework: { ...time_rework.NO_REWORK },
 	failures: { ...time_failures.NO_FAILURES },
 }
 
