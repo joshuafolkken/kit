@@ -22,6 +22,9 @@ import { z } from 'zod'
 // verdict, and that verdict is read first — the bare icon is only consulted where there is none. See
 // `verdict_answer` below and `josh-verdict.ts`.
 //
+// **Bounded on the other side by joshuafolkken/kit#1379**: that verdict silences the run it summarizes
+// and not everything printed before it, which begins at the run's first step header. See `scan_line`.
+//
 // **The outcome is only ever promoted, never lowered.** A call the harness already marked failed
 // stays failed; this answers the two cases the harness got wrong — `ok`, which is the piped gate, and
 // `unknown`, which is a tool that reports no outcome at all.
@@ -99,6 +102,13 @@ function is_failure_line(line: string): boolean {
 // body on the strength of one verdict would silence exactly those, which is the promotion this module
 // exists to make going quiet without failing. A forwarded body is printed *before* the verdict that
 // summarizes it, so what follows the last one belongs to whatever ran next and is still read.
+//
+// **And it speaks only for the run in front of it, not for everything printed earlier**
+// (joshuafolkken/kit#1379). "Everything before the verdict" was one-sided: a call that runs a josh
+// command stating no verdict and *then* a green gate — `pnpm josh propagate; pnpm josh gate` — is
+// labelled by its first segment, and propagate's `✗ <repo>` rows were thrown away by a verdict printed
+// by the command after them. The run a verdict summarizes begins at that gate's first step header, so
+// the silenced region is bounded on both sides.
 function is_failed_verdict(line: string): boolean {
 	return josh_verdict.read_verdict(line) === josh_verdict.FAILED_VERDICT
 }
@@ -107,10 +117,83 @@ function is_passed_verdict(line: string): boolean {
 	return josh_verdict.read_verdict(line) === josh_verdict.PASSED_VERDICT
 }
 
-// `-1` where no verdict was printed, which makes the slice below the whole body — the fallback for a
-// command that states no verdict at all.
-function lines_after_last_pass(lines: ReadonlyArray<string>): ReadonlyArray<string> {
-	return lines.slice(lines.findLastIndex((line) => is_passed_verdict(line)) + 1)
+// What one pass over the body has established. The two failure buckets are kept apart because a
+// passed verdict answers them differently: it discards what the gate forwarded and keeps what was
+// printed before the gate started.
+interface FailureScan {
+	did_find: boolean
+	has_failure_before_region: boolean
+	has_failure_in_region: boolean
+	is_region_open: boolean
+}
+
+function new_scan(): FailureScan {
+	return {
+		did_find: false,
+		has_failure_before_region: false,
+		has_failure_in_region: false,
+		is_region_open: false,
+	}
+}
+
+// **The reading between the two is the whole fix, and the guard on it is the whole of its safety.**
+// A failure mark printed before the region opened is confirmed here, because the gate had not started
+// yet and the gate's opening line is printed before any body it could forward. One printed inside the
+// region is discarded, which is what joshuafolkken/kit#1374 closed.
+//
+// **No opening line seen means no region, and then nothing is confirmed** — the pre-#1379 behavior
+// exactly. That is the case a `2>&1 | tail -40` produces when the head of the gate's output falls off
+// the top of the window, and reading the surviving body lines there would put #1374's false positive
+// straight back. So the fix is bounded by what it can actually see, and where it cannot see, the
+// figure stays the floor it already was.
+function close_region(scan: FailureScan): void {
+	scan.did_find ||= scan.is_region_open && scan.has_failure_before_region
+	scan.has_failure_before_region = false
+	scan.has_failure_in_region = false
+	scan.is_region_open = false
+}
+
+function note_failure(scan: FailureScan): void {
+	if (scan.is_region_open) {
+		scan.has_failure_in_region = true
+
+		return
+	}
+
+	scan.has_failure_before_region = true
+}
+
+// A gate step line opening with the failure icon is read as the gate's own failure rather than as
+// anything about the region: it is the gate's report about one check, and the run it belongs to states
+// a failed verdict of its own.
+function scan_line(scan: FailureScan, line: string): void {
+	if (is_passed_verdict(line)) {
+		close_region(scan)
+
+		return
+	}
+
+	if (is_failure_line(line)) {
+		note_failure(scan)
+
+		return
+	}
+
+	if (josh_verdict.is_gate_opening(line)) scan.is_region_open = true
+}
+
+function scan_body(lines: ReadonlyArray<string>): FailureScan {
+	const scan = new_scan()
+
+	for (const line of lines) scan_line(scan, line)
+
+	return scan
+}
+
+// Nothing closed the last segment, so both buckets count — a body truncated past its verdict, and a
+// command that states no verdict at all, are read exactly as they were before.
+function did_scan_find(scan: FailureScan): boolean {
+	return scan.did_find || scan.has_failure_before_region || scan.has_failure_in_region
 }
 
 // **Answered while the body is in hand, and reduced to one bit.** `time-spans.ts` parses a whole
@@ -127,7 +210,7 @@ function has_failure_line(content: unknown): boolean {
 
 	if (lines.some((line) => is_failed_verdict(line))) return true
 
-	return lines_after_last_pass(lines).some((line) => is_failure_line(line))
+	return did_scan_find(scan_body(lines))
 }
 
 // **The josh guard is the whole of what keeps this from being a guess.** Any tool's output may
