@@ -61,7 +61,10 @@ describe('the opening line a gate prints before its checks', () => {
 			CORES,
 		)
 
-		expect(line).toBe('plan: 4 of 4 checks at once, test:unit at 7 workers (10 cores)')
+		// The round trip is the assertion. The line's exact wording is `gate-plan.test.ts`'s to pin —
+		// copying it here would give the format two owners and fail this test the day a fifth check is
+		// added, for a reason that has nothing to do with the verdict.
+		expect(line.startsWith(josh_verdict.GATE_OPENING_PREFIX)).toBe(true)
 		expect(josh_verdict.is_gate_opening(line)).toBe(true)
 	})
 

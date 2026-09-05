@@ -23,7 +23,9 @@ import { z } from 'zod'
 // `verdict_answer` below and `josh-verdict.ts`.
 //
 // **Bounded on the other side by joshuafolkken/kit#1379**: that verdict silences the run it summarizes
-// and not everything printed before it, which begins at the run's first step header. See `scan_line`.
+// and not everything printed before it. The run begins at the gate's opening `plan:` line — printed
+// once, before any check body exists — and never at a step header, which repeats per check. See
+// `scan_line` here and `is_gate_opening` in `josh-verdict.ts`.
 //
 // **The outcome is only ever promoted, never lowered.** A call the harness already marked failed
 // stays failed; this answers the two cases the harness got wrong — `ok`, which is the piped gate, and
@@ -107,8 +109,8 @@ function is_failure_line(line: string): boolean {
 // (joshuafolkken/kit#1379). "Everything before the verdict" was one-sided: a call that runs a josh
 // command stating no verdict and *then* a green gate — `pnpm josh propagate; pnpm josh gate` — is
 // labelled by its first segment, and propagate's `✗ <repo>` rows were thrown away by a verdict printed
-// by the command after them. The run a verdict summarizes begins at that gate's first step header, so
-// the silenced region is bounded on both sides.
+// by the command after them. The run a verdict summarizes begins at that gate's opening `plan:` line,
+// so the silenced region is bounded on both sides.
 function is_failed_verdict(line: string): boolean {
 	return josh_verdict.read_verdict(line) === josh_verdict.FAILED_VERDICT
 }
