@@ -40,6 +40,37 @@ What one invocation does, in order:
   not a missing Telegram — is what a failed merge looks like from GitHub.
 - **Closes the epics the Issue completes**, on a merged run only.
 
+### It prints how long each of those stages took
+
+Since joshuafolkken/kit#1349 the command closes with one row per stage and a total, so "where did
+`followup` spend its time" is read rather than guessed. The shape, with illustrative durations:
+
+```
+followup stage: closes-check        0.7 s
+followup stage: context             2.1 s
+followup stage: checks-wait         28.4 s
+followup stage: coderabbit-comments 1.3 s
+followup stage: ai-review-comments  2.0 s
+followup stage: telegram            1.1 s
+followup stage: merge               2.6 s
+followup stage: completion-comment  1.4 s
+followup stage: epic-close          1.2 s
+followup stages total:              40.8 s
+```
+
+- **The block is printed on a failed run too**, up to and including the stage that threw, which is
+  named `interrupted`. A `followup` that exits non-zero on an AI-review blocker or a red check is the
+  invocation whose wait was longest, and one that printed nothing would leave the measurement blind to
+  exactly those. **A short block there is the run stopping early, not the printer breaking**: the
+  stages after the failure never ran, so they have no duration to report.
+- **The `merge` row appears only on a run that merged**, so a `--no-merge` block is a row shorter.
+- **The total is the sum of the stages, not the command's whole wall clock.** What sits outside it is
+  the tail the workflow script prints afterwards — the next-issue listing and the version line — so a
+  `pnpm josh time` reading of the same span is a second or two longer, and that gap is the tail.
+- **What was measured is on joshuafolkken/kit#1349**, and cutting any of it is deliberately not this
+  block's business: the required-check wait and the AI-review scan are the merge gate, and narrowing
+  either to make a number smaller is the workaround `CLAUDE.md` prohibits.
+
 A `failure` Telegram is sent **by hand, exactly once**, and only when the agent has finally given up
 recovering — never once per retry:
 
