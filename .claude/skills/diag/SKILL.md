@@ -100,7 +100,7 @@ Read from the JSON, in this order:
   ([#1385](https://github.com/joshuafolkken/kit/issues/1385)). They sum to `round_trip_count`, and a
   density of 1.07 over 101 round trips can be 7 turns of two calls against 94 single-call ones, or 3
   turns issuing three and four calls against 98 — the same number over two differently-shaped runs,
-  and the second has a third as much batching to build on. Quote the pair beside the density rather
+  and the second has less than half as much batching to build on. Quote the pair beside the density rather
   than the density alone.
   Withheld with the block they are printed in, so `span_count: 0` reports them unmeasured too
 - **the price of one round trip** — `ms_per_round_trip`, with `model_ms_per_round_trip` beside it

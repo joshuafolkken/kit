@@ -77,8 +77,8 @@ interface RowTotal {
 // `single_call_turn_count` say how the round trips below divided between the turns that issued several
 // calls and the turns that issued one. The density says a run is not batching; only these say how much
 // of the run that verdict rests on — over 101 round trips, 7 turns of two calls against 94 single-call
-// ones and 3 turns issuing three and four calls against 98 both read 1.07, and the second run has a
-// third as much batching to build on. **Withheld with the block they are printed in**
+// ones and 3 turns issuing three and four calls against 98 both read 1.07, and the second run has
+// less than half as much batching to build on. **Withheld with the block they are printed in**
 // rather than on a test of their own, so `span_count: 0` reports them unmeasured exactly as it reports
 // the counts they sit beside.
 interface TimeReport extends TurnSplit {
