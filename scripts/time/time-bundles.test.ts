@@ -106,6 +106,20 @@ describe('time_bundles.bundle_lines', () => {
 		expect(text).toContain('0.3 min')
 	})
 
+	// A transcript that was read and called no tool has no share and no price. Printed as measured, the
+	// block would say `at 0.0 s model time per round trip` beside a round-trip price row already saying
+	// there was nothing to divide by — one report disagreeing with itself.
+	it('says there was nothing to divide where the run made no round trip', () => {
+		const totals = time_bundles.build_bundles([MODEL])
+		const text = time_bundles
+			.bundle_lines(totals, { round_trip_count: 0, model_ms_per_round_trip: 0 })
+			.join('\n')
+
+		expect(totals.is_measured).toBe(true)
+		expect(text).toContain('no tool call to divide')
+		expect(text).not.toContain('per round trip')
+	})
+
 	// Zero here would read as a run that batched everything, which is the one answer an unread
 	// transcript cannot support.
 	it('withholds every row where no span was read', () => {

@@ -29,6 +29,7 @@ import { time_spans, type Span } from './time-spans'
 // So it is an estimate with its error stated, not a floor and not a ceiling — and it is an estimate
 // of what a run did rather than of what a target density implies.
 
+const { unmeasured_row } = time_format
 const HEADING = 'Bundling:'
 const SEQUENCE_LABEL = 'bundleable sequences'
 const RECOVERABLE_LABEL = 'recoverable round trips'
@@ -231,17 +232,28 @@ function measured_lines(totals: BundleTotals, price: TripPrice): Array<string> {
 	]
 }
 
+const LABELS = [SEQUENCE_LABEL, RECOVERABLE_LABEL, SAVING_LABEL]
+
+// **A transcript that was read but called no tool has nothing to divide by, and says so** — the same
+// answer, in the same words, the round-trip block's own price row gives. Without this the block
+// printed `at 0.0 s model time per round trip` beside a price row reading `no tool call to divide`,
+// which is one report disagreeing with itself about what was measured.
+function no_divisor_lines(): Array<string> {
+	return LABELS.map((label) => time_format.format_columns(label, '', time_format.NO_CALLS))
+}
+
 // **A run whose transcript was not read says so rather than reporting nothing to recover.** Zero here
 // would read as a run that batched everything, which is the one answer an unread transcript cannot
 // support — the same shape, and the same word, the category shares and the round-trip block use.
+//
+// **The two withheld cases are different answers.** One says nothing was read; the other says what was
+// read made no round trip, so there is no share and no price to quote — and the counts beside them
+// would be a measured zero either way, which is what neither is.
 function bundle_lines(totals: BundleTotals, price: TripPrice): Array<string> {
 	const heading = ['', HEADING]
 
-	if (!totals.is_measured) {
-		const labels = [SEQUENCE_LABEL, RECOVERABLE_LABEL, SAVING_LABEL]
-
-		return [...heading, ...labels.map((label) => time_format.unmeasured_row(label))]
-	}
+	if (!totals.is_measured) return [...heading, ...LABELS.map((label) => unmeasured_row(label))]
+	if (price.round_trip_count === NONE) return [...heading, ...no_divisor_lines()]
 
 	return [...heading, ...measured_lines(totals, price)]
 }

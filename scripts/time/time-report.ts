@@ -34,8 +34,9 @@ const COST_LABEL = 'cost per round trip'
 // The unit the density and its floor are both quoted in, written once so the row and the warning
 // beneath it cannot come to name it differently.
 const PER_ROUND_TRIP = 'calls per round trip'
-// What the trips row says instead of a density when there were no round trips to divide by.
-const NO_CALLS = 'no tool call to divide'
+// What the trips row says instead of a density when there were no round trips to divide by. Read from
+// `time-format.ts` since joshuafolkken/kit#1344, so the bundling block withholds in the same words.
+const { NO_CALLS } = time_format
 const NO_DENSITY = 0
 // The one sentence the threshold exists to produce. It names what is not happening rather than the
 // number, because the number is already in the row above it.

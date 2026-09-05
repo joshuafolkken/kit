@@ -62,6 +62,12 @@ describe('time_bundle_call.bash_facts — which commands count', () => {
 		expect(facts.targets).toEqual(['repos/joshuafolkken/kit/issues/1344'])
 	})
 
+	// An in-place edit is what `Edit` does, and `Edit` is bundleable — rejecting the shell spelling of
+	// the same thing would exclude a call the tool form counts.
+	it('reads an in-place edit as bundleable, as it does the tool that edits', () => {
+		expect(time_bundle_call.bash_facts(`sed -i '' 's/a/b/' ${READ_PATH}`).is_bundleable).toBe(true)
+	})
+
 	it('refuses a gh call carrying a write flag', () => {
 		const command = 'gh api repos/joshuafolkken/kit/issues -f title=x'
 

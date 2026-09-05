@@ -25,6 +25,10 @@ const MINUTES_WIDTH = 9
 // table's `not detected` because the two ask different questions: a phase is about a marker, this is
 // about whether anything was read to measure.
 const NOT_MEASURED = 'not measured'
+// What a row says instead of a rate when there was no round trip to divide by. It sits here rather
+// than in `time-report.ts` because two blocks print it — the round-trip price and the bundling block —
+// and `time-bundles.ts` cannot import `time-report.ts`, which imports it (joshuafolkken/kit#1344).
+const NO_CALLS = 'no tool call to divide'
 // How many rows of a table any of these reports prints. Capped, because a long run touches thirty-odd
 // distinct leading commands and a table that long is read by nobody. `--json` carries every row the
 // report holds, so the display cap costs a caller nothing.
@@ -93,6 +97,7 @@ function note_lines(notes: ReadonlyArray<string>): Array<string> {
 
 const time_format = {
 	MAX_ROWS,
+	NO_CALLS,
 	SUFFIX_SEPARATOR,
 	NOT_MEASURED,
 	overflow_line,

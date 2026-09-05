@@ -61,6 +61,10 @@ const READ_COMMANDS = new Set([
 	'pwd',
 	'realpath',
 	'rg',
+	// **`sed -i` is deliberately not excluded.** An in-place edit is what `Edit` does, and `Edit` is on
+	// the allow-list above — a turn may issue several of them, so rejecting the shell spelling of the
+	// same thing would exclude a call the tool form counts. Two in-place edits of the *same* file are
+	// caught by the target test instead, which is where that ordering actually lives.
 	'sed',
 	'sort',
 	'stat',
@@ -175,8 +179,9 @@ function words_of(command: string): Array<string> {
 }
 
 // **A word is compared verbatim, never lower-cased or stripped of its flag dash.** `-X` is a flag and
-// `-x` is a different one; folding case would make `grep -F` — a fixed-string search — read as a `gh`
-// field write.
+// `-x` is a different one, and folding case would put both in one bucket. It does **not** keep a read
+// out of the set: `-f` and `-F` are in it for `gh`, so `grep -F 'literal' path` is rejected too — a
+// call under-counted, which is the direction this module leans everywhere.
 function has_mutation(command: string): boolean {
 	return words_of(command).some((word) => MUTATION_WORDS.has(word))
 }
