@@ -29,6 +29,8 @@ function span(start_minute: number, minutes: number, extra: Partial<Span> = {}):
 		label: '',
 		josh_command: '',
 		marker: time_markers.NO_MARKER,
+		is_bundleable: false,
+		targets: [],
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,

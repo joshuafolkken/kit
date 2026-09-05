@@ -189,6 +189,8 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		label,
 		josh_command: '',
 		marker: time_markers.NO_MARKER,
+		is_bundleable: false,
+		targets: [],
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,
