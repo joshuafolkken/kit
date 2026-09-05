@@ -10,6 +10,7 @@ import unicorn from 'eslint-plugin-unicorn'
 import { defineConfig } from 'eslint/config'
 import globals from 'globals'
 import ts from 'typescript-eslint'
+import { config_fingerprint } from './config-fingerprint.js'
 import { code_quality_rules } from './rules/code-quality.js'
 import { formatting_rules } from './rules/formatting.js'
 import { import_rules } from './rules/import.js'
@@ -97,6 +98,14 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			// them. It is the spelling git's own exclude uses, for the same reason.
 			ignores: ['node_modules/**', '**/.claude/worktrees/**', '*.config.{ts,js,cjs,mjs}'],
 		},
+		// joshuafolkken/kit#1347: a content fingerprint of this directory's rule modules, carried in
+		// `settings` so that ESLint's own cache key changes when one of them is edited. Serializing the
+		// config drops every `create` function, so without this an edit to a rule left every cached
+		// entry valid and the gate reported the pre-edit verdict for every unchanged file. It sits in
+		// the shared config rather than beside either cache file because both the gate's cache and the
+		// edit hook's are invalidated by the same value — `config-fingerprint.js` carries the reasoning
+		// and what the fingerprint deliberately does not cover.
+		config_fingerprint.create_config_fingerprint_block(),
 		js.configs.recommended,
 		...ts.configs.strictTypeChecked,
 		...ts.configs.stylisticTypeChecked,

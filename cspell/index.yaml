@@ -23,8 +23,12 @@ ignorePaths:
   # joshuafolkken/kit#1332: the edit hook's own eslint cache, written wherever the hook runs. It is
   # separate from `.eslintcache` above so that a hook run cannot delete the gate's copy, or overwrite
   # it while the gate is linting the whole tree beside the review.
+  # joshuafolkken/kit#1347: `josh lint:related` has its own for the same reason — an implementation
+  # loop calls it while the gate lints the whole tree, and two eslint runs on one cache file discard
+  # each other's entries.
   - '**/.eslintcache'
   - '**/.eslintcache.edit'
+  - '**/.eslintcache.related'
   - '**/.tsbuildinfo'
   - '**/.cspellcache'
   - '**/.gitignore'

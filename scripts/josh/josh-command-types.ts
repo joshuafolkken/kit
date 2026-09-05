@@ -36,11 +36,18 @@ const PE = ['pnpm', 'exec'] as const
 // second run reads only what changed. eslint had one from the start; the type check and the spell
 // check rescanned the whole tree every time, which cost 10.5s of CPU against 2.8s cached.
 //
-// Neither cache needs an invalidation rule of its own. `tsc` records the compiler options inside
-// the build-info file and re-checks everything when they differ, and `cspell` records a content
-// hash of every config and dictionary file it loaded as that entry's dependency — so editing
+// Neither of those two needs an invalidation rule of its own. `tsc` records the compiler options
+// inside the build-info file and re-checks everything when they differ, and `cspell` records a
+// content hash of every config and dictionary file it loaded as that entry's dependency — so editing
 // `tsconfig.json` or `cspell.config.yaml` invalidates what it should. CI restores only the eslint
 // cache (`.github/workflows/ci.yml` → "Setup ESLint cache"); the other two start every run cold.
+//
+// **eslint's does need one, and it is not here** (joshuafolkken/kit#1347). ESLint hashes the
+// *serialized* config, which drops every rule's `create`, so editing `eslint/rules/*.js` left every
+// cached entry valid on every cache file below. The fix is a content fingerprint of the rule modules
+// carried in the shared config's `settings` — `eslint/config-fingerprint.js` — because one value
+// there invalidates the gate's cache, the scoped one and the edit hook's at once, while a rule
+// written per cache file would have to be repeated for each and would go stale one file at a time.
 //
 // Every location is passed explicitly rather than left to the tool's default, eslint's included:
 // the ignore rules have to name the same paths, and a constant that merely copies a default is
@@ -70,30 +77,60 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = [
 // true, and a single-file run against the gate's full cache was measured byte-identical, so a shared
 // file would keep the entries that run never visited.
 const ESLINT_EDIT_CACHE_FILE = '.eslintcache.edit'
+// joshuafolkken/kit#1347: the same reasoning, reached a second time. `josh lint:related` is what an
+// implementation loop calls between edits, and `josh gate` lints the whole tree beside the review —
+// so those two run at the same time as readily as the hook and the gate do, and they shared one file
+// until this constant existed. Whichever of the pair wrote last replaced the file with "the copy I
+// loaded at start-up plus what I visited", so a narrowed run finishing during a whole-tree run rolled
+// the cache back to its pre-gate state, and a whole-tree run finishing second discarded the narrowed
+// one's entries.
+//
+// **The warming this gives up is worth less than the entries it stops losing.** The comment this
+// replaced argued the shared file let a narrowed run warm the gate's cache, which is true only while
+// the two never overlap; a file of its own is warm from its own second call onwards, and the gate's
+// stays exactly as the gate left it.
+//
+// **The lint's target scope is untouched.** This is where a cache is written, not what is read:
+// `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
+// whole tree before any commit.
+const ESLINT_RELATED_CACHE_FILE = '.eslintcache.related'
 // What the ignore rules are asserted against: every cache file this package writes, wherever it is
-// written from. The gate's three plus the edit hook's — a cache file that is not ignored is
-// committed, or spell-checked, which is a red gate with nothing misspelled in the tree.
-const IGNORED_CACHE_FILES: ReadonlyArray<string> = [...GATE_CACHE_FILES, ESLINT_EDIT_CACHE_FILE]
+// written from. The gate's three, the edit hook's, and the scoped lint's — a cache file that is not
+// ignored is committed, or spell-checked, which is a red gate with nothing misspelled in the tree.
+const IGNORED_CACHE_FILES: ReadonlyArray<string> = [
+	...GATE_CACHE_FILES,
+	ESLINT_EDIT_CACHE_FILE,
+	ESLINT_RELATED_CACHE_FILE,
+]
 
 // `--cache --cache-strategy content` is one convention rather than two coincidences: cspell adopted
 // eslint's spelling for its own cache flags, so the pair is single-sourced here.
 const CONTENT_CACHE_FLAGS = ['--cache', '--cache-strategy', 'content'] as const
 const CACHE_LOCATION_FLAG = '--cache-location'
-const ESLINT_CACHE_FLAGS = [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, ESLINT_CACHE_FILE] as const
-const ESLINT_EDIT_CACHE_FLAGS = [
-	...CONTENT_CACHE_FLAGS,
-	CACHE_LOCATION_FLAG,
-	ESLINT_EDIT_CACHE_FILE,
-] as const
+
+// Four locations are written with these same four flags — the gate's eslint cache, the scoped lint's,
+// the edit hook's and the spell check's — so the sequence is built here once. Spelled out per
+// location, a fix to the order would have to be made four times and each copy fails silently: a flag
+// and its value are one unit, and a wrong order makes the tool read `--cache-strategy` as the file
+// name rather than erroring.
+function content_cache_flags(cache_file: string): ReadonlyArray<string> {
+	return [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, cache_file]
+}
+
+const ESLINT_CACHE_FLAGS = content_cache_flags(ESLINT_CACHE_FILE)
+const ESLINT_EDIT_CACHE_FLAGS = content_cache_flags(ESLINT_EDIT_CACHE_FILE)
+const ESLINT_RELATED_CACHE_FLAGS = content_cache_flags(ESLINT_RELATED_CACHE_FILE)
 const TS_CACHE_FLAGS = ['--incremental', '--tsBuildInfoFile', TS_BUILD_INFO_FILE] as const
-const CSPELL_CACHE_FLAGS = [...CONTENT_CACHE_FLAGS, CACHE_LOCATION_FLAG, CSPELL_CACHE_FILE] as const
+const CSPELL_CACHE_FLAGS = content_cache_flags(CSPELL_CACHE_FILE)
 
 export type { CommandCategory, CommandEntry }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
 // them per target (joshuafolkken/kit#1314): the lint step writes only the eslint one, so a target
 // that cleared the list would report a cold type check as the lint's own cost. The edit hook's
-// `.eslintcache.edit` is deliberately not exported here — nothing but the hook may touch it, which
-// is the whole of joshuafolkken/kit#1332.
+// `.eslintcache.edit` and the scoped lint's `.eslintcache.related` are deliberately not exported
+// here — nothing but their own command may touch either, which is the whole of joshuafolkken/kit#1332
+// and joshuafolkken/kit#1347. Their *flags* are exported, so the one command that writes each file
+// names it from here rather than spelling it out again.
 export {
 	CSPELL_CACHE_FILE,
 	CSPELL_CACHE_FLAGS,
@@ -101,6 +138,7 @@ export {
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,
+	ESLINT_RELATED_CACHE_FLAGS,
 	GATE_CACHE_FILES,
 	GATE_COMMAND,
 	IGNORED_CACHE_FILES,
