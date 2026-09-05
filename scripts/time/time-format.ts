@@ -53,6 +53,17 @@ const MAX_ROWS = 15
 // note, a distribution's range from its sample count. Written once so two renderers of the same
 // report cannot come to punctuate their suffixes differently (joshuafolkken/kit#1312).
 const SUFFIX_SEPARATOR = ' · '
+// The `HH:MM:SS` slice of an ISO instant, and what joins two of them into a window. UTC rather than
+// local time, because the report's own `started_at` / `ended_at` already are — a table in one zone
+// beside a header in another is a report that cannot be read against itself.
+//
+// **They moved here from `time-segments.ts` when the model-gap block became a second renderer of a
+// clock window** (joshuafolkken/kit#1386). A private copy beside the second block is the clone
+// `CLAUDE.md` prohibits, in the one place a drift would make two tables of the same report disagree
+// about which hour a stretch sat in.
+const CLOCK_START = 11
+const CLOCK_END = 19
+const WINDOW_ARROW = ' → '
 
 // **The parenthetical says "this report" rather than "them all"** (joshuafolkken/kit#1301): since
 // `--top` can cut the record itself before either rendering, a promise that `--json` carries every row
@@ -100,6 +111,14 @@ function unmeasured_row(label: string): string {
 	return format_columns(label, '', NOT_MEASURED)
 }
 
+function format_clock(timestamp_ms: number): string {
+	return new Date(timestamp_ms).toISOString().slice(CLOCK_START, CLOCK_END)
+}
+
+function format_window(started_ms: number, ended_ms: number): string {
+	return `${format_clock(started_ms)}${WINDOW_ARROW}${format_clock(ended_ms)}`
+}
+
 // The indent a report's notes sit under, beneath its heading. Written once because three renderers
 // print them — the run scope, the epic scope and the distribution — and a fourth copy is how two
 // tables of one command would come to indent the same sentence differently (joshuafolkken/kit#1312).
@@ -122,6 +141,9 @@ const time_format = {
 	format_share,
 	format_columns,
 	format_row,
+	// `format_clock` stays private: `format_window` is its only caller, and a namespace that offers
+	// both invites a second renderer to join the two with its own arrow.
+	format_window,
 	unmeasured_row,
 	note_lines,
 }

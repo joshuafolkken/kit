@@ -158,6 +158,11 @@ function spread(sample_count: number, min: number, median: number, max: number):
 		sample_count,
 		min_ms: min * MINUTE_MS,
 		median_ms: median * MINUTE_MS,
+		// The p90 of a sample this small *is* the largest reading: by nearest rank, `ceil(0.9n) - 1` is
+		// the last index for every `n` up to **nine**, and every case here reads two to five runs
+		// (joshuafolkken/kit#1386). Stated rather than passed in, so a case that means something else —
+		// a ten-run fixture, where the p90 is the ninth reading rather than the tenth — has to say so.
+		p90_ms: max * MINUTE_MS,
 		max_ms: max * MINUTE_MS,
 	}
 }

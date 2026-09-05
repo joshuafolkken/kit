@@ -4,6 +4,7 @@ import { time_bundles } from './time-bundles'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_failures } from './time-failures'
+import { time_gaps } from './time-gaps'
 import type { TimeReport } from './time-report'
 import { time_run } from './time-run'
 import { time_tool_turns } from './time-tool-turns'
@@ -75,6 +76,7 @@ function report_of(input: ChildInput): TimeReport {
 		by_invocation: [],
 		by_check: [],
 
+		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		failures: { ...time_failures.NO_FAILURES },
 	}

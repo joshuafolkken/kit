@@ -4,6 +4,7 @@ import type { CheckTotal } from './time-checks'
 import { time_cli } from './time-cli'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
+import { time_gaps } from './time-gaps'
 import type { InvocationTotal } from './time-invocations'
 import type { TimeReport, ToolTotal } from './time-report'
 import { time_row_cap } from './time-row-cap'
@@ -108,6 +109,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		by_invocation: invocation_rows(INVOCATION_ROWS),
 		by_check: check_rows(JOSH_ROWS),
 
+		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		failures: { ...time_failures.NO_FAILURES },
 	}
