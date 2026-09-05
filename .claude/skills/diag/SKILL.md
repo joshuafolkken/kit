@@ -90,6 +90,64 @@ Read from the JSON, in this order:
   measured zero. Never rank a phase you did not measure. `wait`, `wait-outside` and `other` rest on
   no marker, so they are `false` only where no span was read — the same state the three transcript
   shares are withheld in.
+- **the two review rounds against each other** — `segments`, read as one pair rather than as two rows
+  ([#1412](https://github.com/joshuafolkken/kit/issues/1412)). The listing already carries both rounds
+  of a two-round run, and a report that prints them as two numbers converts nothing into a reading: on
+  run #1399 they read 260.1 s and 259.9 s and the report stopped there, while the run's `review` phase
+  was 496.1 s of 1,198.1 s — 41% of it.
+  **A pair is identified by a `pr` segment between the two `review` rows, and by nothing else.** Round
+  2 runs after `pnpm josh git -y` (`prompts/review.md` → "The pull request opens between the rounds, so
+  CI runs beside round 2"), so that row is the positive evidence that two rounds ran — the earlier
+  `review` row is round 1 and the later one round 2. **Its absence proves nothing, and there are two
+  ways to lose it.** `--top 5` keeps the *longest* five segments, and the `pr` row is short where both
+  review rows are long — on run #1399 it was 43.2 s, and the cap drops it while keeping both rounds; a
+  `josh git` under `MIN_SEGMENT_MS` is absorbed by the flicker rule instead of printed. So **re-read
+  `segments` without `--top` before deciding a `pr` row is missing**.
+  **Two `review` rows with no `pr` between them in an uncapped listing are ambiguous, and ambiguous is
+  the answer.** They are either two rounds whose commit was absorbed, or one round cut in two by any
+  intervening stretch over `MIN_SEGMENT_MS` — a `gate` call, or the `rework` a round's own fixes are
+  charged to. Report that the pair could not be identified rather than a ratio built on a guess; a
+  round is unambiguously one forked agent, so `pnpm josh time --session <session-id>/agent-<agent-id>`
+  is where that question is settled.
+  **Take the ratio round 2 ÷ round 1, and report it at 0.95 or above.**
+  `prompts/review.md` → "The second round is a verification pass, not a second full review" specifies
+  round 2 as a pass over the fix delta, so a round 2 that costs what round 1 cost is not the cheaper
+  pass that specification describes, and that is worth saying out loud.
+  **The threshold rests on a distribution, and that distribution is not quoted here.** This rule's own
+  reading is run #1399's — 259.9 / 260.1 = **1.00**, taken from `segments` and recorded on
+  joshuafolkken/kit#1305. Where 0.95 comes from is the record below: `prompts/review.md` → "The
+  re-derivation round 2 does is real, and it is not what round 2 costs" reports the round-2 ÷ round-1
+  ratio over every pair it measured, and **0.95 sits above that median and inside the group at the top
+  of it** — so it catches the tail without firing on an ordinary run, which a threshold set near the
+  median would do. **Read those figures there rather than from a copy here**: they move whenever the
+  phase is re-measured, and a copy in this file would go on quoting a retired number with nothing
+  failing.
+  **The ratio is read on this grain and on no other.** A segment's `duration_ms` sums its member spans,
+  the flickers it absorbed included, so it is a stretch of the run rather than either round's own cost
+  — on run #1399 the two rows total 520.0 s against a `review` phase of 496.1 s. The record's ratios
+  are span-level and can place the same run a little differently from this reading, which is one more
+  reason the row is a reading rather than a filing.
+  **Name no cause, and never read one run as the mechanism.** `segments` carries durations and nothing
+  whatever about what either round did, so "round 2 re-read the whole diff" and "the fix delta never
+  reached it" are inventions — on run #1399 both are false, and #1418 found round 2's first command was
+  a `git diff` over the fix delta alone. A single ratio near 1.00 is the tail of the distribution above
+  rather than evidence about the mechanism, which is what
+  `prompts/review.md` → "The re-derivation round 2 does is real, and it is not what round 2 costs"
+  records. So the row carries both durations, the ratio, that this run sits in that tail, and that the
+  cause is readable only from the forked review agents' own transcripts —
+  `pnpm josh time --session <session-id>/agent-<agent-id>`. **It is a reading, not a filing**: step 3
+  ranks `review` against the record those two sections hold, and this row does not lift that bar.
+  **A pair is exactly two `review` rows with a `pr` row between them, and five states are not one.**
+  **One `review` row is not a one-round run.** A clean round 1 does produce one — but so does a
+  two-round run whose `pr` group fell under `MIN_SEGMENT_MS` and was absorbed, since the review spans
+  either side then take the group's name back and the two rounds are emitted as a single row. A lone
+  row therefore says the pair could not be identified, never that one round ran. **More than two
+  `review` rows** is that same answer from the other side: at least one round was cut, and "the earlier
+  row is round 1" would divide a whole round by a fragment of one. `review` reading `not detected` in
+  the phase table — no round ran that this could be about. `span_count: 0` — no transcript was read, so
+  the listing is empty and withheld rather than zero. And a `segments` table the `--top` cap cut: the
+  review rows are normally among the longest five and survive it while the short `pr` row between them
+  does not, so **re-read without the flag before calling any of these states the run's shape**
 - **the round trips** — `tool_call_count` and `round_trip_count`, and the density between them
   (joshuafolkken/kit#1304). Once the verification commands were cut, this is what sets a run's floor:
   the tools themselves run for well under a minute while the turns they sit in cost ten times that.
