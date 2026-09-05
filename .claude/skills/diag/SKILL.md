@@ -186,14 +186,15 @@ Read from the JSON, in this order:
   `by_invocation.durations_ms`: the commit the fix pushed, and the gate that then ran beside its CI.
   **The second CI cycle is the `ci` phase minus `categories.ci_ms`, never the phase whole.** The phase
   is the sum of the two, and the category share is the part of the open→merge window *no* span covers
-  — unattended waiting, which no cycle was running for — so quoting the phase prices idle time as CI.
+  — time no transcript span was attributed to, which is not the same thing as the merge command
+  waiting on a cycle — so quoting the phase whole prices unattributed time as an extra cycle.
   The remainder is what the report already prints in words:
   `1.4 min of the merge command was waiting on CI`. **The single check the fix reached** has two
   readings and no third: the last entry of that check's `by_invocation` row where it ran more than
   once, and `single_checks.duration_ms` where the run issued exactly one single check all told —
   **a check called once has no `by_invocation` row**, which is this component's ordinary case rather
   than its exception. Where neither holds, **report the check as unattributed and the total as a lower
-  bound**; never estimate it. Run #1399, in that order — check 4.4 s, `josh git` 27.0 s, `josh gate`
+  bound**; never estimate it. Run #1399, in run order — check 4.4 s, `josh git` 27.0 s, `josh gate`
   17.4 s, CI 84.0 s — totals **132.8 s, 11.1% of a 1,198.1 s run**, the check 4.4 s of it against
   128.4 s for the other three.
   **The sum is a re-reading of rows already in the tables, never minutes to add to the run.** All four
