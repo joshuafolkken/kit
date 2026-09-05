@@ -1493,6 +1493,34 @@ The level goes to stdout and the reason to stderr, so `$(pnpm josh review:level)
 
 **Three things that look inert are not**: `.vscode/**`, `.gitattributes` and `.prettierignore` are all in `package.json`'s `files` and are written into every consumer project by `josh init` / `josh sync`, so a defect in one reaches a consumer. **Documentation is not inert either** — `CLAUDE.md`, `prompts/**`, `.claude/**` and `docs/**` stay at `medium`. The "Non-runtime updates" exception exempts them from _testing_, which asks whether an automated test could have caught the defect; this asks whether a human reading the diff is the only thing that can. Measured on [#963](https://github.com/joshuafolkken/kit/issues/963) and [#965](https://github.com/joshuafolkken/kit/issues/965), both documentation-only by that classification: a `medium` review found ten real defects in each — pointers into removed sections, citations naming the wrong file — in artifacts distributed to every consumer.
 
+### `josh review:round2`
+
+Say whether the second `/code-review` round is due, or may be skipped entirely ([#1433](https://github.com/joshuafolkken/kit/issues/1433)).
+
+```bash
+pnpm josh review:round2                     # → required ; alias: josh r2
+pnpm josh review:round2 --round-1-closed    # → required | skip
+pnpm josh review:round2 --json              # the verdict and the reason, machine-readable
+```
+
+The verdict goes to stdout and the reason to stderr, so `$(pnpm josh review:round2 --round-1-closed)` reads the verdict and a person still sees why. Run it once round 1's fixes are in and **before** `/code-review` is invoked a second time.
+
+**Every measure before this one narrowed round 2; this one asks whether it is due.** [#1219](https://github.com/joshuafolkken/kit/issues/1219) redefined its question, [#1241](https://github.com/joshuafolkken/kit/issues/1241) carried that question into the forked agent, and the wall clock did not move — because a round's span follows its **turn count** (`r = +0.80`) rather than the size of what it reads (`r = 0.05` for round 1 against churn, `r = -0.15` for round 2 against how much of round 1 it repeats). The saving is in not forking an agent at all, which is what a skip buys and a lighter round does not.
+
+| Answer     | When                                                                                                                       |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `skip`     | **Arm A** — the fix delta is empty: round 1's findings closed without an edit, so there is no unreviewed fix code          |
+| `skip`     | **Arm B** — every path in the fix delta is inert by [`josh review:level`](#josh-reviewlevel)'s classification              |
+| `required` | anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, and one non-inert path among inert ones |
+
+**`--round-1-closed` is the one input no command can read for itself**, so the caller states it: every round-1 High/Medium finding closed, by a fix in this working tree or as a verified false positive, and none was filed or deferred. It is a report of a fact round 1 already wrote down, not a judgement — and its absence is the safe answer, so a run that forgets it pays a round rather than skipping one. Every other uncertainty resolves the same way.
+
+The fix delta is the same comparison [`josh review:brief --round 2`](#josh-reviewbrief) makes — the same round-1 snapshot, the same digest comparison over the same reading of "changed" — so the two commands cannot disagree about what round 1 fixed. Each computes it when asked; what is shared is the record and the code, not one command's result.
+
+**Ask it before `josh bump minor`, never after.** The bump rewrites `package.json`, which is not inert, so a delta taken afterwards carries that write and answers `required` whatever round 1 did — the condition would then never fire in the flow it was built for.
+
+**A prompt fix and a test fix both answer `required`, deliberately.** The condition the issue arrived with exempted anything that is not a runtime code path; that is rejected on the measurement recorded under `josh review:level` — two documentation-only diffs, ten real defects found in each by a `medium` review, none of them covered by a test. A test file is the verification that guards a runtime path, and an assertion a fix weakened still passes. The full reasoning, how a skip is recorded on the Issue, and when the condition is withdrawn are in `prompts/review.md` → "When round 2 is skipped entirely, and when it is not".
+
 ### `josh delegate`
 
 Say whether a step of a run may go to a cheaper execution tier ([#969](https://github.com/joshuafolkken/kit/issues/969)).

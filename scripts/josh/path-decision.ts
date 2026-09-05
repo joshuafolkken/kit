@@ -29,10 +29,20 @@ interface DecisionCommand<Answer extends string> {
 	explain: (paths: ReadonlyArray<string>, answer: Answer) => string
 }
 
+// The flag contract every mechanically-decided command shares — the two here and `josh review:round2`
+// (joshuafolkken/kit#1433). An argument that is not a known flag makes the whole invocation
+// unreadable, and an unreadable invocation is never answered with a default. Shared because the
+// *direction* is the load-bearing part rather than the `some` call: a command that guessed would
+// hand the caller the answer they were reaching for instead of the one their tree supports, and two
+// copies of that judgement are two chances to write it the other way round.
+function has_unknown_flag(argv: ReadonlyArray<string>, known: ReadonlyArray<string>): boolean {
+	return argv.some((argument) => !known.includes(argument))
+}
+
 // `undefined` rather than a default on an unknown flag: a misspelled `--stage` that silently read
 // the branch diff would answer a question nobody asked, and answer it confidently.
 function parse_options(argv: ReadonlyArray<string>): DecisionOptions | undefined {
-	if (argv.some((argument) => !KNOWN_FLAGS.includes(argument))) return undefined
+	if (has_unknown_flag(argv, KNOWN_FLAGS)) return undefined
 
 	return { is_staged: argv.includes(STAGED_FLAG), is_json: argv.includes(JSON_FLAG) }
 }
@@ -81,6 +91,7 @@ async function run_path_decision<Answer extends string>(
 
 const path_decision = {
 	format_path_list,
+	has_unknown_flag,
 	JSON_FLAG,
 	KNOWN_FLAGS,
 	MAX_LISTED_PATHS,

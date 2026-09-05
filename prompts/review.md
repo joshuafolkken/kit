@@ -193,6 +193,8 @@ The output format below demands a severity on every finding, and for a long time
 
 The severity rule above is not a stopping condition on its own. Every fix creates new surface, and a review whose scope is the whole change finds something in it — so the loop is bounded by how much new code the fixes produce, which is unbounded.
 
+**Two rounds is the ceiling, not the schedule.** Whether the second one is due at all is `pnpm josh review:round2`'s answer — see "When round 2 is skipped entirely, and when it is not" below, which is the single source of that condition (joshuafolkken/kit#1433).
+
 This is measured, not theorized. On joshuafolkken/kit#854 four rounds produced 18 findings; on joshuafolkken/kit#855 two rounds produced 19. Almost none of them was a repeat: each round found new things, and many of those were about code the **previous round's fix** had just written. One fix replaced a line-based check with a proximity window, and the next two rounds each found a new defect in that window. Another moved a rule into a skill, and a later round moved it back. Two rounds of that is diligence; a third is the review chasing its own tail.
 
 ### The second round is a verification pass, not a second full review
@@ -253,6 +255,56 @@ Template for the second round:
 - **This says what round 2 costs now; it does not say whether joshuafolkken/kit#1241 moved it.** A round 2 is identified by the round-2 brief, and that brief is what #1241 introduced — **one** pre-#1241 pair in this project's transcripts carries the marker, so no before-and-after baseline can be built at this layer. **The heading above therefore stands unchanged**: what is measured here is round 2 against round 1, never narrowing against not narrowing.
 
 **So handing round 1's derivations to round 2 is not adopted**, and the escalation guard above now has a second figure under it — **one that answers a narrower question than `r = 0.05` above, and only that question**. `r = 0.05` is round 1's cost against the size of its input, so a proposal to narrow what a round is _given_ is still measured against that one; `r = -0.15` is round 2's cost against how much of round 1's reading it repeats, so it is what a proposal to _carry round 1's work forward_ has to say does not reach it. A proposal aimed at how many _turns_ a round takes is the shape this data supports, and neither coefficient is the bar for it.
+
+### When round 2 is skipped entirely, and when it is not
+
+**The two sections above answer a proposal to _narrow_ round 2. Neither answers a proposal to _not run_ one** (joshuafolkken/kit#1433): every figure in them was taken from a run that ran its second round, so nothing there measures what skipping one costs. This section decides when it is skipped, and **the decision is a command's rather than a reading of the list below**:
+
+```bash
+pnpm josh review:round2 --round-1-closed   # → required | skip ; the reason on stderr
+```
+
+**Run it once round 1's fixes are in and — this is the part that decides whether the condition can fire at all — _before_ `pnpm josh bump minor`.** The bump rewrites `package.json`, which is not inert, so a fix delta taken after it carries that write and answers `required` whatever round 1 did; asked before it, the delta is exactly round 1's fixes. **A `skip` moves only whether the second round runs.** The gate still re-runs after the bump, because round 1 edited the tree and that is what made the first gate's result stale — a skipped round is not the clean-first-round case, which has nothing edited to re-run for.
+
+Pass `--round-1-closed` only where every round-1 High/Medium finding actually closed — by a fix in this working tree, or as a verified false positive — and none was filed or deferred. **Without the flag the answer is `required`**, which is also what the command answers to every uncertainty it meets, a missing round-1 snapshot included.
+
+**`skip` has exactly two arms, and both are states in which joshuafolkken/kit#1222's reason for the round does not arise.** That issue's conclusion is the one this section has to answer: round 2 exists because **round 1's fix code is unreviewed**, and that is structural rather than removable.
+
+| Arm                    | What it is                                                                   | Why joshuafolkken/kit#1222's reason does not reach it                                                                                                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A — no fix code**    | The fix delta is empty: round 1's findings closed without an edit            | There is no unreviewed fix code, so the premise is absent rather than overridden. The brief already tells a round 2 here that its target is empty, so what the skip removes is a forked agent invocation that reads nothing                       |
+| **B — inert fix code** | Every path in the fix delta is inert by `josh review:level`'s classification | The fix code is unreviewed **and** unable to reach anyone: inert is defined as neither executing, nor instructing, nor shipping — the three ways a defect in this repository escapes, read here for the fix delta instead of for the whole change |
+
+**Neither arm weakens the standard.** A round-1 High/Medium that did not close is not a closed finding, so the flag is not passable; the cap is still two rounds; and a confirmed High still blocks the merge.
+
+**Arm A's answer carries round 1's timestamp, because the digests alone cannot separate two states.** An empty fix delta means either that round 1 wrote no fix code or that a bare `pnpm josh review:brief` retook the snapshot after the fixes — and the second is already how `pnpm josh review:brief --round 2` misreads that state today, so the arm makes an existing ambiguity legible rather than introducing one. The command prints when round 1 was recorded; a timestamp that postdates the fixes is what shows a retake, which is why it goes into the record verbatim.
+
+#### The wider line joshuafolkken/kit#1433 proposed is not adopted
+
+The condition that issue arrived with was "the fix delta touches no **runtime code path**" — on run #1412 that meant prompts and tests. **It is rejected on evidence already in this repository, not on caution.** `scripts/review/review-level.ts` records why documentation is deliberately absent from the inert list: joshuafolkken/kit#963 and #965 were both documentation-only diffs, and a `medium` review found **ten real defects in each** — dangling pointers into removed sections, citations naming the wrong file, in artifacts distributed to every consumer — that **no test covered, because prose is what they were**. A prompt fix is precisely where the review is the only detector, so exempting it would remove the round in the case it earns its keep.
+
+**The narrower fallback that issue floated — "test files only" — is rejected on the same axis.** A test is the verification that guards a runtime path, and a defect a round-1 fix introduces there is silent: an assertion a fix weakened still passes, and the gate reports green. That is the third arm of "Severity"'s reach test, not an exception to it.
+
+**A distributed prompt is not documentation about this repository; it is what the agent executes.** This file decides whether a defect ships. Calling it inert would be calling itself inert.
+
+#### Skipping, rather than a lighter round
+
+The third option joshuafolkken/kit#1433 raised was replacing round 2 with a category-narrowed pass. **The two sections above rule it out.** Round 1's cost tracks the size of its input at `r = 0.05`, round 2's tracks how much of round 1 it repeats at `r = -0.15`, and what does predict a round's span is its **turn count**, at `r = +0.80`. A narrowed round still forks an agent and still takes turns, so it would buy what joshuafolkken/kit#1219 and joshuafolkken/kit#1241 bought — fewer artificial findings, and no wall clock. **The saving here is entirely in not forking**, which is why the answer is a skip rather than a cheaper read.
+
+#### Recording a skip, so the condition can be judged later
+
+**A skipped round is recorded on the Issue, not only in the run.** Nothing else makes the frequency countable afterwards, and a condition nobody can audit is a condition nobody can withdraw.
+
+1. Label the Issue `review-round2-skipped`, created once per repository exactly as `in-progress` is: `gh api repos/{owner}/{repo}/labels -f name=review-round2-skipped -f color=c5def5 -f description="Review round 2 was skipped under the condition in prompts/review.md" --silent 2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=review-round2-skipped'`.
+2. Post an Issue comment under the heading `## Round 2 skipped`, naming **which arm fired** and quoting **the reason line the command printed**, verbatim — it carries the fix delta on arm B and round 1's timestamp on arm A. The label is what makes the set countable in one query; the comment is what makes a defect found later attributable to a particular skipped delta.
+
+Counting them is then one command: `gh issue list --label review-round2-skipped --state all`.
+
+#### When the condition is withdrawn
+
+**Arm B is withdrawn on the first confirmed case** — a defect traced to a path that sat in a skipped run's fix delta, of a kind a verification pass would have caught. One is enough: the arm's whole claim is that such code cannot reach anyone, so a single counter-example is not a tail event, it is the claim being false. Withdrawing it means deleting arm B from the table above and from `scripts/review/review-round2.ts`, leaving arm A.
+
+**Arm A is not withdrawable by evidence of this kind, and saying so is not confidence.** An empty fix delta wrote nothing, so no defect can originate in it. The only thing that could retire arm A is the discovery that the delta was computed wrongly, which would be a defect in `scripts/review/review-round2.ts` rather than in this condition.
 
 ### Three-way disposition after the cap
 
