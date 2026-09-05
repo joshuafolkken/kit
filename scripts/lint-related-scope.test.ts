@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ESLINT_CACHE_FLAGS } from './josh/josh-command-types'
+import { ESLINT_CACHE_FLAGS, ESLINT_RELATED_CACHE_FLAGS } from './josh/josh-command-types'
 import { lint_related_scope } from './lint-related-scope'
 
 // joshuafolkken/kit#1298: what this file decides is which files reach prettier and eslint, and a
@@ -69,12 +69,21 @@ describe('lint_related_scope.eslint_arguments', () => {
 		expect(lint_related_scope.eslint_arguments(FILES)).toContain('--no-warn-ignored')
 	})
 
-	// A narrowed run leaves the entries it did not visit alone, so it warms the same cache the
-	// whole-tree gate reads rather than making the gate cold.
-	it('shares the cache the whole-tree gate reads', () => {
-		expect(lint_related_scope.eslint_arguments(FILES).join(' ')).toContain(
-			ESLINT_CACHE_FLAGS.join(' '),
-		)
+	// joshuafolkken/kit#1347: this command is called between edits while `josh gate` lints the whole
+	// tree beside the review, and each eslint run rewrites its cache file whole from the copy it loaded
+	// at start-up — so on one file the run that finished last discarded the other's entries. The
+	// location is asserted as a pair with its flags rather than by membership: a flag and its value are
+	// one unit, and a membership check passes on an order that would make eslint read
+	// `--cache-strategy` as the location.
+	//
+	// The gate's location is excluded by comparing the argument itself rather than a substring of the
+	// joined line: `.eslintcache.related` has `.eslintcache` as a prefix, so a substring check can
+	// never fail and would assert nothing.
+	it('keeps a cache of its own, which a concurrent gate run cannot overwrite', () => {
+		const args = lint_related_scope.eslint_arguments(FILES)
+
+		expect(args.join(' ')).toContain(ESLINT_RELATED_CACHE_FLAGS.join(' '))
+		expect(args).not.toContain(ESLINT_CACHE_FLAGS.at(-1))
 	})
 })
 

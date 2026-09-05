@@ -5,7 +5,7 @@ import {
 	type ScopeInputs,
 	type ScopeVocabulary,
 } from './changed-file-scope'
-import { ESLINT_CACHE_FLAGS } from './josh/josh-command-types'
+import { ESLINT_RELATED_CACHE_FLAGS } from './josh/josh-command-types'
 
 // joshuafolkken/kit#1298: `josh lint` read the whole repository on every call, and an
 // implementation loop calls it after every few edits. Measured across four runs with
@@ -96,11 +96,22 @@ function prettier_arguments(files: ReadonlyArray<string>): ReadonlyArray<string>
 	return [...PRETTIER_ARGS, ...files]
 }
 
-// The cache flags are the gate's own, and sharing the cache file is deliberate: eslint's cache
-// keeps an entry per file and leaves the entries a run did not visit alone, so a narrowed run warms
-// the same cache the whole-tree gate reads instead of invalidating it.
+// The cache file is this command's own rather than the gate's, because the two run at the same time
+// (joshuafolkken/kit#1347). `josh gate` lints the whole tree beside the review while an
+// implementation loop calls this command between edits, and each eslint run rewrites its cache file
+// whole from the copy it loaded at start-up — so on one file the run that finished last discarded
+// the other's entries, and a narrowed run finishing during a whole-tree run rolled the cache back to
+// its pre-gate state.
+//
+// **The earlier comment here claimed the opposite and was reasoning about the wrong thing.** It said
+// sharing let a narrowed run warm the gate's cache, since eslint leaves the entries a run did not
+// visit alone; that holds for pruning and says nothing about two writers. It is the same judgement
+// joshuafolkken/kit#1332 made for the edit hook, applied to the second place it was needed.
+//
+// **What is narrowed is still only the target list, never the gate.** `josh gate` runs `josh lint`
+// over the whole tree before any commit; this file decides which files a repeat call reads.
 function eslint_arguments(files: ReadonlyArray<string>): ReadonlyArray<string> {
-	return [...ESLINT_ARGS, ...files, ...ESLINT_CACHE_FLAGS, ...ESLINT_SCOPED_FLAGS]
+	return [...ESLINT_ARGS, ...files, ...ESLINT_RELATED_CACHE_FLAGS, ...ESLINT_SCOPED_FLAGS]
 }
 
 const lint_related_scope = {
