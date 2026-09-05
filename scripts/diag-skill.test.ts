@@ -156,8 +156,10 @@ describe(`${SKILL_PATH} — reports the review ratio as a signal, never as a cau
 // joshuafolkken/kit#1403. The round cap's three-way disposition is chosen on every two-round run, and
 // picking "fix it in place" buys a second commit and a second CI cycle in front of the merge — on run
 // #1399, 132.8 s of a 1,198.1 s run. `josh time` already carried every one of those figures as separate
-// rows, so a report printed them and connected nothing; joshuafolkken/kit#1382 asks whether to cut that
-// cost and cannot be decided without it. The markers pin the detector and the four sources, because a
+// rows, so a report printed them and connected nothing; joshuafolkken/kit#1382 asked whether to cut
+// that cost, and this row is what decided it — the reading and the answer are `prompts/review.md` →
+// "What a round-2 fix-in-place costs, and how often it is paid", pinned by
+// `round-two-fix-cycle-cost.test.ts`. The markers pin the detector and the four sources, because a
 // price line whose components are re-derived each time is one that stops comparing two runs.
 describe(`${SKILL_PATH} — prices the round-2 disposition rather than listing its pieces`, () => {
 	it.each([
