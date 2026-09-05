@@ -53,6 +53,7 @@ const LAST_REPORT: LastTimeReport = {
 	runs: [{ ...MEASURED_ROW }],
 	measured_count: 1,
 	unmeasured_count: 0,
+	collapsed_pulls: [],
 	elapsed: time_distribution.build([RUN_MINUTES * MINUTE_MS]),
 	categories: [time_distribution.labeled(time_report.MODEL_LABEL, [MINUTE_MS])],
 	phases: [],

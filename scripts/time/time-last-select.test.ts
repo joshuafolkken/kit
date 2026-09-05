@@ -21,6 +21,7 @@ const UNREACHED_HOUR = 23
 const NONE = 0
 const TWO = 2
 const THREE = 3
+const REVERT_PULL = 6
 
 function at(hour: number): string {
 	return new Date(Date.UTC(FIXTURE_YEAR, 8, 5, hour)).toISOString()
@@ -94,11 +95,36 @@ describe('time_last_select.select_last_runs — the rows it collapses', () => {
 	// A revert and the change it reverts are two merged pull requests naming one issue, and both
 	// halves of that issue's measurement are the same — so counting both would report one run twice.
 	it('keeps one row per issue, the newest merge winning', async () => {
-		const revert = run_pull(6, 201, OLDEST_HOUR)
+		const revert = run_pull(REVERT_PULL, 201, OLDEST_HOUR)
 		const selection = await select([[NEWEST, revert]], TWO)
 
 		expect(selection.runs).toHaveLength(1)
 		expect(selection.runs[0]?.pull.number).toBe(1)
+	})
+
+	// The collapse is right; the silence was not. Without this the answer was built from two merges
+	// and reported one row, with nothing anywhere saying a merge had been folded away.
+	it('records the pull request it folded away', async () => {
+		const revert = run_pull(REVERT_PULL, 201, OLDEST_HOUR)
+		const selection = await select([[NEWEST, revert]], TWO)
+
+		expect(selection.collapsed_pulls).toEqual([REVERT_PULL])
+	})
+
+	it('records nothing where every run came from a single merge', async () => {
+		const selection = await select([[NEWEST, MIDDLE]], TWO)
+
+		expect(selection.collapsed_pulls).toEqual([])
+	})
+
+	// A duplicate whose own run was pushed out of the window was never a candidate for the answer, so
+	// naming it would point the reader at a run the table does not show.
+	it('leaves out a duplicate whose run did not make the window', async () => {
+		const revert = run_pull(REVERT_PULL, 203, FILLER_HOUR)
+		const selection = await select([[NEWEST, MIDDLE, OLDEST, revert]], TWO)
+
+		expect(selection.runs.map((run) => run.issue_number)).toEqual([201, 202])
+		expect(selection.collapsed_pulls).toEqual([])
 	})
 
 	// An open pull request has no merge instant at all, so it is not one of "the last N merged runs".
