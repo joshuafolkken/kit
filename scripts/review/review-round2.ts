@@ -67,10 +67,17 @@ function empty_reason(taken_at: string): string {
 	return `${EMPTY_DELTA_REASON_PREFIX} (round 1 was recorded at ${taken_at})`
 }
 
+// **Every path, not `format_path_list`'s first five.** This sentence is what the run quotes into the
+// `## Round 2 skipped` comment, and the whole purpose of that record is to attribute a defect found
+// later to the delta that went unreviewed — which a list ending in `+3 more` cannot do. The
+// truncation exists to keep a large diff's reason readable; arm B's delta is inert-only, so there is
+// no large diff here to keep readable.
 function inert_reason(delta: ReadonlyArray<string>): string {
-	return `${INERT_DELTA_REASON_PREFIX}: ${path_decision.format_path_list(delta)}`
+	return `${INERT_DELTA_REASON_PREFIX}: ${delta.join(', ')}`
 }
 
+// The `required` side keeps the truncation: nothing is recorded from it, and a reason naming every
+// path of a hundred-file change would bury the answer it exists to explain.
 function live_reason(deciding: ReadonlyArray<string>): string {
 	return `round 1's fixes touched paths that execute, instruct or ship: ${path_decision.format_path_list(deciding)}`
 }

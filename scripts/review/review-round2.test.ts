@@ -88,6 +88,29 @@ describe('review_round2.decide — the two skip arms', () => {
 	})
 })
 
+// The record the run quotes has to name the whole delta: a defect found later is attributed to the
+// paths that went unreviewed, and a list truncated at five cannot do that.
+describe('review_round2.inert_reason', () => {
+	it('names every path of a skipped delta rather than truncating the list', () => {
+		// Six, because `format_path_list` lists five and replaces the rest with `+N more`.
+		const inert = [
+			'a.code-workspace',
+			'b.code-workspace',
+			'c.code-workspace',
+			'.gitignore',
+			'LICENSE',
+			CHANGELOG,
+		]
+		const reason = review_round2.inert_reason(inert)
+
+		for (const path of inert) {
+			expect(reason).toContain(path)
+		}
+
+		expect(reason).not.toContain('more')
+	})
+})
+
 // The line joshuafolkken/kit#1433 arrived with and this change rejects: a prompt is an instruction
 // file and a test is the verification that guards a runtime path, so a fix that touched either one
 // still gets the round. `review-level.ts` records the measurement behind it — two documentation-only
