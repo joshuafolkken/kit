@@ -14,16 +14,25 @@ const PROMOTE_FLAG = '--promote'
 const ADD_FLAG = '--add'
 const BEFORE_FLAG = '--before'
 const AFTER_FLAG = '--after'
+// The decision record for an insertion, read the same way `--rationale-file` is read for a creation:
+// from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
+// contributes is placing it in the epic's `## Decisions` and on each child (joshuafolkken/kit#1350).
+const DECISION_FLAG = '--decision-file'
 const FLAG_PREFIX = '--'
 // Which flags consume the argument after them. Per parser rather than module-wide: `--before` takes
 // a value only under `--add`, and treating it as one everywhere had `josh epic "T" 101 102 --after
 // 103` silently drop #103 from the new epic instead of ignoring an unknown flag (joshuafolkken/kit#890).
 const VALUE_FLAGS: ReadonlySet<string> = new Set([RATIONALE_FLAG, ORIGIN_FLAG])
-const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([BEFORE_FLAG, AFTER_FLAG])
+const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([BEFORE_FLAG, AFTER_FLAG, DECISION_FLAG])
 // `--add` refuses a flag it does not know, unlike creation and promotion which ignore one. A typo
 // there costs a flag; here a mistyped positioning flag would leave its value positional, so the
 // target becomes a child to add and the insertion silently lands at the end (joshuafolkken/kit#890).
-const ADD_KNOWN_FLAGS: ReadonlySet<string> = new Set([ADD_FLAG, BEFORE_FLAG, AFTER_FLAG])
+const ADD_KNOWN_FLAGS: ReadonlySet<string> = new Set([
+	ADD_FLAG,
+	BEFORE_FLAG,
+	AFTER_FLAG,
+	DECISION_FLAG,
+])
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 
 interface CreateArguments {
@@ -134,6 +143,7 @@ interface AddArguments {
 	epic_number: number
 	children: Array<number>
 	position?: InsertPosition | undefined
+	decision_path?: string | undefined
 }
 
 // Whether the invocation inserts into an existing epic rather than creating or promoting one.
@@ -190,6 +200,19 @@ function has_unknown_flag(argv: ReadonlyArray<string>): boolean {
 	return argv.some((argument) => is_flag(argument) && !ADD_KNOWN_FLAGS.has(argument))
 }
 
+// A value-taking flag given without a usable value: last on the line, or followed by another flag.
+// **Refused rather than read as "none was asked for"** — `--decision-file` is passed precisely because
+// the record has to exist, so a shell that ate the path would otherwise land the insertion, write no
+// record, post no comment and exit 0: success reported for half the job. Repeated, it names two
+// records, which is refused for the reason two positioning flags are (joshuafolkken/kit#1350).
+function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
+	if (!argv.includes(flag)) return false
+	if (count_flag(argv, flag) > 1) return true
+	const value = read_flag_value(argv, flag)
+
+	return value === undefined || is_flag(value)
+}
+
 function read_add_subject(
 	argv: ReadonlyArray<string>,
 ): { epic_number: number; children: Array<number> } | undefined {
@@ -202,12 +225,17 @@ function read_add_subject(
 }
 
 function parse_add_arguments(argv: ReadonlyArray<string>): AddArguments | undefined {
-	if (has_unknown_flag(argv)) return undefined
+	if (has_unknown_flag(argv) || is_value_unusable(argv, DECISION_FLAG)) return undefined
 	const subject = read_add_subject(argv)
 	if (subject === undefined) return undefined
 	const outcome = parse_position(argv)
+	if (outcome.is_refused) return undefined
 
-	return outcome.is_refused ? undefined : { ...subject, position: outcome.position }
+	return {
+		...subject,
+		position: outcome.position,
+		decision_path: read_flag_value(argv, DECISION_FLAG),
+	}
 }
 
 // The one refusal `--add` has to explain rather than merely report. `into owner/repo#N` is a legal
@@ -247,6 +275,18 @@ function format_add_arguments(local: AddArguments): string {
 	return `${[local.epic_number, ...local.children].map(String).join(' ')}${suffix}`
 }
 
+// **`--decision-file` is named rather than relayed** (joshuafolkken/kit#1350). The suggestion is a
+// command to run in a *different* checkout, and the path was resolved against this one: a relative path
+// does not exist there, `-` cannot be re-read from a consumed stdin, and an unquoted path with a space
+// would break the line the person copies. So the flag is asked for again instead of pasted in wrong.
+function format_decision_note(local: AddArguments): Array<string> {
+	if (local.decision_path === undefined) return []
+
+	return [
+		`  The decision record is not carried over — pass \`${DECISION_FLAG}\` there with a path that checkout can read.`,
+	]
+}
+
 // A fully-qualified reference to *this* repository is the same instruction spelled longer, not a
 // cross-repository one — and `into owner/repo#N` is exactly how the suffix is documented, so a run
 // inside that repository would otherwise be refused and told to go to the checkout it is already in
@@ -267,6 +307,7 @@ function format_cross_repo_refusal(found: CrossRepoAddTarget): string {
 	return [
 		`✖ ${reference} is an epic in another repository; this command reads and writes issues in the repository it runs from.`,
 		`  Run \`pnpm josh epic --add ${format_add_arguments(found.local)}\` in that repository's checkout (\`pnpm josh doctor\` prints where each one is).`,
+		...format_decision_note(found.local),
 	].join('\n')
 }
 
@@ -277,12 +318,24 @@ function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
 	return Number(raw)
 }
 
-// `-` reads stdin, matching `gh issue create --body-file -`. An omitted path yields an empty
-// rationale, which the body builder replaces with a visible placeholder rather than a blank section.
-function read_rationale(rationale_path: string | undefined): string {
-	if (rationale_path === undefined) return ''
+// `-` reads stdin, matching `gh issue create --body-file -`. Shared by the two `*-file` flags rather
+// than spelled out per flag, so the stdin form cannot come to mean one thing under `--rationale-file`
+// and another under `--decision-file`.
+function read_file_or_stdin(path: string): string {
+	return readFileSync(path === STDIN_PATH ? STDIN_FD : path, 'utf8')
+}
 
-	return readFileSync(rationale_path === STDIN_PATH ? STDIN_FD : rationale_path, 'utf8')
+// An omitted path yields an empty rationale, which the body builder replaces with a visible
+// placeholder rather than a blank section.
+function read_rationale(rationale_path: string | undefined): string {
+	return rationale_path === undefined ? '' : read_file_or_stdin(rationale_path)
+}
+
+// `undefined` rather than `''` for an omitted path: an insertion that records no decision is the
+// ordinary case, and an empty string is a record that says nothing — which `epic --add` refuses
+// (joshuafolkken/kit#1350).
+function read_decision(decision_path: string | undefined): string | undefined {
+	return decision_path === undefined ? undefined : read_file_or_stdin(decision_path)
 }
 
 const epic_cli = {
@@ -295,6 +348,7 @@ const epic_cli = {
 	parse_create_arguments,
 	parse_promote_arguments,
 	parse_check_argument,
+	read_decision,
 	read_rationale,
 }
 
@@ -303,6 +357,7 @@ export {
 	ADD_FLAG,
 	AFTER_FLAG,
 	BEFORE_FLAG,
+	DECISION_FLAG,
 	ORDERED_FLAG,
 	ORIGIN_FLAG,
 	PROMOTE_FLAG,

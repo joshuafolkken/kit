@@ -1,10 +1,12 @@
 import { git_epic_chains, type Chains } from './git-epic-chains'
-import { DECLARED_CHAIN_LINE, git_epic_parse, UNORDERED_DEPENDENCIES } from './git-epic-parse'
+import { git_epic_decision } from './git-epic-decision'
+import { git_epic_parse } from './git-epic-parse'
 import {
 	format_dependency_link,
 	format_issue_references,
 	to_issue_reference,
 } from './git-epic-reference'
+import { git_epic_sections, type BodyLines, type SectionRange } from './git-epic-sections'
 
 // Rewriting an epic body so its task list and its dependency declaration both name a newly inserted
 // child, and refusing to hand back a body that would not.
@@ -19,36 +21,17 @@ interface RewriteInput {
 	body: string
 	additions: ReadonlyArray<number>
 	chains_after: Chains
+	// The decision record to append to the epic's `## Decisions` section, or `undefined` for an
+	// insertion that records none. It is folded in **before** the declaration work below, so the stray
+	// declaration and round-trip guards see the record too: a record carrying a bare `#A -> #B` line
+	// would otherwise be written and then read back by `epic:next` as part of the order
+	// (joshuafolkken/kit#1350).
+	decision?: string | undefined
 }
 
 type RewriteOutcome = { body: string } | { error: string }
 
-interface BodyLines {
-	lines: ReadonlyArray<string>
-	// `false` for a fence line and everything between a pair of them. A declaration inside a fenced
-	// block is an illustration, and rewriting one would edit a quoted template.
-	mask: ReadonlyArray<boolean>
-}
-
-function to_body_lines(body: string): BodyLines {
-	return { lines: body.split('\n'), mask: git_epic_parse.fence_mask(body) }
-}
-
-function is_readable(input: BodyLines, index: number): boolean {
-	return input.mask[index] === true
-}
-
-function find_indices(input: BodyLines, is_wanted: (line: string) => boolean): Array<number> {
-	return input.lines
-		.map((line, index) => (is_readable(input, index) && is_wanted(line) ? index : -1))
-		.filter((index) => index !== -1)
-}
-
-function is_declaration_line(line: string): boolean {
-	const trimmed = line.trim()
-
-	return DECLARED_CHAIN_LINE.test(trimmed) || trimmed === UNORDERED_DEPENDENCIES
-}
+const { find_indices, is_in_range, to_body_lines } = git_epic_sections
 
 function to_task_row(issue_number: number): string {
 	return `- [ ] ${to_issue_reference(issue_number)}`
@@ -71,29 +54,9 @@ function insert_task_rows(input: BodyLines, additions: ReadonlyArray<number>): A
 // legitimately appear elsewhere — a rationale paragraph quoting `#890 -> #891` is prose, and
 // rewriting it would destroy the sentence while the round-trip guard saw an identical link set.
 const DEPENDENCIES_HEADING = /^#{1,6}[ \t]+Dependencies\b/u
-const ANY_HEADING = /^#{1,6}[ \t]/u
-
-interface SectionRange {
-	start: number
-	end: number
-}
 
 function find_dependencies_range(input: BodyLines): SectionRange | undefined {
-	const [heading] = find_indices(input, (line) => DEPENDENCIES_HEADING.test(line.trim()))
-	if (heading === undefined) return undefined
-
-	const start = heading + 1
-	const next = input.lines
-		.slice(start)
-		.findIndex(
-			(line, offset) => is_readable(input, start + offset) && ANY_HEADING.test(line.trim()),
-		)
-
-	return { start, end: next === -1 ? input.lines.length : start + next }
-}
-
-function is_in_range(index: number, range: SectionRange): boolean {
-	return index >= range.start && index < range.end
+	return git_epic_sections.find_section_range(input, DEPENDENCIES_HEADING)
 }
 
 function splice_declaration(
@@ -115,11 +78,11 @@ function replace_declaration(
 	lines: ReadonlyArray<string>,
 	rendered: ReadonlyArray<string>,
 ): Array<string> | undefined {
-	const input = { lines, mask: git_epic_parse.fence_mask(lines.join('\n')) }
+	const input = to_body_lines(lines)
 	const range = find_dependencies_range(input)
 	if (range === undefined) return undefined
 
-	const found = find_indices(input, (line) => is_declaration_line(line))
+	const found = find_indices(input, (line) => git_epic_parse.is_declaration_line(line))
 	const declarations = found.filter((index) => is_in_range(index, range))
 	const [first] = declarations
 
@@ -132,10 +95,10 @@ function replace_declaration(
 // while the rewrite deliberately will not touch it — so no insertion on this epic can ever produce a
 // consistent body. Named here so the answer is "move this line", not "the order differs".
 function find_stray_declaration(lines: ReadonlyArray<string>): string | undefined {
-	const input = { lines, mask: git_epic_parse.fence_mask(lines.join('\n')) }
+	const input = to_body_lines(lines)
 	const range = find_dependencies_range(input)
 	if (range === undefined) return undefined
-	const stray = find_indices(input, (line) => is_declaration_line(line)).find(
+	const stray = find_indices(input, (line) => git_epic_parse.is_declaration_line(line)).find(
 		(index) => !is_in_range(index, range),
 	)
 
@@ -144,8 +107,20 @@ function find_stray_declaration(lines: ReadonlyArray<string>): string | undefine
 
 type BodyOutcome = { body: string } | { error: string }
 
-function build_body(input: RewriteInput): BodyOutcome {
+// The task rows and the decision record, in that order. **The record goes in before the declaration
+// work**: it is the one part of the new body that a caller wrote by hand, so the stray-declaration and
+// round-trip guards below have to see it — a record appended afterwards would be written unchecked and
+// read back by `epic:next` as part of the order (joshuafolkken/kit#1350).
+function to_written_lines(input: RewriteInput): Array<string> {
 	const with_rows = insert_task_rows(to_body_lines(input.body), input.additions)
+	const { decision } = input
+	if (decision === undefined) return with_rows
+
+	return git_epic_decision.append_decision(with_rows.join('\n'), decision).split('\n')
+}
+
+function build_body(input: RewriteInput): BodyOutcome {
+	const with_rows = to_written_lines(input)
 	const rendered = git_epic_chains.render_chains(input.chains_after)
 	if (rendered.length === 0) return { body: with_rows.join('\n') }
 
@@ -219,7 +194,6 @@ function rewrite_body(input: RewriteInput): RewriteOutcome {
 }
 
 const git_epic_add_body = {
-	is_declaration_line,
 	insert_task_rows,
 	rewrite_body,
 }

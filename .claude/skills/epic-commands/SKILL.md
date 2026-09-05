@@ -54,6 +54,15 @@ several times; and the answers end up only in a conversation nobody can read bac
 - Record each answer in **both** the epic's `## Decisions` and a comment on each child it applies to.
   One without the other leaves either the child's reader without the reasoning or the epic without
   the decision.
+- **Which command writes them depends on whether the child is being inserted.** A decision taken *as* a
+  child joins the epic goes through `pnpm josh epic --add … --decision-file` — the `epic:bundle` section
+  below is that flag's single source. Phase 2's answers are about children the epic **already tracks**,
+  which that flag cannot serve: an insertion with nothing to add is refused outright. Until
+  joshuafolkken/kit#1162 adds an entry point for already-tracked children, write the child comments with `gh issue comment` and
+  put the epic's `## Decisions` entry in with the **next** `--add --decision-file` on that epic, naming
+  every child it covers. **Say in the report that the epic half is still pending** — the entry going
+  unwritten is exactly how two of the four most recent placements in joshuafolkken/kit#1262 ended up with
+  a child comment and nothing on the epic.
 - **Recording a decision removes that child's `needs-decision` label** (Tier A). Without it the child
   stays parked after the answer arrived. The label-clearing rule itself is defined by
   `.claude/skills/workflow-commands/epicrun.md` → "park and continue"; what this section adds is the
@@ -234,6 +243,23 @@ genuinely too close to separate, which is the toss-up Tier B is for and is rare.
 **The decision record is what pays for the autonomy.** Skipping it is not a shortcut past a
 formality — it is the half that makes an unattended choice auditable, and without it the run has
 simply taken a decision nobody can find afterwards.
+
+**Write both halves in the one call that places the issue: `pnpm josh epic --add <E> <N...>
+--decision-file <path|->`** (joshuafolkken/kit#1350). It appends the record to the epic's
+`## Decisions` inside the body edit the insertion already makes — so the epic half costs no round trip
+— and posts the same text as a comment on each child added. **Never hand-edit the epic body to add the
+entry**: that is the operation `--add` exists to remove, and paying for it by hand is why the entry got
+skipped. Two constraints on the record's own text, both refused before anything is written:
+
+- **No line that is *nothing but* a `#A -> #B` chain.** Such a line is read as part of the epic's
+  declaration wherever it sits in the body, so the record would declare an order nobody decided. Quote
+  the order inside backticks, or put it in a fenced block; either is accepted.
+- **The record must say something, and the path must be readable.** An empty file is refused, and so is
+  `--decision-file` with no usable path — otherwise the insertion lands, no record is written anywhere,
+  and the command still exits 0.
+
+`epic:plan` phase 2's answers are about children the epic already tracks and cannot use this flag; that
+section says what to do instead.
 
 **Its sibling runs before the filing, not after it: `pnpm josh issue:scout "<title>"`.** That command
 answers the same epic question for an issue that does not exist yet — this decision, called rather

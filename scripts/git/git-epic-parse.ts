@@ -191,6 +191,16 @@ function has_unordered_declaration(body: string | undefined): boolean {
 	return strip_fenced_blocks(body).includes(UNORDERED_DEPENDENCIES)
 }
 
+// Whether one line, on its own, is part of a machine-readable `Dependencies` declaration — a chain or
+// the unordered sentence. It lives here beside the two patterns it tests rather than in either of the
+// modules that rewrite a body, because both of them need it and a second copy is where one comes to
+// disagree with the parser about what counts as a declaration (joshuafolkken/kit#1350).
+function is_declaration_line(line: string): boolean {
+	const trimmed = line.trim()
+
+	return DECLARED_CHAIN_LINE.test(trimmed) || trimmed === UNORDERED_DEPENDENCIES
+}
+
 // One declared link: `blocker` must finish before `blocked` starts.
 interface DependencyLink {
 	blocker: number
@@ -299,6 +309,7 @@ function is_state_closed(state: string | undefined): boolean {
 const git_epic_parse = {
 	fence_mask,
 	is_task_list_line,
+	is_declaration_line,
 	chain_links,
 	parse_dependency_chains,
 	parse_task_list_issue_numbers,
@@ -320,6 +331,7 @@ export {
 	git_epic_parse,
 	fence_mask,
 	is_task_list_line,
+	is_declaration_line,
 	chain_links,
 	parse_dependency_chains,
 	parse_task_list_issue_numbers,

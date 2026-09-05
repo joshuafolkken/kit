@@ -2,19 +2,27 @@ import { epic_fetch } from '#scripts/epic/epic-fetch'
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
+import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse } from './git-epic-parse'
 import { format_issue_references } from './git-epic-reference'
 import { git_epic_relations } from './git-epic-relations'
 import { git_epic_validate, type EpicSubject } from './git-epic-validate'
 import { git_gh_command } from './git-gh-command'
 
-// `josh epic --add <E> <N...> [--before <M> | --after <M>]` — insert children into an existing epic.
+// `josh epic --add <E> <N...> [--before <M> | --after <M>] [--decision-file <path|->]` — insert
+// children into an existing epic.
 //
 // Adding a child by editing the body is what the procedure told an agent to do, and it is what stops
 // an unattended run: the body then declares an order the native `blocked-by` relations do not record,
 // `epic:next` reports `declaration_mismatch`, and the verdict is `error`. This command writes the
 // task-list row, the declaration and the relations from one input, so the three cannot disagree
 // (joshuafolkken/kit#890).
+//
+// **`--decision-file` folds the fourth and fifth writes in** (joshuafolkken/kit#1350). An auto-decided
+// placement has to be recorded in the epic's `## Decisions` and on each child, and no command wrote the
+// epic half — so a run read the body, edited it and `PATCH`ed it back, which is the hand edit
+// `CLAUDE.md` forbids. The epic half now rides on the body edit this command already makes, so it costs
+// no round trip; the child half is one comment per addition, counted rather than thrown.
 
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
@@ -30,6 +38,11 @@ interface AddChildrenInput {
 	epic_number: number
 	children: ReadonlyArray<number>
 	position?: InsertPosition | undefined
+	// The decision record to write, from `--decision-file`. It goes to two places, and both used to be
+	// separate calls a run made afterwards: the epic's `## Decisions` section — folded into the body
+	// edit below, so it costs no round trip — and a comment on each child added
+	// (joshuafolkken/kit#1350).
+	decision?: string | undefined
 }
 
 async function read_subject(epic_number: number): Promise<EpicSubject | undefined> {
@@ -116,10 +129,31 @@ async function read_epic(
 	return { subject, recorded: recorded.children, repo: recorded.repo }
 }
 
-async function write_plan(epic_number: number, plan: AddPlan): Promise<void> {
+// The child half of the decision record, posted after the epic's body carries its own half. A failure
+// is counted rather than thrown for the reason a relation failure is: the insertion itself has landed,
+// and an exception here would leave the caller unable to tell that from a refusal that wrote nothing.
+async function comment_decision(additions: ReadonlyArray<number>, decision: string): Promise<void> {
+	const posted = await Promise.all(
+		additions.map(async (child) => await git_gh_command.issue_try_comment(String(child), decision)),
+	)
+
+	console.info(
+		git_epic_decision.format_decision_report({
+			total: additions.length,
+			failures: posted.filter((is_posted) => !is_posted).length,
+		}),
+	)
+}
+
+async function write_plan(
+	epic_number: number,
+	plan: AddPlan,
+	decision: string | undefined,
+): Promise<void> {
 	await git_gh_command.issue_edit_body(String(epic_number), plan.body)
 	report_success(epic_number, plan)
 	await apply_plan(plan)
+	if (decision !== undefined) await comment_decision(plan.additions, decision)
 }
 
 // Insert children into an existing epic, or refuse without writing anything. Every refusal happens
@@ -141,6 +175,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		position: input.position,
 		recorded: epic.recorded,
 		repo: epic.repo,
+		decision: input.decision,
 	})
 
 	if ('error' in outcome) {
@@ -149,7 +184,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	await write_plan(input.epic_number, outcome.plan)
+	await write_plan(input.epic_number, outcome.plan, input.decision)
 
 	return SUCCESS_EXIT_CODE
 }
