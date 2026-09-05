@@ -1668,6 +1668,12 @@ Bundling:
   recoverable round trips        25   24.8% of 101 round trip(s)
   recoverable wait          3.4 min   at 8.1 s model time per round trip
 
+Single checks:
+  single checks                   8   6 in the rework phase · 45.9 s of tool time
+  repeat calls                    3   same command and arguments
+  answered nothing new            0   0.0 s · no edit between the two calls
+  recoverable check time    0.0 min   at 8.1 s model time per round trip
+
 Failure re-runs:
   failed calls                    2   of 108 call(s), 59 outcome unreadable
   re-run after failure      0.0 min   0.3% of tool execution
@@ -1697,6 +1703,8 @@ By josh command (descending):
 ```
 
 **The partition is by gap, not by pair.** Every span is the interval between two consecutive dated lines, classified by the **later** one: a span ending at an assistant line is model wait, one ending at a tool result is that tool's execution, one ending at a typed prompt is human wait. So the three shares reconstruct the elapsed time **exactly**, and a reader can check them instead of trusting them. Pairing each `tool_use` with its own `tool_result` instead would double-count parallel calls and leave the shares summing to more than the run took — which is the property that makes two runs comparable.
+
+**The `Single checks:` block is about the probing in front of that gate, not the gate itself** ([#1383](https://github.com/joshuafolkken/kit/issues/1383)). `CLAUDE.md` has said **one gate per run, not one per edit** since [#1246](https://github.com/joshuafolkken/kit/issues/1246), and the single checks — `josh lint:related`, `josh test:related`, `josh cspell:dot` and the type check — are where that rule sends an implementation loop instead. Nothing measured whether the loop then repeated _them_. **Two calls are the same call only if they named the same files**, so the signature is the subcommand plus its arguments, sorted and with shell redirections dropped — read while the tool input is still in hand, since a span keeps none. `answered nothing new` is the narrow figure the rule in `prompts/review.md` → "A single check answers once per tree" is about: a repeat that only a model turn sat between, whose answer was therefore known before it was asked. **It under-reports on purpose** — a repeat separated by a plain `Read` is not counted, because nothing here can prove that call changed no file — and a consumer project's type check is `josh-app check:ci`, which is not a `pnpm josh <cmd>` call at all and so is invisible. The zero above is the honest reading of that run rather than an empty block: all three of its repeats followed an edit.
 
 **The same elapsed time is also read along the run, not only as totals** ([#1311](https://github.com/joshuafolkken/kit/issues/1311)). A phase row says the gate cost 0.6 minutes and cannot say whether its four runs sat together or were spread across the hour, and `josh gate 4 call(s)` is the same row whether the four were even or whether the last took three times the first — which is what the hand-built reports these tables replace did say. **A segment is a maximal stretch of the run in one phase**, named by the phase that spent the most of it and by the busiest command inside it; a phase change lasting under half a minute is absorbed rather than given a row of its own, because a real run alternates — a gate call, the turn that read it, another gate call — and a strict reading yields dozens of rows nobody can read. **The absorbed time is still counted**: every span lands in exactly one segment, so the segments reconstruct the same total the phases do, less the CI share no span covers. **The per-invocation table lists each call's own duration in run order**, for commands called more than once only — one duration is what the per-command table already printed — and the two fragments of a call that bracketed a delegated unit are rejoined by the id they share rather than counted as two calls. The two blocks, on the run of [#1309](https://github.com/joshuafolkken/kit/issues/1309) rather than on the run above:
 

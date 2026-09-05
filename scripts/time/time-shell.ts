@@ -120,9 +120,69 @@ function josh_command_of(command: string): string {
 	return name === undefined ? '' : `${JOSH_PREFIX}${name}`
 }
 
+// A redirection is not an argument, and keeping one splits a single check into two signatures
+// (joshuafolkken/kit#1383). Measured on run #1379, every `pnpm josh <check>` call there was written
+// `… 2>&1`, so an otherwise identical call written without one would have keyed differently and the
+// repeat between them would have gone uncounted.
+//
+// **A token ending in a redirection character takes the next one with it**, because that one is the
+// file — `> out.txt` and `< list.txt` are two words each. **Both characters, not only `>`**: reading
+// `<` as a redirection but not consuming its file left `list.txt` in the argument list, which is
+// exactly the split this function exists to prevent. `2>&1` carries its own target inside the token,
+// so nothing follows it.
+const REDIRECTION_CHARACTERS: ReadonlyArray<string> = ['<', '>']
+
+function is_redirection(word: string): boolean {
+	return REDIRECTION_CHARACTERS.some((character) => word.includes(character))
+}
+
+function ends_in_redirection(word: string): boolean {
+	return REDIRECTION_CHARACTERS.some((character) => word.endsWith(character))
+}
+
+function drop_redirections(words: ReadonlyArray<string>): Array<string> {
+	const kept: Array<string> = []
+	let is_target = false
+
+	for (const word of words) {
+		const is_dropped = is_target || is_redirection(word)
+
+		is_target = ends_in_redirection(word)
+		if (!is_dropped) kept.push(word)
+	}
+
+	return kept
+}
+
+// What a `pnpm josh <cmd>` call passes after its subcommand (joshuafolkken/kit#1383).
+//
+// **Read from the same segment `josh_command_of` reads the subcommand from**, and past the same
+// match. Two calls of one check are told apart by their arguments, so a second reader here would be
+// the one place where the command and its arguments could come from different halves of a chain —
+// `cd x && pnpm josh test:related a.ts | tail -5` has three segments, and only one of them ran the
+// check.
+//
+// **The match's own text is what is sliced off, not a fixed word count.** The prefix is two words in
+// `josh lint`, three in `pnpm josh lint` and four in `pnpm exec josh lint`, so counting words would
+// leave `josh` itself in the argument list for one of the three spellings.
+function josh_arguments(command: string): Array<string> {
+	const text = command_words(command_segment(command)).join(' ')
+	const match = JOSH_PATTERN.exec(text)
+
+	if (match === null) return []
+
+	const words = text
+		.slice(match[0].length)
+		.split(WHITESPACE_PATTERN)
+		.filter((word) => word !== '')
+
+	return drop_redirections(words)
+}
+
 const time_shell = {
 	bash_command,
 	bash_label,
+	josh_arguments,
 	josh_command_of,
 	leading_word,
 }

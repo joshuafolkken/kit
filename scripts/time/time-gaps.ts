@@ -1,6 +1,7 @@
 import { time_distribution, type Distribution } from './time-distribution'
 import { time_format } from './time-format'
 import { time_phases, type PhaseName } from './time-phases'
+import { time_placed, type Placed } from './time-placed'
 import { time_round_trips, type ModelGap } from './time-round-trips'
 import { time_spans, type Span } from './time-spans'
 
@@ -62,24 +63,23 @@ const NO_GAPS: GapTotals = {
 	is_measured: false,
 }
 
-function to_longest(gap: ModelGap, phases: ReadonlyArray<PhaseName>): LongestGap {
+function to_longest(gap: ModelGap, placed: ReadonlyArray<Placed>): LongestGap {
 	return {
 		duration_ms: gap.duration_ms,
 		started_ms: gap.started_ms,
 		ended_ms: gap.ended_ms,
-		phase: phases[gap.span_index] ?? time_phases.OTHER_PHASE,
+		phase: placed[gap.span_index]?.phase ?? time_phases.OTHER_PHASE,
 	}
 }
 
 function build_gaps(spans: ReadonlyArray<Span>): GapTotals {
-	const ordered = time_round_trips.in_time_order(spans)
-	const phases = time_phases.classify(ordered)
+	const placed = time_placed.placed_spans(spans)
 	const gaps = time_round_trips.issuing_model_gaps(spans)
 	const longest = gaps.toSorted((left, right) => right.duration_ms - left.duration_ms)
 
 	return {
 		distribution: time_distribution.build(gaps.map((gap) => gap.duration_ms)),
-		longest: longest.slice(NONE, MAX_LONGEST).map((gap) => to_longest(gap, phases)),
+		longest: longest.slice(NONE, MAX_LONGEST).map((gap) => to_longest(gap, placed)),
 		is_measured: time_spans.has_transcript_data(spans.length),
 	}
 }

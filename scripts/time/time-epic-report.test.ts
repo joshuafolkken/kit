@@ -8,6 +8,7 @@ import { time_gaps } from './time-gaps'
 import type { TimeReport } from './time-report'
 import { time_rework } from './time-rework'
 import { time_run } from './time-run'
+import { time_single_checks } from './time-single-checks'
 import { time_tool_turns } from './time-tool-turns'
 
 const MINUTE_MS = 60_000
@@ -79,6 +80,7 @@ function report_of(input: ChildInput): TimeReport {
 
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
+		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
 		rework: { ...time_rework.NO_REWORK },
 		failures: { ...time_failures.NO_FAILURES },
 	}

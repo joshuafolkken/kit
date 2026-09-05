@@ -6,6 +6,7 @@ import { time_instant } from './time-instant'
 import { time_markers, type PhaseMarker } from './time-markers'
 import { time_reported_failure } from './time-reported-failure'
 import { time_shell } from './time-shell'
+import { time_single_check } from './time-single-check'
 
 // Turning a session transcript into timed spans (joshuafolkken/kit#1267).
 //
@@ -112,9 +113,15 @@ const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
 // Whether a call could have gone out beside another, and what it names, are both read off the input —
 // so a module asking about them after the fact would have nothing to read. `time-bundle-call.ts`
 // decides both; the rule each one follows is stated there.
+//
+// `check_key` is the fourth, and the third time this reason has applied (joshuafolkken/kit#1383). Two
+// runs of one verification check are the same call only if they named the same files, and the files
+// are in the input — so `josh_command` alone cannot say, and nothing downstream could recover it.
+// `time-single-check.ts` decides it.
 interface ToolCall {
 	label: string
 	josh_command: string
+	check_key: string
 	marker: PhaseMarker
 	is_bundleable: boolean
 	targets: ReadonlyArray<string>
@@ -123,12 +130,14 @@ interface ToolCall {
 const NO_CALL: ToolCall = {
 	label: '',
 	josh_command: '',
+	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	...time_bundle_call.not_bundleable(),
 }
 const UNKNOWN_CALL: ToolCall = {
 	label: UNKNOWN_TOOL,
 	josh_command: '',
+	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	...time_bundle_call.not_bundleable(),
 }
@@ -199,16 +208,19 @@ function to_tool_call(name: string, input: unknown): ToolCall {
 		return {
 			label: name,
 			josh_command: '',
+			check_key: time_single_check.NO_CHECK,
 			marker: time_markers.tool_marker(name, input),
 			...time_bundle_call.tool_facts(name, input),
 		}
 	}
 
 	const command = time_shell.bash_command(input)
+	const josh_command = time_shell.josh_command_of(command)
 
 	return {
 		label: time_shell.bash_label(command),
-		josh_command: time_shell.josh_command_of(command),
+		josh_command,
+		check_key: time_single_check.check_key(josh_command, command),
 		marker: time_markers.bash_marker(command),
 		...time_bundle_call.bash_facts(command),
 	}
@@ -379,6 +391,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		category: event.category,
 		label: event.label,
 		josh_command: event.josh_command,
+		check_key: event.check_key,
 		marker: event.marker,
 		is_bundleable: event.is_bundleable,
 		targets: event.targets,

@@ -1,6 +1,6 @@
 import { time_format } from './time-format'
 import { time_phases, type PhaseName } from './time-phases'
-import { time_round_trips } from './time-round-trips'
+import { time_placed, type Placed } from './time-placed'
 import type { Span } from './time-spans'
 
 // The run read as a sequence of timed segments (joshuafolkken/kit#1311).
@@ -59,26 +59,8 @@ interface Segment {
 	lead_label: string
 }
 
-interface Placed {
-	span: Span
-	phase: PhaseName
-}
-
 function started_ms(span: Span): number {
 	return span.ended_ms - span.duration_ms
-}
-
-// The spans in time order with their phase beside each. Ordered here rather than assumed ordered: a
-// delegated unit's spans are appended after the parent's and one session's after another's, so array
-// order says nothing about time — the seam `time_round_trips.in_time_order` already exists for.
-function placed_spans(spans: ReadonlyArray<Span>): Array<Placed> {
-	const ordered = time_round_trips.in_time_order(spans)
-	const phases = time_phases.classify(ordered)
-
-	return ordered.map((span, index) => ({
-		span,
-		phase: phases[index] ?? time_phases.OTHER_PHASE,
-	}))
 }
 
 // What a segment accumulates while it is open: its members, and how long each phase has spent in it.
@@ -193,7 +175,7 @@ function to_segment(group: Group): Segment {
 }
 
 function build_segments(spans: ReadonlyArray<Span>): Array<Segment> {
-	return merged(grouped(placed_spans(spans))).map((group) => to_segment(group))
+	return merged(grouped(time_placed.placed_spans(spans))).map((group) => to_segment(group))
 }
 
 function suffix_of(segment: Segment): string {
