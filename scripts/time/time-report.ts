@@ -5,6 +5,7 @@ import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_invocations, type InvocationTotal } from './time-invocations'
+import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
 import { time_round_trips } from './time-round-trips'
@@ -24,7 +25,6 @@ import { time_trips } from './time-trips'
 // breakdown slices the same array by boundary, and an epic aggregation concatenates several
 // sessions' arrays before calling this. Neither needs a second aggregator.
 
-const NOT_DETECTED = 'not detected'
 // The column and number formatting moved to `time-format.ts` when the failure block became a third
 // renderer sharing it (joshuafolkken/kit#1309). It is re-exported below under the names it always
 // had, so `time-epic-report.ts` and `time-run.ts` keep laying their rows out through one set of
@@ -34,7 +34,10 @@ const NOT_DETECTED = 'not detected'
 // file, so neither could reach back for a cap that lived here.
 const { format_minutes, format_seconds, format_share, format_columns, format_row, unmeasured_row } =
 	time_format
-const PHASE_HEADING = 'By phase (in run order):'
+// The phase block moved to `time-phase-table.ts` when its withheld footnote would not fit inside this
+// file's remaining code lines (joshuafolkken/kit#1392) — the same move, for the same reason, as the
+// round-trip block below. Its heading and its `not detected` wording are re-exported at the bottom
+// under the names they always had.
 // The round-trip block moved to `time-trips.ts` when this file passed its length limit
 // (joshuafolkken/kit#1385) — the shape `time-bundles.ts` and `time-failures.ts` already have, where a
 // block owns its own rendering and this file calls one function per block. Its labels are re-exported
@@ -337,22 +340,6 @@ function build_report(session_id: string, timeline: Timeline): TimeReport {
 	})
 }
 
-// **A phase whose marker never appeared says so rather than printing `0.0 min`.** "Did not run" and
-// "this transcript could not be read for it" are different answers, and a measured zero asserts the
-// first when only the second may be true. The words go in the share column with the duration column
-// left empty, because there is no duration — not a short one.
-function phase_line(phase: PhaseTotal, elapsed_ms: number): string {
-	if (!phase.is_detected) return format_columns(phase.phase, '', NOT_DETECTED)
-
-	return format_row(phase.phase, phase.duration_ms, format_share(phase.duration_ms, elapsed_ms))
-}
-
-function phase_lines(report: TimeReport): Array<string> {
-	if (report.phases.length === 0) return []
-
-	return ['', PHASE_HEADING, ...report.phases.map((phase) => phase_line(phase, report.elapsed_ms))]
-}
-
 function ci_line(report: TimeReport): Array<string> {
 	if (!report.has_ci_data) return []
 
@@ -441,7 +428,7 @@ function format_report(report: TimeReport): string {
 		'',
 		'Where the wall clock went:',
 		...category_lines(report),
-		...phase_lines(report),
+		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
 		...time_segments.segment_lines(report.segments),
 		...time_trips.trip_lines(report),
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
@@ -458,9 +445,11 @@ function format_report(report: TimeReport): string {
 
 const time_report = {
 	MAX_ROWS: time_format.MAX_ROWS,
-	NOT_DETECTED,
+	// The phase block's own names, re-exported so every caller keeps asking one namespace after the
+	// block moved to `time-phase-table.ts` (joshuafolkken/kit#1392).
+	NOT_DETECTED: time_phase_table.NOT_DETECTED,
 	NOT_MEASURED: time_format.NOT_MEASURED,
-	PHASE_HEADING,
+	PHASE_HEADING: time_phase_table.HEADING,
 	// The round-trip block's own names, re-exported so every caller keeps asking one namespace after
 	// the block moved to `time-trips.ts` (joshuafolkken/kit#1385).
 	ROUND_TRIP_HEADING: time_trips.HEADING,

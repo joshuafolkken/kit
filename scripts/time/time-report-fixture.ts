@@ -1,3 +1,4 @@
+import type { CiFacts } from './time-ci'
 import { time_report, type TimeReport } from './time-report'
 import { time_rework, type DiffFacts } from './time-rework'
 import { time_span_fixture } from './time-span-fixture'
@@ -66,15 +67,17 @@ function build(spans: ReadonlyArray<Span>): TimeReport {
 	return time_report.build_report(SESSION, timeline(spans))
 }
 
-// One run, which is what `--issue` reports: the GitHub half was read, so the CI share and the check
-// table are present and the fourth row is printed rather than withheld.
-function run_report(spans: ReadonlyArray<Span>, ci_ms: number): TimeReport {
+// One run, which is what `--issue` reports, with the GitHub half handed over whole so a suite about a
+// reading that *failed* builds the same run as one about a reading that succeeded
+// (joshuafolkken/kit#1392). A second builder beside the second suite is the clone `CLAUDE.md`
+// prohibits, in the one place a drift would have two suites disagreeing about the run underneath.
+function run_report_of(spans: ReadonlyArray<Span>, ci: CiFacts): TimeReport {
 	return time_report.build_from_spans({
 		scope: RUN_SCOPE,
 		spans,
 		started_ms: 0,
 		ended_ms: WINDOW_MINUTES * MINUTE_MS,
-		ci: { ci_ms, has_ci_data: true, windows: [], has_windows: true },
+		ci,
 		diff: DIFF,
 		notes: [SESSION_NOTE],
 		by_check: [
@@ -86,6 +89,12 @@ function run_report(spans: ReadonlyArray<Span>, ci_ms: number): TimeReport {
 			},
 		],
 	})
+}
+
+// The cycles read, which is what every suite that is not about a failed reading wants: the CI share
+// and the check table are present, and the fourth row is printed rather than withheld.
+function run_report(spans: ReadonlyArray<Span>, ci_ms: number): TimeReport {
+	return run_report_of(spans, { ci_ms, has_ci_data: true, windows: [], has_windows: true })
 }
 
 // The one row a case is about, so an assertion cannot pass on a word another row happens to carry —
@@ -111,6 +120,7 @@ const time_report_fixture = {
 	build,
 	line_of,
 	run_report,
+	run_report_of,
 	timeline,
 }
 
