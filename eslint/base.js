@@ -17,10 +17,11 @@ import { naming_convention_rules } from './rules/naming-convention.js'
 import { promise_rules } from './rules/promise.js'
 import { sonarjs_rules } from './rules/sonarjs.js'
 import {
+	CENTRALIZED_TESTS_DIRECTORY_ENTRY,
 	CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
-	centralized_tests_directory_rules,
+	extend_restricted_syntax,
+	SPEC_FILENAME_ENTRY,
 	SPEC_FILENAME_PATTERNS,
-	spec_filename_rules,
 } from './rules/test-filename.js'
 import { typescript_rules } from './rules/typescript.js'
 import { unicorn_rules } from './rules/unicorn.js'
@@ -32,8 +33,46 @@ const FILE_PATTERNS = {
 	typescript: ['**/*.ts', '**/*.tsx'],
 	scripts_ai: SCRIPTS_AI_PATTERNS,
 	scripts: ['scripts/**/*.ts', 'scripts/**/*.js', ...SCRIPTS_AI_PATTERNS],
-	tests: ['**/*.test.ts', '**/*.spec.ts', '**/*.e2e.ts'],
+	// joshuafolkken/kit#1414: `**/*.spec.ts` is deliberately absent. The same config bans that name
+	// outright, so handing it the test relaxation (`max-lines-per-function` 35 and the rest) is the
+	// config contradicting itself, and it is what makes `*.spec.ts` read as supported. A banned file
+	// is already a lint error, so what the removal costs a migrating consumer is one extra error on a
+	// file that was failing anyway.
+	tests: ['**/*.test.ts', '**/*.e2e.ts'],
 	eslint_rules: ['eslint/**/*.ts', 'eslint/rules/**/*.js'],
+}
+
+// One test-filename ban block. Both bans differ only in their glob and their message, so the shape
+// is written once — the `disableTypeChecked` carry and the rule composition both have to hold
+// identically for either, and a second copy is what lets them drift apart.
+//
+// `disableTypeChecked` is carried because a banned file is usually outside the tsconfig project:
+// `tsconfig.json`'s `include` is an allowlist of the directories a project keeps sources in, and a
+// top-level `tests/` is by definition not one of them. With the typed parser forced on, such a file
+// reports `Parsing error: ... was not found in any of the provided project(s)` and
+// `no-restricted-syntax` never runs at all — lint still fails, but on a tsconfig complaint instead
+// of the rename-or-move instruction this rule exists to give. Type-aware rules buy nothing on a file
+// whose only correct fix is to stop existing under that name.
+//
+// joshuafolkken/kit#1414 widened the bans to `.tsx` / `.mts` / `.cts` and the JS siblings, and no
+// parser has to be named for them: typescript-eslint's own base block installs its parser with no
+// `files` restriction, so every extension here is read by it and picks its script kind from the file
+// name. `eslint/base.test.ts` asserts each one reports the rule's message rather than a parse error,
+// so a future change that narrows that parser fails there instead of silently.
+//
+// joshuafolkken/kit#1414: `no-restricted-syntax` is composed on top of `code_quality_rules` rather
+// than set on its own, because flat config replaces a rule's options instead of merging them — set
+// alone, the ban would silently drop that module's four selectors on exactly the files it applies
+// to, which a consumer keeping a legitimate `tests/` would inherit as a hole.
+function create_test_filename_ban_block(files, ban_entry) {
+	return {
+		files,
+		...ts.configs.disableTypeChecked,
+		rules: {
+			...ts.configs.disableTypeChecked.rules,
+			...extend_restricted_syntax(code_quality_rules, ban_entry),
+		},
+	}
 }
 
 export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
@@ -168,24 +207,10 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 		// These two blocks come last so nothing inside this config can override them; a project's
 		// own trailing blocks still can, which is how `eslint.config.js` keeps its existing
 		// per-directory relaxations.
-		//
-		// Both carry `disableTypeChecked` because a banned file is usually outside the tsconfig
-		// project: `tsconfig.json`'s `include` is an allowlist of the directories a project keeps
-		// sources in, and a top-level `tests/` is by definition not one of them. With the typed
-		// parser forced on, such a file reports `Parsing error: ... was not found in any of the
-		// provided project(s)` and `no-restricted-syntax` never runs at all — lint still fails, but
-		// on a tsconfig complaint instead of the rename-or-move instruction this rule exists to
-		// give. Type-aware rules buy nothing on a file whose only correct fix is to stop existing
-		// under that name.
-		{
-			files: SPEC_FILENAME_PATTERNS,
-			...ts.configs.disableTypeChecked,
-			rules: { ...ts.configs.disableTypeChecked.rules, ...spec_filename_rules },
-		},
-		{
-			files: CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
-			...ts.configs.disableTypeChecked,
-			rules: { ...ts.configs.disableTypeChecked.rules, ...centralized_tests_directory_rules },
-		},
+		create_test_filename_ban_block(SPEC_FILENAME_PATTERNS, SPEC_FILENAME_ENTRY),
+		create_test_filename_ban_block(
+			CENTRALIZED_TESTS_DIRECTORY_PATTERNS,
+			CENTRALIZED_TESTS_DIRECTORY_ENTRY,
+		),
 	)
 }
