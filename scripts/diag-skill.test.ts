@@ -138,12 +138,16 @@ describe(`${SKILL_PATH} — reports the review ratio as a signal, never as a cau
 		expect(read_skill()).toContain(marker)
 	})
 
-	// A detector with no negative cases fires on every run that cannot answer it — and three of these
-	// four are the withheld states this skill spends the rest of step 1 distinguishing from zero.
+	// A detector with no negative cases fires on every run that cannot answer it. Two of the five come
+	// from the segment builder rather than from a withheld reading: an absorbed `pr` group emits two
+	// rounds as one row, and a stretch over `MIN_SEGMENT_MS` inside a round emits one round as several
+	// — so a row count is never on its own the run's round count.
 	it.each([
-		'**Four states are not a signal, and each has its own answer.**',
-		'`span_count: 0` — no transcript was read, so the listing is empty and withheld rather than zero.',
-		'a one-round run** — re-read without the flag before calling it one',
+		'**A pair is exactly two `review` rows with a `pr` row between them, and five states are not one.**',
+		'**One `review` row is not a one-round run.**',
+		'**More than two\n  `review` rows** is that same answer from the other side',
+		'`span_count: 0` — no transcript was read, so',
+		"**re-read without the flag before calling any of these states the run's shape**",
 	])('does not fire where there is nothing to compare: %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})

@@ -137,13 +137,17 @@ Read from the JSON, in this order:
   cause is readable only from the forked review agents' own transcripts —
   `pnpm josh time --session <session-id>/agent-<agent-id>`. **It is a reading, not a filing**: step 3
   ranks `review` against the record those two sections hold, and this row does not lift that bar.
-  **Four states are not a signal, and each has its own answer.** Fewer than two `review` segments —
-  nothing to compare, and a one-round run is what a clean round 1 is specified to produce rather than a
-  defect. `review` reading `not detected` in the phase table — no round ran that this could be about.
-  `span_count: 0` — no transcript was read, so the listing is empty and withheld rather than zero. And
-  a `segments` table the `--top` cap cut: both review rows are normally among the longest five and
-  survive it, but where only one appears beside a `notes` line saying rows were withheld, **that is not
-  a one-round run** — re-read without the flag before calling it one, exactly as for the `pr` row above
+  **A pair is exactly two `review` rows with a `pr` row between them, and five states are not one.**
+  **One `review` row is not a one-round run.** A clean round 1 does produce one — but so does a
+  two-round run whose `pr` group fell under `MIN_SEGMENT_MS` and was absorbed, since the review spans
+  either side then take the group's name back and the two rounds are emitted as a single row. A lone
+  row therefore says the pair could not be identified, never that one round ran. **More than two
+  `review` rows** is that same answer from the other side: at least one round was cut, and "the earlier
+  row is round 1" would divide a whole round by a fragment of one. `review` reading `not detected` in
+  the phase table — no round ran that this could be about. `span_count: 0` — no transcript was read, so
+  the listing is empty and withheld rather than zero. And a `segments` table the `--top` cap cut: the
+  review rows are normally among the longest five and survive it while the short `pr` row between them
+  does not, so **re-read without the flag before calling any of these states the run's shape**
 - **the round trips** — `tool_call_count` and `round_trip_count`, and the density between them
   (joshuafolkken/kit#1304). Once the verification commands were cut, this is what sets a run's floor:
   the tools themselves run for well under a minute while the turns they sit in cost ten times that.
