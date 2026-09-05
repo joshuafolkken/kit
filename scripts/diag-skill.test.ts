@@ -84,6 +84,71 @@ describe(`${SKILL_PATH} — reads the price of a round trip, not only the count`
 	})
 })
 
+// joshuafolkken/kit#1412. `segments` already carried both review rounds of run #1399 — 260.1 s and
+// 259.9 s — and step 1 had no rule for comparing two rows of the same phase, so the report printed
+// the pair as two bare numbers and converted nothing. The markers pin the comparison, the threshold
+// and its evidence, because a threshold with no distribution under it is one the next reader lowers.
+describe(`${SKILL_PATH} — compares the two review rounds rather than printing them`, () => {
+	it.each([
+		'**the two review rounds against each other**',
+		'**Take the ratio round 2 ÷ round 1, and report it at 0.95 or above.**',
+		'**The threshold rests on a distribution, and that distribution is not quoted here.**',
+		'**Read those figures there rather than from a copy here**',
+	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// The two rounds are separated by the commit (joshuafolkken/kit#1261), and the flicker rule can cut
+	// one round into two segments — so a pair identified by the phase name alone compares a round
+	// against half of itself. The `pr` row is the evidence, and it is also the row `--top 5` drops:
+	// it kept both 260 s review rows of run #1399 and cut the 43.2 s commit between them, which is the
+	// listing this rule is read against by default.
+	it.each([
+		'**A pair is identified by a `pr` segment between the two `review` rows, and by nothing else.**',
+		'**Its absence proves nothing, and there are two\n  ways to lose it.**',
+		'**re-read\n  `segments` without `--top` before deciding a `pr` row is missing**',
+		'**Two `review` rows with no `pr` between them in an uncapped listing are ambiguous, and ambiguous is',
+	])('identifies the pair by the `pr` segment between them: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
+// The other half of the same rule: what the ratio is allowed to claim once a pair was identified. Kept
+// as its own suite because the two halves fail for different reasons — the one above loses the pair,
+// this one over-reads it.
+describe(`${SKILL_PATH} — reports the review ratio as a signal, never as a cause`, () => {
+	// The threshold is calibrated on span-level ratios and applied to segment durations, which carry
+	// whatever the flicker rule absorbed — 520.0 s of segments against a 496.1 s phase on run #1399. A
+	// rule that did not say so would read as though the two grains were interchangeable.
+	it.each([
+		'**The ratio is read on this grain and on no other.**',
+		'the two rows total 520.0 s against a `review` phase of 496.1 s',
+	])('says which grain the ratio is read on: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// The issue this rule came from was itself filed on a cause that turned out to be false: run #1399's
+	// round 2 diffed only the fix delta. Durations say a run is in the tail; they say nothing about why.
+	it.each([
+		'**Name no cause, and never read one run as the mechanism.**',
+		'A single ratio near 1.00 is the tail of the distribution above',
+		'`pnpm josh time --session <session-id>/agent-<agent-id>`',
+		'**It is a reading, not a filing**',
+	])('reports the ratio without diagnosing it: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// A detector with no negative cases fires on every run that cannot answer it — and three of these
+	// four are the withheld states this skill spends the rest of step 1 distinguishing from zero.
+	it.each([
+		'**Four states are not a signal, and each has its own answer.**',
+		'`span_count: 0` — no transcript was read, so the listing is empty and withheld rather than zero.',
+		'a one-round run** — re-read without the flag before calling it one',
+	])('does not fire where there is nothing to compare: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
 // The correction the issue was edited to make. A ranked list that drops what is already filed
 // reports the backlog as emptier than it is, and an un-started issue that ranks high is usually the
 // cheapest action there is — it needs a run, not a filing.
