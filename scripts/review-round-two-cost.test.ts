@@ -22,6 +22,10 @@ import { read_unwrapped } from './ai-document-fixture'
 const REVIEW_PROMPT = 'prompts/review.md'
 const DIAG_SKILL = '.claude/skills/diag/SKILL.md'
 const SECTION_TITLE = 'The narrowing is real in scope and does not show in the wall clock'
+// The second half of the same record (joshuafolkken/kit#1418), named once so the canonical heading
+// and the pointer that has to reach it cannot drift apart.
+const LAYER_SECTION_TITLE =
+	'The re-derivation round 2 does is real, and it is not what round 2 costs'
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	`### ${SECTION_TITLE}`,
@@ -63,10 +67,52 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'**Round 1 is not a constant**',
 ]
 
+// joshuafolkken/kit#1418 asked the next question down: the section above measures the `review`
+// phase, and a phase says nothing about what the forked agent inside it spent its turns on. Reading
+// 61 round-1/round-2 pairs at that layer found the overlap the proposal assumed — round 2 really
+// does re-open most of what round 1 opened — and found that it does not predict what round 2 costs.
+//
+// **Pinned because the proposal is re-derivable from the overlap alone.** Anyone who opens two
+// review transcripts sees the same files in both and reaches for the same handover; only the
+// correlation says why it would not pay, and only the sample says why one expensive run is not
+// evidence. Both live in the canonical section, and this suite is what keeps them there.
+const ROUND_TWO_LAYER_MARKERS: ReadonlyArray<string> = [
+	`### ${LAYER_SECTION_TITLE}`,
+	// The layer, and that it is the same classifier read finer rather than a second reader — without
+	// which the figures below read as a competing measurement of the section above.
+	'**joshuafolkken/kit#1418 opened the layer the section above never did.**',
+	'**They agree, which is why this refines the section above instead of replacing it**',
+	// The sample and its shape. The single-run reading is named as the tail it is, because the whole
+	// proposal was filed from that one run.
+	'**The pass is cheaper on the median and not reliably, at three times the sample.**',
+	'9 of the 61 paid more for round 2 than for round 1',
+	'**Run #1399, the run #1418 was filed from, is one of the nine.**',
+	// The finding itself: the overlap is real, and it is not the cost. Both halves are needed — the
+	// first alone re-opens the proposal, the second alone reads as denying the overlap exists.
+	"**Round 2 does re-derive round 1's evidence, and the re-derivation does not predict its cost.**",
+	'r = -0.15',
+	// The sample travels with the coefficient here for the same reason it does above, and it is
+	// pinned present as well as forbidden in the skill: an entry that is only forbidden goes vacuous
+	// the moment the canonical wording changes, with both suites still green.
+	'n = 61',
+	'**What predicts the span is the turn count**',
+	'r = +0.80',
+	// The correctness objection, which stands whatever the wall clock says.
+	'**A handover would carry the retired value in exactly the case it was built for.**',
+	// What the brief's instruction half is worth, measured — the thing `review-brief.ts` says must
+	// never be assumed.
+	'8 of the 61 round-2 agents (13%) still ran a gate check of their own',
+	// The limit of the reading, so nobody quotes it as evidence that #1241 worked.
+	'**This says what round 2 costs now; it does not say whether joshuafolkken/kit#1241 moved it.**',
+	'**The heading above therefore stands unchanged**',
+	// The verdict, and the guard that keeps it from becoming a standing refusal.
+	"**So handing round 1's derivations to round 2 is not adopted**",
+]
+
 describe(`${REVIEW_PROMPT} — the measured dead end is recorded`, () => {
 	const content = read_unwrapped(REVIEW_PROMPT)
 
-	it.each(CANONICAL_MARKERS)('states %j', (marker) => {
+	it.each([...CANONICAL_MARKERS, ...ROUND_TWO_LAYER_MARKERS])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 })
@@ -81,9 +127,15 @@ const DIAG_MARKERS: ReadonlyArray<string> = [
 	'**A phase whose earlier measurement is recorded is ranked against that record, not from the tables alone**',
 	'**`review` is the phase that has such a record**',
 	SECTION_TITLE,
+	// The record is two sibling sections, and the pointer named only the first. A `diag` that follows
+	// it reaches the phase measurement and never the forked-agent one — which is the half that closes
+	// the handover proposal, and the proposal a `diag` re-derives, since two review transcripts
+	// visibly open the same files (joshuafolkken/kit#1418).
+	'**The record is two sibling sections, and reading only the first one misses half of it**',
+	LAYER_SECTION_TITLE,
 	// The instruction that keeps the figures single-sourced, which is what the absence suite below
 	// enforces mechanically.
-	'**Read it before ranking `review`, and quote no figure from it that you have not read there**',
+	'**Read both before ranking `review`, and quote no figure from either that you have not read there**',
 	// The record raises the bar on a further proposal rather than closing the question. Without this
 	// the pointer reads as a standing refusal, which would turn a thin correlation into a veto.
 	'**A proposal it already covers is not forbidden: it is required to say why the recorded data does not reach it**',
@@ -109,6 +161,12 @@ const DIAG_FORBIDDEN_FIGURES: ReadonlyArray<string> = [
 	'140 s',
 	'136 to 1053',
 	'177 to 396',
+	// joshuafolkken/kit#1418's figures, guarded on the same rule: the forked-agent layer is the one a
+	// `diag` reads next once the phase stops moving, so it is the next place these would be pasted.
+	'r = -0.15',
+	'r = +0.80',
+	'n = 61',
+	'9 of the 61',
 ]
 
 describe(`${DIAG_SKILL} — the ranker is pointed at it`, () => {
