@@ -3,6 +3,7 @@ import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
+import { time_gaps } from './time-gaps'
 import type { PhaseTotal } from './time-phases'
 import type { TimeReport } from './time-report'
 import { time_tool_turns } from './time-tool-turns'
@@ -60,6 +61,7 @@ type Breakdown = Pick<
 	| 'segments'
 	| 'by_invocation'
 	| 'by_check'
+	| 'gaps'
 	| 'bundles'
 	| 'failures'
 >
@@ -75,6 +77,7 @@ function empty_breakdown(): Breakdown {
 		by_josh_command: [],
 		by_invocation: [],
 		by_check: [],
+		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		failures: { ...time_failures.NO_FAILURES },
 	}

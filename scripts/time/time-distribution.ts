@@ -17,6 +17,9 @@
 
 const NO_SAMPLES = 0
 const HALF = 2
+// The rank the fourth figure is read at. A tenth of the sample sits at or above it, which is the
+// share a reader is asking about when they ask how bad the tail gets.
+const P90_RANK = 0.9
 
 interface Distribution {
 	// How many runs this figure was read from. Never assume it equals the number of runs measured: a
@@ -24,6 +27,12 @@ interface Distribution {
 	sample_count: number
 	min_ms: number
 	median_ms: number
+	// The ninetieth percentile (joshuafolkken/kit#1386). The median says what a typical reading was and
+	// the max says what the worst one was; only this says whether the worst one was alone. It joined
+	// the shape rather than being computed beside it, because a second percentile helper next to the
+	// one caller that wanted it is the clone `CLAUDE.md` prohibits — and the two would then disagree
+	// about what an even-sized sample's middle is.
+	p90_ms: number
 	max_ms: number
 }
 
@@ -31,6 +40,7 @@ const NOTHING_MEASURED: Distribution = {
 	sample_count: NO_SAMPLES,
 	min_ms: 0,
 	median_ms: 0,
+	p90_ms: 0,
 	max_ms: 0,
 }
 
@@ -46,6 +56,16 @@ function median_of(sorted: ReadonlyArray<number>): number {
 	return (upper + (sorted[middle - 1] ?? 0)) / HALF
 }
 
+// **By nearest rank, never interpolated.** The figure is read as a reading the sample actually held —
+// a reader who sees `p90 17.1 s` goes looking for the turn behind it — and an interpolated percentile
+// is a number no reading ever took. `Math.ceil` puts a sample of one at its only reading rather than
+// below the array.
+function p90_of(sorted: ReadonlyArray<number>): number {
+	const rank = Math.ceil(sorted.length * P90_RANK) - 1
+
+	return sorted[Math.max(rank, 0)] ?? 0
+}
+
 // **An empty input answers the withheld distribution, never a zeroed one.** The two are told apart by
 // `sample_count` alone, and every renderer of this record is required to read it before printing a
 // number.
@@ -58,6 +78,7 @@ function build(values: ReadonlyArray<number>): Distribution {
 		sample_count: sorted.length,
 		min_ms: sorted[0] ?? 0,
 		median_ms: median_of(sorted),
+		p90_ms: p90_of(sorted),
 		max_ms: sorted.at(-1) ?? 0,
 	}
 }

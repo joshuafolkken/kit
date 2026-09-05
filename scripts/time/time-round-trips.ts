@@ -123,14 +123,57 @@ function count_round_trips(spans: ReadonlyArray<Span>): number {
 	return group_round_trips(spans).length
 }
 
-// The two running totals `fold_issuing` carries: the model time seen since the last thing that was
-// not a model span, and the model time already charged to a round trip.
-interface IssuingTotals {
-	pending_ms: number
-	issuing_ms: number
+// One round trip's share of the model wait, as the stretch it actually was
+// (joshuafolkken/kit#1386). The price the report prints is the mean of these; a run's longest single
+// stretch — 189 seconds of run #1379, 12% of the whole run — is invisible in that mean and is exactly
+// what this record keeps.
+interface ModelGap {
+	duration_ms: number
+	started_ms: number
+	ended_ms: number
+	// Where the stretch began, as an index into the time-ordered spans: the first model span of it, or
+	// the round trip's own opener where nothing preceded it. An index rather than a phase name, because
+	// this module classifies nothing — `time-gaps.ts` reads the phase off it, so the two cannot come to
+	// order the spans differently.
+	span_index: number
 }
 
-const NO_TOTALS: IssuingTotals = { pending_ms: 0, issuing_ms: 0 }
+// A span with the position it holds in the ordered array, which is what carries the phase across.
+interface Indexed {
+	index: number
+	span: Span
+}
+
+// The stretch currently accumulating, and the stretches already charged to a round trip.
+interface GapWalk {
+	pending: Array<Indexed>
+	gaps: Array<ModelGap>
+}
+
+// **A round trip opened with nothing pending is a gap of zero, not a gap that did not happen.** The
+// mean the report already prints divides the whole issuing time by the round-trip count, so a
+// distribution that dropped those would sit above the mean beside it — one report disagreeing with
+// itself about the same quantity.
+//
+// **The window ends where the last member ended, not where the durations add up to.** The two agree
+// only where consecutive model spans tile, and this module's own walk names two places they do not: a
+// turn that bracketed a delegated unit, and a session seam `time_corpus` concatenated with nothing in
+// between. The duration would be right either way; the *window* is what a reader takes back to the
+// transcript to find the turn behind a figure, so a start plus a sum would send them to the wrong one.
+// An empty stretch has no last member and is stood in for by the opener, which gives it a window of
+// zero length at the instant the round trip opened.
+function to_gap(pending: ReadonlyArray<Indexed>, opener: Indexed): ModelGap {
+	const first = pending[0] ?? opener
+	const last = pending.at(-1)
+	const duration_ms = pending.reduce((sum, entry) => sum + entry.span.duration_ms, NONE)
+
+	return {
+		duration_ms,
+		started_ms: started_ms(first.span),
+		ended_ms: last?.span.ended_ms ?? started_ms(opener.span),
+		span_index: first.index,
+	}
+}
 
 // A turn's model time is charged to a round trip only when that turn went on to open one. **The run's
 // whole model wait is a different quantity**: a turn that called no tool — the answer that ends a
@@ -142,26 +185,41 @@ const NO_TOTALS: IssuingTotals = { pending_ms: 0, issuing_ms: 0 }
 // whose middle went to a delegated unit — opens no round trip, and carrying pending across it would
 // charge the subagent's closing answer to the *parent's* next trip. A session seam does the same,
 // since `time_corpus` concatenates one session's spans after another's with nothing in between.
-function fold_issuing(totals: IssuingTotals, span: Span, is_opener: boolean): IssuingTotals {
-	if (is_model(span)) return { ...totals, pending_ms: totals.pending_ms + span.duration_ms }
-	if (is_opener) return { pending_ms: 0, issuing_ms: totals.issuing_ms + totals.pending_ms }
+function step_gap(walk: GapWalk, entry: Indexed, is_opener: boolean): void {
+	if (is_model(entry.span)) {
+		walk.pending.push(entry)
 
-	return { ...totals, pending_ms: 0 }
+		return
+	}
+
+	if (is_opener) walk.gaps.push(to_gap(walk.pending, entry))
+	walk.pending = []
+}
+
+// **One stretch per round trip, in run order** (joshuafolkken/kit#1386). `group_round_trips` pushes a
+// group on exactly the openers this pushes a gap on, so the two lists are the same length by
+// construction rather than by assumption.
+function issuing_model_gaps(spans: ReadonlyArray<Span>): Array<ModelGap> {
+	const ordered = in_time_order(spans)
+	const walk: GapWalk = { pending: [], gaps: [] }
+
+	// A loop rather than `reduce`, which this project's lint config forbids — `group_round_trips` above
+	// drains its spans the same way.
+	for (const [index, span] of ordered.entries()) {
+		step_gap(walk, { index, span }, opens_round_trip(ordered, index))
+	}
+
+	return walk.gaps
 }
 
 // The model time that actually issued the round trips — the numerator of the price the report
 // prints, and the share of it a batching change removes (joshuafolkken/kit#1307).
+//
+// **Defined as the sum of the stretches above rather than folded separately** (joshuafolkken/kit#1386).
+// The mean and the distribution are then two readings of one walk, so the report cannot come to print
+// a mean the spread it sits beside could not produce.
 function issuing_model_ms(spans: ReadonlyArray<Span>): number {
-	const ordered = in_time_order(spans)
-	let totals = NO_TOTALS
-
-	// A loop rather than `reduce`, which this project's lint config forbids — `totals_by` in
-	// `time-report.ts` drains its map the same way.
-	for (const [index, span] of ordered.entries()) {
-		totals = fold_issuing(totals, span, opens_round_trip(ordered, index))
-	}
-
-	return totals.issuing_ms
+	return issuing_model_gaps(spans).reduce((sum, gap) => sum + gap.duration_ms, NONE)
 }
 
 // What one round trip cost, in whatever unit the numerator carries: calls, for the density the floor
@@ -204,8 +262,12 @@ const time_round_trips = {
 	// after the parent's) is not one a second copy would keep remembering.
 	in_time_order,
 	is_below_floor,
+	// Exported since joshuafolkken/kit#1386, so the distribution `time-gaps.ts` reports is read off the
+	// very stretches the mean is summed from rather than off a second walk beside them.
+	issuing_model_gaps,
 	issuing_model_ms,
 	per_round_trip,
 }
 
+export type { ModelGap }
 export { time_round_trips }

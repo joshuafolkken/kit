@@ -1649,6 +1649,14 @@ Round trips:
   cost per round trip        17.6 s   model wait 9.3 s
   ⚠ independent calls are going out one per turn (floor 1.50 calls per round trip)
 
+Model gap per round trip:
+  model gap                   4.2 s   min 0.0 s · p90 19.4 s · max 189.2 s
+
+Longest model gaps (descending):
+  00:12:34 → 00:15:43       189.2 s   rework · 4.3% of elapsed
+  00:44:02 → 00:44:58        56.0 s   review · 1.3% of elapsed
+  …
+
 Bundling:
   bundleable sequences           15   longest 5 turn(s)
   recoverable round trips        25   20.2% of 124 round trip(s)
@@ -1704,6 +1712,12 @@ Per invocation (repeated commands):
 - **The error is stated in both directions.** It **under-reports** where the target test finds an overlap that was not a dependency, and where a chained command was excluded for a mutation word it never used as one. It **over-reports** where a call named no target at all, since a dependency that exists only in the earlier call's output is invisible. On the three runs it was built from it read 27, 14 and 25 avoidable round trips — 3.3, 2.4 and 3.7 minutes — against the 33 the estimate assumed for the last of them.
 
 **A count cannot be ranked against a phase, so the block also prices one round trip** ([#1307](https://github.com/joshuafolkken/kit/issues/1307)). `diag` ranks candidates by the minutes each would save per run, and `146 round trips` is not minutes — so the counts sat in the report while the ranking was assembled from the phase table beside them, and the 2026-09-04 `diag` left round-trip reduction off its candidate table altogether. The row prints what one trip cost and the **model wait** inside it: on the session above, 17.6 seconds each, of which 9.3 was the model composing the turn that issued the call. Multiplying that by the trips a proposed change would remove is the estimate the table wanted — the same session's 34 `Edit` calls executed for 1.7 minutes and cost about 10 minutes of round trips. **The model share is printed rather than left to be derived** because it is the part batching actually removes: a tool's own execution is paid whichever turn it was issued from.
+
+**And a mean cannot say whether a run was slow everywhere or slow once, so the block beneath it prints the spread** ([#1386](https://github.com/joshuafolkken/kit/issues/1386)). Run #1379's price row read `model wait 8.13 s`; hand-measuring the same run found its per-round-trip stretches were 3.8 s at the median and 17.1 s at p90, with a **maximum of 189 s** — one uninterrupted stretch in the exploration phase, 12% of a 1,633-second run, and arithmetically invisible in that 8.13. The two runs a mean of 8 seconds can describe need opposite fixes: batching removes many small round trips and touches one long think not at all. So `model gap per round trip` prints `min` / `median` / `p90` / `max` through the same `Distribution` record `--last` reports its spreads from — `p90` is new to that record and joined it rather than being computed beside it, so the two scopes cannot come to disagree about what an even-sized sample's middle is; `--last`'s own table still prints `median`, `min – max` and a sample count, because a sample of five runs has no separate ninetieth to print. `Longest model gaps` lists the longest few **by length rather than in run order** — the treatment the segment table already gets — each with the phase it was spent in and its share of the run. The mean above it is unchanged.
+
+- **It is the mean's distribution, not a second measurement.** The stretches come from the same walk `model_ms_per_round_trip` is summed from, so a round trip opened with nothing pending — the call that follows a person typing — is a stretch of **zero** rather than one that did not happen, and the median can never sit above a price the same report prints.
+- **The phase is what makes one row actionable.** Twenty minutes of thinking during `implement` and the same twenty during `rework` are different findings, and the classification is `time_phases.classify`'s rather than a second one — so the row agrees with the phase table by construction.
+- **Withheld rather than zeroed, in the two shapes the neighboring blocks already use.** A scope with `span_count: 0` prints `not measured`, because a median of `0.0 s` would report the fastest possible run for a scope nobody read; a transcript that _was_ read but made no round trip prints `no tool call to divide`, exactly as the price row above it does.
 
 **The numerator is what a round trip is made of, not what the run did while one was outstanding.** Two exclusions, both in the direction that would otherwise over-state a saving and get a cut ranked above one worth more. **Human wait and CI wait are out**: a round trip does not cause them, and a price that folded them in would be multiplied out as a saving and then counted a second time against the `wait` and `ci` rows of the very table it was carried into — on the session above that alone would have priced each trip at 30.1 seconds against a real 17.6. **The model wait of a turn that called nothing is out too**: the answer that ends a reply and the turn that stops to wait for a person composed nothing batching could give back, and the run above spent 237 turns on 146 round trips. Both figures divide by the round trips rather than by the turns, for the same reason. Where there was no round trip to divide by, the row says `no tool call to divide` and the JSON's `ms_per_round_trip` / `model_ms_per_round_trip` are the same withheld answer the counts give, never a measured zero.
 

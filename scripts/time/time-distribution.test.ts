@@ -12,6 +12,7 @@ describe('time_distribution.build', () => {
 			sample_count: 3,
 			min_ms: 10,
 			median_ms: 20,
+			p90_ms: 30,
 			max_ms: 30,
 		})
 	})
@@ -34,12 +35,35 @@ describe('time_distribution.build', () => {
 		const one = time_distribution.build([7])
 
 		expect(time_distribution.is_measured(one)).toBe(true)
-		expect(one).toEqual({ sample_count: 1, min_ms: 7, median_ms: 7, max_ms: 7 })
+		expect(one).toEqual({ sample_count: 1, min_ms: 7, median_ms: 7, p90_ms: 7, max_ms: 7 })
 	})
 
 	// The input is whatever order the runs came in, so the sort is the function's own business.
 	it('does not depend on the order the readings arrived in', () => {
 		expect(time_distribution.build([20, 30, 10])).toEqual(time_distribution.build([10, 20, 30]))
+	})
+})
+
+// The fourth figure, added when a per-round-trip spread needed to say whether its worst reading was
+// alone (joshuafolkken/kit#1386).
+describe('time_distribution.build — the ninetieth percentile', () => {
+	// A hundred readings whose tail is one long one — the shape run #1379 had. The p90 is a tenth of
+	// the max, which is the whole reason a mean cannot answer the question.
+	it('reports it by nearest rank, apart from the largest reading', () => {
+		const readings = [...Array.from({ length: 99 }, (_unused, index) => index + 1), 1000]
+		const spread = time_distribution.build(readings)
+
+		expect(spread.median_ms).toBe(50.5)
+		expect(spread.p90_ms).toBe(90)
+		expect(spread.max_ms).toBe(1000)
+	})
+
+	// **Not interpolated**, so the figure is always a reading the sample actually held. `ceil` also
+	// keeps the rank inside the array for a sample of one, which is what a run with a single round trip
+	// hands over.
+	it('answers the largest reading for a sample too small to have a separate ninetieth', () => {
+		expect(time_distribution.build([5, 9]).p90_ms).toBe(9)
+		expect(time_distribution.build([7]).p90_ms).toBe(7)
 	})
 })
 

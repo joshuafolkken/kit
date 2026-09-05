@@ -143,6 +143,55 @@ describe('time_round_trips.issuing_model_ms', () => {
 	})
 })
 
+// The stretches the mean above is the mean of (joshuafolkken/kit#1386).
+describe('time_round_trips.issuing_model_gaps', () => {
+	// **One stretch per round trip, so the distribution and the mean share a denominator.** A walk that
+	// produced fewer would put the spread above the price the report prints beside it.
+	it('hands back one stretch for every round trip the run made', () => {
+		expect(time_round_trips.issuing_model_gaps(SERIAL)).toHaveLength(
+			time_round_trips.count_round_trips(SERIAL),
+		)
+		expect(time_round_trips.issuing_model_gaps(BATCHED)).toHaveLength(
+			time_round_trips.count_round_trips(BATCHED),
+		)
+	})
+
+	// The mean is defined as the sum of these, rather than folded separately — which is what stops the
+	// two from coming to disagree about what was charged.
+	it('sums to exactly the issuing model time', () => {
+		const total = time_round_trips
+			.issuing_model_gaps(ANSWERED)
+			.reduce((sum, gap) => sum + gap.duration_ms, 0)
+
+		expect(total).toBe(time_round_trips.issuing_model_ms(ANSWERED))
+	})
+
+	// A round trip opened with nothing pending is a stretch of zero, not a stretch that did not happen:
+	// the leading tool span here had no turn in front of it at all.
+	it('records a round trip nothing preceded as a stretch of zero', () => {
+		const [first] = time_round_trips.issuing_model_gaps([TOOL, MODEL, TOOL])
+
+		expect(first?.duration_ms).toBe(0)
+		expect(first?.started_ms).toBe(first?.ended_ms)
+	})
+
+	// **The window ends where the stretch's last span ended, not where its durations add up to.** Two
+	// turns from different sessions are consecutive in the array with real time between them, and a
+	// window measured as a start plus a sum would send a reader back to the wrong turn.
+	it('closes the window at the last span of the stretch, across a gap in the timeline', () => {
+		const { MINUTE_MS } = time_span_fixture
+		const spans = [
+			{ ...MODEL, ended_ms: MINUTE_MS },
+			{ ...MODEL, ended_ms: 10 * MINUTE_MS },
+			{ ...TOOL, ended_ms: 11 * MINUTE_MS },
+		]
+		const [only] = time_round_trips.issuing_model_gaps(spans)
+
+		expect(only?.duration_ms).toBe(2 * MINUTE_MS)
+		expect(only?.ended_ms).toBe(10 * MINUTE_MS)
+	})
+})
+
 describe('time_round_trips.per_round_trip', () => {
 	it('divides the calls by the trips they were issued in', () => {
 		expect(time_round_trips.per_round_trip(4, 2)).toBe(2)
