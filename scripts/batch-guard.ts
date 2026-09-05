@@ -6,6 +6,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { z } from 'zod'
 import { time_batch_guard } from './time/time-batch-guard'
 import { time_density_hook } from './time/time-density-hook'
+import { time_hook_transcript } from './time/time-hook-transcript'
 
 // The disk half of the batching guard (joshuafolkken/kit#1390): find the transcript, read enough of
 // its end, remember when a call was last refused, and write the refusal Claude Code understands.
@@ -47,11 +48,19 @@ const SWITCH_ENV_KEY = 'JOSH_BATCH_GUARD'
 // guard that the list does not recognize leaves it on, and the person sees refusals they asked to stop.
 const DISABLED_VALUES: ReadonlyArray<string> = ['off', '0', 'false', 'no']
 
-// Only the three fields this reads. Claude Code hands a `PreToolUse` hook the tool it is about to run
-// beside the session's own transcript path, so nothing is searched for and a delegated unit is
-// answered with its own file rather than its parent's.
+// Only the four fields this reads. Claude Code hands a `PreToolUse` hook the tool it is about to run
+// beside a transcript path, so nothing is searched for.
+//
+// **`agent_id` is what makes a delegated unit answerable with its own file** (joshuafolkken/kit#1424).
+// The path in the payload is the *parent* session's whichever agent issued the call, so without this
+// field the guard judged the parent's frozen timeline and refused nothing at all inside a fork;
+// `time-hook-transcript.ts` carries the measurement and the derivation.
 const payload_schema = z.object({
 	transcript_path: z.string().min(1),
+	// **`nullish`, not `optional`.** A payload spelling the absent agent as `null` has to read as "no
+	// fork"; rejected, it would fail `safeParse` for the whole payload and take the guard off every call
+	// of the main line, in silence — the one failure this file's every other path is written to avoid.
+	agent_id: z.string().nullish(),
 	tool_name: z.string().min(1),
 	tool_input: z.unknown(),
 })
@@ -112,8 +121,9 @@ function refusal_for_payload(payload: GuardPayload, now_ms: number): string | un
 
 	if (!time_batch_guard.is_guarded_call(call)) return undefined
 
-	const target = refusal_path(payload.transcript_path)
-	const tail = time_density_hook.read_tail(payload.transcript_path)
+	const transcript = time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id)
+	const target = refusal_path(transcript)
+	const tail = time_density_hook.read_tail(transcript)
 
 	if (!time_batch_guard.should_block(tail, call, last_refusal_ms(target))) return undefined
 	if (!record_refusal(target, now_ms)) return undefined

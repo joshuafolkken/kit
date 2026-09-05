@@ -39,6 +39,8 @@ const TURN_MINUTES = 2
 // about the density is never answered by the sample-size guard instead. Named here rather than in
 // each suite because three of them assert against the round-trip count it produces.
 const DENSITY_TURNS = 12
+// The `}` a serialized payload ends in, dropped so another field can be appended after the last one.
+const CLOSING_BRACE = -1
 // The minute a concurrent session's call lands on — inside the same window, on an instant the
 // delegated unit's spans do not share, so the cross-session dedupe cannot collapse the two.
 const CONCURRENT_CALL_MINUTE = 2
@@ -228,6 +230,19 @@ function density_text(turns: number, calls: number): string {
 	return [prompt_line(0, BRANCH), ...groups.flat()].join('\n')
 }
 
+// A hook payload whose `agent_id` is the JSON literal `null` (joshuafolkken/kit#1424).
+//
+// **Spliced in as text rather than set as a value**, for two reasons that point the same way: it is
+// what the harness sends, and a `null` written in TypeScript source is what `unicorn/no-null` forbids.
+// What the cases built on it assert is that a hook's schema reads that spelling as "no fork" instead of
+// rejecting the whole payload — which would take the hook off every call of the main line, in silence.
+//
+// **Shared rather than restated in each suite**: both hook suites need it, and the guard and the
+// density line must not come to disagree about what an absent agent looks like.
+function with_null_agent(payload_json: string): string {
+	return `${payload_json.slice(0, CLOSING_BRACE)},"agent_id":null}`
+}
+
 function project_directory(home: string): string {
 	return path.join(home, cost_transcript.project_slug(CWD))
 }
@@ -309,6 +324,7 @@ const time_transcript_fixture = {
 	run_lines,
 	delegating_lines,
 	concurrent_lines,
+	with_null_agent,
 	project_directory,
 	write_session,
 	write_unit,

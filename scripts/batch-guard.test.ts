@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
@@ -11,6 +11,7 @@ import {
 	refusal_path,
 	SWITCH_ENV_KEY,
 } from './batch-guard'
+import { time_hook_transcript } from './time/time-hook-transcript'
 import { time_transcript_fixture } from './time/time-transcript-fixture'
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'batch-guard-'))
@@ -21,6 +22,9 @@ const { open_turn_lines, target_turn_lines, ms } = time_transcript_fixture
 const FRESH_PATH = 'scripts/fresh.ts'
 const LATER_MINUTE = 59
 const NOW_MS = ms(LATER_MINUTE)
+// The shape Claude Code puts in a forked agent's payload: the id of the fork, beside the *parent*
+// session's transcript path (joshuafolkken/kit#1424).
+const AGENT_ID = 'a313eea340918b8a1'
 
 // A transcript of its own per case, so one case's refusal record never silences another's — the record
 // is keyed on the transcript the payload names. Each is remembered rather than listed again in the
@@ -37,6 +41,17 @@ function unbatched_text(): string {
 	].join('\n')
 }
 
+// A run that already batched, which the guard has nothing to say about. Used both as a case of its own
+// and as the *parent* half of the fork cases, where it is what proves the fork's own file was read.
+function batched_text(): string {
+	return [
+		...target_turn_lines(0, ['a.ts']),
+		...target_turn_lines(1, ['b.ts', 'e.ts']),
+		...target_turn_lines(2, ['f.ts']),
+		...open_turn_lines(3, ['c.ts']),
+	].join('\n')
+}
+
 function write_transcript(name: string, text: string): string {
 	const target = path.join(WORK_DIRECTORY, `${name}.jsonl`)
 
@@ -50,6 +65,27 @@ function payload_of(name: string, text: string = unbatched_text()): string {
 	return JSON.stringify({
 		hook_event_name: 'PreToolUse',
 		transcript_path: write_transcript(name, text),
+		tool_name: 'Read',
+		tool_input: { file_path: FRESH_PATH },
+	})
+}
+
+// A payload as a forked agent's call arrives: `transcript_path` naming the parent — whose history says
+// nothing — and `agent_id` naming the fork, whose own history is a run of single-call turns. **Where
+// the fork's file goes comes from the module that resolves it**, so this suite cannot drift from the
+// layout Claude Code writes; `time-hook-transcript.test.ts` is what pins that layout literally.
+function fork_payload_of(name: string, agent_id: string = AGENT_ID): string {
+	const session_path = write_transcript(name, batched_text())
+	const fork = time_hook_transcript.fork_path(session_path, agent_id)
+
+	mkdirSync(path.dirname(fork), { recursive: true })
+	writeFileSync(fork, unbatched_text())
+	WRITTEN_TRANSCRIPTS.add(fork)
+
+	return JSON.stringify({
+		hook_event_name: 'PreToolUse',
+		transcript_path: session_path,
+		agent_id,
 		tool_name: 'Read',
 		tool_input: { file_path: FRESH_PATH },
 	})
@@ -89,14 +125,9 @@ describe('batch_refusal', () => {
 
 	// A turn that already batched breaks the run of singles, so what precedes it is not carried across.
 	it('says nothing where a batched turn broke the run of singles', () => {
-		const batched = [
-			...target_turn_lines(0, ['a.ts']),
-			...target_turn_lines(1, ['b.ts', 'e.ts']),
-			...target_turn_lines(2, ['f.ts']),
-			...open_turn_lines(3, ['c.ts']),
-		].join('\n')
+		const payload = payload_of('batched', batched_text())
 
-		expect(batch_refusal(payload_of('batched', batched), NOW_MS)).toBeUndefined()
+		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
 	})
 
 	// Every failure allows the call: a hook that failed closed would stop a run over its own plumbing.
@@ -118,6 +149,54 @@ describe('batch_refusal', () => {
 		process.env[SWITCH_ENV_KEY] = DISABLED_VALUES[0] ?? 'off'
 
 		expect(batch_refusal(payload_of('switched-off'), NOW_MS)).toBeUndefined()
+	})
+})
+
+// A forked review agent's calls were never judged before this (joshuafolkken/kit#1424): the payload
+// names the parent session, whose timeline is frozen for as long as the fork runs, so the guard
+// refused nothing at all in 551 measured forks.
+describe('batch_refusal — a forked agent is judged on its own transcript', () => {
+	it("refuses on the fork's history where the parent's says nothing", () => {
+		expect(batch_refusal(fork_payload_of('fork-judged'), NOW_MS)).toContain('batching')
+	})
+
+	// The record has always been described as giving a delegated unit a budget of its own. It only does
+	// once it is keyed on the fork's path — keyed on the parent's, one fork's refusal would silence the
+	// next fork of the same session.
+	it("records the refusal against the fork's own path", () => {
+		const payload = fork_payload_of('fork-record')
+		const { transcript_path } = JSON.parse(payload) as { transcript_path: string }
+		const fork = time_hook_transcript.fork_path(transcript_path, AGENT_ID)
+
+		expect(batch_refusal(payload, NOW_MS)).toBeDefined()
+		expect(existsSync(refusal_path(fork))).toBe(true)
+		expect(existsSync(refusal_path(transcript_path))).toBe(false)
+	})
+
+	// **The fork's first call, before anything has been written under it — and the parent's own history
+	// must not answer for it.** A parent is often mid-streak exactly when it delegates, so judging on its
+	// tail would refuse a fork that has run nothing at all *and* spend the parent's record, admitting the
+	// parent's next genuine third single-call turn in silence.
+	it("says nothing, and spends nothing, when the fork's transcript is not there yet", () => {
+		const session_path = write_transcript('fork-absent', unbatched_text())
+		const payload = JSON.stringify({
+			hook_event_name: 'PreToolUse',
+			transcript_path: session_path,
+			agent_id: AGENT_ID,
+			tool_name: 'Read',
+			tool_input: { file_path: FRESH_PATH },
+		})
+
+		expect(batch_refusal(payload, NOW_MS)).toBeUndefined()
+		expect(existsSync(refusal_path(session_path))).toBe(false)
+	})
+
+	// A main line that spells its absent agent `null` is a main line, not a fork. Rejected by the schema
+	// instead, the whole payload would fail to parse and the guard would go silent on every call.
+	it('judges the session itself when the agent is spelled null', () => {
+		const payload = time_transcript_fixture.with_null_agent(payload_of('null-agent'))
+
+		expect(batch_refusal(payload, NOW_MS)).toContain('batching')
 	})
 })
 
