@@ -6,7 +6,7 @@
 // ルールでガードする。詳細は prompts/testing-guide.md の「Test file naming & placement」。
 
 const SPEC_FILENAME_MESSAGE =
-	'Rename this file: the *.spec.ts / *.spec.js suffix is forbidden. Use *.test.ts (node/unit) or *.svelte.test.ts (component/browser). See prompts/testing-guide.md.'
+	'Rename this file: the *.spec.* suffix is forbidden, in every JS/TS extension. Use *.test.ts (node/unit) or *.svelte.test.ts (component/browser). See prompts/testing-guide.md.'
 
 const CENTRALIZED_TESTS_DIRECTORY_MESSAGE =
 	'A top-level tests/ directory is forbidden. Colocate every test next to the code it exercises (foo.test.ts beside foo.ts), and place E2E specs under src/routes/**. See prompts/testing-guide.md.'
@@ -63,6 +63,11 @@ const centralized_tests_directory_rules = {
 // `no-restricted-syntax` を単独で設定すると、共有ルール側が同じキーで持つセレクタが
 // 禁止パターンに一致するファイルでは全て黙って消える。既存のエントリの上に重ねることで、
 // 禁止ファイルでも共有セレクタが効いたままになる — セレクタを書き写さないので単一ソース。
+//
+// **severity は常に `error` で、`base_rules` 側の severity は引き継がない。** 禁止は声高に
+// 失敗することが存在理由なので、`['warn', ...]` の設定に合わせて禁止まで warn に落ちるのは
+// 誤りである。代償として、warn や off で置いてあったセレクタは禁止パターンのファイルでだけ
+// error に上がる — 対象はどのみち rename/move しか正解の無いファイルなので許容する。
 /**
  * @param {import('eslint').Linter.RulesRecord} base_rules
  * @param {{ selector: string; message: string }} ban_entry

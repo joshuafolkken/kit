@@ -231,7 +231,7 @@ describe('create_base_config — nested checkouts', () => {
 })
 
 const RESTRICTED_SYNTAX_RULE = 'no-restricted-syntax'
-const SPEC_BAN_FRAGMENT = 'the *.spec.ts / *.spec.js suffix is forbidden'
+const SPEC_BAN_FRAGMENT = 'the *.spec.* suffix is forbidden'
 const CENTRALIZED_TESTS_BAN_FRAGMENT = 'A top-level tests/ directory is forbidden'
 const PROBE_SOURCE = 'export const PROBE = 1\n'
 const SPEC_PROBE_FILE = 'src/lib/probe.spec.ts'

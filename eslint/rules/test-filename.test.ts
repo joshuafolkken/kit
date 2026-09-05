@@ -12,15 +12,22 @@ import {
 
 const ECMA_VERSION = 2024
 const COLOCATED_TEST_FILE = 'src/lib/foo.test.ts'
+const SPEC_FILE = 'src/lib/foo.spec.ts'
 const RESTRICTED_SYNTAX_RULE = 'no-restricted-syntax'
 
 // A stand-in for whatever `no-restricted-syntax` the surrounding config already carries — kit's base
 // composes the ban onto `eslint/rules/code-quality.js`. Importing that module here would tie this
 // suite to rules that are not part of the standalone building blocks it covers, so the shape is
 // mirrored rather than borrowed (joshuafolkken/kit#1414).
+const SURROUNDING_ENTRY = { selector: 'ForInStatement', message: 'no for..in' }
 const SURROUNDING_RESTRICTION: Linter.RulesRecord = {
-	[RESTRICTED_SYNTAX_RULE]: ['error', { selector: 'WithStatement', message: 'no with' }],
+	[RESTRICTED_SYNTAX_RULE]: ['error', SURROUNDING_ENTRY],
 }
+
+// A source that trips the stand-in selector, so the wiring above is self-checking: drop the
+// composition and this file's own cases fall from two reports to one (joshuafolkken/kit#1414).
+const FOR_IN_SOURCE = 'const PROBE = { a: 1 }\nfor (const key in PROBE) globalThis.log(key)\n'
+const BAN_PLUS_SURROUNDING = 2
 
 // Minimal flat config mirroring how the kit eslint config wires the fragments: each ban is composed
 // onto the surrounding restriction and scoped to its filename patterns. Linting with a virtual
@@ -51,7 +58,7 @@ function restricted_messages(file_name: string, source = ''): Array<Linter.LintM
 
 describe('test-filename — forbids *.spec.ts / *.spec.js', () => {
 	it('flags a colocated *.spec.ts file', () => {
-		const messages = restricted_messages('src/lib/foo.spec.ts')
+		const messages = restricted_messages(SPEC_FILE)
 
 		expect(messages).toHaveLength(1)
 		expect(messages[0]?.message).toContain('*.test.ts')
@@ -129,17 +136,26 @@ describe('test-filename — both bans cover every JS/TS extension (issue #1414)'
 	})
 })
 
+describe('test-filename — the composed wiring keeps the surrounding restriction (issue #1414)', () => {
+	it('reports the spec ban beside the surrounding selector', () => {
+		expect(restricted_messages(SPEC_FILE, FOR_IN_SOURCE)).toHaveLength(BAN_PLUS_SURROUNDING)
+	})
+
+	it('reports the tests/ ban beside the surrounding selector', () => {
+		expect(restricted_messages('tests/foo.ts', FOR_IN_SOURCE)).toHaveLength(BAN_PLUS_SURROUNDING)
+	})
+})
+
 // joshuafolkken/kit#1414: flat config replaces a rule's options rather than merging them, so a ban
 // set on its own erases whatever the shared config already restricted. This is the composition that
 // prevents it; the base config's own wiring is asserted end to end in `eslint/base.test.ts`.
 describe('extend_restricted_syntax (issue #1414)', () => {
-	const BASE_ENTRY = { selector: 'ForInStatement', message: 'no for..in' }
-	const BASE_RULES: Linter.RulesRecord = { [RESTRICTED_SYNTAX_RULE]: ['error', BASE_ENTRY] }
+	const BASE_RULES: Linter.RulesRecord = { [RESTRICTED_SYNTAX_RULE]: ['error', SURROUNDING_ENTRY] }
 
 	it('keeps the existing entries and appends the ban after them', () => {
 		const rules = extend_restricted_syntax(BASE_RULES, SPEC_FILENAME_ENTRY)
 
-		expect(rules[RESTRICTED_SYNTAX_RULE]).toEqual(['error', BASE_ENTRY, SPEC_FILENAME_ENTRY])
+		expect(rules[RESTRICTED_SYNTAX_RULE]).toEqual(['error', SURROUNDING_ENTRY, SPEC_FILENAME_ENTRY])
 	})
 
 	it('falls back to the ban alone when the base restricts nothing', () => {
