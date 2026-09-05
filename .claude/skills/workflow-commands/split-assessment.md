@@ -13,6 +13,21 @@ Separately mergeable is the test — not "large", not "touches many files". A ch
 one commit to be correct is one deliverable however big it is; two changes that could each ship
 alone are two, however small.
 
+## Diff size is not a criterion, and that is measured
+
+**The test above says the answer is not "large" and not "touches many files", and that exclusion is
+measured rather than stylistic.** joshuafolkken/kit#1436 proposed adding a diff-size arm here, on the
+ground that review round 1's wall clock tracks how much it is handed to read. **It does track it —
+and splitting an Issue in two to shorten round 1 lengthens it**, because each Issue pays round 1's
+fixed cost again while the size-dependent part is merely divided between the halves. The fit, the
+sample, the unreadable share of it and the decision are `prompts/review.md` → "Round 1's cost does
+track the change size, and splitting is still not how to cut it", which is the single source. **A
+proposal to add a size threshold here is required to say why that data does not reach it**, which is
+a different bar from being refused.
+
+**It changes nothing about the assessment itself.** Two or more separately-mergeable deliverables
+still always means an epic, and one deliverable stays one however large its diff is.
+
 ## What each entry point does with the answer
 
 | Entry | Single | Two or more |

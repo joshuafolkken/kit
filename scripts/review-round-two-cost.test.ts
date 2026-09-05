@@ -127,15 +127,17 @@ const DIAG_MARKERS: ReadonlyArray<string> = [
 	'**A phase whose earlier measurement is recorded is ranked against that record, not from the tables alone**',
 	'**`review` is the phase that has such a record**',
 	SECTION_TITLE,
-	// The record is two sibling sections, and the pointer named only the first. A `diag` that follows
+	// The record is three sibling sections, and the pointer named only the first. A `diag` that follows
 	// it reaches the phase measurement and never the forked-agent one — which is the half that closes
 	// the handover proposal, and the proposal a `diag` re-derives, since two review transcripts
-	// visibly open the same files (joshuafolkken/kit#1418).
-	'**The record is two sibling sections, and reading only the first one misses half of it**',
+	// visibly open the same files (joshuafolkken/kit#1418). The count moved to three when
+	// joshuafolkken/kit#1436 re-measured this section's own round-1 coefficient; that section's own
+	// markers live in `review-round-one-cost.test.ts`, and only the count belongs here.
+	'**The record is three sibling sections, and reading only the first one misses most of it**',
 	LAYER_SECTION_TITLE,
 	// The instruction that keeps the figures single-sourced, which is what the absence suite below
 	// enforces mechanically.
-	'**Read both before ranking `review`, and quote no figure from either that you have not read there**',
+	'**Read all three before ranking `review`, and quote no figure from any of them that you have not read there**',
 	// The record raises the bar on a further proposal rather than closing the question. Without this
 	// the pointer reads as a standing refusal, which would turn a thin correlation into a veto.
 	'**A proposal it already covers is not forbidden: it is required to say why the recorded data does not reach it**',
