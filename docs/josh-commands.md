@@ -81,7 +81,7 @@ Each block's header names the command that ran, not only the check, because the 
 - **An empty changed map**, which is never evidence. Straight after `git switch main && git pull` the map is empty, and an empty map compares equal to any other empty map. `epicrun` runs exactly that pair of commands between children. Refusing costs nothing: a tree with no changed file is not where a run spends its gate time.
 - **`pnpm josh gate --force`**, for when something outside the tree changed and you know it — a `pnpm install`, a toolchain bump, a cache thrown away.
 
-**The pre-push hook reads the same record through the same decision** ([#1334](https://github.com/joshuafolkken/kit/issues/1334)) — see [`josh pre-push-unit`](#josh-pre-push-unit), which adds one condition of its own because a push carries `HEAD` where this record describes the working tree.
+**Both git hooks read the same record through the same decision**, each adding one condition of its own because the record describes the working tree while a git operation carries something narrower — [`josh pre-push-unit`](#josh-pre-push-unit) for the unit suite, since a push carries `HEAD` ([#1334](https://github.com/joshuafolkken/kit/issues/1334)), and [`josh pre-commit-type-check`](#josh-pre-commit-type-check) for the project-wide type check, since a commit carries the index ([#1381](https://github.com/joshuafolkken/kit/issues/1381)). What the two share is `scripts/hook-gate-reuse.ts`, and the comparison itself is `scripts/gate-skip.ts` in both — so no hook can answer "is this still the recorded tree" differently from the gate printing its answer beside it.
 
 #### A gate a pending version bump would invalidate is refused, not run
 
@@ -1052,6 +1052,37 @@ The output claims the result rather than the omission, because a line reading "u
 The escape hatch is an environment variable rather than the gate's `--force` flag because the hook's command line belongs to `lefthook/base.yml` — nobody types this invocation, so a flag would be unreachable at the moment it is wanted. `pnpm josh audit`, the hook's other command, is untouched: the gate does not run it, so it is not a duplicate of anything.
 
 When the suite does run it goes through the same guard [`josh test:unit`](#josh-testunit) uses, so a project with no vitest or no test files prints a skip notice instead of failing the push.
+
+### `josh pre-commit-type-check`
+
+Type-check the whole project for the pre-commit hook, reusing the result when [`josh gate`](#josh-gate) already recorded that exact tree green ([#1381](https://github.com/joshuafolkken/kit/issues/1381)). Wired in by `lefthook/base.yml` as the pre-commit `type-check` command; it replaces the bare `pnpm exec tsc --noEmit` that hook used to carry.
+
+```bash
+pnpm josh pre-commit-type-check             # alias: josh ptc
+JOSH_PRE_COMMIT_FORCE=1 git commit          # type-check even on a tree recorded green
+```
+
+Measured in kit: `pnpm exec tsc --noEmit` over the whole project takes 3.8–4.4s warm, and every commit paid it seconds after the gate had printed the same project-wide type check green on the same tree — twice per `fullrun`, which commits twice.
+
+**It is the one project-wide check the pre-commit hook had left.** The hook runs its commands in parallel, so its wall time is the longest of them: the staged-file `cspell`, `prettier` and `eslint` commands cost 0.3–1.0s each and are a **narrower scope** than the gate's project-wide run, so they are untouched — skipping them would buy about half a second in exchange for trading a narrow reading for a recorded wide one. `prevent-main-commit` and `secretlint` are untouched for a different reason: the gate does not run either, so neither is a duplicate of anything.
+
+**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, an advanced default branch, an empty map, a missing record and a red gate (which writes none) each run the whole project type check exactly as before.
+
+**Two conditions are added on top, and both only ever narrow.**
+
+- **The commit has to carry the recorded tree.** The record describes the **working tree**; a commit carries the **index**. Stage half of a green tree and the map still matches while the commit being made is a tree no check has read. So the reuse also requires every `git status --porcelain` entry to be staged in full — an unstaged edit (` M`), a partially staged file (`MM`) and an untracked file (`??`) each send the hook back to the full check, as does a status that could not be read at all. `pnpm josh git` stages before it commits, which is exactly the state that satisfies this.
+- **The gate's type check has to be this type check.** The record says the four checks were green; it does not say _which_ type check ran, and [that step is resolved per project](#josh-gate) ([#934](https://github.com/joshuafolkken/kit/issues/934)) — a project carrying a `josh-app` or `josh-game` shim has the toolkit's `check:ci` as its gate step, where this hook's is `tsc --noEmit`. Reusing across that difference would skip `tsc --noEmit` on the strength of a different check, so on such a project the hook runs the whole type check exactly as it always did. The saving therefore lands on kit and on plain TypeScript projects, whose gate step _is_ `pnpm josh check`.
+
+**The set of checks is unchanged.** When it runs, it runs the same `pnpm exec tsc --noEmit` the hook always ran; what changes is only whether an already-passed check is executed again on an unchanged tree. **Nothing is forwarded to `tsc`**, and an argument other than `--force` is refused rather than dropped: `tsc --noEmit <file>` ignores `tsconfig.json`, so forwarding a path would silently narrow the very check this command exists to run in full.
+
+The output claims the result rather than the omission, because a line reading "type check skipped" is indistinguishable from "not verified" while the commit it precedes goes ahead on the strength of it:
+
+```
+✔ this tree is already green — the type check passed on it at 2026-09-06T02:41:17.104Z (`pnpm josh gate`), and this commit carries that same tree.
+  Reusing that result; nothing was re-run. `JOSH_PRE_COMMIT_FORCE=1 git commit` runs it anyway.
+```
+
+That sentence is built in one place for all three readers — the gate's own skip, this hook and [`josh pre-push-unit`](#josh-pre-push-unit) — so a claim this load-bearing cannot drift into three different claims.
 
 ### `josh hook:install`
 

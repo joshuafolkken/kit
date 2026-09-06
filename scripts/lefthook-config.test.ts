@@ -29,6 +29,10 @@ const PRE_COMMIT = 'pre-commit'
 const PRE_PUSH = 'pre-push'
 const CSPELL = 'cspell'
 const SECRETLINT = 'secretlint'
+const TYPE_CHECK = 'type-check'
+// Both hooks make the same claim about the same record (kit#1334, kit#1381), so both say it the same
+// way — a reader scanning the suite for "which layers reuse the gate's result" finds one phrase.
+const DELEGATES_TO_WRAPPER = 'delegates to the josh wrapper that can reuse a recorded green gate'
 // lefthook resolves a nested `extends` from the consumer git root, so kit presets must reference
 // base by this root-relative node_modules path — not the file-relative `./base.yml` that lefthook
 // silently drops in consumers (kit#629).
@@ -137,12 +141,37 @@ describe('lefthook/base.yml pre-push unit command (kit#1334)', () => {
 		expect(test_unit).toBeDefined()
 	})
 
-	it('delegates to the josh wrapper that can reuse a recorded green gate', () => {
+	it(DELEGATES_TO_WRAPPER, () => {
 		expect(run).toContain('josh pre-push-unit')
 	})
 
 	it('does not invoke vitest through a bare pnpm exec', () => {
 		expect(run).not.toContain('pnpm exec vitest')
+	})
+})
+
+// kit#1381: the hook type-checked the whole project seconds after `josh gate` had printed the same
+// project-wide type check green on the same tree. The wrapper is what can read that record; a bare
+// `pnpm exec tsc` has nothing to read it with. The glob is asserted too, because dropping it would
+// run the whole project type check on a commit that touches no TypeScript at all.
+describe('lefthook/base.yml pre-commit type-check command (kit#1381)', () => {
+	const type_check = load_pre_commit_command(BASE_LEFTHOOK, TYPE_CHECK)
+	const run = type_check?.run ?? ''
+
+	it('defines a type-check pre-commit command', () => {
+		expect(type_check).toBeDefined()
+	})
+
+	it(DELEGATES_TO_WRAPPER, () => {
+		expect(run).toContain('josh pre-commit-type-check')
+	})
+
+	it('does not invoke tsc through a bare pnpm exec', () => {
+		expect(run).not.toContain('pnpm exec tsc')
+	})
+
+	it('stays scoped to the file types a type check can be about', () => {
+		expect(type_check?.glob).toContain('ts')
 	})
 })
 

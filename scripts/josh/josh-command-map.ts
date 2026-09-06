@@ -78,6 +78,7 @@ const ALIASES: Record<string, string> = {
 	cm: 'check-commit-message',
 	ss: 'secretlint-scan',
 	ppu: 'pre-push-unit',
+	ptc: 'pre-commit-type-check',
 	hi: 'hook:install',
 	hu: 'hook:uninstall',
 	hc: 'hook:commit',

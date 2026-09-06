@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
-import { git_command } from './git/git-command'
+import { hook_gate_reuse } from './hook-gate-reuse'
 import type { FileMapStamp } from './josh/file-map-stamp'
 import { test_unit_guard } from './test-unit-guard'
 
@@ -20,6 +20,11 @@ import { test_unit_guard } from './test-unit-guard'
 // prohibits. So `gate_skip.reusable_green_gate` decides all three of its conditions here too: the
 // file map matches, the **base commit** the map is a diff against matches, and the map is non-empty.
 //
+// **What this hook shares with the pre-commit type check is `hook-gate-reuse.ts`**
+// (joshuafolkken/kit#1381): the escape hatch, the pre-filter in front of the record and the one
+// `git status` reading both narrow themselves from. Only the narrowing itself is written here, because
+// only it is about a push.
+//
 // **What this adds is one condition, and it only ever narrows.** A commit changes nothing outside
 // this checkout; a push puts code where other people and CI read it, so an unverified commit reaching
 // the remote is the failure this must not have. The gate's record describes the **working tree**, and
@@ -30,10 +35,7 @@ import { test_unit_guard } from './test-unit-guard'
 //
 // **`audit` is untouched.** The gate does not run it, so it is not a duplicate of anything.
 
-// The escape hatch, for the times a person knows something outside the tree moved — a `pnpm install`,
-// a toolchain change, a cache thrown away. An environment variable rather than the gate's `--force`
-// flag because the hook's command line belongs to `lefthook/base.yml`: nobody types this invocation,
-// so a flag would be unreachable at the moment it is wanted.
+// The escape hatch's name; the shared reading of it is `hook_gate_reuse.is_force_requested`.
 const FORCE_ENV = 'JOSH_PRE_PUSH_FORCE'
 
 // The gate's own two readings — the changed-file map and the commit it is a diff against, taken from
@@ -45,33 +47,17 @@ interface PushTree extends GateTree {
 // `git status --porcelain` prints one line per difference from HEAD, untracked files included — so an
 // empty output is the whole of "what this push carries is what the record was taken from". Untracked
 // files count: the gate's map covers them, and one left behind is content the record was green on
-// that the pushed commit does not have.
+// that the pushed commit does not have. An unreadable status fails toward running the suite, like
+// every other read here.
 //
-// An unreadable status fails toward running the suite, like every other read here: a git command that
-// could not be run says nothing about the tree, and "we could not tell" must never resolve to "no
-// need to check".
-async function read_is_clean(): Promise<boolean> {
-	try {
-		const status = await git_command.status()
-
-		return status.trim() === ''
-	} catch {
-		return false
-	}
-}
-
 // The readings are independent, so they are started together rather than one after the other.
 async function read_push_tree(): Promise<PushTree> {
-	const [tree, is_clean] = await Promise.all([gate_tree.read_gate_tree(), read_is_clean()])
+	const [tree, lines] = await Promise.all([
+		gate_tree.read_gate_tree(),
+		hook_gate_reuse.read_status_lines(),
+	])
 
-	return { ...tree, is_clean }
-}
-
-// Any value at all, empty string aside: this is read from a shell, where `JOSH_PRE_PUSH_FORCE=1` and
-// `JOSH_PRE_PUSH_FORCE=true` are the two spellings a person reaches for and neither should be the one
-// that silently does nothing.
-function is_force_requested(): boolean {
-	return (process.env[FORCE_ENV] ?? '') !== ''
+	return { ...tree, is_clean: hook_gate_reuse.is_worktree_clean(lines) }
 }
 
 // `--force` is the gate's own flag, reused rather than respelled: it and `JOSH_PRE_PUSH_FORCE` are
@@ -93,20 +79,27 @@ function reusable_green_push(
 	extra_arguments: ReadonlyArray<string>,
 	source?: string,
 ): FileMapStamp | undefined {
-	if (extra_arguments.length > 0 || is_force_requested() || !tree.is_clean) return undefined
-
-	return gate_skip.reusable_green_gate(tree.files, tree.base, source)
+	return hook_gate_reuse.reusable_green_hook({
+		tree,
+		is_tree_carried: tree.is_clean,
+		extra_arguments,
+		force_env: FORCE_ENV,
+		source,
+	})
 }
 
 // **The sentence claims the result, never merely the omission.** "unit tests skipped" reads as "not
 // verified", which is the one thing this line must not be mistaken for while the push it precedes
-// goes on to the remote. So it says what passed, on which tree, when, and how to run it anyway.
+// goes on to the remote. So it says what passed, on which tree, when, and how to run it anyway — in
+// the one sentence every reader of the record shares (joshuafolkken/kit#1381).
 function format_skip(taken_at: string): string {
-	return (
-		`✔ this tree is already green — the unit tests passed on it at ${taken_at} ` +
-		`(\`pnpm josh gate\`), and this push carries that same tree.\n` +
-		`  Reusing that result; nothing was re-run. \`${FORCE_ENV}=1 git push\` runs them anyway.`
-	)
+	return gate_skip.format_reuse_notice({
+		subject: 'the unit tests',
+		carried_clause: ', and this push carries that same tree',
+		taken_at,
+		force_hint: `${FORCE_ENV}=1 git push`,
+		rerun_object: 'them',
+	})
 }
 
 // The suite is run through the guard `josh test:unit` uses rather than a bare `vitest run`, so a
@@ -143,7 +136,6 @@ const pre_push_unit = {
 	FORCE_ENV,
 	format_skip,
 	forwarded_arguments,
-	is_force_requested,
 	read_push_tree,
 	reusable_green_push,
 	run_pre_push_unit,
