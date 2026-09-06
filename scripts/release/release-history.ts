@@ -15,10 +15,17 @@ const { PACKAGE_JSON } = version_targets
 // guessing past that point would be worse than saying so.
 const BASE_SEARCH_LIMIT = 30
 
+// **Which ref the history is read from.** `josh release` runs on a pulled default branch, so `HEAD`
+// is main there and the default is right. A caller on a feature branch names the ref it means —
+// `origin/main` — because `--first-parent` from a branch tip walks that branch rather than main, and
+// the count would silently omit every merge main took after the branch was cut
+// (joshuafolkken/kit#1486).
+const DEFAULT_TIP = 'HEAD'
+
 // The reads this module makes, named so a test can answer them without a git repository. Production
 // callers take the default and never pass one.
 interface HistoryReader {
-	log_first_parent: (limit: number, file_path: string) => Promise<Array<string>>
+	log_first_parent: (limit: number, file_path: string, tip: string) => Promise<Array<string>>
 	show_file: (spec: string) => Promise<string>
 	count_merges: (range: string) => Promise<number>
 }
@@ -58,16 +65,22 @@ async function read_version_at(
 	}
 }
 
-async function read_versioned_commits(reader: HistoryReader): Promise<Array<VersionedCommit>> {
-	const shas = await reader.log_first_parent(BASE_SEARCH_LIMIT, PACKAGE_JSON)
+async function read_versioned_commits(
+	reader: HistoryReader,
+	tip: string,
+): Promise<Array<VersionedCommit>> {
+	const shas = await reader.log_first_parent(BASE_SEARCH_LIMIT, PACKAGE_JSON, tip)
 
 	return await Promise.all(
 		shas.map(async (sha) => ({ sha, version: await read_version_at(reader, sha) })),
 	)
 }
 
-async function read_base(reader: HistoryReader = git_reader): Promise<string | undefined> {
-	const commits = await read_versioned_commits(reader)
+async function read_base(
+	reader: HistoryReader = git_reader,
+	tip: string = DEFAULT_TIP,
+): Promise<string | undefined> {
+	const commits = await read_versioned_commits(reader, tip)
 	const oldest = commits.at(-1)
 	const oldest_parent_version =
 		oldest === undefined ? undefined : await read_version_at(reader, `${oldest.sha}^`)
@@ -80,12 +93,13 @@ async function read_base(reader: HistoryReader = git_reader): Promise<string | u
 async function read_release_plan(
 	current_version: string,
 	reader: HistoryReader = git_reader,
+	tip: string = DEFAULT_TIP,
 ): Promise<ReleasePlan | undefined> {
-	const base = await read_base(reader)
+	const base = await read_base(reader, tip)
 
 	if (base === undefined) return undefined
 
-	const pending = await reader.count_merges(`${base}..HEAD`)
+	const pending = await reader.count_merges(`${base}..${tip}`)
 
 	return {
 		base,
@@ -100,6 +114,7 @@ const release_history = {
 	read_base,
 	read_release_plan,
 	BASE_SEARCH_LIMIT,
+	DEFAULT_TIP,
 }
 
 export { release_history }

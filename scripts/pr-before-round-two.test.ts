@@ -12,11 +12,12 @@ import { read_unwrapped } from './ai-document-fixture'
 //
 //   - without "only the second round moves", the first round drifts after the commit too, which is
 //     the wider form joshuafolkken/kit#1216 rejected on a mechanism rather than a rule;
-//   - without the bump-before-gate rule, the gate record no longer matches the bumped tree and
-//     `review:brief --round 2` answers `Not verified`, sending the review agent back to the unit
-//     suite the gate had just passed — which costs more than the overlap saves;
-//   - without the follow-up-commit rule, a fix the second round makes in place either never reaches
-//     CI or reaches it with a second version bump on top;
+//   - without the nothing-edits-the-tree rule, something slips between the gate and the commit, the
+//     gate record no longer matches the pushed tree and `review:brief --round 2` answers
+//     `Not verified`, sending the review agent back to the unit suite the gate had just passed —
+//     which costs more than the overlap saves (joshuafolkken/kit#1486 removed the version bump that
+//     used to sit exactly there);
+//   - without the follow-up-commit rule, a fix the second round makes in place never reaches CI;
 //   - without the merge-gate sentence, the change reads as relaxing what `followup --merge` blocks
 //     on, which it does not.
 const REVIEW_PROMPT = 'prompts/review.md'
@@ -35,7 +36,7 @@ const EVAL_DOC = 'docs/eval.md'
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'### The pull request opens between the rounds, so CI runs beside round 2',
 	'**Only the second round moves, and that is what makes the overlap safe.**',
-	'**The bump goes in front of that gate, not after it.**',
+	'**Nothing edits the tree between that gate and the commit**',
 	'**The merge gate is untouched.**',
 	'**What this trades is a CI run for wall-clock, and the trade was made deliberately.**',
 	// The narrowing is the whole argument against kit#1216's recorded rejection; without it the two
@@ -85,13 +86,14 @@ describe('every entry that opens a pull request states where it opens', () => {
 	})
 })
 
-// The follow-up commit, asserted in each file that describes one. The version moves once per run, so
-// a second `bump` on the same branch is the mistake this half exists to name.
+// The follow-up commit, asserted in each file that describes one. A fix the second round makes in
+// place goes onto the branch that is already open — a second pull request is the mistake this half
+// exists to name.
 const FOLLOW_UP_COMMIT_FILES: ReadonlyArray<string> = [SKILL, CHAIN_RULE, FULLRUN, QUEUE]
 
-describe('a second-round fix is a follow-up commit, not a second bump', () => {
-	it.each(FOLLOW_UP_COMMIT_FILES)('%s says no second bump', (path) => {
-		expect(read_unwrapped(path)).toContain('no second `bump`')
+describe('a second-round fix is a follow-up commit on the same branch', () => {
+	it.each(FOLLOW_UP_COMMIT_FILES)('%s says so', (path) => {
+		expect(read_unwrapped(path)).toContain('a follow-up commit on the same branch')
 	})
 })
 
@@ -173,13 +175,10 @@ describe(`${BUNDLE_TOPIC} — the Japanese carve-out matches the English one`, (
 })
 
 // The command reference carries the two mechanical consequences: `josh git` run twice on one branch,
-// and the bumped `package.json` landing in the round-2 target.
+// and what the round-2 target therefore holds.
 const COMMANDS_MARKERS: ReadonlyArray<string> = [
 	'**Running it a second time on the same branch makes a follow-up commit, not a second pull request.**',
-	'**`--round 2` is taken after the commit, and `package.json` is in its target for that reason.**',
-	// The command reference spells the same rule with the full command name, since a reader here has
-	// no surrounding procedure to resolve a bare `bump` against.
-	'**no second `pnpm josh bump`**',
+	"**`--round 2` is taken after the commit, and its target is round 1's fixes and nothing else.**",
 ]
 
 describe(`${COMMANDS_DOC} — the command reference carries the consequences`, () => {

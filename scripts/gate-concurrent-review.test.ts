@@ -49,9 +49,9 @@ describe(`${GATE_BULLET} — the gate bullet states the new order`, () => {
 })
 
 // The chain rule is what a run reads at the moment the review settles — the exact point at which the
-// gate's result is still outstanding and the next command would be `bump minor`.
+// gate's result is still outstanding and the next command would be the commit.
 const CHAIN_RULE_MARKERS: ReadonlyArray<string> = [
-	'**Join the gate before `pnpm josh bump minor` — every row of the table below runs after that, not instead of it.**',
+	'**Join the gate before `pnpm josh git -y` — every row of the table below runs after that, not instead of it.**',
 	'**A red gate is fixed and re-run whatever the review concluded**',
 	'**There is no row here that reaches a commit on a gate nobody read.**',
 ]

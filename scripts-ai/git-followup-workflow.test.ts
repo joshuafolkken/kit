@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const RESOLVED_BRANCH = vi.hoisted(() => 'resolved-branch')
+// Deliberately not the real line's shape. What these two cases can prove is the wiring — that
+// whatever `pending_release_line` returns is what gets printed, and printed last. The line's own
+// wording is pinned where it is built, in `scripts/git/git-followup-pending.test.ts`; asserting a
+// realistic-looking string here would only prove the stub round-trips through `console.info`.
+const PENDING_SENTINEL = vi.hoisted(() => 'pending-release-line-sentinel')
 
 vi.mock('node:util', () => ({
 	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
@@ -26,6 +31,17 @@ vi.mock('../scripts/git/git-next-issues', () => ({
 
 vi.mock('../scripts/git/git-error', () => ({
 	git_error: { handle: vi.fn() },
+}))
+
+// **Mocked because the real one fetches the default branch** (joshuafolkken/kit#1486): the count has
+// to come from main rather than from whatever branch is checked out, so resolving it touches the
+// network. `main` runs at import time in this module, which would make every run of this suite do it.
+vi.mock('../scripts/git/git-followup-pending', () => ({
+	git_followup_pending: {
+		pending_release_line: vi
+			.fn<() => Promise<string | undefined>>()
+			.mockResolvedValue(PENDING_SENTINEL),
+	},
 }))
 
 // **Mocked because `main` runs at import time in this module, and the real removal would take the
@@ -116,15 +132,17 @@ describe('is_merge_resolved', () => {
 	})
 })
 
-describe('print_project_version', () => {
-	it('logs the formatted project version line for the current project', () => {
+// joshuafolkken/kit#1486: the line used to be `📦 project version: <v>`, read from the local
+// `package.json`. Children no longer bump, so that number names the previous release rather than what
+// the run ships, and the count of unreleased merges replaces it. What is asserted here is the wiring
+// — the line the run prints is the one `git_followup_pending` built.
+describe('print_pending_release', () => {
+	it('logs whatever the pending-release module returned', async () => {
 		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 		try {
-			git_followup_workflow.print_project_version()
-			expect(spy).toHaveBeenCalledWith(
-				expect.stringMatching(/^📦 project version: \d+\.\d+\.\d+$/u),
-			)
+			await git_followup_workflow.print_pending_release()
+			expect(spy).toHaveBeenCalledWith(PENDING_SENTINEL)
 		} finally {
 			spy.mockRestore()
 		}
@@ -233,8 +251,8 @@ describe('print_completion - merge gating', () => {
 		}
 	})
 
-	// The version line is the documented final line of the console output.
-	it('prints the project version last', async () => {
+	// The pending-release line is the documented final line of the console output.
+	it('prints the unreleased merge count last', async () => {
 		fetch_next_issue_lines_mock.mockResolvedValueOnce([NEXT_ISSUES_HEADER])
 		const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
@@ -242,7 +260,7 @@ describe('print_completion - merge gating', () => {
 			await git_followup_workflow.print_completion('42', true)
 			const last_call = spy.mock.calls.at(-1)
 
-			expect(last_call?.[0]).toMatch(/^📦 project version: \d+\.\d+\.\d+$/u)
+			expect(last_call?.[0]).toBe(PENDING_SENTINEL)
 		} finally {
 			spy.mockRestore()
 		}

@@ -106,7 +106,7 @@ describe('review timing — prompts', () => {
 		const raw = read_repo_file(REVIEW_PROMPT)
 
 		expect(raw).toContain('The implementing session runs it inline, before committing')
-		expect(raw).toContain('before `pnpm josh bump minor` and the commit')
+		expect(raw).toContain('Round 1 runs before the commit')
 		// The auto-continue section states the same timing a second time, in the context the
 		// review skill actually runs in; the two halves of the file must not disagree.
 		//

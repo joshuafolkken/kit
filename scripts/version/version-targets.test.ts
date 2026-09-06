@@ -135,28 +135,12 @@ describe('version_targets.read_workspace_version', () => {
 	})
 })
 
-describe('version_targets.format_project_version_line', () => {
-	it('formats a known version with the package icon', () => {
-		expect(version_targets.format_project_version_line(PROJECT_VERSION)).toBe(
-			`📦 project version: ${PROJECT_VERSION}`,
-		)
-	})
-
-	it('returns undefined when the version is undefined', () => {
-		expect(version_targets.format_project_version_line(undefined)).toBeUndefined()
-	})
-})
-
-describe('version_targets.project_version_line', () => {
-	it('reads and formats the project version line from <cwd>/package.json', () => {
-		write_manifest(JSON.stringify({ version: PROJECT_VERSION }))
-
-		expect(version_targets.project_version_line(ctx.work_directory)).toBe(
-			`📦 project version: ${PROJECT_VERSION}`,
-		)
-	})
-
-	it('returns undefined when the manifest is absent', () => {
-		expect(version_targets.project_version_line(ctx.work_directory)).toBeUndefined()
+// The `📦 project version: <v>` formatters this module carried were removed with the child's version
+// bump (joshuafolkken/kit#1486). Asserted as an absence, because the reading they encoded — the local
+// manifest names what this run ships — is the one that has to stay gone.
+describe('version_targets — the project version line is gone', () => {
+	it('no longer exposes either formatter', () => {
+		expect(Object.keys(version_targets)).not.toContain('format_project_version_line')
+		expect(Object.keys(version_targets)).not.toContain('project_version_line')
 	})
 })

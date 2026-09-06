@@ -3,7 +3,6 @@ import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { bounded_pool } from './bounded-pool'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
-import { gate_bump_order } from './gate-bump-order'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -369,13 +368,12 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 		return 0
 	}
 
-	// Asked only once reuse has been refused (joshuafolkken/kit#1437): a record that matches this tree
-	// exactly is answered by the skip above at no cost, so the ordering question is only ever about a
-	// tree that has moved since the last green gate.
-	const refused = gate_bump_order.refuse_bump_order(tree.files, tree.base, options)
-
-	if (refused !== undefined) return refused
-
+	// **Nothing stands between the skip and the checks any more** (joshuafolkken/kit#1486).
+	// joshuafolkken/kit#1437 refused a gate here whenever a green record covered work whose changed
+	// files carried no `package.json`, because `pnpm josh bump minor` was certain to rewrite it and
+	// force a second gate. Children no longer bump at all — `pnpm josh release` decides the version
+	// from main's history — so that shape is now what a normal run looks like, and the refusal would
+	// reject every gate after the first green one.
 	return await run_checked_gate(tree, options, started_at)
 }
 

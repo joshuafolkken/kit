@@ -2,13 +2,13 @@
 import { parseArgs } from 'node:util'
 import { git_branch } from '../scripts/git/git-branch'
 import { git_error } from '../scripts/git/git-error'
+import { git_followup_pending } from '../scripts/git/git-followup-pending'
 import { git_next_issues } from '../scripts/git/git-next-issues'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 import { review_stamps } from '../scripts/review/review-stamps'
 import { run_hold } from '../scripts/run/run-hold'
 import { time_history } from '../scripts/time/time-history'
-import { version_targets } from '../scripts/version/version-targets'
 import { load_optional_environment } from './environment-loader'
 
 load_optional_environment()
@@ -104,8 +104,18 @@ function is_merge_resolved(values: CliArguments['values']): boolean {
 	return values['no-merge'] !== true
 }
 
-function print_project_version(): void {
-	const line = version_targets.project_version_line(process.cwd())
+// **The count of unreleased merges, not the project version** (joshuafolkken/kit#1486). This line
+// used to read the local `package.json` and was read as "the version this run just shipped"; children
+// no longer bump, so that number names the *previous* release and the reading is false. The count is
+// the one `pnpm josh release` acts on, and it is printed here for the same reason it goes into the
+// Telegram: a number that keeps climbing is a release nobody has run.
+//
+// Printed after the merge, and the count is read from a freshly fetched default branch — so this
+// run's own merge is already in it and nothing here says otherwise, unlike the Telegram sent one step
+// earlier from a tree the merge had not reached.
+async function print_pending_release(): Promise<void> {
+	const line = await git_followup_pending.pending_release_line({ is_merge_pending: false })
+
 	if (line !== undefined) console.info(line)
 }
 
@@ -129,7 +139,7 @@ async function print_next_issues(completed_issue_number: string | undefined): Pr
 	for (const line of lines) console.info(line)
 }
 
-// The tail printed once the workflow itself has finished. `print_project_version` stays last by
+// The tail printed once the workflow itself has finished. `print_pending_release` stays last by
 // contract, so anything added here goes above it.
 async function print_completion(
 	issue_number: string | undefined,
@@ -140,7 +150,7 @@ async function print_completion(
 	// Merged runs only, like the epic auto-close: on `--no-merge` the linked issue is still open
 	// and still the current task, so a "next" list would hide the one issue that matters.
 	if (should_merge) await print_next_issues(issue_number)
-	print_project_version()
+	await print_pending_release()
 }
 
 // A **merged** run ends here, and the round-1 review snapshot's lifetime is one run
@@ -167,7 +177,7 @@ function clear_round_one_snapshot(should_merge: boolean): void {
 // `--no-merge` run has not finished: the pull request is still open and its CI wait is not over, so
 // a record written there would compare a part of a run against whole ones.
 //
-// **Printed above `print_completion`**, because `print_project_version` stays the final line of the
+// **Printed above `print_completion`**, because `print_pending_release` stays the final line of the
 // console output by contract.
 async function record_run_report(
 	issue_number: string | undefined,
@@ -205,7 +215,7 @@ async function release_worktree_hold(should_merge: boolean): Promise<void> {
 
 // The tail every invocation shares, in one function so `main` stays inside its statement budget: the
 // run report, the console completion, and the two records only a merged run releases. The order is
-// the contract — `print_completion` ends with the project version, which is the final console line.
+// the contract — `print_completion` ends with the unreleased-merge count, the final console line.
 async function finish(issue_number: string | undefined, should_merge: boolean): Promise<void> {
 	await record_run_report(issue_number, should_merge)
 	await print_completion(issue_number, should_merge)
@@ -252,7 +262,7 @@ const git_followup_workflow = {
 	parse_issue_number_from_text,
 	resolve_branch_name,
 	is_merge_resolved,
-	print_project_version,
+	print_pending_release,
 	print_next_issues,
 	print_completion,
 }
