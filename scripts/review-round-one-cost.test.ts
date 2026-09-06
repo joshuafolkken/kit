@@ -186,14 +186,19 @@ describe(`${COMMAND_DOC} — the retired coefficient is replaced by the pointer`
 // omission until the measurement behind it is named. The note carries the reason and the pointer and
 // no figure, on the same rule as the skill above.
 const SPLIT_MARKERS: ReadonlyArray<string> = [
-	'## Diff size is not a criterion, and that is measured',
-	'**The test above says the answer is not "large" and not "touches many files", and that exclusion is measured rather than stylistic.**',
+	'## Diff size is not a reason to split, and that is measured',
+	'**Size is a bar a split has to clear; it is never a reason to split.**',
 	'**It does track it — and splitting an Issue in two to shorten round 1 lengthens it**',
 	SECTION_TITLE,
-	'**A proposal to add a size threshold here is required to say why that data does not reach it**',
-	// Without this the note reads as having softened the assessment, which is the one thing
-	// `split-assessment-document-rule.test.ts` exists to prevent at every entry point.
-	'**It changes nothing about the assessment itself.**',
+	'**A proposal to add a size threshold that splits more is required to say why that data does not reach it**',
+	// joshuafolkken/kit#1469 added a size condition to this very assessment, so the record has to say
+	// why that is not the arm this section refuses. **Direction is the whole of the distinction** —
+	// #1436 wanted a threshold that splits *more*, #1469's splits *less* — and without the pinned
+	// reconciliation the next reader finds a refusal and a threshold in the same document and has to
+	// guess which one is live. The refusal is re-pinned in the narrowed form it now takes, so
+	// widening it back to "no size arm at all" fails here rather than silently.
+	"**joshuafolkken/kit#1469's threshold points the other way, which is why the two are not in contradiction.**",
+	'**What this section refuses is any arm that would raise the number of splits at some size**',
 ]
 
 describe(`${SPLIT_SKILL} — the size threshold is refused with its reason`, () => {
