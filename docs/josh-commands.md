@@ -1851,6 +1851,41 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:liveness 1
 
 The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "A delegated unit that stopped without reporting".
 
+### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
+
+Open and close a lane: one linked git work tree with its own branch and its own port seed ([#1490](https://github.com/joshuafolkken/kit/issues/1490)).
+
+```bash
+pnpm josh lane:open 1490    # prints the lane directory on standard output; alias: josh lno
+pnpm josh lane:close 1490   # alias: josh lnc
+pnpm josh lane:close --all
+pnpm josh lane:list         # alias: josh lnl
+pnpm josh lane:prune        # alias: josh lnp
+```
+
+**`lane:open` prints the directory and nothing else**, so `dir=$(pnpm josh lane:open 1490)` is what a caller needs, and a refusal is an empty capture beside a non-zero exit. Every explanation goes to standard error, the contract [`josh run:hold`](#josh-runhold--josh-runrelease) and [`josh epic:next`](#josh-epicnext) already set.
+
+**Port separation is the reason this command exists, not a detail of it.** `PORT_SEED` is read from the project root's uncommitted `.env`, and `ports/index.js` resolves that root as the nearest ancestor holding a `package.json` — which, inside a linked work tree, is the lane's own directory. So a lane with no `.env` runs on seed 0 and a lane handed a verbatim copy runs on the root's seed; either way every lane lands on one pair of ports, and a busy port **fails on the spot rather than retrying on another**, which is the behavior `playwright.config.ts` documents and which nothing here weakens. `lane:open` therefore copies the root `.env` — `TELEGRAM_*`, `JOSH_SESSION_LANG` and everything else carried across verbatim — with the `PORT_SEED` line replaced by the lane's own.
+
+**The main work tree is always seat 0.** Lanes are numbered from the project's base seed **upward**, so a checkout that never opens one keeps exactly the ports it has today, and CI — one work tree, no `.env` — stays on 5173 / 4173.
+
+**Every seed stays under 1000, and that is structural.** dev is `5173 + seed` and preview is `4173 + seed`, so the two bases are exactly 1000 apart and one project's preview port equals another project's dev port as soon as their seeds differ by 1000. The band is **base+1..base+9** — nine seats against a default of six lanes — and the way to spend the space is one base seed per project on a multiple of ten, which leaves room for a hundred projects inside the limit. **A base whose band would reach 1000 fails with an error naming what to set**, and a band with every seat taken fails too: the numbers are never wrapped, because wrapping is that same collision under a friendlier name.
+
+**The free seat is read from the live lanes' own `.env`, never from a counter.** A monotonic counter, or a number derived from how many lanes have ever been opened, hands a closed-and-reopened lane the seat a running lane is still using. `lane:open` reads `git worktree list --porcelain`, reads the `PORT_SEED` of each lane it finds and takes the lowest unused seed in the band — so **the state lives only in each lane's `.env`**, and `git worktree remove` erases the record of a seat along with the tree that held it. There is no ledger file, and nothing that can go stale.
+
+**A live lane whose `.env` cannot be read stops the allocation** rather than being passed over. Read as free, its seat would be handed to the next lane while the ports it holds are still bound — a collision nothing reports until an E2E run fails in a different work tree. The refusal names the lane and its directory; `lane:list` shows it as `unreadable`.
+
+| Setting               | What it does                                                                                                                                                                                                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_LANE_ROOT`      | Where the lanes go. Unset or blank means `.<repository-name>-lanes`, a hidden **sibling** of the repository root — a lane is a second full checkout, so nesting it inside would hand the lint run, the unit suite, the spell check and `git status` a duplicate of the tree they are walking |
+| `JOSH_LANE_SEED_BASE` | The seed lanes are numbered from. Unset or blank means this project's own `PORT_SEED`. Set it, to a free multiple of ten no higher than 990, only when the nine seeds just above this project's are already taken by another project                                                         |
+
+**Closing is written for the states a lane is actually closed in.** A park, a failure or an interruption leaves uncommitted and untracked work in the tree, so `worktree remove` is forced and the branch is deleted with `-D`; a lane git never registered is still closed, because the issue number implies both paths. `lane:close --all` closes every one of them, and **`lane:prune` closes the lanes an interruption left registered without a work tree** — the route out of a directory someone deleted by hand.
+
+`lane:list` prints one line per lane: the issue, its seed and the dev and preview ports that seed resolves to, its branch, its state (`open`, `stranded` or `unreadable`) and its directory. The ports are computed through `ports/index.js` rather than added up separately, so they are the numbers [`josh port`](#josh-port) and `playwright.config.ts` will resolve inside the lane.
+
+**What this command does not decide** is how many lanes may be open at once ([#1491](https://github.com/joshuafolkken/kit/issues/1491)) or how `epicrun` drives them ([#1492](https://github.com/joshuafolkken/kit/issues/1492)). This is the container; those are what goes in it.
+
 ### `josh cost`
 
 Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).

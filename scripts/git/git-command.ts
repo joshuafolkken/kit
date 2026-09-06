@@ -29,6 +29,9 @@ async function exec_git_command_with_output(
 	}
 }
 
+// git's machine-readable output, asked for by the two readers below that parse rather than display.
+const PORCELAIN_FLAG = '--porcelain'
+
 async function branch(): Promise<string> {
 	return await exec_git_command_read(['rev-parse', '--abbrev-ref', 'HEAD'])
 }
@@ -41,7 +44,7 @@ async function branch(): Promise<string> {
 // pre-push hook reuses a record for a commit that does not contain them. Naming git's own default
 // makes the reading answer to this codebase rather than to whoever ran it.
 async function status(): Promise<string> {
-	return await exec_git_command_read(['status', '--porcelain', '--untracked-files=normal'])
+	return await exec_git_command_read(['status', PORCELAIN_FLAG, '--untracked-files=normal'])
 }
 
 // The absolute path every other git command's output is relative to. Asking git rather than reading
@@ -369,8 +372,57 @@ async function count_merges(range: string): Promise<number> {
 	return Number.isFinite(parsed) ? parsed : 0
 }
 
+// The four worktree reads and writes a lane's lifecycle needs (joshuafolkken/kit#1490). They live
+// beside the other git commands rather than in `scripts/lane/` because `exec_git_command_read` is
+// what resolves the git binary and turns a non-zero exit into an error — a second spawn helper next
+// to it would be the clone `CLAUDE.md` prohibits.
+const WORKTREE = 'worktree'
+
+// Every registered work tree of this repository, in git's own machine-readable form: one `worktree
+// <path>` / `HEAD <sha>` / `branch <ref>` block per tree, blocks separated by a blank line. Parsing
+// it is the caller's, so this module keeps one shape for every reader.
+async function worktree_list(): Promise<string> {
+	return await exec_git_command_read([WORKTREE, 'list', PORCELAIN_FLAG])
+}
+
+// `-b` creates the branch as part of the add, so there is no window in which the directory exists on
+// a detached HEAD; `start_point` is passed explicitly rather than left to `HEAD`, because a lane is
+// branched from the default branch whatever the checkout that opened it happens to be sitting on.
+async function worktree_add(
+	directory: string,
+	branch_name: string,
+	start_point: string,
+): Promise<string> {
+	return await exec_git_command_read([WORKTREE, 'add', '-b', branch_name, directory, start_point])
+}
+
+// **`--force` is the point, not a convenience.** A lane is closed after a park, a failure or an
+// interruption as readily as after a success, and in each of those the tree still holds uncommitted
+// or untracked work. Refusing to remove it there would leave exactly the debris the close exists to
+// prevent.
+async function worktree_remove(directory: string): Promise<string> {
+	return await exec_git_command_read([WORKTREE, 'remove', '--force', directory])
+}
+
+// Drops the registrations whose directories are already gone — what makes a lane whose directory was
+// deleted by hand recoverable rather than a permanent `worktree add` refusal on that path.
+async function worktree_prune(): Promise<string> {
+	return await exec_git_command_read([WORKTREE, 'prune'])
+}
+
+// `-D` rather than `-d`: a lane branch is deleted whatever state its work reached, and `-d` refuses
+// one that was never merged — which is every lane closed after a park or a failure.
+async function branch_delete(branch_name: string): Promise<string> {
+	return await exec_git_command_read(['branch', '-D', branch_name])
+}
+
 const git_command = {
 	branch,
+	branch_delete,
+	worktree_add,
+	worktree_list,
+	worktree_prune,
+	worktree_remove,
 	status,
 	repository_root,
 	git_directories,
