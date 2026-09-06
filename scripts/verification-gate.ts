@@ -3,6 +3,7 @@ import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { bounded_pool } from './bounded-pool'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
+import { gate_bump_order } from './gate-bump-order'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -362,11 +363,20 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 	const tree = await gate_tree.read_gate_tree()
 	const reusable = reusable_stamp(tree, options)
 
-	if (reusable === undefined) return await run_checked_gate(tree, options, started_at)
+	if (reusable !== undefined) {
+		process.stdout.write(`${gate_skip.format_skip(reusable.taken_at)}\n`)
 
-	process.stdout.write(`${gate_skip.format_skip(reusable.taken_at)}\n`)
+		return 0
+	}
 
-	return 0
+	// Asked only once reuse has been refused (joshuafolkken/kit#1437): a record that matches this tree
+	// exactly is answered by the skip above at no cost, so the ordering question is only ever about a
+	// tree that has moved since the last green gate.
+	const refused = gate_bump_order.refuse_bump_order(tree.files, tree.base, options)
+
+	if (refused !== undefined) return refused
+
+	return await run_checked_gate(tree, options, started_at)
 }
 
 // `josh gate` fans out to four sub-commands and forwards nothing to them, so an appended flag
