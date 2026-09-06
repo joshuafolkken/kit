@@ -324,14 +324,9 @@ a mutex.
 working tree, one `main` and one `pnpm-lock.yaml` that `josh latest` rewrites; since
 joshuafolkken/kit#1490 a lane is its own checkout with its own branch and its own ports, so the
 contended resource is the lane and the repository-wide number is a **ceiling on how many of them run
-at once**. Either way it does not care which epic a child belongs to. The earlier reasoning here —
-each session takes only its own repository's children, and within a repository children run one at a
-time — was true *inside one epic* and said nothing about two: `epic-classify.ts` sorts only the
-children the epic tracks, so a second `epicrun` started in the same checkout answered "nothing of
-mine is in progress" and both ran. What actually serialized them was a person typing the runs one
-after another, which is a habit rather than a property of the model. **How a session opens a lane and
-drives more than one child at a time is joshuafolkken/kit#1492's**, not this section's: what changed
-here is only what `epic:next` answers.
+at once**. Either way it does not care which epic a child belongs to. **How a session opens a lane
+and drives more than one child at a time is "Lanes — running more than one child at a time" below**;
+what this section decides is only what `epic:next` answers.
 
 **A stale label holds a lane, so the stale rule reaches past this epic's own
 children.** An interrupted run leaves `in-progress` behind, and that label holds a lane rather
@@ -350,22 +345,213 @@ the same answer** (joshuafolkken/kit#1067): the paging bounds every listing now,
 no visible holder is still not "nothing is running" — `wait`, with its own message, since clearing a
 stale label would not change it.
 
-**Two children of one repository still may not run at once** — the guard makes that mechanical
-rather than customary, and it does not make same-repository parallelism safe. An epic that wants it
-has to **replace** this guard, with worktrees and a manifest each child can rewrite alone, not merely
-switch it off. Do not read this section as "concurrency needs no coordination": the coordination
-exists, and it is this.
+**Two children of one repository may run at once once joshuafolkken/kit#1497 lands, and the section
+below is how** — that Issue is the last thing between the procedure and a run using it. This paragraph
+used to say the opposite, and the three reasons it gave have each been answered rather than waived
+(joshuafolkken/kit#1492). They are recorded here because a reader who finds only the new procedure
+cannot tell which of them was solved and which was merely stopped being mentioned:
 
-Why same-repository parallelism is out of scope here: `josh latest` would have two children
-rewriting one `pnpm-lock.yaml`, one checkout cannot hold two branches without worktrees, and two
-children touching the same files need conflict prediction. **Every one of those reasons is specific
-to sharing a repository.** Across repositories the manifests are different files, the checkouts are
-already separate, no file is shared, and Actions runs are independent — so none of them apply, and
-cross-repository parallelism is in scope.
+| The premise this section used to assert         | What replaced it                                                                                                                                                                       |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Two children would collide over the version     | **Gone.** A child no longer picks a version at all — `pnpm josh release` decides it from main's own history (joshuafolkken/kit#1169, joshuafolkken/kit#1486), so there is nothing to collide over |
+| One checkout cannot hold two branches           | **Gone.** A lane is its own linked work tree with its own branch, its own `.env` and its own ports (joshuafolkken/kit#1490), and `josh latest` runs once before any of them opens        |
+| Two children touching one file need prediction  | **Not built, deliberately.** Overlap is surfaced at the merge, where GitHub already reports it, and the child that loses the race is parked — "Conflicts are not predicted" below       |
+
+**So the guard is a ceiling rather than a prohibition.** It was always scoped to the resource rather
+than to the epic — `epic-classify.ts` sorts only the children the epic tracks, so a second `epicrun`
+in the same checkout answered "nothing of mine is in progress" and both ran, and what actually
+serialized them was a person typing the runs one after another. What changed is that the resource is
+now a lane rather than the one working tree, and `JOSH_LANE_LIMIT` is how many of them may run at
+once. **Do not read any of this as "concurrency needs no coordination"**: the coordination exists, it
+is this section plus the one below, and switching the guard off is still not one of the ways to get
+parallelism.
+
+**Across repositories nothing changed.** The manifests are different files, the checkouts were
+already separate and Actions runs are independent, so cross-repository parallelism was in scope
+before lanes existed and is unaffected by them.
 
 Parallelism only helps children that do not depend on each other. When app-kit's child needs kit's
 new feature, that is recorded as `blocked-by` and `epic:next` makes it wait. That is the dependency,
 not a limit of the model.
+
+## Lanes — running more than one child at a time
+
+`pnpm josh epic:next <E> --repo <owner/repo> --lanes` answers with **one issue number per line**, up
+to the number of free lanes, and each of those children runs in a **lane** of its own: a linked git
+work tree with its own branch, its own `.env` and its own dev and preview ports
+(joshuafolkken/kit#1490, `docs/josh-commands.md` → "`josh lane:open` / `josh lane:close` /
+`josh lane:list` / `josh lane:prune`"). **Implementation, the verification gate and the review run in
+parallel; the merges stay serial** — not because this procedure serializes them, but because each one
+lands on the `main` the next one is then measured against.
+
+**The lane path is not executable yet, and one command is why.** `pnpm josh git` refuses to commit
+from a branch that is neither the default branch nor one sharing the child's `<N>-` prefix
+(`scripts/git/git-branch.ts` → `has_same_issue_prefix`, `/^\d+-/`), and a lane's branch is
+`lane/<N>`, which matches neither — so a child implemented in a lane exits 1 at its commit with
+"Branch mismatch detected". **Switching the lane to another branch is not the way round it, and
+reaching for one is the failure this paragraph exists to stop.** `lane-registry.ts` → `branch_issue`
+identifies a lane **by** that `lane/` branch, so a switched lane drops out of `list_lanes()`
+altogether: `lane:open` re-issues its seat to the next lane and the two bind the same dev and preview
+ports, `lane:list` and `lane:close --all` stop seeing it, and `lane:prune` cannot reach it — the
+port isolation that is the whole reason a lane exists, lost to work around a branch name.
+**joshuafolkken/kit#1497 renames the lane branch so both hold.** Until it lands, ask `epic:next`
+**without** `--lanes` and run one child at a time exactly as before; everything below is what happens
+the moment it does.
+
+**Running unattended gets harder, not easier, and that is the honest trade.** Six lanes make the overlap
+between children real — two open issues touching `scripts/git/git-epic-*` and two touching
+`scripts/eval/*` are very likely to be in flight together — and every overlap that becomes a conflict
+parks a child, which waits for a person. The run finishes more work per hour **and** asks for a
+person more often. Do not report the first without the second.
+
+### Once per repository, before the first lane opens
+
+In the **primary checkout**, in this order, and never again per lane:
+
+1. `git switch main && git pull` — every lane is branched from this ref.
+2. `pnpm josh latest:scope`, and the update on `required` — "`josh latest` runs once per session" above.
+3. `pnpm josh lane:prune` — closes the lanes an interruption left registered without a work tree.
+
+**`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there.** The
+elapsed-time window that makes that answer meaningful is keyed to the project root —
+`latest-stamp.ts` → `stamp_path(STAMP_PREFIX, PROJECT_ROOT)` — and a lane's project root is its own
+directory, so a fresh lane has no stamp, is told `required`, and six lanes run six dependency
+updates. That is the failure the hoist above exists to prevent, reappearing one layer down. **Ask it
+in the primary checkout; in a lane, do not ask at all.**
+
+**The rewritten lock file still has to reach a pull request**, and with lanes no child runs in the
+primary checkout to carry it. `git stash` is a repository-level ref shared by every work tree, so the
+change moves without being copied:
+
+```bash
+git stash push -u -m "epicrun: josh latest before lanes"   # primary checkout, only if the update rewrote anything
+git -C "$dir" stash pop                                    # the first lane opened, before its install
+```
+
+Record it on that first child's Issue as any other stash is recorded — the comment is what gets it
+popped if the run dies in between. "The lock file the update rewrites lands with the first child"
+above is unchanged; only where the first child stands has moved.
+
+### Opening one lane
+
+```bash
+dir=$(pnpm josh lane:open "$n") || exit 1   # the directory on stdout, nothing else; alias: josh lno
+git -C "$dir" stash pop || exit 1           # the first lane only, and only if `josh latest` stashed
+pnpm --dir "$dir" install --frozen-lockfile
+```
+
+- **A refusal is an empty capture beside a non-zero exit**, with the reason on standard error:
+  `full` (every seat taken) and `already-open` (a lane for this child exists) are the two. **The
+  guard is in the snippet rather than left to the reader** — without it the next two lines run
+  `--dir ""` in whatever directory the parent happens to stand in.
+- **The install is not optional.** A linked work tree has no `node_modules`, and neither does anything
+  above it — the lane root is a hidden *sibling* of the repository — so every `pnpm josh …` inside
+  the lane fails until it is installed. `lane:open` ships the container, not its contents.
+- **The install comes after the stash pop, never before it.** The pop brings in the `pnpm-lock.yaml`
+  that `josh latest` rewrote, and that is the lock the install has to build against: installed first,
+  the first child runs its whole verification gate against `node_modules` from the *previous* lock
+  while committing the new one — a gate that cannot see the regression it exists to catch. **A pop
+  that fails stops the lane** rather than installing anyway, which is the same failure by a different
+  route.
+- **Nothing switches the lane's branch.** The reason is at the top of this section: the registry
+  identifies a lane by that branch, so a switch costs the lane its seat, its listing and its
+  isolation. The commit path is joshuafolkken/kit#1497's, and it is why the lane path is gated.
+- **`pnpm josh run:preflight` is not asked in a lane; `lane:open`'s own answer replaces it.** A lane
+  that opened a moment ago was created from the default branch and is clean by construction, and the
+  command could not answer usefully anyway: its `reclaim` arm tests `HEAD != default branch`, which
+  is true of **every** lane, and the recovery it prints — `git switch <default>` — cannot run in a
+  linked work tree, because the default branch is checked out in the main one. What a leftover looks
+  like here is `lane:open` answering `already-open`, and the branch for that is in the table below.
+- **`pnpm josh run:hold` is unchanged, and is claimed inside the lane.** It keys on
+  `git rev-parse --absolute-git-dir`, which is `.git/worktrees/<name>` in a linked work tree, so each
+  lane holds independently and the child's own `fullrun` claims it exactly as it always did.
+
+### Handing the child over
+
+The child runs as `fullrun #<N>` in a delegated unit, per "Each child runs in a delegated unit"
+above, with two additions to the brief: **the lane directory every command is to run in**, and that
+`josh latest` is not to be run there. Everything else — the plan, the gate, `/code-review`,
+`pnpm josh git`, `pnpm josh followup` — is unchanged, and `pnpm josh followup` releases that lane's
+hold at the merge as it always has.
+
+**Start each unit without blocking on it, and poll them all.** That is "A delegated unit that stopped
+without reporting" above applied N times rather than once, and
+`pnpm josh run:liveness <N> --output <path>` is read **in that child's lane** — the case that section
+already names when it says the traces are read in the checkout the unit was given.
+
+**`git switch main && git pull` is the parent's now, not the child's.** No lane can switch to the
+default branch, because it is checked out in the main work tree, so the refresh moves to the primary
+checkout and happens **before each `lane:open`** — which is where it does the same job, since that is
+the ref the lane is cut from.
+
+### Conflicts are not predicted
+
+**Nothing here forecasts which children will overlap.** A forecast is wrong often, and when it is
+wrong it is wrong silently. The overlap surfaces where GitHub already reports it: a pull request that
+conflicts with its base comes back `mergeStateStatus: DIRTY`, which `git-pr-checks-eval.ts` reads as
+a **failure** rather than polling through it (joshuafolkken/kit#1232) — so `pnpm josh followup` ends
+that child with a named conflict in about ten seconds rather than running its 32-minute budget out.
+
+**That child is parked**: `needs-decision` plus a comment naming the conflict, exactly as "park and
+continue" below, its lane closed after its work is stashed (the table below), and the loop goes on.
+It is **not** counted against the consecutive-failure guard — a lost merge race is an ordinary
+outcome of running six lanes, and counting it would abort the run for working as designed.
+
+**Rebasing the loser automatically is deliberately not done.** A rebase that resolves cleanly puts
+work nobody reviewed onto a branch whose review has already converged, and one that does not resolve
+leaves a half-rebased lane for the next poll to misread. A person re-runs the child on a current
+`main`, which is one `pnpm josh lane:close <N>` and one label removal away.
+
+### What happens to a lane
+
+| When | The lane | Why |
+| --- | --- | --- |
+| The child **merged** | `pnpm josh lane:close <N>` | `followup` released the hold and the branch is on `main`; nothing in that tree is wanted |
+| The child was **parked** | `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work with it. Closing is what keeps the seat free, and it has to happen: `epic:next` already counts a parked child's lane as released, so a lane left open would hold a seat the count believes is free |
+| The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at, so nothing is stashed and nothing is closed. Name the lane directory in the stop report and in the Telegram, or the person is told to look at a tree and not told where it is |
+| The child **failed** | The parked row, plus the consecutive-failure count | Same reasoning; only the counter differs |
+| The run was **interrupted** | Nothing to do — the work tree survives on disk | The next session's `pnpm josh lane:prune` closes what git no longer has a tree for, and `lane:open` answers `already-open` for what is still there. **Park that child**, naming the lane and `pnpm josh lane:close <N>` as the way out: resuming somebody's half-finished lane unattended is the judgement `run:preflight` refuses to make on its own, and in a lane there is no command to make it |
+
+**A `needs-human-review` stop ends the run, and the lanes already in flight are allowed to finish.**
+No new lane is opened — "the remaining children are not started" is unchanged — but killing units
+that are mid-gate would strand as many trees as there are lanes, which is the opposite of what that
+stop is for. When the others have merged or parked, report and stop.
+
+### CI concurrency — recorded as to-be-measured
+
+Six lanes push six branches, and each push starts `playwright-image`, `checks`, `security` and
+`e2e-detect` at once, with `e2e` behind two of them — so **the peak is about four jobs per run and
+about twenty-four across six lanes**, not thirty: `e2e` never runs beside the two jobs it `needs`.
+GitHub-hosted runners carry a per-account concurrency entitlement, and past it jobs **queue** rather
+than fail — which lengthens CI waits and could cancel out what the lanes bought.
+
+**This is recorded as to-be-measured rather than addressed, and the reasons are these.** The number
+to compare against is the account's entitlement, which is not readable from this repository; the
+arrivals are staggered rather than simultaneous, because children start minutes apart and reach CI at
+different points; and the one lever that responds needs no code at all — `JOSH_LANE_LIMIT` lowers the
+ceiling immediately. Building a throttle before the measurement would be sizing a solution against a
+number nobody has.
+
+**What settles it is already printed.** `pnpm josh followup` reports `followup stage: checks-wait` on
+every run (joshuafolkken/kit#1349) and every merged run is appended to `.time-history.jsonl`
+(joshuafolkken/kit#1471), so the comparison is `pnpm josh time --period <days>` before and after: a
+`checks-wait` that grows with the lane count **is** the queueing, and one that does not is the answer
+that no throttle is needed. **One thing about the workflow is already right** — `ci.yml`'s
+concurrency group is `${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`, so
+N lanes on N branches are N independent groups and no lane cancels another's run.
+
+### The wall-clock comparison, and the half of it that is still missing
+
+**Baseline, measured on 2026-09-06 before any lane existed** (`pnpm josh time --period 1`): 6 runs
+across 2 lanes over a 337-minute window — **1.3 effective of 2 lanes, 1.07 runs per hour** — with a
+per-child wall clock of 20–46 minutes.
+
+**The "after" is not in this document, and saying so is the point.** It needs a real multi-lane epic
+run, which the single-lane run that wrote this procedure could not produce. **Take it with
+`pnpm josh time --period <days>` after the first epic actually run through lanes** and put the two
+side by side: runs per hour and effective lanes are the figures that answer whether this changed
+anything, with `checks-wait` beside them answering the section above. Until that reading exists, no
+claim about the speed-up is a measured one.
 
 ## Audit before the first child
 
@@ -427,6 +613,16 @@ found once — fix it forward before the child is parked for it.
 brings the previous child's merge into the tree, and a child that skips it starts implementing on a
 stale main. Only the dependency update moves to the run.
 
+**In lanes it stays per child and changes hands.** No lane can switch to the default branch — it is
+checked out in the main work tree — so the parent runs it in the primary checkout **before each
+`lane:open`**, which is the ref that lane is cut from. Same job, same frequency, different context:
+"Lanes — running more than one child at a time" above.
+
+**And in a lane `josh latest` is not even asked.** A lane's `latest:scope` is keyed to its own
+project root, so it has no stamp and always answers `required` — six lanes, six dependency updates,
+which is this whole section's failure one layer down. The reason and the stash that carries the lock
+file into the first lane are in "Once per repository, before the first lane opens" above.
+
 This is the same rule `queue.md` step 1 already states — the dependency update once, before the
 first issue, and asked of `pnpm josh latest:scope` rather than decided. Two entry points to the same
 serial batch now read the same way; they disagreed before (joshuafolkken/kit#913).
@@ -482,29 +678,49 @@ preflight is what turns that into something the batch can act on.
 run's summary, with the stash reference where there was one — a reclaim nobody mentioned is
 indistinguishable from a run that never crashed.
 
+**It is not asked in a lane.** Every lane's HEAD is on `lane/<N>` rather than the default branch, so
+the `reclaim` arm fires on all of them and the recovery it prints cannot run in a linked work tree.
+What replaces it there is `lane:open`'s own answer, in "Opening one lane" above. This section is
+unchanged for a child implemented in the session's own checkout.
+
 ## The loop
 
-`josh epic:next <E> --repo <this repository>` prints **one token** on standard output: an issue
-number when there is a child to run, otherwise the verdict. Everything else goes to standard error,
-so the token is what a shell captures.
+`josh epic:next <E> --repo <this repository> --lanes` prints **one issue number per line** on
+standard output — as many as that repository has free lanes — or, when there is no child to run, the
+verdict as a single token. Everything else goes to standard error, so what a shell captures is the
+list. Without `--lanes` the answer is a single token either way, which is what a caller running one
+child at a time still gets — **and that is the form to use until joshuafolkken/kit#1497 lands**, for
+the reason at the top of "Lanes — running more than one child at a time" above: a child cannot be
+committed from inside a lane yet.
 
 ```bash
 answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
+# add --lanes once joshuafolkken/kit#1497 lands, and read a line per child instead of one token
 ```
 
+**The snippet shows the one-at-a-time form deliberately.** A block carrying `--lanes` beside prose saying not
+to use it yet is a block that gets copied, and the run that copies it opens lanes and loses every
+child at `pnpm josh git` — which is the pressure that produces the branch switch this file forbids.
+
 1. Run the command above.
-2. **A number** — **first ask `pnpm josh run:preflight <N>` and obey it** ("Preflight — reclaim what
-   an interrupted run left" above): `reclaim` is recovered and the command asked again, `park` parks
+2. **One or more numbers** — where the child runs in this session's own checkout, **first ask
+   `pnpm josh run:preflight <N>` and obey it** ("Preflight — reclaim what an interrupted run left"
+   above): `reclaim` is recovered and the command asked again, `park` parks
    this child and returns to step 1, `unknown` stops the session, and `resume` starts the child on
-   the branch that is already there with the whole verification gate re-run. Then run that child as
-   `fullrun #<N>` does, through the verification gate and the
+   the branch that is already there with the whole verification gate re-run. **In a lane it is not
+   asked at all**, and `lane:open`'s own answer replaces it — "Lanes — running more than one child at
+   a time" above is where that lane is opened, installed and handed over. **Everything from here on
+   is per child**: with several in flight each one is confirmed, counted and closed on its own, and
+   step 1 is asked again once a lane comes free rather than once the last child returns. Either way
+   the child then runs as `fullrun #<N>` does, through the verification gate and the
    merge, **in a delegated unit where one is available** (`pnpm josh delegate epic-child` →
    `delegate`; see "Each child runs in a delegated unit" above) and **in this session's own context
    where none is**, **except that `josh latest` is not run** — it runs once, before this session's
    first child, and not again (above).
    `git switch main && git pull` runs per child in whichever context implements it, **and again in
    this session afterwards** when the child was delegated — otherwise the parent's checkout never
-   receives that merge and the next child starts on a stale default branch.
+   receives that merge and the next child starts on a stale default branch. **In a lane the child
+   cannot run it at all**, so it is the parent's, immediately before that lane's `lane:open`.
 
    **Start the unit without blocking on it, note where it writes, and poll.** Blocking on the return
    leaves the parent with no turn in which to notice that the return is never coming, which is the
@@ -855,6 +1071,12 @@ chooses", and the choosing is what the label exists for on a candidate-selection
 per-repository exclusion so a parked child releases the checkout; this label deliberately does not,
 because releasing it would start the next child on top of uncommitted work.
 
+**Its lane is left open and untouched**, for the same reason and by the same specification: the
+uncommitted work in that tree *is* the artifact a person has to look at, so nothing is stashed and
+nothing is closed. **Name the lane directory in the stop report and in the Telegram** — a person told
+to look at a working tree and not told which one has been told nothing. The lanes already in flight
+finish; no new lane is opened.
+
 **Never apply or remove the label** — `auto-ok`'s rule, at `auto-ok`'s strength. Full definition and
 the `needs-decision` comparison: `SKILL.md` → §2z, which is the single source.
 
@@ -874,6 +1096,13 @@ exactly as the classification does, so the next child is offered normally.
 
 Then return to step 1. The other children are unaffected unless they depend on this one, and
 `epic:next` works that out.
+
+**A parked child's lane is stashed and closed, never left open.** `epic:next` already counts a parked
+child as having released its lane, so a lane left standing holds a seat the count believes is free —
+and `lane:close` removes the work tree by force, so the work goes first:
+`git -C <dir> stash push -u -m "epicrun: parked #<N>"`, the stash recorded on the Issue, then
+`pnpm josh lane:close <N>`. The full table, including the two states where a lane is *not* closed, is
+"What happens to a lane" above.
 
 **Parking replaces stopping the session, not the rule that produced the stop.** An upstream defect
 is still filed immediately and unconditionally (Tier A for a first-party target), and a workaround
@@ -905,10 +1134,10 @@ mattered. An interrupted run leaves it behind, and a child that carries it is ex
 future `epic:next` — permanently. **A session that detects a stale child removes the label itself**
 (Tier A) and reports it, before continuing the loop.
 
-**It costs more than that one child now.** Since the repository-level exclusion above, an open issue
-carrying `in-progress` makes `epic:next --repo` answer `wait` for the *whole repository* — so a stale
-label stalls every epic that touches that checkout, including one on an issue this epic does not
-track. **The rule therefore applies to any open issue in the repository, not only to this epic's
+**It costs more than that one child now.** Since the lane count above, an open issue carrying
+`in-progress` occupies one of the repository's lanes — whichever epic it belongs to — so a stale
+label narrows every epic that touches that checkout, and enough of them make `epic:next --repo`
+answer `wait` for all of them at once. **The rule therefore applies to any open issue in the repository, not only to this epic's
 children**, and `epic:next` names the holders on standard error so there is something to go and look
 at. **Age alone is not the test.** Check the 90-minute window below *and* look at what is holding it,
 because three ordinary states hold the label legitimately for longer than that: a `halfrun` stopped
