@@ -270,3 +270,43 @@ describe('git_command.fetch_branch', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#926: `run:preflight` needs the branch an interrupted run left, not merely whether
+// one exists, so the boolean is expressed on top of the listing rather than beside it.
+describe('git_command.branch_names', () => {
+	const ISSUE_BRANCH_PATTERN = '926-*'
+	const ISSUE_BRANCH = '926-reclaim-a-tree'
+
+	it('asks git for the short names matching the pattern', async () => {
+		const { git_command } = await import('./git-command')
+
+		execa_mock.state.stdout = ISSUE_BRANCH
+
+		expect(await git_command.branch_names(ISSUE_BRANCH_PATTERN)).toStrictEqual([ISSUE_BRANCH])
+		expect(execa_mock.state.last_arguments).toStrictEqual([
+			'branch',
+			'--list',
+			'--format=%(refname:short)',
+			ISSUE_BRANCH_PATTERN,
+		])
+	})
+
+	it('answers with nothing when git fails rather than propagating', async () => {
+		const { git_command } = await import('./git-command')
+
+		execa_mock.state.should_fail = true
+
+		expect(await git_command.branch_names(ISSUE_BRANCH_PATTERN)).toStrictEqual([])
+		expect(await git_command.branch_exists('926-x')).toBe(false)
+	})
+
+	it('reads a branch that exists as true and an empty listing as false', async () => {
+		const { git_command } = await import('./git-command')
+
+		execa_mock.state.stdout = 'main'
+		expect(await git_command.branch_exists('main')).toBe(true)
+
+		execa_mock.state.stdout = ''
+		expect(await git_command.branch_exists('main')).toBe(false)
+	})
+})

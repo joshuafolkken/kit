@@ -252,14 +252,47 @@ async function pull(): Promise<void> {
 	await exec_git_command_with_output('pull', [])
 }
 
-async function branch_exists(branch_name: string): Promise<boolean> {
-	try {
-		const output: string = await exec_git_command_read(['branch', '--list', branch_name])
+// Every local branch matching a `git branch --list` pattern, one name per line. The boolean below is
+// this same read, expressed on top of it rather than beside it: `run:preflight` needs the name
+// itself, because the pull request an interrupted run left behind is keyed by its head branch and the
+// slug is not derivable from an issue number alone (joshuafolkken/kit#926).
+const SHORT_NAME_FORMAT = '--format=%(refname:short)'
+const REMOTES_FLAG = '--remotes'
 
-		return output.trim().length > 0
+async function list_branches(
+	flags: ReadonlyArray<string>,
+	pattern: string,
+): Promise<Array<string>> {
+	try {
+		const output: string = await exec_git_command_read([
+			'branch',
+			'--list',
+			SHORT_NAME_FORMAT,
+			...flags,
+			pattern,
+		])
+
+		return output.split('\n').filter((line) => line.trim() !== '')
 	} catch {
-		return false
+		return []
 	}
+}
+
+async function branch_names(pattern: string): Promise<Array<string>> {
+	return await list_branches([], pattern)
+}
+
+// **The pattern is matched against the short name, which for a remote-tracking branch includes the
+// remote** — `origin/926-x`, not `926-x` — so a caller passes `*/926-*` here and strips the remote
+// back off itself.
+async function branch_names_remote(pattern: string): Promise<Array<string>> {
+	return await list_branches([REMOTES_FLAG], pattern)
+}
+
+async function branch_exists(branch_name: string): Promise<boolean> {
+	const names = await branch_names(branch_name)
+
+	return names.length > 0
 }
 
 async function add_tracked(): Promise<void> {
@@ -290,6 +323,8 @@ const git_command = {
 	push,
 	pull,
 	branch_exists,
+	branch_names,
+	branch_names_remote,
 	add_tracked,
 	add_path,
 	is_upstream_not_set_error,

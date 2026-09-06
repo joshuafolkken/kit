@@ -1766,6 +1766,36 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)
 
 The entry points that ask it, and where in each procedure, are `.claude/skills/workflow-commands/SKILL.md` → "2f. The working-tree hold — one run per tree".
 
+### `josh run:preflight`
+
+Say what an interrupted run left in this working tree, and what the rule says to do about it before the next child starts ([#926](https://github.com/joshuafolkken/kit/issues/926)).
+
+```bash
+pnpm josh run:preflight 926   # alias: josh rp
+```
+
+Standard output carries exactly one token, so `answer=$(pnpm josh run:preflight 926)` captures something a loop can branch on. Every explanation goes to standard error: what was found, and the exact commands that recover it.
+
+| Answer    | What it found                                                                   | What the caller does                                                            |
+| --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `clean`   | Clean tree, HEAD on the default branch, no branch or pull request for the issue | Start the child                                                                 |
+| `reclaim` | Uncommitted changes, or HEAD off the default branch                             | Stash with `-u`, switch back, record the stash on the issue, then **ask again** |
+| `resume`  | A branch for the issue, or an open pull request, is still there                 | Reuse it and run the whole verification gate from the start                     |
+| `park`    | The pull request for the issue is merged or closed                              | Park the child with `needs-decision` and a comment                              |
+| `unknown` | The tree could not be read — exits non-zero                                     | Stop. It is not "the tree is clean"                                             |
+
+**The precedence between those states is fixed, and the first row is why it has to be.** A `resume` or a `park` decided over a dirty tree would hand the next child a checkout it cannot switch, so the tree is reclaimed first and the question asked again on the clean tree — rather than two answers being merged into one. The child is not read at all once the tree already answers `reclaim`: the verdict would be `reclaim` whatever it said, so the `gh` round trip is not spent.
+
+**It is re-askable, which `josh run:hold` deliberately is not.** A claim asked twice answers `busy`, because the second ask is a second run. This command reads state and writes nothing, so "reclaim, then ask again" is a procedure rather than a contradiction. The two guard different things and neither replaces the other: `run:hold` asks whether another **live** run owns this tree, this asks what a **dead** one left in it.
+
+**A branch is found by pattern, not by name.** `pnpm josh git` builds `<N>-<slug>`, and the slug is not derivable from an issue number, so the read is `git branch --list '<N>-*'` — which matches whatever the title was and never matches `<N><digit>-…`. **Remote-tracking branches are searched too**, with the remote name stripped back off: a run interrupted on another machine, or in a checkout since re-cloned, leaves the branch on the remote with no local counterpart, and a local-only search would answer `clean` over an open pull request. The same listing answers `git_command.branch_exists`, so there is one reading rather than two.
+
+**The pull request is reached through its head branch, which is the limit of what this command sees.** A branch that exists in neither place — deleted after a merge, say — takes its pull request out of view with it, and the answer is `clean`. Where more than one branch matches, a **decided** pull request on any of them outranks an open one on another, so a retry branch cannot hide a merged pull request behind itself. **An unreadable `gh` is never read as an absent pull request**: existence is asked through `pr_exists`, which throws on a lookup it could not complete ([#1048](https://github.com/joshuafolkken/kit/issues/1048)), and that reaches the caller as `unknown` rather than as `resume` over work somebody already merged.
+
+**The stash this command prescribes is the one sanctioned stash that is never popped.** What it moves aside belongs to a run that has ended, not to the run doing the stashing, so the Issue comment naming it is the only thing that can ever bring it back. The enumeration of flows that may stash automatically is `prompts/collaboration-workflow/operating-rules.md`.
+
+The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "Preflight — reclaim what an interrupted run left, before the next child starts".
+
 ### `josh cost`
 
 Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).

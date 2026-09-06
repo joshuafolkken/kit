@@ -386,6 +386,52 @@ that decides which children remain lives on GitHub, and the tree the resumed ses
 days old — which is exactly what the window answers: a session resumed within it is told `skip`, and
 one resumed a day later is told `required`.
 
+## Preflight — reclaim what an interrupted run left, before the next child starts
+
+**An unattended run ends abnormally.** A crash, a Ctrl-C, a laptop asleep, an expired token — and
+what it leaves is not a stale label but a **working tree**: its feature branch, its open pull
+request, its uncommitted changes. joshuafolkken/kit#920 covers the *planned* wind-down, and
+"`in-progress` is removed by whoever finds it stale" covers the label. **Nobody was looking at the
+tree**, and the loop below opens every child with `git switch main && git pull`, which refuses over a
+dirty one — while an agent may not reach for `git stash` on its own judgement. So an unattended batch
+could not recover from its own crash (joshuafolkken/kit#926).
+
+**Ask, the moment `epic:next` hands back a number and before the child is started:**
+
+```bash
+answer=$(pnpm josh run:preflight 926)   # alias: josh rp ; one token on stdout, prose on stderr
+```
+
+| Answer    | What it found                                                         | What to do                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clean`   | Nothing left behind                                                   | Start the child. This is the ordinary answer and costs one command.                                                                                                                                                                                                                                                                                                                                                                                     |
+| `reclaim` | Uncommitted changes, or HEAD off the default branch                   | Run what stderr printed: `git stash push -u -m "run:preflight reclaimed before #<N>"`, then `git switch <default> && git pull`. **`-u` is not optional** — the leftovers almost always include a new `*.test.ts`, which is untracked, and a stash without it leaves exactly the files the switch then refuses over. **Then record the stash on `#<N>` as a comment, and ask again**: the command is re-askable, and the clean tree gets its own answer. |
+| `resume`  | A branch for `#<N>`, or an open pull request, is still here           | **Reuse it and run the whole verification gate from the start** — refactor, `pnpm josh gate`, `/code-review`, all of it — never only the part the interrupted run had not reached. The tools are already idempotent (`git-branch.ts` switches to an existing branch, `git-pr.ts` updates an existing pull request), so what was missing was never the tooling; it was that **nobody had verified what the dead run already committed**.                    |
+| `park`    | The pull request for `#<N>` is **merged** or **closed**               | **Park the child** — `needs-decision` plus a comment naming what was found — and continue with the next one. Carrying on over a merged pull request duplicates work that already landed; carrying on over a closed one revives work somebody rejected. Which of those is happening is a person's read. Do not delete the branch, do not reopen the pull request, and do not commit on top of it.                                                          |
+| `unknown` | The tree could not be read                                            | Stop the session and report. It is not "the tree is clean".                                                                                                                                                                                                                                                                                                                                                                                             |
+
+**The rule answers, so the run does not judge.** "There is a branch already, I will carry on from it"
+and "there is a branch already, I had better stop" are both defensible in the moment, which is
+exactly why the choice is not left to the moment — the same reason `pnpm josh delegate` and
+`pnpm josh review:level` refuse to leave their answers to an agent.
+
+**The `git stash` above is one of the flows that authorizes automatic stashing**, enumerated in
+`prompts/collaboration-workflow/operating-rules.md` → the `git stash` bullet. **It is the one entry
+there that is not followed by `git stash pop`**: what is being stashed belongs to a run that is gone,
+not to the run doing the stashing, so there is nothing to restore it into — **the Issue comment is
+the only thing that can ever bring it back**, exactly as it is for a prerequisite stop.
+
+**It is not `run:hold`, and neither replaces the other.** `run:hold` asks *whether another live run
+owns this tree* and is claimed once, per child, by the `fullrun` procedure each child follows; this
+asks *what a dead run left in it* and is a read that writes nothing, so it is **re-askable** — which
+is what makes "reclaim, then ask again" a procedure rather than a `busy` answer. Ask this one first:
+a tree still holding an interrupted run's uncommitted work makes `run:hold` answer `busy`, and the
+preflight is what turns that into something the batch can act on.
+
+**Report what was reclaimed.** A child that started from a `reclaim` or a `resume` says so in the
+run's summary, with the stash reference where there was one — a reclaim nobody mentioned is
+indistinguishable from a run that never crashed.
+
 ## The loop
 
 `josh epic:next <E> --repo <this repository>` prints **one token** on standard output: an issue
@@ -397,7 +443,11 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
 ```
 
 1. Run the command above.
-2. **A number** — run that child as `fullrun #<N>` does, through the verification gate and the
+2. **A number** — **first ask `pnpm josh run:preflight <N>` and obey it** ("Preflight — reclaim what
+   an interrupted run left" above): `reclaim` is recovered and the command asked again, `park` parks
+   this child and returns to step 1, `unknown` stops the session, and `resume` starts the child on
+   the branch that is already there with the whole verification gate re-run. Then run that child as
+   `fullrun #<N>` does, through the verification gate and the
    merge, **in a delegated unit where one is available** (`pnpm josh delegate epic-child` →
    `delegate`; see "Each child runs in a delegated unit" above) and **in this session's own context
    where none is**, **except that `josh latest` is not run** — it runs once, before this session's

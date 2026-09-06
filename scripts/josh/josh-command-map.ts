@@ -104,6 +104,7 @@ const ALIASES: Record<string, string> = {
 	dg: 'delegate',
 	rh: 'run:hold',
 	rr: 'run:release',
+	rp: 'run:preflight',
 	ig: 'investigation:guard',
 	ev: 'eval',
 	es: 'eval:scope',
