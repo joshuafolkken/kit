@@ -49,7 +49,7 @@ function parse_round(argv: ReadonlyArray<string>): number | undefined {
 const KEPT_NOTE_PREFIX = 'Round-1 snapshot: kept the record taken at'
 
 function kept_note(taken_at: string): string {
-	return `${KEPT_NOTE_PREFIX} ${taken_at} rather than retaking it — the fix delta is measured from there, so everything changed since is reviewed rather than assumed away (joshuafolkken/kit#1441).`
+	return `${KEPT_NOTE_PREFIX} ${taken_at} rather than retaking it — the fix delta is measured from there, so everything changed since is reviewed rather than assumed away. Check that timestamp: a record left behind by an earlier run measures the delta from further back, which widens the round rather than narrowing it (joshuafolkken/kit#1441).`
 }
 
 // The snapshot is taken on round 1 only, and it is taken **before** the review reports, so the

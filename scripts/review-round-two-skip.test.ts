@@ -52,7 +52,11 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	// the fixes read identically, and the round is skipped over fix code nobody read; without the
 	// sentence naming the direction, a later reader takes a stale record for a reason to narrow.
 	'**Arm A rests on the snapshot not being retaken, and that is enforced rather than left to a timestamp somebody might notice.**',
-	'once per run',
+	// Both fragments are specific to this section on purpose: a bare `once per run` also matches the
+	// unrelated gate sentence "started once per run, not once per edit" elsewhere in this file, so the
+	// write-once convention could be deleted from the arm and the suite would still pass on that.
+	'recorded once per run and never retaken',
+	'records the round-1 snapshot **once per run**',
 	'**A record that outlives its run only ever widens the next one**',
 ]
 
