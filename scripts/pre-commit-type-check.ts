@@ -48,10 +48,9 @@ const REFUSED_EXIT_CODE = 1
 // `process.argv` is [runner, script, ...arguments].
 const FIRST_ARGUMENT_INDEX = 2
 
-// The gate's own two readings plus the two this hook adds.
+// The gate's own two readings plus the one this hook adds.
 interface CommitTree extends GateTree {
 	is_index_matching_worktree: boolean
-	is_recorded_check_this_check: boolean
 }
 
 // **The record says the gate's four checks were green; it does not say *which* type check ran.**
@@ -64,41 +63,50 @@ interface CommitTree extends GateTree {
 // So the reuse is refused wherever the two are not the same command, and the resolution is asked of
 // `type_check_step` rather than re-derived here. **The hook's own command is unchanged either way**:
 // what this narrows is only when an identical check is not re-run.
+//
+// **The `catch` is the module's invariant, not defensiveness**: a reading that could not be taken says
+// nothing about which check ran, and "we could not tell" must resolve to running the check.
 async function is_recorded_check_this_check(start_directory: string): Promise<boolean> {
-	const resolved = await type_check_step.resolve_type_check_args(start_directory)
+	try {
+		const resolved = await type_check_step.resolve_type_check_args(start_directory)
 
-	return resolved.join(' ') === DEFAULT_TYPE_CHECK_ARGS.join(' ')
-}
-
-// The readings are independent, so they are started together rather than one after the other.
-async function read_commit_tree(start_directory: string = process.cwd()): Promise<CommitTree> {
-	const [tree, lines, is_this_check] = await Promise.all([
-		gate_tree.read_gate_tree(),
-		hook_gate_reuse.read_status_lines(),
-		is_recorded_check_this_check(start_directory),
-	])
-
-	return {
-		...tree,
-		is_index_matching_worktree: hook_gate_reuse.is_index_matching_worktree(lines),
-		is_recorded_check_this_check: is_this_check,
+		return resolved.join(' ') === DEFAULT_TYPE_CHECK_ARGS.join(' ')
+	} catch {
+		return false
 	}
 }
 
-function reusable_green_commit(
+// The readings are independent, so they are started together rather than one after the other.
+async function read_commit_tree(): Promise<CommitTree> {
+	const [tree, lines] = await Promise.all([
+		gate_tree.read_gate_tree(),
+		hook_gate_reuse.read_status_lines(),
+	])
+
+	return { ...tree, is_index_matching_worktree: hook_gate_reuse.is_index_matching_worktree(lines) }
+}
+
+// **The type-check identity is asked last, because it is the only reading that can spawn a process.**
+// `resolve_type_check_args` probes a toolkit shim for its usage line, and on a project that has one the
+// reuse is refused anyway — so asking it before the record had matched would put a subprocess on the
+// force path, on a dirty index, and on every commit of a project that can never reuse.
+async function reusable_green_commit(
 	tree: CommitTree,
 	extra_arguments: ReadonlyArray<string>,
 	source?: string,
-): FileMapStamp | undefined {
-	if (!tree.is_recorded_check_this_check) return undefined
-
-	return hook_gate_reuse.reusable_green_hook({
+	start_directory: string = process.cwd(),
+): Promise<FileMapStamp | undefined> {
+	const reusable = hook_gate_reuse.reusable_green_hook({
 		tree,
 		is_tree_carried: tree.is_index_matching_worktree,
 		extra_arguments,
 		force_env: FORCE_ENV,
 		source,
 	})
+
+	if (reusable === undefined) return undefined
+
+	return (await is_recorded_check_this_check(start_directory)) ? reusable : undefined
 }
 
 // **Nothing is forwarded to `tsc`, and an argument is refused rather than dropped.** `tsc --noEmit
@@ -148,7 +156,7 @@ async function run_pre_commit_type_check(
 		return REFUSED_EXIT_CODE
 	}
 
-	const reusable = reusable_green_commit(await read_commit_tree(), extra_arguments, source)
+	const reusable = await reusable_green_commit(await read_commit_tree(), extra_arguments, source)
 
 	if (reusable === undefined) return await run_type_check()
 
@@ -165,6 +173,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const pre_commit_type_check = {
 	FORCE_ENV,
+	TYPE_CHECK_ARGUMENTS,
 	format_refusal,
 	format_skip,
 	is_recorded_check_this_check,

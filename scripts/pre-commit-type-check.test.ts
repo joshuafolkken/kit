@@ -70,17 +70,29 @@ vi.mock('./git/git-command', () => ({
 
 // What `type-check-step.ts` resolves the gate's type-check step to for this project. The default is
 // this hook's own `tsc --noEmit`; a toolkit project's is not, and the record cannot tell them apart.
-const gate_step = vi.hoisted((): { args: ReadonlyArray<string> } => ({ args: ['josh', 'check'] }))
+const gate_step = vi.hoisted((): { args: ReadonlyArray<string>; unreadable: boolean } => ({
+	args: ['josh', 'check'],
+	unreadable: false,
+}))
 
 vi.mock('./type-check-step', () => ({
 	DEFAULT_TYPE_CHECK_ARGS: ['josh', 'check'],
 	type_check_step: {
-		resolve_type_check_args: async (): Promise<ReadonlyArray<string>> => gate_step.args,
+		resolve_type_check_args: async (): Promise<ReadonlyArray<string>> => {
+			if (gate_step.unreadable) throw new Error('the toolkit shim could not be probed')
+
+			return gate_step.args
+		},
 	},
 }))
 
 const TOOLKIT_STEP: ReadonlyArray<string> = ['josh-app', 'check:ci']
 const DEFAULT_STEP: ReadonlyArray<string> = ['josh', 'check']
+// Held in a variable so the lookup keeps its index-signature form: `COMMAND_MAP.check` is what the
+// formatter rewrites a literal key to, and `noPropertyAccessFromIndexSignature` then refuses it.
+const GATE_TYPE_CHECK_COMMAND = 'check'
+// The one token of the hook's argv that names `pnpm exec` rather than the check itself.
+const EXEC_TOKEN = 'exec'
 
 const TYPE_CHECK_EXIT_CODE = 2
 
@@ -143,6 +155,7 @@ beforeEach(() => {
 	repository.status = STAGED_ONLY
 	repository.unreadable = READS_FINE
 	gate_step.args = DEFAULT_STEP
+	gate_step.unreadable = false
 	vi.stubEnv(FORCE_ENV, '')
 })
 
@@ -239,6 +252,17 @@ describe('a tree that is not the commit being made', () => {
 		expect(check_run_count()).toBe(CHECK_RAN)
 	})
 
+	// The same invariant as the git readings: a probe that could not be taken says nothing about which
+	// check ran, so it must resolve to running the check rather than to a crash.
+	it('runs the type check when the project’s type check step could not be resolved', async () => {
+		gate_step.unreadable = true
+
+		const [code] = await run_hook()
+
+		expect(code).toBe(0)
+		expect(check_run_count()).toBe(CHECK_RAN)
+	})
+
 	// A git command that could not be run says nothing about the tree, and "we could not tell" must
 	// never resolve to "no need to check". One case per reading, because each is a separate `catch`.
 	it.each(['status', 'tree', 'base'])(
@@ -306,6 +330,19 @@ describe('a record that cannot speak for this tree', () => {
 
 		expect(code).toBe(TYPE_CHECK_EXIT_CODE)
 	})
+})
+
+// The guard compares the gate's resolved step against `josh check` rather than against this hook's own
+// argv, because that is what `type-check-step.ts` answers with. That the two are the same check is a
+// real invariant, and leaving it unchecked would let a later redefinition of `josh check` reopen the
+// hole the guard closes: the guard would still say yes while the record covered a different check.
+describe('the recorded default step is this hook’s own check', () => {
+	it.each(pre_commit_type_check.TYPE_CHECK_ARGUMENTS.filter((token) => token !== EXEC_TOKEN))(
+		'josh check runs %s, so a record it wrote covers what this hook would run',
+		(token) => {
+			expect(COMMAND_MAP[GATE_TYPE_CHECK_COMMAND]?.shell).toContain(token)
+		},
+	)
 })
 
 // The hook's line names this command, so a command that is not registered is a commit that fails on
