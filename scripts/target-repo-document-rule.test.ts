@@ -28,13 +28,18 @@ const ENTRY_FORMS: ReadonlyArray<string> = [
 	'epicrun joshuafolkken/kit#858',
 ]
 
+// The entry whose parent loop runs in the session's own repository while its issues may live in
+// another — which is what makes an unqualified write there resolve to the wrong tracker. Declared
+// before `ENTRY_FILES` so the path is written once and the two cannot drift.
+const QUEUE_SKILL = '.claude/skills/workflow-commands/queue.md'
+
 // The five entry files. A file that does not name the definition is a file that will grow a second
 // one, which is exactly the defect the acceptance criteria call out ("do not fix one entry point").
 const ENTRY_FILES: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/kickoff.md',
 	'.claude/skills/workflow-commands/fullrun.md',
 	'.claude/skills/workflow-commands/halfrun.md',
-	'.claude/skills/workflow-commands/queue.md',
+	QUEUE_SKILL,
 	'.claude/skills/workflow-commands/epicrun.md',
 ]
 
@@ -221,6 +226,71 @@ describe.each(ENTRY_FILES)('%s — references the one definition', (document_pat
 	// canonical's Japanese wording is the one this alternation was already catching.
 	it('does not restate the expansion rule', () => {
 		expect(unwrapped).not.toMatch(/prefixing the session repository's owner|owner を前置して/u)
+	})
+})
+
+// joshuafolkken/kit#1160: the queue loop's stale-`in-progress` cleanup resolved through gh's
+// `{owner}/{repo}` placeholder, which gh expands from the checkout the command runs in — this
+// session's own repository, whatever repository `queue kit#1 kit#2` targets. The `issue:state` read
+// thirty lines above it already carries `--repo` and warns about that exact mis-resolution, so the
+// two halves of one loop disagreed; and `2>/dev/null || true` meant the miss was silent, leaving the
+// label on and `epic:next` answering `wait` for a whole repository with nobody told.
+describe(`${QUEUE_SKILL} — the stale-\`in-progress\` cleanup names the target repository`, () => {
+	const unwrapped = read_unwrapped(QUEUE_SKILL)
+
+	// The placeholder is the defect itself, so its absence is what is asserted — a replacement
+	// spelling added beside it would leave the wrong command still there to be copied. **The
+	// `gh api -X DELETE` prefix is part of the marker on purpose**: without it the assertion would
+	// ban the file from ever quoting the old spelling in prose, and the rollout note explaining what
+	// changed is exactly the prose a reader most needs.
+	it('does not resolve the delete through the `{owner}/{repo}` placeholder', () => {
+		expect(unwrapped).not.toContain(
+			'gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress',
+		)
+	})
+
+	it('writes the repository into the delete path', () => {
+		expect(unwrapped).toContain(
+			'gh api -X DELETE repos/<owner>/<repo>/issues/<N>/labels/in-progress',
+		)
+	})
+
+	// One rule rather than two that happen to agree today: the write is grounded in the `--repo` note
+	// the same file already states, which is what stops the next editor restoring the placeholder.
+	it('grounds the delete in the `--repo` rule the same file already states', () => {
+		expect(unwrapped).toContain('exactly as `--repo` is on the read above')
+		expect(unwrapped).toContain('cannot name two different repositories')
+	})
+
+	// The premise the dropped `|| true` rests on has to be established rather than assumed: the
+	// branch is selected by `state: OPEN` and the two stop labels, which say nothing about this one,
+	// and `fullrun`'s prerequisite stop removes it itself — so without this the delete 404s on a
+	// legitimate path and the `failure` Telegram claims a label that is not there.
+	it('conditions the delete on the label the read above actually listed', () => {
+		expect(unwrapped).toContain('Run it only where the `issue:state` read above listed')
+		expect(unwrapped).toContain('there is nothing to remove')
+	})
+
+	// The other copies of this command run inside the target repository's own checkout, so the rule
+	// is stated for this loop rather than as a claim the diff enforces in one file out of seven.
+	it('scopes the claim to this loop rather than to every copy of the command', () => {
+		expect(unwrapped).toContain('That claim is about this loop')
+	})
+
+	// The silence was half the defect. `|| true` had nothing innocent left to absorb once the read
+	// above reported the labels, so what it absorbed was every way the delete genuinely fails.
+	it('stops swallowing the delete failure', () => {
+		expect(unwrapped).not.toContain('labels/in-progress 2>/dev/null || true')
+		expect(unwrapped).toContain('there is no `2>/dev/null || true`')
+	})
+
+	// A failure that is reported nowhere is the same as one that was swallowed, so the branch names
+	// where it goes — the `failure` Telegram this branch was already sending.
+	it('routes a failed delete into the `failure` Telegram the branch already sends', () => {
+		expect(unwrapped).toContain('`failure` Telegram step 2c already sends')
+		expect(unwrapped).toContain(
+			'Never report the label cleared on a command whose output nobody read',
+		)
 	})
 })
 

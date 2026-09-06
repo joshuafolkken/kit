@@ -84,8 +84,36 @@ What a queue does with each answer is the only part that differs, because a queu
   for the whole repository. Then step 2c: the `failure` Telegram, and stop.
 
   ```bash
-  gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
+  gh api -X DELETE repos/<owner>/<repo>/issues/<N>/labels/in-progress
   ```
+
+  **Run it only where the `issue:state` read above listed `in-progress`.** This branch is selected by
+  `state: OPEN` and the absence of the two stop labels, which says nothing whatever about that one: a
+  unit that died before the label step never applied it, and `fullrun`'s prerequisite stop removes it
+  itself before stopping. Where the read did not list it there is nothing to remove — say so and go
+  straight to step 2c. The read has already printed the labels, so this costs no extra call.
+
+  **The repository is written out, exactly as `--repo` is on the read above**
+  (joshuafolkken/kit#1160). `<owner>/<repo>` is the queue's target — the same repository `--repo`
+  names on that read, and this one where a bare `queue #1 #2` was typed. `{owner}/{repo}` is not
+  that: `gh` expands it from the checkout the command runs in, and this loop runs in the session's
+  own repository whatever repository the queue targets — so on `queue kit#1 kit#2` from anywhere else
+  the delete lands on the session's repository, which is the mis-resolution the `--repo` note above
+  already warns about. **In this loop a read and a write about the same issue cannot name two
+  different repositories.** That claim is about this loop, not about every
+  `-X DELETE …/labels/in-progress` in these files: `fullrun.md` and `halfrun.md` remove the label
+  from inside the target repository's own checkout, where `{owner}/{repo}` resolves to exactly that
+  repository, and `epicrun.md`'s copies are left as they are pending the separate confirmation
+  joshuafolkken/kit#1160 asks for.
+
+  **The failure is then not discarded, which is why there is no `2>/dev/null || true`.** The label is
+  known to be on the issue by the time the command runs, so "the label was not there" is not a case
+  it can meet, and what `|| true` would absorb instead is every way the delete genuinely fails — a
+  404 from a repository this issue does not live in, expired auth, a rate limit — each of which
+  leaves the label on and makes `epic:next` answer `wait` for that whole repository with nobody told.
+  **A non-zero exit here goes into the `failure` Telegram step 2c already sends**, naming the issue
+  and that the label is still on it; it needs no stop of its own, because this branch is already
+  stopping. Never report the label cleared on a command whose output nobody read.
 
 Never advance the queue on the summary alone.
 
