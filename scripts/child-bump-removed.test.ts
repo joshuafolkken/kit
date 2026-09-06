@@ -129,6 +129,21 @@ describe('no document still puts a version bump in the child flow', () => {
 	})
 })
 
+// The instruction a run follows when it writes its completion report. It is the one place that told
+// an agent to quote a version at the reader, so a stale copy here reproduces the false claim the code
+// no longer makes.
+describe('the completion instruction reports a count, not a version', () => {
+	const content = read_unwrapped('.claude/skills/workflow-commands/followup.md')
+
+	it('no longer tells the run to surface a project version', () => {
+		expect(content).not.toContain('📦 project version')
+	})
+
+	it('names the count that replaced it', () => {
+		expect(content).toContain('unreleased merges on main')
+	})
+})
+
 // The replacement has to be named somewhere a run reads, or a child that no longer bumps looks like
 // a version that never moves.
 describe('the documents name what raises the version instead', () => {

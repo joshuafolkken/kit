@@ -2,8 +2,26 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { HistoryReader } from '#scripts/release/release-history'
-import { afterAll, describe, expect, it } from 'vitest'
-import { git_followup_pending } from './git-followup-pending'
+import { afterAll, describe, expect, it, vi } from 'vitest'
+
+const DEFAULT_BRANCH = 'main'
+const fetched = vi.hoisted(() => ({ branches: [] as Array<string> }))
+
+// The two reads `read_tip` makes. Mocked rather than exercised, because resolving the tip fetches
+// from `origin` and a unit suite must not reach the network — which is also why every other case
+// here passes an explicit `tip`.
+vi.mock('./git-command', () => ({
+	git_command: {
+		get_default_branch: async (): Promise<string> => DEFAULT_BRANCH,
+		fetch_branch: async (branch_name: string): Promise<string> => {
+			fetched.branches.push(branch_name)
+
+			return ''
+		},
+	},
+}))
+
+const { git_followup_pending } = await import('./git-followup-pending')
 
 // joshuafolkken/kit#1486: the completion notification used to read the local `package.json` and
 // report it as the shipping version. Children no longer bump, so that read now names the *previous*
@@ -137,6 +155,23 @@ describe('git_followup_pending.pending_release_line — which ref the count is r
 			tip: TIP,
 		})
 
+		expect(seen).toStrictEqual([TIP, `${BASE_SHA}..${TIP}`])
+	})
+
+	// The half no other case reaches: with no `tip` given, production has to resolve one itself. Left
+	// unchecked, `read_tip` could return `HEAD` and the whole suite would still pass — which is the
+	// defect this pair of tests exists to pin, not the threading below it.
+	it('resolves the fetched default branch when no tip is given', async () => {
+		const seen: Array<string> = []
+
+		fetched.branches = []
+		await git_followup_pending.pending_release_line({
+			is_merge_pending: false,
+			cwd: project_at(CURRENT_VERSION),
+			reader: reader_with(PENDING_COUNT, seen),
+		})
+
+		expect(fetched.branches).toStrictEqual([DEFAULT_BRANCH])
 		expect(seen).toStrictEqual([TIP, `${BASE_SHA}..${TIP}`])
 	})
 })

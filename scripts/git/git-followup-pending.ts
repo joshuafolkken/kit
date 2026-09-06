@@ -52,12 +52,16 @@ async function read_tip(options: PendingLineOptions): Promise<string> {
 // not run, or a history whose base the search cannot resolve is not "nothing is waiting to ship" —
 // and a notification that said so would be the same class of false statement this module exists to
 // remove.
+// The manifest read is **inside** the `try` with the rest. `readFileSync` can throw after
+// `existsSync` passed — EACCES, EISDIR, a racing write — and this function is called from
+// `notify_completion`, which runs *before* `pr_merge`: an escaping rejection there would abort the
+// run and lose a merge over a cosmetic line.
 async function read_pending(options: PendingLineOptions): Promise<number | undefined> {
-	const current_version = version_targets.read_workspace_version(options.cwd ?? process.cwd())
-
-	if (current_version === undefined) return undefined
-
 	try {
+		const current_version = version_targets.read_workspace_version(options.cwd ?? process.cwd())
+
+		if (current_version === undefined) return undefined
+
 		const tip = await read_tip(options)
 		const plan = await release_history.read_release_plan(current_version, options.reader, tip)
 
