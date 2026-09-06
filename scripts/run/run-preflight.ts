@@ -2,6 +2,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_gh_pr_read } from '#scripts/git/git-gh-pr-read'
 import { z } from 'zod'
 import { run_hold } from './run-hold'
+import { run_issue_number } from './run-issue-number'
 
 // `josh run:preflight <N>` — what an interrupted run left in this working tree, and what the rule
 // says to do about it before the next child starts (joshuafolkken/kit#926).
@@ -81,11 +82,10 @@ const PARK_ADVICE =
 const STASH_LABEL_PREFIX = 'run:preflight reclaimed before #'
 
 // The issue number reaches the advice inside a double-quoted shell command a caller is told to paste,
-// so the shape it may take is pinned here, beside the interpolation, rather than only in the CLI that
-// happens to be today's single caller.
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
-
-const BAD_ISSUE_MESSAGE = 'Not an issue number: '
+// so the shape it may take is pinned beside the interpolation rather than only in the CLI that
+// happens to be today's single caller. `run:liveness` interpolates it the same way, so the pattern
+// and the refusal live in one module both read (joshuafolkken/kit#1485).
+const { ISSUE_NUMBER_PATTERN, require_issue_number } = run_issue_number
 const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
 
 function needs_reclaim(tree: TreeState): boolean {
@@ -296,13 +296,6 @@ async function read_child_state(issue: string): Promise<ChildState> {
 	return pick_child_state(
 		await Promise.all(candidates.map(async (name) => await read_pr_of_branch(name))),
 	)
-}
-
-// The number is checked here rather than only in the CLI, because it is interpolated into a
-// double-quoted shell command the caller is told to paste — so the constraint lives with the
-// interpolation, and an entry point that forgot to validate fails loudly instead of emitting it.
-function require_issue_number(issue: string): void {
-	if (!ISSUE_NUMBER_PATTERN.test(issue)) throw new Error(`${BAD_ISSUE_MESSAGE}${issue}`)
 }
 
 // The child read is skipped where the tree already answers `reclaim`: a `gh` round trip buys nothing

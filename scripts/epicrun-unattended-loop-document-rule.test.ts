@@ -30,7 +30,7 @@ const DELEGATE_COMMAND = 'pnpm josh delegate epic-child'
 // The two halves of the detection, each asserted twice — present in the skill, absent from the
 // pointer. Written out twice they would drift, and a pointer suite matching a marker the skill no
 // longer carries reports a body left behind that is not there.
-const CONJUNCTION_RULE = 'All four together, never any one alone'
+const CONJUNCTION_RULE = 'Silence and no process, together — never either one alone'
 const WINDOW_ROW = '| Silent delegated unit | 30 min |'
 
 describe(`${SKILL} — the cost check fires only where delegation is unavailable`, () => {
@@ -161,24 +161,53 @@ describe(`${SKILL} — a delegated unit that stopped without reporting`, () => {
 		expect(unwrapped).toContain('a unit that is not running trips none of them')
 	})
 
-	// The traces are the whole detection. Enumerated in the document, per the Issue's acceptance
-	// criterion, so an agent has something to read rather than a judgement to make.
+	// joshuafolkken/kit#1485 replaced the four hand-read traces with one command, because combining
+	// them was the judgement that got it wrong. What is pinned now is the invocation and the four
+	// answers, so an agent has something to run rather than a conjunction to evaluate.
 	it.each([
-		"The unit's output has not changed.",
-		'The checkout is dirty, and nothing was ever opened for the child.',
-		"No process of the child's is alive in that checkout.",
-		'The child still carries `in-progress`.',
-	])('enumerates the trace %j', (trace) => {
-		expect(unwrapped).toContain(trace)
+		'pnpm josh run:liveness <N> --output <path> --process none',
+		'| `alive` |',
+		'| `stopped` |',
+		'| `settled` |',
+		'| `undetermined` |',
+	])('enumerates the answer %j', (marker) => {
+		expect(unwrapped).toContain(marker)
 	})
 
-	// One trace alone has an innocent reading, and acting on it would kill a working unit.
-	it('requires all four rather than any one', () => {
+	// One half alone has an innocent reading — a unit inside a long check writes nothing, and a unit
+	// that is only reading runs no check — so acting on either would kill a working unit.
+	it('requires both halves rather than either one', () => {
 		expect(unwrapped).toContain(CONJUNCTION_RULE)
+	})
+
+	// The direction of the error is the design: a live unit booked as stopped loses work, so every
+	// trace that could not be read falls the other way.
+	it('falls to undetermined rather than to a stop', () => {
+		expect(unwrapped).toContain(
+			'a trace that could not be read answers `undetermined`, never `stopped`',
+		)
 	})
 
 	it('pins the window in the waiting table', () => {
 		expect(content).toContain(WINDOW_ROW)
+	})
+})
+
+// The two ways the new answer could itself fall back to never firing: a poll that keeps saying
+// nothing, and the dirty-checkout requirement that made the old test unsatisfiable.
+describe(`${SKILL} — the detection cannot fall back to never firing`, () => {
+	const unwrapped = read_unwrapped(SKILL)
+
+	it('bounds a repeating undetermined without escalating it to a stop', () => {
+		expect(unwrapped).toContain(
+			'**Two `undetermined` answers in a row is a fault in the check, not a slow unit.**',
+		)
+		expect(unwrapped).toContain('**It is never escalated to a `stopped`**')
+	})
+
+	it('says a clean checkout is not evidence of life', () => {
+		expect(unwrapped).toContain('A clean checkout is not evidence that the unit is alive.')
+		expect(unwrapped).toContain('"Nothing was ever opened for the child" is not part of it either.')
 	})
 })
 
@@ -192,19 +221,18 @@ describe(`${SKILL} — the detection can actually run`, () => {
 	// makes.
 	it('gives the detection somewhere to execute', () => {
 		expect(unwrapped).toContain(
-			'**Start the unit without blocking on it, note where it writes and the modification time of that file, and poll.**',
+			'**Start the unit without blocking on it, note where it writes, and poll.**',
 		)
 		expect(unwrapped).toContain(
 			'So the parent checks rather than waiting — which means it must not be waiting.',
 		)
 	})
 
-	// Trace 1 compares against a previous reading, so the first check has nothing to compare against
-	// unless the baseline was taken at hand-off — and a trace nothing can evaluate makes the conjunction
-	// unsatisfiable rather than merely uncertain.
-	it('takes the baseline at hand-off', () => {
+	// The path is the one thing the parent cannot recover afterwards; the timestamp is not, and
+	// carrying it forty minutes is what made the symlink misread invisible (joshuafolkken/kit#1485).
+	it('records the path at hand-off and reads the timestamp from the file', () => {
 		expect(unwrapped).toContain(
-			'**Record the baseline when the child is handed over, not at the first check.**',
+			'**Note where the unit writes at hand-off; the modification time is read from the file, not carried.**',
 		)
 	})
 
@@ -214,13 +242,14 @@ describe(`${SKILL} — the detection can actually run`, () => {
 		expect(unwrapped).toContain('read **in the checkout the unit was given**')
 	})
 
-	// Two of the four were first written so they could never fire: a `--head <branch>` read with no
-	// branch to name, and a `pgrep` by command name on a machine that runs several kit projects at
-	// once by design. Either one held false forever makes the conjunction above undetectable.
+	// The two ways a trace was written so it could never answer: a `pgrep` by command name on a machine
+	// that runs several kit projects at once by design, and a modification time read off a symlink,
+	// whose own timestamp never moves. The branch-and-pull-request read is gone with the trace it
+	// belonged to — `josh run:preflight` owns that question at the start of the next child.
 	it.each([
-		"git branch --list '<N>-*'",
 		'**A bare command-name match is not the test**',
-		'**`--state all` is not optional either**',
+		'**Read the file the path points at, not the link.**',
+		'a `stat` typed by hand needs `-L`',
 	])('keeps the trace readable: %j', (marker) => {
 		expect(unwrapped).toContain(marker)
 	})
@@ -238,6 +267,7 @@ describe(`${SKILL} — what a stopped unit's child gets`, () => {
 		'git stash push -u -m "epicrun: stopped unit for #<N>"',
 		'gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress',
 		'Count it against the consecutive-failure guard and park it',
+		'naming what `run:liveness` answered and what it read',
 	])('books it as a failed child: %j', (step) => {
 		expect(unwrapped).toContain(step)
 	})

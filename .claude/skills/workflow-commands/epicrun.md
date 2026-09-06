@@ -165,47 +165,89 @@ that mere slowness does not.
 
 **So the parent checks rather than waiting — which means it must not be waiting.** **Hand the child to
 the unit without blocking on its return, and poll.** A parent that blocks is waiting for exactly the
-report a stopped unit never makes, so it has no turn in which to run any of the reads below; written
+report a stopped unit never makes, so it has no turn in which to run the check below; written
 that way the detection would be present in the document and unreachable in the run, which is
-joshuafolkken/kit#1176 reproduced unchanged. Poll at the loop's polling interval, and run the four
-traces once the unit's output has been unchanged for the silent-unit window —
+joshuafolkken/kit#1176 reproduced unchanged. Poll at the loop's polling interval, and ask once the
+unit's output has been unchanged for the silent-unit window —
 `| Silent delegated unit | 30 min |` in the waiting table below.
 
-**Record the baseline when the child is handed over, not at the first check.** Note the path the unit
-writes its transcript or result to, and that file's modification time, at the moment of hand-off. A
-trace that compares against a previous check has nothing to compare against on the first one, and a
-trace that cannot be evaluated makes the conjunction below **unsatisfiable** rather than merely
-uncertain — the detection would then never fire at all.
+**Note where the unit writes at hand-off; the modification time is read from the file, not carried.**
+The path is the one thing the parent cannot recover afterwards, so it is written down the moment the
+child is handed over. The timestamp is not — a value copied down forty minutes earlier is a value
+that was read once, and reading it from the file each time is both cheaper and correct across a
+parent that restarted.
 
-**The four traces the stopped unit actually left.** Traces 2 and 3 are read **in the checkout the unit
-was given** — this session's own unless the unit was handed a separate work tree, in which case that
-one, and the stash in the recovery below is taken there too. Read them against the parent's checkout
-while the unit worked in a work tree and both come back clean, the stop goes undetected, and the
-stash saves nothing while the half-written work stays in the abandoned tree:
+**Ask the command rather than combining the traces yourself.** It reads the output, the checkout and
+the child's state, and answers one verdict. Traces are read **in the checkout the unit was given** —
+this session's own unless the unit was handed a separate work tree, in which case run it there, and
+the stash in the recovery below is taken there too. Read against the parent's checkout while the unit
+worked in a work tree and everything comes back clean, the stop goes undetected, and the stash saves
+nothing while the half-written work stays in the abandoned tree.
 
-1. **The unit's output has not changed.** The file noted at hand-off carries the same modification
-   time it carried then.
-2. **The checkout is dirty, and nothing was ever opened for the child.** `git status --short` shows
-   uncommitted work while `git branch --list '<N>-*'` and `gh pr list --state all --search '<N> in:body'`
-   find nothing. A child is implemented on the default branch, `pnpm josh git` creates the branch —
-   named for the child's issue number — only at commit time, so a unit that died mid-implementation
-   leaves exactly this. **The branch pattern is what makes the read possible**: there is no branch name
-   to pass to `--head`, since the premise of the trace is that no branch exists. **`--state all` is not
-   optional either** — the default lists open pull requests only, so a child whose PR merged while the
-   parent was polling would read as having opened nothing.
-3. **No process of the child's is alive in that checkout.** Read the command lines rather than the
-   names — `pgrep -laf vitest`, `pgrep -laf playwright`, `pgrep -laf 'josh gate'` — and look for one
-   naming **that checkout's path**. **A bare command-name match is not the test**: several kit
-   projects are meant to run at once (`PORT_SEED` exists for that), so one unrelated watcher anywhere
-   on the machine would hold this trace false forever — and since all four are required, a stopped
-   unit would then never be detected at all.
-4. **The child still carries `in-progress`.** `pnpm josh issue:state <N>` answers `state: OPEN` and
-   lists the label.
+```bash
+pnpm josh run:liveness <N> --output <path> --process none    # alias: josh rv
+pnpm josh run:liveness <N> --output <path> --process alive
+pnpm josh run:liveness <N> --output <path> --process none --window 45 --repo <owner/repo>
+```
 
-**All four together, never any one alone.** Every one of them has an innocent reading by itself — a
-long type check writes no file, a child that has not reached its commit has no branch yet — so acting
-on one would kill a unit that was working. There is no state of a live unit that produces all four at
-once, which is what makes the conjunction the test.
+| Answer | What it found | What the parent does |
+| --- | --- | --- |
+| `alive` | The output moved, or a process of the child is running | Keep polling; touch nothing |
+| `stopped` | The output has been frozen past the window and no process of the child is alive | The recovery below |
+| `settled` | The child closed, or the unit parked it with `needs-decision` | Re-read it with `pnpm josh issue:state <N>` and take the branch its state says |
+| `undetermined` | A trace could not be read | Read the trace that failed and ask again — and see the two-in-a-row rule below |
+
+**Two `undetermined` answers in a row is a fault in the check, not a slow unit.** The path noted at
+hand-off can be wrong, or rotated, or never created; read that way every poll answers `undetermined`
+forever and the stop is never detected — which is the failure this whole section exists to remove,
+reappearing one layer up. So the second consecutive `undetermined` on the same child ends the polling:
+send a `confirmation` Telegram naming the trace that failed, and stop. **It is never escalated to a
+`stopped`** — nothing was read, and inventing a verdict from that is exactly the error the design
+forbids.
+
+**Silence and no process, together — never either one alone.** Each has an innocent reading by
+itself: a unit inside a long check writes nothing for as long as the check runs — `pnpm josh followup
+--merge` waits on CI for up to 32 minutes, which is longer than the window — and a unit that is only
+reading has no check process at all. Together they have no innocent reading. **Which way an error
+falls is the whole design**: a live unit booked as stopped has its working work killed, while a
+stopped one booked as alive costs waiting — so **a trace that could not be read answers
+`undetermined`, never `stopped`**, and a process trace nobody gave is an unasked question rather than an
+answer of "no process".
+
+**Output that moved answers `alive` on its own; a live process does not.** Growth in the transcript
+needs nothing else to mean what it says. A live process is weighed only once every trace has answered,
+because a `pgrep` scoped a shade too wide — the thing this section already warns about — would
+otherwise answer `alive` on every poll over an output path that resolves to nothing, and no poll would
+ever say `undetermined` for the rule below to count.
+
+**The path passed to `--output` is absolute.** A relative one resolves against whatever directory the
+parent happens to run from, which for a unit given its own work tree is rarely the one meant, so the
+command refuses it rather than resolving it.
+
+**The process trace is the one the command does not read for itself.** Run it in the checkout the unit
+was given and pass what you saw. Read the command lines rather than the names — `pgrep -laf vitest`,
+`pgrep -laf playwright`, `pgrep -laf 'josh gate'` — and look for one naming **that checkout's path**.
+**A bare command-name match is not the test**: several kit projects are meant to run at once
+(`PORT_SEED` exists for that), so one unrelated watcher anywhere on the machine would answer `alive`
+forever and no stop would ever be detected.
+
+**Read the file the path points at, not the link.** A unit's transcript path is a symlink, and a
+link's own modification time never changes after it is created — so the shell's `stat`, which does not
+follow a link by default on macOS, reports that creation time whether the unit is alive or dead. Both
+errors follow from it, and the costly one is the second: this parent twice reported a dead unit as
+alive on such a read. `run:liveness` follows the link and compares the size as well as the timestamp,
+across two samples a few seconds apart; a `stat` typed by hand needs `-L`.
+
+**A clean checkout is not evidence that the unit is alive.** The detection this replaces required a
+dirty one, on the reasoning that a unit which died mid-implementation leaves exactly that — and the
+stop that actually happened came seven minutes in, while the unit was still reading the skill and the
+issue, so the tree was clean and the test could never become true (joshuafolkken/kit#1485). The
+checkout is still read, for one thing only: whether there is work to stash before the child is parked.
+
+**"Nothing was ever opened for the child" is not part of it either.** It is equally the normal state of
+a unit that has not reached its commit yet, so it separates nothing — and that question already has an
+owner: `pnpm josh run:preflight` asks it at the start of the next child, which is where the answer is
+acted on.
 
 **What follows is what a failed child already gets.** Re-read the child first with
 `pnpm josh issue:state <N>`, in case the unit finished between the traces and this read; then, while
@@ -220,7 +262,7 @@ back to step 1.
 2. **Remove `in-progress`** — `gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true`.
    Left on, it holds the whole repository under the per-repository exclusion below.
 3. **Count it against the consecutive-failure guard and park it** with `needs-decision` and a comment
-   naming the four traces that were observed. This is the Guards table's "a failure that is not
+   naming what `run:liveness` answered and what it read. This is the Guards table's "a failure that is not
    consecutive parks its child", applied to a child whose unit stopped.
 4. **Go back to step 1 of the loop.**
 
@@ -456,11 +498,11 @@ answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
    this session afterwards** when the child was delegated — otherwise the parent's checkout never
    receives that merge and the next child starts on a stale default branch.
 
-   **Start the unit without blocking on it, note where it writes and the modification time of that
-   file, and poll.** Blocking on the return leaves the parent with no turn in which to notice that the
-   return is never coming, which is the whole of "A delegated unit that stopped without reporting"
-   above. Poll at the polling interval; run the four traces once that file has been unchanged for the
-   silent-unit window.
+   **Start the unit without blocking on it, note where it writes, and poll.** Blocking on the return
+   leaves the parent with no turn in which to notice that the return is never coming, which is the
+   whole of "A delegated unit that stopped without reporting" above. Poll at the polling interval; ask
+   `pnpm josh run:liveness <N> --output <path> --process none` (or `--process alive`) once that file has been unchanged
+   for the silent-unit window.
 
    When the unit reports back, **confirm the child from GitHub before believing it**:
 
