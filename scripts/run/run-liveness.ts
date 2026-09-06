@@ -25,9 +25,10 @@ import { run_issue_number } from './run-issue-number'
 // yet, and the branch-and-pull-request question already has an owner in `josh run:preflight`.
 //
 // **The binding constraint is the direction of the error.** A live unit booked as stopped has its
-// working work killed; a stopped unit booked as alive costs waiting. So the ladder reads positive
-// evidence of life first — either half saying the unit is working ends the check as `alive`, whatever
-// else could not be read — and only then falls to `undetermined` for a trace that answered nothing.
+// working work killed; a stopped unit booked as alive costs waiting. So the ladder reads the one
+// unambiguous sign of life first — output that moved — then settles, then refuses to answer at all
+// where a trace could not be read, and only decides between a long check and a stop once every trace
+// has answered.
 //
 // **The output read follows the link.** The path a unit writes its transcript to is a symlink, and
 // the link's own modification time never changes after it is created — read with the shell's `stat`,
@@ -116,14 +117,21 @@ const STOPPED_DIRTY_ADVICE =
 const UNDETERMINED_ADVICE =
 	'Read the trace that failed and ask again. Where the process trace was never given, run the `pgrep` against the checkout the unit was given and pass `--process alive` or `--process none`. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
 
-// Either half on its own ends the check as `alive`, and it is asked before anything else. Output that
-// moved is a unit that is writing; a live process is a unit inside a long check — a
-// `pnpm josh followup --merge` waiting on CI writes nothing for up to 32 minutes, which is longer
-// than the silent window and is exactly the false positive this half exists to stop. Positive
-// evidence of life outranks a trace that could not be read, because what is being protected is a unit
-// that is working.
-function is_still_working(traces: Traces): boolean {
-	return traces.is_output_frozen === false || traces.process_trace === PROCESS_ALIVE
+// Output that moved is a unit that is writing, and it is asked before anything else — it is the one
+// reading that needs no other trace to mean what it says.
+function is_output_moving(traces: Traces): boolean {
+	return traces.is_output_frozen === false
+}
+
+// A live process is a unit inside a long check — a `pnpm josh followup --merge` waiting on CI writes
+// nothing for up to 32 minutes, which is longer than the silent window and is exactly the false
+// positive this trace exists to stop. **It is asked after the unreadable check rather than before it**
+// (joshuafolkken/kit#1485, review round 2): a `pgrep` scoped a shade too wide answers `alive` on a
+// machine running several kit projects at once, and read ahead of an output path that resolves to
+// nothing it would answer `alive` on every poll forever — the unbounded stall this command exists to
+// remove, reappearing where nothing would ever count it.
+function is_check_running(traces: Traces): boolean {
+	return traces.process_trace === PROCESS_ALIVE
 }
 
 // A trace that answered nothing makes the verdict `undetermined` rather than pushing it either way —
@@ -137,11 +145,11 @@ function has_unreadable_trace(traces: Traces): boolean {
 }
 
 function to_verdict(traces: Traces): LivenessVerdict {
-	if (is_still_working(traces)) return ALIVE_VERDICT
+	if (is_output_moving(traces)) return ALIVE_VERDICT
 	if (traces.is_child_settled === true) return SETTLED_VERDICT
 	if (has_unreadable_trace(traces)) return UNDETERMINED_VERDICT
 
-	return STOPPED_VERDICT
+	return is_check_running(traces) ? ALIVE_VERDICT : STOPPED_VERDICT
 }
 
 function to_advice(verdict: LivenessVerdict, has_work_to_stash: boolean): string {
@@ -250,7 +258,7 @@ async function check(request: LivenessRequest): Promise<LivenessDecision> {
 
 // The constants are exported by name rather than through the namespace: read back off a namespace
 // object their literal types widen to `string`, and `ProcessTrace` would then admit anything.
-const run_liveness = { check, decide, read_output_frozen, sample_output }
+const run_liveness = { check, decide, read_child_settled, read_output_frozen, sample_output }
 
 export type {
 	LivenessDecision,

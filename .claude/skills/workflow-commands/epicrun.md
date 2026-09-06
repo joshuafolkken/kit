@@ -214,6 +214,12 @@ stopped one booked as alive costs waiting — so **a trace that could not be rea
 `undetermined`, never `stopped`**, and a process trace nobody gave is an unasked question rather than an
 answer of "no process".
 
+**Output that moved answers `alive` on its own; a live process does not.** Growth in the transcript
+needs nothing else to mean what it says. A live process is weighed only once every trace has answered,
+because a `pgrep` scoped a shade too wide — the thing this section already warns about — would
+otherwise answer `alive` on every poll over an output path that resolves to nothing, and no poll would
+ever say `undetermined` for the rule below to count.
+
 **The process trace is the one the command does not read for itself.** Run it in the checkout the unit
 was given and pass what you saw. Read the command lines rather than the names — `pgrep -laf vitest`,
 `pgrep -laf playwright`, `pgrep -laf 'josh gate'` — and look for one naming **that checkout's path**.

@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
 	ALIVE_VERDICT,
 	MS_PER_MINUTE,
@@ -21,6 +22,8 @@ import {
 // a unit that stopped before implementing, because it required a dirty checkout. These are the cases
 // the reading has to answer, and the one it must never get wrong: a live unit booked as stopped
 // kills work that was in progress.
+
+const ISSUE = '1169'
 
 function arrange_traces(overrides: Partial<Traces> = {}): Traces {
 	return {
@@ -84,16 +87,22 @@ describe('a live unit is never booked as stopped', () => {
 		expect(run_liveness.decide(traces).verdict).toBe(ALIVE_VERDICT)
 	})
 
-	// Positive evidence of life outranks a trace nothing could be read from, which is what the module
-	// header and the documented contract both promise.
-	it.each([{ is_child_settled: undefined }, { is_output_frozen: undefined }])(
-		'answers alive on a live process even where a trace could not be read: %j',
-		(overrides) => {
-			const traces = arrange_traces({ ...overrides, process_trace: PROCESS_ALIVE })
+	// Output that moved needs nothing else to mean what it says, so it outranks a trace that could not
+	// be read.
+	it('answers alive on moving output even where another trace could not be read', () => {
+		const traces = arrange_traces({ is_child_settled: undefined, is_output_frozen: false })
 
-			expect(run_liveness.decide(traces).verdict).toBe(ALIVE_VERDICT)
-		},
-	)
+		expect(run_liveness.decide(traces).verdict).toBe(ALIVE_VERDICT)
+	})
+
+	// A live process does not, and this is the ordering round 2 corrected: a `pgrep` scoped too wide
+	// over an output path that resolves to nothing would answer `alive` on every poll forever, and no
+	// poll would ever say `undetermined` for the two-in-a-row bound to count.
+	it('refuses to answer alive from a live process alone when the output could not be read', () => {
+		const traces = arrange_traces({ is_output_frozen: undefined, process_trace: PROCESS_ALIVE })
+
+		expect(run_liveness.decide(traces).verdict).toBe(UNDETERMINED_VERDICT)
+	})
 
 	// The last row is a process trace nobody gave: an unasked question, not an answer of "no process".
 	it.each<Partial<Traces>>([
@@ -210,6 +219,39 @@ describe('what counts as frozen', () => {
 		rmSync(target)
 
 		await expect(pending).resolves.toBeUndefined()
+	})
+})
+
+function arrange_issue(state: string, labels: ReadonlyArray<string>): void {
+	const json = JSON.stringify({ labels: labels.map((name) => ({ name })), state })
+
+	vi.spyOn(git_gh_issue_read, 'issue_view_json').mockResolvedValue(json)
+}
+
+// Round 2 named the gap: every settled test above passes an already-decided boolean, so the read that
+// decides it could be edited back to the `in-progress` test — round 1's defect — with the suite green.
+describe('what makes a child settled, read from GitHub', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it.each([
+		['CLOSED', [], true],
+		['OPEN', ['needs-decision'], true],
+		['OPEN', ['in-progress'], false],
+		// The unit applies `in-progress` itself, after it reads the issue — so a unit that stopped
+		// before applying it leaves exactly this, and reading it as settled loses the stop.
+		['OPEN', [], false],
+	])('reads %s %j as settled=%j', async (state, labels, expected) => {
+		arrange_issue(state, labels)
+
+		await expect(run_liveness.read_child_settled(ISSUE)).resolves.toBe(expected)
+	})
+
+	it('answers undetermined rather than settled when the issue could not be read', async () => {
+		vi.spyOn(git_gh_issue_read, 'issue_view_json').mockResolvedValue(undefined)
+
+		await expect(run_liveness.read_child_settled(ISSUE)).resolves.toBeUndefined()
 	})
 })
 
