@@ -137,6 +137,8 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   **not** an epic — running it as a `fullrun`, and building the epic around it only if a prerequisite
   or a split turns up (`epicrun.md` → "When `#N` is not an epic"). Both follow from what the keyword
   authorizes: a batch, decided once at the start.
+- **The working-tree hold is claimed before anything else** — `pnpm josh run:hold`, at every typed
+  entry point, ahead of the split assessment and ahead of a `new` entry's filing. §2f.
 - **The split assessment** runs before any work starts, at *every* entry point, from the one
   definition in `split-assessment.md`. **The default is not to split**: separability and a scope that
   clearly exceeds what one verification gate can confirm in one pass — the guide is about 10 changed
@@ -632,6 +634,68 @@ answers every time rather than whatever that run's search happened to cover.
 
 Full behavior, the thresholds and why the duplicate half compares titles rather than bodies:
 `docs/josh-commands.md` → "`josh issue:scout`".
+
+## 2f. The working-tree hold — one run per tree
+
+**Ask `pnpm josh run:hold` before anything else, and obey what it answers.** It is the first call of
+`fullrun`, `halfrun` and `kickoff` alike — before the title is normalized, before `git switch main`,
+and **before a `new` entry files its Issue**, because a run stopped after the filing has already left
+behind the artifact it should not have created.
+
+```bash
+pnpm josh run:hold <N>     # a `#N` entry point ; alias: josh rh
+pnpm josh run:hold         # a `new` entry point, before the issue exists
+pnpm josh run:release      # alias: josh rr
+```
+
+- **`hold` — this run now holds the tree. Continue.**
+- **`busy` — another run holds it. Stop.** Send a `confirmation` Telegram carrying what the command
+  printed on stderr (the holder, when the record was written, and the release command) and stop.
+  **File nothing, create no branch, edit nothing.**
+- **`unknown` — nothing was established. Stop the same way.** It is not "the tree is free".
+
+**The unit is the working tree, and `epic-busy.ts` is not reused for it** (joshuafolkken/kit#1091).
+That read answers about a *repository* and implements `epicrun`'s one-child-per-repository rule; what
+these entry points contend for is one branch, one index and one uncommitted diff, and a linked work
+tree has its own three. Asked here, the repository-scoped question would stop a second work tree's
+legitimate run. **`epicrun`'s own guard is unchanged** — the two layers guard different resources, and
+neither replaces the other. An `epicrun`'s children run this one as any `fullrun` does, one after
+another in the same tree.
+
+**Claim it in the checkout the run will edit.** The record is keyed to the work tree the command runs
+in, so a cross-repository `fullrun owner/repo#N` resolves that repository's checkout from
+`pnpm josh doctor` **first** — that resolution is a read and writes nothing — and claims there;
+claiming in the session's own tree would guard the one tree the run never touches. `kickoff` needs no
+checkout at all and claims the session's own tree, which is the only one it can disturb.
+
+**Releasing is the run's, not a person's memory.** `pnpm josh followup` releases the hold on a merged
+run — the seam every `fullrun`, and every child of an `epicrun` or a `queue`, passes through — and a
+record abandoned by a crashed session expires after 8 hours rather than locking the tree for good.
+**A stop that leaves the tree clean releases it explicitly**: `kickoff` ends with
+`pnpm josh run:release`, and so does a `fullrun` / `halfrun` that stops on a split, a prerequisite or a
+third-party target, because in each of those the tree carries nothing. **`halfrun`'s stop before
+commit keeps the hold**, and so does a `needs-human-review` stop: the uncommitted work still in the
+tree is exactly what a second run would trample, so the release command goes in the stop report and
+the Telegram for the person to type once they are done with it.
+
+**Those two stops are held across a person's latency, not a run's, and no expiry could be sized for
+them** — so the age is not what decides. **An expired record over a tree that still has uncommitted
+changes does not free it**: the command answers `busy` and says to commit, stash, or release once the
+work is done. Only an expired record over a clean tree is replaced, which is the crashed run the
+expiry was written for — and a stop whose work is already committed and pushed, such as a run halted
+by a standing High finding, is deliberately in that second group: the branch is safe on the remote,
+so freeing the tree after eight hours loses nothing.
+
+**The batch entry points claim per child, not per batch.** `epicrun` and `queue` never call it
+themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh followup`
+releases it at that child's merge, leaving the tree free for the next child and held against anything
+else for the whole time a child is in flight.
+
+**It answers, so the entry point does not judge.** "This one is a small change, it will be fine" is
+the judgement made under time pressure that produced the incident this guard was written after, and
+it is the shape `pnpm josh delegate` refuses to leave to an agent for the same reason. The command's
+behavior, the answer table and the incident are `docs/josh-commands.md` → "`josh run:hold` /
+`josh run:release`"; this section is the single source of the procedure.
 
 ## 3. What stays resident, and what is read from here
 

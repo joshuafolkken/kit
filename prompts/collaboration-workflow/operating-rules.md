@@ -97,6 +97,14 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'<�
 - 同一の停止に対して通知は 1 回のみ。再評価のたびに送らない
 - ユーザー自身がそのターンで停止を指示した場合は通知しない（既に把握しているため）
 
+### 作業ツリーは 1 本のランが保持する（`josh run:hold`）
+
+手順の単一ソースは `.claude/skills/workflow-commands/SKILL.md` → 「2f. The working-tree hold — one run per tree」にある。ここに書くのは、キーワードが打たれていないターンでも読まれる位置に、引き金だけを置くためである。
+
+`fullrun` / `halfrun` / `kickoff` は、**他の何よりも先に `pnpm josh run:hold` を実行し、その答えに従う**。`busy` または `unknown` なら、`confirmation` Telegram を送って停止する — **起票もブランチ作成もファイル編集もしない**。`new` 系の入口では起票より前に問う。起票してから気付けば、掃除すべき副作用が残るためである。
+
+**判定の単位は作業ツリーであり、リポジトリではない。** `epicrun` が使う `epic-busy.ts` はリポジトリに問う読み取りで、「1 リポジトリにつき同時 1 子」を実装している。これらの入口が奪い合う資源は 1 本のブランチ・1 つの index・1 つの未コミット差分であり、別 worktree ならそれらは別々に存在するので競合しない。ここでリポジトリ単位の判定を使うと、正当な 2 本目まで止まる。**`epicrun` 側の既存ガードは変更しない** — 両者は別の資源を守っており、片方が片方を置き換えることはできない（joshuafolkken/kit#1091）。
+
 ### overrides の保護（`pnpm-workspace.yaml` / `package.json` の両方を見る）
 
 overrides に設定された制約は、**セキュリティ・互換性・動作保証のために意図的に追加されたもの**である。

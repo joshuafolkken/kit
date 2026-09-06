@@ -21,6 +21,8 @@ joshuafolkken/kit#858` from an app-kit checkout. A bare `#858` resolves to *this
 
 That qualification is not a form of its own: it is the `owner/repo#` prefix every entry point takes, and the definition is the same at every entry point — `SKILL.md` → "2c. The `owner/repo#` prefix". What it names here is where the *epic* lives; how the children are divided between sessions is "Concurrency" below.
 
+**The working-tree hold is claimed per child, never per batch.** This command does not call `pnpm josh run:hold` itself: each child runs the `fullrun` procedure, so it claims the tree on entry and `pnpm josh followup` releases it at that child's merge — the tree stays free for the next child and held against anything else for the whole time a child is in flight. `SKILL.md` → §2f is the single source.
+
 ## When `#N` is not an epic
 
 `epicrun` accepts an ordinary Issue as well as an epic. `epicrun #<N>` on an Issue with no task list
