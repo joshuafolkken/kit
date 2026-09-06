@@ -39,6 +39,17 @@ What one invocation does, in order:
   request. A run that stopped at the merge therefore has no Issue comment, and the missing comment —
   not a missing Telegram — is what a failed merge looks like from GitHub.
 - **Closes the epics the Issue completes**, on a merged run only.
+- **Emits the run report and appends it to `.time-history.jsonl`**, on a merged run only
+  (joshuafolkken/kit#1471). Until then the measurement only ever happened when a person typed `diag`,
+  so a run nobody asked about left no record at all — and a measurement that is not continuous cannot
+  say whether the last change made anything faster. Every `fullrun`, and every child of an `epicrun`
+  or a `queue`, ends here, which is why this one seam covers all of them. **It measures nothing of its
+  own**: the report is built by the same builder `josh time` calls, and what is printed is a short
+  block — elapsed, turns, round trips, the per-round-trip cost, and the same figures against the
+  previous recorded run. **It cannot fail a run**: the merge has already happened by the time it runs,
+  so a history that cannot be read or written prints one line saying the measurement was unavailable
+  and names the `pnpm josh time --issue <N>` that would take it. `JOSH_TIME_HISTORY=0` turns it off,
+  and the full tables stay where they were — `pnpm josh time`, and the `diag` skill that reads them.
 
 ### It prints how long each of those stages took
 
