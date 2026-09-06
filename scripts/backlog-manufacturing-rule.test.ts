@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { AI_DOCS, read_repo_file, read_unwrapped, WORKFLOW_PROMPT } from './ai-document-fixture'
+import {
+	AI_DOCS,
+	read_index,
+	read_repo_file,
+	read_unwrapped,
+	WORKFLOW_PROMPT,
+} from './ai-document-fixture'
 
 // joshuafolkken/kit#1469: over the seven days to 2026-09-06 the backlog took 257 filings against 163
 // closures — +13.4 issues a day, with filings beating closures on all fourteen of the preceding
@@ -105,10 +111,11 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	'**its default is not to split**',
 	'about 10 changed files, about 400 changed lines',
 	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
-	'### Backlog WIP cap (30 open Issues)',
 	// The heading sits above `### Shorthand Commands`, not inside it: that subtree is scoped to the
 	// five keywords, and this rule's whole reason for being resident is that it fires on turns where
 	// none of them was typed. The sentence is pinned so a later tidy-up cannot demote it back in.
+	// **The heading level itself is asserted separately, on the raw text** — collapsed whitespace
+	// cannot tell `###` from `####`, since the shorter string is a substring of the longer one.
 	'**This binds on every filing, inside a workflow or not.**',
 	'with more than 30 open, close one first',
 	'Nothing honestly closable means **do not file**',
@@ -122,14 +129,22 @@ describe.each(AI_DOCS)('%s — carries the trigger for all three defaults', (doc
 	it.each(RESIDENT_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
+
+	// Read raw, and with the surrounding newlines: demoted to `####` the section falls back inside
+	// `### Shorthand Commands`, whose preamble scopes that subtree to the five keywords — and the
+	// whole reason this rule is resident is that it fires on turns where none was typed.
+	it('keeps the cap at heading level 3, outside the shorthand-command subtree', () => {
+		expect(read_repo_file(document_path)).toContain('\n### Backlog WIP cap (30 open Issues)\n')
+	})
 })
 
-// The index is how a topic file is reached at all: a file nothing links to is a file nobody opens,
-// and `read_repo_file` reads the workflow prompt as the index plus every topic, so a missing row
-// would still let every marker above pass.
+// The index is how a topic file is reached at all: a file nothing links to is a file nobody opens.
+// **`read_index` and not `read_repo_file`** — the fixture resolves the workflow prompt to the index
+// concatenated with every topic file, so a deleted index row would still be found inside whichever
+// topic happened to quote the label, and the assertion would pass on a link that no longer exists.
 describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () => {
 	it('links the topic file', () => {
-		expect(read_repo_file(WORKFLOW_PROMPT)).toContain('| オープン Issue の WIP 上限（30 件）')
+		expect(read_index()).toContain('| オープン Issue の WIP 上限（30 件）')
 	})
 })
 

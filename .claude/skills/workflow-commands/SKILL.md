@@ -712,8 +712,10 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   happens on turns that typed no keyword at all: an upstream defect, a review-cap follow-up from a
   standalone pre-commit review, a note a conversation decides to record. A cap that only fired
   inside a workflow would leave the routes that grew the backlog fastest uncounted. What stays
-  resident is the count command, the refusal, and the exemption for a filing a run is blocked by;
-  the procedure and why the number can move are `prompts/collaboration-workflow/wip-cap.md`
+  resident is the instruction to count, the refusal, and the exemption for a filing a run is blocked
+  by. **The count command itself is not resident** — it has to name the *target* repository and
+  exclude pull requests, and a command copied into two places is a command kept correct in one; read
+  it from `prompts/collaboration-workflow/wip-cap.md`, which also carries why the number can move
   (joshuafolkken/kit#1469).
 - **The three `josh epic:*` rules that bind outside those commands** — recording a decision removes
   that child's `needs-decision` label, fixing what `epic:audit` finds is Tier A, and an epic in
