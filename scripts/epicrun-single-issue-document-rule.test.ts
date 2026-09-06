@@ -11,7 +11,9 @@ import { AI_DOCS, read_repo_file, read_unwrapped } from './ai-document-fixture'
 const SKILL = '.claude/skills/workflow-commands/epicrun.md'
 const ENTRY_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
-const EPIC_NEXT = 'scripts/epic/epic-next.ts'
+// The refusal moved to the read module when `epic:next` learned to take several epics
+// (joshuafolkken/kit#1493); the message itself is unchanged, which is what this pins.
+const EPIC_NEXT = 'scripts/epic/epic-next-read.ts'
 const REJECTION_MESSAGE = 'tracks no children in a task list.'
 
 // Read from each document itself rather than from the rule surface: the surface concatenates every
@@ -106,7 +108,7 @@ describe('epicrun single-issue entry — what it must not have widened', () => {
 		const content = read_unwrapped(ENTRY_SKILL)
 
 		expect(content).toContain('**`epicrun` differs on two points.**')
-		expect(content).toContain('| `epicrun #E` | `epicrun.md` + `split-assessment.md`')
+		expect(content).toContain('| `epicrun #E…` | `epicrun.md` + `split-assessment.md`')
 	})
 
 	it('records the exception where the split assessment is defined', () => {

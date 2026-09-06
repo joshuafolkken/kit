@@ -1,6 +1,7 @@
 # `epicrun` — Unattended execution of an epic's children
 
-`epicrun #<E>` runs an epic to completion without a person watching it. Read `fullrun.md`,
+`epicrun #<E>` runs an epic to completion without a person watching it, and `epicrun #<E1> #<E2> …`
+runs several of them through one lane pool ("Several epics in one run" below). Read `fullrun.md`,
 `chain-rule.md` and `followup.md` as well — each child is a `fullrun` — and read this file for what
 running many of them unattended changes.
 
@@ -22,6 +23,64 @@ joshuafolkken/kit#858` from an app-kit checkout. A bare `#858` resolves to *this
 That qualification is not a form of its own: it is the `owner/repo#` prefix every entry point takes, and the definition is the same at every entry point — `SKILL.md` → "2c. The `owner/repo#` prefix". What it names here is where the *epic* lives; how the children are divided between sessions is "Concurrency" below.
 
 **The working-tree hold is claimed per child, never per batch.** This command does not call `pnpm josh run:hold` itself: each child runs the `fullrun` procedure, so it claims the tree on entry and `pnpm josh followup` releases it at that child's merge — the tree stays free for the next child and held against anything else for the whole time a child is in flight. `SKILL.md` → §2f is the single source.
+
+## Several epics in one run — `epicrun #E1 #E2 …`
+
+**More than one epic can be named, and their children share one lane pool**
+(joshuafolkken/kit#1493). `pnpm josh epic:next` takes the same list — every leading argument is an
+epic reference — so `epic:next 858 909 --repo <this repository> --lanes` answers with children from
+both, up to the number of free lanes. Before this, a repository with six free lanes could only fill
+them from whichever epic was named first, which is the whole reason for having six.
+
+**It is not a second spelling of `queue`, and reading it as one gets the blast radius wrong.**
+
+| | `queue #N1 #N2 …` | `epicrun #E1 #E2 …` |
+| --- | --- | --- |
+| What is named | The **issues** to run | The **epics** whose children to run |
+| What the order means | The schedule — issue 1 finishes before issue 2 starts | A tie-break — whose candidate takes the next free lane |
+| How they run | Serially, one at a time | Concurrently, one per free lane |
+| A stop | Ends the whole session at the first failure | Parks that child; the run continues |
+
+So `epicrun #858 #909` is **not** "run 858 to completion, then 909". Both graphs feed the pool from
+the first round, and a child of 909 can merge before a child of 858 does.
+
+**The priority order is the order the epics were named**, and it is a decision rather than a
+fallback. Dependency depth was the alternative and it does not compare across graphs: depth is
+measured inside one epic, so a depth-2 child of a five-deep epic and a depth-2 child of a two-deep
+one make the same claim about entirely different amounts of remaining work, and there is no relation
+between two epics to normalize against. Argument order is the one ranking a person typed and can
+change, and it is readable from the output because `epic:next` heads each epic's block with its own
+reference. **Inside one epic nothing moves**: that epic's declared chain still decides which of its
+children is a candidate, and this order only decides whose candidate takes a free lane first.
+
+**A child two epics both track is entered once.** One issue is one lane; entered twice it would open
+two work trees on it, two branches and two pull requests, the second merging over the first. Identity
+is `owner/repo#number` rather than the number alone, because a bare number names a different issue in
+another repository. The
+epic named **earlier** keeps it, which also settles what happens when that epic withholds it: it
+stays withheld, because a `blocked-by` relation belongs to the issue rather than to the epic that
+lists it.
+
+**Everything else is unchanged, and that is the point of merging at the pool rather than at the
+entry point.** Park and continue, the stopping conditions, the guards and the `needs-human-review`
+stop all read a child, never an epic, so none of them learns how many epics were named — the
+per-run guards below count the run, so 30 children and 10 filings are the ceiling across the whole
+pool rather than per epic. **`pnpm josh latest` still runs once**: its hoist is keyed to the session
+and the checkout, never to an epic ("`josh latest` runs once per session" below), so five epics
+still mean one dependency update, asked the first time the loop hands back any child.
+
+**The end-of-epic work is per epic, and the pooled token does not say when.** `--repo` answers about
+the *pool*, so it prints `complete` only once every named epic is — read as one epic's signal, it
+would delay each epic's summary until the last of them finished. An epic's own completion is read
+from the aggregate form instead: `pnpm josh epic:next 858 909`, no `--repo`, which prints each epic's
+block and its own verdict. Ask it once the pooled answer stops offering that epic's children, send
+that epic's summary then, and run `josh propagate` unchanged.
+
+**A childless epic is skipped rather than refusing the command** — the one read failure that does not
+stop the run. An epic whose task list is not filled in yet is a valid epic of ours, and refusing for
+it would stop every other named epic's children being offered on every polling round; it is named on
+standard error and the run carries on. A reference that does not parse, or one naming another owner's
+tracker, still stops everything.
 
 ## When `#N` is not an epic
 
@@ -92,6 +151,16 @@ epic and then **stops** (`split-assessment.md` → "Finding a split mid-run stop
 still prints `#<N> tracks no children in a task list.` — the acceptance of a bare Issue belongs to
 `epicrun`, which has not built an epic yet at that point and therefore never asks `epic:next` about
 one.
+
+**Naming a bare Issue *beside* an epic is the one thing that does change, and it is a mistyped
+command rather than a second entry** (joshuafolkken/kit#1493). Where one reference is named, that
+refusal is the whole answer and the sentence above stands unqualified. Where several are, a
+task-listless reference is **skipped** so the other epics keep running — so `epicrun #<E> #<N>` with
+`#<N>` an ordinary Issue exits 0, notes the skip on standard error, and **never runs `#<N>`**.
+`epicrun` is what accepts a bare Issue, and it accepts one only when it is the *sole* reference: a
+run that means to do both types `epicrun #<N>` on its own after the epic. Read the stderr notice —
+an epic listed there that you expected to have children is either that mistake or an epic nobody has
+filled in yet.
 
 ## What one invocation approves
 
@@ -703,6 +772,8 @@ running one child at a time still gets.
 ```bash
 answers=$(pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes)
 # one issue number per line, up to the number of free lanes; a verdict token when there is none
+answers=$(pnpm josh epic:next 858 909 --repo joshuafolkken/kit --lanes)
+# every named epic, merged into the same pool — "Several epics in one run" above
 ```
 
 **`--lanes` is the form to use.** A lane's branch is `<N>-lane`, which `pnpm josh git` commits from

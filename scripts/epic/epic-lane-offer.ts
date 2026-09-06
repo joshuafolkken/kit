@@ -5,7 +5,7 @@ import {
 	type ConfirmContext,
 	type RepoAnswer,
 } from './epic-candidate-confirm'
-import type { EpicChild } from './epic-graph'
+import { epic_graph, type EpicChild } from './epic-graph'
 import type { EpicVerdict } from './epic-report'
 
 // Which children a repository has room to start right now (joshuafolkken/kit#1491).
@@ -16,11 +16,12 @@ import type { EpicVerdict } from './epic-report'
 // GitHub, compared against `lane_capacity`'s limit.
 //
 // **The pool takes several sources, and none of them is an epic.** `RepoPool` is a candidate list
-// with the context needed to confirm it; today `epic:next` builds exactly one of them from one
-// epic's snapshot, and a caller with two epics passes two without anything here changing. Once the
-// guarded resource is the lane rather than the repository, which epic a child came from stops
-// mattering — so the signatures never learn it, and multi-epic execution costs a caller change
-// rather than a rewrite of the scheduler.
+// with the context needed to confirm it. Since joshuafolkken/kit#1493 `epic:next` builds one per
+// named epic and passes them all, which cost the caller change this design predicted and no rewrite
+// of the scheduler: the signatures never learned what an epic is, because once the guarded resource
+// is the lane rather than the repository, which epic a child came from stops mattering. The one
+// thing several sources did add is `dedupe_pools` below — two epics can name the same child, and one
+// child is one lane.
 
 const WAIT_VERDICT: EpicVerdict = 'wait'
 const RUN_VERDICT: EpicVerdict = 'run'
@@ -104,6 +105,38 @@ function candidates_in(pool: RepoPool, repo: string): RepoPool {
 	return { ...pool, candidates: pool.candidates.filter((child) => child.repo === repo) }
 }
 
+// One pool's candidates, minus every one an earlier pool already carries. `seen` is mutated rather
+// than rebuilt because the earlier pools' claim is what the later one is filtered against.
+function unseen_candidates(pool: RepoPool, seen: Set<string>): RepoPool {
+	const candidates: Array<EpicChild> = []
+
+	for (const child of pool.candidates) {
+		const key = epic_graph.key_of(child)
+
+		if (seen.has(key)) continue
+		seen.add(key)
+		candidates.push(child)
+	}
+
+	return { ...pool, candidates }
+}
+
+// A child two epics both track is still one child, and entering it twice would open two lanes on one
+// issue — two branches, two pull requests, and the second one merging over the first
+// (joshuafolkken/kit#1493). Keyed through `epic_graph.key_of`, the one spelling of an issue's
+// identity in this package: a bare number names a different issue in another repository.
+//
+// **The earlier pool keeps it**, and that is a decision rather than an accident of iteration order.
+// The pool order is the order the epics were named, which is the only ranking a person typed. It
+// also settles what happens when the first pool *withholds* the child: it stays withheld, because a
+// `blocked-by` relation belongs to the issue rather than to the epic that lists it, so offering it
+// from the second pool would start work the first pool's confirmation had just refused.
+function dedupe_pools(pools: ReadonlyArray<RepoPool>): ReadonlyArray<RepoPool> {
+	const seen = new Set<string>()
+
+	return pools.map((pool) => unseen_candidates(pool, seen))
+}
+
 async function ask_pool(pool: RepoPool, wanted: number): Promise<RepoAnswer> {
 	return await epic_candidate_confirm.answer_for_repo(pool.candidates, pool.context, wanted)
 }
@@ -151,7 +184,7 @@ async function offer_for_repo(
 		}
 	}
 
-	const for_repo = pools.map((pool) => candidates_in(pool, request.repo))
+	const for_repo = dedupe_pools(pools.map((pool) => candidates_in(pool, request.repo)))
 	const answer = await collect(for_repo, wanted_of(request, free))
 
 	return { ...answer, notice: offered_notice(answer.children, read, request) }
@@ -163,6 +196,8 @@ const epic_lane_offer = {
 	wanted_of,
 	combine_verdicts,
 	candidates_in,
+	unseen_candidates,
+	dedupe_pools,
 	withheld_message,
 	collect,
 	offer_for_repo,

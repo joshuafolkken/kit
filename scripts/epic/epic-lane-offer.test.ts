@@ -160,9 +160,9 @@ describe('epic_lane_offer.offer_for_repo — a listing that settles nothing', ()
 	})
 })
 
-// The pool is a list of candidate sources, and nothing in it names an epic. Multi-epic execution is
-// not wired up anywhere yet; what this asserts is that the scheduler would not have to be rewritten
-// to add it (joshuafolkken/kit#1491).
+// The pool is a list of candidate sources, and nothing in it names an epic. joshuafolkken/kit#1493
+// wired `epic:next` to pass one per named epic, which cost the caller alone — the assertions below
+// were written before it and did not change (joshuafolkken/kit#1491).
 describe('epic_lane_offer.offer_for_repo — the pool is not one epic', () => {
 	it('fills the free lanes from more than one source', async () => {
 		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
@@ -216,5 +216,57 @@ describe('epic_lane_offer.combine_verdicts', () => {
 
 	it('reports complete only when nothing else was said', () => {
 		expect(epic_lane_offer.combine_verdicts('complete', 'complete')).toBe('complete')
+	})
+})
+
+// Two epics can track the same issue, and one issue is one lane: entered twice it would open two
+// work trees on it, two branches and two pull requests, the second merging over the first
+// (joshuafolkken/kit#1493).
+describe('epic_lane_offer.dedupe_pools', () => {
+	it('leaves a child in the first pool that named it', () => {
+		const pools = epic_lane_offer.dedupe_pools([pool([child(FIRST)]), pool([child(FIRST)])])
+
+		expect(numbers_of(pools[0]?.candidates ?? [])).toEqual([FIRST])
+		expect(pools[1]?.candidates).toEqual([])
+	})
+
+	it('keeps the candidates only one pool named', () => {
+		const pools = epic_lane_offer.dedupe_pools([
+			pool([child(FIRST), child(SECOND)]),
+			pool([child(SECOND), child(THIRD)]),
+		])
+
+		expect(numbers_of(pools[1]?.candidates ?? [])).toEqual([THIRD])
+	})
+
+	// Issue numbers are unique per repository rather than globally, which is why the key is
+	// `epic_graph.key_of` rather than the number.
+	it('treats the same number in two repositories as two children', () => {
+		const pools = epic_lane_offer.dedupe_pools([
+			pool([child(FIRST)]),
+			pool([child(FIRST, OTHER_REPO)]),
+		])
+
+		expect(numbers_of(pools[1]?.candidates ?? [])).toEqual([FIRST])
+	})
+
+	it('leaves the context of each pool alone', () => {
+		const second = pool([child(SECOND)])
+		const pools = epic_lane_offer.dedupe_pools([pool([child(FIRST)]), second])
+
+		expect(pools[1]?.context).toBe(second.context)
+	})
+})
+
+describe('epic_lane_offer.offer_for_repo — a child two epics both track', () => {
+	it('offers it once, leaving the other lane for a different child', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const offer = await epic_lane_offer.offer_for_repo(
+			[pool([child(FIRST)]), pool([child(FIRST), child(SECOND)])],
+			request(THREE_LANES),
+		)
+
+		expect(numbers_of(offer.children)).toEqual([FIRST, SECOND])
 	})
 })
