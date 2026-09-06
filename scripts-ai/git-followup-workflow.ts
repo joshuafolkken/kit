@@ -6,6 +6,7 @@ import { git_next_issues } from '../scripts/git/git-next-issues'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 import { review_stamps } from '../scripts/review/review-stamps'
+import { run_hold } from '../scripts/run/run-hold'
 import { time_history } from '../scripts/time/time-history'
 import { version_targets } from '../scripts/version/version-targets'
 import { load_optional_environment } from './environment-loader'
@@ -181,6 +182,37 @@ async function record_run_report(
 	for (const line of lines) console.info(line)
 }
 
+// joshuafolkken/kit#1091: the working-tree hold a typed entry point claims before it starts is
+// released here, on the one seam every `fullrun` — and every child of an `epicrun` or a `queue` —
+// passes through, so a finished run never leaves the next one locked out. **Gated on `should_merge`
+// like the epic auto-close and the round-1 snapshot clear**: a `--no-merge` run has not finished, and
+// its tree is still the one nobody else may start in.
+//
+// It swallows its own failure for the same reason the gate's in-flight marker does: the record must
+// never decide whether a merged run reports success. A record that survives anyway expires on its own
+// eight hours later, which is what covers an abnormally ended run.
+async function release_worktree_hold(should_merge: boolean): Promise<void> {
+	if (!should_merge) return
+
+	try {
+		const directory = await run_hold.worktree_directory()
+
+		if (directory !== undefined) run_hold.release_hold(run_hold.hold_path(directory))
+	} catch {
+		/* the record expires on its own, and `pnpm josh run:release` clears it early */
+	}
+}
+
+// The tail every invocation shares, in one function so `main` stays inside its statement budget: the
+// run report, the console completion, and the two records only a merged run releases. The order is
+// the contract — `print_completion` ends with the project version, which is the final console line.
+async function finish(issue_number: string | undefined, should_merge: boolean): Promise<void> {
+	await record_run_report(issue_number, should_merge)
+	await print_completion(issue_number, should_merge)
+	clear_round_one_snapshot(should_merge)
+	await release_worktree_hold(should_merge)
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -203,9 +235,7 @@ async function main(): Promise<void> {
 		is_skip_watch: cli.values['skip-watch'] === true,
 		should_merge,
 	})
-	await record_run_report(issue_number, should_merge)
-	await print_completion(issue_number, should_merge)
-	clear_round_one_snapshot(should_merge)
+	await finish(issue_number, should_merge)
 }
 
 try {
@@ -217,6 +247,7 @@ try {
 
 const git_followup_workflow = {
 	clear_round_one_snapshot,
+	release_worktree_hold,
 	record_run_report,
 	parse_issue_number_from_text,
 	resolve_branch_name,

@@ -82,6 +82,34 @@ describe('stamp_file.write_stamp and read_stamp_text', () => {
 	})
 })
 
+// joshuafolkken/kit#1091: the write for a record whose absence is what the caller checked. Two
+// processes may reach it at once, and only one of them may be told it won.
+describe('stamp_file.create_stamp', () => {
+	it('writes the record when the path is free', () => {
+		const target = path.join(scratch, 'created.json')
+
+		expect(stamp_file.create_stamp(target, PAYLOAD)).toBe(true)
+		expect(stamp_file.read_stamp_text(target)).toBe(JSON.stringify(PAYLOAD))
+	})
+
+	it('refuses the second creation and leaves the first record intact', () => {
+		const target = path.join(scratch, 'contended.json')
+
+		stamp_file.create_stamp(target, PAYLOAD)
+
+		expect(stamp_file.create_stamp(target, { ran_at: 'second' })).toBe(false)
+		expect(stamp_file.read_stamp_text(target)).toBe(JSON.stringify(PAYLOAD))
+	})
+
+	// "Someone else got here first" is an answer; "this could not be written at all" is not, and a
+	// record that could not be written must never read as one somebody else holds.
+	it('throws rather than answering false when the failure is not a collision', () => {
+		const target = path.join(scratch, 'missing-directory', 'nowhere.json')
+
+		expect(() => stamp_file.create_stamp(target, PAYLOAD)).toThrow()
+	})
+})
+
 // The path is deterministic and sits in a directory every account on the host may write to, so a
 // record somebody else chose is a record that suppresses exactly the work the reader exists to force.
 describe('stamp_file refuses a record it did not write', () => {

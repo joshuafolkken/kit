@@ -17,6 +17,8 @@ Each issue in the queue is a full `fullrun`, so read `fullrun.md`, `chain-rule.m
    c. On failure: send a `failure` Telegram notification via `pnpm josh notify --task-type failure --issue-url "<issue-url>" --body="<reason>"` and **stop immediately** (do not proceed to the next issue).
 3. No extra batch summary notification — each issue's `pnpm josh followup --merge` already sends the per-issue completion notification as usual. **Run `pnpm josh ms` once more here when the final issue ran in a delegated unit**, in that same checkout — step 2a only covers the issues that have a successor, so without it the last merge is never pulled in. `queue` always ends on the default branch, with every merge it produced pulled in.
 
+**The working-tree hold is claimed per child, never per batch.** This command does not call `pnpm josh run:hold` itself: each child runs the `fullrun` procedure, so it claims the tree on entry and `pnpm josh followup` releases it at that child's merge — the tree stays free for the next child and held against anything else for the whole time a child is in flight. `SKILL.md` → §2f is the single source.
+
 ## Each issue runs in a delegated unit
 
 **A queued issue is not run in the parent loop's context** (joshuafolkken/kit#1149). One issue goes

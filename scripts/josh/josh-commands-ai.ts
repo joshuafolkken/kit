@@ -1,5 +1,8 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
+// One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
+const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
+
 /* eslint-disable @typescript-eslint/naming-convention */
 const AI_COMMANDS: Record<string, CommandEntry> = {
 	prep: {
@@ -99,6 +102,17 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/delegation/delegation-cli.ts',
 		description: 'Say whether a run step may go to a cheaper execution tier',
 		category: 'AI tools',
+	},
+	'run:hold': {
+		script: RUN_HOLD_SCRIPT,
+		description: 'Claim this working tree for a run, or say which run already holds it',
+		category: 'AI tools',
+	},
+	'run:release': {
+		script: RUN_HOLD_SCRIPT,
+		description: "Release this working tree's run record",
+		category: 'AI tools',
+		default_script_arguments: ['--release'],
 	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',

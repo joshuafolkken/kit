@@ -24,6 +24,10 @@ const STAMP_FILE_MODE = 0o600
 // Create-exclusively. Refusing an existing path is what keeps a write from being redirected into a
 // file the running user owns; the unlink below is what keeps the normal rewrite working.
 const STAMP_WRITE_FLAG = 'wx'
+// The same flag under the name that says what `create_stamp` uses it for: there the exclusivity is
+// the contract rather than a defense, because no unlink precedes it.
+const STAMP_CREATE_FLAG = STAMP_WRITE_FLAG
+const EXISTS_ERROR_CODE = 'EEXIST'
 
 // Bytes rather than a decoded string. UTF-8 decoding is lossy — every invalid sequence collapses to
 // the same replacement character — so hashing the decoded form would let two different files agree,
@@ -58,6 +62,27 @@ function write_stamp(target: string, payload: unknown): string {
 	writeFileSync(target, JSON.stringify(payload), { flag: STAMP_WRITE_FLAG, mode: STAMP_FILE_MODE })
 
 	return target
+}
+
+// `write_stamp` for a record whose *absence* is what the caller checked, and which two processes may
+// therefore try to create at once (joshuafolkken/kit#1091). It does **not** unlink first, so `wx` is
+// doing the job it exists for: the second writer loses and is told so, rather than both being told
+// they won. `false` is that loss and never an error, because "someone else got here first" is an
+// answer; anything else still throws, since a record that could not be written for another reason
+// must not read as a record somebody else holds.
+function create_stamp(target: string, payload: unknown): boolean {
+	try {
+		writeFileSync(target, JSON.stringify(payload), {
+			flag: STAMP_CREATE_FLAG,
+			mode: STAMP_FILE_MODE,
+		})
+
+		return true
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === EXISTS_ERROR_CODE) return false
+
+		throw error
+	}
 }
 
 // The counterpart to `write_stamp`, for a record that means something only while it exists — the
@@ -96,6 +121,7 @@ function read_stamp_text(source: string): string | undefined {
 }
 
 const stamp_file = {
+	create_stamp,
 	digest,
 	is_own_regular_file,
 	read_stamp_text,
