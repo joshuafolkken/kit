@@ -173,6 +173,8 @@ describe('time_history.to_record', () => {
 		expect(kept).toStrictEqual({
 			issue: CURRENT_ISSUE,
 			recorded_at: RECORDED_AT,
+			started_at: report.started_at,
+			ended_at: report.ended_at,
 			elapsed_ms: report.elapsed_ms,
 			turn_count: report.turn_count,
 			tool_call_count: report.tool_call_count,

@@ -39,9 +39,18 @@ const HEADING_PREFIX = '📈 Run report'
 // Only the figures two runs are actually compared on. The full report stays reachable through
 // `pnpm josh time --issue <N>`; carrying its tables here would make the file large without making
 // any comparison possible that these numbers do not already support.
+//
+// **`started_at` / `ended_at` are optional because the records written before them exist**
+// (joshuafolkken/kit#1470). They are what a period report packs runs into lanes by — `recorded_at`
+// is the append instant, which says when a run *finished being merged* and nothing about the window
+// it occupied — and a schema that required them would drop every earlier line as unparsable, which
+// is silent here by design. A record without them is excluded from the lane table and counted in
+// that report's notes, never defaulted to the epoch.
 const record_schema = z.object({
 	issue: z.number(),
 	recorded_at: z.string(),
+	started_at: z.string().optional(),
+	ended_at: z.string().optional(),
 	elapsed_ms: z.number(),
 	turn_count: z.number(),
 	tool_call_count: z.number(),
@@ -127,6 +136,8 @@ function to_record(issue: number, report: TimeReport, recorded_at: string): RunT
 	return {
 		issue,
 		recorded_at,
+		started_at: report.started_at,
+		ended_at: report.ended_at,
 		elapsed_ms: report.elapsed_ms,
 		turn_count: report.turn_count,
 		tool_call_count: report.tool_call_count,

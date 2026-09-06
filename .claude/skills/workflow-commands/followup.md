@@ -50,6 +50,11 @@ What one invocation does, in order:
   so a history that cannot be read or written prints one line saying the measurement was unavailable
   and names the `pnpm josh time --issue <N>` that would take it. `JOSH_TIME_HISTORY=0` turns it off,
   and the full tables stay where they were — `pnpm josh time`, and the `diag` skill that reads them.
+  **What reads the accumulation back is `pnpm josh time --period <days>`**
+  (joshuafolkken/kit#1470): it groups the recorded runs into lanes by the wall clock they occupied and
+  reports the backlog's throughput, idle time and serialization — the questions one run's internals
+  cannot answer. That is why the record carries the run's `started_at` / `ended_at` as well as its
+  headline figures.
 
 ### It prints how long each of those stages took
 

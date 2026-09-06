@@ -5,6 +5,9 @@ import { time_cli_fixture } from './time-cli-fixture'
 import { time_distribution } from './time-distribution'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_last, type LastTimeReport } from './time-last'
+import { time_period } from './time-period'
+import { time_period_fixture } from './time-period-fixture'
+import { time_period_report } from './time-period-report'
 import { time_report } from './time-report'
 
 // The two scopes that report several runs at once (joshuafolkken/kit#1271, joshuafolkken/kit#1312).
@@ -23,6 +26,9 @@ const EPIC_SCOPE = `epic #${String(EPIC)}`
 const LAST_COUNT = 5
 const LAST_SCOPE = 'the last 1 merged run(s)'
 const LAST_FLAG = '--last'
+const PERIOD_FLAG = '--period'
+const PERIOD_DAYS = 7
+const PERIOD_REPORT = time_period_fixture.built(time_period_fixture.OVERLAPPING)
 const CI_MS = CI_MINUTES * MINUTE_MS
 
 const MEASURED_ROW = {
@@ -169,5 +175,44 @@ describe('time_cli.run — the last N runs', () => {
 		expect(await time_cli.run([LAST_FLAG, String(LAST_COUNT)], CWD)).toBe(1)
 		expect(errors()).toContain(time_cli.NO_RUNS)
 		expect(output()).toBe('')
+	})
+})
+
+// The third scope that reports several runs at once, and the first whose unit is a period rather
+// than a run (joshuafolkken/kit#1470).
+describe('time_cli.run — a period of the backlog', () => {
+	it('reports the lanes under --period', async () => {
+		vi.spyOn(time_period, 'build_period_report').mockReturnValue(PERIOD_REPORT)
+
+		expect(await time_cli.run([PERIOD_FLAG, String(PERIOD_DAYS)], CWD)).toBe(0)
+		expect(output()).toContain(time_period_report.LANE_HEADING)
+		expect(output()).toContain(time_period_report.WAIT_HEADING)
+	})
+
+	it('carries the lane totals under --json', async () => {
+		vi.spyOn(time_period, 'build_period_report').mockReturnValue(PERIOD_REPORT)
+		await time_cli.run([PERIOD_FLAG, String(PERIOD_DAYS), '--json'], CWD)
+
+		expect(JSON.parse(output())).toMatchObject({
+			lane_count: 2,
+			lanes: [{ index: 0 }, { index: 1 }],
+		})
+	})
+
+	// An absent history and a period in which nothing ran are different answers, and only the second
+	// one is a measurement.
+	it('fails rather than reporting an empty period when no history could be read', async () => {
+		vi.spyOn(time_period, 'build_period_report').mockReturnValue(undefined)
+
+		expect(await time_cli.run([PERIOD_FLAG, String(PERIOD_DAYS)], CWD)).toBe(1)
+		expect(errors()).toContain(time_cli.NO_PERIOD)
+		expect(output()).toBe('')
+	})
+
+	it('refuses a period named beside another scope', async () => {
+		expect(
+			await time_cli.run([PERIOD_FLAG, String(PERIOD_DAYS), '--issue', String(ISSUE)], CWD),
+		).toBe(1)
+		expect(errors()).toContain(time_cli.ONE_SCOPE)
 	})
 })

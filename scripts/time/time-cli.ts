@@ -7,6 +7,8 @@ import { time_epic } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_last } from './time-last'
 import { time_last_report } from './time-last-report'
+import { time_period } from './time-period'
+import { time_period_report } from './time-period-report'
 import { time_report, type TimeReport } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
@@ -28,10 +30,16 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const JSON_INDENT = 2
 const USAGE =
-	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--top <rows>] [--json]'
+	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--json]'
 const NO_MERGED_RUN =
 	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
-const ONE_SCOPE = 'Give one of --issue, --session, --epic or --last: they name different things.'
+const ONE_SCOPE =
+	'Give one of --issue, --session, --epic, --last or --period: they name different things.'
+// Two causes, and naming only the first sent a reader looking for a file that is sitting right
+// there: a checkout upgraded to joshuafolkken/kit#1470 has a full history in which no record yet
+// carries the wall-clock window the lane table is built from.
+const NO_PERIOD =
+	'No run in .time-history.jsonl carries a wall-clock window, so there is no period to report on. The file is written by josh followup — a fresh checkout legitimately has none, and records written before the window was stored carry none either.'
 const NO_EPIC =
 	'The epic could not be read, so there is no batch to report on. Check the number, and that gh is authenticated.'
 const NO_RUNS =
@@ -48,6 +56,10 @@ interface Options {
 	// How many of the most recently merged runs to report the distribution across
 	// (joshuafolkken/kit#1312). A scope like the three above, and refused alongside them.
 	last: number | undefined
+	// How many days back from the newest recorded run to report the backlog's throughput across
+	// (joshuafolkken/kit#1470). A scope like the four above, and refused alongside them: it is the one
+	// scope whose unit is a period rather than a run.
+	period: number | undefined
 	// How many rows of the per-tool and per-`josh <cmd>` tables to carry, or `undefined` for all of
 	// them (joshuafolkken/kit#1301). It is not a scope: it narrows whichever scope was asked for.
 	top: number | undefined
@@ -64,13 +76,14 @@ const PARSE_ARGS_OPTIONS = {
 	issue: { type: 'string' },
 	epic: { type: 'string' },
 	last: { type: 'string' },
+	period: { type: 'string' },
 	top: { type: 'string' },
 	json: { type: 'boolean', default: false },
 } as const
 
 // The flags that name a scope, in both the spelling `parseArgs` reports and the spelling a person
 // types. One list, so a fifth scope cannot be added to the parser and forgotten by the refusal.
-const SCOPE_KEYS = ['issue', 'session', 'epic', 'last'] as const
+const SCOPE_KEYS = ['issue', 'session', 'epic', 'last', 'period'] as const
 const SCOPE_FLAGS = SCOPE_KEYS.map((key) => `--${key}`)
 
 // Only a positive number is an issue number, the rule `cost-cli.ts` states: a non-positive value
@@ -89,6 +102,7 @@ interface RawValues {
 	session?: string
 	epic?: string
 	last?: string
+	period?: string
 	top?: string
 }
 
@@ -98,12 +112,13 @@ interface ParsedNumbers {
 	issue: number | undefined
 	epic: number | undefined
 	last: number | undefined
+	period: number | undefined
 	top: number | undefined
 }
 
 // Every flag whose value is a number, listed once so a fifth one is refused when it does not parse
 // by being added here rather than by being remembered in the condition below.
-const NUMBER_KEYS = ['issue', 'epic', 'last', 'top'] as const
+const NUMBER_KEYS = ['issue', 'epic', 'last', 'period', 'top'] as const
 
 // A flag that was given but did not parse is a refusal, not an absent flag: `--issue abc` must not
 // quietly become "report the most recent run instead".
@@ -139,6 +154,7 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 			issue: to_number(values.issue),
 			epic: to_number(values.epic),
 			last: to_number(values.last),
+			period: to_number(values.period),
 			top: to_number(values.top),
 		}
 
@@ -286,12 +302,33 @@ async function run_last(count: number, cwd: string, output: Output): Promise<num
 	return exit_code_of(report.runs)
 }
 
+// The backlog over a period, read from the run history `josh followup` accumulates rather than from
+// GitHub: the question is how fast a batch of runs emptied the queue, and the records are already
+// what every merged run leaves behind. A checkout with no history is told so — an absent file is not
+// a period in which nothing happened.
+function run_period(days: number, cwd: string, output: Output): number {
+	const report = time_period.build_period_report(days, cwd)
+
+	if (report === undefined) {
+		console.error(NO_PERIOD)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const capped = time_row_cap.cap_period_report(report, output.top)
+
+	print_scope(capped, () => time_period_report.format_period_report(capped), output.is_json)
+
+	return 0
+}
+
 async function dispatch(options: Options, cwd: string): Promise<number> {
-	const { session, epic, last } = options
+	const { session, epic, last, period } = options
 
 	if (session !== undefined) return run_session(session, cwd, options)
 	if (epic !== undefined) return await run_epic(epic, cwd, options)
 	if (last !== undefined) return await run_last(last, cwd, options)
+	if (period !== undefined) return run_period(period, cwd, options)
 
 	return await run_issue(options.issue, cwd, options)
 }
@@ -320,6 +357,7 @@ const time_cli = {
 	NO_MERGED_RUN,
 	NO_EPIC,
 	NO_RUNS,
+	NO_PERIOD,
 	ONE_SCOPE,
 	parse_options,
 	pick_session,
