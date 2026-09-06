@@ -83,6 +83,27 @@ Each block's header names the command that ran, not only the check, because the 
 
 **The pre-push hook reads the same record through the same decision** ([#1334](https://github.com/joshuafolkken/kit/issues/1334)) — see [`josh pre-push-unit`](#josh-pre-push-unit), which adds one condition of its own because a push carries `HEAD` where this record describes the working tree.
 
+#### A gate a pending version bump would invalidate is refused, not run
+
+**`josh bump` always rewrites `package.json`, so a gate run before it is certain to run again after it** ([#1437](https://github.com/joshuafolkken/kit/issues/1437)). Neither the reuse above nor the pre-push hook's can match a record taken before the version moved, so the second gate is full price. Measured on `fullrun 1428` (PR #1435), one run went `gate` → `bump` → `gate` and threw 19 seconds away entirely; the order the workflow prescribes — the bump first — needs one gate for the same tree. The gate now says so instead of spending the time:
+
+```
+⚠ nothing was checked — this gate would have been paid for twice.
+  Lint, the type check, the spell check and the unit tests were already green on this branch at 2026-09-05T14:29:41.118Z, the tree has moved since, and this branch still carries no version bump.
+  Where this run will commit: `pnpm josh bump minor` rewrites `package.json`, so whatever is verified now has to be verified again after it — run `pnpm josh bump minor` first and then `pnpm josh gate`, one gate instead of two.
+  Where it will not (`halfrun`, or a `needs-human-review` child — neither ever bumps): `pnpm josh gate --force` runs the four checks now.
+```
+
+**It refuses rather than warning, because a warning is printed by a command that has already run.** The seconds are spent by the time anyone reads one, and the gate's `call_count` does not move — [#1344](https://github.com/joshuafolkken/kit/issues/1344) measured across three consecutive runs that notices and prose do not change the numbers. **Nothing is narrowed, dropped or reinterpreted**: the first words say nothing was verified, so the output cannot be mistaken for a pass, and it carries neither of the gate's own verdict lines so a re-run after it is not charged as rework ([#1374](https://github.com/joshuafolkken/kit/issues/1374)).
+
+**No run-progress state is involved, and none exists to consult.** The tree and the record already say it: all five of these hold, and any one of them failing leaves the gate exactly as it was.
+
+- **A green record covers this same branch state** — the same base commit, and **every path that record covers is still changed in this tree**. Within one run that always holds: a fix moves digests and may add files, and nothing a run has edited stops differing from the base. Across runs it usually fails, because the previous run's work has been committed, reverted or stashed — which is what keeps a record left by an abandoned run from refusing the _first_ gate of the next one, something the base check alone cannot do while the default branch has not moved. The one case it does not exclude is a run resuming an earlier one's uncommitted tree, and there the refusal is right.
+- **That record was itself taken before a bump.** A record written after one carries `package.json`, so the last gate of a run that followed the prescribed order can never be the one that refuses.
+- **The working tree carries no version bump yet** — `package.json` is absent from the changed map. Changed for any other reason, it reads as "the bump may already be in" and nothing fires: a missed refusal costs one gate, a wrong one costs a run that cannot verify itself.
+- **The tree has moved since that record.** A tree it still covers is answered by the reuse above at no cost, so the ordering question only ever arises where real time is at stake.
+- **`--force` was not passed.** A run that will not commit — `halfrun`, or a `needs-human-review` child — never bumps at all, and no condition above can see which kind of run this is, so the message names the flag as its second way forward rather than burying it after the bump. `halfrun.md`'s fix-round step says the same thing from the other end.
+
 ```bash
 pnpm josh gate --verbose   # every check's output, passing ones included
 pnpm josh gate --force     # run the four checks even on a tree already recorded green

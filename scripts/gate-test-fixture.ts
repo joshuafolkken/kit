@@ -1,3 +1,6 @@
+import { rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import type { execa } from 'execa'
 import { vi } from 'vitest'
 
@@ -57,12 +60,46 @@ function capture_stdout(): CapturedOutput {
 	}
 }
 
+interface SuiteRecords {
+	stamp_path: string
+	marker_path: string
+	clear: () => void
+}
+
+// Where a suite driving the real `run_verification_gate` puts the two records it would otherwise share
+// with the live gate — and **the reason `GateOptions` carries those destinations at all**.
+//
+// A green run writes the green-gate record joshuafolkken/kit#1328 reuses, so a suite writing to the
+// shared path plants "these files are green" for whatever the *real* working tree happens to be, and
+// the next `pnpm josh gate` skips its four checks on the strength of it. The in-flight marker is the
+// same hazard one step further on: cleared here, it stops telling the review beside a live gate that
+// the unit suite is already running (joshuafolkken/kit#1242).
+//
+// Keyed on the label and the pid together, so two suites in parallel workers cannot answer for each
+// other, and `clear` comes back with the paths rather than being written out per suite — three suites
+// removing two files each is where the fourth one forgets the marker.
+function suite_records(label: string): SuiteRecords {
+	const suite_key = `${label}-${String(process.pid)}`
+	const stamp_path = path.join(tmpdir(), `josh-gate-suite-stamp-${suite_key}.json`)
+	const marker_path = path.join(tmpdir(), `josh-gate-suite-running-${suite_key}.json`)
+
+	return {
+		stamp_path,
+		marker_path,
+		clear: (): void => {
+			rmSync(stamp_path, { force: true })
+			rmSync(marker_path, { force: true })
+		},
+	}
+}
+
 const gate_test_fixture = {
 	as_execa_implementation,
 	capture_stdout,
 	fake_result,
 	FORWARDED_FLAG,
+	suite_records,
 }
 
-export type { CapturedOutput, ExecaResult, FakeExeca }
+export type { CapturedOutput, ExecaResult, FakeExeca, SuiteRecords }
 export { gate_test_fixture }
