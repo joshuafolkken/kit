@@ -330,3 +330,49 @@ describe('git_command.merge_count_arguments', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#1490: a lane's whole lifecycle is these four calls, and each one's flags are the
+// difference between a lane that closes cleanly and debris nobody can account for.
+const LANE_DIRECTORY = '/w/.kit-lanes/1490'
+const LANE_BRANCH = 'lane/1490'
+
+describe('git_command worktree calls', () => {
+	it('creates the branch as part of the add, from an explicit start point', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.worktree_add(LANE_DIRECTORY, LANE_BRANCH, 'main')
+
+		expect(execa_mock.state.last_arguments).toStrictEqual([
+			'worktree',
+			'add',
+			'-b',
+			LANE_BRANCH,
+			LANE_DIRECTORY,
+			'main',
+		])
+	})
+
+	it('forces the removal, because a lane is closed with work still in it', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.worktree_remove(LANE_DIRECTORY)
+
+		expect(execa_mock.state.last_arguments).toContain('--force')
+	})
+
+	it('deletes the lane branch with -D, since a parked lane never merged', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.branch_delete(LANE_BRANCH)
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['branch', '-D', LANE_BRANCH])
+	})
+
+	it('asks for the machine-readable listing rather than the displayed one', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.worktree_list()
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['worktree', 'list', '--porcelain'])
+	})
+})

@@ -2,6 +2,11 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 
 // One script answers both `run:hold` and `run:release`; the flag below is what tells them apart.
 const RUN_HOLD_SCRIPT = 'scripts/run/run-hold-cli.ts'
+// One script answers all four `lane:*` commands; the verb below is what tells them apart.
+const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
+// `JOSH_LANE_ROOT` and `JOSH_LANE_SEED_BASE` are personal, non-committed settings, so every lane
+// command has to read `.env` to see them — without this the two are documented and unreachable.
+const LANE_ARGUMENTS = { script: LANE_SCRIPT, tsx_arguments: OPTIONAL_ENV_FILE_FLAGS } as const
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const AI_COMMANDS: Record<string, CommandEntry> = {
@@ -123,6 +128,30 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/run-liveness-cli.ts',
 		description: 'Say whether a delegated unit is still working, or stopped without reporting',
 		category: 'AI tools',
+	},
+	'lane:open': {
+		...LANE_ARGUMENTS,
+		description: 'Open a lane: a linked work tree with its own branch and its own port seed',
+		category: 'AI tools',
+		default_script_arguments: ['open'],
+	},
+	'lane:close': {
+		...LANE_ARGUMENTS,
+		description: 'Close a lane, leaving no work tree, branch or directory behind',
+		category: 'AI tools',
+		default_script_arguments: ['close'],
+	},
+	'lane:list': {
+		...LANE_ARGUMENTS,
+		description: 'List the open lanes: which issue, which ports, and where each one is',
+		category: 'AI tools',
+		default_script_arguments: ['list'],
+	},
+	'lane:prune': {
+		...LANE_ARGUMENTS,
+		description: 'Close every lane an interruption left without its work tree',
+		category: 'AI tools',
+		default_script_arguments: ['prune'],
 	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
