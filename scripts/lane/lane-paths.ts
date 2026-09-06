@@ -12,7 +12,14 @@ import path from 'node:path'
 
 const LANE_ROOT_KEY = 'JOSH_LANE_ROOT'
 const LANE_DIRECTORY_SUFFIX = '-lanes'
-const LANE_BRANCH_PREFIX = 'lane/'
+// **The issue number comes first because `pnpm josh git` will not commit from a branch that starts
+// any other way** (joshuafolkken/kit#1497). Its `has_same_issue_prefix` reads `/^\d+-/`, so the
+// original `lane/<N>` spelling made every lane a checkout nothing could be committed from — and
+// switching the branch inside the lane is not the way round it, because `lane_registry` identifies a
+// lane *by* this name: the moment it changes, the work tree drops out of `lane:list`, its seat is
+// re-issued to the next lane, and two live lanes share the dev and preview ports lanes exist to keep
+// apart. The name is therefore fixed at both ends at once rather than adapted at one of them.
+const LANE_BRANCH_SUFFIX = '-lane'
 
 type LaneEnvironment = Record<string, string | undefined>
 
@@ -37,11 +44,11 @@ function lane_directory(root: string, issue: string): string {
 }
 
 function lane_branch(issue: string): string {
-	return `${LANE_BRANCH_PREFIX}${issue}`
+	return `${issue}${LANE_BRANCH_SUFFIX}`
 }
 
 const lane_paths = {
-	LANE_BRANCH_PREFIX,
+	LANE_BRANCH_SUFFIX,
 	LANE_ROOT_KEY,
 	default_lane_root,
 	lane_branch,

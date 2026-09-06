@@ -35,13 +35,13 @@ const REPOSITORY_ROOT = path.join(scratch, 'kit')
 const LANE_ROOT = path.join(scratch, 'lanes')
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
-const LANE_BRANCH = 'lane/1490'
+const LANE_BRANCH = '1490-lane'
 const SEED = 6
 
 function lane_of(issue: string, seed: number): LaneInfo {
 	return {
 		issue,
-		branch: `lane/${issue}`,
+		branch: `${issue}-lane`,
 		directory: path.join(LANE_ROOT, issue),
 		seed,
 		is_stranded: false,

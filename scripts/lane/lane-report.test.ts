@@ -9,7 +9,7 @@ import { lane_report } from './lane-report'
 const DEV_BASE = 5173
 const PREVIEW_BASE = 4173
 const SEED = 6
-const LANE_BRANCH = 'lane/1490'
+const LANE_BRANCH = '1490-lane'
 const LANE_DIRECTORY = '/w/.kit-lanes/1490'
 
 function lane(overrides: Partial<LaneInfo> = {}): LaneInfo {

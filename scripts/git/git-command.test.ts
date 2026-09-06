@@ -334,7 +334,7 @@ describe('git_command.merge_count_arguments', () => {
 // joshuafolkken/kit#1490: a lane's whole lifecycle is these four calls, and each one's flags are the
 // difference between a lane that closes cleanly and debris nobody can account for.
 const LANE_DIRECTORY = '/w/.kit-lanes/1490'
-const LANE_BRANCH = 'lane/1490'
+const LANE_BRANCH = '1490-lane'
 
 describe('git_command worktree calls', () => {
 	it('creates the branch as part of the add, from an explicit start point', async () => {

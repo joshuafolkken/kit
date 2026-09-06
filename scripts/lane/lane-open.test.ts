@@ -59,7 +59,7 @@ function lane_environment_file(issue: string): string {
 function live_lane(issue: string, seed: number | undefined): LaneInfo {
 	return {
 		issue,
-		branch: `lane/${issue}`,
+		branch: `${issue}-lane`,
 		directory: path.join(LANE_ROOT, issue),
 		seed,
 		is_stranded: false,
@@ -94,7 +94,7 @@ describe('opening a lane', () => {
 		expect(outcome.kind).toBe('opened')
 		expect(vi.mocked(git_command.worktree_add)).toHaveBeenCalledWith(
 			path.join(LANE_ROOT, ISSUE),
-			'lane/1490',
+			'1490-lane',
 			'main',
 		)
 	})
