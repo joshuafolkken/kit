@@ -50,6 +50,20 @@ beforeEach(() => {
 	execa_mock.state.last_arguments = []
 })
 
+// joshuafolkken/kit#1381: every reader of this porcelain output depends on the `??` lines being there
+// — `git-staging.ts` stages exactly those, and the pre-push hook reads an empty output as "this push
+// carries the recorded tree". `status.showUntrackedFiles=no` in a person's git config removes them
+// silently, so the flag is passed rather than inherited.
+describe('the status reading names its untracked-files mode', () => {
+	it('asks git for untracked files rather than inheriting the config', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.status()
+
+		expect(execa_mock.state.last_arguments).toContain('--untracked-files=normal')
+	})
+})
+
 // joshuafolkken/kit#907: with git's default quoting, a path containing a non-ASCII byte comes back
 // C-quoted, and a classifier matching a path prefix answers no for a file it should have matched.
 // `josh eval:scope` fails toward `skip` there — a change it exists to measure would go unmeasured.

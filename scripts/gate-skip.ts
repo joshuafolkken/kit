@@ -69,15 +69,47 @@ function reusable_green_gate(
 // **The sentence claims the result, and never merely the omission.** "verification skipped" on its
 // own reads as `Not verified` — the one thing this output must not be mistaken for, since the run
 // goes on to a commit on the strength of it. So the line says what passed, on which tree and when,
-// and names the flag that runs the four anyway.
-function format_skip(taken_at: string): string {
+// and names the flag or the variable that runs the checks anyway.
+//
+// **One sentence, every reader of the record** (joshuafolkken/kit#1381). The gate says it, the
+// pre-push hook says it and the pre-commit hook says it, and three copies of a claim this load-bearing
+// would not have stayed the same sentence — the clone `CLAUDE.md` prohibits. What differs between them
+// is four fragments and nothing else, so those are the parameters and the shape is not.
+interface ReuseNotice {
+	// The noun phrase that `passed on it` is said of — `the unit tests`, `the type check`.
+	subject: string
+	// What the git operation about to happen carries, where the reader has a narrower condition than
+	// the gate's own. Empty for the gate, which speaks about the working tree it just read.
+	carried_clause: string
+	taken_at: string
+	// How a person runs the checks anyway: a flag where they type the command, a variable where the
+	// command line belongs to `lefthook/base.yml`.
+	force_hint: string
+	// What that hint re-runs, so the last clause reads as English in each caller — `the four checks`,
+	// `them`, `it`.
+	rerun_object: string
+}
+
+function format_reuse_notice(notice: ReuseNotice): string {
 	return (
-		`✔ this tree is already green — lint, the type check, the spell check and the unit tests ` +
-		`all passed on it at ${taken_at} (\`pnpm josh gate\`).\n` +
-		`  Reusing that result; nothing was re-run. \`pnpm josh gate ${FORCE_FLAG}\` runs the four checks anyway.`
+		`✔ this tree is already green — ${notice.subject} passed on it at ${notice.taken_at} ` +
+		`(\`pnpm josh gate\`)${notice.carried_clause}.\n` +
+		`  Reusing that result; nothing was re-run. \`${notice.force_hint}\` runs ${notice.rerun_object} anyway.`
 	)
 }
 
-const gate_skip = { FORCE_FLAG, format_skip, reusable_green_gate }
+function format_skip(taken_at: string): string {
+	return format_reuse_notice({
+		subject: 'lint, the type check, the spell check and the unit tests all',
+		carried_clause: '',
+		taken_at,
+		force_hint: `pnpm josh gate ${FORCE_FLAG}`,
+		rerun_object: 'the four checks',
+	})
+}
+
+const gate_skip = { FORCE_FLAG, format_reuse_notice, format_skip, reusable_green_gate }
+
+export type { ReuseNotice }
 
 export { gate_skip }

@@ -15,6 +15,7 @@ import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 
 const PRETTIER = 'prettier'
 const ESLINT = 'eslint'
+const TYPE_CHECK = 'type-check'
 const UNIT_TESTS = 'unit-tests'
 const SECRET_SCAN = 'secret-scan'
 const DEPENDENCY_AUDIT = 'dependency-audit'
@@ -38,7 +39,7 @@ interface ToolSignature {
 const TOOL_SIGNATURES: ReadonlyArray<ToolSignature> = [
 	{ id: PRETTIER, patterns: [[PRETTIER]] },
 	{ id: ESLINT, patterns: [[ESLINT]] },
-	{ id: 'type-check', patterns: [['tsc', '--noemit']] },
+	{ id: TYPE_CHECK, patterns: [['tsc', '--noemit']] },
 	{ id: 'cspell', patterns: [['cspell']] },
 	{ id: UNIT_TESTS, patterns: [['vitest']] },
 	{ id: 'e2e-tests', patterns: [['test:e2e'], ['playwright test']] },
@@ -59,6 +60,7 @@ const JOSH_TOOLS: Record<string, ReadonlyArray<string>> = {
 	'test:unit': [UNIT_TESTS],
 	'test:related': [UNIT_TESTS],
 	'pre-push-unit': [UNIT_TESTS],
+	'pre-commit-type-check': [TYPE_CHECK],
 	audit: [DEPENDENCY_AUDIT],
 	'secretlint-scan': [SECRET_SCAN],
 	'prevent-main-commit': ['branch-guard'],

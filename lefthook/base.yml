@@ -28,9 +28,20 @@ pre-commit:
       glob: '*.{js,jsx,ts,tsx,mjs,cjs}'
       run: pnpm exec eslint --quiet --cache --cache-strategy content {staged_files}
 
+    # Routed through `josh pre-commit-type-check` rather than a bare `pnpm exec tsc --noEmit` so the
+    # hook can read the record `pnpm josh gate` leaves behind (kit#1381) — the same reader the
+    # pre-push unit command became in kit#1334. A green gate writes down the digest of every changed
+    # file it passed on and the commit that map is a diff against; where that record covers the tree
+    # this commit carries — the index matching the working tree, which is what `josh git` leaves once
+    # it has staged — `tsc` is not run again. Measured: 3.8–4.4s of every commit, spent seconds after
+    # the same project-wide type check went green on the same tree, and this is the one project-wide
+    # check in a parallel hook, so it is the hook's wall time. Anything else runs the whole project
+    # type check exactly as before, and `JOSH_PRE_COMMIT_FORCE=1 git commit` runs it regardless.
+    # The staged-file commands above are a narrower scope than the gate's project-wide run and cost
+    # under a second each in parallel, so they are left alone.
     type-check:
       glob: '*.{ts,js,mjs,cjs}'
-      run: pnpm exec tsc --noEmit
+      run: pnpm josh pre-commit-type-check
 
   fail_text: |
     🚫 Commit blocked due to quality checks failure
