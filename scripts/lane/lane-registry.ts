@@ -43,11 +43,19 @@ function line_value(lines: ReadonlyArray<string>, prefix: string): string | unde
  * failure in a different work tree — the kind of silent failure `playwright.config.ts` refuses to
  * add by dying on a busy port instead of retrying on another.
  */
+function seed_from_content(content: string): number | undefined {
+	// **A file with no `PORT_SEED` line at all is not seat 0.** `read_root_seed` answers with the
+	// documented default of 0 for one, and 0 is the main work tree's own seat — so a lane whose seed
+	// line was lost would be booked as sharing it while the lane in fact still runs on whatever ports
+	// it was started with, and `lane:open` would allocate straight over them.
+	const has_seed = content.split('\n').some((line) => lane_environment.is_seed_line(line))
+
+	return has_seed ? lane_environment.read_root_seed(content) : undefined
+}
+
 function read_seed(directory: string): number | undefined {
 	try {
-		const file = path.join(directory, ENV_FILE_NAME)
-
-		return lane_environment.read_root_seed(readFileSync(file, 'utf8'))
+		return seed_from_content(readFileSync(path.join(directory, ENV_FILE_NAME), 'utf8'))
 	} catch {
 		return undefined
 	}

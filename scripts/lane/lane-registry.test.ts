@@ -109,6 +109,19 @@ describe('what does not count as a lane', () => {
 		expect(lane_registry.parse_block(spike)).toBeUndefined()
 	})
 
+	// `read_root_seed` answers 0 for a file with no seed line, and 0 is the main work tree's seat — so
+	// a lane booked there would be treated as sharing it while it still runs on its own ports.
+	it('reports a lane whose .env lost its seed line, rather than booking it on seat 0', async () => {
+		open_on_disk('1490', undefined)
+		writeFileSync(path.join(LANE_ROOT, '1490', '.env'), 'TELEGRAM_CHAT_ID=42\n')
+		list_of(lane_block('1490'))
+
+		const lanes = await lane_registry.list_lanes()
+
+		expect(lanes[0]?.seed).toBeUndefined()
+		expect(lane_registry.unreadable_lanes(lanes)).toHaveLength(1)
+	})
+
 	it('ignores a block with no branch line, such as a detached work tree', () => {
 		const detached = ['worktree /somewhere', HEAD_LINE, 'detached'].join('\n')
 

@@ -100,8 +100,10 @@ function report_sweep(outcome: SweepOutcome): number {
 
 	const named = outcome.failed.map((issue) => `#${issue}`).join(', ')
 
+	// `lane:list` reads git's work trees, and the usual survivor is a branch whose work tree is
+	// already gone — which that listing cannot show. Closing each one again is what names it.
 	console.error(
-		`These lanes could not be closed: ${named}. Run \`pnpm josh lane:list\` to see what is left of them.`,
+		`These lanes could not be closed: ${named}. Run \`pnpm josh lane:close <issue-number>\` on each to see what is left of it.`,
 	)
 
 	return FAILURE_EXIT_CODE
