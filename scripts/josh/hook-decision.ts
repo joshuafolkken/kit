@@ -1,8 +1,8 @@
-import { ENV_FILE_NAME } from '#ports'
 import type { GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_density_hook } from '#scripts/time/time-density-hook'
 import { time_hook_transcript } from '#scripts/time/time-hook-transcript'
 import { z } from 'zod'
+import { josh_environment_file } from './josh-environment-file'
 import { stamp_file } from './stamp-file'
 
 // The parts every refusing `PreToolUse` hook needs, held once (joshuafolkken/kit#1460).
@@ -117,23 +117,15 @@ function create_refusal_stamp(prefix: string): RefusalStamp {
 	return { path, last_ms: last_refusal_ms, record: record_refusal }
 }
 
-// **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`.** The flag form is
-// what every other command uses, but declaring any `tsx_arguments` disqualifies a command from
-// in-process dispatch (`josh-in-process.ts`) — putting a second ~0.16 s tsx start in front of every
-// guarded call, which is the hot path joshuafolkken/kit#1342 took it off. `process.loadEnvFile` is
-// node's own `--env-file` parser and keeps node's precedence: a value already in the environment
-// wins over the file's. A missing or unreadable file is swallowed, as `--env-file-if-exists` does.
+// **`.env` is loaded here rather than through the dispatcher's `tsx_arguments`**, and the reason —
+// declaring any `tsx_arguments` disqualifies a command from in-process dispatch — is now shared with
+// every other command that has to stay in-process, so the loader lives in `josh-environment-file.ts` rather
+// than here (joshuafolkken/kit#1491). Re-exported under this namespace because that is where the
+// hooks reach for it.
 //
 // **Call it only on the real hook path**, never inside the pure refusal function, so a developer's
 // own `.env` cannot decide what the unit tests see.
-function load_environment_file(): void {
-	try {
-		process.loadEnvFile(ENV_FILE_NAME)
-	} catch {
-		// No `.env` beside this project, or one this process may not read. The switch then reads from
-		// the environment alone, which is what it did before any file existed.
-	}
-}
+const { load_environment_file } = josh_environment_file
 
 // What one refusing hook differs from another by, and nothing else. Both existing hooks judge the
 // call, derive the transcript, read its tail, ask their own rule and record before refusing — the

@@ -60,17 +60,17 @@ const GUARD_MARKERS: ReadonlyArray<string> = [
 // this Issue removes; they are now checked in the one file that holds them.
 const RULE_MARKERS: ReadonlyArray<string> = [
 	'park and continue',
-	'one child per repository, repositories in parallel',
+	'as many children per repository as it has free lanes',
 	'Stopping conditions',
-	// The invariant is per *repository*, not per epic: the working tree, `main` and the
-	// `package.json` `josh bump` rewrites are shared by every epic that touches the checkout, so an
-	// `in-progress` issue this epic does not track still has to stop it (joshuafolkken/kit#925).
-	'**The exclusion is per repository, and `epic:next` is what applies it.**',
+	// The count is per *repository*, not per epic (joshuafolkken/kit#925): an `in-progress` issue
+	// this epic does not track still occupies one of that repository's lanes, and a session counting
+	// only its own epic's children would run past the limit (joshuafolkken/kit#1491).
+	'**The lane count is per repository, and `epic:next` is what applies it.**',
 	'whichever epic that issue belongs to',
 	// The two limits are part of the definition: read as unconditional, an agent treats a `complete`
-	// answer during an in-progress issue as impossible, and a parked child holds the repository it
-	// was just set aside from.
-	'a **parked** issue does not hold the repository',
+	// answer during an in-progress issue as impossible, and a parked child goes on holding the lane
+	// it was just set aside from.
+	'not hold a lane: `needs-decision` outranks `in-progress`',
 	// Overstated as a mutex, a reader stops guarding the check-then-act window it does not close.
 	'**It is advisory and it is not atomic.**',
 	'**A listing it could not read is not an idle repository.**',

@@ -3,16 +3,26 @@ import { has_any_label, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 
-// Whether a repository already has work running in it — asked of the *repository*, never of the
-// epic (joshuafolkken/kit#925).
+// How much of a repository's parallelism is already spoken for — asked of the *repository*, never of
+// the epic (joshuafolkken/kit#925), and counted rather than treated as a yes/no since
+// joshuafolkken/kit#1491.
 //
-// The contended resource is one working tree, one `main` and one `package.json` that `josh bump`
-// rewrites, and none of them cares which epic a child belongs to. `epic-classify.ts` sorts only the
-// children the epic tracks, so an `in-progress` issue belonging to a *different* epic is invisible
-// to it: start two `epicrun`s and both answer "nothing of mine is in progress", after which two
-// children implement in the same checkout and the result is destruction rather than interleaving.
-// This read is what closes that gap, and it is deliberately outside the classification — the
-// question is not about the graph.
+// `epic-classify.ts` sorts only the children the epic tracks, so an `in-progress` issue belonging to
+// a *different* epic is invisible to it: start two `epicrun`s and both answer "nothing of mine is in
+// progress". This read is what closes that gap, and it is deliberately outside the classification —
+// the question is not about the graph.
+//
+// **What an `in-progress` issue holds is one lane, not the repository.** Until joshuafolkken/kit#1490
+// the contended resource really was one working tree, one `main` and one `pnpm-lock.yaml`, so one
+// holder excluded everything. A lane is its own checkout with its own branch and its own ports, so
+// the question stopped being "is anything running" and became "how many are running" — and the
+// answer is a count the caller compares against `lane_capacity`'s limit.
+//
+// **The count is read from GitHub, never kept in the session.** Two `epicrun`s counting to six in
+// their own memory give twelve lanes; the label on an open issue is the one record both of them
+// read. It is an advisory guard rather than a mutex — the label is applied after the read, so two
+// sessions starting in the same instant can still take one seat twice. What it closes is the window
+// that actually occurs: a lane holding the label for minutes.
 
 // Wide enough that the cap is never what decides the answer: a repository with a hundred issues
 // carrying `in-progress` at once is already the state this guard exists to report.
@@ -53,8 +63,31 @@ function format_holders(issues: ReadonlyArray<OpenIssueData>): string {
 	return issues.map((issue) => `#${String(issue.number)} ${issue.title}`).join(', ')
 }
 
-function busy_message(issues: ReadonlyArray<OpenIssueData>, repo: string): string {
-	return `Already in progress in ${repo}: ${format_holders(issues)}. One child runs at a time per repository, whichever epic it belongs to, so nothing is offered here. If a label is stale, remove it and ask again.`
+// How many lanes this read shows occupied. Every kind but `busy` is zero, and the two that could not
+// see the whole listing are held back by their kind rather than by their count — a read that saw
+// nothing is not a repository with nothing running, and the caller checks the kind first.
+function occupied_lanes(read: BusyRead): number {
+	return read.kind === 'busy' ? read.issues.length : 0
+}
+
+// Named holders rather than a bare count, for the reason the stale-label rule needs: it is applied
+// by whoever finds the label stale, and it cannot be applied to an issue nobody was told about.
+function occupancy_message(
+	issues: ReadonlyArray<OpenIssueData>,
+	repo: string,
+	limit: number,
+): string {
+	return `${String(issues.length)} of ${String(limit)} lanes in use in ${repo}: ${format_holders(issues)}.`
+}
+
+// The occupancy said once, with the consequence appended — rather than a second sentence that
+// re-derives the same numbers and can drift from the first.
+function lanes_full_message(
+	issues: ReadonlyArray<OpenIssueData>,
+	repo: string,
+	limit: number,
+): string {
+	return `${occupancy_message(issues, repo, limit)} No lane is free, so nothing is offered here. A lane is released when its child merges or is parked; if a label is stale, remove it and ask again, and \`JOSH_LANE_LIMIT\` is what raises the ceiling.`
 }
 
 function unreadable_message(repo: string): string {
@@ -66,7 +99,7 @@ function unreadable_message(repo: string): string {
 // stronger than elsewhere, so the message says the consequence out loud rather than leaving a reader
 // to infer it from a warning marker.
 //
-// **It does not tell anyone to clear stale labels, the way `busy_message` does.** The only cut that
+// **It does not tell anyone to clear stale labels, the way `lanes_full_message` does.** The only cut that
 // reaches here is the page ceiling, which needs hundreds of labelled pull requests to fire — nothing
 // an issue label can clear, and nothing asking again will resolve either. So it names what the run
 // is waiting on and sends the reader to the one thing that would change the answer.
@@ -85,19 +118,21 @@ const BUSY_REASONS: Readonly<
 	truncated: truncated_message,
 }
 
-function busy_reason(read: BusyRead, repo: string): string {
-	if (read.kind === 'busy') return busy_message(read.issues, repo)
+function busy_reason(read: BusyRead, repo: string, limit: number): string {
+	if (read.kind === 'busy') return lanes_full_message(read.issues, repo, limit)
 	if (read.kind === 'idle') return ''
 
 	return BUSY_REASONS[read.kind](repo)
 }
 
-// A parked issue does not hold the repository, and this is not a special case bolted on: it is the
+// A parked issue does not hold a lane, and this is not a special case bolted on: it is the
 // precedence `epic_classify.local_category` already applies, which reads `needs-decision` *before*
 // `in-progress` and so calls a parked child `human` rather than `time`. Two readings of one issue
 // have to agree, and without this they do not — nothing removes `in-progress` when a child is
-// parked, so `park and continue` would hand the repository to the very child it just set aside and
-// the run would poll instead of continuing (joshuafolkken/kit#925).
+// parked, so `park and continue` would spend a lane on the very child it just set aside, and with
+// one lane the run would poll instead of continuing (joshuafolkken/kit#925). A child stopped by
+// `needs-human-review` is deliberately not parked and goes on holding its lane: its uncommitted work
+// is still sitting in that checkout.
 function is_parked(issue: OpenIssueData): boolean {
 	return has_any_label(issue.labels, PARKED_LABELS)
 }
@@ -142,7 +177,9 @@ async function read_repository(repo: string): Promise<BusyRead> {
 
 const epic_busy = {
 	LISTING_LIMIT,
-	busy_message,
+	occupied_lanes,
+	occupancy_message,
+	lanes_full_message,
 	unreadable_message,
 	truncated_message,
 	busy_reason,

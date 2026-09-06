@@ -121,20 +121,6 @@ describe('epic_report.candidates_for_repo', () => {
 	})
 })
 
-describe('epic_report.pick_for_repo', () => {
-	it('takes the lowest-numbered candidate for the repository', () => {
-		const result = epic_report.build_result(classification({ runnable: [child(2), child(1)] }), [])
-
-		expect(epic_report.pick_for_repo(result, KIT)?.number).toBe(1)
-	})
-
-	it('returns nothing for a repository with no candidate', () => {
-		const result = epic_report.build_result(classification({ runnable: [child(1)] }), [])
-
-		expect(epic_report.pick_for_repo(result, APP_KIT)).toBeUndefined()
-	})
-})
-
 describe('epic_report.format_result', () => {
 	it('names each repository and its candidates', () => {
 		const result = epic_report.build_result(

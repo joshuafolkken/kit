@@ -270,7 +270,7 @@ back to step 1.
 half-written, and the consecutive-failure guard is the only thing that notices the environment rather
 than the children is at fault — a stall the parent quietly restarts is a stall nothing ever counts.
 
-## Concurrency: one child per repository, repositories in parallel
+## Concurrency: as many children per repository as it has free lanes
 
 Execution state lives on GitHub and nowhere else (`epic:next`, joshuafolkken/kit#860), so **an
 `epicrun` need not be a single session.** One session per repository; each calls
@@ -299,34 +299,42 @@ timeout with nothing an operator can edit to clear it. The answer is read from t
 repository's own manifest and never from the registry: a registry 404 also means "this token may not
 see it", so resolving on one would start a consumer child before its blocker's release existed.
 
-**The exclusion is per repository, and `epic:next` is what applies it.** When
-`josh epic:next --repo <owner/repo>` has a child to offer, it first asks that repository whether
-anything is already running there: **any** open issue carrying `in-progress` and not parked makes
-the answer `wait` — whichever epic that issue belongs to, and whether or not this epic tracks it at
-all (joshuafolkken/kit#925). Two limits are part of the definition rather than gaps in it. It is
+**The lane count is per repository, and `epic:next` is what applies it.** When
+`josh epic:next --repo <owner/repo>` has a child to offer, it first asks that repository **how many
+of its lanes are already running something**: every open issue carrying `in-progress` and not parked
+counts for one — whichever epic that issue belongs to, and whether or not this epic tracks it at
+all (joshuafolkken/kit#925, counted rather than excluded since joshuafolkken/kit#1491). What is left
+of `JOSH_LANE_LIMIT` (**default 6**) is what gets offered, and at zero the answer is `wait`. Two
+limits are part of the definition rather than gaps in it. It is
 asked **only when there is a candidate**, so `stop` and `complete` are still answered while
 something is in progress — neither of them is about to start anything. And a **parked** issue does
-not hold the repository: `needs-decision` outranks `in-progress` here exactly as it does in the
-classification, or `park and continue` would hand the repository to the child it just set aside.
+not hold a lane: `needs-decision` outranks `in-progress` here exactly as it does in the
+classification, or `park and continue` would spend a lane on the child it just set aside. A child
+stopped by `needs-human-review` is deliberately not parked and goes on holding its lane, because its
+uncommitted work is still sitting in that checkout.
 
 **It is advisory and it is not atomic.** The label is applied by whoever is about to implement a
-child, *after* this read — so two sessions starting in the very same instant can both read an idle
-repository and both be handed the same child. What the check closes is the window that actually
-occurs: a session already running a child holds the label for the whole of it, which is minutes,
+child, *after* this read — so two sessions starting in the very same instant can both read the same
+free lane and both be handed a child for it. What the check closes is the window that actually
+occurs: a lane already running a child holds the label for the whole of it, which is minutes,
 against a race measured in seconds. Treat it as a guard that makes the invariant mechanical, not as
 a mutex.
 
-**It is scoped to the resource, not to the epic.** What two children contend for is one working
-tree, one `main` and one `pnpm-lock.yaml` that `josh latest` rewrites, and none of those cares which
-epic a child belongs to. The earlier reasoning here — each session takes only its own repository's
-children, and within a repository children run one at a time — was true *inside one epic* and said
-nothing about two: `epic-classify.ts` sorts only the children the epic tracks, so a second `epicrun`
-started in the same checkout answered "nothing of mine is in progress" and both ran. What actually
-serialized them was a person typing the runs one after another, which is a habit rather than a
-property of the model.
+**It is scoped to the resource, not to the epic.** What two children contend for used to be one
+working tree, one `main` and one `pnpm-lock.yaml` that `josh latest` rewrites; since
+joshuafolkken/kit#1490 a lane is its own checkout with its own branch and its own ports, so the
+contended resource is the lane and the repository-wide number is a **ceiling on how many of them run
+at once**. Either way it does not care which epic a child belongs to. The earlier reasoning here —
+each session takes only its own repository's children, and within a repository children run one at a
+time — was true *inside one epic* and said nothing about two: `epic-classify.ts` sorts only the
+children the epic tracks, so a second `epicrun` started in the same checkout answered "nothing of
+mine is in progress" and both ran. What actually serialized them was a person typing the runs one
+after another, which is a habit rather than a property of the model. **How a session opens a lane and
+drives more than one child at a time is joshuafolkken/kit#1492's**, not this section's: what changed
+here is only what `epic:next` answers.
 
-**A stale label now holds the whole repository, so the stale rule reaches past this epic's own
-children.** An interrupted run leaves `in-progress` behind, and that label holds the checkout rather
+**A stale label holds a lane, so the stale rule reaches past this epic's own
+children.** An interrupted run leaves `in-progress` behind, and that label holds a lane rather
 than one child —
 so "`in-progress` is removed by whoever finds it stale" below applies to **any** open issue in the
 repository, not only to this epic's children. `epic:next` names the issues holding the repository on

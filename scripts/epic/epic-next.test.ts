@@ -122,7 +122,32 @@ describe('epic_next.parse_options', () => {
 	})
 })
 
+// joshuafolkken/kit#1491: asking for every free lane is opt-in, so a caller that reads one token
+// keeps reading one token.
+describe('epic_next.parse_options — --lanes', () => {
+	it('is off unless the flag is passed', () => {
+		expect(epic_next.parse_options(['858', '--repo', REPO]).is_all_lanes).toBe(false)
+	})
+
+	it('is on when the flag is passed', () => {
+		expect(epic_next.parse_options(['858', '--repo', REPO, '--lanes']).is_all_lanes).toBe(true)
+	})
+})
+
 describe('epic_next.parse_options — refusals', () => {
+	// The lane count is a property of one repository, so the aggregate listing has nothing to apply it
+	// to — refused rather than ignored, since a flag that silently does nothing is worse than one that
+	// is rejected.
+	it('refuses --lanes without --repo', () => {
+		expect(epic_next.parse_options(['858', '--lanes']).usage).toContain('Usage:')
+	})
+
+	// A value that is itself a flag is no value at all: this used to narrow to a repository literally
+	// named `--lanes` and report `No runnable child in --lanes` with exit 0.
+	it('refuses a --repo whose value is the next flag', () => {
+		expect(epic_next.parse_options(['858', '--repo', '--lanes']).usage).toContain('Usage:')
+	})
+
 	it('refuses a --repo with nothing after it', () => {
 		expect(epic_next.parse_options(['858', '--repo']).usage).toContain('Usage:')
 	})

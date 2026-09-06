@@ -12,9 +12,10 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { epic_busy } from './epic-busy'
 
-// joshuafolkken/kit#925: the contended resource is the repository — one working tree, one `main`,
-// one `package.json` that `josh bump` rewrites — and none of them cares which epic a child belongs
-// to. This read is what lets `epic:next` see an `in-progress` issue the epic does not track.
+// joshuafolkken/kit#925: the question is asked of the repository rather than of the epic, which is
+// what lets `epic:next` see an `in-progress` issue the epic does not track. joshuafolkken/kit#1491
+// turned the answer into a count: each such issue occupies one lane, and the caller compares that
+// count against the repository's limit.
 
 vi.mock('#scripts/git/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_in_repo: vi.fn() },
@@ -30,6 +31,9 @@ const { issue } = auto_ok_fixture
 
 const REPO = 'joshuafolkken/kit'
 const HOLDER_NUMBER = 912
+const LANE_LIMIT = 6
+const TWO_HOLDERS = 2
+const OTHER_HOLDER_NUMBER = 913
 // The half of every not-idle message that says the guard did not fall open.
 const NOT_IDLE = 'not "nothing is running"'
 
@@ -144,11 +148,43 @@ describe('epic_busy.read_repository — a child stopped for human review', () =>
 	})
 })
 
+// joshuafolkken/kit#1491: the answer is a count, because a lane is what an `in-progress` issue
+// holds. A read that could not see the whole listing counts nothing — the caller holds it back by
+// its kind, since "I saw no holder" and "there are no holders" are not the same statement.
+describe('epic_busy.occupied_lanes', () => {
+	it('counts one lane per holder', async () => {
+		issue_list.mockResolvedValueOnce(
+			listing_of([holder(), issue(OTHER_HOLDER_NUMBER, CREATED_EARLIER, [IN_PROGRESS_LABEL])]),
+		)
+
+		expect(epic_busy.occupied_lanes(await epic_busy.read_repository(REPO))).toBe(TWO_HOLDERS)
+	})
+
+	it('counts nothing in an idle repository', () => {
+		expect(epic_busy.occupied_lanes({ kind: 'idle' })).toBe(0)
+	})
+
+	it('counts nothing for a read that saw nothing', () => {
+		expect(epic_busy.occupied_lanes({ kind: 'unreadable' })).toBe(0)
+		expect(epic_busy.occupied_lanes({ kind: 'truncated' })).toBe(0)
+	})
+})
+
 describe('epic_busy messages', () => {
 	// The stale-label rule is applied by whoever finds the label stale, and it cannot be applied to
 	// an issue nobody was told about — so the holder's number is part of the answer, not decoration.
 	it('names the issue holding the repository', () => {
-		expect(epic_busy.busy_message([holder()], REPO)).toContain(`#${String(HOLDER_NUMBER)}`)
+		expect(epic_busy.lanes_full_message([holder()], REPO, LANE_LIMIT)).toContain(
+			`#${String(HOLDER_NUMBER)}`,
+		)
+	})
+
+	// The occupancy is what a person tunes `JOSH_LANE_LIMIT` against, so both numbers are in the
+	// message rather than only the fact that it is full.
+	it('says how many of the lanes are in use', () => {
+		expect(epic_busy.occupancy_message([holder()], REPO, LANE_LIMIT)).toContain(
+			`1 of ${String(LANE_LIMIT)} lanes in use`,
+		)
 	})
 
 	it('names the repository the read failed for', () => {
@@ -202,9 +238,9 @@ describe('epic_busy.read_repository — a listing that was cut short', () => {
 	// inherit the unreadable listing's advice.
 	it('gives each not-idle kind its own reason', () => {
 		const reasons = [
-			epic_busy.busy_reason({ kind: 'truncated' }, REPO),
-			epic_busy.busy_reason({ kind: 'unreadable' }, REPO),
-			epic_busy.busy_reason({ kind: 'busy', issues: [holder()] }, REPO),
+			epic_busy.busy_reason({ kind: 'truncated' }, REPO, LANE_LIMIT),
+			epic_busy.busy_reason({ kind: 'unreadable' }, REPO, LANE_LIMIT),
+			epic_busy.busy_reason({ kind: 'busy', issues: [holder()] }, REPO, LANE_LIMIT),
 		]
 
 		expect(new Set(reasons).size).toBe(reasons.length)

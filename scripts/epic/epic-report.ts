@@ -21,7 +21,9 @@ interface RepoCandidates {
 
 interface EpicNextResult {
 	verdict: EpicVerdict
-	// Runnable children bundled per repository, so a caller can run one per repository in parallel.
+	// Runnable children bundled per repository. How many of one bundle may start at once is the
+	// repository's free-lane count, which `epic-lane-offer.ts` decides and this report does not know
+	// (joshuafolkken/kit#1491).
 	candidates: ReadonlyArray<RepoCandidates>
 	waiting: ReadonlyArray<EpicChild>
 	blocked_on_people: ReadonlyArray<EpicChild>
@@ -107,12 +109,6 @@ function candidates_for_repo(result: EpicNextResult, repo: string): ReadonlyArra
 	return result.candidates.find((bundle) => bundle.repo === repo)?.children ?? []
 }
 
-// The single candidate for one repository, for a caller that runs one repository at a time. The head
-// of the list above rather than a second spelling of the same lookup.
-function pick_for_repo(result: EpicNextResult, repo: string): EpicChild | undefined {
-	return candidates_for_repo(result, repo)[0]
-}
-
 // The repository, with the checkout a runner would use. A repository with no local checkout says so
 // rather than being omitted: it is still where the work belongs.
 function format_bundle_heading(bundle: RepoCandidates): string {
@@ -130,7 +126,7 @@ function format_group(label: string, children: ReadonlyArray<EpicChild>): Array<
 }
 
 const VERDICT_LINES: Readonly<Record<EpicVerdict, string>> = {
-	run: 'Runnable children (one per repository may run at a time):',
+	run: 'Runnable children (each takes a free lane in its repository):',
 	wait: 'Nothing is runnable yet, but these resolve on their own — wait and ask again:',
 	stop: 'Nothing will resolve on its own. These need a person:',
 	complete: 'Every child is closed; the epic is complete.',
@@ -166,7 +162,6 @@ const epic_report = {
 	decide_verdict,
 	build_result,
 	candidates_for_repo,
-	pick_for_repo,
 	format_result,
 	VERDICT_LINES,
 }
