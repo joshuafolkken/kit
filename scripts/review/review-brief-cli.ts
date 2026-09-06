@@ -42,18 +42,50 @@ function parse_round(argv: ReadonlyArray<string>): number | undefined {
 	return parse_round_value(argv[1])
 }
 
+// **Printed on stderr, because stdout is the `/code-review` invocation and nothing else.** A kept
+// record is not an error, but it is the one thing a second round-1 invocation has to be told: the
+// delta it is about to be measured against was taken earlier than this call, and silence there is
+// what made the retake invisible in the first place.
+const KEPT_NOTE_PREFIX = 'Round-1 snapshot: kept the record taken at'
+
+function kept_note(taken_at: string): string {
+	return `${KEPT_NOTE_PREFIX} ${taken_at} rather than retaking it — the fix delta is measured from there, so everything changed since is reviewed rather than assumed away (joshuafolkken/kit#1441).`
+}
+
 // The snapshot is taken on round 1 only, and it is taken **before** the review reports, so the
 // digests describe the implementation as the first round read it. Taking it again on round 2 would
 // overwrite the very record the delta is measured against.
 //
+// **It is written once per run and never retaken** (joshuafolkken/kit#1441). Overwriting on every
+// round-1 invocation put a wrong `skip` one command away: run a bare `josh review:brief` after round
+// 1's fixes are in and the record is retaken against the fixed tree, the fix delta reads empty, and
+// `josh review:round2 --round-1-closed` fires arm A on unreviewed fix code. Keeping the record the
+// run already has removes that path outright — a second round-1 invocation reads it and leaves it
+// alone, so every later reading of the delta is measured from before the fixes.
+//
+// **The record's lifetime is one run, and `josh followup` is what ends it** (`review-stamps.ts` →
+// `clear_round_one`). That is the whole of "is this a new run or the same one", answered by the event
+// that ends a run rather than by a proxy for it — and the two proxies considered were both rejected
+// for pointing the wrong way when they are wrong. A record left behind by a run that never reached
+// `followup` is measured from further back, so the next run's delta is **wider**: it costs a round 2
+// rather than skipping one, which is the direction every uncertainty here has to fall.
+//
 // The write is swallowed for the same reason the gate's is: the brief has already been printed and
 // is correct, so a temp-directory problem must not turn it into a non-zero exit. What a missing
 // snapshot costs is a round 2 that reviews the whole change — wider, never narrower.
-function record_round_one(round: number, tree: Record<string, string>): void {
+function record_round_one(round: number, tree: Record<string, string>, target?: string): void {
 	if (round !== FIRST_ROUND) return
 
 	try {
-		review_stamps.round_one_stamp.write(tree)
+		const recorded = review_stamps.round_one_stamp.read(target)
+
+		if (recorded !== undefined) {
+			console.error(kept_note(recorded.taken_at))
+
+			return
+		}
+
+		review_stamps.round_one_stamp.write(tree, target)
 	} catch {
 		/* no record widens the next round rather than narrowing it */
 	}
@@ -88,7 +120,16 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const review_brief_cli = { FIRST_ROUND, main, parse_round, run, USAGE }
+const review_brief_cli = {
+	FIRST_ROUND,
+	KEPT_NOTE_PREFIX,
+	kept_note,
+	main,
+	parse_round,
+	record_round_one,
+	run,
+	USAGE,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

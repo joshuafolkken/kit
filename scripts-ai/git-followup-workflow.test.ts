@@ -28,6 +28,15 @@ vi.mock('../scripts/git/git-error', () => ({
 	git_error: { handle: vi.fn() },
 }))
 
+// **Mocked because `main` runs at import time in this module, and the real removal would take the
+// round-1 review snapshot of whatever run is executing this suite** — the trap joshuafolkken/kit#1437
+// fixed for the gate's own records, one directory over (joshuafolkken/kit#1441). With the record gone,
+// that run's next `josh review:brief` records a fresh one against its already-fixed tree and
+// `josh review:round2` skips the round it owes.
+vi.mock('../scripts/review/review-stamps', () => ({
+	review_stamps: { clear_round_one: vi.fn() },
+}))
+
 const { git_followup_workflow } = await import('./git-followup-workflow')
 
 describe('parse_issue_number_from_text', () => {
@@ -208,6 +217,32 @@ describe('print_completion - merge gating', () => {
 		} finally {
 			spy.mockRestore()
 		}
+	})
+})
+
+const { review_stamps } = await import('../scripts/review/review-stamps')
+const clear_round_one_mock = vi.mocked(review_stamps.clear_round_one)
+
+// The round-1 review snapshot's lifetime is one run, and `--no-merge` is not the end of one: the pull
+// request is still open, and a record removed there lets the next round-1 brief write a fresh one
+// against the already-fixed tree — the arm-A skip joshuafolkken/kit#1441 closed, arriving from the
+// other side. Importing this module already ran `main()` once, so the counter is cleared first for the
+// reason the next-issues suite states.
+describe('the round-1 snapshot is cleared only by a merged run', () => {
+	beforeEach(() => {
+		clear_round_one_mock.mockClear()
+	})
+
+	it('clears the record when the run merged', () => {
+		git_followup_workflow.clear_round_one_snapshot(true)
+
+		expect(clear_round_one_mock).toHaveBeenCalledTimes(1)
+	})
+
+	it('leaves the record in place on a --no-merge run', () => {
+		git_followup_workflow.clear_round_one_snapshot(false)
+
+		expect(clear_round_one_mock).not.toHaveBeenCalled()
 	})
 })
 

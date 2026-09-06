@@ -47,9 +47,13 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	// And the half a reader most easily takes with the skip: round 1 edited the tree, so the gate is
 	// stale and re-runs after the bump. Without this the run commits on an unverified tree.
 	'**A `skip` moves only whether the second round runs.**',
-	// The one state the digests cannot describe on their own. Without the timestamp in the record,
-	// an arm-A skip and a snapshot retaken after the fixes read identically forever after.
-	"**Arm A's answer carries round 1's timestamp, because the digests alone cannot separate two states.**",
+	// The one state the digests cannot describe on their own — and the defense joshuafolkken/kit#1441
+	// put in front of it. Without the write-once convention an arm-A skip and a snapshot retaken after
+	// the fixes read identically, and the round is skipped over fix code nobody read; without the
+	// sentence naming the direction, a later reader takes a stale record for a reason to narrow.
+	'**Arm A rests on the snapshot not being retaken, and that is enforced rather than left to a timestamp somebody might notice.**',
+	'once per run',
+	'**A record that outlives its run only ever widens the next one**',
 ]
 
 // The three rejections. Each one is a line someone will propose again, and each is rejected on

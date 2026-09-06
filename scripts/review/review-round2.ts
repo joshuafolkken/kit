@@ -59,10 +59,13 @@ interface RoundTwoDecision {
 }
 
 // **The snapshot's own timestamp travels with the answer**, the way `review-brief.ts` prints it
-// beside a round-2 target. An empty delta has two readings — round 1 wrote no fix code, or the
-// record was retaken after the fixes by a bare `josh review:brief` — and the digests cannot tell
-// them apart. Printing when round 1 was recorded is what lets a person reading the Issue comment
-// see a timestamp that postdates the fixes, which is the only way that second reading shows.
+// beside a round-2 target. An empty delta used to have two readings — round 1 wrote no fix code, or
+// the record was retaken after the fixes by a bare `josh review:brief` — and the digests cannot tell
+// them apart, so joshuafolkken/kit#1441 closed the second one at the source: the record is written
+// once per run and kept thereafter, which leaves "round 1 wrote no fix code" as the only reading of
+// an empty delta. The timestamp stays in the reason because a record can still **outlive** its run —
+// `josh followup` is what clears it — and a delta measured from an earlier run's record is wider
+// rather than narrower, which a reader can only see from when that record was taken.
 function empty_reason(taken_at: string): string {
 	return `${EMPTY_DELTA_REASON_PREFIX} (round 1 was recorded at ${taken_at})`
 }
