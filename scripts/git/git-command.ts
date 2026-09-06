@@ -303,6 +303,62 @@ async function add_path(file_path: string): Promise<void> {
 	await exec_git_command_with_output('add', ['--', file_path])
 }
 
+// Main's own line of history. Both reads below restrict themselves to it, and for one reason: a
+// child's commits are merged into main rather than being main's, so a walk that follows every parent
+// answers about everything ever merged instead of about main (joshuafolkken/kit#1169).
+const FIRST_PARENT_FLAG = '--first-parent'
+
+// The commits that touched `file_path` along the current branch's own first-parent line, newest
+// first. **`--first-parent` is what keeps the answer about main's history rather than about
+// everything ever merged into it**: a child's own commits are not main's, and the version question
+// (joshuafolkken/kit#1169) is asked of main.
+async function log_first_parent(limit: number, file_path: string): Promise<Array<string>> {
+	const output = await exec_git_command_read([
+		'log',
+		FIRST_PARENT_FLAG,
+		'--format=%H',
+		`-n`,
+		String(limit),
+		'--',
+		file_path,
+	])
+
+	return output.split('\n').filter((line) => line.length > 0)
+}
+
+// One blob at one revision — `git show <ref>:<path>`. It throws when the path is absent there, which
+// the caller reads as "no version at this revision" rather than as an error.
+async function show_file(spec: string): Promise<string> {
+	return await exec_git_command_read(['show', spec])
+}
+
+// **`--first-parent` is what makes this a count of pull requests rather than of merge commits.**
+// Without it `rev-list` walks every ancestor of `HEAD` that `base` cannot reach, which includes
+// merges made *inside* a pull request branch — GitHub's "Update branch" button, or a local
+// `git merge main` before pushing. Measured on this repository, `HEAD~200..HEAD` counts 201 merges
+// unrestricted and 200 along the first-parent line, so one such merge is already in the last two
+// hundred commits and would have inflated a release by a whole minor (joshuafolkken/kit#1169).
+const MERGE_COUNT_ARGUMENTS: ReadonlyArray<string> = [
+	'rev-list',
+	'--count',
+	'--merges',
+	FIRST_PARENT_FLAG,
+]
+
+function merge_count_arguments(range: string): Array<string> {
+	return [...MERGE_COUNT_ARGUMENTS, range]
+}
+
+// How many pull requests were merged into this branch's own line in the range. **A git failure
+// throws**, as every read here does; the `isFinite` guard is only for output that is not a number,
+// and zero is the safe answer there because zero means "nothing to release".
+async function count_merges(range: string): Promise<number> {
+	const output = await exec_git_command_read(merge_count_arguments(range))
+	const parsed = Number(output.trim())
+
+	return Number.isFinite(parsed) ? parsed : 0
+}
+
 const git_command = {
 	branch,
 	status,
@@ -327,6 +383,10 @@ const git_command = {
 	branch_names_remote,
 	add_tracked,
 	add_path,
+	log_first_parent,
+	show_file,
+	count_merges,
+	merge_count_arguments,
 	is_upstream_not_set_error,
 }
 

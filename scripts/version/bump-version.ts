@@ -18,17 +18,34 @@ function compute_new_version(version: string, bump_type: BumpType): string {
 	return new_version
 }
 
-function bump_version(bump_type: BumpType): void {
-	const package_path = path.join(process.cwd(), 'package.json')
-	const file_content = readFileSync(package_path, 'utf8')
-	const { version } = package_with_version_schema.parse(JSON.parse(file_content))
-	const new_version = compute_new_version(version, bump_type)
-	const package_json = json_object_schema.parse(JSON.parse(file_content))
+function package_json_path(): string {
+	return path.join(process.cwd(), 'package.json')
+}
+
+// **Set the version to an already-decided number.** `bump_version` below is this plus the decision;
+// `pnpm josh release` supplies its own, because a release raises the version by as many minors as
+// main has taken merges rather than by one (joshuafolkken/kit#1169). Written once so the two agree
+// on the file's shape and indentation.
+function write_version(new_version: string): void {
+	const package_path = package_json_path()
+	const package_json = json_object_schema.parse(JSON.parse(readFileSync(package_path, 'utf8')))
 
 	writeFileSync(
 		package_path,
 		`${JSON.stringify({ ...package_json, version: new_version }, undefined, PACKAGE_JSON_INDENT)}\n`,
 	)
+}
+
+function read_current_version(): string {
+	const file_content = readFileSync(package_json_path(), 'utf8')
+
+	return package_with_version_schema.parse(JSON.parse(file_content)).version
+}
+
+function bump_version(bump_type: BumpType): void {
+	const new_version = compute_new_version(read_current_version(), bump_type)
+
+	write_version(new_version)
 	console.info(new_version)
 }
 
@@ -51,5 +68,5 @@ function main(): void {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 
-export { bump_version, compute_new_version }
+export { bump_version, compute_new_version, write_version }
 export type { BumpType }

@@ -60,6 +60,7 @@ const ALIASES: Record<string, string> = {
 	ms: 'main:sync',
 	mm: 'main:merge',
 	bp: 'bump',
+	re: 'release',
 	v: 'version',
 	vu: 'version:upgrade',
 	r: 'ranges',
