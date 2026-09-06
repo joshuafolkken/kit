@@ -6,6 +6,7 @@ import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import { time_gaps } from './time-gaps'
 import type { InvocationTotal } from './time-invocations'
+import { time_period_fixture } from './time-period-fixture'
 import type { TimeReport, ToolTotal } from './time-report'
 import { time_rework } from './time-rework'
 import { time_row_cap } from './time-row-cap'
@@ -350,5 +351,30 @@ describe('josh time --top — one epic', () => {
 
 		expect(output()).toContain(`#${String(ISSUE)}`)
 		expect(output()).not.toContain(WITHHELD)
+	})
+})
+
+// The one table a period grows unboundedly — the stretches it serialized on (joshuafolkken/kit#1470).
+const PERIOD_CAP = 1
+const HOUR_MS = 60 * MINUTE_MS
+const { record, built, BASE_MS, ISSUE_A, ISSUE_B } = time_period_fixture
+// One long run passed by a one-minute run, which leaves a serialized stretch on either side of it.
+const CONTENDED = [
+	record(ISSUE_A, BASE_MS, HOUR_MS),
+	record(ISSUE_B, BASE_MS + MINUTE_MS, MINUTE_MS),
+]
+
+describe('time_row_cap.cap_period_report', () => {
+	it('carries the report untouched when no cap was asked for', () => {
+		const period = built(CONTENDED)
+
+		expect(time_row_cap.cap_period_report(period, undefined)).toBe(period)
+	})
+
+	it('keeps the longest stretches and says how many it withheld', () => {
+		const capped = time_row_cap.cap_period_report(built(CONTENDED), PERIOD_CAP)
+
+		expect(capped.serialization).toHaveLength(PERIOD_CAP)
+		expect(capped.notes.some((note) => time_row_cap.is_truncation_note(note))).toBe(true)
 	})
 })

@@ -21,6 +21,16 @@ rule in `CLAUDE.md` is unchanged, and `diag` is not one of the keywords it gover
 | `diag` / `diag fullrun` | The most recently merged run | `pnpm josh time --top 5 --json` |
 | `diag #<N>` | Issue `#N`'s whole run, from the `fullrun` invocation to the merge | `pnpm josh time --issue <N> --top 5 --json` |
 | `diag epicrun` / `diag #<E>` where `#<E>` is an epic | Every child of the epic, in execution order | `pnpm josh time --epic <E> --top 5 --json` |
+| `diag backlog` / `diag <N> days` | The backlog over a period — lanes, idle, serialization, throughput | `pnpm josh time --period <N> --top 5 --json` |
+
+**The period scope answers a different question from the three above it**
+([#1470](https://github.com/joshuafolkken/kit/issues/1470)). Those three report where **one run's**
+wall clock went; `--period` reports how fast the **backlog** emptied, which is what actually wants
+shortening and which no single run's internals can show. Read it when the question is whether a lane
+sat idle, whether the work serialized behind one run, or whether a wait was hidden behind other work
+rather than exposed bare — and read one of the three above when the question is which phase of one
+run was slow. It is built from `.time-history.jsonl` alone, so it needs no `gh` call and no
+transcript, and a checkout whose history is empty is told so rather than shown a table of zeroes.
 
 An epic is measured child by child because a run is measured from its `fullrun` invocation to its
 merge, and an `epicrun` is several of those. **One call does the whole batch**
@@ -42,6 +52,7 @@ pnpm josh time --top 5 --json               # alias: josh tm
 pnpm josh time --issue <N> --top 5 --json
 pnpm josh time --epic <E> --top 5 --json
 pnpm josh time --last <N> --top 5 --json    # the spread across the last N merged runs
+pnpm josh time --period <N> --top 5 --json  # the backlog over the last N days — lanes, idle, serialization
 ```
 
 **One reading is not `josh time`'s, and asking it for one is how the repetition stays invisible** ([#1313](https://github.com/joshuafolkken/kit/issues/1313)). Which checks run in more than one verification layer — `josh gate`, the pre-commit hook, the pre-push hook, CI — cannot be read from a session transcript at all: a hook's seconds are buried inside `josh git`'s, and CI's appear only as a per-check duration with nothing to compare them against. Run `pnpm josh layers` (alias `josh ly`) when a candidate is about removing work rather than about overlapping it; it reads the configuration files and re-derives the answer, so it stays true when a hook changes. It measures no seconds, so a row it produces is ranked below in step 3 on what the repeated check costs in `josh time`'s own tables.
@@ -323,8 +334,18 @@ with both figures beside it.
   record, not a report**: it carries no phase table, so a verdict about a phase still comes from
   `pnpm josh time --issue <M> --json` above. What it is for is the question that used to have no
   answer at all — which runs happened, and roughly where each one sat — for a run whose report was
-  never taken. Read it with `tail`; the file is gitignored, so a fresh checkout legitimately has none
-  and its absence is not a measurement.
+  never taken. The file is gitignored, so a fresh checkout legitimately has none and its absence is
+  not a measurement.
+- **The backlog over a period is read from those records, with
+  `pnpm josh time --period <N> --top 5 --json`**
+  ([#1470](https://github.com/joshuafolkken/kit/issues/1470)) — the row the table above adds. It
+  answers what no single run's internals can: **issues finished per day**, **per-lane busy and idle
+  time** against the effective throughput, **the stretches the work serialized on** each named by the
+  run that held the only busy lane, and **the wall clock another run was hiding** told apart from the
+  wall clock that was exposed with nothing else running. **Lanes are derived from the wall clock**,
+  since no lane field exists to read, so with nothing overlapping the honest answer is one lane and
+  the report says so in its notes. Reach for it when the verdict is about the backlog rather than
+  about a phase; a verdict about a phase still comes from `--issue` above.
 - **"Cannot tell" is an answer.** A phase that is `not detected` in either run, or a run with no
   merge read, cannot support a verdict, and reporting one anyway is how a speedup that did nothing
   keeps its reputation.
