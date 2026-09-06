@@ -87,11 +87,20 @@ What a queue does with each answer is the only part that differs, because a queu
   gh api -X DELETE repos/<owner>/<repo>/issues/<N>/labels/in-progress
   ```
 
-  **Run it only where the `issue:state` read above listed `in-progress`.** This branch is selected by
-  `state: OPEN` and the absence of the two stop labels, which says nothing whatever about that one: a
-  unit that died before the label step never applied it, and `fullrun`'s prerequisite stop removes it
-  itself before stopping. Where the read did not list it there is nothing to remove — say so and go
-  straight to step 2c. The read has already printed the labels, so this costs no extra call.
+  **Run it only where the `issue:state` read above listed `in-progress` — matched
+  case-insensitively.** This branch is selected by `state: OPEN` and the absence of the two stop
+  labels, which says nothing whatever about that one: a unit that died before the label step never
+  applied it, and `fullrun`'s prerequisite stop removes it itself before stopping. Where the read did
+  not list it there is nothing to remove — say so and go straight to step 2c. The read has already
+  printed the labels, so this costs no extra call.
+
+  **The case-insensitive comparison is not a nicety.** GitHub keeps the spelling a label was created
+  with, so a repository whose label is `In-Progress` prints that string and an exact match reads it
+  as absent — the delete is skipped, the stale label stays, and `epic:next` answers `wait` for the
+  whole repository with nobody told, which is the failure this branch exists to prevent. It is the
+  same hazard joshuafolkken/kit#1132 answered by having the `human_review:` line read rather than the
+  `labels:` one eye-matched; `issue:state` computes no such line for `in-progress`, so the comparison
+  is stated here instead of being left to the eye.
 
   **The repository is written out, exactly as `--repo` is on the read above**
   (joshuafolkken/kit#1160). `<owner>/<repo>` is the queue's target — the same repository `--repo`

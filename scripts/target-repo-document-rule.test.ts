@@ -262,19 +262,33 @@ describe(`${QUEUE_SKILL} — the stale-\`in-progress\` cleanup names the target 
 		expect(unwrapped).toContain('cannot name two different repositories')
 	})
 
-	// The premise the dropped `|| true` rests on has to be established rather than assumed: the
-	// branch is selected by `state: OPEN` and the two stop labels, which say nothing about this one,
-	// and `fullrun`'s prerequisite stop removes it itself — so without this the delete 404s on a
+	// The other copies of this command run inside the target repository's own checkout, so the rule
+	// is stated for this loop rather than as a claim the diff enforces in one file out of seven.
+	it('scopes the claim to this loop rather than to every copy of the command', () => {
+		expect(unwrapped).toContain('That claim is about this loop')
+	})
+})
+
+// The other half of the same defect: the mis-resolution was silent, and the condition that makes the
+// silence removable has to be established rather than assumed. Split from the suite above only
+// because one `describe` body may not exceed 35 code lines.
+describe(`${QUEUE_SKILL} — the stale-\`in-progress\` cleanup fails loudly`, () => {
+	const unwrapped = read_unwrapped(QUEUE_SKILL)
+
+	// The branch is selected by `state: OPEN` and the two stop labels, which say nothing about this
+	// one, and `fullrun`'s prerequisite stop removes it itself — so without this the delete 404s on a
 	// legitimate path and the `failure` Telegram claims a label that is not there.
 	it('conditions the delete on the label the read above actually listed', () => {
 		expect(unwrapped).toContain('Run it only where the `issue:state` read above listed')
 		expect(unwrapped).toContain('there is nothing to remove')
 	})
 
-	// The other copies of this command run inside the target repository's own checkout, so the rule
-	// is stated for this loop rather than as a claim the diff enforces in one file out of seven.
-	it('scopes the claim to this loop rather than to every copy of the command', () => {
-		expect(unwrapped).toContain('That claim is about this loop')
+	// The condition itself must not reintroduce the eye-match this same file forbids twenty-five
+	// lines earlier: GitHub prints the spelling a label was created with, so an exact match against
+	// `In-Progress` reads as absent and the stale label survives the branch that exists to remove it.
+	it('matches the label case-insensitively rather than by eye', () => {
+		expect(unwrapped).toContain('matched case-insensitively')
+		expect(unwrapped).toContain('The case-insensitive comparison is not a nicety')
 	})
 
 	// The silence was half the defect. `|| true` had nothing innocent left to absorb once the read
