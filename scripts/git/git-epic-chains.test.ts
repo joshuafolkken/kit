@@ -30,10 +30,6 @@ function error_of(outcome: InsertOutcome): string {
 }
 
 describe('git_epic_chains.insert_children — where the child lands', () => {
-	it('appends to the last chain when no position is given', () => {
-		expect(chains_of(insert(LINEAR, [894], undefined))).toStrictEqual([[890, 891, 892, 894]])
-	})
-
 	it('inserts before the target', () => {
 		const outcome = insert(LINEAR, [894], {
 			kind: 'before',
@@ -56,6 +52,23 @@ describe('git_epic_chains.insert_children — where the child lands', () => {
 		})
 
 		expect(chains_of(outcome)).toStrictEqual([[890, 891, 894, 895, 892]])
+	})
+})
+
+// joshuafolkken/kit#1253: the additions used to extend the last declared chain, which recorded a
+// dependency nobody declared — and an epic mixing ordered and unordered children is the normal state.
+describe('git_epic_chains.insert_children — no position given', () => {
+	it('leaves the declaration untouched', () => {
+		expect(chains_of(insert(LINEAR, [894], undefined))).toStrictEqual([[890, 891, 892]])
+	})
+
+	it('leaves every chain of a mixed epic untouched', () => {
+		const mixed = [
+			[1, 2],
+			[3, 4],
+		]
+
+		expect(chains_of(insert(mixed, [9], undefined))).toStrictEqual(mixed)
 	})
 })
 
@@ -146,11 +159,11 @@ describe('git_epic_chains.diff_links — what an insertion changes', () => {
 		expect(diff.removed).toStrictEqual([{ blocker: 890, blocked: 891 }])
 	})
 
-	it('removes nothing when the child is appended to the end', () => {
+	it('adds and removes nothing when no position is given', () => {
 		const after = chains_of(insert(LINEAR, [894], undefined))
 		const diff = git_epic_chains.diff_links(LINEAR, after)
 
-		expect(diff.added).toStrictEqual([{ blocker: 892, blocked: 894 }])
+		expect(diff.added).toStrictEqual([])
 		expect(diff.removed).toStrictEqual([])
 	})
 

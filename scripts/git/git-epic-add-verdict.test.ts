@@ -1,8 +1,11 @@
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
+import { EPIC_FIXTURE_REPO, git_epic_add_fixture } from './git-epic-add-fixture'
 import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import { git_epic_parse } from './git-epic-parse'
 import { git_epic_validate } from './git-epic-validate'
+
+const { child, plan_of } = git_epic_add_fixture
 
 // What the two readers make of a body `--add` produced.
 //
@@ -12,7 +15,7 @@ import { git_epic_validate } from './git-epic-validate'
 // the real checkers is what proves the command does not stop the run it exists to keep going
 // (joshuafolkken/kit#890).
 
-const REPO = 'joshuafolkken/kit'
+const REPO = EPIC_FIXTURE_REPO
 const EPIC_NUMBER = 893
 const EPIC_BODY = [
 	'## Split rationale',
@@ -35,31 +38,20 @@ const EPIC_BODY = [
 	'',
 ].join('\n')
 
-function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
-	return {
-		number,
-		repo: REPO,
-		state: 'OPEN',
-		labels: [],
-		blocked_by: blocked_by.map((blocker) => ({ repo: REPO, number: blocker })),
-	}
-}
-
 const RECORDED = [child(890), child(891, [890]), child(892, [891])]
 
 function plan_for(position?: { kind: 'before' | 'after'; target: number }): AddPlan {
-	const outcome = git_epic_add_plan.build_plan({
-		epic_number: EPIC_NUMBER,
-		repo: REPO,
-		body: EPIC_BODY,
-		labels: ['epic'],
-		children: [894],
-		position,
-		recorded: RECORDED,
-	})
-	if ('error' in outcome) throw new Error(outcome.error)
-
-	return outcome.plan
+	return plan_of(
+		git_epic_add_plan.build_plan({
+			epic_number: EPIC_NUMBER,
+			repo: REPO,
+			body: EPIC_BODY,
+			labels: ['epic'],
+			children: [894],
+			position,
+			recorded: RECORDED,
+		}),
+	)
 }
 
 // The children as they stand once the planned relations have been applied — what `epic:next` would
@@ -103,7 +95,7 @@ function check_failures(plan: AddPlan): Array<string> {
 }
 
 describe('josh epic --add — the epic still satisfies epic:check', () => {
-	it('passes every requirement after an append', () => {
+	it('passes every requirement after a no-position add', () => {
 		expect(check_failures(plan_for())).toStrictEqual([])
 	})
 
@@ -113,7 +105,7 @@ describe('josh epic --add — the epic still satisfies epic:check', () => {
 })
 
 describe('josh epic --add — epic:next reports no declaration_mismatch', () => {
-	it('finds no anomaly after an append', () => {
+	it('finds no anomaly after a no-position add', () => {
 		expect(anomalies_after(plan_for())).toStrictEqual([])
 	})
 
