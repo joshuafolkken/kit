@@ -403,6 +403,21 @@ overhead at all. The number is derived from run #1406's figures rather than from
 comparison, and `pnpm josh delegate --list` prints it — the verdict command prints the verifier, so it
 is the listing that carries the count.
 
+**A delegation resets the counter rather than spending it, and `pnpm josh investigation:guard` is what
+counts** (joshuafolkken/kit#1460). Measured on run #1441 the question was asked once, at t+4.0 min, and
+the main line then read **8 more files it did not edit** — over twice the threshold — without it ever
+being asked again: a count kept in an agent's head is a one-shot judgement, and after a delegation a run
+remembers the *step* as done rather than the *counter* as zero. So the counting happens in a
+`PreToolUse` hook that reads the transcript, and the read that reaches the threshold is **refused**
+rather than commented on — the conclusion joshuafolkken/kit#1390 reached after joshuafolkken/kit#1344
+measured three consecutive runs in which prose and a live notice moved the number not at all. A
+delegation clears the pending set, three more unedited files rebuild it, and the refusal fires again;
+**one refusal per accumulation** keeps a false positive costing a single round trip instead of wedging
+the run. An **edit takes its file back out of the set**, so reading something this run will edit is
+still the main line's, exactly as this section already says. `docs/josh-commands.md` →
+"`josh investigation:guard`" carries which shell commands count as reading, why it is wired to `Read`
+and `Bash`, and the `JOSH_INVESTIGATION_GUARD` off-switch.
+
 **One trigger, deliberately.** A second arm on characters read would need a tie-break against the file
 count, and neither number is measured more precisely than the other — so the character figures above
 are the derivation of the one number and not a second rule.

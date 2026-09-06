@@ -21,6 +21,10 @@ const FORMAT_HOOK_COMMAND = 'pnpm josh format:edited'
 // the round trip has already been spent — three runs measured after it shipped came in unchanged at
 // 1.10–1.12 calls per round trip against a 1.50 floor.
 const GUARD_HOOK_COMMAND = 'pnpm josh batch:guard'
+// The investigation guard, on the same event and for the same reason (joshuafolkken/kit#1460): the
+// threshold it enforces was already distributed as prose and as an enumeration row, and run #1441
+// asked the question once and then read eight more unedited files without asking again.
+const READ_GUARD_HOOK_COMMAND = 'pnpm josh investigation:guard'
 // Derived from the script's own per-spawn bound rather than written as a number: raising that bound
 // has to raise the declared budget with it, or the harness kills a run the script still considers
 // healthy — and it lands at a moment the script did not choose, possibly inside `prettier --write`.
@@ -51,6 +55,11 @@ const FORMAT_TOOLS = ['Edit', 'Write', 'Bash']
 // that can only ever answer "allow". `Bash` is 88–100% of the calls in every session under the floor,
 // so the reach is unaffected.
 const GUARD_TOOLS = ['Bash']
+// The investigation guard names both, because in this repository the reading is split between them:
+// run #1441 issued 5 `Read` calls against 10 `cat`, 16 `sed` and 1 `tail`, so a `Read`-only wiring
+// would miss the idiom that carries most of the text. It is safe on `Bash` where the batching guard is
+// — it refuses only a line that guard would also have refused, which excludes every possible write.
+const READ_GUARD_TOOLS = ['Read', 'Bash']
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.
@@ -156,6 +165,13 @@ describe_tool_hook('.claude/settings.json — pre-call batching guard', {
 	event: 'PreToolUse',
 	command: GUARD_HOOK_COMMAND,
 	tools: GUARD_TOOLS,
+	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
+})
+
+describe_tool_hook('.claude/settings.json — pre-read investigation guard', {
+	event: 'PreToolUse',
+	command: READ_GUARD_HOOK_COMMAND,
+	tools: READ_GUARD_TOOLS,
 	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
 })
 
