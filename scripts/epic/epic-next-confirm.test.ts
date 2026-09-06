@@ -55,6 +55,10 @@ function snapshot(children: ReadonlyArray<EpicChild>): EpicSnapshot {
 	}
 }
 
+// One lane, which is the shape every assertion below was written against: the repository runs one
+// child at a time (joshuafolkken/kit#1491 made that number a setting rather than the only option).
+const ONE_LANE = 1
+
 const stdout_lines: Array<string> = []
 const stderr_lines: Array<string> = []
 
@@ -70,7 +74,11 @@ function stdout(): string {
 async function answer_for(children: ReadonlyArray<EpicChild>): Promise<number> {
 	const state = snapshot(children)
 
-	return await epic_next.report(epic_next.decide(state), state, REPO)
+	return await epic_next.report(epic_next.decide(state), state, {
+		repo: REPO,
+		limit: ONE_LANE,
+		is_all_lanes: false,
+	})
 }
 
 beforeEach(() => {

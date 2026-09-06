@@ -142,6 +142,18 @@ updating it. Label names are single-sourced in `scripts/git/issue-labels.ts`.
 
 Returns **every** runnable child, bundled per repository with the local checkout to run it in.
 `--repo <owner/repo>` narrows to one and prints a single token: the issue number, or the verdict.
+`--lanes` beside it prints one issue number per line instead, **up to the number of free lanes in
+that repository** — so a caller that reads one token keeps reading one token
+(joshuafolkken/kit#1491).
+
+**An `in-progress` issue occupies a lane rather than the whole repository.** The occupancy is counted
+from that repository's own `in-progress` listing — never from anything the session remembers, since
+two sessions counting to the limit in their own memory would double it — and what is left of
+`JOSH_LANE_LIMIT` (**default 6**) is what gets offered. At zero the answer is `wait` and the holders
+are named on standard error. A parked child releases its lane; one stopped by `needs-human-review`
+goes on holding one, because its uncommitted work is still in that checkout. It is an advisory guard
+rather than a mutex: the label is applied after the read, so what it closes is the window that
+actually occurs — a lane holding the label for minutes.
 
 Children that are not runnable are sorted by **whether waiting helps**, never by label:
 

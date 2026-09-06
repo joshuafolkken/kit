@@ -65,7 +65,7 @@ describe('epic_candidate_confirm.answer_for_repo — a stale zero summary', () =
 			context(children, new Map([[2, [1]]])),
 		)
 
-		expect(answer.child).toBeUndefined()
+		expect(answer.children).toEqual([])
 		expect(answer.verdict).toBe('wait')
 	})
 
@@ -73,7 +73,7 @@ describe('epic_candidate_confirm.answer_for_repo — a stale zero summary', () =
 		const children = [child(1)]
 		const answer = await epic_candidate_confirm.answer_for_repo(children, context(children))
 
-		expect(answer.child?.number).toBe(1)
+		expect(answer.children.map((entry) => entry.number)).toEqual([1])
 		expect(answer.verdict).toBe('run')
 	})
 })
@@ -88,7 +88,7 @@ describe('epic_candidate_confirm.answer_for_repo — what the recovered blocker 
 			context(children, new Map([[2, [1]]])),
 		)
 
-		expect(answer.child?.number).toBe(2)
+		expect(answer.children.map((entry) => entry.number)).toEqual([2])
 	})
 
 	it('reports a parked blocker as needing a person rather than as waiting', async () => {
@@ -110,7 +110,7 @@ describe('epic_candidate_confirm.answer_for_repo — what the recovered blocker 
 			context(children),
 		)
 
-		expect(answer.child?.repo).toBe(REPO)
+		expect(answer.children.map((entry) => entry.repo)).toEqual([REPO])
 	})
 })
 
@@ -127,7 +127,7 @@ describe('epic_candidate_confirm.answer_for_repo — a blocker outside the epic'
 			context(children, new Map([[2, [OUTSIDER]]])),
 		)
 
-		expect(answer.child?.number).toBe(2)
+		expect(answer.children.map((entry) => entry.number)).toEqual([2])
 		warn.mockRestore()
 	})
 
@@ -187,7 +187,7 @@ describe('epic_candidate_confirm.answer_for_repo — walking the bundle', () => 
 			context(children, new Map([[2, [1]]])),
 		)
 
-		expect(answer.child?.number).toBe(3)
+		expect(answer.children.map((entry) => entry.number)).toEqual([3])
 	})
 
 	// Only the carried-forward correction reaches `stop`: judged against the stale snapshot instead,
@@ -205,7 +205,7 @@ describe('epic_candidate_confirm.answer_for_repo — walking the bundle', () => 
 			),
 		)
 
-		expect(answer.child).toBeUndefined()
+		expect(answer.children).toEqual([])
 		expect(answer.verdict).toBe('stop')
 	})
 })
@@ -223,7 +223,7 @@ describe('epic_candidate_confirm.answer_for_repo — a read that failed', () => 
 		}
 		const answer = await epic_candidate_confirm.answer_for_repo(children, state)
 
-		expect(answer.child).toBeUndefined()
+		expect(answer.children).toEqual([])
 		expect(warn.mock.calls[0]?.[0]).toContain('could not confirm the blockers of #1')
 		warn.mockRestore()
 	})

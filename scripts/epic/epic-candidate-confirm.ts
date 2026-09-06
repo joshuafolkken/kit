@@ -29,10 +29,15 @@ interface ConfirmContext {
 	read_blockers: BlockersReader
 }
 
-// The answer for one repository: the child to offer, or the verdict that stands in its place when
+// The answer for one repository: the children to offer, or the verdict that stands in its place when
 // every candidate was withheld.
+//
+// A list rather than one child since joshuafolkken/kit#1491: a repository runs as many children at
+// once as it has free lanes, and how many that is comes from the caller as `wanted`. The type says
+// nothing about lanes or epics — it is a list and a verdict, so the same walk serves one lane, six,
+// or a caller that has not been written yet.
 interface RepoAnswer {
-	child?: EpicChild
+	children: ReadonlyArray<EpicChild>
 	verdict: EpicVerdict
 }
 
@@ -44,7 +49,16 @@ interface CandidateVerdict {
 	children: ReadonlyArray<EpicChild>
 }
 
+// What a walk of the bundle produced: the children confirmed for a lane, and the graph with every
+// correction the walk learned along the way applied.
+interface ConfirmWalk {
+	children: ReadonlyArray<EpicChild>
+	confirmed: ReadonlyArray<EpicChild>
+}
+
 const NO_ANOMALIES = 0
+const NO_LANES = 0
+const ONE_LANE = 1
 
 // Blocker sets, compared as sets: the listing and the summary-derived read need not agree on order,
 // and a difference in order is not a difference in dependencies.
@@ -188,27 +202,37 @@ async function confirm_one(
 	return { is_confirmed, children }
 }
 
-// The bundle walked from its head until a candidate confirms.
+// The bundle walked from its head until `wanted` candidates have confirmed, or the bundle runs out.
 //
 // Walking on rather than making the whole repository wait is the recorded decision on
 // joshuafolkken/kit#1108: a healthy sibling should not be held for one child whose counter is stale,
 // and nobody repairs that counter — so the next poll would put the same child at the head and answer
 // the same way, and the wait would never clear. The worst case is one request per candidate, and it
 // happens only when every candidate is withheld, where the epic is broken and stopping is right.
-async function confirm_candidate(
+//
+// **It stops the moment the caller's appetite is met**, so asking for one child costs exactly what
+// it cost before joshuafolkken/kit#1491: the walk ends at the first confirmation.
+//
+// Recursive rather than a loop with two exits, because the corrected graph has to be threaded from
+// one candidate to the next: a second candidate is classified against what the first read
+// established rather than against the stale snapshot.
+async function confirm_candidates(
 	candidates: ReadonlyArray<EpicChild>,
 	context: ConfirmContext,
-): Promise<CandidateVerdict & { child?: EpicChild }> {
-	let { children } = context
+	wanted: number,
+): Promise<ConfirmWalk> {
+	const [candidate, ...rest] = candidates
 
-	for (const candidate of candidates) {
-		const verdict = await confirm_one(candidate, { ...context, children })
-
-		children = verdict.children
-		if (verdict.is_confirmed) return { is_confirmed: true, children, child: candidate }
+	if (candidate === undefined || wanted <= NO_LANES) {
+		return { children: context.children, confirmed: [] }
 	}
 
-	return { is_confirmed: false, children }
+	const verdict = await confirm_one(candidate, context)
+	const taken = verdict.is_confirmed ? [candidate] : []
+	const next = { ...context, children: verdict.children }
+	const walk = await confirm_candidates(rest, next, wanted - taken.length)
+
+	return { children: walk.children, confirmed: [...taken, ...walk.confirmed] }
 }
 
 // The verdict once every candidate was withheld, read off the corrected graph rather than assumed.
@@ -226,14 +250,18 @@ function withheld_verdict(
 
 // The answer for one repository. An empty bundle costs no request and re-derives the verdict the
 // caller already had, so the path a repository with nothing to offer takes is unchanged.
+//
+// `wanted` defaults to one lane, so a caller written before joshuafolkken/kit#1491 asks for exactly
+// what it used to get.
 async function answer_for_repo(
 	candidates: ReadonlyArray<EpicChild>,
 	context: ConfirmContext,
+	wanted: number = ONE_LANE,
 ): Promise<RepoAnswer> {
-	const outcome = await confirm_candidate(candidates, context)
-	if (outcome.child !== undefined) return { child: outcome.child, verdict: 'run' }
+	const outcome = await confirm_candidates(candidates, context, wanted)
+	if (outcome.confirmed.length > NO_LANES) return { children: outcome.confirmed, verdict: 'run' }
 
-	return { verdict: withheld_verdict(outcome.children, context.resolve) }
+	return { children: [], verdict: withheld_verdict(outcome.children, context.resolve) }
 }
 
 const epic_candidate_confirm = {
@@ -241,7 +269,7 @@ const epic_candidate_confirm = {
 	untracked_blockers,
 	with_blockers,
 	is_still_runnable,
-	confirm_candidate,
+	confirm_candidates,
 	withheld_verdict,
 	answer_for_repo,
 }

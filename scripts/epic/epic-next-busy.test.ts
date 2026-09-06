@@ -13,7 +13,12 @@ import { epic_next } from './epic-next'
 // joshuafolkken/kit#925: `epic:next --repo` used to answer from the epic's own children alone, so an
 // `in-progress` issue belonging to a *different* epic was invisible. Two `epicrun`s in one checkout
 // then both answered "nothing of mine is in progress", and two children ran in the same working
-// tree — destruction rather than interleaving. The invariant is now one child per *repository*.
+// tree — destruction rather than interleaving. The invariant is per *repository*.
+//
+// joshuafolkken/kit#1491 made that invariant a count rather than a yes/no: an `in-progress` issue
+// occupies one lane, and a repository offers children until its lanes are full. The one-lane case is
+// exactly the old behavior, which is why the tests written for it pass `ONE_LANE` and still assert
+// what they asserted before.
 
 // `issue_blocked_by_references` is here because `epic:next --repo` confirms the candidate it is about
 // to offer against its own relations listing (joshuafolkken/kit#1121). Left out, every candidate is
@@ -36,7 +41,10 @@ const FIRST_CHILD = 861
 const SECOND_CHILD = 862
 // An issue this epic does not track at all — the case the classification cannot see.
 const FOREIGN_HOLDER = 700
+const THIRD_CHILD = 863
 const SUCCESS_EXIT_CODE = 0
+const ONE_LANE = 1
+const TWO_LANES = 2
 const WAIT_TOKEN = 'wait'
 // The half of every not-idle explanation that says the guard did not fall open.
 const NOT_IDLE = 'not "nothing is running"'
@@ -72,12 +80,20 @@ function stderr(): string {
 	return stderr_lines.join('\n')
 }
 
-// One `--repo` answer, end to end: classify the children, then ask the repository whether anything
-// is already running in it.
-async function answer_for(children: ReadonlyArray<EpicChild>): Promise<number> {
+// One `--repo` answer, end to end: classify the children, then ask the repository how many of its
+// lanes are already running something.
+//
+// The limit defaults to one lane, which is what every assertion written before
+// joshuafolkken/kit#1491 assumed — the old repository-wide exclusion is exactly the one-lane case,
+// so those tests keep asserting the behavior they were written for.
+async function answer_for(
+	children: ReadonlyArray<EpicChild>,
+	limit: number = ONE_LANE,
+	is_all_lanes = false,
+): Promise<number> {
 	const state = snapshot(children)
 
-	return await epic_next.report(epic_next.decide(state), state, REPO)
+	return await epic_next.report(epic_next.decide(state), state, { repo: REPO, limit, is_all_lanes })
 }
 
 function listing(numbers: ReadonlyArray<number>): string {
@@ -266,6 +282,66 @@ describe('josh epic:next --repo — a listing that was cut short', () => {
 		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
 
 		expect(await answer_for([child(FIRST_CHILD)])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(FIRST_CHILD))
+	})
+})
+
+// joshuafolkken/kit#1491: an `in-progress` issue occupies a lane rather than the whole repository, so
+// a second child starts beside the first for as long as the limit has not been reached.
+describe('josh epic:next --repo — lanes rather than a repository-wide exclusion', () => {
+	it('offers a child while another lane is running, when one is still free', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FOREIGN_HOLDER])))
+
+		expect(await answer_for([child(FIRST_CHILD)], TWO_LANES)).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(FIRST_CHILD))
+	})
+
+	it('waits once every lane is in use', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FOREIGN_HOLDER, THIRD_CHILD])))
+
+		expect(await answer_for([child(FIRST_CHILD)], TWO_LANES)).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(WAIT_TOKEN)
+	})
+
+	// The occupancy is the number a person tunes the limit against, so it is said rather than left to
+	// be inferred from a bare `wait`.
+	it('names how many lanes are in use when it refuses', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FOREIGN_HOLDER, THIRD_CHILD])))
+
+		await answer_for([child(FIRST_CHILD)], TWO_LANES)
+
+		expect(stderr()).toContain('2 of 2 lanes in use')
+	})
+
+	// The count comes from the repository's own `in-progress` listing, never from anything this
+	// session remembers — which is what stops two sessions each counting to the limit on their own.
+	it('counts the lanes from the in-progress listing', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(listing([FOREIGN_HOLDER])))
+
+		await answer_for([child(FIRST_CHILD)], TWO_LANES)
+
+		expect(issue_list).toHaveBeenCalledWith(IN_PROGRESS_LABEL, expect.any(Number), REPO)
+	})
+})
+
+// `--lanes` is what asks for more than one child. Without it the answer is a single token, so
+// `child=$(josh epic:next … --repo …)` reads exactly what it always read (joshuafolkken/kit#1491).
+describe('josh epic:next --repo --lanes', () => {
+	it('offers one child per free lane', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const children = [child(FIRST_CHILD), child(SECOND_CHILD), child(THIRD_CHILD)]
+
+		expect(await answer_for(children, TWO_LANES, true)).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(`${String(FIRST_CHILD)}\n${String(SECOND_CHILD)}`)
+	})
+
+	it('offers a single child without the flag, however many lanes are free', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome('[]'))
+
+		const children = [child(FIRST_CHILD), child(SECOND_CHILD), child(THIRD_CHILD)]
+
+		expect(await answer_for(children, TWO_LANES)).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(FIRST_CHILD))
 	})
 })
