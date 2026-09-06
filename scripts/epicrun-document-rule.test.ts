@@ -78,7 +78,7 @@ const RULE_MARKERS: ReadonlyArray<string> = [
 	// epic's own children — otherwise one stale label stalls every epic in the checkout, forever.
 	"The rule therefore applies to any open issue in the repository, not only to this epic's children",
 	// Without this the next epic inherits "concurrency needs no coordination" and ships a race.
-	'has to **replace** this guard',
+	'Do not read any of this as "concurrency needs no coordination"',
 	'**Parking replaces stopping the session, not the rule that produced the stop.**',
 	'**Removing the label is Tier A — do it without asking.**',
 	// Reading the labels instead stops in the one moment the run must wait.
@@ -86,6 +86,69 @@ const RULE_MARKERS: ReadonlyArray<string> = [
 	'a label-based reading calls that "done" and stops, in the one moment it must wait',
 	// A Tier C action narrows the stop to one child rather than ending the run.
 	'A Tier C action still stops — for that child.',
+]
+
+// joshuafolkken/kit#1492: the procedure that drives the lanes joshuafolkken/kit#1490 opens and
+// joshuafolkken/kit#1491 counts. Each marker below is a step or a decision that cannot be re-derived
+// from the commands: the commands say what a lane *is*, and these say what a run does with one.
+const LANE_MARKERS: ReadonlyArray<string> = [
+	'Lanes — running more than one child at a time',
+	// Six lanes make overlap real, and every overlap that conflicts parks a child. Reported as a
+	// throughput win alone, the run reads as more unattended when it is measurably less.
+	'**Running unattended gets harder, not easier, and that is the honest trade.**',
+	// A lane's `latest:scope` is keyed to its own project root, so it has no stamp and always answers
+	// `required` — six lanes, six dependency updates, which is the hoist's own failure one layer down.
+	'**`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there.**',
+	// With no child in the primary checkout, the rewritten lock file has nothing to commit it.
+	'The rewritten lock file still has to reach a pull request',
+	// A linked work tree starts with no `node_modules`, and the lane root is a sibling rather than a
+	// child of the repository, so nothing above it resolves either.
+	'**The install is not optional.**',
+	// `pnpm josh git` compares on the `<N>-` prefix, which `lane/<N>` does not carry, so a child left
+	// on the lane branch exits 1 at its commit — and the obvious way round it is the trap. The
+	// registry identifies a lane *by* that branch (`lane-registry.ts` → `branch_issue`), so switching
+	// drops the lane out of `list_lanes()`: the next `lane:open` re-issues its seat and two live
+	// lanes bind one pair of ports. The gate and the prohibition are pinned separately because a
+	// document keeping only the gate reads as an invitation to work around it.
+	'**The lane path is not executable yet, and one command is why.**',
+	'**Switching the lane to another branch is not the way round it',
+	"**Nothing switches the lane's branch.**",
+	'joshuafolkken/kit#1497',
+	// The pop carries the lock file the install has to build against; installed first, the first
+	// child's gate runs against `node_modules` from the previous lock while committing the new one.
+	'**The install comes after the stash pop, never before it.**',
+	// Every lane's HEAD is off the default branch, so `run:preflight` answers `reclaim` on all of
+	// them and prints a recovery a linked work tree cannot run.
+	"**`pnpm josh run:preflight` is not asked in a lane; `lane:open`'s own answer replaces it.**",
+	// The whole conflict design in one sentence: no forecast, and the merge is where it shows.
+	'**Nothing here forecasts which children will overlap.**',
+	'comes back `mergeStateStatus: DIRTY`',
+	// A lost merge race is what six lanes produce on purpose; counted as a failure it aborts the run
+	// for working as designed.
+	'It is **not** counted against the consecutive-failure guard',
+	'**Rebasing the loser automatically is deliberately not done.**',
+	// What a lane does on each ending — the four the Issue asked to have written down.
+	'What happens to a lane',
+	"**A parked child's lane is stashed and closed, never left open.**",
+	'**Its lane is left open and untouched**',
+	"The next session's `pnpm josh lane:prune` closes what git no longer has a tree for",
+	// The Issue's acceptance criterion is that the CI-concurrency question is answered either way and
+	// which way is recorded. Dropping this leaves the criterion satisfied by silence.
+	'CI concurrency — recorded as to-be-measured',
+	'**This is recorded as to-be-measured rather than addressed, and the reasons are these.**',
+	// The measurement is half-done by construction, and the missing half has to stay visible rather
+	// than being quietly dropped once the document reads as finished.
+	'**Baseline, measured on 2026-09-06 before any lane existed**',
+	'**The "after" is not in this document, and saying so is the point.**',
+]
+
+// The premises this section asserted before lanes existed. Each was answered rather than waived, and
+// a document that still carries the old sentence tells the next reader that same-repository
+// parallelism is out of scope — which is what the procedure above now is.
+const WITHDRAWN_PREMISES: ReadonlyArray<string> = [
+	'has to **replace** this guard',
+	'Two children of one repository still may not run at once',
+	'Why same-repository parallelism is out of scope here',
 ]
 
 // joshuafolkken/kit#913: a child is run as `fullrun #<N>`, and `fullrun` requires `josh latest`
@@ -185,12 +248,23 @@ describe('epicrun definition', () => {
 describe(`${SKILL} — the single source states the rule`, () => {
 	const content = read_unwrapped(SKILL)
 
-	it.each([...RULE_MARKERS, ...LATEST_HOIST_MARKERS, ...STALE_HOLDER_MARKERS])(
+	it.each([...RULE_MARKERS, ...LATEST_HOIST_MARKERS, ...STALE_HOLDER_MARKERS, ...LANE_MARKERS])(
 		'states %j',
 		(marker) => {
 			expect(content).toContain(marker)
 		},
 	)
+
+	it.each(WITHDRAWN_PREMISES)('no longer asserts the replaced premise: %j', (marker) => {
+		expect(content).not.toContain(marker)
+	})
+
+	// The table is what makes the replacement auditable rather than merely absent: a reader who
+	// remembers one of the three premises finds which of them was solved and which was declined.
+	it('records what replaced each premise it withdrew', () => {
+		expect(read_repo_file(SKILL)).toContain('| The premise this section used to assert')
+		expect(read_repo_file(SKILL)).toContain('**Not built, deliberately.**')
+	})
 
 	it.each([...TIMEOUT_MARKERS, ...GUARD_MARKERS])('pins a number on %j', (marker) => {
 		expect(read_repo_file(SKILL)).toContain(marker)

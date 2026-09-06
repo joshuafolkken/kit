@@ -1892,7 +1892,9 @@ pnpm josh lane:prune        # alias: josh lnp
 
 `lane:list` prints one line per lane: the issue, its seed and the dev and preview ports that seed resolves to, its branch, its state (`open`, `stranded` or `unreadable`) and its directory. The ports are computed through `ports/index.js` rather than added up separately, so they are the numbers [`josh port`](#josh-port) and `playwright.config.ts` will resolve inside the lane.
 
-**What this command does not decide** is how many lanes may be open at once — that is `JOSH_LANE_LIMIT`, applied by [`josh epic:next`](#josh-epicnext) ([#1491](https://github.com/joshuafolkken/kit/issues/1491)) — or how `epicrun` drives them ([#1492](https://github.com/joshuafolkken/kit/issues/1492)). This is the container; those are what goes in it. **The limit and the nine seats are separate bounds**: the seats are structural and the limit is the one a person tunes, so a limit raised past nine fails at `lane:open` rather than here.
+**A lane holds no `node_modules`, and this command does not install one.** A linked work tree starts as a checkout and nothing else, and the lane root is a hidden _sibling_ of the repository, so nothing above it resolves either — run `pnpm --dir "$dir" install --frozen-lockfile` before any `pnpm josh …` inside a lane. This is the container; filling it belongs to whoever opened it.
+
+**What this command does not decide** is how many lanes may be open at once — that is `JOSH_LANE_LIMIT`, applied by [`josh epic:next`](#josh-epicnext) ([#1491](https://github.com/joshuafolkken/kit/issues/1491)) — or how `epicrun` drives them, which is [`epicrun.md`](../.claude/skills/workflow-commands/epicrun.md) → "Lanes — running more than one child at a time" ([#1492](https://github.com/joshuafolkken/kit/issues/1492)). **The limit and the nine seats are separate bounds**: the seats are structural and the limit is the one a person tunes, so a limit raised past nine fails at `lane:open` rather than here.
 
 ### `josh cost`
 
