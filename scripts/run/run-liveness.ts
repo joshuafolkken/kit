@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs'
+import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
 import { NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
@@ -172,12 +173,30 @@ function decide(traces: Traces): LivenessDecision {
 	}
 }
 
+// The path arrives on a command line, so it is normalized and required to be absolute before anything
+// touches the file system. That is a correctness rule before it is a safety one: this command is
+// routinely asked about a *different* checkout, and a relative path would resolve against whatever
+// directory the caller happened to run from, which is rarely the one meant. Normalizing first is what
+// makes the absolute test worth anything, since it is what collapses whatever `..` the caller wrote.
+function to_safe_path(output_path: string): string | undefined {
+	const normalized = path.normalize(output_path)
+
+	if (!path.isAbsolute(normalized)) return undefined
+	if (normalized.split(path.sep).includes('..')) return undefined
+
+	return normalized
+}
+
 // `statSync` follows a symlink; `lstatSync` and the shell's bare `stat` do not. That difference is
 // the whole of joshuafolkken/kit#1485's second symptom, so it is stated here rather than left to a
 // reader to know. A path that resolves to nothing, or to something that is not a regular file, is
 // unreadable rather than frozen.
 function sample_output(output_path: string): OutputSample | undefined {
-	const stats = statSync(output_path, { throwIfNoEntry: false })
+	const safe_path = to_safe_path(output_path)
+
+	if (safe_path === undefined) return undefined
+
+	const stats = statSync(safe_path, { throwIfNoEntry: false })
 
 	if (!stats?.isFile()) return undefined
 

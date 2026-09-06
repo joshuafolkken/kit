@@ -220,6 +220,10 @@ because a `pgrep` scoped a shade too wide — the thing this section already war
 otherwise answer `alive` on every poll over an output path that resolves to nothing, and no poll would
 ever say `undetermined` for the rule below to count.
 
+**The path passed to `--output` is absolute.** A relative one resolves against whatever directory the
+parent happens to run from, which for a unit given its own work tree is rarely the one meant, so the
+command refuses it rather than resolving it.
+
 **The process trace is the one the command does not read for itself.** Run it in the checkout the unit
 was given and pass what you saw. Read the command lines rather than the names — `pgrep -laf vitest`,
 `pgrep -laf playwright`, `pgrep -laf 'josh gate'` — and look for one naming **that checkout's path**.

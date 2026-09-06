@@ -1841,6 +1841,8 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:liveness 1
 
 **The output read follows the symlink, and compares the size as well as the timestamp.** A unit's transcript path is a symlink, and a link's own modification time never changes after it is created — so the shell's `stat`, which does not follow a link by default on macOS, reports that creation time whether the unit is alive or dead. `--window` (30 minutes by default) is the window the file must have been silent for, and `--gap` (5 seconds) is how far apart the two samples are taken; growth between them is what says the unit is writing.
 
+**`--output` must be absolute.** A relative path would resolve against whatever directory the caller happened to run from, and this command is routinely asked about a different checkout from the one it runs in — so a relative path is refused rather than resolved, and the answer is `undetermined` rather than a stop invented from a file that was never read.
+
 **The process trace is the one input the command does not read for itself.** A scan matching too little books a live unit as stopped; one matching too much never detects anything. So the caller runs `pgrep -laf` against the checkout it handed the unit and passes `--process alive` or `--process none`.
 
 **An open child that is not parked is not `settled`, even without `in-progress`.** That label is applied by the unit itself once it has read the issue, so a unit that stopped before applying it would otherwise be reported as a child needing nothing — and the stop would go undetected exactly as it did before. Only a closed child, or one carrying `needs-decision`, is settled.

@@ -24,6 +24,7 @@ import {
 // kills work that was in progress.
 
 const ISSUE = '1169'
+const TRANSCRIPT_NAME = 'transcript.jsonl'
 
 function arrange_traces(overrides: Partial<Traces> = {}): Traces {
 	return {
@@ -140,7 +141,7 @@ function arrange_transcript(age_ms: number): { link: string; target: string } {
 
 	directories.push(directory)
 
-	const target = path.join(directory, 'transcript.jsonl')
+	const target = path.join(directory, TRANSCRIPT_NAME)
 	const link = path.join(directory, 'link.jsonl')
 
 	writeFileSync(target, 'first\n')
@@ -186,6 +187,15 @@ describe('the output read follows the symlink', () => {
 
 		expect(run_liveness.sample_output(absent)).toBeUndefined()
 	})
+
+	// A relative path would resolve against whatever directory the caller ran from, which for a command
+	// asked about another checkout is rarely the one meant — so it is refused rather than resolved.
+	it.each([TRANSCRIPT_NAME, `./${TRANSCRIPT_NAME}`, `../${TRANSCRIPT_NAME}`])(
+		'refuses the relative path %j',
+		(relative) => {
+			expect(run_liveness.sample_output(relative)).toBeUndefined()
+		},
+	)
 })
 
 describe('what counts as frozen', () => {
