@@ -137,7 +137,7 @@ describe('investigation_reads.tally_of — what a delegation does to the count',
 describe('investigation_reads — the run’s own instructions are not the subject', () => {
 	it.each([
 		'prompts/refactoring.md',
-		'/Users/someone/kit/prompts/collaboration-workflow/delegation.md',
+		'prompts/collaboration-workflow/delegation.md',
 		'.claude/skills/workflow-commands/SKILL.md',
 		'CLAUDE.md',
 	])('does not count %s', (target) => {
@@ -145,8 +145,15 @@ describe('investigation_reads — the run’s own instructions are not the subje
 		expect(investigation_reads.tally_of(bash_text(`cat ${target}`)).pending).toEqual([])
 	})
 
-	it('still counts a document that is the subject rather than the instructions', () => {
-		expect(investigation_reads.is_instruction_document('docs/josh-commands.md')).toBe(false)
+	// Anchored at the repository root: matching the absolute path anywhere made every file in the
+	// repository an instruction document for a checkout sitting under a directory called `prompts`.
+	it.each([
+		'docs/josh-commands.md',
+		'scripts/eval/prompts/x.ts',
+		'MY_CLAUDE.md',
+		'/Users/someone/prompts/kit/scripts/one.ts',
+	])('still counts %s, which is subject material', (target) => {
+		expect(investigation_reads.is_instruction_document(target)).toBe(false)
 	})
 
 	it('never refuses a call that names only instructions', () => {
@@ -157,11 +164,11 @@ describe('investigation_reads — the run’s own instructions are not the subje
 
 describe('investigation_reads.is_at_threshold — the boundary is the read that reaches it', () => {
 	it('trips on the call that would take the count up to the threshold', () => {
-		expect(investigation_reads.is_at_threshold(THRESHOLD)).toBe(true)
+		expect(investigation_reads.is_at_threshold(BELOW_THRESHOLD)).toBe(true)
 	})
 
 	it('leaves the calls below it in the main line', () => {
-		expect(investigation_reads.is_at_threshold(BELOW_THRESHOLD)).toBe(false)
+		expect(investigation_reads.is_at_threshold(BELOW_THRESHOLD - 1)).toBe(false)
 	})
 
 	// A blind increment refused a *re-read* — a second `sed -n` window of a file already pending, or a
@@ -171,6 +178,21 @@ describe('investigation_reads.is_at_threshold — the boundary is the read that 
 
 		expect(investigation_reads.projected_count(pending, read_call(FIRST_FILE))).toBe(pending.length)
 		expect(investigation_reads.projected_count(pending, read_call(NEXT_FILE))).toBe(THRESHOLD)
+	})
+
+	// Counting the call's own targets toward the boundary refused one bundled multi-file read as the
+	// very first call of a run, with a reason claiming three files had already been read.
+	it('allows a bundled multi-file read before anything has accumulated', () => {
+		const call = bash_call(`cat ${FIRST_FILE} ${SECOND_FILE} ${NEXT_FILE}`)
+
+		expect(investigation_reads.should_block('', call, NEVER_REFUSED_MS)).toBe(false)
+	})
+
+	// A glob resolves to a literal path with a `*` in it, which no edit can ever name.
+	it('does not count a shell glob as a file', () => {
+		expect(investigation_reads.tally_of(bash_text('cat scripts/delegation/*.ts')).pending).toEqual(
+			[],
+		)
 	})
 })
 

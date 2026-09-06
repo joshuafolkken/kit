@@ -29,7 +29,7 @@ import { delegation_policy } from './delegation-policy'
 // decision instead of describing it — and this is the same conclusion applied to the same class of
 // rule. The wording is corrected too, but it is not what is expected to move the number.
 
-const READ_TOOLS: ReadonlySet<string> = new Set(['Read', 'NotebookRead'])
+const READ_TOOLS: ReadonlySet<string> = new Set(['Read'])
 // The label a subagent call carries is the verbatim tool name (`time-spans.ts` → `to_tool_call`), and
 // both spellings are in use: `Task` in the published tool set, `Agent` in this harness's transcripts.
 // Neither has a constant anywhere, so the pair is named here rather than matched loosely.
@@ -77,9 +77,10 @@ interface ReadTally {
 // be sent to read them on the main line's behalf. #1441's own measurement excluded 5 of them by hand
 // for exactly this reason, and a count that includes them trips on a run that has investigated nothing.
 //
-// **Anchored at a path segment rather than matched anywhere in the string**: `includes('prompts/')`
-// also exempted `scripts/eval/prompts/x.ts`, which is subject code, and `endsWith('CLAUDE.md')` also
-// exempted `MY_CLAUDE.md`.
+// **Matched against the path relative to the repository root, so `prompts` means *this* repository's**:
+// `includes('prompts/')` also exempted `scripts/eval/prompts/x.ts`, which is subject code, and
+// `endsWith('CLAUDE.md')` also exempted `MY_CLAUDE.md`. A file outside the checkout is subject
+// material like any other — only these paths inside it are the run's own instructions.
 const INSTRUCTION_PATHS: ReadonlyArray<string> = ['prompts', '.claude/skills']
 const INSTRUCTION_FILES: ReadonlySet<string> = new Set(['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'])
 const REPOSITORY_ROOT = process.cwd()
@@ -93,14 +94,23 @@ function resolved(target: string): string {
 	return path.resolve(REPOSITORY_ROOT, target)
 }
 
+// **Anchored at the repository root, not matched anywhere in the absolute path.** Testing the
+// absolute string made every file in the repository an instruction document for anyone whose checkout
+// sits under a directory called `prompts` — which disarmed the guard entirely, in silence.
 function is_instruction_document(target: string): boolean {
-	const segments = resolved(target).split(path.sep)
-	const name = segments.at(-1) ?? ''
+	const relative = path.relative(REPOSITORY_ROOT, resolved(target))
+	const segments = relative.split(path.sep)
 
 	return (
-		INSTRUCTION_FILES.has(name) ||
-		INSTRUCTION_PATHS.some((prefix) => segments.join('/').includes(`/${prefix}/`))
+		INSTRUCTION_FILES.has(segments.at(-1) ?? '') ||
+		INSTRUCTION_PATHS.some((prefix) => relative.startsWith(`${prefix}${path.sep}`))
 	)
+}
+
+// A shell glob resolves to a literal path with a `*` in it, which no edit can ever name — so left in,
+// it stays pending until the next delegation and keeps contributing to a count it does not belong in.
+function is_nameable_file(target: string): boolean {
+	return !target.includes('*') && !target.includes('?')
 }
 
 function is_content_read(label: string): boolean {
@@ -109,7 +119,7 @@ function is_content_read(label: string): boolean {
 
 function subject_targets(targets: ReadonlyArray<string>): ReadonlyArray<string> {
 	return targets
-		.filter((target) => !is_instruction_document(target))
+		.filter((target) => is_nameable_file(target) && !is_instruction_document(target))
 		.map((target) => resolved(target))
 }
 
@@ -173,18 +183,27 @@ function tally_of(text: string): ReadTally {
 	}
 }
 
-// **The count includes the call in hand, which is why it is projected rather than incremented.** A
-// blind `+ 1` refused a *re-read* of a file already pending — a second `sed -n` window of the same
-// file, or a `Read` with a new `offset` — when the set would not have grown at all.
 function projected_count(pending: ReadonlyArray<string>, call: GuardedCall): number {
 	return new Set([...pending, ...call_targets(call)]).size
+}
+
+// **The call has to actually add a file.** A blind `+ 1` refused a *re-read* of something already
+// pending — a second `sed -n` window of the same file, or a `Read` with a new `offset` — when the set
+// would not have grown at all.
+function adds_a_subject_file(pending: ReadonlyArray<string>, call: GuardedCall): boolean {
+	return projected_count(pending, call) > pending.length
 }
 
 // **The read that takes the count *up to* the threshold is the boundary.** The ones below it stay in
 // the main line, which is what keeps a small investigation from paying the two turns a brief and a
 // result cost.
-function is_at_threshold(count: number): boolean {
-	return count >= delegation_policy.INVESTIGATION_FILE_THRESHOLD
+//
+// **It is the *accumulated* count that has to reach the boundary, never the projected one.** Counting
+// the call's own targets toward it let one bundled multi-file read — `cat a.ts b.ts c.ts`, exactly the
+// batching `CLAUDE.md` mandates — be refused as the first call of a run, with a reason claiming three
+// files had already been read. The boundary is crossed by a call, not jumped over by one.
+function is_at_threshold(pending_count: number): boolean {
+	return pending_count + 1 >= delegation_policy.INVESTIGATION_FILE_THRESHOLD
 }
 
 // **One refusal per accumulation, re-armed by a delegation and by nothing else.** A run that reads on
@@ -231,7 +250,9 @@ function should_block(text: string, call: GuardedCall, refused_at_ms: number): b
 
 	const tally = tally_of(text)
 
-	return is_at_threshold(projected_count(tally.pending, call)) && is_rearmed(tally, refused_at_ms)
+	if (!is_at_threshold(tally.pending.length)) return false
+
+	return adds_a_subject_file(tally.pending, call) && is_rearmed(tally, refused_at_ms)
 }
 
 const investigation_reads = {
