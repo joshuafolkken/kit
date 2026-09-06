@@ -1,3 +1,4 @@
+import { poll } from '#scripts/poll'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 import {
 	describe_pr_failure,
@@ -112,12 +113,6 @@ function parse_repo_name_from_package(package_json_content: string): string {
 	return result.data.name
 }
 
-async function sleep(ms: number): Promise<void> {
-	await new Promise((resolve) => {
-		setTimeout(resolve, ms)
-	})
-}
-
 function advance_stable_count(previous: number, state: PrEvaluation): number {
 	return state === 'success' ? previous + 1 : 0
 }
@@ -160,7 +155,7 @@ async function attempt_pr_success_poll(input: {
 	if (classification.is_done) return { snapshot, next_stable_count: 0 }
 
 	if (input.attempt < input.options.max_attempts - 1) {
-		await sleep(input.options.interval_ms)
+		await poll.sleep(input.options.interval_ms)
 	}
 
 	return { next_stable_count: classification.next_stable_count }

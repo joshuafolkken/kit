@@ -736,6 +736,44 @@ pnpm josh bump patch
 
 After bumping, update `docs/` to reflect any behavior changes before committing.
 
+### `josh release`
+
+Release everything main has taken since the version last changed — one command, run by a person ([#1169](https://github.com/joshuafolkken/kit/issues/1169)).
+
+```bash
+pnpm josh release
+pnpm josh release --dry-run   # count and report, write nothing
+```
+
+**A version is a property of main's history, not of a branch.** `josh bump` reads the local `package.json` and increments it, so two branches cut from the same version both claim the same next number — and git's three-way merge does not report two branches writing the same line to the same value as a conflict. What surfaces instead is one version carrying two issues, with the other version never existing. No smarter `bump` can fix that: two branches cannot both know they are next.
+
+So the decision moves off the branch entirely. There is one place that decides, it runs when a person types this, and it looks only at main as it stands at that moment — which is why **no lock, no reserved number, no serial queue and no conflict detection is needed**.
+
+What one invocation does:
+
+1. **Counts `pending`** — the merge commits main has taken since the commit that last changed the version, **along main's own first-parent line**. Every pull request this repository merges lands as one merge commit there, so this is the count of merged pull requests, dependency updates included: a dependency update is a change worth shipping. The first-parent restriction is what keeps merges made _inside_ a pull request branch — GitHub's "Update branch" button, or a local `git merge main` — from each inflating the release by a minor.
+2. **Reports and stops when `pending` is zero.** Nothing is written, nothing is opened, and the exit code is 0.
+3. **Otherwise raises the version by `pending` minors**, commits it on `release/v<version>`, opens a pull request and merges it through the same gate every other pull request goes through — `wait_for_pr_success`, the one `josh followup` waits on.
+4. **Watches for the tag, and reports its absence as a failure.**
+
+The merge is what starts the distribution chain that already exists: `ci.yml`'s `notify-auto-tag` dispatches, `auto-tag.yml` creates `v<version>`, and `publish.yml` / `production.yml` run off that tag.
+
+#### The tag watch is the point of step 4
+
+**A merged release pull request is not a released version.** Every link after the merge can fail silently, and one of them is known to: a later push to main cancels the release commit's CI run ([#1481](https://github.com/joshuafolkken/kit/issues/1481)), so nothing dispatches and nothing is tagged. An automatic release would have been picked up by the next cycle. **A release a person types has no next cycle**, so without the watch the person walks away believing something shipped when nothing did.
+
+The command therefore polls for `v<version>` and exits non-zero when it never appears, naming what did not happen rather than guessing which link broke. The budget is 30 minutes, overridable with `JOSH_RELEASE_TAG_TIMEOUT_SECONDS`.
+
+#### Numbers are skipped, and the accounting still holds
+
+Release after three merges and `1.339.0` becomes `1.342.0` with **one** tag, `v1.342.0`; `v1.340.0` and `v1.341.0` never exist. What is preserved is "minors raised == issues shipped"; what is given up is "one issue, one tag". Which issue went into which release is recovered from the merge commits between two tags, which `.github/release.yml` already classifies. `scripts/version/publishable-range-check.ts`, the `prepack` gate, checks that published ranges still resolve and does not look at version distance at all, so a multi-minor jump passes it unchanged.
+
+#### It refuses to guess
+
+- The working tree must be clean and the checkout on the default branch — the count is only meaningful there, and the release commit is made on top of it. Both are checked before anything is read. A real run then pulls; **`--dry-run` does not**, because a pull is a write.
+- It searches back through the last 30 commits that touched `package.json` for the one that moved the version, and **a revision whose `package.json` cannot be read stops it declaring a base there** rather than being compared against a version several commits older. Finding no base at all, it says so and exits non-zero rather than picking one.
+- A `release/v<version>` branch that already exists is reported as a previous attempt that got as far as opening one — the wait for CI can throw and leave the branch and its pull request behind — rather than failing as git's `a branch named … already exists`.
+
 ### `josh version`
 
 Show the global install version, the current project version, and the latest published version — all in one report, regardless of how `josh` was invoked.

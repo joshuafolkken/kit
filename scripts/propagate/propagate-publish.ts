@@ -1,3 +1,4 @@
+import { poll } from '#scripts/poll'
 import { with_page_size } from '#scripts/version/version-remote'
 import { execaSync } from 'execa'
 
@@ -89,17 +90,11 @@ interface ResolvedWait {
 	now: () => number
 }
 
-async function real_sleep(milliseconds: number): Promise<void> {
-	await new Promise((resolve) => {
-		setTimeout(resolve, milliseconds)
-	})
-}
-
 const WAIT_DEFAULTS: ResolvedWait = {
 	timeout_ms: DEFAULT_TIMEOUT_MS,
 	interval_ms: DEFAULT_INTERVAL_MS,
 	fetch_versions: fetch_published_versions,
-	sleep: real_sleep,
+	sleep: poll.sleep,
 	now: Date.now,
 }
 

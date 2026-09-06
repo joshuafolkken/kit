@@ -310,3 +310,23 @@ describe('git_command.branch_names', () => {
 		expect(await git_command.branch_exists('main')).toBe(false)
 	})
 })
+
+// **`--first-parent` is what makes the count a count of pull requests.** Without it `rev-list` walks
+// merges made inside a pull request branch too — "Update branch", or a local `git merge main` — and
+// a release would raise the version by more minors than issues shipped (joshuafolkken/kit#1169).
+const FIRST_PARENT_FLAG = '--first-parent'
+const MERGE_COUNT_RANGE = 'base..HEAD'
+
+describe('git_command.merge_count_arguments', () => {
+	it('restricts the count to the branch own first-parent line', async () => {
+		const { git_command } = await import('./git-command')
+
+		expect(git_command.merge_count_arguments(MERGE_COUNT_RANGE)).toStrictEqual([
+			'rev-list',
+			'--count',
+			'--merges',
+			FIRST_PARENT_FLAG,
+			MERGE_COUNT_RANGE,
+		])
+	})
+})

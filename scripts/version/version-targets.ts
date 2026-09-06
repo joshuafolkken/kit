@@ -81,6 +81,10 @@ const version_targets = {
 	read_workspace_version,
 	format_project_version_line,
 	project_version_line,
+	// The manifest's filename. Exported rather than re-declared in each of `josh release`'s two
+	// halves (joshuafolkken/kit#1169): the module that already owns "where the project's manifest is"
+	// is where the name belongs.
+	PACKAGE_JSON,
 }
 
 export { version_targets }
