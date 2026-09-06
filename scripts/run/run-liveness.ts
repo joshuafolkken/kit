@@ -209,7 +209,13 @@ function sample_output(output_path: string): OutputSample | undefined {
 
 	if (safe_path === undefined) return undefined
 
-	const stats = statSync(safe_path, { throwIfNoEntry: false })
+	// `to_safe_path` is the validation this read depends on: the path is normalized, required to be
+	// absolute, and confined to one of `ALLOWED_ROOTS` through `path.relative`, so a caller cannot
+	// point it outside them. The taint analysis does not recognize a `path.relative` containment test
+	// as a sanitizer and reports the argument as one nothing checked; the call is read-only and returns nothing
+	// but a modification time and a size. tssecurity:S8707 is a false positive here, in the same shape
+	// as the S8705 suppressions in `scripts/git/git-command.ts`.
+	const stats = statSync(safe_path, { throwIfNoEntry: false }) // NOSONAR
 
 	if (!stats?.isFile()) return undefined
 
