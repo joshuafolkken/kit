@@ -85,6 +85,9 @@ const STASH_LABEL_PREFIX = 'run:preflight reclaimed before #'
 // happens to be today's single caller.
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 
+const BAD_ISSUE_MESSAGE = 'Not an issue number: '
+const UNREADABLE_PR_MESSAGE = 'The pull request could not be read for branch '
+
 function needs_reclaim(tree: TreeState): boolean {
 	return tree.is_dirty || tree.branch !== tree.default_branch
 }
@@ -96,6 +99,11 @@ function is_pr_decided(state: PrState): boolean {
 	return state === MERGED_PR || state === CLOSED_PR
 }
 
+// **The second clause is `decide`'s contract, not a case `check` produces.** A pull request is only
+// ever reached through one of the candidate branches, so a state read from `check` never carries an
+// open pull request without the branch it belongs to — and a pull request whose head branch is gone
+// from the checkout *and* the remote is outside what this command can see at all, which is what
+// `docs/josh-commands.md` says rather than implying coverage the read does not have.
 function has_leftover_work(child: ChildState): boolean {
 	return child.branch_name !== undefined || child.pr_state === OPEN_PR
 }
@@ -218,27 +226,39 @@ async function read_tree_state(): Promise<TreeState> {
 // could not complete (joshuafolkken/kit#1048). That throw reaches the CLI as `unknown`; without it a
 // rate-limited or logged-out `gh` turns a **merged** pull request into `resume`, and the run commits
 // on top of work somebody already landed — the exact hazard `park` exists for.
+// **The second half of the same guard.** `pr_exists` refuses to read an unreadable lookup as an
+// absence, but `pr_view` still folds any failure of its own into `''` — and the two are separate
+// round trips, so a rate limit or a 5xx arriving between them would put a **merged** pull request
+// back through `NO_PR` and out as `resume`. An empty answer for a branch `pr_exists` has just
+// confirmed is therefore a failed read by construction, and it throws rather than answering.
 async function read_pr_state(branch_name: string): Promise<PrState> {
 	if (!(await git_gh_pr_read.pr_exists(branch_name))) return NO_PR
 
-	return to_pr_state(await git_gh_pr_read.pr_view(branch_name))
+	const raw = await git_gh_pr_read.pr_view(branch_name)
+
+	if (raw === '') throw new Error(`${UNREADABLE_PR_MESSAGE}${branch_name}`)
+
+	return to_pr_state(raw)
 }
 
 function is_pr_open(state: PrState): boolean {
 	return state === OPEN_PR
 }
 
+async function read_pr_of_branch(branch_name: string): Promise<ChildState> {
+	return { branch_name, pr_state: await read_pr_state(branch_name) }
+}
+
 // **A decided pull request on any candidate branch outranks an open one on another.** An interrupted
 // run can leave more than one branch for an issue — a retry beside the original — and reading only
-// whichever git lists first hides a merged pull request behind a branch that has none.
-async function read_pr_states(branch_names: ReadonlyArray<string>): Promise<PrState> {
-	const states = await Promise.all(branch_names.map(async (name) => await read_pr_state(name)))
+// whichever git lists first hides a merged pull request behind a branch that has none. **The branch
+// reported is the one that produced the winning state**, so the reason never names branch A while the
+// verdict came from branch B's pull request.
+function pick_child_state(reads: ReadonlyArray<ChildState>): ChildState {
+	const decided = reads.find((read) => is_pr_decided(read.pr_state))
+	const open = reads.find((read) => is_pr_open(read.pr_state))
 
-	return (
-		states.find((state) => is_pr_decided(state)) ??
-		states.find((state) => is_pr_open(state)) ??
-		NO_PR
-	)
+	return decided ?? open ?? { branch_name: reads[0]?.branch_name, pr_state: NO_PR }
 }
 
 // `git branch --list` takes a glob, so the branch is found without knowing its slug: `pnpm josh git`
@@ -272,15 +292,25 @@ async function read_branch_candidates(issue: string): Promise<Array<string>> {
 
 async function read_child_state(issue: string): Promise<ChildState> {
 	const candidates = await read_branch_candidates(issue)
-	const [branch_name] = candidates
 
-	return { branch_name, pr_state: await read_pr_states(candidates) }
+	return pick_child_state(
+		await Promise.all(candidates.map(async (name) => await read_pr_of_branch(name))),
+	)
+}
+
+// The number is checked here rather than only in the CLI, because it is interpolated into a
+// double-quoted shell command the caller is told to paste — so the constraint lives with the
+// interpolation, and an entry point that forgot to validate fails loudly instead of emitting it.
+function require_issue_number(issue: string): void {
+	if (!ISSUE_NUMBER_PATTERN.test(issue)) throw new Error(`${BAD_ISSUE_MESSAGE}${issue}`)
 }
 
 // The child read is skipped where the tree already answers `reclaim`: a `gh` round trip buys nothing
 // there, because the verdict would be `reclaim` whatever it said, and the recovery ends by asking
 // this command again on the clean tree.
 async function check(issue: string): Promise<PreflightDecision> {
+	require_issue_number(issue)
+
 	const tree = await read_tree_state()
 
 	if (needs_reclaim(tree)) return decide(tree, NO_CHILD_WORK, issue)

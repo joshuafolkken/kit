@@ -177,7 +177,8 @@ describe('check finds the branch an interrupted run left', () => {
 		expect(pr_exists).toHaveBeenCalledExactlyOnceWith(BRANCH)
 	})
 
-	// A retry branch beside the original must not hide the merged pull request behind it.
+	// A retry branch beside the original must not hide the merged pull request behind it, and the
+	// reason must name the branch the winning state came from rather than whichever git listed first.
 	it('lets a decided pull request on any candidate outrank an open one', async () => {
 		arrange_clean_tree()
 		branch_names.mockResolvedValue(['926-first', '926-retry'])
@@ -187,6 +188,20 @@ describe('check finds the branch an interrupted run left', () => {
 		)
 
 		expect(await verdict_from_check()).toBe('park')
+	})
+})
+
+describe('check names the branch the verdict came from', () => {
+	it('reports the candidate that carried the winning state, not the first git listed', async () => {
+		arrange_clean_tree()
+		branch_names.mockResolvedValue(['926-first', '926-retry'])
+		pr_exists.mockImplementation(async (name) => name === '926-retry')
+		pr_view.mockResolvedValue(OPEN_PR_JSON)
+
+		const decision = await run_preflight.check(ISSUE)
+
+		expect(decision.verdict).toBe('resume')
+		expect(decision.reason).toContain('926-retry')
 	})
 
 	it('answers clean when nothing was left', async () => {
@@ -207,6 +222,21 @@ describe('check refuses to read an absence into a failed read', () => {
 		pr_exists.mockRejectedValue(new Error('gh is rate limited'))
 
 		await expect(run_preflight.check(ISSUE)).rejects.toThrow('rate limited')
+	})
+
+	// `pr_exists` and `pr_view` are two round trips; a failure arriving between them would otherwise
+	// put a merged pull request back through the empty answer and out as `resume`.
+	it('refuses an empty pr_view for a branch pr_exists just confirmed', async () => {
+		arrange_clean_tree()
+		branch_names.mockResolvedValue(['926-x'])
+		pr_exists.mockResolvedValue(true)
+		pr_view.mockResolvedValue('')
+
+		await expect(run_preflight.check(ISSUE)).rejects.toThrow('926-x')
+	})
+
+	it('refuses an issue number it would otherwise interpolate into a shell command', async () => {
+		await expect(run_preflight.check('9"; rm -rf /')).rejects.toThrow('Not an issue number')
 	})
 
 	it('treats an unreadable status as a dirty tree, the way run_hold does', async () => {
