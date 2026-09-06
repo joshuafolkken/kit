@@ -65,25 +65,27 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   **Whether that second round is due at all is `pnpm josh review:round2 --round-1-closed`'s answer,
   never a judgement** (joshuafolkken/kit#1433): `skip` on the two arms it names — round 1 wrote no fix
   code, or every path it fixed is inert — and `required` on everything else, the flag absent included.
-  **Ask it once round 1's fixes are in and _before_ `pnpm josh bump minor`**: the bump rewrites
-  `package.json`, which is not inert, so a delta taken after it contains that write and no arm can
-  ever fire. **A `skip` does not carry the clean-first-round row's second half** — round 1 edited the
-  tree, so the first gate's result is stale and `pnpm josh gate` re-runs after the bump exactly as it
-  would have. The skip is recorded on the Issue, inside the CI wait beside the follow-up filing, so
+  **Ask it once round 1's fixes are in and before the commit**: the delta it reads is then exactly
+  those fixes. Nothing writes to the tree in between any more — the version bump a child used to make
+  here put a `package.json` write, which is not inert, into that delta, so no arm could ever
+  fire (joshuafolkken/kit#1486). **A `skip` does not carry the clean-first-round row's second half** —
+  round 1 edited the tree, so the first gate's result is stale and `pnpm josh gate` re-runs before the
+  commit exactly as it would have. The skip is recorded on the Issue, inside the CI wait beside the follow-up filing, so
   the condition stays auditable; `prompts/review.md` → "When round 2 is skipped entirely, and when it
   is not" is the single source.
   **Joining the gate is a step, not a formality — there is no path to a commit on a gate nobody read.**
-  Read what the gate printed before `pnpm josh bump minor`; a red one is fixed and re-run **whatever
+  Read what the gate printed before `pnpm josh git -y`; a red one is fixed and re-run **whatever
   the review concluded**, and because that fix is uncommitted like every other, it lands in the
   round-2 fix delta and is reviewed with the rest.
   **Where a second round is coming, the pull request opens between the two** (joshuafolkken/kit#1261):
-  once round 1's fixes are in, run `pnpm josh bump minor` → `pnpm josh gate` → join → `pnpm josh git -y`,
-  and then run round 2 beside the CI that commit started. **The bump goes in front of that gate**, so the
-  one the commit rests on covers the exact tree it carries and round 2's brief still reads
-  `Already verified` — taken before the bump it reads `Not verified`, and the review agent re-runs the
-  unit suite the gate had just passed. **A finding round 2 fixes in place is pushed before its gate**
+  once round 1's fixes are in, run `pnpm josh gate` → join → `pnpm josh git -y`,
+  and then run round 2 beside the CI that commit started. **Nothing edits the tree between that gate
+  and the commit** (joshuafolkken/kit#1486) — the version bump a child used to make here is gone,
+  because `pnpm josh release` decides the version from main's own history — so the gate the commit
+  rests on covers the exact tree it carries and round 2's brief still reads `Already verified`.
+  **A finding round 2 fixes in place is pushed before its gate**
   (joshuafolkken/kit#1326): the single check the fix reaches, then a follow-up commit on the same
-  branch (**no second `bump`**), then its own `pnpm josh gate` **joined before `pnpm josh followup --merge`**
+  branch, then its own `pnpm josh gate` **joined before `pnpm josh followup --merge`**
   — so the CI that commit re-runs has the gate beside it rather than in front of it. A red gate there is
   fixed, re-checked with the same single check and pushed again; the superseded cycle is cancelled by
   `ci.yml`'s concurrency group, and the merge still waits on the head commit's checks

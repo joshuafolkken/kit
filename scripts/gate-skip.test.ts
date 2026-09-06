@@ -52,10 +52,9 @@ const NOTHING_RAN = 0
 const CHANGED_FILE = 'scripts/gate-skip.ts'
 const CHANGED_TREE: Record<string, string> = { [CHANGED_FILE]: 'digest-one' }
 const MOVED_TREE: Record<string, string> = { [CHANGED_FILE]: 'digest-two' }
-// A tree the version bump is already in, which is what keeps joshuafolkken/kit#1437's ordering refusal
-// out of the one case below that needs the four checks to run over a record that cannot be reused.
-const PACKAGE_JSON = 'package.json'
-const BUMPED_TREE: Record<string, string> = { ...CHANGED_TREE, [PACKAGE_JSON]: 'digest-version' }
+// A third state of the same file, so the one case below that needs the four checks to run can have a
+// tree and a record that differ without either of them being empty.
+const ADVANCED_TREE: Record<string, string> = { [CHANGED_FILE]: 'digest-three' }
 const EMPTY_TREE: Record<string, string> = {}
 const BASE = 'a1b2c3d4'
 const ADVANCED_BASE = 'e5f6a7b8'
@@ -202,11 +201,11 @@ describe('run_verification_gate — a tree the record cannot speak for', () => {
 		expect(text).toContain('verification gate passed')
 	})
 
-	// The tree carries the version bump, so joshuafolkken/kit#1437's ordering refusal is not in play and
-	// this stays a question about the record alone: a gate run *before* an owed bump is refused rather
-	// than run, and that branch is `gate-bump-order.test.ts`'s subject.
+	// Purely a question about the record: the digest moved, so it cannot be reused and the four checks
+	// run. Nothing else stands between the skip and them since joshuafolkken/kit#1486 removed the
+	// bump→gate refusal, whose own branch `child-bump-removed.test.ts` now pins as absent.
 	it('runs all four checks when a file has moved since the record', async () => {
-		repository.tree = BUMPED_TREE
+		repository.tree = ADVANCED_TREE
 		record_green(MOVED_TREE, BASE)
 
 		await run_gate()

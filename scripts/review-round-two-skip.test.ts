@@ -40,10 +40,12 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	// The standard is untouched, which is the sentence a reader most easily assumes away when a round
 	// disappears.
 	'**Neither arm weakens the standard.**',
-	// The ordering, which is the difference between a condition that fires and one that cannot.
-	// `pnpm josh bump minor` writes `package.json` — not inert — into the fix delta, so an answer
-	// taken after it is `required` whatever round 1 did, and neither arm ever fires again.
-	'_before_ `pnpm josh bump minor`',
+	// The ordering, which is the difference between a condition that fires and one that cannot. The
+	// version bump a child used to make between the fixes and the commit wrote `package.json` — not
+	// inert — into the fix delta, so an answer taken after it was `required` whatever round 1 did and
+	// neither arm ever fired. joshuafolkken/kit#1486 removed the bump; the ordering stays stated,
+	// because anything else placed there would re-open the same hole.
+	"**Ask it once round 1's fixes are in and before the commit.**",
 	// And the half a reader most easily takes with the skip: round 1 edited the tree, so the gate is
 	// stale and re-runs after the bump. Without this the run commits on an unverified tree.
 	'**A `skip` moves only whether the second round runs.**',
@@ -119,9 +121,9 @@ const ROUTING: ReadonlyArray<string> = [CHAIN_RULE, GATE_BULLET, FULLRUN]
 // round can be skipped and never told when it cannot.
 const RECORDED_SKIP = /records? the skip|skip is recorded/u
 // The ordering constraint, in whichever wording each document reached for. A document that names the
-// command without it sends a run to ask after `pnpm josh bump minor`, where the answer is `required`
-// forever — the command would look correct and the condition would never once fire.
-const ASK_BEFORE_BUMP = /before[^.]{0,40}bump/u
+// command without it sends a run to ask after something has written to the tree, where the answer is
+// `required` — the command would look correct and the condition would never once fire.
+const ASK_BEFORE_COMMIT = 'before the commit'
 
 describe('every document that reaches the round names the command', () => {
 	it.each(ROUTING)('%s names the command with its flag', (document) => {
@@ -144,10 +146,10 @@ describe('every document that reaches the round names the command', () => {
 		expect(read_unwrapped(document)).toMatch(RECORDED_SKIP)
 	})
 
-	it.each(ROUTING)('%s puts the ask ahead of the version bump', (document) => {
+	it.each(ROUTING)('%s puts the ask ahead of the commit', (document) => {
 		const content = read_unwrapped(document)
 
-		expect(content).toMatch(ASK_BEFORE_BUMP)
+		expect(content).toContain(ASK_BEFORE_COMMIT)
 		expect(content).toContain('is not inert')
 	})
 })
@@ -165,7 +167,7 @@ describe(`${COMMAND_DOC} — the command is documented`, () => {
 		// The rejected line, kept beside the command so a reader reaching for `--round-1-closed` on a
 		// prompt-only fix finds the answer where they are rather than in `prompts/review.md`.
 		'**A prompt fix and a test fix both answer `required`, deliberately.**',
-		'**Ask it before `josh bump minor`, never after.**',
+		"**Ask it once round 1's fixes are in, and before the commit.**",
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})

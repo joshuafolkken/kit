@@ -56,7 +56,9 @@ const ORDER_MARKERS: ReadonlyArray<string> = [
 	PUSHED_FIRST,
 	'the single check the fix reaches',
 	'joined before `pnpm josh followup --merge`',
-	'no second `bump`',
+	// The fix goes onto the branch that is already open. The version-bump half this list used to carry
+	// went with joshuafolkken/kit#1486, which took the bump out of the child flow altogether.
+	'a follow-up commit on the same branch',
 ]
 
 // Every file a run follows on its own. Asserted per file because each is read alone: an order stated

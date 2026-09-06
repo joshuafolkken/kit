@@ -6,7 +6,6 @@ import { safe_json_parse } from './parse-json'
 
 const NODE_MODULES = 'node_modules'
 const PACKAGE_JSON = 'package.json'
-const PROJECT_VERSION_ICON = '📦'
 
 // Build the `pnpm ls -g --json <package>` arguments for the package being checked.
 function build_pnpm_ls_arguments(package_name: string): Array<string> {
@@ -58,18 +57,12 @@ function read_workspace_version(cwd: string): string | undefined {
 	return parse_project_version(raw)
 }
 
-// Format the project version as a display line, or undefined when the version is unknown.
-function format_project_version_line(version: string | undefined): string | undefined {
-	if (version === undefined) return undefined
-
-	return `${PROJECT_VERSION_ICON} project version: ${version}`
-}
-
-// Read and format the current project's version line for display at workflow completion.
-// Undefined when <cwd>/package.json is missing or malformed.
-function project_version_line(cwd: string): string | undefined {
-	return format_project_version_line(read_workspace_version(cwd))
-}
+// `format_project_version_line` / `project_version_line` lived here and formatted
+// `📦 project version: <v>` for the end of a workflow. Both are gone (joshuafolkken/kit#1486): a
+// child no longer bumps, so the local manifest names the *previous* release rather than what the run
+// ships, and every caller now prints the count of unreleased merges instead
+// (`scripts/git/git-followup-pending.ts`). Removed rather than left unused, so nothing reaches for
+// the misleading reading again.
 
 const version_targets = {
 	build_pnpm_ls_arguments,
@@ -79,8 +72,6 @@ const version_targets = {
 	read_project_version,
 	project_package_path,
 	read_workspace_version,
-	format_project_version_line,
-	project_version_line,
 	// The manifest's filename. Exported rather than re-declared in each of `josh release`'s two
 	// halves (joshuafolkken/kit#1169): the module that already owns "where the project's manifest is"
 	// is where the name belongs.

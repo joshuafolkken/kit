@@ -308,17 +308,27 @@ async function add_path(file_path: string): Promise<void> {
 // answers about everything ever merged instead of about main (joshuafolkken/kit#1169).
 const FIRST_PARENT_FLAG = '--first-parent'
 
-// The commits that touched `file_path` along the current branch's own first-parent line, newest
-// first. **`--first-parent` is what keeps the answer about main's history rather than about
-// everything ever merged into it**: a child's own commits are not main's, and the version question
+// The commits that touched `file_path` along `tip`'s own first-parent line, newest first.
+// **`--first-parent` is what keeps the answer about main's history rather than about everything ever
+// merged into it**: a child's own commits are not main's, and the version question
 // (joshuafolkken/kit#1169) is asked of main.
-async function log_first_parent(limit: number, file_path: string): Promise<Array<string>> {
+//
+// **`tip` is not decoration.** `--first-parent` only reads as "main's line" when the walk starts on
+// main; started on a feature branch it walks that branch's commits first, and any merge main took
+// after the branch was cut is not an ancestor at all. A caller that is not on main names the ref it
+// means — `origin/main`, say — rather than inheriting `HEAD` (joshuafolkken/kit#1486).
+async function log_first_parent(
+	limit: number,
+	file_path: string,
+	tip = 'HEAD',
+): Promise<Array<string>> {
 	const output = await exec_git_command_read([
 		'log',
 		FIRST_PARENT_FLAG,
 		'--format=%H',
 		`-n`,
 		String(limit),
+		tip,
 		'--',
 		file_path,
 	])

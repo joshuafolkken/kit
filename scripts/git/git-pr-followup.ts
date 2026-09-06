@@ -1,5 +1,5 @@
-import { version_targets } from '#scripts/version/version-targets'
 import { git_epic_close } from './git-epic-close'
+import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
 import { git_gh_helpers } from './git-gh-helpers'
@@ -266,12 +266,17 @@ async function fetch_telegram_context(input: {
 	return { repo_name, issue_title, issue_url, pr_url }
 }
 
+// The pending count replaces the project version line (joshuafolkken/kit#1486): children no longer
+// bump, so the local `package.json` names the previous release rather than what this run ships.
+// A count that could not be read contributes no line at all, rather than a zero nobody measured.
 async function notify_completion(
 	context: TelegramContext,
 	skip_notes: ReadonlyArray<string>,
+	is_merge_pending: boolean,
 ): Promise<void> {
-	const version_line = version_targets.project_version_line(process.cwd())
-	const body = [version_line, ...skip_notes].join('\n')
+	const pending_line = await git_followup_pending.pending_release_line({ is_merge_pending })
+	const lines = pending_line === undefined ? skip_notes : [pending_line, ...skip_notes]
+	const body = lines.join('\n')
 
 	await telegram_notify.send(
 		build_telegram_input({
@@ -357,7 +362,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<void> {
 	lap(log, STAGE.context)
 	const skip_notes = await run_review_checks(input, context, log)
 
-	await notify_completion(context, skip_notes)
+	await notify_completion(context, skip_notes, input.should_merge)
 
 	lap(log, STAGE.telegram)
 	await run_wrapup(input, context, log)

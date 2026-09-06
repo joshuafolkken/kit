@@ -275,7 +275,7 @@ against a race measured in seconds. Treat it as a guard that makes the invariant
 a mutex.
 
 **It is scoped to the resource, not to the epic.** What two children contend for is one working
-tree, one `main` and one `package.json` that `josh bump` rewrites, and none of those cares which
+tree, one `main` and one `pnpm-lock.yaml` that `josh latest` rewrites, and none of those cares which
 epic a child belongs to. The earlier reasoning here — each session takes only its own repository's
 children, and within a repository children run one at a time — was true *inside one epic* and said
 nothing about two: `epic-classify.ts` sorts only the children the epic tracks, so a second `epicrun`
@@ -306,8 +306,8 @@ has to **replace** this guard, with worktrees and a manifest each child can rewr
 switch it off. Do not read this section as "concurrency needs no coordination": the coordination
 exists, and it is this.
 
-Why same-repository parallelism is out of scope here: `josh bump minor` would have two children
-rewriting one `package.json`, one checkout cannot hold two branches without worktrees, and two
+Why same-repository parallelism is out of scope here: `josh latest` would have two children
+rewriting one `pnpm-lock.yaml`, one checkout cannot hold two branches without worktrees, and two
 children touching the same files need conflict prediction. **Every one of those reasons is specific
 to sharing a repository.** Across repositories the manifests are different files, the checkouts are
 already separate, no file is shared, and Actions runs are independent — so none of them apply, and

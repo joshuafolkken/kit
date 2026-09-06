@@ -100,11 +100,15 @@ type ManifestAnswer =
 	| { kind: 'absent' }
 	| { kind: 'unreadable' }
 
-// The version another repository's default branch declares — the one its merge is about to publish.
+// The version another repository's default branch declares — the last one it published.
 //
 // Read from GitHub rather than from a local checkout: a consumer's state is a GitHub fact, and the
-// wait must work before anyone has cloned the repository. `josh bump minor` runs before the commit,
-// so the version on the merged default branch is exactly the release that follows.
+// wait must work before anyone has cloned the repository.
+//
+// **It moves when `josh release` runs, not when a child merges** (joshuafolkken/kit#1486). A child's
+// pull request carries no version change at all, so the number here right after one merges is still
+// the previous release. The target of a wait is therefore the version that follows the release the
+// change lands in, never the one the merge itself leaves behind.
 //
 // Never "whatever is newest": a consumer several releases behind would be satisfied by any publish
 // at all, including one that predates the change it is waiting for.
