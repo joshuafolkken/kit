@@ -173,6 +173,16 @@ describe('an expired record', () => {
 		expect(errors.join('\n')).toContain('uncommitted changes')
 	})
 
+	// Replacing an expired record is still a race between everyone who found it expired, so the
+	// replacement goes through the same exclusive create the free path does.
+	it('answers busy to the replacement that lost the exclusive create', async () => {
+		vi.spyOn(run_hold, 'create_hold').mockReturnValue(false)
+
+		await run_hold_cli.run([OTHER_ISSUE])
+
+		expect(out).toEqual([run_hold_cli.BUSY_VERDICT])
+	})
+
 	it('stops the claim when the tree state could not be read', async () => {
 		git_status.mockRejectedValue(new Error('git is not on the path'))
 

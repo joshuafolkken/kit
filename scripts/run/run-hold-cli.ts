@@ -79,14 +79,18 @@ async function blocking_message(read: HoldRead): Promise<string | undefined> {
 function take_free_tree(target: string, issue: string): number {
 	if (run_hold.create_hold(target, issue)) return report_hold()
 
-	return report_busy(run_hold.race_message(run_hold.read_hold(target)))
+	return report_busy(run_hold.race_message(run_hold.read_hold(target), target))
 }
 
+// **The stale path takes the tree the same exclusive way the free path does.** Replacing an expired
+// record with a plain write would tell two sessions that both found it expired that they both won —
+// the race the free path was just fixed for, reintroduced one branch over. Removing it first is what
+// turns the expired record into a free tree; the create is what decides between the two claimants.
 function replace_stale(target: string, issue: string, hold: RunHold): number {
 	console.error(run_hold.stale_message(hold))
-	run_hold.write_hold(target, issue)
+	run_hold.release_hold(target)
 
-	return report_hold()
+	return take_free_tree(target, issue)
 }
 
 async function claim(target: string, issue: string): Promise<number> {

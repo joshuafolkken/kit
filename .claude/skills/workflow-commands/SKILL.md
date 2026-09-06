@@ -682,7 +682,9 @@ the Telegram for the person to type once they are done with it.
 them** — so the age is not what decides. **An expired record over a tree that still has uncommitted
 changes does not free it**: the command answers `busy` and says to commit, stash, or release once the
 work is done. Only an expired record over a clean tree is replaced, which is the crashed run the
-expiry was written for.
+expiry was written for — and a stop whose work is already committed and pushed, such as a run halted
+by a standing High finding, is deliberately in that second group: the branch is safe on the remote,
+so freeing the tree after eight hours loses nothing.
 
 **The batch entry points claim per child, not per batch.** `epicrun` and `queue` never call it
 themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh followup`

@@ -81,7 +81,8 @@ function parse_hold(raw: string): RunHold | undefined {
 // **A `taken_at` that is not a date is stale, not current.** It passes the schema — it is a string —
 // so reading it as current would leave the tree held with nothing left to expire it, which is the one
 // state the expiry exists to make impossible. Fail-closed is still the answer for the *tree*: a stale
-// record only lets a claim through once `claim_state` has also found the tree clean.
+// record only lets a claim through once `run-hold-cli.ts`'s `blocking_message` has also found the
+// tree clean.
 function is_stale(hold: RunHold, now: Date): boolean {
 	const taken = Date.parse(hold.taken_at)
 
@@ -172,12 +173,15 @@ function uncommitted_message(hold: RunHold): string {
 }
 
 // The exclusive claim lost: another process wrote the record between this one's read and its write.
-// Re-reading names the winner where it still holds; where it has already gone the answer is still
-// `busy`, because this run did not get the tree and must not assume it did.
-function race_message(read: HoldRead): string {
+// Re-reading names the winner where it still holds; where it does not, the record is one this account
+// cannot read — a file another user owns on a shared temp directory — and the answer is still `busy`,
+// because this run did not get the tree. **The path is named** so the person is not sent round a loop
+// of "ask again" that can never come out differently: `run:release` cannot remove a file it does not
+// own either.
+function race_message(read: HoldRead, target: string): string {
 	if (read.kind === 'held') return held_message(read.hold)
 
-	return `Another run claimed this working tree at the same moment — ${NOT_IDLE}. Nothing was written here; ask again.`
+	return `A record already exists at ${target} and this run did not write it — ${NOT_IDLE}. Either another run claimed the tree at the same moment, or the record belongs to another account. Run \`${RELEASE_COMMAND}\`, and remove that file by hand if it is still there.`
 }
 
 function unknown_message(): string {
