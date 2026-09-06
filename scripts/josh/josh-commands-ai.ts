@@ -119,6 +119,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Say what an interrupted run left in this tree, and what to do about it',
 		category: 'AI tools',
 	},
+	'run:liveness': {
+		script: 'scripts/run/run-liveness-cli.ts',
+		description: 'Say whether a delegated unit is still working, or stopped without reporting',
+		category: 'AI tools',
+	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
 		description:

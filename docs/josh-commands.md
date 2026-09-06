@@ -1815,6 +1815,38 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:preflight 
 
 The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "Preflight — reclaim what an interrupted run left, before the next child starts".
 
+### `josh run:liveness`
+
+Say whether the delegated unit running a child is still working, or stopped without reporting ([#1485](https://github.com/joshuafolkken/kit/issues/1485)).
+
+```bash
+pnpm josh run:liveness 1169 --output ~/.claude/projects/<project>/<session>.jsonl --process none   # alias: josh rv
+pnpm josh run:liveness 1169 --output <path> --process alive --window 45 --gap 2 --repo joshuafolkken/app-kit
+```
+
+Standard output carries exactly one token, so `answer=$(pnpm josh run:liveness 1169 --output "$out" --process none)` captures something a loop can branch on. Every explanation goes to standard error: what each trace said, and what to do about it.
+
+| Answer         | What it found                                                                          | What the caller does                                                    | Exit code |
+| -------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------- |
+| `alive`        | The output moved, or a process of the child is running                                 | Keep polling; touch nothing                                             | 0         |
+| `stopped`      | The output has been frozen past the silent window and no process of the child is alive | Stash if the answer says so, remove `in-progress`, park the child       | 0         |
+| `settled`      | The child closed, or the unit parked it with `needs-decision`                          | Re-read it with `pnpm josh issue:state <N>` and take that branch        | 0         |
+| `undetermined` | A trace could not be read                                                              | Read the trace that failed and ask again. It is not "the unit is alive" | 1         |
+
+**Two traces decide it, and neither depends on whether implementation started.** The detection this replaces required a **dirty** checkout, on the reasoning that a unit which died mid-implementation leaves exactly that — so a unit that stopped seven minutes in, while still reading the skill and the issue, left a clean tree and the test could never become true. The checkout is still read, for one thing only: whether there is work to stash before the child is parked. "Nothing was ever opened for the child" is dropped outright, because it is equally the normal state of a unit that has not reached its commit yet, and `josh run:preflight` already owns that question.
+
+**Which way an error falls is the design.** A live unit booked as stopped has its working work killed; a stopped one booked as alive costs waiting. So a trace that could not be read answers `undetermined` rather than `stopped`, a `--process` nobody gave is an unasked question rather than an answer of "no process", and either half of the test saying the unit is working ends the check as `alive`.
+
+**The output read follows the symlink, and compares the size as well as the timestamp.** A unit's transcript path is a symlink, and a link's own modification time never changes after it is created — so the shell's `stat`, which does not follow a link by default on macOS, reports that creation time whether the unit is alive or dead. `--window` (30 minutes by default) is the window the file must have been silent for, and `--gap` (5 seconds) is how far apart the two samples are taken; growth between them is what says the unit is writing.
+
+**The process trace is the one input the command does not read for itself.** A scan matching too little books a live unit as stopped; one matching too much never detects anything. So the caller runs `pgrep -laf` against the checkout it handed the unit and passes `--process alive` or `--process none`.
+
+**An open child that is not parked is not `settled`, even without `in-progress`.** That label is applied by the unit itself once it has read the issue, so a unit that stopped before applying it would otherwise be reported as a child needing nothing — and the stop would go undetected exactly as it did before. Only a closed child, or one carrying `needs-decision`, is settled.
+
+**Two `undetermined` answers in a row is a fault in the check rather than a slow unit.** The output path can be wrong, rotated, or never created, and read that way every poll answers `undetermined` forever. The caller stops polling on the second one and reports it; it is never escalated to a `stopped`, because nothing was read. Both durations are whole and positive for the same reason — `--window 0 --gap 0` would call any unit that is not writing at that instant frozen.
+
+The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "A delegated unit that stopped without reporting".
+
 ### `josh cost`
 
 Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).
