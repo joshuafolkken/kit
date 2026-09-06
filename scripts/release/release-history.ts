@@ -47,7 +47,12 @@ async function read_version_at(
 	reference: string,
 ): Promise<string | undefined> {
 	try {
-		return parse_version(await reader.show_file(`${reference}:${PACKAGE_JSON}`))
+		// `./` is not decoration. `git show <sha>:package.json` resolves against the **repository
+		// root**, while the `git log -- package.json` that produced these revisions resolves against
+		// **cwd** — so run from a workspace sub-package the two halves would be comparing different
+		// files, and every version comparison would be against the wrong one. `./` makes `show`
+		// cwd-relative too, which is also what `read_workspace_version(process.cwd())` reads.
+		return parse_version(await reader.show_file(`${reference}:./${PACKAGE_JSON}`))
 	} catch {
 		return undefined
 	}

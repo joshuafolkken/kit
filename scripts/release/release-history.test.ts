@@ -30,9 +30,11 @@ function reader_for(input: {
 	}
 }
 
+// `./` matches what `read_version_at` asks git for — cwd-relative, so it agrees with the
+// `git log -- package.json` that produced the revisions.
 function manifests_of(entries: Array<[string, string]>): Map<string, string> {
 	return new Map(
-		entries.map(([reference, version]) => [`${reference}:package.json`, manifest(version)]),
+		entries.map(([reference, version]) => [`${reference}:./package.json`, manifest(version)]),
 	)
 }
 

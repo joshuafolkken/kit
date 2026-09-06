@@ -48,8 +48,21 @@ function existing_branch_message(branch_name: string): string {
 	return `\`${branch_name}\` already exists — a previous release attempt got as far as opening it. Finish or delete that pull request and branch, then run \`pnpm josh release\` again.`
 }
 
+// **The remote is asked as well as the local branch.** A previous attempt pushed before it opened
+// the pull request, so deleting the local branch — or retrying from a second checkout — leaves the
+// remote one standing on its own. Checking only locally there lets the run write the version, commit
+// it and reach `push`, which then fails with git's non-fast-forward message: the raw error this
+// guard exists to replace, and now after two writes rather than before them.
+async function is_release_branch_taken(branch_name: string): Promise<boolean> {
+	if (await git_command.branch_exists(branch_name)) return true
+
+	const remote_names = await git_command.branch_names_remote(branch_name)
+
+	return remote_names.length > 0
+}
+
 async function refuse_existing_branch(branch_name: string): Promise<void> {
-	if (!(await git_command.branch_exists(branch_name))) return
+	if (!(await is_release_branch_taken(branch_name))) return
 
 	throw new Error(existing_branch_message(branch_name))
 }
