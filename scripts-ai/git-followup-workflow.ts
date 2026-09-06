@@ -6,6 +6,7 @@ import { git_next_issues } from '../scripts/git/git-next-issues'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
 import { review_stamps } from '../scripts/review/review-stamps'
+import { time_history } from '../scripts/time/time-history'
 import { version_targets } from '../scripts/version/version-targets'
 import { load_optional_environment } from './environment-loader'
 
@@ -156,6 +157,30 @@ function clear_round_one_snapshot(should_merge: boolean): void {
 	if (should_merge) review_stamps.clear_round_one()
 }
 
+// joshuafolkken/kit#1471: the run report only ever appeared when a person typed `diag`, so a run
+// nobody asked about left no record — and a measurement that is not continuous cannot say whether
+// the last change made anything faster. Every `fullrun`, and every child of an `epicrun` or a
+// `queue`, ends here, so emitting it from this one seam covers all of them without a second hook.
+//
+// **Gated on `should_merge`, like the epic auto-close and the round-1 snapshot clear above.** A
+// `--no-merge` run has not finished: the pull request is still open and its CI wait is not over, so
+// a record written there would compare a part of a run against whole ones.
+//
+// **Printed above `print_completion`**, because `print_project_version` stays the final line of the
+// console output by contract.
+async function record_run_report(
+	issue_number: string | undefined,
+	should_merge: boolean,
+): Promise<void> {
+	if (!should_merge) return
+
+	const completed = parse_completed_issue_number(issue_number)
+	if (completed === undefined) return
+
+	const lines = await time_history.record_run(completed, process.cwd())
+	for (const line of lines) console.info(line)
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -178,6 +203,7 @@ async function main(): Promise<void> {
 		is_skip_watch: cli.values['skip-watch'] === true,
 		should_merge,
 	})
+	await record_run_report(issue_number, should_merge)
 	await print_completion(issue_number, should_merge)
 	clear_round_one_snapshot(should_merge)
 }
@@ -191,6 +217,7 @@ try {
 
 const git_followup_workflow = {
 	clear_round_one_snapshot,
+	record_run_report,
 	parse_issue_number_from_text,
 	resolve_branch_name,
 	is_merge_resolved,

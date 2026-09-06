@@ -316,6 +316,15 @@ with both figures beside it.
   readings to tell" become two different sentences instead of one shrug. Take it before writing a
   verdict that rests on two runs; where two runs still disagree, say so rather than picking the one
   that supports the change.
+- **The runs nobody measured are recorded anyway, in `.time-history.jsonl`**
+  ([#1471](https://github.com/joshuafolkken/kit/issues/1471)). Every merged run appends one line —
+  issue, timestamp, elapsed, turns, tool calls, round trips and the two per-round-trip costs — from
+  `josh followup`, so the sample accumulates whether or not anyone typed `diag`. **It is a headline
+  record, not a report**: it carries no phase table, so a verdict about a phase still comes from
+  `pnpm josh time --issue <M> --json` above. What it is for is the question that used to have no
+  answer at all — which runs happened, and roughly where each one sat — for a run whose report was
+  never taken. Read it with `tail`; the file is gitignored, so a fresh checkout legitimately has none
+  and its absence is not a measurement.
 - **"Cannot tell" is an answer.** A phase that is `not detected` in either run, or a run with no
   merge read, cannot support a verdict, and reporting one anyway is how a speedup that did nothing
   keeps its reputation.
