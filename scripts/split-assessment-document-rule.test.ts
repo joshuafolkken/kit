@@ -38,7 +38,12 @@ const AI_DOC_MARKERS: ReadonlyArray<string> = [
 // shared file; it is the copy that replaced the resident one, so it is asserted like one.
 const ENTRY_MARKERS: ReadonlyArray<string> = [
 	'**The split assessment** runs before any work starts, at *every* entry point, from the one definition in `split-assessment.md`',
-	'Two or more separately-mergeable deliverables always means an epic — no count threshold, no ordering condition',
+	// joshuafolkken/kit#1469 raised the bar rather than moving it: separability is now necessary and
+	// no longer sufficient, so both halves are pinned. Without the first the entry file reads as the
+	// old sufficient test; without the second an entry could drop the epic rule it still owes once a
+	// split is decided.
+	'**The default is not to split**',
+	'always means an epic — no count threshold, no ordering condition',
 ]
 
 // joshuafolkken/kit#1174: the rule body is single-sourced into the skill and the canonical topic
@@ -52,9 +57,20 @@ const REMOVED_BODY_MARKERS: ReadonlyArray<string> = [
 ]
 
 const SHARED_MARKERS: ReadonlyArray<string> = [
+	// joshuafolkken/kit#1469: separability used to be the whole test, and it split nearly everything
+	// because almost any request can be described as several deliverables. Both questions are pinned
+	// **and so is the word "together"** — dropping it leaves two questions a reader satisfies with
+	// either one, which is the state this change was made from.
+	'**The default is not to split.**',
 	'Does the request contain two or more deliverables that could each be merged separately?',
-	// The unconditional rule is the half most easily softened into "a large split gets an epic".
+	'Does the whole of it clearly exceed what one verification gate can confirm in one pass?',
+	'about 10 changed files and about 400 changed lines',
+	'Two questions have to answer yes **together**',
+	// The unconditional rule is the half most easily softened into "a large split gets an epic". It
+	// is about what follows a split, so raising the bar for making one leaves it untouched — pinned
+	// beside the sentence that says so, since the two read as contradicting each other otherwise.
 	'Two or more always means an epic',
+	'This is about what follows a split, never about whether to make one',
 	'There is no count threshold and no ordering condition to evaluate',
 	'**An entry point that applies a different condition is a defect**',
 	'Promote, or create a new epic',

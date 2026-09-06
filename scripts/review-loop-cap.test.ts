@@ -30,7 +30,12 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	// three-way disposition. The resident copy states it as its trigger — fix-in-place, file, or drop —
 	// and filing is now one of three exits rather than the only one.
 	'place each remaining non-High finding in one of three exits',
-	'file it as a follow-up Issue when it reaches a runtime path or needs a decision',
+	// joshuafolkken/kit#1469 named a default among the three. Both halves are pinned because either
+	// alone re-opens the drift: the filing bar without the default reads as "file unless obviously
+	// droppable", and the default without the narrowed bar leaves "or it needs a decision" as a live
+	// second route into filing — which is how this exit stayed the highest-volume one.
+	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
+	'**the default** — drop it with a one-line PR note',
 	CAP_TITLE,
 ]
 

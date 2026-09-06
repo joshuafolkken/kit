@@ -138,9 +138,12 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   or a split turns up (`epicrun.md` → "When `#N` is not an epic"). Both follow from what the keyword
   authorizes: a batch, decided once at the start.
 - **The split assessment** runs before any work starts, at *every* entry point, from the one
-  definition in `split-assessment.md`. Two or more separately-mergeable deliverables always means an
-  epic — no count threshold, no ordering condition — and a `fullrun` / `halfrun` that finds one files
-  the epic and **stops** rather than widening its own authorization to a batch.
+  definition in `split-assessment.md`. **The default is not to split**: separability and a scope that
+  clearly exceeds what one verification gate can confirm in one pass — the guide is about 10 changed
+  files and about 400 changed lines — have to hold **together**, and either alone leaves the work as
+  one Issue (joshuafolkken/kit#1469). Where both hold, two or more separately-mergeable deliverables
+  always means an epic — no count threshold, no ordering condition — and a `fullrun` / `halfrun` that
+  finds one files the epic and **stops** rather than widening its own authorization to a batch.
 - **A prerequisite discovered mid-run is a dependency rather than a park**, at every entry point —
   §2d. It is the third thing a run can discover, beside an upstream defect and a split, and the one
   whose procedure is neither of theirs.
@@ -705,6 +708,15 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
 - **The UI-verification gate** — a rendered change is not done until the screen has been looked at,
   and the procedure for capturing it is `verify-ui`. The gate binds whenever a UI change is reported
   finished, which is routinely a turn with no workflow keyword typed and no skill loaded.
+- **The backlog WIP cap** — with more than 30 Issues open, close one before filing a new one. Filing
+  happens on turns that typed no keyword at all: an upstream defect, a review-cap follow-up from a
+  standalone pre-commit review, a note a conversation decides to record. A cap that only fired
+  inside a workflow would leave the routes that grew the backlog fastest uncounted. What stays
+  resident is the instruction to count, the refusal, and the exemption for a filing a run is blocked
+  by. **The count command itself is not resident** — it has to name the *target* repository and
+  exclude pull requests, and a command copied into two places is a command kept correct in one; read
+  it from `prompts/collaboration-workflow/wip-cap.md`, which also carries why the number can move
+  (joshuafolkken/kit#1469).
 - **The three `josh epic:*` rules that bind outside those commands** — recording a decision removes
   that child's `needs-decision` label, fixing what `epic:audit` finds is Tier A, and an epic in
   another repository is referenced as `owner/repo#N`. Each fires on a turn where no `epic:*` command
