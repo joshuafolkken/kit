@@ -5,6 +5,7 @@ import { git_error } from '../scripts/git/git-error'
 import { git_next_issues } from '../scripts/git/git-next-issues'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
+import { review_stamps } from '../scripts/review/review-stamps'
 import { version_targets } from '../scripts/version/version-targets'
 import { load_optional_environment } from './environment-loader'
 
@@ -140,6 +141,21 @@ async function print_completion(
 	print_project_version()
 }
 
+// A **merged** run ends here, and the round-1 review snapshot's lifetime is one run
+// (joshuafolkken/kit#1441). `--no-merge` is not the end of one — the pull request is still open and
+// the issue is still the current task, the same line `print_next_issues` and the epic auto-close
+// already draw — and clearing there would be the unsafe direction: the next round-1 brief would find
+// no record and write a fresh one against the already-fixed tree, which is the arm-A skip over
+// unreviewed fix code the record exists to prevent.
+//
+// A named function rather than one line inside `main`, so the gate itself is testable: `main` runs at
+// import time in this module, so a suite reaching the clear through it would be removing the record of
+// whatever run is in flight around it (the trap joshuafolkken/kit#1437 fixed for the gate's own
+// records).
+function clear_round_one_snapshot(should_merge: boolean): void {
+	if (should_merge) review_stamps.clear_round_one()
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
@@ -163,6 +179,7 @@ async function main(): Promise<void> {
 		should_merge,
 	})
 	await print_completion(issue_number, should_merge)
+	clear_round_one_snapshot(should_merge)
 }
 
 try {
@@ -173,6 +190,7 @@ try {
 }
 
 const git_followup_workflow = {
+	clear_round_one_snapshot,
 	parse_issue_number_from_text,
 	resolve_branch_name,
 	is_merge_resolved,

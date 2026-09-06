@@ -115,9 +115,11 @@ function round_two_block(snapshot: FileMapStamp | undefined, tree: Record<string
 	if (snapshot === undefined) return `${ROUND_TWO_HEADING}\n${NO_SNAPSHOT_LINE}`
 
 	const delta = file_map_stamp.changed_since(snapshot, tree)
-	// The snapshot's own timestamp, printed rather than assumed: a bare `review:brief` re-run between
-	// the rounds retakes it against the post-fix tree, and the empty delta that follows would
-	// otherwise read as "the fixes changed nothing" instead of "the record was retaken".
+	// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the
+	// record is round 1's own — written once per run, and kept by a later round-1 invocation rather
+	// than retaken against the fixed tree — so this line says how far back the target below is
+	// measured from. A record left behind by a run that never reached `josh followup` makes the target
+	// wider, and its timestamp is the only thing that shows that from here.
 	const taken = `Round 1 was recorded at ${snapshot.taken_at}.`
 
 	return `${ROUND_TWO_HEADING}\n${taken}\n${round_two_target(delta)}\n${ROUND_TWO_QUESTION}`
