@@ -22,6 +22,11 @@ const HOOKS_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Git hook: run unit tests, reusing a green gate recorded on the pushed tree',
 		category: 'Git hooks',
 	},
+	'pre-commit-type-check': {
+		script: 'scripts/pre-commit-type-check.ts',
+		description: 'Git hook: type-check, reusing a green gate recorded on the committed tree',
+		category: 'Git hooks',
+	},
 	'hook:install': {
 		shell: [...PE, 'lefthook', 'install'],
 		description: 'Install git hooks',

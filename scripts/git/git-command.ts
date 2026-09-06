@@ -33,8 +33,15 @@ async function branch(): Promise<string> {
 	return await exec_git_command_read(['rev-parse', '--abbrev-ref', 'HEAD'])
 }
 
+// **`--untracked-files=normal` is passed rather than inherited** (joshuafolkken/kit#1381). Every
+// reader of this output depends on the `??` lines being there: `git-staging.ts` stages exactly those,
+// and `hook-gate-reuse.ts` reads an empty output as "this push carries the recorded tree". A person
+// with `status.showUntrackedFiles=no` in their git config — a common setting on large repositories —
+// gets porcelain output with those lines silently absent, so untracked files go unstaged and the
+// pre-push hook reuses a record for a commit that does not contain them. Naming git's own default
+// makes the reading answer to this codebase rather than to whoever ran it.
 async function status(): Promise<string> {
-	return await exec_git_command_read(['status', '--porcelain'])
+	return await exec_git_command_read(['status', '--porcelain', '--untracked-files=normal'])
 }
 
 // The absolute path every other git command's output is relative to. Asking git rather than reading
