@@ -84,8 +84,13 @@ describe(`${REVIEW_PROMPT} — severity is a test`, () => {
 
 	// Branch 3 and the pre-commit Low rule both said "a Low may be skipped"; with two ways of
 	// becoming a `low` that sentence now lets a user-facing finding be dropped in one line.
+	//
+	// joshuafolkken/kit#1469 made branch 3 the default, so it is no longer scoped to a test-1 failure
+	// alone — what is pinned now is that the test-1 failure is still *named* inside it, since a branch
+	// 3 that stopped distinguishing the two ways of becoming a `low` would take the user-facing one
+	// before branch 1 had been considered.
 	it.each([
-		'A Low finding that does not reach the user — that is, one that failed test 1 of "Severity" above, and **only** that one',
+		'a Low that does not reach the user — one that failed test 1 of "Severity" above',
 		'"Low findings that do not reach the user may be skipped with a one-line reason"',
 		'a `low` that does not reach the user may be skipped with a one-line reason',
 	])('scopes the droppable Low with %j', (marker) => {

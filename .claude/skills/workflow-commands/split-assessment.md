@@ -7,26 +7,61 @@ been three Issues could reach a merge as one pull request (joshuafolkken/kit#865
 
 ## The question
 
-**Does the request contain two or more deliverables that could each be merged separately?**
+**The default is not to split.** Two questions have to answer yes **together**; either one alone
+leaves the work as one Issue (joshuafolkken/kit#1469):
 
-Separately mergeable is the test — not "large", not "touches many files". A change that must land in
-one commit to be correct is one deliverable however big it is; two changes that could each ship
-alone are two, however small.
+1. **Does the request contain two or more deliverables that could each be merged separately?**
+2. **Does the whole of it clearly exceed what one verification gate can confirm in one pass?** The
+   guide is **about 10 changed files and about 400 changed lines**. Under that, it is one Issue
+   however many separable pieces a reader can name inside it.
 
-## Diff size is not a criterion, and that is measured
+Separately mergeable is still the first test, and it is unchanged: a change that must land in one
+commit to be correct is one deliverable however big it is. What changed is that **separability alone
+no longer splits anything** — it is now a necessary condition rather than a sufficient one.
 
-**The test above says the answer is not "large" and not "touches many files", and that exclusion is
-measured rather than stylistic.** joshuafolkken/kit#1436 proposed adding a diff-size arm here, on the
-ground that review round 1's wall clock tracks how much it is handed to read. **It does track it —
-and splitting an Issue in two to shorten round 1 lengthens it**, because each Issue pays round 1's
-fixed cost again while the size-dependent part is merely divided between the halves. The fit, the
+**The guide is a guide, and "clearly" is the operative word.** A run that has to argue itself past
+the numbers has already answered no. They are read against the whole request's estimate, not against
+the diff a first pass happens to produce, and a request that lands at 11 files is not thereby a
+split.
+
+## Why the default is not to split
+
+**The rules were manufacturing Issues faster than runs could close them.** Over the seven days to
+2026-09-06 the backlog took 257 filings against 163 closures — **+13.4 Issues a day**, with filings
+beating closures on **all fourteen** of the preceding fourteen days — while a `fullrun` ran a median
+of about ten minutes from pull request to merge. **Execution was never the bottleneck; arrival was**,
+and this assessment was one of the three routes producing it: `route:split` accounted for **28 of
+the 119 open Issues (24%)**.
+
+**Separability is not scarce, which is why a test made only of it splits nearly everything.** Almost
+any request can be described as several deliverables that could each ship alone, so the old test bit
+on requests worth a handful of lines: joshuafolkken/kit#1205 through #1209 are five Issues of the
+same shape, each a sentence's worth of work. The second question is what makes the test bite only
+where one Issue would genuinely be unverifiable in one pass.
+
+**It moved with the other two, in one commit.** The review round cap's default and the WIP cap
+changed alongside it, for the reason joshuafolkken/kit#1469 gives: a ceiling on open Issues that
+arrives while the manufacturing routes are still open stops execution without stopping arrival, and
+leaves the state worse than before.
+
+## Diff size is not a reason to split, and that is measured
+
+**Size is a bar a split has to clear; it is never a reason to split.** Question 2 is a *minimum* —
+below it the work stays whole — and nothing anywhere makes a large diff a reason to divide one.
+joshuafolkken/kit#1436 proposed exactly that reason: a diff-size arm that would split a large Issue,
+on the ground that review round 1's wall clock tracks how much it is handed to read. **It does track
+it — and splitting an Issue in two to shorten round 1 lengthens it**, because each Issue pays round
+1's fixed cost again while the size-dependent part is merely divided between the halves. The fit, the
 sample, the unreadable share of it and the decision are `prompts/review.md` → "Round 1's cost does
 track the change size, and splitting is still not how to cut it", which is the single source. **A
-proposal to add a size threshold here is required to say why that data does not reach it**, which is
-a different bar from being refused.
+proposal to add a size threshold that splits more is required to say why that data does not reach
+it**, which is a different bar from being refused.
 
-**It changes nothing about the assessment itself.** Two or more separately-mergeable deliverables
-still always means an epic, and one deliverable stays one however large its diff is.
+**joshuafolkken/kit#1469's threshold points the other way, which is why the two are not in
+contradiction.** At every diff size the current test splits as often as the old one or less often
+and never more, so it can only remove intercepts the measurement above says a split adds — the same
+data supports both decisions. **What this section refuses is any arm that would raise the number of
+splits at some size**, whatever ground it is argued from.
 
 ## What each entry point does with the answer
 
@@ -51,7 +86,9 @@ defined in `SKILL.md` → §2d, which is its single source; each entry's own bra
 ## Two or more always means an epic
 
 **Splitting into two or more Issues always creates an epic. There is no count threshold and no
-ordering condition to evaluate.** This rule already existed for `kickoff new`; extending the
+ordering condition to evaluate.** This is about what follows a split, never about whether to make
+one — the bar for that is "The question" above, and once it is cleared this rule takes over
+unchanged. This rule already existed for `kickoff new`; extending the
 assessment to every entry extends the rule with it. **An entry point that applies a different
 condition is a defect** — the whole point of one definition is that where the split was noticed
 cannot change what happens next.
