@@ -37,6 +37,17 @@ vi.mock('../scripts/review/review-stamps', () => ({
 	review_stamps: { clear_round_one: vi.fn() },
 }))
 
+// **Mocked for the same reason `review_stamps` above is**: `main` runs at import time, so the real
+// recorder would measure — and append a record for — whatever run is executing this suite
+// (joshuafolkken/kit#1471).
+const record_run_mock = vi.hoisted(() =>
+	vi.fn<() => Promise<Array<string>>>().mockResolvedValue([]),
+)
+
+vi.mock('../scripts/time/time-history', () => ({
+	time_history: { record_run: record_run_mock },
+}))
+
 const { git_followup_workflow } = await import('./git-followup-workflow')
 
 describe('parse_issue_number_from_text', () => {
@@ -243,6 +254,45 @@ describe('the round-1 snapshot is cleared only by a merged run', () => {
 		git_followup_workflow.clear_round_one_snapshot(false)
 
 		expect(clear_round_one_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#1471. The report is emitted by the run that finished rather than by a person
+// typing `diag`, and "finished" is the merge — the same gate the round-1 clear above uses, for the
+// same reason: a `--no-merge` run's CI wait is not over, so its record would not be comparable.
+describe('the run report is emitted only by a merged run', () => {
+	beforeEach(() => {
+		record_run_mock.mockClear()
+	})
+
+	it('records the run that merged, against the checkout it ran in', async () => {
+		await git_followup_workflow.record_run_report('#42', true)
+
+		expect(record_run_mock).toHaveBeenCalledWith(42, process.cwd())
+	})
+
+	it('records nothing on a --no-merge run', async () => {
+		await git_followup_workflow.record_run_report('#42', false)
+
+		expect(record_run_mock).not.toHaveBeenCalled()
+	})
+
+	it('records nothing when no issue number was given', async () => {
+		await git_followup_workflow.record_run_report(undefined, true)
+
+		expect(record_run_mock).not.toHaveBeenCalled()
+	})
+
+	it('prints every line the recorder returned', async () => {
+		const heading = '📈 Run report — issue #42'
+
+		record_run_mock.mockResolvedValueOnce([heading])
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await git_followup_workflow.record_run_report('#42', true)
+
+		expect(info).toHaveBeenCalledWith(heading)
+		info.mockRestore()
 	})
 })
 
