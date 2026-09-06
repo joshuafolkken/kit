@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild } from './epic-graph'
 import { epic_next } from './epic-next'
+import type { EpicView } from './epic-next-views'
+import { epic_view_fixture } from './epic-view-fixture'
 
 // joshuafolkken/kit#925: `epic:next --repo` used to answer from the epic's own children alone, so an
 // `in-progress` issue belonging to a *different* epic was invisible. Two `epicrun`s in one checkout
@@ -37,6 +39,7 @@ const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 const { issue, record } = auto_ok_fixture
 
 const REPO = 'joshuafolkken/kit'
+const EPIC_NUMBER = 858
 const FIRST_CHILD = 861
 const SECOND_CHILD = 862
 // An issue this epic does not track at all — the case the classification cannot see.
@@ -80,6 +83,10 @@ function stderr(): string {
 	return stderr_lines.join('\n')
 }
 
+function views_of(children: ReadonlyArray<EpicChild>): Array<EpicView> {
+	return epic_view_fixture.single_view(snapshot(children), EPIC_NUMBER)
+}
+
 // One `--repo` answer, end to end: classify the children, then ask the repository how many of its
 // lanes are already running something.
 //
@@ -91,9 +98,7 @@ async function answer_for(
 	limit: number = ONE_LANE,
 	is_all_lanes = false,
 ): Promise<number> {
-	const state = snapshot(children)
-
-	return await epic_next.report(epic_next.decide(state), state, { repo: REPO, limit, is_all_lanes })
+	return await epic_next.report(views_of(children), { repo: REPO, limit, is_all_lanes })
 }
 
 function listing(numbers: ReadonlyArray<number>): string {
@@ -233,18 +238,14 @@ describe('josh epic:next --repo — verdicts that start nothing', () => {
 // for a reader to discover.
 describe('josh epic:next without --repo', () => {
 	it('says the per-repository exclusion was not consulted', async () => {
-		const state = snapshot([child(FIRST_CHILD)])
-
-		await epic_next.report(epic_next.decide(state), state, undefined)
+		await epic_next.report(views_of([child(FIRST_CHILD)]), undefined)
 
 		expect(stderr()).toContain(epic_next.UNCHECKED_EXCLUSION)
 		expect(issue_list).not.toHaveBeenCalled()
 	})
 
 	it('says nothing of the kind when there is no runnable child', async () => {
-		const state = snapshot([child(FIRST_CHILD, [IN_PROGRESS_LABEL])])
-
-		await epic_next.report(epic_next.decide(state), state, undefined)
+		await epic_next.report(views_of([child(FIRST_CHILD, [IN_PROGRESS_LABEL])]), undefined)
 
 		expect(stderr()).not.toContain(epic_next.UNCHECKED_EXCLUSION)
 	})

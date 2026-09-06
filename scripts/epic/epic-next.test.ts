@@ -10,6 +10,7 @@ import { epic_next } from './epic-next'
 const REPO = 'joshuafolkken/kit'
 const CROSS_REPO_REFERENCE = `${REPO}#858`
 const THIRD_PARTY_REPO = 'sveltejs/kit'
+const BAD_REFERENCE = 'nine-oh-nine'
 const DEPENDENCIES_BODY = 'Dependencies\n\n#1 -> #2'
 const UNORDERED_BODY = 'None — the children are independent; any execution order works.'
 
@@ -85,26 +86,26 @@ describe('epic_next.parse_options — a qualified epic', () => {
 	it('reads the repository the epic lives in', () => {
 		const options = epic_next.parse_options([CROSS_REPO_REFERENCE])
 
-		expect(options.epic_repo).toBe(REPO)
-		expect(options.epic_number).toBe(858)
+		expect(options.references?.[0]?.repo).toBe(REPO)
+		expect(options.references?.[0]?.number).toBe(858)
 	})
 
 	it('leaves the epic repository unset for a bare number', () => {
-		expect(epic_next.parse_options(['858']).epic_repo).toBeUndefined()
+		expect(epic_next.parse_options(['858']).references?.[0]?.repo).toBeUndefined()
 	})
 })
 
 // The qualified read joshuafolkken/kit#1016 added names that repository in its REST path, so an
 // epic naming another owner would send this command to their tracker — the read
 // joshuafolkken/kit#869 forbids for a child, forbidden here for the same reason.
-describe('epic_next.run_epic — an epic that belongs to somebody else', () => {
+describe('epic_next.run_epics — an epic that belongs to somebody else', () => {
 	it('refuses without asking that repository anything', async () => {
 		vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 		const fetch_epic = vi.spyOn(epic_fetch, 'fetch_epic')
 		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 		const options = epic_next.parse_options([`${THIRD_PARTY_REPO}#858`])
 
-		expect(await epic_next.run_epic(options)).toBe(1)
+		expect(await epic_next.run_epics(options)).toBe(1)
 		expect(fetch_epic).not.toHaveBeenCalled()
 		expect(errors).toHaveBeenCalledWith(epic_next.FOREIGN_EPIC)
 
@@ -114,7 +115,7 @@ describe('epic_next.run_epic — an epic that belongs to somebody else', () => {
 
 describe('epic_next.parse_options', () => {
 	it('reads the epic number', () => {
-		expect(epic_next.parse_options(['858']).epic_number).toBe(858)
+		expect(epic_next.parse_options(['858']).references?.[0]?.number).toBe(858)
 	})
 
 	it('reads the repository to narrow to', () => {
@@ -154,6 +155,55 @@ describe('epic_next.parse_options — refusals', () => {
 
 	it('refuses a missing epic number', () => {
 		expect(epic_next.parse_options([]).usage).toContain('Usage:')
+	})
+})
+
+// joshuafolkken/kit#1493: several epics feed one lane pool, so the entry grammar takes several
+// references. The split is on the first flag rather than on a fixed count, and the order they were
+// named is the order their children take free lanes in.
+describe('epic_next.parse_options — several epics', () => {
+	it('reads every leading reference', () => {
+		const options = epic_next.parse_options(['858', '909', '--repo', REPO, '--lanes'])
+
+		expect(options.references?.map((entry) => entry.number)).toEqual([858, 909])
+	})
+
+	it('keeps them in the order they were named', () => {
+		expect(
+			epic_next.parse_options(['909', '858']).references?.map((entry) => entry.number),
+		).toEqual([909, 858])
+	})
+
+	it('reads a qualified reference beside a bare one', () => {
+		const options = epic_next.parse_options(['858', CROSS_REPO_REFERENCE])
+
+		expect(options.references?.[1]?.repo).toBe(REPO)
+	})
+
+	// A mistyped second epic would otherwise run the first one alone and say nothing about the one
+	// that was missed — an unattended run silently doing half of what was asked.
+	it('refuses the whole read when one reference does not parse', () => {
+		expect(epic_next.parse_options(['858', BAD_REFERENCE]).usage).toContain('Usage:')
+		expect(epic_next.parse_options(['858', BAD_REFERENCE]).references).toBeUndefined()
+	})
+
+	it('does not read a flag value as an epic', () => {
+		expect(
+			epic_next.parse_options(['858', '--repo', REPO]).references?.map((entry) => entry.number),
+		).toEqual([858])
+	})
+})
+
+describe('epic_next.split_at_flag', () => {
+	it('puts everything before the first flag in the head', () => {
+		expect(epic_next.split_at_flag(['858', '909', '--lanes'])).toEqual({
+			head: ['858', '909'],
+			rest: ['--lanes'],
+		})
+	})
+
+	it('takes the whole argument list as the head when there is no flag', () => {
+		expect(epic_next.split_at_flag(['858'])).toEqual({ head: ['858'], rest: [] })
 	})
 })
 
@@ -316,7 +366,7 @@ describe('josh epic:next — a repository that could not be read', () => {
 			.spyOn(git_gh_command, 'repo_get_name_with_owner')
 			.mockResolvedValue(undefined)
 
-		expect(await epic_next.run_epic({ epic_number: 858 })).toBe(1)
+		expect(await epic_next.run_epics({ references: [{ number: 858 }] })).toBe(1)
 		expect(error.mock.calls.join('\n')).toContain('cannot be keyed by repository')
 		repo_read.mockRestore()
 		error.mockRestore()

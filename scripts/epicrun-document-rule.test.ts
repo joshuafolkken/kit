@@ -243,7 +243,7 @@ describe('epicrun definition', () => {
 	})
 
 	it.each(AI_DOCS)('lists the keyword in the shorthand table of %s', (document_name) => {
-		expect(read_unwrapped(document_name)).toContain('| `epicrun #E`')
+		expect(read_unwrapped(document_name)).toContain('| `epicrun #E…`')
 	})
 
 	// The upstream-interrupt rule is where a reader looks when a defect appears mid-run, and it has

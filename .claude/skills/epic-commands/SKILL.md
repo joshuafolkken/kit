@@ -138,13 +138,27 @@ about the search itself rather than about anything the children say (joshuafolkk
 state or artifact, list the existing code referencing that concept and confirm some child owns
 updating it. Label names are single-sourced in `scripts/git/issue-labels.ts`.
 
-## `josh epic:next <E>` — what is runnable
+## `josh epic:next <E…>` — what is runnable
 
 Returns **every** runnable child, bundled per repository with the local checkout to run it in.
 `--repo <owner/repo>` narrows to one and prints a single token: the issue number, or the verdict.
 `--lanes` beside it prints one issue number per line instead, **up to the number of free lanes in
 that repository** — so a caller that reads one token keeps reading one token
 (joshuafolkken/kit#1491).
+
+**It takes more than one epic, and they answer as one** (joshuafolkken/kit#1493). Every leading
+argument is an epic reference — the split is on the first flag, so `epic:next 858 909 --repo X
+--lanes` reads two — and their runnable children merge into one candidate pool per repository, so six
+free lanes fill from every named epic rather than from whichever was typed first.
+**The priority order is the order the epics were named**: dependency
+depth does not compare across graphs, since depth is measured inside one epic and there is no
+relation between two epics to normalize against, while argument order is the one ranking a person
+typed and can change. Inside one epic nothing moves — its own declared chain still decides which of
+its children is a candidate. **A child two epics both track enters once**, keyed by
+`owner/repo#number` and kept by the epic named earlier; withheld there, it stays withheld, because a
+`blocked-by` relation belongs to the issue rather than to the epic listing it. **One unusable graph
+refuses the whole answer**, and **one reference that does not parse fails the read** rather than
+being dropped. `docs/josh-commands.md` → "`josh epic:next`" carries the worked form.
 
 **An `in-progress` issue occupies a lane rather than the whole repository.** The occupancy is counted
 from that repository's own `in-progress` listing — never from anything the session remembers, since

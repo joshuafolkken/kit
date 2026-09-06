@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EpicSnapshot } from './epic-fetch'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_next } from './epic-next'
+import { epic_view_fixture } from './epic-view-fixture'
 
 // joshuafolkken/kit#1121: `read_blocked_by` answers from the issue's own dependency summary when that
 // summary says zero, so a child whose counter is stale reads as having no blockers at all. Nothing in
@@ -58,6 +59,7 @@ function snapshot(children: ReadonlyArray<EpicChild>): EpicSnapshot {
 // One lane, which is the shape every assertion below was written against: the repository runs one
 // child at a time (joshuafolkken/kit#1491 made that number a setting rather than the only option).
 const ONE_LANE = 1
+const EPIC_NUMBER = 858
 
 const stdout_lines: Array<string> = []
 const stderr_lines: Array<string> = []
@@ -72,13 +74,9 @@ function stdout(): string {
 // One `--repo` answer, end to end: classify the children, ask the repository whether anything is
 // running there, then confirm the candidate against its relations listing.
 async function answer_for(children: ReadonlyArray<EpicChild>): Promise<number> {
-	const state = snapshot(children)
+	const views = epic_view_fixture.single_view(snapshot(children), EPIC_NUMBER)
 
-	return await epic_next.report(epic_next.decide(state), state, {
-		repo: REPO,
-		limit: ONE_LANE,
-		is_all_lanes: false,
-	})
+	return await epic_next.report(views, { repo: REPO, limit: ONE_LANE, is_all_lanes: false })
 }
 
 beforeEach(() => {
