@@ -99,7 +99,10 @@ async function materialize(plan: LanePlan): Promise<void> {
  * both, and the refusal says so.
  */
 async function open_lane(issue: string): Promise<OpenOutcome> {
-	const repository_root = await git_command.repository_root()
+	// The main work tree's, never this one's: run from inside a lane, the current root would put the
+	// new lane under `<lane>/.<lane>-lanes` and read the lane's own seed as the root's — a lane
+	// `list_lanes` cannot see, on ports it never recorded (joshuafolkken/kit#1497).
+	const repository_root = await lane_registry.main_repository_root()
 	const lanes = await lane_registry.list_lanes()
 	const existing = lane_registry.find_lane(lanes, issue)
 

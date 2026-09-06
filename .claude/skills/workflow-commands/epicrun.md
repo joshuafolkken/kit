@@ -345,8 +345,7 @@ the same answer** (joshuafolkken/kit#1067): the paging bounds every listing now,
 no visible holder is still not "nothing is running" — `wait`, with its own message, since clearing a
 stale label would not change it.
 
-**Two children of one repository may run at once once joshuafolkken/kit#1497 lands, and the section
-below is how** — that Issue is the last thing between the procedure and a run using it. This paragraph
+**Two children of one repository may run at once, and the section below is how.** This paragraph
 used to say the opposite, and the three reasons it gave have each been answered rather than waived
 (joshuafolkken/kit#1492). They are recorded here because a reader who finds only the new procedure
 cannot tell which of them was solved and which was merely stopped being mentioned:
@@ -384,19 +383,21 @@ work tree with its own branch, its own `.env` and its own dev and preview ports
 parallel; the merges stay serial** — not because this procedure serializes them, but because each one
 lands on the `main` the next one is then measured against.
 
-**The lane path is not executable yet, and one command is why.** `pnpm josh git` refuses to commit
-from a branch that is neither the default branch nor one sharing the child's `<N>-` prefix
-(`scripts/git/git-branch.ts` → `has_same_issue_prefix`, `/^\d+-/`), and a lane's branch is
-`lane/<N>`, which matches neither — so a child implemented in a lane exits 1 at its commit with
-"Branch mismatch detected". **Switching the lane to another branch is not the way round it, and
-reaching for one is the failure this paragraph exists to stop.** `lane-registry.ts` → `branch_issue`
-identifies a lane **by** that `lane/` branch, so a switched lane drops out of `list_lanes()`
-altogether: `lane:open` re-issues its seat to the next lane and the two bind the same dev and preview
-ports, `lane:list` and `lane:close --all` stop seeing it, and `lane:prune` cannot reach it — the
-port isolation that is the whole reason a lane exists, lost to work around a branch name.
-**joshuafolkken/kit#1497 renames the lane branch so both hold.** Until it lands, ask `epic:next`
-**without** `--lanes` and run one child at a time exactly as before; everything below is what happens
-the moment it does.
+**A lane's branch is `<N>-lane`, and the issue number leads it so that the commit path accepts it**
+(joshuafolkken/kit#1497). `pnpm josh git` refuses to commit from a branch that is neither the default
+branch nor one sharing the child's `<N>-` prefix (`scripts/git/git-branch.ts` →
+`has_same_issue_prefix`, `/^\d+-/`); the original `lane/<N>` matched neither, so a child implemented
+in a lane exited 1 at its commit with "Branch mismatch detected" and no lane could ship anything.
+**Switching the lane to another branch is not the way round it, and reaching for one is the failure
+this paragraph exists to stop.** `lane-registry.ts` → `branch_issue` identifies a lane **by** that
+branch name, so a switched lane drops out of `list_lanes()` altogether: `lane:open` re-issues its
+seat to the next lane and the two bind the same dev and preview ports, `lane:list` and
+`lane:close --all` stop seeing it, and `lane:prune` cannot reach it — the port isolation that is the
+whole reason a lane exists, lost to work around a branch name. **The rename is what makes the
+workaround unnecessary rather than merely forbidden**: `lane_paths.lane_branch` and
+`lane_registry.branch_issue` read the same name from one constant, and it is a name `pnpm josh git`
+already commits from. So `epic:next` is asked **with** `--lanes`, and everything below runs as
+written.
 
 **Running unattended gets harder, not easier, and that is the honest trade.** Six lanes make the overlap
 between children real — two open issues touching `scripts/git/git-epic-*` and two touching
@@ -455,7 +456,9 @@ pnpm --dir "$dir" install --frozen-lockfile
   route.
 - **Nothing switches the lane's branch.** The reason is at the top of this section: the registry
   identifies a lane by that branch, so a switch costs the lane its seat, its listing and its
-  isolation. The commit path is joshuafolkken/kit#1497's, and it is why the lane path is gated.
+  isolation. **Nor is there anything to switch it for** — `<N>-lane` is already a name
+  `pnpm josh git` commits from (joshuafolkken/kit#1497), so the child commits, pushes and opens its
+  pull request from the branch `lane:open` created.
 - **`pnpm josh run:preflight` is not asked in a lane; `lane:open`'s own answer replaces it.** A lane
   that opened a moment ago was created from the default branch and is clean by construction, and the
   command could not answer usefully anyway: its `reclaim` arm tests `HEAD != default branch`, which
@@ -678,29 +681,34 @@ preflight is what turns that into something the batch can act on.
 run's summary, with the stash reference where there was one — a reclaim nobody mentioned is
 indistinguishable from a run that never crashed.
 
-**It is not asked in a lane.** Every lane's HEAD is on `lane/<N>` rather than the default branch, so
+**It is not asked in a lane.** Every lane's HEAD is on `<N>-lane` rather than the default branch, so
 the `reclaim` arm fires on all of them and the recovery it prints cannot run in a linked work tree.
 What replaces it there is `lane:open`'s own answer, in "Opening one lane" above. This section is
 unchanged for a child implemented in the session's own checkout.
+
+**Asked in the primary checkout while a lane for that child is open, it answers `resume`, and that
+is correct rather than a false positive.** The branch read is `git branch --list '<N>-*'`, which
+`<N>-lane` now matches (joshuafolkken/kit#1497) — so the answer says a branch for this issue exists,
+which is exactly true. The loop never reaches it that way, because `epic:next` does not offer a
+child already carrying `in-progress`; a person asking by hand is being told where the work is.
 
 ## The loop
 
 `josh epic:next <E> --repo <this repository> --lanes` prints **one issue number per line** on
 standard output — as many as that repository has free lanes — or, when there is no child to run, the
 verdict as a single token. Everything else goes to standard error, so what a shell captures is the
-list. Without `--lanes` the answer is a single token either way, which is what a caller running one
-child at a time still gets — **and that is the form to use until joshuafolkken/kit#1497 lands**, for
-the reason at the top of "Lanes — running more than one child at a time" above: a child cannot be
-committed from inside a lane yet.
+list. Without `--lanes` the answer is a single token either way, which is what a caller deliberately
+running one child at a time still gets.
 
 ```bash
-answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
-# add --lanes once joshuafolkken/kit#1497 lands, and read a line per child instead of one token
+answers=$(pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes)
+# one issue number per line, up to the number of free lanes; a verdict token when there is none
 ```
 
-**The snippet shows the one-at-a-time form deliberately.** A block carrying `--lanes` beside prose saying not
-to use it yet is a block that gets copied, and the run that copies it opens lanes and loses every
-child at `pnpm josh git` — which is the pressure that produces the branch switch this file forbids.
+**`--lanes` is the form to use.** A lane's branch is `<N>-lane`, which `pnpm josh git` commits from
+(joshuafolkken/kit#1497), so a child handed a lane runs the whole `fullrun` procedure inside it —
+there is nothing left to work around and no reason to drop back to one child at a time. Read a line
+per child, and treat a single non-numeric line as the verdict.
 
 1. Run the command above.
 2. **One or more numbers** — where the child runs in this session's own checkout, **first ask

@@ -26,8 +26,8 @@ interface LaneInfo {
 const WORKTREE_PREFIX = 'worktree '
 const BRANCH_PREFIX = 'branch refs/heads/'
 const BLOCK_SEPARATOR = '\n\n'
-// The same shape `lane:open` accepts. Nothing reserves the `lane/` prefix, so a hand-made
-// `lane/spike` branch with a work tree would otherwise be read as a lane — and `lane:close --all`
+// The same shape `lane:open` accepts. Nothing reserves the `-lane` suffix, so a hand-made
+// `spike-lane` branch with a work tree would otherwise be read as a lane — and `lane:close --all`
 // would delete its directory and its branch on an issue number that never existed.
 const ISSUE_PATTERN = /^[1-9]\d*$/u
 
@@ -65,9 +65,9 @@ function read_seed(directory: string): number | undefined {
 // spellings of one path — git prints the resolved one, and a lane root reached through a symlink
 // would otherwise read as no lane at all.
 function branch_issue(branch: string | undefined): string | undefined {
-	if (!branch?.startsWith(lane_paths.LANE_BRANCH_PREFIX)) return undefined
+	if (!branch?.endsWith(lane_paths.LANE_BRANCH_SUFFIX)) return undefined
 
-	const issue = branch.slice(lane_paths.LANE_BRANCH_PREFIX.length)
+	const issue = branch.slice(0, -lane_paths.LANE_BRANCH_SUFFIX.length)
 
 	return ISSUE_PATTERN.test(issue) ? issue : undefined
 }
@@ -96,13 +96,29 @@ function build_lane(
 	}
 }
 
-function parse_block(block: string): LaneInfo | undefined {
+// **A lane is its branch *and* its place, and the place is what makes the identification safe**
+// (joshuafolkken/kit#1497). The branch alone is not a namespace anyone stays out of: `pnpm josh git`
+// builds an issue branch as `<N>-<slug of the title>`, so an issue titled "Lane" produces `<N>-lane`
+// — byte for byte the name `lane_paths.lane_branch` builds. Read as a lane, that work tree is
+// whichever checkout the person was working in, and `lane:close --all` would delete it, because
+// `lane-close.ts` → `remove_directory` runs `rmSync` on whatever directory the registry reported.
+// Requiring the directory to be exactly `<lane root>/<N>` costs a real lane nothing — `lane:open`
+// puts it there and nowhere else — and takes the whole class of collision out. The cost is that a
+// lane root reached through a symlink stops reading as a lane; that fails safe, where the branch
+// check alone failed destructively.
+function is_lane_directory(root: string, issue: string, directory: string): boolean {
+	return directory === lane_paths.lane_directory(root, issue)
+}
+
+function parse_block(block: string, root: string): LaneInfo | undefined {
 	const lines = block.split('\n')
 	const directory = line_value(lines, WORKTREE_PREFIX)
 	const branch = line_value(lines, BRANCH_PREFIX)
 	const issue = branch_issue(branch)
 
 	if (directory === undefined || branch === undefined || issue === undefined) return undefined
+
+	if (!is_lane_directory(root, issue, directory)) return undefined
 
 	return build_lane(issue, branch, directory, is_gone(directory))
 }
@@ -111,11 +127,40 @@ function is_lane(lane: LaneInfo | undefined): lane is LaneInfo {
 	return lane !== undefined
 }
 
+async function worktree_blocks(): Promise<Array<string>> {
+	const listing = await git_command.worktree_list()
+
+	return listing.split(BLOCK_SEPARATOR)
+}
+
+function main_worktree(blocks: ReadonlyArray<string>): string | undefined {
+	return line_value((blocks[0] ?? '').split('\n'), WORKTREE_PREFIX)
+}
+
+/**
+ * The main work tree's root, whichever work tree this was run in.
+ *
+ * **Every lane path is derived from here, and `git rev-parse --show-toplevel` is not it**
+ * (joshuafolkken/kit#1497). That answers the *current* work tree, which inside a lane is the lane
+ * itself — so `lane:list` run there looks for lanes under `<lane>/.<lane>-lanes` and reports that
+ * none are open while six are running, and `lane:open` run there puts the new lane under that same
+ * wrong root, reads the lane's own `.env` as the root's, and lands somewhere `list_lanes` cannot see
+ * it: the seat goes unrecorded and the next lane binds the same ports. `git worktree list` names the
+ * main work tree first and prints the same thing from every work tree, so one reading serves
+ * `lane:list`, `lane:open` and `lane:close` alike — which is why it is here rather than copied into
+ * each. The fallback is the old behavior, for a listing that named no work tree at all.
+ */
+async function main_repository_root(): Promise<string> {
+	const blocks = await worktree_blocks()
+
+	return main_worktree(blocks) ?? (await git_command.repository_root())
+}
+
 /** Every open lane of this repository, lowest issue number first. */
 async function list_lanes(): Promise<Array<LaneInfo>> {
-	const listing = await git_command.worktree_list()
-	const blocks = listing.split(BLOCK_SEPARATOR)
-	const lanes = blocks.map((block) => parse_block(block)).filter(is_lane)
+	const root = lane_paths.lane_root(await main_repository_root())
+	const blocks = await worktree_blocks()
+	const lanes = blocks.map((block) => parse_block(block, root)).filter(is_lane)
 
 	return lanes.toSorted((left, right) => Number(left.issue) - Number(right.issue))
 }
@@ -137,6 +182,7 @@ function find_lane(lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | un
 const lane_registry = {
 	find_lane,
 	list_lanes,
+	main_repository_root,
 	parse_block,
 	unreadable_lanes,
 	used_seeds,

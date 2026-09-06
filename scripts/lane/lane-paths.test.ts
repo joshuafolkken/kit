@@ -1,4 +1,6 @@
 import path from 'node:path'
+import { git_branch } from '#scripts/git/git-branch'
+import { issue_logic } from '#scripts/issue/issue-logic'
 import { describe, expect, it } from 'vitest'
 import { lane_paths } from './lane-paths'
 
@@ -42,7 +44,26 @@ describe('what a lane is called', () => {
 		expect(lane_paths.lane_directory('/w/.kit-lanes', ISSUE)).toBe('/w/.kit-lanes/1490')
 	})
 
-	it('namespaces the branch so a lane branch is never mistaken for an issue branch', () => {
-		expect(lane_paths.lane_branch(ISSUE)).toBe('lane/1490')
+	it('leads the branch with the issue number, which is what a commit from a lane needs', () => {
+		expect(lane_paths.lane_branch(ISSUE)).toBe('1490-lane')
+	})
+
+	// joshuafolkken/kit#1497: `lane/<N>` was rejected by this very function, so `pnpm josh git` exited
+	// 1 before committing anything and the whole lane path was unusable. Asserting against the real
+	// matcher rather than a copy of its pattern is the point — a copy is what let the mismatch ship.
+	it('produces a branch pnpm josh git will commit from', () => {
+		const target = `${ISSUE}-name-a-lane-branch`
+
+		expect(git_branch.has_same_issue_prefix(lane_paths.lane_branch(ISSUE), target)).toBe(true)
+	})
+
+	// The name is inside the namespace `pnpm josh git` generates, and there is no spelling that both
+	// leads with `<N>-` and stays out of it: an issue titled "Lane" slugs to exactly this. Pinned so
+	// the next reader knows the collision is real and is answered by `lane_registry.parse_block`
+	// requiring the work tree to sit at `<lane root>/<N>`, not by the branch name being unique.
+	it('is a name pnpm josh git could also generate, which is why the directory is checked too', () => {
+		expect(issue_logic.suggest_branch_name(Number(ISSUE), 'Lane')).toBe(
+			lane_paths.lane_branch(ISSUE),
+		)
 	})
 })

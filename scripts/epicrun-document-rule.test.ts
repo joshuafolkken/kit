@@ -104,16 +104,20 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	// A linked work tree starts with no `node_modules`, and the lane root is a sibling rather than a
 	// child of the repository, so nothing above it resolves either.
 	'**The install is not optional.**',
-	// `pnpm josh git` compares on the `<N>-` prefix, which `lane/<N>` does not carry, so a child left
-	// on the lane branch exits 1 at its commit — and the obvious way round it is the trap. The
+	// joshuafolkken/kit#1497: `pnpm josh git` compares on the `<N>-` prefix, so the lane branch leads
+	// with the issue number — and the obvious way round the old `lane/<N>` is still the trap. The
 	// registry identifies a lane *by* that branch (`lane-registry.ts` → `branch_issue`), so switching
 	// drops the lane out of `list_lanes()`: the next `lane:open` re-issues its seat and two live
-	// lanes bind one pair of ports. The gate and the prohibition are pinned separately because a
-	// document keeping only the gate reads as an invitation to work around it.
-	'**The lane path is not executable yet, and one command is why.**',
+	// lanes bind one pair of ports. The name and the prohibition are pinned separately because a
+	// document keeping only the name reads as an invitation to rename it again locally.
+	"**A lane's branch is `<N>-lane`, and the issue number leads it",
 	'**Switching the lane to another branch is not the way round it',
 	"**Nothing switches the lane's branch.**",
 	'joshuafolkken/kit#1497',
+	// The whole point of the rename is that the loop asks for lanes. A snippet without `--lanes` is
+	// the one that gets copied, and a run copying it does one child at a time for no reason.
+	'--repo joshuafolkken/kit --lanes',
+	'**`--lanes` is the form to use.**',
 	// The pop carries the lock file the install has to build against; installed first, the first
 	// child's gate runs against `node_modules` from the previous lock while committing the new one.
 	'**The install comes after the stash pop, never before it.**',
@@ -149,6 +153,13 @@ const WITHDRAWN_PREMISES: ReadonlyArray<string> = [
 	'has to **replace** this guard',
 	'Two children of one repository still may not run at once',
 	'Why same-repository parallelism is out of scope here',
+	// joshuafolkken/kit#1497 renamed the lane branch, so the freeze these sentences imposed is over.
+	// Left in place they tell a reader to drop back to one child at a time — the lane machinery three
+	// issues built, switched off by a paragraph nobody remembered to delete.
+	'**The lane path is not executable yet, and one command is why.**',
+	'Until it lands, ask `epic:next`',
+	'**The snippet shows the one-at-a-time form deliberately.**',
+	'add --lanes once joshuafolkken/kit#1497 lands',
 ]
 
 // joshuafolkken/kit#913: a child is run as `fullrun #<N>`, and `fullrun` requires `josh latest`

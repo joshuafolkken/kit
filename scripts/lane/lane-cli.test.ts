@@ -26,7 +26,7 @@ const FAILURE = 1
 const LANE: LaneInfo = {
 	issue: ISSUE,
 	seed: 6,
-	branch: 'lane/1490',
+	branch: '1490-lane',
 	directory: '/w/.kit-lanes/1490',
 	is_stranded: false,
 }
@@ -128,7 +128,7 @@ describe('a close that did not finish', () => {
 	// Reported as a success, a close that left a branch behind sends the caller to the next
 	// `lane:open`, which then fails on git's own message about a branch that already exists.
 	it('exits non-zero and names what a close left behind', async () => {
-		closes_as('incomplete', ['lane/1490'])
+		closes_as('incomplete', ['1490-lane'])
 
 		expect(await lane_cli.run(['close', ISSUE])).toBe(FAILURE)
 	})

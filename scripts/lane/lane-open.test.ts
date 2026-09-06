@@ -13,7 +13,6 @@ import type { LaneInfo } from './lane-registry'
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
 		get_default_branch: vi.fn(),
-		repository_root: vi.fn(),
 		worktree_add: vi.fn(),
 	},
 }))
@@ -22,6 +21,7 @@ vi.mock('./lane-registry', () => ({
 		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
 			lanes.find((lane) => lane.issue === issue),
 		list_lanes: vi.fn(),
+		main_repository_root: vi.fn(),
 		unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
 			lanes.filter((lane) => !lane.is_stranded && lane.seed === undefined),
 		used_seeds: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
@@ -59,7 +59,7 @@ function lane_environment_file(issue: string): string {
 function live_lane(issue: string, seed: number | undefined): LaneInfo {
 	return {
 		issue,
-		branch: `lane/${issue}`,
+		branch: `${issue}-lane`,
 		directory: path.join(LANE_ROOT, issue),
 		seed,
 		is_stranded: false,
@@ -76,7 +76,7 @@ beforeEach(() => {
 	writeFileSync(path.join(REPOSITORY_ROOT, '.env'), ROOT_ENV)
 	process.env[lane_paths.LANE_ROOT_KEY] = LANE_ROOT
 	lanes_are([])
-	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
 	// Stands in for what `git worktree add` does to the filesystem, so the `.env` write that follows
 	// it has somewhere to land.
@@ -94,7 +94,7 @@ describe('opening a lane', () => {
 		expect(outcome.kind).toBe('opened')
 		expect(vi.mocked(git_command.worktree_add)).toHaveBeenCalledWith(
 			path.join(LANE_ROOT, ISSUE),
-			'lane/1490',
+			'1490-lane',
 			'main',
 		)
 	})
