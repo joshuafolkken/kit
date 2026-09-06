@@ -135,11 +135,25 @@ function to_written_lines(input: RewriteInput): Array<string> {
 	return git_epic_decision.append_decision(with_rows.join('\n'), decision).split('\n')
 }
 
-function build_body(input: RewriteInput): BodyOutcome {
-	const with_rows = to_written_lines(input)
-	const rendered = git_epic_chains.render_chains(input.chains_after)
-	if (rendered.length === 0) return { body: with_rows.join('\n') }
+// Whether the body already declares exactly the order the caller computed, chain structure included:
+// the comparison is the rendered declaration rather than the link set, since two disjoint chains and
+// one branching chain produce the same links.
+function is_declaration_unchanged(lines: ReadonlyArray<string>, chains_after: Chains): boolean {
+	const declared = git_epic_parse.parse_dependency_chains(lines.join('\n'))
+	const rendered = git_epic_chains.render_chains(chains_after)
 
+	return git_epic_chains.render_chains(declared).join('\n') === rendered.join('\n')
+}
+
+// The declaration work, once the task rows and any record are in.
+//
+// **An unchanged declaration is left as text rather than re-rendered** (joshuafolkken/kit#1253). The
+// rewrite moves every chain line to the first one's index, so re-rendering a declaration nothing
+// changed detaches the rationale lines a chain is documented by and files them under whichever chain
+// ends up above them — a rewrite of somebody else's prose in exchange for a body that would have been
+// byte-identical. An insertion given no position computes exactly the declaration it read, so this is
+// the path it takes.
+function to_declared_body(with_rows: ReadonlyArray<string>, chains_after: Chains): BodyOutcome {
 	const stray = find_stray_declaration(with_rows)
 
 	if (stray !== undefined) {
@@ -148,11 +162,23 @@ function build_body(input: RewriteInput): BodyOutcome {
 		}
 	}
 
-	const replaced = replace_declaration(with_rows, rendered)
+	if (is_declaration_unchanged(with_rows, chains_after)) return { body: with_rows.join('\n') }
+
+	const replaced = replace_declaration(with_rows, git_epic_chains.render_chains(chains_after))
 
 	return replaced === undefined
 		? { error: 'Could not locate the `Dependencies` section to rewrite; nothing was written.' }
 		: { body: replaced.join('\n') }
+}
+
+function build_body(input: RewriteInput): BodyOutcome {
+	const with_rows = to_written_lines(input)
+
+	if (git_epic_chains.render_chains(input.chains_after).length === 0) {
+		return { body: with_rows.join('\n') }
+	}
+
+	return to_declared_body(with_rows, input.chains_after)
 }
 
 function to_link_keys(chains: Chains): Array<string> {

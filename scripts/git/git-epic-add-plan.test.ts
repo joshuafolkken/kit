@@ -1,14 +1,10 @@
-import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
-import {
-	git_epic_add_plan,
-	type AddPlan,
-	type PlanInput,
-	type PlanOutcome,
-} from './git-epic-add-plan'
+import { EPIC_FIXTURE_REPO, git_epic_add_fixture } from './git-epic-add-fixture'
+import { git_epic_add_plan, type PlanInput, type PlanOutcome } from './git-epic-add-plan'
 import { git_epic_parse } from './git-epic-parse'
 
-const REPO = 'joshuafolkken/kit'
+const { child, plan_of } = git_epic_add_fixture
+const REPO = EPIC_FIXTURE_REPO
 const EPIC_NUMBER = 893
 const DEPENDENCIES_HEADING = '## Dependencies'
 const PROGRESS_HEADING = '## Progress'
@@ -45,16 +41,6 @@ const UNORDERED_BODY = [
 	BLANK,
 ].join('\n')
 
-function child(number: number, blocked_by: ReadonlyArray<number> = []): EpicChild {
-	return {
-		number,
-		repo: REPO,
-		state: 'OPEN',
-		labels: [],
-		blocked_by: blocked_by.map((blocker) => ({ repo: REPO, number: blocker })),
-	}
-}
-
 // The relations an epic created with `--ordered` actually carries for `#890 -> #891 -> #892`.
 const ORDERED_CHILDREN = [child(890), child(891, [890]), child(892, [891])]
 // The same epic on a `gh` too old to record any of them.
@@ -72,31 +58,28 @@ function plan(overrides: Partial<PlanInput>): PlanOutcome {
 	})
 }
 
-function plan_of(outcome: PlanOutcome): AddPlan {
-	if ('error' in outcome) throw new Error(outcome.error)
-
-	return outcome.plan
-}
-
 function error_of(outcome: PlanOutcome): string {
 	if ('plan' in outcome) throw new Error('expected a refusal')
 
 	return outcome.error
 }
 
-describe('git_epic_add_plan.build_plan — appending', () => {
+describe('git_epic_add_plan.build_plan — no position given', () => {
 	it('tracks the new child', () => {
 		const tracked = git_epic_parse.parse_task_list_issue_numbers(plan_of(plan({})).body)
 
 		expect(tracked).toStrictEqual([890, 891, 892, 894])
 	})
 
-	it('extends the declared chain and records only the new link', () => {
-		const appended = plan_of(plan({}))
+	// joshuafolkken/kit#1253: the child used to be appended to the declared chain, so it came out
+	// blocked by an issue nobody related it to.
+	it('leaves the declared chain alone and records no relation', () => {
+		const added_child = plan_of(plan({}))
 
-		expect(appended.body).toContain('#890 -> #891 -> #892 -> #894')
-		expect(appended.added).toStrictEqual([{ blocker: 892, blocked: 894 }])
-		expect(appended.removed).toStrictEqual([])
+		expect(added_child.body).toContain(ORDERED_CHAIN)
+		expect(added_child.body).not.toContain('#892 -> #894')
+		expect(added_child.added).toStrictEqual([])
+		expect(added_child.removed).toStrictEqual([])
 	})
 
 	it('keeps an unordered batch unordered', () => {
@@ -186,10 +169,11 @@ describe('git_epic_add_plan.build_plan — relations the body already declared',
 	it('records a declared link that was never applied, so the write repairs it', () => {
 		const repaired = plan_of(plan({ recorded: UNRECORDED_CHILDREN }))
 
+		// The links the body already declared, and only those: the addition itself declares none
+		// (joshuafolkken/kit#1253).
 		expect(repaired.added).toStrictEqual([
 			{ blocker: 890, blocked: 891 },
 			{ blocker: 891, blocked: 892 },
-			{ blocker: 892, blocked: 894 },
 		])
 	})
 
