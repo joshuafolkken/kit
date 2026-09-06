@@ -26,6 +26,14 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check that every published dependency range still resolves for a consumer',
 		category: 'Versioning',
 	},
+	// The one place that decides a version (joshuafolkken/kit#1169). A `script` entry for the same
+	// reason `ranges` is one: script paths resolve against the kit package root, so it keeps working
+	// from a consumer repository where the file lives under node_modules.
+	release: {
+		script: 'scripts/release/release-cli.ts',
+		description: 'Release the merges main has taken since the version last changed',
+		category: 'Versioning',
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

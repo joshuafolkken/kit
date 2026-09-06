@@ -2,6 +2,7 @@
 import path from 'node:path'
 import { bounded_pool } from '#scripts/bounded-pool'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
+import { poll } from '#scripts/poll'
 import { eval_judge, type Verdict } from './eval-judge'
 import { eval_report } from './eval-report'
 import { eval_runner, type RunnerDependencies } from './eval-runner'
@@ -38,9 +39,7 @@ function log(message: string): void {
 }
 
 async function pause(duration_ms: number): Promise<void> {
-	await new Promise((resolve) => {
-		setTimeout(resolve, duration_ms)
-	})
+	await poll.sleep(duration_ms)
 }
 
 // The sandbox is removed in `finally` so a scenario that threw does not leave a full copy of the

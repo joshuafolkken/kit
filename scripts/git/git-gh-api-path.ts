@@ -91,9 +91,16 @@ function commit_status_api_path(commit_sha: string, repo?: string): string {
 	return `${commit_api_path(commit_sha, repo)}/status`
 }
 
+// A single tag reference. REST answers 404 when the tag does not exist, which is the whole of the
+// question the release command's tag watch asks (joshuafolkken/kit#1169).
+function tag_reference_api_path(tag: string, repo?: string): string {
+	return `${repo_api_path(repo)}/git/ref/tags/${tag}`
+}
+
 const git_gh_api_path = {
 	FULL_PAGE_QUERY,
 	repo_api_path,
+	tag_ref_api_path: tag_reference_api_path,
 	issues_api_path,
 	issue_api_path,
 	blocked_by_api_path,
