@@ -490,6 +490,17 @@ SECURITY.md         tsconfig.sonar.json
 > file. `docs/josh-commands.md` carries the conditions, what the guard
 > cannot know about the turn it interrupts, and the bound on how often a refusal can repeat.
 >
+> **A second `PreToolUse` hook runs `pnpm josh investigation:guard`, on `Read` and `Bash`**
+> (joshuafolkken/kit#1460). It refuses a file read once the run has read the delegation threshold's
+> worth of files it has not edited **since its last delegated unit** — the count taken off the
+> transcript rather than kept in an agent's head, which is what makes the threshold fire a second and
+> third time instead of once per run. It names `Read` as well as `Bash` because in these transcripts the
+> reading is split between the two, and on the `Bash` side it refuses only a line the batching guard
+> would also have refused, so the never-refuse-a-write guarantee above is one rule and not two. A
+> `sed -n` read is therefore counted and never refused. `JOSH_INVESTIGATION_GUARD=off` switches it off,
+> and `docs/josh-commands.md` carries which commands count as reading, the one-refusal-per-accumulation
+> bound and how to verify it.
+>
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
 > turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
 > blocked only for the agent: the user runs `git add` in their own terminal unchanged. A permanent
