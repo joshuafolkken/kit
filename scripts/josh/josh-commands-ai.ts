@@ -100,6 +100,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Say whether a run step may go to a cheaper execution tier',
 		category: 'AI tools',
 	},
+	'investigation:guard': {
+		script: 'scripts/delegation/investigation-guard.ts',
+		description:
+			'Claude Code hook: refuse a read once the unedited-read threshold is reached again (reads the tool call on stdin)',
+		category: 'AI tools',
+		// **No `tsx_arguments`, for the reason `batch:guard` declares none** (joshuafolkken/kit#1342):
+		// declaring any disqualifies a command from in-process dispatch, and this one runs in front of
+		// every read. The script calls `process.loadEnvFile` itself instead, through
+		// `hook-decision.ts`.
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',

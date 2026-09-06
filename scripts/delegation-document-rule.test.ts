@@ -330,6 +330,10 @@ describe(`${QUEUE_SKILL} — what the parent keeps when the issue is delegated`,
 // return shape would have a unit hand back the file text, which puts the cost back where it was.
 const INVESTIGATION_ISSUE = '1426'
 const THRESHOLD_SENTENCE = `the threshold is ${String(delegation_policy.INVESTIGATION_FILE_THRESHOLD)} files, and it is a count, not a forecast`
+// joshuafolkken/kit#1460: the half #1426 left unsaid — what a delegation does to the count.
+const RESET_ISSUE = '1460'
+const RESET_SENTENCE = 'a delegation resets the counter rather than spending it'
+const READ_GUARD_COMMAND = 'josh investigation:guard'
 
 describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (document_path) => {
 	const unwrapped = read_unwrapped(document_path)
@@ -356,6 +360,20 @@ describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (
 
 	it('names the origin', () => {
 		expect(read_repo_file(document_path)).toContain(INVESTIGATION_ISSUE)
+	})
+
+	// joshuafolkken/kit#1460: a document that states the count without saying what a delegation does to
+	// it leaves the threshold as a one-shot judgement — which is how run #1441 asked the question once
+	// and then read 8 more unedited files without asking again. The command has to be named too: the
+	// counting moved out of the agent's head, and a document that omits where it went sends a reader
+	// back to counting by hand.
+	it('says a delegation resets the counter, and names what counts', () => {
+		expect(unwrapped.toLowerCase()).toContain(RESET_SENTENCE)
+		expect(unwrapped).toContain(READ_GUARD_COMMAND)
+	})
+
+	it('names the origin of the reset', () => {
+		expect(read_repo_file(document_path)).toContain(RESET_ISSUE)
 	})
 })
 
