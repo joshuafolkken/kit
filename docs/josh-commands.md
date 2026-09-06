@@ -1728,6 +1728,44 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh delegate <s
 
 **The mechanism is not the unit.** How a thing is delegated is separate from what is delegated — one step of a run, or one whole child of a batch ([#984](https://github.com/joshuafolkken/kit/issues/984)). Both are rows of the one enumeration above rather than two mechanisms, which is why `epic-child` is answered by this same command. **One row covers both batch entry points**: an epic's child under `epicrun` and one issue of a `queue` are the same unit — same brief, same summary, same `pnpm josh issue:state` verifier — so the queue was wired to this row rather than given one of its own ([#1149](https://github.com/joshuafolkken/kit/issues/1149)).
 
+### `josh run:hold` / `josh run:release`
+
+Say whether another run already holds this working tree, and claim it when it does not ([#1091](https://github.com/joshuafolkken/kit/issues/1091)).
+
+```bash
+pnpm josh run:hold 1091                            # alias: josh rh
+pnpm josh run:hold                                 # a `new` entry point, before the issue exists
+pnpm josh run:release                              # alias: josh rr
+```
+
+**The unit is the working tree, not the repository.** `epicrun` already asks `epic-busy.ts` whether a _repository_ has a child in flight, and that read must not be reused here: what these entry points contend for is one branch, one index and one uncommitted diff, and a linked work tree has its own three — so a repository-scoped answer would stop a second work tree's legitimate run, which is exactly the parallelism a later epic is meant to buy. The record is keyed to `git rev-parse --absolute-git-dir`, which is `.git` in the main work tree and `.git/worktrees/<name>` in a linked one, so two work trees of one repository key differently and two commands in the same work tree key alike.
+
+**It exists because the guard `epicrun` has never covered the entry points a person types.** On 2026-08-30 one session held #1071 in this checkout while another `fullrun new` filed #1090 and implemented nine files in the same tree; a person noticed one command before `pnpm josh git -y` would have committed those nine files onto the other run's branch. **A guard that depends on someone watching is not a guard**, and unattended execution is the whole premise.
+
+| Answer     | Meaning                                                                  | Exit code |
+| ---------- | ------------------------------------------------------------------------ | --------- |
+| `hold`     | The tree was free (or the record had expired) and this run now holds it  | 0         |
+| `busy`     | Another run holds it — **stop before filing anything**                   | 0         |
+| `unknown`  | The work tree's git directory could not be read; nothing was established | 1         |
+| `released` | `run:release` cleared a record that was there                            | 0         |
+| `none`     | `run:release` found nothing to clear                                     | 0         |
+
+Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)` captures something a loop can branch on. Every explanation goes to standard error, and it names the holder, the time the record was written, the pid that wrote it, and `pnpm josh run:release` as the way to clear a stale one.
+
+**An unreadable record answers `busy`, never `hold`.** A present record that cannot be parsed is the state a guard must not fall open on, because the run that wrote it is the one whose uncommitted work would be trampled — the same reason `epic-busy.ts` refuses to report an unreadable listing as an idle repository.
+
+**A claim never overwrites a record that is already there.** Overwriting is the thing being prevented; the person who knows the other run has ended clears it with `pnpm josh run:release`.
+
+**Two claims racing for one tree cannot both win.** The claim on a tree that read as free is an exclusive create rather than a write, so of two sessions typing an entry point in the same second exactly one is told `hold` and the other is told `busy` — a plain write would tell both of them they won, which is the incident reproduced by the guard meant to stop it.
+
+**The record does not outlive the run in either direction.** A normally finished run releases it inside `pnpm josh followup` on the merge — the one seam every `fullrun`, and every child of an `epicrun` or a `queue`, passes through, so nothing has to remember to type the release. An abnormally ended one is covered by age: a record older than **8 hours** is replaced rather than honoured, which is longer than any measured run and short enough to be gone by the next working day. **The pid is recorded for the person reading the stop, never as the liveness test** — the process that claims the tree is a short-lived `josh run:hold`, so it has exited before anything reads the record back. A `taken_at` that is not a date is read as expired rather than as current, because a record nothing could ever expire is the one state the expiry exists to make impossible.
+
+**Age alone never frees a tree, because some holds are held across a person's latency.** `halfrun`'s stop before commit and a `needs-human-review` stop both leave uncommitted work in the tree deliberately, and no age can be chosen that covers a person going home for the night. **An expired record over a tree that still has uncommitted changes answers `busy`** and says to commit, stash, or release once the work is done; only an expired record over a clean tree is replaced. A tree state that could not be read counts as dirty, for the reason every other unreadable state here blocks.
+
+**Claim it in the checkout the run will edit.** The record is keyed to the work tree the command runs in, so a cross-repository entry point resolves the target repository's checkout from `pnpm josh doctor` before claiming; claiming in the session's own tree would guard the one tree that run never touches.
+
+The entry points that ask it, and where in each procedure, are `.claude/skills/workflow-commands/SKILL.md` → "2f. The working-tree hold — one run per tree".
+
 ### `josh cost`
 
 Report what a run actually spent, read from Claude Code's own session transcripts ([#962](https://github.com/joshuafolkken/kit/issues/962)).

@@ -48,6 +48,24 @@ vi.mock('../scripts/time/time-history', () => ({
 	time_history: { record_run: record_run_mock },
 }))
 
+// **Mocked for the same reason the two above are**: `main` runs at import time, so a real release
+// would clear the working-tree hold of whatever run is executing this suite — handing this checkout
+// to a second run while this one is mid-flight, which is the incident joshuafolkken/kit#1091 exists
+// to prevent.
+const WORKTREE_DIRECTORY = vi.hoisted(() => '/scratch/.git')
+const release_hold_mock = vi.hoisted(() => vi.fn())
+const worktree_directory_mock = vi.hoisted(() =>
+	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(WORKTREE_DIRECTORY),
+)
+
+vi.mock('../scripts/run/run-hold', () => ({
+	run_hold: {
+		hold_path: (directory: string) => `${directory}/hold.json`,
+		release_hold: release_hold_mock,
+		worktree_directory: worktree_directory_mock,
+	},
+}))
+
 const { git_followup_workflow } = await import('./git-followup-workflow')
 
 describe('parse_issue_number_from_text', () => {
@@ -293,6 +311,36 @@ describe('the run report is emitted only by a merged run', () => {
 
 		expect(info).toHaveBeenCalledWith(heading)
 		info.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#1091. The hold a typed entry point claims before it starts is released on the one
+// seam every finished run passes through, so nothing has to remember to type the release command. The
+// merge gate is the same one the two records above use, and for the same reason: a `--no-merge` run's
+// tree is still the one nobody else may start in.
+describe('the working-tree hold is released only by a merged run', () => {
+	beforeEach(() => {
+		release_hold_mock.mockClear()
+		worktree_directory_mock.mockResolvedValue(WORKTREE_DIRECTORY)
+	})
+
+	it('releases the hold on the work tree the run used', async () => {
+		await git_followup_workflow.release_worktree_hold(true)
+
+		expect(release_hold_mock).toHaveBeenCalledWith(`${WORKTREE_DIRECTORY}/hold.json`)
+	})
+
+	it('keeps the hold on a --no-merge run', async () => {
+		await git_followup_workflow.release_worktree_hold(false)
+
+		expect(release_hold_mock).not.toHaveBeenCalled()
+	})
+
+	it('reports success when the work tree could not be read', async () => {
+		worktree_directory_mock.mockRejectedValueOnce(new Error('not a git repository'))
+
+		await expect(git_followup_workflow.release_worktree_hold(true)).resolves.toBeUndefined()
+		expect(release_hold_mock).not.toHaveBeenCalled()
 	})
 })
 
