@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_history, type RunTimeRecord } from './time-history'
 import { time_report_fixture } from './time-report-fixture'
 
@@ -67,6 +67,11 @@ function now(): string {
 
 beforeEach(() => {
 	writeFileSync(time_history.history_path(WORK_ROOT), '', 'utf8')
+})
+
+// Undone after each case rather than before the next one, so the last case of the file cannot leave
+// `JOSH_TIME_HISTORY` stubbed behind it.
+afterEach(() => {
 	vi.unstubAllEnvs()
 })
 
@@ -98,6 +103,19 @@ describe('time_history.append_record', () => {
 
 		expect(time_history.read_records(WORK_ROOT).map((entry) => entry.issue)).toStrictEqual([
 			PREVIOUS_ISSUE,
+			CURRENT_ISSUE,
+		])
+	})
+
+	// The interrupt the format is built to survive leaves a line with no newline after it. Appended
+	// straight onto, the next run's JSON would join that fragment and be dropped with it — so this
+	// run's own record would vanish, which is the one loss the format is meant to rule out.
+	it('starts a new line after a fragment left by an interrupted write', () => {
+		writeFileSync(time_history.history_path(WORK_ROOT), '{"issue":', 'utf8')
+
+		time_history.append_record(WORK_ROOT, record(CURRENT_ISSUE, 30, 100))
+
+		expect(time_history.read_records(WORK_ROOT).map((entry) => entry.issue)).toStrictEqual([
 			CURRENT_ISSUE,
 		])
 	})
@@ -150,12 +168,17 @@ describe('time_history.to_record', () => {
 		const report = time_report_fixture.run_report(time_report_fixture.MIXED, CI_MS)
 		const kept = time_history.to_record(CURRENT_ISSUE, report, RECORDED_AT)
 
-		expect(kept).toMatchObject({
+		// Every field, not a sample of them: a mapping that dropped one would still pass a partial
+		// assertion, and the dropped figure is what the next run is compared on.
+		expect(kept).toStrictEqual({
 			issue: CURRENT_ISSUE,
 			recorded_at: RECORDED_AT,
 			elapsed_ms: report.elapsed_ms,
 			turn_count: report.turn_count,
+			tool_call_count: report.tool_call_count,
 			round_trip_count: report.round_trip_count,
+			ms_per_round_trip: report.ms_per_round_trip,
+			model_ms_per_round_trip: report.model_ms_per_round_trip,
 		})
 	})
 })
@@ -215,6 +238,8 @@ describe('time_history.format_block — a re-run of the same issue', () => {
 		])
 
 		expect(row_of(lines, 'vs #')).toContain(`vs #${String(PREVIOUS_ISSUE)}`)
+		// The plural branch of the run count, which the single-record cases below cannot reach.
+		expect(lines.join('\n')).toContain('(3 runs in')
 	})
 
 	it('says there is nothing to compare against when every record is this issue', () => {

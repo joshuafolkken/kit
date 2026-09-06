@@ -1,6 +1,5 @@
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { time_format } from './time-format'
 import type { TimeReport } from './time-report'
@@ -30,11 +29,6 @@ const MAX_RECORDS = 200
 // that rewrites the file whole**, so it happens once every `TRIM_SLACK` runs rather than on every run
 // past the cap — which is what keeps the append-only property above true in the steady state.
 const TRIM_SLACK = 50
-// A bound on the measurement, because it now sits on every merged run's path rather than only on a
-// `diag` someone asked for: the corpus walk grows with the checkout's transcript history, and a
-// report is never worth holding a finished run open for.
-const BUILD_TIMEOUT_MS = 60_000
-const TIMED_OUT = `the measurement did not finish within ${String(BUILD_TIMEOUT_MS)} ms`
 const ENVIRONMENT_KEY = 'JOSH_TIME_HISTORY'
 const DISABLED_VALUE = '0'
 const PERCENT_SCALE = 100
@@ -102,12 +96,22 @@ function write_records(root: string, records: ReadonlyArray<RunTimeRecord>): voi
 	writeFileSync(history_path(root), lines.join(''), 'utf8')
 }
 
+// **A record never continues a line it did not start.** The interrupt this format is built to
+// survive leaves a partial line with no newline after it, and appending straight onto that would
+// concatenate the new JSON to the fragment — dropping *this* run's record too, silently, since an
+// unparsable line is skipped. So the separator is restored first.
+function append_line(target: string, line: string): void {
+	const existing = read_text(target)
+	const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : ''
+
+	appendFileSync(target, `${separator}${line}\n`, 'utf8')
+}
+
 // **The new record is appended, and the file is rewritten only to trim it.** Rewriting it whole on
 // every run would make the one failure the line-oriented format exists to survive — an interrupt
-// mid-write — cost the entire sample rather than the last line, which is the property the header
-// comment claims and a case below asserts.
+// mid-write — cost the entire sample rather than the last line.
 function append_record(root: string, record: RunTimeRecord): Array<RunTimeRecord> {
-	appendFileSync(history_path(root), `${JSON.stringify(record)}\n`, 'utf8')
+	append_line(history_path(root), JSON.stringify(record))
 
 	const all = read_records(root)
 	if (all.length <= MAX_RECORDS + TRIM_SLACK) return all
@@ -250,34 +254,19 @@ function is_measured(report: TimeReport): boolean {
 	return report.span_count > 0 && report.elapsed_ms > 0
 }
 
-// The measurement, bounded. `undefined` is the timeout rather than a thrown error, because the timer
-// is a race the builder lost and not something that went wrong with it.
-async function build_within(
-	build: ReportBuilder,
-	issue_number: number,
-	cwd: string,
-): Promise<TimeReport | undefined> {
-	const expiry = new AbortController()
-
-	try {
-		return await Promise.race([
-			build(issue_number, cwd),
-			delay(BUILD_TIMEOUT_MS, undefined, { signal: expiry.signal }),
-		])
-	} finally {
-		expiry.abort()
-	}
-}
-
-// `undefined` is the bound above having expired, which is reported exactly as an unreadable half is:
-// the run finished either way, and what is withheld is the measurement rather than the run.
+// **There is deliberately no timeout around the builder.** A `Promise.race` was written here and
+// removed: `collect_issue_spans` reads the transcript corpus with `readFileSync`, so the walk blocks
+// the event loop and no timer can fire during it — and on the one await it *could* fire during, the
+// builder keeps running afterwards, so the run would print `unavailable`, print the completion
+// banner, and then sit there until the walk it never cancelled finished. A bound that cannot
+// interrupt the work it names is worse than none: it claims a guarantee and adds a hang. Bounding
+// this for real needs cancellation inside the walk or a worker of its own, which is not this change.
 function measured_lines(
 	issue_number: number,
 	cwd: string,
-	report: TimeReport | undefined,
+	report: TimeReport,
 	now: Clock,
 ): Array<string> {
-	if (report === undefined) return unavailable_lines(issue_number, TIMED_OUT)
 	if (!is_measured(report)) return unavailable_lines(issue_number, report.notes.join('; '))
 
 	const kept = append_record(cwd, to_record(issue_number, report, now()))
@@ -297,7 +286,7 @@ async function record_run(
 	if (is_disabled()) return []
 
 	try {
-		return measured_lines(issue_number, cwd, await build_within(build, issue_number, cwd), now)
+		return measured_lines(issue_number, cwd, await build(issue_number, cwd), now)
 	} catch (error) {
 		return unavailable_lines(issue_number, reason_of(error))
 	}
