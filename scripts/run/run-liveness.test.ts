@@ -196,6 +196,15 @@ describe('the output read follows the symlink', () => {
 			expect(run_liveness.sample_output(relative)).toBeUndefined()
 		},
 	)
+
+	// The argument is composed by an agent rather than typed by a person, so a `stat` that could be
+	// pointed anywhere would be an existence oracle for the whole file system.
+	it.each(['/etc/hosts', '/etc/../etc/hosts'])(
+		'refuses %j, which is under no allowed root',
+		(outside) => {
+			expect(run_liveness.sample_output(outside)).toBeUndefined()
+		},
+	)
 })
 
 describe('what counts as frozen', () => {

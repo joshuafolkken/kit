@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
@@ -173,18 +174,30 @@ function decide(traces: Traces): LivenessDecision {
 	}
 }
 
-// The path arrives on a command line, so it is normalized and required to be absolute before anything
-// touches the file system. That is a correctness rule before it is a safety one: this command is
-// routinely asked about a *different* checkout, and a relative path would resolve against whatever
-// directory the caller happened to run from, which is rarely the one meant. Normalizing first is what
-// makes the absolute test worth anything, since it is what collapses whatever `..` the caller wrote.
+// The two roots a unit's output can legitimately be under: the agent harness writes a transcript into
+// the user's own data directory, and a test writes one into the OS temp directory. The path is
+// validated against them rather than merely normalized, because the argument is composed by an agent
+// rather than typed by a person, and a `stat` that can be pointed anywhere is an existence oracle for
+// the whole file system.
+const ALLOWED_ROOTS: ReadonlyArray<string> = [homedir(), tmpdir()]
+
+function is_within(candidate: string, root: string): boolean {
+	const relative = path.relative(root, candidate)
+
+	return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
+}
+
+// Absolute is required before the root test, and it is a correctness rule before it is a safety one:
+// this command is routinely asked about a *different* checkout, and a relative path would resolve
+// against whatever directory the caller happened to run from, which is rarely the one meant.
+// Normalizing first is what makes both tests worth anything, since it is what collapses whatever `..`
+// the caller wrote.
 function to_safe_path(output_path: string): string | undefined {
 	const normalized = path.normalize(output_path)
 
 	if (!path.isAbsolute(normalized)) return undefined
-	if (normalized.split(path.sep).includes('..')) return undefined
 
-	return normalized
+	return ALLOWED_ROOTS.some((root) => is_within(normalized, root)) ? normalized : undefined
 }
 
 // `statSync` follows a symlink; `lstatSync` and the shell's bare `stat` do not. That difference is
