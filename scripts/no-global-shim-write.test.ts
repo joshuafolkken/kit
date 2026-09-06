@@ -29,7 +29,16 @@ const FORBIDDEN_SOURCE_MARKERS: ReadonlyArray<string> = [...SHARED_PATH_MARKERS,
 // script *writes* to a shared, user-level location; an exempted file is therefore held to a
 // stricter rule than the ban it escapes — it must contain no write call at all, which the second
 // test below enforces. Adding a name here without that property defeats the guard.
-const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [path.join('cost', 'cost-transcript.ts')]
+//
+// `run:liveness` is the second, for the same reason and against the same file: it asks how long ago a
+// delegated unit last wrote its Claude Code transcript, and the path arrives on a command line, so it
+// is validated against the roots such a transcript can legitimately be under before anything stats it
+// (joshuafolkken/kit#1485). It stats and never puts a byte on disk, which is the price of the
+// exemption.
+const HOME_DIRECTORY_READERS: ReadonlyArray<string> = [
+	path.join('cost', 'cost-transcript.ts'),
+	path.join('run', 'run-liveness.ts'),
+]
 // Every way a Node script can put bytes on disk — sync, async and `fs/promises` alike — plus the
 // low-level primitives the named calls are built on. Each entry is written so it can only match a
 // call, never prose in a comment: a bare `rm` would match "confirm" and a bare `open` would match

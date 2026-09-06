@@ -32,7 +32,7 @@ import { run_issue_number } from './run-issue-number'
 // where a trace could not be read, and only decides between a long check and a stop once every trace
 // has answered.
 //
-// **The output read follows the link.** The path a unit writes its transcript to is a symlink, and
+// **The output read follows the link.** The path a unit writes its transcript to is a symbolic link, and
 // the link's own modification time never changes after it is created — read with the shell's `stat`,
 // which does not follow by default on macOS, the file looks frozen whether the unit is alive or
 // dead. That is the second half of joshuafolkken/kit#1485: the same parent reported a dead unit as
@@ -200,7 +200,7 @@ function to_safe_path(output_path: string): string | undefined {
 	return ALLOWED_ROOTS.some((root) => is_within(normalized, root)) ? normalized : undefined
 }
 
-// `statSync` follows a symlink; `lstatSync` and the shell's bare `stat` do not. That difference is
+// `statSync` follows a symbolic link; `lstatSync` and the shell's bare `stat` do not. That difference is
 // the whole of joshuafolkken/kit#1485's second symptom, so it is stated here rather than left to a
 // reader to know. A path that resolves to nothing, or to something that is not a regular file, is
 // unreadable rather than frozen.
