@@ -127,27 +127,40 @@ function is_lane(lane: LaneInfo | undefined): lane is LaneInfo {
 	return lane !== undefined
 }
 
-// **The lane root is derived from the main work tree, never from the one this ran in.**
-// `git rev-parse --show-toplevel` answers the *current* work tree, which inside a lane is the lane
-// itself — so `lane:list` run there would look for lanes under `<lane>/.1497-lanes`, find none, and
-// report that no lanes are open while six were running. `git worktree list` prints the main work
-// tree first and prints the same thing from every work tree, so the answer does not depend on where
-// the command was typed. It is the listing this function already reads, so nothing extra is asked.
+async function worktree_blocks(): Promise<Array<string>> {
+	const listing = await git_command.worktree_list()
+
+	return listing.split(BLOCK_SEPARATOR)
+}
+
 function main_worktree(blocks: ReadonlyArray<string>): string | undefined {
 	return line_value((blocks[0] ?? '').split('\n'), WORKTREE_PREFIX)
 }
 
+/**
+ * The main work tree's root, whichever work tree this was run in.
+ *
+ * **Every lane path is derived from here, and `git rev-parse --show-toplevel` is not it**
+ * (joshuafolkken/kit#1497). That answers the *current* work tree, which inside a lane is the lane
+ * itself — so `lane:list` run there looks for lanes under `<lane>/.<lane>-lanes` and reports that
+ * none are open while six are running, and `lane:open` run there puts the new lane under that same
+ * wrong root, reads the lane's own `.env` as the root's, and lands somewhere `list_lanes` cannot see
+ * it: the seat goes unrecorded and the next lane binds the same ports. `git worktree list` names the
+ * main work tree first and prints the same thing from every work tree, so one reading serves
+ * `lane:list`, `lane:open` and `lane:close` alike — which is why it is here rather than copied into
+ * each. The fallback is the old behavior, for a listing that named no work tree at all.
+ */
+async function main_repository_root(): Promise<string> {
+	const blocks = await worktree_blocks()
+
+	return main_worktree(blocks) ?? (await git_command.repository_root())
+}
+
 /** Every open lane of this repository, lowest issue number first. */
 async function list_lanes(): Promise<Array<LaneInfo>> {
-	const listing = await git_command.worktree_list()
-	const blocks = listing.split(BLOCK_SEPARATOR)
-	const main = main_worktree(blocks)
-
-	if (main === undefined) return []
-
-	const lanes = blocks
-		.map((block) => parse_block(block, lane_paths.lane_root(main)))
-		.filter(is_lane)
+	const root = lane_paths.lane_root(await main_repository_root())
+	const blocks = await worktree_blocks()
+	const lanes = blocks.map((block) => parse_block(block, root)).filter(is_lane)
 
 	return lanes.toSorted((left, right) => Number(left.issue) - Number(right.issue))
 }
@@ -169,6 +182,7 @@ function find_lane(lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | un
 const lane_registry = {
 	find_lane,
 	list_lanes,
+	main_repository_root,
 	parse_block,
 	unreadable_lanes,
 	used_seeds,

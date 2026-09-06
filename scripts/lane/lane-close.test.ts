@@ -13,7 +13,6 @@ vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
 		branch_delete: vi.fn(),
 		branch_exists: vi.fn(),
-		repository_root: vi.fn(),
 		worktree_prune: vi.fn(),
 		worktree_remove: vi.fn(),
 	},
@@ -23,6 +22,7 @@ vi.mock('./lane-registry', () => ({
 		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
 			lanes.find((lane) => lane.issue === issue),
 		list_lanes: vi.fn(),
+		main_repository_root: vi.fn(),
 	},
 }))
 
@@ -74,7 +74,7 @@ beforeEach(() => {
 	mkdirSync(LANE_ROOT, { recursive: true })
 	process.env[lane_paths.LANE_ROOT_KEY] = LANE_ROOT
 	lanes_are([])
-	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(git_command.worktree_prune).mockResolvedValue('')
 	vi.mocked(git_command.branch_delete).mockResolvedValue('')
 	vi.mocked(git_command.branch_exists).mockResolvedValue(false)

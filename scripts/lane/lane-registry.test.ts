@@ -59,6 +59,10 @@ function list_of(...blocks: ReadonlyArray<string>): void {
 }
 
 beforeEach(() => {
+	// `JOSH_LANE_ROOT` is a supported setting and vitest loads `.env` into `process.env`, so a machine
+	// that has one set would send `lane_root` somewhere other than the scratch tree and fail every
+	// test below. Blank is how `lane_paths` spells "not set", so this pins the default path.
+	vi.stubEnv('JOSH_LANE_ROOT', '')
 	rmSync(LANE_ROOT, { force: true, recursive: true })
 	mkdirSync(LANE_ROOT, { recursive: true })
 })
