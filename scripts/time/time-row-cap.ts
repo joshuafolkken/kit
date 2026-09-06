@@ -1,6 +1,7 @@
 import type { RunTiming } from './time-batch'
 import type { EpicTimeReport } from './time-epic'
 import type { LastTimeReport } from './time-last'
+import type { PeriodTimeReport } from './time-period'
 import type { TimeReport } from './time-report'
 import type { ReworkTotals } from './time-rework'
 import type { Segment } from './time-segments'
@@ -44,6 +45,9 @@ const INVOCATION_TABLE = 'by_invocation'
 // reach sixty — which is the same unbounded growth the cap exists for. **It is ordered dropped-first,
 // so taking the first `cap` rows takes the findings**, exactly as the descending tables do.
 const REWORK_TABLE = 'rework.files'
+// The table joshuafolkken/kit#1470 added. It is ordered longest-first, so taking the first `cap` rows
+// takes the stretches worth removing — the same property the descending tables above rely on.
+const SERIAL_TABLE = 'serialization'
 // The tail every truncation note ends with, so a renderer that has to tell one apart from the notes
 // beside it matches this rather than a phrase it spells out for itself.
 const WITHHELD_SUFFIX = 'withheld by --top'
@@ -146,17 +150,33 @@ function cap_last_report(report: LastTimeReport, cap: number | undefined): LastT
 	return { ...report, runs: report.runs.map((run) => cap_run(run, cap)) }
 }
 
+// A period carries one unbounded table: the serialized stretches, which grow with how many times the
+// lanes fell to one rather than with any vocabulary. **The lane table and the per-day table are left
+// uncapped** for the reason `by_check` is — the lanes are one row per lane and the days are one row
+// per day of a window the reader chose, so cutting either would hide a lane or a day rather than a
+// tail (joshuafolkken/kit#1470).
+function cap_period_report(report: PeriodTimeReport, cap: number | undefined): PeriodTimeReport {
+	if (cap === undefined) return report
+
+	const notes = [...report.notes]
+	const serialization = cap_table(SERIAL_TABLE, report.serialization, cap, notes)
+
+	return { ...report, serialization, notes }
+}
+
 const time_row_cap = {
 	TOOL_TABLE,
 	JOSH_TABLE,
 	SEGMENT_TABLE,
 	INVOCATION_TABLE,
 	REWORK_TABLE,
+	SERIAL_TABLE,
 	truncation_note,
 	is_truncation_note,
 	cap_report,
 	cap_epic_report,
 	cap_last_report,
+	cap_period_report,
 }
 
 export { time_row_cap }
