@@ -345,7 +345,8 @@ the same answer** (joshuafolkken/kit#1067): the paging bounds every listing now,
 no visible holder is still not "nothing is running" — `wait`, with its own message, since clearing a
 stale label would not change it.
 
-**Two children of one repository may now run at once, and the section below is how.** This paragraph
+**Two children of one repository may run at once once joshuafolkken/kit#1497 lands, and the section
+below is how** — that Issue is the last thing between the procedure and a run using it. This paragraph
 used to say the opposite, and the three reasons it gave have each been answered rather than waived
 (joshuafolkken/kit#1492). They are recorded here because a reader who finds only the new procedure
 cannot tell which of them was solved and which was merely stopped being mentioned:
@@ -435,7 +436,7 @@ above is unchanged; only where the first child stands has moved.
 
 ```bash
 dir=$(pnpm josh lane:open "$n") || exit 1   # the directory on stdout, nothing else; alias: josh lno
-git -C "$dir" stash pop                     # the first lane only, and only if `josh latest` stashed
+git -C "$dir" stash pop || exit 1           # the first lane only, and only if `josh latest` stashed
 pnpm --dir "$dir" install --frozen-lockfile
 ```
 
@@ -449,7 +450,9 @@ pnpm --dir "$dir" install --frozen-lockfile
 - **The install comes after the stash pop, never before it.** The pop brings in the `pnpm-lock.yaml`
   that `josh latest` rewrote, and that is the lock the install has to build against: installed first,
   the first child runs its whole verification gate against `node_modules` from the *previous* lock
-  while committing the new one — a gate that cannot see the regression it exists to catch.
+  while committing the new one — a gate that cannot see the regression it exists to catch. **A pop
+  that fails stops the lane** rather than installing anyway, which is the same failure by a different
+  route.
 - **Nothing switches the lane's branch.** The reason is at the top of this section: the registry
   identifies a lane by that branch, so a switch costs the lane its seat, its listing and its
   isolation. The commit path is joshuafolkken/kit#1497's, and it is why the lane path is gated.
@@ -691,8 +694,13 @@ the reason at the top of "Lanes — running more than one child at a time" above
 committed from inside a lane yet.
 
 ```bash
-answers=$(pnpm josh epic:next 858 --repo joshuafolkken/kit --lanes)
+answer=$(pnpm josh epic:next 858 --repo joshuafolkken/kit)
+# add --lanes once joshuafolkken/kit#1497 lands, and read a line per child instead of one token
 ```
+
+**The snippet shows the one-at-a-time form deliberately.** A block carrying `--lanes` beside prose saying not
+to use it yet is a block that gets copied, and the run that copies it opens lanes and loses every
+child at `pnpm josh git` — which is the pressure that produces the branch switch this file forbids.
 
 1. Run the command above.
 2. **One or more numbers** — where the child runs in this session's own checkout, **first ask
