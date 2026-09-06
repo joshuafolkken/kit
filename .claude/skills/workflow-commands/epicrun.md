@@ -152,6 +152,16 @@ still prints `#<N> tracks no children in a task list.` — the acceptance of a b
 `epicrun`, which has not built an epic yet at that point and therefore never asks `epic:next` about
 one.
 
+**Naming a bare Issue *beside* an epic is the one thing that does change, and it is a mistyped
+command rather than a second entry** (joshuafolkken/kit#1493). Where one reference is named, that
+refusal is the whole answer and the sentence above stands unqualified. Where several are, a
+task-listless reference is **skipped** so the other epics keep running — so `epicrun #<E> #<N>` with
+`#<N>` an ordinary Issue exits 0, notes the skip on standard error, and **never runs `#<N>`**.
+`epicrun` is what accepts a bare Issue, and it accepts one only when it is the *sole* reference: a
+run that means to do both types `epicrun #<N>` on its own after the epic. Read the stderr notice —
+an epic listed there that you expected to have children is either that mistake or an epic nobody has
+filled in yet.
+
 ## What one invocation approves
 
 **One `epicrun` approves every merge in the epic**, plus pushes to more than one repository and the

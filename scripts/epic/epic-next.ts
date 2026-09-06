@@ -358,10 +358,6 @@ function views_of(reads: ReadonlyArray<EpicRead>): ReadonlyArray<EpicView> {
 	return reads.map((read) => ({ ...read, result: decide(read.snapshot, paths) }))
 }
 
-// Where the epic lives, or nothing when it belongs to another owner. The qualified read added by
-// joshuafolkken/kit#1016 names that repository in its REST path, so without this a reference naming
-// a third party's epic would send this command to their tracker — the read joshuafolkken/kit#869
-// forbids for a child, forbidden here for the same reason.
 // What the read walk produced, or nothing when there is still work to report. A skipped epic is
 // named on standard error only where some other epic survived: with none left, the notices *are* the
 // refusal, which is exactly the line a single childless epic printed before several were allowed.

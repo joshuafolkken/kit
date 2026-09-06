@@ -104,6 +104,13 @@ describe('what a multi-epic answer does not say', () => {
 		expect(read_unwrapped(EPICRUN)).toContain('the pooled token does not say when')
 	})
 
+	// The skip has a sharp edge: a bare Issue named beside an epic has no task list, so it is skipped
+	// rather than run — and the single-reference sentence a few sections up would otherwise read as
+	// saying it is refused.
+	it('epicrun says a bare Issue named beside an epic is never run', () => {
+		expect(read_unwrapped(EPICRUN)).toContain('never runs `#<N>`')
+	})
+
 	it.each([EPICRUN, COMMAND_DOC])(
 		'%s routes per-epic completion to the aggregate form',
 		(document_path) => {
