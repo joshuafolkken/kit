@@ -114,6 +114,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		default_script_arguments: ['--release'],
 	},
+	'run:preflight': {
+		script: 'scripts/run/run-preflight-cli.ts',
+		description: 'Say what an interrupted run left in this tree, and what to do about it',
+		category: 'AI tools',
+	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
 		description:
