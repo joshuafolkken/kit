@@ -37,7 +37,32 @@ const gate_stamp: FileMapStampAccess = file_map_stamp.create(GATE_PREFIX, PROJEC
 const in_flight_stamp: FileMapStampAccess = file_map_stamp.create(IN_FLIGHT_PREFIX, PROJECT_ROOT)
 const round_one_stamp: FileMapStampAccess = file_map_stamp.create(ROUND_ONE_PREFIX, PROJECT_ROOT)
 
+// **The round-1 snapshot's lifetime is one run, and something has to end it**
+// (joshuafolkken/kit#1441). Since the record is written once and never retaken, one left on disk
+// would be the record the **next** run's fix delta is measured against — so the run that ends removes
+// it, and `josh followup` is where a run ends. That is the answer to "the same run or a new one" the
+// retake guard needs, taken from the event itself rather than from a proxy for it.
+//
+// **Only one of the two directions is safe, which is why the caller is a single place.** A record
+// this never reaches — a run that stopped before `followup`, a `--no-merge` invocation, a `halfrun`,
+// a review run on its own — is measured from further back, so the next run's delta is wider and the
+// answer is `required`. **Removing one out of turn is the unsafe direction**: the next round-1 brief
+// finds nothing and writes a fresh record against the already-fixed tree, and arm A then fires on
+// unreviewed fix code — the defect joshuafolkken/kit#1441 closed, reintroduced from the other side.
+// So this is called from the end of a run that **merged**, and from nowhere else.
+//
+// Swallowed, and the caller is why: by the time this runs the pull request has already merged, so a
+// temp-directory problem must not turn a completed run into a failed one.
+function clear_round_one(target?: string): void {
+	try {
+		round_one_stamp.remove(target)
+	} catch {
+		/* a record left behind widens the next round rather than narrowing it */
+	}
+}
+
 const review_stamps = {
+	clear_round_one,
 	GATE_PREFIX,
 	gate_stamp,
 	IN_FLIGHT_PREFIX,
