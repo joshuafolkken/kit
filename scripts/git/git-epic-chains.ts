@@ -160,14 +160,17 @@ function insert_at_position(
 	}
 }
 
-// No position given: the additions extend the last declared chain. An epic with no chain at all is
-// an unordered batch, and staying unordered is the right answer — adding a chain would claim an
-// order nobody declared.
-function append_to_last(chains: Chains, additions: ReadonlyArray<number>): InsertOutcome {
-	if (chains.length === 0) return { chains: [] }
-	const last = chains.length - 1
-
-	return { chains: replace_chain(chains, last, [...(chains[last] ?? []), ...additions]) }
+// No position given: nothing was declared about the additions, so the declaration is copied through
+// exactly as it stood. An order is recorded only where `--before` / `--after` names one.
+//
+// The additions used to extend the **last declared chain**, and that invented a dependency
+// (joshuafolkken/kit#1253). An epic mixing ordered and unordered children is the normal state
+// (joshuafolkken/kit#949), so an unrelated child added to one came out blocked by whatever issue
+// happened to sit at that chain's tail — and `epic:next` then withheld it as blocked, with neither a
+// park nor a `needs-decision` label to show that it was stuck. An epic with no chain at all was
+// already left alone, which is the same answer this gives for every epic.
+function keep_declaration(chains: Chains): InsertOutcome {
+	return { chains: chains.map((chain) => [...chain]) }
 }
 
 // An epic with no chain at all, given a position. The target still has to be one of its children:
@@ -189,7 +192,7 @@ function apply_insertion(
 	position: InsertPosition | undefined,
 	tracked: ReadonlyArray<number>,
 ): InsertOutcome {
-	if (position === undefined) return append_to_last(chains, additions)
+	if (position === undefined) return keep_declaration(chains)
 	if (chains.length === 0) return start_chain_or_refuse(additions, position, tracked)
 
 	return insert_at_position(chains, additions, position, tracked)
@@ -213,9 +216,11 @@ function already_declared_error(issue_number: number): string {
 }
 
 // Checked on the way in *and* on the way out. The result matters more than the input: a child the
-// task list has lost but the declaration still names would otherwise be appended a second time,
-// producing `#890 -> #891 -> #892 -> #891` — a cycle, whose verdict is `error`, which halts the very
-// run this command exists to keep going (joshuafolkken/kit#890).
+// task list has lost but the declaration still names would otherwise be written into a chain a second
+// time — `--after #892` on `#890 -> #891 -> #892 -> #891` produces a cycle, whose verdict is `error`,
+// which halts the very run this command exists to keep going (joshuafolkken/kit#890). The example was
+// a no-position add until joshuafolkken/kit#1253 stopped that path touching the declaration at all;
+// the guard still matters, because a positioned insert writes into a chain.
 //
 // The two guards cover different things, and both are needed since `add_chain` can write into a
 // chain the addition is not in. The in-guard refuses an addition the declaration already names
