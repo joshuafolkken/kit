@@ -15,6 +15,14 @@ import { gh_subcommand_guard, type GhSpawn } from './gh-subcommand-guard'
 // forbidden spawn out in full here is not itself one.
 
 const FIXTURE_FILE = 'scripts/fixture.ts'
+const AI_FIXTURE_FILE = 'scripts-ai/fixture.ts'
+// The real module on disk that the import-resolution cases name, in the three spellings a
+// `scripts/` or `scripts-ai/` file can reach it by.
+const RELATIVE_MODULE = './gh-subcommand-guard-fixture'
+const SUBPATH_MODULE = '#scripts/gh-subcommand-guard-fixture'
+const PARENT_MODULE = '../scripts/gh-subcommand-guard-fixture'
+const GH_CONSTANT = 'FIXTURE_GH_BINARY'
+const GIT_CONSTANT = 'FIXTURE_GIT_BINARY'
 const SCRIPTS_DIRECTORY = 'scripts'
 const SCRIPTS_AI_DIRECTORY = 'scripts-ai'
 const ISSUE_PREP_FILE = 'scripts-ai/issue-prep.ts'
@@ -26,8 +34,17 @@ function scan(source: string): Array<GhSpawn> {
 	return gh_subcommand_guard.find_gh_spawns(source, FIXTURE_FILE)
 }
 
-function subcommands(source: string): Array<string> {
-	return scan(source).map((spawn) => spawn.subcommand)
+function subcommands(source: string, file: string = FIXTURE_FILE): Array<string> {
+	return gh_subcommand_guard.find_gh_spawns(source, file).map((spawn) => spawn.subcommand)
+}
+
+// `import { <name> } from '<module>'`, followed by a spawn of whatever it bound.
+function importing(module: string, name: string, local: string = name): string {
+	const clause = local === name ? name : `${name} as ${local}`
+
+	return [`import { ${clause} } from '${module}'`, `await execa(${local}, ['issue', 'view'])`].join(
+		'\n',
+	)
 }
 
 describe('gh subcommand guard — the repository as it stands', () => {
@@ -194,6 +211,47 @@ describe('gh subcommand guard — a binary named indirectly', () => {
 			subcommands([`let bin = 'gh'`, `execaSync(bin, ['issue', 'edit'])`].join('\n')),
 		).toStrictEqual(['issue'])
 		expect(subcommands('execaSync(`gh`, [`label`, `list`])')).toStrictEqual(['label'])
+	})
+})
+
+// joshuafolkken/kit#1073. The same evasion as a same-file `const GH = 'gh'`, one file further out:
+// the guard now reads the imported module and takes its own string constant.
+describe('gh subcommand guard — a binary named through an import', () => {
+	it('resolves a name imported from a relative module', () => {
+		expect(subcommands(importing(RELATIVE_MODULE, GH_CONSTANT))).toStrictEqual(['issue'])
+	})
+
+	it('resolves a name imported under an alias', () => {
+		expect(subcommands(importing(RELATIVE_MODULE, GH_CONSTANT, 'bin'))).toStrictEqual(['issue'])
+	})
+
+	// The two spellings a cross-directory import takes: the `#scripts/*` subpath `package.json`
+	// declares, and the `../scripts/…` form `scripts-ai/` files are allowed to write.
+	it('resolves the subpath and parent-relative spellings of the same module', () => {
+		expect(subcommands(importing(SUBPATH_MODULE, GH_CONSTANT))).toStrictEqual(['issue'])
+		expect(subcommands(importing(PARENT_MODULE, GH_CONSTANT), AI_FIXTURE_FILE)).toStrictEqual([
+			'issue',
+		])
+	})
+
+	// `moduleResolution: bundler` plus `"type": "module"` make `./x.js` name `x.ts`, so a specifier
+	// written with its extension has to be followed too — looked for at `x.js.ts` it would find
+	// nothing and skip the spawn, which is the evasion this whole block exists to close.
+	it('resolves a specifier written with an extension', () => {
+		expect(subcommands(importing(`${RELATIVE_MODULE}.js`, GH_CONSTANT))).toStrictEqual(['issue'])
+		expect(subcommands(importing(`${RELATIVE_MODULE}.ts`, GH_CONSTANT))).toStrictEqual(['issue'])
+	})
+
+	// Resolving the name is not by itself a report: only a name that resolves to `gh` is one.
+	it('reports nothing for an imported name that is another binary', () => {
+		expect(subcommands(importing(RELATIVE_MODULE, GIT_CONSTANT))).toStrictEqual([])
+	})
+
+	// The hop is a single one, and an unresolvable specifier stays skipped rather than guessed at.
+	it('skips an import it cannot follow', () => {
+		expect(subcommands(importing('./no-such-module', GH_CONSTANT))).toStrictEqual([])
+		expect(subcommands(importing('execa', GH_CONSTANT))).toStrictEqual([])
+		expect(subcommands(importing(RELATIVE_MODULE, 'NOT_DECLARED_THERE'))).toStrictEqual([])
 	})
 })
 
