@@ -1,4 +1,4 @@
-import { git_command } from './git/git-command'
+import { change_base } from './git/change-base'
 import { review_tree } from './review/review-tree'
 
 // The two readings a green-gate record is written from and compared against: the digest of every
@@ -30,12 +30,10 @@ async function read_changed_files(): Promise<Record<string, string>> {
 	}
 }
 
+// The resolver lives in `git/change-base.ts` since joshuafolkken/kit#1537, because the review brief
+// needs exactly this reading and a second copy of it is the clone `CLAUDE.md` prohibits.
 async function read_base(): Promise<string | undefined> {
-	try {
-		return await git_command.change_base_commit()
-	} catch {
-		return undefined
-	}
+	return await change_base.resolved()
 }
 
 // The two readings are independent, so they are started together rather than one after the other.

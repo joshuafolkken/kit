@@ -324,6 +324,7 @@ const run_preflight = {
 	STASH_LABEL_PREFIX,
 	check,
 	decide,
+	read_child_state,
 	to_pr_state,
 }
 

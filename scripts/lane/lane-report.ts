@@ -82,6 +82,7 @@ const lane_report = {
 	describe_lanes,
 	describe_opened,
 	development_port,
+	lane_state,
 	preview_port,
 }
 

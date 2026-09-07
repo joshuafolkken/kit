@@ -1794,15 +1794,15 @@ Pass the whole output to `/code-review`. The level is on the first line, so `$(p
 
 What the brief carries:
 
-| Part                  | Where it comes from                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| The level             | `josh review:level`, reused rather than decided again                                                         |
-| "Already verified"    | The record `josh gate` writes when all four checks pass, **and only if its digests still match this tree**    |
-| "Running now"         | The marker `josh gate` keeps for as long as its checks run, **and only if its digests still match this tree** |
-| The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                   |
-| The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed                   |
-| The checkout          | `git rev-parse` in the tree the run is implementing in — the absolute root, the branch and the HEAD commit    |
-| The attestation nonce | Written to a record before it is printed, and checked by `josh review:attest`                                 |
+| Part                  | Where it comes from                                                                                                                                                                                              |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The level             | `josh review:level`, reused rather than decided again                                                                                                                                                            |
+| "Already verified"    | The record `josh gate` writes when all four checks pass, **and only if its digests still match this tree**                                                                                                       |
+| "Running now"         | The marker `josh gate` keeps for as long as its checks run, **and only if its digests still match this tree**                                                                                                    |
+| The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                                                                                                                      |
+| The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed — reconciled against the change, and widened back to the whole of it when the record's change base no longer matches |
+| The checkout          | `git rev-parse` in the tree the run is implementing in — the absolute root, the branch and the HEAD commit                                                                                                       |
+| The attestation nonce | Written to a record before it is printed, and checked by `josh review:attest`                                                                                                                                    |
 
 **`--round 2` is taken after the commit, and its target is round 1's fixes and nothing else.** Since [#1261](https://github.com/joshuafolkken/kit/issues/1261) the pull request opens between the rounds, and since [#1486](https://github.com/joshuafolkken/kit/issues/1486) nothing edits the tree in between: the version bump that used to sit there put `package.json` into the target every time. So the record the gate wrote still matches the tree and this brief answers `Already verified`, instead of sending the review agent back to the unit suite the gate had just passed.
 
@@ -1815,6 +1815,10 @@ What the brief carries:
 **A gate still running is its own answer** ([#1242](https://github.com/joshuafolkken/kit/issues/1242)). The workflow starts `josh gate` alongside the review rather than in front of it — the two read the same tree and neither writes to it — so at the moment the brief is composed the checks have usually not finished. `josh gate` keeps a marker for as long as it runs and clears it on the way out, green or red, and the brief prints `Running now`: **no result is claimed**, the review agent is told not to run the unit suite the gate is running beside it, and the run joins the gate's own result before committing. Without this state a running gate is indistinguishable from one that never ran, and the review re-runs everything — the cost [#1241](https://github.com/joshuafolkken/kit/issues/1241) had just removed.
 
 **The round-1 snapshot is what makes `--round 2` mechanical.** The implementation and the review's fixes are uncommitted in the same tree, so `git diff` cannot say which side of the review a change fell on. Round 1 records a digest per changed path; round 2 compares and names exactly the paths that moved. With no snapshot it falls back to the whole change: a missing record must widen a review, never narrow it.
+
+**The record carries the commit its map was measured against, and a moved base widens the round rather than narrowing it** ([#1537](https://github.com/joshuafolkken/kit/issues/1537)). Both maps are a diff against [`josh`'s change base](#josh-reviewlevel) — the branch's merge base with the default branch — and that base is resolved afresh on every invocation. Merge the default branch between the two rounds, which is what resuming an interrupted run does, and the two maps stop covering the same set of paths: their difference is then a set difference, not a fix delta. Measured across four resumed runs (#1080 / #1085 / #1147 / #1197) it named up to five files the branch had never touched, and — the dangerous direction — **omitted files the branch had**, while the round reported no findings. Round 1 now records the base beside the digests; round 2 compares it, and where it differs, or where the record predates the field, the target is the whole change again.
+
+**Where the target and `git diff` still disagree, the brief says so rather than continuing.** The delta is intersected with the change, so a path the change does not contain is never a target: any such path is listed under `Not in this change`, and the count of files the change touches that round 1 already read is printed with the `git diff --name-only` command — plus the untracked files beside it — to check it against. A round-2 target that silently disagrees with the branch is the failure [#1537](https://github.com/joshuafolkken/kit/issues/1537) was filed on, and it is not fixed by making the disagreement smaller.
 
 **It is recorded once per run and never retaken** ([#1441](https://github.com/joshuafolkken/kit/issues/1441)). A second round-1 invocation — a bare `pnpm josh review:brief` re-run after round 1's fixes are in — keeps the record it finds and says so on stderr, naming when that record was taken. Retaking it used to be one command away from a wrong answer: the record would describe the **fixed** tree, the fix delta would read empty, and `josh review:round2 --round-1-closed` would skip the second round over fix code nobody had read. The record's lifetime is one run, and `josh followup` removes it at the end of a run that **merged** so the next run takes its own; a run that stops earlier — or one invoked with `--no-merge`, where the pull request is still open — leaves it behind, and the next run's delta is then measured from further back: wider, which costs a round 2 rather than skipping one.
 
@@ -1855,15 +1859,19 @@ The verdict goes to stdout and the reason to stderr, so `$(pnpm josh review:roun
 
 **Every measure before this one narrowed round 2; this one asks whether it is due.** [#1219](https://github.com/joshuafolkken/kit/issues/1219) redefined its question, [#1241](https://github.com/joshuafolkken/kit/issues/1241) carried that question into the forked agent, and the wall clock did not move — because a round's span follows its **turn count** (`r = +0.80`) rather than the size of what it reads (`r = -0.15` for round 2 against how much of round 1 it repeats; round 1 against churn was re-measured at a larger sample and its coefficient retired, so read it from `prompts/review.md` → "Round 1's cost does track the change size, and splitting is still not how to cut it" rather than from a number here). The saving is in not forking an agent at all, which is what a skip buys and a lighter round does not.
 
-| Answer     | When                                                                                                                       |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `skip`     | **Arm A** — the fix delta is empty: round 1's findings closed without an edit, so there is no unreviewed fix code          |
-| `skip`     | **Arm B** — every path in the fix delta is inert by [`josh review:level`](#josh-reviewlevel)'s classification              |
-| `required` | anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, and one non-inert path among inert ones |
+| Answer     | When                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `skip`     | **Arm A** — the fix delta is empty: round 1's findings closed without an edit, so there is no unreviewed fix code                                                                    |
+| `skip`     | **Arm B** — every path in the fix delta is inert by [`josh review:level`](#josh-reviewlevel)'s classification                                                                        |
+| `required` | anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a round-1 snapshot taken against a different change base, and one non-inert path among inert ones |
 
 **`--round-1-closed` is the one input no command can read for itself**, so the caller states it: every round-1 High/Medium finding closed, by a fix in this working tree or as a verified false positive, and none was filed or deferred. It is a report of a fact round 1 already wrote down, not a judgement — and its absence is the safe answer, so a run that forgets it pays a round rather than skipping one. Every other uncertainty resolves the same way.
 
-The fix delta is the same comparison [`josh review:brief --round 2`](#josh-reviewbrief) makes — the same round-1 snapshot, the same digest comparison over the same reading of "changed" — so the two commands cannot disagree about what round 1 fixed. Each computes it when asked; what is shared is the record and the code, not one command's result.
+The fix delta is the same comparison [`josh review:brief --round 2`](#josh-reviewbrief) makes — the same round-1 snapshot, the same digest comparison over the same reading of "changed", and since [#1537](https://github.com/joshuafolkken/kit/issues/1537) the same refusal when the record's change base has moved. Each computes it when asked; what is shared is the record and the code, not one command's result.
+
+**One thing does differ, and it differs in one direction only.** The brief intersects its delta with the change before printing a target, because a path the change no longer contains is not something to send a reviewer to read; this decision does not, so a delta the brief has narrowed to nothing can still answer `required` here. That asymmetry is deliberate: narrowing a _target_ costs a reviewer a file, narrowing a _verdict_ costs the round itself, and only one of those is recoverable.
+
+**Sharing the comparison means sharing its guard** ([#1537](https://github.com/joshuafolkken/kit/issues/1537)). A record taken against a different change base describes a different set of paths, so an empty or inert-looking delta is then no evidence at all about what round 1 fixed — and here that evidence buys a `skip`, which leaves the fixes unread rather than merely mistargeted. The base is compared before the digests are, and a mismatch — or a record written before the field existed — answers `required`.
 
 **Ask it once round 1's fixes are in, and before the commit.** The delta it reads is then exactly those fixes. Nothing writes to the tree in between since [#1486](https://github.com/joshuafolkken/kit/issues/1486) took the version bump out of the child flow — it rewrote `package.json`, which is not inert, so a delta taken after it answered `required` whatever round 1 did and the condition never fired in the flow it was built for.
 
@@ -2039,6 +2047,52 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:liveness 1
 **Two `undetermined` answers in a row is a fault in the check rather than a slow unit.** The output path can be wrong, rotated, or never created, and read that way every poll answers `undetermined` forever. The caller stops polling on the second one and reports it; it is never escalated to a `stopped`, because nothing was read. Both durations are whole and positive for the same reason — `--window 0 --gap 0` would call any unit that is not writing at that instant frozen.
 
 The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "A delegated unit that stopped without reporting".
+
+### `josh run:progress`
+
+Report an unattended run's progress once it has gone quiet for an interval ([#1520](https://github.com/joshuafolkken/kit/issues/1520)).
+
+```bash
+pnpm josh run:progress --output ~/.claude/projects/<project>/<session>.jsonl   # alias: josh rg
+pnpm josh run:progress --mark                       # a real report just happened; restart the clock
+pnpm josh run:progress --once                       # one line now, whatever the clock says
+pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
+```
+
+**This is the one josh command meant to be started and left running.** Every other one answers once and the caller's own loop drives it. That shape was rejected here deliberately: a parent that waits and reports spends one of its own turns per heartbeat — 36 of them in a three-hour run, taken at the point its context is largest and most expensive. The loop lives inside the command, an agent starts it in the background, and all the agent does is relay what appears.
+
+**The trigger is silence, not a clock.** The interval is measured from the last report of _any_ kind, so a line never lands immediately behind a real one. `--mark` is how a run tells the clock that a real report happened; it is a single cheap call at the points a run already reports, and it is honoured even while reporting is switched off, so the clock stays true either way. A tick that printed nothing does not move the clock, so the first child to appear is reported at once instead of waiting out an interval the repository spent idle.
+
+**Standard output carries the progress line and nothing else**, the way `run:liveness` keeps its verdict there — a relaying agent should never have to tell a report apart from an explanation. Notices go to standard error.
+
+**It cannot send a Telegram, and that is structural rather than a promise.** Nothing the command is built from imports `scripts/git/telegram-notify.ts`, which is the only egress there is. A heartbeat every ten minutes on a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages that do need to interrupt someone.
+
+**The line reports no verification result, because it reads none.** No gate conclusion, no CI conclusion, no check rollup. What it says about a pull request is that one exists and what state GitHub calls it, which is a read it performs — printing a result nobody read is the failure this repository keeps relearning.
+
+The fields, in order:
+
+| Field                      | What it says                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quiet <m>`                | How long since the last report of any kind — the silence this line is breaking                                                                                                                                                                                                                                                                        |
+| `#<N> <labels> PR:<state>` | One per child in flight, from the same `in-progress` listing `epicrun` sizes its lanes from, with `none` / `open` / `merged` / `closed` for its pull request                                                                                                                                                                                          |
+| `lanes <N>:<state>`        | The open lanes, or `none`; `open` / `stranded` / `unreadable` as `lane:list` reports them. **These are this checkout's lanes, and `--repo` does not move them** — a work tree is local to the machine, so pointing the children at another repository leaves the lanes, the load average and the transcript sample reading the one you are sitting in |
+| `load <n>`                 | The one-minute load average, which is what actually bites when several lanes run at once                                                                                                                                                                                                                                                              |
+| `record +<m>`              | How long since the newest `--output` transcript last grew — the field that says a run may be stuck rather than merely slow. `unread` when no path was given or none could be sampled, never a guess                                                                                                                                                   |
+| `unchanged <m>`            | How long the children and lanes have been identical. The load average and the record age are deliberately excluded from that comparison: both move on every tick, and including either would make `unchanged` impossible to reach                                                                                                                     |
+
+**Why ten minutes.** Five was measured in live use on 2026-09-07 and 6 of 15 reports carried no changed number at all — the same information as silence, and the "still running" line this command exists not to print. A child measures 20–46 minutes, so ten gives two to five reports per child and catches the stage changes: implementation, commit, pull request, review, merge.
+
+| Setting                          | What it does                                                                                                                                                                                                                                                                        |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_PROGRESS_INTERVAL_MINUTES` | The silence interval in minutes. Default 10. Anything that is not a positive number falls back to the default rather than throwing — this runs unattended, and dying on a typo in an optional setting removes the reporting the setting was there to tune. `--interval` outranks it |
+| `JOSH_PROGRESS=0`                | Reports nothing at all. `--mark` still records, so switching reporting back on does not inherit a stale clock                                                                                                                                                                       |
+| `--hours`                        | How long the watcher lives before it exits on its own. Default 8, the same expiry `run:hold` uses: longer than any run, short enough that one abandoned by a crashed session is gone by the next working day                                                                        |
+
+**A repository with nothing in flight is told apart from one whose listing could not be read.** Under `--once`, no child carrying `in-progress` prints nothing and exits 0 — that is an answer — while a listing that could not be read prints nothing and exits 1, the same fail-closed reading `run:hold` and `run:liveness` give an unreadable record. **The watcher has nowhere to exit to, so it says the reason on standard error instead**, once per streak rather than once per attempt: a condition lasting an afternoon costs one line, and a watcher that swallowed it would look exactly like an idle repository.
+
+**A tick that reads nothing does not end the watcher, and does not spin either.** Every reading it makes spawns a process or touches the temp directory, so one `git worktree list` that cannot fork under load — the load this command exists to report — would otherwise take the reporting down for the rest of the run, with nothing waiting on it to notice. The failure is reported on standard error and the loop continues. A declined tick leaves the report clock alone, so the first child to appear is still reported at once, but it does set a **two-minute read cooldown**: without one, an idle or failing repository would be re-read every 30 seconds for eight hours, which is enough calls to start causing the unreadable listings it is handling.
+
+Who starts it, and when, is `.claude/skills/workflow-commands/epicrun.md` → "Progress while the run is quiet".
 
 ### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
 

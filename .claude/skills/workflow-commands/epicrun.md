@@ -789,6 +789,45 @@ is correct rather than a false positive.** The branch read is `git branch --list
 which is exactly true. The loop never reaches it that way, because `epic:next` does not offer a
 child already carrying `in-progress`; a person asking by hand is being told where the work is.
 
+## Progress while the run is quiet
+
+**Start the progress watcher before step 1 of the loop, and do it without being asked.**
+
+```bash
+pnpm josh run:progress --output <the transcript path of each delegated unit>   # in the background
+```
+
+It is started **in the background** — the parent does not wait on it — and everything it prints on
+standard output is **relayed into the session as it appears**. The parent adds nothing to those
+lines and asks nothing to produce them.
+
+**It starts by itself, and that is the requirement rather than a convenience.** Until
+joshuafolkken/kit#1520 the person had to type "give me progress reports" at the start of every run,
+which moved the polling this reporting exists to remove from the report to the report's *start* —
+so the work was done and the person was still typing. A run that has to be asked has not solved it.
+
+**`--mark` at every real report.** Whenever this loop reports something of its own — a child merged,
+a child parked, a stop — run `pnpm josh run:progress --mark` in the same turn. That restarts the
+silence clock, which is what keeps a heartbeat from landing immediately behind a real report, where
+it would be noise rather than news. The clock is silence, never a timer; the command's own reference
+is `docs/josh-commands.md` → "`josh run:progress`".
+
+**The line carries observations, never "still running".** Children in flight with their labels and
+their pull request state, the open lanes, the load average, how long the newest unit transcript has
+gone without growing, and how long that whole set has been identical. **Nothing in it is a
+verification result** — no gate, no CI, no check rollup — because the command reads none of them, and
+a result nobody read must never be printed as one.
+
+**It goes to the session only.** No Telegram: the existing `confirmation` and `completion` messages
+are what interrupt a person, and a heartbeat every ten minutes beside them would cheapen both.
+
+**Nothing is reported while no child is in flight**, so a run parked on a decision goes quiet rather
+than repeating itself, and the first child to start is reported at once.
+
+**The scope is this command.** A standalone `fullrun` or `queue` does not start it — the Issue that
+added it left that undecided, and widening it without a decision would print progress for a run
+nobody is watching unattended, which is the opposite of what the silence trigger is for.
+
 ## The loop
 
 `josh epic:next <E> --repo <this repository> --lanes` prints **one issue number per line** on
