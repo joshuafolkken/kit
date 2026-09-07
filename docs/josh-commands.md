@@ -662,7 +662,58 @@ That boundary is also the answer to who propagates when several sessions are run
 
 Because every merge publishes, propagating per pull request would bury the consumers in bump pull requests. Run it **once at the end** of an epic or a queue; it works standalone all the same.
 
+The opposite direction — one consumer catching itself up, from its own checkout — is [`josh adopt`](#josh-adopt). The two share the step sequence, so what a consumer receives is the same either way.
+
 > To make `josh` available system-wide, install the kit globally (`pnpm add -g @joshuafolkken/kit`) instead of running an install subcommand. See [cli.md](./cli.md) for details.
+
+---
+
+### `josh adopt`
+
+Upgrade every `@joshuafolkken/*` toolkit installed in **this** repository to latest, sync each one's managed files, verify, and open the issue and pull request ([#1085](https://github.com/joshuafolkken/kit/issues/1085)).
+
+```bash
+pnpm josh adopt           # alias: josh ad
+pnpm josh adopt --dry-run # report the steps without touching anything
+```
+
+Any other argument is refused with the usage line rather than ignored, for the reason [`josh propagate`](#josh-propagate) refuses one: a misspelled `--dryrun` that fell through would run the real write path.
+
+It is `propagate` seen from the other end. `propagate` stands in the supplier and pushes one released version out to every consumer; `adopt` stands in the consumer and pulls whatever is newest in. Everything else is the same — literally, not by resemblance: both run `propagate`'s step order through the same runner, so the working-tree pre-check, the ordering and the return to the default branch cannot drift apart.
+
+|           | [`josh propagate`](#josh-propagate)           | `josh adopt`                              |
+| --------- | --------------------------------------------- | ----------------------------------------- |
+| Runs from | the supplier repository                       | the consumer repository (the current one) |
+| Targets   | every consumer checked out next to it         | itself, one repository                    |
+| Version   | the exact version whose publish it waited for | each installed toolkit's latest           |
+
+The steps, in the consumer's own directory:
+
+| Step                       | What runs                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `working tree check`       | refuses a tree that is dirty, not on its default branch, or behind its remote   |
+| `josh vu`                  | `pnpm add -D <toolkit>@latest`, **once per installed toolkit**, base tier first |
+| `josh sync`                | that toolkit's own CLI — `pnpm josh sync`, then `pnpm josh-app sync`, once each |
+| `verification gate`        | [`josh gate`](#josh-gate)                                                       |
+| `open issue`               | one issue naming every toolkit the run carried                                  |
+| `josh git`                 | [`josh git`](#josh-git) against that issue                                      |
+| `return to default branch` | back to the default branch, so the next run's pre-check passes                  |
+
+**The upgrade and the sync repeat per toolkit; everything else happens once.** An app-kit project depends on both `@joshuafolkken/kit` and `@joshuafolkken/app-kit`, and each has its own CLI — `josh` and `josh-app` — so a run that synced only `josh` would leave app-kit's managed files behind. One pull request carries both.
+
+**They run base-first, never in name order.** app-kit and game-kit distribute files _derived_ from kit's, so the two tiers can manage the same path and whichever `sync` ran last decides its contents (see [sync.md](./sync.md)). kit syncs first and the toolkits that overlay it follow; alphabetical order would put kit last and have it overwrite the overlay with the original on every run.
+
+**Which toolkits are installed is read, not listed.** The scoped packages in `devDependencies` are the candidates; a candidate is a target only when its CLI shim is actually present in `node_modules/.bin`, and its CLI name comes from the installed package's own `bin` field rather than a table in kit. A fourth toolkit needs no edit here.
+
+`dependencies` is deliberately not read. The upgrade installs with `pnpm add -D`, so a toolkit declared there would be _relocated_ into `devDependencies` — a manifest rewrite nobody asked for, riding silently into the pull request. Such a toolkit is named on the console as skipped rather than passed over in silence.
+
+**`@joshuafolkken/kit` has to be one of them.** The verification gate and the pull request run through `pnpm josh`, and pnpm writes that shim only for a project's _direct_ dependencies — so a repository declaring only app-kit or game-kit would fail both steps _after_ the upgrade and the sync had written. That is refused up front, before anything writes.
+
+**Nothing to do is a skip, not a failure.** With no `@joshuafolkken/*` toolkit installed, or with every toolkit already current and the sync rewriting no file, the run reports the skip and opens neither an issue nor a pull request — exit code 0. A failed verification gate stops before the issue, so a red gate never produces one either.
+
+**It refuses to run inside kit's own repository**, the same boundary [`josh sync`](#josh-sync) draws ([#868](https://github.com/joshuafolkken/kit/issues/868)) and for the same reason: the sync would overwrite the distribution source with its own derived templates. The refusal comes before anything writes. Only kit is refused — app-kit and game-kit are themselves consumers of kit, which is exactly what this command is for.
+
+**It stops at the open pull request.** Merging is `pnpm josh followup "<title> #N" --merge`'s, under an authorization a CLI does not have.
 
 ---
 

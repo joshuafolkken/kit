@@ -25,35 +25,81 @@ const STEP_TIMEOUT_MS = 1_800_000
 // point has already been upgraded to the version being propagated, so the command is present.
 const VERIFY_SCRIPT = `pnpm josh ${GATE_COMMAND}`
 
-// The commands each spawning step runs inside the consumer's own directory. `pnpm josh` resolves the
-// consumer's installed CLI, never the supplier's checkout — which is what keeps the sync a
-// consumer-side sync and leaves kit's self-sync guard (joshuafolkken/kit#868) satisfied.
+// The commands the release-independent spawning steps run inside the target's own directory. The
+// upgrade and the sync are not here: both are per toolkit, so they are built from the plan instead.
 const STEP_COMMANDS: Readonly<Record<string, ReadonlyArray<string>>> = {
-	[propagate_run.STEP_SYNC]: ['pnpm', 'josh', 'sync'],
 	[propagate_run.STEP_VERIFY]: ['sh', '-c', VERIFY_SCRIPT],
 }
 
-// The upgrade installs the **exact** version that was waited for, not the registry's latest.
-// `josh version:upgrade` resolves latest, which would defeat the exact-version wait: a release
-// published while the run was in flight would be the one every consumer received. Built through
-// kit's own upgrade-command builder so the lockfile repair it chains stays single-sourced.
+// kit's own CLI name. The sync is spelled through the *toolkit's* bin rather than hardcoded, because
+// `@joshuafolkken/app-kit` syncs with `josh-app` and `@joshuafolkken/game-kit` with `josh-game`; a
+// run that synced only `josh` would leave the other toolkit's managed files behind
+// (joshuafolkken/kit#1085).
+const JOSH_BIN = 'josh'
+
+// `pnpm <bin>` resolves the target's own installed CLI, never this checkout — which is what keeps
+// the sync a consumer-side sync and leaves kit's self-sync guard (joshuafolkken/kit#868) satisfied.
+function sync_command(bin_name: string): ReadonlyArray<string> {
+	return ['pnpm', bin_name, 'sync']
+}
+
+// The upgrade installs the version the plan names. For `josh propagate` that is the **exact**
+// version that was waited for, not the registry's latest — `josh version:upgrade` resolves latest,
+// which would defeat the exact-version wait: a release published while the run was in flight would
+// be the one every consumer received. `josh adopt` names `latest` deliberately, because it is pulling
+// whatever is newest inward rather than carrying one known release outward. Built through kit's own
+// upgrade-command builder either way, so the lockfile repair it chains stays single-sourced.
 function upgrade_command(package_name: string, version: string): ReadonlyArray<string> {
 	const config = create_version_command_config({ package_name })
 
 	return ['sh', '-c', build_upgrade_shell_command(version, true, config)]
 }
 
+const PROPAGATE_ORIGIN =
+	'Opened by `josh propagate` from the supplier repository after the release was published.'
+const RUN_NOTE =
+	'The upgrade, the managed-file sync and the verification gate have already run here.'
+const EMPTY_PLAN_TITLE = 'Upgrade the installed toolkits'
+const LAST_SEPARATOR = ' and '
+const NAME_SEPARATOR = ', '
+
 function issue_title(package_name: string, version: string): string {
 	return `Upgrade ${package_name} to ${version}`
 }
 
+// The packages a plan names, as English prose: one name alone, two joined by "and", more as a list
+// with "and" before the last. `josh git` derives the branch name from this title, so it stays one
+// plain line whatever the count.
+function release_names(releases: ReadonlyArray<Release>): string {
+	const names = releases.map((release) => release.package_name)
+	const last = names.at(-1) ?? ''
+	if (names.length <= 1) return last
+
+	return `${names.slice(0, -1).join(NAME_SEPARATOR)}${LAST_SEPARATOR}${last}`
+}
+
+// One release reproduces `issue_title` exactly, which is what keeps a `propagate` run's issue title
+// unchanged by the generalization.
+function plan_title(releases: ReadonlyArray<Release>): string {
+	const [first] = releases
+	if (first === undefined) return EMPTY_PLAN_TITLE
+
+	return issue_title(release_names(releases), first.version)
+}
+
+function plan_body(plan: ReleasePlan): string {
+	const specs = plan.releases
+		.map((release) => `\`${release.package_name}@${release.version}\``)
+		.join(NAME_SEPARATOR)
+
+	return [`Carry ${specs} into this repository.`, '', plan.origin, RUN_NOTE].join('\n')
+}
+
 function issue_body(package_name: string, version: string): string {
-	return [
-		`Carry \`${package_name}@${version}\` into this repository.`,
-		'',
-		'Opened by `josh propagate` from the supplier repository after the release was published.',
-		'The upgrade, the managed-file sync and the verification gate have already run here.',
-	].join('\n')
+	return plan_body({
+		releases: [{ package_name, version, bin_name: JOSH_BIN }],
+		origin: PROPAGATE_ORIGIN,
+	})
 }
 
 // Run a command in the consumer's directory, with its output inherited so a failing step shows why
@@ -117,20 +163,20 @@ function to_issue_detail(error: unknown): string {
 	return message.replaceAll('\n', ' ').trim()
 }
 
-function open_issue(target: PropagateTarget, package_name: string, version: string): IssueOutcome {
+function create_issue(target: PropagateTarget, title: string, body: string): IssueOutcome {
 	try {
 		const url = git_gh_exec.exec_gh_api_sync(
-			git_gh_issue_write.issue_create_request({
-				title: issue_title(package_name, version),
-				body: issue_body(package_name, version),
-				repo: target.repo,
-			}),
+			git_gh_issue_write.issue_create_request({ title, body, repo: target.repo }),
 		)
 
 		return { url }
 	} catch (error) {
 		return { detail: to_issue_detail(error) }
 	}
+}
+
+function open_issue(target: PropagateTarget, package_name: string, version: string): IssueOutcome {
+	return create_issue(target, issue_title(package_name, version), issue_body(package_name, version))
 }
 
 // What the creation produced: the new issue's URL, or gh's reason for refusing.
@@ -154,7 +200,7 @@ function parse_issue_number(issue_url: string): string | undefined {
 function issue_step(
 	target: PropagateTarget,
 	step: string,
-	release: Release,
+	plan: ReleasePlan,
 	issue_numbers: Map<string, string>,
 ): StepResult {
 	// Nothing changed, so there is nothing to open an issue about. Reached when the upgrade installed
@@ -164,7 +210,7 @@ function issue_step(
 		return { step, is_ok: true, is_complete: true, detail: 'already current — nothing to commit' }
 	}
 
-	const outcome = open_issue(target, release.package_name, release.version)
+	const outcome = create_issue(target, plan_title(plan.releases), plan_body(plan))
 	const number = parse_issue_number(outcome.url ?? '')
 
 	if (number === undefined) {
@@ -189,31 +235,83 @@ function return_step(target: PropagateTarget, step: string): StepResult {
 function pull_request_step(
 	target: PropagateTarget,
 	step: string,
-	release: Release,
+	plan: ReleasePlan,
 	issue_numbers: ReadonlyMap<string, string>,
 ): StepResult {
 	const number = issue_numbers.get(target.repo)
 	if (number === undefined) return { step, is_ok: false, detail: 'no issue number' }
-	const argument = `${issue_title(release.package_name, release.version)} #${number}`
+	const argument = `${plan_title(plan.releases)} #${number}`
 
 	return spawn_step(target, step, ['pnpm', 'josh', 'git', '-y', argument])
 }
 
-// The release being carried, as one value so the step handlers stay within the parameter limit.
+// One toolkit release being carried, as one value so the step handlers stay within the parameter
+// limit. `bin_name` is the CLI that toolkit installs, which is what its own `sync` is spelled with.
 interface Release {
 	package_name: string
 	version: string
+	bin_name: string
 }
 
-// A step runner bound to one propagation run. The issue number created for a consumer is kept here
-// so the pull-request step can name it, without any module-level state to leak between runs.
-function create_step_runner(release: Release): RunStep {
+// What one run carries: the releases, and the sentence naming the command that opened the issue.
+// `josh propagate` always passes exactly one release; `josh adopt` passes every toolkit installed in
+// the repository it runs in (joshuafolkken/kit#1085). Only the upgrade and the sync repeat per
+// release — the pre-check, the verification gate, the issue, the pull request and the return to the
+// default branch happen once, which is why the step order itself is unchanged.
+interface ReleasePlan {
+	releases: ReadonlyArray<Release>
+	origin: string
+}
+
+// One release's command under a step that repeats per release. The package name travels with it so
+// a failure can say *which* toolkit failed: the run's report is one line per target, and `exit 1`
+// alone would leave a two-toolkit upgrade with nothing to act on.
+interface ToolkitCommand {
+	package_name: string
+	command: ReadonlyArray<string>
+}
+
+// Run one command per release under a single step, stopping at the first failure. The step is
+// reported once, so a failing toolkit ends the sequence before the gate rather than leaving a
+// half-upgraded tree to be verified.
+function run_each(
+	target: PropagateTarget,
+	step: string,
+	commands: ReadonlyArray<ToolkitCommand>,
+): StepResult {
+	for (const { package_name, command } of commands) {
+		const result = spawn_step(target, step, command)
+
+		if (!result.is_ok) return { ...result, detail: `${package_name}: ${result.detail ?? 'failed'}` }
+	}
+
+	return { step, is_ok: true }
+}
+
+function upgrade_commands(plan: ReleasePlan): ReadonlyArray<ToolkitCommand> {
+	return plan.releases.map((release) => ({
+		package_name: release.package_name,
+		command: upgrade_command(release.package_name, release.version),
+	}))
+}
+
+function sync_commands(plan: ReleasePlan): ReadonlyArray<ToolkitCommand> {
+	return plan.releases.map((release) => ({
+		package_name: release.package_name,
+		command: sync_command(release.bin_name),
+	}))
+}
+
+// A step runner bound to one run. The issue number created for a target is kept here so the
+// pull-request step can name it, without any module-level state to leak between runs.
+function create_step_runner(plan: ReleasePlan): RunStep {
 	const issue_numbers = new Map<string, string>()
 	const handlers: Record<string, (target: PropagateTarget, step: string) => StepResult> = {
 		[propagate_run.STEP_PRECHECK]: precheck_step,
-		[propagate_run.STEP_ISSUE]: (target, step) => issue_step(target, step, release, issue_numbers),
-		[propagate_run.STEP_PR]: (target, step) =>
-			pull_request_step(target, step, release, issue_numbers),
+		[propagate_run.STEP_UPGRADE]: (target, step) => run_each(target, step, upgrade_commands(plan)),
+		[propagate_run.STEP_SYNC]: (target, step) => run_each(target, step, sync_commands(plan)),
+		[propagate_run.STEP_ISSUE]: (target, step) => issue_step(target, step, plan, issue_numbers),
+		[propagate_run.STEP_PR]: (target, step) => pull_request_step(target, step, plan, issue_numbers),
 		[propagate_run.STEP_RETURN]: return_step,
 	}
 
@@ -222,10 +320,6 @@ function create_step_runner(release: Release): RunStep {
 		const handler = handlers[step]
 
 		if (handler !== undefined) return handler(target, step)
-
-		if (step === propagate_run.STEP_UPGRADE) {
-			return spawn_step(target, step, upgrade_command(release.package_name, release.version))
-		}
 
 		return spawn_step(target, step, STEP_COMMANDS[step] ?? [])
 	}
@@ -240,11 +334,18 @@ function describe_step(target: PropagateTarget, step: string): StepResult {
 
 const propagate_steps = {
 	STEP_COMMANDS,
+	JOSH_BIN,
+	PROPAGATE_ORIGIN,
+	sync_command,
 	upgrade_command,
+	upgrade_commands,
+	sync_commands,
 	return_step,
 	VERIFY_SCRIPT,
 	issue_title,
 	issue_body,
+	plan_title,
+	plan_body,
 	parse_issue_number,
 	open_issue,
 	precheck_step,
@@ -252,5 +353,5 @@ const propagate_steps = {
 	describe_step,
 }
 
-export type { Release }
+export type { Release, ReleasePlan }
 export { propagate_steps }

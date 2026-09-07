@@ -12,6 +12,11 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Carry the published release into every consumer repository next to this one',
 		category: 'Project',
 	},
+	adopt: {
+		script: 'scripts/adopt/adopt.ts',
+		description: 'Upgrade every installed @joshuafolkken toolkit here and open the pull request',
+		category: 'Project',
+	},
 }
 
 export { PROJECT_COMMANDS }
