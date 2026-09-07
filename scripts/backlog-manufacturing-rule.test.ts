@@ -1,3 +1,4 @@
+import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { describe, expect, it } from 'vitest'
 import {
 	AI_DOCS,
@@ -174,39 +175,64 @@ const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	'**its default is not to split**',
 	'about 10 changed files, about 400 changed lines',
 	'file it as a follow-up Issue only when it is a confirmed defect that reaches a runtime path',
-	// The heading sits above `### Shorthand Commands`, not inside it: that subtree is scoped to the
-	// five keywords, and this rule's whole reason for being resident is that it fires on turns where
-	// none of them was typed. The sentence is pinned so a later tidy-up cannot demote it back in.
-	// **The heading level itself is asserted separately, on the raw text** — collapsed whitespace
-	// cannot tell `###` from `####`, since the shorter string is a substring of the longer one.
-	'**This binds on every filing, inside a workflow or not.**',
-	'with more than 30 open, close one first',
-	'Nothing honestly closable means **do not file**',
-	'**A filing the run is blocked by is exempt**',
-	// joshuafolkken/kit#1518. The three tests are resident rather than only the exemption, because a
-	// resident "an interrupt is exempt" with the tests at the pointer leaves the deciding to
-	// judgement on the one turn the pointer is never opened — which is the state joshuafolkken/kit#1517
-	// was lost in. The carve-out is pinned beside them so the new route cannot absorb the old one.
-	'and so is an **interrupt** — three tests decide that, never judgement',
-	'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
-	'Meeting none of the three, a finding stays discretionary',
+]
+
+// joshuafolkken/kit#1524 moved the WIP cap off residency: filing an Issue is one nameable tool call,
+// so `pnpm josh rule:guard` refuses that call and states the rule there. **The cap is therefore
+// pinned by what the refusal says, not by what `CLAUDE.md` holds** — and every sentence below has to
+// survive, because dropping one changes what an agent does at the only moment it will read them.
+const DELIVERED_CAP_MARKERS: ReadonlyArray<string> = [
+	"count the target repository's open Issues",
+	'With more than 30 open, close one first',
+	'nothing honestly closable means do not file',
+	'one the run is blocked by',
+	// joshuafolkken/kit#1518. The three tests travel with the exemption rather than being left at the
+	// pointer, because a delivery saying only "an interrupt is exempt" hands the deciding back to
+	// judgement at the one moment nothing else is open to read — the state joshuafolkken/kit#1517 was
+	// lost in.
+	'three tests rather than judgement',
+	'a verification answers wrongly',
+	'a documented workflow cannot complete',
+	'data is lost or written outside the repository',
+	// A delivery that could not be acted on would wedge the very call it asked for.
+	'Reissue this call once you have counted',
 	WIP_TOPIC,
 ]
 
-describe.each(AI_DOCS)('%s — carries the trigger for all three defaults', (document_path) => {
-	const content = read_unwrapped(document_path)
-
-	it.each(RESIDENT_MARKERS)('states %j', (marker) => {
-		expect(content).toContain(marker)
-	})
-
-	// Read raw, and with the surrounding newlines: demoted to `####` the section falls back inside
-	// `### Shorthand Commands`, whose preamble scopes that subtree to the five keywords — and the
-	// whole reason this rule is resident is that it fires on turns where none was typed.
-	it('keeps the cap at heading level 3, outside the shorthand-command subtree', () => {
-		expect(read_repo_file(document_path)).toContain('\n### Backlog WIP cap (30 open Issues)\n')
+describe('the delivered text — the WIP cap at the call that files', () => {
+	it.each(DELIVERED_CAP_MARKERS)('states %j', (marker) => {
+		expect(delivered_rules.WIP_CAP_REASON).toContain(marker)
 	})
 })
+
+describe.each(AI_DOCS)(
+	'%s — carries the trigger for the two resident defaults',
+	(document_path) => {
+		const content = read_unwrapped(document_path)
+
+		it.each(RESIDENT_MARKERS)('states %j', (marker) => {
+			expect(content).toContain(marker)
+		})
+
+		// **The cap keeps its trigger resident and loses its section.** A hook reaches this harness
+		// alone, so removing the line outright would leave a Codex, Gemini or Cursor session — each
+		// reading `CLAUDE.md` through a pointer and running no hook — able to file past 30 with nothing
+		// telling it to count. What the relocation takes out is the heading and the procedure.
+		it.each([
+			"**Count the target repository's open Issues before filing; with more than 30 open, close one first.**",
+			'and so is an **interrupt** — three tests decide that, never judgement',
+			'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
+			'`pnpm josh rule:guard` states it again at the call that files',
+			WIP_TOPIC,
+		])('keeps the trigger %j resident', (marker) => {
+			expect(content).toContain(marker)
+		})
+
+		it('no longer carries a section of its own', () => {
+			expect(read_repo_file(document_path)).not.toContain('### Backlog WIP cap (30 open Issues)')
+		})
+	},
+)
 
 // The index is how a topic file is reached at all: a file nothing links to is a file nobody opens.
 // **`read_index` and not `read_repo_file`** — the fixture resolves the workflow prompt to the index

@@ -726,8 +726,32 @@ behavior, the answer table and the incident are `docs/josh-commands.md` → "`jo
 
 ## 3. What stays resident, and what is read from here
 
+**The first question is whether the rule's trigger can be named** (joshuafolkken/kit#1524):
+
+> **Can the moment the rule begins to bind be named as one tool call?**
+
+**A rule whose trigger can be named moves its body out of `CLAUDE.md`.** It goes on the enumeration
+in `prompts/collaboration-workflow/rule-delivery.md`, and a hook refuses that call and states the
+rule — cheaper than resident prose, because it costs nothing on every other turn, and **stronger,
+because a refusal cannot be skimmed past**. joshuafolkken/kit#1344 and joshuafolkken/kit#1460 each
+measured a rule that was resident and never fired once; in both, a `PreToolUse` refusal was what
+moved the number. **Relocating is not deleting** — the rule's text survives, on a stronger channel,
+which is why it does not wait on joshuafolkken/kit#1477's measurement of what reading a rule costs.
+
+**What stays behind is the trigger and the criterion, one line, because the channel reaches one
+harness.** `CLAUDE.md` is agent-agnostic by construction — `AGENTS.md`, `GEMINI.md` and
+`.cursorrules` are pointers to it, and a Codex, Gemini or Cursor session runs no
+`.claude/settings.json` hook at all; so does a Claude Code session with the guard's own off-switch
+set. Removing the line outright would leave those sessions with no statement of the rule anywhere,
+which is the deletion this Issue's own premise forbids. **The gain is the body, not the line**: the
+measurement, the rejected mechanisms and the procedure leave, and what remains is what the residency
+doctrine already calls a resident rule — a trigger plus a pointer. A rule may leave residency
+entirely only where the agent that has to obey it is always this harness.
+
+Only a rule whose trigger cannot be named reaches the second question:
+
 **A rule stays in `CLAUDE.md` if and only if it has to fire on a turn where no skill was loaded.**
-That is the whole test, and it has exactly one input: when does the rule first bind — before a
+That test has exactly one input: when does the rule first bind — before a
 command has started, or after. Everything a run reaches only *after* it has read this skill is
 routed to from `CLAUDE.md`, never restated there.
 
@@ -778,8 +802,10 @@ Within that scope, every rule that passes the test is resident in full, and a ma
 each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most of them,
 `scripts/verify-ui-skill.test.ts` for the UI gate,
 `scripts/review-followup-bundle-document-rule.test.ts` for the follow-up filing step, and
-`scripts/inline-edit-rule.test.ts` for the file-editing prohibition, and
-`scripts/turn-batching-rule.test.ts` for the one-turn instruction:
+and `scripts/inline-edit-rule.test.ts` for the file-editing prohibition. **A trigger-delivered rule
+is pinned differently** — by what its refusal says and by the trigger firing, in
+`scripts/turn-batching-rule.test.ts`, `scripts/backlog-manufacturing-rule.test.ts` and
+`scripts/rules/delivered-rules.test.ts`, with only its one-line trigger asserted resident:
 
 - **Explicit invocation required** — it decides whether a workflow starts at all, so it binds on the
   turn the user types the keyword, which is before anything here has been read.
@@ -799,17 +825,6 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
 - **The UI-verification gate** — a rendered change is not done until the screen has been looked at,
   and the procedure for capturing it is `verify-ui`. The gate binds whenever a UI change is reported
   finished, which is routinely a turn with no workflow keyword typed and no skill loaded.
-- **The backlog WIP cap** — with more than 30 Issues open, close one before filing a new one. Filing
-  happens on turns that typed no keyword at all: an upstream defect, a review-cap follow-up from a
-  standalone pre-commit review, a note a conversation decides to record. A cap that only fired
-  inside a workflow would leave the routes that grew the backlog fastest uncounted. What stays
-  resident is the instruction to count, the refusal, the exemption for a filing a run is blocked
-  by, and — since joshuafolkken/kit#1518 — the interrupt exemption together with the three tests
-  that decide it, because a trigger that says only "an interrupt is exempt" hands the deciding back
-  to judgement on exactly the turn no pointer is opened. **The count command itself is not resident** — it has to name the *target* repository and
-  exclude pull requests, and a command copied into two places is a command kept correct in one; read
-  it from `prompts/collaboration-workflow/wip-cap.md`, which also carries why the number can move
-  (joshuafolkken/kit#1469).
 - **The three `josh epic:*` rules that bind outside those commands** — recording a decision removes
   that child's `needs-decision` label, fixing what `epic:audit` finds is Tier A, and an epic in
   another repository is referenced as `owner/repo#N`. Each fires on a turn where no `epic:*` command
@@ -825,12 +840,23 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   file to fix the three lines a review named carries the replacement wholesale exactly as a heredoc
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
-- **The instruction to put independent calls in one turn** — a tool call happens on any turn at all
-  and no skill is loaded before one, so this passes the criterion for the same reason the
-  prohibition above does, and binds at the same moment. What stays resident is the trigger and the
-  criterion that decides it — whether this call's input needs another call's result, not what kind of
-  call it is. The measured cost, the mechanisms that were rejected and how `pnpm josh time` reports
-  the result are at `prompts/collaboration-workflow/turn-batching.md` (joshuafolkken/kit#1304).
+
+**Two rules left this list at the first question, and are delivered by a hook instead**
+(joshuafolkken/kit#1524). Neither lost a sentence; both are pinned by the firing test named beside
+them rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
+enumeration and the single source of what a turn where the trigger does not fire means.
+
+- **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
+  `Bash` call that would make a third consecutive single-call turn, and states the criterion there.
+  It was resident through every run the topic file measures, and moved none of them, so what the
+  relocation gave up is prose that was not being obeyed
+  (`prompts/collaboration-workflow/turn-batching.md`, `scripts/turn-batching-rule.test.ts`).
+- **The backlog WIP cap** — `pnpm josh rule:guard` refuses the `Bash` call that files an Issue
+  (`gh issue create`, or a `title`-bearing POST to `…/issues`) and delivers the count, the refusal,
+  both exemptions and the three tests that decide the interrupt one — the three kept whole, because a
+  delivery saying only "an interrupt is exempt" hands the deciding back to judgement
+  (joshuafolkken/kit#1518). A comment endpoint is not a filing and is left alone
+  (`prompts/collaboration-workflow/wip-cap.md`, `scripts/backlog-manufacturing-rule.test.ts`).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in

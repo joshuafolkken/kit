@@ -114,8 +114,11 @@ const REDIRECTION = '>'
 const REASON =
 	`⛔ batching: the last ${String(SEQUENCE_BEFORE_LIMIT)} turns each issued a single tool call, so ` +
 	`this one would make ${String(CONSECUTIVE_LIMIT)} in a row. Reissue it in one turn together with ` +
-	`the calls meant to follow it that do not need its result — CLAUDE.md → "Put every call that does ` +
-	`not depend on another's result in the same turn". If this turn was already batching, or the call ` +
+	`the calls meant to follow it that do not need its result. **The criterion is whether this call's ` +
+	`input needs another call's result, not what kind of call it is** — edits are covered exactly as ` +
+	`reads are, and it never authorizes weakening a verification gate or a review: fewer turns, never ` +
+	`less work. The measured cost and the rejected mechanisms are in ` +
+	`\`prompts/collaboration-workflow/turn-batching.md\`. If this turn was already batching, or the call ` +
 	`genuinely has nothing to go beside it, reissue it as it was: this fires once per run of ` +
 	`single-call turns and cannot repeat on the call in hand.`
 

@@ -321,6 +321,27 @@ The refusal leaves through `hookSpecificOutput.permissionDecision`, the only sha
 
 **Verify it the way #1390 asks to be verified**: run `pnpm josh time --issue <N>` afterwards and compare the pre-implementation phase — `plan` plus `setup`, or the run start to the first `Edit` where the phase table charges a delegated run to `pre-run` — against run #1441's hand-measured 15.4 min and 34%.
 
+### `josh rule:guard`
+
+Deliver a rule at the tool call that binds it, instead of carrying it resident in `CLAUDE.md` on every turn ([#1524](https://github.com/joshuafolkken/kit/issues/1524)). Like the other two guards it is not run by hand: `.claude/settings.json` wires it to `PreToolUse` and Claude Code pipes the call it is about to run to it as JSON on stdin.
+
+```json
+"PreToolUse": [
+	{
+		"matcher": "Bash",
+		"hooks": [{ "type": "command", "command": "pnpm josh rule:guard", "timeout": 20 }]
+	}
+]
+```
+
+**It is a dispatcher, not a third guard.** `scripts/rules/delivered-rules.ts` holds one row per relocated rule — an id, the trigger read from the call, and the text the refusal states — and each row is a `hook_decision.create_transcript_guard` spec, the same shell `josh batch:guard` and `josh investigation:guard` already share. So the next rule that leaves residency costs a row and a test, never a fourth process in front of every call. The enumeration and the criterion that decides what belongs on it are `prompts/collaboration-workflow/rule-delivery.md`.
+
+**What it delivers today** is the backlog WIP cap: the trigger is a `Bash` call that files an Issue — `gh issue create`, or a `title`-bearing POST to a path ending in `/issues` — and the refusal states the count, the refusal, both exemptions and the three tests that decide the interrupt one. **A comment endpoint is not a filing**: `…/issues/<N>/comments` is left alone, and so is a listing, because comments outnumber filings by a wide margin and a guard that fired on them would be the hook that fires on the wrong turns.
+
+**Wired to `Bash` alone**, for the reason `josh batch:guard` documents: Claude Code denies one call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself not. Every rule the enumeration carries is therefore one whose binding moment is a shell call.
+
+**One delivery per run**, recorded by the same stamp the other two use, and the refusal text says so — a delivery that repeated would stop the very call it asked for. Set `JOSH_RULE_GUARD` to `off`, `0`, `false` or `no` to switch it off; unset is **on**.
+
 ### `josh cspell`
 
 Run spell check.

@@ -168,6 +168,15 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// every read. The script calls `process.loadEnvFile` itself instead, through
 		// `hook-decision.ts`.
 	},
+	'rule:guard': {
+		script: 'scripts/rules/rule-guard.ts',
+		description:
+			'Claude Code hook: deliver a trigger-delivered rule at the call that binds it (reads the tool call on stdin)',
+		category: 'AI tools',
+		// **No `tsx_arguments`, for the reason the other two guards declare none**
+		// (joshuafolkken/kit#1342): declaring any disqualifies a command from in-process dispatch, and
+		// this one runs in front of every shell call.
+	},
 	eval: {
 		script: 'scripts/eval/eval-run.ts',
 		description: 'Run the agent rule-compliance scenarios (real Claude sessions)',
