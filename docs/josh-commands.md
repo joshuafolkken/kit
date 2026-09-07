@@ -2019,6 +2019,52 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:liveness 1
 
 The loop that asks it, and what each answer does there, is `.claude/skills/workflow-commands/epicrun.md` → "A delegated unit that stopped without reporting".
 
+### `josh run:progress`
+
+Report an unattended run's progress once it has gone quiet for an interval ([#1520](https://github.com/joshuafolkken/kit/issues/1520)).
+
+```bash
+pnpm josh run:progress --output ~/.claude/projects/<project>/<session>.jsonl   # alias: josh rg
+pnpm josh run:progress --mark                       # a real report just happened; restart the clock
+pnpm josh run:progress --once                       # one line now, whatever the clock says
+pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
+```
+
+**This is the one josh command meant to be started and left running.** Every other one answers once and the caller's own loop drives it. That shape was rejected here deliberately: a parent that waits and reports spends one of its own turns per heartbeat — 36 of them in a three-hour run, taken at the point its context is largest and most expensive. The loop lives inside the command, an agent starts it in the background, and all the agent does is relay what appears.
+
+**The trigger is silence, not a clock.** The interval is measured from the last report of _any_ kind, so a line never lands immediately behind a real one. `--mark` is how a run tells the clock that a real report happened; it is a single cheap call at the points a run already reports, and it is honoured even while reporting is switched off, so the clock stays true either way. A tick that printed nothing does not move the clock, so the first child to appear is reported at once instead of waiting out an interval the repository spent idle.
+
+**Standard output carries the progress line and nothing else**, the way `run:liveness` keeps its verdict there — a relaying agent should never have to tell a report apart from an explanation. Notices go to standard error.
+
+**It cannot send a Telegram, and that is structural rather than a promise.** Nothing the command is built from imports `scripts/git/telegram-notify.ts`, which is the only egress there is. A heartbeat every ten minutes on a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages that do need to interrupt someone.
+
+**The line reports no verification result, because it reads none.** No gate conclusion, no CI conclusion, no check rollup. What it says about a pull request is that one exists and what state GitHub calls it, which is a read it performs — printing a result nobody read is the failure this repository keeps relearning.
+
+The fields, in order:
+
+| Field                      | What it says                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quiet <m>`                | How long since the last report of any kind — the silence this line is breaking                                                                                                                                                                                                                                                                        |
+| `#<N> <labels> PR:<state>` | One per child in flight, from the same `in-progress` listing `epicrun` sizes its lanes from, with `none` / `open` / `merged` / `closed` for its pull request                                                                                                                                                                                          |
+| `lanes <N>:<state>`        | The open lanes, or `none`; `open` / `stranded` / `unreadable` as `lane:list` reports them. **These are this checkout's lanes, and `--repo` does not move them** — a work tree is local to the machine, so pointing the children at another repository leaves the lanes, the load average and the transcript sample reading the one you are sitting in |
+| `load <n>`                 | The one-minute load average, which is what actually bites when several lanes run at once                                                                                                                                                                                                                                                              |
+| `record +<m>`              | How long since the newest `--output` transcript last grew — the field that says a run may be stuck rather than merely slow. `unread` when no path was given or none could be sampled, never a guess                                                                                                                                                   |
+| `unchanged <m>`            | How long the children and lanes have been identical. The load average and the record age are deliberately excluded from that comparison: both move on every tick, and including either would make `unchanged` impossible to reach                                                                                                                     |
+
+**Why ten minutes.** Five was measured in live use on 2026-09-07 and 6 of 15 reports carried no changed number at all — the same information as silence, and the "still running" line this command exists not to print. A child measures 20–46 minutes, so ten gives two to five reports per child and catches the stage changes: implementation, commit, pull request, review, merge.
+
+| Setting                          | What it does                                                                                                                                                                                                                                                                        |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_PROGRESS_INTERVAL_MINUTES` | The silence interval in minutes. Default 10. Anything that is not a positive number falls back to the default rather than throwing — this runs unattended, and dying on a typo in an optional setting removes the reporting the setting was there to tune. `--interval` outranks it |
+| `JOSH_PROGRESS=0`                | Reports nothing at all. `--mark` still records, so switching reporting back on does not inherit a stale clock                                                                                                                                                                       |
+| `--hours`                        | How long the watcher lives before it exits on its own. Default 8, the same expiry `run:hold` uses: longer than any run, short enough that one abandoned by a crashed session is gone by the next working day                                                                        |
+
+**A repository with nothing in flight is told apart from one whose listing could not be read.** Under `--once`, no child carrying `in-progress` prints nothing and exits 0 — that is an answer — while a listing that could not be read prints nothing and exits 1, the same fail-closed reading `run:hold` and `run:liveness` give an unreadable record. **The watcher has nowhere to exit to, so it says the reason on standard error instead**, once per streak rather than once per attempt: a condition lasting an afternoon costs one line, and a watcher that swallowed it would look exactly like an idle repository.
+
+**A tick that reads nothing does not end the watcher, and does not spin either.** Every reading it makes spawns a process or touches the temp directory, so one `git worktree list` that cannot fork under load — the load this command exists to report — would otherwise take the reporting down for the rest of the run, with nothing waiting on it to notice. The failure is reported on standard error and the loop continues. A declined tick leaves the report clock alone, so the first child to appear is still reported at once, but it does set a **two-minute read cooldown**: without one, an idle or failing repository would be re-read every 30 seconds for eight hours, which is enough calls to start causing the unreadable listings it is handling.
+
+Who starts it, and when, is `.claude/skills/workflow-commands/epicrun.md` → "Progress while the run is quiet".
+
 ### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`
 
 Open and close a lane: one linked git work tree with its own branch and its own port seed ([#1490](https://github.com/joshuafolkken/kit/issues/1490)).
