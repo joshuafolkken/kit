@@ -313,14 +313,18 @@ describe('strip_managed_postinstall', () => {
 })
 
 // Mirrors scripts/init/init.ts apply_package_json_merges so the composed ordering
-// (migrate → suggested-scripts merge → lifecycle append) is regression-protected.
+// (migrate → suggested-scripts merge → lefthook-warning upgrade → lifecycle append) is
+// regression-protected. The upgrade sits where it does for a reason the steps either side encode:
+// after the merge, which never overwrites an existing `prepare`, and before the append, which
+// early-returns on the fix-gh-packages marker the consumer being upgraded is carrying.
 function run_pipeline(content: string): Record<string, string> {
 	const migrated = init_logic.strip_managed_postinstall(content)
 	const merged = init_logic.merge_package_scripts(
 		migrated,
 		init_logic.get_suggested_scripts_for_content(migrated),
 	)
-	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(merged)
+	const upgraded = init_logic.upgrade_prepare_lefthook_warning(merged)
+	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(upgraded)
 
 	return (JSON.parse(with_lifecycle) as { scripts: Record<string, string> }).scripts
 }
