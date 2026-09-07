@@ -175,10 +175,21 @@ function format_paths(root: string, paths: ReadonlyArray<string>): string {
 	return paths.map((relative) => `  ${root}/${relative}`).join('\n')
 }
 
-function round_two_target(root: string, delta: ReadonlyArray<string>): string {
-	if (delta.length === 0) return EMPTY_DELTA_LINE
+// **An empty target has two readings, and only one of them is "nothing changed"**
+// (joshuafolkken/kit#1537). Since the delta is intersected with the change, round 1's fixes can be
+// real and still leave no target — a fix that reverts a file to its base content takes that path out
+// of `git diff` altogether. Printing "nothing changed since round 1" there would contradict the
+// `Not in this change` list directly below it, which is the self-disagreement this whole change
+// exists to remove.
+const NOTHING_LEFT_LINE =
+	'The fix delta is empty once reconciled against this change — every path the comparison offered has left it, so there is nothing here for a verification pass to read.'
 
-	return `Target: only these files, which are the ones round 1's fixes changed:\n${format_paths(root, delta)}`
+function round_two_target(root: string, scope: RoundTwoScope): string {
+	if (scope.target.length > 0) {
+		return `Target: only these files, which are the ones round 1's fixes changed:\n${format_paths(root, scope.target)}`
+	}
+
+	return scope.dropped.length > 0 ? NOTHING_LEFT_LINE : EMPTY_DELTA_LINE
 }
 
 // **What round 2 is sent to read, reconciled against the change it is meant to cover**
@@ -296,7 +307,7 @@ function narrow_block(
 	return [
 		ROUND_TWO_HEADING,
 		`Round 1 was recorded at ${recorded_at}.`,
-		round_two_target(root, scope.target),
+		round_two_target(root, scope),
 		...reconciliation(root, base, scope),
 		ROUND_TWO_QUESTION,
 	].join('\n')
@@ -377,6 +388,7 @@ const review_brief = {
 	live_marker,
 	matching_stamp,
 	no_snapshot_line,
+	NOTHING_LEFT_LINE,
 	NOT_VERIFIED_LINE,
 	ROUND_TWO_HEADING,
 	ROUND_TWO_QUESTION,

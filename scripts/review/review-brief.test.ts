@@ -138,13 +138,29 @@ describe('review_brief.gate_line — never claims a gate that did not run on thi
 	it('refuses to claim green when there is no record at all', () => {
 		expect(gate_line({}, tree)).toContain(NOT_VERIFIED)
 	})
+})
 
-	// joshuafolkken/kit#1537. A merge of the default branch that touches nothing the branch touches
+// joshuafolkken/kit#1537: matching digests are not enough. A merge of the default branch that touches
+// nothing the branch touches leaves every digest identical while the tree gains code the gate never
+// read, so the commit the gate measured against is compared too.
+describe('review_brief.gate_line — the base the gate was green against', () => {
+	const tree = { [FILE_A]: 'x', [FILE_B]: 'y' }
+
+	// A merge of the default branch that touches nothing the branch touches
 	// leaves every digest identical, so the digests alone would still say "this exact tree" about a
 	// tree that gained code the gate never read. The gate records the commit it measured against; this
 	// is the same refusal `gate-skip.ts` already makes of the same record.
 	it('refuses to claim green when the gate measured a different change base', () => {
 		const line = gate_line({ gate: stamp_of(tree), base: OTHER_BASE }, tree)
+
+		expect(line).toContain(NOT_VERIFIED)
+		expect(line).not.toContain(VERIFIED)
+	})
+
+	// A record written before the field existed cannot be shown to describe this base, and the safe
+	// answer for an unprovable green is the same one a stale record gets.
+	it('refuses to claim green when the gate record carries no base', () => {
+		const line = gate_line({ gate: { taken_at: TAKEN_AT, files: tree } }, tree)
 
 		expect(line).toContain(NOT_VERIFIED)
 		expect(line).not.toContain(VERIFIED)

@@ -264,6 +264,32 @@ describe('a round-2 target when the change base did not move', () => {
 })
 
 describe('the reconciliation the brief prints beside a narrow target', () => {
+	// An empty target is not always "nothing changed": a fix that reverts a file to its base content
+	// takes that path out of the change, so the comparison still offers it while nothing is left to
+	// read. Saying "nothing changed since round 1" there would contradict the list printed under it.
+	it(
+		'distinguishes a target emptied by reconciliation from one that never had anything',
+		async () => {
+			const round_one = snapshot_of(await read_round())
+
+			write_file(SHARED, 'old')
+
+			const round_two = await read_round()
+			const block = review_brief.round_two_block(
+				round_one,
+				round_two.tree,
+				fixture.root,
+				round_two.base,
+			)
+
+			expect(block).toContain(review_brief.NOTHING_LEFT_LINE)
+			expect(block).not.toContain(review_brief.EMPTY_DELTA_LINE)
+		},
+		TIMEOUT_MS,
+	)
+})
+
+describe('the two lists the brief prints beside a narrow target', () => {
 	it(
 		'prints both disagreements rather than passing them over',
 		async () => {
