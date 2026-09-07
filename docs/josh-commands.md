@@ -563,14 +563,13 @@ josh test takes no extra arguments — pass them to josh test:unit or josh test:
 | `test`       | `test:unit`, `test:e2e`                          |
 | `format`     | `format:prettier`, `format:eslint`               |
 | `latest`     | `latest:corepack`, `latest:update`, `audit`      |
-| `main:sync`  | — (chains raw `git` calls; nothing is forwarded) |
 | `main:merge` | — (chains raw `git` calls; nothing is forwarded) |
 
 Every other command — the ones that invoke a single tool or script — forwards extra arguments exactly as before; `pnpm josh test:e2e --workers=1` reaches Playwright unchanged.
 
 The refusal is driven by the **shape** of the command rather than a per-command opt-in, so a composite added later cannot reintroduce the silent discard by forgetting to declare itself. A unit test audits the whole command map on every commit.
 
-The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before.
+The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before. [`josh main:sync`](#josh-mainsync) refuses the same way for the same reason: it left the table above when it became a script, not because it started accepting arguments.
 
 ---
 
@@ -794,11 +793,17 @@ Note: do not use `--task-type completion` manually — always use `josh followup
 
 ### `josh main:sync`
 
-Checkout `main` and pull the latest changes.
+Checkout the default branch and pull the latest changes.
 
 ```bash
 pnpm josh main:sync
 ```
+
+**It refuses inside a linked work tree — a lane — and exits non-zero.** The default branch is a branch, and git allows one branch in one work tree at a time, so checking it out from a lane takes it away from wherever it belongs. Measured on 2026-09-07 with five lanes open, one `josh ms` run inside a lane did two things nobody asked for: the lane dropped out of [`josh lane:list`](#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune) because that listing matches on the branch name — leaving `lane:close` unable to reach it and its port seat never reclaimed — and every other lane's `josh ms` then failed with `fatal: 'main' is already used by worktree at …`.
+
+A lane's terminal step is `pnpm josh lane:close <issue-number>`; run `pnpm josh main:sync` in the primary checkout instead. Nothing about the main work tree's behavior changed.
+
+Note that [`josh lane:open`](#josh-laneopen--josh-laneclose--josh-lanelist--josh-laneprune) no longer depends on the local default branch being current — it cuts each lane from `refs/remotes/origin/<default>` — so there is no longer a reason to reach for `josh ms` inside a lane in the first place (joshuafolkken/kit#1535).
 
 ### `josh main:merge`
 
@@ -2027,6 +2032,8 @@ pnpm josh lane:prune        # alias: josh lnp
 ```
 
 **`lane:open` prints the directory and nothing else**, so `dir=$(pnpm josh lane:open 1490)` is what a caller needs, and a refusal is an empty capture beside a non-zero exit. Every explanation goes to standard error, the contract [`josh run:hold`](#josh-runhold--josh-runrelease) and [`josh epic:next`](#josh-epicnext) already set.
+
+**A lane is cut from `refs/remotes/origin/<default>`, never from the local default branch** ([#1535](https://github.com/joshuafolkken/kit/issues/1535)). The bare name would resolve to `refs/heads/<default>`, and nothing in this workflow advances that ref: merges happen on GitHub through [`josh followup`](#josh-followup), and a repository whose default branch is checked out in no work tree never receives the fast-forward — so the local branch falls one commit further behind on every merge and a lane opened from it starts without the work that was just merged. The remote-tracking ref is fetched first and read after; where the fetch fails, the lane still opens from that ref as it stands, and where there is no remote-tracking ref at all — a fresh `git init`, a clone with no `origin` — the local branch is the answer. The branch is created with `--no-track`, so the lane's own `git push` cannot inherit an upstream aimed at the default branch.
 
 **Port separation is the reason this command exists, not a detail of it.** `PORT_SEED` is read from the project root's uncommitted `.env`, and `ports/index.js` resolves that root as the nearest ancestor holding a `package.json` — which, inside a linked work tree, is the lane's own directory. So a lane with no `.env` runs on seed 0 and a lane handed a verbatim copy runs on the root's seed; either way every lane lands on one pair of ports, and a busy port **fails on the spot rather than retrying on another**, which is the behavior `playwright.config.ts` documents and which nothing here weakens. `lane:open` therefore copies the root `.env` — `TELEGRAM_*`, `JOSH_SESSION_LANG` and everything else carried across verbatim — with the `PORT_SEED` line replaced by the lane's own.
 

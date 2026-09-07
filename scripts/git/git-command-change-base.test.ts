@@ -12,34 +12,45 @@ const execa_mock = vi.hoisted(() => {
 	const MERGE_BASE = 'merge-base'
 	const MERGE_BASE_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 	const REV_PARSED_SHA = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+	const ORIGIN_HEAD_TARGET = 'refs/remotes/origin/main'
 
 	const state = {
 		calls: [] as Array<Array<string>>,
 		merge_base_fails: false as boolean,
+		// Whether `git rev-parse --verify refs/remotes/origin/main` resolves, which is what decides
+		// between the remote-tracking ref and the bare name (joshuafolkken/kit#1535).
+		has_remote_ref: true as boolean,
 	}
 
 	function stdout_for(arguments_: Array<string>): string {
-		if (arguments_.includes('symbolic-ref')) return 'refs/remotes/origin/main'
+		if (arguments_.includes('symbolic-ref')) return ORIGIN_HEAD_TARGET
 		if (arguments_[0] === MERGE_BASE) return MERGE_BASE_SHA
 		if (arguments_[0] === 'rev-parse') return REV_PARSED_SHA
 
 		return ''
 	}
 
+	function should_fail(arguments_: Array<string>): boolean {
+		if (arguments_[0] === MERGE_BASE) return state.merge_base_fails
+
+		return arguments_.includes('--verify') && !state.has_remote_ref
+	}
+
 	async function mock_execa(_cmd: string, arguments_: Array<string>): Promise<{ stdout: string }> {
 		state.calls.push([...arguments_])
 
-		if (arguments_[0] === MERGE_BASE && state.merge_base_fails) throw new Error('no merge base')
+		if (should_fail(arguments_)) throw new Error('git refused')
 
 		return { stdout: stdout_for(arguments_) }
 	}
 
-	return { state, mock_execa, MERGE_BASE, MERGE_BASE_SHA, REV_PARSED_SHA }
+	return { state, mock_execa, MERGE_BASE, MERGE_BASE_SHA, ORIGIN_HEAD_TARGET, REV_PARSED_SHA }
 })
 
 vi.mock('execa', () => ({ execa: execa_mock.mock_execa }))
 
 const DEFAULT_BRANCH = 'main'
+const DEFAULT_BRANCH_REF = execa_mock.ORIGIN_HEAD_TARGET
 const A_TRACKED_FILE = 'package.json'
 
 function last_call(): Array<string> {
@@ -49,6 +60,44 @@ function last_call(): Array<string> {
 beforeEach(() => {
 	execa_mock.state.calls = []
 	execa_mock.state.merge_base_fails = false
+	execa_mock.state.has_remote_ref = true
+})
+
+// joshuafolkken/kit#1535: a lane is cut from `refs/remotes/origin/<default>`, so the base has to be
+// measured against that same ref. Measured against the bare name — which git resolves to the local
+// branch nothing advances — a lane cut from a remote-tracking ref three commits ahead reported
+// those three commits' files as its own change.
+describe('the base is the ref the lane was cut from', () => {
+	it('takes the merge base against the remote-tracking ref, not the local branch', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.change_base()
+
+		expect(execa_mock.state.calls).toContainEqual([
+			execa_mock.MERGE_BASE,
+			DEFAULT_BRANCH_REF,
+			'HEAD',
+		])
+	})
+
+	it('resolves the same ref a lane start point does', async () => {
+		const { git_command } = await import('./git-command')
+
+		await expect(git_command.default_branch_reference()).resolves.toBe(DEFAULT_BRANCH_REF)
+	})
+
+	// A fresh `git init`, or a clone whose `origin` was removed: the local branch is the only answer
+	// there is, and it is the reading every caller had before.
+	it('falls back to the bare name where no remote-tracking ref exists', async () => {
+		execa_mock.state.has_remote_ref = false
+
+		const { git_command } = await import('./git-command')
+
+		await git_command.change_base()
+
+		await expect(git_command.default_branch_reference()).resolves.toBe(DEFAULT_BRANCH)
+		expect(execa_mock.state.calls).toContainEqual([execa_mock.MERGE_BASE, DEFAULT_BRANCH, 'HEAD'])
+	})
 })
 
 // A linked work tree shares the `main` ref with every other lane, so a two-dot `git diff main`
@@ -60,7 +109,11 @@ describe('the changed-path reading measures against the merge base', () => {
 
 		await git_command.change_base()
 
-		expect(execa_mock.state.calls).toContainEqual([execa_mock.MERGE_BASE, DEFAULT_BRANCH, 'HEAD'])
+		expect(execa_mock.state.calls).toContainEqual([
+			execa_mock.MERGE_BASE,
+			DEFAULT_BRANCH_REF,
+			'HEAD',
+		])
 	})
 
 	it('diffs the name listing against that commit rather than against the branch', async () => {
@@ -96,6 +149,6 @@ describe('the changed-path reading measures against the merge base', () => {
 
 		const { git_command } = await import('./git-command')
 
-		await expect(git_command.change_base()).resolves.toBe(DEFAULT_BRANCH)
+		await expect(git_command.change_base()).resolves.toBe(DEFAULT_BRANCH_REF)
 	})
 })

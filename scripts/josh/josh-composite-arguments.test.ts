@@ -104,13 +104,10 @@ describe('composite_arguments.reject_extra_arguments', () => {
 	})
 })
 
-const EXPECTED_COMPOSITES: ReadonlyArray<string> = [
-	'format',
-	'latest',
-	'main:merge',
-	'main:sync',
-	TEST_CMD,
-]
+// `main:sync` left this list when it became a script that enforces a precondition of its own; it
+// still refuses extra arguments, with the same message, from inside `scripts/git/main-sync.ts`
+// (joshuafolkken/kit#1535).
+const EXPECTED_COMPOSITES: ReadonlyArray<string> = ['format', 'latest', 'main:merge', TEST_CMD]
 
 function collect_composite_entries(): Array<[string, CommandEntry]> {
 	return Object.entries(COMMAND_MAP).filter(([, entry]) =>
