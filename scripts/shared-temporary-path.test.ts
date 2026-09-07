@@ -19,7 +19,9 @@ import { describe, expect, it } from 'vitest'
 // It is a textual scan and has one edge it does not cover: `const TEMP_ROOT = tmpdir()` followed by
 // `path.join(TEMP_ROOT, 'sync-test')` rebuilds the shared directory without spelling `tmpdir()`
 // inside the join. Closing that needs type information this scan does not have; what it does cover
-// is every spelling the repository actually contains.
+// is every spelling the repository actually contains. The `node:fs` qualification below has the
+// matching edge: a suite that names the path and hands it to a helper module that does the writing
+// imports no `fs` of its own, and is exempted along with the string-only suites.
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(SCRIPTS_DIR, '..')
@@ -36,9 +38,10 @@ const WRAPPED_UNIQUE_CALL = /mkdtempSync\(\s+/gu
 // `path.join(tmpdir(), 'name')` — a plain string literal, so the path is identical in every
 // concurrent run. An argument written as a template literal is left alone: the stamp files keyed on
 // `process.pid` are already unique, and that is the escape the interpolation buys. The lookbehind is
-// what lets the fix itself through.
+// what lets the fix itself through, and the optional comma is what keeps a *wrapped* offender from
+// escaping: prettier puts a trailing comma where the close paren would otherwise be.
 const FIXED_JOIN =
-	/(?<!mkdtempSync\()path\.join\(\s*(?:os\.)?tmpdir\(\)\s*,\s*(['"])[^'"\n]*\1\s*\)/gu
+	/(?<!mkdtempSync\()path\.join\(\s*(?:os\.)?tmpdir\(\)\s*,\s*(['"])[^'"\n]*\1(?:\s*,)?\s*\)/gu
 // The same path spelled by interpolation instead, with nothing inside it that varies per run.
 const FIXED_TEMPLATE = /(?<!mkdtempSync\()`\$\{\s*(?:os\.)?tmpdir\(\)\s*\}\/[^`$\n]*`/gu
 const FIXED_PATTERNS: ReadonlyArray<RegExp> = [FIXED_JOIN, FIXED_TEMPLATE]
@@ -72,8 +75,16 @@ function files_under(root: string): Array<string> {
 		.map((entry) => path.join(REPO_ROOT, entry))
 }
 
+// The repository root holds test files of its own — `playwright.config.test.ts` and its fixture —
+// and a walk that only descended into directories would never open them.
+function root_files(): Array<string> {
+	return readdirSync(REPO_ROOT, { encoding: 'utf8' })
+		.filter((entry) => is_scanned(entry))
+		.map((entry) => path.join(REPO_ROOT, entry))
+}
+
 function scanned_files(): Array<string> {
-	return source_roots().flatMap((root) => files_under(root))
+	return [...root_files(), ...source_roots().flatMap((root) => files_under(root))]
 }
 
 function matches_in(content: string, pattern: RegExp): Array<string> {
@@ -103,15 +114,17 @@ describe('temp directories in test suites', () => {
 		expect(scanned_files().flatMap((file) => offenders_in(file))).toStrictEqual([])
 	})
 
-	it('reports a fixture directory named by a literal', () => {
-		const sample = "const dir = path.join(tmpdir(), 'shared-fixture')"
-
-		expect(fixed_temporary_paths(sample)).toHaveLength(1)
-	})
-
-	it('reports the same path spelled as a template literal', () => {
-		const sample = 'const dir = `${os.tmpdir()}/shared-fixture`'
-
+	// The third case is the offender prettier produces once the constant name is long: the trailing
+	// comma sits where the close paren would otherwise be, which is what an earlier version of this
+	// pattern required and what let a wrapped fixed name through.
+	it.each([
+		['a fixture directory named by a literal', "const dir = path.join(tmpdir(), 'shared-fixture')"],
+		['the same path spelled as a template literal', 'const dir = `${os.tmpdir()}/shared-fixture`'],
+		[
+			'a fixture directory prettier has wrapped across lines',
+			"const dir = path.join(\n\ttmpdir(),\n\t'shared-fixture',\n)",
+		],
+	])('reports %s', (_label, sample) => {
 		expect(fixed_temporary_paths(sample)).toHaveLength(1)
 	})
 
