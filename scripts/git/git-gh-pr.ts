@@ -1,9 +1,11 @@
+import { poll } from '#scripts/poll'
 import { git_command } from './git-command'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_issue_write } from './git-gh-issue-write'
-import { forget_pr_numbers, git_gh_pr_read, require_pr_number } from './git-gh-pr-read'
+import { forget_pr_numbers, git_gh_pr_read, read_pull, require_pr_number } from './git-gh-pr-read'
+import { git_gh_pr_rest } from './git-gh-pr-rest'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 
 // The pull-request writes, through REST.
@@ -31,6 +33,18 @@ const PUT_METHOD = 'PUT'
 // (`allow_squash_merge` and `allow_rebase_merge` are both false). Sent explicitly rather than left to
 // the endpoint's default, so a change to either would fail loudly instead of silently squashing.
 const MERGE_COMMIT_METHOD = 'merge'
+// The one write worth waiting longer for, and the only per-request override in this file. It is the
+// least idempotent request the layer makes, so the failure the shared 60-second budget produces is
+// the expensive one: a merge that landed while the request was already being abandoned. Three
+// minutes lowers how often that happens without leaving the request unbounded — the recovery below
+// is what actually removes the failure mode, and this only makes it rarer (joshuafolkken/kit#1077).
+const MERGE_REQUEST_TIMEOUT_MS = 180_000
+// What a failed merge whose outcome could not be read back is reported as. Deliberately neither
+// "merged" nor "not merged": nobody read it.
+const MERGE_UNCONFIRMED_MESSAGE =
+	'gh api could not read the pull request back after the merge request failed'
+const MERGE_READ_BACK_ATTEMPTS = 3
+const MERGE_READ_BACK_INTERVAL_MS = 1000
 
 // **`head` is required and `gh pr create` never asked for it.** The CLI inferred it from the current
 // branch; REST does not, and a request without it is a 422. The branch is read from git rather than
@@ -97,21 +111,73 @@ async function pr_comment(branch_name: string, body: string): Promise<string> {
 	return await git_gh_issue_write.issue_comment(String(pr_number), body)
 }
 
-// **The least idempotent write in this layer.** Since joshuafolkken/kit#1065 it carries the shared
-// request budget like everything else, and a merge that lands server-side but overruns it throws:
-// `followup` then skips its completion notification and the epic auto-close, and a re-run answers
-// 405 on a pull request that is already merged. The budget is not what created that — before it the
-// same request hung forever, with no notification either and no end to the run — but what `followup`
-// should *do* about a request that failed after its effect landed is a recovery design of its own,
-// deliberately out of joshuafolkken/kit#1065's scope. Tracked in joshuafolkken/kit#1077.
-async function pr_merge(branch_name: string): Promise<void> {
-	const pr_number = await require_pr_number(branch_name)
-
+async function put_merge(pr_number: number): Promise<void> {
 	await git_gh_exec.exec_gh_api({
 		path: git_gh_api_path.pull_merge_api_path(String(pr_number)),
 		method: PUT_METHOD,
 		body: JSON.stringify({ merge_method: MERGE_COMMIT_METHOD }),
+		timeout_ms: MERGE_REQUEST_TIMEOUT_MS,
 	})
+}
+
+// `undefined` is "nobody read it", kept apart from the `false` that means "the pull request is not
+// merged". Folding the two is the misread joshuafolkken/kit#925 / #950 / #973 / #1048 all refuse.
+async function read_merge_state(pr_number: number): Promise<boolean | undefined> {
+	try {
+		return git_gh_pr_rest.is_merged(await read_pull(pr_number))
+	} catch {
+		return undefined
+	}
+}
+
+// Whether the merge is actually there, asked only after the request failed.
+//
+// **The read-back is retried, because the outage that killed the merge request is the one most
+// likely to kill the read that follows it** — the same rate limit, the same dropped connection. One
+// unretried request would therefore fail hardest in exactly the case this recovery exists for. Three
+// attempts a second apart get past a dropped connection; a real outage still ends below, and a
+// re-run of `followup` recovers from that.
+//
+// **A read that failed is still not an answer.** Out of attempts it throws rather than reporting
+// `false`, carrying the merge failure as its `cause`, so no run ever concludes "the merge did not
+// happen" from a read nobody got.
+async function has_merge_landed(pr_number: number, merge_error: unknown): Promise<boolean> {
+	for (let attempt = 0; attempt < MERGE_READ_BACK_ATTEMPTS; attempt += 1) {
+		const is_merged = await read_merge_state(pr_number)
+		if (is_merged !== undefined) return is_merged
+
+		await poll.sleep(MERGE_READ_BACK_INTERVAL_MS)
+	}
+
+	throw new Error(MERGE_UNCONFIRMED_MESSAGE, { cause: merge_error })
+}
+
+// **The least idempotent write in this layer, made re-entrant** (joshuafolkken/kit#1077).
+//
+// The request carries a budget like everything else since joshuafolkken/kit#1065, and a merge that
+// lands server-side but overruns it used to throw: `followup` then skipped its completion
+// notification and the epic auto-close, and a re-run answered 405 on a pull request that was already
+// merged. The budget did not create that — before it the same request hung forever, with no
+// notification either and no end to the run — it only turned a silent hang into a loud failure.
+//
+// **A failed merge request is not proof the merge did not happen**, so the pull request's own state
+// settles it: merged, and this returns as if the request had succeeded, which is what lets
+// `followup` carry on to the notification and the epic close, and what makes re-running it recover
+// instead of failing on the 405. Not merged, and the original failure is rethrown unchanged.
+//
+// **The question is "is this pull request merged", not "did my request merge it"**, and that is
+// deliberate: the state the recovery has to act on is whether the branch is in, and a merge someone
+// made by hand between the failure and the read leaves `followup` with exactly the same work to
+// finish. REST offers nothing that would tell the two apart without keeping the merge commit's SHA
+// across a request that never answered.
+async function pr_merge(branch_name: string): Promise<void> {
+	const pr_number = await require_pr_number(branch_name)
+
+	try {
+		await put_merge(pr_number)
+	} catch (error) {
+		if (!(await has_merge_landed(pr_number, error))) throw error
+	}
 }
 
 const git_gh_pr = {
@@ -123,4 +189,4 @@ const git_gh_pr = {
 	pr_merge,
 }
 
-export { git_gh_pr, MERGE_COMMIT_METHOD }
+export { git_gh_pr, MERGE_COMMIT_METHOD, MERGE_REQUEST_TIMEOUT_MS, MERGE_UNCONFIRMED_MESSAGE }
