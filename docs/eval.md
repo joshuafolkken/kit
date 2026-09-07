@@ -153,11 +153,36 @@ cannot be compared against the whole suite's.
 **What a result does** is the last line of the run, because the exit code cannot carry it: `0` only
 when every scenario passed, so a failed run and one that measured nothing exit alike.
 
-| Verdict      | Meaning                                  | The merge                                                                    |
-| ------------ | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `held`       | every scenario held                      | continue                                                                     |
-| `blocked`    | a scenario failed — a measured violation | **stops the merge** — fix the prose its `→` line names, re-run that scenario |
-| `unmeasured` | a scenario produced no measurement (`?`) | does not block, and is stated in the completion report                       |
+| Verdict       | Meaning                                  | The merge                                                                     |
+| ------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `held`        | every scenario held                      | continue                                                                      |
+| `blocked`     | a scenario failed — a measured violation | **stops the merge** — fix the prose its `→` line names, re-run that scenario  |
+| `unmeasured`  | a scenario produced no measurement (`?`) | does not block, and is stated in the completion report                        |
+| `unreachable` | the suite could not reach the API (`⚠`)  | does not block, and is stated in the completion report, naming the connection |
+
+**`unreachable` is the narrow half of `unmeasured`.** Both leave the rules unmeasured and neither
+blocks a merge, so the fourth word buys nothing at the merge and everything at the report: a reader
+sent to the `?` lines to fix the harness or the prompt found nothing wrong with either, because the
+fault was a refused connection (joshuafolkken/kit#1197). Under its own word the suite says which one
+to look at, and a run of them three days running is visible as three of the same word.
+
+**One refused session earns the word; two stop the suite.** The verdict is `unreachable` as soon as a
+single `⚠` line appears, which says only that this run did not measure every scenario — the other
+four may have held, and every session may have run. What the second refusal adds is the stop: from
+there the suite starts no more sessions — the retries first, then any scenario still queued — because
+each one is a whole Claude session that meets the same refusal. **Which scenarios that actually saves
+depends on the width**, so read the `⚠` lines rather than the count: only the ones whose note says
+`session not started` were skipped, and on a run where every scenario was dequeued there are none.
+
+**At the shipped default it saves less than it looks like.** Five scenarios and a width of five means
+every scenario is dequeued before the first verdict returns, so no scenario is ever queued and the
+only sessions left to skip are retries — and a refused session is not retried in the first place. So
+on the run this was written for, where every session meets the same refusal, the tally skips nothing
+at all: the five sessions were already in flight, and none of them would have made a second attempt.
+What it does save is the mixed run — refusals accumulating while other scenarios come back merely
+inconclusive — where it stops up to three of those retries, and any suite wider than its pool, where
+everything still queued is skipped. Lower `JOSH_EVAL_CONCURRENCY` and the queue, and the saving,
+appear at five scenarios too.
 
 **A `blocked` verdict is confirmed, then attributed, before it blocks.** One scenario is one real
 Claude session, so its verdict is a sample rather than a fact: measured on
@@ -227,9 +252,18 @@ prevent anything, and under a pool it holds a slot for the whole time
 (joshuafolkken/kit#1144). **The retry itself is unchanged** — one attempt, only for an inconclusive
 verdict.
 
-**Do not read that as a solved problem.** The honest state is that the reason is visible and points at
-connectivity to the API rather than at pacing, and nothing here fixes it. To check where it stands
-after changing anything here:
+**The cause was found, and it was neither pacing nor width.** A session spawned from inside a Claude
+session inherited the parent's own `CLAUDE_CODE_MESSAGING_SOCKET` — a UNIX socket only the parent
+listens on — dialled it, and was refused; lowering `JOSH_EVAL_CONCURRENCY`, the suspected cause,
+made it worse. Removing that variable and the three beside it from the child's environment restored
+5/5 held in 54 seconds (joshuafolkken/kit#1158, carried into joshuafolkken/kit#1197). The harness now
+does that itself, in `session_environment`, so nothing has to be set by hand.
+
+**That fix does not retire the defense built beside it.** A connection can fail again for reasons
+that have nothing to do with an inherited socket, and the failure mode being closed here is the one
+where the suite pays for five sessions and returns `unmeasured` — so a refused connection is now
+reported under its own verdict and stops the suite starting further sessions, whatever caused it. To
+check where it stands after changing anything here:
 
 ```bash
 pnpm josh eval <one-scenario>   # must hold on its own
@@ -274,8 +308,8 @@ Running 5 scenario(s) on sonnet.
 Verdict: blocked — a scenario failed; fix the rule its → line names before merging
 ```
 
-The last line is what a run means for a merge, in one token — `held`, `blocked` or `unmeasured`
-("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
+The last line is what a run means for a merge, in one token — `held`, `blocked`, `unmeasured` or
+`unreachable` ("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
 the evidence**, and the calls the run actually made. The `→` line is the one to act on — it points at
 the rule, so a red scenario tells you which prose to change rather than only that something went
 wrong.

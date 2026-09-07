@@ -110,7 +110,33 @@ function read_tool_calls(transcript: string): ReadonlyArray<ToolCall> {
 	return transcript.split('\n').flatMap((line) => tool_calls_in_line(line))
 }
 
-const eval_transcript = { has_started, read_error_reason, read_tool_calls }
+// "The session ran and did not settle the rule" and "the session never reached the API" are different
+// states, and only the first is worth a retry or a `unmeasured` verdict. The second is a setup
+// failure that costs a whole Claude session to learn and returns nothing, so it is named here and
+// separated everywhere downstream (joshuafolkken/kit#1197).
+//
+// Matched on the reason text because that is where it arrives: the CLI reports it as the `result` of
+// a `type:"result"`, `is_error:true` line in the stdout stream, with stderr empty on every occurrence
+// measured under joshuafolkken/kit#1001. Two phrasings rather than one — the CLI has emitted the
+// wrapper sentence and the bare cause independently — and both are matched case-insensitively so a
+// re-worded prefix does not silently turn an unreachable API back into `unmeasured`.
+const UNREACHABLE_PATTERNS: ReadonlyArray<RegExp> = [
+	/unable to connect to api/iu,
+	/connection\s*refused/iu,
+]
+
+function is_unreachable_reason(reason: string | undefined): boolean {
+	if (reason === undefined) return false
+
+	return UNREACHABLE_PATTERNS.some((pattern) => pattern.test(reason))
+}
+
+const eval_transcript = {
+	has_started,
+	is_unreachable_reason,
+	read_error_reason,
+	read_tool_calls,
+}
 
 export { eval_transcript }
 export type { ToolCall }

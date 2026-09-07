@@ -23,6 +23,12 @@ interface Verdict {
 	// The run says nothing about the rule — it made no tool calls, or it did not finish. Distinct from
 	// a failure: nothing was violated, and distinct from a pass: nothing was demonstrated.
 	is_inconclusive: boolean
+	// The narrower half of `is_inconclusive`: the session never reached the API at all, so nothing
+	// about the rule was even attempted. Always implies `is_inconclusive`, and carried separately
+	// because the two cost different things to learn and want different answers — a session that ran
+	// and settled nothing is worth retrying, one that could not connect is worth stopping the suite
+	// for (joshuafolkken/kit#1197).
+	is_unreachable: boolean
 	// Why, when there is a why. Printed instead of a rule name, because the thing to fix is the
 	// harness or the prompt rather than the prose.
 	note: string | undefined
@@ -143,13 +149,36 @@ interface SessionOutcome {
 // the stream's `result` event second, because **every** non-measurement observed across
 // joshuafolkken/kit#908 had an empty stderr, which is what made four failed scenarios in a row
 // indistinguishable from each other.
-function failure_detail(session: SessionOutcome): string {
+function session_reason(session: SessionOutcome): string | undefined {
 	const last_line = session.stderr.trim().split('\n').at(-1) ?? ''
 
-	if (last_line !== '') return `: ${last_line}`
-	const reason = eval_transcript.read_error_reason(session.transcript)
+	if (last_line !== '') return last_line
+
+	return eval_transcript.read_error_reason(session.transcript)
+}
+
+function failure_detail(session: SessionOutcome): string {
+	const reason = session_reason(session)
 
 	return reason === undefined ? '' : `: ${reason}`
+}
+
+// **Both sources, not whichever one `session_reason` picked.** That function returns the stderr line
+// when there is one and the transcript's reason only when stderr is empty — the right order for the
+// single line a note prints, and the wrong one for this question: a `claude` CLI that writes any
+// unrelated line to stderr (a deprecation warning, an update notice) and then dies with
+// `Unable to connect to API` in the stream's `result` event would be judged on the warning, come back
+// as an ordinary `unmeasured`, and take with it both the `⚠` line and the abort. The observation
+// behind `session_reason`'s ordering is that stderr was empty on every occurrence measured under
+// joshuafolkken/kit#908 — an observation, not a guarantee, and the transcript fallback exists because
+// of that.
+//
+// A session that reached the API and then failed a prohibition is not unreachable however it ended:
+// the flag is deliberately a subset of `is_inconclusive`, and `judge` is what enforces that.
+function is_unreachable_session(session: SessionOutcome): boolean {
+	const sources = [session.stderr, eval_transcript.read_error_reason(session.transcript)]
+
+	return sources.some((source) => eval_transcript.is_unreachable_reason(source))
 }
 
 // Whether the session got far enough to announce itself, which is what separates "never started"
@@ -203,6 +232,7 @@ function judge(
 		rule: scenario.rule,
 		is_pass: failures.length === 0 && !is_cut_short,
 		is_inconclusive: is_cut_short,
+		is_unreachable: is_cut_short && is_unreachable_session(session),
 		note: session_note(session, calls),
 		failures,
 		calls,

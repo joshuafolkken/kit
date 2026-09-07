@@ -1,19 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import type { Verdict } from './eval-judge'
-import { eval_runner, type RunnerDependencies } from './eval-runner'
+import { eval_runner, type RunnerDependencies, type UnreachableTally } from './eval-runner'
 import type { Scenario } from './eval-scenario'
 import { scenario_with } from './eval-scenario-fixture'
 
-function verdict(name: string, is_pass: boolean, is_inconclusive: boolean): Verdict {
+function verdict(
+	name: string,
+	is_pass: boolean,
+	is_inconclusive: boolean,
+	is_unreachable = false,
+): Verdict {
 	return {
 		name,
 		rule: 'a rule',
 		is_pass,
 		is_inconclusive,
+		is_unreachable,
 		note: undefined,
 		failures: [],
 		calls: [],
 	}
+}
+
+function unreachable(name: string): Verdict {
+	return verdict(name, false, true, true)
 }
 
 function scenarios(count: number): Array<Scenario> {
@@ -213,5 +223,102 @@ describe('eval_runner.run_all aggregation', () => {
 
 		expect(test.logged).toContain('  ▸ probe-0 (1/2)')
 		expect(test.logged).toContain('  ▸ probe-1 (2/2)')
+	})
+})
+
+// The two halves of joshuafolkken/kit#1197's second deliverable: a session that never reached the
+// API is not retried, and once enough of them have come back the suite stops starting new sessions.
+// Both are asserted through `attempts`, which counts the sessions that would have been real Claude
+// runs — the whole cost this behavior exists to avoid.
+describe('eval_runner.run_scenario when the API cannot be reached', () => {
+	it('does not retry a session that never reached the API', async () => {
+		const bench = harness(({ name }) => unreachable(name))
+
+		const result = await eval_runner.run_scenario(scenario_with({ name: 'probe' }), bench.deps)
+
+		expect(result.is_unreachable).toBe(true)
+		expect(bench.attempts).toStrictEqual(['probe'])
+		expect(bench.waits).toStrictEqual([])
+	})
+
+	// The existing retry is untouched: an ordinary non-measurement is still worth a second attempt.
+	it('still retries an ordinary non-measurement', async () => {
+		const bench = harness(({ name }) => verdict(name, false, true))
+
+		await eval_runner.run_scenario(scenario_with({ name: 'probe' }), bench.deps)
+
+		expect(bench.attempts).toHaveLength(1 + eval_runner.INCONCLUSIVE_RETRIES)
+	})
+
+	// **The case the default width makes the only one.** Five scenarios and five slots means every
+	// scenario is dequeued before any verdict returns, so the check in front of a first attempt never
+	// fires and the retries are the only sessions left to skip. The tally crossing the limit while this
+	// scenario's own session is in flight is exactly what happens when two neighbors come back refused.
+	it('does not retry once other sessions have used up the limit', async () => {
+		const tally: UnreachableTally = { count: 0 }
+		const bench = harness(({ name }) => {
+			tally.count = eval_runner.UNREACHABLE_LIMIT
+
+			return verdict(name, false, true)
+		})
+
+		await eval_runner.run_scenario(scenario_with({ name: 'probe' }), bench.deps, tally)
+
+		expect(bench.attempts).toStrictEqual(['probe'])
+		expect(bench.waits).toStrictEqual([])
+	})
+})
+
+// Serial, so the tally is already over the limit by the time the later scenarios are dequeued —
+// which is the case the abort exists for, a suite wider than its pool.
+async function serial_run(count: number): Promise<Harness & { verdicts: Array<Verdict> }> {
+	const bench = harness(({ name }) => unreachable(name), 1)
+	const verdicts = await eval_runner.run_all(scenarios(count), bench.deps)
+
+	return { ...bench, verdicts }
+}
+
+describe('eval_runner.run_all when the API cannot be reached', () => {
+	it('starts no session once the limit is reached', async () => {
+		const run = await serial_run(5)
+
+		expect(run.attempts).toHaveLength(eval_runner.UNREACHABLE_LIMIT)
+	})
+
+	// Skipped is not silently green: every scenario still comes back with a verdict, and each one
+	// says it was never measured.
+	it('reports every scenario, skipped ones included', async () => {
+		const run = await serial_run(5)
+
+		expect(run.verdicts).toHaveLength(5)
+		expect(run.reported).toHaveLength(5)
+		expect(run.verdicts.every((result) => result.is_unreachable)).toBe(true)
+	})
+
+	it('says in the note that the skipped sessions were never started', async () => {
+		const run = await serial_run(5)
+
+		expect(run.verdicts.at(-1)?.note).toContain('not started')
+	})
+
+	// The progress line announces a session that is about to start, so printing one for a scenario the
+	// tally has already skipped puts `▸ probe-4` immediately above `⚠ probe-4 … session not started`.
+	it('announces no session for a scenario it skipped', async () => {
+		const run = await serial_run(5)
+
+		expect(run.logged.filter((line) => line.includes('▸'))).toHaveLength(
+			eval_runner.UNREACHABLE_LIMIT,
+		)
+	})
+
+	// A single refusal is not enough to abandon a run that would have measured the rest.
+	it('runs the whole suite when only one session could not connect', async () => {
+		const bench = harness(({ name }) =>
+			name === 'probe-0' ? unreachable(name) : verdict(name, true, false),
+		)
+
+		const verdicts = await eval_runner.run_all(scenarios(4), bench.deps)
+
+		expect(verdicts.filter((result) => result.is_pass)).toHaveLength(3)
 	})
 })

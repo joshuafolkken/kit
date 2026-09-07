@@ -27,6 +27,29 @@ const INCONCLUSIVE_RETRIES = 1
 // `JOSH_EVAL_CONCURRENCY` is the lever — a wait is not.
 const RETRY_PAUSE_MS = 5000
 
+// How many sessions may come back unable to reach the API before the suite stops starting new ones.
+// Every one of them is a whole Claude session that returns no measurement, and the cause is a setup
+// failure — an inherited socket, a dropped connection — that the next session meets unchanged, so
+// spending the rest of the suite on it buys nothing but the same answer at full price
+// (joshuafolkken/kit#1197).
+//
+// **Two rather than one**, so a single transient refusal does not abandon a run that would have
+// measured the other four. Two in a row is no longer transient.
+//
+// **What it stops is sessions, not the pool.** A scenario already in flight is left to finish — the
+// pool has no cancellation seam and killing a live session would throw away a measurement that is
+// already paid for. What is skipped is every session not yet started: the retries of scenarios still
+// running, and any scenario still queued.
+//
+// **At the shipped default that is less than it sounds, and the comment used to overstate it.** Five
+// scenarios into five slots leaves nothing queued, and a refused session is not retried anyway — so
+// on a run where every session is refused this skips nothing whatever, and the five were already
+// paid for by the time the second verdict arrived. It bites on the mixed run, where refusals
+// accumulate while other scenarios come back merely inconclusive and their retries are stopped — at
+// most three of them, since reaching the limit spends two of the five on verdicts that were never
+// retryable — and on any suite wider than its pool, where the queue is skipped outright.
+const UNREACHABLE_LIMIT = 2
+
 // **Bounded, not unbounded.** The scenarios are independent execution units — each builds its own
 // sandbox — so nothing about them has to be serialized, and the comment that said otherwise ("the
 // scenarios share one API rate budget") asserted a cause joshuafolkken/kit#1001 had already looked
@@ -76,18 +99,94 @@ interface RunnerDependencies {
 	concurrency: number
 }
 
-// Only an inconclusive verdict is retried. A scenario that failed measured something, and running it
-// again until it passes would turn the suite into a slot machine.
-async function run_scenario(scenario: Scenario, deps: RunnerDependencies): Promise<Verdict> {
-	let verdict = await deps.run_once(scenario)
+// How many sessions have already come back unable to reach the API. Shared across the pool by
+// reference rather than counted from the verdicts, because the decision has to be made while the
+// other scenarios are still running — a count taken after `bounded_map` resolves is taken after
+// every session it could have saved has already been spent.
+interface UnreachableTally {
+	count: number
+}
 
-	for (let attempt = 0; attempt < INCONCLUSIVE_RETRIES && verdict.is_inconclusive; attempt += 1) {
+function fresh_tally(): UnreachableTally {
+	return { count: 0 }
+}
+
+// Asked in three places — in front of a scenario's first attempt, in front of a retry, and in front of
+// the progress line that announces one — so it is one predicate rather than the same comparison
+// written out three times.
+function can_start_session(tally: UnreachableTally): boolean {
+	return tally.count < UNREACHABLE_LIMIT
+}
+
+// Only an inconclusive verdict is retried, and only the half of it that a second attempt could
+// settle. A scenario that failed measured something, and running it again until it passes would turn
+// the suite into a slot machine; a scenario whose session never reached the API measured nothing for
+// a reason the retry meets unchanged — joshuafolkken/kit#1001 measured that neither an extra attempt
+// nor a longer wait recovered a single one.
+//
+// **The tally gates this too, because at the default width the retries are the only sessions left to
+// skip.** Five scenarios into five slots means `bounded_map` dequeues every one before the first
+// verdict returns, so the check in front of a scenario's *first* attempt can never fire there —
+// gated only in front of that first attempt, the abort would be unreachable code at the shipped
+// width. **It is not the whole failure this Issue is about**: a refused session is already excluded
+// above, so a run whose every session is refused has no retry to stop either. What this gate saves is
+// the mixed run — up to three ordinary non-measurements whose second attempt would go into a
+// connection two neighbors have already found dead.
+function is_retryable(verdict: Verdict, tally: UnreachableTally): boolean {
+	if (!can_start_session(tally)) return false
+
+	return verdict.is_inconclusive && !verdict.is_unreachable
+}
+
+// The verdict for a scenario whose session was never started. Inconclusive because nothing was
+// measured, and unreachable because the reason is the same one that stopped the suite — reporting it
+// as an ordinary non-measurement would hide the abort behind five scenarios that look merely quiet.
+// The count comes from the tally rather than from `UNREACHABLE_LIMIT`: at the default width four
+// in-flight sessions can all come back refused before a queued scenario is dequeued, and a note
+// naming the limit would then understate what was actually observed.
+function skipped_verdict(scenario: Scenario, tally: UnreachableTally): Verdict {
+	return {
+		name: scenario.name,
+		rule: scenario.rule,
+		is_pass: false,
+		is_inconclusive: true,
+		is_unreachable: true,
+		note: `session not started: ${String(tally.count)} earlier sessions could not reach the API`,
+		failures: [],
+		calls: [],
+	}
+}
+
+async function run_with_retry(
+	scenario: Scenario,
+	deps: RunnerDependencies,
+	tally: UnreachableTally,
+): Promise<Verdict> {
+	let verdict = await deps.run_once(scenario)
+	let attempt = 0
+
+	while (attempt < INCONCLUSIVE_RETRIES && is_retryable(verdict, tally)) {
+		attempt += 1
 		deps.log(
 			`  … ${scenario.name} produced no measurement; waiting ${String(RETRY_PAUSE_MS / MS_PER_SECOND)}s, then retrying`,
 		)
 		await deps.pause(RETRY_PAUSE_MS)
 		verdict = await deps.run_once(scenario)
 	}
+
+	return verdict
+}
+
+async function run_scenario(
+	scenario: Scenario,
+	deps: RunnerDependencies,
+	tally: UnreachableTally = fresh_tally(),
+): Promise<Verdict> {
+	if (!can_start_session(tally)) return skipped_verdict(scenario, tally)
+
+	const verdict = await run_with_retry(scenario, deps, tally)
+
+	if (verdict.is_unreachable) tally.count += 1
 
 	return verdict
 }
@@ -107,10 +206,16 @@ async function run_all(
 	chosen: ReadonlyArray<Scenario>,
 	deps: RunnerDependencies,
 ): Promise<Array<Verdict>> {
-	return await bounded_pool.bounded_map(chosen, deps.concurrency, async (scenario, index) => {
-		deps.log(`  ▸ ${scenario.name} (${String(index + 1)}/${String(chosen.length)})`)
+	const tally = fresh_tally()
 
-		const verdict = await run_scenario(scenario, deps)
+	return await bounded_pool.bounded_map(chosen, deps.concurrency, async (scenario, index) => {
+		// Announced only where a session is about to start. A `▸` line in front of a scenario the tally
+		// has already skipped contradicts the `⚠ … session not started` line that follows it.
+		if (can_start_session(tally)) {
+			deps.log(`  ▸ ${scenario.name} (${String(index + 1)}/${String(chosen.length)})`)
+		}
+
+		const verdict = await run_scenario(scenario, deps, tally)
 
 		deps.report(verdict)
 
@@ -126,7 +231,8 @@ const eval_runner = {
 	RETRY_PAUSE_MS,
 	run_all,
 	run_scenario,
+	UNREACHABLE_LIMIT,
 }
 
 export { eval_runner }
-export type { ConcurrencyChoice, RunnerDependencies }
+export type { ConcurrencyChoice, RunnerDependencies, UnreachableTally }

@@ -128,6 +128,28 @@ every scenario passed, so a failed run and one that measured nothing exit alike.
 | `held`       | every scenario held                         | continue                                                                     |
 | `blocked`    | a scenario failed — a measured violation    | **stop** — fix the prose its `→` line names, re-run that scenario by name     |
 | `unmeasured` | a scenario produced no measurement (`?`)    | continue, and say so in the completion report                                 |
+| `unreachable` | the suite could not reach the API (`⚠`)   | continue, and say so — the same duty as `unmeasured`, naming the connection   |
+
+**`unreachable` is the narrow half of `unmeasured`, and it is reported rather than rolled back into
+it** (joshuafolkken/kit#1197). Both leave the rules unmeasured and neither blocks, so the difference
+is not what the merge does — it is what the reader is told to look at. `unmeasured` sends them to
+the harness or the prompt; `unreachable` says the sessions never reached the API, so the harness, the
+prompt and the rule are all untested rather than tested and unclear. **The suite stops starting
+sessions once two have come back that way**, since the rest meet the same refusal at five sessions'
+cost, so an `unreachable` run has measured less than its scenario count suggests and never means
+"the remaining scenarios held". **Report the word the run printed**, never the general one: three
+`unreachable` runs in a row are a connection to fix, and folded into `unmeasured` they read as three
+unrelated harness hiccups.
+
+**A run of them is counted for you, and the warning is not optional to report.** The suite keeps the
+last verdict per checkout, and once **three runs in a row** have ended on the same non-`held` word it
+prints `Warning: N runs in a row have ended …` **above** the verdict line, which stays last so
+"read the run's last line" keeps meaning the verdict. A run that prints it has told you the gate has
+stood open since before those runs — carry that sentence into the completion report verbatim rather
+than reporting only this run's verdict, because the thing to act on is the sequence and no single
+line in it looks like a problem. **Only a whole-suite run counts**, so the named re-run a bad verdict
+asks for neither adds to the run nor clears it; a `held` suite clears it, and `blocked` never warns
+at all — that one measured something.
 
 - **A red scenario is confirmed on the same tree before a pair is formed.** One scenario is one real
   Claude session, so its verdict is a sample rather than a fact: measured on joshuafolkken/kit#1071,

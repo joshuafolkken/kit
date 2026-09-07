@@ -19,6 +19,26 @@ const SCRUBBED_ENV: Readonly<Record<string, string>> = {
 	GITHUB_ENTERPRISE_TOKEN: '',
 }
 
+// Cleared to empty is not the same as absent, and these four need to be *absent*. execa runs with
+// `extendEnv: true` by default, so the child inherits this process's whole environment and every one
+// of these names the *parent* Claude session: `CLAUDE_CODE_MESSAGING_SOCKET` is a UNIX socket only
+// the parent listens on, `CLAUDE_CODE_MESSAGING_TOKEN` is that socket's credential, and the two
+// session identifiers claim the parent's session as the child's own. Inherited, the child dials the
+// parent's private socket, is refused, and the session dies as `API Error: Unable to connect to API
+// (ConnectionRefused)` — which the harness could only report as `unmeasured`. Measured under
+// joshuafolkken/kit#1158: removing them restored 5/5 held in 54 seconds, and lowering
+// `JOSH_EVAL_CONCURRENCY` — the suspected cause before this one was found — made it worse.
+//
+// `undefined` rather than `''` because an empty socket path is still a socket path to whatever reads
+// it; Node's spawn omits an environment key whose value is `undefined`, which is the only way to hand
+// the child an environment that does not have the variable at all.
+const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
+	'CLAUDE_CODE_MESSAGING_SOCKET',
+	'CLAUDE_CODE_MESSAGING_TOKEN',
+	'CLAUDE_CODE_SESSION_ID',
+	'CLAUDE_CODE_CHILD_SESSION',
+]
+
 const GH_CONFIG_KEY = 'GH_CONFIG_DIR'
 const SPAWN_FAILURE_EXIT_CODE = -1
 // A stalled session holds its pool slot with no output and never reaches the retry that exists for
@@ -87,8 +107,16 @@ function session_arguments(scenario: Scenario, model: string): ReadonlyArray<str
 	]
 }
 
-function session_environment(sandbox_path: string): Record<string, string> {
-	return { ...SCRUBBED_ENV, [GH_CONFIG_KEY]: `${sandbox_path}/.gh-config` }
+function removed_environment(): Record<string, undefined> {
+	return Object.fromEntries(PARENT_SESSION_KEYS.map((key) => [key, undefined]))
+}
+
+function session_environment(sandbox_path: string): Record<string, string | undefined> {
+	return {
+		...removed_environment(),
+		...SCRUBBED_ENV,
+		[GH_CONFIG_KEY]: `${sandbox_path}/.gh-config`,
+	}
 }
 
 // The exit code and stderr are carried out rather than dropped. A session that never ran — a missing
@@ -125,7 +153,13 @@ async function run_session(
 	}
 }
 
-const eval_session = { run_session, session_arguments, session_environment, spawn_failure_note }
+const eval_session = {
+	PARENT_SESSION_KEYS,
+	run_session,
+	session_arguments,
+	session_environment,
+	spawn_failure_note,
+}
 
 export { eval_session }
 export type { SessionResult }

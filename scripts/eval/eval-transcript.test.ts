@@ -157,3 +157,30 @@ describe('eval_transcript.read_error_reason', () => {
 		expect(eval_transcript.read_error_reason(transcript)).toBe('second')
 	})
 })
+
+// "The session ran and settled nothing" and "the session never reached the API" cost the same to
+// learn and want different answers, and the reason text is the only place the difference shows
+// (joshuafolkken/kit#1197). Both phrasings are matched because the CLI has emitted the wrapper
+// sentence and the bare cause independently.
+describe('eval_transcript.is_unreachable_reason', () => {
+	it.each([
+		'API Error: Unable to connect to API (ConnectionRefused)',
+		'unable to connect to api',
+		'connect ECONNREFUSED 127.0.0.1:443 — connection refused',
+	])('reads %s as unreachable', (reason) => {
+		expect(eval_transcript.is_unreachable_reason(reason)).toBe(true)
+	})
+
+	// A session that ran and stopped early is not unreachable, and reading it as one would abort the
+	// suite for a scenario that measured something.
+	it.each(['error during execution', 'max turns reached', ''])(
+		'reads %s as an ordinary non-measurement',
+		(reason) => {
+			expect(eval_transcript.is_unreachable_reason(reason)).toBe(false)
+		},
+	)
+
+	it('reads an absent reason as reachable', () => {
+		expect(eval_transcript.is_unreachable_reason(undefined)).toBe(false)
+	})
+})

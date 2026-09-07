@@ -7,6 +7,7 @@ import type { Verdict } from './eval-judge'
 const PASS_MARK = '✔'
 const FAIL_MARK = '✘'
 const INCONCLUSIVE_MARK = '?'
+const UNREACHABLE_MARK = '⚠'
 const CALL_PREVIEW_LENGTH = 80
 
 function summarize_calls(verdict: Verdict): string {
@@ -35,7 +36,24 @@ function report_inconclusive(verdict: Verdict): void {
 	console.error('      → fix the harness or the prompt; this says nothing about the rule')
 }
 
+// Printed apart from an ordinary non-measurement, because it sends the reader somewhere else again.
+// A `?` line says the harness or the prompt is wrong; this one says nothing about either — the
+// session never reached the API, so the scenario, the prompt and the rule are all untested rather
+// than tested and unclear (joshuafolkken/kit#1197).
+function report_unreachable(verdict: Verdict): void {
+	console.error(
+		`  ${UNREACHABLE_MARK} ${verdict.name} — ${verdict.note ?? 'the session could not reach the API'}`,
+	)
+	console.error('      → nothing was attempted; this says nothing about the rule or the harness')
+}
+
 function report_verdict(verdict: Verdict): void {
+	if (verdict.is_unreachable) {
+		report_unreachable(verdict)
+
+		return
+	}
+
 	if (verdict.is_inconclusive) {
 		report_inconclusive(verdict)
 
@@ -51,6 +69,22 @@ function report_verdict(verdict: Verdict): void {
 	report_failure(verdict)
 }
 
+// The two kinds of non-measurement are counted apart. Merged into one "inconclusive" number, a suite
+// that never connected read as five scenarios that ran and said nothing — the same figure as a real
+// measurement problem, at five sessions' cost (joshuafolkken/kit#1197).
+function count_note(verdicts: ReadonlyArray<Verdict>): string {
+	const unreachable = verdicts.filter((verdict) => verdict.is_unreachable).length
+	const inconclusive = verdicts.filter(
+		(verdict) => verdict.is_inconclusive && !verdict.is_unreachable,
+	).length
+	const parts = [
+		inconclusive === 0 ? undefined : `${String(inconclusive)} inconclusive`,
+		unreachable === 0 ? undefined : `${String(unreachable)} could not reach the API`,
+	].filter((part) => part !== undefined)
+
+	return parts.length === 0 ? '' : ` (${parts.join(', ')})`
+}
+
 // The count is printed even when everything passed, because "5 of 5" is the number a document change
 // is compared against; "no output" is not a baseline anyone can act on.
 function report_summary(verdicts: ReadonlyArray<Verdict>): boolean {
@@ -64,10 +98,10 @@ function report_summary(verdicts: ReadonlyArray<Verdict>): boolean {
 	}
 
 	const passed = verdicts.filter((verdict) => verdict.is_pass).length
-	const inconclusive = verdicts.filter((verdict) => verdict.is_inconclusive).length
-	const note = inconclusive === 0 ? '' : ` (${String(inconclusive)} inconclusive)`
 
-	console.info(`\n${String(passed)}/${String(verdicts.length)} scenarios held.${note}`)
+	console.info(
+		`\n${String(passed)}/${String(verdicts.length)} scenarios held.${count_note(verdicts)}`,
+	)
 
 	return passed === verdicts.length
 }
@@ -88,14 +122,32 @@ function report_summary(verdicts: ReadonlyArray<Verdict>): boolean {
 const VERDICT_BLOCKED = 'blocked'
 const VERDICT_HELD = 'held'
 const VERDICT_UNMEASURED = 'unmeasured'
+// **A fourth word, because "the sessions ran and told us nothing" and "the sessions never ran" are
+// different things to be told** (joshuafolkken/kit#1197). Both leave the rules unmeasured and neither
+// blocks the merge, so `unmeasured` was not *wrong* — it was unactionable: a reader sent to the `?`
+// lines to fix the harness or the prompt found nothing wrong with either, because the fault was a
+// connection. Reported under its own word, the suite says which one to look at, and a run of these
+// three days running is visible as three of the same word rather than three of the general one.
+const VERDICT_UNREACHABLE = 'unreachable'
 
-type MergeVerdict = typeof VERDICT_BLOCKED | typeof VERDICT_HELD | typeof VERDICT_UNMEASURED
+type MergeVerdict =
+	| typeof VERDICT_BLOCKED
+	| typeof VERDICT_HELD
+	| typeof VERDICT_UNMEASURED
+	| typeof VERDICT_UNREACHABLE
 
 const VERDICT_SENTENCES: Record<MergeVerdict, string> = {
 	[VERDICT_BLOCKED]: 'a scenario failed; fix the rule its → line names before merging',
 	[VERDICT_HELD]: 'every scenario held; nothing here blocks the merge',
 	[VERDICT_UNMEASURED]:
 		'not every scenario produced a measurement, so the rules were not measured; the ? line above each one says why. It does not block the merge, and it is not evidence that anything held',
+	// **Says what one refused session proves, not what two of them cause.** The word is reached by a
+	// single unreachable scenario while the suite only stops starting sessions at two, so a sentence
+	// asserting that nothing was measured and that the rest were never started is false on the
+	// one-refusal run — and both CLAUDE.md and `eval-gate.md` tell an agent to carry this sentence into
+	// the completion report verbatim, which is exactly how a falsehood here would travel.
+	[VERDICT_UNREACHABLE]:
+		'a session could not reach the API, so not every scenario was measured; once two are refused the suite starts no more. Fix the connection and re-run. It does not block the merge, and it is not evidence that anything held',
 }
 
 // A failure outranks an inconclusive verdict: one measured violation is a fact about the rules
@@ -112,6 +164,7 @@ function merge_verdict(verdicts: ReadonlyArray<Verdict>): MergeVerdict {
 	const is_failed = verdicts.some((verdict) => !verdict.is_pass && !verdict.is_inconclusive)
 
 	if (is_failed) return VERDICT_BLOCKED
+	if (verdicts.some((verdict) => verdict.is_unreachable)) return VERDICT_UNREACHABLE
 	if (verdicts.some((verdict) => verdict.is_inconclusive)) return VERDICT_UNMEASURED
 
 	return VERDICT_HELD
@@ -132,16 +185,23 @@ function report_not_run(): MergeVerdict {
 
 // On stdout beside the count, because the whole point is that a run says what it means for the
 // merge without anybody reading the marks and deciding.
-function report_merge_verdict(verdicts: ReadonlyArray<Verdict>): MergeVerdict {
-	const verdict = merge_verdict(verdicts)
-
+//
+// Split from `report_merge_verdict` so a caller that needs the verdict *before* the line is printed
+// — anything that has to say something above it — does not compute it a second time to get it
+// (joshuafolkken/kit#1197).
+function print_verdict(verdict: MergeVerdict): MergeVerdict {
 	console.info(`Verdict: ${verdict} — ${VERDICT_SENTENCES[verdict]}`)
 
 	return verdict
 }
 
+function report_merge_verdict(verdicts: ReadonlyArray<Verdict>): MergeVerdict {
+	return print_verdict(merge_verdict(verdicts))
+}
+
 const eval_report = {
 	merge_verdict,
+	print_verdict,
 	report_merge_verdict,
 	report_not_run,
 	report_summary,
@@ -149,6 +209,7 @@ const eval_report = {
 	VERDICT_BLOCKED,
 	VERDICT_HELD,
 	VERDICT_UNMEASURED,
+	VERDICT_UNREACHABLE,
 }
 
 export type { MergeVerdict }
