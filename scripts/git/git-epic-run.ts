@@ -32,7 +32,7 @@ async function apply_dependencies(input: {
 
 	console.info(
 		git_epic_relations.format_relation_report({
-			total: pairs.length,
+			links: pairs,
 			failures,
 			action: 'record',
 		}),

@@ -10,6 +10,7 @@ const DEPENDENCIES_HEADING = '## Dependencies'
 const PROGRESS_HEADING = '## Progress'
 const BLANK = ''
 const INSERTED_CHAIN = '#890 -> #894 -> #891 -> #892'
+const CHAIN_LINE = '#890 -> #894'
 const ROW_890 = '- [ ] #890'
 const ROW_891 = '- [ ] #891'
 const ROW_892 = '- [ ] #892'
@@ -102,10 +103,15 @@ describe('git_epic_add_plan.build_plan — positioning', () => {
 		expect(inserted.removed).toStrictEqual([{ blocker: 890, blocked: 891 }])
 	})
 
-	it('inserts after the target when asked', () => {
+	// joshuafolkken/kit#1080: `--after` used to splice, so this produced `#890 -> #894 -> #891 -> #892`
+	// and recorded `#894 -> #891` on top of the link the position asked for.
+	it('branches after the target rather than splicing into the chain', () => {
 		const inserted = plan_of(plan({ position: { kind: 'after', target: 890 } }))
 
-		expect(inserted.body).toContain(INSERTED_CHAIN)
+		expect(inserted.body).toContain(ORDERED_CHAIN)
+		expect(inserted.body).toContain(CHAIN_LINE)
+		expect(inserted.added).toStrictEqual([{ blocker: 890, blocked: 894 }])
+		expect(inserted.removed).toStrictEqual([])
 	})
 
 	it('removes nothing when the target has no blocker yet', () => {
@@ -316,7 +322,7 @@ describe('git_epic_add_plan.build_plan — a child with no order yet', () => {
 describe('git_epic_add_plan.build_plan — the decision record', () => {
 	const REASON_LINE = '- 理由: 主題が同じ'
 	const RECORD = ['### Where #894 goes', BLANK, REASON_LINE].join('\n')
-	const CHAIN_LINE = '#890 -> #894'
+
 	const CHAIN_RECORD = ['- 経緯: なし', CHAIN_LINE].join('\n')
 
 	it('writes the record into the epic body it hands back', () => {

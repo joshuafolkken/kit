@@ -39,6 +39,13 @@ function join_references(references: ReadonlyArray<string>): string {
 	return references.join(REFERENCE_SEPARATOR)
 }
 
+// A list of links, in the same form a single one takes. One definition rather than a `map().join()`
+// per caller: the insertion planner and the relation reporter now print the same list side by side,
+// and two spellings of it would read as two different things (joshuafolkken/kit#1080).
+function format_dependency_links(links: ReadonlyArray<DependencyLink>): string {
+	return join_references(links.map((link) => format_dependency_link(link)))
+}
+
 function format_issue_references(issue_numbers: ReadonlyArray<number>): string {
 	return join_references(issue_numbers.map((issue_number) => to_issue_reference(issue_number)))
 }
@@ -49,6 +56,7 @@ const git_epic_reference = {
 	to_issue_reference,
 	join_references,
 	format_dependency_link,
+	format_dependency_links,
 	format_issue_references,
 }
 
@@ -60,5 +68,6 @@ export {
 	to_issue_reference,
 	join_references,
 	format_dependency_link,
+	format_dependency_links,
 	format_issue_references,
 }

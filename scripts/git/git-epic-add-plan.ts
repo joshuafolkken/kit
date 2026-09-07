@@ -3,7 +3,11 @@ import { git_epic_add_body } from './git-epic-add-body'
 import { git_epic_chains, type InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse, type DependencyLink } from './git-epic-parse'
-import { format_dependency_link, to_issue_reference } from './git-epic-reference'
+import {
+	format_dependency_link,
+	format_dependency_links,
+	to_issue_reference,
+} from './git-epic-reference'
 import { EPIC_LABEL } from './issue-labels'
 
 // Everything `josh epic --add` decides before it writes anything.
@@ -38,10 +42,6 @@ interface AddPlan {
 }
 
 type PlanOutcome = { plan: AddPlan } | { error: string }
-
-function format_links(links: ReadonlyArray<DependencyLink>): string {
-	return links.map((link) => format_dependency_link(link)).join(', ')
-}
 
 function missing_declaration_error(epic_number: number): string {
 	const check = `josh epic:check ${String(epic_number)}`
@@ -145,7 +145,7 @@ function find_relation_error(
 	const undeclared = epic_graph.undeclared_relations(links, recorded, repo)
 	if (undeclared.length === 0) return undefined
 
-	const list = format_links(undeclared)
+	const list = format_dependency_links(undeclared)
 
 	return `The epic already records relations its body does not declare (${list}); reconcile them before inserting.`
 }
@@ -241,7 +241,6 @@ function build_plan(input: PlanInput): PlanOutcome {
 
 const git_epic_add_plan = {
 	build_plan,
-	format_links,
 }
 
 export { git_epic_add_plan }
