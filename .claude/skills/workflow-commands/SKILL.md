@@ -778,8 +778,10 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   happens on turns that typed no keyword at all: an upstream defect, a review-cap follow-up from a
   standalone pre-commit review, a note a conversation decides to record. A cap that only fired
   inside a workflow would leave the routes that grew the backlog fastest uncounted. What stays
-  resident is the instruction to count, the refusal, and the exemption for a filing a run is blocked
-  by. **The count command itself is not resident** — it has to name the *target* repository and
+  resident is the instruction to count, the refusal, the exemption for a filing a run is blocked
+  by, and — since joshuafolkken/kit#1518 — the interrupt exemption together with the three tests
+  that decide it, because a trigger that says only "an interrupt is exempt" hands the deciding back
+  to judgement on exactly the turn no pointer is opened. **The count command itself is not resident** — it has to name the *target* repository and
   exclude pull requests, and a command copied into two places is a command kept correct in one; read
   it from `prompts/collaboration-workflow/wip-cap.md`, which also carries why the number can move
   (joshuafolkken/kit#1469).

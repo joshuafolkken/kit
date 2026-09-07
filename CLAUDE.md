@@ -230,7 +230,7 @@ Before every `git commit` — including follow-up commits on the same branch —
 
 ### Backlog WIP cap (30 open Issues)
 
-**This binds on every filing, inside a workflow or not.** Count the target repository's open Issues before filing, and **with more than 30 open, close one first**. Nothing honestly closable means **do not file**: the finding takes its non-filing exit. **A filing the run is blocked by is exempt** — a prerequisite, an upstream defect, a split's children and epic, a `new` entry the user typed — and proceeds, stating the overage. The count command, what counts as one filing and why the number can move: `prompts/collaboration-workflow/wip-cap.md`.
+**This binds on every filing, inside a workflow or not.** Count the target repository's open Issues, and **with more than 30 open, close one first**. Nothing honestly closable means **do not file**. **A filing the run is blocked by is exempt**, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository. Meeting none of the three, a finding stays discretionary. Both exemptions proceed, stating the overage. The count command and both procedures: `prompts/collaboration-workflow/wip-cap.md`.
 
 ### Shorthand Commands
 
