@@ -77,21 +77,20 @@ async function run_capturing(
 	}
 }
 
+// **The gate now sizes its unit step from what else is running on the machine**
+// (joshuafolkken/kit#1515), and `GATE_STEPS` above was built for a machine with nothing else on it.
+// Left real, this suite would assert `--maxWorkers=7` while a run inside `pnpm josh gate` produced a
+// narrower share — passing alone and failing through the gate. Pinned per case to a quiet machine,
+// which is the situation the fixture describes.
+const live_runs = vi.spyOn(unit_worker_share, 'live_run_count')
+
 beforeEach(() => {
 	vi.clearAllMocks()
-	// **The gate now sizes its unit step from what else is running on the machine**
-	// (joshuafolkken/kit#1515), and `GATE_STEPS` above was built for a machine with nothing else on it.
-	// Left real, this suite would assert `--maxWorkers=7` while a run inside `pnpm josh gate` produced a
-	// narrower share — passing alone and failing through the gate. Pinned to a quiet machine, which is
-	// the situation the fixture describes.
-	vi.spyOn(unit_worker_share, 'live_run_count').mockReturnValue(0)
+	live_runs.mockReturnValue(0)
 	RECORDS.clear()
 })
 
-afterEach(() => {
-	vi.restoreAllMocks()
-	RECORDS.clear()
-})
+afterEach(RECORDS.clear)
 
 describe('run_verification_gate', () => {
 	it('returns 0 when every check passes', async () => {
@@ -455,5 +454,20 @@ describe('the gate follows the plan', () => {
 		const [, text] = await run_capturing(ALL_PASS)
 
 		expect(text).toMatch(/^plan: \d+ of \d+ checks at once, /u)
+	})
+})
+
+// **What `announce_gate_plan` does with the machine's answer** (joshuafolkken/kit#1515). The rest of
+// this suite pins the count to a quiet machine, so nothing else here would notice the gate going back
+// to sizing itself from the core count alone — the defect six lanes were built on.
+describe('the gate counts the runs it is sharing the machine with', () => {
+	// One other run in flight makes this gate the second, and the line has to say so rather than only
+	// narrow: a lane owner reading a one-worker gate must not have to derive the reason.
+	it('names them in the plan line', async () => {
+		live_runs.mockReturnValue(1)
+
+		const [, text] = await run_capturing(ALL_PASS)
+
+		expect(text).toMatch(/^plan: .*, 2 unit runs\)/mu)
 	})
 })

@@ -56,18 +56,22 @@ function has_unit_tests(project_directory: string): boolean {
 // `vitest related <files> --run` where this command runs `vitest run`, and the two must not grow
 // two copies of the guard, the spawn or the skip notice around that one difference
 // (joshuafolkken/kit#1257).
-// **The share is resolved before the marker is written, and the marker wraps the spawn.** This is the
-// one funnel every josh-driven vitest goes through — `test:unit`, `test:related` and the pre-push
-// hook alike — so it is where a run both learns how many others are in flight and announces itself to
-// them (joshuafolkken/kit#1515). The pre-push hook is the reason it is here rather than only in the
-// gate: it passed no cap at all, so vitest opened one worker per core in every lane at once.
+// **The share is read from inside the marker, not before it.** This is the one funnel every
+// josh-driven vitest goes through — `test:unit`, `test:related` and the pre-push hook alike — so it is
+// where a run both learns how many others are in flight and announces itself to them
+// (joshuafolkken/kit#1515). The pre-push hook is the reason it is here rather than only in the gate:
+// it passed no cap at all, so vitest opened one worker per core in every lane at once.
+//
+// Reading the share first and claiming afterwards leaves a window in which two hooks firing together
+// both count "alone" and both run uncapped. Inside the marker the number is identical — this run's own
+// record is now on disk and `is_nested_run` therefore contributes nothing — and the window is gone.
 async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<number> {
-	const share = unit_worker_share.current_share()
-	const sized = unit_worker_share.worker_arguments(vitest_arguments, share)
-	const shared = [...vitest_arguments, ...sized]
-
 	return await unit_worker_share.with_run_marker(async () => {
-		const result = await execa(PNPM, ['exec', 'vitest', ...shared], {
+		const sized = unit_worker_share.worker_arguments(
+			vitest_arguments,
+			unit_worker_share.current_share(),
+		)
+		const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments, ...sized], {
 			stdio: 'inherit',
 			reject: false,
 		})

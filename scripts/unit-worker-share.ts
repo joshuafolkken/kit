@@ -101,12 +101,27 @@ function marker_files(directory: string = tmpdir()): Array<string> {
 // at one worker and `josh gate` announcing lanes that do not exist. `finally` in `with_run_marker`
 // cannot prevent the leak, because the interrupt that produces it (Ctrl-C reaching the whole foreground
 // group) does not unwind. Sweeping on read is what bounds it: the first later run collects it.
+function sweep_marker(source: string): void {
+	try {
+		stamp_file.remove_stamp(source)
+	} catch {
+		/* not ours to remove; counting it out is the whole requirement */
+	}
+}
+
+// **Only a marker that parsed to a dead pid is swept, and the unlink still cannot throw.** A marker
+// this account may not read — another user's file on a sticky `/tmp` — is `undefined` here, and
+// deleting on that answer would raise `EPERM` from a path with no `catch` between it and
+// `announce_gate_plan`: an unreadable file belonging to somebody else would abort the gate outright,
+// which is worse than the leak this sweep exists for. Unreadable therefore counts as not-live and is
+// left alone, exactly as it was before the sweep existed.
 function is_marker_live(source: string): boolean {
 	const pid = read_marker_pid(source)
 
-	if (pid !== undefined && is_running(pid)) return true
+	if (pid === undefined) return false
+	if (is_running(pid)) return true
 
-	stamp_file.remove_stamp(source)
+	sweep_marker(source)
 
 	return false
 }
@@ -145,10 +160,13 @@ function resolve_unit_workers(available_cores: number, runs: number): number | u
 // Inside `josh gate` the marker was written by the parent before this process started, so `+ 1` here
 // would count one run twice — and on a machine the gate leaves uncapped, a four-core CI runner among
 // them, that alone would halve a solo run nothing was sharing.
-function current_share(available_cores: number = availableParallelism()): number | undefined {
+function current_share(
+	available_cores: number = availableParallelism(),
+	live_runs: number = live_run_count(),
+): number | undefined {
 	const own_run = is_nested_run() ? 0 : SOLO_RUNS
 
-	return resolve_unit_workers(available_cores, live_run_count() + own_run)
+	return resolve_unit_workers(available_cores, live_runs + own_run)
 }
 
 function is_worker_flag(argument: string): boolean {

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -21,6 +21,7 @@ const DEAD_PID = 2 ** 22
 // otherwise answer "alive" for a marker nothing wrote.
 const GROUP_PID = 0
 
+const DEAD_MARKER = `${unit_worker_share.RUN_PREFIX}dead.json`
 const RUN_ARGUMENTS = ['run']
 const RUN_FAILURE = 'unit suite failed'
 
@@ -92,9 +93,44 @@ describe('unit_worker_share.live_run_count — who counts as running', () => {
 		const directory = probe_directory()
 
 		try {
-			write_marker(directory, `${unit_worker_share.RUN_PREFIX}dead.json`, { pid })
+			write_marker(directory, DEAD_MARKER, { pid })
 
 			expect(unit_worker_share.live_run_count(directory)).toBe(0)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+})
+
+describe('unit_worker_share.live_run_count — sweeping what it counted out', () => {
+	// **Skipping the phantom is not enough, and this is the assertion that says so.** A pid is reissued
+	// eventually, and from the moment it is, a leaked marker counts as a live run for good — holding
+	// every solo run on the machine at one worker. Reading is therefore also sweeping.
+	it('removes the marker of a process that is gone', () => {
+		const directory = probe_directory()
+
+		try {
+			write_marker(directory, DEAD_MARKER, { pid: DEAD_PID })
+			unit_worker_share.live_run_count(directory)
+
+			expect(existsSync(path.join(directory, DEAD_MARKER))).toBe(false)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
+	// **A marker that could not be read is left where it is.** `read_stamp_text` answers `undefined`
+	// for a file another account owns as readily as for a corrupt one, and unlinking on that answer
+	// raises `EPERM` from a path with no `catch` between it and the gate's plan line — aborting the run
+	// over somebody else's file, which is worse than the leak the sweep exists for.
+	it('leaves a marker it could not read rather than deleting it', () => {
+		const directory = probe_directory()
+
+		try {
+			writeFileSync(path.join(directory, DEAD_MARKER), 'not json')
+
+			expect(unit_worker_share.live_run_count(directory)).toBe(0)
+			expect(existsSync(path.join(directory, DEAD_MARKER))).toBe(true)
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}
@@ -118,6 +154,38 @@ describe('unit_worker_share.live_run_count — who counts as running', () => {
 		const absent = path.join(tmpdir(), 'josh-absent-1515')
 
 		expect(unit_worker_share.live_run_count(absent)).toBe(0)
+	})
+})
+
+// The arithmetic half of the nesting handoff. `with_run_marker`'s half is pinned below; this is the
+// half that decides the number, and regressing it to always add one would halve every gate's unit
+// share on a busy machine with the whole suite still green (joshuafolkken/kit#1515).
+describe('unit_worker_share.current_share — counting this run once', () => {
+	const outer_flag = process.env[unit_worker_share.NESTED_KEY]
+
+	function set_nesting(is_nested: boolean): void {
+		process.env[unit_worker_share.NESTED_KEY] = is_nested ? '1' : ''
+	}
+
+	afterEach(() => {
+		process.env[unit_worker_share.NESTED_KEY] = outer_flag ?? ''
+	})
+
+	// The top-level case: the marker is not written yet, so this run is the one the count is missing.
+	it('adds this run to the ones already in flight', () => {
+		set_nesting(false)
+
+		expect(unit_worker_share.current_share(MEASURED_CORES, 1)).toBe(5)
+	})
+
+	// Inside `josh gate` the parent wrote the marker before this process existed, so it is already in
+	// the count. Adding one here would say two runs where there is one — and on a machine the gate
+	// leaves uncapped, a four-core CI runner among them, that alone narrows a solo run.
+	it('counts a nested run once, not twice', () => {
+		set_nesting(true)
+
+		expect(unit_worker_share.current_share(MEASURED_CORES, 1)).toBeUndefined()
+		expect(unit_worker_share.current_share(MEASURED_CORES, 2)).toBe(5)
 	})
 })
 

@@ -58,12 +58,13 @@ vi.mock('./git-epic-close', () => ({
 // round trip per test, measured at 4.1s against a 10s test timeout, which is what made this file
 // half the unit suite's wall clock and what failed the pre-push gate non-deterministically.
 //
-// **`git-followup-pending` itself is left real and only its git access is replaced**, so a stage this
-// suite times still runs the code it is timing; what it composes then resolves to no pending line,
-// which no case here asserts on. The five entries are every function this suite's import graph reaches
-// — the two that fetch, and the three `release-history.ts` builds its default reader from. The `gh`
-// shim in `scripts/test-network-guard.ts` covers `git` too since the same issue, and fails this suite
-// outright if the fetch ever comes back.
+// **`git-followup-pending` itself is left real and only its git access is replaced**, so the wiring
+// from `notify_completion` down still runs. The five entries are every function this suite's import
+// graph reaches — the two that fetch, and the three `release-history.ts` builds its default reader
+// from — and each answers an empty history, so the run reaches "there is nothing pending" by the same
+// path a real empty repository would rather than by throwing into `read_pending`'s blanket `catch`.
+// No case here asserts on the line it composes. The `gh` shim in `scripts/test-network-guard.ts`
+// covers `git` too since the same issue, and fails this suite outright if the fetch ever returns.
 vi.mock('./git-command', () => ({
 	git_command: {
 		get_default_branch: vi.fn(),
@@ -101,6 +102,9 @@ const BASE_INPUT: FollowupInput = {
 function answer_local_git(): void {
 	vi.mocked(git_command.get_default_branch).mockResolvedValue(DEFAULT_BRANCH)
 	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
+	vi.mocked(git_command.log_first_parent).mockResolvedValue([])
+	vi.mocked(git_command.show_file).mockResolvedValue('')
+	vi.mocked(git_command.count_merges).mockResolvedValue(0)
 }
 
 function answer_github_reads(): void {

@@ -102,6 +102,16 @@ function resolve_concurrency(available_cores: number): number {
 // instead, by `unit-worker-share.ts`, which is the same answer `test-unit-guard.ts` gives the pre-push
 // hook. At one run — every solo gate, CI included — the number is exactly what it was.
 //
+// **The shared branch drops `RESERVED_CORES`, knowingly, and it is not a strict improvement.** Each
+// concurrent gate still runs lint, the type check and the spell check beside its unit step, and the
+// share below does not subtract them: on 12 cores a solo gate takes 8 unit workers plus 3 siblings —
+// 11 processes for 12 cores — while two concurrent gates take 6 each plus 3 siblings each, which is 18.
+// The obvious correction, `⌊(cores − RESERVED_CORES × runs) ÷ runs⌋`, is **not** applied because
+// nothing has measured it: it hands two gates on an 11-core machine one worker apiece, against the
+// 11.7s-at-8-workers / 16.7s-at-4 curve the table above was built from, and trading a measured
+// oversubscription for an unmeasured starvation is not an improvement anyone can defend. What *is*
+// measured is the unit half — six concurrent suites went from ten timeouts to none at this share.
+//
 // **The count is a parameter rather than a read.** This module stays a pure function of its inputs, so
 // its own assertions are about arithmetic and not about what happened to be running while they ran;
 // `verification-gate.ts` is where the machine is asked.
