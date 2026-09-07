@@ -365,6 +365,14 @@ describe('the canonical topic file is a pointer to the skill single source', () 
 		expect(read_unwrapped(SKILL)).toContain(`\`${POINTER}\` is a pointer to it`)
 	})
 
+	// joshuafolkken/kit#1147: naming only "the parent reads GitHub state" leaves the return
+	// classification invisible from this side, and the branch that matters most is the one a reader
+	// re-derives wrongly — an open child stopped on purpose looks exactly like one that failed.
+	it('names the return classification and its branches', () => {
+		expect(pointer).toContain('4 分岐')
+		expect(pointer).toContain('`human_review: yes`')
+	})
+
 	// The index is the only route to a pointer, so a topic file it does not list is unreachable.
 	it('is listed in the index', () => {
 		expect(read_index()).toContain('(./collaboration-workflow/epicrun.md)')
