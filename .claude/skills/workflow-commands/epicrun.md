@@ -464,6 +464,22 @@ the trap joshuafolkken/kit#1515 and joshuafolkken/kit#1517 both hit. **Ask it of
 written after are `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」, which is its single
 source (joshuafolkken/kit#1518).
 
+**A lane's review does not inherit the lane, and `pnpm josh review:brief` is what closes that**
+(joshuafolkken/kit#1522). `/code-review` is forked by the harness into the **session's** working
+directory, which during a lane run is a different tree — usually the default branch, with the
+previous child already merged into it. Reading that, the review finds nothing wrong and reports no
+findings, and **the failure arrives as approval**: the child counts the round as clean and commits a
+diff nobody read. Measured across the seven children `epicrun #1474` merged, twelve of fifteen review
+rounds named the lane's absolute path in the invocation and cited files that were in their own diff;
+the one round whose invocation named no path is the one that reviewed a different pull request
+(joshuafolkken/kit#1517, round 1). **So the path is no longer something a brief has to remember to
+carry**: `pnpm josh review:brief` prints the lane's absolute root, branch and HEAD, hands over targets
+written `git -C <root> …`, and prints a nonce the review attests with
+`pnpm josh review:attest <nonce>` from the checkout it actually read. **The child asks
+`pnpm josh review:attest --check` before it counts a round**, and `pnpm josh followup --merge` asks
+again before it merges; `missing` and `mismatch` are both refusals, because the defect's own signal
+is silence. A clean round is therefore the case to check hardest, not the case to skip the check on.
+
 **A lane's branch is `<N>-lane`, and the issue number leads it so that the commit path accepts it**
 (joshuafolkken/kit#1497). `pnpm josh git` refuses to commit from a branch that is neither the default
 branch nor one sharing the child's `<N>-` prefix (`scripts/git/git-branch.ts` →

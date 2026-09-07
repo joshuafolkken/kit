@@ -6,6 +6,7 @@ import { git_followup_pending } from '../scripts/git/git-followup-pending'
 import { git_next_issues } from '../scripts/git/git-next-issues'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
+import { review_attest } from '../scripts/review/review-attest'
 import { review_stamps } from '../scripts/review/review-stamps'
 import { run_hold } from '../scripts/run/run-hold'
 import { time_history } from '../scripts/time/time-history'
@@ -168,6 +169,44 @@ function clear_round_one_snapshot(should_merge: boolean): void {
 	if (should_merge) review_stamps.clear_round_one()
 }
 
+// joshuafolkken/kit#1522: `/code-review` is forked by the harness and inherits the *session's*
+// working directory, so a run implementing in a lane can be reviewed against a different tree
+// entirely — one holding the previous child's already-merged code. That review finds nothing wrong
+// and says so, and the run reads the silence as a clean round. **This is the seam where that stops
+// being free**: a merge is refused unless the review attested the checkout it was briefed on.
+//
+// **Absence is a refusal, not a pass.** The defect produced *no* signal, so a check that only
+// compared two present records would answer `ok` in exactly the state it exists to catch.
+//
+// **Scoped to a checkout that actually briefed a review.** `review_attest.check` answers
+// `not-required` where no `josh review:brief` was run here inside a run's lifetime, so a project or
+// a flow that does not use the brief merges exactly as it did before.
+//
+// The direction is deliberate: a wrongly-refused merge costs one re-run of the review, and a wrongly
+// allowed one ships a diff nobody read. Thrown rather than reported, so no `completion` Telegram is
+// sent and nothing merges — `git_pr_followup.run` is never reached.
+async function assert_review_attested(should_merge: boolean): Promise<void> {
+	if (!should_merge) return
+
+	const verdict = await review_attest.check_here()
+
+	if (verdict.status === 'ok' || verdict.status === 'not-required') return
+
+	throw new Error(review_attest.refusal_message(verdict))
+}
+
+// Cleared beside the round-1 snapshot, and for the same reason: the contract's lifetime is one run,
+// and a record left behind is the one the next run's check would read.
+async function clear_review_target(should_merge: boolean): Promise<void> {
+	if (!should_merge) return
+
+	try {
+		await review_attest.clear_here()
+	} catch {
+		/* the record goes stale on its own after eight hours */
+	}
+}
+
 // joshuafolkken/kit#1471: the run report only ever appeared when a person typed `diag`, so a run
 // nobody asked about left no record — and a measurement that is not continuous cannot say whether
 // the last change made anything faster. Every `fullrun`, and every child of an `epicrun` or a
@@ -220,6 +259,7 @@ async function finish(issue_number: string | undefined, should_merge: boolean): 
 	await record_run_report(issue_number, should_merge)
 	await print_completion(issue_number, should_merge)
 	clear_round_one_snapshot(should_merge)
+	await clear_review_target(should_merge)
 	await release_worktree_hold(should_merge)
 }
 
@@ -236,6 +276,7 @@ async function main(): Promise<void> {
 		cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined)
 	const should_merge = is_merge_resolved(cli.values)
 
+	await assert_review_attested(should_merge)
 	await git_pr_followup.run({
 		branch_name: await resolve_branch_name(cli.values.branch),
 		issue_number,
@@ -256,6 +297,8 @@ try {
 }
 
 const git_followup_workflow = {
+	assert_review_attested,
+	clear_review_target,
 	clear_round_one_snapshot,
 	release_worktree_hold,
 	record_run_report,

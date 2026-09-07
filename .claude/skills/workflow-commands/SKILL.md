@@ -131,6 +131,13 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
   the stop. `CLAUDE.md` → "Completion gate" carries the rule, `prompts/testing-guide.md` → "Closing
   the E2E gate without a human run" the procedure.
+- **A review's verdict counts only once `pnpm josh review:attest --check` answers `ok`**, because
+  `/code-review` is forked into the session's checkout rather than the run's: in a lane it can read a
+  tree holding the previous child's already-merged code, find nothing wrong, and have that silence
+  read as a clean round (joshuafolkken/kit#1522). `pnpm josh review:brief` names the checkout and
+  prints the nonce the review attests with; `missing` and `mismatch` are both refusals, and
+  `pnpm josh followup --merge` refuses the merge on either. `prompts/review.md` → "The brief names the
+  checkout, and a review that read another one is refused" is the single source.
 - **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
   only once it has merged — decided from an enumeration (the verification gate, the code review, the
   pre-push hook, the merge checks) rather than from how serious the defect looks. It binds wherever

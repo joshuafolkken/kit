@@ -55,6 +55,14 @@ async function repository_root(): Promise<string> {
 	return await exec_git_command_read(['rev-parse', '--show-toplevel'])
 }
 
+// The commit this checkout is sitting on, as opposed to `default_branch_commit`'s commit on the
+// branch a change is measured against. Read by `josh review:brief` to say which tree a review was
+// briefed on, so a review that read a different one can be told apart from one that read this one
+// (joshuafolkken/kit#1522).
+async function head_commit(): Promise<string> {
+	return await exec_git_command_read(['rev-parse', 'HEAD'])
+}
+
 // Both git directories this checkout has, absolute, one per line. In the main work tree they are the
 // same path; in a linked work tree the first is `<repo>/.git/worktrees/<name>` and the second is
 // `<repo>/.git`, and the commit-message file lives under the first. Asking git rather than assuming
@@ -425,6 +433,7 @@ const git_command = {
 	worktree_remove,
 	status,
 	repository_root,
+	head_commit,
 	git_directories,
 	diff_cached,
 	diff_cached_names,
