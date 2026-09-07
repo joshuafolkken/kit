@@ -52,6 +52,22 @@ vi.mock('./telegram-notify', () => ({
 	},
 }))
 
+// **The missing mock, added while the merge-gate recovery in joshuafolkken/kit#1077 was being
+// verified.** `notify_completion` asks this collaborator for the unreleased-merge line, and the real
+// one resolves the tip by running `git fetch origin main` — measured at about 5 seconds in a linked
+// work tree. Every one of this file's tests calls `run`, so every one of them made that request, and
+// against the 10-second `testTimeout` a handful of them failed on network variance rather than on
+// anything under test. That is exactly what joshuafolkken/kit#1353's network guard exists to prevent;
+// the guard only watches `gh`, so a `git` fetch walked straight past it. Nothing here asserts on the
+// line — `git-followup-pending.test.ts` covers it, passing `tip` so it fetches nothing.
+vi.mock('./git-followup-pending', () => ({
+	git_followup_pending: {
+		MERGE_PENDING_NOTE: '',
+		pending_release_line: vi.fn(),
+		read_pending: vi.fn(),
+	},
+}))
+
 const { git_gh_command } = await import('./git-gh-command')
 const { git_pr_checks } = await import('./git-pr-checks')
 const { git_pr_ai_review } = await import('./git-pr-ai-review')

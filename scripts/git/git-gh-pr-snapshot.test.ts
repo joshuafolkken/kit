@@ -11,6 +11,7 @@ import {
 	pr_reviews_path,
 	pr_routes,
 	status_pages,
+	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import {
 	forget_pr_numbers,
@@ -48,7 +49,7 @@ function routes(input: {
 	check_runs?: string
 	statuses?: string
 	reviews?: string
-}): Record<string, string> {
+}): Record<string, GhApiAnswer> {
 	return pr_routes(input.pull ?? {}, {
 		[commit_check_runs_path()]: input.check_runs ?? check_runs_pages([PASSING_RUN]),
 		[commit_status_path()]: input.statuses ?? status_pages([]),
