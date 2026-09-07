@@ -458,12 +458,21 @@ async function worktree_list(): Promise<string> {
 // `-b` creates the branch as part of the add, so there is no window in which the directory exists on
 // a detached HEAD; `start_point` is passed explicitly rather than left to `HEAD`, because a lane is
 // branched from the default branch whatever the checkout that opened it happens to be sitting on.
+//
+// **`--no-track` is load-bearing now that the start point is a remote-tracking ref**
+// (joshuafolkken/kit#1535). Branching from `refs/remotes/origin/<default>` makes git's default
+// `branch.autoSetupMerge` set `branch.<lane>.merge=refs/heads/<default>`, and a bare `git push` from
+// the lane then fails with "the upstream branch of your current branch does not match the name of
+// your current branch" — which is *not* the missing-upstream error `push()` retries as
+// `--set-upstream`, so every lane's `pnpm josh git` would stop there. Measured against git 2.x.
 async function worktree_add(
 	directory: string,
 	branch_name: string,
 	start_point: string,
 ): Promise<string> {
-	return await exec_git_command_read([WORKTREE, 'add', '-b', branch_name, directory, start_point])
+	const flags = ['add', '--no-track', '-b', branch_name]
+
+	return await exec_git_command_read([WORKTREE, ...flags, directory, start_point])
 }
 
 // **`--force` is the point, not a convenience.** A lane is closed after a park, a failure or an

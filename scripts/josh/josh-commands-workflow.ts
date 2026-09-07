@@ -27,13 +27,11 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Workflow',
 		tsx_arguments: ENV_FILE_FLAGS,
 	},
+	// A script rather than an `sh -c` chain, because it has a precondition to enforce: run inside a
+	// linked work tree it would hijack the default branch from every other one (joshuafolkken/kit#1535).
 	'main:sync': {
-		shell: [
-			'sh',
-			'-c',
-			'DEFAULT=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed "s|refs/remotes/origin/||"); git checkout "${DEFAULT:-main}" && git pull',
-		],
-		description: 'Checkout default branch and pull latest',
+		script: 'scripts/git/main-sync.ts',
+		description: 'Checkout default branch and pull latest (refuses inside a lane)',
 		category: 'Workflow',
 	},
 	'main:merge': {

@@ -6,6 +6,7 @@ import { lane_environment } from './lane-environment'
 import { lane_paths } from './lane-paths'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seed_policy } from './lane-seed'
+import { lane_start_point } from './lane-start-point'
 
 // Opening a lane: one linked work tree, one branch, one port seed (joshuafolkken/kit#1490).
 //
@@ -82,10 +83,14 @@ function build_plan(
 
 // The `.env` is written straight after the work tree exists, because the seed is the reason the
 // lane is being opened. Nothing else is recorded anywhere: that file *is* the record.
+//
+// The start point comes from `lane_start_point` rather than from the default branch's bare name:
+// that name resolves to a local ref nothing advances, and the lane would start without the work
+// merged just before it (joshuafolkken/kit#1535).
 async function materialize(plan: LanePlan): Promise<void> {
 	mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
 
-	const start_point = await git_command.get_default_branch()
+	const start_point = await lane_start_point.resolve()
 
 	await git_command.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
 	writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)

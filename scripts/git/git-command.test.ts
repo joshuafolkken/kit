@@ -150,12 +150,12 @@ describe('git_command.diff_main', () => {
 	})
 })
 
-const SYMBOLIC_REF_MAIN = 'refs/remotes/origin/main'
+const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
 const NON_PREFIX_OUTPUT = 'something-else'
 
 describe('git_command.get_default_branch', () => {
 	it('returns branch name parsed from symbolic ref output', async () => {
-		execa_mock.state.stdout = SYMBOLIC_REF_MAIN
+		execa_mock.state.stdout = ORIGIN_MAIN_REF
 
 		const { git_command } = await import('./git-command')
 		const result = await git_command.get_default_branch()
@@ -337,18 +337,22 @@ const LANE_DIRECTORY = '/w/.kit-lanes/1490'
 const LANE_BRANCH = '1490-lane'
 
 describe('git_command worktree calls', () => {
-	it('creates the branch as part of the add, from an explicit start point', async () => {
+	// `--no-track` is not decoration: the start point is a remote-tracking ref now, and without it
+	// git points the lane branch's upstream at the default branch, where a bare `git push` fails with
+	// an error `push()` does not retry as `--set-upstream` (joshuafolkken/kit#1535).
+	it('creates the untracked branch as part of the add, from an explicit start point', async () => {
 		const { git_command } = await import('./git-command')
 
-		await git_command.worktree_add(LANE_DIRECTORY, LANE_BRANCH, 'main')
+		await git_command.worktree_add(LANE_DIRECTORY, LANE_BRANCH, ORIGIN_MAIN_REF)
 
 		expect(execa_mock.state.last_arguments).toStrictEqual([
 			'worktree',
 			'add',
+			'--no-track',
 			'-b',
 			LANE_BRANCH,
 			LANE_DIRECTORY,
-			'main',
+			ORIGIN_MAIN_REF,
 		])
 	})
 
