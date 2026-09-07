@@ -19,12 +19,32 @@ interface TreeState {
 	reason?: string
 }
 
+// **`cwd` alone does not say which repository this is about** (joshuafolkken/kit#1515). `GIT_DIR` and
+// `GIT_WORK_TREE` beat it outright, and git exports both to every hook it runs — so under
+// `pnpm josh git`'s pre-push hook every probe below silently answered about the checkout the hook was
+// firing in rather than the path it was handed. The visible cost was in the unit suite, where
+// `propagate-guard.test.ts` builds directories that are deliberately *not* repositories and expects
+// the tree check to refuse them: with `GIT_DIR` inherited they resolved to the real checkout instead,
+// `current_branch` succeeded, and `is_up_to_date` went out to `origin` for real — two live fetches, 4
+// seconds each against a 10-second test timeout, on the one code path that only ever runs inside a
+// hook. That is the intermittent `propagate-guard` failure listed on the issue, and it is why it never
+// reproduced outside a push.
+//
+// Clearing the two is what makes `cwd` mean what it says. `-C` would work as well and is not used
+// here, because every call below already passes the path this way and a second spelling of the same
+// intent is one more thing to keep in step.
+const GIT_LOCATION_VARIABLES: ReadonlyArray<string> = ['GIT_DIR', 'GIT_WORK_TREE']
+
+function location_free_environment(): Record<string, undefined> {
+	return Object.fromEntries(GIT_LOCATION_VARIABLES.map((name) => [name, undefined]))
+}
+
 function run_git(repository_path: string, args: ReadonlyArray<string>): string | undefined {
 	const result = execaSync('git', args, {
 		cwd: repository_path,
 		reject: false,
 		timeout: GIT_TIMEOUT_MS,
-		env: { LC_ALL: 'C', LANGUAGE: 'C' },
+		env: { LC_ALL: 'C', LANGUAGE: 'C', ...location_free_environment() },
 		extendEnv: true,
 	})
 
