@@ -5,7 +5,10 @@ import { epic_bundle, type BacklogIssue } from './epic-bundle'
 import { epic_bundle_cli } from './epic-bundle-cli'
 
 const REPO = 'joshuafolkken/kit'
+const OTHER_REPO = 'joshuafolkken/app-kit'
 const FOLLOWS_TWO = 'follows #2'
+const FOLLOWS_TWO_AND_THREE = 'follows #2 and #3'
+const FOLLOWS_THREE_ISSUES = 'follows #2, #3 and #4'
 const PARENT_LINE = 'parent: #900'
 const CREATE_DECISION = { action: 'create_epic' as const, epics: [], candidates: [2], reason: '' }
 
@@ -97,9 +100,85 @@ describe('epic_bundle.decide_bundle — the four outcomes', () => {
 
 	// Merging epics is not reversible in the way adding a child is.
 	it('asks when the related issues are spread across different epics', () => {
-		const decision = epic_bundle.decide_bundle(issue(1, { body: 'follows #2 and #3' }), [
+		const decision = epic_bundle.decide_bundle(issue(1, { body: FOLLOWS_TWO_AND_THREE }), [
 			issue(2, { epic: 900 }),
 			issue(3, { epic: 901 }),
+		])
+
+		expect(decision.action).toBe('ask')
+		expect(decision.epics).toEqual([900, 901])
+	})
+})
+
+// joshuafolkken/kit#1079: the spread verdict fired on an epic and its own parent, which is not two
+// peers to choose between — the parent already contains the child, so nobody is proposing a merge.
+// Three such false positives were recorded, one of which stopped a whole batch.
+describe('epic_bundle.decide_bundle — nested epics', () => {
+	it('adds to the inner epic when the other epic is its parent', () => {
+		const decision = epic_bundle.decide_bundle(issue(1, { body: FOLLOWS_TWO_AND_THREE }), [
+			issue(2, { epic: 909 }),
+			issue(3, { epic: 1061 }),
+			issue(1061, { is_epic: true, epic: 909 }),
+		])
+
+		expect(decision.action).toBe('add_to_epic')
+		expect(decision.epic).toBe(1061)
+		expect(decision.reason).toContain('its own parents')
+	})
+
+	// The narrowing drops parents, never peers: one unrelated epic beside a nested chain is still a
+	// choice a person makes.
+	it('still asks when an unrelated epic sits beside a nested chain', () => {
+		const decision = epic_bundle.decide_bundle(issue(1, { body: FOLLOWS_THREE_ISSUES }), [
+			issue(2, { epic: 900 }),
+			issue(3, { epic: 902 }),
+			issue(4, { epic: 950 }),
+			issue(901, { is_epic: true, epic: 900 }),
+			issue(902, { is_epic: true, epic: 901 }),
+		])
+
+		expect(decision.action).toBe('ask')
+		expect(decision.epics).toEqual([902, 950])
+	})
+})
+
+describe('epic_bundle.decide_bundle — nesting that cannot be narrowed', () => {
+	// A cycle has no innermost member. With a third epic beside it that is not academic: the two
+	// cover each other, so narrowing would leave the unrelated one as the sole survivor and place
+	// the issue there with nothing asked.
+	it('does not narrow when the declared nesting is cyclic', () => {
+		const decision = epic_bundle.decide_bundle(issue(1, { body: FOLLOWS_THREE_ISSUES }), [
+			issue(2, { epic: 900 }),
+			issue(3, { epic: 901 }),
+			issue(4, { epic: 950 }),
+			issue(900, { is_epic: true, epic: 901 }),
+			issue(901, { is_epic: true, epic: 900 }),
+		])
+
+		expect(decision.action).toBe('ask')
+		expect(decision.epics).toEqual([900, 901, 950])
+	})
+
+	// The one-step cycle: an epic whose task list names itself must not drop itself.
+	it('does not narrow an epic that names itself as its own parent', () => {
+		const decision = epic_bundle.decide_bundle(issue(1, { body: FOLLOWS_TWO_AND_THREE }), [
+			issue(2, { epic: 900 }),
+			issue(3, { epic: 901 }),
+			issue(900, { is_epic: true, epic: 900 }),
+		])
+
+		expect(decision.action).toBe('ask')
+		expect(decision.epics).toEqual([900, 901])
+	})
+
+	// Defensive: every caller stamps one repository onto the whole listing today, so this state is
+	// not reachable. The filter is what keeps a bare epic number naming the subject's repository if
+	// one ever assembles two.
+	it('reads nesting only from the subject repository', () => {
+		const decision = epic_bundle.decide_bundle(issue(1, { body: FOLLOWS_TWO_AND_THREE }), [
+			issue(2, { epic: 900 }),
+			issue(3, { epic: 901 }),
+			issue(901, { is_epic: true, epic: 900, repo: OTHER_REPO }),
 		])
 
 		expect(decision.action).toBe('ask')
@@ -276,7 +355,6 @@ describe('josh epic:bundle registration', () => {
 // nobody's data supported, and, through `bundle_dependency_links`, a `blocked-by` relation recorded
 // onto the wrong issue.
 describe('epic_bundle — a blocker in another repository', () => {
-	const OTHER_REPO = 'joshuafolkken/app-kit'
 	const SHARED_NUMBER = 40
 
 	it('does not read a same-numbered issue elsewhere as a recorded dependency', () => {

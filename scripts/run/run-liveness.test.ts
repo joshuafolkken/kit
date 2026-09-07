@@ -195,7 +195,7 @@ describe('the output read follows the symlink', () => {
 	})
 
 	it('reports a path that resolves to nothing as unreadable', () => {
-		const absent = path.join(tmpdir(), 'run-liveness-absent.jsonl')
+		const absent = path.join(arrange_directory(tmpdir()), 'absent.jsonl')
 
 		expect(run_liveness.sample_output(absent)).toBeUndefined()
 	})

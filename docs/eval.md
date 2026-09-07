@@ -117,14 +117,25 @@ CI is 95–120s and already parallel, and the suite alone runs 100s and up.
 **What the overlap costs is certainty, and it is bought back mechanically.** A run measures the
 documents as they stood when it started, so a review that then edited a measured path leaves the
 verdict describing a tree that no longer exists — and a stale result is never reported. `josh eval`
-writes a record of what it measured before its first session; once the review has converged,
-`pnpm josh eval:scope --since-eval` compares that record against the tree now. `skip` means the
+writes a record of what it measured before its first session and marks that record finished once the
+run has returned a verdict; once the review has converged, `pnpm josh eval:scope --since-eval`
+compares that record against the tree now. `skip` means the
 review changed nothing the scenarios can see and the concurrent verdict stands; `required` means it
-edited a measured path — or that there is no record at all — and the suite runs again. The common
+edited a measured path — or that there is no record at all, or that the recorded run never reached a
+verdict — and the suite runs again. The common
 answer is `skip`: a review that lands no high/medium finding changes nothing. Only _when_ the
 measurement is taken changes; what a verdict does is untouched, and a concurrent run's output is read
 in full before its verdict is treated as an answer. Running the suite after the review instead is
 still correct, only slower.
+
+**The record vouches for a finished run, not merely a started one**
+([#1164](https://github.com/joshuafolkken/kit/issues/1164)). It is written before the first session,
+because only then does it describe the tree the suite is about to read — but the completion is
+written when the run returns, so a run stopped at the keyboard or killed by a throw leaves a record
+with no completion in it. `--since-eval` reads that exactly as it reads no record at all: `required`.
+The two are the same fact, and the earlier design could answer `skip` for a verdict that was never
+reached. The completion is an amendment rather than a second write, so what the run measured and
+when stay as they were.
 
 **Two things the record does not cover.** It is written only by a whole-suite run — a named re-run
 (`pnpm josh eval <name>`) leaves it alone, so a one-scenario reading can never stand in for the

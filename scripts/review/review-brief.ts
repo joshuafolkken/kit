@@ -1,4 +1,5 @@
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { review_checkout, type ReviewCheckout } from './review-checkout'
 
 // The text `josh review:brief` prints — the `/code-review` invocation, composed from what the run
 // already knows (joshuafolkken/kit#1241).
@@ -19,8 +20,53 @@ import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 const TEST_COMMAND_LINE =
 	'- The unit suite is `pnpm josh test:unit`. Do not reach for `npx vitest`; it is not how this project runs them.'
 
-const WHOLE_CHANGE_TARGET =
-	'Target: the whole change — `git diff main` plus the untracked files beside it.'
+// **The checkout block, and why the target below names a path instead of assuming one**
+// (joshuafolkken/kit#1522). `/code-review` is forked by the harness and inherits the session's
+// working directory, so during a lane run it starts in a tree that holds the previous child's
+// already-merged code. Reading that tree, it finds nothing wrong and says so — and the run reads
+// that silence as a clean review. Neither half of this block is a paragraph a person has to remember
+// to type: the path is generated from `git rev-parse --show-toplevel` in the checkout the run is
+// implementing in, and the nonce is written to a record before it is printed.
+// **The root is interpolated rather than left as a placeholder.** Every other path this brief prints
+// is absolute for one reason — a forked agent resolves a relative path against its own tree — and a
+// literal `<path>` in the line that says *how* to run the commands undoes exactly that: copied
+// verbatim it fails, and the agent falls back to the checkout it inherited, which is the wrong one.
+function checkout_warning(root: string): string {
+	return `You do not inherit that working directory. Run every command for this review against it — \`git -C ${root} …\` — and read no file outside it.`
+}
+
+function attest_line(nonce: string): string {
+	return `Attest before you report: run \`pnpm josh review:attest ${nonce}\` from the checkout you actually read. A non-zero exit means it was not the one above — report \`REVIEW TARGET MISMATCH\` and no findings. Never report "no findings" without that command having passed: a review of the wrong tree finds nothing wrong, and the run cannot tell that apart from approval (joshuafolkken/kit#1522).`
+}
+
+function checkout_block(checkout: ReviewCheckout, nonce: string): string {
+	return [
+		`Checkout: ${review_checkout.describe_checkout(checkout)}`,
+		checkout_warning(checkout.root),
+		attest_line(nonce),
+	].join('\n')
+}
+
+// `-C <root>` rather than a bare `git diff`, so the command works from whatever directory the
+// forked agent happens to be sitting in rather than only from the right one.
+//
+// **The base is the merge base, not `main` itself** (joshuafolkken/kit#1527). A linked work tree
+// shares the `main` ref with every other lane, so a two-dot `git diff main` run in an unmerged lane
+// lists whatever another lane merged in the meantime — in reverse. This line is a command the forked
+// agent runs, so printing the old spelling would hand it exactly the mixed-in listing the reading
+// itself no longer produces.
+//
+// **The base is resolved here and embedded as a value, never printed as a `$(…)` substitution.** A
+// subshell that fails expands to the empty string, and `git -C <root> diff` with no revision exits 0
+// listing only the *unstaged* working tree — so a `merge-base` that could not answer would silently
+// narrow the review to a fraction of the change and the agent would report "no findings" on code it
+// never read. `git_command.change_base` already degrades to the default branch name instead, which
+// is the previous command and fails loudly rather than open.
+function whole_change_target(root: string, base: string): string {
+	const command = `git -C ${root} diff ${base}`
+
+	return `Target: the whole change — \`${command}\` plus the untracked files beside it.`
+}
 
 const ROUND_TWO_HEADING =
 	'Round 2 — a verification pass over the fix delta, not a second full review.'
@@ -28,7 +74,9 @@ const ROUND_TWO_HEADING =
 const ROUND_TWO_QUESTION =
 	'Ask whether each first-round finding closed and whether the fix itself introduced a defect. Do not re-read the parts of the diff no fix touched.'
 
-const NO_SNAPSHOT_LINE = `No round-1 snapshot was recorded, so the fix delta cannot be named. ${WHOLE_CHANGE_TARGET}`
+function no_snapshot_line(root: string, base: string): string {
+	return `No round-1 snapshot was recorded, so the fix delta cannot be named. ${whole_change_target(root, base)}`
+}
 
 const EMPTY_DELTA_LINE =
 	'The fix delta is empty — nothing changed since round 1, so there is nothing for a verification pass to read.'
@@ -98,21 +146,29 @@ function gate_line(
 	return NOT_VERIFIED_LINE
 }
 
-function format_paths(paths: ReadonlyArray<string>): string {
-	return paths.map((relative) => `  ${relative}`).join('\n')
+// Absolute, for the same reason the round-1 target carries `-C`: git prints repository-root-relative
+// paths, and a forked agent sitting in another checkout resolves them against that one — where the
+// same relative path names a different file, or none.
+function format_paths(root: string, paths: ReadonlyArray<string>): string {
+	return paths.map((relative) => `  ${root}/${relative}`).join('\n')
 }
 
-function round_two_target(delta: ReadonlyArray<string>): string {
+function round_two_target(root: string, delta: ReadonlyArray<string>): string {
 	if (delta.length === 0) return EMPTY_DELTA_LINE
 
-	return `Target: only these files, which are the ones round 1's fixes changed:\n${format_paths(delta)}`
+	return `Target: only these files, which are the ones round 1's fixes changed:\n${format_paths(root, delta)}`
 }
 
 // `undefined` for the snapshot and "the whole change" as the answer: a missing record must widen the
 // review, never narrow it. A brief that silently reviewed nothing would be the cheapest possible run
 // and the most dangerous.
-function round_two_block(snapshot: FileMapStamp | undefined, tree: Record<string, string>): string {
-	if (snapshot === undefined) return `${ROUND_TWO_HEADING}\n${NO_SNAPSHOT_LINE}`
+function round_two_block(
+	snapshot: FileMapStamp | undefined,
+	tree: Record<string, string>,
+	root: string,
+	base: string,
+): string {
+	if (snapshot === undefined) return `${ROUND_TWO_HEADING}\n${no_snapshot_line(root, base)}`
 
 	const delta = file_map_stamp.changed_since(snapshot, tree)
 	// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the
@@ -122,7 +178,7 @@ function round_two_block(snapshot: FileMapStamp | undefined, tree: Record<string
 	// wider, and its timestamp is the only thing that shows that from here.
 	const taken = `Round 1 was recorded at ${snapshot.taken_at}.`
 
-	return `${ROUND_TWO_HEADING}\n${taken}\n${round_two_target(delta)}\n${ROUND_TWO_QUESTION}`
+	return `${ROUND_TWO_HEADING}\n${taken}\n${round_two_target(root, delta)}\n${ROUND_TWO_QUESTION}`
 }
 
 interface BriefStamps {
@@ -136,14 +192,19 @@ interface BriefInput {
 	round: number
 	tree: Record<string, string>
 	stamps: BriefStamps
+	checkout: ReviewCheckout
+	nonce: string
+	// The commit the change is measured against, resolved by the caller so the printed target carries
+	// a value rather than a subshell that can fail open (joshuafolkken/kit#1527).
+	base: string
 }
 
 const SECOND_ROUND = 2
 
 function target_block(input: BriefInput): string {
-	if (input.round < SECOND_ROUND) return WHOLE_CHANGE_TARGET
+	if (input.round < SECOND_ROUND) return whole_change_target(input.checkout.root, input.base)
 
-	return round_two_block(input.stamps.round_one, input.tree)
+	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
 }
 
 // The level alone on the first line, because `review:level`'s contract — a caller reading the answer
@@ -151,6 +212,8 @@ function target_block(input: BriefInput): string {
 function compose(input: BriefInput): string {
 	return [
 		input.level,
+		'',
+		checkout_block(input.checkout, input.nonce),
 		'',
 		gate_line(input.stamps, input.tree),
 		TEST_COMMAND_LINE,
@@ -160,20 +223,23 @@ function compose(input: BriefInput): string {
 }
 
 const review_brief = {
+	attest_line,
+	checkout_block,
+	checkout_warning,
 	compose,
 	EMPTY_DELTA_LINE,
 	gate_line,
 	in_flight_line,
 	live_marker,
 	matching_stamp,
-	NO_SNAPSHOT_LINE,
+	no_snapshot_line,
 	NOT_VERIFIED_LINE,
 	ROUND_TWO_HEADING,
 	ROUND_TWO_QUESTION,
 	round_two_block,
 	SECOND_ROUND,
 	TEST_COMMAND_LINE,
-	WHOLE_CHANGE_TARGET,
+	whole_change_target,
 }
 
 export type { BriefInput, BriefStamps }

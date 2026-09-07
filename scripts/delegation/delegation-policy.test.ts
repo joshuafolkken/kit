@@ -12,6 +12,8 @@ const INVESTIGATION = 'investigation'
 const DIAGNOSIS = 'diagnosis'
 // One title shared by the two rows that each assert their own membership.
 const DELEGATABLE_CASE = 'is delegatable'
+// The first line `--list` writes, and nothing else writes it: it is what says the listing ran.
+const LIST_HEADING = 'delegatable:'
 
 // joshuafolkken/kit#969: which steps may run in a cheaper tier is decided by an enumeration, and
 // everything not enumerated is kept. The direction of the default is the whole safety argument — a
@@ -137,16 +139,31 @@ describe('epic-child is a second unit on the one mechanism', () => {
 	})
 })
 
+// What a call writes to stdout. The listing and a verdict both exit 0, so the output is the only
+// thing that tells them apart — which is why the assertions below read it rather than the code.
+function captured_info(act: () => void): Array<string> {
+	const written: Array<string> = []
+	const info_spy = vi.spyOn(console, 'info').mockImplementation((line: string) => {
+		written.push(line)
+	})
+	const error_spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	// `finally`, so a throw inside `act` cannot leave the console mocked for the rest of the file:
+	// the leaked spy would fail later tests and point the report at the wrong one.
+	try {
+		act()
+	} finally {
+		info_spy.mockRestore()
+		error_spy.mockRestore()
+	}
+
+	return written
+}
+
 // What `--list` actually writes for one step, captured rather than reconstructed: the row is what an
 // agent reads, and the fields it is built from can carry the number while the printed row does not.
 function listed_row(step_name: string): string | undefined {
-	const written: Array<string> = []
-	const spy = vi.spyOn(console, 'info').mockImplementation((line: string) => {
-		written.push(line)
-	})
-
-	delegation_cli.print_list()
-	spy.mockRestore()
+	const written = captured_info(() => delegation_cli.print_list())
 
 	return written.find((line) => line.includes(step_name))
 }
@@ -264,5 +281,15 @@ describe('delegation_cli.run', () => {
 
 	it('still accepts the one flag it has', () => {
 		expect(delegation_cli.run(['--list'])).toBe(0)
+	})
+
+	// joshuafolkken/kit#1096: the guard trimmed and the branch did not, so a padded `--list` passed as
+	// a known flag and then fell through to a verdict about a step of that name. Both paths exit 0, so
+	// the exit code cannot tell them apart — the listing itself is what the assertion has to read.
+	it.each([[' --list'], ['--list '], ['  --list  ']])('lists on the padded %j', (padded) => {
+		const written = captured_info(() => delegation_cli.run([padded]))
+
+		expect(written[0]).toBe(LIST_HEADING)
+		expect(written).not.toContain(delegation_policy.KEEP_VERDICT)
 	})
 })

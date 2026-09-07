@@ -39,6 +39,16 @@ pnpm josh review:brief --round 2  # the verification pass, scoped to the fix del
 
 **Two halves, and only one of them is mechanical.** The round-2 target _is_ the scope, so a narrowed round is narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so its effect is measured rather than assumed. **The brief never claims a green gate it cannot prove**: with no record, or with one taken before an edit, it prints `Not verified` and asserts nothing.
 
+### The brief names the checkout, and a review that read another one is refused
+
+**`/code-review` is forked by the harness into the session's working directory, not the run's** (joshuafolkken/kit#1522). Where the run is implementing in a lane — a linked work tree opened by `pnpm josh lane:open` — that is a different tree entirely, holding the previous child's already-merged code. A review that reads it finds nothing wrong and says so, and **the failure arrives as approval**: the run reads "no findings" as a clean round and commits a diff nobody read.
+
+**So the brief names the checkout, mechanically.** `pnpm josh review:brief` prints the absolute repository root, the branch and the HEAD commit, generated from `git rev-parse` in the tree the run is implementing in; every target it prints carries `git -C <root>`, and the round-2 file list is absolute. Nothing here depends on a person remembering to paste a path into a hand-off — one omission reopens the hole, and reopens it silently.
+
+**And the review attests what it actually read.** The brief prints a nonce; the review runs `pnpm josh review:attest <nonce>` from the checkout it read, before it reports. That command asks git about its **own** working directory, so it cannot be satisfied by copying values out of the brief, and it exits non-zero when the tree is not the briefed one. On a non-zero exit the review reports `REVIEW TARGET MISMATCH` and no findings.
+
+**The run checks the other end — `pnpm josh review:attest --check` — before it acts on the verdict, and `pnpm josh followup --merge` checks it again before merging.** A missing attestation is a refusal exactly as a mismatched one is: the defect produced no signal, so treating silence as a pass would leave the hole open in the shape it actually takes. A wrongly refused merge costs one re-run of the review; a wrongly allowed one ships unreviewed code.
+
 ### The gate runs beside this review, not in front of it
 
 **`pnpm josh gate` is started when the review starts and joined before the commit** (joshuafolkken/kit#1242). The two read the same tree and neither writes to it, so running them one after the other was pure waiting — 187 seconds of a 1623-second run, measured on joshuafolkken/kit#1240. It is the treatment `josh eval` already gets, for the same stated reason.
@@ -553,6 +563,7 @@ State the **one concrete thing** in this change you are least confident about, a
 
 ## Stop conditions
 
+- **A checkout that cannot be attested** → report `REVIEW TARGET MISMATCH` and **no findings**, and do not report a verdict of any kind. `pnpm josh review:attest <nonce>` exiting non-zero means this review read a tree the brief did not describe, so everything it would say — "no findings" above all — is about somebody else's code (joshuafolkken/kit#1522)
 - **High** findings → must fix before committing
 - **Medium** findings → must fix before opening the PR
 - **Low** findings → document in the PR body if skipped

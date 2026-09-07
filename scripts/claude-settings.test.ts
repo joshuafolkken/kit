@@ -19,8 +19,7 @@ const INDEX_DENY_PATTERNS: ReadonlyArray<string> = [
 	'Bash(git reset*)',
 	'Bash(git restore --staged*)',
 	'Bash(git restore -S*)',
-	'Bash(git commit -a*)',
-	'Bash(git commit --all*)',
+	'Bash(git commit*)',
 ]
 
 const PR_MERGE_DENY = 'Bash(gh pr merge*)'
@@ -134,6 +133,9 @@ const DENIED_COMMANDS: ReadonlyArray<string> = [
 	'git reset HEAD~1',
 	'git reset --hard origin/main',
 	'gh pr merge 850 --merge',
+	'git commit',
+	'git commit -m "wip"',
+	'git commit --amend',
 	'git commit -am "wip"',
 	'git commit --all -m "wip"',
 	'gh pr merge my-branch --squash',

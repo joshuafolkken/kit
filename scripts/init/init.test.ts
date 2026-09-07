@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +17,8 @@ function fake_lefthook_result(exit_code: number | undefined): ReturnType<typeof 
 	return result as unknown as ReturnType<typeof execaSync>
 }
 
-const TEST_DIR = path.join(tmpdir(), 'init-test')
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
+const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'init-test-'))
 const TEMPLATE_PATH = path.join(TEST_DIR, 'template.properties')
 const DEST_PATH = path.join(TEST_DIR, 'sonar-project.properties')
 

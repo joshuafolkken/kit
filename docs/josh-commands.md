@@ -39,6 +39,13 @@ The plan comes from one table in `scripts/gate-plan.ts`, where each check declar
 - **The unit suite is the only check worth sizing.** It accounts for 107 of the gate's 122 CPU-seconds on its own, because vitest opens one worker per core while the other three are one or two processes each. It is handed `--maxWorkers=<cores − 4>` — the cores the other three do not hold — which keeps the gate's total demand at the size of the machine instead of about 1.3× it. Measured: no change in wall time beyond run-to-run noise, and 5–6% less CPU burned (101s against 107s). The flag needs vitest 2.1 or newer, which every project this package supports is far past.
 - **A machine smaller than the one it was measured on is left alone.** The cap applies from 11 cores up and nowhere below, because four reserved cores are half an eight-core machine against a third of the measured one, and one measurement says nothing about whether the reservation still pays there. Extrapolating it downward is what would hurt: the suite takes 11.7s at eight workers and 16.7s at four, so a rule that handed an eight-core machine four workers would pin the longest check at the slow end of a curve nobody measured there. Below the line vitest keeps sizing its own pool — the behavior `josh gate` had before the plan existed — and a four-core CI runner is far below it, so CI runs exactly as it did.
 - **Below four cores the checks queue instead of fighting.** The three reserving checks want four cores between them, so a three-core machine runs two checks at a time and a two-core machine one. **Every check still runs and every failure is still reported in one pass** — narrowing the plan changes the order, never the set.
+- **The machine is divided when more than one unit run is on it** ([#1515](https://github.com/joshuafolkken/kit/issues/1515)). The three numbers above describe one gate on an idle machine, and nothing in them asked whether another lane was running. Six lanes each concluding "11 cores, take 7" put 42 workers on 11 cores at a load average of 14.97, and the pre-push hook was worse still — it passed no cap at all, so vitest opened one worker per core in every lane at once. Each run now counts the unit runs already in flight and takes `⌊cores ÷ runs⌋` of the machine, never fewer than one worker. Measured: six concurrent copies of the full suite produced ten `Test timed out in 10000ms` failures across the six; at this share the same six produced **none**, with the load average falling from 209 to 22. **A run that is alone on the machine is sized exactly as it was**, so CI and every quiet checkout behave bit for bit as before, and the line says so only when it is not:
+
+  ```
+  plan: 4 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)
+  ```
+
+  The count is a marker per in-flight run in the temp directory, carrying the pid that wrote it; a run killed outright leaves its file behind and is ignored, because the pid rather than the file is what says a run is live. A number you pass yourself is never divided — `pnpm josh test:unit --maxWorkers=4` is left as typed.
 
 The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
@@ -77,7 +84,7 @@ Each block's header names the command that ran, not only the check, because the 
 
 - **No record** — including after a red gate, and after a green one that had something to print (a check that passed with warnings, or one that passed without running), neither of which writes one. So the re-verification that follows a fix always runs, and a warning is never made invisible by a run that reuses a result instead of printing it.
 - **A file either side covers has moved, appeared or gone.** The comparison unions both key sets, so a new untracked file refuses the skip exactly as an edited one does.
-- **The default branch moved**, even with the map byte-identical. Fetch an advanced `main` and rebase onto it and the same files still differ by the same digests, over a working tree whose every other file has been replaced by code no check has read. The record pins the commit it was taken against, and both halves have to match.
+- **The base commit moved**, even with the map byte-identical. Fetch an advanced `main` and rebase onto it and the same files still differ by the same digests, over a working tree whose every other file has been replaced by code no check has read. The record pins the commit it was taken against, and both halves have to match. **That commit is the branch's merge base with the default branch, not the default branch's own tip** ([#1527](https://github.com/joshuafolkken/kit/issues/1527)): a rebase moves `HEAD` and so moves the merge base with it, which is the case this condition was written for — while another lane merging into the shared `main` of a linked work tree moves neither, and correctly leaves a record standing that still describes this tree exactly.
 - **An empty changed map**, which is never evidence. Straight after `git switch main && git pull` the map is empty, and an empty map compares equal to any other empty map. `epicrun` runs exactly that pair of commands between children. Refusing costs nothing: a tree with no changed file is not where a run spends its gate time.
 - **`pnpm josh gate --force`**, for when something outside the tree changed and you know it — a `pnpm install`, a toolchain bump, a cache thrown away.
 
@@ -335,14 +342,36 @@ present, it runs `vitest run` as usual.
 pnpm josh test:unit
 ```
 
-**A unit test that reaches GitHub fails the run.** In kit's own checkout `vitest.config.ts` arms a
-`globalSetup` guard (`scripts/test-network-guard.ts`) that puts a recording `gh` in front of the real
-one on `PATH`; if anything spawned it, the run ends with the invocations listed and a non-zero exit
-([#1353](https://github.com/joshuafolkken/kit/issues/1353)). The failure it exists for is invisible
-otherwise — a test that calls through still **passes**, just slowly and against whatever GitHub
-happens to answer, which is how one such test reached the 10-second test timeout in CI. The fix is
-always in the test: mock the read it forgot. An unreadable record is reported as a failure too rather
-than as "no violations", because a guard that cannot answer must not claim the run was clean.
+**A unit test that reaches the network fails the run.** In kit's own checkout `vitest.config.ts` arms
+a `globalSetup` guard (`scripts/test-network-guard.ts`) that puts a recording `gh` in front of the
+real one on `PATH`; if anything spawned it, the run ends with the invocations listed and a non-zero
+exit ([#1353](https://github.com/joshuafolkken/kit/issues/1353)). The failure it exists for is
+invisible otherwise — a test that calls through still **passes**, just slowly and against whatever
+GitHub happens to answer, which is how one such test reached the 10-second test timeout in CI. The
+fix is always in the test: mock the read it forgot. An unreadable record is reported as a failure too
+rather than as "no violations", because a guard that cannot answer must not claim the run was clean.
+
+**`git` is guarded too, and by subcommand**
+([#1515](https://github.com/joshuafolkken/kit/issues/1515)). Guarding `gh` alone left the other way
+out of the machine open, and two `followup` suites walked through it: a live `git fetch` inside the
+release count they drove, once per test, 4.1s each against a 10-second timeout. Those two files were
+half the unit suite's wall clock and failed the pre-push gate non-deterministically — on an idle
+machine as readily as under parallel load, 63.7s of wall clock against 14.9 CPU-seconds. Unlike `gh`,
+`git` cannot simply be refused: half the suite reads its own repository with `status`, `log`,
+`rev-parse` and the worktree commands, and those pass straight through to the real binary. Refused
+are `archive`, `clone`, `fetch`, `ls-remote`, `pull`, `push`, `remote`, `send-email` and `submodule` —
+the last three whole, because splitting `remote update` from `remote -v` inside a shell `case` fails
+open when it gets it wrong. The shim finds the subcommand behind git's own global options, so
+`git -C <dir> fetch` is caught rather than read as a subcommand named after the directory.
+
+Extending it found a second offender the same day, and one that only appears inside a hook:
+`propagate-git.ts` passed the repository as `cwd`, which **`GIT_DIR` overrides** — and git exports
+`GIT_DIR` to every hook it runs. Under `pnpm josh git`'s pre-push hook its probes therefore answered
+about the checkout the hook was firing in rather than the path they were handed, so directories the
+tests build deliberately as non-repositories resolved to the real one and the tree check fetched from
+`origin` for them. That is the intermittent `propagate-guard` failure on
+[#1515](https://github.com/joshuafolkken/kit/issues/1515), and why it never reproduced outside a push.
+The probes now clear `GIT_DIR` and `GIT_WORK_TREE` for the child, so `cwd` means what it says.
 
 ### `josh test:related`
 
@@ -1088,7 +1117,7 @@ Measured on [#1326](https://github.com/joshuafolkken/kit/issues/1326): `pnpm jos
 
 **Which pushes that saving reaches is decided by where the last gate ran.** A run whose gate finished before its last edit leaves a record that does not cover the pushed tree, and this hook then runs the whole suite exactly as it did — the safe direction, and not a regression. The saving lands where a gate ran after the last edit, which in the workflow's own order (`gate` → join → `josh git -y`) is the common case: since [#1486](https://github.com/joshuafolkken/kit/issues/1486) nothing edits the tree between the join and the commit, because the child no longer bumps the version.
 
-**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply here unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, an advanced default branch, an empty map, a missing record and a red gate (which writes none) each run the whole suite exactly as before. A hook that answered that question differently from the gate beside it would be two commands disagreeing about one tree.
+**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply here unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, a moved base commit, an empty map, a missing record and a red gate (which writes none) each run the whole suite exactly as before. A hook that answered that question differently from the gate beside it would be two commands disagreeing about one tree.
 
 **One condition is added on top, and it only ever narrows.** A commit changes nothing outside the checkout; a push puts code where CI and other people read it, so an unverified commit reaching the remote is the failure this must not have. The gate's record describes the **working tree**, and a push carries **HEAD** — the same thing only while nothing is uncommitted. So the reuse also requires `git status --porcelain` to be empty, untracked files included: commit half of a green tree and the map still matches while the commit being pushed is a tree no check has read. `josh git` commits before it pushes, which is exactly the state that satisfies this; anything else, including a status that could not be read at all, runs the suite.
 
@@ -1116,7 +1145,7 @@ Measured in kit: `pnpm exec tsc --noEmit` over the whole project takes 3.8–4.4
 
 **It is the one project-wide check the pre-commit hook had left.** The hook runs its commands in parallel, so its wall time is the longest of them: the staged-file `cspell`, `prettier` and `eslint` commands cost 0.3–1.0s each and are a **narrower scope** than the gate's project-wide run, so they are untouched — skipping them would buy about half a second in exchange for trading a narrow reading for a recorded wide one. `prevent-main-commit` and `secretlint` are untouched for a different reason: the gate does not run either, so neither is a duplicate of anything.
 
-**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, an advanced default branch, an empty map, a missing record and a red gate (which writes none) each run the whole project type check exactly as before.
+**The decision is [#1328](https://github.com/joshuafolkken/kit/issues/1328)'s, imported rather than restated.** All three of its conditions apply unchanged — the file map matches, the base commit that map is a diff against matches, and the map is non-empty — so a moved file, a moved base commit, an empty map, a missing record and a red gate (which writes none) each run the whole project type check exactly as before.
 
 **Two conditions are added on top, and both only ever narrow.**
 
@@ -1474,11 +1503,12 @@ An issue belongs to at most one epic, because that is what a task list can expre
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---- |
 | **The new issue itself already has an epic**       | Nothing — an issue belongs to at most one, and moving it between epics is not what this is for | —    |
 | Already a child of an epic                         | **Add to that epic**; do not create a second one                                               | A    |
+| Spread across an epic and its **own parent**       | **Add to the inner epic** — the parent already contains it                                     | A    |
 | Spread across **different** epics                  | **Choose the one you recommend, add to it, and record why**                                    | A    |
 | In no epic, and two or more counting the new issue | **Create an epic** for them                                                                    | A    |
 | No strong signal                                   | Nothing                                                                                        | —    |
 
-Bundling is reversible — an epic is editable and a child can be removed — so it needs no confirmation, and **that includes the spread row**: one `epic --add` moves an issue to a different epic, so choosing between two candidate epics is Tier A. Record what was taken, what was rejected and why, on both the issue and the epic ([#1339](https://github.com/joshuafolkken/kit/issues/1339)). **The spread row is not a proposal to merge epics** — it fires whenever related issues sit in different epics, an epic and its own parent included.
+Bundling is reversible — an epic is editable and a child can be removed — so it needs no confirmation, and **that includes the spread row**: one `epic --add` moves an issue to a different epic, so choosing between two candidate epics is Tier A. Record what was taken, what was rejected and why, on both the issue and the epic ([#1339](https://github.com/joshuafolkken/kit/issues/1339)). **The spread row is not a proposal to merge epics**, and since [#1079](https://github.com/joshuafolkken/kit/issues/1079) **an epic and its own parent no longer reach it**: the parent already contains the child, so the pair is narrowed to the inner epic and the issue is added there. The narrowing drops parents, never peers — an unrelated epic beside a nested chain still asks, and so does a cyclic parent declaration, where no inner epic can be picked.
 
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies`, on an addition as much as on a new epic: without it the batch survives and the reason it is a batch does not. An order **nobody declared is not invented** — only relations already recorded are carried over.
 
@@ -1665,10 +1695,14 @@ What the brief carries:
 | "Running now"         | The marker `josh gate` keeps for as long as its checks run, **and only if its digests still match this tree** |
 | The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                   |
 | The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed                   |
+| The checkout          | `git rev-parse` in the tree the run is implementing in — the absolute root, the branch and the HEAD commit    |
+| The attestation nonce | Written to a record before it is printed, and checked by `josh review:attest`                                 |
 
 **`--round 2` is taken after the commit, and its target is round 1's fixes and nothing else.** Since [#1261](https://github.com/joshuafolkken/kit/issues/1261) the pull request opens between the rounds, and since [#1486](https://github.com/joshuafolkken/kit/issues/1486) nothing edits the tree in between: the version bump that used to sit there put `package.json` into the target every time. So the record the gate wrote still matches the tree and this brief answers `Already verified`, instead of sending the review agent back to the unit suite the gate had just passed.
 
 **Only one half is mechanical.** The round-2 target _is_ the scope handed over, so a narrowed round stays narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so whether it obeys is measured rather than assumed.
+
+**It names the checkout, because the forked agent does not inherit one** ([#1522](https://github.com/joshuafolkken/kit/issues/1522)). `/code-review` is forked by the harness into the **session's** working directory, so a run implementing in a lane (`josh lane:open`) is reviewed from a tree that holds the previous child's already-merged code. Nothing there is wrong, so the review returns no findings — and **the failure arrives as approval**. Measured across the seven children `epicrun #1474` merged: twelve of the fifteen review rounds named the lane's absolute path in the invocation and cited files that were actually in their own diff; the one round whose invocation named no path is the one that reviewed a different pull request. So the path is now generated from `git rev-parse --show-toplevel` rather than left to whoever writes the hand-off, every target the brief prints carries `git -C <root>`, and the round-2 file list is absolute. Whether the review then honors it is checked by [`josh review:attest`](#josh-reviewattest).
 
 **It never claims a gate it cannot prove.** The gate's record holds a digest per changed path; if any of them has moved since — or there is no record at all — the brief prints `Not verified` and asserts nothing about lint, the type check, the spell check or the unit tests. Re-run `pnpm josh gate` after applying fixes and the record catches up.
 
@@ -1728,6 +1762,32 @@ The fix delta is the same comparison [`josh review:brief --round 2`](#josh-revie
 **Ask it once round 1's fixes are in, and before the commit.** The delta it reads is then exactly those fixes. Nothing writes to the tree in between since [#1486](https://github.com/joshuafolkken/kit/issues/1486) took the version bump out of the child flow — it rewrote `package.json`, which is not inert, so a delta taken after it answered `required` whatever round 1 did and the condition never fired in the flow it was built for.
 
 **A prompt fix and a test fix both answer `required`, deliberately.** The condition the issue arrived with exempted anything that is not a runtime code path; that is rejected on the measurement recorded under `josh review:level` — two documentation-only diffs, ten real defects found in each by a `medium` review, none of them covered by a test. A test file is the verification that guards a runtime path, and an assertion a fix weakened still passes. The full reasoning, how a skip is recorded on the Issue, and when the condition is withdrawn are in `prompts/review.md` → "When round 2 is skipped entirely, and when it is not".
+
+### `josh review:attest`
+
+Record, or verify, which checkout a `/code-review` actually read ([#1522](https://github.com/joshuafolkken/kit/issues/1522)).
+
+```bash
+pnpm josh review:attest <nonce>   # run by the review, from the checkout it read
+pnpm josh review:attest --check   # run by the run, before it acts on the review; alias: josh ra
+```
+
+**The root cause is not this repository's to fix.** `/code-review` is forked by the harness and inherits the session's working directory; nothing here decides that. What is decidable is the direction the error falls in. A review that read the wrong tree reads already-merged, already-reviewed code, finds nothing, and reports that silence as approval — so the run commits and merges a diff nobody read. **Detection is therefore the deliverable**: a review that cannot show which tree it read is treated as no review at all.
+
+`josh review:brief` records the checkout it is describing and prints a nonce. `josh review:attest <nonce>` reads the checkout it is **itself** run in — `git rev-parse` answers about the process's own working directory, so values handed in on the command line would only ever agree with themselves — and exits non-zero when that is not the briefed one. `--check` is the other end: the run asks it before acting on the review's verdict, and `josh followup --merge` asks it again before merging.
+
+| Answer         | What it means                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ok`           | The review attested the checkout it was briefed on                                                                |
+| `missing`      | A brief was recorded and nothing attested it — **a refusal, not a pass**                                          |
+| `mismatch`     | The review attested a different root, branch or HEAD. Its findings, "no findings" included, describe another tree |
+| `not-required` | No brief was recorded in this checkout inside a run's lifetime, so there is nothing to attest                     |
+
+**Absence is a refusal.** The defect produced no signal at all, so a check that read silence as success would answer `ok` in exactly the state it exists to catch. A wrongly refused merge costs one re-run of the review; a wrongly allowed one ships a diff nobody read.
+
+**All three fields, not the root alone.** A second work tree of the same repository has a different root, which the root test catches on its own; a `git switch` inside the right tree does not, and a lane's branch is what its commit lands on.
+
+**Scoped to a checkout that briefed a review, and expiring after eight hours.** A project or a flow that never runs `josh review:brief` merges exactly as it did before, and a run that crashed before `josh followup` does not hold the next one hostage — the same expiry `josh run:hold` uses, and read only in the direction that drops the requirement, so it can never turn a real mismatch into a pass. `josh followup` clears the record at the end of a run that merged, beside the round-1 snapshot.
 
 ### `josh delegate`
 
@@ -2506,7 +2566,11 @@ the measured paths, written to a temp-directory file keyed to this checkout
 alongside `/code-review` and still be checked for staleness afterwards, with
 [`josh eval:scope --since-eval`](#josh-evalscope). **Only a whole-suite run writes it** — a named
 re-run (`pnpm josh eval <name>`, what a `blocked` verdict asks for) leaves the record alone, so a
-one-scenario reading can never stand in for the suite's measurement. A run that cannot write it says
+one-scenario reading can never stand in for the suite's measurement. **The record is marked finished
+when the run returns a verdict** ([#1164](https://github.com/joshuafolkken/kit/issues/1164)) — an
+amendment that leaves what was measured and when untouched — so a run interrupted at the keyboard or
+killed by a throw leaves a record with no completion, which `--since-eval` reads exactly as it reads
+no record at all. A run that cannot write it says
 so and continues, which leaves the check with no record — and no record answers `required`. The file
 is created owner-only and exclusively, after unlinking whatever was at the path, so a predictable
 name in a shared temp directory cannot redirect the write or plant a record the check would trust.
@@ -2537,8 +2601,8 @@ The measured set is derived from what the eval sandbox copies rather than restat
 
 The gate asks about the branch diff. `--staged` is for a pre-commit reading, and the empty-list rule bites hardest there: an empty index answers `required`, which costs five real Claude sessions rather than `review:level`'s free `medium`.
 
-**`--since-eval` asks the same question of a different diff — the one `/code-review` itself produced** ([#1152](https://github.com/joshuafolkken/kit/issues/1152)). The gate starts `josh eval` when the review starts, since neither writes to the working tree; the suite therefore measures the documents as they stood at that moment, and a review that then edited a measured path leaves the verdict describing a tree that no longer exists. This flag compares the record `josh eval` wrote before its first session against the tree now: `skip` means the review changed nothing the scenarios can see and the concurrent verdict stands, `required` means it edited a measured path — or that no record exists — and the suite runs again. Git cannot answer this: the implementation and the review's fixes are uncommitted in the same tree, so a diff cannot say which side of the review a change fell on.
+**`--since-eval` asks the same question of a different diff — the one `/code-review` itself produced** ([#1152](https://github.com/joshuafolkken/kit/issues/1152)). The gate starts `josh eval` when the review starts, since neither writes to the working tree; the suite therefore measures the documents as they stood at that moment, and a review that then edited a measured path leaves the verdict describing a tree that no longer exists. This flag compares the record `josh eval` wrote before its first session against the tree now: `skip` means the review changed nothing the scenarios can see and the concurrent verdict stands, `required` means it edited a measured path — or that no record exists, or that the recorded run never reached a verdict ([#1164](https://github.com/joshuafolkken/kit/issues/1164)) — and the suite runs again. Git cannot answer this: the implementation and the review's fixes are uncommitted in the same tree, so a diff cannot say which side of the review a change fell on.
 
-Two differences from the branch reading, both deliberate. **An empty result answers `skip` here**, the opposite of the branch reading's empty diff: the paths come from walking the trigger's own set rather than from a caller's diff, so nothing found is the positive fact that nothing moved. And **`--staged` alongside it is refused rather than resolved** — one asks about the index, the other about a recorded run, and answering one of them silently would answer a question nobody asked. The reason line names when the recorded run started, so a record left by some other loop is visible rather than assumed away.
+Two differences from the branch reading, both deliberate. **An empty result answers `skip` here**, the opposite of the branch reading's empty diff: the paths come from walking the trigger's own set rather than from a caller's diff, so nothing found is the positive fact that nothing moved. And **`--staged` alongside it is refused rather than resolved** — one asks about the index, the other about a recorded run, and answering one of them silently would answer a question nobody asked. The reason line names when the recorded run started, so a record left by some other loop is visible rather than assumed away — and a record whose run never finished is named as that rather than compared at all, because there is no verdict for the comparison to vouch for.
 
 Where the answer is used, what a failure does, and why an epic's completion does not run the suite a second time: [docs/eval.md](./eval.md) → "When it runs".

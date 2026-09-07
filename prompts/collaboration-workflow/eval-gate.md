@@ -8,7 +8,7 @@
 
 - 発火条件はコマンド（`pnpm josh eval:scope`）が答え、裁量に委ねないこと／測定対象パス集合の出所／空差分も `required`
 - 検証ゲートのどこに入るか（`/code-review` と同時に開始し収束後に読む・`pnpm josh gate` の中には入れない）
-- 収束後の再確認（`pnpm josh eval:scope --since-eval`）と、古い結果を報告しない原則
+- 収束後の再確認（`pnpm josh eval:scope --since-eval`）、記録が保証するのは「走り始めた」ではなく「走り終えて判定が出た」ランであること（joshuafolkken/kit#1164）、古い結果を報告しない原則
 - 判定（`held` / `blocked` / `unmeasured`）とその扱い、赤の再現確認と baseline による帰属
 - 消費側リポジトリでは測るのはインストール済みの kit であること
 - コストの上限（全シナリオ・Issue に 1 回）、EPIC 完了時には回さない理由（joshuafolkken/kit#917 / joshuafolkken/kit#860）

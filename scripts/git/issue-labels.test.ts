@@ -5,6 +5,7 @@ import {
 	FILING_ROUTE_LABELS,
 	has_any_label,
 	IN_PROGRESS_LABEL,
+	INTERRUPT_ROUTE_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
@@ -29,7 +30,10 @@ const NOT_DIRECTLY_RUNNABLE_COUNT = 3
 const REVIEW_CAP_ROUTE_SPELLING = 'route:review-cap'
 const SPLIT_ROUTE_SPELLING = 'route:split'
 const TIER_A_ROUTE_SPELLING = 'route:tier-a'
-const FILING_ROUTE_COUNT = 3
+// joshuafolkken/kit#1518: the interrupt route, whose aggregation query is what makes "how often did
+// a serious defect have to bypass the cap" answerable at all.
+const INTERRUPT_ROUTE_SPELLING = 'route:interrupt'
+const FILING_ROUTE_COUNT = 4
 
 describe('the label names', () => {
 	it.each([
@@ -38,6 +42,7 @@ describe('the label names', () => {
 		[NEEDS_DECISION_LABEL, NEEDS_DECISION_SPELLING],
 		[AUTO_OK_LABEL, AUTO_OK_SPELLING],
 		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
+		[INTERRUPT_ROUTE_LABEL, INTERRUPT_ROUTE_SPELLING],
 		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
 		[SPLIT_ROUTE_LABEL, SPLIT_ROUTE_SPELLING],
 		[TIER_A_ROUTE_LABEL, TIER_A_ROUTE_SPELLING],
@@ -51,13 +56,14 @@ describe('FILING_ROUTE_LABELS', () => {
 	// is created with. A route added to the constants but not here would never be provisioned.
 	it('carries one entry per route label', () => {
 		expect(FILING_ROUTE_LABELS.map((label) => label.name)).toStrictEqual([
+			INTERRUPT_ROUTE_LABEL,
 			REVIEW_CAP_ROUTE_LABEL,
 			SPLIT_ROUTE_LABEL,
 			TIER_A_ROUTE_LABEL,
 		])
 	})
 
-	it('holds exactly the three route labels', () => {
+	it('holds exactly the four route labels', () => {
 		expect(FILING_ROUTE_LABELS).toHaveLength(FILING_ROUTE_COUNT)
 	})
 
@@ -85,6 +91,14 @@ describe('NOT_DIRECTLY_RUNNABLE_LABELS', () => {
 	// label would silently become a second `needs-decision`.
 	it('does not hold the human-review label', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(NEEDS_HUMAN_REVIEW_LABEL)).toBe(false)
+	})
+
+	// joshuafolkken/kit#1518: a route label is informational — it says which filing produced an issue,
+	// never whether the issue may run. Added here, `route:interrupt` would make every interrupt
+	// invisible to `epic:next`, so the defect the cap now lets through would be filed and then never
+	// offered — the "filed but never run" state the rule body warns is no better than a lost comment.
+	it.each(FILING_ROUTE_LABELS.map((label) => label.name))('does not hold %s', (name) => {
+		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(name)).toBe(false)
 	})
 
 	it('holds those three and nothing else', () => {
