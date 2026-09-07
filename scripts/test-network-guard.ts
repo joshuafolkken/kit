@@ -340,10 +340,12 @@ function install_git_shim(directory: string, guarded_directory: string | undefin
 // The shims, written where they will be spawned from. Shared with this module's own test rather than
 // re-written there: a test that builds its own copy proves that copy works and says nothing about
 // the one the suite actually runs behind.
-function install_shim(
-	directory: string = GUARD_DIRECTORY,
-	guarded_directory: string | undefined = GUARDED_GIT_DIRECTORY,
-): string {
+// **`undefined` here means "there is no repository to guard", and a parameter default could not say
+// that** — a JavaScript default fires on an explicit `undefined` too, so a caller asking for the
+// no-repository shim silently got one guarding the real checkout, and the branch that omits the
+// resolver had no test at all (review round 2 of joshuafolkken/kit#1530). The default lives in the
+// wrapper below instead, where it is applied rather than defaulted.
+function install_shim_guarding(directory: string, guarded_directory: string | undefined): string {
 	const shim_file = path.join(directory, SHIM_NAME)
 
 	mkdirSync(directory, { recursive: true })
@@ -352,6 +354,10 @@ function install_shim(
 	install_git_shim(directory, guarded_directory)
 
 	return shim_file
+}
+
+function install_shim(directory: string = GUARD_DIRECTORY): string {
+	return install_shim_guarding(directory, GUARDED_GIT_DIRECTORY)
 }
 
 // `undefined` for a record that could not be read, which is not the same answer as an empty one:
@@ -414,6 +420,7 @@ const test_network_guard = {
 	disarm,
 	git_shim_script,
 	install_shim,
+	install_shim_guarding,
 	log_in,
 	resolve_binary,
 	shim_script,

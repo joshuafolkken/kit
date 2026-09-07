@@ -370,15 +370,28 @@ open when it gets it wrong. The shim finds the subcommand behind git's own globa
 only `{ cwd }` builds its fixture inside the checkout the pre-push hook is firing in: three commits
 titled `base` and `another lane merged` landed on a live lane's branch during `pnpm josh git`, and a
 `git config user.email` wrote a fixture identity into a `--local` config that every linked work tree
-shares. The same shim now refuses a **writing** subcommand — `add`, `commit`, `config`, `init`,
-`reset`, `worktree` and the rest — on either of two findings: any git location variable is still set
-in its environment, or the command resolves into the repository the suite belongs to (its shared git
-directory, so a lane's write into a sibling work tree is caught as well). Reads are untouched, since
-half the suite reads its own repository and a read cannot move a branch. The refusal happens at the
-call, so vitest names the test that made it, and the record read at teardown is the backstop for a
-test that swallows the error. The fix is always in the test: clear the git location environment —
-`git_location_env.location_free_environment()` in `scripts/git/git-location-env.ts` — and carry any
-identity on `-c` rather than writing it into a config file.
+shares. The same shim now refuses a **writing** subcommand on either of two findings: any git
+location variable is still set in its environment, or the command resolves into the repository the
+suite belongs to — its shared git directory, so a lane's write into a sibling work tree is caught as
+well, and the resolution is asked with the caller's own `-C` / `--git-dir` in front of it rather than
+from the shim's working directory. Reads are untouched, since half the suite reads its own repository
+and a read cannot move a branch.
+
+Which finding a subcommand faces depends on whether it has a reading spelling this suite uses.
+`add`, `commit`, `init`, `reset`, `checkout`, `switch`, `update-ref` and their kind face **both**.
+`apply`, `branch`, `config`, `notes`, `stash`, `tag` and `worktree` face the **environment finding
+only**: `worktree list`, `branch --show-current` and `config --get` are ordinary reads of the real
+checkout, an ambient working directory inside it is exactly how they are spelled, and splitting a
+read from a write on its flags inside a shell `case` fails open when it gets it wrong. So a
+deliberate `git worktree add` or `git config user.email <value>` run with a clean environment from
+inside the checkout is **not** refused — the accident this guard exists for always carries the
+inherited environment, which the first finding catches whatever the subcommand is.
+
+The refusal happens at the call, so vitest names the test that made it, and the record read at
+teardown is the backstop for a test that swallows the error. The fix is in the test: clear the git
+location environment — `git_location_environment.location_free_environment()` in
+`scripts/git/git-location-environment.ts` — and carry any identity on `-c` rather than writing it
+into a config file.
 
 Extending it found a second offender the same day, and one that only appears inside a hook:
 `propagate-git.ts` passed the repository as `cwd`, which **`GIT_DIR` overrides** — and git exports

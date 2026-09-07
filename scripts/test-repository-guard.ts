@@ -120,8 +120,11 @@ const WRITE_MARKER = 'repository write:'
 // misleading instruction, which is what the same sentence said for both until review round 1.
 const BLOCKED_WRITE_MESSAGE =
 	'josh: a unit test must not run a writing git command against the repository the suite is running in'
+// Finding-neutral, like the stderr message and for the same reason: each recorded line carries its
+// own `— via …`, and a run failed on the working-directory finding must not be told to clear an
+// environment that was already clean (review round 2).
 const WRITE_VIOLATION_HEADING =
-	'The unit suite ran a writing git command against the repository it is running in. Clear GIT_DIR and its siblings in the test that made it:'
+	'The unit suite ran a writing git command against the repository it is running in. Each line names what took it there:'
 
 // The record and the stderr detail both read as prose and both expand in `sh`: `$*` is the arguments
 // the shim stood in for, `$guard_via` the finding that refused them.

@@ -74,7 +74,7 @@ interface ShimRun {
 function run_shim(invocation: Invocation): ShimRun {
 	const directory = temporary_directory()
 
-	test_network_guard.install_shim(directory, invocation.guarded)
+	test_network_guard.install_shim_guarding(directory, invocation.guarded)
 
 	const shim = path.join(directory, test_network_guard.GIT_SHIM_NAME)
 	const result = execaSync(shim, invocation.args, {
@@ -236,6 +236,20 @@ describe('the write guard — subcommands that read as often as they write', () 
 
 		expect(blocked.exit_code).toBe(BLOCKED_EXIT_CODE)
 		expect(blocked.log).toContain(test_repository_guard.WRITE_MARKER)
+	})
+})
+
+// The one deliberate fail-open: there is no repository for a test to damage, so the resolution
+// finding is left out of the generated shim and the environment one is generated as always.
+describe('the write guard — nothing to guard', () => {
+	it('omits the resolver from the shim', () => {
+		const directory = temporary_directory()
+
+		test_network_guard.install_shim_guarding(directory, undefined)
+		const script = readFileSync(path.join(directory, test_network_guard.GIT_SHIM_NAME), 'utf8')
+
+		expect(script).not.toContain('guard_dir_of')
+		expect(script).toContain('GIT_INDEX_FILE')
 	})
 })
 
