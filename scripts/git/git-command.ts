@@ -161,6 +161,30 @@ const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
 // at the source rather than leaving each caller to discover the configuration.
 const NO_RELATIVE_PATHS = '--no-relative'
 
+// **Rename detection is turned off because this listing is a description of a tree, not a summary of
+// a change** (joshuafolkken/kit#1533). With git's default `diff.renames=true`, a rename prints only
+// its *destination*: `git diff --name-only <base>` across a commit that moved `scripts/init-logic.ts`
+// to `scripts/init/init-logic.ts` names the second path and never the first.
+//
+// That omission is what breaks `josh gate`'s reuse. The green record it compares is `base` plus a
+// digest per listed path, and the whole claim that the record still describes the tree rests on one
+// property: **every path that differs from `base` is in the list**, so `base` plus the digests
+// determines the tracked tree completely. A rename's source path differs from `base` — it is gone —
+// and it is not in the list. So a tree in which the file was renamed away and a tree in which it has
+// since come back produce the *same* record: the returned file matches `base`, so it enters no diff,
+// while the destination is an addition either way. The gate then reuses a green taken on the first
+// tree for the second, without running one check on it, and a duplicated module that lint, the type
+// check and the unit suite would all have failed on is committed on a "passed".
+//
+// Off, a rename is listed as its two halves — a delete and an add — and the delete is what makes the
+// two trees compare unequal. `review-tree.ts` already records a listed path the tree does not hold
+// as `ABSENT_DIGEST` rather than dropping it, which is exactly the entry this flag produces.
+//
+// **Every other reader moves in the safe direction.** `josh review:level` and `josh eval:scope` see
+// one more path and can only widen; `josh lint:related` and `josh test:related` drop what the tree
+// no longer holds through `changed-file-scope.ts`, which they already had to do for a plain delete.
+const NO_RENAME_DETECTION = '--no-renames'
+
 // The commit `change_base` resolves to. Every "changed" reading below is a diff against it, so a set
 // of changed paths — or a map of their digests — means nothing without it: fetch an advanced default
 // branch and rebase onto it, and each digest can stay identical while the rest of the tree is
@@ -178,6 +202,7 @@ async function diff_main_names(): Promise<string> {
 		'diff',
 		NAME_ONLY_FLAG,
 		NO_RELATIVE_PATHS,
+		NO_RENAME_DETECTION,
 		await change_base(),
 		'--',
 	])
@@ -190,6 +215,7 @@ async function diff_cached_names(): Promise<string> {
 		'--cached',
 		NAME_ONLY_FLAG,
 		NO_RELATIVE_PATHS,
+		NO_RENAME_DETECTION,
 	])
 }
 
