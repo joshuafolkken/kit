@@ -1,10 +1,10 @@
-import { mkdtempSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { git_command } from './git-command'
+import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
+import { git_location_environment } from './git-location-environment'
 
 // joshuafolkken/kit#1527, with real git rather than a mocked one.
 //
@@ -19,12 +19,41 @@ const LANE_FILE = 'lane-change.txt'
 const OTHER_LANE_FILE = 'other-lane-merged.txt'
 const LANE_EDIT = 'edited by this lane\n'
 
-const fixture = { workspace: '', repository_root: '', lane_root: '', previous_cwd: '' }
+const BYSTANDER = 'bystander'
+const HOOK_FILE = 'made-under-a-hook.txt'
+const WORKSPACE_PREFIX = 'kit-lane-base-'
 
-async function git(cwd: string, arguments_: Array<string>): Promise<string> {
-	const { stdout } = await execa('git', arguments_, { cwd })
+const HOOK_CONTENT = 'under a hook\n'
+const HOOK_SUBJECT = 'committed under a hook environment'
 
-	return stdout.trimEnd()
+// The identity, the `-c` options that carry it, the `git` helper and the workspace lifecycle are
+// `./git-fixture-workspace`, shared with `rename-changed-paths.test.ts` (joshuafolkken/kit#1533).
+// They were copied into the second suite first; a hardening like joshuafolkken/kit#1530's lands in
+// one copy and silently misses the other, so there is only one.
+const { AUTHOR_NAME, git, MAIN_BRANCH } = git_fixture_workspace
+
+const fixture: FixtureWorkspace & { repository_root: string; lane_root: string } = {
+	workspace: '',
+	repository_root: '',
+	lane_root: '',
+	previous_cwd: '',
+	restore_environment: undefined,
+}
+
+// `--local` rather than the effective value: what is being asserted is that this fixture wrote
+// nothing into a config file, not what the machine's own git happens to be configured with.
+//
+// It reads with `execa` directly rather than through the shared helper, because the point is to ask
+// git a question with no `-c` identity attached — the very options the helper always carries.
+async function local_identity(cwd: string): Promise<string> {
+	const { stdout } = await execa('git', ['config', '--local', '--get', 'user.email'], {
+		cwd,
+		reject: false,
+		env: git_location_environment.location_free_environment(),
+		extendEnv: true,
+	})
+
+	return stdout.trim()
 }
 
 async function commit_all(cwd: string, message: string): Promise<void> {
@@ -33,11 +62,20 @@ async function commit_all(cwd: string, message: string): Promise<void> {
 }
 
 async function build_repository(): Promise<void> {
-	await git(fixture.repository_root, ['config', 'user.email', 'lane@example.test'])
-	await git(fixture.repository_root, ['config', 'user.name', 'Lane Fixture'])
-	await git(fixture.repository_root, ['config', 'commit.gpgsign', 'false'])
 	await writeFile(path.join(fixture.repository_root, LANE_FILE), 'base\n')
 	await commit_all(fixture.repository_root, 'base')
+}
+
+// A stand-in for the repository a hook is firing in. Never the real one: pointing `GIT_DIR` at the
+// checkout is the damage under test, not an acceptable way to detect it.
+async function build_bystander(): Promise<string> {
+	const root = path.join(fixture.workspace, BYSTANDER)
+
+	await git(fixture.workspace, ['init', MAIN_BRANCH, BYSTANDER])
+	await writeFile(path.join(root, LANE_FILE), 'bystander\n')
+	await commit_all(root, 'bystander base')
+
+	return root
 }
 
 // The lane is cut first, and only afterwards does another lane's work land on the shared `main`.
@@ -53,19 +91,76 @@ async function advance_main_after_cutting_the_lane(): Promise<void> {
 }
 
 beforeEach(async () => {
-	fixture.previous_cwd = process.cwd()
-	fixture.workspace = mkdtempSync(path.join(tmpdir(), 'kit-lane-base-'))
+	// `open_workspace` is what clears the git location variables for this process too, not only for
+	// the children `git()` spawns. The assertions drive `git_command`, which spawns `git` with no
+	// environment of its own and so inherits this one — under a hook that made the readings answer
+	// about the repository being pushed, which is the other half of what joshuafolkken/kit#1530 saw.
+	const opened = git_fixture_workspace.open_workspace(WORKSPACE_PREFIX)
+
+	fixture.workspace = opened.workspace
+	fixture.previous_cwd = opened.previous_cwd
+	fixture.restore_environment = opened.restore_environment
 	fixture.repository_root = path.join(fixture.workspace, 'primary')
 	fixture.lane_root = path.join(fixture.workspace, 'lane')
 
-	await git(fixture.workspace, ['init', '--initial-branch=main', 'primary'])
+	await git(fixture.workspace, ['init', MAIN_BRANCH, 'primary'])
 	await build_repository()
 	await advance_main_after_cutting_the_lane()
 }, TIMEOUT_MS)
 
 afterEach(async () => {
-	process.chdir(fixture.previous_cwd)
-	await rm(fixture.workspace, { force: true, recursive: true })
+	await git_fixture_workspace.close_workspace(fixture)
+})
+
+// The regression joshuafolkken/kit#1530 was filed for. The condition is "run with a hook-like
+// environment", so the test sets those variables deliberately and asserts that the repository they
+// point at came through untouched.
+describe('the fixture built with a git hook environment inherited', () => {
+	it(
+		'writes nothing into the repository the environment points at',
+		async () => {
+			const bystander = await build_bystander()
+			const head_before = await git(bystander, ['rev-parse', 'HEAD'])
+
+			process.env['GIT_DIR'] = path.join(bystander, '.git')
+			process.env['GIT_INDEX_FILE'] = path.join(bystander, '.git', 'index')
+			await writeFile(path.join(fixture.repository_root, HOOK_FILE), HOOK_CONTENT)
+			await commit_all(fixture.repository_root, HOOK_SUBJECT)
+
+			await expect(git(bystander, ['rev-parse', 'HEAD'])).resolves.toBe(head_before)
+			await expect(local_identity(bystander)).resolves.toBe('')
+		},
+		TIMEOUT_MS,
+	)
+
+	// The commit has to land somewhere, and "nowhere" would satisfy the assertions above.
+	it(
+		'still commits into the fixture it was handed',
+		async () => {
+			process.env['GIT_DIR'] = path.join(await build_bystander(), '.git')
+			await writeFile(path.join(fixture.repository_root, HOOK_FILE), HOOK_CONTENT)
+			await commit_all(fixture.repository_root, HOOK_SUBJECT)
+
+			const subject = await git(fixture.repository_root, ['log', '-1', '--format=%s'])
+
+			expect(subject).toBe(HOOK_SUBJECT)
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// The second symptom: the identity rides on `-c`, so no config file anywhere gains it.
+describe('the fixture identity', () => {
+	it(
+		'is carried as options rather than written into config',
+		async () => {
+			await expect(local_identity(fixture.repository_root)).resolves.toBe('')
+			await expect(git(fixture.repository_root, ['log', '-1', '--format=%an'])).resolves.toBe(
+				AUTHOR_NAME,
+			)
+		},
+		TIMEOUT_MS,
+	)
 })
 
 describe('a lane reads its own changes while the shared default branch advances', () => {
