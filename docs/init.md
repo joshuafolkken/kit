@@ -103,13 +103,15 @@ These files have no merge strategy. If they already exist, `josh init` prints th
 
 `josh init` adds these scripts to your `package.json`:
 
-| Script       | Command                                                                                                                      |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `preinstall` | `pnpm dlx @aikidosec/safe-chain setup-ci`                                                                                    |
-| `prepare`    | `(command -v lefthook >/dev/null 2>&1 && lefthook install \|\| true) && (command -v tsx >/dev/null 2>&1 && tsx … \|\| true)` |
-| `josh`       | `josh`                                                                                                                       |
+| Script       | Command                                                                                                                                             |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preinstall` | `pnpm dlx @aikidosec/safe-chain setup-ci`                                                                                                           |
+| `prepare`    | `(command -v lefthook >/dev/null 2>&1 && { lefthook install \|\| echo '…' >&2; } \|\| true) && (command -v tsx >/dev/null 2>&1 && tsx … \|\| true)` |
+| `josh`       | `josh`                                                                                                                                              |
 
-The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`**, not `postinstall`. `prepare` runs on a local `pnpm install` and during `pack`/`publish`, but **not** when your package is installed as a dependency by a consumer — which is the correct scope for these developer-only hooks. The command is **guarded**: each step runs only when its binary is on `PATH`, and each optional hook is individually tolerated with `|| true`, chained with `&&`. This prevents a missing `lefthook`/`tsx` (or a failing optional hook) from aborting `pnpm install` in production or CI installs that omit dev dependencies — **without** masking the core steps it is appended to. When `josh init` appends the lifecycle to an existing `prepare` (e.g. `pnpm gen && svelte-kit sync`), those core steps stay fail-fast: if they fail, `prepare` still exits non-zero.
+The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`**, not `postinstall`. `prepare` runs on a local `pnpm install` and during `pack`/`publish`, but **not** when your package is installed as a dependency by a consumer — which is the correct scope for these developer-only hooks. The command is **guarded**: each step runs only when its binary is on `PATH`, and each optional hook is individually tolerated with `|| true`, chained with `&&`. This prevents a missing `lefthook`/`tsx` (or a failing optional hook) from aborting `pnpm install` in production or CI installs that omit dev dependencies — **without** masking the core steps it is appended to.
+
+**A `lefthook install` that runs and fails now says so on standard error** ([#1503](https://github.com/joshuafolkken/kit/issues/1503)). It still exits zero — a consumer's install must not die over a developer-only hook, which is what the `|| true` is for — but silence was never part of that bargain: a missing binary and a binary that failed were indistinguishable, so an install leaving **zero** hooks in place reported success and the developer went on committing for weeks with no pre-commit or pre-push check running at all. The warning sits **inside** the branch the binary check already gates, so the ordinary production install — where `lefthook` is simply absent — stays exactly as quiet as it was. When `josh init` appends the lifecycle to an existing `prepare` (e.g. `pnpm gen && svelte-kit sync`), those core steps stay fail-fast: if they fail, `prepare` still exits non-zero.
 
 When a `prepare` already exists, `josh init` appends the lifecycle to it rather than replacing it. If a script already runs `fix-gh-packages`, `josh init` skips re-adding the hook so re-running it never duplicates. A kit-managed `postinstall` from an earlier version (one that runs `fix-gh-packages`) is migrated to `prepare`; a custom `postinstall` of your own is left untouched.
 
@@ -189,6 +191,25 @@ sonar-project.properties  (generated from GitHub repo name)
 After all files are processed, `josh init` runs:
 
 1. **`lefthook install`** — installs git hooks defined in `lefthook.yml` (pre-commit, commit-msg, pre-push).
+
+### `core.hooksPath` stops lefthook installing anything
+
+**lefthook refuses to install while git has a custom hooks path set**, and it refuses whatever that path points at — including the repository's own `.git/hooks`, which is where git would have put the hooks anyway. The message names the path and offers three ways out.
+
+**The symptom is not an error you will see.** `prepare` tolerates the failure so your install still exits zero, so what you get is a project with **no** pre-commit, pre-push or commit-msg hook and no sign of it beyond the one warning line above — secret scanning, the type check and the unit suite all silently stop guarding your commits. Two situations make it certain rather than likely: a **fresh clone**, and a **linked work tree** (`git worktree add`, which is what `josh lane:open` creates). An existing checkout hides it, because a `pnpm install` with nothing to do never runs `prepare` at all.
+
+**This is not something kit can fix for you, and the reason is worth stating.** `core.hooksPath` lives in `.git/config`, which is per-clone; git deliberately provides no way to commit repository configuration, since a clone would then be able to activate arbitrary hooks on the machine that cloned it. Putting the hooks themselves in a tracked directory does not change that — the `git config` pointing at it still has to run once per clone.
+
+Check and clear it:
+
+```bash
+git config --get core.hooksPath                 # prints the path when one is set
+git config --unset-all --local core.hooksPath   # restores git's default — the same directory
+```
+
+The value is almost always redundant: it names `<repo>/.git/hooks`, which is git's default, so unsetting it changes nothing except that lefthook will install again. Re-run `pnpm install` (or `pnpm josh lefthook:install`) afterwards.
+
+`lefthook install --reset-hooks-path` does the same unset for you, and `lefthook install --force` installs into the path without touching the setting. **Neither is wired into `prepare` on purpose**: rewriting a developer's git configuration as a side effect of `pnpm install` would break the setup of anyone who set that path deliberately.
 
 ### Dependency barrier (pre-push)
 

@@ -12,7 +12,7 @@
 	},
 	"scripts": {
 		"preinstall": "pnpm dlx @aikidosec/safe-chain@1.5.1 setup-ci",
-		"prepare": "lefthook install",
+		"prepare": "(command -v lefthook >/dev/null 2>&1 && { lefthook install || echo 'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything' >&2; } || true)",
 		"build": "tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts && tsx scripts/build-self-sync-guard.ts",
 		"prepack": "tsx scripts/version/publishable-range-check.ts && tsx scripts/build-bin.ts && tsx scripts/build-version.ts && tsx scripts/build-config-merge.ts && tsx scripts/build-managed-marker.ts && tsx scripts/build-self-sync-guard.ts",
 		"josh": "tsx scripts/josh/josh.ts"

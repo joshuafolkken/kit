@@ -44,7 +44,28 @@ const LEGACY_POSTINSTALL_KEY = 'postinstall'
 // global installs outside a git repo) does not abort `pnpm install`. These are
 // developer-only hooks, so they live in `prepare` (local install + pack/publish)
 // rather than `postinstall`, which also runs when the package is a consumer dependency.
-const GUARDED_LEFTHOOK_CMD = `command -v lefthook >/dev/null 2>&1 && ${LEFTHOOK_INSTALL_CMD}`
+// A failing `lefthook install` used to be indistinguishable from a missing binary: `|| true` swallowed
+// both, so an install that left **zero** hooks in place still exited 0 and said nothing. The way it
+// happens in practice is `core.hooksPath` — lefthook refuses to install while any custom hooks path is
+// set — and the developer then commits and pushes for weeks with no pre-commit or pre-push check
+// running at all, believing they are (joshuafolkken/kit#1503).
+//
+// **The `|| true` stays**: a consumer's `pnpm install` must not die over a developer-only hook, which
+// is what it was added for. What changes is that the failure is named on standard error. The warning
+// sits **inside the branch the binary check already gates**, which is what separates the two cases —
+// the ordinary production or CI install, where lefthook is simply absent, stays exactly as silent as
+// it was, and only "lefthook is here and could not install" speaks up.
+// **It names a likely cause rather than asserting one, and links a URL rather than a path.** A set
+// `core.hooksPath` is much the commonest reason, but not the only one — a dev-dependency install in a
+// container with no `.git` fails here too — so a message that diagnosed would misdiagnose that build
+// on every run. And `docs/` is not among the files `josh init` copies, so a consumer told to read
+// `docs/init.md` is told to open a file their repository does not contain.
+const HOOK_INSTALL_WARNING =
+	'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything'
+const LEFTHOOK_BINARY_GUARD = 'command -v lefthook >/dev/null 2>&1'
+const GUARDED_LEFTHOOK_CMD = `${LEFTHOOK_BINARY_GUARD} && { ${LEFTHOOK_INSTALL_CMD} || echo '${HOOK_INSTALL_WARNING}' >&2; }`
+// What every already-initialized consumer has in `prepare` today, and what the upgrade below rewrites.
+const LEGACY_GUARDED_LEFTHOOK_CMD = `${LEFTHOOK_BINARY_GUARD} && ${LEFTHOOK_INSTALL_CMD}`
 const GUARDED_FIX_GH_PACKAGES_CMD = `command -v tsx >/dev/null 2>&1 && ${FIX_GH_PACKAGES_CMD}`
 // Tolerate each optional hook individually with `|| true` and chain them with `&&`,
 // rather than a blanket trailing `; true`. A blanket `; true` is reached
@@ -378,6 +399,22 @@ function get_suggested_scripts_for_content(content: string): Record<string, stri
 	return Object.fromEntries(Object.entries(scripts).filter(([key]) => key !== PREPARE_KEY))
 }
 
+// **The upgrade path for projects `josh init` has already run in.** Their `prepare` carries the
+// fix-gh-packages marker, and that marker is exactly what makes both merges here return early — so
+// the population joshuafolkken/kit#1503 is actually about, the consumers already installing with zero
+// hooks and no warning, would never receive the fix however often they re-ran `josh init`; only new
+// projects would. This rewrites the lefthook clause kit itself wrote and nothing else, because the
+// rest of that script is the consumer's. It is idempotent by construction: the new clause does not
+// contain the old one as a substring, since `{ ` sits between them.
+function upgrade_prepare_lefthook_warning(content: string): string {
+	return init_logic_json_merge.replace_in_package_script(
+		content,
+		PREPARE_KEY,
+		LEGACY_GUARDED_LEFTHOOK_CMD,
+		GUARDED_LEFTHOOK_CMD,
+	)
+}
+
 // Append the guarded lifecycle commands to an existing `prepare` when no script yet runs
 // fix-gh-packages, so the dev-only hooks land in `prepare` instead of being lost when the
 // suggested-scripts merge skips the already-present `prepare` key.
@@ -440,6 +477,8 @@ const init_logic = {
 	strip_kit_only_vscode_settings,
 	strip_kit_only_vscode_settings_content,
 	VSCODE_EXTENSIONS_FILENAME,
+	GUARDED_LEFTHOOK_CMD,
+	upgrade_prepare_lefthook_warning,
 	get_npmrc_lines,
 	get_development_engines_value,
 	get_ai_copy_files,
