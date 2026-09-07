@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 
-const TEST_DIR = path.join(tmpdir(), 'sync-deploy-vps-test')
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
+const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-deploy-vps-test-'))
 const DEPLOY_VPS_DEST = path.join(TEST_DIR, 'dest', 'deploy-vps.yml')
 
 const OLD_DEPLOY_VPS_CONTENT = `    script: |

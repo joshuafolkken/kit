@@ -29,6 +29,19 @@ function probe_directory(): string {
 	return mkdtempSync(path.join(tmpdir(), PROBE_PREFIX))
 }
 
+// The count for a path under a directory this run just created, so it cannot exist. A fixed name
+// under `os.tmpdir()` would be absent only for as long as no other unit suite on the machine
+// happened to name it (joshuafolkken/kit#1517).
+function count_under_absent_child(): number {
+	const directory = probe_directory()
+
+	try {
+		return unit_worker_share.live_run_count(path.join(directory, 'absent'))
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
 function write_marker(directory: string, name: string, payload: unknown): void {
 	writeFileSync(path.join(directory, name), JSON.stringify(payload))
 }
@@ -151,9 +164,7 @@ describe('unit_worker_share.live_run_count — sweeping what it counted out', ()
 	// A temp directory that cannot be read answers "no other run", which leaves behavior as it was.
 	// Being wrong in this direction costs wall time; being wrong in the other throttles a solo run.
 	it('answers no other run when the directory cannot be read', () => {
-		const absent = path.join(tmpdir(), 'josh-absent-1515')
-
-		expect(unit_worker_share.live_run_count(absent)).toBe(0)
+		expect(count_under_absent_child()).toBe(0)
 	})
 })
 

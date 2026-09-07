@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { cost_transcript } from './cost-transcript'
 
 const CWD = '/Users/someone/Development/kit'
@@ -28,6 +28,19 @@ function make_home(content: string): string {
 
 	return home
 }
+
+// A path that is guaranteed not to exist, named under a directory this run created. A fixed name
+// under `os.tmpdir()` would be shared with every other unit suite on the machine, so whether it is
+// absent would depend on what those suites happen to be doing (joshuafolkken/kit#1517).
+const ABSENT_ROOT = mkdtempSync(path.join(tmpdir(), 'cost-absent-'))
+
+function absent_path(name: string): string {
+	return path.join(ABSENT_ROOT, name)
+}
+
+afterAll(() => {
+	rmSync(ABSENT_ROOT, { recursive: true, force: true })
+})
 
 function sessions_in(home: string): ReturnType<typeof cost_transcript.list_sessions> {
 	return cost_transcript.list_sessions(cost_transcript.transcript_directory(CWD, home))
@@ -85,7 +98,7 @@ describe('cost_transcript.list_sessions', () => {
 	})
 
 	it('returns nothing for a project that has none, rather than throwing', () => {
-		const absent = path.join(tmpdir(), 'cost-absent')
+		const absent = absent_path('project')
 
 		expect(cost_transcript.list_sessions(absent)).toStrictEqual([])
 	})
@@ -169,7 +182,7 @@ describe('cost_transcript.read_session', () => {
 	it('gives each unreadable session its own records array', () => {
 		const missing = {
 			session_id: 'x',
-			path: path.join(tmpdir(), 'cost-absent-file'),
+			path: absent_path('missing.jsonl'),
 			modified_ms: 0,
 			is_delegated: false,
 		}
