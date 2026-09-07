@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { file_reader } from './read-file'
 
 // joshuafolkken/kit#1063: nothing stopped a new `gh <noun> <verb>` spawn from being added.
 //
@@ -38,13 +39,24 @@ import ts from 'typescript'
 // `scripts-ai/telegram-test.ts` from joshuafolkken/kit#1022's survey and from this guard's own
 // first draft.
 //
-// **A binary this file cannot resolve is skipped, not reported**, and that is a deliberate limit
-// rather than an oversight. `execa(resolve_bin(), […])` and a name imported from another module
-// need the type checker to follow, and reporting every unresolvable binary instead would mean an
-// allowlist entry for each of the dozen spawns here that launch `pnpm`, `git`, `sh` or `tsx` — an
-// inventory nobody would read, which is a worse guard than a narrower one. An unresolvable
-// *argument list* is different and **is** reported as `<dynamic>`: the binary is known to be `gh`
-// there, so the only open question is which subcommand.
+// **A name imported from another module resolves too** (joshuafolkken/kit#1073). `import { GH_BIN }
+// from './constants'` then `execa(GH_BIN, […])` is the same evasion one file further out, and the
+// import is followed by reading that module's source and taking its own string `const` — the pass
+// above, applied to the imported file. The alternative was `ts.createProgram` with a `TypeChecker`,
+// which follows any indirection but builds a program over every file under `scripts/` and
+// `scripts-ai/` on a scan that runs in the unit suite; nothing else in this repository does that,
+// and the shape it would buy beyond this one is not a shape kit writes.
+//
+// **The import hop is a single one, and it is deliberate.** A constant that is itself imported from
+// a third module stays unresolved, as do a namespace import's properties and a default import —
+// this repository bans `export default`, so the last of those cannot arise here at all.
+//
+// **A binary this file cannot resolve is still skipped rather than reported**, and that remains a
+// deliberate limit. `execa(resolve_bin(), […])` needs the type checker to follow, and reporting
+// every unresolvable binary instead would mean an allowlist entry for each of the dozen spawns here
+// that launch `pnpm`, `git`, `sh` or `tsx` — an inventory nobody would read, which is a worse guard
+// than a narrower one. An unresolvable *argument list* is different and **is** reported as
+// `<dynamic>`: the binary is known to be `gh` there, so the only open question is which subcommand.
 //
 // This module is excluded from the published package (`package.json` → `files`), because it is used
 // only by its own test and imports `typescript`, a devDependency.
@@ -56,8 +68,28 @@ import ts from 'typescript'
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(SCRIPTS_DIR, '..')
 
-const SCANNED_DIRECTORIES: ReadonlyArray<string> = ['scripts', 'scripts-ai']
+const SCRIPTS_DIRECTORY = 'scripts'
+const SCANNED_DIRECTORIES: ReadonlyArray<string> = [SCRIPTS_DIRECTORY, 'scripts-ai']
 const TS_EXTENSION = '.ts'
+
+// How an import specifier names a file. `#scripts/…` is the subpath `package.json` → `imports`
+// defines for cross-directory imports inside `scripts/`; `./…` and `../…` are read from the
+// importing file's own directory. Every other specifier — a package name, and the `#eslint/` and
+// `#ports/` subpaths — is left unfollowed: none of them declares a binary name of ours.
+//
+// `scripts/build-library.ts` maps the same subpath for rollup. What the two share is the *name*
+// `#scripts/` and one path join, not logic: that one resolves to an absolute path for a bundler
+// while this one resolves to the repository-relative posix path the scan keys on, with the
+// directory-`index.ts` fallback below that a bundler does its own way. Extracting the join would
+// put the build script's resolution behind a guard's concern for one expression.
+const SCRIPTS_IMPORT_PREFIX = '#scripts/'
+const RELATIVE_IMPORT_PREFIX = '.'
+const INDEX_MODULE = 'index'
+// The extensions a specifier may be written with. `moduleResolution: bundler` and `"type":
+// "module"` between them make `./constants.js` name `constants.ts`, so the written extension is
+// dropped before the real one is appended — otherwise `./constants.js` would be looked for at
+// `constants.js.ts`, find nothing, and skip the spawn it names.
+const WRITTEN_EXTENSIONS: ReadonlyArray<string> = ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts']
 
 const GH_BINARY = 'gh'
 const GH_COMMAND_PREFIX = `${GH_BINARY} `
@@ -127,16 +159,28 @@ interface GhSpawn {
 	subcommand: string
 }
 
-// What one file's own declarations say: which identifiers hold a plain string, and which name a
-// spawn function under another name.
+// A local name and where it came from: `import { GH_BIN as BIN } from './constants'` binds `BIN` to
+// `{ module: './constants', name: 'GH_BIN' }`.
+interface ImportBinding {
+	module: string
+	name: string
+}
+
+// What one file's own declarations say: which identifiers hold a plain string, which name a spawn
+// function under another name, and which were bound by an import.
 interface Collected {
 	values: Map<string, string>
 	aliases: Set<string>
+	imports: Map<string, ImportBinding>
 }
 
 interface Scope {
 	values: ReadonlyMap<string, string>
 	aliases: ReadonlySet<string>
+	imports: ReadonlyMap<string, ImportBinding>
+	// The scanned path of the file this scope belongs to, which is what a relative specifier is
+	// read against.
+	file: string
 }
 
 function visit(node: ts.Node, on_node: (node: ts.Node) => void): void {
@@ -181,22 +225,106 @@ function record_declaration(declaration: ts.VariableDeclaration, collected: Coll
 	if (is_spawn_alias(initializer)) collected.aliases.add(name.text)
 }
 
+// Only the `{ … }` form is read. A namespace import is reached through a property access rather
+// than an identifier, and a default import cannot occur because this repository bans
+// `export default`.
+function to_named_imports(node: ts.ImportDeclaration): ts.NamedImports | undefined {
+	const bindings = node.importClause?.namedBindings
+
+	return bindings !== undefined && ts.isNamedImports(bindings) ? bindings : undefined
+}
+
+function record_import(node: ts.ImportDeclaration, collected: Collected): void {
+	const named = to_named_imports(node)
+	const specifier = node.moduleSpecifier
+	if (named === undefined || !ts.isStringLiteral(specifier)) return
+
+	for (const element of named.elements) {
+		const source = element.propertyName ?? element.name
+
+		collected.imports.set(element.name.text, { module: specifier.text, name: source.text })
+	}
+}
+
+function record_node(node: ts.Node, collected: Collected): void {
+	if (ts.isVariableDeclaration(node)) record_declaration(node, collected)
+	if (ts.isImportDeclaration(node)) record_import(node, collected)
+}
+
 // What the file's own declarations say. Collected in its own pass because a declaration may sit
 // below the call that uses it.
-function collect_scope(tree: ts.SourceFile): Scope {
-	const collected: Collected = { values: new Map<string, string>(), aliases: new Set<string>() }
+function collect_scope(tree: ts.SourceFile, file: string): Scope {
+	const collected: Collected = {
+		values: new Map<string, string>(),
+		aliases: new Set<string>(),
+		imports: new Map<string, ImportBinding>(),
+	}
 
 	visit(tree, (node) => {
-		if (ts.isVariableDeclaration(node)) record_declaration(node, collected)
+		record_node(node, collected)
 	})
 
-	return collected
+	return { ...collected, file }
+}
+
+// The repository-relative path an import specifier names, without the extension.
+function to_module_base(specifier: string, from_file: string): string | undefined {
+	if (specifier.startsWith(SCRIPTS_IMPORT_PREFIX)) {
+		return path.posix.join(SCRIPTS_DIRECTORY, specifier.slice(SCRIPTS_IMPORT_PREFIX.length))
+	}
+
+	return specifier.startsWith(RELATIVE_IMPORT_PREFIX)
+		? path.posix.join(path.posix.dirname(from_file), specifier)
+		: undefined
+}
+
+// `./self-sync-guard` names a directory's `index.ts` as readily as `./read-file` names a file.
+function module_candidates(specifier_base: string): ReadonlyArray<string> {
+	const written = WRITTEN_EXTENSIONS.find((extension) => specifier_base.endsWith(extension))
+	const base = written === undefined ? specifier_base : specifier_base.slice(0, -written.length)
+
+	return [`${base}${TS_EXTENSION}`, `${path.posix.join(base, INDEX_MODULE)}${TS_EXTENSION}`]
+}
+
+// The string constants the imported module declares. A file that is not there reads as empty, so a
+// specifier that resolves to nothing simply yields no value.
+function module_values(file: string): ReadonlyMap<string, string> {
+	const source = file_reader.read_file_or_empty(path.join(REPO_ROOT, file))
+	const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+
+	return collect_scope(tree, file).values
+}
+
+function imported_value(binding: ImportBinding, from_file: string): string | undefined {
+	const base = to_module_base(binding.module, from_file)
+	if (base === undefined) return undefined
+
+	return module_candidates(base)
+		.map((candidate) => module_values(candidate).get(binding.name))
+		.find((value) => value !== undefined)
+}
+
+// The file's own declarations first, an import only where the file declares nothing by that name.
+//
+// **That precedence is file-wide rather than lexical**, and it is the same flattening the same-file
+// resolution above has always had: `collect_scope` walks nested scopes too, so a `const GH = 'gh'`
+// inside a function resolves a spawn anywhere in the file — which is the point, since the evasion
+// this guard was written for can be written at any depth. The cost is the mirror case: a nested
+// declaration of a name that is *also* imported wins over the import, so a spawn using the imported
+// one is left unresolved. That is the pre-existing limit rather than a new hole — the import
+// resolved to nothing at all before joshuafolkken/kit#1073.
+function identifier_value(name: string, scope: Scope): string | undefined {
+	const local = scope.values.get(name)
+	if (local !== undefined) return local
+	const binding = scope.imports.get(name)
+
+	return binding === undefined ? undefined : imported_value(binding, scope.file)
 }
 
 function to_string_value(node: ts.Expression, scope: Scope): string | undefined {
 	if (ts.isStringLiteralLike(node)) return node.text
 
-	return ts.isIdentifier(node) ? scope.values.get(node.text) : undefined
+	return ts.isIdentifier(node) ? identifier_value(node.text, scope) : undefined
 }
 
 function is_spawn_call(expression: ts.LeftHandSideExpression, scope: Scope): boolean {
@@ -265,7 +393,7 @@ function line_of(tree: ts.SourceFile, node: ts.Node): number {
 // Every `gh` spawn in one file, whatever shape it is written in.
 function find_gh_spawns(source: string, file: string): Array<GhSpawn> {
 	const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
-	const scope = collect_scope(tree)
+	const scope = collect_scope(tree, file)
 	const spawns: Array<GhSpawn> = []
 
 	visit(tree, (node) => {
