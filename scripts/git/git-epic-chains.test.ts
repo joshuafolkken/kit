@@ -145,7 +145,7 @@ describe('git_epic_chains.insert_children — a second branch at the same point'
 })
 
 describe('git_epic_chains.insert_children — several chains', () => {
-	it('touches only the chain that names the target', () => {
+	it('leaves every existing chain as it stood and appends the branch', () => {
 		const outcome = insert(
 			[
 				[1, 2],
