@@ -26,11 +26,4 @@ function stamp_of(files: Record<string, string>, is_finished = true): EvalStamp 
 	}
 }
 
-export {
-	STAMP_COMPLETED_AT,
-	STAMP_DOCUMENT,
-	STAMP_HASH,
-	STAMP_OTHER_HASH,
-	STAMP_STARTED_AT,
-	stamp_of,
-}
+export { STAMP_DOCUMENT, STAMP_HASH, STAMP_OTHER_HASH, STAMP_STARTED_AT, stamp_of }
