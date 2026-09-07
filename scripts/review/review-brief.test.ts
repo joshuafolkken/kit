@@ -57,6 +57,8 @@ const CHECKOUT: ReviewCheckout = {
 	head: '0123456789abcdef0123456789abcdef01234567',
 }
 const NONCE = 'deadbeefcafef00d'
+// The commit the change is measured against, resolved by the caller (joshuafolkken/kit#1527).
+const BASE = 'fedcba9876543210fedcba9876543210fedcba98'
 
 function compose(input: {
 	round: number
@@ -73,6 +75,7 @@ function compose(input: {
 		stamps: { gate: input.gate, in_flight: input.in_flight, round_one: input.round_one },
 		checkout: input.checkout ?? CHECKOUT,
 		nonce: NONCE,
+		base: BASE,
 	})
 }
 
@@ -210,8 +213,8 @@ describe('review_brief — round 2 is scoped by comparison, not by recall', () =
 	it('falls back to the whole change when no snapshot was recorded', () => {
 		const brief = compose({ round: 2, tree: after })
 
-		expect(brief).toContain(review_brief.no_snapshot_line(CHECKOUT.root))
-		expect(brief).toContain(review_brief.whole_change_target(CHECKOUT.root))
+		expect(brief).toContain(review_brief.no_snapshot_line(CHECKOUT.root, BASE))
+		expect(brief).toContain(review_brief.whole_change_target(CHECKOUT.root, BASE))
 	})
 
 	it('says so when nothing changed since round 1', () => {
@@ -222,8 +225,25 @@ describe('review_brief — round 2 is scoped by comparison, not by recall', () =
 
 	it('reviews the whole change on round 1', () => {
 		expect(compose({ round: 1, tree: before })).toContain(
-			review_brief.whole_change_target(CHECKOUT.root),
+			review_brief.whole_change_target(CHECKOUT.root, BASE),
 		)
+	})
+})
+
+// joshuafolkken/kit#1527. This line is a command the forked agent runs, and in a lane a two-dot
+// `git diff main` lists whatever another lane merged since the lane was cut — so the base is the
+// merge base, and it is embedded as a value rather than as a `$(…)` a failing subshell would expand
+// to nothing, leaving a bare `git diff` that lists only the unstaged working tree.
+describe('review_brief — the target names the base it measures against', () => {
+	it('embeds the resolved base rather than the default-branch ref', () => {
+		const target = review_brief.whole_change_target(CHECKOUT.root, BASE)
+
+		expect(target).toContain(`git -C ${CHECKOUT.root} diff ${BASE}`)
+		expect(target).not.toContain('main')
+	})
+
+	it('never prints a command substitution that could expand to nothing', () => {
+		expect(review_brief.whole_change_target(CHECKOUT.root, BASE)).not.toContain('$(')
 	})
 })
 
