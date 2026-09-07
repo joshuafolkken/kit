@@ -58,7 +58,9 @@ vi.mock('./telegram-notify', () => ({
 // work tree. Every one of this file's tests calls `run`, so every one of them made that request, and
 // against the 10-second `testTimeout` a handful of them failed on network variance rather than on
 // anything under test. That is exactly what joshuafolkken/kit#1353's network guard exists to prevent;
-// the guard only watches `gh`, so a `git` fetch walked straight past it. Nothing here asserts on the
+// the guard watched `gh` only, so a `git` fetch walked straight past it — **which it no longer does**:
+// joshuafolkken/kit#1515 extended the shim to `git`, so this mock going missing now fails the whole
+// suite rather than costing it four seconds a test. Nothing here asserts on the
 // line — `git-followup-pending.test.ts` covers it, passing `tip` so it fetches nothing.
 vi.mock('./git-followup-pending', () => ({
 	git_followup_pending: {

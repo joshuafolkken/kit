@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { execaSync } from 'execa'
@@ -21,6 +21,13 @@ const ONE_CALL = 'gh api one'
 const ANOTHER_CALL = 'gh api two'
 const VERSION_CALL = 'gh --version'
 const RECORDED_LINE = 'gh api repos/joshuafolkken/kit/issues/1'
+const FETCH_ARGUMENTS = ['fetch', 'origin']
+// A read that touches nothing outside the checkout, so it must reach the real binary.
+const LOCAL_ARGUMENTS = ['rev-parse', '--is-inside-work-tree']
+const RECORDED_FETCH = 'git fetch origin'
+// A name no `PATH` entry can hold, so the "not found" answer is exercised without depending on what
+// this machine happens to have installed.
+const ABSENT_BINARY = 'josh-no-such-binary-1515'
 
 const directories: Array<string> = []
 
@@ -55,19 +62,29 @@ interface ShimRun {
 	log: string
 }
 
-function shim_of(directory: string): string {
-	return path.join(directory, test_network_guard.SHIM_NAME)
+function shim_of(directory: string, name: string = test_network_guard.SHIM_NAME): string {
+	return path.join(directory, name)
 }
 
-function run_shim(prefix: string = TEMP_PREFIX): ShimRun {
+// One armed directory, one spawn against the shim named in it, and everything the assertions read
+// back. Both shims go through it — the binary differs and nothing else does.
+function spawn_shim(name: string, args: ReadonlyArray<string>, prefix: string): ShimRun {
 	const directory = armed_directory(prefix)
-	const result = execaSync(shim_of(directory), API_ARGUMENTS, { reject: false })
+	const result = execaSync(shim_of(directory, name), args, { reject: false })
 
 	return {
 		exit_code: result.exitCode,
 		stderr: result.stderr,
 		log: readFileSync(test_network_guard.log_in(directory), 'utf8'),
 	}
+}
+
+function run_shim(prefix: string = TEMP_PREFIX): ShimRun {
+	return spawn_shim(test_network_guard.SHIM_NAME, API_ARGUMENTS, prefix)
+}
+
+function run_git(...args: Array<string>): ShimRun {
+	return spawn_shim(test_network_guard.GIT_SHIM_NAME, args, TEMP_PREFIX)
 }
 
 describe('test_network_guard — what the shim does when it is spawned', () => {
@@ -97,6 +114,67 @@ describe('test_network_guard — what the shim does when it is spawned', () => {
 
 	it('still records from a path containing an apostrophe', () => {
 		expect(run_shim(APOSTROPHE_PREFIX).log).toContain(RECORDED_LINE)
+	})
+})
+
+// joshuafolkken/kit#1515: guarding `gh` alone left `git` as the other way out of the machine, and
+// `git-pr-followup.test.ts` walked through it — a live `git fetch` per test, 4.1s each against a 10s
+// timeout. This shim cannot simply refuse, the way the `gh` one does: half the suite reads its own
+// repository with local `git`, so what is asserted here is the split — the network subcommands are
+// refused and everything else reaches the real binary.
+describe('test_network_guard — the git shim, which blocks by subcommand', () => {
+	// The half that must keep working: a shim that refused this would stop the suite rather than the
+	// network. Asserted through a real spawn — `exec`ing the wrong path fails here and nowhere in the
+	// generated text.
+	it('hands a local subcommand to the real binary', () => {
+		const passed_through = run_git(...LOCAL_ARGUMENTS)
+
+		expect(passed_through.exit_code).toBe(0)
+		expect(passed_through.log).toBe('')
+	})
+
+	it('refuses and records a subcommand that opens a connection', () => {
+		const blocked = run_git(...FETCH_ARGUMENTS)
+
+		expect(blocked.exit_code).toBe(BLOCKED_EXIT_CODE)
+		expect(blocked.log).toContain(RECORDED_FETCH)
+		expect(blocked.stderr).toContain(test_network_guard.BLOCKED_MESSAGE)
+	})
+
+	// The regression the argument scan exists for. Reading `$1` as the subcommand finds `-C`, then the
+	// directory after it, and lets the fetch through — silently, which is the only failure mode of this
+	// guard that matters.
+	it('still sees the subcommand behind a global option that takes a value', () => {
+		expect(run_git('-C', tmpdir(), ...FETCH_ARGUMENTS).exit_code).toBe(BLOCKED_EXIT_CODE)
+	})
+
+	// The same option in its one-word spelling, which must *not* swallow the word after it.
+	it('reads a local subcommand behind an inline option value', () => {
+		expect(run_git('-c', 'user.name=nobody', ...LOCAL_ARGUMENTS).exit_code).toBe(0)
+	})
+})
+
+describe('test_network_guard.resolve_binary — finding the real one', () => {
+	it('finds the binary the shim has to hand its arguments to', () => {
+		expect(test_network_guard.GIT_BINARY).toBeDefined()
+	})
+
+	// The branch that skips installing the git shim. It must answer "not found" rather than a path that
+	// does not exist, or the shim would `exec` nothing and fail every local `git` in the suite.
+	it('answers undefined rather than a path for a binary that is not there', () => {
+		expect(test_network_guard.resolve_binary(ABSENT_BINARY)).toBeUndefined()
+	})
+})
+
+// **The one case that is about this very run.** Everything else spawns a shim built for the test;
+// this asks whether the suite it is running inside is actually behind one. A guard that installed
+// nothing reports every run clean, so a green suite proves nothing until this passes.
+describe('test_network_guard — armed for the run this test is part of', () => {
+	it('resolves git through an armed guard directory', () => {
+		const first_entry = (process.env['PATH'] ?? '').split(path.delimiter)[0] ?? ''
+
+		expect(first_entry).toContain(test_network_guard.GUARD_PREFIX)
+		expect(existsSync(shim_of(first_entry, test_network_guard.GIT_SHIM_NAME))).toBe(true)
 	})
 })
 

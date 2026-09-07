@@ -39,6 +39,13 @@ The plan comes from one table in `scripts/gate-plan.ts`, where each check declar
 - **The unit suite is the only check worth sizing.** It accounts for 107 of the gate's 122 CPU-seconds on its own, because vitest opens one worker per core while the other three are one or two processes each. It is handed `--maxWorkers=<cores − 4>` — the cores the other three do not hold — which keeps the gate's total demand at the size of the machine instead of about 1.3× it. Measured: no change in wall time beyond run-to-run noise, and 5–6% less CPU burned (101s against 107s). The flag needs vitest 2.1 or newer, which every project this package supports is far past.
 - **A machine smaller than the one it was measured on is left alone.** The cap applies from 11 cores up and nowhere below, because four reserved cores are half an eight-core machine against a third of the measured one, and one measurement says nothing about whether the reservation still pays there. Extrapolating it downward is what would hurt: the suite takes 11.7s at eight workers and 16.7s at four, so a rule that handed an eight-core machine four workers would pin the longest check at the slow end of a curve nobody measured there. Below the line vitest keeps sizing its own pool — the behavior `josh gate` had before the plan existed — and a four-core CI runner is far below it, so CI runs exactly as it did.
 - **Below four cores the checks queue instead of fighting.** The three reserving checks want four cores between them, so a three-core machine runs two checks at a time and a two-core machine one. **Every check still runs and every failure is still reported in one pass** — narrowing the plan changes the order, never the set.
+- **The machine is divided when more than one unit run is on it** ([#1515](https://github.com/joshuafolkken/kit/issues/1515)). The three numbers above describe one gate on an idle machine, and nothing in them asked whether another lane was running. Six lanes each concluding "11 cores, take 7" put 42 workers on 11 cores at a load average of 14.97, and the pre-push hook was worse still — it passed no cap at all, so vitest opened one worker per core in every lane at once. Each run now counts the unit runs already in flight and takes `⌊cores ÷ runs⌋` of the machine, never fewer than one worker. Measured: six concurrent copies of the full suite produced ten `Test timed out in 10000ms` failures across the six; at this share the same six produced **none**, with the load average falling from 209 to 22. **A run that is alone on the machine is sized exactly as it was**, so CI and every quiet checkout behave bit for bit as before, and the line says so only when it is not:
+
+  ```
+  plan: 4 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)
+  ```
+
+  The count is a marker per in-flight run in the temp directory, carrying the pid that wrote it; a run killed outright leaves its file behind and is ignored, because the pid rather than the file is what says a run is live. A number you pass yourself is never divided — `pnpm josh test:unit --maxWorkers=4` is left as typed.
 
 The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
@@ -335,14 +342,36 @@ present, it runs `vitest run` as usual.
 pnpm josh test:unit
 ```
 
-**A unit test that reaches GitHub fails the run.** In kit's own checkout `vitest.config.ts` arms a
-`globalSetup` guard (`scripts/test-network-guard.ts`) that puts a recording `gh` in front of the real
-one on `PATH`; if anything spawned it, the run ends with the invocations listed and a non-zero exit
-([#1353](https://github.com/joshuafolkken/kit/issues/1353)). The failure it exists for is invisible
-otherwise — a test that calls through still **passes**, just slowly and against whatever GitHub
-happens to answer, which is how one such test reached the 10-second test timeout in CI. The fix is
-always in the test: mock the read it forgot. An unreadable record is reported as a failure too rather
-than as "no violations", because a guard that cannot answer must not claim the run was clean.
+**A unit test that reaches the network fails the run.** In kit's own checkout `vitest.config.ts` arms
+a `globalSetup` guard (`scripts/test-network-guard.ts`) that puts a recording `gh` in front of the
+real one on `PATH`; if anything spawned it, the run ends with the invocations listed and a non-zero
+exit ([#1353](https://github.com/joshuafolkken/kit/issues/1353)). The failure it exists for is
+invisible otherwise — a test that calls through still **passes**, just slowly and against whatever
+GitHub happens to answer, which is how one such test reached the 10-second test timeout in CI. The
+fix is always in the test: mock the read it forgot. An unreadable record is reported as a failure too
+rather than as "no violations", because a guard that cannot answer must not claim the run was clean.
+
+**`git` is guarded too, and by subcommand**
+([#1515](https://github.com/joshuafolkken/kit/issues/1515)). Guarding `gh` alone left the other way
+out of the machine open, and two `followup` suites walked through it: a live `git fetch` inside the
+release count they drove, once per test, 4.1s each against a 10-second timeout. Those two files were
+half the unit suite's wall clock and failed the pre-push gate non-deterministically — on an idle
+machine as readily as under parallel load, 63.7s of wall clock against 14.9 CPU-seconds. Unlike `gh`,
+`git` cannot simply be refused: half the suite reads its own repository with `status`, `log`,
+`rev-parse` and the worktree commands, and those pass straight through to the real binary. Refused
+are `archive`, `clone`, `fetch`, `ls-remote`, `pull`, `push`, `remote`, `send-email` and `submodule` —
+the last three whole, because splitting `remote update` from `remote -v` inside a shell `case` fails
+open when it gets it wrong. The shim finds the subcommand behind git's own global options, so
+`git -C <dir> fetch` is caught rather than read as a subcommand named after the directory.
+
+Extending it found a second offender the same day, and one that only appears inside a hook:
+`propagate-git.ts` passed the repository as `cwd`, which **`GIT_DIR` overrides** — and git exports
+`GIT_DIR` to every hook it runs. Under `pnpm josh git`'s pre-push hook its probes therefore answered
+about the checkout the hook was firing in rather than the path they were handed, so directories the
+tests build deliberately as non-repositories resolved to the real one and the tree check fetched from
+`origin` for them. That is the intermittent `propagate-guard` failure on
+[#1515](https://github.com/joshuafolkken/kit/issues/1515), and why it never reproduced outside a push.
+The probes now clear `GIT_DIR` and `GIT_WORK_TREE` for the child, so `cwd` means what it says.
 
 ### `josh test:related`
 

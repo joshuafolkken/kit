@@ -51,6 +51,22 @@ vi.mock('./git-epic-close', () => ({
 	git_epic_close: { close_completed_epics: vi.fn() },
 }))
 
+// The same rule as the auto-close above, applied to the path that suite missed. `notify_completion`
+// asks this collaborator for the unreleased-merge line, and the real one resolves the tip by running
+// `git fetch origin main` — a live round trip, about 4 seconds per test on the machine it was found
+// on, once for every case here that calls `run`. This suite is a *timing* suite, so it was reporting
+// the network as the `telegram` stage's cost. `git-pr-followup.test.ts` mocks the same collaborator
+// the same way (joshuafolkken/kit#1077), and since joshuafolkken/kit#1515 the network guard in
+// `scripts/test-network-guard.ts` covers `git` as well as `gh`, so either mock going missing fails the
+// suite outright instead of quietly slowing it down.
+vi.mock('./git-followup-pending', () => ({
+	git_followup_pending: {
+		MERGE_PENDING_NOTE: '',
+		pending_release_line: vi.fn(),
+		read_pending: vi.fn(),
+	},
+}))
+
 const { git_gh_command } = await import('./git-gh-command')
 const { git_pr_checks } = await import('./git-pr-checks')
 const { git_pr_ai_review } = await import('./git-pr-ai-review')
@@ -58,6 +74,8 @@ const { telegram_notify } = await import('./telegram-notify')
 const { git_epic_close } = await import('./git-epic-close')
 
 const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
+
+const PR_URL = 'https://github.com/owner/repo/pull/1'
 
 const BASE_INPUT: FollowupInput = {
 	branch_name: 'test-branch',
@@ -69,20 +87,24 @@ const BASE_INPUT: FollowupInput = {
 	should_merge: false,
 }
 
-function answer_every_call(): void {
+function answer_github_reads(): void {
 	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
 	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
-	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue('https://github.com/owner/repo/pull/1')
+	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
 	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
+	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
+	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+}
+
+function answer_every_call(): void {
+	answer_github_reads()
 	vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
 		rollup: [],
 		merge_state_status: undefined,
 		review_decision: undefined,
 	})
-	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
 	vi.mocked(telegram_notify.send).mockResolvedValue()
-	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
 	vi.mocked(git_epic_close.close_completed_epics).mockResolvedValue()
 }
 

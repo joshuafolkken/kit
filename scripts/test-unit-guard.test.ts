@@ -4,6 +4,7 @@ import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_unit_guard } from './test-unit-guard'
+import { unit_worker_share } from './unit-worker-share'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 
@@ -21,12 +22,23 @@ function fake_result(exit_code: number | undefined): ExecaResult {
 
 const ctx = { project_directory: '' }
 
+// **Pinned rather than left real, because the real answer is what else is running on the machine**
+// (joshuafolkken/kit#1515). `run_vitest` asks for this run's share of the workers and appends
+// `--maxWorkers` when there is one, so a suite asserting the exact argument list would pass alone and
+// fail beside a second lane — the class of flake this whole issue is about. Only the share is stubbed;
+// the marker lifecycle around the spawn stays real, so the wrapper is still exercised.
+function stub_share(share: number | undefined): void {
+	vi.spyOn(unit_worker_share, 'current_share').mockReturnValue(share)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
+	stub_share(undefined)
 	ctx.project_directory = mkdtempSync(path.join(tmpdir(), 'unit-guard-'))
 })
 
 afterEach(() => {
+	vi.restoreAllMocks()
 	rmSync(ctx.project_directory, { recursive: true, force: true })
 })
 
@@ -186,5 +198,20 @@ describe('test_unit_guard.run_guarded_unit — run path', () => {
 		const exit_code = await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
 
 		expect(exit_code).toBe(1)
+	})
+
+	// The pre-push hook is why this lives here rather than only in `josh gate`: it passed no cap at
+	// all, so vitest opened one worker per core in every lane at once (joshuafolkken/kit#1515).
+	it('narrows the worker pool when other unit runs share the machine', async () => {
+		stub_share(2)
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
+
+		expect(mocked_execa).toHaveBeenCalledWith(
+			'pnpm',
+			['exec', 'vitest', 'run', '--maxWorkers=2'],
+			expect.objectContaining({ reject: false }),
+		)
 	})
 })
