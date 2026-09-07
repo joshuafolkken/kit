@@ -54,12 +54,19 @@ const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 // so none of them joins NOT_DIRECTLY_RUNNABLE_LABELS. The names are duplicated as literals in the
 // filing procedures (prose cannot import this module); `scripts/filing-route-label.test.ts` keys the
 // docs to these constants so a filing command that drops the label fails rather than drifting.
+//
+// joshuafolkken/kit#1518 added a fourth: an interrupt is a defect found in *this* repository that
+// does not block the run that found it, and which the WIP cap would otherwise push into the
+// discretionary exit — the route joshuafolkken/kit#1517 took, surviving only as a comment on another
+// issue. It is not `route:tier-a`: that one is a filing the run is blocked by (an upstream defect or
+// a prerequisite), and reading the two as one is what lost #1517.
+const INTERRUPT_ROUTE_LABEL = 'route:interrupt'
 const REVIEW_CAP_ROUTE_LABEL = 'route:review-cap'
 const SPLIT_ROUTE_LABEL = 'route:split'
 const TIER_A_ROUTE_LABEL = 'route:tier-a'
 
-// The three route labels with the metadata `gh api ... labels` needs, in one place so a repository is
-// provisioned from the single source rather than three scattered creation commands. Applying one at
+// The route labels with the metadata `gh api ... labels` needs, in one place so a repository is
+// provisioned from the single source rather than from scattered creation commands. Applying one at
 // issue-creation time already auto-creates a missing label (REST, with a generated color and no
 // description); creating them here first is what gives each its stable color and description.
 const FILING_ROUTE_LABELS: ReadonlyArray<{
@@ -67,6 +74,15 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 	color: string
 	description: string
 }> = [
+	{
+		name: INTERRUPT_ROUTE_LABEL,
+		// Not `5319e7`, which is the `epic` label's purple: in a listing an interrupt would render as
+		// an epic, and the two are read at a glance rather than by name.
+		color: '1d76db',
+		// Keyed to the tests rather than to severity. "A serious defect" is the self-assessment
+		// `wip-cap.md` bans as a criterion, and this string is what a person reads in `gh label list`.
+		description: 'Filed past the WIP cap — meets one of the three interrupt tests (wip-cap.md)',
+	},
 	{
 		name: REVIEW_CAP_ROUTE_LABEL,
 		color: 'eab308',
@@ -107,6 +123,7 @@ export {
 	FILING_ROUTE_LABELS,
 	has_any_label,
 	IN_PROGRESS_LABEL,
+	INTERRUPT_ROUTE_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,

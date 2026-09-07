@@ -452,6 +452,18 @@ work tree with its own branch, its own `.env` and its own dev and preview ports
 parallel; the merges stay serial** — not because this procedure serializes them, but because each one
 lands on the `main` the next one is then measured against.
 
+**One kind of child takes no lane beside anything: an interrupt whose subject is a defect in the
+verification path itself.** It runs alone, and the batch resumes only once it has merged. **Decide it
+from the enumeration, never from how serious it looks** — does the defect reach the verification gate
+(lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge
+checks? One of those, and the offered children wait; none of them, and it fills a lane like any other
+child. Two reasons, either sufficient: six lanes running on a broken verifier produce six results
+nobody can trust, and the interrupt's own verification is subject to the very defect it is fixing —
+the trap joshuafolkken/kit#1515 and joshuafolkken/kit#1517 both hit. **Ask it of what
+`epic:next --lanes` just offered, before opening a second lane**; the rule and the failure it was
+written after are `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」, which is its single
+source (joshuafolkken/kit#1518).
+
 **A lane's branch is `<N>-lane`, and the issue number leads it so that the commit path accepts it**
 (joshuafolkken/kit#1497). `pnpm josh git` refuses to commit from a branch that is neither the default
 branch nor one sharing the child's `<N>-` prefix (`scripts/git/git-branch.ts` →
