@@ -512,7 +512,10 @@ SECURITY.md         tsconfig.sonar.json
 > share. **This is what makes a rule cheaper to ship than to carry** — `CLAUDE.md` is read on every
 > turn and had run out of room, while a refusal costs nothing until the call that binds the rule and
 > cannot be skimmed past. Today it delivers the backlog WIP cap at the call that files an Issue; a
-> comment endpoint is not a filing and is left alone. `JOSH_RULE_GUARD=off` switches it off, and
+> comment endpoint is not a filing and is left alone, and so — the trigger reads the command string —
+> is a filing whose title never appears in it. **That limit is why the rule keeps a one-line trigger
+> resident**: the line binds on every route, and the delivery reinforces it where it can see one.
+> `JOSH_RULE_GUARD=off` switches it off, and
 > `prompts/collaboration-workflow/rule-delivery.md` is the enumeration and the criterion behind it.
 >
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this

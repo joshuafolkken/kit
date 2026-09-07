@@ -222,6 +222,11 @@ describe.each(AI_DOCS)(
 			"**Count the target repository's open Issues before filing; with more than 30 open, close one first.**",
 			'and so is an **interrupt** — three tests decide that, never judgement',
 			'a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository',
+			// Without these two the three tests are listed with nothing saying what happens when none is
+			// met, and no instruction to state the overage — for the agent that runs no hook, which is
+			// the whole audience the resident line exists for.
+			'Meeting none of the three, a finding stays discretionary',
+			'both exemptions proceed, stating the overage',
 			'`pnpm josh rule:guard` states it again at the call that files',
 			WIP_TOPIC,
 		])('keeps the trigger %j resident', (marker) => {

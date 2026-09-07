@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { time_batch_guard } from '#scripts/time/time-batch-guard'
@@ -159,6 +159,13 @@ describe('rule_delivery — silent where nothing binds', () => {
 		expect(rule_delivery('not json', NOW_MS)).toBeUndefined()
 	})
 
+	it('says nothing when the payload names no command at all', () => {
+		expect(rule_delivery(payload_of('empty', ''), NOW_MS)).toBeUndefined()
+	})
+})
+
+// **The collision that would delete a rule silently, and the invariant that prevents it.**
+describe('rule_delivery — the two Bash guards never answer about the same call', () => {
 	// **The collision that would delete a rule silently, and the invariant that prevents it.**
 	// `pnpm josh batch:guard` is wired to `Bash` too, and the shared shell records its stamp *before*
 	// returning a reason — so a call both hooks refused would lose one of the two reasons with both
@@ -174,13 +181,21 @@ describe('rule_delivery — silent where nothing binds', () => {
 		},
 	)
 
-	// And the stand-aside itself: a run whose history is the shape the batching guard refuses gets no
-	// delivery and, crucially, **no record** — so the rule still fires on the next filing call rather
-	// than being spent on a call whose reason nobody saw.
-	it('records nothing when it stands aside', () => {
+	// **The stand-aside cannot be exercised end to end through this rule, and that is the invariant
+	// above restated.** A run whose history is the shape the batching guard refuses still gets the
+	// delivery here, because the second half of that guard's own test — is this call one it may refuse
+	// at all — is false for every filing call. So the assertion is the delivery *happening* on that
+	// history: a fixture that stood aside would mean the invariant had broken.
+	it('still delivers on a history the batching guard would otherwise refuse', () => {
 		const transcript = transcript_for('collision', unbatched_text())
+		const payload = JSON.stringify({
+			hook_event_name: 'PreToolUse',
+			transcript_path: transcript,
+			tool_name: 'Bash',
+			tool_input: { command: FILING_COMMAND },
+		})
 
-		expect(existsSync(delivered_rules.delivery_path(WIP_CAP, transcript))).toBe(false)
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 	})
 })
 

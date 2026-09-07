@@ -48,8 +48,11 @@ const ISSUE_CREATE_COMMAND = /\bgh\s+(?:\S+\s+)*?issue\s+create\b/u
 // (`…/issues/1524/comments`) and a listing under it are both left alone.
 const ISSUES_ENDPOINT = /repos\/[^\s'"]*\/issues(?=$|["'\s])/u
 // A title field is what separates the POST that files from the GET that lists: `gh api …/issues`
-// with no field is a listing, and a listing files nothing.
-const TITLE_FIELD = /(?:-f|--field|--raw-field)\s*'?title=/u
+// with no field is a listing, and a listing files nothing. **All four spellings**, `-F` included —
+// it is `--field`'s short form and reads as a different flag to a pattern that only knows `-f`.
+// A body passed with `--input <file>` carries the title inside the file and is not visible here;
+// that limit is recorded beside the non-`gh` one in `prompts/collaboration-workflow/rule-delivery.md`.
+const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
 
 function is_issue_filing(command: string): boolean {
 	if (ISSUE_CREATE_COMMAND.test(command)) return true

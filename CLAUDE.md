@@ -227,7 +227,7 @@ Before every `git commit` — including follow-up commits on the same branch —
 ## Collaboration Workflow
 
 - For issue-driven proposal/plan/execution/notification flow, follow `prompts/collaboration-workflow/` — `prompts/collaboration-workflow.md` is its index and each topic is its own file, so consulting one costs a single topic rather than the whole document
-- **Count the target repository's open Issues before filing; with more than 30 open, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository. `pnpm josh rule:guard` states it again at the call that files. The count command and both procedures: `prompts/collaboration-workflow/wip-cap.md`.
+- **Count the target repository's open Issues before filing; with more than 30 open, close one first.** Nothing honestly closable means do not file. A filing the run is blocked by is exempt, and so is an **interrupt** — three tests decide that, never judgement: a verification answers wrongly, a documented workflow cannot complete, or data is lost or written outside the repository. Meeting none of the three, a finding stays discretionary; both exemptions proceed, stating the overage. `pnpm josh rule:guard` states it again at the call that files. The count command and both procedures: `prompts/collaboration-workflow/wip-cap.md`.
 
 ### Shorthand Commands
 
