@@ -3,6 +3,7 @@ import { existsSync, globSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execa } from 'execa'
+import { unit_worker_share } from './unit-worker-share'
 
 const PNPM = 'pnpm'
 const FAIL_EXIT_CODE = 1
@@ -55,13 +56,24 @@ function has_unit_tests(project_directory: string): boolean {
 // `vitest related <files> --run` where this command runs `vitest run`, and the two must not grow
 // two copies of the guard, the spawn or the skip notice around that one difference
 // (joshuafolkken/kit#1257).
+// **The share is resolved before the marker is written, and the marker wraps the spawn.** This is the
+// one funnel every josh-driven vitest goes through — `test:unit`, `test:related` and the pre-push
+// hook alike — so it is where a run both learns how many others are in flight and announces itself to
+// them (joshuafolkken/kit#1515). The pre-push hook is the reason it is here rather than only in the
+// gate: it passed no cap at all, so vitest opened one worker per core in every lane at once.
 async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<number> {
-	const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments], {
-		stdio: 'inherit',
-		reject: false,
-	})
+	const share = unit_worker_share.current_share()
+	const sized = unit_worker_share.worker_arguments(vitest_arguments, share)
+	const shared = [...vitest_arguments, ...sized]
 
-	return result.exitCode ?? FAIL_EXIT_CODE
+	return await unit_worker_share.with_run_marker(async () => {
+		const result = await execa(PNPM, ['exec', 'vitest', ...shared], {
+			stdio: 'inherit',
+			reject: false,
+		})
+
+		return result.exitCode ?? FAIL_EXIT_CODE
+	})
 }
 
 // The label names the command the notice is printed for, so a skipped scoped run says

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_command } from './git-command'
 import { git_followup_stages } from './git-followup-stages'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
@@ -51,6 +52,28 @@ vi.mock('./git-epic-close', () => ({
 	git_epic_close: { close_completed_epics: vi.fn() },
 }))
 
+// The same rule as the auto-close above, applied to the path that suite missed
+// (joshuafolkken/kit#1515). `notify_completion` asks how many merges main has taken since the last
+// release, and that read resolves the default branch and **fetches it from `origin`** — one live
+// round trip per test, measured at 4.1s against a 10s test timeout, which is what made this file
+// half the unit suite's wall clock and what failed the pre-push gate non-deterministically.
+//
+// **`git-followup-pending` itself is left real and only its git access is replaced**, so a stage this
+// suite times still runs the code it is timing; what it composes then resolves to no pending line,
+// which no case here asserts on. The five entries are every function this suite's import graph reaches
+// — the two that fetch, and the three `release-history.ts` builds its default reader from. The `gh`
+// shim in `scripts/test-network-guard.ts` covers `git` too since the same issue, and fails this suite
+// outright if the fetch ever comes back.
+vi.mock('./git-command', () => ({
+	git_command: {
+		get_default_branch: vi.fn(),
+		fetch_branch: vi.fn(),
+		log_first_parent: vi.fn(),
+		show_file: vi.fn(),
+		count_merges: vi.fn(),
+	},
+}))
+
 const { git_gh_command } = await import('./git-gh-command')
 const { git_pr_checks } = await import('./git-pr-checks')
 const { git_pr_ai_review } = await import('./git-pr-ai-review')
@@ -58,6 +81,10 @@ const { telegram_notify } = await import('./telegram-notify')
 const { git_epic_close } = await import('./git-epic-close')
 
 const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
+
+// Any branch name will do — what matters is that resolving it costs nothing.
+const DEFAULT_BRANCH = 'main'
+const PR_URL = 'https://github.com/owner/repo/pull/1'
 
 const BASE_INPUT: FollowupInput = {
 	branch_name: 'test-branch',
@@ -69,20 +96,32 @@ const BASE_INPUT: FollowupInput = {
 	should_merge: false,
 }
 
-function answer_every_call(): void {
+// The calls that would otherwise leave the machine; see the `./git-command` factory above. The factory
+// is what makes the network unreachable — these values only keep the run realistic.
+function answer_local_git(): void {
+	vi.mocked(git_command.get_default_branch).mockResolvedValue(DEFAULT_BRANCH)
+	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
+}
+
+function answer_github_reads(): void {
 	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
 	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
-	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue('https://github.com/owner/repo/pull/1')
+	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
 	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
+	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
+	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
+}
+
+function answer_every_call(): void {
+	answer_github_reads()
+	answer_local_git()
 	vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
 		rollup: [],
 		merge_state_status: undefined,
 		review_decision: undefined,
 	})
-	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
 	vi.mocked(telegram_notify.send).mockResolvedValue()
-	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
 	vi.mocked(git_epic_close.close_completed_epics).mockResolvedValue()
 }
 

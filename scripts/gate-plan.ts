@@ -1,5 +1,6 @@
 import { availableParallelism } from 'node:os'
 import { josh_verdict } from './josh-verdict'
+import { unit_worker_share } from './unit-worker-share'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
 // both derived from the machine rather than fixed at four (joshuafolkken/kit#1258).
@@ -93,7 +94,24 @@ function resolve_concurrency(available_cores: number): number {
 // The cores left once the other three have their share — on the measured machine, 7 of 11, which
 // held the gate's wall time inside run-to-run noise while burning 5–6% less CPU (101s against
 // 107s). A machine smaller than the measured one is left uncapped; see `MEASURED_CORES`.
-function resolve_unit_worker_cap(available_cores: number): number | undefined {
+//
+// **The table above is a measurement of one gate on an idle machine, and `concurrent_runs` is what
+// says whether that is the situation** (joshuafolkken/kit#1515). Six lanes each reading "11 cores,
+// take 7" put 42 workers on 11 cores, at a load average of 14.97, and the gate had no way to know the
+// other five existed. Where more than one unit run is in flight the machine is divided between them
+// instead, by `unit-worker-share.ts`, which is the same answer `test-unit-guard.ts` gives the pre-push
+// hook. At one run — every solo gate, CI included — the number is exactly what it was.
+//
+// **The count is a parameter rather than a read.** This module stays a pure function of its inputs, so
+// its own assertions are about arithmetic and not about what happened to be running while they ran;
+// `verification-gate.ts` is where the machine is asked.
+function resolve_unit_worker_cap(
+	available_cores: number,
+	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
+): number | undefined {
+	const share = unit_worker_share.resolve_unit_workers(available_cores, concurrent_runs)
+
+	if (share !== undefined) return share
 	if (available_cores < MEASURED_CORES) return undefined
 
 	return available_cores - RESERVED_CORES
@@ -101,10 +119,13 @@ function resolve_unit_worker_cap(available_cores: number): number | undefined {
 
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually
 // use, so a container with a CPU quota is sized by the quota rather than by the host.
-function resolve_gate_plan(available_cores: number = availableParallelism()): GatePlan {
+function resolve_gate_plan(
+	available_cores: number = availableParallelism(),
+	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
+): GatePlan {
 	return {
 		concurrency: resolve_concurrency(available_cores),
-		unit_worker_cap: resolve_unit_worker_cap(available_cores),
+		unit_worker_cap: resolve_unit_worker_cap(available_cores, concurrent_runs),
 	}
 }
 
@@ -115,9 +136,22 @@ function resolve_gate_plan(available_cores: number = availableParallelism()): Ga
 // this line to tell where a gate run's output begins — it is the one line the gate prints before any
 // check body exists — so the printer and the detector build it from the same strings, exactly as they
 // already do for the verdict.
+// **The machine is described as shared only when it is.** A solo gate prints exactly the line it
+// always printed — which is what keeps `josh time`'s detector, and every reader used to the old
+// output, unaffected — while a narrowed one says why it is narrow, so a lane owner reading a slow
+// gate is not left deriving the reason from a worker count that looks wrong (joshuafolkken/kit#1515).
+function format_machine(available_cores: number, concurrent_runs: number): string {
+	const cores = `${String(available_cores)} cores`
+
+	if (concurrent_runs <= unit_worker_share.SOLO_RUNS) return cores
+
+	return `${cores}, ${String(concurrent_runs)} unit runs`
+}
+
 function format_gate_plan(
 	plan: GatePlan,
 	available_cores: number = availableParallelism(),
+	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
 ): string {
 	const cap =
 		plan.unit_worker_cap === undefined
@@ -125,8 +159,9 @@ function format_gate_plan(
 			: `${UNIT_LABEL} at ${String(plan.unit_worker_cap)} workers`
 	const count = `${String(plan.concurrency)} of ${String(GATE_CHECKS.length)}`
 	const width = `${count}${josh_verdict.GATE_OPENING_MARK}`
+	const machine = format_machine(available_cores, concurrent_runs)
 
-	return `${josh_verdict.GATE_OPENING_PREFIX}${width}, ${cap} (${String(available_cores)} cores)`
+	return `${josh_verdict.GATE_OPENING_PREFIX}${width}, ${cap} (${machine})`
 }
 
 const gate_plan = {
@@ -136,6 +171,7 @@ const gate_plan = {
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
 	format_gate_plan,
+	format_machine,
 	resolve_concurrency,
 	resolve_gate_plan,
 	resolve_unit_worker_cap,

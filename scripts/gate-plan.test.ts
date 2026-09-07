@@ -15,6 +15,9 @@ const MID_SIZED_CORES = 8
 // Well past the point where every check is admitted, so the monotonicity check covers the whole
 // shape of the curve rather than only the machines anyone has today.
 const CORE_COUNTS_PROBED = 20
+// What `epicrun` runs at, and the count the field measurement of joshuafolkken/kit#1515 was taken
+// under: six lanes, each gate sizing itself from the core count alone.
+const LANE_COUNT = 6
 
 describe('gate_plan.resolve_concurrency', () => {
 	it('runs every check at once on a machine that can host them', () => {
@@ -84,6 +87,28 @@ describe('gate_plan.resolve_unit_worker_cap', () => {
 			MEASURED_CORES + 1 - gate_plan.RESERVED_CORES,
 		)
 	})
+
+	// joshuafolkken/kit#1515: the reserve table is a measurement of one gate on an idle machine, and
+	// six lanes each reading it put 42 workers on 11 cores at a load average of 14.97. Six concurrent
+	// suites produced ten `Test timed out in 10000ms` failures; at the share below they produced none.
+	it('divides the machine when other unit runs are in flight', () => {
+		expect(gate_plan.resolve_unit_worker_cap(MEASURED_CORES, LANE_COUNT)).toBe(1)
+		expect(gate_plan.resolve_unit_worker_cap(MEASURED_CORES, 2)).toBe(5)
+	})
+
+	// The share beats the "leave a small machine alone" rule rather than the other way round: leaving
+	// an eight-core machine uncapped is a decision about one gate, and six of them on it is not that.
+	it('divides a machine below the measured one too, once it is shared', () => {
+		expect(gate_plan.resolve_unit_worker_cap(MID_SIZED_CORES, LANE_COUNT)).toBe(1)
+	})
+
+	// The property the whole change rests on: a solo gate is sized exactly as it was, so CI and every
+	// quiet machine behave as before and only the measured-broken condition changes.
+	it('is unchanged for a gate that is the only run on the machine', () => {
+		expect(gate_plan.resolve_unit_worker_cap(MEASURED_CORES, 1)).toBe(
+			gate_plan.resolve_unit_worker_cap(MEASURED_CORES),
+		)
+	})
 })
 
 describe('gate_plan.GATE_CHECKS', () => {
@@ -115,5 +140,20 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(CI_CORES)
 
 		expect(gate_plan.format_gate_plan(plan, CI_CORES)).toContain('test:unit unrestricted')
+	})
+
+	// A lane owner reading a gate that took one worker must not be left deriving the reason from a
+	// number that looks wrong. The solo line is unchanged, which is what keeps `josh time`'s detector
+	// and every existing reader unaffected (joshuafolkken/kit#1515).
+	it('says how many runs the machine is being shared with', () => {
+		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
+
+		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
+			'plan: 4 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
+		)
+	})
+
+	it('says nothing about sharing when the gate is the only run', () => {
+		expect(gate_plan.format_machine(MEASURED_CORES, 1)).toBe('11 cores')
 	})
 })

@@ -3,6 +3,7 @@ import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
 import { josh_verdict } from './josh-verdict'
 import { test_unit_guard } from './test-unit-guard'
+import { unit_worker_share } from './unit-worker-share'
 import type { GateStep } from './verification-gate'
 
 vi.mock('execa', () => ({
@@ -78,10 +79,19 @@ async function run_capturing(
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	// **The gate now sizes its unit step from what else is running on the machine**
+	// (joshuafolkken/kit#1515), and `GATE_STEPS` above was built for a machine with nothing else on it.
+	// Left real, this suite would assert `--maxWorkers=7` while a run inside `pnpm josh gate` produced a
+	// narrower share — passing alone and failing through the gate. Pinned to a quiet machine, which is
+	// the situation the fixture describes.
+	vi.spyOn(unit_worker_share, 'live_run_count').mockReturnValue(0)
 	RECORDS.clear()
 })
 
-afterEach(RECORDS.clear)
+afterEach(() => {
+	vi.restoreAllMocks()
+	RECORDS.clear()
+})
 
 describe('run_verification_gate', () => {
 	it('returns 0 when every check passes', async () => {

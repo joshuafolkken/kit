@@ -15,6 +15,7 @@ import { review_tree } from './review/review-tree'
 import { status_icons } from './status-icons'
 import { test_unit_guard } from './test-unit-guard'
 import { type_check_step } from './type-check-step'
+import { unit_worker_share } from './unit-worker-share'
 
 // joshuafolkken/kit#914: the completion gate's four checks are independent and share no mutable
 // state, yet every entry point ran them one after another — paid again on every `epicrun` child,
@@ -299,11 +300,16 @@ async function run_marked_gate_steps(
 // The core count is read once and handed to both calls. Letting each default to
 // `availableParallelism()` would be two independent reads, and a quota changed between them prints
 // a core count the plan was not derived from — the one misreading this line exists to prevent.
+// The concurrent-run count is read here rather than inside `gate-plan.ts` for the reason the core
+// count already is: that module stays a pure function of its inputs, and the machine is asked once and
+// handed to both calls. Counted *before* the unit step writes its own marker, so `+ 1` is this gate
+// (joshuafolkken/kit#1515).
 function announce_gate_plan(): GatePlan {
 	const available_cores = availableParallelism()
-	const plan = gate_plan.resolve_gate_plan(available_cores)
+	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
+	const plan = gate_plan.resolve_gate_plan(available_cores, concurrent_runs)
 
-	process.stdout.write(`${gate_plan.format_gate_plan(plan, available_cores)}\n`)
+	process.stdout.write(`${gate_plan.format_gate_plan(plan, available_cores, concurrent_runs)}\n`)
 
 	return plan
 }
@@ -330,7 +336,15 @@ async function run_checked_gate(
 	started_at: number,
 ): Promise<number> {
 	const plan = announce_gate_plan()
-	const results = await run_marked_gate_steps(tree.files, plan, options.marker_path)
+	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
+	// would write it is a subprocess started a second or so after the count above, so two lanes launched
+	// together — the shape `epicrun` produces — would both read "nothing else is running" and both take
+	// the whole machine. Claimed here, after the count and before any check, it is already there when
+	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
+	// second marker for the same run (joshuafolkken/kit#1515).
+	const results = await unit_worker_share.with_run_marker(
+		async () => await run_marked_gate_steps(tree.files, plan, options.marker_path),
+	)
 
 	for (const result of results) print_gate_step(result, options.is_verbose ?? false)
 

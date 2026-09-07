@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_command } from './git-command'
 import { UNREADABLE_CR_NOTE } from './git-pr-coderabbit'
 import {
 	build_issue_url,
@@ -52,12 +53,38 @@ vi.mock('./telegram-notify', () => ({
 	},
 }))
 
+// **The one collaborator this suite reached the network through** (joshuafolkken/kit#1515).
+// `notify_completion` asks how many merges main has taken since the last release, and that read
+// resolves the default branch and then **fetches it from `origin`** — a live round trip, measured at
+// 4.1s on the machine it was found on, once per test that calls `run`. Fifteen such tests made this
+// file half the unit suite's wall clock and failed the pre-push gate at the 10s test timeout, on an
+// idle machine as readily as under load: 63.7s of wall clock against 14.9 CPU-seconds, three
+// quarters of it spent waiting rather than computing.
+//
+// **`git-followup-pending` itself is left real and only its git access is replaced**, so the wiring
+// from `notify_completion` down still runs; what it composes then resolves to no pending line, which
+// no case here asserts on. The five entries are every function this suite's import graph reaches —
+// the two that fetch, and the three `release-history.ts` builds its default reader from. The `gh` shim
+// in `scripts/test-network-guard.ts` covers `git` too since the same issue, and fails this suite
+// outright if the fetch ever returns.
+vi.mock('./git-command', () => ({
+	git_command: {
+		get_default_branch: vi.fn(),
+		fetch_branch: vi.fn(),
+		log_first_parent: vi.fn(),
+		show_file: vi.fn(),
+		count_merges: vi.fn(),
+	},
+}))
+
 const { git_gh_command } = await import('./git-gh-command')
 const { git_pr_checks } = await import('./git-pr-checks')
 const { git_pr_ai_review } = await import('./git-pr-ai-review')
 const { telegram_notify } = await import('./telegram-notify')
 
 const PR_URL = 'https://github.com/owner/repo/pull/1'
+// Any branch name will do — what matters is that resolving it costs nothing.
+const DEFAULT_BRANCH = 'main'
 
 const BASE_INPUT: FollowupInput = {
 	branch_name: 'test-branch',
@@ -83,7 +110,17 @@ function silence_warnings(): void {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 }
 
+// The two calls that would otherwise leave the machine; see the `./git-command` factory above. The
+// factory is what makes the network unreachable — these values only keep the run realistic, so a
+// test that forgets this setup is slow in no way and merely counts from a branch that resolves to
+// nothing.
+function setup_local_git_mocks(): void {
+	vi.mocked(git_command.get_default_branch).mockResolvedValue(DEFAULT_BRANCH)
+	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
+}
+
 function setup_run_mocks(): void {
+	setup_local_git_mocks()
 	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
 	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
 	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
