@@ -66,6 +66,7 @@ const ALIASES: Record<string, string> = {
 	r: 'ranges',
 	dr: 'doctor',
 	pg: 'propagate',
+	ad: 'adopt',
 	ov: 'overrides',
 	a: 'audit',
 	rt: 'reconcile-templates',

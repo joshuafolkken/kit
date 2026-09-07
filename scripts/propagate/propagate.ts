@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { refuse_unknown_flags } from '#scripts/cli-flags'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { self_sync_guard } from '#scripts/self-sync-guard/self-sync-guard-logic'
@@ -35,16 +36,13 @@ interface RunOptions {
 // Reject anything not on the list rather than ignoring it. `--dryrun` silently falling through to
 // the real write path is the mistake this refusal exists to prevent.
 function parse_options(argv: ReadonlyArray<string>): RunOptions {
-	const unknown = argv.filter((argument) => !KNOWN_FLAGS.includes(argument))
 	const options: RunOptions = {
 		is_dry_run: argv.includes(DRY_RUN_FLAG),
 		is_publish_wait_skipped: argv.includes(SKIP_PUBLISH_FLAG),
 	}
+	const usage = refuse_unknown_flags(argv, KNOWN_FLAGS, 'propagate')
 
-	if (unknown.length === 0) return options
-	const usage = `Usage: josh propagate [${KNOWN_FLAGS.join('] [')}]`
-
-	return { ...options, usage: `Unknown argument(s): ${unknown.join(' ')}\n${usage}` }
+	return usage === undefined ? options : { ...options, usage }
 }
 
 // Propagation runs from the supplier's own repository, and only there.
@@ -139,7 +137,16 @@ function propagate_to_consumers(version: string, is_dry_run: boolean): number {
 	const targets = propagate_targets.resolve_targets(map, KIT_PACKAGE_NAME, version)
 	const step = is_dry_run
 		? propagate_steps.describe_step
-		: propagate_steps.create_step_runner({ package_name: KIT_PACKAGE_NAME, version })
+		: propagate_steps.create_step_runner({
+				releases: [
+					{
+						package_name: KIT_PACKAGE_NAME,
+						version,
+						bin_name: propagate_steps.JOSH_BIN,
+					},
+				],
+				origin: propagate_steps.PROPAGATE_ORIGIN,
+			})
 	const results = propagate_run.run_targets(
 		targets,
 		step,

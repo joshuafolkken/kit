@@ -21,7 +21,10 @@ vi.mock('#scripts/git/git-gh-exec', async (import_original) => ({
 const mocked_api_sync = vi.mocked(git_gh_exec.exec_gh_api_sync)
 
 const KIT = '@joshuafolkken/kit'
+const APP_KIT = '@joshuafolkken/app-kit'
 const VERSION = '1.111.0'
+const LATEST = 'latest'
+const ADOPT_ORIGIN = 'Opened by `josh adopt` in this repository.'
 const TARGET: PropagateTarget = {
 	repo: 'joshuafolkken/app-kit',
 	path: '/Users/example/Development/app-kit',
@@ -183,14 +186,19 @@ describe('propagate_steps.describe_step', () => {
 	})
 })
 
-describe('propagate_steps.STEP_COMMANDS', () => {
+describe('propagate_steps.sync_command', () => {
 	it('runs the consumer own CLI, never this checkout', () => {
-		expect(propagate_steps.STEP_COMMANDS[propagate_run.STEP_SYNC]?.slice(0, 2)).toEqual([
-			'pnpm',
-			'josh',
-		])
+		expect(propagate_steps.sync_command(propagate_steps.JOSH_BIN)).toEqual(['pnpm', 'josh', 'sync'])
 	})
 
+	// `@joshuafolkken/app-kit` syncs with `josh-app`. A sync spelled `josh` for every toolkit would
+	// leave app-kit's managed files behind (joshuafolkken/kit#1085).
+	it('spells the sync with the toolkit own CLI', () => {
+		expect(propagate_steps.sync_command('josh-app')).toEqual(['pnpm', 'josh-app', 'sync'])
+	})
+})
+
+describe('propagate_steps.STEP_COMMANDS', () => {
 	// The four checks used to be re-chained here as a string. They are now single-sourced in
 	// `josh gate` (joshuafolkken/kit#914), so the coverage is asserted against that definition —
 	// a check added to the gate reaches the consumer-side verification without a second edit.
@@ -237,6 +245,73 @@ describe('propagate_steps.precheck_step', () => {
 		)
 
 		expect(result.is_ok).toBe(false)
+	})
+})
+
+// `josh adopt` carries every toolkit a consumer has installed, so the upgrade and the sync repeat
+// per release while everything else happens once (joshuafolkken/kit#1085). The step order itself is
+// unchanged, which is what keeps the two commands on one sequence.
+const PLAN = {
+	releases: [
+		{ package_name: KIT, version: LATEST, bin_name: 'josh' },
+		{ package_name: APP_KIT, version: LATEST, bin_name: 'josh-app' },
+	],
+	origin: ADOPT_ORIGIN,
+}
+
+describe('propagate_steps — a plan repeats the upgrade and the sync per release', () => {
+	it('upgrades once per toolkit', () => {
+		const commands = propagate_steps.upgrade_commands(PLAN).map((one) => one.command.join(' '))
+
+		expect(commands).toHaveLength(2)
+		expect(commands[0]).toContain(`${KIT}@${LATEST}`)
+		expect(commands[1]).toContain(`${APP_KIT}@${LATEST}`)
+	})
+
+	it('syncs once per toolkit, through each toolkit own CLI', () => {
+		expect(propagate_steps.sync_commands(PLAN).map((one) => one.command)).toEqual([
+			['pnpm', 'josh', 'sync'],
+			['pnpm', 'josh-app', 'sync'],
+		])
+	})
+
+	// The run's report is one line per target, so a failed step that said only `exit 1` would leave a
+	// two-toolkit upgrade with nothing to act on.
+	it('carries the package name so a failure can name which toolkit failed', () => {
+		expect(propagate_steps.sync_commands(PLAN).map((one) => one.package_name)).toEqual([
+			KIT,
+			APP_KIT,
+		])
+	})
+})
+
+describe('propagate_steps — one issue names every release the plan carries', () => {
+	it('names every toolkit in the one issue title', () => {
+		expect(propagate_steps.plan_title(PLAN.releases)).toBe(
+			`Upgrade ${KIT} and ${APP_KIT} to ${LATEST}`,
+		)
+	})
+
+	it('keeps the title on one line, which josh git derives the branch name from', () => {
+		expect(propagate_steps.plan_title(PLAN.releases)).not.toContain('\n')
+	})
+
+	it('names every toolkit in the one issue body, and says which command opened it', () => {
+		const body = propagate_steps.plan_body(PLAN)
+
+		expect(body).toContain(`\`${KIT}@${LATEST}\``)
+		expect(body).toContain(`\`${APP_KIT}@${LATEST}\``)
+		expect(body).toContain(ADOPT_ORIGIN)
+	})
+
+	// The generalization must leave a propagation run's own issue exactly as it was.
+	it('reproduces the single-release title and body unchanged', () => {
+		const single = [{ package_name: KIT, version: VERSION, bin_name: 'josh' }]
+
+		expect(propagate_steps.plan_title(single)).toBe(propagate_steps.issue_title(KIT, VERSION))
+		expect(
+			propagate_steps.plan_body({ releases: single, origin: propagate_steps.PROPAGATE_ORIGIN }),
+		).toBe(propagate_steps.issue_body(KIT, VERSION))
 	})
 })
 
