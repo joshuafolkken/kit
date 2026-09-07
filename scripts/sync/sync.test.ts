@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { PACKAGE_DIR } from '#scripts/init/init-paths'
@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 import { workflow_pin_logic } from './workflow-pin-logic'
 
-const TEST_DIR = path.join(tmpdir(), 'sync-test')
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
+const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-test-'))
 const SRC_PATH = path.join(TEST_DIR, 'src', 'gitignore')
 const GITIGNORE_DEST_NAME = '.gitignore'
 const DEST_PATH = path.join(TEST_DIR, 'dest', GITIGNORE_DEST_NAME)
