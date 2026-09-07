@@ -115,6 +115,7 @@ const ALIASES: Record<string, string> = {
 	lnl: 'lane:list',
 	lnp: 'lane:prune',
 	ig: 'investigation:guard',
+	rug: 'rule:guard',
 	ev: 'eval',
 	es: 'eval:scope',
 }

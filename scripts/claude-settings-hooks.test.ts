@@ -60,6 +60,14 @@ const GUARD_TOOLS = ['Bash']
 // would miss the idiom that carries most of the text. It is safe on `Bash` where the batching guard is
 // — it refuses only a line that guard would also have refused, which excludes every possible write.
 const READ_GUARD_TOOLS = ['Read', 'Bash']
+// The rule guard (joshuafolkken/kit#1524): the one dispatcher for rules whose trigger can be named as
+// a tool call, so the next rule to leave `CLAUDE.md` costs a row in `delivered-rules.ts` rather than a
+// fourth process in front of every call.
+const RULE_GUARD_HOOK_COMMAND = 'pnpm josh rule:guard'
+// `Bash` alone, for the reason the batching guard names it alone: a refused `Edit` leaves the
+// siblings of its turn applied and itself not, so every rule this dispatcher carries is one whose
+// binding moment is a shell call.
+const RULE_GUARD_TOOLS = ['Bash']
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.
@@ -172,6 +180,13 @@ describe_tool_hook('.claude/settings.json — pre-read investigation guard', {
 	event: 'PreToolUse',
 	command: READ_GUARD_HOOK_COMMAND,
 	tools: READ_GUARD_TOOLS,
+	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
+})
+
+describe_tool_hook('.claude/settings.json — pre-call rule delivery guard', {
+	event: 'PreToolUse',
+	command: RULE_GUARD_HOOK_COMMAND,
+	tools: RULE_GUARD_TOOLS,
 	minimum_timeout_seconds: MINIMUM_GUARD_TIMEOUT_SECONDS,
 })
 

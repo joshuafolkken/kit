@@ -42,6 +42,7 @@
 | `josh eval` をいつ回すか（配布物の変更を測る）                                 | [`eval-gate.md`](./collaboration-workflow/eval-gate.md)                                 |
 | 依存更新（`josh latest`）をいつ回すか                                          | [`latest-gate.md`](./collaboration-workflow/latest-gate.md)                             |
 | 常駐ドキュメントと skill の分担（何を常駐に残すか）                            | [`residency.md`](./collaboration-workflow/residency.md)                                 |
+| 引き金つき配送 — 規則を効く瞬間に届ける                                        | [`rule-delivery.md`](./collaboration-workflow/rule-delivery.md)                         |
 | `needs-human-review` — 成果物を人が見るまで出荷させない                        | [`human-review-label.md`](./collaboration-workflow/human-review-label.md)               |
 | コマンド出力が文脈へ持ち込む量の上限                                           | [`output-bounds.md`](./collaboration-workflow/output-bounds.md)                         |
 | 運用ルール                                                                     | [`operating-rules.md`](./collaboration-workflow/operating-rules.md)                     |
