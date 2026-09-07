@@ -105,7 +105,8 @@ function apply_dependency_merges(content: string): string {
 
 function apply_package_json_merges(content: string): string {
 	const with_kit = apply_dependency_merges(content)
-	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(with_kit)
+	const upgraded = init_logic.upgrade_prepare_lefthook_warning(with_kit)
+	const with_lifecycle = init_logic.merge_prepare_lifecycle_cmd(upgraded)
 	const kit_pm = get_kit_package_manager()
 	const with_pm =
 		kit_pm === undefined ? with_lifecycle : init_logic.merge_package_manager(with_lifecycle, kit_pm)
