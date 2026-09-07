@@ -38,9 +38,16 @@ const RETRY_PAUSE_MS = 5000
 //
 // **What it stops is sessions, not the pool.** A scenario already in flight is left to finish — the
 // pool has no cancellation seam and killing a live session would throw away a measurement that is
-// already paid for. What is skipped is every session not yet started: the retries first, which is
-// where the saving lands hardest at the default width (five scenarios, five slots, up to five retry
-// sessions), and then any scenario still queued once the suite grows past that width.
+// already paid for. What is skipped is every session not yet started: the retries of scenarios still
+// running, and any scenario still queued.
+//
+// **At the shipped default that is less than it sounds, and the comment used to overstate it.** Five
+// scenarios into five slots leaves nothing queued, and a refused session is not retried anyway — so
+// on a run where every session is refused this skips nothing whatever, and the five were already
+// paid for by the time the second verdict arrived. It bites on the mixed run, where refusals
+// accumulate while other scenarios come back merely inconclusive and their retries are stopped — at
+// most three of them, since reaching the limit spends two of the five on verdicts that were never
+// retryable — and on any suite wider than its pool, where the queue is skipped outright.
 const UNREACHABLE_LIMIT = 2
 
 // **Bounded, not unbounded.** The scenarios are independent execution units — each builds its own
@@ -117,12 +124,14 @@ function can_start_session(tally: UnreachableTally): boolean {
 // a reason the retry meets unchanged — joshuafolkken/kit#1001 measured that neither an extra attempt
 // nor a longer wait recovered a single one.
 //
-// **The tally gates this too, and that is where the saving actually lands.** At the shipped default —
-// five scenarios, five slots — `bounded_map` dequeues every scenario before the first verdict returns,
-// so the check in front of a scenario's *first* attempt can never fire and the only sessions left to
-// skip are the retries. Gated here as well, a suite that has already had two sessions refused stops
-// paying for up to five more into the same dead connection; gated only in front of the first attempt,
-// it pays for all of them and the abort is unreachable code at the default width.
+// **The tally gates this too, because at the default width the retries are the only sessions left to
+// skip.** Five scenarios into five slots means `bounded_map` dequeues every one before the first
+// verdict returns, so the check in front of a scenario's *first* attempt can never fire there —
+// gated only in front of that first attempt, the abort would be unreachable code at the shipped
+// width. **It is not the whole failure this Issue is about**: a refused session is already excluded
+// above, so a run whose every session is refused has no retry to stop either. What this gate saves is
+// the mixed run — up to three ordinary non-measurements whose second attempt would go into a
+// connection two neighbors have already found dead.
 function is_retryable(verdict: Verdict, tally: UnreachableTally): boolean {
 	if (!can_start_session(tally)) return false
 

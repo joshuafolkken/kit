@@ -170,15 +170,19 @@ to look at, and a run of them three days running is visible as three of the same
 single `⚠` line appears, which says only that this run did not measure every scenario — the other
 four may have held, and every session may have run. What the second refusal adds is the stop: from
 there the suite starts no more sessions — the retries first, then any scenario still queued — because
-each one is a whole Claude session that meets the same refusal. So an `unreachable` run's scenario
-count is the number selected rather than the number attempted **whenever two or more `⚠` lines
-appear**, and the `⚠` lines themselves say which were never started.
+each one is a whole Claude session that meets the same refusal. **Which scenarios that actually saves
+depends on the width**, so read the `⚠` lines rather than the count: only the ones whose note says
+`session not started` were skipped, and on a run where every scenario was dequeued there are none.
 
-**At the shipped default the retries are where the stop lands.** Five scenarios and a width of five
-means every scenario is dequeued before the first verdict returns, so there is no queue left to skip
-and what the tally saves is the second attempt each non-measurement would otherwise make — up to five
-more sessions into the same dead connection. A queue only exists once the suite grows past its width
-or `JOSH_EVAL_CONCURRENCY` lowers it.
+**At the shipped default it saves less than it looks like.** Five scenarios and a width of five means
+every scenario is dequeued before the first verdict returns, so no scenario is ever queued and the
+only sessions left to skip are retries — and a refused session is not retried in the first place. So
+on the run this was written for, where every session meets the same refusal, the tally skips nothing
+at all: the five sessions were already in flight, and none of them would have made a second attempt.
+What it does save is the mixed run — refusals accumulating while other scenarios come back merely
+inconclusive — where it stops up to three of those retries, and any suite wider than its pool, where
+everything still queued is skipped. Lower `JOSH_EVAL_CONCURRENCY` and the queue, and the saving,
+appear at five scenarios too.
 
 **A `blocked` verdict is confirmed, then attributed, before it blocks.** One scenario is one real
 Claude session, so its verdict is a sample rather than a fact: measured on
