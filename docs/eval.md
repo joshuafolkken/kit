@@ -153,11 +153,32 @@ cannot be compared against the whole suite's.
 **What a result does** is the last line of the run, because the exit code cannot carry it: `0` only
 when every scenario passed, so a failed run and one that measured nothing exit alike.
 
-| Verdict      | Meaning                                  | The merge                                                                    |
-| ------------ | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `held`       | every scenario held                      | continue                                                                     |
-| `blocked`    | a scenario failed — a measured violation | **stops the merge** — fix the prose its `→` line names, re-run that scenario |
-| `unmeasured` | a scenario produced no measurement (`?`) | does not block, and is stated in the completion report                       |
+| Verdict       | Meaning                                  | The merge                                                                     |
+| ------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `held`        | every scenario held                      | continue                                                                      |
+| `blocked`     | a scenario failed — a measured violation | **stops the merge** — fix the prose its `→` line names, re-run that scenario  |
+| `unmeasured`  | a scenario produced no measurement (`?`) | does not block, and is stated in the completion report                        |
+| `unreachable` | the suite could not reach the API (`⚠`)  | does not block, and is stated in the completion report, naming the connection |
+
+**`unreachable` is the narrow half of `unmeasured`.** Both leave the rules unmeasured and neither
+blocks a merge, so the fourth word buys nothing at the merge and everything at the report: a reader
+sent to the `?` lines to fix the harness or the prompt found nothing wrong with either, because the
+fault was a refused connection (joshuafolkken/kit#1197). Under its own word the suite says which one
+to look at, and a run of them three days running is visible as three of the same word.
+
+**One refused session earns the word; two stop the suite.** The verdict is `unreachable` as soon as a
+single `⚠` line appears, which says only that this run did not measure every scenario — the other
+four may have held, and every session may have run. What the second refusal adds is the stop: from
+there the suite starts no more sessions — the retries first, then any scenario still queued — because
+each one is a whole Claude session that meets the same refusal. So an `unreachable` run's scenario
+count is the number selected rather than the number attempted **whenever two or more `⚠` lines
+appear**, and the `⚠` lines themselves say which were never started.
+
+**At the shipped default the retries are where the stop lands.** Five scenarios and a width of five
+means every scenario is dequeued before the first verdict returns, so there is no queue left to skip
+and what the tally saves is the second attempt each non-measurement would otherwise make — up to five
+more sessions into the same dead connection. A queue only exists once the suite grows past its width
+or `JOSH_EVAL_CONCURRENCY` lowers it.
 
 **A `blocked` verdict is confirmed, then attributed, before it blocks.** One scenario is one real
 Claude session, so its verdict is a sample rather than a fact: measured on
@@ -227,9 +248,18 @@ prevent anything, and under a pool it holds a slot for the whole time
 (joshuafolkken/kit#1144). **The retry itself is unchanged** — one attempt, only for an inconclusive
 verdict.
 
-**Do not read that as a solved problem.** The honest state is that the reason is visible and points at
-connectivity to the API rather than at pacing, and nothing here fixes it. To check where it stands
-after changing anything here:
+**The cause was found, and it was neither pacing nor width.** A session spawned from inside a Claude
+session inherited the parent's own `CLAUDE_CODE_MESSAGING_SOCKET` — a UNIX socket only the parent
+listens on — dialled it, and was refused; lowering `JOSH_EVAL_CONCURRENCY`, the suspected cause,
+made it worse. Removing that variable and the three beside it from the child's environment restored
+5/5 held in 54 seconds (joshuafolkken/kit#1158, carried into joshuafolkken/kit#1197). The harness now
+does that itself, in `session_environment`, so nothing has to be set by hand.
+
+**That fix does not retire the defense built beside it.** A connection can fail again for reasons
+that have nothing to do with an inherited socket, and the failure mode being closed here is the one
+where the suite pays for five sessions and returns `unmeasured` — so a refused connection is now
+reported under its own verdict and stops the suite starting further sessions, whatever caused it. To
+check where it stands after changing anything here:
 
 ```bash
 pnpm josh eval <one-scenario>   # must hold on its own
@@ -274,8 +304,8 @@ Running 5 scenario(s) on sonnet.
 Verdict: blocked — a scenario failed; fix the rule its → line names before merging
 ```
 
-The last line is what a run means for a merge, in one token — `held`, `blocked` or `unmeasured`
-("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
+The last line is what a run means for a merge, in one token — `held`, `blocked`, `unmeasured` or
+`unreachable` ("When it runs" above). A failure names three things: the expectation that broke, the sentence explaining **why that call was
 the evidence**, and the calls the run actually made. The `→` line is the one to act on — it points at
 the rule, so a red scenario tells you which prose to change rather than only that something went
 wrong.

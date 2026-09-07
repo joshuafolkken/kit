@@ -2583,9 +2583,27 @@ rather than the sum of all of them ([#1144](https://github.com/joshuafolkken/kit
 `JOSH_EVAL_CONCURRENCY` lowers the width; a value that is not a positive integer is refused rather
 than replaced by the default.
 
-The run's last line is a verdict rather than only a count — `held`, `blocked` or `unmeasured` — because
-the exit code is `0` only when every scenario passed, so a failed run and one that measured nothing
-exit alike. `blocked` stops a merge; `unmeasured` does not, but is reported.
+The run's last line is a verdict rather than only a count — `held`, `blocked`, `unmeasured` or
+`unreachable` — because the exit code is `0` only when every scenario passed, so a failed run and one
+that measured nothing exit alike. `blocked` stops a merge; the other two do not, but are reported.
+
+`unreachable` is the narrow half of `unmeasured`: the sessions never reached the API, so the harness,
+the prompt and the rule are all untested rather than tested and unclear
+([#1197](https://github.com/joshuafolkken/kit/issues/1197)). Once two sessions have come back that
+way the suite starts no more — the retries first, then anything still queued — because each one is a
+whole Claude session meeting the same refusal. The environment a session is spawned with drops the
+parent Claude session's own messaging socket and session identifiers, which is what made this the
+default failure inside a delegated unit before
+[#1158](https://github.com/joshuafolkken/kit/issues/1158) found it.
+
+**A run of non-measurements is counted across runs.** The last verdict is kept in a small
+per-checkout file in the temp directory, and three runs in a row ending on the same non-`held` word
+print a `Warning: N runs in a row have ended …` line above the verdict, which stays the last line.
+One non-measurement is already reported and reads as a one-off; the sequence is what says the gate
+has been standing open, and nothing was watching it. Only a whole-suite run is counted — the named
+re-run a bad verdict asks for would otherwise clear the count with a single scenario — a `held` suite
+clears it, a different verdict starts a new one, and `blocked` never warns, because it measured
+something and already stops the merge.
 
 **Before the first session it records what it is about to measure** — a content hash per file under
 the measured paths, written to a temp-directory file keyed to this checkout

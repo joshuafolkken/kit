@@ -10,6 +10,7 @@ import { eval_sandbox } from './eval-sandbox'
 import { eval_scenario, type Scenario } from './eval-scenario'
 import { eval_session } from './eval-session'
 import { eval_stamp } from './eval-stamp'
+import { eval_streak } from './eval-streak'
 import { eval_transcript } from './eval-transcript'
 
 // `pnpm josh eval [name...]`. Deliberately not wired into CI: every scenario is a real Claude
@@ -124,6 +125,7 @@ function complete_measured_tree(): void {
 async function run_selection(
 	chosen: ReadonlyArray<Scenario>,
 	concurrency: number,
+	is_whole_suite: boolean,
 ): Promise<boolean> {
 	const model = process.env[MODEL_ENV_KEY] ?? DEFAULT_MODEL
 	const width = bounded_pool.pool_width(concurrency, chosen.length)
@@ -137,20 +139,31 @@ async function run_selection(
 	// sent the run here for, so it is the last thing printed rather than something to scroll back to.
 	const is_held = eval_report.report_summary(verdicts)
 
-	eval_report.report_merge_verdict(verdicts)
+	const verdict = eval_report.merge_verdict(verdicts)
+
+	// **Above the verdict line.** Every documented procedure reads the run's *last* line as the
+	// one-token verdict, so a warning printed after it would send an agent following the gate to the
+	// wrong line. Whether it is written at all is `run_recorded`'s single whole-suite condition,
+	// carried down rather than re-tested (joshuafolkken/kit#1197).
+	if (is_whole_suite) eval_streak.report_streak(verdict)
+
+	eval_report.print_verdict(verdict)
 
 	return is_held
 }
 
 // Both halves of the record are written under one condition — the whole-suite run below — so it is
-// asked once rather than twice, and neither half can be written without the other's guard.
+// asked once rather than twice, and neither half can be written without the other's guard. The run
+// of verdicts is carried down rather than re-tested here for the same reason: it belongs to the same
+// condition, and it has to be *printed* from inside the selection, above the verdict line
+// (joshuafolkken/kit#1197).
 async function run_recorded(
 	chosen: ReadonlyArray<Scenario>,
 	concurrency: number,
 ): Promise<boolean> {
 	record_measured_tree()
 
-	const is_held = await run_selection(chosen, concurrency)
+	const is_held = await run_selection(chosen, concurrency, true)
 
 	complete_measured_tree()
 
@@ -175,8 +188,10 @@ async function main(): Promise<boolean> {
 	// `--since-eval` would then compare that tree against itself and answer `skip`: a one-scenario
 	// reading standing in for the suite's measurement. The record says what the suite measured, so it
 	// is written only where the suite is what ran — and, since joshuafolkken/kit#1164, the completion
-	// it later takes is written under the same condition rather than a second one.
-	if (names.length > 0) return await run_selection(chosen, choice.limit)
+	// it later takes is written under the same condition rather than a second one. The run of verdicts
+	// joshuafolkken/kit#1197 counts is the third thing under that one condition, and for the same
+	// reason: a named re-run would otherwise clear the count with a single scenario.
+	if (names.length > 0) return await run_selection(chosen, choice.limit, false)
 
 	return await run_recorded(chosen, choice.limit)
 }

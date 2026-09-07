@@ -101,6 +101,88 @@ describe('eval_judge.judge — should_not_call', () => {
 	})
 })
 
+// joshuafolkken/kit#1197. `is_unreachable` is deliberately a subset of `is_inconclusive`: a session
+// that reached the API and then failed a prohibition measured something, and treating it as
+// unreachable would abort the suite over a real result. **Both sources are read**, rather than the
+// one the printed note happens to prefer: the note wants a single line and takes stderr first, so a
+// session that wrote anything at all to stderr before dying of a refused connection would otherwise
+// be judged on that unrelated line.
+function dead_session(reason: string): { exit_code: number; stderr: string; transcript: string } {
+	return {
+		exit_code: 1,
+		stderr: '',
+		transcript: JSON.stringify({ type: 'result', is_error: true, result: reason }),
+	}
+}
+
+const REFUSED = 'API Error: Unable to connect to API (ConnectionRefused)'
+const UNREACHABLE_SCENARIO = scenario_with({ should_call: [{ tool: 'Read', because: BECAUSE }] })
+
+describe('eval_judge.judge — an API the session could not reach', () => {
+	const SCENARIO = UNREACHABLE_SCENARIO
+
+	it('marks a refused connection unreachable', () => {
+		const verdict = eval_judge.judge(SCENARIO, [], dead_session(REFUSED))
+
+		expect(verdict.is_unreachable).toBe(true)
+		expect(verdict.is_inconclusive).toBe(true)
+	})
+
+	it('reads the reason from stderr too', () => {
+		const verdict = eval_judge.judge(SCENARIO, [], {
+			exit_code: 1,
+			stderr: REFUSED,
+			transcript: '',
+		})
+
+		expect(verdict.is_unreachable).toBe(true)
+	})
+
+	// The regression the note's own ordering would cause: stderr wins there, so one deprecation warning
+	// ahead of a refused connection used to hide the refusal behind an ordinary non-measurement —
+	// no `⚠` line, no abort, and a reader sent to fix a harness that was never at fault.
+	it('sees a refused connection behind an unrelated stderr line', () => {
+		const verdict = eval_judge.judge(SCENARIO, [], {
+			exit_code: 1,
+			stderr: '(node:1) DeprecationWarning: something unrelated',
+			transcript: JSON.stringify({ type: 'result', is_error: true, result: REFUSED }),
+		})
+
+		expect(verdict.is_unreachable).toBe(true)
+	})
+})
+
+// The other half of the subset rule: what must *not* be called unreachable. Each of these would stop
+// the suite over something a second attempt could settle, or over a result that was measured.
+describe('eval_judge.judge — sessions that stay reachable', () => {
+	const SCENARIO = UNREACHABLE_SCENARIO
+
+	// The common non-measurement is not this one, and calling it this one would stop the suite for a
+	// harness problem a second attempt could still settle.
+	it('leaves an ordinary non-measurement reachable', () => {
+		const verdict = eval_judge.judge(SCENARIO, [], dead_session('error during execution'))
+
+		expect(verdict.is_inconclusive).toBe(true)
+		expect(verdict.is_unreachable).toBe(false)
+	})
+
+	it('leaves a session that produced a measurement reachable', () => {
+		const verdict = eval_judge.judge(SCENARIO, [call('Read')], HEALTHY_SESSION)
+
+		expect(verdict.is_unreachable).toBe(false)
+	})
+
+	// A cut-short session that already made a forbidden call is conclusive, and a conclusive verdict
+	// is never unreachable however the session ended.
+	it('leaves a conclusive forbidden call reachable', () => {
+		const scenario = scenario_with({ should_not_call: [{ tool: 'Edit', because: BECAUSE }] })
+		const verdict = eval_judge.judge(scenario, [call('Edit')], dead_session(REFUSED))
+
+		expect(verdict.is_inconclusive).toBe(false)
+		expect(verdict.is_unreachable).toBe(false)
+	})
+})
+
 describe('eval_judge.judge — should_call_in_order', () => {
 	const ORDERED = {
 		should_call_in_order: [{ before: { tool: 'Read' }, after: { tool: 'Bash' }, because: BECAUSE }],

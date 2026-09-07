@@ -150,6 +150,7 @@ describe('what a verdict does is stated with the tokens the run prints', () => {
 		eval_report.VERDICT_BLOCKED,
 		eval_report.VERDICT_HELD,
 		eval_report.VERDICT_UNMEASURED,
+		eval_report.VERDICT_UNREACHABLE,
 	]
 
 	it.each([SKILL_GATE, EVAL_DOC])('%s names every verdict', (document_path) => {
