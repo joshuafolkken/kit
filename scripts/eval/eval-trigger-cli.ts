@@ -28,6 +28,11 @@ const NO_STAMP_REASON =
 	'no record of what a run measured, so a concurrent result has nothing vouching for it — measure rather than assume'
 const UNREADABLE_TREE_REASON =
 	'the measured paths could not be read, so nothing can be compared against the record — measure rather than assume'
+// A record is written before the first session and completed when the run returns, so one left by an
+// interrupted or crashed run says a run started and nothing more (joshuafolkken/kit#1164). It is the
+// same answer no record at all gets, because it is the same fact: there is no verdict to vouch for.
+const INCOMPLETE_STAMP_REASON =
+	'the recorded run never reached a verdict, so a concurrent result has nothing vouching for it — measure rather than assume'
 
 interface Decision {
 	scope: EvalScope
@@ -59,13 +64,18 @@ function since_eval_reason(started_at: string, changed: ReadonlyArray<string>): 
 	return `changed since the run started at ${started_at}: ${path_decision.format_path_list(changed)}`
 }
 
-// Both ways of having no comparison to make — no record, or a tree that would not read — answer
-// `required`. That is the same direction the branch reading takes its empty diff in: a caller that
-// could not establish what changed is never handed the answer a caller that measured would get.
+// Every way of having no verdict to vouch for — no record, a record whose run never finished, or a
+// tree that would not read — answers `required`. That is the same direction the branch reading takes
+// its empty diff in: a caller that could not establish what changed is never handed the answer a
+// caller that measured would get.
 function since_eval_decision(): Decision {
 	const stamp = eval_stamp.read_stamp()
 
 	if (stamp === undefined) return { scope: eval_trigger.REQUIRED_SCOPE, reason: NO_STAMP_REASON }
+
+	if (stamp.completed_at === undefined) {
+		return { scope: eval_trigger.REQUIRED_SCOPE, reason: INCOMPLETE_STAMP_REASON }
+	}
 
 	const tree = eval_stamp.try_read_tree()
 
@@ -142,6 +152,7 @@ const eval_trigger_cli = {
 	disabled_decision,
 	explain_scope,
 	format_reason,
+	INCOMPLETE_STAMP_REASON,
 	JSON_KEY,
 	main,
 	NO_STAMP_REASON,

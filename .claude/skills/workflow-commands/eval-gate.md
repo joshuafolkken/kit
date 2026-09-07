@@ -86,7 +86,15 @@ pnpm josh eval:scope --since-eval   # → required | skip ; the reason on stderr
 | Answer     | What it means                                                                             | What to do                                           |
 | ---------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | `skip`     | the review changed nothing the scenarios can see                                          | the concurrent verdict stands — read it and go on    |
-| `required` | the review edited a measured path, **or there is no record of what a run measured**       | run `pnpm josh eval` again and read *that* verdict    |
+| `required` | the review edited a measured path, **or there is no record of what a run measured, or the recorded run never reached a verdict** | run `pnpm josh eval` again and read *that* verdict    |
+
+**A record vouches for a finished run, not merely a started one** (joshuafolkken/kit#1164). The
+record is written before the first session — that is the only moment at which it describes the tree
+the suite is about to read — and **marked finished when the run returns its verdict**, so a run
+stopped at the keyboard or killed by a throw leaves a record with no completion. `--since-eval` reads
+that as `required`, exactly as it reads no record at all: the two are the same fact, and without the
+completion the check could answer `skip` on behalf of a verdict nobody ever saw. The completion is an
+amendment, so what the run measured and when are untouched by it.
 
 **The question is asked of the review's own diff, not the branch's.** `josh eval` writes the record
 before its first session, so the comparison is against exactly the tree those scenarios read; the

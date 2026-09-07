@@ -13,6 +13,7 @@ import {
 	PR_NUMBER,
 	pr_routes,
 	request_body,
+	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import {
 	forget_pr_numbers,
@@ -78,7 +79,7 @@ function write_extra(): Record<string, string> {
 	}
 }
 
-function write_routes(): Record<string, string> {
+function write_routes(): Record<string, GhApiAnswer> {
 	return pr_routes({}, write_extra())
 }
 

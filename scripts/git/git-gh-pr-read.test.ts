@@ -15,6 +15,7 @@ import {
 	RATE_LIMITED,
 	rest_pull,
 	rest_pull_page,
+	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import {
 	forget_pr_numbers,
@@ -37,7 +38,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const PR_BODY = 'closes #1027'
 const NO_PULL_REQUEST = { [pr_lookup_path()]: EMPTY_LISTING }
 
-function stub(routes: Record<string, string>): void {
+function stub(routes: Record<string, GhApiAnswer>): void {
 	mocked_api.mockImplementation(gh_api_routes(routes))
 }
 

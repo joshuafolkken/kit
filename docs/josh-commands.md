@@ -358,10 +358,20 @@ release count they drove, once per test, 4.1s each against a 10-second timeout. 
 half the unit suite's wall clock and failed the pre-push gate non-deterministically — on an idle
 machine as readily as under parallel load, 63.7s of wall clock against 14.9 CPU-seconds. Unlike `gh`,
 `git` cannot simply be refused: half the suite reads its own repository with `status`, `log`,
-`rev-parse` and the worktree commands, and those pass straight through to the real binary. Only
-`clone`, `fetch`, `ls-remote`, `pull` and `push` are refused, and the shim finds the subcommand behind
-git's own global options, so `git -C <dir> fetch` is caught rather than read as a subcommand named
-after the directory.
+`rev-parse` and the worktree commands, and those pass straight through to the real binary. Refused
+are `archive`, `clone`, `fetch`, `ls-remote`, `pull`, `push`, `remote`, `send-email` and `submodule` —
+the last three whole, because splitting `remote update` from `remote -v` inside a shell `case` fails
+open when it gets it wrong. The shim finds the subcommand behind git's own global options, so
+`git -C <dir> fetch` is caught rather than read as a subcommand named after the directory.
+
+Extending it found a second offender the same day, and one that only appears inside a hook:
+`propagate-git.ts` passed the repository as `cwd`, which **`GIT_DIR` overrides** — and git exports
+`GIT_DIR` to every hook it runs. Under `pnpm josh git`'s pre-push hook its probes therefore answered
+about the checkout the hook was firing in rather than the path they were handed, so directories the
+tests build deliberately as non-repositories resolved to the real one and the tree check fetched from
+`origin` for them. That is the intermittent `propagate-guard` failure on
+[#1515](https://github.com/joshuafolkken/kit/issues/1515), and why it never reproduced outside a push.
+The probes now clear `GIT_DIR` and `GIT_WORK_TREE` for the child, so `cwd` means what it says.
 
 ### `josh test:related`
 
@@ -2524,7 +2534,11 @@ the measured paths, written to a temp-directory file keyed to this checkout
 alongside `/code-review` and still be checked for staleness afterwards, with
 [`josh eval:scope --since-eval`](#josh-evalscope). **Only a whole-suite run writes it** — a named
 re-run (`pnpm josh eval <name>`, what a `blocked` verdict asks for) leaves the record alone, so a
-one-scenario reading can never stand in for the suite's measurement. A run that cannot write it says
+one-scenario reading can never stand in for the suite's measurement. **The record is marked finished
+when the run returns a verdict** ([#1164](https://github.com/joshuafolkken/kit/issues/1164)) — an
+amendment that leaves what was measured and when untouched — so a run interrupted at the keyboard or
+killed by a throw leaves a record with no completion, which `--since-eval` reads exactly as it reads
+no record at all. A run that cannot write it says
 so and continues, which leaves the check with no record — and no record answers `required`. The file
 is created owner-only and exclusively, after unlinking whatever was at the path, so a predictable
 name in a shared temp directory cannot redirect the write or plant a record the check would trust.
@@ -2555,8 +2569,8 @@ The measured set is derived from what the eval sandbox copies rather than restat
 
 The gate asks about the branch diff. `--staged` is for a pre-commit reading, and the empty-list rule bites hardest there: an empty index answers `required`, which costs five real Claude sessions rather than `review:level`'s free `medium`.
 
-**`--since-eval` asks the same question of a different diff — the one `/code-review` itself produced** ([#1152](https://github.com/joshuafolkken/kit/issues/1152)). The gate starts `josh eval` when the review starts, since neither writes to the working tree; the suite therefore measures the documents as they stood at that moment, and a review that then edited a measured path leaves the verdict describing a tree that no longer exists. This flag compares the record `josh eval` wrote before its first session against the tree now: `skip` means the review changed nothing the scenarios can see and the concurrent verdict stands, `required` means it edited a measured path — or that no record exists — and the suite runs again. Git cannot answer this: the implementation and the review's fixes are uncommitted in the same tree, so a diff cannot say which side of the review a change fell on.
+**`--since-eval` asks the same question of a different diff — the one `/code-review` itself produced** ([#1152](https://github.com/joshuafolkken/kit/issues/1152)). The gate starts `josh eval` when the review starts, since neither writes to the working tree; the suite therefore measures the documents as they stood at that moment, and a review that then edited a measured path leaves the verdict describing a tree that no longer exists. This flag compares the record `josh eval` wrote before its first session against the tree now: `skip` means the review changed nothing the scenarios can see and the concurrent verdict stands, `required` means it edited a measured path — or that no record exists, or that the recorded run never reached a verdict ([#1164](https://github.com/joshuafolkken/kit/issues/1164)) — and the suite runs again. Git cannot answer this: the implementation and the review's fixes are uncommitted in the same tree, so a diff cannot say which side of the review a change fell on.
 
-Two differences from the branch reading, both deliberate. **An empty result answers `skip` here**, the opposite of the branch reading's empty diff: the paths come from walking the trigger's own set rather than from a caller's diff, so nothing found is the positive fact that nothing moved. And **`--staged` alongside it is refused rather than resolved** — one asks about the index, the other about a recorded run, and answering one of them silently would answer a question nobody asked. The reason line names when the recorded run started, so a record left by some other loop is visible rather than assumed away.
+Two differences from the branch reading, both deliberate. **An empty result answers `skip` here**, the opposite of the branch reading's empty diff: the paths come from walking the trigger's own set rather than from a caller's diff, so nothing found is the positive fact that nothing moved. And **`--staged` alongside it is refused rather than resolved** — one asks about the index, the other about a recorded run, and answering one of them silently would answer a question nobody asked. The reason line names when the recorded run started, so a record left by some other loop is visible rather than assumed away — and a record whose run never finished is named as that rather than compared at all, because there is no verdict for the comparison to vouch for.
 
 Where the answer is used, what a failure does, and why an epic's completion does not run the suite a second time: [docs/eval.md](./eval.md) → "When it runs".

@@ -108,6 +108,19 @@ function record_measured_tree(): void {
 	}
 }
 
+// The other half of the record, written once the run has returned a verdict (joshuafolkken/kit#1164).
+// A run interrupted at the keyboard, or one whose scenarios threw, never reaches this line, and the
+// record it leaves says only that a run started — which `--since-eval` reads as `required`, the same
+// answer no record at all gets. Best-effort for the same reason the write is: an unrecorded
+// completion costs a re-measurement, and re-measuring is the safe direction.
+function complete_measured_tree(): void {
+	try {
+		eval_stamp.complete_stamp()
+	} catch (error) {
+		console.error(`Could not record that this run finished: ${String(error)}`)
+	}
+}
+
 async function run_selection(
 	chosen: ReadonlyArray<Scenario>,
 	concurrency: number,
@@ -129,6 +142,21 @@ async function run_selection(
 	return is_held
 }
 
+// Both halves of the record are written under one condition — the whole-suite run below — so it is
+// asked once rather than twice, and neither half can be written without the other's guard.
+async function run_recorded(
+	chosen: ReadonlyArray<Scenario>,
+	concurrency: number,
+): Promise<boolean> {
+	record_measured_tree()
+
+	const is_held = await run_selection(chosen, concurrency)
+
+	complete_measured_tree()
+
+	return is_held
+}
+
 async function main(): Promise<boolean> {
 	const names = process.argv.slice(ARGV_SCENARIO_OFFSET)
 	const scenarios = eval_scenario.load_scenarios(SCENARIO_DIRECTORY)
@@ -140,14 +168,17 @@ async function main(): Promise<boolean> {
 
 	if (unknown !== undefined) return report_startup_problem(unknown)
 
+	const chosen = selected(scenarios, names)
+
 	// **Only a whole-suite run leaves a record.** A named re-run — what a `blocked` verdict asks for —
 	// would otherwise overwrite the record with a newer timestamp and the tree as it is now, and
 	// `--since-eval` would then compare that tree against itself and answer `skip`: a one-scenario
 	// reading standing in for the suite's measurement. The record says what the suite measured, so it
-	// is written only where the suite is what ran.
-	if (names.length === 0) record_measured_tree()
+	// is written only where the suite is what ran — and, since joshuafolkken/kit#1164, the completion
+	// it later takes is written under the same condition rather than a second one.
+	if (names.length > 0) return await run_selection(chosen, choice.limit)
 
-	return await run_selection(selected(scenarios, names), choice.limit)
+	return await run_recorded(chosen, choice.limit)
 }
 
 const is_all_held = await main()
