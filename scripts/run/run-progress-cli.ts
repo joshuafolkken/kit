@@ -230,7 +230,14 @@ async function step(options: WatchOptions, target: string, loop: WatchLoop): Pro
 
 	const last_ms = run_progress_read.read_last_report(target) ?? loop.last_ms
 
-	if (!run_progress.is_due(last_ms, now_ms, options.interval_ms)) return { ...loop, last_ms }
+	// **A tick that was not due ends the decline streak**, because no read was attempted and so this
+	// tick is not part of one. Without that, two unrelated outages either side of a quiet period read
+	// as one streak: the first prints its notice, and the second — hours later, and permanent — is
+	// deduplicated away against it, leaving the watcher silent in exactly the way the notice exists to
+	// prevent.
+	if (!run_progress.is_due(last_ms, now_ms, options.interval_ms)) {
+		return { ...loop, last_ms, said: undefined }
+	}
 
 	try {
 		return await attempt(options, target, { ...loop, last_ms }, now_ms)

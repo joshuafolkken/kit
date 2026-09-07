@@ -271,6 +271,31 @@ describe('the watch loop — when a tick produces nothing', () => {
 
 		expect(output.warned).toEqual([run_progress_cli.IDLE_NOTICE])
 	})
+})
+
+describe('the watch loop — the decline streak and its cooldown', () => {
+	// Two unrelated outages either side of a quiet period are two streaks, not one. Deduplicating the
+	// second against the first would leave the watcher silent through a permanent failure — the state
+	// the notice exists to prevent.
+	it('ends a decline streak at the first tick that was not due', async () => {
+		read_observations.mockResolvedValue({ kind: 'unreadable' })
+
+		const declined = await run_progress_cli.step(OPTIONS, STAMP, loop_at(Date.now() - 30 * MINUTE))
+
+		read_last_report.mockReturnValue(Date.now())
+
+		const quiet = await run_progress_cli.step(OPTIONS, STAMP, { ...declined, retry_at_ms: 0 })
+
+		expect(quiet.said).toBeUndefined()
+
+		read_last_report.mockReturnValue(undefined)
+		await run_progress_cli.step(OPTIONS, STAMP, { ...quiet, last_ms: Date.now() - 30 * MINUTE })
+
+		expect(output.warned).toEqual([
+			run_progress_cli.UNREADABLE_NOTICE,
+			run_progress_cli.UNREADABLE_NOTICE,
+		])
+	})
 
 	it('reads nothing at all while a cooldown is running', async () => {
 		const loop = loop_at(Date.now() - 30 * MINUTE, { retry_at_ms: Date.now() + MINUTE })
