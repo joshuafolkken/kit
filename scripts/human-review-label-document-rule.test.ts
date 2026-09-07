@@ -57,6 +57,13 @@ const SURFACE_MARKERS: ReadonlyArray<string> = [
 	// The check has to happen before implementation; the post-return confirmation is too late.
 	'Ask once, before implementing',
 	'Leave `in-progress` **on**',
+	// joshuafolkken/kit#1147: §2b describes the same state read for every delegated child, and said
+	// only that a child whose PR never merged is still open. Read on its own that is "not CLOSED
+	// means unfinished", which is the failure branch — so the carve-out has to be stated where the
+	// verifier is described, not only where the per-entry classification lives.
+	'Reading that state is not the same as reading `CLOSED` and calling every other answer a failure',
+	"one open answer is the run's own ending rather than an unfinished child",
+	'comes back open **by design**',
 	// A batch that halts on its first such issue is the intended end, not a run that broke. Read the
 	// other way, the next reader removes the stop to keep the batch moving.
 	'Stopping is the specification, not a failure',

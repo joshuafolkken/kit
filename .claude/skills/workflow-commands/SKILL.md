@@ -382,10 +382,22 @@ the per-issue procedure is `queue.md` → "Each issue runs in a delegated unit".
 **`epic-child`'s verifier is not the child's own completion report.** The parent reads the child's
 state from GitHub — `pnpm josh issue:state <N>`, the moment the unit returns — because a child
 reported done whose pull request never merged is still open, and a loop advancing on the summary has
-discarded the very thing that made the unit delegatable. The per-entry procedure is
-`epicrun.md` → "Each child runs in a delegated unit" and `queue.md` → "Each issue runs in a
-delegated unit"; the enumeration itself is `scripts/delegation/delegation-policy.ts`, printed in
-readable form by `docs/josh-commands.md` → "`josh delegate`".
+discarded the very thing that made the unit delegatable.
+
+**Reading that state is not the same as reading `CLOSED` and calling every other answer a failure**
+(joshuafolkken/kit#1147). That is why the command prints a `human_review:` line beside the state
+rather than the state alone: **one open answer is the run's own ending rather than an unfinished
+child**. A child stopped by `needs-human-review` comes back open **by design** (§2z) — its
+`in-progress` stays on, because the uncommitted work a person is meant to look at is still in the
+checkout and the child must go on holding its repository, and it is never counted against the
+consecutive-failure guard. Read as a failure there, the parent strips that label, releases the
+repository, and hands the next child a `git switch main && git pull` on top of that uncommitted
+work — the exact event joshuafolkken/kit#1125 filed the label to prevent — while a stop that went
+exactly to specification is tallied as an environment fault. **The classification itself belongs to
+the per-entry procedure**, and both entries carry every branch of it: `epicrun.md` → "Each child
+runs in a delegated unit" and `queue.md` → "Each issue runs in a delegated unit". The enumeration
+itself is `scripts/delegation/delegation-policy.ts`, printed in readable form by
+`docs/josh-commands.md` → "`josh delegate`".
 
 ### The pre-implementation reading — what goes to a unit, and from which file
 

@@ -407,6 +407,14 @@ describe('the canonical topic file is a pointer to the skill single source', () 
 		for (const marker of REMOVED_BODY_MARKERS) expect(pointer).not.toContain(marker)
 	})
 
+	// joshuafolkken/kit#1147: the verifier line used to stop at "the parent reads GitHub state",
+	// which a reader completes as "anything but CLOSED failed". Naming the exception here keeps the
+	// index honest about what the single source actually says.
+	it('names that the state read is not a blanket CLOSED-or-failure', () => {
+		expect(pointer).toContain('`CLOSED` 以外を一律に失敗と読むことではない')
+		expect(pointer).toContain('`needs-human-review`')
+	})
+
 	// A back-reference from the single source itself costs no second hop, and it is what tells a
 	// reader who landed on the skill that the topic file holds no body.
 	it('is named as a pointer by the skill that now holds the body', () => {

@@ -20,7 +20,7 @@
 
 - EPIC でない素の Issue も受け取ること、その経路で前提・分割が出ても停止せず起票して続けること、何も出てこなければ EPIC を作らないこと
 - 1 回の起動が承認する範囲（EPIC 内のマージ・複数リポジトリへの push・実行中の自動起票。外側は `auto-ok` だけ）
-- 子 1 件を隔離された実行単位へ委譲すること、親が読むのは要約ではなく `pnpm josh issue:state` が返す GitHub の状態であること
+- 子 1 件を隔離された実行単位へ委譲すること、親が読むのは要約ではなく `pnpm josh issue:state` が返す GitHub の状態であること、その返却の分類が 4 分岐（`CLOSED` / open ＋ `needs-decision` / open ＋ `human_review: yes` / open ＋ どちらも無し）であること
 - 並行度モデル（repo あたり同時 1 件・repo 間は並行・`epic:next` が適用する repo 単位の排他・advisory であってアトミックではないこと・90 分の stale 窓）
 - 複数 epic を 1 回の起動で指定できること、その候補が 1 つのレーンプールに合流すること、優先順の根拠、重複した子の扱い、`queue` の複数指定との違い（joshuafolkken/kit#1493）
 - 依存更新はセッションごとに 1 回で、子ごとには走らせないこと（走らせるかどうかは `pnpm josh latest:scope` が答える）
