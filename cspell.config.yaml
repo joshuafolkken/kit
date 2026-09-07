@@ -2,9 +2,14 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
-  # git's own spelling of the `commit.gpgsign` config key, turned off in the throwaway repository
-  # `lane-change-base.test.ts` builds so a signing setup on the machine cannot fail its commits.
+  # git's own spelling of the `commit.gpgsign` config key, carried on `-c` by the throwaway
+  # repository `lane-change-base.test.ts` builds so a signing setup on the machine cannot fail its
+  # commits.
   - gpgsign
+  # git's own name for the log of where a ref has been. It is the only evidence joshuafolkken/kit#1530
+  # left behind, and `test-repository-guard.ts` cites it three times as the reason the guard has to
+  # name what it caught.
+  - reflog
   # What `josh review:attest` calls a review that read a checkout other than the one it was briefed
   # on (joshuafolkken/kit#1522). cspell derives "targeted" but not the "mis-" compound.
   - mistargeted

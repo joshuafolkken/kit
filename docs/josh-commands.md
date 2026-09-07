@@ -364,6 +364,22 @@ the last three whole, because splitting `remote update` from `remote -v` inside 
 open when it gets it wrong. The shim finds the subcommand behind git's own global options, so
 `git -C <dir> fetch` is caught rather than read as a subcommand named after the directory.
 
+**A unit test that writes into the repository the suite is running in fails too**
+([#1530](https://github.com/joshuafolkken/kit/issues/1530)). Git exports `GIT_DIR` and
+`GIT_INDEX_FILE` to every hook it runs and both beat `cwd`, so a test whose fixture helper passes
+only `{ cwd }` builds its fixture inside the checkout the pre-push hook is firing in: three commits
+titled `base` and `another lane merged` landed on a live lane's branch during `pnpm josh git`, and a
+`git config user.email` wrote a fixture identity into a `--local` config that every linked work tree
+shares. The same shim now refuses a **writing** subcommand — `add`, `commit`, `config`, `init`,
+`reset`, `worktree` and the rest — on either of two findings: any git location variable is still set
+in its environment, or the command resolves into the repository the suite belongs to (its shared git
+directory, so a lane's write into a sibling work tree is caught as well). Reads are untouched, since
+half the suite reads its own repository and a read cannot move a branch. The refusal happens at the
+call, so vitest names the test that made it, and the record read at teardown is the backstop for a
+test that swallows the error. The fix is always in the test: clear the git location environment —
+`git_location_env.location_free_environment()` in `scripts/git/git-location-env.ts` — and carry any
+identity on `-c` rather than writing it into a config file.
+
 Extending it found a second offender the same day, and one that only appears inside a hook:
 `propagate-git.ts` passed the repository as `cwd`, which **`GIT_DIR` overrides** — and git exports
 `GIT_DIR` to every hook it runs. Under `pnpm josh git`'s pre-push hook its probes therefore answered
