@@ -1,4 +1,4 @@
-import { statSync } from 'node:fs'
+import { realpathSync, statSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -174,12 +174,51 @@ function decide(traces: Traces): LivenessDecision {
 	}
 }
 
-// The two roots a unit's output can legitimately be under: the agent harness writes a transcript into
-// the user's own data directory, and a test writes one into the OS temp directory. The path is
-// validated against them rather than merely normalized, because the argument is composed by an agent
-// rather than typed by a person, and a `stat` that can be pointed anywhere is an existence oracle for
-// the whole file system.
-const ALLOWED_ROOTS: ReadonlyArray<string> = [homedir(), tmpdir()]
+const POSIX_TEMP_ROOT = '/tmp'
+const WINDOWS_PLATFORM = 'win32'
+
+// The temp directory in the spelling `os.tmpdir()` cannot reach. **`os.tmpdir()` is not "the temp
+// directory"**: it honors `TMPDIR`, which on macOS names a per-user `/var/folders/…/T`, so a harness
+// writing its transcript under `/tmp` lands somewhere `os.tmpdir()` never names
+// (joshuafolkken/kit#1501).
+//
+// **It is decided by platform rather than written as a bare `/tmp`, because a POSIX literal is not
+// inert on Windows.** `path.relative` resolves a rooted path against the current drive, so `/tmp`
+// there becomes `C:\tmp` and would admit anything under it — a root nobody declared, on the one
+// platform where `os.tmpdir()` already is the whole answer. Windows therefore contributes
+// `os.tmpdir()` again, which the set below collapses away.
+const PLATFORM_TEMP_ROOT = process.platform === WINDOWS_PLATFORM ? tmpdir() : POSIX_TEMP_ROOT
+
+// A root that does not resolve is simply not a second spelling — never a reason to fail this module's
+// load. `realpathSync` throws for a path that does not exist, and it has no `throwIfNoEntry` option
+// the way `statSync` does.
+function to_resolved_root(root: string): string {
+	try {
+		return realpathSync(root)
+	} catch {
+		return root
+	}
+}
+
+// The roots a unit's output can legitimately be under: the agent harness writes a transcript into the
+// user's own data directory, and both a harness and a test write into the OS temp directory. The path
+// is validated against them rather than merely normalized, because the argument is composed by an
+// agent rather than typed by a person, and a `stat` that can be pointed anywhere is an existence
+// oracle for the whole file system.
+//
+// **Every root is listed in both spellings, and that is load-bearing rather than defensive.** `/tmp`
+// is a symbolic link to `/private/tmp` on macOS and `/var` one to `/private/var`, so a containment
+// test against one spelling rejects a transcript whose path was written as the other — `path.relative`
+// resolves no link. Measured on 2026-09-07: a transcript at `/private/tmp/claude-501/…` was refused,
+// every poll answered `undetermined`, and the parent could not detect a stopped unit at all — the
+// unbounded stall this command exists to remove, reappearing inside its own path check. Resolving the
+// *candidate* would not do instead: it does not exist yet in the "resolves to nothing" case, which has
+// to stay unreadable rather than throw.
+const ALLOWED_ROOTS: ReadonlyArray<string> = [
+	...new Set(
+		[homedir(), tmpdir(), PLATFORM_TEMP_ROOT].flatMap((root) => [root, to_resolved_root(root)]),
+	),
+]
 
 function is_within(candidate: string, root: string): boolean {
 	const relative = path.relative(root, candidate)
@@ -312,6 +351,7 @@ export {
 	DEFAULT_SILENT_MINUTES,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
+	PLATFORM_TEMP_ROOT,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,
