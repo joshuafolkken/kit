@@ -131,6 +131,12 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
   the stop. `CLAUDE.md` → "Completion gate" carries the rule, `prompts/testing-guide.md` → "Closing
   the E2E gate without a human run" the procedure.
+- **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
+  only once it has merged — decided from an enumeration (the verification gate, the code review, the
+  pre-push hook, the merge checks) rather than from how serious the defect looks. It binds wherever
+  children are dispatched, so `epicrun.md` → "Lanes" carries it for the parallel case and
+  `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 is the single source
+  (joshuafolkken/kit#1518).
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
   §2z. It is the one *child's* stop `epicrun` does not turn into a park — an `epic:audit` error and
   the consecutive-failure abort end a run too, but neither is a child asking for something.

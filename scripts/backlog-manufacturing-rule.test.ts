@@ -27,6 +27,7 @@ const SPLIT_SKILL = '.claude/skills/workflow-commands/split-assessment.md'
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const REVIEW_PROMPT = 'prompts/review.md'
 const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
+const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
 // The guide, written once: the single source and the entry summary have to state the same numbers,
 // and a guide that drifted between them would be two different thresholds under one rule.
 const SPLIT_GUIDE = 'about 10 changed files and about 400 changed lines'
@@ -103,6 +104,15 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	// what makes `epic:next` withhold the child the interrupt does not block.
 	'**`--before` / `--after` を使ってはならない。**',
 	'**順序は実行側が持つ**',
+	// The prescription, not only the prohibition. Pinned separately because restoring `--before <M>`
+	// while leaving the ban sentence in place reproduces round 1's exact contradiction with the suite
+	// still green — a ban is not a command form.
+	'`pnpm josh epic --add <E> <N>`',
+	'**位置を指定せずに**',
+	// The epic-less half of "filing and making it runnable are one unit". Without it the rule is
+	// unsatisfiable for an interrupt no epic tracks, which is the state it was corrected out of.
+	'**epic の下に無いなら挿入先そのものが無い**',
+	'**epic の外にある割り込みでは、まとまりの後半は 4 の報告そのもの**',
 	// joshuafolkken/kit#1518's added requirement: how an interrupt is *run*. Pinned as the enumeration
 	// rather than as the conclusion, because the conclusion alone ("run it alone if it is serious") is
 	// the judgement the whole rule is written to remove — the same loophole the three tests close.
@@ -114,6 +124,9 @@ const INTERRUPT_MARKERS: ReadonlyArray<string> = [
 	'**いずれかに当たれば単独実行。**',
 	'**「重大だと感じるか」は判定条件ではない**',
 	'**理由は 2 つあり、どちらか一方だけでも単独実行の根拠として十分である。**',
+	// "Landed" is three different points in a lane run — PR opened, review converged, merged — so the
+	// resume point is pinned as the one the section's own premise requires.
+	'バッチを再開するのはそれが `main` へマージされてからとする。**',
 	// The blocked-by exemption's enumeration used to be resident and is not any more: `CLAUDE.md` had
 	// 105 bytes of slack under `RESIDENT_CEILING_BYTES`, and the interrupt's three tests had to be
 	// paid for out of it. Moving is only moving if the destination is pinned, so the list is asserted
@@ -208,6 +221,37 @@ describe(`${WORKFLOW_PROMPT} — the WIP cap is reachable from the index`, () =>
 // The entry summary is what a run reads before it opens the shared file. A default raised in the
 // single source and left unraised here is the softening `split-assessment-document-rule.test.ts` was
 // written to prevent, one document further out.
+// A rule written only in `wip-cap.md` fires only for a run that opens `wip-cap.md`, and nothing in
+// the batch entry points sent a reader there — `epicrun` fills every free lane from
+// `epic:next --lanes` without ever reading the cap. That is the same "written where it never fires"
+// failure this whole issue is about, so the solo-run rule is asserted reachable from both documents
+// that dispatch children (joshuafolkken/kit#1518).
+// `read_unwrapped` collapses whitespace, so every marker here is written as the single line the
+// wrapped source reads as — which is also why a hard-wrapped sentence can be pinned at all.
+const SOLO_RUN_REACH: ReadonlyArray<{ doc: string; marker: string }> = [
+	{
+		doc: EPICRUN_SKILL,
+		marker: 'an interrupt whose subject is a defect in the verification path itself',
+	},
+	{
+		doc: EPICRUN_SKILL,
+		marker:
+			'the verification gate (lint / type check / spell check / unit tests), the code review, the pre-push hook, or the merge checks?',
+	},
+	{ doc: EPICRUN_SKILL, marker: 'It runs alone, and the batch resumes only once it has merged.' },
+	{
+		doc: WORKFLOW_SKILL,
+		marker:
+			'**An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes only once it has merged',
+	},
+]
+
+describe('the solo-run rule is reachable from the documents that dispatch children', () => {
+	it.each(SOLO_RUN_REACH)('$doc states $marker', ({ doc, marker }) => {
+		expect(read_unwrapped(doc)).toContain(marker)
+	})
+})
+
 describe(`${WORKFLOW_SKILL} — the entry summary carries the raised default`, () => {
 	const content = read_unwrapped(WORKFLOW_SKILL)
 

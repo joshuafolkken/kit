@@ -76,8 +76,12 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 }> = [
 	{
 		name: INTERRUPT_ROUTE_LABEL,
-		color: '5319e7',
-		description: 'Filed as an interrupt — a serious defect exempt from the WIP cap (wip-cap.md)',
+		// Not `5319e7`, which is the `epic` label's purple: in a listing an interrupt would render as
+		// an epic, and the two are read at a glance rather than by name.
+		color: '1d76db',
+		// Keyed to the tests rather than to severity. "A serious defect" is the self-assessment
+		// `wip-cap.md` bans as a criterion, and this string is what a person reads in `gh label list`.
+		description: 'Filed past the WIP cap — meets one of the three interrupt tests (wip-cap.md)',
 	},
 	{
 		name: REVIEW_CAP_ROUTE_LABEL,
