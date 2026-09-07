@@ -129,13 +129,35 @@ function live_marker(
 	return matched
 }
 
+// **Matching digests are not enough for the green claim** (joshuafolkken/kit#1537). The map covers
+// the paths the change makes changed, so a merge of the default branch that touches nothing the
+// branch touches leaves every digest identical while the tree gains code the gate never read —
+// and the brief would tell the reviewer that lint, the type check, the spell check and the unit tests
+// passed on "this exact tree". The gate already records the commit it measured against, and
+// `gate-skip.ts` already refuses reuse on it; this is the same refusal for the same record.
+//
+// **The in-flight marker is deliberately left alone.** It carries no base, and it claims no result:
+// the worst a moved base does there is report that a gate is running, which is true.
+function green_stamp(
+	stamp: FileMapStamp | undefined,
+	tree: Record<string, string>,
+	base: string,
+): FileMapStamp | undefined {
+	const matched = matching_stamp(stamp, tree)
+
+	if (matched === undefined || !file_map_stamp.describes_base(matched, base)) return undefined
+
+	return matched
+}
+
 // Green first: a matching gate stamp is a proven result, and a gate running beside it can only be a
 // second one over the same unverified tree.
 function gate_line(
 	stamps: { gate: FileMapStamp | undefined; in_flight: FileMapStamp | undefined },
 	tree: Record<string, string>,
+	base: string,
 ): string {
-	const green = matching_stamp(stamps.gate, tree)
+	const green = green_stamp(stamps.gate, tree, base)
 
 	if (green !== undefined) return verified_line(green.taken_at)
 
@@ -159,6 +181,127 @@ function round_two_target(root: string, delta: ReadonlyArray<string>): string {
 	return `Target: only these files, which are the ones round 1's fixes changed:\n${format_paths(root, delta)}`
 }
 
+// **What round 2 is sent to read, reconciled against the change it is meant to cover**
+// (joshuafolkken/kit#1537). The delta alone is not that list. It is the difference between two file
+// maps, each one a diff against `change_base` **as it stood when that map was taken** — and nothing
+// used to record which commit that was. Move the base between the rounds, which is exactly what a
+// resumed run's merge of the default branch does, and the two maps stop covering the same set of
+// paths: their difference then names files the branch never touched and misses files it did.
+//
+// The three fields are the whole reconciliation, and the run needs all three rather than the first:
+// `target` is what to read, `dropped` is what the comparison offered that this change does not
+// contain, and `carried` counts what this change contains that round 1 already read. A brief that
+// printed `target` alone would still be silently disagreeing with `git diff` — the failure the Issue
+// was filed on — it would just be disagreeing in a smaller way.
+//
+// **`recorded_at` is present exactly when the round is narrow.** It is the timestamp of the record the
+// delta was measured from, and its absence is what says the round was widened — so the block below
+// branches on this one decision rather than making a second one of its own.
+interface RoundTwoScope {
+	recorded_at: string | undefined
+	target: ReadonlyArray<string>
+	dropped: ReadonlyArray<string>
+	carried: ReadonlyArray<string>
+}
+
+function sorted_names(names: ReadonlyArray<string>): ReadonlyArray<string> {
+	return [...names].toSorted((left, right) => left.localeCompare(right))
+}
+
+// A record that cannot be compared widens the round to the whole change rather than narrowing it, so
+// every path the change touches is a target. This is the same direction joshuafolkken/kit#1241 chose
+// for a missing record, extended to a record that is present and unusable.
+function whole_change_scope(tree: Record<string, string>): RoundTwoScope {
+	return {
+		recorded_at: undefined,
+		target: sorted_names(Object.keys(tree)),
+		dropped: [],
+		carried: [],
+	}
+}
+
+// `tree`'s keys are this change's paths — `git diff <base>` plus the untracked files beside it — so
+// intersecting against them is what keeps a path the change does not contain out of the target.
+function delta_scope(
+	delta: ReadonlyArray<string>,
+	tree: Record<string, string>,
+	recorded_at: string,
+): RoundTwoScope {
+	const target = delta.filter((name) => Object.hasOwn(tree, name))
+
+	return {
+		recorded_at,
+		target,
+		dropped: delta.filter((name) => !Object.hasOwn(tree, name)),
+		carried: sorted_names(Object.keys(tree).filter((name) => !target.includes(name))),
+	}
+}
+
+// A type predicate rather than two spellings of the same condition: the scope and the printed block
+// must never disagree about whether the record was usable.
+function is_comparable(snapshot: FileMapStamp | undefined, base: string): snapshot is FileMapStamp {
+	return snapshot !== undefined && file_map_stamp.describes_base(snapshot, base)
+}
+
+function round_two_scope(
+	snapshot: FileMapStamp | undefined,
+	tree: Record<string, string>,
+	base: string,
+): RoundTwoScope {
+	if (!is_comparable(snapshot, base)) return whole_change_scope(tree)
+
+	return delta_scope(file_map_stamp.changed_since(snapshot, tree), tree, snapshot.taken_at)
+}
+
+const BASE_MOVED_PREFIX = 'The change base moved since round 1 was recorded'
+
+function base_moved_line(snapshot: FileMapStamp, root: string, base: string): string {
+	const recorded = snapshot.base ?? 'a commit it did not record'
+
+	return `${BASE_MOVED_PREFIX} — round 1 measured this change against ${recorded}, this round measures it against ${base}. The two file maps therefore cover different sets of files, and their difference is not the fix delta. ${whole_change_target(root, base)}`
+}
+
+function widened_line(snapshot: FileMapStamp | undefined, root: string, base: string): string {
+	if (snapshot === undefined) return no_snapshot_line(root, base)
+
+	return base_moved_line(snapshot, root, base)
+}
+
+function dropped_line(root: string, dropped: ReadonlyArray<string>): string {
+	return `Not in this change, so not a target here — the comparison offered them and \`git diff\` does not list them:\n${format_paths(root, dropped)}`
+}
+
+function carried_line(root: string, base: string, count: number): string {
+	return `${String(count)} further file(s) this change touches are byte-identical to round 1 and were read there, so they are deliberately out of scope. Reconcile before you report: \`git -C ${root} diff --name-only ${base}\` plus the untracked files beside it is this change, and every path in it is either a target above or one of those.`
+}
+
+function reconciliation(root: string, base: string, scope: RoundTwoScope): ReadonlyArray<string> {
+	return [
+		...(scope.dropped.length > 0 ? [dropped_line(root, scope.dropped)] : []),
+		...(scope.carried.length > 0 ? [carried_line(root, base, scope.carried.length)] : []),
+	]
+}
+
+// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the record
+// is round 1's own — written once per run, and kept by a later round-1 invocation rather than retaken
+// against the fixed tree — so this line says how far back the target below is measured from. A record
+// left behind by a run that never reached `josh followup` makes the target wider, and its timestamp is
+// the only thing that shows that from here.
+function narrow_block(
+	recorded_at: string,
+	scope: RoundTwoScope,
+	root: string,
+	base: string,
+): string {
+	return [
+		ROUND_TWO_HEADING,
+		`Round 1 was recorded at ${recorded_at}.`,
+		round_two_target(root, scope.target),
+		...reconciliation(root, base, scope),
+		ROUND_TWO_QUESTION,
+	].join('\n')
+}
+
 // `undefined` for the snapshot and "the whole change" as the answer: a missing record must widen the
 // review, never narrow it. A brief that silently reviewed nothing would be the cheapest possible run
 // and the most dangerous.
@@ -168,17 +311,13 @@ function round_two_block(
 	root: string,
 	base: string,
 ): string {
-	if (snapshot === undefined) return `${ROUND_TWO_HEADING}\n${no_snapshot_line(root, base)}`
+	const scope = round_two_scope(snapshot, tree, base)
 
-	const delta = file_map_stamp.changed_since(snapshot, tree)
-	// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the
-	// record is round 1's own — written once per run, and kept by a later round-1 invocation rather
-	// than retaken against the fixed tree — so this line says how far back the target below is
-	// measured from. A record left behind by a run that never reached `josh followup` makes the target
-	// wider, and its timestamp is the only thing that shows that from here.
-	const taken = `Round 1 was recorded at ${snapshot.taken_at}.`
+	if (scope.recorded_at === undefined) {
+		return `${ROUND_TWO_HEADING}\n${widened_line(snapshot, root, base)}`
+	}
 
-	return `${ROUND_TWO_HEADING}\n${taken}\n${round_two_target(root, delta)}\n${ROUND_TWO_QUESTION}`
+	return narrow_block(scope.recorded_at, scope, root, base)
 }
 
 interface BriefStamps {
@@ -215,7 +354,7 @@ function compose(input: BriefInput): string {
 		'',
 		checkout_block(input.checkout, input.nonce),
 		'',
-		gate_line(input.stamps, input.tree),
+		gate_line(input.stamps, input.tree, input.base),
 		TEST_COMMAND_LINE,
 		'',
 		target_block(input),
@@ -224,11 +363,16 @@ function compose(input: BriefInput): string {
 
 const review_brief = {
 	attest_line,
+	BASE_MOVED_PREFIX,
+	base_moved_line,
+	carried_line,
 	checkout_block,
 	checkout_warning,
 	compose,
+	dropped_line,
 	EMPTY_DELTA_LINE,
 	gate_line,
+	green_stamp,
 	in_flight_line,
 	live_marker,
 	matching_stamp,
@@ -237,10 +381,11 @@ const review_brief = {
 	ROUND_TWO_HEADING,
 	ROUND_TWO_QUESTION,
 	round_two_block,
+	round_two_scope,
 	SECOND_ROUND,
 	TEST_COMMAND_LINE,
 	whole_change_target,
 }
 
-export type { BriefInput, BriefStamps }
+export type { BriefInput, BriefStamps, RoundTwoScope }
 export { review_brief }

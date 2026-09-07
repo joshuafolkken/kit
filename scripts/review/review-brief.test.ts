@@ -31,8 +31,18 @@ const STARTED_AT = '2026-09-03T02:00:00.000Z'
 
 type Tree = Record<string, string>
 
+// The commit the change is measured against, resolved by the caller (joshuafolkken/kit#1527). One
+// base throughout here, which is the ordinary run.
+const BASE = 'fedcba9876543210fedcba9876543210fedcba98'
+// A second commit, for the cases that assert what happens when the base moves under a record.
+const OTHER_BASE = '89abcdef0123456789abcdef0123456789abcdef'
+
+// The base travels with every record since joshuafolkken/kit#1537: a round-1 snapshot taken against a
+// different commit is not comparable, and reads as "widen the round" rather than as a fix delta. The
+// cases below are all one base, which is the ordinary run; the moved base has a suite of its own in
+// `review-round2-target-scope.test.ts`, where real git moves it.
 function stamp_of(files: Tree): FileMapStamp {
-	return { taken_at: TAKEN_AT, files }
+	return { taken_at: TAKEN_AT, files, base: BASE }
 }
 
 // A marker asserts a live process, so the fixture carries this one: without a pid the reader answers
@@ -57,8 +67,6 @@ const CHECKOUT: ReviewCheckout = {
 	head: '0123456789abcdef0123456789abcdef01234567',
 }
 const NONCE = 'deadbeefcafef00d'
-// The commit the change is measured against, resolved by the caller (joshuafolkken/kit#1527).
-const BASE = 'fedcba9876543210fedcba9876543210fedcba98'
 
 function compose(input: {
 	round: number
@@ -79,8 +87,15 @@ function compose(input: {
 	})
 }
 
-function gate_line(input: { gate?: FileMapStamp; in_flight?: FileMapStamp }, tree: Tree): string {
-	return review_brief.gate_line({ gate: input.gate, in_flight: input.in_flight }, tree)
+function gate_line(
+	input: { gate?: FileMapStamp; in_flight?: FileMapStamp; base?: string },
+	tree: Tree,
+): string {
+	return review_brief.gate_line(
+		{ gate: input.gate, in_flight: input.in_flight },
+		tree,
+		input.base ?? BASE,
+	)
 }
 
 describe('review_brief.compose — the level stays first', () => {
@@ -122,6 +137,25 @@ describe('review_brief.gate_line — never claims a gate that did not run on thi
 
 	it('refuses to claim green when there is no record at all', () => {
 		expect(gate_line({}, tree)).toContain(NOT_VERIFIED)
+	})
+
+	// joshuafolkken/kit#1537. A merge of the default branch that touches nothing the branch touches
+	// leaves every digest identical, so the digests alone would still say "this exact tree" about a
+	// tree that gained code the gate never read. The gate records the commit it measured against; this
+	// is the same refusal `gate-skip.ts` already makes of the same record.
+	it('refuses to claim green when the gate measured a different change base', () => {
+		const line = gate_line({ gate: stamp_of(tree), base: OTHER_BASE }, tree)
+
+		expect(line).toContain(NOT_VERIFIED)
+		expect(line).not.toContain(VERIFIED)
+	})
+
+	// The in-flight marker carries no base and claims no result, so requiring one would delete the
+	// state joshuafolkken/kit#1242 added rather than guard it.
+	it('still reports a running gate when the change base moved', () => {
+		expect(gate_line({ in_flight: started_stamp_of(tree), base: OTHER_BASE }, tree)).toContain(
+			RUNNING,
+		)
 	})
 })
 
