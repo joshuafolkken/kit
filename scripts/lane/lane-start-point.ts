@@ -16,12 +16,12 @@ import { git_command } from '#scripts/git/git-command'
 // happens to be called `origin/<default>` cannot capture the reading.
 
 const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
-const ORIGIN_SHORT_PREFIX = 'origin/'
 
-// A fetch failure is reported and stepped over rather than raised. `lane:open` is a local operation
-// and has to keep working with no network at all — offline, on a clone with no `origin`, and while
-// GitHub's ssh endpoint is timing out. What it degrades to is whatever `origin/<default>` already
-// holds, which is still never *behind* the local branch.
+// A fetch *failure* is reported and stepped over rather than raised. `lane:open` has to keep working
+// with no network at all — offline, and on a clone with no `origin` — and what it degrades to is
+// whatever `origin/<default>` already holds, which is still never *behind* the local branch. Note
+// what this does not cover: `fetch_branch` runs through `exec_git_command_read`, which sets no
+// timeout, so a connection that hangs rather than failing blocks here instead of degrading.
 async function refresh_default_branch(default_branch: string): Promise<void> {
 	try {
 		await git_command.fetch_branch(default_branch)
@@ -32,15 +32,21 @@ async function refresh_default_branch(default_branch: string): Promise<void> {
 	}
 }
 
-async function has_remote_tracking_branch(default_branch: string): Promise<boolean> {
-	const pattern = `${ORIGIN_SHORT_PREFIX}${default_branch}`
-	const names = await git_command.branch_names_remote(pattern)
-
-	return names.includes(pattern)
+// Said out loud rather than taken quietly. The resolver answers the bare name for a repository with
+// no remote *and* for a `rev-parse` that failed, and the second reading puts the lane back on the
+// stale ref this module exists to avoid — so the fallback is never silent.
+function report_local_fallback(default_branch: string): void {
+	console.error(
+		`No ${REFS_REMOTES_ORIGIN_PREFIX}${default_branch} to cut the lane from; using the local ${default_branch}, which may be behind what has been merged.`,
+	)
 }
 
 /**
  * The commit-ish `git worktree add` should branch a lane from.
+ *
+ * The ref itself comes from `git_command.default_branch_reference`, which `change_base` resolves through
+ * too — one resolution rather than two, so a lane is measured against the commit it was cut from.
+ * What is added here is the fetch, which belongs to opening a lane and not to reading a diff.
  *
  * Falls back to the bare default-branch name where no remote-tracking ref exists — a fresh
  * `git init`, or a clone whose `origin` was removed. There the local branch is the only answer
@@ -51,18 +57,11 @@ async function resolve(): Promise<string> {
 
 	await refresh_default_branch(default_branch)
 
-	if (await has_remote_tracking_branch(default_branch)) {
-		return `${REFS_REMOTES_ORIGIN_PREFIX}${default_branch}`
-	}
+	const start_point = await git_command.default_branch_reference()
 
-	// Said out loud rather than taken quietly. `git branch --list` answers `[]` for a repository that
-	// has no remote *and* for a git call that failed, and the second reading puts the lane back on the
-	// stale ref this module exists to avoid — so the fallback is never silent.
-	console.error(
-		`No refs/remotes/origin/${default_branch} to cut the lane from; using the local ${default_branch}, which may be behind what has been merged.`,
-	)
+	if (!start_point.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) report_local_fallback(default_branch)
 
-	return default_branch
+	return start_point
 }
 
 const lane_start_point = { resolve }

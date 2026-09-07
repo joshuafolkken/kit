@@ -12,7 +12,7 @@ import type { LaneInfo } from './lane-registry'
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
-		branch_names_remote: vi.fn(),
+		default_branch_reference: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
 		worktree_add: vi.fn(),
@@ -44,6 +44,7 @@ const ROOT_ENV = [BOT_TOKEN, CHAT_ID, 'PORT_SEED=5', ''].join('\n')
 const ROOT_SEED = 5
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
+const START_POINT = 'refs/remotes/origin/main'
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
@@ -81,7 +82,7 @@ beforeEach(() => {
 	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
 	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
-	vi.mocked(git_command.branch_names_remote).mockResolvedValue(['origin/main'])
+	vi.mocked(git_command.default_branch_reference).mockResolvedValue(START_POINT)
 	// Stands in for what `git worktree add` does to the filesystem, so the `.env` write that follows
 	// it has somewhere to land.
 	vi.mocked(git_command.worktree_add).mockImplementation(async (directory: string) => {
@@ -101,7 +102,7 @@ describe('opening a lane', () => {
 		expect(vi.mocked(git_command.worktree_add)).toHaveBeenCalledWith(
 			path.join(LANE_ROOT, ISSUE),
 			'1490-lane',
-			'refs/remotes/origin/main',
+			START_POINT,
 		)
 	})
 

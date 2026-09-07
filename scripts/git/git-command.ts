@@ -104,6 +104,35 @@ async function get_default_branch(): Promise<string> {
 
 const MERGE_BASE_COMMAND = 'merge-base'
 
+// **The ref the default branch is actually at**, which is not the same thing as its name
+// (joshuafolkken/kit#1535). `get_default_branch` returns the bare name, and git resolves that to the
+// *local* `refs/heads/<default>` — a ref nothing in this workflow advances, because merges happen on
+// GitHub and the default branch is checked out in no work tree. This is the single source both the
+// lane's start point and `change_base` below resolve through, so a lane cut from
+// `refs/remotes/origin/<default>` is measured against that same commit. Measured without it: a lane
+// cut from a remote-tracking ref three commits ahead reported those three commits' files as its own.
+//
+// It falls back to the bare name where there is no remote-tracking ref — a fresh `git init`, a clone
+// with no `origin` — which is the reading every caller had before. The one case it reads differently
+// is a local default branch *ahead* of the remote, which this workflow does not produce and
+// `prevent-main-commit.ts` exists to stop.
+async function reference_exists(reference: string): Promise<boolean> {
+	try {
+		await exec_git_command_read(['rev-parse', '--verify', '--quiet', reference])
+
+		return true
+	} catch {
+		return false
+	}
+}
+
+async function default_branch_reference(): Promise<string> {
+	const default_branch = await get_default_branch()
+	const remote_reference = `${REFS_REMOTES_ORIGIN_PREFIX}${default_branch}`
+
+	return (await reference_exists(remote_reference)) ? remote_reference : default_branch
+}
+
 // The commit this branch was cut from — and the base every "changed" reading below measures
 // against, in place of the default branch itself.
 //
@@ -130,7 +159,7 @@ const MERGE_BASE_COMMAND = 'merge-base'
 // changes there. A repository with no common ancestor to find falls back to the previous reading
 // rather than failing the callers, all of which treat a throw as "nothing can be reused".
 async function change_base(): Promise<string> {
-	const default_branch = await get_default_branch()
+	const default_branch = await default_branch_reference()
 
 	try {
 		return await exec_git_command_read([MERGE_BASE_COMMAND, default_branch, 'HEAD'])
@@ -514,6 +543,7 @@ const git_command = {
 	diff_main_names,
 	untracked_names,
 	get_default_branch,
+	default_branch_reference,
 	fetch_branch,
 	merge_fast_forward,
 	checkout_b,

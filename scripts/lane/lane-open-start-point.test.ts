@@ -128,10 +128,11 @@ describe('the commit a new lane starts from', () => {
 	it(
 		'leaves the lane branch with no upstream, so a bare push cannot aim at the default branch',
 		async () => {
-			await lane_open.open_lane(ISSUE)
+			const outcome = await lane_open.open_lane(ISSUE)
 
 			const configured = await configured_upstream(lane_paths.lane_branch(ISSUE))
 
+			expect(outcome.kind).toBe('opened')
 			expect(configured).toBe('')
 		},
 		TIMEOUT_MS,
