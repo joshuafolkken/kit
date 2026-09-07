@@ -203,7 +203,7 @@ async function clear_review_target(should_merge: boolean): Promise<void> {
 	try {
 		await review_attest.clear_here()
 	} catch {
-		/* the record goes stale on its own after eight hours */
+		/* a fresh `josh review:brief` replaces the record the next run reads */
 	}
 }
 

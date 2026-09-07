@@ -52,8 +52,13 @@ async function run_attest(nonce: string): Promise<number> {
 	return FAILURE_EXIT_CODE
 }
 
-function run_check(): number {
-	const verdict = review_attest.check()
+// **`check_here`, not `check`** — the pointer is keyed on the repository root, and `check`'s default
+// is `PROJECT_ROOT`, which is `process.cwd()`. Run from a subdirectory, or from the session checkout
+// rather than the lane's, the two hash different keys: no pointer is found, the command prints "no
+// review target is recorded" and exits 0. That is a pass in the one state this command exists to
+// catch, and it is the gate the documents tell a run to consult before counting a review round.
+async function run_check(): Promise<number> {
+	const verdict = await review_attest.check_here()
 
 	if (verdict.status === 'not-required') {
 		console.info(NOT_REQUIRED_LINE)
@@ -85,7 +90,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const [first] = argv
 
 	if (first === undefined || argv.length !== 1) return usage()
-	if (first === CHECK_FLAG) return run_check()
+	if (first === CHECK_FLAG) return await run_check()
 	if (NONCE_PATTERN.test(first)) return await run_attest(first)
 
 	return usage()
