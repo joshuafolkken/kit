@@ -1,3 +1,4 @@
+import { git_location_environment } from '#scripts/git/git-location-environment'
 import { execaSync } from 'execa'
 
 // The git probes propagation needs before it writes anything into a working tree.
@@ -30,21 +31,22 @@ interface TreeState {
 // hook. That is the intermittent `propagate-guard` failure listed on the issue, and it is why it never
 // reproduced outside a push.
 //
-// Clearing the two is what makes `cwd` mean what it says. `-C` would work as well and is not used
-// here, because every call below already passes the path this way and a second spelling of the same
-// intent is one more thing to keep in step.
-const GIT_LOCATION_VARIABLES: ReadonlyArray<string> = ['GIT_DIR', 'GIT_WORK_TREE']
-
-function location_free_environment(): Record<string, undefined> {
-	return Object.fromEntries(GIT_LOCATION_VARIABLES.map((name) => [name, undefined]))
-}
+// Clearing them is what makes `cwd` mean what it says. `-C` would work as well and is not used here,
+// because every call below already passes the path this way and a second spelling of the same intent
+// is one more thing to keep in step.
+//
+// **The list itself moved to `#scripts/git/git-location-environment`** when joshuafolkken/kit#1530
+// found the same defect in a second file: three consumers now clear the same names, and a list kept
+// in one of them is a list the other two drift away from. It widened there past `GIT_DIR` /
+// `GIT_WORK_TREE` to the index and object-store variables, which redirect a *write* rather than a
+// lookup — inert for the read-only probes below, and required by the fixture that commits.
 
 function run_git(repository_path: string, args: ReadonlyArray<string>): string | undefined {
 	const result = execaSync('git', args, {
 		cwd: repository_path,
 		reject: false,
 		timeout: GIT_TIMEOUT_MS,
-		env: { LC_ALL: 'C', LANGUAGE: 'C', ...location_free_environment() },
+		env: { LC_ALL: 'C', LANGUAGE: 'C', ...git_location_environment.location_free_environment() },
 		extendEnv: true,
 	})
 
