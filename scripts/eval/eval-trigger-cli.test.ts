@@ -97,6 +97,22 @@ describe('eval_trigger_cli.since_eval_decision', () => {
 	})
 })
 
+// The gap joshuafolkken/kit#1152 left open. An interrupted run leaves a record saying only that a run
+// started, and the tree it measured is untouched — so a comparison on its own answers `skip` for a
+// verdict that was never reached (joshuafolkken/kit#1164).
+describe('eval_trigger_cli.since_eval_decision — a run that never finished', () => {
+	it('requires a run when the record carries no completion', () => {
+		const files = { [STAMP_DOCUMENT]: STAMP_HASH }
+
+		given(stamp_of(files, false), { ...files })
+
+		const { scope, reason } = eval_trigger_cli.since_eval_decision()
+
+		expect(scope).toBe(eval_trigger.REQUIRED_SCOPE)
+		expect(reason).toBe(eval_trigger_cli.INCOMPLETE_STAMP_REASON)
+	})
+})
+
 describe('eval_trigger_cli.run_since_eval', () => {
 	it('puts the scope on stdout and the reason on stderr', () => {
 		const files = { [STAMP_DOCUMENT]: STAMP_HASH }
