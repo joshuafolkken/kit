@@ -55,8 +55,8 @@ async function repository_root(): Promise<string> {
 	return await exec_git_command_read(['rev-parse', '--show-toplevel'])
 }
 
-// The commit this checkout is sitting on, as opposed to `default_branch_commit`'s commit on the
-// branch a change is measured against. Read by `josh review:brief` to say which tree a review was
+// The commit this checkout is sitting on, as opposed to `change_base_commit`'s commit a change is
+// measured against. Read by `josh review:brief` to say which tree a review was
 // briefed on, so a review that read a different one can be told apart from one that read this one
 // (joshuafolkken/kit#1522).
 async function head_commit(): Promise<string> {
@@ -102,10 +102,45 @@ async function get_default_branch(): Promise<string> {
 	return DEFAULT_BRANCH_FALLBACK
 }
 
-async function diff_main(file_path: string): Promise<string> {
+const MERGE_BASE_COMMAND = 'merge-base'
+
+// The commit this branch was cut from — and the base every "changed" reading below measures
+// against, in place of the default branch itself.
+//
+// **A two-dot `git diff <default-branch>` compares a moving *ref* to the working tree, and in a
+// linked work tree that ref is shared with every other lane** (joshuafolkken/kit#1527). So when one
+// lane merges, an unmerged lane's diff picks that lane's files up in reverse: files this branch
+// never touched arrive in `josh review:brief`'s target list, in the digest map `josh gate` stamps,
+// and in `josh review:round2`'s fix delta.
+//
+// **The merge base is the fixed point that removes it**, because it is a commit rather than a ref:
+// an advance of the default branch that this branch is an ancestor of does not move it. It is also
+// the right answer at both points of a run, and a lane passes through both — with the work still
+// uncommitted `HEAD` is the cut commit and the merge base is that same commit, so the diff is the
+// uncommitted work; once the branch commits, `HEAD` moves ahead while the merge base stays put, so
+// the diff is the branch's whole change plus anything still uncommitted. `<default-branch>...HEAD`
+// answers neither, because a three-dot diff ends at `HEAD` and a lane's work is uncommitted for
+// most of its run.
+//
+// **It never reports less than the old reading did.** The new set is the branch's own change; the
+// old one was that same set plus the inverse of whatever the default branch had advanced by — so
+// this narrows the reading and cannot hide a file the branch actually changed.
+//
+// In a checkout sitting on the default branch the merge base *is* that branch's commit, so nothing
+// changes there. A repository with no common ancestor to find falls back to the previous reading
+// rather than failing the callers, all of which treat a throw as "nothing can be reused".
+async function change_base(): Promise<string> {
 	const default_branch = await get_default_branch()
 
-	return await exec_git_command_read(['diff', default_branch, '--', file_path])
+	try {
+		return await exec_git_command_read([MERGE_BASE_COMMAND, default_branch, 'HEAD'])
+	} catch {
+		return default_branch
+	}
+}
+
+async function diff_main(file_path: string): Promise<string> {
+	return await exec_git_command_read(['diff', await change_base(), '--', file_path])
 }
 
 // Names only, for callers that classify a change rather than read it — `josh review:level` decides
@@ -126,23 +161,24 @@ const NO_PATH_QUOTING: ReadonlyArray<string> = ['-c', 'core.quotePath=false']
 // at the source rather than leaving each caller to discover the configuration.
 const NO_RELATIVE_PATHS = '--no-relative'
 
-// The commit the default branch points at. Every "changed" reading below is a diff against that
-// branch, so a set of changed paths — or a map of their digests — means nothing without it: fetch an
-// advanced default branch and rebase onto it, and each digest can stay identical while the rest of
-// the tree is replaced by code no check has read (joshuafolkken/kit#1328).
-async function default_branch_commit(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', await get_default_branch()])
+// The commit `change_base` resolves to. Every "changed" reading below is a diff against it, so a set
+// of changed paths — or a map of their digests — means nothing without it: fetch an advanced default
+// branch and rebase onto it, and each digest can stay identical while the rest of the tree is
+// replaced by code no check has read (joshuafolkken/kit#1328). A rebase still invalidates a stamp
+// taken against it — the rebase moves `HEAD`, and with it the merge base — while another lane
+// merging into the shared default branch no longer does, because it moves neither
+// (joshuafolkken/kit#1527).
+async function change_base_commit(): Promise<string> {
+	return await exec_git_command_read(['rev-parse', await change_base()])
 }
 
 async function diff_main_names(): Promise<string> {
-	const default_branch = await get_default_branch()
-
 	return await exec_git_command_read([
 		...NO_PATH_QUOTING,
 		'diff',
 		NAME_ONLY_FLAG,
 		NO_RELATIVE_PATHS,
-		default_branch,
+		await change_base(),
 		'--',
 	])
 }
@@ -438,7 +474,8 @@ const git_command = {
 	diff_cached,
 	diff_cached_names,
 	diff_main,
-	default_branch_commit,
+	change_base,
+	change_base_commit,
 	diff_main_names,
 	untracked_names,
 	get_default_branch,

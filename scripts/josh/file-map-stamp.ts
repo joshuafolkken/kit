@@ -21,11 +21,14 @@ interface FileMapStamp {
 	// which stays true however long the file sits there, so they carry it and never read it.
 	pid?: number
 	// The commit the file map is defined against (joshuafolkken/kit#1328). Every reader of these
-	// records computes its map as a diff against the default branch, so **the map alone does not
-	// describe a tree**: fetch an advanced default branch and rebase onto it, and every digest can stay
-	// identical while the rest of the working tree is replaced by code no check has read. Only a reader
-	// that acts on the record — `josh gate`, which reuses a green result instead of re-running it —
-	// needs the guarantee, so it is the one that writes and compares this.
+	// records computes its map as a diff against that commit — the branch's merge base with the
+	// default branch since joshuafolkken/kit#1527 — so **the map alone does not describe a tree**:
+	// fetch an advanced default branch and rebase onto it, and every digest can stay identical while
+	// the rest of the working tree is replaced by code no check has read. The rebase moves `HEAD` and
+	// so moves the merge base, which is what this field catches; another lane merging into the shared
+	// default branch moves neither, and correctly leaves the record standing. Only a reader that acts
+	// on the record — `josh gate`, which reuses a green result instead of re-running it — needs the
+	// guarantee, so it is the one that writes and compares this.
 	base?: string
 	// When the run that wrote this record reached its verdict (joshuafolkken/kit#1164). Written only
 	// by `complete`, so it is absent on a record whose run was interrupted or threw — which is the

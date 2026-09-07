@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { git_command } from '#scripts/git/git-command'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -123,6 +124,10 @@ async function compose_brief(
 		round,
 		tree,
 		stamps,
+		// Resolved here rather than printed as a `$(…)` the forked agent would expand: a subshell that
+		// fails expands to nothing, and the bare `git diff` left behind lists only the unstaged working
+		// tree — a review silently narrowed to a fraction of the change (joshuafolkken/kit#1527).
+		base: await git_command.change_base(),
 		...(await open_contract()),
 	})
 }

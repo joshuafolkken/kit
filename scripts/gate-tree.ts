@@ -32,7 +32,7 @@ async function read_changed_files(): Promise<Record<string, string>> {
 
 async function read_base(): Promise<string | undefined> {
 	try {
-		return await git_command.default_branch_commit()
+		return await git_command.change_base_commit()
 	} catch {
 		return undefined
 	}

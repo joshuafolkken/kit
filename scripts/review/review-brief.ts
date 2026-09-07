@@ -47,10 +47,25 @@ function checkout_block(checkout: ReviewCheckout, nonce: string): string {
 	].join('\n')
 }
 
-// `-C <root>` rather than a bare `git diff main`, so the command works from whatever directory the
+// `-C <root>` rather than a bare `git diff`, so the command works from whatever directory the
 // forked agent happens to be sitting in rather than only from the right one.
-function whole_change_target(root: string): string {
-	return `Target: the whole change — \`git -C ${root} diff main\` plus the untracked files beside it.`
+//
+// **The base is the merge base, not `main` itself** (joshuafolkken/kit#1527). A linked work tree
+// shares the `main` ref with every other lane, so a two-dot `git diff main` run in an unmerged lane
+// lists whatever another lane merged in the meantime — in reverse. This line is a command the forked
+// agent runs, so printing the old spelling would hand it exactly the mixed-in listing the reading
+// itself no longer produces.
+//
+// **The base is resolved here and embedded as a value, never printed as a `$(…)` substitution.** A
+// subshell that fails expands to the empty string, and `git -C <root> diff` with no revision exits 0
+// listing only the *unstaged* working tree — so a `merge-base` that could not answer would silently
+// narrow the review to a fraction of the change and the agent would report "no findings" on code it
+// never read. `git_command.change_base` already degrades to the default branch name instead, which
+// is the previous command and fails loudly rather than open.
+function whole_change_target(root: string, base: string): string {
+	const command = `git -C ${root} diff ${base}`
+
+	return `Target: the whole change — \`${command}\` plus the untracked files beside it.`
 }
 
 const ROUND_TWO_HEADING =
@@ -59,8 +74,8 @@ const ROUND_TWO_HEADING =
 const ROUND_TWO_QUESTION =
 	'Ask whether each first-round finding closed and whether the fix itself introduced a defect. Do not re-read the parts of the diff no fix touched.'
 
-function no_snapshot_line(root: string): string {
-	return `No round-1 snapshot was recorded, so the fix delta cannot be named. ${whole_change_target(root)}`
+function no_snapshot_line(root: string, base: string): string {
+	return `No round-1 snapshot was recorded, so the fix delta cannot be named. ${whole_change_target(root, base)}`
 }
 
 const EMPTY_DELTA_LINE =
@@ -151,8 +166,9 @@ function round_two_block(
 	snapshot: FileMapStamp | undefined,
 	tree: Record<string, string>,
 	root: string,
+	base: string,
 ): string {
-	if (snapshot === undefined) return `${ROUND_TWO_HEADING}\n${no_snapshot_line(root)}`
+	if (snapshot === undefined) return `${ROUND_TWO_HEADING}\n${no_snapshot_line(root, base)}`
 
 	const delta = file_map_stamp.changed_since(snapshot, tree)
 	// The snapshot's own timestamp, printed rather than assumed. Since joshuafolkken/kit#1441 the
@@ -178,14 +194,17 @@ interface BriefInput {
 	stamps: BriefStamps
 	checkout: ReviewCheckout
 	nonce: string
+	// The commit the change is measured against, resolved by the caller so the printed target carries
+	// a value rather than a subshell that can fail open (joshuafolkken/kit#1527).
+	base: string
 }
 
 const SECOND_ROUND = 2
 
 function target_block(input: BriefInput): string {
-	if (input.round < SECOND_ROUND) return whole_change_target(input.checkout.root)
+	if (input.round < SECOND_ROUND) return whole_change_target(input.checkout.root, input.base)
 
-	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root)
+	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
 }
 
 // The level alone on the first line, because `review:level`'s contract — a caller reading the answer

@@ -51,7 +51,7 @@ vi.mock('./review/review-tree', () => ({
 
 vi.mock('./git/git-command', () => ({
 	git_command: {
-		default_branch_commit: async (): Promise<string> => {
+		change_base_commit: async (): Promise<string> => {
 			refuse_when('base')
 
 			return repository.base
