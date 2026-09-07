@@ -254,6 +254,7 @@ hundred of them, never pay it.
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
 | Already a child of an epic | Add to **that** epic; do not create a second | A |
+| Spread across an epic and its **own parent** | Add to the inner epic — the parent already contains it | A |
 | Spread across **different** epics | **Choose the one you recommend, add to it, and record why** | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
@@ -262,11 +263,16 @@ hundred of them, never pay it.
 is reversible — one `epic --add` moves an issue to a different epic — so choosing between two
 candidate epics is Tier A: take the one you recommend, and write the decision (what was taken, what
 was rejected, why, and the date) on **both** the issue and the epic's `## Decisions`. **Merging two
-epics is a different action, and nothing here proposes it**: this verdict fires whenever related
-issues sit in different epics, which includes an epic and its own parent — joshuafolkken/kit#1079
-records three such false positives, one of which stopped a whole batch over an issue whose
-implementation was finished and whose pull request was mergeable. Stop only where the two epics are
-genuinely too close to separate, which is the toss-up Tier B is for and is rare.
+epics is a different action, and nothing here proposes it.**
+
+**An epic and its own parent no longer produce the spread verdict at all** (joshuafolkken/kit#1079).
+They were never two peers to choose between — the parent already contains the child — so the pair is
+narrowed to the inner epic and the issue is added there. The verdict had recorded three such false
+positives, one of which stopped a whole batch over an issue whose implementation was finished and
+whose pull request was mergeable. **The narrowing drops parents, never peers**: one unrelated epic
+beside a nested chain still asks, and so does a cyclic declaration, where there is no inner epic to
+pick. Stop only where the epics left are genuinely too close to separate, which is the toss-up
+Tier B is for and is rare.
 
 **The decision record is what pays for the autonomy.** Skipping it is not a shortcut past a
 formality — it is the half that makes an unattended choice auditable, and without it the run has
