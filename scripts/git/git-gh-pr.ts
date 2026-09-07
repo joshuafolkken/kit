@@ -125,9 +125,21 @@ async function put_merge(pr_number: number): Promise<void> {
 async function read_merge_state(pr_number: number): Promise<boolean | undefined> {
 	try {
 		return git_gh_pr_rest.is_merged(await read_pull(pr_number))
-	} catch {
+	} catch (error) {
+		// The reason goes in the line, for the same reason the poll loop's warning carries one: the
+		// failure this throws below names the *merge* request as its cause, so without this an operator
+		// is told the pull request could not be read back and never why.
+		console.warn(`Could not read the pull request back: ${String(error)}`)
+
 		return undefined
 	}
+}
+
+// The wait goes **between** attempts and never after the last one — the convention `poll.wait_between`
+// and `git-pr-checks.ts`'s own `sleep_before_next_attempt` both hold to. Without the guard a merge
+// whose read-back never succeeds delays its own failure report by a whole interval.
+async function sleep_between_read_backs(attempt: number): Promise<void> {
+	if (attempt < MERGE_READ_BACK_ATTEMPTS - 1) await poll.sleep(MERGE_READ_BACK_INTERVAL_MS)
 }
 
 // Whether the merge is actually there, asked only after the request failed.
@@ -146,7 +158,7 @@ async function has_merge_landed(pr_number: number, merge_error: unknown): Promis
 		const is_merged = await read_merge_state(pr_number)
 		if (is_merged !== undefined) return is_merged
 
-		await poll.sleep(MERGE_READ_BACK_INTERVAL_MS)
+		await sleep_between_read_backs(attempt)
 	}
 
 	throw new Error(MERGE_UNCONFIRMED_MESSAGE, { cause: merge_error })
