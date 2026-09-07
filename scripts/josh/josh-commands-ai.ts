@@ -134,6 +134,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Say whether a delegated unit is still working, or stopped without reporting',
 		category: 'AI tools',
 	},
+	'run:progress': {
+		script: 'scripts/run/run-progress-cli.ts',
+		description: 'Report an unattended run’s progress once it has gone quiet for an interval',
+		category: 'AI tools',
+	},
 	'lane:open': {
 		...LANE_ARGUMENTS,
 		description: 'Open a lane: a linked work tree with its own branch and its own port seed',
