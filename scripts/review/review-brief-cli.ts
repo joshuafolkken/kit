@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { review_attest } from './review-attest'
@@ -76,7 +77,16 @@ function kept_note(taken_at: string): string {
 // The write is swallowed for the same reason the gate's is: the brief has already been printed and
 // is correct, so a temp-directory problem must not turn it into a non-zero exit. What a missing
 // snapshot costs is a round 2 that reviews the whole change — wider, never narrower.
-function record_round_one(round: number, tree: Record<string, string>, target?: string): void {
+// **The base is recorded beside the file map** (joshuafolkken/kit#1537). The map is a diff against
+// `change_base`, and `change_base` is recomputed on every invocation — so without the commit it was
+// measured against, round 2 cannot tell a fix from a base that moved under it, and reports the
+// difference between two incomparable sets as round 1's fixes.
+function record_round_one(
+	round: number,
+	tree: Record<string, string>,
+	base: string | undefined,
+	target?: string,
+): void {
 	if (round !== FIRST_ROUND) return
 
 	try {
@@ -88,7 +98,7 @@ function record_round_one(round: number, tree: Record<string, string>, target?: 
 			return
 		}
 
-		review_stamps.round_one_stamp.write(tree, target)
+		review_stamps.round_one_stamp.write(tree, target, base)
 	} catch {
 		/* no record widens the next round rather than narrowing it */
 	}
@@ -112,6 +122,7 @@ async function compose_brief(
 	round: number,
 	paths: ReadonlyArray<string>,
 	tree: Record<string, string>,
+	base: string,
 ): Promise<string> {
 	const stamps = {
 		gate: review_stamps.gate_stamp.read(),
@@ -124,12 +135,26 @@ async function compose_brief(
 		round,
 		tree,
 		stamps,
-		// Resolved here rather than printed as a `$(…)` the forked agent would expand: a subshell that
-		// fails expands to nothing, and the bare `git diff` left behind lists only the unstaged working
-		// tree — a review silently narrowed to a fraction of the change (joshuafolkken/kit#1527).
-		base: await git_command.change_base(),
+		// Resolved by the caller rather than printed as a `$(…)` the forked agent would expand: a
+		// subshell that fails expands to nothing, and the bare `git diff` left behind lists only the
+		// unstaged working tree — a review silently narrowed to a fraction of the change
+		// (joshuafolkken/kit#1527). One reading is shared with the record written below, so the commit
+		// the map is stored against is the same one the brief printed (joshuafolkken/kit#1537).
+		base,
 		...(await open_contract()),
 	})
+}
+
+// **What is printed and what is recorded are two readings of one thing** (joshuafolkken/kit#1537).
+// `commit` is what the record stores and round 2 compares, and it has to be a commit: `change_base`
+// degrades to the default-branch *name* when `merge-base` cannot answer, and two rounds storing that
+// same name compare equal while the ref moves under them — the guard failing open, which is the
+// failure it exists to prevent. Where it cannot be resolved the printed command keeps `change_base`'s
+// answer, which still runs, and the record is written without a base so the next round widens.
+async function read_bases(): Promise<{ base: string; commit: string | undefined }> {
+	const commit = await change_base.resolved()
+
+	return { base: commit ?? (await git_command.change_base()), commit }
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -143,11 +168,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	// One reading, used for both halves. Read twice, the level could describe a different change from
 	// the digests printed beside it — and it would cost four git spawns to do so.
+	const { base, commit } = await read_bases()
 	const paths = await changed_paths.read_changed_paths(false)
 	const tree = await review_tree.read_changed_tree(paths)
 
-	console.info(await compose_brief(round, paths, tree))
-	record_round_one(round, tree)
+	console.info(await compose_brief(round, paths, tree, base))
+	record_round_one(round, tree, commit)
 
 	return 0
 }

@@ -26,9 +26,11 @@ interface FileMapStamp {
 	// fetch an advanced default branch and rebase onto it, and every digest can stay identical while
 	// the rest of the working tree is replaced by code no check has read. The rebase moves `HEAD` and
 	// so moves the merge base, which is what this field catches; another lane merging into the shared
-	// default branch moves neither, and correctly leaves the record standing. Only a reader that acts
-	// on the record — `josh gate`, which reuses a green result instead of re-running it — needs the
-	// guarantee, so it is the one that writes and compares this.
+	// default branch moves neither, and correctly leaves the record standing. Every reader that acts on
+	// a record rather than merely reporting it needs the guarantee: `josh gate`, which reuses a green
+	// result instead of re-running it, and since joshuafolkken/kit#1537 the round-1 review snapshot,
+	// whose whole use is to name what round 1's fixes changed. A record written without it is refused
+	// rather than trusted.
 	base?: string
 	// When the run that wrote this record reached its verdict (joshuafolkken/kit#1164). Written only
 	// by `complete`, so it is absent on a record whose run was interrupted or threw — which is the
@@ -89,8 +91,30 @@ function is_process_alive(pid: number | undefined): boolean {
 	}
 }
 
+// Whether a record may be compared against a map read now (joshuafolkken/kit#1537). Every map here is
+// a diff against `change_base`, so two of them taken against **different** bases do not cover the same
+// set of paths — and `changed_since` below reports that set difference as though the files had been
+// edited. Measured on the resumed runs of #1080 / #1085 / #1147 / #1197: a merge of the default branch
+// between the two rounds moved the base, and the round-2 target then named files the branch had never
+// touched while omitting files it had.
+//
+// **A record written before the field existed carries no base, and that reads as "cannot be compared"
+// rather than "matches".** The caller's only safe response to an unusable record is to widen its
+// round, never to narrow it, so the absent case has to fall on the same side as a mismatch.
+//
+// **`undefined` on either side is a mismatch, never a match.** A caller that could not resolve the
+// base to a commit knows less than one that could, and two unknowns comparing equal is the same
+// fail-open the ref-name fallback produces.
+function describes_base(stamp: FileMapStamp, base: string | undefined): boolean {
+	return base !== undefined && stamp.base === base
+}
+
 // Every path in either map is one the caller's reader chose, so an empty result is the positive fact
 // "nothing this record covers has changed", never an unread diff.
+//
+// **It says nothing about two maps read against different bases.** It takes the union of the key
+// sets, so a path only one of them covers is reported as changed — a set difference, not an edit.
+// Callers guard that with `describes_base` above (joshuafolkken/kit#1537).
 function changed_since(stamp: FileMapStamp, tree: Record<string, string>): ReadonlyArray<string> {
 	const names = new Set([...Object.keys(stamp.files), ...Object.keys(tree)])
 
@@ -187,6 +211,7 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 const file_map_stamp = {
 	changed_since,
 	create,
+	describes_base,
 	is_file_map,
 	is_process_alive,
 	parse_stamp,
