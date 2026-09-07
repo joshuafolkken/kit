@@ -389,17 +389,18 @@ SECURITY.md         tsconfig.sonar.json
 > instructed the agent to run exactly that command, and denying it here would have broken a
 > documented flow from the other half of the distribution. **That reason is gone.**
 > joshuafolkken/kit#1064 retired the prompt, and no distributed document instructs the agent to run a
-> bare `git commit` any more, because `pnpm josh git` drives the whole commit through a node script — so the Bash matcher
-> sees `pnpm josh …` and the approved commit flow is untouched by any pattern written here.
-> joshuafolkken/kit#1075 therefore folded both flag entries into the single `Bash(git commit*)` that
-> contains them. What that closes is the second fallback: an agent refused at `git add` reached for
-> `git commit -a`, and an agent refused at both reached for `git commit -m`, which is now denied by
-> the same prefix as the staging command it was standing in for.
+> bare `git commit` any more, because `pnpm josh git` drives the whole commit through a node script —
+> so the Bash matcher sees `pnpm josh …` and the approved commit flow is untouched by any pattern
+> written here. joshuafolkken/kit#1075 therefore folded both flag entries into the single
+> `Bash(git commit*)` that contains them. What that closes is the second fallback: an agent refused
+> at `git add` reached for `git commit -a`, and an agent refused at both reached for `git commit -m`,
+> which is now denied by the same prefix as the staging command it was standing in for. The one bare
+> `git commit` still printed anywhere is the pre-commit type check's `JOSH_PRE_COMMIT_FORCE=1 …`
+> hint, and that is addressed to whoever is at the terminal: an environment assignment ahead of the
+> command does not escape the matcher, so an agent that copies it is refused like any other spelling.
 >
 > **It is a guardrail, not a sandbox.** Each entry is a prefix pattern, so plenty still runs: a
-> global option ahead of the subcommand (`git -C . add .`), an environment assignment ahead of it
-> (`JOSH_PRE_COMMIT_FORCE=1 git commit`, which the pre-commit type check prints for a human to run in
-> their own terminal), a flag pair the prefix does not cover
+> global option ahead of the subcommand (`git -C . add .`), a flag pair the prefix does not cover
 > (`git restore --worktree --staged <path>`), the plumbing spellings (`git update-index`,
 > `git apply --cached`), and everything that stages or commits by another route (`git merge`,
 > `git cherry-pick`, `git revert`). `git stash` is the notable one: the documented `fullrun new` /
