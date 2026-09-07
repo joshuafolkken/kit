@@ -27,6 +27,13 @@ interface FileMapStamp {
 	// that acts on the record — `josh gate`, which reuses a green result instead of re-running it —
 	// needs the guarantee, so it is the one that writes and compares this.
 	base?: string
+	// When the run that wrote this record reached its verdict (joshuafolkken/kit#1164). Written only
+	// by `complete`, so it is absent on a record whose run was interrupted or threw — which is the
+	// whole difference between "a run measured this tree" and "a run measured this tree and
+	// finished". Only a reader that acts on the *verdict* needs the second, so `josh eval` writes and
+	// reads it and the two `josh review:brief` records, which assert a completed past fact by
+	// existing at all, neither write nor read it.
+	completed_at?: string
 }
 
 // Takes `unknown` rather than the declared field type, because the declared type is an assertion
@@ -43,19 +50,24 @@ function is_file_map(value: unknown): value is Record<string, string> {
 // reader treats an absent field as the safe answer — "not running" for a `pid`, "cannot be reused"
 // for a `base`. Spread rather than assigned, because `exactOptionalPropertyTypes` makes an explicit
 // `undefined` a different thing from an absent key.
-function optional_fields(pid: unknown, base: unknown): Partial<FileMapStamp> {
+function optional_fields(
+	pid: unknown,
+	base: unknown,
+	completed_at: unknown,
+): Partial<FileMapStamp> {
 	return {
 		...(typeof pid === 'number' && { pid }),
 		...(typeof base === 'string' && { base }),
+		...(typeof completed_at === 'string' && { completed_at }),
 	}
 }
 
 function parse_stamp(raw: string): FileMapStamp | undefined {
-	const { taken_at, files, pid, base } = JSON.parse(raw) as Partial<FileMapStamp>
+	const { taken_at, files, pid, base, completed_at } = JSON.parse(raw) as Partial<FileMapStamp>
 
 	if (typeof taken_at !== 'string' || !is_file_map(files)) return undefined
 
-	return { taken_at, files, ...optional_fields(pid, base) }
+	return { taken_at, files, ...optional_fields(pid, base, completed_at) }
 }
 
 // `signal 0` runs every permission check and delivers nothing, so it is the standard liveness probe:
@@ -89,6 +101,11 @@ interface FileMapStampAccess {
 	// `base` is written by the one record that is acted on rather than merely reported —
 	// joshuafolkken/kit#1328's green-gate reuse. The others omit it and are unaffected.
 	write: (files: Record<string, string>, target?: string, base?: string) => string
+	// Marks an existing record as belonging to a run that finished (joshuafolkken/kit#1164). It
+	// amends rather than rewrites, and answers `undefined` where there is no record to amend: a run
+	// whose record never got written has nothing to assert a completion about, and inventing one here
+	// would manufacture the very vouching the field exists to withhold.
+	complete: (target?: string) => string | undefined
 	read: (source?: string) => FileMapStamp | undefined
 	// For a record whose meaning is its existence rather than its contents — the in-flight gate marker
 	// (joshuafolkken/kit#1242). A record nobody removes would go on asserting a gate that ended.
@@ -111,6 +128,32 @@ function read_at(source: string): FileMapStamp | undefined {
 	}
 }
 
+// Amending is the whole point, and re-writing would defeat it: `write` stamps a fresh `taken_at` and
+// takes a fresh file map, so calling it again at the end of a run would claim the tree as the run
+// *left* it was the tree the run measured — the record would then vouch for a comparison of that
+// tree against itself, which is the one answer it exists to withhold (joshuafolkken/kit#1164).
+//
+// **It completes only a record this process wrote**, which the `pid` already in the payload is what
+// says. The path is deterministic per checkout, so a second whole-suite run started beside the first
+// overwrites it with its own record — and a completion stamped onto that one would describe a run
+// that is still going, or was killed, as finished: the false `skip` this field exists to prevent,
+// reintroduced from the other side. A foreign record answers `undefined`, which every caller already
+// reads as "no completion", which is `required`.
+//
+// The write is of the *parsed* record, so it carries exactly the fields `parse_stamp` knows. That is
+// deliberate but total-by-assumption: a field added to `write` without a matching entry in
+// `parse_stamp` and `optional_fields` would be dropped by any `complete`, so the two are extended
+// together.
+function complete_at(target: string): string | undefined {
+	const stamp = read_at(target)
+
+	if (stamp === undefined) return undefined
+
+	if (stamp.pid !== process.pid) return undefined
+
+	return stamp_file.write_stamp(target, { ...stamp, completed_at: new Date().toISOString() })
+}
+
 // The destination is a parameter on both sides so a test can exercise the round trip without
 // overwriting the record a real run may be relying on — two commands share one path by design, and a
 // suite that wrote to it would be a second writer nobody declared.
@@ -130,6 +173,7 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 				pid: process.pid,
 				base,
 			}),
+		complete: (target = resolve()) => complete_at(target),
 		read: (source = resolve()) => read_at(source),
 		remove: (target = resolve()) => {
 			stamp_file.remove_stamp(target)

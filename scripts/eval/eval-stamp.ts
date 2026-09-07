@@ -87,6 +87,13 @@ function write_stamp(target: string = stamp_path()): string {
 	return access.write(read_tree(), target)
 }
 
+// The record's other half. `write_stamp` says a run measured this tree; this says that run reached a
+// verdict (joshuafolkken/kit#1164). Best-effort in the same direction as the write: a completion that
+// could not be recorded leaves the record incomplete, and an incomplete record answers `required`.
+function complete_stamp(target: string = stamp_path()): string | undefined {
+	return access.complete(target)
+}
+
 function read_stamp(source: string = stamp_path()): EvalStamp | undefined {
 	return access.read(source)
 }
@@ -100,6 +107,7 @@ function changed_since(stamp: EvalStamp, tree: Record<string, string>): Readonly
 
 const eval_stamp = {
 	changed_since,
+	complete_stamp,
 	files_under,
 	read_stamp,
 	read_tree,
