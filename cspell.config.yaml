@@ -2,6 +2,12 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # What `josh review:attest` calls a review that read a checkout other than the one it was briefed
+  # on (joshuafolkken/kit#1522). cspell derives "targeted" but not the "mis-" compound.
+  - mistargeted
+  # `git rev-parse --show-toplevel`, quoted in `docs/josh-commands.md` as the source of the checkout
+  # root the review brief prints. git's own spelling of the flag.
+  - toplevel
   # What `josh lint:related` calls a file the two linters read (joshuafolkken/kit#1298), matching
   # the "relatable" the sibling unit narrowing already uses for a file a test can import.
   - lintable

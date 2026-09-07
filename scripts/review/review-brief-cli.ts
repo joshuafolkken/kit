@@ -1,7 +1,9 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
+import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_level } from './review-level'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
@@ -91,6 +93,40 @@ function record_round_one(round: number, tree: Record<string, string>, target?: 
 	}
 }
 
+// **Recorded before it is printed, and the write is not swallowed** (joshuafolkken/kit#1522). The
+// nonce the brief prints is a contract the run enforces later; a brief that printed one it had
+// failed to record would hand the review a command that cannot succeed and the run a check that
+// answers `not-required` — the guard gone, silently, which is the shape this whole record exists to
+// remove.
+async function open_contract(): Promise<{ checkout: ReviewCheckout; nonce: string }> {
+	const checkout = await review_checkout.read_checkout()
+
+	// Keyed on the root git just answered with, never on `process.cwd()`: the check made before the
+	// merge asks git the same question, and the two hash different keys the moment one of them runs
+	// from a subdirectory — a mismatch that would drop the guard with nothing printed.
+	return { checkout, nonce: review_attest.record_target(checkout, checkout.root) }
+}
+
+async function compose_brief(
+	round: number,
+	paths: ReadonlyArray<string>,
+	tree: Record<string, string>,
+): Promise<string> {
+	const stamps = {
+		gate: review_stamps.gate_stamp.read(),
+		in_flight: review_stamps.in_flight_stamp.read(),
+		round_one: review_stamps.round_one_stamp.read(),
+	}
+
+	return review_brief.compose({
+		level: review_level.level_for(paths),
+		round,
+		tree,
+		stamps,
+		...(await open_contract()),
+	})
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const round = parse_round(argv)
 
@@ -104,13 +140,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	// the digests printed beside it — and it would cost four git spawns to do so.
 	const paths = await changed_paths.read_changed_paths(false)
 	const tree = await review_tree.read_changed_tree(paths)
-	const stamps = {
-		gate: review_stamps.gate_stamp.read(),
-		in_flight: review_stamps.in_flight_stamp.read(),
-		round_one: review_stamps.round_one_stamp.read(),
-	}
 
-	console.info(review_brief.compose({ level: review_level.level_for(paths), round, tree, stamps }))
+	console.info(await compose_brief(round, paths, tree))
 	record_round_one(round, tree)
 
 	return 0

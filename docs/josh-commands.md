@@ -1693,10 +1693,14 @@ What the brief carries:
 | "Running now"         | The marker `josh gate` keeps for as long as its checks run, **and only if its digests still match this tree** |
 | The unit-test command | Named outright, because both measured rounds reached for `npx vitest` first                                   |
 | The target            | The whole change on round 1; on `--round 2`, only the files the first round's fixes changed                   |
+| The checkout          | `git rev-parse` in the tree the run is implementing in — the absolute root, the branch and the HEAD commit    |
+| The attestation nonce | Written to a record before it is printed, and checked by `josh review:attest`                                 |
 
 **`--round 2` is taken after the commit, and its target is round 1's fixes and nothing else.** Since [#1261](https://github.com/joshuafolkken/kit/issues/1261) the pull request opens between the rounds, and since [#1486](https://github.com/joshuafolkken/kit/issues/1486) nothing edits the tree in between: the version bump that used to sit there put `package.json` into the target every time. So the record the gate wrote still matches the tree and this brief answers `Already verified`, instead of sending the review agent back to the unit suite the gate had just passed.
 
 **Only one half is mechanical.** The round-2 target _is_ the scope handed over, so a narrowed round stays narrowed whatever the agent decides. The "already verified" block is an instruction to an agent that has a shell, so whether it obeys is measured rather than assumed.
+
+**It names the checkout, because the forked agent does not inherit one** ([#1522](https://github.com/joshuafolkken/kit/issues/1522)). `/code-review` is forked by the harness into the **session's** working directory, so a run implementing in a lane (`josh lane:open`) is reviewed from a tree that holds the previous child's already-merged code. Nothing there is wrong, so the review returns no findings — and **the failure arrives as approval**. Measured across the seven children `epicrun #1474` merged: twelve of the fifteen review rounds named the lane's absolute path in the invocation and cited files that were actually in their own diff; the one round whose invocation named no path is the one that reviewed a different pull request. So the path is now generated from `git rev-parse --show-toplevel` rather than left to whoever writes the hand-off, every target the brief prints carries `git -C <root>`, and the round-2 file list is absolute. Whether the review then honors it is checked by [`josh review:attest`](#josh-reviewattest).
 
 **It never claims a gate it cannot prove.** The gate's record holds a digest per changed path; if any of them has moved since — or there is no record at all — the brief prints `Not verified` and asserts nothing about lint, the type check, the spell check or the unit tests. Re-run `pnpm josh gate` after applying fixes and the record catches up.
 
@@ -1756,6 +1760,32 @@ The fix delta is the same comparison [`josh review:brief --round 2`](#josh-revie
 **Ask it once round 1's fixes are in, and before the commit.** The delta it reads is then exactly those fixes. Nothing writes to the tree in between since [#1486](https://github.com/joshuafolkken/kit/issues/1486) took the version bump out of the child flow — it rewrote `package.json`, which is not inert, so a delta taken after it answered `required` whatever round 1 did and the condition never fired in the flow it was built for.
 
 **A prompt fix and a test fix both answer `required`, deliberately.** The condition the issue arrived with exempted anything that is not a runtime code path; that is rejected on the measurement recorded under `josh review:level` — two documentation-only diffs, ten real defects found in each by a `medium` review, none of them covered by a test. A test file is the verification that guards a runtime path, and an assertion a fix weakened still passes. The full reasoning, how a skip is recorded on the Issue, and when the condition is withdrawn are in `prompts/review.md` → "When round 2 is skipped entirely, and when it is not".
+
+### `josh review:attest`
+
+Record, or verify, which checkout a `/code-review` actually read ([#1522](https://github.com/joshuafolkken/kit/issues/1522)).
+
+```bash
+pnpm josh review:attest <nonce>   # run by the review, from the checkout it read
+pnpm josh review:attest --check   # run by the run, before it acts on the review; alias: josh ra
+```
+
+**The root cause is not this repository's to fix.** `/code-review` is forked by the harness and inherits the session's working directory; nothing here decides that. What is decidable is the direction the error falls in. A review that read the wrong tree reads already-merged, already-reviewed code, finds nothing, and reports that silence as approval — so the run commits and merges a diff nobody read. **Detection is therefore the deliverable**: a review that cannot show which tree it read is treated as no review at all.
+
+`josh review:brief` records the checkout it is describing and prints a nonce. `josh review:attest <nonce>` reads the checkout it is **itself** run in — `git rev-parse` answers about the process's own working directory, so values handed in on the command line would only ever agree with themselves — and exits non-zero when that is not the briefed one. `--check` is the other end: the run asks it before acting on the review's verdict, and `josh followup --merge` asks it again before merging.
+
+| Answer         | What it means                                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ok`           | The review attested the checkout it was briefed on                                                                |
+| `missing`      | A brief was recorded and nothing attested it — **a refusal, not a pass**                                          |
+| `mismatch`     | The review attested a different root, branch or HEAD. Its findings, "no findings" included, describe another tree |
+| `not-required` | No brief was recorded in this checkout inside a run's lifetime, so there is nothing to attest                     |
+
+**Absence is a refusal.** The defect produced no signal at all, so a check that read silence as success would answer `ok` in exactly the state it exists to catch. A wrongly refused merge costs one re-run of the review; a wrongly allowed one ships a diff nobody read.
+
+**All three fields, not the root alone.** A second work tree of the same repository has a different root, which the root test catches on its own; a `git switch` inside the right tree does not, and a lane's branch is what its commit lands on.
+
+**Scoped to a checkout that briefed a review, and expiring after eight hours.** A project or a flow that never runs `josh review:brief` merges exactly as it did before, and a run that crashed before `josh followup` does not hold the next one hostage — the same expiry `josh run:hold` uses, and read only in the direction that drops the requirement, so it can never turn a real mismatch into a pass. `josh followup` clears the record at the end of a run that merged, beside the round-1 snapshot.
 
 ### `josh delegate`
 

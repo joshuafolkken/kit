@@ -5,6 +5,7 @@ import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
+import type { ReviewCheckout } from './review-checkout'
 import { review_tree } from './review-tree'
 
 // joshuafolkken/kit#1241: `/code-review` runs in a forked process that reads none of this
@@ -48,18 +49,30 @@ function stale_stamp_of(files: Tree): FileMapStamp {
 	return { taken_at: STARTED_AT, files, pid: DEAD_PID }
 }
 
+// A path no fixture file name is a substring of, so `not.toContain(FILE_B)` still means what it says
+// once the round-2 target prints its paths under this root (joshuafolkken/kit#1522).
+const CHECKOUT: ReviewCheckout = {
+	root: '/lanes/1522',
+	branch: '1522-lane',
+	head: '0123456789abcdef0123456789abcdef01234567',
+}
+const NONCE = 'deadbeefcafef00d'
+
 function compose(input: {
 	round: number
 	tree: Record<string, string>
 	gate?: FileMapStamp
 	in_flight?: FileMapStamp
 	round_one?: FileMapStamp
+	checkout?: ReviewCheckout
 }): string {
 	return review_brief.compose({
 		level: LEVEL,
 		round: input.round,
 		tree: input.tree,
 		stamps: { gate: input.gate, in_flight: input.in_flight, round_one: input.round_one },
+		checkout: input.checkout ?? CHECKOUT,
+		nonce: NONCE,
 	})
 }
 
@@ -197,8 +210,8 @@ describe('review_brief — round 2 is scoped by comparison, not by recall', () =
 	it('falls back to the whole change when no snapshot was recorded', () => {
 		const brief = compose({ round: 2, tree: after })
 
-		expect(brief).toContain(review_brief.NO_SNAPSHOT_LINE)
-		expect(brief).toContain(review_brief.WHOLE_CHANGE_TARGET)
+		expect(brief).toContain(review_brief.no_snapshot_line(CHECKOUT.root))
+		expect(brief).toContain(review_brief.whole_change_target(CHECKOUT.root))
 	})
 
 	it('says so when nothing changed since round 1', () => {
@@ -208,7 +221,56 @@ describe('review_brief — round 2 is scoped by comparison, not by recall', () =
 	})
 
 	it('reviews the whole change on round 1', () => {
-		expect(compose({ round: 1, tree: before })).toContain(review_brief.WHOLE_CHANGE_TARGET)
+		expect(compose({ round: 1, tree: before })).toContain(
+			review_brief.whole_change_target(CHECKOUT.root),
+		)
+	})
+})
+
+// joshuafolkken/kit#1522. `/code-review` is forked by the harness and inherits the session's working
+// directory, so during a lane run it starts in a tree holding the previous child's already-merged
+// code. Reading that, it finds nothing wrong and says so — and the run cannot tell that silence apart
+// from a clean review. The checkout is therefore named in the brief itself, generated from git rather
+// than typed in by whoever wrote the hand-off.
+describe('review_brief — the brief names the checkout it describes', () => {
+	const tree = { [FILE_A]: 'x' }
+
+	it('prints the root, the branch and the head', () => {
+		const brief = compose({ round: 1, tree })
+
+		expect(brief).toContain(CHECKOUT.root)
+		expect(brief).toContain(CHECKOUT.branch)
+		expect(brief).toContain(CHECKOUT.head)
+	})
+
+	// Copied verbatim, a literal `<path>` fails and sends the agent back to the tree it inherited —
+	// which is the wrong one, and the whole failure this block exists to prevent.
+	it('interpolates the root into the command it tells the agent to run', () => {
+		const brief = compose({ round: 1, tree })
+
+		expect(brief).toContain(review_brief.checkout_warning(CHECKOUT.root))
+		expect(brief).not.toContain('<path>')
+	})
+
+	// The nonce is what the run checks afterwards, so a brief that printed no attestation command
+	// would leave the mistargeted review indistinguishable from a clean one — the whole defect.
+	it('carries the attestation command with the nonce of this run', () => {
+		expect(compose({ round: 1, tree })).toContain(review_brief.attest_line(NONCE))
+	})
+
+	it('keeps the level on the first line', () => {
+		expect(compose({ round: 1, tree }).split('\n', 1)[0]).toBe(LEVEL)
+	})
+
+	// git prints repository-root-relative paths, and a forked agent sitting in another checkout
+	// resolves them against that one — where the same relative path names a different file, or none.
+	it('names the fix delta under the root it briefed', () => {
+		const before = { [FILE_A]: 'x', [FILE_B]: 'y' }
+		const after = { ...before, [FILE_A]: EDITED }
+
+		expect(compose({ round: 2, tree: after, round_one: stamp_of(before) })).toContain(
+			`${CHECKOUT.root}/${FILE_A}`,
+		)
 	})
 })
 
