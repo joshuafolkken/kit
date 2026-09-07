@@ -1,10 +1,9 @@
-import { mkdtempSync } from 'node:fs'
-import { rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { git_command } from './git-command'
+import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
 import { git_location_environment } from './git-location-environment'
 
 // joshuafolkken/kit#1527, with real git rather than a mocked one.
@@ -22,19 +21,18 @@ const LANE_EDIT = 'edited by this lane\n'
 
 const BYSTANDER = 'bystander'
 const HOOK_FILE = 'made-under-a-hook.txt'
-const AUTHOR_NAME = 'Lane Fixture'
+const WORKSPACE_PREFIX = 'kit-lane-base-'
 
-const MAIN_BRANCH = '--initial-branch=main'
 const HOOK_CONTENT = 'under a hook\n'
 const HOOK_SUBJECT = 'committed under a hook environment'
 
-const fixture: {
-	workspace: string
-	repository_root: string
-	lane_root: string
-	previous_cwd: string
-	restore_environment: (() => void) | undefined
-} = {
+// The identity, the `-c` options that carry it, the `git` helper and the workspace lifecycle are
+// `./git-fixture-workspace`, shared with `rename-changed-paths.test.ts` (joshuafolkken/kit#1533).
+// They were copied into the second suite first; a hardening like joshuafolkken/kit#1530's lands in
+// one copy and silently misses the other, so there is only one.
+const { AUTHOR_NAME, git, MAIN_BRANCH } = git_fixture_workspace
+
+const fixture: FixtureWorkspace & { repository_root: string; lane_root: string } = {
 	workspace: '',
 	repository_root: '',
 	lane_root: '',
@@ -42,38 +40,11 @@ const fixture: {
 	restore_environment: undefined,
 }
 
-// joshuafolkken/kit#1530. Run from the pre-push hook, this helper inherited `GIT_DIR` and
-// `GIT_INDEX_FILE` from the hook environment — both of which beat `cwd` outright — so every command
-// below ran against the repository being pushed rather than against the fixture. Three commits
-// titled `base` and `another lane merged` landed on `1085-lane`'s branch, and `git config
-// user.email` wrote this fixture's identity into `--local` config, which every linked work tree of
-// the repository shares.
-//
-// Two things fix it, and both are needed. The environment is cleared, so `cwd` means what it says;
-// and the identity rides on `-c` for the one command instead of being written into a config file
-// that outlives the test. The suite-wide guard that refuses the same mistake in any other test is
-// `scripts/test-repository-guard.ts`.
-const IDENTITY_OPTIONS: ReadonlyArray<string> = [
-	'-c',
-	'user.email=lane@example.test',
-	'-c',
-	`user.name=${AUTHOR_NAME}`,
-	'-c',
-	'commit.gpgsign=false',
-]
-
-async function git(cwd: string, arguments_: Array<string>): Promise<string> {
-	const { stdout } = await execa('git', [...IDENTITY_OPTIONS, ...arguments_], {
-		cwd,
-		env: git_location_environment.location_free_environment(),
-		extendEnv: true,
-	})
-
-	return stdout.trimEnd()
-}
-
 // `--local` rather than the effective value: what is being asserted is that this fixture wrote
 // nothing into a config file, not what the machine's own git happens to be configured with.
+//
+// It reads with `execa` directly rather than through the shared helper, because the point is to ask
+// git a question with no `-c` identity attached — the very options the helper always carries.
 async function local_identity(cwd: string): Promise<string> {
 	const { stdout } = await execa('git', ['config', '--local', '--get', 'user.email'], {
 		cwd,
@@ -120,13 +91,15 @@ async function advance_main_after_cutting_the_lane(): Promise<void> {
 }
 
 beforeEach(async () => {
-	// Cleared for this process too, not only for the children `git()` spawns. The assertions drive
-	// `git_command`, which spawns `git` with no environment of its own and so inherits this one —
-	// under a hook that made the readings answer about the repository being pushed, which is the
-	// other half of what joshuafolkken/kit#1530 saw.
-	fixture.restore_environment = git_location_environment.clear_git_location_variables()
-	fixture.previous_cwd = process.cwd()
-	fixture.workspace = mkdtempSync(path.join(tmpdir(), 'kit-lane-base-'))
+	// `open_workspace` is what clears the git location variables for this process too, not only for
+	// the children `git()` spawns. The assertions drive `git_command`, which spawns `git` with no
+	// environment of its own and so inherits this one — under a hook that made the readings answer
+	// about the repository being pushed, which is the other half of what joshuafolkken/kit#1530 saw.
+	const opened = git_fixture_workspace.open_workspace(WORKSPACE_PREFIX)
+
+	fixture.workspace = opened.workspace
+	fixture.previous_cwd = opened.previous_cwd
+	fixture.restore_environment = opened.restore_environment
 	fixture.repository_root = path.join(fixture.workspace, 'primary')
 	fixture.lane_root = path.join(fixture.workspace, 'lane')
 
@@ -136,9 +109,7 @@ beforeEach(async () => {
 }, TIMEOUT_MS)
 
 afterEach(async () => {
-	process.chdir(fixture.previous_cwd)
-	fixture.restore_environment?.()
-	await rm(fixture.workspace, { force: true, recursive: true })
+	await git_fixture_workspace.close_workspace(fixture)
 })
 
 // The regression joshuafolkken/kit#1530 was filed for. The condition is "run with a hook-like
