@@ -84,6 +84,10 @@ function select_pull(pulls: ReadonlyArray<RestPull>): RestPull | undefined {
 
 // REST reports a merge as a field beside the state rather than as a state, and both spellings of it
 // are accepted: the single-pull endpoint carries `merged`, the listing carries only `merged_at`.
+//
+// Exported since joshuafolkken/kit#1077, because `pr_merge` asks the same question directly: a merge
+// request that failed after the merge landed is settled by reading the pull request back, and the
+// merge-or-not verdict must be the one `to_pr_state` already uses rather than a second spelling of it.
 function is_merged(pull: RestPull): boolean {
 	return pull.merged === true || typeof pull.merged_at === 'string'
 }
@@ -153,6 +157,7 @@ const git_gh_pr_rest = {
 	parse_rest_pulls,
 	select_pull,
 	is_same_repository_head,
+	is_merged,
 	to_pr_state,
 	to_pr_info,
 	to_pr_comments,

@@ -17,15 +17,23 @@ import { review_stamps } from './review/review-stamps'
 // differently from the brief printed beside it would be two commands disagreeing about the same tree.
 //
 // **A file map does not describe a tree on its own, because it is a diff.** It lists what differs
-// from the default branch, so everything the record says stays true while the branch it is measured
-// against moves underneath it. Two shapes of that, one obvious and one not:
+// from the commit the branch was cut from — its merge base with the default branch since
+// joshuafolkken/kit#1527 — so everything the record says stays true while that base moves underneath
+// it. Two shapes of that, one obvious and one not:
 //
 // - Straight after `git switch main && git pull` the map is **empty**, and an empty map compares
 //   equal to any other empty map however many commits the pull brought in. `epicrun` runs exactly
 //   that pair of commands between children.
 // - Fetch an advanced default branch and rebase a feature branch onto it, and the map can come back
 //   **byte-identical** — the same files still differ by the same digests — over a working tree whose
-//   every other file has been replaced by code no check has read.
+//   every other file has been replaced by code no check has read. The rebase moves `HEAD`, so it
+//   moves the merge base with it, and the base check still catches this.
+//
+// **What no longer refuses a reuse is another lane merging into the shared default branch**
+// (joshuafolkken/kit#1527). In a linked work tree the default branch's ref is shared, but the merge
+// base is a commit: an advance this branch is an ancestor of does not move it, and nothing this
+// checkout's four checks read has changed — so refusing there would have discarded a record that
+// still describes the tree exactly.
 //
 // So the record pins the commit the map was taken against, and both halves have to match. The empty
 // map is refused on top of that rather than left to the base check, because a skip there buys nothing

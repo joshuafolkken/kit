@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,7 +7,8 @@ import { sync_configs } from './sync-configs'
 // An app-kit SvelteKit consumer references app-kit presets that already layer kit base. A re-sync
 // must NOT add a second kit-base reference — for lefthook that would be a hard recursion crash;
 // for cspell / tsconfig a redundant duplicate (#660). Each managed file must stay byte-identical.
-const TEST_DIR = path.join(tmpdir(), 'sync-configs-app-kit-test')
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
+const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'sync-configs-app-kit-test-'))
 const LEFTHOOK_DEST = path.join(TEST_DIR, 'lefthook.yml')
 const CSPELL_DEST = path.join(TEST_DIR, 'cspell.config.yaml')
 const TSCONFIG_DEST = path.join(TEST_DIR, 'tsconfig.json')

@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { read_repo_file } from './ai-document-fixture'
-import { REVIEW_CAP_ROUTE_LABEL, SPLIT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './git/issue-labels'
+import {
+	INTERRUPT_ROUTE_LABEL,
+	REVIEW_CAP_ROUTE_LABEL,
+	SPLIT_ROUTE_LABEL,
+	TIER_A_ROUTE_LABEL,
+} from './git/issue-labels'
 
 // joshuafolkken/kit#1083: an added Issue should say, by label, which filing route produced it — a
-// review round-cap carry-forward, a split child, or a Tier A filing during implementation — so the
-// backlog's composition is countable with `gh api "…/issues?labels=<route>"` instead of grepping
+// review round-cap carry-forward, a split child, a Tier A filing during implementation, or (since
+// joshuafolkken/kit#1518) an interrupt filed past the WIP cap — so the backlog's composition is
+// countable with `gh api "…/issues?labels=<route>"` instead of grepping
 // issue bodies by hand, which is how the 2026-08-30 breakdown was produced and why it did not
 // reproduce.
 //
@@ -48,6 +54,15 @@ const FILING_ROUTE_COMMANDS: ReadonlyArray<{ route: string; label: string; doc: 
 		route: 'Tier A upstream defect',
 		label: TIER_A_ROUTE_LABEL,
 		doc: 'prompts/collaboration-workflow/upstream-interrupt.md',
+	},
+	// joshuafolkken/kit#1518: the interrupt files from the WIP cap's own rule body, because the cap is
+	// what it is an exemption from. Pinned in the flag form for the same reason the other three are —
+	// a filing that drops the label is uncountable, and "how often did a defect have to bypass the
+	// cap" is the one question this route exists to answer.
+	{
+		route: 'interrupt',
+		label: INTERRUPT_ROUTE_LABEL,
+		doc: 'prompts/collaboration-workflow/wip-cap.md',
 	},
 ]
 

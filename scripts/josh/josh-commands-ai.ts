@@ -98,6 +98,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Print the whole /code-review invocation: level, what the gate already proved, target',
 		category: 'AI tools',
 	},
+	'review:attest': {
+		script: 'scripts/review/review-attest-cli.ts',
+		description: 'Record, or verify, which checkout a /code-review actually read',
+		category: 'AI tools',
+	},
 	'review:round2': {
 		script: 'scripts/review/review-round2-cli.ts',
 		description: 'Say whether the second /code-review round is due, or may be skipped entirely',

@@ -143,6 +143,26 @@ describe('the record round trip', () => {
 	})
 })
 
+// `josh eval`'s completion travels in the same payload these three records use
+// (joshuafolkken/kit#1164), so the parser they all share has to carry it back out again.
+describe('the record round trip — the completion field', () => {
+	it('reads back a completion it was given', () => {
+		const raw = '{"taken_at":"now","files":{},"completed_at":"later"}'
+
+		expect(file_map_stamp.parse_stamp(raw)?.completed_at).toBe('later')
+	})
+
+	// An optional field of the wrong type is dropped rather than rejected, and dropping is the safe
+	// direction here: a record with no completion is one whose run nothing vouches for.
+	it('drops a completion that is not a string rather than rejecting the record', () => {
+		const raw = '{"taken_at":"now","files":{},"completed_at":5}'
+		const stamp = file_map_stamp.parse_stamp(raw)
+
+		expect(stamp?.completed_at).toBeUndefined()
+		expect(stamp?.taken_at).toBe('now')
+	})
+})
+
 describe('verification_gate.record_green_gate — withholds the record rather than lying', () => {
 	const directory = use_temporary_directory('josh-gate-withhold-')
 	const target = (): string => path.join(directory(), STAMP_FILE)

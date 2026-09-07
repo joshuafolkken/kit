@@ -53,6 +53,24 @@ vi.mock('../scripts/review/review-stamps', () => ({
 	review_stamps: { clear_round_one: vi.fn() },
 }))
 
+// **Mocked for the same reason `review_stamps` above is, and for one more** (joshuafolkken/kit#1522):
+// `main` runs at import time, so the real check would read — and the real clear would remove — the
+// checkout-attestation record of whatever run is executing this suite. The real check would also
+// *refuse*, because a suite is not a review: importing this module would then throw before a single
+// case ran.
+const NOT_REQUIRED = vi.hoisted(() => 'not-required')
+const attest_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: NOT_REQUIRED })))
+const attest_clear_mock = vi.hoisted(() => vi.fn(async () => undefined))
+const REFUSAL_SENTINEL = vi.hoisted(() => 'attestation-refusal-sentinel')
+
+vi.mock('../scripts/review/review-attest', () => ({
+	review_attest: {
+		check_here: attest_check_mock,
+		clear_here: attest_clear_mock,
+		refusal_message: () => REFUSAL_SENTINEL,
+	},
+}))
+
 // **Mocked for the same reason `review_stamps` above is**: `main` runs at import time, so the real
 // recorder would measure — and append a record for — whatever run is executing this suite
 // (joshuafolkken/kit#1471).
@@ -290,6 +308,42 @@ describe('the round-1 snapshot is cleared only by a merged run', () => {
 		git_followup_workflow.clear_round_one_snapshot(false)
 
 		expect(clear_round_one_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#1522. `/code-review` is forked by the harness into the *session's* working
+// directory, so a run implementing in a lane can be reviewed against a different tree — one holding
+// the previous child's already-merged code, where there is nothing wrong to find. The review returns
+// no findings and the run reads that as clean. This is the seam where that stops being free.
+describe('a merge is refused unless the review attested its checkout', () => {
+	// The whole point: the defect produced *no* signal, so silence must not read as success.
+	it.each([['missing'], ['mismatch']])('throws when the verdict is %s', async (status) => {
+		attest_check_mock.mockResolvedValueOnce({ status })
+
+		await expect(git_followup_workflow.assert_review_attested(true)).rejects.toThrow(
+			REFUSAL_SENTINEL,
+		)
+	})
+
+	it.each([['ok'], [NOT_REQUIRED]])('allows the merge when the verdict is %s', async (status) => {
+		attest_check_mock.mockResolvedValueOnce({ status })
+
+		await expect(git_followup_workflow.assert_review_attested(true)).resolves.toBeUndefined()
+	})
+
+	// A `--no-merge` run has not reached the gate this record guards, and nothing merges there.
+	it('leaves a --no-merge run alone, and clears only on a merged one', async () => {
+		attest_check_mock.mockClear()
+		attest_clear_mock.mockClear()
+		await git_followup_workflow.assert_review_attested(false)
+		await git_followup_workflow.clear_review_target(false)
+
+		expect(attest_check_mock).not.toHaveBeenCalled()
+		expect(attest_clear_mock).not.toHaveBeenCalled()
+
+		await git_followup_workflow.clear_review_target(true)
+
+		expect(attest_clear_mock).toHaveBeenCalledTimes(1)
 	})
 })
 

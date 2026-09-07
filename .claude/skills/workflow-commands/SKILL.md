@@ -131,6 +131,19 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
   the stop. `CLAUDE.md` → "Completion gate" carries the rule, `prompts/testing-guide.md` → "Closing
   the E2E gate without a human run" the procedure.
+- **A review's verdict counts only once `pnpm josh review:attest --check` answers `ok`**, because
+  `/code-review` is forked into the session's checkout rather than the run's: in a lane it can read a
+  tree holding the previous child's already-merged code, find nothing wrong, and have that silence
+  read as a clean round (joshuafolkken/kit#1522). `pnpm josh review:brief` names the checkout and
+  prints the nonce the review attests with; `missing` and `mismatch` are both refusals, and
+  `pnpm josh followup --merge` refuses the merge on either. `prompts/review.md` → "The brief names the
+  checkout, and a review that read another one is refused" is the single source.
+- **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
+  only once it has merged — decided from an enumeration (the verification gate, the code review, the
+  pre-push hook, the merge checks) rather than from how serious the defect looks. It binds wherever
+  children are dispatched, so `epicrun.md` → "Lanes" carries it for the parallel case and
+  `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 is the single source
+  (joshuafolkken/kit#1518).
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
   §2z. It is the one *child's* stop `epicrun` does not turn into a park — an `epic:audit` error and
   the consecutive-failure abort end a run too, but neither is a child asking for something.
@@ -778,8 +791,10 @@ each one present in `CLAUDE.md` — `scripts/workflow-skills.test.ts` for most o
   happens on turns that typed no keyword at all: an upstream defect, a review-cap follow-up from a
   standalone pre-commit review, a note a conversation decides to record. A cap that only fired
   inside a workflow would leave the routes that grew the backlog fastest uncounted. What stays
-  resident is the instruction to count, the refusal, and the exemption for a filing a run is blocked
-  by. **The count command itself is not resident** — it has to name the *target* repository and
+  resident is the instruction to count, the refusal, the exemption for a filing a run is blocked
+  by, and — since joshuafolkken/kit#1518 — the interrupt exemption together with the three tests
+  that decide it, because a trigger that says only "an interrupt is exempt" hands the deciding back
+  to judgement on exactly the turn no pointer is opened. **The count command itself is not resident** — it has to name the *target* repository and
   exclude pull requests, and a command copied into two places is a command kept correct in one; read
   it from `prompts/collaboration-workflow/wip-cap.md`, which also carries why the number can move
   (joshuafolkken/kit#1469).

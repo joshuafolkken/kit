@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -13,7 +13,8 @@ const APP_KIT_TSCONFIG = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltek
 const APP_KIT_TSCONFIG_LEGACY = './node_modules/@joshuafolkken/app-kit/tsconfig/sveltekit.jsonc'
 const SVELTE_KIT_GENERATED = './.svelte-kit/tsconfig.json'
 
-const TEST_DIR = path.join(tmpdir(), 'init-logic-json-merge-tsconfig-migration-test')
+// Unique per run, guarded by `shared-temporary-path.test.ts` (joshuafolkken/kit#1517).
+const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'init-logic-json-merge-tsconfig-migration-test-'))
 
 function install_preset(relative_path: string): void {
 	const absolute = path.join(TEST_DIR, relative_path)
