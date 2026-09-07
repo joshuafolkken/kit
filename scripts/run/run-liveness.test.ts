@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
@@ -7,6 +7,7 @@ import {
 	ALIVE_VERDICT,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
+	PLATFORM_TEMP_ROOT,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,
@@ -135,16 +136,27 @@ describe('a child that no longer needs recovering', () => {
 })
 
 const directories: Array<string> = []
+const DIRECTORY_PREFIX = 'run-liveness-'
+const FIRST_LINE = 'first\n'
 
-function arrange_transcript(age_ms: number): { link: string; target: string } {
-	const directory = mkdtempSync(path.join(tmpdir(), 'run-liveness-'))
+// One temp directory per case, registered for the teardown that removes them all. The root is a
+// parameter because the cases below deliberately sit under different ones: `os.tmpdir()` for the
+// reads that only need somewhere to write, and the platform temp root for the two that exist to
+// assert it is reachable at all (joshuafolkken/kit#1501).
+function arrange_directory(root: string): string {
+	const directory = mkdtempSync(path.join(root, DIRECTORY_PREFIX))
 
 	directories.push(directory)
 
+	return directory
+}
+
+function arrange_transcript(age_ms: number): { link: string; target: string } {
+	const directory = arrange_directory(tmpdir())
 	const target = path.join(directory, TRANSCRIPT_NAME)
 	const link = path.join(directory, 'link.jsonl')
 
-	writeFileSync(target, 'first\n')
+	writeFileSync(target, FIRST_LINE)
 	symlinkSync(target, link)
 
 	const seconds = (Date.now() - age_ms) / MS_PER_SECOND
@@ -207,6 +219,33 @@ describe('the output read follows the symlink', () => {
 	)
 })
 
+// joshuafolkken/kit#1501. `os.tmpdir()` honors `TMPDIR`, which on macOS names a per-user
+// `/var/folders/…/T` — so an agent harness writing under `/tmp` lands somewhere the old two-root list
+// never named, every poll answered `undetermined`, and the parent could not detect a stopped unit at
+// all. Both spellings are asserted because `/tmp` is a symbolic link to `/private/tmp` there and
+// `path.relative` resolves no link; on Linux the two coincide and the pair degenerates to one case
+// rather than becoming untrue.
+function arrange_platform_transcript(): { resolved: string; written: string } {
+	const directory = arrange_directory(PLATFORM_TEMP_ROOT)
+	const written = path.join(directory, TRANSCRIPT_NAME)
+
+	writeFileSync(written, FIRST_LINE)
+
+	return { resolved: path.join(realpathSync(directory), TRANSCRIPT_NAME), written }
+}
+
+describe('the platform temp root, in both of its spellings', () => {
+	it('reads a transcript written under the platform temp root', () => {
+		expect(run_liveness.sample_output(arrange_platform_transcript().written)).toBeDefined()
+	})
+
+	// The measured failure: the path the harness reports is already resolved, so this is the spelling
+	// that actually reached the command.
+	it('reads the same transcript through its resolved spelling', () => {
+		expect(run_liveness.sample_output(arrange_platform_transcript().resolved)).toBeDefined()
+	})
+})
+
 describe('what counts as frozen', () => {
 	it('calls a file written inside the silent window not frozen', async () => {
 		const { link } = arrange_transcript(0)
@@ -226,7 +265,7 @@ describe('what counts as frozen', () => {
 		const { link, target } = arrange_transcript(2 * MS_PER_MINUTE)
 		const pending = is_frozen(link, 20)
 
-		writeFileSync(target, 'first\nsecond\n')
+		writeFileSync(target, `${FIRST_LINE}second\n`)
 
 		await expect(pending).resolves.toBe(false)
 	})
