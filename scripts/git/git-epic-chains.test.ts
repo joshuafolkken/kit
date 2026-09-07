@@ -3,6 +3,7 @@ import { git_epic_chains, type InsertOutcome } from './git-epic-chains'
 
 const LINEAR = [[890, 891, 892]]
 const NOT_A_CHILD = 'is not a child of this epic'
+const AMBIGUOUS = 'appears in more than one declared chain'
 // Every number these cases position against. `insert_children` requires the epic's task list, and
 // what each case is about is the chains — so the list is supplied once here and overridden where a
 // case is specifically about a target the epic does not track.
@@ -39,10 +40,10 @@ describe('git_epic_chains.insert_children — where the child lands', () => {
 		expect(chains_of(outcome)).toStrictEqual([[890, 894, 891, 892]])
 	})
 
-	it('inserts after the target', () => {
-		const outcome = insert(LINEAR, [894], { kind: 'after', target: 891 })
+	it('appends after the target when it is the tail of its chain', () => {
+		const outcome = insert(LINEAR, [894], { kind: 'after', target: 892 })
 
-		expect(chains_of(outcome)).toStrictEqual([[890, 891, 894, 892]])
+		expect(chains_of(outcome)).toStrictEqual([[890, 891, 892, 894]])
 	})
 
 	it('inserts several children in the order given', () => {
@@ -84,6 +85,65 @@ describe('git_epic_chains.insert_children — an unordered batch', () => {
 	})
 })
 
+// joshuafolkken/kit#1080: `--after <M>` spliced the additions between `#M` and whatever already
+// followed it, so `#N -> #<successor>` was recorded although only `#M -> #N` had been asked for.
+describe('git_epic_chains.insert_children — after a target that already has a successor', () => {
+	it('declares a branch instead of splicing into the chain', () => {
+		const outcome = insert(LINEAR, [894], { kind: 'after', target: 891 })
+
+		expect(chains_of(outcome)).toStrictEqual([
+			[890, 891, 892],
+			[891, 894],
+		])
+	})
+
+	it('records only the link the position asked for', () => {
+		const outcome = insert(LINEAR, [894], { kind: 'after', target: 891 })
+
+		expect(git_epic_chains.diff_links(LINEAR, chains_of(outcome))).toStrictEqual({
+			added: [{ blocker: 891, blocked: 894 }],
+			removed: [],
+		})
+	})
+
+	it('keeps several additions in the order given, on the branch', () => {
+		const outcome = insert(LINEAR, [894, 895], { kind: 'after', target: 890 })
+
+		expect(chains_of(outcome)).toStrictEqual([
+			[890, 891, 892],
+			[890, 894, 895],
+		])
+	})
+})
+
+// A branch writes its target into a second chain, so the ambiguity refusal would otherwise make that
+// target impossible to position against — the hand edit this command exists to avoid.
+describe('git_epic_chains.insert_children — a second branch at the same point', () => {
+	it('branches again where every chain naming the target has a successor', () => {
+		const branched = [
+			[890, 891, 892],
+			[890, 894],
+		]
+
+		expect(chains_of(insert(branched, [895], { kind: 'after', target: 890 }))).toStrictEqual([
+			[890, 891, 892],
+			[890, 894],
+			[890, 895],
+		])
+	})
+
+	// Still ambiguous: one chain would be extended and the other branched, so which is meant is a
+	// question only the person who wrote the declaration can answer.
+	it('still refuses when one of the chains naming the target ends on it', () => {
+		const mixed = [
+			[890, 891],
+			[893, 890],
+		]
+
+		expect(error_of(insert(mixed, [895], { kind: 'after', target: 890 }))).toContain(AMBIGUOUS)
+	})
+})
+
 describe('git_epic_chains.insert_children — several chains', () => {
 	it('touches only the chain that names the target', () => {
 		const outcome = insert(
@@ -97,7 +157,8 @@ describe('git_epic_chains.insert_children — several chains', () => {
 
 		expect(chains_of(outcome)).toStrictEqual([
 			[1, 2],
-			[3, 9, 4],
+			[3, 4],
+			[3, 9],
 		])
 	})
 })
@@ -122,7 +183,7 @@ describe('git_epic_chains.insert_children — what it refuses', () => {
 			{ kind: 'before', target: 2 },
 		)
 
-		expect(error_of(outcome)).toContain('appears in more than one declared chain')
+		expect(error_of(outcome)).toContain(AMBIGUOUS)
 	})
 
 	it('refuses a declaration that names one issue twice', () => {

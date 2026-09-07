@@ -4,7 +4,7 @@ import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse } from './git-epic-parse'
-import { format_issue_references } from './git-epic-reference'
+import { format_dependency_links, format_issue_references } from './git-epic-reference'
 import { git_epic_relations } from './git-epic-relations'
 import { git_epic_validate, type EpicSubject } from './git-epic-validate'
 import { git_gh_command } from './git-gh-command'
@@ -77,7 +77,7 @@ function report_relations(plan: AddPlan, failures: { added: number; removed: num
 	if (plan.removed.length > 0) {
 		console.info(
 			git_epic_relations.format_relation_report({
-				total: plan.removed.length,
+				links: plan.removed,
 				failures: failures.removed,
 				action: 'drop',
 			}),
@@ -88,7 +88,7 @@ function report_relations(plan: AddPlan, failures: { added: number; removed: num
 
 	console.info(
 		git_epic_relations.format_relation_report({
-			total: plan.added.length,
+			links: plan.added,
 			failures: failures.added,
 			action: 'record',
 		}),
@@ -110,7 +110,7 @@ function report_success(epic_number: number, plan: AddPlan): void {
 	console.info(`📋 Added ${list} to epic #${String(epic_number)}.`)
 
 	if (plan.removed.length > 0) {
-		console.info(`↪ Re-pointed: ${git_epic_add_plan.format_links(plan.removed)} was replaced.`)
+		console.info(`↪ Re-pointed: ${format_dependency_links(plan.removed)} was replaced.`)
 	}
 }
 

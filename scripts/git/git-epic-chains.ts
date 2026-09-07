@@ -101,8 +101,10 @@ function start_chain(additions: ReadonlyArray<number>, position: InsertPosition)
 	return { chains: [chain_for(additions, position)] }
 }
 
-// A second declaration alongside the existing ones. Every other chain is copied through untouched:
-// the target had no order, so nothing that was declared about anything else changes.
+// A second declaration alongside the existing ones. Every other chain is copied through untouched,
+// so nothing that was declared about anything else changes. Two callers reach it: a target that no
+// chain names yet, and a `--after` whose target already has a successor — a branch rather than a
+// splice (joshuafolkken/kit#1080).
 function add_chain(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -135,6 +137,59 @@ function insert_outside_chains(
 	return not_a_child_error(position.target)
 }
 
+// Whether the chain names anything after `target`, which is what separates a branch from a tail
+// append.
+function has_successor(chain: Chain, target: number): boolean {
+	return chain.indexOf(target) < chain.length - 1
+}
+
+// `--after <M>` where the declaration already names something after `#M`. Splicing there puts the
+// additions between `#M` and that successor, which records `#N -> #<successor>` — an order nobody
+// declared, and the second of joshuafolkken/kit#1080's two paths. What `--after <M>` states is that
+// `#M` must finish first, and a fan-out (`#A -> #B` beside `#A -> #C`) already expresses exactly
+// that, so the addition becomes a chain line of its own and the existing one is left as it stood.
+// Appending after the tail is not a branch: with no successor to displace it keeps extending the
+// chain, which is what the operator asking for a tail append means.
+//
+// A branch needs no one chain to be identified — the addition becomes a line of its own either way —
+// so a target several chains name is only ambiguous while one of them could still be *extended*.
+// With a successor in every chain that names it, the answer is the same new line whichever chain a
+// reader picks, and refusing would send the second branch at one fan-out point to the hand edit this
+// command exists to avoid: declaring `#1107 -> #1100` beside `#1107 -> #1099` must not leave `#1107`
+// impossible to position against.
+function is_branching_after(
+	chains: Chains,
+	indices: ReadonlyArray<number>,
+	position: InsertPosition,
+): boolean {
+	if (position.kind !== 'after') return false
+
+	return indices.every((index) => has_successor(chains[index] ?? [], position.target))
+}
+
+function ambiguous_position_error(position: InsertPosition): InsertOutcome {
+	return {
+		error: `${to_issue_reference(position.target)} appears in more than one declared chain, so "${position.kind}" does not identify one place; edit the declaration by hand.`,
+	}
+}
+
+// Where a position that is not a branch lands: `--before` always, and `--after` at a chain's tail.
+// Inserting between two references re-points the pair, which is what keeps `--before` from leaving
+// the chain broken.
+function splice_into_chain(
+	chains: Chains,
+	index: number,
+	additions: ReadonlyArray<number>,
+	position: InsertPosition,
+): InsertOutcome {
+	const chain = chains[index] ?? []
+	const at = chain.indexOf(position.target) + (position.kind === 'after' ? 1 : 0)
+
+	return {
+		chains: replace_chain(chains, index, [...chain.slice(0, at), ...additions, ...chain.slice(at)]),
+	}
+}
+
 function insert_at_position(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -145,19 +200,10 @@ function insert_at_position(
 	const [index] = indices
 
 	if (index === undefined) return insert_outside_chains(chains, additions, position, tracked)
+	if (is_branching_after(chains, indices, position)) return add_chain(chains, additions, position)
+	if (indices.length >= AMBIGUOUS_MATCH_COUNT) return ambiguous_position_error(position)
 
-	if (indices.length >= AMBIGUOUS_MATCH_COUNT) {
-		return {
-			error: `${to_issue_reference(position.target)} appears in more than one declared chain, so "${position.kind}" does not identify one place; edit the declaration by hand.`,
-		}
-	}
-
-	const chain = chains[index] ?? []
-	const at = chain.indexOf(position.target) + (position.kind === 'after' ? 1 : 0)
-
-	return {
-		chains: replace_chain(chains, index, [...chain.slice(0, at), ...additions, ...chain.slice(at)]),
-	}
+	return splice_into_chain(chains, index, additions, position)
 }
 
 // No position given: nothing was declared about the additions, so the declaration is copied through

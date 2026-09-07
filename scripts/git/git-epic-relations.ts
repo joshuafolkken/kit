@@ -1,4 +1,5 @@
 import type { DependencyLink } from './git-epic-parse'
+import { format_dependency_links } from './git-epic-reference'
 import { git_gh_command } from './git-gh-command'
 
 // Recording and dropping the native `blocked-by` relations an epic's declared order implies.
@@ -40,20 +41,32 @@ function describe_action(action: RelationAction): string {
 	return action === 'record' ? 'recorded' : 'removed'
 }
 
-// What happened, phrased as a count rather than a per-link list: the useful signal is whether the
-// native relations now match the body, not which individual link was refused.
+// What happened, and to which pairs. The count used to stand on its own, and a count cannot be
+// checked: an insertion that recorded an order nobody declared printed the same
+// `1 blocked-by relation(s) recorded.` as a correct one, so the invented chains of
+// joshuafolkken/kit#1080 were caught only by whoever thought to open the epic body afterwards. The
+// links are named in the `#blocker -> #blocked` form the declaration itself uses, so the reader
+// compares like with like.
+//
+// The failure line still carries no list: `apply_relations` reports how many writes failed and not
+// which, so naming the whole set there would assert more than is known.
 function format_relation_report(input: {
-	total: number
+	links: ReadonlyArray<DependencyLink>
 	failures: number
 	action: RelationAction
 }): string {
 	const verb = describe_action(input.action)
+	const total = String(input.links.length)
+
+	// Nothing to name. Every caller already skips the report on an empty list, but the invariant
+	// belongs with the message rather than with each of them.
+	if (input.links.length === 0) return `🔗 No blocked-by relation was ${verb}.`
 
 	if (input.failures === 0) {
-		return `🔗 ${String(input.total)} blocked-by relation(s) ${verb}.`
+		return `🔗 ${total} blocked-by relation(s) ${verb}: ${format_dependency_links(input.links)}.`
 	}
 
-	return `⚠️  ${String(input.failures)} of ${String(input.total)} blocked-by relation(s) could not be ${verb}; the epic body is intact.`
+	return `⚠️  ${String(input.failures)} of ${total} blocked-by relation(s) could not be ${verb}; the epic body is intact.`
 }
 
 const git_epic_relations = {
