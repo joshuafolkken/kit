@@ -329,7 +329,7 @@ SECURITY.md         tsconfig.sonar.json
 > ```json
 > "Bash(git add*)", "Bash(git stage*)", "Bash(git rm*)", "Bash(git mv*)",
 > "Bash(git reset*)", "Bash(git restore --staged*)", "Bash(git restore -S*)",
-> "Bash(git commit -a*)", "Bash(git commit --all*)", "Bash(gh pr merge*)"
+> "Bash(git commit*)", "Bash(gh pr merge*)"
 > ```
 >
 > **The REST era gave every write a second spelling, and joshuafolkken/kit#1022 left the deny list
@@ -382,20 +382,24 @@ SECURITY.md         tsconfig.sonar.json
 > denied. Unblocked is not the same as endorsed — the prose rule still has the agent ask before
 > running that or any other destructive rewrite.
 >
-> **`git commit` is denied by flag, not as a whole.** `git commit -a` stages every tracked file and
-> commits it, which is the fallback a refused `git add` pushes an agent toward, so both spellings of
-> that flag are denied. Plain `git commit -m "…"` was left alone deliberately:
-> `prompts/git-automation.md` — shipped to consumers in the same package — instructed the agent to
-> run exactly that command, and denying it here would have broken a documented flow from the other
-> half of the distribution. **That reason is gone**: joshuafolkken/kit#1064 retired the prompt, and
-> nothing distributed asks for a bare `git commit` any more, because `pnpm josh git` drives the whole
-> commit through a node script. Widening the deny to the subcommand is joshuafolkken/kit#1075 rather
-> than part of that retirement — it rewrites the entry list `CLAUDE.md` and
-> `prompts/collaboration-workflow/operating-rules.md` both quote, which is a separate deliverable
-> from removing the document that blocked it.
+> **`git commit` is denied as a whole subcommand, and was not always.** `git commit -a` stages every
+> tracked file and commits it, which is the fallback a refused `git add` pushes an agent toward, so
+> the two spellings of that flag were denied first and alone. Plain `git commit -m "…"` was left
+> reachable deliberately: `prompts/git-automation.md` — shipped to consumers in the same package —
+> instructed the agent to run exactly that command, and denying it here would have broken a
+> documented flow from the other half of the distribution. **That reason is gone.**
+> joshuafolkken/kit#1064 retired the prompt, and no distributed document instructs the agent to run a
+> bare `git commit` any more, because `pnpm josh git` drives the whole commit through a node script — so the Bash matcher
+> sees `pnpm josh …` and the approved commit flow is untouched by any pattern written here.
+> joshuafolkken/kit#1075 therefore folded both flag entries into the single `Bash(git commit*)` that
+> contains them. What that closes is the second fallback: an agent refused at `git add` reached for
+> `git commit -a`, and an agent refused at both reached for `git commit -m`, which is now denied by
+> the same prefix as the staging command it was standing in for.
 >
 > **It is a guardrail, not a sandbox.** Each entry is a prefix pattern, so plenty still runs: a
-> global option ahead of the subcommand (`git -C . add .`), a flag pair the prefix does not cover
+> global option ahead of the subcommand (`git -C . add .`), an environment assignment ahead of it
+> (`JOSH_PRE_COMMIT_FORCE=1 git commit`, which the pre-commit type check prints for a human to run in
+> their own terminal), a flag pair the prefix does not cover
 > (`git restore --worktree --staged <path>`), the plumbing spellings (`git update-index`,
 > `git apply --cached`), and everything that stages or commits by another route (`git merge`,
 > `git cherry-pick`, `git revert`). `git stash` is the notable one: the documented `fullrun new` /
