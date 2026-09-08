@@ -430,7 +430,7 @@ describe('time_run.unread_lines', () => {
 	it('names how many were missed', () => {
 		const [note] = time_run.unread_lines(2)
 
-		expect(note).toContain('2 transcript(s) of this run could not be read')
+		expect(note).toContain('2 transcript(s) of this run could not be measured')
 		expect(time_run.is_unread_note(note ?? '')).toBe(true)
 	})
 

@@ -65,9 +65,10 @@ interface IssueSpans {
 	excluded: Array<ExcludedSession>
 	is_separated: boolean
 	attributed_count: number
-	// The transcripts of this run's own family that could not be read (joshuafolkken/kit#1439). Kept
-	// apart from `session_count` because a transcript nobody could read contributed no span, and
-	// folding the two would report a run that is missing minutes as one that spent none.
+	// The transcripts of this run's own family whose minutes could not be measured — unreadable, or
+	// read and holding no parseable span (joshuafolkken/kit#1439, joshuafolkken/kit#1599). Kept apart
+	// from `session_count` because such a transcript contributed no span, and folding the two would
+	// report a run that is missing minutes as one that spent none.
 	unread_count: number
 }
 
@@ -100,7 +101,7 @@ interface Collector {
 	by_session: Map<string, SessionSpans>
 	counted: Map<string, Span>
 	transcripts: Map<string, number>
-	// Which transcripts this issue took spans from, and which of its family could not be read
+	// Which transcripts this issue took spans from, and which of its family could not be measured
 	// (joshuafolkken/kit#1439). The first is what the family expansion grows from — a session id
 	// alone cannot say whether it was the session's own file or one of its units that contributed.
 	contributed: Set<string>

@@ -32,6 +32,12 @@ import { time_spans, type Span } from './time-spans'
 // **A transcript that could not be read is reported, never measured at zero.** `read_optional` is
 // what makes the two answers different, and the count travels back with the spans so the note above
 // the report can name it.
+//
+// **A transcript that was read and holds no parseable span is the same answer**
+// (joshuafolkken/kit#1599). It has no window either, so it bounds the parent's minutes exactly as
+// badly as an unreadable one does — the difference is only in why, and the run is short by the same
+// minutes whichever it was. What decides the answer is therefore whether a window came back, never
+// whether the file opened.
 
 const NO_SPANS = 0
 const BEFORE_EVERYTHING = 0
@@ -51,8 +57,13 @@ interface Relative {
 	spans: ReadonlyArray<Span>
 }
 
-// What the family added, and what it could not read. The second is a list rather than a count so the
-// note can be built from the same values a test asserts on.
+// What the family added, and whose minutes went unmeasured. The second is a list rather than a count
+// so the note can be built from the same values a test asserts on.
+//
+// **Two causes, one list** (joshuafolkken/kit#1599): a transcript that could not be read at all, and
+// one that was read and yielded no span. They are kept together because the consequence is identical
+// — the run is short by whatever that transcript held — and a reader told the figures are missing
+// minutes needs no second sentence to say which of the two it was.
 interface Relatives {
 	added: Array<Relative>
 	unread: Array<string>
@@ -241,15 +252,25 @@ function inside_window(
 }
 
 // The units of one family split by whether this run holds them, each as the wall clock it occupies,
-// and the ones whose transcript could not be read at all.
+// and the ones no window could be taken for.
 // **An unreadable unit is not an empty one, and `?? []` is exactly the fold this change exists to
 // remove.** A sibling read as empty leaves `outside`, so `adjacency_window` is no longer bounded by
 // it and `inside_window` no longer subtracts it — the parent's minutes bracketing that sibling are
 // then charged to this run, measured rather than reported. It travels back as an id instead.
+//
+// **The window is what decides membership, not the read** (joshuafolkken/kit#1599). Splitting on
+// `spans === undefined` left a third state between the two: a sibling whose transcript opened and
+// parsed to no span had no window either, so it fell out of `inside` and `outside` alike while being
+// counted as read — invisible to `adjacency_window` and to `inside_window` in exactly the way an
+// unreadable one had been, and with nothing saying so.
 interface UnitWindows {
 	inside: Array<Interval>
 	outside: Array<Interval>
-	unread: Array<string>
+	unmeasured: Array<string>
+}
+
+function measured_window(spans: ReadonlyArray<Span> | undefined): Interval | undefined {
+	return spans === undefined ? undefined : window_of(spans)
 }
 
 function unit_windows(
@@ -257,17 +278,15 @@ function unit_windows(
 	is_held: (unit: SessionFile) => boolean,
 	read: SpanReader,
 ): UnitWindows {
-	const opened = units.map((unit) => ({ unit, spans: read(unit) }))
-	const found = opened.flatMap((one) => {
-		const window = one.spans === undefined ? undefined : window_of(one.spans)
-
-		return window === undefined ? [] : [{ unit: one.unit, window }]
-	})
+	const opened = units.map((unit) => ({ unit, window: measured_window(read(unit)) }))
+	const found = opened.flatMap((one) =>
+		one.window === undefined ? [] : [{ unit: one.unit, window: one.window }],
+	)
 
 	return {
 		inside: found.filter((one) => is_held(one.unit)).map((one) => one.window),
 		outside: found.filter((one) => !is_held(one.unit)).map((one) => one.window),
-		unread: opened.filter((one) => one.spans === undefined).map((one) => one.unit.session_id),
+		unmeasured: opened.filter((one) => one.window === undefined).map((one) => one.unit.session_id),
 	}
 }
 
@@ -304,10 +323,12 @@ function upward(family: Family, contributed: ReadonlySet<string>, read: SpanRead
 
 	if (held.inside.length === NO_SPANS) return no_relatives()
 
-	// **A sibling nobody could read bounds nothing, so nothing is taken on the strength of it.** Its
+	// **A sibling with no window bounds nothing, so nothing is taken on the strength of it.** Its
 	// window is unknown, so neither the adjacency bound nor the concurrent-sibling subtraction can be
 	// trusted; the parent's minutes go unmeasured and the note names the transcript that was missing.
-	if (held.unread.length > NO_SPANS) return { added: [], unread: held.unread }
+	// **Whether the transcript failed to open or opened onto no span makes no difference here**
+	// (joshuafolkken/kit#1599): the bound is missing either way.
+	if (held.unmeasured.length > NO_SPANS) return { added: [], unread: held.unmeasured }
 
 	return parent_relatives(parent, held, read)
 }
