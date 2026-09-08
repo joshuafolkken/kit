@@ -34,9 +34,12 @@
 //
 // - **The date is carried, not just the clock time.** The confusion above happened across a day
 //   boundary, so an `HH:MM` alone would have left the same hole open.
-// - **UTC, never the reader's zone.** The line is read from other machines and from cloud sessions, and
-//   joshuafolkken/kit#1245 already paid for a timestamp rendered in the reader's zone making one
-//   process look like a stranger. `toISOString` is what every other stamp in this repository uses.
+// - **The local clock leads, and UTC is printed beside it.** The local half is the one a person can
+//   act on without converting anything, which is what UTC alone denied a reader seven hours from it
+//   (joshuafolkken/kit#1589). UTC is kept rather than replaced: the line is read from other machines
+//   and from cloud sessions, and joshuafolkken/kit#1245 already paid for a timestamp rendered in the
+//   reader's zone making one process look like a stranger. The printed offset ties the two halves
+//   together, so a reader on a third machine can place both.
 // - **It is added beside the elapsed figures, never in place of them.** How long it has been quiet and
 //   when the observation was taken are two different facts, and neither can be reconstructed from the
 //   other without knowing the answer already.
@@ -83,6 +86,9 @@ const QUIET_MARKER = '⏳'
 // `1970-01-01T00:00:00.000Z` cut after the minutes. Seconds are dropped because the interval this line
 // breaks is measured in minutes, and a heartbeat that claims a precision nobody uses is noise.
 const STAMP_END = 16
+// Two digits for every calendar and clock field the local half prints, and for each half of the offset.
+const PAD_WIDTH = 2
+const MINUTES_PER_HOUR = 60
 
 function to_minutes(elapsed_ms: number): number {
 	return Math.floor(elapsed_ms / MS_PER_MINUTE)
@@ -92,15 +98,62 @@ function format_minutes(elapsed_ms: number): string {
 	return `${String(to_minutes(elapsed_ms))}m`
 }
 
+function pad(value: number): string {
+	return String(value).padStart(PAD_WIDTH, '0')
+}
+
 /**
- * The instant this observation was taken, with its date, in UTC.
+ * The local clock's offset from UTC, in whole minutes, signed the way a reader expects to see it.
+ *
+ * `getTimezoneOffset` counts minutes the local zone is *behind* UTC, so the sign is inverted here — a
+ * zone ahead of UTC answers a negative number there and has to read `+`.
+ *
+ * **It is rounded**, because a historic offset is not a whole number of minutes: `Asia/Kathmandu` was
+ * `+05:41:16` until 1986, so a stamp taken at an instant in that era answers `-341.2666…` and the
+ * minutes field would print `41.26666666666667` rather than `41`.
+ */
+function offset_minutes(date: Date): number {
+	return Math.round(-date.getTimezoneOffset())
+}
+
+/** That offset written `+HH:MM` or `-HH:MM`, from the same rounded minute total the stamp is built on. */
+function format_offset(total_minutes: number): string {
+	const sign = total_minutes < 0 ? '-' : '+'
+	const absolute = Math.abs(total_minutes)
+
+	return `${sign}${pad(Math.floor(absolute / MINUTES_PER_HOUR))}:${pad(absolute % MINUTES_PER_HOUR)}`
+}
+
+/**
+ * The instant this observation was taken, on the local clock and in UTC, with its date on both.
+ *
+ * **The local half leads because it is the half a person can act on.** The line used to carry UTC
+ * alone, and on a machine seven hours ahead every stamp in the report was a number the reader had to
+ * convert before it meant anything — which is the same failure joshuafolkken/kit#1560 filed, arriving
+ * from the other side: a stamp nobody can place is a stamp nobody reads.
+ *
+ * **UTC is kept beside it rather than replaced.** The reason it was pinned is real and unchanged: the
+ * line is relayed to other machines and read in cloud sessions, and joshuafolkken/kit#1245 already
+ * paid for a timestamp rendered in the reader's zone making one process look like a stranger. Printing
+ * both costs twenty-five characters and leaves neither reader guessing — the offset is what ties the
+ * two halves together, so a reader on a third machine can place the local half as well.
+ *
+ * **The local half is read off the instant shifted by that same rounded offset, never off `getHours`
+ * and `getMinutes`.** Those truncate the seconds of a sub-minute offset while the offset beside them
+ * is rounded, so the two would disagree by a minute in a zone such as `Africa/Monrovia` (`-00:44:30`
+ * in 1970) and the stamp would no longer parse back to the instant it was taken at. Shifting first and
+ * reading UTC fields off the result makes the two halves consistent by construction.
  *
  * It reads the `now_ms` the line is already formatted against rather than calling a clock of its own,
- * so the stamp can never disagree with the elapsed figures printed beside it — and the module stays
- * deterministic, which is what lets the test pin an exact string with no fake timer.
+ * so the stamp can never disagree with the elapsed figures printed beside it.
  */
 function format_observed_at(now_ms: number): string {
-	return `${new Date(now_ms).toISOString().slice(0, STAMP_END)}Z`
+	const minutes = offset_minutes(new Date(now_ms))
+	const local = new Date(now_ms + minutes * MS_PER_MINUTE)
+	const day = `${String(local.getUTCFullYear())}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`
+	const clock = `${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}${format_offset(minutes)}`
+
+	return `${day} ${clock} / ${new Date(now_ms).toISOString().slice(0, STAMP_END)}Z`
 }
 
 /**

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_progress, type Observations } from './run-progress'
 
 // joshuafolkken/kit#1520. The two properties that make this a progress report rather than a timer:
@@ -17,6 +17,15 @@ function observations(overrides: Partial<Observations> = {}): Observations {
 		record_age_ms: 2 * MINUTE,
 		...overrides,
 	}
+}
+
+// The local half of the stamp, parsed back with the offset the line itself printed. Both round-trip
+// assertions below read it the same way, so the shape lives here rather than in each of them. A line
+// with no stamp parses to `NaN`, which fails the comparison rather than passing quietly.
+function parse_stamp(line: string): number {
+	const stamp = /at (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}[+-]\d{2}:\d{2}) \//u.exec(line)
+
+	return Date.parse(`${stamp?.[1] ?? ''}T${stamp?.[2] ?? ''}`)
 }
 
 describe('is_due — the trigger is silence, not a clock', () => {
@@ -145,7 +154,7 @@ describe('format_line — observations, never "still running"', () => {
 // passed, and concluded the machine's clock was broken when it was correct to the second.
 describe('format_line — when the observation was taken', () => {
 	it('says when it was observed, beside how long the silence had run', () => {
-		expect(LINE).toContain('at 1970-01-01T10:00Z')
+		expect(LINE).toContain('1970-01-01T10:00Z')
 		expect(LINE).toContain('quiet 12m')
 	})
 
@@ -156,14 +165,59 @@ describe('format_line — when the observation was taken', () => {
 			unchanged_since_ms: NOW,
 		})
 
-		expect(next_day).toContain('at 1970-01-02T10:00Z')
+		expect(next_day).toContain('1970-01-02T10:00Z')
 	})
 
-	// The UTC pin is the exact stamp above: `NOW` is ten hours after the epoch, so a formatter that
-	// reached for the reader's own zone prints another hour on any machine that is not on UTC. What
-	// this one pins is the `Z` beside it, which is what stops a reader having to guess the zone.
+	// The UTC half stays an exact pin: `NOW` is ten hours after the epoch, so a formatter that printed
+	// the reader's own zone *instead* would show another hour on any machine that is not on UTC. The
+	// `Z` is what stops a reader having to guess which of the two halves is which.
 	it('marks the zone, so a reader in another one is not left guessing', () => {
-		expect(LINE).toMatch(/ at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z /u)
+		expect(LINE).toMatch(/ \/ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z /u)
+	})
+
+	// The local half is what a person can act on without converting anything, and it leads for that
+	// reason. It cannot be pinned to a literal — the value depends on the machine's zone — so what is
+	// asserted is its shape and its offset, both of which hold wherever the suite runs.
+	it('leads with the local clock, and names the offset that places it', () => {
+		expect(LINE).toMatch(/ at \d{4}-\d{2}-\d{2} \d{2}:\d{2}[+-]\d{2}:\d{2} \/ /u)
+	})
+
+	// The two halves have to be the same instant, or the line is worse than one of them alone. Parsing
+	// the local half back with its own printed offset is what checks that, and it stays deterministic
+	// on every machine because the offset it is read with is the one the line just printed.
+	it('prints one instant twice, not two clocks that disagree', () => {
+		expect(parse_stamp(LINE)).toBe(Math.floor(NOW / MINUTE) * MINUTE)
+	})
+})
+
+// A zone's offset is not always a whole number of minutes, and `NOW` is an instant in 1970 —
+// `Asia/Kathmandu` was `+05:41:16` then, which answers `-341.2666…`. Two separate things break there,
+// and the machine running the suite is the only reason neither is normally seen: the minutes field
+// printed `41.26666666666667`, and the local clock read off `getHours` / `getMinutes` truncated the
+// seconds the offset beside it rounded, so the stamp no longer named the instant it was taken at.
+describe('format_line — a zone whose offset is not whole minutes', () => {
+	const KATHMANDU_1970_MINUTES = -341.2666666666667
+
+	function line_in_kathmandu(): string {
+		vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(KATHMANDU_1970_MINUTES)
+
+		return run_progress.format_line(observations(), {
+			now_ms: NOW,
+			quiet_since_ms: NOW,
+			unchanged_since_ms: NOW,
+		})
+	}
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('rounds the offset rather than printing a fraction of a minute', () => {
+		expect(line_in_kathmandu()).toContain('+05:41 /')
+	})
+
+	it('still names the instant it was taken at, the clock and the offset agreeing', () => {
+		expect(parse_stamp(line_in_kathmandu())).toBe(NOW)
 	})
 })
 
