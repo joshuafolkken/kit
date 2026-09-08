@@ -190,10 +190,10 @@ describe(`${SKILL_PATH} — prices the round-2 disposition rather than listing i
 	// the editing itself is a cost every exit but "drop it" would have paid.
 	it.each([
 		'**The sum is a re-reading of rows already in the tables, never minutes to add to the run.**',
-		'**The second CI cycle is the `ci` phase minus `categories.ci_ms`, never the phase whole.**',
+		'**The second CI cycle is the last row of the `CI cycles` block, read as its `naked` figure**',
 		'**a check called once has no `by_invocation` row**',
 		'report the check as unattributed and the total as a lower',
-		'**That remainder is an *extra* cycle only where the detector fired.**',
+		'**That last row is an *extra* cycle only where the detector fired.**',
 		"**A second `pr` row is not proof the commit was round 2's.**",
 		"**The fix's own editing time stays out of the sum.**",
 	])('does not over-read the price: %j', (marker) => {

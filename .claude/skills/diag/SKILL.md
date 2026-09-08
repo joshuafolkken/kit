@@ -215,12 +215,21 @@ Read from the JSON, in this order:
   [#1403](https://github.com/joshuafolkken/kit/issues/1403) enumerated, each with one source. **The
   second `josh git`** and **the last `josh gate`** are that row's own entries in
   `by_invocation.durations_ms`: the commit the fix pushed, and the gate that then ran beside its CI.
-  **The second CI cycle is the `ci` phase minus `categories.ci_ms`, never the phase whole.** The phase
-  is the sum of the two, and the category share is the part of the open→merge window *no* span covers
-  — time no transcript span was attributed to, which is not the same thing as the merge command
-  waiting on a cycle — so quoting the phase whole prices unattributed time as an extra cycle.
-  The remainder is what the report already prints in words:
-  `1.4 min of the merge command was waiting on CI`. **The single check the fix reached** has two
+  **The second CI cycle is the last row of the `CI cycles` block, read as its `naked` figure**
+  ([#1465](https://github.com/joshuafolkken/kit/issues/1465)). The block prints one row per check
+  window — `00:44:43 → 00:46:26  1.7 min  naked 103.0 s` — and the naked figure is the part of that
+  cycle nothing but the merge command overlapped, which is exactly what the run waited.
+  **The phase difference it replaces read low, and by more than half.** `ci` minus
+  `categories.ci_ms` is `serial_ci_ms`: the part of a cycle the merge spans cover *and nothing else
+  does*, which drops every minute of a cycle that no span covers at all — `followup` not yet issued,
+  or between attempts. On run #1441 that difference read **56.5 s** against a hand-measured **103 s**,
+  and the sum it fed was reported as sitting in the middle of the recorded distribution when the run
+  was in fact above its maximum. **It also could not say which cycle was which**: that run's first
+  cycle (1 m 49 s) ran wholly behind the second review round and cost nothing, its second (1 m 43 s)
+  ran naked, and one folded number reads them the same.
+  **A row whose `naked` equals its length ran with nothing beside it; one that says `behind …` names
+  the phase and the busiest command it hid behind** — the evidence that the hiding place was real,
+  rather than an inference from two totals. **The single check the fix reached** has two
   readings and no third: the last entry of that check's `by_invocation` row where it ran more than
   once, and `single_checks.duration_ms` where the run issued exactly one single check all told —
   **a check called once has no `by_invocation` row**, which is this component's ordinary case rather
@@ -231,7 +240,7 @@ Read from the JSON, in this order:
   **The sum is a re-reading of rows already in the tables, never minutes to add to the run.** All four
   are already counted once — three in tool execution, the fourth in the `ci` phase — so the line
   prices a decision and does not lengthen the run it was read from.
-  **That remainder is an *extra* cycle only where the detector fired.** It is the CI the merge command
+  **That last row is an *extra* cycle only where the detector fired.** It is the CI the merge command
   sat on, and a clean round 2 has one cycle that can be partly serial too — so the same figure means
   "the second cycle" here and "the only cycle" there. Never quote it as an extra cycle on a run whose
   second commit was not found.
@@ -244,8 +253,12 @@ Read from the JSON, in this order:
   no `josh git` row at all is **did not occur** — a round 2 that found nothing to fix in place,
   **never reported as 0 minutes**. Everything else is **could not tell**: the two evidences
   disagreeing, a pair that could not be identified in the first place — any of the five states above —
-  a listing read with `--top`, `ci` reading `not detected`, or a `failures` chain that makes the
+  a listing read with `--top`, `ci` reading `not detected`, a `CI cycles` block reading
+  `not measured`, or a `failures` chain that makes the
   second commit someone else's. Report it as such rather than resolving it either way.
+  **A `CI cycles` block that is absent is not `not measured`**: the block is withheld only where the
+  scope has no pull request at all, and a scope with no pull request has no second commit to price
+  either.
   **Frequency comes from `--last <N>`, by applying this detector per run.**
   `pnpm josh time --last <N> --json` carries every run's whole report under `runs[]`, so the three
   answers counted across that set are the frequency joshuafolkken/kit#1382 asks for. Drop `--top`
