@@ -545,7 +545,7 @@ pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, 
   and holding its seat, so the next `lane:open` for that child answers `already-open` and never
   retries the install. **Park that child and name `pnpm josh lane:close <N>`** — the message on
   standard error carries pnpm's own reason, and a lock the lane cannot build is a state a person
-  fixes, not one a retry loop resolves. **The**
+  fixes, not one a retry loop resolves. **The
   guard is in the snippet rather than left to the reader** — without it the next two lines run
   `--dir ""` in whatever directory the parent happens to stand in.
 - **`lane:open` installs; the third line is a *re*-install, and only the popping lane needs it**
