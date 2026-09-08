@@ -26,6 +26,30 @@ import { json_value } from '#scripts/json-value'
 const BASH_SEPARATOR = ': '
 const WHITESPACE_PATTERN = /\s+/u
 const SEGMENT_PATTERN = /&&|\|\||;|\|/u
+// A pipe alone, never the `||` that happens to be spelled with the same character twice. The two are
+// opposites for the purpose below: a pipeline throws away the exit status of every command but its
+// last, while `||` keeps the first command's and runs the second only when it failed. `|&` is a pipe
+// and is cut here, its `&` left in the fragment that follows.
+const PIPE_PATTERN = /(?<!\|)\|(?!\|)/u
+// What `SEGMENT_PATTERN` cuts on minus the pipe, for reading *inside* one pipe segment.
+const CHAIN_PATTERN = /&&|\|\||;/u
+// A quoted span is text, not shell syntax, and it is removed before the pipe reading below. This
+// repository's issue bodies, comment bodies and commit messages quote command chains constantly, so
+// `--body "cd x && pnpm josh gate | tail"` is a `gh` call and nothing else — a reader that split its
+// quoted text would answer about a command the shell never ran. Whichever quote opens first consumes
+// to its own close, so the `'` inside `"it's fine"` is a character rather than an opener.
+//
+// **The trade-off, stated rather than left to be discovered.** A shell does execute its quoted
+// argument — `bash -c "pnpm josh gate | tail"`, `sh -c`, `ssh host "…"` — and that pipeline becomes
+// invisible here. Erring this way is the cheaper error for every caller: a missed reading costs
+// nothing beyond the reading, while a fragment read as a command answers about work the shell never
+// did, on the shape this repository writes constantly.
+const QUOTED_SPAN_PATTERN = /'[^']*'|"[^"]*"/gu
+// `set -o pipefail` tells the shell to report the pipeline with the first failing command's status,
+// so nothing in it is discarded. The flag letters are loose because `set -eo pipefail` and
+// `set -euo pipefail` are the same instruction, and the `set` word is required so that a path or a
+// message merely containing "pipefail" cannot turn the reading off.
+const PIPEFAIL_PATTERN = /\bset\s+-[a-z]*o\s+pipefail\b/u
 // A command name never opens with `-`; that is a flag, and a flag became the label whenever the walk
 // landed on one (`Bash: -t`, from `F=$(ls -t *.jsonl | head -1)`).
 const COMMAND_WORD_PATTERN = /^[\w./@:+][\w./@:+-]*$/u
@@ -105,6 +129,33 @@ function leading_word(command: string): string {
 	return segment_command(command_segment(command))
 }
 
+// Every command a pipeline throws the exit status of away — one per `|`-separated segment except the
+// last (joshuafolkken/kit#1556). A shell reports a pipeline with its final command's status, so a
+// check run anywhere earlier has its verdict discarded before anything reads it.
+//
+// **The command of a segment is at the end of its chain, not the start.** `|` binds tighter than `&&`
+// and `;`, so `cd x && pnpm josh gate | tail` runs `cd x && (pnpm josh gate | tail)` and what the pipe
+// discards is `pnpm josh gate`; taking the segment's first command would name `cd` and miss every
+// check written behind a directory change, which is how nearly all of them are written here.
+//
+// **Quoted text is removed first, and here that is load-bearing rather than tidy.** `command_segment`
+// can tolerate a quote-cut fragment because it only reads the *first* segment that runs something;
+// this reader walks into the middle of a chain, where a quoted `… && pnpm josh gate | tail` inside a
+// `gh` comment body would otherwise be answered for as though the check had run.
+//
+// **A pipeline under `set -o pipefail` discards nothing**, so it is not this function's business —
+// answering otherwise would name the very form a caller is told to use instead.
+function discarded_commands(command: string): Array<string> {
+	const unquoted = command.replaceAll(QUOTED_SPAN_PATTERN, ' ')
+
+	if (PIPEFAIL_PATTERN.test(unquoted)) return []
+
+	return unquoted
+		.split(PIPE_PATTERN)
+		.slice(0, -1)
+		.map((segment) => segment.split(CHAIN_PATTERN).at(-1) ?? '')
+}
+
 // A call nothing could be named for stays under the bare tool name. Naming it after the word that
 // was rejected — the old fallback — is what put `Bash: FOO=1` in the table.
 function bash_label(command: string): string {
@@ -180,8 +231,10 @@ function josh_arguments(command: string): Array<string> {
 }
 
 const time_shell = {
+	JOSH_PREFIX,
 	bash_command,
 	bash_label,
+	discarded_commands,
 	josh_arguments,
 	josh_command_of,
 	leading_word,

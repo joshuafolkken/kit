@@ -56,10 +56,7 @@ describe('the verdict line a josh command prints about itself', () => {
 // ends cannot drift apart without this failing.
 describe('the opening line a gate prints before its checks', () => {
 	it('reads back the line the gate formats', () => {
-		const line = gate_plan.format_gate_plan(
-			{ concurrency: CONCURRENCY, unit_worker_cap: CAP },
-			CORES,
-		)
+		const line = gate_plan.format_gate_plan(gate_plan.plan_of(CONCURRENCY, CAP), CORES)
 
 		// The round trip is the assertion. The line's exact wording is `gate-plan.test.ts`'s to pin —
 		// copying it here would give the format two owners and fail this test the day a fifth check is

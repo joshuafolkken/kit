@@ -215,3 +215,45 @@ describe('gate_plan.format_gate_plan', () => {
 		expect(gate_plan.format_machine(MEASURED_CORES, 1)).toBe('11 cores')
 	})
 })
+
+// joshuafolkken/kit#1226: CI runs the unit suite on a runner of its own, so the gate needs a plan
+// that fans out to the other three. What matters is that the narrower plan is still a *plan* —
+// every check it names runs, and the printed line describes the set that ran rather than the set
+// the gate has when nobody passes the flag.
+describe('gate_plan without the unit suite', () => {
+	it('keeps the three static checks and drops only the unit one', () => {
+		expect(gate_plan.select_gate_checks(false)).toEqual(gate_plan.STATIC_CHECKS)
+		expect(gate_plan.select_gate_checks(true)).toEqual(gate_plan.GATE_CHECKS)
+	})
+
+	it('is the whole gate minus one check, not a different set', () => {
+		expect(gate_plan.GATE_CHECKS).toHaveLength(gate_plan.STATIC_CHECKS.length + 1)
+		expect(gate_plan.GATE_CHECKS.slice(0, -1)).toEqual(gate_plan.STATIC_CHECKS)
+	})
+
+	it('runs all three at once on the four-core runner CI gives it', () => {
+		const plan = gate_plan.resolve_gate_plan(CI_CORES, 1, false)
+
+		expect(plan.concurrency).toBe(gate_plan.STATIC_CHECKS.length)
+		expect(plan.checks).toEqual(gate_plan.STATIC_CHECKS)
+	})
+
+	// A worker cap is a number for a check this plan never starts, so it carries none — and the line
+	// says where the suite went rather than printing a blank or an inherited count.
+	it('carries no worker cap and says where the unit suite is', () => {
+		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, 1, false)
+
+		expect(plan.unit_worker_cap).toBeUndefined()
+		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES)).toBe(
+			'plan: 3 of 3 checks at once, test:unit elsewhere (11 cores)',
+		)
+	})
+
+	// The default is the full gate on every entry point that does not ask otherwise, and it is
+	// asserted rather than assumed: a flipped default would silently stop running the unit suite
+	// everywhere, which is the one regression this flag must not be able to cause.
+	it('leaves every other caller with all four checks', () => {
+		expect(gate_plan.resolve_gate_plan(MEASURED_CORES).checks).toEqual(gate_plan.GATE_CHECKS)
+		expect(gate_plan.has_unit_check(gate_plan.resolve_gate_plan(CI_CORES).checks)).toBe(true)
+	})
+})

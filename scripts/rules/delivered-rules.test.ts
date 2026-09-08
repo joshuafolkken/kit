@@ -38,6 +38,10 @@ const ISSUE_LIST_COMMAND = 'gh issue list --state open --limit 100'
 // use.
 const LEAVES_ALONE = 'leaves %j alone'
 const CARRIES_MARKER = 'carries %j'
+const PIPED_VERIFICATION = 'piped-verification'
+// The shape joshuafolkken/kit#1556 was filed on: a gate whose failure the pipeline reports as a
+// success. Reused wherever a case needs the third row's trigger to match.
+const PIPED_GATE_COMMAND = 'pnpm josh gate 2>&1 | tail -40'
 const ONCE_PER_RUN = 'delivers once per run rather than once per call'
 // The shortest command that really files an Issue, reused wherever a case needs the trigger to match
 // so that no case can pass on a spelling the others do not use.
@@ -279,6 +283,29 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 	})
 })
 
+describe('rule_delivery — the masked verification at the call that pipes it', () => {
+	it('delivers the rule on the call that pipes a check', () => {
+		const reason = rule_delivery(payload_of('piped', PIPED_GATE_COMMAND), NOW_MS)
+
+		expect(reason).toBe(delivered_rules.PIPED_VERIFICATION_REASON)
+	})
+
+	it(ONCE_PER_RUN, () => {
+		const payload = payload_of('piped-repeat', PIPED_GATE_COMMAND)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.PIPED_VERIFICATION_REASON)
+		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+	})
+
+	// The invariant `is_first_delivery` depends on, re-checked for this row as the enumeration's own
+	// comment requires: a trigger the batching guard also considers would put the silent collision back.
+	it('is not a call the batching guard may also refuse', () => {
+		const call = { name: 'Bash', input: { command: PIPED_GATE_COMMAND } }
+
+		expect(time_batch_guard.is_guarded_call(call)).toBe(false)
+	})
+})
+
 // What happens on a turn where the trigger does not fire: nothing at all reaches stdout, which is the
 // same answer the other two guards give. A hook that spoke on these calls would cost every run.
 describe('rule_delivery — silent where nothing binds', () => {
@@ -413,7 +440,7 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it.each([WIP_CAP, ISSUE_COMMENTS, SHELL_BODY])('names %j', (id) => {
+	it.each([WIP_CAP, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION])('names %j', (id) => {
 		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
 	})
 
@@ -423,6 +450,7 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		BODY_READ_COMMAND,
 		BODY_READ_API_COMMAND,
 		EVALUATED_BODY_COMMAND,
+		PIPED_GATE_COMMAND,
 	])('is claimed by exactly one rule: %j', (command) => {
 		expect(rules_claiming(command)).toBe(1)
 	})

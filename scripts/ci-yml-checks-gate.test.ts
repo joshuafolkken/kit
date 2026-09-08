@@ -8,7 +8,13 @@ import { GATE_TARGETS, verification_gate } from './verification-gate'
 // merge. `josh gate` already runs exactly those checks concurrently and reports every failure in
 // one pass, so the job runs that instead of restating the five tool invocations.
 
-const CHECKS_JOB = 'checks'
+// joshuafolkken/kit#1226 then moved the unit suite off that job and onto a runner of its own, so in
+// this repository's workflow the gate step lives on `static-checks` and the name `Checks` belongs to
+// the job that aggregates both halves for the branch ruleset. The template still runs one job called
+// `checks`, for the ordering reasons pinned at the bottom of this file, so the two names are read
+// separately rather than shared.
+const RUNTIME_GATE_JOB = 'static-checks'
+const TEMPLATE_CHECKS_JOB = 'checks'
 const GATE_STEP = 'pnpm josh gate'
 // The five invocations the job used to spell out. Each one is now reached through the `josh`
 // sub-command that defines it, so finding any of them here again means the job has gone back to
@@ -22,14 +28,14 @@ const RESTATED_TOOL_TOKENS: ReadonlyArray<string> = [
 ]
 
 function checks_steps(): ReadonlyArray<WorkflowStep> {
-	return ci_yml_fixture.find_job(ci_yml_fixture.RUNTIME_CI_YML, CHECKS_JOB)?.steps ?? []
+	return ci_yml_fixture.find_job(ci_yml_fixture.RUNTIME_CI_YML, RUNTIME_GATE_JOB)?.steps ?? []
 }
 
 function checks_scripts(): ReadonlyArray<string> {
 	return checks_steps().map((step) => ci_yml_fixture.step_run(step))
 }
 
-describe('the Checks job runs the verification gate', () => {
+describe('the static-checks job runs the verification gate', () => {
 	it('runs the gate command', () => {
 		expect(checks_scripts().some((script) => script.startsWith(GATE_STEP))).toBe(true)
 	})
@@ -48,11 +54,15 @@ describe('the Checks job runs the verification gate', () => {
 		expect(checks_scripts().some((script) => script.includes(fragment))).toBe(false)
 	})
 
-	// The count is what says the suite ran. `josh test:unit` skips rather than fails on a project
-	// with no tests — deliberately, and shared with the template — so a quiet green log would look
-	// identical whether vitest executed everything or nothing.
-	it('prints every check body so the unit count is in the log', () => {
-		expect(checks_scripts()).toContain(`${GATE_STEP} ${verification_gate.VERBOSE_FLAG}`)
+	// Whole-script equality, and both flags matter. `--verbose` prints every check body, so a check
+	// that passed with warnings is in the log rather than hidden behind a one-line green summary.
+	// `--no-unit` is what says this job runs three of the four — asserted from the constants the gate
+	// itself defines, so a flag renamed in `verification-gate.ts` fails here rather than leaving the
+	// workflow passing an argument the gate would refuse.
+	it('runs the three static checks verbosely, the unit suite having its own job', () => {
+		expect(checks_scripts()).toContain(
+			`${GATE_STEP} ${verification_gate.VERBOSE_FLAG} ${verification_gate.NO_UNIT_FLAG}`,
+		)
 	})
 })
 
@@ -74,7 +84,7 @@ describe('the gate still covers every check the job used to run', () => {
 // runs `pnpm build` in the e2e job too, so a file-wide `indexOf` could be satisfied by that one and
 // hold while the ordering it names was broken.
 function template_checks_scripts(): ReadonlyArray<string> {
-	const job = ci_yml_fixture.find_job(ci_yml_fixture.TEMPLATE_CI_YML, CHECKS_JOB)
+	const job = ci_yml_fixture.find_job(ci_yml_fixture.TEMPLATE_CI_YML, TEMPLATE_CHECKS_JOB)
 
 	return (job?.steps ?? []).map((step) => ci_yml_fixture.step_run(step))
 }

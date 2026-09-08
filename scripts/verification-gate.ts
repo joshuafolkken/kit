@@ -50,7 +50,6 @@ const JOSH = 'josh'
 const { GATE_CHECKS, TYPE_CHECK_LABEL, UNIT_LABEL } = gate_plan
 
 const GATE_TARGETS: ReadonlyArray<string> = GATE_CHECKS.map((check) => check.target)
-const STEP_COUNT = String(GATE_CHECKS.length)
 
 // vitest's own flag, appended to the sub-command rather than set in `vitest.config.ts`: the config
 // is one project's, and the number this carries is a property of the machine the gate is running
@@ -90,7 +89,7 @@ async function build_gate_steps(
 	plan: GatePlan = gate_plan.resolve_gate_plan(),
 ): Promise<ReadonlyArray<GateStep>> {
 	return await Promise.all(
-		GATE_CHECKS.map(async (check) => await build_gate_step(check, start_directory, plan)),
+		plan.checks.map(async (check) => await build_gate_step(check, start_directory, plan)),
 	)
 }
 
@@ -169,11 +168,15 @@ function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
 // so a sum would report about three times what the caller waited. It is what the four are read
 // against: four checks at 9s, 5s, 3s and 15s against a total of 23s says the fan-out is working,
 // and the same four against 80s says the machine was contended rather than any check being slow.
-function print_gate_summary(failed_labels: ReadonlyArray<string>, elapsed_ms: number): void {
+function print_gate_summary(
+	failed_labels: ReadonlyArray<string>,
+	elapsed_ms: number,
+	step_count: string,
+): void {
 	const total = format_seconds(elapsed_ms)
 
 	if (failed_labels.length === 0) {
-		process.stdout.write(`\n${josh_verdict.format_gate_passed(STEP_COUNT, total)}\n`)
+		process.stdout.write(`\n${josh_verdict.format_gate_passed(step_count, total)}\n`)
 
 		return
 	}
@@ -278,23 +281,40 @@ async function with_gate_marker<T>(
 // the pool's first-failure abort — written for callers that spawn real Claude sessions — never
 // fires here and every queued check still runs. Results come back in input order however they
 // finished, which is what keeps the printed sections in declaration order.
+async function run_gate_steps(plan: GatePlan): Promise<ReadonlyArray<GateStepResult>> {
+	const steps = await build_gate_steps(process.cwd(), plan)
+
+	return await bounded_pool.bounded_map(
+		steps,
+		plan.concurrency,
+		async (step) => await run_gate_step(step),
+	)
+}
+
 async function run_marked_gate_steps(
 	before: Record<string, string>,
 	plan: GatePlan,
 	marker_path?: string,
 ): Promise<ReadonlyArray<GateStepResult>> {
-	return await with_gate_marker(
-		before,
-		async () => {
-			const steps = await build_gate_steps(process.cwd(), plan)
+	return await with_gate_marker(before, async () => await run_gate_steps(plan), marker_path)
+}
 
-			return await bounded_pool.bounded_map(
-				steps,
-				plan.concurrency,
-				async (step) => await run_gate_step(step),
-			)
-		},
-		marker_path,
+// **Both markers are claims about the unit suite, so a gate that is not running it makes neither**
+// (joshuafolkken/kit#1226). The in-flight marker tells the next `josh review:brief` that a gate is
+// covering this tree right now, which is what stops a review agent re-running the suite; the
+// unit-run marker tells a sibling lane a vitest run is on the machine, which is what makes that
+// lane divide its own workers. A `--no-unit` gate that wrote either would be answering for a check
+// it never started — the first by telling a review the tests are covered when they are running in a
+// different CI job, the second by throttling a lane on its behalf.
+async function run_planned_gate_steps(
+	before: Record<string, string>,
+	plan: GatePlan,
+	marker_path?: string,
+): Promise<ReadonlyArray<GateStepResult>> {
+	if (!gate_plan.has_unit_check(plan.checks)) return await run_gate_steps(plan)
+
+	return await unit_worker_share.with_run_marker(
+		async () => await run_marked_gate_steps(before, plan, marker_path),
 	)
 }
 
@@ -308,10 +328,10 @@ async function run_marked_gate_steps(
 // count already is: that module stays a pure function of its inputs, and the machine is asked once and
 // handed to both calls. Counted *before* the unit step writes its own marker, so `+ 1` is this gate
 // (joshuafolkken/kit#1515).
-function announce_gate_plan(): GatePlan {
+function announce_gate_plan(is_unit_included: boolean): GatePlan {
 	const available_cores = availableParallelism()
 	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
-	const plan = gate_plan.resolve_gate_plan(available_cores, concurrent_runs)
+	const plan = gate_plan.resolve_gate_plan(available_cores, concurrent_runs, is_unit_included)
 
 	process.stdout.write(`${gate_plan.format_gate_plan(plan, available_cores, concurrent_runs)}\n`)
 
@@ -327,8 +347,28 @@ function announce_gate_plan(): GatePlan {
 interface GateOptions {
 	is_verbose?: boolean
 	is_forced?: boolean
+	// Whether the unit suite is one of this gate's checks. Defaults to true everywhere; only
+	// `--no-unit` turns it off, for the CI job that runs the suite on a runner of its own.
+	is_unit_included?: boolean
 	stamp_path?: string
 	marker_path?: string
+}
+
+// **A partial gate records nothing green, and this is the same rule as the skip one layer out**
+// (joshuafolkken/kit#1226). The record's whole meaning to `josh review:brief` and to `gate_skip` is
+// "every check this repository gates on passed on exactly this tree"; a `--no-unit` run proves three
+// of the four, so writing it would let the next full `josh gate` be skipped on a tree whose unit
+// suite nobody ran here — a check reporting success without having run, which is the state
+// joshuafolkken/kit#1224 exists to refuse.
+async function record_whole_gate(
+	plan: GatePlan,
+	results: ReadonlyArray<GateStepResult>,
+	tree: GateTree,
+	options: GateOptions,
+): Promise<void> {
+	if (!gate_plan.has_unit_check(plan.checks)) return
+
+	await record_green_gate(results, tree.files, options.stamp_path, tree.base)
 }
 
 // The plan line is printed by the checked path alone. A run that announced a four-way fan-out and
@@ -339,16 +379,15 @@ async function run_checked_gate(
 	options: GateOptions,
 	started_at: number,
 ): Promise<number> {
-	const plan = announce_gate_plan()
+	const is_unit_included = options.is_unit_included ?? true
+	const plan = announce_gate_plan(is_unit_included)
 	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
 	// would write it is a subprocess started a second or so after the count above, so two lanes launched
 	// together — the shape `epicrun` produces — would both read "nothing else is running" and both take
 	// the whole machine. Claimed here, after the count and before any check, it is already there when
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run (joshuafolkken/kit#1515).
-	const results = await unit_worker_share.with_run_marker(
-		async () => await run_marked_gate_steps(tree.files, plan, options.marker_path),
-	)
+	const results = await run_planned_gate_steps(tree.files, plan, options.marker_path)
 
 	for (const result of results) print_gate_step(result, options.is_verbose ?? false)
 
@@ -356,11 +395,11 @@ async function run_checked_gate(
 		.filter((result) => is_gate_step_failed(result))
 		.map((result) => result.label)
 
-	print_gate_summary(failed_labels, performance.now() - started_at)
+	print_gate_summary(failed_labels, performance.now() - started_at, String(plan.checks.length))
 
 	if (failed_labels.length > 0) return FAIL_EXIT_CODE
 
-	await record_green_gate(results, tree.files, options.stamp_path, tree.base)
+	await record_whole_gate(plan, results, tree, options)
 
 	return 0
 }
@@ -404,7 +443,10 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 // sub-commands, and a flag the gate reads itself never reaches them. Every other argument is still
 // refused.
 const VERBOSE_FLAG = '--verbose'
-const ACCEPTED_FLAGS: ReadonlyArray<string> = [VERBOSE_FLAG, gate_skip.FORCE_FLAG]
+// Read here and never forwarded, exactly as the two above are: it selects which sub-commands the
+// gate fans out to rather than being passed to one of them.
+const NO_UNIT_FLAG = '--no-unit'
+const ACCEPTED_FLAGS: ReadonlyArray<string> = [VERBOSE_FLAG, gate_skip.FORCE_FLAG, NO_UNIT_FLAG]
 
 // The flags are the caller's, the destinations are the run's, so the two are merged here rather than
 // letting an option override a flag the user typed.
@@ -415,8 +457,9 @@ async function run_gate_command(
 	const unknown = extra_arguments.filter((argument) => !ACCEPTED_FLAGS.includes(argument))
 
 	if (unknown.length > 0) {
-		// The shared refusal, plus the arguments it is actually about. Two flags are accepted, so the
-		// bare "takes no extra arguments" would send a reader to drop the ones that work.
+		// The shared refusal, plus the arguments it is actually about. Some flags are accepted, so the
+		// bare "takes no extra arguments" would send a reader to drop the ones that work. The list is
+		// interpolated rather than spelled out here, so adding a flag cannot leave this line stale.
 		process.stderr.write(
 			`${composite_arguments.format_rejection(GATE_COMMAND, GATE_TARGETS)}\n` +
 				`  refused: ${unknown.join(' ')}\n` +
@@ -430,6 +473,7 @@ async function run_gate_command(
 		...options,
 		is_verbose: extra_arguments.includes(VERBOSE_FLAG),
 		is_forced: extra_arguments.includes(gate_skip.FORCE_FLAG),
+		is_unit_included: !extra_arguments.includes(NO_UNIT_FLAG),
 	})
 }
 
@@ -443,6 +487,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 const verification_gate = {
 	ACCEPTED_FLAGS,
+	NO_UNIT_FLAG,
 	UNIT_WORKER_FLAG,
 	VERBOSE_FLAG,
 	build_gate_step,
@@ -452,6 +497,7 @@ const verification_gate = {
 	mark_gate_running,
 	record_green_gate,
 	run_marked_gate_steps,
+	run_planned_gate_steps,
 	with_gate_marker,
 	run_checked_gate,
 	run_gate_command,

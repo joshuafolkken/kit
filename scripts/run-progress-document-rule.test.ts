@@ -48,6 +48,8 @@ const DOC_MARKERS: ReadonlyArray<string> = [
 	'JOSH_PROGRESS=0',
 	// Idle and unreadable are not one answer.
 	'A repository with nothing in flight is told apart from one whose listing could not be read',
+	// joshuafolkken/kit#1560. The absolute observation time, and the three decisions behind it.
+	'When the observation was taken, with its date, in UTC',
 ]
 
 const SKILL_MARKERS: ReadonlyArray<string> = [
@@ -79,6 +81,12 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'A tool result only you read is not one',
 	// Why the flag the loop passes is dropped where no transcript stays current for the whole run.
 	'`--output` is omitted in those runs, and `record` reads `unread`',
+	// joshuafolkken/kit#1560. Without the heading rule the machine's line carries the instant and the
+	// run's own prose does not, which is the half of the report a person actually reads.
+	'Every report this run writes opens with the time the observation was taken',
+	'The date is part of it',
+	'The zone is UTC, and never the one the reader happens to be in',
+	'It is added, never substituted for the elapsed figure',
 ]
 
 // One case per file per marker: the section's body must live in exactly one file.

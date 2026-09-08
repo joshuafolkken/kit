@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
+import { piped_verification } from './piped-verification'
 import { shell_body_trigger } from './shell-body-trigger'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
@@ -204,6 +205,11 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: on_bash_command(is_shell_evaluated_body),
 		reason: SHELL_BODY_REASON,
 	},
+	{
+		id: 'piped-verification',
+		is_trigger: on_bash_command(piped_verification.is_masked_verification),
+		reason: piped_verification.PIPED_VERIFICATION_REASON,
+	},
 ]
 
 // **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
@@ -313,6 +319,7 @@ function is_enabled(): boolean {
 const delivered_rules = {
 	DELIVERED_RULES,
 	ISSUE_COMMENTS_REASON,
+	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,
@@ -321,6 +328,7 @@ const delivered_rules = {
 	is_body_only_issue_read,
 	is_enabled,
 	is_issue_filing,
+	is_masked_verification: piped_verification.is_masked_verification,
 }
 
 export type { DeliveredRule }
