@@ -117,6 +117,26 @@ describe('cli_body.resolve — both flags at once', () => {
 	})
 })
 
+// The path arrives from a command line, so a wrong one must fail legibly rather than reaching the
+// file system unexamined and dying on a raw `ENOENT` in the middle of a merge.
+describe('cli_body.resolve — a path that names no file', () => {
+	// A missing file and a directory: the two ways a path can exist as a string and name nothing this
+	// reader can open.
+	it.each([path.join(WORK_DIRECTORY, 'absent.md'), WORK_DIRECTORY])(
+		'refuses %j, naming the resolved path',
+		(file_path) => {
+			expect(() =>
+				cli_body.resolve({
+					inline: undefined,
+					file_path,
+					inline_flag: INLINE_FLAG,
+					file_flag: FILE_FLAG,
+				}),
+			).toThrow('Not a readable file')
+		},
+	)
+})
+
 describe('cli_body.has_value', () => {
 	it.each([
 		[undefined, false],

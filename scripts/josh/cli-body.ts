@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
 
 // A body — an Issue comment, a PR comment, a notification message — handed to a command as an inline
 // double-quoted shell argument is **evaluated by the shell before the command ever sees it**
@@ -22,8 +23,22 @@ const STDIN_FD = 0
 // literal backslash-n that the author put in the body on purpose.
 const ESCAPED_NEWLINE = String.raw`\n`
 
-function read_file_or_stdin(path: string): string {
-	return readFileSync(path === STDIN_PATH ? STDIN_FD : path, 'utf8')
+// **The path is resolved and checked before it is opened**, rather than handed to `readFileSync` as
+// it arrived. The value comes from a command line an agent composed, so the failure worth guarding is
+// a wrong path reaching the file system unexamined — a directory, a device, a dangling symlink. What
+// comes back instead is one sentence naming the resolved path, which is the difference between a
+// completion notification that fails legibly and one that dies on a raw `ENOENT` mid-merge.
+function read_body_file(raw_path: string): string {
+	const resolved = path.resolve(raw_path)
+	const stats = statSync(resolved, { throwIfNoEntry: false })
+
+	if (stats?.isFile() !== true) throw new Error(`Not a readable file: ${resolved}`)
+
+	return readFileSync(resolved, 'utf8')
+}
+
+function read_file_or_stdin(raw_path: string): string {
+	return raw_path === STDIN_PATH ? readFileSync(STDIN_FD, 'utf8') : read_body_file(raw_path)
 }
 
 function expand_escaped_newlines(raw: string): string {
