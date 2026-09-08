@@ -18,6 +18,11 @@ const CORE_COUNTS_PROBED = 20
 // What `epicrun` runs at, and the count the field measurement of joshuafolkken/kit#1515 was taken
 // under: six lanes, each gate sizing itself from the core count alone.
 const LANE_COUNT = 6
+// Two lanes still leave every check a core of the measured machine, so this is the boundary the
+// narrowing must not cross: the point where sharing is real and the fan-out is still affordable.
+const PAIRED_LANES = 2
+// More lanes than the machine has cores, which is the arithmetic `MIN_SHARED_CORES` exists for.
+const OVERSUBSCRIBED_LANES = 99
 
 describe('gate_plan.resolve_concurrency', () => {
 	it('runs every check at once on a machine that can host them', () => {
@@ -55,6 +60,55 @@ describe('gate_plan.resolve_concurrency', () => {
 		)
 
 		expect(widths).toEqual([...widths].toSorted((left, right) => left - right))
+	})
+})
+
+describe('gate_plan.resolve_concurrency under concurrency', () => {
+	// joshuafolkken/kit#1547: joshuafolkken/kit#1515 divided the machine for the unit suite alone,
+	// leaving each lane's other three checks unbounded — six lanes therefore put 24 checks on 11
+	// cores, where one gate took 254.1s with lint alone at 252.9s against 5.2s solo. eslint, tsc and
+	// cspell take no worker count between them, so how many run at once is the only quantity left.
+	it('narrows to one check at a time when six lanes share the machine', () => {
+		expect(gate_plan.resolve_concurrency(MEASURED_CORES, LANE_COUNT)).toBe(1)
+	})
+
+	// The narrowing is proportional rather than a switch: two lanes still fit every check, so a pair
+	// of gates keeps the fan-out that was measured faster than running them back to back.
+	it('leaves a pair of lanes the whole fan-out', () => {
+		expect(gate_plan.resolve_concurrency(MEASURED_CORES, PAIRED_LANES)).toBe(
+			gate_plan.GATE_CHECKS.length,
+		)
+	})
+
+	// The property the whole change rests on: at one run the division is `cores / 1`, so a solo gate
+	// and a CI runner are handed the number they were always handed — the same number by arithmetic,
+	// not a branch that could later be got wrong.
+	it.each([MEASURED_CORES, CI_CORES, MID_SIZED_CORES, 1])(
+		'is unchanged on %i cores for a gate that is the only run',
+		(cores) => {
+			expect(gate_plan.resolve_concurrency(cores, 1)).toBe(gate_plan.resolve_concurrency(cores))
+		},
+	)
+
+	// A count that is not a number must leave the machine undivided rather than sail through the
+	// clamp: `Math.max(1, NaN)` is `NaN`, every `reserved > share` comparison against it is false,
+	// and the gate would admit all four checks in exactly the condition meant to narrow it. A count
+	// below one is nonsense too, and reading it as one run leaves behavior where it was.
+	it.each([NaN, 0, -1])('leaves the machine undivided for a run count of %p', (runs) => {
+		expect(gate_plan.resolve_concurrency(MEASURED_CORES, runs)).toBe(
+			gate_plan.resolve_concurrency(MEASURED_CORES),
+		)
+	})
+
+	// More lanes never means more checks in flight, and the far end of that curve must still start a
+	// gate rather than return a width of zero — which would run no check and report a green gate.
+	it('never widens, and never stops, as lanes are added', () => {
+		const widths = Array.from({ length: OVERSUBSCRIBED_LANES }, (_unused, index) =>
+			gate_plan.resolve_concurrency(MEASURED_CORES, index + 1),
+		)
+
+		expect(widths).toEqual([...widths].toSorted((left, right) => right - left))
+		expect(widths.at(-1)).toBe(1)
 	})
 })
 
@@ -145,11 +199,15 @@ describe('gate_plan.format_gate_plan', () => {
 	// A lane owner reading a gate that took one worker must not be left deriving the reason from a
 	// number that looks wrong. The solo line is unchanged, which is what keeps `josh time`'s detector
 	// and every existing reader unaffected (joshuafolkken/kit#1515).
+	//
+	// **Both numbers move together now** (joshuafolkken/kit#1547): the width in front is what the
+	// three checks that take no worker count are narrowed by, and the worker count behind it is the
+	// unit suite's share, so a shared gate says on one line how it was cut down and why.
 	it('says how many runs the machine is being shared with', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
-			'plan: 4 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
+			'plan: 1 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
 		)
 	})
 
