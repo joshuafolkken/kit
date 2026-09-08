@@ -40,16 +40,48 @@ interface GateCheck {
 const TYPE_CHECK_LABEL = 'check'
 const UNIT_LABEL = 'test:unit'
 
-// The four checks, in the order their output is printed.
-const GATE_CHECKS: ReadonlyArray<GateCheck> = [
+// The three checks that read the tree without running it, in the order their output is printed.
+// They are named apart from the unit suite because CI runs them on their own runner
+// (joshuafolkken/kit#1226): the unit suite is the only check that fans out across every core, so on
+// a 4-core GitHub runner it and the other three spent the whole job taking cores off each other.
+const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	{ label: 'lint', target: 'lint', reserved_cores: 2 },
 	{ label: TYPE_CHECK_LABEL, target: 'check', reserved_cores: 1 },
 	{ label: 'cspell', target: 'cspell:dot', reserved_cores: 1 },
+]
+
+// The four checks, in the order their output is printed.
+const GATE_CHECKS: ReadonlyArray<GateCheck> = [
+	...STATIC_CHECKS,
 	{ label: UNIT_LABEL, target: UNIT_LABEL, reserved_cores: 0 },
 ]
 
-// What the three non-elastic checks hold between them: 2 + 1 + 1.
-const RESERVED_CORES: number = GATE_CHECKS.reduce((total, check) => total + check.reserved_cores, 0)
+// **Selecting is not skipping, and the difference is where the unit suite runs rather than whether
+// it runs.** `josh gate --no-unit` exists for one caller — the CI job that has handed the unit suite
+// to a runner of its own — and every other entry point still gets all four. What makes the narrower
+// set safe is that nothing downstream may mistake it for the full gate: `verification-gate.ts`
+// withholds both the green-gate record and the in-flight marker on a partial run, so a `--no-unit`
+// gate can never tell `josh review:brief` that the unit suite passed on this tree.
+function select_gate_checks(is_unit_included: boolean): ReadonlyArray<GateCheck> {
+	return is_unit_included ? GATE_CHECKS : STATIC_CHECKS
+}
+
+// Asked of the plan rather than of the flag, so the one question "did this gate run the unit suite"
+// has one answer however the plan was built.
+function has_unit_check(checks: ReadonlyArray<GateCheck>): boolean {
+	return checks.some((check) => check.label === UNIT_LABEL)
+}
+
+// What the three non-elastic checks hold between them: 2 + 1 + 1. Reduced over `STATIC_CHECKS`
+// rather than over all four, because that is the set the sentence above names: `resolve_unit_worker_cap`
+// spends this as the cores the unit suite must leave to its siblings, so summing the unit check into
+// it would have the suite subtract its own reservation from its own budget the day that reservation
+// stops being zero. The two sets give the same number today, which is exactly why the narrower one
+// has to be the declared one.
+const RESERVED_CORES: number = STATIC_CHECKS.reduce(
+	(total, check) => total + check.reserved_cores,
+	0,
+)
 
 // The machine the table above was measured on, and the smallest one the cap is applied to.
 //
@@ -72,6 +104,10 @@ const MIN_CONCURRENCY = 1
 const MIN_SHARED_CORES = 1
 
 interface GatePlan {
+	// The checks this run fans out to — all four, or the static three when the unit suite has a
+	// runner of its own. Carried on the plan rather than re-derived at each use, so the concurrency,
+	// the printed plan line and the steps that actually run can never describe different sets.
+	checks: ReadonlyArray<GateCheck>
 	// How many checks run at once.
 	concurrency: number
 	// `--maxWorkers` for the unit suite, or `undefined` to leave the choice to vitest.
@@ -123,12 +159,13 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 function resolve_concurrency(
 	available_cores: number,
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
+	checks: ReadonlyArray<GateCheck> = GATE_CHECKS,
 ): number {
 	const share = shared_cores(available_cores, concurrent_runs)
 	let admitted = 0
 	let reserved = 0
 
-	for (const check of GATE_CHECKS) {
+	for (const check of checks) {
 		reserved += check.reserved_cores
 
 		if (reserved > share) break
@@ -183,13 +220,35 @@ function resolve_unit_worker_cap(
 
 // `availableParallelism()` rather than `cpus().length`: it reports what this process may actually
 // use, so a container with a CPU quota is sized by the quota rather than by the host.
+// The three fields together, for a caller that has already decided the numbers. The gate's own
+// suites need plans the resolver would never produce — a serial one, a capped one — and building
+// them by hand meant restating the check list at every literal, so a field added to `GatePlan` broke
+// each of them individually. One constructor is what keeps a new field from being an edit per plan.
+function plan_of(
+	concurrency: number,
+	unit_worker_cap?: number,
+	checks: ReadonlyArray<GateCheck> = GATE_CHECKS,
+): GatePlan {
+	return { checks, concurrency, unit_worker_cap }
+}
+
+//
+// **The worker cap follows the checks rather than the machine.** A plan with no unit step has no
+// unit suite to size, so it carries no cap — leaving one on would print a worker count for a check
+// this run never starts.
 function resolve_gate_plan(
 	available_cores: number = availableParallelism(),
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
+	is_unit_included = true,
 ): GatePlan {
+	const checks = select_gate_checks(is_unit_included)
+
 	return {
-		concurrency: resolve_concurrency(available_cores, concurrent_runs),
-		unit_worker_cap: resolve_unit_worker_cap(available_cores, concurrent_runs),
+		checks,
+		concurrency: resolve_concurrency(available_cores, concurrent_runs, checks),
+		unit_worker_cap: is_unit_included
+			? resolve_unit_worker_cap(available_cores, concurrent_runs)
+			: undefined,
 	}
 }
 
@@ -212,16 +271,23 @@ function format_machine(available_cores: number, concurrent_runs: number): strin
 	return `${cores}, ${String(concurrent_runs)} unit runs`
 }
 
+// **A gate that is not running the unit suite says so where the worker count would go.** The line is
+// what a slow or surprising gate is read against, and "3 of 3" alone would leave a reader deriving
+// which three from the check bodies below it.
+function format_unit_cap(plan: GatePlan): string {
+	if (!has_unit_check(plan.checks)) return `${UNIT_LABEL} elsewhere`
+	if (plan.unit_worker_cap === undefined) return `${UNIT_LABEL} unrestricted`
+
+	return `${UNIT_LABEL} at ${String(plan.unit_worker_cap)} workers`
+}
+
 function format_gate_plan(
 	plan: GatePlan,
 	available_cores: number = availableParallelism(),
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
 ): string {
-	const cap =
-		plan.unit_worker_cap === undefined
-			? `${UNIT_LABEL} unrestricted`
-			: `${UNIT_LABEL} at ${String(plan.unit_worker_cap)} workers`
-	const count = `${String(plan.concurrency)} of ${String(GATE_CHECKS.length)}`
+	const cap = format_unit_cap(plan)
+	const count = `${String(plan.concurrency)} of ${String(plan.checks.length)}`
 	const width = `${count}${josh_verdict.GATE_OPENING_MARK}`
 	const machine = format_machine(available_cores, concurrent_runs)
 
@@ -232,13 +298,18 @@ const gate_plan = {
 	GATE_CHECKS,
 	MEASURED_CORES,
 	RESERVED_CORES,
+	STATIC_CHECKS,
 	TYPE_CHECK_LABEL,
 	UNIT_LABEL,
 	format_gate_plan,
 	format_machine,
+	format_unit_cap,
+	has_unit_check,
+	plan_of,
 	resolve_concurrency,
 	resolve_gate_plan,
 	resolve_unit_worker_cap,
+	select_gate_checks,
 }
 
 export type { GateCheck, GatePlan }

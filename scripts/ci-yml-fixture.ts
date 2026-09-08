@@ -21,6 +21,9 @@ interface WorkflowStep {
 interface WorkflowJob {
 	container?: unknown
 	env?: Record<string, string>
+	// The display name, and the string a branch ruleset's required status check is matched against —
+	// so a guard on what a merge is gated by has to be able to read it (joshuafolkken/kit#1226).
+	name?: string
 	if?: string
 	outputs?: Record<string, string>
 	needs?: string | ReadonlyArray<string>

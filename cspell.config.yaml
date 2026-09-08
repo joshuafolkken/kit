@@ -120,3 +120,9 @@ words:
   # comment is about several of them at once — `process-identity-fixture.ts` and the suite that
   # exercises the reissued-pid case.
   - pids
+  # GitHub's own name for the combined status of a commit's checks — the thing that counts a skipped
+  # job as a passing one, which is why `.github/workflows/ci.yml` explains it twice
+  # (joshuafolkken/kit#991, joshuafolkken/kit#1226). A dictionary cspell enables for markdown already
+  # carries it, so `docs/josh-commands.md` has used it for some time; the workflow is YAML, where
+  # that dictionary is off, so the word has to be declared here to be spelled the same in both.
+  - rollup
