@@ -59,7 +59,8 @@ several times; and the answers end up only in a conversation nobody can read bac
   below is that flag's single source. Phase 2's answers are about children the epic **already tracks**,
   which that flag cannot serve: an insertion with nothing to add is refused outright. Until
   joshuafolkken/kit#1162 adds an entry point for already-tracked children, write the child comments with
-  `gh issue comment` on each child the answer applies to, and **say in the report that the epic's
+  `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` on each child the answer
+  applies to, and **say in the report that the epic's
   `## Decisions` entry is still pending** — the entry going unwritten is exactly how two of the four most
   recent placements in joshuafolkken/kit#1262 ended up with a child comment and nothing on the epic.
   **Do not carry it on the next unrelated `--add --decision-file`**: that call posts the record as a
