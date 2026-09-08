@@ -299,7 +299,10 @@ describe('the hand-off report is tied to the stop, not to the reading', () => {
 		const unwrapped = read_unwrapped(FORMAT)
 
 		expect(unwrapped).toContain('この書式は「止まったとき」だけのものである')
-		expect(unwrapped).toContain('drain 中のランは区切りの報告を書かない')
+		expect(unwrapped).toContain('まだ止まっていないランは区切りの報告を書かない')
+		// The format serves every entry point, so conditioning it on lane state would leave the one
+		// that opens no lane unable to satisfy it — and falling back to the format it forbids.
+		expect(unwrapped).toContain('この書式を lane の状態で条件づけない')
 		expect(unwrapped).toContain('閾値を超えたこと自体は区切りではなく、停止したことが区切りである')
 	})
 })
