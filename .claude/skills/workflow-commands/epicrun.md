@@ -936,16 +936,21 @@ the count wrong for the rest of the run.
 
 **Every report this run writes opens with the time the observation was taken.** Not only how long it
 has been quiet: the heading carries an absolute instant, in the same form the watcher prints —
-`at YYYY-MM-DDTHH:MMZ`. A relative figure means something only while the reports keep coming, and
+`at YYYY-MM-DD HH:MM±HH:MM / YYYY-MM-DDTHH:MMZ`. A relative figure means something only while the reports keep coming, and
 unattended execution is made of the events that break exactly that assumption — a suspend, a rate
 limit, a restarted process. `epicrun #1474` was suspended overnight, resumed, read its own
 `quiet 11m` as if no time had passed and concluded the machine's clock was broken; it was correct to
 the second against GitHub's own `Date` header, and an absolute time in the report would have settled
 it at a glance (joshuafolkken/kit#1560). **The date is part of it**, because that confusion happened
-across a day boundary and a bare clock time would have left the same hole open. **The zone is UTC,
-and never the one the reader happens to be in** — joshuafolkken/kit#1245 already paid for a timestamp
-rendered in the reader's zone making one process look like a stranger, and this line is relayed to
-other machines and read in cloud sessions. **It is added, never substituted for the elapsed figure**:
+across a day boundary and a bare clock time would have left the same hole open. **The local clock
+leads and UTC is printed beside it, with the offset that ties the two together** — this line used to
+carry UTC alone, and on a machine seven hours ahead every stamp in the report was a number the reader
+had to convert before it meant anything, which is joshuafolkken/kit#1560's own failure arriving from
+the other side: a stamp nobody can place is a stamp nobody reads. **UTC is kept rather than
+replaced**, because the reason it was pinned is real and unchanged — the line is relayed to other
+machines and read in cloud sessions, and joshuafolkken/kit#1245 already paid for a timestamp rendered
+in the reader's zone making one process look like a stranger. Printing both costs twenty-five characters
+and leaves neither reader guessing, which is why neither half is dropped. **It is added, never substituted for the elapsed figure**:
 how long it has been quiet and when the observation was taken are two different facts, and neither
 can be reconstructed from the other. **The relayed lines need nothing added to them** — `josh
 run:progress` prints the same stamp itself, so the rule above still holds exactly as written.

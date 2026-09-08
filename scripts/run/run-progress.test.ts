@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { run_progress, type Observations } from './run-progress'
 
 // joshuafolkken/kit#1520. The two properties that make this a progress report rather than a timer:
@@ -145,7 +145,7 @@ describe('format_line — observations, never "still running"', () => {
 // passed, and concluded the machine's clock was broken when it was correct to the second.
 describe('format_line — when the observation was taken', () => {
 	it('says when it was observed, beside how long the silence had run', () => {
-		expect(LINE).toContain('at 1970-01-01T10:00Z')
+		expect(LINE).toContain('1970-01-01T10:00Z')
 		expect(LINE).toContain('quiet 12m')
 	})
 
@@ -156,14 +156,59 @@ describe('format_line — when the observation was taken', () => {
 			unchanged_since_ms: NOW,
 		})
 
-		expect(next_day).toContain('at 1970-01-02T10:00Z')
+		expect(next_day).toContain('1970-01-02T10:00Z')
 	})
 
-	// The UTC pin is the exact stamp above: `NOW` is ten hours after the epoch, so a formatter that
-	// reached for the reader's own zone prints another hour on any machine that is not on UTC. What
-	// this one pins is the `Z` beside it, which is what stops a reader having to guess the zone.
+	// The UTC half stays an exact pin: `NOW` is ten hours after the epoch, so a formatter that printed
+	// the reader's own zone *instead* would show another hour on any machine that is not on UTC. The
+	// `Z` is what stops a reader having to guess which of the two halves is which.
 	it('marks the zone, so a reader in another one is not left guessing', () => {
-		expect(LINE).toMatch(/ at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z /u)
+		expect(LINE).toMatch(/ \/ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z /u)
+	})
+
+	// The local half is what a person can act on without converting anything, and it leads for that
+	// reason. It cannot be pinned to a literal — the value depends on the machine's zone — so what is
+	// asserted is its shape and its offset, both of which hold wherever the suite runs.
+	it('leads with the local clock, and names the offset that places it', () => {
+		expect(LINE).toMatch(/ at \d{4}-\d{2}-\d{2} \d{2}:\d{2}[+-]\d{2}:\d{2} \/ /u)
+	})
+
+	// The two halves have to be the same instant, or the line is worse than one of them alone. Parsing
+	// the local half back with its own printed offset is what checks that, and it stays deterministic
+	// on every machine because the offset it is read with is the one the line just printed.
+	it('prints one instant twice, not two clocks that disagree', () => {
+		const stamp = /at (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}[+-]\d{2}:\d{2}) \//u.exec(LINE)
+		const minute_ms = 60_000
+
+		expect(stamp).not.toBeNull()
+		expect(Date.parse(`${stamp?.[1] ?? ''}T${stamp?.[2] ?? ''}`)).toBe(
+			Math.floor(NOW / minute_ms) * minute_ms,
+		)
+	})
+})
+
+// A zone's offset is not always a whole number of minutes, and `NOW` is an instant in 1970 —
+// `Asia/Kathmandu` was `+05:41:16` then, which answers `-341.2666…`. Left unrounded the minutes field
+// printed `41.26666666666667`, so the stamp assertions above failed on any machine in such a zone
+// rather than on none of them.
+describe('format_line — a zone whose offset is not whole minutes', () => {
+	it('rounds the offset rather than printing a fraction of a minute', () => {
+		const KATHMANDU_1970_MINUTES = -341.2666666666667
+		const offset = vi
+			.spyOn(Date.prototype, 'getTimezoneOffset')
+			.mockReturnValue(KATHMANDU_1970_MINUTES)
+
+		try {
+			expect(
+				run_progress.format_line(observations(), {
+					now_ms: NOW,
+					quiet_since_ms: NOW,
+					unchanged_since_ms: NOW,
+				}),
+			).toContain('+05:41 /')
+		} finally {
+			offset.mockRestore()
+		}
 	})
 })
 

@@ -49,8 +49,10 @@ const DOC_MARKERS: ReadonlyArray<string> = [
 	'JOSH_PROGRESS=0',
 	// Idle and unreadable are not one answer.
 	'A repository with nothing in flight is told apart from one whose listing could not be read',
-	// joshuafolkken/kit#1560. The absolute observation time, and the three decisions behind it.
-	'When the observation was taken, with its date, in UTC',
+	// joshuafolkken/kit#1560. The absolute observation time, and the three decisions behind it — the
+	// third of which now prints both clocks, so the local half is pinned beside the UTC one.
+	'When the observation was taken, with its date, on the local clock and in UTC',
+	'The local half leads and UTC is printed beside it, with the offset that places both',
 	// joshuafolkken/kit#1570. The moved default, the argument for it, and the row that enforces the
 	// interval against the run's own prose rather than only against this command's own lines.
 	'Why twenty minutes.',
@@ -106,7 +108,11 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	// run's own prose does not, which is the half of the report a person actually reads.
 	'Every report this run writes opens with the time the observation was taken',
 	'The date is part of it',
-	'The zone is UTC, and never the one the reader happens to be in',
+	// Both halves are pinned, because dropping either is the failure the other one was filed for: UTC
+	// alone is unreadable to the person in front of the run, and local alone breaks the relay.
+	'The local clock leads and UTC is printed beside it, with the offset that ties the two together',
+	'UTC is kept rather than replaced',
+	'a stamp nobody can place is a stamp nobody reads',
 	'It is added, never substituted for the elapsed figure',
 	// joshuafolkken/kit#1570. The refusal in front of the arm, the three answers it turns on, and the
 	// measurement that makes it believable — the promise was kept and the interval was not.
