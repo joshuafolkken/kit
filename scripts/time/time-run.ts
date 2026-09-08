@@ -98,6 +98,37 @@ function span_note(found: IssueSpans, issue_number: number): string {
 	return `${String(found.session_count)} transcript(s)`
 }
 
+// The phrase the unread note is recognized by, written once for the reason `OVERLAP_MARK` is: a run
+// whose family lost a transcript still read its merge, so `--epic` would print a figure short by
+// however long that transcript was with no sentence saying so.
+// **The whole phrase, not the two words at the end of it.** `could not be read` alone also matches
+// the refused pull-request listing and the refused diff, and a mark that matches a note it was not
+// written for lets that note through a filter that was meant to hold it.
+const UNREAD_MARK = 'transcript(s) of this run could not be read'
+
+function is_unread_note(note: string): boolean {
+	return note.includes(UNREAD_MARK)
+}
+
+// **A transcript nobody could read and one that cost nothing are different answers, and only one of
+// them is a measurement** (joshuafolkken/kit#1439). `span_note` counts what contributed, so an
+// unreadable member of the run's own family is invisible there — the count stands above figures that
+// are short by exactly what it held, and `2 transcript(s)` hides the third one's absence.
+// **The sentence itself, taking a count rather than a scope.** The session scope reaches the same
+// state — naming one unit reads the session that delegated it — and a second spelling of this note
+// there would be free to disagree with this one about what the reader is being told.
+function unread_lines(count: number): Array<string> {
+	if (count === NO_SESSIONS) return []
+
+	const held = 'so the figures below are missing their minutes rather than measuring them as zero'
+
+	return [`${String(count)} ${UNREAD_MARK} — ${held}`]
+}
+
+function unread_note(found: IssueSpans): Array<string> {
+	return unread_lines(found.unread_count)
+}
+
 // The two phrases the session-separation notes are recognized by, written once for the reason
 // `OVERLAP_MARK` is: `--epic` prints a child's notes only where the GitHub half is missing, and a
 // *completed* child is exactly where a concurrent session's minutes used to be summed into the row
@@ -379,18 +410,28 @@ function serial_note(report: TimeReport): Array<string> {
 // **`has_ci_data` is whether a merge was actually read, not whether an issue scope was asked for.**
 // Hardcoding it true printed `CI wait 0.0 min` directly beneath the note saying the CI wait is
 // unknown — the measured zero standing in for an unknown that the flag exists to prevent.
-function to_report(facts: RunFacts): TimeReport {
+// Every note that can be written before the report exists. Kept apart from `to_report` so the two
+// halves of the note list — this one and the pair that needs the finished figures — each read as one
+// thing, and so neither grows the other past the function-length limit.
+function corpus_notes(facts: RunFacts): Array<string> {
 	const { found, search } = facts
-	const window = window_of(found.spans, search.pull)
-	const notes = [
+
+	return [
 		span_note(found, facts.issue_number),
 		...excluded_note(found),
 		...not_separated_note(found, facts.issue_number),
+		...unread_note(found),
 		pull_note(search, facts.issue_number),
 		...check_note(facts.is_check_read_failed, facts.issue_number),
 		...cycle_note(facts.ci, facts.issue_number),
 		...diff_note(facts.diff.state, facts.issue_number),
 	]
+}
+
+function to_report(facts: RunFacts): TimeReport {
+	const { found, search } = facts
+	const window = window_of(found.spans, search.pull)
+	const notes = corpus_notes(facts)
 	const report = time_report.build_from_spans({
 		scope: `issue #${String(facts.issue_number)}`,
 		spans: found.spans,
@@ -473,6 +514,8 @@ const time_run = {
 	is_check_read_note,
 	is_diff_read_note,
 	is_session_note,
+	is_unread_note,
+	unread_lines,
 	issue_of,
 	build_run_report,
 	build_latest_run_report,

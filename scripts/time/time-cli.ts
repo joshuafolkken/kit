@@ -5,6 +5,7 @@ import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript
 import { time_batch, type RunTiming } from './time-batch'
 import { time_epic } from './time-epic'
 import { time_epic_report } from './time-epic-report'
+import { time_family } from './time-family'
 import { time_last } from './time-last'
 import { time_last_report } from './time-last-report'
 import { time_period } from './time-period'
@@ -12,7 +13,7 @@ import { time_period_report } from './time-period-report'
 import { time_report, type TimeReport } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
-import { time_spans } from './time-spans'
+import type { Span, Timeline } from './time-spans'
 
 // `josh time` — where a run's wall clock went, read from Claude Code's own session transcripts and,
 // for the part no transcript records, from GitHub (joshuafolkken/kit#1267, joshuafolkken/kit#1268).
@@ -28,6 +29,9 @@ import { time_spans } from './time-spans'
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
+// What a timeline's ends are when nothing was parsed — the same zero `parse_timeline` yields for a
+// transcript with no event, so an empty family reports exactly as an empty file already did.
+const NO_INSTANT = 0
 const JSON_INDENT = 2
 const USAGE =
 	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--json]'
@@ -196,10 +200,31 @@ function report_empty(cwd: string, session_id: string | undefined): number {
 	return FAILURE_EXIT_CODE
 }
 
-function build_session_report(file: SessionFile): TimeReport {
+// The window the union occupies, which `build_report` takes as a `Timeline`. Read from the spans
+// rather than from one transcript's first and last line: the family's ends are the run's, and the
+// named file is only part of it.
+function to_timeline(spans: ReadonlyArray<Span>): Timeline {
+	const window = time_family.window_of(spans)
+
+	return {
+		spans: [...spans],
+		started_ms: window?.started_ms ?? NO_INSTANT,
+		ended_ms: window?.ended_ms ?? NO_INSTANT,
+	}
+}
+
+// **A session scope reports the named transcript's family, not the file alone**
+// (joshuafolkken/kit#1439). Naming the session adds the units it delegated; naming one unit adds the
+// handoff and the teardown the session ran around it. Without both, `--session` and `--issue` read
+// different corpora of the same run and disagree about how long its review took.
+function build_session_report(cwd: string, file: SessionFile): TimeReport {
+	const files = cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd))
+	const found = time_family.for_session(files, file)
+
 	return time_report.build_report(
 		file.session_id,
-		time_spans.parse_timeline(cost_transcript.read_raw(file)),
+		to_timeline(found.spans),
+		time_run.unread_lines(found.unread.length),
 	)
 }
 
@@ -225,7 +250,7 @@ function run_session(session_id: string, cwd: string, output: Output): number {
 
 	if (file === undefined) return report_empty(cwd, session_id)
 
-	print_report(build_session_report(file), output)
+	print_report(build_session_report(cwd, file), output)
 
 	return 0
 }

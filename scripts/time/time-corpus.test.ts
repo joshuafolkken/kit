@@ -250,6 +250,7 @@ describe('time_corpus.collect_for_issues — one pass, however many issues', () 
 			excluded: [],
 			is_separated: false,
 			attributed_count: 0,
+			unread_count: 0,
 		})
 	})
 
