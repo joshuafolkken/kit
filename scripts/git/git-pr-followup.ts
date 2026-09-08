@@ -65,7 +65,6 @@ interface FollowupInput {
 	notify_config: GitNotifyConfig | undefined
 	coderabbit_ignore_reason: string | undefined
 	ai_review_ignore_reason: string | undefined
-	managed_config_ignore_reason: string | undefined
 	is_skip_watch: boolean
 	should_merge: boolean
 }
@@ -270,23 +269,25 @@ async function run_comment_scans(
 	return [...comment_notes, ...ai_review_notes]
 }
 
-// **The managed config-file gate runs first, ahead of the check wait** (joshuafolkken/kit#1578). It
-// reads the branch diff and nothing else, so a run that is going to stop stops in seconds rather
-// than after the whole of CI — the prose it replaces said "after CI status checks complete", which
-// spent the entire wait on an answer that never depended on a check result.
+// **The managed config-file read runs first, ahead of the check wait** (joshuafolkken/kit#1578). It
+// reads the branch diff and nothing else, so its answer is in hand before CI is waited on at all.
+// Since joshuafolkken/kit#1592 that answer stops nothing — it is a report — but the position is kept:
+// a read this cheap belongs beside the other things decided from the diff.
 //
 // **It laps no stage of its own.** The printed stage sequence is asserted as an exact list, and a
 // diff read this cheap is not what a measurement of `followup` is looking for; its cost lands inside
 // `checks-wait`, where it is indistinguishable from noise.
+//
+// **The managed report comes back beside the notes as well as inside them**, because the two have
+// different destinations: every note reaches the completion notification, and this one alone also
+// reaches the completion report posted to the Issue (joshuafolkken/kit#1592). Returning it twice is
+// what lets `run_stages` hand each destination what belongs to it without re-deriving the answer.
 async function run_review_checks(
 	input: FollowupInput,
 	context: TelegramContext,
 	log: StageLog,
-): Promise<Array<string>> {
-	const managed_notes = await git_pr_managed_config.handle_managed_config_changes({
-		branch_name: input.branch_name,
-		ignore_reason: input.managed_config_ignore_reason,
-		context,
+): Promise<{ notes: Array<string>; managed: Array<string> }> {
+	const managed = await git_pr_managed_config.handle_managed_config_changes({
 		should_merge: input.should_merge,
 	})
 	const snapshot = await run_checks({
@@ -300,7 +301,7 @@ async function run_review_checks(
 	log_skip_notes(check_notes)
 	const scan_notes = await run_comment_scans(input, context, log)
 
-	return [...managed_notes, ...check_notes, ...scan_notes]
+	return { notes: [...managed, ...check_notes, ...scan_notes], managed }
 }
 
 // **Answers with the issue number the run actually used** (joshuafolkken/kit#1539), which is the one
@@ -316,9 +317,9 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 	const context = await fetch_telegram_context({ branch_name: input.branch_name, issue_number })
 
 	lap(log, STAGE.context)
-	const skip_notes = await run_review_checks(input, context, log)
+	const checks = await run_review_checks(input, context, log)
 
-	await notify_completion(context, skip_notes, input.should_merge)
+	await notify_completion(context, checks.notes, input.should_merge)
 
 	lap(log, STAGE.telegram)
 	await git_pr_followup_wrapup.run_wrapup(
@@ -328,6 +329,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 			notify_config: input.notify_config,
 			pr_url: context.pr_url,
 			should_merge: input.should_merge,
+			managed_notes: checks.managed,
 		},
 		log,
 	)

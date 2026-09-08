@@ -65,18 +65,34 @@ function build_notify_config(input: {
 	}
 }
 
+// **`notes` is what the run has to say about itself beyond the message it was handed**, and today
+// that is the managed config-file report (joshuafolkken/kit#1592). It is a separate field rather than
+// text folded into `message`, because the message is the person's own completion summary and the
+// notes are the command's — folding them together would leave a caller unable to tell which half it
+// wrote. **A run with nothing to note adds no line at all**, blank separator included, so the
+// ordinary completion report is byte-for-byte what it was.
+// Its own function so the builder below keeps one branch rather than two: the absent case and the
+// empty case are the same answer, and both have to add nothing — the blank separator included.
+function note_section(notes: ReadonlyArray<string> | undefined): Array<string> {
+	if (notes === undefined || notes.length === 0) return []
+
+	return ['', ...notes]
+}
+
 function build_completion_comment_body(input: {
 	message: string
 	issue_number: string | undefined
 	pr_url: string | undefined
 	mentions: Array<string>
+	notes?: ReadonlyArray<string>
 }): string {
 	const base_lines = [`✅ ${input.message}`]
 	const issue_lines = input.issue_number === undefined ? [] : [`Issue: #${input.issue_number}`]
 	const pr_lines = input.pr_url === undefined ? [] : [`PR: ${input.pr_url}`]
+	const note_lines = note_section(input.notes)
 	const mention_lines = input.mentions.length === 0 ? [] : ['', input.mentions.join(' ')]
 
-	return [...base_lines, ...issue_lines, ...pr_lines, ...mention_lines].join('\n')
+	return [...base_lines, ...issue_lines, ...pr_lines, ...note_lines, ...mention_lines].join('\n')
 }
 
 const git_notify = {

@@ -95,7 +95,6 @@ const BASE_INPUT: FollowupInput = {
 	notify_config: undefined,
 	coderabbit_ignore_reason: undefined,
 	ai_review_ignore_reason: undefined,
-	managed_config_ignore_reason: undefined,
 	is_skip_watch: true,
 	should_merge: false,
 }
