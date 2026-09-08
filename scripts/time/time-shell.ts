@@ -38,6 +38,12 @@ const CHAIN_PATTERN = /&&|\|\||;/u
 // `--body "cd x && pnpm josh gate | tail"` is a `gh` call and nothing else — a reader that split its
 // quoted text would answer about a command the shell never ran. Whichever quote opens first consumes
 // to its own close, so the `'` inside `"it's fine"` is a character rather than an opener.
+//
+// **The trade-off, stated rather than left to be discovered.** A shell does execute its quoted
+// argument — `bash -c "pnpm josh gate | tail"`, `sh -c`, `ssh host "…"` — and that pipeline becomes
+// invisible here. Erring this way is the cheaper error for every caller: a missed reading costs
+// nothing beyond the reading, while a fragment read as a command answers about work the shell never
+// did, on the shape this repository writes constantly.
 const QUOTED_SPAN_PATTERN = /'[^']*'|"[^"]*"/gu
 // `set -o pipefail` tells the shell to report the pipeline with the first failing command's status,
 // so nothing in it is discarded. The flag letters are loose because `set -eo pipefail` and

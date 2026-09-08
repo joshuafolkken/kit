@@ -30,6 +30,11 @@ import { time_shell } from '#scripts/time/time-shell'
 // `pre-push-unit` are run by lefthook rather than typed by anyone, so no call of theirs is ever
 // composed here; and `e2e:retry-check` *reports* whether the preview server crashed rather than
 // passing or failing on it, which puts it with the answers above.
+//
+// **`eval` is in, even though its verdict is the last line rather than the exit code.** Piping it to
+// `tail -1` does keep that line — and throws away the scenario rows the same rule requires next, since
+// a `blocked` verdict has to be attributed before it blocks a merge and a red scenario may predate the
+// change. The Issue that filed this rule names `eval` for that reason.
 const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 	'check',
 	'cspell',
@@ -90,6 +95,10 @@ const PIPED_VERIFICATION_REASON =
 	'is in `prompts/collaboration-workflow/output-bounds.md`. Reissue this call with no pipe — it ' +
 	'fires once per run and cannot repeat on the call in hand.'
 
-const piped_verification = { PIPED_VERIFICATION_REASON, is_masked_verification }
+const piped_verification = {
+	PIPED_VERIFICATION_REASON,
+	VERIFICATION_COMMANDS,
+	is_masked_verification,
+}
 
 export { piped_verification }

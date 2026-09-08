@@ -1,4 +1,5 @@
 import { delivered_rules } from '#scripts/rules/delivered-rules'
+import { piped_verification } from '#scripts/rules/piped-verification'
 import { describe, expect, it } from 'vitest'
 import {
 	AI_DOCS,
@@ -120,5 +121,15 @@ describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, 
 	// trigger has not been identified. This one's is that no verification status is being discarded.
 	it('says what a turn with no trigger means', () => {
 		expect(content).toContain('検証の終了コードが握りつぶされていない')
+	})
+
+	// **The trigger set drifts out of the table the moment a command joins it**, and the reader who
+	// concludes from the table that `pnpm josh overrides | head` is untouched is refused by the hook
+	// instead. Each command is satisfied by its own name or by the glob standing for its family, so a
+	// row may stay short — but never silently incomplete.
+	it.each([...piped_verification.VERIFICATION_COMMANDS])('names the trigger %j', (command) => {
+		const family = command.split(':', 1).join('')
+
+		expect(content.includes(`\`${command}\``) || content.includes(`\`${family}*\``)).toBe(true)
 	})
 })
