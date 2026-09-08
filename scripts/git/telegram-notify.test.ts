@@ -251,7 +251,13 @@ describe('telegram_notify.send_or_report — reports and carries on', () => {
 		const { errors } = silence_console()
 
 		await expect(telegram_notify.send_or_report(make_base({}), undefined)).resolves.toBe(false)
-		expect(errors.join('\n')).toContain(DNS_FAILURE_TEXT)
+
+		// Once, not twice: the thrown error's own `cause` is a redacted copy of its message, so a
+		// reporter that walked the chain again would print the whole reason a second time.
+		const printed = errors.join('\n')
+
+		expect(printed).toContain(DNS_FAILURE_TEXT)
+		expect(printed.indexOf(DNS_FAILURE_TEXT)).toBe(printed.lastIndexOf(DNS_FAILURE_TEXT))
 	})
 
 	it('answers true when the send succeeds', async () => {

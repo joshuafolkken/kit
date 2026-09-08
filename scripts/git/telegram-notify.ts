@@ -63,10 +63,21 @@ function join_cause(error: Error): string {
 
 // A non-`Error` throw is stated rather than stringified: `String({})` is `[object Object]`, which
 // tells a reader nothing and is what `typescript:S6551` flags.
+function describe_non_error(error: unknown): string {
+	return typeof error === 'string' ? error : UNKNOWN_ERROR_TEXT
+}
+
 function describe_error(error: unknown): string {
 	if (error instanceof Error) return join_cause(error)
 
-	return typeof error === 'string' ? error : UNKNOWN_ERROR_TEXT
+	return describe_non_error(error)
+}
+
+// **The message alone, for an error this module built itself.** What `send` throws already carries
+// the joined cause inside its own message, and its `cause` is a redacted copy of that same text — so
+// walking the chain again here printed the whole reason twice on one line.
+function describe_symptom(error: unknown): string {
+	return error instanceof Error ? error.message : describe_non_error(error)
 }
 
 // The request URL carries the bot token in its own path, so an error raised anywhere near the
@@ -207,7 +218,7 @@ async function send(input: TelegramSendInput): Promise<void> {
 // send happens *before* the merge. Borrowing it would print a sentence that is not true.
 function report_send_failure(error: unknown, recovery: string | undefined): void {
 	console.error('')
-	console.error(`❗ ${describe_error(error)}`)
+	console.error(`❗ ${describe_symptom(error)}`)
 	console.error('   Nobody was notified, and the run carried on.')
 
 	if (recovery !== undefined) console.error(`   Recovery: ${recovery}`)
