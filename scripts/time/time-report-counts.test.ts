@@ -82,3 +82,32 @@ describe('time_report.build_from_spans — the CI a run waited on inside the mer
 		]).toEqual([SERIAL_CI_MINUTES, MERGE_MINUTES - SERIAL_CI_MINUTES])
 	})
 })
+
+// A per-call table reports what a call took; the categories report its share of the wall clock
+// (joshuafolkken/kit#1591). One call bracketing a delegated unit is where the two figures part
+// company, and the invariant that has to survive the split is joshuafolkken/kit#1287's: the four
+// category shares still reconstruct the elapsed time.
+describe('time_report.build_report — a call whose middle went to a delegated unit', () => {
+	const OWN_MINUTES = 10
+	const HEAD_MINUTES = 2
+	const TAIL_MINUTES = 1
+	const head: Span = {
+		...span(time_spans.TOOL_CATEGORY, HEAD_MINUTES, 'Task'),
+		call_id: 'task-1',
+		own_duration_ms: OWN_MINUTES * MINUTE_MS,
+	}
+	const tail: Span = { ...head, duration_ms: TAIL_MINUTES * MINUTE_MS, is_continuation: true }
+
+	it('prices the call at its own duration rather than at what the subtraction left', () => {
+		const [row] = build([head, tail]).by_tool
+
+		expect([row?.duration_ms, row?.call_count]).toEqual([OWN_MINUTES * MINUTE_MS, 1])
+	})
+
+	it('leaves the elapsed time and the category shares on the subtracted durations', () => {
+		const report = build([head, tail])
+		const left_over = (HEAD_MINUTES + TAIL_MINUTES) * MINUTE_MS
+
+		expect([report.categories.tool_ms, report.elapsed_ms]).toEqual([left_over, left_over])
+	})
+})

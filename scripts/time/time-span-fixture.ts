@@ -37,7 +37,7 @@ function span(
 		outcome: time_spans.UNKNOWN_OUTCOME,
 		is_continuation: false,
 		ended_ms: 0,
-		duration_ms: minutes * MINUTE_MS,
+		...time_spans.equal_durations(minutes * MINUTE_MS),
 	}
 }
 

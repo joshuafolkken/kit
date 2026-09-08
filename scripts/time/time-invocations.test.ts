@@ -17,8 +17,20 @@ const GATE_COMMAND = 'josh gate'
 function call(end_minute: number, minutes: number, label: string, josh_command = ''): Span {
 	return {
 		...time_span_fixture.outcome_span(end_minute, time_spans.UNKNOWN_OUTCOME, label, josh_command),
-		duration_ms: minutes * MINUTE_MS,
+		...time_spans.equal_durations(minutes * MINUTE_MS),
 	}
+}
+
+// What `time_overlap.trim` leaves of one call whose middle went to a delegated unit: two fragments
+// sharing the call's id, each holding only the minutes the subtraction did not take, and both still
+// carrying the whole call in `own_duration_ms` (joshuafolkken/kit#1591).
+function bracketing(own_minutes: number, head: Span, tail: Span): Array<Span> {
+	const own_duration_ms = own_minutes * MINUTE_MS
+
+	return [
+		{ ...head, own_duration_ms },
+		{ ...tail, own_duration_ms, call_id: head.call_id, is_continuation: true },
+	]
 }
 
 function shaped(rows: ReadonlyArray<InvocationTotal>): Array<[string, number, Array<number>]> {
@@ -79,16 +91,23 @@ describe('time_invocations.build_invocations — what counts as one call', () =>
 	})
 
 	// One call bracketing a delegated unit comes back as a head and a tail. Two rows would report a
-	// call the run never made; dropping the tail would report the call as shorter than it was.
-	it('rejoins the two fragments of one bracketing call', () => {
-		const head = call(5, 2, 'Task')
+	// call the run never made, and summing the fragments reports the minutes nobody delegated rather
+	// than the minutes the call took — the 65 ms joshuafolkken/kit#1591 was filed for.
+	it('reports one bracketing call once, at the duration the call itself took', () => {
 		const rows = time_invocations.build_invocations([
-			head,
-			{ ...call(9, 1, 'Task'), call_id: head.call_id, is_continuation: true },
+			...bracketing(10, call(5, 2, 'Task'), call(9, 1, 'Task')),
 			call(12, 3, 'Task'),
 		])
 
-		expect(shaped(rows)).toEqual([['Task', 2, [3, 3]]])
+		expect(shaped(rows)).toEqual([['Task', 2, [10, 3]]])
+	})
+
+	// The other half of the same rule: with nothing delegated the two durations are one number, so a
+	// run that never forked reports exactly what it reported before joshuafolkken/kit#1591.
+	it('reports the span duration itself where nothing was delegated', () => {
+		const rows = time_invocations.build_invocations([call(2, 4, 'Task'), call(9, 6, 'Task')])
+
+		expect(shaped(rows)).toEqual([['Task', 2, [4, 6]]])
 	})
 
 	// Every call the transcript could not name shares one label, so a row over them would list
@@ -126,9 +145,10 @@ describe('time_invocations.invocation_lines', () => {
 		const lines = time_invocations.invocation_lines(rows)
 
 		expect(lines[1]).toBe(time_invocations.HEADING)
-		expect(lines[2]).toContain(GATE_COMMAND)
-		expect(lines[2]).toContain('4.0 min')
-		expect(lines[2]).toContain('2 call(s): 60.0 s, 180.0 s')
+		expect(lines[2]).toBe(time_invocations.NOTE)
+		expect(lines[3]).toContain(GATE_COMMAND)
+		expect(lines[3]).toContain('4.0 min')
+		expect(lines[3]).toContain('2 call(s): 60.0 s, 180.0 s')
 	})
 
 	// A run edits fifty files, and fifty durations on one line is a row nobody reads. The whole list
@@ -137,6 +157,6 @@ describe('time_invocations.invocation_lines', () => {
 		const many = Array.from({ length: 14 }, (_unused, index) => call(index + 1, 1, 'Edit'))
 		const lines = time_invocations.invocation_lines(time_invocations.build_invocations(many))
 
-		expect(lines[2]).toContain(`+${String(14 - time_invocations.MAX_DURATIONS)} more`)
+		expect(lines[3]).toContain(`+${String(14 - time_invocations.MAX_DURATIONS)} more`)
 	})
 })

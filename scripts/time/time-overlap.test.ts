@@ -226,6 +226,17 @@ describe('time_overlap.resolve_delegated — where the remainder sits', () => {
 		expect(parent_span?.ended_ms).toBe(8 * MINUTE_MS)
 		expect(parent_span?.duration_ms).toBe(8 * MINUTE_MS)
 	})
+
+	// The subtraction prices a call's *share* of the wall clock; what the call itself took has to
+	// survive it, or the per-invocation table has nothing left to read and prints the remainder as
+	// though it were the call (joshuafolkken/kit#1591). A covered end is gone from the fragments, so
+	// this is the only place the original length still exists.
+	it('keeps the call’s own duration on every fragment it leaves', () => {
+		const resolved = time_overlap.resolve_delegated([span('Agent', 10, 10)], [span('Read', 8, 6)])
+		const parts = resolved.filter((one) => one.label === 'Agent')
+
+		expect(parts.map((one) => one.own_duration_ms)).toStrictEqual([10 * MINUTE_MS, 10 * MINUTE_MS])
+	})
 })
 
 // joshuafolkken/kit#1384: a pull request's CI windows are read per commit, and two commits pushed in

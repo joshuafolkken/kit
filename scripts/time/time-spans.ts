@@ -126,6 +126,22 @@ const UNKNOWN_CALL: ToolCall = {
 interface Span extends ToolCall, ResultFacts {
 	category: SpanCategory
 	duration_ms: number
+	// What the call itself took, before any of its minutes were handed to a delegated unit
+	// (joshuafolkken/kit#1591). Carried beside `duration_ms` rather than derived from it, because
+	// nothing downstream could recover it: `time_overlap.trim` replaces `duration_ms` and keeps no
+	// record of what it replaced.
+	//
+	// **The two answer different questions, and a report needs both.** `duration_ms` is this span's
+	// share of the run's wall clock, so the subtraction shortens it wherever a unit covered the same
+	// minutes — without that the four category shares stop reconstructing `elapsed_ms`, which is the
+	// double count joshuafolkken/kit#1287 fixed. This one is what a per-invocation row is asked for:
+	// a `Skill` call that really ran for five minutes was printed as 65 ms, because 65 ms is all the
+	// subtraction had left of it.
+	//
+	// It survives that subtraction because `trim` copies the span and overwrites only `duration_ms`
+	// and `ended_ms`, so every fragment of one call carries the same value — which is why the tables
+	// that read it count the first fragment and drop the continuations rather than summing them.
+	own_duration_ms: number
 	ended_ms: number
 	branch: string
 	// Whether this span is the *remainder* of a call whose middle was given to a delegated unit, cut
@@ -290,6 +306,14 @@ function to_events(
 // The span is named by the event that *closes* it, so the branch is that event's too: the work the
 // interval paid for is the work the later line records, and taking the opening line's branch would
 // attribute the first span after a `josh git` to whatever preceded the branch.
+// The two durations of a span that nothing has taken a share of yet, which is every span a
+// transcript itself yields and every span a test builds (joshuafolkken/kit#1591). Written once here
+// so no builder can set one and forget the other — the drift would be silent, and would surface as a
+// per-invocation row disagreeing with the transcript it was read from.
+function equal_durations(duration_ms: number): Pick<Span, 'duration_ms' | 'own_duration_ms'> {
+	return { duration_ms, own_duration_ms: duration_ms }
+}
+
 function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 	return events.slice(1).map((event, index) => ({
 		category: event.category,
@@ -305,7 +329,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		outcome: event.outcome,
 		is_continuation: false,
 		ended_ms: event.timestamp_ms,
-		duration_ms: event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms),
+		...equal_durations(event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms)),
 	}))
 }
 
@@ -346,6 +370,7 @@ const time_spans = {
 	NO_MESSAGE_ID,
 	UNKNOWN_TOOL,
 	has_transcript_data,
+	equal_durations,
 	// Re-exported so the suites that measure how a command is read keep asking one namespace, and so
 	// `time-shell.ts` moving out of this file changed no call site (joshuafolkken/kit#1344).
 	bash_label: time_shell.bash_label,
