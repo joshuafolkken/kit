@@ -50,10 +50,10 @@ const { MODEL_LABEL, TOOL_LABEL, HUMAN_LABEL, CI_LABEL, NO_CALLS } = time_format
 // `ci_ms` is the fourth share (joshuafolkken/kit#1268): the part of the pull request's
 // open→merge window that no transcript span covers. Disjoint from the other three by construction,
 // so the four still reconstruct the elapsed time exactly — the property that makes two runs
-// comparable, and the one a naive "add the PR window" would have broken, since `followup --merge`
+// comparable, and the one a naive "add the PR window" would have broken, since `followup`
 // waits for CI *inside* a tool span that is already counted.
 //
-// **So the CI a run waited for inside `followup --merge` is in `tool_ms`, and in no other field**
+// **So the CI a run waited for inside `followup` is in `tool_ms`, and in no other field**
 // (joshuafolkken/kit#1406). It is the merge command's own execution, and `ci_ms` deliberately
 // excludes it — a hand read that saw the phase table's `ci` row beside a `CI wait 0.0 min` category
 // row could take the two for the same quantity and conclude a stretch had gone unmeasured. Nothing

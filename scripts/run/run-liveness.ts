@@ -125,7 +125,7 @@ function is_output_moving(traces: Traces): boolean {
 	return traces.is_output_frozen === false
 }
 
-// A live process is a unit inside a long check — a `pnpm josh followup --merge` waiting on CI writes
+// A live process is a unit inside a long check — a `pnpm josh followup` waiting on CI writes
 // nothing for up to 32 minutes, which is longer than the silent window and is exactly the false
 // positive this trace exists to stop. **It is asked after the unreadable check rather than before it**
 // (joshuafolkken/kit#1485, review round 2): a `pgrep` scoped a shade too wide answers `alive` on a

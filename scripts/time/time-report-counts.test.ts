@@ -39,7 +39,7 @@ describe('time_report.build_report — how many turns a run had', () => {
 	})
 })
 
-// `followup --merge` waits for the checks *inside* a Bash span, so that wait is the merge command's
+// `followup` waits for the checks *inside* a Bash span, so that wait is the merge command's
 // own execution. The phase table moves it from `merge` to `ci`; a hand read that saw a `ci` row
 // beside `CI wait 0.0 min` could take the two for one quantity and conclude the stretch had gone
 // unmeasured. These two cases say where it actually is.

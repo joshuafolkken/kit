@@ -59,7 +59,7 @@ The trigger set is derived from what the eval sandbox copies, not restated: `CLA
 ## Where it sits — started with the review, read after it
 
 **Start `pnpm josh eval` in the background when `/code-review` starts, and read its verdict once the
-review has converged — before `pnpm josh followup --merge`, and never inside `pnpm josh gate`.** The
+review has converged — before `pnpm josh followup`, and never inside `pnpm josh gate`.** The
 anchor is the merge rather than the commit because the commit now sits between the two review rounds
 (joshuafolkken/kit#1261), and `blocked` has always stopped the merge rather than the commit — reading
 it before `pnpm josh git -y` would mean reading it before the review had converged, which is the

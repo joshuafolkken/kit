@@ -228,7 +228,7 @@ describe('time_history.format_block — the comparison against the previous run'
 	})
 })
 
-// `josh followup --merge` is re-runnable — a merge that succeeded with a failing step after it is
+// `josh followup` is re-runnable — a merge that succeeded with a failing step after it is
 // finished by re-invoking it — so the record immediately before this one can be this same run
 // measured twice, which would print `+0.0 min` as though nothing had changed between two runs.
 describe('time_history.format_block — a re-run of the same issue', () => {
