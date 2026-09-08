@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { execaSync } from 'execa'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMMAND_MAP } from './josh/josh-logic'
 import { security_audit } from './security-audit'
 import { security_audit_logic } from './security-audit-logic'
@@ -24,6 +25,9 @@ beforeEach(() => {
 
 const OSV_SCANNER = 'osv-scanner'
 const PNPM_LOCKFILE = 'pnpm-lock.yaml'
+const MANAGED_SCANNER_PATH = '/managed/osv-scanner'
+const EXECUTABLE_MODE = 0o755
+const READABLE_MODE = 0o644
 const RETIRED_AUDIT = 'pnpm audit'
 const RETIRED_AUDIT_RUN = `run: ${RETIRED_AUDIT}`
 const RETIRED_AUDIT_FRAGMENT = `${RETIRED_AUDIT} `
@@ -56,13 +60,118 @@ describe('security_audit.run_scanner', () => {
 	it('returns the scanner exit code', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
 
-		expect(security_audit.run_scanner()).toBe(0)
+		expect(security_audit.run_scanner(OSV_SCANNER)).toBe(0)
 	})
 
 	it('falls back to the failure code when exitCode is undefined', () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
 
-		expect(security_audit.run_scanner()).toBe(1)
+		expect(security_audit.run_scanner(OSV_SCANNER)).toBe(1)
+	})
+
+	it('spawns the path it was handed rather than the bare binary name', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+		security_audit.run_scanner(MANAGED_SCANNER_PATH)
+
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			MANAGED_SCANNER_PATH,
+			[`--lockfile=${PNPM_LOCKFILE}`],
+			expect.anything(),
+		)
+	})
+})
+
+// joshuafolkken/kit#1563: PATH stays the preference, so a machine that installed the scanner itself
+// behaves exactly as it did; the provisioned directory only answers when PATH did not.
+describe('security_audit.resolve_scanner_path', () => {
+	const scratch = mkdtempSync(path.join(tmpdir(), 'kit-audit-resolve-'))
+
+	afterAll(() => {
+		rmSync(scratch, { recursive: true, force: true })
+	})
+
+	it('prefers the binary on PATH over the provisioned copy', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(0))
+
+		expect(security_audit.resolve_scanner_path(scratch, 'linux')).toBe(OSV_SCANNER)
+	})
+
+	it('returns undefined when neither PATH nor the provisioned directory has one', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
+
+		expect(security_audit.resolve_scanner_path(scratch, 'linux')).toBeUndefined()
+	})
+
+	it('falls back to the provisioned copy when PATH has none', () => {
+		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
+		const managed_path = security_audit_logic.build_managed_binary_path(scratch, 'linux')
+
+		mkdirSync(path.dirname(managed_path), { recursive: true })
+		writeFileSync(managed_path, 'stub')
+		chmodSync(managed_path, EXECUTABLE_MODE)
+
+		expect(security_audit.resolve_scanner_path(scratch, 'linux')).toBe(managed_path)
+	})
+})
+
+// Existence is not enough: an interrupted install leaves a zero-byte file, and a `chmod` refused by
+// a restrictive mount leaves a non-executable one. Spawning either fails with EACCES or ENOEXEC —
+// an error naming neither the scanner nor how to get one — so neither counts as a provisioned copy.
+describe('security_audit.is_executable_file', () => {
+	const scratch = mkdtempSync(path.join(tmpdir(), 'kit-audit-exec-'))
+
+	afterAll(() => {
+		rmSync(scratch, { recursive: true, force: true })
+	})
+
+	function write_candidate(name: string, content: string, mode: number): string {
+		const candidate_path = path.join(scratch, name)
+
+		writeFileSync(candidate_path, content)
+		chmodSync(candidate_path, mode)
+
+		return candidate_path
+	}
+
+	it('accepts a non-empty file with the execute bit set', () => {
+		expect(security_audit.is_executable_file(write_candidate('ok', 'stub', EXECUTABLE_MODE))).toBe(
+			true,
+		)
+	})
+
+	it('rejects a zero-byte leftover even with the execute bit set', () => {
+		expect(security_audit.is_executable_file(write_candidate('empty', '', EXECUTABLE_MODE))).toBe(
+			false,
+		)
+	})
+
+	it('rejects a file whose execute bit never landed', () => {
+		expect(security_audit.is_executable_file(write_candidate('plain', 'stub', READABLE_MODE))).toBe(
+			false,
+		)
+	})
+
+	it('rejects a path with nothing at it', () => {
+		expect(security_audit.is_executable_file(path.join(scratch, 'absent'))).toBe(false)
+	})
+})
+
+describe('security_audit_logic.build_managed_binary_path', () => {
+	// Spelled out here rather than read from the module: this is the assertion that the provisioned
+	// directory sits inside `node_modules`, which is the whole reason no `.gitignore` entry is
+	// distributed for it — a test that asked the module for the segments could not fail on a move.
+	const managed_directory = ['/repo', 'node_modules', '.cache', 'josh-tools']
+
+	it('places the scanner under the node_modules cache the project already ignores', () => {
+		expect(security_audit_logic.build_managed_binary_path('/repo', 'darwin')).toBe(
+			path.join(...managed_directory, OSV_SCANNER),
+		)
+	})
+
+	it('adds the .exe suffix on Windows so the written file is executable there', () => {
+		expect(security_audit_logic.build_managed_binary_path('/repo', 'win32')).toBe(
+			path.join(...managed_directory, `${OSV_SCANNER}.exe`),
+		)
 	})
 })
 

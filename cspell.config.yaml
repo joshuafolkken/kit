@@ -2,6 +2,10 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The mount option that refuses to execute anything on a filesystem. `security-audit.ts` names it
+  # as one of the reasons a provisioned osv-scanner can exist and still not be runnable
+  # (joshuafolkken/kit#1563), which is why existence alone is not the check.
+  - noexec
   # git's own spelling of the `commit.gpgsign` config key, carried on `-c` by the throwaway
   # repository `lane-change-base.test.ts` builds so a signing setup on the machine cannot fail its
   # commits.
