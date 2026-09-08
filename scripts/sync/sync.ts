@@ -254,6 +254,25 @@ function sync_secretlint_development_deps(destination_path: string): void {
 	)
 }
 
+// `lefthook install` fails silently when `core.hooksPath` is set, leaving a consumer with no hooks
+// and no message (joshuafolkken/kit#1503). `josh init` rewrites the clause it wrote so the failure
+// is reported; this covers everyone already initialized, who never re-runs `josh init`.
+function sync_prepare_lefthook_warning(destination_path: string): void {
+	sync_package_json_with(
+		destination_path,
+		(existing) => init_logic.upgrade_prepare_lefthook_warning(existing),
+		'  ✔ synced    prepare lefthook install warning (run `pnpm install`)',
+	)
+}
+
+// Every migration an already-initialized consumer needs applied to its own manifest, run as one
+// group so the next one is added here rather than at the call site.
+function sync_package_json_migrations(destination_path: string): void {
+	sync_package_manager_version(destination_path)
+	sync_secretlint_development_deps(destination_path)
+	sync_prepare_lefthook_warning(destination_path)
+}
+
 // Two distributed artifacts each depend on a repository setting kit cannot write, and both reports
 // are tied to the moment the artifact reaches the consumer. `.github/dependabot.yml` disables npm
 // version updates (joshuafolkken/kit#803), so a synced consumer only receives npm Dependabot pull
@@ -279,8 +298,7 @@ function sync_project_artifacts(is_force: boolean): void {
 
 	sync_sonar_with_template(name_with_owner, is_force)
 	sync_config_files()
-	sync_package_manager_version(path.join(PROJECT_ROOT, PACKAGE_JSON))
-	sync_secretlint_development_deps(path.join(PROJECT_ROOT, PACKAGE_JSON))
+	sync_package_json_migrations(path.join(PROJECT_ROOT, PACKAGE_JSON))
 	report_repository_settings(name_with_owner)
 }
 
@@ -308,6 +326,7 @@ const sync = {
 	sync_deploy_vps,
 	sync_package_manager_version,
 	sync_secretlint_development_deps,
+	sync_prepare_lefthook_warning,
 	migrate_prettierrc: did_migrate_prettierrc,
 }
 
