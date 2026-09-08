@@ -120,3 +120,6 @@ words:
   # comment is about several of them at once — `process-identity-fixture.ts` and the suite that
   # exercises the reissued-pid case.
   - pids
+  # The `git log --oneline` flag, quoted in the read-only cases that pin what the piped-verification
+  # rule must not catch (joshuafolkken/kit#1556).
+  - oneline
