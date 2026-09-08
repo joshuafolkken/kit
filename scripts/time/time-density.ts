@@ -124,8 +124,9 @@ function format_notice(reading: DensityReading): string {
 	return (
 		`⚠ batching: ${density} calls per round trip over the last ${String(reading.round_trip_count)}, ` +
 		`under the ${floor} floor, and this turn issued one call. ` +
-		`Independent reads, greps, gh queries and edits go out together — CLAUDE.md → ` +
-		`"Put every call that does not depend on another's result in the same turn".`
+		`Independent reads, greps, gh queries and edits go out together; the criterion is whether this ` +
+		`call's input needs another call's result, not what kind of call it is — ` +
+		`prompts/collaboration-workflow/turn-batching.md.`
 	)
 }
 
