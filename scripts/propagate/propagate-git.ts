@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { execaSync } from 'execa'
 
@@ -9,10 +11,15 @@ import { execaSync } from 'execa'
 // success (joshuafolkken/kit#863).
 
 const GIT_TIMEOUT_MS = 10_000
+// The probes that talk to the remote get their own budget. Ten seconds is generous for a local
+// `rev-parse` and tight for an ssh handshake, and a probe that times out answers "no" — which for
+// the two below would report a push that never reached origin as a push nobody attempted.
+const REMOTE_TIMEOUT_MS = 60_000
 const SUCCESS_EXIT_CODE = 0
 const DEFAULT_BRANCH_REF = 'refs/remotes/origin/HEAD'
 const FALLBACK_DEFAULT_BRANCH = 'main'
 const ORIGIN_PREFIX = 'refs/remotes/origin/'
+const PRE_PUSH_HOOK = 'pre-push'
 
 // What a repository has to be for propagation to write into it, or the reason it is not.
 interface TreeState {
@@ -41,11 +48,15 @@ interface TreeState {
 // `GIT_WORK_TREE` to the index and object-store variables, which redirect a *write* rather than a
 // lookup — inert for the read-only probes below, and required by the fixture that commits.
 
-function run_git(repository_path: string, args: ReadonlyArray<string>): string | undefined {
+function run_git(
+	repository_path: string,
+	args: ReadonlyArray<string>,
+	timeout_ms: number = GIT_TIMEOUT_MS,
+): string | undefined {
 	const result = execaSync('git', args, {
 		cwd: repository_path,
 		reject: false,
-		timeout: GIT_TIMEOUT_MS,
+		timeout: timeout_ms,
 		env: { LC_ALL: 'C', LANGUAGE: 'C', ...git_location_environment.location_free_environment() },
 		extendEnv: true,
 	})
@@ -91,6 +102,62 @@ function is_up_to_date(repository_path: string, branch: string): boolean {
 	if (local === undefined || remote === undefined) return false
 
 	return local === remote
+}
+
+// The commit a feature branch carries beyond the default branch, or nothing when it carries none.
+// A branch that was created but never committed to still sits on the default branch's own tip, and
+// reading that tip as a commit would report a refused push for a push nobody attempted.
+function commit_ahead(repository_path: string, default_name: string): string | undefined {
+	const head = run_git(repository_path, ['rev-parse', 'HEAD'])
+	const base = run_git(repository_path, ['rev-parse', default_name])
+
+	if (head === undefined || head === base) return undefined
+
+	return run_git(repository_path, ['rev-parse', '--short', 'HEAD'])
+}
+
+// Whether origin already carries the branch. Asked of the remote itself rather than of a
+// remote-tracking ref: a push that was refused leaves no such ref behind, and neither does a branch
+// that was never pushed at all, so the ref cannot tell the two apart.
+function has_remote_branch(repository_path: string, branch: string): boolean {
+	const heads = run_git(
+		repository_path,
+		['ls-remote', '--heads', 'origin', branch],
+		REMOTE_TIMEOUT_MS,
+	)
+
+	return heads !== undefined && heads !== ''
+}
+
+// Whether the consumer has a pre-push hook at all, honouring `core.hooksPath` — which `rev-parse
+// --git-path` does not. Without this the classification would name a hook on the strength of a dry
+// run alone, and **any** push failure that has cleared by the time the probe runs satisfies that: a
+// dropped ssh connection, a refreshed token, one 500 from GitHub. Naming a hook that does not exist
+// is the same misattribution joshuafolkken/kit#1417 was filed for, pointed the other way.
+function hooks_directory(repository_path: string): string | undefined {
+	const configured = run_git(repository_path, ['config', '--get', 'core.hooksPath'])
+	if (configured !== undefined && configured !== '') return configured
+
+	return run_git(repository_path, ['rev-parse', '--git-path', 'hooks'])
+}
+
+function has_pre_push_hook(repository_path: string): boolean {
+	const directory = hooks_directory(repository_path)
+	if (directory === undefined || directory === '') return false
+
+	return existsSync(path.resolve(repository_path, directory, PRE_PUSH_HOOK))
+}
+
+// Whether the push would go through with the consumer's own hooks out of the way. Asked *after* a
+// real push has failed, this is what separates a pre-push hook's refusal from a transport failure:
+// both leave the commit local and origin without the branch, and only this says which of the two
+// happened. `--dry-run` writes nothing, so asking costs a round trip and no more — and `--no-verify`
+// is scoped to this probe, which never pushes anything: the consumer's gate stays exactly as strong
+// as it was, and a push it refused stays refused.
+function can_push_without_hooks(repository_path: string, branch: string): boolean {
+	const args = ['push', '--dry-run', '--no-verify', 'origin', branch]
+
+	return run_git(repository_path, args, REMOTE_TIMEOUT_MS) !== undefined
 }
 
 // Decide from already-gathered facts, so the decision is testable without a repository.
@@ -141,6 +208,10 @@ const propagate_git = {
 	fetch_branch,
 	return_to_default_branch,
 	current_branch,
+	commit_ahead,
+	has_remote_branch,
+	has_pre_push_hook,
+	can_push_without_hooks,
 	is_clean,
 	is_up_to_date,
 	decide_tree_state,

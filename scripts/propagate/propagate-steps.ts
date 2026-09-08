@@ -5,6 +5,7 @@ import { build_upgrade_shell_command } from '#scripts/version/upgrade-shell-comm
 import { create_version_command_config } from '#scripts/version/version-command-config'
 import { execaSync } from 'execa'
 import { propagate_git } from './propagate-git'
+import { propagate_git_failure } from './propagate-git-failure'
 import { propagate_run, type RunStep, type StepResult } from './propagate-run'
 import type { PropagateTarget } from './propagate-targets'
 
@@ -102,25 +103,72 @@ function issue_body(package_name: string, version: string): string {
 	})
 }
 
-// Run a command in the consumer's directory, with its output inherited so a failing step shows why
-// it failed. Discarding it would leave the report saying only `exit 1`.
+// A step's result together with what the step printed, one entry per stream.
+interface SpawnOutcome {
+	result: StepResult
+	streams: ReadonlyArray<string>
+}
+
+const NO_COMMAND = 'no command defined'
+
+function step_result(step: string, exit_code: number | undefined): StepResult {
+	if (exit_code === SUCCESS_EXIT_CODE) return { step, is_ok: true }
+
+	return { step, is_ok: false, detail: `exit ${String(exit_code ?? 'timed out')}` }
+}
+
+// Run a command in the consumer's directory with its output inherited, so a failing step shows why
+// it failed rather than only `exit 1`, and so the long steps print as they run.
 function spawn_step(
 	target: PropagateTarget,
 	step: string,
 	command: ReadonlyArray<string>,
 ): StepResult {
 	const [executable, ...rest] = command
-	if (executable === undefined) return { step, is_ok: false, detail: 'no command defined' }
-	const result = execaSync(executable, rest, {
+	if (executable === undefined) return { step, is_ok: false, detail: NO_COMMAND }
+	const spawned = execaSync(executable, rest, {
 		cwd: target.path,
 		reject: false,
 		stdio: 'inherit',
 		timeout: STEP_TIMEOUT_MS,
 	})
 
-	if (result.exitCode === SUCCESS_EXIT_CODE) return { step, is_ok: true }
+	return step_result(step, spawned.exitCode)
+}
 
-	return { step, is_ok: false, detail: `exit ${String(result.exitCode ?? 'timed out')}` }
+// The same, keeping what the command printed. Only the pull-request step uses it: a consumer's
+// pre-push hook names the check that stopped it in its own last lines, and until
+// joshuafolkken/kit#1417 nothing in the run kept them — so the report had one exit code to attribute
+// three sub-steps with, and attributed it to the wrong one.
+//
+// **This step's output is replayed when it finishes rather than printed as it runs**, and that is
+// the price of keeping it. A synchronous spawn gives one target per file descriptor, so `['inherit',
+// 'pipe']` cannot do both: execa buffers and writes the buffer out when the child exits. Nothing is
+// lost, and the cost is confined to this one step — every other step above still streams, including
+// the consumer's own verification gate, which is the long one. The alternative was to reproduce the
+// message afterwards by pushing again with hooks enabled, which runs the consumer's whole gate a
+// second time.
+function spawn_captured(
+	target: PropagateTarget,
+	step: string,
+	command: ReadonlyArray<string>,
+): SpawnOutcome {
+	const [executable, ...rest] = command
+
+	if (executable === undefined) {
+		return { result: { step, is_ok: false, detail: NO_COMMAND }, streams: [] }
+	}
+
+	const spawned = execaSync(executable, rest, {
+		cwd: target.path,
+		reject: false,
+		stdin: 'inherit',
+		stdout: ['inherit', 'pipe'],
+		stderr: ['inherit', 'pipe'],
+		timeout: STEP_TIMEOUT_MS,
+	})
+
+	return { result: step_result(step, spawned.exitCode), streams: [spawned.stdout, spawned.stderr] }
 }
 
 // Refuse a consumer whose working tree is not clean, is not on its default branch, or is behind its
@@ -241,8 +289,10 @@ function pull_request_step(
 	const number = issue_numbers.get(target.repo)
 	if (number === undefined) return { step, is_ok: false, detail: 'no issue number' }
 	const argument = `${plan_title(plan.releases)} #${number}`
+	const outcome = spawn_captured(target, step, ['pnpm', 'josh', 'git', '-y', argument])
+	if (outcome.result.is_ok) return outcome.result
 
-	return spawn_step(target, step, ['pnpm', 'josh', 'git', '-y', argument])
+	return propagate_git_failure.attribute(target.path, outcome.result, outcome.streams)
 }
 
 // One toolkit release being carried, as one value so the step handlers stay within the parameter

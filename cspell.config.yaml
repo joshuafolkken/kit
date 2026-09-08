@@ -35,6 +35,10 @@ words:
   # its counterpart uses for the first of those alone. Neither reaches a distributed file.
   - untimed
   - unstarted
+  # What `propagate-git-failure.ts` calls a branch `josh git` committed to and could not push — the
+  # state a consumer's pre-push hook leaves behind (joshuafolkken/kit#1417). It reaches no
+  # distributed file: the word appears only in that module's own unit suite.
+  - unpushed
   # What `time-ci.ts` does with a CI cycle the merge command sat waiting for: it moves from the
   # `merge` phase to `ci` (joshuafolkken/kit#1384). All three forms are needed — cspell's
   # dictionaries derive none of them from another — and none reaches a distributed file.
