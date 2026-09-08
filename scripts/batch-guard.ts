@@ -35,7 +35,7 @@ const SWITCH_ENV_KEY = 'JOSH_BATCH_GUARD'
 // refuse and whether the run has stopped batching are both its, so a refusal here can never disagree
 // with the report the Issue's own verification step reads.
 const GUARD = hook_decision.create_transcript_guard({
-	prefix: 'josh-batch-guard-',
+	prefix: time_batch_guard.STAMP_PREFIX,
 	switch_key: SWITCH_ENV_KEY,
 	is_candidate: time_batch_guard.is_guarded_call,
 	should_block: time_batch_guard.should_block,

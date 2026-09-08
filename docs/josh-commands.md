@@ -49,7 +49,7 @@ The plan comes from one table in `scripts/gate-plan.ts`, where each check declar
   plan: 1 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)
   ```
 
-  The count is a marker per in-flight run in the temp directory, carrying the pid that wrote it; a run killed outright leaves its file behind and is ignored, because the pid rather than the file is what says a run is live. A number you pass yourself is never divided — `pnpm josh test:unit --maxWorkers=4` is left as typed.
+  The count is a marker per in-flight run in the temp directory, carrying the pid that wrote it **and the time that process started** ([#1245](https://github.com/joshuafolkken/kit/issues/1245)); a run killed outright leaves its file behind and is ignored, because the process rather than the file is what says a run is live. The start time is there because a pid alone is not a process: once the operating system reissues the number, a leaked marker would pass a pid-only liveness probe and hold every later run on the machine at one worker. A marker recording no start time — written by an older version, or on a platform where it cannot be read — still counts as live, which is the direction that costs a narrower share rather than an oversubscribed machine. A number you pass yourself is never divided — `pnpm josh test:unit --maxWorkers=4` is left as typed.
 
 The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
@@ -341,6 +341,8 @@ Deliver a rule at the tool call that binds it, instead of carrying it resident i
 **It is a dispatcher, not a third guard.** `scripts/rules/delivered-rules.ts` holds one row per relocated rule — an id, the trigger read from the call, and the text the refusal states — and each row is a `hook_decision.create_transcript_guard` spec, the same shell `josh batch:guard` and `josh investigation:guard` already share. So the next rule that leaves residency costs a row and a test, never a fourth process in front of every call. The enumeration and the criterion that decides what belongs on it are `prompts/collaboration-workflow/rule-delivery.md`.
 
 **What it delivers today** is the backlog WIP cap: the trigger is a `Bash` call that files an Issue — `gh issue create`, or a `title`-bearing POST to a path ending in `/issues` (a title passed inside `--input <file>` is not visible to it) — and the refusal states the count, the refusal, both exemptions and the three tests that decide the interrupt one. **A comment endpoint is not a filing**: `…/issues/<N>/comments` is left alone, and so is a listing, because comments outnumber filings by a wide margin and a guard that fired on them would be the hook that fires on the wrong turns.
+
+**The second row is the Issue's comments** ([#1319](https://github.com/joshuafolkken/kit/issues/1319)): the trigger is a `Bash` call that reads an Issue's body **without** them — `gh issue view <N>`, or a `GET` of a path ending `…/issues/<N>` — and the refusal hands over the reissue that carries them (`gh issue view <N> --comments`) together with the rule for a comment that contradicts the body. A read that already carries the comments is left alone: `--comments`, a `comments` field in a `--json` projection, and the comments endpoint anywhere on the line — the last one because batching puts the body read and the comment read on one line, and refusing that would refuse the very shape the rule asks for. **A write to the same path is not a read of it**: an explicit non-`GET` method, or any `-f` / `-F` / `--field` / `--raw-field` / `--input` (which makes `gh api` POST), is left alone — otherwise `kickoff`'s title-normalizing `PATCH` would spend the one delivery this run gets. The short `-c` is deliberately **not** read as "comments included", because `-c` belongs to `wc`, `grep` and `sort` far more often than to `gh`, and treating it that way silenced the rule on every compound line that ended in a pipe; a run that types `-c` pays one round trip instead. **It is the one row whose trigger `josh batch:guard` also considers**, so it stands aside on that guard's turn — recording nothing — and delivers on the reissue. The procedure it points at is `.claude/skills/workflow-commands/SKILL.md` → §2g, which is where the rule lives for a session that runs no hooks at all.
 
 **Wired to `Bash` alone**, for the reason `josh batch:guard` documents: Claude Code denies one call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself not. Every rule the enumeration carries is therefore one whose binding moment is a shell call.
 
@@ -2689,7 +2691,12 @@ open for the whole of it, so clearing them mid-flight would corrupt the run payi
 run is minutes long and clears a target's caches before each cold reading, so a check once at start-up
 would walk straight into a gate a hook or another session started after it; once a gate is running the
 readings are void anyway, and the run stops rather than finishing with figures nobody can use. The
-in-flight marker carries the gate's pid, so one left behind by a killed process blocks nothing.
+in-flight marker carries the gate's pid **and the time that process started**
+([#1245](https://github.com/joshuafolkken/kit/issues/1245)), so one left behind by a killed gate blocks
+nothing — and goes on blocking nothing after the operating system reissues that pid, which the pid on
+its own could not promise. **The uncertain answer refuses rather than clears**: where the start time
+cannot be read at all, a marker naming a live pid holds `josh bench` back, because being wrong the
+other way deletes the caches a running gate is reading.
 
 **Stopping keeps the readings it already took** ([#1369](https://github.com/joshuafolkken/kit/issues/1369)).
 The abort's rationale is that a reading taken beside a gate measures neither of them, and that does not

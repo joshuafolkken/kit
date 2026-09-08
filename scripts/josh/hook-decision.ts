@@ -131,6 +131,12 @@ const { load_environment_file } = josh_environment_file
 // call, derive the transcript, read its tail, ask their own rule and record before refusing — the
 // same six steps in the same order — so those steps are here and the three fields below are what a
 // hook supplies.
+// What a rule may need about the run rather than about the call in hand.
+interface GuardRun {
+	transcript: string
+	now_ms: number
+}
+
 interface TranscriptGuardSpec {
 	// Keeps one hook's refusal record out of the other's.
 	prefix: string
@@ -140,8 +146,12 @@ interface TranscriptGuardSpec {
 	// most of a run's calls are ones the hook could never refuse, and a quarter-megabyte tail read for
 	// each of them would be paid inside a hook that is holding the call.
 	is_candidate: (call: GuardedCall) => boolean
-	// This hook's own rule, over the tail.
-	should_block: (tail: string, call: GuardedCall, refused_at_ms: number) => boolean
+	// This hook's own rule, over the tail. `run` carries what a rule may need about the *run* rather
+	// than about the call — the transcript the stamps are keyed on, and the instant this decision is
+	// being made — because a rule may have to ask what **another** hook has already recorded, and
+	// whether that record is about the call in hand or an earlier one. A rule that needs neither is
+	// free to declare three parameters and ignore it.
+	should_block: (tail: string, call: GuardedCall, refused_at_ms: number, run: GuardRun) => boolean
 	// What the model is told. The deny reason is the only text that reaches it.
 	reason: string
 }
@@ -168,7 +178,9 @@ function guard_reason_for_payload(
 	const target = stamp.path(transcript)
 	const tail = time_density_hook.read_tail(transcript)
 
-	if (!spec.should_block(tail, call, stamp.last_ms(target))) return undefined
+	const run = { transcript, now_ms }
+
+	if (!spec.should_block(tail, call, stamp.last_ms(target), run)) return undefined
 	if (!stamp.record(target, now_ms)) return undefined
 
 	return spec.reason
@@ -243,5 +255,5 @@ const hook_decision = {
 	write_decision,
 }
 
-export type { HookPayload, RefusalStamp, TranscriptGuard, TranscriptGuardSpec }
+export type { GuardRun, HookPayload, RefusalStamp, TranscriptGuard, TranscriptGuardSpec }
 export { hook_decision }

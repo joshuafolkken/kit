@@ -18,11 +18,17 @@ import { review_stamps } from '#scripts/review/review-stamps'
 const GATE_RUNNING_MESSAGE =
 	'josh gate is running on this tree; its caches are in use. Try again once it has finished.'
 
-// The marker carries the gate's pid, so one left behind by a killed process blocks nothing.
+// The marker carries the gate's pid **and the start time of the process that wrote it**, so one left
+// behind by a killed gate blocks nothing — and goes on blocking nothing after the operating system
+// reissues that pid, which the pid on its own could not promise (joshuafolkken/kit#1245).
+//
+// **The question is "am I sure the gate is gone", not "am I sure it is running".** This is a guard
+// over someone else's caches, so the uncertain answer has to hold the run back: reading it as "not
+// running" would let `josh bench` clear the caches out from under a live gate, which is what
+// joshuafolkken/kit#1332 was filed for. The start-time probe is a subprocess and can fail on a loaded
+// machine — and a machine running `josh gate` is exactly that machine.
 function is_gate_running(): boolean {
-	const marker = review_stamps.in_flight_stamp.read()
-
-	return marker !== undefined && file_map_stamp.is_process_alive(marker.pid)
+	return !file_map_stamp.is_writer_gone(review_stamps.in_flight_stamp.read())
 }
 
 function assert_no_gate(): void {

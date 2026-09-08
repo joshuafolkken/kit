@@ -110,3 +110,13 @@ words:
   # in the distributed dictionary beside `workerd`, because that fixture is one of the `*-fixture.ts`
   # files `package.json` keeps out of the published package — no consumer ever spell-checks it.
   - miniflare
+  # `ps`'s own name for the field that prints a process's start time, and the name of the `ps`
+  # implementation Linux ships. Both are quoted in `scripts/josh/process-identity.ts`, which pairs
+  # that start time with a pid so a reissued pid cannot pass as the process that wrote a record
+  # (joshuafolkken/kit#1245). They stay in this local list because neither reaches a distributed file.
+  - lstart
+  - procps
+  # The plural of `pid`, which cspell's dictionaries carry only in the singular. Used where the
+  # comment is about several of them at once — `process-identity-fixture.ts` and the suite that
+  # exercises the reissued-pid case.
+  - pids
