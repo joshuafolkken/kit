@@ -2,7 +2,7 @@ import { read_index, read_unwrapped } from '#scripts/ai-document-fixture'
 import { describe, expect, it } from 'vitest'
 
 // The chain rule — `/code-review` output is not a turn boundary, and a `fullrun` continues through
-// `git -y` → `followup --merge` — was written twice: once in English in the skill a
+// `git -y` → `followup` — was written twice: once in English in the skill a
 // run actually reads, and once in `plan-comment.md`, four sections of it. Two copies of a rule that
 // exists because agents stop where they should not is the clone `CLAUDE.md` prohibits, sitting in
 // the document that states the prohibition.
@@ -154,7 +154,7 @@ describe(`${STEP_THREE} — keeps Step 3 and routes the chain rule away`, () => 
 
 	it.each([
 		'`fullrun` STOPPING CONDITIONS — read this before you stop',
-		'Chain rule: `/code-review` → `followup --merge` decision table',
+		'Chain rule: `/code-review` → `followup` decision table',
 		'Anti-pattern catalog (concrete violation phrases',
 		TOOLING_HEADING,
 	])('no longer carries %j', (marker) => {

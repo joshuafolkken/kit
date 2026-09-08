@@ -551,7 +551,7 @@ function is_detected(phase: PhaseName, found: Detection): boolean {
 // The CI a cycle spent with the run doing nothing else (joshuafolkken/kit#1384).
 //
 // **The merge command's span is left out of the covering set, and that is the whole of the change.**
-// `followup --merge` waits for the checks *inside* a Bash span, so every serialized cycle is covered
+// `followup` waits for the checks *inside* a Bash span, so every serialized cycle is covered
 // by one — which is why measuring the cycles against every span answered zero, and why the 109
 // seconds of PR #1380's second cycle read as merge work. Every other span stays in: a cycle that ran
 // beside the review, the round-2 fixes or a person's own wait cost the run nothing extra, and

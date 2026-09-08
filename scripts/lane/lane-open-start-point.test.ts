@@ -3,6 +3,7 @@ import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_install } from './lane-install'
 import { lane_open } from './lane-open'
 import { lane_paths } from './lane-paths'
 
@@ -13,7 +14,7 @@ import { lane_paths } from './lane-paths'
 // already pins.
 //
 // The fixture stands in for a merge by advancing `refs/remotes/origin/main` past `refs/heads/main`,
-// which is the exact shape this repository is in after `pnpm josh followup --merge`: the remote-
+// which is the exact shape this repository is in after `pnpm josh followup`: the remote-
 // tracking ref moves on the next fetch, and the local branch — checked out in no work tree — never
 // does. Measured on 2026-09-07 in this repository: `refs/heads/main` `e3a68c04`,
 // `refs/remotes/origin/main` `78f746f9`.
@@ -100,6 +101,13 @@ beforeEach(async () => {
 	// The fetch is the one step this fixture cannot take — the suite's network guard refuses it — and
 	// it is not what is under test: the assertion is which ref the lane is cut from.
 	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
+	// The install is stubbed for the same reason git is not (joshuafolkken/kit#1554): this fixture
+	// commits two text files and no `package.json`, so a real `pnpm install` there would fail on a
+	// manifest that was never the subject. `lane-install.test.ts` pins what it asks pnpm for.
+	vi.spyOn(lane_install, 'install_dependencies').mockResolvedValue({
+		is_installed: true,
+		output: '',
+	})
 
 	await build_repository()
 	process.chdir(fixture.repository_root)

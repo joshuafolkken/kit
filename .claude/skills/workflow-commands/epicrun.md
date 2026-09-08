@@ -192,7 +192,7 @@ pnpm josh delegate epic-child   # → delegate
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier, and it is the whole
 reason the unit may be delegated at all: a unit that reports a child finished without its PR merged
 leaves that child open, and `pnpm josh issue:state <N>` says so in one call. The child's own
-gate, `/code-review` and CI run inside the unit, and `pnpm josh followup --merge` will not touch the
+gate, `/code-review` and CI run inside the unit, and `pnpm josh followup` will not touch the
 PR until they are green. **Never advance the loop on the summary alone** — that discards the
 verifier, and without it `epic-child` is not a delegatable unit.
 
@@ -275,9 +275,9 @@ send a `confirmation` Telegram naming the trace that failed, and stop. **It is n
 forbids.
 
 **Silence and no process, together — never either one alone.** Each has an innocent reading by
-itself: a unit inside a long check writes nothing for as long as the check runs — `pnpm josh followup
---merge` waits on CI for up to 32 minutes, which is longer than the window — and a unit that is only
-reading has no check process at all. Together they have no innocent reading. **Which way an error
+itself: a unit inside a long check writes nothing for as long as the check runs — `pnpm josh
+followup` waits on CI for up to 32 minutes, which is longer than the window — and a unit that is
+only reading has no check process at all. Together they have no innocent reading. **Which way an error
 falls is the whole design**: a live unit booked as stopped has its working work killed, while a
 stopped one booked as alive costs waiting — so **a trace that could not be read answers
 `undetermined`, never `stopped`**, and a process trace nobody gave is an unasked question rather than an
@@ -476,7 +476,7 @@ the one round whose invocation named no path is the one that reviewed a differen
 carry**: `pnpm josh review:brief` prints the lane's absolute root, branch and HEAD, hands over targets
 written `git -C <root> …`, and prints a nonce the review attests with
 `pnpm josh review:attest <nonce>` from the checkout it actually read. **The child asks
-`pnpm josh review:attest --check` before it counts a round**, and `pnpm josh followup --merge` asks
+`pnpm josh review:attest --check` before it counts a round**, and `pnpm josh followup` asks
 again before it merges; `missing` and `mismatch` are both refusals, because the defect's own signal
 is silence. A clean round is therefore the case to check hardest, not the case to skip the check on.
 
@@ -523,7 +523,7 @@ change moves without being copied:
 
 ```bash
 git stash push -u -m "epicrun: josh latest before lanes"   # primary checkout, only if the update rewrote anything
-git -C "$dir" stash pop                                    # the first lane opened, before its install
+git -C "$dir" stash pop                                    # the first lane opened, after `lane:open`'s own install
 ```
 
 Record it on that first child's Issue as any other stash is recorded — the comment is what gets it
@@ -535,22 +535,33 @@ above is unchanged; only where the first child stands has moved.
 ```bash
 dir=$(pnpm josh lane:open "$n") || exit 1   # the directory on stdout, nothing else; alias: josh lno
 git -C "$dir" stash pop || exit 1           # the first lane only, and only if `josh latest` stashed
-pnpm --dir "$dir" install --frozen-lockfile
+pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, which changed the lock
 ```
 
 - **A refusal is an empty capture beside a non-zero exit**, with the reason on standard error:
-  `full` (every seat taken) and `already-open` (a lane for this child exists) are the two. **The
+  `full` (every seat taken), `already-open` (a lane for this child exists) and a **failed install**
+  are the three (joshuafolkken/kit#1554). **The third is not like the other two**: `full` and
+  `already-open` create nothing, while a failed install leaves a real work tree behind, registered
+  and holding its seat, so the next `lane:open` for that child answers `already-open` and never
+  retries the install. **Park that child and name `pnpm josh lane:close <N>`** — the message on
+  standard error carries pnpm's own reason, and a lock the lane cannot build is a state a person
+  fixes, not one a retry loop resolves. **The
   guard is in the snippet rather than left to the reader** — without it the next two lines run
   `--dir ""` in whatever directory the parent happens to stand in.
-- **The install is not optional.** A linked work tree has no `node_modules`, and neither does anything
-  above it — the lane root is a hidden *sibling* of the repository — so every `pnpm josh …` inside
-  the lane fails until it is installed. `lane:open` ships the container, not its contents.
-- **The install comes after the stash pop, never before it.** The pop brings in the `pnpm-lock.yaml`
-  that `josh latest` rewrote, and that is the lock the install has to build against: installed first,
-  the first child runs its whole verification gate against `node_modules` from the *previous* lock
-  while committing the new one — a gate that cannot see the regression it exists to catch. **A pop
-  that fails stops the lane** rather than installing anyway, which is the same failure by a different
-  route.
+- **`lane:open` installs; the third line is a *re*-install, and only the popping lane needs it**
+  (joshuafolkken/kit#1554). A lane comes back with its dependencies already in it, built against the
+  lock as committed on the ref it was cut from — an install left to the caller was a step nothing
+  enforced, and every lane opened without it failed on its first `pnpm josh …` with
+  `tsx: command not found`. **A failed install fails `lane:open`**, so a directory on standard output
+  is already the guarantee that the lane runs; there is nothing to check afterwards.
+- **What the pop changes is the lock, which is why that one lane installs twice.** The pop brings in
+  the `pnpm-lock.yaml` that `josh latest` rewrote, and that is the lock this child's gate has to build
+  against: left at what `lane:open` installed, the first child runs its whole verification gate
+  against `node_modules` from the *previous* lock while committing the new one — a gate that cannot
+  see the regression it exists to catch. The second install is a few seconds from a warm store, and
+  **it runs only where a pop actually happened**; every other lane is finished when `lane:open`
+  returns. **A pop that fails stops the lane** rather than re-installing anyway, which is the same
+  failure by a different route.
 - **Nothing switches the lane's branch.** The reason is at the top of this section: the registry
   identifies a lane by that branch, so a switch costs the lane its seat, its listing and its
   isolation. **Nor is there anything to switch it for** — `<N>-lane` is already a name
@@ -610,6 +621,7 @@ leaves a half-rebased lane for the next poll to misread. A person re-runs the ch
 | The child was **parked** | `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work with it. Closing is what keeps the seat free, and it has to happen: `epic:next` already counts a parked child's lane as released, so a lane left open would hold a seat the count believes is free |
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at, so nothing is stashed and nothing is closed. Name the lane directory in the stop report and in the Telegram, or the person is told to look at a tree and not told where it is |
 | The child **failed** | The parked row, plus the consecutive-failure count | Same reasoning; only the counter differs |
+| **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | The work tree was created and its seat allocated before the install ran, so a lane exists that no `pnpm josh …` runs in and the next `lane:open` answers `already-open` rather than retrying (joshuafolkken/kit#1554). Closing frees the seat; parking is right because the causes — an outdated lock, an unreachable registry — are ones a person fixes. Carry pnpm's reason, printed on standard error, into the park note |
 | The run was **interrupted** | Nothing to do — the work tree survives on disk | The next session's `pnpm josh lane:prune` closes what git no longer has a tree for, and `lane:open` answers `already-open` for what is still there. **Park that child**, naming the lane and `pnpm josh lane:close <N>` as the way out: resuming somebody's half-finished lane unattended is the judgement `run:preflight` refuses to make on its own, and in a lane there is no command to make it |
 
 **A `needs-human-review` stop ends the run, and the lanes already in flight are allowed to finish.**
@@ -811,6 +823,22 @@ a child parked, a stop — run `pnpm josh run:progress --mark` in the same turn.
 silence clock, which is what keeps a heartbeat from landing immediately behind a real report, where
 it would be noise rather than news. The clock is silence, never a timer; the command's own reference
 is `docs/josh-commands.md` → "`josh run:progress`".
+
+**Every report this run writes opens with the time the observation was taken.** Not only how long it
+has been quiet: the heading carries an absolute instant, in the same form the watcher prints —
+`at YYYY-MM-DDTHH:MMZ`. A relative figure means something only while the reports keep coming, and
+unattended execution is made of the events that break exactly that assumption — a suspend, a rate
+limit, a restarted process. `epicrun #1474` was suspended overnight, resumed, read its own
+`quiet 11m` as if no time had passed and concluded the machine's clock was broken; it was correct to
+the second against GitHub's own `Date` header, and an absolute time in the report would have settled
+it at a glance (joshuafolkken/kit#1560). **The date is part of it**, because that confusion happened
+across a day boundary and a bare clock time would have left the same hole open. **The zone is UTC,
+and never the one the reader happens to be in** — joshuafolkken/kit#1245 already paid for a timestamp
+rendered in the reader's zone making one process look like a stranger, and this line is relayed to
+other machines and read in cloud sessions. **It is added, never substituted for the elapsed figure**:
+how long it has been quiet and when the observation was taken are two different facts, and neither
+can be reconstructed from the other. **The relayed lines need nothing added to them** — `josh
+run:progress` prints the same stamp itself, so the rule above still holds exactly as written.
 
 **The line carries observations, never "still running".** Children in flight with their labels and
 their pull request state, the open lanes, the load average, how long the newest unit transcript has
@@ -1478,7 +1506,7 @@ the repository that owns the epic.** It sends the epic completion summary, and i
 repository, so the two rules agree. Every other session finishes quietly when its own repository has
 no children left.
 
-Per-child completion notifications are unchanged: `pnpm josh followup --merge` sends one each, as in
+Per-child completion notifications are unchanged: `pnpm josh followup` sends one each, as in
 any `fullrun`.
 
 Send an epic **start** notification when the run begins, and an epic **completion** summary at the

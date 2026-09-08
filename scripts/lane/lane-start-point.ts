@@ -4,7 +4,7 @@ import { git_command } from '#scripts/git/git-command'
 //
 // **The bare default-branch name is the wrong start point, because git resolves it to the *local*
 // `refs/heads/<default>` — a ref nothing in this workflow ever advances.** Merges happen on GitHub
-// through `pnpm josh followup --merge`, and this repository's main work tree does not have the
+// through `pnpm josh followup`, and this repository's main work tree does not have the
 // default branch checked out, so there is no fast-forward for it to receive. It falls one commit
 // further behind on every merge, and a lane opened from it starts without the work that was just
 // merged. Measured on 2026-09-07: `refs/heads/main` was `e3a68c04` while `refs/remotes/origin/main`

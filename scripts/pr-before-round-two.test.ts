@@ -18,7 +18,7 @@ import { read_unwrapped } from './ai-document-fixture'
 //     which costs more than the overlap saves (joshuafolkken/kit#1486 removed the version bump that
 //     used to sit exactly there);
 //   - without the follow-up-commit rule, a fix the second round makes in place never reaches CI;
-//   - without the merge-gate sentence, the change reads as relaxing what `followup --merge` blocks
+//   - without the merge-gate sentence, the change reads as relaxing what `followup` blocks
 //     on, which it does not.
 const REVIEW_PROMPT = 'prompts/review.md'
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
@@ -74,10 +74,7 @@ const ENTRY_MARKERS: ReadonlyArray<readonly [string, string]> = [
 	[FULLRUN, BETWEEN_THE_ROUNDS],
 	// `queue` spells the whole per-issue pipeline in its own file rather than deferring to
 	// `fullrun.md`, so an order stated only there leaves this entry running the old one.
-	[
-		QUEUE,
-		'**The second review round runs between `pnpm josh git -y` and `pnpm josh followup --merge`**',
-	],
+	[QUEUE, '**The second review round runs between `pnpm josh git -y` and `pnpm josh followup`**'],
 ]
 
 describe('every entry that opens a pull request states where it opens', () => {
@@ -108,7 +105,7 @@ describe(`${HALFRUN} — the stop before commit is untouched`, () => {
 // The rule-compliance measurement re-anchored. Its verdict has always stopped the merge rather than
 // the commit, and the commit is no longer the last step before the merge — so a document still
 // naming `bump minor` would have the run read a verdict about a draft.
-const EVAL_ANCHOR = 'before `pnpm josh followup --merge`'
+const EVAL_ANCHOR = 'before `pnpm josh followup`'
 const EVAL_ANCHOR_FILES: ReadonlyArray<string> = [CLAUDE_DOC, EVAL_GATE, EVAL_DOC]
 
 describe('the eval verdict is read before the merge, not before the bump', () => {

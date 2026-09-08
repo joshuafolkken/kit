@@ -1,4 +1,4 @@
-## `/code-review` → `followup --merge` の連鎖規則
+## `/code-review` → `followup` の連鎖規則
 
 **この規則の単一ソースは [`.claude/skills/workflow-commands/chain-rule.md`](../../.claude/skills/workflow-commands/chain-rule.md) である。** ここに本文を複製しない（「クローン禁止・単一ソース化」の適用。joshuafolkken/kit#1174 のパイロットに続く横展開 joshuafolkken/kit#1186）。
 

@@ -12,7 +12,7 @@ import { review_checkout } from './review-checkout'
 // somebody else's code.
 //
 // **`josh review:attest --check` is run by the run**, before it acts on the review's verdict and
-// again by `josh followup --merge` before it merges. It fails on a missing attestation exactly as it
+// again by `josh followup` before it merges. It fails on a missing attestation exactly as it
 // fails on a mismatched one: the defect this command exists for produced *no* signal, so treating
 // silence as a pass would leave the hole open in the one shape it actually takes.
 

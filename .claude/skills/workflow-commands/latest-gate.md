@@ -57,7 +57,7 @@ this command answered — so it is conditional on the **tree**, never on the ans
 
 `pnpm audit` runs inside `josh latest`, so a `skip` skips that reading too. **What still covers every
 merge is CI**: the `Security Audit` job runs on every pull request and is one of the required checks
-`pnpm josh followup --merge` waits on, so nothing reaches the default branch without a fresh audit —
+`pnpm josh followup` waits on, so nothing reaches the default branch without a fresh audit —
 whatever this gate answered locally. The local reading is a head start on a failure CI would catch
 anyway; it was never the only net.
 

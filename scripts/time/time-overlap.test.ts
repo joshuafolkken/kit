@@ -5,7 +5,7 @@ import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 const { MINUTE_MS, span, total_span_ms: total_ms } = fixture
 
 describe('time_overlap.uncovered_ms', () => {
-	// The property the whole join rests on. `followup --merge` waits for CI inside a Bash tool span
+	// The property the whole join rests on. `followup` waits for CI inside a Bash tool span
 	// that is already counted, so adding the pull request's window whole would count it twice and
 	// leave the four shares summing to more than the run took.
 	it('subtracts the part of the window a span already covers', () => {

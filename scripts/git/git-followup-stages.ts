@@ -4,7 +4,7 @@ import { time_format } from '#scripts/time/time-format'
 //
 // joshuafolkken/kit#1333 removed 19 seconds of dead air between reading a clean review and issuing
 // the merge, and left the next stretch of the same 134 seconds unexamined: the **44 seconds
-// `followup --merge` spends on itself**. One invocation does nine things in order — the `closes #N`
+// `followup` spends on itself**. One invocation does nine things in order — the `closes #N`
 // check, the three GitHub reads the notification needs, the required-check wait, the CodeRabbit line
 // comments, the AI reviewers' top-level comments, the completion Telegram, the merge request, the
 // completion comment and the epic auto-close — and not one of them had ever been timed. So every

@@ -27,7 +27,7 @@ import {
 import { evaluate_pr_state } from './git-pr-checks-eval'
 import { parse_pr_state_snapshot } from './git-pr-checks-parse'
 
-// The merge gate's snapshot, assembled from four REST reads. `pnpm josh followup --merge` decides a
+// The merge gate's snapshot, assembled from four REST reads. `pnpm josh followup` decides a
 // pull request is green from this value, so the assertions here are about the whole round trip: what
 // the reads ask for, and what `evaluate_pr_state` then makes of the answer (joshuafolkken/kit#1028).
 
