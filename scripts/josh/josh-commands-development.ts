@@ -98,7 +98,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'test:unit': {
 		script: 'scripts/test-unit-guard.ts',
-		description: 'Run unit tests with Vitest (skips when absent or no test files)',
+		description:
+			'Run unit tests with Vitest (skips when Vitest is absent; fails when it has no tests)',
 		category: 'Development',
 	},
 	'test:related': {

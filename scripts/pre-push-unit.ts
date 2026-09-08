@@ -103,8 +103,10 @@ function format_skip(taken_at: string): string {
 }
 
 // The suite is run through the guard `josh test:unit` uses rather than a bare `vitest run`, so a
-// project with no vitest or no test files prints a skip notice instead of failing the push — the
-// behavior the hook's other commands already have.
+// project with no vitest prints a skip notice instead of failing the push — the behavior the hook's
+// other commands already have. **A project that has vitest and no test file at all fails the push
+// instead** (joshuafolkken/kit#1224): the guard treats that half as a broken state rather than a
+// young project, and the hook returns what the guard returns.
 async function run_pre_push_unit(
 	extra_arguments: ReadonlyArray<string> = [],
 	source?: string,

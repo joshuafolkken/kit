@@ -61,8 +61,10 @@ describe('test_unit_guard.resolve_guard_action', () => {
 		expect(test_unit_guard.resolve_guard_action(false, true)).toBe('skip-missing-package')
 	})
 
-	it('skips when no unit tests exist', () => {
-		expect(test_unit_guard.resolve_guard_action(true, false)).toBe('skip-no-tests')
+	// joshuafolkken/kit#1224: vitest being installed is the project declaring that it runs unit
+	// tests, so zero matching files there is a broken state rather than a young one.
+	it('fails when vitest is installed but no unit tests exist', () => {
+		expect(test_unit_guard.resolve_guard_action(true, false)).toBe('fail-no-tests')
 	})
 
 	it('runs when the package and unit tests are both present', () => {
@@ -112,7 +114,7 @@ describe('test_unit_guard.has_unit_tests', () => {
 	})
 })
 
-describe('test_unit_guard.run_guarded_unit — skip paths', () => {
+describe('test_unit_guard.run_guarded_unit — the non-running paths', () => {
 	it('skips and returns 0 when the package is missing', async () => {
 		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
@@ -123,15 +125,28 @@ describe('test_unit_guard.run_guarded_unit — skip paths', () => {
 		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('not installed'))
 	})
 
-	it('skips and returns 0 when no unit files exist', async () => {
+	// joshuafolkken/kit#1224: the merge gate reads only the exit code, so a unit check that ran
+	// nothing must not hand it a zero. A young project has no vitest and takes the skip above.
+	it('fails and returns a non-zero code when vitest is installed but no unit files exist', async () => {
 		add_vitest_package()
-		const info_spy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const error_spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		const exit_code = await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
 
-		expect(exit_code).toBe(0)
+		expect(exit_code).not.toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()
-		expect(info_spy).toHaveBeenCalledWith(expect.stringContaining('no *.{test,spec}'))
+		expect(error_spy).toHaveBeenCalledWith(expect.stringContaining('no *.{test,spec}'))
+	})
+
+	// The gate reads this word to know a passing step did not actually run (joshuafolkken/kit#967).
+	// A failing step is already visible as a failure, so marking it would make the word ambiguous.
+	it('keeps the skip marker off the failing path', async () => {
+		add_vitest_package()
+		const error_spy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		await test_unit_guard.run_guarded_unit(ctx.project_directory, [])
+
+		expect(error_spy).not.toHaveBeenCalledWith(expect.stringContaining(test_unit_guard.SKIP_MARKER))
 	})
 })
 

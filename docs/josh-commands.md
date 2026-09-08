@@ -71,7 +71,7 @@ Each block's header names the command that ran, not only the check, because the 
 
 **That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat. **Two of the checks that loop repeats are scoped**: [`josh lint:related`](#josh-lintrelated) checks only the changed files ([#1298](https://github.com/joshuafolkken/kit/issues/1298)) and [`josh test:related`](#josh-testrelated) runs only the tests related to them ([#1257](https://github.com/joshuafolkken/kit/issues/1257)); the gate itself keeps running `josh lint` and `josh test:unit` over everything.
 
-**Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent or the project has no tests, and a gate that ran zero tests must not look like one that ran them all), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
+**Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent, and a gate that ran zero tests must not look like one that ran them all — the other empty case, vitest present with no test file, [fails](#josh-testunit) rather than passing since [#1224](https://github.com/joshuafolkken/kit/issues/1224)), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
 
 **A tree the gate was already green on is not checked again** ([#1328](https://github.com/joshuafolkken/kit/issues/1328)). Every green run records the digest of each changed file it passed on — the record `josh review:brief` reads to print `Already verified` ([#1241](https://github.com/joshuafolkken/kit/issues/1241)). The gate now reads it back at start-up, and where nothing that record covers has moved it prints the recorded result and exits 0 without starting a process:
 
@@ -355,9 +355,15 @@ pnpm josh cspell:dot      # includes dotfiles
 
 Run unit tests with vitest. Because a freshly-bootstrapped project may have no unit suite yet
 (and therefore no `vitest` installed), this command **skips gracefully (exit 0)** when `vitest`
-is not installed or when no `*.{test,spec}.{ts,js}` files exist — so CI and the local gate never
-block a project that has no unit tests yet. Once both `vitest` and at least one test file are
-present, it runs `vitest run` as usual.
+is not installed — so CI and the local gate never block a project that has no unit tests yet.
+Once both `vitest` and at least one test file are present, it runs `vitest run` as usual.
+
+**`vitest` installed with no `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip**
+([#1224](https://github.com/joshuafolkken/kit/issues/1224)). Installing vitest is the project
+declaring that it runs unit tests, so an empty match there is a mis-scoped glob or a deleted suite
+rather than a young project — and `pnpm josh followup --merge` reads only the exit code, so a zero
+would hand the merge gate a verification that verified nothing. `josh init` installs no vitest, so a
+project that has genuinely not started testing yet takes the skip above and is unaffected.
 
 ```bash
 pnpm josh test:unit
@@ -458,7 +464,7 @@ The two are separate answers on purpose: an empty list is a change this cannot n
 
 A narrowed run can still match no test file — a new module nothing imports yet is the usual case. vitest prints `No test files found` and exits 0, which the gate's full run answers for a few minutes later.
 
-Like `josh test:unit`, it skips gracefully (exit 0) when `vitest` is not installed or the project has no test files, and says so naming itself.
+Like `josh test:unit`, it goes through the same guard and says so naming itself: it skips gracefully (exit 0) when `vitest` is not installed, and fails when `vitest` is installed and the project has no test file at all ([#1224](https://github.com/joshuafolkken/kit/issues/1224)).
 
 ### `josh test:e2e`
 
@@ -1236,7 +1242,7 @@ The output claims the result rather than the omission, because a line reading "u
 
 The escape hatch is an environment variable rather than the gate's `--force` flag because the hook's command line belongs to `lefthook/base.yml` — nobody types this invocation, so a flag would be unreachable at the moment it is wanted. `pnpm josh audit`, the hook's other command, is untouched: the gate does not run it, so it is not a duplicate of anything.
 
-When the suite does run it goes through the same guard [`josh test:unit`](#josh-testunit) uses, so a project with no vitest or no test files prints a skip notice instead of failing the push.
+When the suite does run it goes through the same guard [`josh test:unit`](#josh-testunit) uses, so a project with no vitest prints a skip notice instead of failing the push — and a project that has vitest with no test file at all fails it, exactly as the gate would ([#1224](https://github.com/joshuafolkken/kit/issues/1224)).
 
 ### `josh pre-commit-type-check`
 
