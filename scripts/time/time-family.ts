@@ -276,9 +276,6 @@ function unit_windows(
 	}
 }
 
-// **Up.** The session that delegated a unit this run holds, bounded to the handoff and the teardown
-// around it. Nothing is taken when the run already reads the parent directly: its attributed spans
-// are in the corpus, and adding them a second time under a different rule would be two answers.
 // The parent's own contribution, once the run is known to hold one of its units: the handoff and the
 // teardown around them, bounded by the siblings either side and by the parent's own idle time.
 function parent_relatives(parent: SessionFile, held: UnitWindows, read: SpanReader): Relatives {
@@ -297,6 +294,9 @@ function parent_relatives(parent: SessionFile, held: UnitWindows, read: SpanRead
 	}
 }
 
+// **Up.** The session that delegated a unit this run holds, bounded to the handoff and the teardown
+// around it. Nothing is taken when the run already reads the parent directly: its attributed spans
+// are in the corpus, and adding them a second time under a different rule would be two answers.
 function upward(family: Family, contributed: ReadonlySet<string>, read: SpanReader): Relatives {
 	const parent = family.own
 
