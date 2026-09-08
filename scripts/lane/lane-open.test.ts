@@ -18,6 +18,9 @@ vi.mock('#scripts/git/git-command', () => ({
 		worktree_add: vi.fn(),
 	},
 }))
+vi.mock('./lane-install', () => ({
+	lane_install: { install_dependencies: vi.fn() },
+}))
 vi.mock('./lane-registry', () => ({
 	lane_registry: {
 		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
@@ -32,6 +35,7 @@ vi.mock('./lane-registry', () => ({
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
+const { lane_install } = await import('./lane-install')
 const { lane_registry } = await import('./lane-registry')
 const { lane_open } = await import('./lane-open')
 
@@ -45,6 +49,14 @@ const ROOT_SEED = 5
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
 const START_POINT = 'refs/remotes/origin/main'
+// What `prepare` prints in a linked work tree, whose hooks belong to the primary repository
+// (joshuafolkken/kit#1503, #1507). It rides on a successful install and must not refuse the lane.
+const LEFTHOOK_WARNING = 'lefthook install failed: git hooks are NOT installed.'
+const INSTALL_FAILURE = 'ERR_PNPM_OUTDATED_LOCKFILE'
+
+function install_answers(is_installed: boolean, output: string): void {
+	vi.mocked(lane_install.install_dependencies).mockResolvedValue({ is_installed, output })
+}
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
@@ -73,13 +85,7 @@ function lanes_are(lanes: ReadonlyArray<LaneInfo>): void {
 	vi.mocked(lane_registry.list_lanes).mockResolvedValue([...lanes])
 }
 
-beforeEach(() => {
-	rmSync(LANE_ROOT, { force: true, recursive: true })
-	mkdirSync(REPOSITORY_ROOT, { recursive: true })
-	writeFileSync(path.join(REPOSITORY_ROOT, '.env'), ROOT_ENV)
-	process.env[lane_paths.LANE_ROOT_KEY] = LANE_ROOT
-	lanes_are([])
-	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
+function git_answers(): void {
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
 	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
 	vi.mocked(git_command.default_branch_reference).mockResolvedValue(START_POINT)
@@ -90,6 +96,17 @@ beforeEach(() => {
 
 		return ''
 	})
+}
+
+beforeEach(() => {
+	rmSync(LANE_ROOT, { force: true, recursive: true })
+	mkdirSync(REPOSITORY_ROOT, { recursive: true })
+	writeFileSync(path.join(REPOSITORY_ROOT, '.env'), ROOT_ENV)
+	process.env[lane_paths.LANE_ROOT_KEY] = LANE_ROOT
+	lanes_are([])
+	install_answers(true, '')
+	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	git_answers()
 })
 
 describe('opening a lane', () => {
@@ -136,6 +153,29 @@ describe('opening a lane', () => {
 	})
 })
 
+describe('opening a lane — its dependencies', () => {
+	// The work tree is the container and this is its contents: without them the first `pnpm josh …`
+	// typed in the lane fails with `tsx: command not found` (joshuafolkken/kit#1554). It is asked for
+	// the lane's own directory, never the one `lane:open` was typed in.
+	it('installs the dependencies into the lane it just created', async () => {
+		await lane_open.open_lane(ISSUE)
+
+		expect(vi.mocked(lane_install.install_dependencies)).toHaveBeenCalledWith(
+			path.join(LANE_ROOT, ISSUE),
+		)
+	})
+
+	// The hooks of a linked work tree belong to the primary repository, so the installer warning is
+	// the expected state rather than a fault — and the lane opens through it.
+	it('opens the lane through a lefthook warning that rode on a successful install', async () => {
+		install_answers(true, LEFTHOOK_WARNING)
+
+		const outcome = await lane_open.open_lane(ISSUE)
+
+		expect(outcome.kind).toBe('opened')
+	})
+})
+
 describe('refusing to open a lane', () => {
 	// Reopening would mean `worktree add` onto a path git still registers, after this side had
 	// already handed the caller a second seat.
@@ -165,5 +205,25 @@ describe('refusing to open a lane', () => {
 
 		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(/#1491/u)
 		expect(vi.mocked(git_command.worktree_add)).not.toHaveBeenCalled()
+	})
+
+	// Reported as a success, the caller would capture the directory and type the first `pnpm josh …`
+	// into a lane nothing runs in — the failure the install exists to remove, with a success line
+	// above it (joshuafolkken/kit#1554). The refusal names both ways out, because the work tree is
+	// left on disk and either one needs it.
+	it('refuses the lane when the install failed, naming both ways out', async () => {
+		install_answers(false, INSTALL_FAILURE)
+
+		const failure = lane_open.open_lane(ISSUE)
+
+		await expect(failure).rejects.toThrow(/pnpm josh lane:close 1490/u)
+		await expect(failure).rejects.toThrow(/install --frozen-lockfile/u)
+	})
+
+	// Diagnosing it needs pnpm's own words; the caller has nothing else to go on.
+	it('carries the failed install output into the refusal', async () => {
+		install_answers(false, INSTALL_FAILURE)
+
+		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(new RegExp(INSTALL_FAILURE, 'u'))
 	})
 })

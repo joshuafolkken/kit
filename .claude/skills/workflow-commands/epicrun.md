@@ -523,7 +523,7 @@ change moves without being copied:
 
 ```bash
 git stash push -u -m "epicrun: josh latest before lanes"   # primary checkout, only if the update rewrote anything
-git -C "$dir" stash pop                                    # the first lane opened, before its install
+git -C "$dir" stash pop                                    # the first lane opened, after `lane:open`'s own install
 ```
 
 Record it on that first child's Issue as any other stash is recorded — the comment is what gets it
@@ -535,22 +535,33 @@ above is unchanged; only where the first child stands has moved.
 ```bash
 dir=$(pnpm josh lane:open "$n") || exit 1   # the directory on stdout, nothing else; alias: josh lno
 git -C "$dir" stash pop || exit 1           # the first lane only, and only if `josh latest` stashed
-pnpm --dir "$dir" install --frozen-lockfile
+pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, which changed the lock
 ```
 
 - **A refusal is an empty capture beside a non-zero exit**, with the reason on standard error:
-  `full` (every seat taken) and `already-open` (a lane for this child exists) are the two. **The
+  `full` (every seat taken), `already-open` (a lane for this child exists) and a **failed install**
+  are the three (joshuafolkken/kit#1554). **The third is not like the other two**: `full` and
+  `already-open` create nothing, while a failed install leaves a real work tree behind, registered
+  and holding its seat, so the next `lane:open` for that child answers `already-open` and never
+  retries the install. **Park that child and name `pnpm josh lane:close <N>`** — the message on
+  standard error carries pnpm's own reason, and a lock the lane cannot build is a state a person
+  fixes, not one a retry loop resolves. **The**
   guard is in the snippet rather than left to the reader** — without it the next two lines run
   `--dir ""` in whatever directory the parent happens to stand in.
-- **The install is not optional.** A linked work tree has no `node_modules`, and neither does anything
-  above it — the lane root is a hidden *sibling* of the repository — so every `pnpm josh …` inside
-  the lane fails until it is installed. `lane:open` ships the container, not its contents.
-- **The install comes after the stash pop, never before it.** The pop brings in the `pnpm-lock.yaml`
-  that `josh latest` rewrote, and that is the lock the install has to build against: installed first,
-  the first child runs its whole verification gate against `node_modules` from the *previous* lock
-  while committing the new one — a gate that cannot see the regression it exists to catch. **A pop
-  that fails stops the lane** rather than installing anyway, which is the same failure by a different
-  route.
+- **`lane:open` installs; the third line is a *re*-install, and only the popping lane needs it**
+  (joshuafolkken/kit#1554). A lane comes back with its dependencies already in it, built against the
+  lock as committed on the ref it was cut from — an install left to the caller was a step nothing
+  enforced, and every lane opened without it failed on its first `pnpm josh …` with
+  `tsx: command not found`. **A failed install fails `lane:open`**, so a directory on standard output
+  is already the guarantee that the lane runs; there is nothing to check afterwards.
+- **What the pop changes is the lock, which is why that one lane installs twice.** The pop brings in
+  the `pnpm-lock.yaml` that `josh latest` rewrote, and that is the lock this child's gate has to build
+  against: left at what `lane:open` installed, the first child runs its whole verification gate
+  against `node_modules` from the *previous* lock while committing the new one — a gate that cannot
+  see the regression it exists to catch. The second install is a few seconds from a warm store, and
+  **it runs only where a pop actually happened**; every other lane is finished when `lane:open`
+  returns. **A pop that fails stops the lane** rather than re-installing anyway, which is the same
+  failure by a different route.
 - **Nothing switches the lane's branch.** The reason is at the top of this section: the registry
   identifies a lane by that branch, so a switch costs the lane its seat, its listing and its
   isolation. **Nor is there anything to switch it for** — `<N>-lane` is already a name
@@ -610,6 +621,7 @@ leaves a half-rebased lane for the next poll to misread. A person re-runs the ch
 | The child was **parked** | `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work with it. Closing is what keeps the seat free, and it has to happen: `epic:next` already counts a parked child's lane as released, so a lane left open would hold a seat the count believes is free |
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at, so nothing is stashed and nothing is closed. Name the lane directory in the stop report and in the Telegram, or the person is told to look at a tree and not told where it is |
 | The child **failed** | The parked row, plus the consecutive-failure count | Same reasoning; only the counter differs |
+| **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | The work tree was created and its seat allocated before the install ran, so a lane exists that no `pnpm josh …` runs in and the next `lane:open` answers `already-open` rather than retrying (joshuafolkken/kit#1554). Closing frees the seat; parking is right because the causes — an outdated lock, an unreachable registry — are ones a person fixes. Carry pnpm's reason, printed on standard error, into the park note |
 | The run was **interrupted** | Nothing to do — the work tree survives on disk | The next session's `pnpm josh lane:prune` closes what git no longer has a tree for, and `lane:open` answers `already-open` for what is still there. **Park that child**, naming the lane and `pnpm josh lane:close <N>` as the way out: resuming somebody's half-finished lane unattended is the judgement `run:preflight` refuses to make on its own, and in a lane there is no command to make it |
 
 **A `needs-human-review` stop ends the run, and the lanes already in flight are allowed to finish.**

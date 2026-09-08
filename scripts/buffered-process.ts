@@ -30,17 +30,33 @@ interface BufferedProcessResult {
 	elapsed_ms: number
 }
 
+// The two things a caller outside the fan-out needs to vary, and the only two
+// (joshuafolkken/kit#1554). `lane:open` runs its install in the work tree it just created rather
+// than in the directory `josh` was typed in, and bounds it well under the fan-out's half hour
+// because an install that never answers has to end the command rather than hold a parallel run
+// open. Everything else — the buffering, the non-throwing exit, the forced color — is the same
+// contract, so it is inherited rather than restated.
+interface BufferedProcessOptions {
+	cwd?: string
+	timeout_ms?: number
+}
+
 async function run_buffered_process(
 	command_args: ReadonlyArray<string>,
+	options: BufferedProcessOptions = {},
 ): Promise<BufferedProcessResult> {
 	// `performance.now()` rather than `Date.now()`: it is monotonic, so a system clock adjusted
 	// mid-check cannot produce a negative or wildly inflated duration.
 	const started_at = performance.now()
+	// `cwd` is spread in rather than assigned: `exactOptionalPropertyTypes` refuses an explicit
+	// `undefined` for an optional `string`, and passing one anyway breaks execa's overload
+	// resolution — which silently widens `result.all` back to `string | undefined`.
 	const result = await execa(PNPM, [...command_args], {
 		env: { ...process.env, FORCE_COLOR },
 		all: true,
 		reject: false,
-		timeout: PROCESS_TIMEOUT_MS,
+		...(options.cwd !== undefined && { cwd: options.cwd }),
+		timeout: options.timeout_ms ?? PROCESS_TIMEOUT_MS,
 	})
 
 	return {
@@ -58,5 +74,5 @@ function is_process_failed(result: Pick<BufferedProcessResult, 'exit_code'>): bo
 
 const buffered_process = { is_process_failed, run_buffered_process }
 
-export type { BufferedProcessResult }
+export type { BufferedProcessOptions, BufferedProcessResult }
 export { buffered_process, FAIL_EXIT_CODE, PROCESS_TIMEOUT_MS }
