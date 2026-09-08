@@ -117,11 +117,23 @@ function has_any_label(
 	return (labels ?? []).some((label) => wanted.has(label.name.toLowerCase()))
 }
 
+// The same comparison for a caller holding label *names* rather than listing rows. `EpicChild.labels`
+// is an array of strings (`scripts/epic/epic-graph.ts`), which is the one shape `has_any_label` cannot
+// take — so `epic-classify.ts` and `git-epic-validate.ts` each grew a raw case-sensitive
+// `Array.includes` instead, and an `Epic`-cased label walked past both. Kept here beside the rule it
+// implements rather than at either call site, for the reason the comment above gives.
+function has_label_name(labels: ReadonlyArray<string>, wanted: string): boolean {
+	const target = wanted.toLowerCase()
+
+	return labels.some((label) => label.toLowerCase() === target)
+}
+
 export {
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,
 	has_any_label,
+	has_label_name,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	NEEDS_DECISION_LABEL,

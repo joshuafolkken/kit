@@ -1,5 +1,6 @@
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { has_label_name, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
+import { epic_nested } from './epic-nested'
 
 // Sorting an epic's open children into what a caller should do about them.
 //
@@ -38,14 +39,27 @@ function resolve_by_state(blocker: EpicChild): DependencyVerdict {
 	return blocker.state === CLOSED ? 'resolved' : 'inherit'
 }
 
+// Case-insensitive, through the shared comparison rather than `Array.includes`. GitHub keeps the
+// casing a label was created with and treats `Epic` and `epic` as one label, so a repository that
+// predates these scripts can answer with either spelling — and a child read by eye against the
+// lowercase string is one this classification never sees (`scripts/git/issue-labels.ts`).
 function has_label(child: EpicChild, label: string): boolean {
-	return child.labels.includes(label)
+	return has_label_name(child.labels, label)
 }
 
 // What a child is before its dependencies are considered. A parked child is `human` whatever blocks
 // it, and a child already being worked on is `time` — someone else's session will finish it.
+//
+// **A child that is itself an epic is `human`** (joshuafolkken/kit#1476). An epic is not a unit of
+// work, so a run handed one has nothing to implement; before this the row fell straight through to
+// `from_blockers`, which mints `runnable` for anything unblocked, and `epicrun` passed the epic to
+// `fullrun` as an ordinary issue. `human` rather than `time` because no amount of waiting turns an
+// epic into work: a person has to flatten the row or restructure the epics, and meta-epic support is
+// frozen (joshuafolkken/kit#894). What the question is — and, just as importantly, what it is not —
+// is `epic-nested.ts`, which the audit asks the same way.
 function local_category(child: EpicChild): ChildCategory | undefined {
 	if (child.state === CLOSED) return 'done'
+	if (epic_nested.is_nested_epic(child)) return 'human'
 	if (has_label(child, NEEDS_DECISION_LABEL)) return 'human'
 	if (has_label(child, IN_PROGRESS_LABEL)) return 'time'
 
@@ -105,6 +119,28 @@ function report_untracked(child: EpicChild, blocker: IssueReference): void {
 		`⚠ #${String(child.number)} is blocked by ${epic_graph.key_of(blocker)}, ` +
 			'which this epic does not track — the dependency is not weighed',
 	)
+}
+
+// Said out loud because the report cannot say it: a withheld epic prints as a bare `#N` under
+// "Waiting on a person", which is true of a parked issue and of an epic alike, and the two need
+// entirely different things done to them (joshuafolkken/kit#1476).
+function report_nested_epic(child: EpicChild): void {
+	const line = `epic:${epic_graph.key_of(child)}`
+	if (reported.has(line)) return
+
+	reported.add(line)
+	console.warn(
+		`⚠ ${epic_graph.key_of(child)} is itself an epic — a run cannot implement one, ` +
+			'so it is withheld rather than offered',
+	)
+}
+
+// Announced once per classification pass, deduplicated by `reported` like every other notice here.
+// Closed children are skipped: a finished epic is the part of the graph nobody has to act on.
+function report_nested_epics(children: ReadonlyArray<EpicChild>): void {
+	for (const child of children) {
+		if (child.state !== CLOSED && epic_nested.is_nested_epic(child)) report_nested_epic(child)
+	}
 }
 
 // What one recorded relation contributes. A blocker inside the epic is resolved through the caller's
@@ -201,6 +237,7 @@ function classify_children(
 	}
 
 	fill_memo(children, context)
+	report_nested_epics(children)
 
 	for (const child of children) {
 		const category = context.memo.get(epic_graph.key_of(child)) ?? 'time'

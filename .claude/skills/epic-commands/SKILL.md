@@ -102,6 +102,7 @@ adds is reading *inside* the children:
 | A child's body names another child, nothing orders the two | warning |
 | A child's **acceptance criteria** name another child, nothing orders the two | **error**; a warning once both children are closed, and a warning when the pair is in two repositories (joshuafolkken/kit#1128 — such an order only became recordable with joshuafolkken/kit#1126, so an error would stop every epic written before it). A warning there does **not** mean the pair is safe: the child is still offered as runnable, and recording the relation is what clears it |
 | A body cites a missing or already-closed issue | warning |
+| A task-list row points at another **epic** | warning — `epic:next` withholds the row, so the batch is already safe; what is left is a thing a person has to look at (joshuafolkken/kit#1476) |
 | An issue names this epic as parent that the task list does not track | warning |
 | The search for those issues could not read the open backlog | **error** |
 | That search stopped before the end of the backlog | warning |
@@ -168,6 +169,19 @@ are named on standard error. A parked child releases its lane; one stopped by `n
 goes on holding one, because its uncommitted work is still in that checkout. It is an advisory guard
 rather than a mutex: the label is applied after the read, so what it closes is the window that
 actually occurs — a lane holding the label for minutes.
+
+**A child that is itself an epic is never offered** (joshuafolkken/kit#1476). An epic is not a unit of
+work, so a run handed one has nothing to implement — before this the row fell through to the
+dependency reading, which makes anything unblocked runnable, and `epicrun` passed the epic to
+`fullrun` as an ordinary issue. It waits on a *person*, because no amount of waiting turns an epic
+into work. **The test is the child's `epic` label, never how its task-list row is written**: a row
+naming `owner/repo#N` is a different property and a legitimate one — it disables the epic auto-close
+by design, which is why a cross-repository backlink is prose rather than a row — so a
+cross-repository child that is not an epic stays runnable, and one that is an epic is withheld
+exactly like a local one. **A parent epic over another epic never auto-closes**: the auto-close
+evaluates only the epics whose own task list holds the issue a merge just closed, and a grandchild
+merging never reaches the grandparent. `epic:audit` reports the same row, with that consequence in
+the finding.
 
 Children that are not runnable are sorted by **whether waiting helps**, never by label:
 

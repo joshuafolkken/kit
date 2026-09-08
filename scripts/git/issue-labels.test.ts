@@ -4,6 +4,7 @@ import {
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,
 	has_any_label,
+	has_label_name,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	NEEDS_DECISION_LABEL,
@@ -20,6 +21,9 @@ import {
 
 // Spelled out rather than compared to the constants themselves, which would assert nothing.
 const EPIC_SPELLING = 'epic'
+// The same label as GitHub answers with in a repository that created it before these scripts did.
+const EPIC_CREATED_CASING = 'Epic'
+const UNRELATED_SPELLING = 'bug'
 const IN_PROGRESS_SPELLING = 'in-progress'
 const NEEDS_DECISION_SPELLING = 'needs-decision'
 const AUTO_OK_SPELLING = 'auto-ok'
@@ -114,11 +118,11 @@ describe('has_any_label', () => {
 	// GitHub keeps the casing a label was created with and treats `Epic` and `epic` as one label, so
 	// a repository that predates these scripts can answer with either spelling.
 	it('matches regardless of the casing GitHub answers with', () => {
-		expect(has_any_label([{ name: 'Epic' }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(true)
+		expect(has_any_label([{ name: EPIC_CREATED_CASING }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(true)
 	})
 
 	it('does not match an unrelated label', () => {
-		expect(has_any_label([{ name: 'bug' }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(false)
+		expect(has_any_label([{ name: UNRELATED_SPELLING }], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(false)
 	})
 
 	it('treats a missing labels field as no labels', () => {
@@ -127,5 +131,25 @@ describe('has_any_label', () => {
 
 	it('treats an empty labels field as no labels', () => {
 		expect(has_any_label([], NOT_DIRECTLY_RUNNABLE_LABELS)).toBe(false)
+	})
+})
+
+// The same rule for the one shape `has_any_label` cannot take: bare label names, which is what
+// `EpicChild.labels` carries (joshuafolkken/kit#1476).
+describe('has_label_name', () => {
+	it('matches the label it is given', () => {
+		expect(has_label_name([IN_PROGRESS_SPELLING], IN_PROGRESS_LABEL)).toBe(true)
+	})
+
+	it('matches a bare name regardless of the casing GitHub answers with', () => {
+		expect(has_label_name([EPIC_CREATED_CASING], EPIC_LABEL)).toBe(true)
+	})
+
+	it('does not match a bare name that is an unrelated label', () => {
+		expect(has_label_name([UNRELATED_SPELLING], EPIC_LABEL)).toBe(false)
+	})
+
+	it('treats an empty label list as no labels', () => {
+		expect(has_label_name([], EPIC_LABEL)).toBe(false)
 	})
 })

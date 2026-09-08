@@ -138,6 +138,7 @@ function audit(input: AuditInput): AuditResult {
 			input.reference_states,
 			input.repo,
 		),
+		...epic_audit_checks.find_nested_epics(input.children, input.repo),
 		...epic_audit_orphans.search_findings(input.claiming),
 		...epic_audit_checks.find_orphans(
 			input.tracked,
