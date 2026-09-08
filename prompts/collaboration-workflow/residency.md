@@ -33,6 +33,7 @@
 
 - **独立した呼び出しを同じターンに載せる規則** — 引き金は `pnpm josh batch:guard`（単発呼び出しのターンが 3 つ続いた次の `Bash`）。常駐していた間の実測が示したのは、**常駐は効いていなかった**という事実である（数値は指し先）。実測値・却下した機構案・ゲートを弱めない条件は [`turn-batching.md`](./turn-batching.md) にある（joshuafolkken/kit#1304、#1390、#1524）
 - **バックログの WIP 上限（オープン 30 件）** — 引き金は `pnpm josh rule:guard`（Issue を作成する `Bash`）。配送文が件数の数え方・起票しない判断・2 つの免除・**割り込みの 3 条件**をそのまま運ぶ。3 条件を落とすと「重大かどうか」が判断に戻るため、配送文からも削っていない（joshuafolkken/kit#1518）。手順と数字を動かす条件は [`wip-cap.md`](./wip-cap.md) にある（joshuafolkken/kit#1469、#1524）
+- **本文をシェルの二重引用符に載せない** — 引き金は `pnpm josh rule:guard`（本文値にバッククォートか `$` を含む `Bash`）。**常駐側に 1 行が残っているのは、ここが「削除してよい」側ではないからである** — 配送は Claude Code にしか届かず、正規表現が知っている綴り（`-f body=` ／ `--body` ／ `--notify-message`）だけが規則の適用範囲になってはならない。実測・安全な綴り・引き金の死角は [`shell-body.md`](./shell-body.md) にある（joshuafolkken/kit#1198）
 
 no になり skill 側に本体を置くものの例:
 

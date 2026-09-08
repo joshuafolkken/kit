@@ -13,12 +13,24 @@ import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 // that does not.
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'rule-guard-'))
 const WIP_CAP = 'wip-cap'
+const SHELL_BODY = 'shell-body'
 const NOW_MS = 1_700_000_000_000
+// A comment body carrying the character the shell runs. It is a single-quoted TypeScript literal, so
+// the backtick is inert here and dangerous only in the command it describes.
+const EVALUATED_BODY_COMMAND =
+	'gh api repos/joshuafolkken/kit/issues/1198/comments -f body="see `pnpm josh ms`"'
 // The shortest command that really files an Issue, reused wherever a case needs the trigger to match
 // so that no case can pass on a spelling the others do not use.
 const FILING_COMMAND = 'gh issue create --title "x"'
 // The `gh api` spelling of the same filing, used both as a trigger case and as a collision case.
 const FILING_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues -f title="x" -f body="y"'
+// A command that binds no rule at all, used by both guards' silence cases.
+const ORDINARY_COMMAND = 'pnpm josh gate'
+// Case names shared by the two rules' blocks, so the pair reads as the same question asked twice.
+const LEAVES_ALONE_CASE = 'leaves %j alone'
+const CARRIES_CASE = 'carries %j'
+const REISSUE_CASE = 'tells the reader the call may be reissued'
+const ONCE_PER_RUN_CASE = 'delivers once per run rather than once per call'
 const WRITTEN_TRANSCRIPTS = new Set<string>()
 const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
@@ -62,6 +74,7 @@ beforeEach(() => {
 afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
 		rmSync(delivered_rules.delivery_path(WIP_CAP, transcript), { force: true })
+		rmSync(delivered_rules.delivery_path(SHELL_BODY, transcript), { force: true })
 	}
 
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
@@ -88,7 +101,7 @@ describe('is_issue_filing', () => {
 		'gh api repos/joshuafolkken/kit/issues --jq length',
 		'gh issue list --state open --limit 100',
 		'gh pr create --title "x"',
-	])('leaves %j alone', (command) => {
+	])(LEAVES_ALONE_CASE, (command) => {
 		expect(delivered_rules.is_issue_filing(command)).toBe(false)
 	})
 })
@@ -112,21 +125,83 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		'a documented workflow cannot complete',
 		'data is lost or written outside the repository',
 		'`prompts/collaboration-workflow/wip-cap.md`',
-	])('carries %j', (marker) => {
+	])(CARRIES_CASE, (marker) => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain(marker)
 	})
 
 	// A delivery that repeated would wedge the very call it asked for, so the reason has to say that
 	// reissuing is the expected next move.
-	it('tells the reader the call may be reissued', () => {
+	it(REISSUE_CASE, () => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call once you have counted')
 	})
 
-	it('delivers once per run rather than once per call', () => {
+	it(ONCE_PER_RUN_CASE, () => {
 		const payload = payload_of('repeat', FILING_COMMAND)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1198: the trigger reads what the body *contains*, not which flag carries it —
+// every worked example in this repository's prompts passes a placeholder, and keying on the flag
+// would refuse those too. So the matching cases all carry a backtick or a `$`, and the non-matching
+// ones are the same flags with a body the shell leaves alone.
+describe('is_shell_evaluated_body', () => {
+	it.each([
+		EVALUATED_BODY_COMMAND,
+		'gh issue comment 1198 --body "ran `git switch main`"',
+		'gh api repos/{owner}/{repo}/issues/1/comments --field body="$HOME is expanded"',
+		'gh api repos/o/r/issues -f title="x" -f \'body=y\' -f body="`x`"',
+		'pnpm josh followup "t #1" --merge --notify-message="Result: `josh notify` ships it"',
+	])('reads %j as an evaluated body', (command) => {
+		expect(delivered_rules.is_shell_evaluated_body(command)).toBe(true)
+	})
+
+	it.each([
+		// The shape every prompt in this repository actually writes — inert, and left alone.
+		'gh api repos/{owner}/{repo}/issues/1198/comments -f body="<plan>"',
+		'gh issue comment 1198 --body "Implemented the gate. Done!"',
+		// Already safe: the body never reaches the shell as text.
+		'gh api repos/o/r/issues/1/comments --field body=@/tmp/body.md',
+		'gh issue comment 1198 --body-file /tmp/body.md',
+		'pnpm josh followup "t #1" --merge --notify-message-file /tmp/body.md',
+		// A backslash makes the next character literal inside double quotes.
+		String.raw`gh issue comment 1 --body "costs \$5 and a \` mark"`,
+		// `-b` is `git checkout`'s branch flag as often as it is `gh`'s body flag.
+		'git checkout -b "feature-$USER"',
+		// Already safe: a command substitution's output is not re-scanned, so the body reaches `gh`
+		// byte for byte and the rule is being kept.
+		'gh api repos/o/r/issues/1/comments -f body="$(cat /tmp/body.md)"',
+		ORDINARY_COMMAND,
+	])(LEAVES_ALONE_CASE, (command) => {
+		expect(delivered_rules.is_shell_evaluated_body(command)).toBe(false)
+	})
+})
+
+describe('rule_delivery — the shell-body rule at the call that would execute text', () => {
+	it('delivers the rule on a comment whose body carries a backtick', () => {
+		const reason = rule_delivery(payload_of('evaluated', EVALUATED_BODY_COMMAND), NOW_MS)
+
+		expect(reason).toBe(delivered_rules.SHELL_BODY_REASON)
+	})
+
+	// What the reason *says* is pinned by `scripts/shell-body-rule.test.ts`, which the marker-test
+	// table in `shell-body.md` makes the owner of the delivery text. Restating those markers here
+	// would be the clone `CLAUDE.md` prohibits, and the cost is drift: a wording change updated in one
+	// list and not the other leaves a marker silently unpinned. This suite owns firing and silence.
+	it(ONCE_PER_RUN_CASE, () => {
+		const payload = payload_of('body-repeat', EVALUATED_BODY_COMMAND)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.SHELL_BODY_REASON)
+		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+	})
+
+	// **Never wired to a write** (joshuafolkken/kit#1390), the same omission the WIP cap depends on.
+	it('says nothing about a write tool even when its input looks like an inline body', () => {
+		const payload = payload_of('body-write', EVALUATED_BODY_COMMAND, 'Edit')
+
+		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
 
@@ -135,7 +210,7 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 describe('rule_delivery — silent where nothing binds', () => {
 	it.each([
 		['a comment', 'gh api repos/joshuafolkken/kit/issues/1524/comments --field body=@/tmp/b.md'],
-		['an ordinary command', 'pnpm josh gate'],
+		['an ordinary command', ORDINARY_COMMAND],
 		['a listing', 'gh issue list --state open'],
 	])('says nothing on %s', (label, command) => {
 		expect(rule_delivery(payload_of(`quiet-${label}`, command), NOW_MS)).toBeUndefined()
@@ -174,7 +249,7 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 	// is what makes the stand-aside in `is_first_delivery` inert today rather than load-bearing, and
 	// **it has to be re-checked for any row added to the enumeration**: a trigger the batching guard
 	// does consider would put the collision back.
-	it.each([FILING_COMMAND, FILING_API_COMMAND])(
+	it.each([FILING_COMMAND, FILING_API_COMMAND, EVALUATED_BODY_COMMAND])(
 		'is not a call the batching guard may also refuse: %j',
 		(command) => {
 			expect(time_batch_guard.is_guarded_call({ name: 'Bash', input: { command } })).toBe(false)
@@ -208,8 +283,19 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it('names the WIP cap', () => {
-		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(WIP_CAP)
+	it.each([WIP_CAP, SHELL_BODY])('names %j', (id) => {
+		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
+	})
+
+	// **The order is load-bearing where two triggers overlap** (joshuafolkken/kit#1198). A filing whose
+	// body carries a backtick matches both rows; `wip-cap` is first because it decides whether the
+	// Issue should exist at all, and rewriting a body into a file for an Issue that must not be filed
+	// is wasted work. Nothing is lost by losing the race — the stamps are keyed per `id`, so the
+	// reissued call is delivered the second rule.
+	it('lists the WIP cap ahead of the shell-body rule', () => {
+		const ids = delivered_rules.DELIVERED_RULES.map((rule) => rule.id)
+
+		expect(ids.indexOf(WIP_CAP)).toBeLessThan(ids.indexOf(SHELL_BODY))
 	})
 
 	it('is on by default', () => {

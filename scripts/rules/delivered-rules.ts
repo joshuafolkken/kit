@@ -83,8 +83,72 @@ const WIP_CAP_REASON =
 	'`prompts/collaboration-workflow/wip-cap.md`. Reissue this call once you have counted — it fires ' +
 	'once per run and cannot repeat on the call in hand.'
 
+// A body handed to a command as an inline double-quoted argument, in the spellings a run reaches for:
+// `gh`'s field flags (`-f` / `-F` / `--field` / `--raw-field` with `body=`), `gh`'s own `--body`, and
+// `josh`'s `--body` and `--notify-message`. The value is captured so the decision can be made on what
+// the body actually contains rather than on the flag alone.
+//
+// **`-b` is deliberately absent.** It is `gh`'s short `--body`, but it is also `git checkout -b`, and
+// a branch name is not a body — covering it would refuse calls where nothing is wrong. The `*-file`
+// spellings end in `-` where this pattern needs whitespace or `=`, so `--body-file <path>` and
+// `--notify-message-file <path>` cannot match it.
+const INLINE_BODY_VALUE =
+	/(?:(?:-f|-F|--field|--raw-field)\s*'?body=|(?:--body|--notify-message)[\s=]+)"((?:[^"\\]|\\.)*)"/gu
+
+// **What zsh evaluates inside double quotes, measured in this harness rather than assumed**
+// (joshuafolkken/kit#1198): a backtick runs as command substitution and a `$` expands. `!` does
+// **not** — history expansion is off in a non-interactive zsh, and `"hello!world"` survives intact —
+// so it is deliberately absent: a rule that fired on every exclamation mark would be firing on turns
+// where nothing is wrong, which `prompts/collaboration-workflow/rule-delivery.md` names as worse than
+// no hook at all.
+//
+// **`$(` is excluded for that same reason.** `body="$(cat <path>)"` is the rule already being kept:
+// the substitution's output is not re-scanned by the shell, so a body full of backticks reaches the
+// command byte for byte. Refusing it would spend the run's one delivery on a caller who had already
+// moved the body into a file.
+const SHELL_EVALUATED = /`|\$(?!\()/u
+
+// A backslash escape makes the next character literal inside double quotes, so `\$` and `` \` `` are
+// safe. They are dropped before the test rather than excluded from it, which is the same thing in one
+// pass and keeps `SHELL_EVALUATED` readable.
+const ESCAPED_PAIR = /\\./gu
+
+// **The trigger is the body's content, not the flag.** Every worked example in this repository's
+// prompts passes a placeholder (`-f body="<plan>"`), which is inert; the moment a real body carrying
+// a backtick is substituted in, the call becomes the one that executes text. Keying on the flag would
+// refuse the inert examples too — firing on turns where the rule is already being kept.
+function is_shell_evaluated_body(command: string): boolean {
+	for (const match of command.matchAll(INLINE_BODY_VALUE)) {
+		if (SHELL_EVALUATED.test((match[1] ?? '').replaceAll(ESCAPED_PAIR, ''))) return true
+	}
+
+	return false
+}
+
+function is_inline_body_call(call: GuardedCall): boolean {
+	if (call.name !== cost_blocks.BASH_TOOL) return false
+
+	return is_shell_evaluated_body(time_shell.bash_command(call.input))
+}
+
+// The instruction in the shape a refusal can carry: what the shell is about to do, the four safe
+// spellings, and the reissue sentence every delivery needs. The damage is named because it is the
+// half that reads as unbelievable — the substituted text is *executed*, not discarded.
+const SHELL_BODY_REASON =
+	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
+	'contains a backtick or a `$`. The shell evaluates both before the command runs, so the text is ' +
+	'executed rather than merely mangled — joshuafolkken/kit#1198 recorded a PR comment whose own ' +
+	"words ran as git commands and switched a lane's work tree onto main. Write the body to a file " +
+	'and pass it by path: `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` (a ' +
+	'PR comment is an issue comment), `pnpm josh followup --notify-message-file <path>`, `pnpm josh ' +
+	"notify --body-file <path>`, and `--body-file <path>` wherever a command offers it. `$'…'` " +
+	'quoting is the other safe form and is unchanged. The rule and what the trigger cannot see are in ' +
+	'`prompts/collaboration-workflow/shell-body.md`. Reissue this call once the body is in a file — ' +
+	'it fires once per run and cannot repeat on the call in hand.'
+
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	{ id: 'wip-cap', is_trigger: is_filing_call, reason: WIP_CAP_REASON },
+	{ id: 'shell-body', is_trigger: is_inline_body_call, reason: SHELL_BODY_REASON },
 ]
 
 // **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
@@ -134,9 +198,15 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 
 // **The first entry whose delivery actually fires wins — not the first whose trigger matches.** Only
 // one refusal can leave a `PreToolUse` hook, so a rule that matched but has already been delivered
-// this run falls through and a later rule may speak on the same call. With one entry that cannot
-// happen; with the second row this file is built for it would be a mis-delivery, so a rule added
-// here has to be one whose trigger no other row also matches.
+// this run falls through and a later rule may speak on the same call.
+//
+// **The two rows can both match one call, and the order is the answer rather than a defect**
+// (joshuafolkken/kit#1198). A `gh api …/issues -f title="…" -f body="… \`x\` …"` is a filing *and* an
+// inline body. `wip-cap` is listed first because it decides whether the Issue should exist at all,
+// and a body rewritten into a file for an Issue that must not be filed is wasted work. Nothing is
+// lost by losing the race: the stamps are keyed per `id`, so the reissued call is delivered the
+// second rule. A row whose trigger overlaps an existing one is therefore admissible only when this
+// same reading holds — that its delivery is still correct one call later.
 function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
 	for (const guard of GUARDS.values()) {
 		const reason = guard.refusal(raw_payload, now_ms)
@@ -153,12 +223,14 @@ function is_enabled(): boolean {
 
 const delivered_rules = {
 	DELIVERED_RULES,
+	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,
 	delivery,
 	delivery_path,
 	is_enabled,
 	is_issue_filing,
+	is_shell_evaluated_body,
 }
 
 export type { DeliveredRule }

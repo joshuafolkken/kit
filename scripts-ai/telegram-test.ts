@@ -17,6 +17,7 @@ function parse_cli_arguments(): CliValues {
 			'repo-name': { type: 'string' },
 			'issue-title': { type: 'string' },
 			body: { type: 'string' },
+			'body-file': { type: 'string' },
 			'issue-url': { type: 'string' },
 			'pr-url': { type: 'string' },
 		},

@@ -57,14 +57,28 @@ describe('git_notify.build_notify_config — message and mentions', () => {
 		expect(result?.mentions).toEqual(['@user1', '@user2'])
 	})
 
-	it(String.raw`replaces literal \n with newline in message`, () => {
+	// joshuafolkken/kit#1198 moved the `\n` expansion to `cli_body`, where the flag is read: a message
+	// arriving from `--notify-message-file` already holds real newlines, so a literal backslash-n in
+	// one is the author's text. Expanding it here would rewrite it, and the escape's own coverage now
+	// lives in `scripts/josh/cli-body.test.ts`.
+	it(String.raw`keeps a literal \n in the message it was handed`, () => {
 		const result = git_notify.build_notify_config({
 			raw_target: TARGET_PR,
 			raw_message: String.raw`line1\nline2`,
 			raw_mentions: undefined,
 		})
 
-		expect(result?.message).toBe('line1\nline2')
+		expect(result?.message).toBe(String.raw`line1\nline2`)
+	})
+
+	it('trims surrounding whitespace', () => {
+		const result = git_notify.build_notify_config({
+			raw_target: TARGET_PR,
+			raw_message: '  done  ',
+			raw_mentions: undefined,
+		})
+
+		expect(result?.message).toBe('done')
 	})
 })
 

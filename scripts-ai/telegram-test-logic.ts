@@ -1,4 +1,5 @@
 import type { TelegramSendInput, TelegramTaskType } from '../scripts/git/telegram-notify'
+import { cli_body } from '../scripts/josh/cli-body'
 
 /* eslint-disable @typescript-eslint/naming-convention */
 interface CliValues {
@@ -6,6 +7,7 @@ interface CliValues {
 	'repo-name'?: string
 	'issue-title'?: string
 	body?: string
+	'body-file'?: string
 	'issue-url'?: string
 	'pr-url'?: string
 }
@@ -41,9 +43,9 @@ function parse_task_type(raw: string | undefined): TelegramTaskType {
 // A flag counts as given only when it carries text, so `--issue-title ''` is not an answer. The
 // callers that *skip* a lookup because the flag already answered it read the same predicate, or the
 // two could disagree about an empty string and leave the field blank (joshuafolkken/kit#903).
-function has_flag_value(raw: string | undefined): boolean {
-	return raw !== undefined && raw.length > 0
-}
+// It is `cli_body`'s predicate rather than a second copy: the body flags are resolved there, and two
+// definitions of "given" would let `--body ''` count on one side and not the other.
+const has_flag_value = cli_body.has_value
 
 function coalesce(primary: string | undefined, fallback: string | undefined): string | undefined {
 	if (has_flag_value(primary)) return primary
@@ -51,10 +53,16 @@ function coalesce(primary: string | undefined, fallback: string | undefined): st
 	return fallback
 }
 
-function normalize_body(raw: string | undefined): string | undefined {
-	if (raw === undefined) return undefined
-
-	return raw.replaceAll(String.raw`\n`, '\n')
+// `--body-file` is the form to reach for whenever the body carries a backtick or a `$`: inside shell
+// double quotes those are evaluated before this process starts, and the text runs
+// (joshuafolkken/kit#1198). The resolution itself is `cli_body`'s, shared with `josh followup`.
+function normalize_body(values: CliValues): string | undefined {
+	return cli_body.resolve({
+		inline: values.body,
+		file_path: values['body-file'],
+		inline_flag: '--body',
+		file_flag: '--body-file',
+	})
 }
 
 function build_input(input: { values: CliValues; context: ResolvedContext }): TelegramSendInput {
@@ -62,7 +70,7 @@ function build_input(input: { values: CliValues; context: ResolvedContext }): Te
 		task_type: parse_task_type(input.values['task-type']),
 		repo_name: coalesce(input.values['repo-name'], input.context.repo_name),
 		issue_title: coalesce(input.values['issue-title'], input.context.issue_title),
-		body: normalize_body(input.values.body),
+		body: normalize_body(input.values),
 		issue_url: input.values['issue-url'],
 		pr_url: input.values['pr-url'],
 	}

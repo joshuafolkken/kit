@@ -34,10 +34,14 @@ function parse_notify_mentions(raw_mentions: string | undefined): Array<string> 
 	return split_and_trim(raw_mentions).map((mention) => normalize_mention(mention))
 }
 
+// The `\n` escape the inline `--notify-message` form needs is expanded by `cli_body` at the point the
+// flag is read, not here (joshuafolkken/kit#1198). Expanding again would rewrite a literal backslash-n
+// that `--notify-message-file` legitimately carries — a file already holds real newlines, so an
+// escape sequence in one is the author's text rather than a quoting workaround.
 function resolve_notify_message(raw_message: string | undefined): string {
 	if (raw_message === undefined || raw_message.trim().length === 0) return DEFAULT_NOTIFY_MESSAGE
 
-	return raw_message.trim().replaceAll(String.raw`\n`, '\n')
+	return raw_message.trim()
 }
 
 function build_notify_config(input: {

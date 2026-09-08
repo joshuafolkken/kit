@@ -39,7 +39,11 @@ const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
 // ceiling is written to allow: **what it guards against is the index absorbing content**, not a new
 // topic being indexed at all. A row is about 180 bytes and a topic file nothing links to is a file
 // nobody opens, so refusing the row would keep the number green by leaving the corpus unreachable.
-const INDEX_CEILING_BYTES = 9200
+//
+// And once more by one row for `shell-body.md` (joshuafolkken/kit#1198), on the same reading. The
+// row itself measured 131 bytes; the ceiling moves by a full row so the next topic is not decided by
+// how long its title happens to be.
+const INDEX_CEILING_BYTES = 9380
 
 // The fixture already enumerates them for the concatenating reader; re-implementing it here would
 // let the two drift and quietly stop covering a file the reader still concatenates.

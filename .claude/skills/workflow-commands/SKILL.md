@@ -841,9 +841,9 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
 
-**Two rules left this list at the first question, and are delivered by a hook instead**
-(joshuafolkken/kit#1524). Neither lost a sentence; both are pinned by the firing test named beside
-them rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
+**Three rules left this list at the first question, and are delivered by a hook instead**
+(joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside
+it rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
 enumeration and the single source of what a turn where the trigger does not fire means.
 
 - **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
@@ -857,6 +857,14 @@ enumeration and the single source of what a turn where the trigger does not fire
   delivery saying only "an interrupt is exempt" hands the deciding back to judgement
   (joshuafolkken/kit#1518). A comment endpoint is not a filing and is left alone
   (`prompts/collaboration-workflow/wip-cap.md`, `scripts/backlog-manufacturing-rule.test.ts`).
+- **The prohibition on putting a body inside shell double quotes** — `pnpm josh rule:guard` refuses
+  the `Bash` call whose inline body value carries a backtick or a `$`, the two characters this
+  harness's zsh was measured to evaluate there, and hands back the path-shaped spellings
+  (`--body-file`, `--field body=@<path>`, `--notify-message-file`). **The trigger reads the body, not
+  the flag**: every worked example in these documents passes a placeholder, which is inert, so keying
+  on the flag would refuse the turns where the rule is already kept. A one-line trigger stays resident
+  because a hook reaches Claude Code alone (`prompts/collaboration-workflow/shell-body.md`,
+  `scripts/shell-body-rule.test.ts`, joshuafolkken/kit#1198).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in
