@@ -169,6 +169,10 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
   subject is delegated, a file this run will edit is read in the main line, and what comes back is
   the conclusion plus its `file:line` citations rather than the text.
+- **An Issue's comments are read before implementing, at every `#N` entry point** — §2g. An
+  agreement recorded after the body was written lives only in a comment, and between a body and a
+  comment that disagree the later text is the one in force. `pnpm josh rule:guard` refuses the
+  body-only read once per run and states the reissue there.
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
   the Issue instead.
@@ -724,6 +728,75 @@ it is the shape `pnpm josh delegate` refuses to leave to an agent for the same r
 behavior, the answer table and the incident are `docs/josh-commands.md` → "`josh run:hold` /
 `josh run:release`"; this section is the single source of the procedure.
 
+## 2g. An Issue's comments are part of the Issue
+
+**Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun`
+and `kickoff` (joshuafolkken/kit#1319). A `queue` issue and an `epicrun` child inherit it rather than
+restate it: each runs in a delegated unit executing `fullrun`'s procedure, and because the hook keys
+its once-per-run record on the *fork's* transcript (§2b, joshuafolkken/kit#1424) every child is
+delivered to in its own right. The read is one call, made in the same turn as whatever else the run
+already needs:
+
+```bash
+gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
+```
+
+`gh issue view <N> --comments` prints the body and the comments together and is the one to type by
+hand — but it is GraphQL-backed, a cloud session is answered `403`, and `scripts/gh-document-guard.test.ts`
+refuses it in a runnable block for exactly that reason. The REST call above is the portable form.
+
+**This repository writes its agreements into comments and then reads only bodies.** `CLAUDE.md` →
+"Decision autonomy" requires a Tier A decision to be logged as an Issue comment; the review round
+cap requires a dropped finding's disposition to be recorded; `epic:plan` writes each decision to the
+epic's `## Decisions` **and** to a comment on the child; a stash left behind is recorded on the
+Issue. **The place a run is told to write is the place it was never told to read.** Nothing in a
+body says it has been superseded, so the mistake is silent: on joshuafolkken/kit#1304 neither review
+round, nor the verification gate, nor CI noticed that part of the work had been handed to
+joshuafolkken/kit#1307 seventeen minutes before implementation started.
+
+**What the reading is for**, so it is not skimmed: the boundary of the scope — work a comment moved
+to another Issue, or added to this one; the record of an auto-decision already made; a split or epic
+agreement reached after filing; a recorded stash or an in-flight branch; and a **correction of the
+body's own diagnosis** — joshuafolkken/kit#1537's body named the wrong cause and two comments
+overturned it, and joshuafolkken/kit#1520's comment changed a default and added an acceptance
+criterion the body still does not carry.
+
+### When a comment contradicts the body
+
+**The later text is the agreement in force.** A body is written first and is not rewritten when a
+decision arrives, so of a body and a comment that disagree the comment is the newer of the two and
+wins. **This is settled by ordering, never by judging which reads better.** Name in the two-layer
+work summary which comment superseded what, so the person sees the substitution before the work
+starts.
+
+**Two answers are not the run's to make, and each is decided from what the comment says:**
+
+- **A comment that reassigns part of the scope to another Issue** takes that part out of scope: do
+  not implement it, whatever acceptance criteria the body still lists, and name the Issue it went to
+  in the completion report. Implementing it anyway is joshuafolkken/kit#1304 exactly.
+- **A comment saying the Issue no longer has a reason to exist** — the defect does not reproduce, or
+  it was fixed elsewhere — stops the run with a `confirmation` Telegram. Closing an Issue is Tier C,
+  and a run that quietly implemented nothing would report success on work nobody did.
+
+Everything else is the ordinary work of the run, **a widened scope included**: a widening large
+enough to be several separately-mergeable deliverables is the split assessment's business
+(`split-assessment.md`), and not a second kind of stop.
+
+### A long thread
+
+**The fetch is one call however long the thread is; what costs is carrying it afterwards** — which is
+why the call above projects each comment down to its author, its timestamp and its body rather than
+taking the whole payload. Once the thread runs longer than the Issue itself it is exactly the
+pre-implementation reading §2b describes: brief a delegated unit to return **the agreements in force
+plus the comment URLs that carry them**, never the comment text. That is the same rule applied, not
+a second one — nothing is skipped, and what reaches the main line is the conclusion.
+
+**`pnpm josh rule:guard` refuses the body-only read** and hands over the reissue and the conflict
+rule at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`,
+`scripts/rules/delivered-rules.test.ts`). The refusal reaches Claude Code alone and fires once per
+run, so **this section is the rule and the hook is what makes it hard to walk past** — a session
+that runs no hooks still owes the read.
+
 ## 3. What stays resident, and what is read from here
 
 **The first question is whether the rule's trigger can be named** (joshuafolkken/kit#1524):
@@ -841,9 +914,9 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
 
-**Two rules left this list at the first question, and are delivered by a hook instead**
-(joshuafolkken/kit#1524). Neither lost a sentence; both are pinned by the firing test named beside
-them rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
+**Three rules left this list at the first question, and are delivered by a hook instead**
+(joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside it
+rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
 enumeration and the single source of what a turn where the trigger does not fire means.
 
 - **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
@@ -857,6 +930,13 @@ enumeration and the single source of what a turn where the trigger does not fire
   delivery saying only "an interrupt is exempt" hands the deciding back to judgement
   (joshuafolkken/kit#1518). A comment endpoint is not a filing and is left alone
   (`prompts/collaboration-workflow/wip-cap.md`, `scripts/backlog-manufacturing-rule.test.ts`).
+- **The Issue's comments** — `pnpm josh rule:guard` refuses the `Bash` call that reads an Issue's
+  body without them (`gh issue view <N>`, or a `GET` of a path ending `…/issues/<N>`) and hands over
+  the reissue that carries them plus the rule for a comment that contradicts the body. It is the one
+  row whose trigger `batch:guard` also considers, so it stands aside on that guard's turn and fires
+  on the reissue. §2g is the procedure and stays here, because a session that runs no hooks still
+  owes the read (`prompts/collaboration-workflow/rule-delivery.md`,
+  `scripts/rules/delivered-rules.test.ts`).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in
