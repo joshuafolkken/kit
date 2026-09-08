@@ -1,6 +1,6 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` — planning, implementation, the verification gate, unattended epic execution, the `/code-review` → `followup --merge` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` — planning, implementation, the verification gate, unattended epic execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
@@ -85,7 +85,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   rests on covers the exact tree it carries and round 2's brief still reads `Already verified`.
   **A finding round 2 fixes in place is pushed before its gate**
   (joshuafolkken/kit#1326): the single check the fix reaches, then a follow-up commit on the same
-  branch, then its own `pnpm josh gate` **joined before `pnpm josh followup --merge`**
+  branch, then its own `pnpm josh gate` **joined before `pnpm josh followup`**
   — so the CI that commit re-runs has the gate beside it rather than in front of it. A red gate there is
   fixed, re-checked with the same single check and pushed again; the superseded cycle is cancelled by
   `ci.yml`'s concurrency group, and the merge still waits on the head commit's checks
@@ -93,7 +93,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   "The pull request opens between the rounds, so CI runs beside round 2" is the single source; a clean
   round 1 has no second round and its order is unchanged.
   **A clean second round is not a turn boundary either**: the turn that reads it issues
-  `pnpm josh followup --merge`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a
+  `pnpm josh followup`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a
   turn of its own — the 19 seconds of dead air joshuafolkken/kit#1333 measured between the two
   (`prompts/review.md` → "A clean second round issues the merge in the same turn", the single source).
   While the checks are in flight the brief says so
@@ -116,7 +116,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   answer is already in hand and the call buys a second copy of it. `pnpm josh time`'s `Single checks:`
   block is what says whether the run held to it; the rule is `prompts/review.md` → "A single check
   answers once per tree".
-  **The rule-compliance measurement is read after the review and before `pnpm josh followup --merge`,
+  **The rule-compliance measurement is read after the review and before `pnpm josh followup`,
   never inside `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval`
   is five real Claude sessions. The anchor is the merge rather than the commit because the commit now
   sits between the rounds, and `blocked` has always stopped the merge rather than the commit
@@ -127,7 +127,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   not but is reported, and a run nobody saw hold is never reported as green. `eval-gate.md` carries
   the trigger set, the cost ceiling, and why an epic's completion does not run it a second time.
   **E2E closes after that, and never by asking the user**: where the command ends in a pull request
-  (`fullrun` / `queue` / `epicrun`) the CI E2E job is the result and `pnpm josh followup --merge`
+  (`fullrun` / `queue` / `epicrun`) the CI E2E job is the result and `pnpm josh followup`
   is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
   the stop. `CLAUDE.md` → "Completion gate" carries the rule, `prompts/testing-guide.md` → "Closing
   the E2E gate without a human run" the procedure.
@@ -136,7 +136,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   tree holding the previous child's already-merged code, find nothing wrong, and have that silence
   read as a clean round (joshuafolkken/kit#1522). `pnpm josh review:brief` names the checkout and
   prints the nonce the review attests with; `missing` and `mismatch` are both refusals, and
-  `pnpm josh followup --merge` refuses the merge on either. `prompts/review.md` → "The brief names the
+  `pnpm josh followup` refuses the merge on either. `prompts/review.md` → "The brief names the
   checkout, and a review that read another one is refused" is the single source.
 - **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
   only once it has merged — decided from an enumeration (the verification gate, the code review, the
@@ -169,6 +169,10 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
   subject is delegated, a file this run will edit is read in the main line, and what comes back is
   the conclusion plus its `file:line` citations rather than the text.
+- **An Issue's comments are read before implementing, at every `#N` entry point** — §2g. An
+  agreement recorded after the body was written lives only in a comment, and between a body and a
+  comment that disagree the later text is the one in force. `pnpm josh rule:guard` refuses the
+  body-only read once per run and states the reissue there.
 - **The two-layer work summary** is presented once per Issue immediately before implementation
   starts, including when the Issue body was already filled. `kickoff` is exempt: it posts a plan to
   the Issue instead.
@@ -200,7 +204,7 @@ does nothing whatever — an epic's children run without it.
 - **Implementation and the verification gate run normally** — refactor, `pnpm josh gate`,
   `/code-review`, `pnpm josh eval:scope`, exactly as for any other child.
 - **Run `pnpm josh test:e2e` yourself before stopping.** With no pull request there is no CI E2E job,
-  and `pnpm josh followup --merge` — the thing that blocks a merge on it — is never reached. This is
+  and `pnpm josh followup` — the thing that blocks a merge on it — is never reached. This is
   `halfrun`'s situation exactly, and `CLAUDE.md` → "Completion gate" gives it the same answer: where
   no pull request is open, you run it and read what it prints. A printed skip is the answer for a
   project with no E2E suite; a skip nobody saw printed is not.
@@ -530,7 +534,7 @@ epicrun joshuafolkken/kit#858
   checked out rather than cloning it, and a dirty tree holds work that is not yours to stash or
   discard (each entry's own "stash what is in the tree" step covers the session's repository, never
   someone else's checkout). Otherwise the commands that act
-  on the target, from `git switch main && git pull` to `pnpm josh followup --merge`, execute in that
+  on the target, from `git switch main && git pull` to `pnpm josh followup`, execute in that
   checkout — **a command naming a different repository still runs where that repository is**, which
   is why a cross-repository `into` insertion runs in the epic's checkout (§2a).
 - **`epicrun` is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,
@@ -724,6 +728,75 @@ it is the shape `pnpm josh delegate` refuses to leave to an agent for the same r
 behavior, the answer table and the incident are `docs/josh-commands.md` → "`josh run:hold` /
 `josh run:release`"; this section is the single source of the procedure.
 
+## 2g. An Issue's comments are part of the Issue
+
+**Every `#N` entry point reads the Issue's comments before it implements** — `fullrun`, `halfrun`
+and `kickoff` (joshuafolkken/kit#1319). A `queue` issue and an `epicrun` child inherit it rather than
+restate it: each runs in a delegated unit executing `fullrun`'s procedure, and because the hook keys
+its once-per-run record on the *fork's* transcript (§2b, joshuafolkken/kit#1424) every child is
+delivered to in its own right. The read is one call, made in the same turn as whatever else the run
+already needs:
+
+```bash
+gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
+```
+
+`gh issue view <N> --comments` prints the body and the comments together and is the one to type by
+hand — but it is GraphQL-backed, a cloud session is answered `403`, and `scripts/gh-document-guard.test.ts`
+refuses it in a runnable block for exactly that reason. The REST call above is the portable form.
+
+**This repository writes its agreements into comments and then reads only bodies.** `CLAUDE.md` →
+"Decision autonomy" requires a Tier A decision to be logged as an Issue comment; the review round
+cap requires a dropped finding's disposition to be recorded; `epic:plan` writes each decision to the
+epic's `## Decisions` **and** to a comment on the child; a stash left behind is recorded on the
+Issue. **The place a run is told to write is the place it was never told to read.** Nothing in a
+body says it has been superseded, so the mistake is silent: on joshuafolkken/kit#1304 neither review
+round, nor the verification gate, nor CI noticed that part of the work had been handed to
+joshuafolkken/kit#1307 seventeen minutes before implementation started.
+
+**What the reading is for**, so it is not skimmed: the boundary of the scope — work a comment moved
+to another Issue, or added to this one; the record of an auto-decision already made; a split or epic
+agreement reached after filing; a recorded stash or an in-flight branch; and a **correction of the
+body's own diagnosis** — joshuafolkken/kit#1537's body named the wrong cause and two comments
+overturned it, and joshuafolkken/kit#1520's comment changed a default and added an acceptance
+criterion the body still does not carry.
+
+### When a comment contradicts the body
+
+**The later text is the agreement in force.** A body is written first and is not rewritten when a
+decision arrives, so of a body and a comment that disagree the comment is the newer of the two and
+wins. **This is settled by ordering, never by judging which reads better.** Name in the two-layer
+work summary which comment superseded what, so the person sees the substitution before the work
+starts.
+
+**Two answers are not the run's to make, and each is decided from what the comment says:**
+
+- **A comment that reassigns part of the scope to another Issue** takes that part out of scope: do
+  not implement it, whatever acceptance criteria the body still lists, and name the Issue it went to
+  in the completion report. Implementing it anyway is joshuafolkken/kit#1304 exactly.
+- **A comment saying the Issue no longer has a reason to exist** — the defect does not reproduce, or
+  it was fixed elsewhere — stops the run with a `confirmation` Telegram. Closing an Issue is Tier C,
+  and a run that quietly implemented nothing would report success on work nobody did.
+
+Everything else is the ordinary work of the run, **a widened scope included**: a widening large
+enough to be several separately-mergeable deliverables is the split assessment's business
+(`split-assessment.md`), and not a second kind of stop.
+
+### A long thread
+
+**The fetch is one call however long the thread is; what costs is carrying it afterwards** — which is
+why the call above projects each comment down to its author, its timestamp and its body rather than
+taking the whole payload. Once the thread runs longer than the Issue itself it is exactly the
+pre-implementation reading §2b describes: brief a delegated unit to return **the agreements in force
+plus the comment URLs that carry them**, never the comment text. That is the same rule applied, not
+a second one — nothing is skipped, and what reaches the main line is the conclusion.
+
+**`pnpm josh rule:guard` refuses the body-only read** and hands over the reissue and the conflict
+rule at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`,
+`scripts/rules/delivered-rules.test.ts`). The refusal reaches Claude Code alone and fires once per
+run, so **this section is the rule and the hook is what makes it hard to walk past** — a session
+that runs no hooks still owes the read.
+
 ## 3. What stays resident, and what is read from here
 
 **The first question is whether the rule's trigger can be named** (joshuafolkken/kit#1524):
@@ -841,9 +914,9 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
 
-**Two rules left this list at the first question, and are delivered by a hook instead**
-(joshuafolkken/kit#1524). Neither lost a sentence; both are pinned by the firing test named beside
-them rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
+**Three rules left this list at the first question, and are delivered by a hook instead**
+(joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside it
+rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
 enumeration and the single source of what a turn where the trigger does not fire means.
 
 - **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
@@ -857,6 +930,13 @@ enumeration and the single source of what a turn where the trigger does not fire
   delivery saying only "an interrupt is exempt" hands the deciding back to judgement
   (joshuafolkken/kit#1518). A comment endpoint is not a filing and is left alone
   (`prompts/collaboration-workflow/wip-cap.md`, `scripts/backlog-manufacturing-rule.test.ts`).
+- **The Issue's comments** — `pnpm josh rule:guard` refuses the `Bash` call that reads an Issue's
+  body without them (`gh issue view <N>`, or a `GET` of a path ending `…/issues/<N>`) and hands over
+  the reissue that carries them plus the rule for a comment that contradicts the body. It is the one
+  row whose trigger `batch:guard` also considers, so it stands aside on that guard's turn and fires
+  on the reissue. §2g is the procedure and stays here, because a session that runs no hooks still
+  owes the read (`prompts/collaboration-workflow/rule-delivery.md`,
+  `scripts/rules/delivered-rules.test.ts`).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in

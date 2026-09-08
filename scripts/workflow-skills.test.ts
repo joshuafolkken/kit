@@ -182,6 +182,8 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 		},
 	)
 
+	// The comment-reading step every `#N` entry point owes is pinned by its own suite, beside the two
+	// other delivered rules: `scripts/issue-comments-rule.test.ts` (joshuafolkken/kit#1319).
 	it.each([
 		[FULLRUN_FILE, 'pnpm josh followup'],
 		[HALFRUN_FILE, '**Invoking `halfrun` is _not_ authorization to commit, push, or merge**'],
@@ -343,7 +345,7 @@ describe.each(AI_DOCS)('%s — routes to the skills instead of inlining them', (
 		'#### `fullrun` — Full execution',
 		'#### `halfrun` — Implement + verify',
 		'#### `queue` — Sequential multi-issue fullrun',
-		'#### `/review` → `followup --merge` chain rule (MANDATORY)',
+		'#### `/review` → `followup` chain rule (MANDATORY)',
 		ANTI_PATTERN_MARKER,
 		// joshuafolkken/kit#951: three rules that bind only after a command has started, restated
 		// resident until the documents reached the ceiling. Their opening sentences are pinned absent

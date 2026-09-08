@@ -102,7 +102,7 @@ rather than read as a measurement; narrowing the trigger would mean parsing the 
 judgement the command exists to remove.
 
 **Where it sits:** started when `/code-review` starts, read once the review has converged and before
-`pnpm josh followup --merge`, and **never inside `pnpm josh gate`** — the gate re-runs on every fix
+`pnpm josh followup`, and **never inside `pnpm josh gate`** — the gate re-runs on every fix
 round and on every `epicrun` child, and the review rewrites the very prose being measured. The anchor
 is the merge rather than the commit because the commit sits between the two review rounds
 ([joshuafolkken/kit#1261](https://github.com/joshuafolkken/kit/issues/1261)), and a `blocked` verdict

@@ -372,7 +372,7 @@ SECURITY.md         tsconfig.sonar.json
 > cannot be denied and is left to the prose rule. An entry carrying a colon would ship as a guard
 > that was never in force, which is why `claude-settings.test.ts` fails one.
 >
-> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup --merge` run git and gh from
+> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup` run git and gh from
 > inside node scripts, so the only command string the Bash matcher ever sees is the `pnpm josh …`
 > wrapper — denying the direct forms leaves the entire commit-and-merge workflow intact. `git rm` is
 > denied whole rather than as `git rm --cached`, which would leave `git rm -r --cached` through; a
@@ -443,7 +443,7 @@ SECURITY.md         tsconfig.sonar.json
 > **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
 > documents used to inline.** The rule document is read in full on every turn, and roughly
 > half of it was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
-> `halfrun` / `queue` steps, the `/code-review` → `followup --merge` chain rule, and the checks that run
+> `halfrun` / `queue` steps, the `/code-review` → `followup` chain rule, and the checks that run
 > after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
 > documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB.
 >
@@ -515,10 +515,11 @@ SECURITY.md         tsconfig.sonar.json
 > comment endpoint is not a filing and is left alone, and so — the trigger reads the command string —
 > is a filing whose title never appears in it. **That limit is why the rule keeps a one-line trigger
 > resident**: the line binds on every route, and the delivery reinforces it where it can see one. It
-> delivers a second rule at the call that pipes a verification command (joshuafolkken/kit#1556): a
-> pipeline exits with its last command's status, so a red gate read through `| tail` came back as a
-> success. **Read-only listings are untouched** — the trigger names only the checks whose result means
-> pass or fail, and narrowing a listing with `| head` is how one is properly read.
+> also delivers the rule that an Issue's comments are read with its body (joshuafolkken/kit#1319), and
+> the one that a verification command is not read through a pipe (joshuafolkken/kit#1556) — a pipeline
+> exits with its last command's status, so a red gate read through `| tail` came back as a success.
+> **Read-only listings are untouched** — that trigger names only the checks whose result means pass or
+> fail, and narrowing a listing with `| head` is how one is properly read.
 > `JOSH_RULE_GUARD=off` switches it off, and
 > `prompts/collaboration-workflow/rule-delivery.md` is the enumeration and the criterion behind it.
 >

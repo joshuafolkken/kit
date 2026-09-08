@@ -16,7 +16,7 @@ import type { Span } from './time-spans'
 // cost the run nothing, while cycle two ran 01:53:38 → 01:55:27 with the run doing nothing but
 // waiting, and the merge followed at 01:56:01. `josh time` read the head commit's check-runs alone,
 // so a second cycle could not be expressed at all — and it read a negative `merge_gap` as "the run
-// did not wait", which is never true of `followup --merge`, whose whole job is to wait for the
+// did not wait", which is never true of `followup`, whose whole job is to wait for the
 // checks before merging. The `ci` phase therefore reported 0, and `diag` ranked the issue that would
 // have cut those 109 seconds last, as work with no wall clock behind it.
 //

@@ -3,12 +3,14 @@ import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_command } from '#scripts/git/git-command'
 import { lane_environment } from './lane-environment'
+import { lane_install, type InstallResult } from './lane-install'
 import { lane_paths } from './lane-paths'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seed_policy } from './lane-seed'
 import { lane_start_point } from './lane-start-point'
 
-// Opening a lane: one linked work tree, one branch, one port seed (joshuafolkken/kit#1490).
+// Opening a lane: one linked work tree, one branch, one port seed, and the dependencies to run in it
+// (joshuafolkken/kit#1490, joshuafolkken/kit#1554).
 //
 // **The reading side of a linked work tree already worked; only the creating side was missing.**
 // `git_directories()` resolves the tree's own git directory, `run-hold.ts` keys its record on it and
@@ -63,6 +65,24 @@ function guard_unreadable(lanes: ReadonlyArray<LaneInfo>): void {
 	)
 }
 
+/**
+ * Fail the open when the install failed, rather than handing back a lane nothing runs in.
+ *
+ * Reported as a success, the caller captures the directory and types the first `pnpm josh …` in it —
+ * which fails with `tsx: command not found`, the exact failure the install exists to remove, now
+ * with a success line printed above it (joshuafolkken/kit#1554). The work tree is left where it is
+ * because both ways out need it there: the install can be run again against it, or `lane:close` can
+ * take it away. The child's own output is carried along, since it is the only thing that says which
+ * of the two applies.
+ */
+function guard_install(lane: LaneInfo, result: InstallResult): void {
+	if (result.is_installed) return
+
+	throw new Error(
+		`Opened a lane for #${lane.issue} at ${lane.directory}, but installing its dependencies failed, so no \`pnpm josh …\` will run there. Finish it with \`pnpm --dir ${lane.directory} install --frozen-lockfile\`, or take it away with \`pnpm josh lane:close ${lane.issue}\`.\n${result.output}`,
+	)
+}
+
 function build_plan(
 	repository_root: string,
 	root: string,
@@ -87,6 +107,12 @@ function build_plan(
 // The start point comes from `lane_start_point` rather than from the default branch's bare name:
 // that name resolves to a local ref nothing advances, and the lane would start without the work
 // merged just before it (joshuafolkken/kit#1535).
+//
+// **The install is the last step rather than a caller's, because a lane without it is unusable**
+// (joshuafolkken/kit#1554). Leaving it to whoever opened the lane made it a step nothing enforced,
+// and every lane opened without it failed on its first `pnpm josh …`. It runs after the `.env`
+// rather than before, so a lane that fails here still carries the seat it was allocated and the
+// failure is recoverable by re-running the install alone.
 async function materialize(plan: LanePlan): Promise<void> {
 	mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
 
@@ -94,6 +120,7 @@ async function materialize(plan: LanePlan): Promise<void> {
 
 	await git_command.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
 	writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
+	guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
 }
 
 /**

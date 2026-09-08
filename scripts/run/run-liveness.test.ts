@@ -80,7 +80,7 @@ describe('a live unit is never booked as stopped', () => {
 		)
 	})
 
-	// A `pnpm josh followup --merge` waits on CI for up to 32 minutes and writes nothing while it
+	// A `pnpm josh followup` waits on CI for up to 32 minutes and writes nothing while it
 	// does, which is longer than the silent window. The process trace is what keeps that from reading
 	// as a stop.
 	it('answers alive while a process of the child is running a long check', () => {

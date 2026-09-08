@@ -1,3 +1,4 @@
+import { process_identity } from './process-identity'
 import { stamp_file } from './stamp-file'
 
 // A stamp whose payload is "when this was taken, and the digest of every file it covers"
@@ -20,6 +21,15 @@ interface FileMapStamp {
 	// the in-flight gate marker (joshuafolkken/kit#1242). The other two assert a completed past fact,
 	// which stays true however long the file sits there, so they carry it and never read it.
 	pid?: number
+	// The other half of that process's identity: when it started (joshuafolkken/kit#1245). **A pid
+	// alone names whatever holds that number now**, so a marker left behind by a killed gate began
+	// reading as live again the moment the operating system reissued its pid — the brief then reporting
+	// a gate running on this tree about a gate that no longer exists. The pair separates them, because
+	// a reissued pid necessarily started after the record was written. Written by every record and read
+	// only by the one that asserts the present, exactly as `pid` already was; a record written before
+	// the field existed carries none, which `process_identity.is_same_process` answers as "cannot tell"
+	// rather than as a match.
+	process_start?: string
 	// The commit the file map is defined against (joshuafolkken/kit#1328). Every reader of these
 	// records computes its map as a diff against that commit — the branch's merge base with the
 	// default branch since joshuafolkken/kit#1527 — so **the map alone does not describe a tree**:
@@ -59,36 +69,54 @@ function optional_fields(
 	pid: unknown,
 	base: unknown,
 	completed_at: unknown,
+	process_start: unknown,
 ): Partial<FileMapStamp> {
 	return {
 		...(typeof pid === 'number' && { pid }),
 		...(typeof base === 'string' && { base }),
 		...(typeof completed_at === 'string' && { completed_at }),
+		...(typeof process_start === 'string' && { process_start }),
 	}
 }
 
 function parse_stamp(raw: string): FileMapStamp | undefined {
-	const { taken_at, files, pid, base, completed_at } = JSON.parse(raw) as Partial<FileMapStamp>
+	const { taken_at, files, pid, base, completed_at, process_start } = JSON.parse(
+		raw,
+	) as Partial<FileMapStamp>
 
 	if (typeof taken_at !== 'string' || !is_file_map(files)) return undefined
 
-	return { taken_at, files, ...optional_fields(pid, base, completed_at) }
+	return { taken_at, files, ...optional_fields(pid, base, completed_at, process_start) }
 }
 
-// `signal 0` runs every permission check and delivers nothing, so it is the standard liveness probe:
-// it throws `ESRCH` where the process is gone. `EPERM` means it exists but belongs to someone else,
-// which cannot happen for a record this process wrote into its own temp path — and answering "not
-// running" there is the safe direction regardless.
-function is_process_alive(pid: number | undefined): boolean {
-	if (pid === undefined) return false
+// Whether the process that wrote this record is still running (joshuafolkken/kit#1245). It takes the
+// whole record rather than a pid, because a pid on its own is not a process: asked that way a caller
+// could not tell the writing process from whatever the operating system later reissued its number to,
+// which is exactly the state the in-flight marker must never describe.
+//
+// **Three answers, and no record at all is the definite `false`.** `undefined` is "there is a live
+// process with that pid and this platform cannot say whether it is the writer" — a record from before
+// the field existed, a machine with no `ps`, or a probe that failed under load.
+function writer_state(stamp: FileMapStamp | undefined): boolean | undefined {
+	if (stamp === undefined) return false
 
-	try {
-		process.kill(pid, 0)
+	return process_identity.is_same_process(stamp.pid, stamp.process_start)
+}
 
-		return true
-	} catch {
-		return false
-	}
+// **For a claim: only when certain.** `josh review:brief` prints "a gate is running on this tree", so
+// an uncertain answer must not become that sentence; it becomes `Not verified`, and the run pays one
+// redundant reading of checks it was already running.
+function is_writer_running(stamp: FileMapStamp | undefined): boolean {
+	return writer_state(stamp) === true
+}
+
+// **For a guard: only when certain of the opposite.** `josh bench` deletes caches a running gate is
+// reading, so the question it must ask is not "is the writer running" but "am I sure it is gone" — an
+// uncertain answer there would clear the caches out from under a live gate, which is the very event
+// joshuafolkken/kit#1332 was filed for. The probe is a subprocess and can fail on a loaded machine,
+// which is exactly the machine a gate makes, so this is not a theoretical branch.
+function is_writer_gone(stamp: FileMapStamp | undefined): boolean {
+	return writer_state(stamp) === false
 }
 
 // Whether a record may be compared against a map read now (joshuafolkken/kit#1537). Every map here is
@@ -171,12 +199,23 @@ function read_at(source: string): FileMapStamp | undefined {
 // deliberate but total-by-assumption: a field added to `write` without a matching entry in
 // `parse_stamp` and `optional_fields` would be dropped by any `complete`, so the two are extended
 // together.
+// **The pid is not the whole of that check either** (joshuafolkken/kit#1245). A record left behind by
+// a run that was killed, whose pid this process was later handed, passes `pid === process.pid` — and
+// stamping it would describe that dead run as finished, which is the false `skip` the field exists to
+// prevent, reached from a third direction. `is_writer_gone` is the added half rather than
+// `is_writer_running`, so a record carrying no start time keeps the behavior it had: the run that
+// wrote it is the one completing it, and refusing there would answer `required` forever on any
+// platform that cannot report a start time.
+function is_own_record(stamp: FileMapStamp): boolean {
+	return stamp.pid === process.pid && !is_writer_gone(stamp)
+}
+
 function complete_at(target: string): string | undefined {
 	const stamp = read_at(target)
 
 	if (stamp === undefined) return undefined
 
-	if (stamp.pid !== process.pid) return undefined
+	if (!is_own_record(stamp)) return undefined
 
 	return stamp_file.write_stamp(target, { ...stamp, completed_at: new Date().toISOString() })
 }
@@ -193,11 +232,13 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 		stamp_path: resolve,
 		// `base` goes into the payload undefined and all — `JSON.stringify` drops an undefined value,
 		// so a caller that has no base writes exactly the record it wrote before this field existed.
+		// `own_fields` is what writes the pid, and since joshuafolkken/kit#1245 the writing process's
+		// start time beside it — assembled in one place so no record can carry half an identity.
 		write: (files, target = resolve(), base?: string) =>
 			stamp_file.write_stamp(target, {
 				taken_at: new Date().toISOString(),
 				files,
-				pid: process.pid,
+				...process_identity.own_fields(),
 				base,
 			}),
 		complete: (target = resolve()) => complete_at(target),
@@ -213,7 +254,8 @@ const file_map_stamp = {
 	create,
 	describes_base,
 	is_file_map,
-	is_process_alive,
+	is_writer_gone,
+	is_writer_running,
 	parse_stamp,
 	read_at,
 }
