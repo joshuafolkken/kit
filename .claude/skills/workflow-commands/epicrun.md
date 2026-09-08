@@ -824,6 +824,22 @@ silence clock, which is what keeps a heartbeat from landing immediately behind a
 it would be noise rather than news. The clock is silence, never a timer; the command's own reference
 is `docs/josh-commands.md` → "`josh run:progress`".
 
+**Every report this run writes opens with the time the observation was taken.** Not only how long it
+has been quiet: the heading carries an absolute instant, in the same form the watcher prints —
+`at YYYY-MM-DDTHH:MMZ`. A relative figure means something only while the reports keep coming, and
+unattended execution is made of the events that break exactly that assumption — a suspend, a rate
+limit, a restarted process. `epicrun #1474` was suspended overnight, resumed, read its own
+`quiet 11m` as if no time had passed and concluded the machine's clock was broken; it was correct to
+the second against GitHub's own `Date` header, and an absolute time in the report would have settled
+it at a glance (joshuafolkken/kit#1560). **The date is part of it**, because that confusion happened
+across a day boundary and a bare clock time would have left the same hole open. **The zone is UTC,
+and never the one the reader happens to be in** — joshuafolkken/kit#1245 already paid for a timestamp
+rendered in the reader's zone making one process look like a stranger, and this line is relayed to
+other machines and read in cloud sessions. **It is added, never substituted for the elapsed figure**:
+how long it has been quiet and when the observation was taken are two different facts, and neither
+can be reconstructed from the other. **The relayed lines need nothing added to them** — `josh
+run:progress` prints the same stamp itself, so the rule above still holds exactly as written.
+
 **The line carries observations, never "still running".** Children in flight with their labels and
 their pull request state, the open lanes, the load average, how long the newest unit transcript has
 gone without growing, and how long that whole set has been identical. **Nothing in it is a

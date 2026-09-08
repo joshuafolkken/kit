@@ -6,6 +6,7 @@ import { run_progress, type Observations } from './run-progress'
 
 const MINUTE = run_progress.MS_PER_MINUTE
 const NOW = 10 * 60 * MINUTE
+const DAY = 24 * 60 * MINUTE
 const IN_PROGRESS = 'in-progress'
 
 function observations(overrides: Partial<Observations> = {}): Observations {
@@ -137,6 +138,32 @@ describe('format_line — observations, never "still running"', () => {
 
 	it('reports no verification result, because it reads none', () => {
 		expect(LINE).not.toMatch(/gate|CI|check|green|pass/iu)
+	})
+})
+
+// joshuafolkken/kit#1560. A suspended session resumed, read its own `quiet 11m` as if no time had
+// passed, and concluded the machine's clock was broken when it was correct to the second.
+describe('format_line — when the observation was taken', () => {
+	it('says when it was observed, beside how long the silence had run', () => {
+		expect(LINE).toContain('at 1970-01-01T10:00Z')
+		expect(LINE).toContain('quiet 12m')
+	})
+
+	it('carries the date, because the run that needed this was suspended across one', () => {
+		const next_day = run_progress.format_line(observations(), {
+			now_ms: NOW + DAY,
+			quiet_since_ms: NOW,
+			unchanged_since_ms: NOW,
+		})
+
+		expect(next_day).toContain('at 1970-01-02T10:00Z')
+	})
+
+	// The UTC pin is the exact stamp above: `NOW` is ten hours after the epoch, so a formatter that
+	// reached for the reader's own zone prints another hour on any machine that is not on UTC. What
+	// this one pins is the `Z` beside it, which is what stops a reader having to guess the zone.
+	it('marks the zone, so a reader in another one is not left guessing', () => {
+		expect(LINE).toMatch(/ at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z /u)
 	})
 })
 
