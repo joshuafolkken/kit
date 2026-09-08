@@ -34,7 +34,12 @@ const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
 // So the ceiling stays a byte count, raised from 8000 by the one row joshuafolkken/kit#1186 adds
 // plus room for the rollout's remaining section extractions at roughly 180 bytes a row. Measured
 // there, the index is 8090 bytes.
-const INDEX_CEILING_BYTES = 9000
+//
+// Raised again by one row for `rule-delivery.md` (joshuafolkken/kit#1524), which is the growth this
+// ceiling is written to allow: **what it guards against is the index absorbing content**, not a new
+// topic being indexed at all. A row is about 180 bytes and a topic file nothing links to is a file
+// nobody opens, so refusing the row would keep the number green by leaving the corpus unreachable.
+const INDEX_CEILING_BYTES = 9200
 
 // The fixture already enumerates them for the concatenating reader; re-implementing it here would
 // let the two drift and quietly stop covering a file the reader still concatenates.

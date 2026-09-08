@@ -112,9 +112,11 @@ function is_gate_step_failed(result: GateStepResult): boolean {
 //
 // A failing check keeps its whole output: that is the one time the body is the answer. So does a
 // check that **passed without running** — `test-unit-guard` exits 0 with a notice when vitest is
-// absent or the project has no tests, and suppressing that made a gate which ran zero tests print
-// the same five lines as one that ran them all. The marker comes from the guard itself rather than
-// being matched by eye, so the two cannot drift apart.
+// absent, and suppressing that made a gate which ran zero tests print the same five lines as one
+// that ran them all. The marker comes from the guard itself rather than being matched by eye, so
+// the two cannot drift apart. **The guard's other empty case is no longer one of these**: vitest
+// present with no test file exits non-zero and carries no marker, so it reaches the failing branch
+// above rather than this one (joshuafolkken/kit#1224).
 function is_skip_notice(result: GateStepResult): boolean {
 	return result.output.includes(test_unit_guard.SKIP_MARKER)
 }

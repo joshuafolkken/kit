@@ -45,6 +45,14 @@ describe('git_epic_validate.validate_epic — a generated epic', () => {
 		expect(is_valid(to_subject({}))).toBe(true)
 	})
 
+	// GitHub keeps the casing a label was created with and treats `Epic` and `epic` as one label, so
+	// a repository that predates these scripts answers with either spelling. Compared literally, this
+	// check told such an epic to add a label it already carries — and the addition is then refused as
+	// a duplicate, so the instruction could not be followed (joshuafolkken/kit#1476).
+	it('accepts the epic label whatever casing the repository created it with', () => {
+		expect(check_names_failing(to_subject({ labels: ['Epic'] }))).not.toContain(LABEL_CHECK)
+	})
+
 	it('accepts an ordered epic produced by the body builder', () => {
 		const subject = to_subject({ body: generated_body(true) })
 

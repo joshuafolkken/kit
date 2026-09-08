@@ -36,6 +36,15 @@ function install_toolkit(package_name: string, bin_name: string, has_shim = true
 	writeFileSync(path.join(bin_directory, bin_name), '#!/bin/sh\n')
 }
 
+// A scoped package that is installed perfectly well and simply ships no CLI — a shared config or a
+// types package, not a toolkit. Nothing about it is broken, so nothing may refuse on it.
+function install_library(package_name: string): void {
+	write_manifest(path.join(state.project, NODE_MODULES, package_name), {
+		name: package_name,
+		version: '1.0.0',
+	})
+}
+
 beforeEach(() => {
 	state.project = mkdtempSync(path.join(tmpdir(), 'adopt-toolkits-'))
 })
@@ -80,6 +89,7 @@ describe('adopt_toolkits.misplaced_toolkits', () => {
 			dependencies: { [APP_KIT]: RANGE, zod: RANGE },
 			devDependencies: { [KIT]: RANGE },
 		})
+		install_toolkit(APP_KIT, JOSH_APP)
 
 		expect(adopt_toolkits.misplaced_toolkits(state.project)).toEqual([APP_KIT])
 	})
@@ -90,6 +100,16 @@ describe('adopt_toolkits.misplaced_toolkits', () => {
 			dependencies: { [KIT]: RANGE },
 			devDependencies: { [KIT]: RANGE },
 		})
+		install_toolkit(KIT, JOSH)
+
+		expect(adopt_toolkits.misplaced_toolkits(state.project)).toEqual([])
+	})
+
+	// Telling the owner of a scoped runtime library to move it into `devDependencies` would break the
+	// build it is there to serve. Only a package that ships a CLI can be a misplaced toolkit.
+	it('says nothing about a scoped package that ships no CLI', () => {
+		write_manifest(state.project, { name: 'consumer', dependencies: { [EXAMPLE]: RANGE } })
+		install_library(EXAMPLE)
 
 		expect(adopt_toolkits.misplaced_toolkits(state.project)).toEqual([])
 	})
@@ -161,5 +181,52 @@ describe('adopt_toolkits.discover_toolkits', () => {
 		write_manifest(state.project, { name: 'consumer', devDependencies: { zod: RANGE } })
 
 		expect(adopt_toolkits.discover_toolkits(state.project)).toEqual([])
+	})
+})
+
+// The drop `discover_toolkits` makes used to be invisible, which is how a partial install synced kit
+// alone and reverted the overlay tier (joshuafolkken/kit#1540). This is what makes it nameable.
+describe('adopt_toolkits.unresolved_toolkits', () => {
+	it('names a declared toolkit whose CLI shim is not installed', () => {
+		write_manifest(state.project, {
+			name: 'consumer',
+			devDependencies: { [KIT]: RANGE, [APP_KIT]: RANGE },
+		})
+		install_toolkit(KIT, JOSH)
+		install_toolkit(APP_KIT, JOSH_APP, false)
+
+		expect(adopt_toolkits.unresolved_toolkits(state.project)).toEqual([APP_KIT])
+	})
+
+	it('names a declared toolkit that was never installed at all', () => {
+		write_manifest(state.project, { name: 'consumer', devDependencies: { [APP_KIT]: RANGE } })
+
+		expect(adopt_toolkits.unresolved_toolkits(state.project)).toEqual([APP_KIT])
+	})
+
+	// `resolve_toolkit` and `is_unreachable_toolkit` share the same two primitives, so a resolved
+	// toolkit can never appear in both lists.
+	it('names nothing when every declared toolkit resolves', () => {
+		write_manifest(state.project, { name: 'consumer', devDependencies: { [KIT]: RANGE } })
+		install_toolkit(KIT, JOSH)
+
+		expect(adopt_toolkits.unresolved_toolkits(state.project)).toEqual([])
+	})
+
+	// It is installed exactly as asked; `pnpm install` would change nothing, so refusing on it would
+	// leave the consumer with a diagnosis that is false and a fix that can never work.
+	it('names nothing for a scoped package that is installed but ships no CLI', () => {
+		write_manifest(state.project, { name: 'consumer', devDependencies: { [EXAMPLE]: RANGE } })
+		install_library(EXAMPLE)
+
+		expect(adopt_toolkits.unresolved_toolkits(state.project)).toEqual([])
+	})
+
+	// A broken install is a broken install wherever it was declared, and `pnpm install` is the fix in
+	// both fields — so this list reads `dependencies` too.
+	it('names a broken install declared under dependencies as well', () => {
+		write_manifest(state.project, { name: 'consumer', dependencies: { [APP_KIT]: RANGE } })
+
+		expect(adopt_toolkits.unresolved_toolkits(state.project)).toEqual([APP_KIT])
 	})
 })

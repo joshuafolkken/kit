@@ -71,7 +71,7 @@ Each block's header names the command that ran, not only the check, because the 
 
 **That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat. **Two of the checks that loop repeats are scoped**: [`josh lint:related`](#josh-lintrelated) checks only the changed files ([#1298](https://github.com/joshuafolkken/kit/issues/1298)) and [`josh test:related`](#josh-testrelated) runs only the tests related to them ([#1257](https://github.com/joshuafolkken/kit/issues/1257)); the gate itself keeps running `josh lint` and `josh test:unit` over everything.
 
-**Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent or the project has no tests, and a gate that ran zero tests must not look like one that ran them all), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
+**Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent, and a gate that ran zero tests must not look like one that ran them all — the other empty case, vitest present with no test file, [fails](#josh-testunit) rather than passing since [#1224](https://github.com/joshuafolkken/kit/issues/1224)), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
 
 **A tree the gate was already green on is not checked again** ([#1328](https://github.com/joshuafolkken/kit/issues/1328)). Every green run records the digest of each changed file it passed on — the record `josh review:brief` reads to print `Already verified` ([#1241](https://github.com/joshuafolkken/kit/issues/1241)). The gate now reads it back at start-up, and where nothing that record covers has moved it prints the recorded result and exits 0 without starting a process:
 
@@ -321,6 +321,27 @@ The refusal leaves through `hookSpecificOutput.permissionDecision`, the only sha
 
 **Verify it the way #1390 asks to be verified**: run `pnpm josh time --issue <N>` afterwards and compare the pre-implementation phase — `plan` plus `setup`, or the run start to the first `Edit` where the phase table charges a delegated run to `pre-run` — against run #1441's hand-measured 15.4 min and 34%.
 
+### `josh rule:guard`
+
+Deliver a rule at the tool call that binds it, instead of carrying it resident in `CLAUDE.md` on every turn ([#1524](https://github.com/joshuafolkken/kit/issues/1524)). Like the other two guards it is not run by hand: `.claude/settings.json` wires it to `PreToolUse` and Claude Code pipes the call it is about to run to it as JSON on stdin.
+
+```json
+"PreToolUse": [
+	{
+		"matcher": "Bash",
+		"hooks": [{ "type": "command", "command": "pnpm josh rule:guard", "timeout": 20 }]
+	}
+]
+```
+
+**It is a dispatcher, not a third guard.** `scripts/rules/delivered-rules.ts` holds one row per relocated rule — an id, the trigger read from the call, and the text the refusal states — and each row is a `hook_decision.create_transcript_guard` spec, the same shell `josh batch:guard` and `josh investigation:guard` already share. So the next rule that leaves residency costs a row and a test, never a fourth process in front of every call. The enumeration and the criterion that decides what belongs on it are `prompts/collaboration-workflow/rule-delivery.md`.
+
+**What it delivers today** is the backlog WIP cap: the trigger is a `Bash` call that files an Issue — `gh issue create`, or a `title`-bearing POST to a path ending in `/issues` (a title passed inside `--input <file>` is not visible to it) — and the refusal states the count, the refusal, both exemptions and the three tests that decide the interrupt one. **A comment endpoint is not a filing**: `…/issues/<N>/comments` is left alone, and so is a listing, because comments outnumber filings by a wide margin and a guard that fired on them would be the hook that fires on the wrong turns.
+
+**Wired to `Bash` alone**, for the reason `josh batch:guard` documents: Claude Code denies one call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself not. Every rule the enumeration carries is therefore one whose binding moment is a shell call.
+
+**One delivery per run**, recorded by the same stamp the other two use, and the refusal text says so — a delivery that repeated would stop the very call it asked for. Set `JOSH_RULE_GUARD` to `off`, `0`, `false` or `no` to switch it off; unset is **on**.
+
 ### `josh cspell`
 
 Run spell check.
@@ -334,9 +355,15 @@ pnpm josh cspell:dot      # includes dotfiles
 
 Run unit tests with vitest. Because a freshly-bootstrapped project may have no unit suite yet
 (and therefore no `vitest` installed), this command **skips gracefully (exit 0)** when `vitest`
-is not installed or when no `*.{test,spec}.{ts,js}` files exist — so CI and the local gate never
-block a project that has no unit tests yet. Once both `vitest` and at least one test file are
-present, it runs `vitest run` as usual.
+is not installed — so CI and the local gate never block a project that has no unit tests yet.
+Once both `vitest` and at least one test file are present, it runs `vitest run` as usual.
+
+**`vitest` installed with no `*.{test,spec}.{ts,js}` file anywhere is a failure, not a skip**
+([#1224](https://github.com/joshuafolkken/kit/issues/1224)). Installing vitest is the project
+declaring that it runs unit tests, so an empty match there is a mis-scoped glob or a deleted suite
+rather than a young project — and `pnpm josh followup --merge` reads only the exit code, so a zero
+would hand the merge gate a verification that verified nothing. `josh init` installs no vitest, so a
+project that has genuinely not started testing yet takes the skip above and is unaffected.
 
 ```bash
 pnpm josh test:unit
@@ -437,7 +464,7 @@ The two are separate answers on purpose: an empty list is a change this cannot n
 
 A narrowed run can still match no test file — a new module nothing imports yet is the usual case. vitest prints `No test files found` and exits 0, which the gate's full run answers for a few minutes later.
 
-Like `josh test:unit`, it skips gracefully (exit 0) when `vitest` is not installed or the project has no test files, and says so naming itself.
+Like `josh test:unit`, it goes through the same guard and says so naming itself: it skips gracefully (exit 0) when `vitest` is not installed, and fails when `vitest` is installed and the project has no test file at all ([#1224](https://github.com/joshuafolkken/kit/issues/1224)).
 
 ### `josh test:e2e`
 
@@ -719,11 +746,23 @@ The steps, in the consumer's own directory:
 
 **Which toolkits are installed is read, not listed.** The scoped packages in `devDependencies` are the candidates; a candidate is a target only when its CLI shim is actually present in `node_modules/.bin`, and its CLI name comes from the installed package's own `bin` field rather than a table in kit. A fourth toolkit needs no edit here.
 
-`dependencies` is deliberately not read. The upgrade installs with `pnpm add -D`, so a toolkit declared there would be _relocated_ into `devDependencies` — a manifest rewrite nobody asked for, riding silently into the pull request. Such a toolkit is named on the console as skipped rather than passed over in silence.
+**A declared toolkit that cannot be carried refuses the run — it is never dropped from the plan** ([#1540](https://github.com/joshuafolkken/kit/issues/1540)). Both ways one falls out stop the run before anything writes, naming each package and the one command that fixes it:
+
+| What was found                                                                 | What happens                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| A runnable toolkit declared under `dependencies` rather than `devDependencies` | refused — move it with `pnpm add -D <toolkit>`                |
+| A declared package that is missing here, or whose CLI shim is not installed    | refused — `pnpm install` (either field)                       |
+| A scoped package that is installed and simply ships no CLI                     | **ignored** — it is a library, and nothing about it is broken |
+
+`dependencies` is deliberately not read for the plan: the upgrade installs with `pnpm add -D`, so a toolkit declared there would be _relocated_ into `devDependencies` — a manifest rewrite nobody asked for, riding silently into the pull request.
+
+**The refusal names only what it can prove**, which is why the third row exists. The `@joshuafolkken/` prefix says nothing about whether a package is a toolkit, so a shared config or a types package under that scope must not be told to reinstall — it is already installed — nor to move out of `dependencies`, which would break the build it is there to serve. A package counts as a toolkit only when its own installed `bin` field says so.
+
+**Continuing without one is worse than not running at all**, which is why this refuses rather than warning. The toolkits overlay files _derived_ from kit's (see [sync.md](./sync.md)), so a run that syncs kit without the overlay does not merely do less — it rewrites the overlay's paths back to kit's originals. That diff then arrives in the pull request wearing kit's own face, where a reviewer has nothing to notice. The refusal is also what the `--dry-run` reports, so what the dry run lists stays what the real run does.
 
 **`@joshuafolkken/kit` has to be one of them.** The verification gate and the pull request run through `pnpm josh`, and pnpm writes that shim only for a project's _direct_ dependencies — so a repository declaring only app-kit or game-kit would fail both steps _after_ the upgrade and the sync had written. That is refused up front, before anything writes.
 
-**Nothing to do is a skip, not a failure.** With no `@joshuafolkken/*` toolkit installed, or with every toolkit already current and the sync rewriting no file, the run reports the skip and opens neither an issue nor a pull request — exit code 0. A failed verification gate stops before the issue, so a red gate never produces one either.
+**Nothing to do is a skip, not a failure.** With no `@joshuafolkken/*` toolkit _declared_, or with every toolkit already current and the sync rewriting no file, the run reports the skip and opens neither an issue nor a pull request — exit code 0. A toolkit that is declared but cannot be carried is the refusal above, not this skip: nothing declared and something declared-but-unreachable are different states, and only the first is a no-op. A failed verification gate stops before the issue, so a red gate never produces one either.
 
 **It refuses to run inside kit's own repository**, the same boundary [`josh sync`](#josh-sync) draws ([#868](https://github.com/joshuafolkken/kit/issues/868)) and for the same reason: the sync would overwrite the distribution source with its own derived templates. The refusal comes before anything writes. Only kit is refused — app-kit and game-kit are themselves consumers of kit, which is exactly what this command is for.
 
@@ -1230,7 +1269,7 @@ The output claims the result rather than the omission, because a line reading "u
 
 The escape hatch is an environment variable rather than the gate's `--force` flag because the hook's command line belongs to `lefthook/base.yml` — nobody types this invocation, so a flag would be unreachable at the moment it is wanted. `pnpm josh audit`, the hook's other command, is untouched: the gate does not run it, so it is not a duplicate of anything.
 
-When the suite does run it goes through the same guard [`josh test:unit`](#josh-testunit) uses, so a project with no vitest or no test files prints a skip notice instead of failing the push.
+When the suite does run it goes through the same guard [`josh test:unit`](#josh-testunit) uses, so a project with no vitest prints a skip notice instead of failing the push — and a project that has vitest with no test file at all fails it, exactly as the gate would ([#1224](https://github.com/joshuafolkken/kit/issues/1224)).
 
 ### `josh pre-commit-type-check`
 
@@ -1554,7 +1593,9 @@ The cost is one request per candidate confirmed — one in the ordinary case, wh
 | ------------------- | --------------------------------------------------------------------------------------- | -------------------- |
 | Runnable            | Open, not parked, not already being worked on, and every dependency resolved            | Run it               |
 | Waiting on time     | Being worked on elsewhere, waiting on a release, or blocked by something in this bucket | Wait and ask again   |
-| Waiting on a person | Carries `needs-decision`, or is blocked by something in this bucket                     | Stop and report      |
+| Waiting on a person | Carries `needs-decision` or `epic`, or is blocked by something in this bucket           | Stop and report      |
+
+**A child that is itself an epic is never runnable** ([#1476](https://github.com/joshuafolkken/kit/issues/1476)). An epic is not a unit of work, so a run handed one has nothing to implement — and before this the row fell through to the dependency reading, which makes anything unblocked runnable, so `epicrun` passed the epic to `fullrun` as an ordinary issue. It waits on a person rather than on time because no amount of waiting turns an epic into work. **The test is the child's `epic` label, never how its task-list row is written**: a row naming `owner/repo#N` is a different property and a legitimate one, so a cross-repository child that is not an epic stays runnable and one that is an epic is withheld exactly like a local one. The reason is printed on standard error, because the report itself shows only a bare `#N`; [`josh epic:audit`](#josh-epicaudit) reports the same row as a finding.
 
 Reading the labels instead would fail in a specific, ordinary state. The moment kit's child closes and app-kit's child is waiting for the release to publish, there is no runnable child, nothing carries `in-progress` (kit's child is closed) and nothing carries `needs-decision` (nothing was parked). A label-based reading sees "nothing running, nothing parked" and stops — in the one situation where it should wait.
 
@@ -1666,6 +1707,7 @@ The graph's own properties — a cycle, and a body declaring one order while the
 | Implicit dependency  | warning   | A child's body names another child of the same epic, and nothing orders the two.                                                                                                          |
 | Order contradiction  | **error** | A child's **acceptance criteria** name another child, and nothing orders the two — it can run first. A warning instead once both children are closed, and for a pair in two repositories. |
 | Unresolved reference | warning   | A body cites an issue that does not exist, or one already closed.                                                                                                                         |
+| Nested epic          | warning   | A task-list row points at another epic. [`josh epic:next`](#josh-epicnext) withholds it, and this epic never auto-closes.                                                                 |
 | Orphan child         | warning   | An issue names this epic as its parent but the epic's task list does not track it.                                                                                                        |
 | Orphan search        | **error** | The search for those issues could not read the open backlog — a rate limit, expired auth.                                                                                                 |
 | Orphan search        | warning   | That search stopped before the end of the backlog: its 500-issue page cap, or its 50-match cap.                                                                                           |
@@ -1681,6 +1723,12 @@ What remains an error is a name in the acceptance criteria with **nothing orderi
 **And unless both children are closed, in which case it is also a warning** ([#1010](https://github.com/joshuafolkken/kit/issues/1010)). The whole force of the error is that the criteria's child _can run first_; once neither child has any execution left, that is no longer true of either, and the finding cannot describe anything that will happen. Left as an error it is permanent — every epic that ever forgot to declare an order fails its audit from then on, and `epicrun` runs the audit before its first child, so the epic stops at step one for a contradiction nothing can trip over. It was confirmed on a real epic: the audit was red while `epic:next` handed back a runnable child perfectly happily.
 
 **Demoted rather than dropped, and the choice was made on the output.** The acceptance criteria are part of the body, so the same pair also matches the implicit-dependency check, which stays quiet only while this one reports the pair. Drop the finding and the pair reappears one line lower as `implicit dependency` — the report is not one line shorter, and the message has lost the one thing worth reading in it, that the name is in the **acceptance criteria**. Since the brevity a drop would buy does not exist, the history stays visible at the level matching what is left to go wrong. Closed is asserted rather than inferred: a state the audit cannot confirm as `CLOSED` (a `MERGED` pull request among them) keeps the error.
+
+**A row pointing at another epic is reported, and the test is the child's `epic` label** ([#1476](https://github.com/joshuafolkken/kit/issues/1476)). The hierarchy is writable — nothing stops `- [ ] #<another epic>` being typed into a body — and until this check nothing read it either: `epic:next` classified the row like any other child and offered it as runnable, so an unattended run picked an epic up and had nothing to implement. It is **not** the cross-repository row, which is a different property and a legitimate one: a row naming `owner/repo#N` disables the epic auto-close by design, which is why a cross-repository backlink is written as prose rather than as a row. The two are independent — a cross-repository child that is not an epic is not reported, and one that is an epic is reported exactly like a local one.
+
+**A parent epic over another epic never auto-closes, and the finding says so.** The auto-close fires once per pull-request merge and evaluates only the epics whose own task list holds the issue that merge just closed; a grandparent's task list holds the _child epic's_ number, not the leaf issue's, so it is skipped — and closing the child epic through the API is not a merge, so nothing re-enters the evaluation afterwards. There is no depth at which that changes, which is why this is stated rather than fixed: flattening the row is meta-epic support, and that is [#894](https://github.com/joshuafolkken/kit/issues/894)'s frozen scope.
+
+**A warning rather than an error**, for the reason the demotions above give: an error fails the audit `epicrun` runs before its first child, so it would stop the whole batch — and the batch is already safe without that, because `epic:next` withholds the row instead of offering it. The child is reported under `Waiting on a person`, with the reason on standard error, since a bare `#N` there reads the same for a parked issue and for an epic while the two need entirely different things done to them.
 
 **The two `orphan search` findings are about the search, not about the children** ([#1033](https://github.com/joshuafolkken/kit/issues/1033)). The orphan check lists the open issues and matches their bodies client-side; a listing that could not be read used to arrive as an empty result, so a rate limit produced a clean audit that had looked at nothing. It is an error now, and the response is to **re-run the audit** — there is no contradiction to fix and no design choice to park, so neither the Tier A rule below nor a `needs-decision` park applies. If it keeps failing, check `gh auth status` and the rate limit. The warning form means the scan stopped early — at its 500-issue page cap, or once 50 open bodies mentioned the epic — so it covered the newest part of the backlog only; the audit still passes, and an orphan expected further down has to be looked for by hand.
 

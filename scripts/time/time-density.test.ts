@@ -139,10 +139,15 @@ describe('time_density.format_notice', () => {
 		expect(line).toContain('1.50 floor')
 	})
 
-	it('names the resident rule rather than restating it, and stays one line', () => {
+	// joshuafolkken/kit#1524 took the rule out of `CLAUDE.md`: it is delivered at the call that binds
+	// it, so the line has to carry the criterion itself and point at the topic file that holds the
+	// reasoning — a reference to a document the rule no longer sits in names nothing.
+	it('carries the criterion and names the topic file, and stays one line', () => {
 		const line = time_density.format_notice(reading())
 
-		expect(line).toContain('CLAUDE.md')
+		expect(line).toContain('prompts/collaboration-workflow/turn-batching.md')
+		expect(line).toContain("needs another call's result")
+		expect(line).not.toContain('CLAUDE.md')
 		expect(line).not.toContain('\n')
 	})
 })
