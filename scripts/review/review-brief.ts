@@ -116,15 +116,21 @@ function in_flight_line(taken_at: string): string {
 // a `finally`, and a `finally` does not run when the gate is killed — Ctrl-C, Stop, SIGTERM — so an
 // interrupted gate leaves the file on disk with the tree it was reading still intact. Believed on the
 // digests alone it would say a gate is running for as long as nobody edits that tree, about a process
-// that no longer exists: exactly the state the record must never describe. The written `pid` is what
-// separates the two, and a marker with none is read as not running, which falls back to `Not verified`.
+// that no longer exists: exactly the state the record must never describe.
+//
+// **The written pid alone did not separate the two** (joshuafolkken/kit#1245). It names whatever holds
+// that number now, so once the operating system reissued it the abandoned marker passed the liveness
+// probe again and this line went back to printing `Running now` about nothing — the same untrue
+// sentence, reached by a longer route. The record therefore carries the writing process's start time
+// beside its pid, and `is_writer_running` requires the pair. A marker carrying neither, or one whose
+// platform cannot report a start time, is read as not running and falls back to `Not verified`.
 function live_marker(
 	stamp: FileMapStamp | undefined,
 	tree: Record<string, string>,
 ): FileMapStamp | undefined {
 	const matched = matching_stamp(stamp, tree)
 
-	if (matched === undefined || !file_map_stamp.is_process_alive(matched.pid)) return undefined
+	if (!file_map_stamp.is_writer_running(matched)) return undefined
 
 	return matched
 }

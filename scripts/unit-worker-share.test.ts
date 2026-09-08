@@ -2,6 +2,8 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { process_identity } from './josh/process-identity'
+import { process_identity_fixture } from './josh/process-identity-fixture'
 import { unit_worker_share } from './unit-worker-share'
 
 // joshuafolkken/kit#1515: six lanes each read "11 cores, take 7 workers" and put 42 workers on 11,
@@ -14,14 +16,13 @@ const MEASURED_CORES = 11
 // What `epicrun` runs at, and the count the field measurement was taken under.
 const LANE_COUNT = 6
 const PROBE_PREFIX = 'josh-unit-share-test-'
-// Above every platform's pid ceiling, so it names a process that cannot exist rather than one that
-// happens not to right now.
-const DEAD_PID = 2 ** 22
-// Not a process at all: `process.kill(0, …)` addresses the caller's own process group and would
-// otherwise answer "alive" for a marker nothing wrote.
-const GROUP_PID = 0
+// The pids no live process holds and the start time none can have — `process-identity-fixture.ts` for
+// why each is the value it is.
+const { DEAD_PID, FOREIGN_START, GROUP_PID, NEGATIVE_PID } = process_identity_fixture
 
 const DEAD_MARKER = `${unit_worker_share.RUN_PREFIX}dead.json`
+const ALIVE_MARKER = `${unit_worker_share.RUN_PREFIX}alive.json`
+const RECYCLED_MARKER = `${unit_worker_share.RUN_PREFIX}recycled.json`
 const RUN_ARGUMENTS = ['run']
 const RUN_FAILURE = 'unit suite failed'
 
@@ -49,7 +50,7 @@ function write_marker(directory: string, name: string, payload: unknown): void {
 // The marker this process would write, read back. Named so the two `with_run_marker` cases below do
 // not nest the read three calls deep inside an assertion.
 function own_marker_pid(): number | undefined {
-	return unit_worker_share.read_marker_pid(unit_worker_share.marker_path())
+	return unit_worker_share.read_marker(unit_worker_share.marker_path())?.pid
 }
 
 describe('unit_worker_share.resolve_unit_workers', () => {
@@ -84,35 +85,49 @@ describe('unit_worker_share.resolve_unit_workers', () => {
 })
 
 describe('unit_worker_share.live_run_count — who counts as running', () => {
-	it('counts a marker whose process is still alive', () => {
+	// **The second row is the one that is not obvious, and it is deliberate** (joshuafolkken/kit#1245).
+	// A marker recording no start time — written before the field existed, or on a platform that cannot
+	// report one — is a live pid nobody can identify, and it still counts. That is the opposite of what
+	// the in-flight gate marker's readers do with the same answer, because what being wrong costs
+	// differs: here it costs this run a narrower share of the machine, while the other direction puts
+	// six unit suites on eleven cores.
+	it.each([
+		['names a process that is still alive', process_identity.own_fields()],
+		['records a pid but no start time', { pid: process.pid }],
+	])('counts a marker that %s', (_label: string, payload: unknown) => {
 		const directory = probe_directory()
 
 		try {
-			write_marker(directory, `${unit_worker_share.RUN_PREFIX}alive.json`, { pid: process.pid })
+			write_marker(directory, ALIVE_MARKER, payload)
 
 			expect(unit_worker_share.live_run_count(directory)).toBe(1)
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}
 	})
+})
 
+describe('unit_worker_share.live_run_count — who does not', () => {
 	// The leak this rule exists for. A run killed outright leaves its file behind, and counting it
 	// would hold every later run at one worker until somebody swept the temp directory by hand.
 	//
-	// `0` is the second case rather than a variant of it: it is not a dead process but the caller's own
-	// process group, which a bare `process.kill` probe reports as alive — so a corrupt marker would
-	// throttle the machine permanently.
-	it.each([[DEAD_PID], [GROUP_PID]])('ignores a marker recording pid %i', (pid: number) => {
-		const directory = probe_directory()
+	// `0` and `-1` are the second case rather than variants of it: neither is a dead process, they are
+	// the caller's own process group and another group, and a bare `process.kill` probe reports both as
+	// alive — so a corrupt marker would throttle the machine permanently.
+	it.each([[DEAD_PID], [GROUP_PID], [NEGATIVE_PID]])(
+		'ignores a marker recording pid %i',
+		(pid: number) => {
+			const directory = probe_directory()
 
-		try {
-			write_marker(directory, DEAD_MARKER, { pid })
+			try {
+				write_marker(directory, DEAD_MARKER, { pid })
 
-			expect(unit_worker_share.live_run_count(directory)).toBe(0)
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
-	})
+				expect(unit_worker_share.live_run_count(directory)).toBe(0)
+			} finally {
+				rmSync(directory, { recursive: true, force: true })
+			}
+		},
+	)
 })
 
 describe('unit_worker_share.live_run_count — sweeping what it counted out', () => {
@@ -132,6 +147,29 @@ describe('unit_worker_share.live_run_count — sweeping what it counted out', ()
 		}
 	})
 
+	// **Sweeping only ever collected the phantoms whose pid had not yet been reissued**, which is the
+	// half the comment above could not deliver (joshuafolkken/kit#1245). From the moment the operating
+	// system handed that number to something else, the pid-only probe answered "alive", the marker was
+	// counted rather than swept, and every solo run on the machine stayed at one worker for good. The
+	// recorded start time is what tells the reissued process from the one that wrote the file.
+	it('counts out and removes the marker of a pid that was reissued', () => {
+		const directory = probe_directory()
+
+		try {
+			write_marker(directory, RECYCLED_MARKER, {
+				pid: process.pid,
+				process_start: FOREIGN_START,
+			})
+
+			expect(unit_worker_share.live_run_count(directory)).toBe(0)
+			expect(existsSync(path.join(directory, RECYCLED_MARKER))).toBe(false)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+})
+
+describe('unit_worker_share.live_run_count — what it leaves alone', () => {
 	// **A marker that could not be read is left where it is.** `read_stamp_text` answers `undefined`
 	// for a file another account owns as readily as for a corrupt one, and unlinking on that answer
 	// raises `EPERM` from a path with no `catch` between it and the gate's plan line — aborting the run
