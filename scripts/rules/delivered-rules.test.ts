@@ -379,43 +379,8 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 })
 
 // The enumeration is the mechanism: one row per relocated rule, and the next rule to leave residency
-// costs a row rather than a second delivery path.
-// joshuafolkken/kit#1198: the trigger reads what the body *contains*, not which flag carries it —
-// every worked example in this repository's prompts passes a placeholder, and keying on the flag
-// would refuse those too. So the matching cases all carry a backtick or a `$`, and the non-matching
-// ones are the same flags with a body the shell leaves alone.
-describe('is_shell_evaluated_body', () => {
-	it.each([
-		EVALUATED_BODY_COMMAND,
-		'gh issue comment 1198 --body "ran `git switch main`"',
-		'gh api repos/{owner}/{repo}/issues/1/comments --field body="$HOME is expanded"',
-		'pnpm josh followup "t #1" --merge --notify-message="Result: `josh notify` ships it"',
-		// A substitution embedded in prose really is evaluated, so the `$(…)` exemption below is
-		// anchored to a value that is nothing else.
-		'gh api repos/o/r/issues/1/comments -f body="Result: run $(git log -1) to confirm"',
-	])('reads %j as an evaluated body', (command) => {
-		expect(delivered_rules.is_shell_evaluated_body(command)).toBe(true)
-	})
-
-	it.each([
-		// The shape every prompt in this repository actually writes — inert, and left alone.
-		'gh api repos/{owner}/{repo}/issues/1198/comments -f body="<plan>"',
-		'gh issue comment 1198 --body "Implemented the gate. Done!"',
-		// Already safe: the body never reaches the shell as text. The `*-file` spellings end in `-`
-		// where the pattern needs whitespace or `=`, so they cannot match it.
-		'gh api repos/o/r/issues/1/comments --field body=@/tmp/body.md',
-		'pnpm josh followup "t #1" --merge --notify-message-file /tmp/body.md',
-		// A whole-value substitution's output is not re-scanned, so the body arrives byte for byte.
-		'gh api repos/o/r/issues/1/comments -f body="$(cat /tmp/body.md)"',
-		// A backslash makes the next character literal inside double quotes.
-		String.raw`gh issue comment 1 --body "costs \$5 and a \` mark"`,
-		// `-b` is `git checkout`'s branch flag as often as it is `gh`'s body flag.
-		'git checkout -b "feature-$USER"',
-	])(LEAVES_ALONE, (command) => {
-		expect(delivered_rules.is_shell_evaluated_body(command)).toBe(false)
-	})
-})
-
+// costs a row rather than a second delivery path. The reading of the call itself is
+// `shell-body-trigger.test.ts`; what is pinned here is the row wired to it.
 describe('rule_delivery — the shell-body rule at the call that would execute text', () => {
 	it('delivers the rule on a comment whose body carries a backtick', () => {
 		const reason = rule_delivery(payload_of('evaluated', EVALUATED_BODY_COMMAND), NOW_MS)

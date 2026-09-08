@@ -25,14 +25,23 @@ const ESCAPED_NEWLINE = String.raw`\n`
 
 // **The path is resolved and checked before it is opened**, rather than handed to `readFileSync` as
 // it arrived. The value comes from a command line an agent composed, so the failure worth guarding is
-// a wrong path reaching the file system unexamined — a directory, a device, a dangling symlink. What
-// comes back instead is one sentence naming the resolved path, which is the difference between a
-// completion notification that fails legibly and one that dies on a raw `ENOENT` mid-merge.
+// a wrong path reaching the file system unexamined — a missing path, or a directory. What comes back
+// instead is one sentence naming the resolved path, which is the difference between a completion
+// notification that fails legibly and one that dies on a raw `ENOENT` mid-merge.
+//
+// **The check refuses those two, not "everything that is not a regular file."** `epic --rationale-file`
+// accepted any readable path before this module existed, and the two spellings a run actually reaches
+// for are not regular files: `--rationale-file /dev/stdin` is a character device or a symlink to a
+// pipe, and a `<(…)` process substitution arrives as the FIFO `/dev/fd/63`. An `isFile()` test rejects
+// both with `Not a readable file`, which is a regression dressed as a guard — so the test is
+// `isDirectory()`, and anything else readable is opened exactly as it was before.
 function read_body_file(raw_path: string): string {
 	const resolved = path.resolve(raw_path)
 	const stats = statSync(resolved, { throwIfNoEntry: false })
 
-	if (stats?.isFile() !== true) throw new Error(`Not a readable file: ${resolved}`)
+	if (stats === undefined || stats.isDirectory()) {
+		throw new Error(`Not a readable file: ${resolved}`)
+	}
 
 	return readFileSync(resolved, 'utf8')
 }
@@ -51,8 +60,15 @@ function has_value(raw: string | undefined): boolean {
 }
 
 // The inline half, kept apart so `resolve` reads as the one decision it makes: file or not.
+//
+// **Trim first, expand second — the order the inline form has always had.** `git_notify` used to run
+// `raw.trim().replaceAll(…)` in one expression; moving only the expansion up here would leave a trim
+// downstream of it, and a body written `--notify-message "…\n"` would have its own trailing newline
+// eaten as surrounding whitespace. Trimming the raw argument removes quoting slack, which is the only
+// whitespace a shell token picks up by accident; the newlines the escape produces are the author's
+// text and survive it.
 function resolve_inline(inline: string | undefined): string | undefined {
-	return inline === undefined ? undefined : expand_escaped_newlines(inline)
+	return inline === undefined ? undefined : expand_escaped_newlines(inline.trim())
 }
 
 // **Both flags at once is refused rather than ranked.** A precedence rule would let a caller that

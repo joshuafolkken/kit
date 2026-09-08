@@ -2,6 +2,7 @@ import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
+import { shell_body_trigger } from './shell-body-trigger'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
@@ -171,60 +172,10 @@ const ISSUE_COMMENTS_REASON =
 	'`.claude/skills/workflow-commands/SKILL.md` → "An Issue\'s comments are part of the Issue". It ' +
 	'fires once per run and cannot repeat on the call in hand.'
 
-// A body handed to a command as an inline double-quoted argument, in the spellings a run reaches for:
-// `gh`'s field flags (`-f` / `-F` / `--field` / `--raw-field` with `body=`), `gh`'s own `--body`, and
-// `josh`'s `--body` and `--notify-message`. The value is captured so the decision can be made on what
-// the body actually contains rather than on the flag alone.
-//
-// **`-b` is deliberately absent.** It is `gh`'s short `--body`, but it is also `git checkout -b`, and
-// a branch name is not a body — covering it would refuse calls where nothing is wrong. The `*-file`
-// spellings end in `-` where this pattern needs whitespace or `=`, so `--body-file <path>` and
-// `--notify-message-file <path>` cannot match it.
-const INLINE_BODY_VALUE =
-	/(?:(?:-f|-F|--field|--raw-field)\s*'?body=|(?:--body|--notify-message)[\s=]+)"((?:[^"\\]|\\.)*)"/gu
-
-// **What zsh evaluates inside double quotes, measured in this harness rather than assumed**
-// (joshuafolkken/kit#1198): a backtick runs as command substitution and a `$` expands. `!` does
-// **not** — history expansion is off in a non-interactive zsh, and `"hello!world"` survives intact —
-// so it is deliberately absent: a rule that fired on every exclamation mark would be firing on turns
-// where nothing is wrong, which `prompts/collaboration-workflow/rule-delivery.md` names as worse than
-// no hook at all.
-const SHELL_EVALUATED = /[`$]/u
-
-// **The one exemption: a body that is *entirely* one command substitution.** `body="$(cat <path>)"`
-// is the rule already being kept — the substitution's output is not re-scanned by the shell, so a
-// body full of backticks reaches the command byte for byte, and refusing it would spend the run's one
-// delivery on a caller who had already moved the body into a file.
-//
-// **It is anchored to the whole value, not to the `$(` alone.** Excusing `$(` anywhere would let
-// `body="Result: run $(git log -1) to confirm"` through, and that one really is evaluated: the
-// substitution replaces the text and the command runs.
-const WHOLE_VALUE_SUBSTITUTION = /^\$\([^()]*\)$/u
-
-// A backslash escape makes the next character literal inside double quotes, so `\$` and `` \` `` are
-// safe. They are dropped before the test rather than excluded from it, which is the same thing in one
-// pass and keeps `SHELL_EVALUATED` readable.
-const ESCAPED_PAIR = /\\./gu
-
-function is_evaluated_value(raw_value: string): boolean {
-	const literal = raw_value.replaceAll(ESCAPED_PAIR, '')
-
-	if (WHOLE_VALUE_SUBSTITUTION.test(literal)) return false
-
-	return SHELL_EVALUATED.test(literal)
-}
-
-// **The trigger is the body's content, not the flag.** Every worked example in this repository's
-// prompts passes a placeholder (`-f body="<plan>"`), which is inert; the moment a real body carrying
-// a backtick is substituted in, the call becomes the one that executes text. Keying on the flag would
-// refuse the inert examples too — firing on turns where the rule is already being kept.
-function is_shell_evaluated_body(command: string): boolean {
-	for (const match of command.matchAll(INLINE_BODY_VALUE)) {
-		if (is_evaluated_value(match[1] ?? '')) return true
-	}
-
-	return false
-}
+// The reading of the call itself — which spellings carry a body inline, and what the shell does to
+// the value — is `shell-body-trigger.ts`, beside its own cases. A row states its trigger and its
+// text; a model of zsh quoting is more than a row.
+const { is_shell_evaluated_body } = shell_body_trigger
 
 // The instruction in the shape a refusal can carry: what the shell is about to do, the safe
 // spellings, and the reissue sentence every delivery needs. The damage is named because it is the
@@ -370,7 +321,6 @@ const delivered_rules = {
 	is_body_only_issue_read,
 	is_enabled,
 	is_issue_filing,
-	is_shell_evaluated_body,
 }
 
 export type { DeliveredRule }

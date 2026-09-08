@@ -49,7 +49,7 @@ pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 
 ### 引き金つき配送 — 書いただけでは守られないため
 
-**規則を書くだけでは守られないことは、本リポジトリで繰り返し計測されている**（[`rule-delivery.md`](./rule-delivery.md)）。したがってこの規則は joshuafolkken/kit#1524 の機構に 1 行として載っており、`pnpm josh rule:guard` が該当する `Bash` 呼び出しを拒否して本文を突きつける。列挙表の行は `scripts/rules/delivered-rules.ts` の `shell-body` である。
+**規則を書くだけでは守られないことは、本リポジトリで繰り返し計測されている**（[`rule-delivery.md`](./rule-delivery.md)）。したがってこの規則は joshuafolkken/kit#1524 の機構に 1 行として載っており、`pnpm josh rule:guard` が該当する `Bash` 呼び出しを拒否して本文を突きつける。列挙表の行は `scripts/rules/delivered-rules.ts` の `shell-body` であり、その行が読む引き金 — どの綴りが本文をインラインで運ぶか、シェルがその値に何をするか — は `scripts/rules/shell-body-trigger.ts` にある。
 
 **引き金はフラグではなく本文の中身である。** 本リポジトリのプロンプトにある作例はいずれもプレースホルダ（`-f body="<plan>"`）を渡しており、これは無害である。フラグで引くと、規則が既に守られているそれらのターンでも拒否することになる。実際にバッククォートか `$` を含む本文が二重引用符に載った瞬間だけが、テキストが実行される呼び出しである。
 
@@ -64,6 +64,7 @@ pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 
 ### マーカーテスト
 
-- `scripts/josh/cli-body.test.ts` — バッククォート・`$` を含む本文がファイル経由で無改変に通ること、`-` が標準入力を読むこと、インラインとファイルの同時指定を拒否すること
-- `scripts/rules/delivered-rules.test.ts` — 危険な綴りで発火し、プレースホルダ・`@file` 形式・エスケープ済み `\$`・非 `Bash` ツールでは無言であること
-- `scripts/shell-body-rule.test.ts` — 常駐 1 行がこの文書を指しており、配送文が被害・安全な綴り・再発行の指示を運ぶこと
+- `scripts/josh/cli-body.test.ts` — バッククォート・`$` を含む本文がファイル経由で無改変に通ること、`-` が標準入力を読むこと、通常ファイル以外の読める経路（`/dev/stdin`・プロセス置換）を開けること、インラインとファイルの同時指定を拒否すること
+- `scripts/rules/shell-body-trigger.test.ts` — 危険な綴りで発火し、プレースホルダ・`@file` 形式・エスケープ済み `\$` では無言であること。`body=` のどちら側に引用符があっても発火すること、`$( … )` で包んでもバッククォートは免除されないこと、`$( … )` の中の引用符で捕捉が切れないことを、いずれも発火・非発火の対で固定する
+- `scripts/rules/delivered-rules.test.ts` — 上の引き金が列挙表の行に配線されており、非 `Bash` ツールでは無言であること
+- `scripts/shell-body-rule.test.ts` — 常駐 1 行がこの文書を指しており、配送文が被害・安全な綴り・再発行の指示を運ぶこと。**この一覧そのものも固定する** — 一覧が「あるスイートが何を固定しているか」を書きながら、そのケースが存在しないという食い違いが実際に起きた（`-` の標準入力）

@@ -19,6 +19,11 @@ const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
 const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/${SKILL_ENTRY_FILE}`
 const SUITE_PATH = 'scripts/shell-body-rule.test.ts'
+// The trigger's own suite, split out of the enumeration's so the reading of a call is read beside the
+// cases it has to keep. The marker list has to name it, or the split loses its coverage claim.
+const TRIGGER_SUITE = 'scripts/rules/shell-body-trigger.test.ts'
+// The one line in that list that had drifted from the suite it credits.
+const STDIN_CLAIM = '`-` が標準入力を読むこと'
 // Named once: the enumeration, both residency lists and this suite have to agree on the command.
 const GUARD_COMMAND = 'pnpm josh rule:guard'
 // The measurement the rule rests on, and the most quotable part of it — so it is the first thing that
@@ -106,6 +111,18 @@ describe(`${CANONICAL} — carries the damage, the measurement and the safe spel
 	// rather than a footnote — it is the reason the resident line was not deleted.
 	it.each(['### 引き金が見えないもの', 'gh api --input <file>', '`-b`'])(
 		'records the blind spot %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
+
+	// **The marker list is a claim about other suites, and nothing was checking it.** The list said
+	// `cli-body.test.ts` pinned the stdin `-` form while no case in it passed `-` at all — a
+	// documentation line that read as coverage and was not. So each suite the list credits is asserted
+	// here by name, and the one claim that had drifted is asserted as text: the suites themselves carry
+	// the cases, and this is what fails when the list and the suites part company again.
+	it.each([TRIGGER_SUITE, 'scripts/josh/cli-body.test.ts', SUITE_PATH, STDIN_CLAIM])(
+		'credits %j in the marker list',
 		(marker) => {
 			expect(content).toContain(marker)
 		},

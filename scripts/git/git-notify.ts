@@ -38,10 +38,16 @@ function parse_notify_mentions(raw_mentions: string | undefined): Array<string> 
 // flag is read, not here (joshuafolkken/kit#1198). Expanding again would rewrite a literal backslash-n
 // that `--notify-message-file` legitimately carries — a file already holds real newlines, so an
 // escape sequence in one is the author's text rather than a quoting workaround.
+//
+// **Trimming moved up with it, and for the same reason.** This function used to read
+// `raw.trim().replaceAll(…)` — trim first, expand second. Keeping the trim here after the expansion
+// had moved reversed that order, so `--notify-message "…\n"` lost the newline its own escape had just
+// produced. `trim` survives only as the emptiness test, where the whitespace is being counted rather
+// than removed.
 function resolve_notify_message(raw_message: string | undefined): string {
 	if (raw_message === undefined || raw_message.trim().length === 0) return DEFAULT_NOTIFY_MESSAGE
 
-	return raw_message.trim()
+	return raw_message
 }
 
 function build_notify_config(input: {
