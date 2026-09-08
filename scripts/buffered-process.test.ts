@@ -13,12 +13,15 @@ type ExecaImplementation = Parameters<typeof mocked_execa.mockImplementation>[0]
 
 const SIGNAL_EXIT_CODE = undefined
 const FAILING_EXIT_CODE = 1
+const LANE_DIRECTORY = '/lanes/1554'
+const SHORTER_TIMEOUT_MS = 600_000
 
-// Only the three options the callers depend on; execa's own Options type carries dozens more.
+// Only the options the callers depend on; execa's own Options type carries dozens more.
 interface ObservedExecaOptions {
 	all?: boolean
 	reject?: boolean
 	timeout?: number
+	cwd?: string
 }
 
 const spawn_options: Array<ObservedExecaOptions> = []
@@ -57,6 +60,32 @@ describe('run_buffered_process', () => {
 		expect(spawn_options[0]?.all).toBe(true)
 		expect(spawn_options[0]?.reject).toBe(false)
 		expect(spawn_options[0]?.timeout).toBe(PROCESS_TIMEOUT_MS)
+	})
+
+	// joshuafolkken/kit#1554: `lane:open` runs its install in the work tree it just created, so a
+	// `cwd` silently dropped here would install the repository `josh` was typed in and leave every
+	// lane exactly as empty as before — the failure that command exists to remove, reported as done.
+	it('runs the child in a caller-supplied directory, under a caller-supplied bound', async () => {
+		mock_execa()
+
+		await buffered_process.run_buffered_process(['install'], {
+			cwd: LANE_DIRECTORY,
+			timeout_ms: SHORTER_TIMEOUT_MS,
+		})
+
+		expect(spawn_options[0]?.cwd).toBe(LANE_DIRECTORY)
+		expect(spawn_options[0]?.timeout).toBe(SHORTER_TIMEOUT_MS)
+	})
+
+	// The fan-out callers pass no options at all, and execa's overload resolution is sensitive to an
+	// explicitly-`undefined` `cwd` — it widens `all` back to `string | undefined`, so the key has to
+	// be absent rather than present and empty.
+	it('omits the directory key entirely when no caller asked for one', async () => {
+		mock_execa()
+
+		await buffered_process.run_buffered_process(['josh', 'lint'])
+
+		expect(spawn_options[0]).not.toHaveProperty('cwd')
 	})
 
 	it('returns the captured output and exit code', async () => {

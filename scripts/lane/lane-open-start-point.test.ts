@@ -3,6 +3,7 @@ import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_install } from './lane-install'
 import { lane_open } from './lane-open'
 import { lane_paths } from './lane-paths'
 
@@ -100,6 +101,13 @@ beforeEach(async () => {
 	// The fetch is the one step this fixture cannot take — the suite's network guard refuses it — and
 	// it is not what is under test: the assertion is which ref the lane is cut from.
 	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
+	// The install is stubbed for the same reason git is not (joshuafolkken/kit#1554): this fixture
+	// commits two text files and no `package.json`, so a real `pnpm install` there would fail on a
+	// manifest that was never the subject. `lane-install.test.ts` pins what it asks pnpm for.
+	vi.spyOn(lane_install, 'install_dependencies').mockResolvedValue({
+		is_installed: true,
+		output: '',
+	})
 
 	await build_repository()
 	process.chdir(fixture.repository_root)
