@@ -7,7 +7,7 @@ Within `fullrun` / `fullrun new` / `queue`, the `/code-review` skill output is *
 1. **PR is merged, the `completion` Telegram notification has been sent, AND `pnpm josh ms` has returned the working tree to the default branch** — normal end state, report the PR URL and stop. **In a lane, `josh ms` refuses and that refusal is the answer**: a linked work tree cannot check the default branch out without taking it from another one, so the run ends at the merge and the lane is handed back for `pnpm josh lane:close <N>` (joshuafolkken/kit#1535).
 2. **A genuine blocker requires user judgment** — exactly three count:
    - A CodeRabbit / Claude Review substantive finding that cannot be auto-verified as a false positive.
-   - The managed config-file confirmation gate (`josh sync`-distributed files in the diff).
+   - The managed config-file confirmation gate (`josh sync`-distributed files in the diff). **`pnpm josh followup` raises this one itself** — it matches the diff against the three distribution lists and exits non-zero ahead of the CI wait, so it is read rather than judged (joshuafolkken/kit#1578).
    - A CI failure that requires user input to resolve.
 
    When a blocker fires, send a `confirmation` Telegram **before** stopping.

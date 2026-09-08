@@ -41,6 +41,15 @@ vi.mock('./git-pr-ai-review', () => ({
 	},
 }))
 
+// The same rule as the auto-close below, applied to the managed config-file gate: the real one reads
+// the branch diff of whatever tree this suite runs in, so a timing suite would measure `git diff` —
+// and the stage sequence pinned here would flip to the interrupted one the moment the working copy
+// held a distributed change (joshuafolkken/kit#1578). The implementation goes inside `vi.fn` so it
+// survives a reset; `run_review_checks` spreads the result.
+vi.mock('./git-pr-managed-config', () => ({
+	git_pr_managed_config: { handle_managed_config_changes: vi.fn(async () => []) },
+}))
+
 vi.mock('./telegram-notify', () => ({
 	telegram_notify: { send: vi.fn(), send_or_report: vi.fn() },
 }))
@@ -83,6 +92,7 @@ const BASE_INPUT: FollowupInput = {
 	notify_config: undefined,
 	coderabbit_ignore_reason: undefined,
 	ai_review_ignore_reason: undefined,
+	managed_config_ignore_reason: undefined,
 	is_skip_watch: true,
 	should_merge: false,
 }

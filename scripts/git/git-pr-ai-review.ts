@@ -5,23 +5,9 @@ import {
 	type ReviewComment,
 } from './git-ai-review-scan'
 import { git_gh_command } from './git-gh-command'
+import { git_pr_confirmation, has_ignore_reason, type TelegramContext } from './git-pr-confirmation'
 import { parse_json_array_or_undefined } from './parse-json-array'
 import { ai_review_pull_comment_schema } from './schemas'
-import { telegram_notify, type TelegramSendInput } from './telegram-notify'
-
-// What to type when the confirmation notification itself could not be delivered
-// (joshuafolkken/kit#1564). The `--body-file` spelling rather than `--body`, because the body names
-// commands and a backtick inside shell double quotes is evaluated before the command runs.
-const CONFIRMATION_RECOVERY =
-	'send it by hand — `pnpm josh notify --task-type confirmation --issue-url <url> ' +
-	'--body-file <path>`'
-
-interface TelegramContext {
-	repo_name: string | undefined
-	issue_title: string | undefined
-	issue_url: string | undefined
-	pr_url: string | undefined
-}
 
 interface AiReviewPullComment {
 	body?: string | undefined
@@ -94,37 +80,6 @@ function build_ai_review_ignore_comment(
 	return lines.join('\n')
 }
 
-function build_confirmation_input(input: {
-	context: TelegramContext
-	body: string
-}): TelegramSendInput {
-	return {
-		task_type: 'confirmation',
-		repo_name: input.context.repo_name,
-		issue_title: input.context.issue_title,
-		body: input.body,
-		issue_url: input.context.issue_url,
-		pr_url: input.context.pr_url,
-	}
-}
-
-async function notify_ai_review_confirmation(input: {
-	context: TelegramContext
-	body: string
-}): Promise<void> {
-	// **The tolerant send** (joshuafolkken/kit#1564). What stops the run here is the blocker this
-	// notification is *about*, and it is raised by the caller — so a failed send must not replace that
-	// diagnosis with a Telegram error. It is reported and the caller's own stop still happens.
-	//
-	// Unlike the completion notification, this one *has* a recovery: a `confirmation` is exactly what
-	// `josh notify` is for, and the run stops here anyway, so re-sending it by hand loses nothing.
-	await telegram_notify.send_or_report(build_confirmation_input(input), CONFIRMATION_RECOVERY)
-}
-
-function has_ignore_reason(reason: string | undefined): reason is string {
-	return reason !== undefined && reason.trim().length > 0
-}
-
 async function fetch_review_comments(
 	branch_name: string,
 ): Promise<Array<ReviewComment> | undefined> {
@@ -149,7 +104,7 @@ async function handle_blockers(input: {
 		return
 	}
 
-	await notify_ai_review_confirmation({ context: input.context, body })
+	await git_pr_confirmation.notify_confirmation({ context: input.context, body })
 
 	throw new Error(body)
 }
@@ -181,7 +136,10 @@ async function handle_unreadable_comments(input: {
 		return [UNREADABLE_COMMENTS_NOTE]
 	}
 
-	await notify_ai_review_confirmation({ context: input.context, body: UNREADABLE_COMMENTS_BODY })
+	await git_pr_confirmation.notify_confirmation({
+		context: input.context,
+		body: UNREADABLE_COMMENTS_BODY,
+	})
 
 	throw new Error(UNREADABLE_COMMENTS_BODY)
 }
@@ -215,8 +173,9 @@ export {
 	handle_ai_review_findings,
 	parse_ai_review_comments,
 	to_review_comment,
-	has_ignore_reason,
 	UNREADABLE_COMMENTS_BODY,
 	UNREADABLE_COMMENTS_NOTE,
 }
-export type { TelegramContext, AiReviewPullComment }
+export type { AiReviewPullComment }
+
+export { has_ignore_reason, type TelegramContext } from './git-pr-confirmation'

@@ -9,6 +9,7 @@ import { is_coderabbit_check } from './git-pr-checks-eval'
 import { CHECK_STATUS_PASS, git_pr_checks_parse, type PrStateSnapshot } from './git-pr-checks-parse'
 import { git_pr_coderabbit } from './git-pr-coderabbit'
 import { git_pr_followup_wrapup } from './git-pr-followup-wrapup'
+import { git_pr_managed_config } from './git-pr-managed-config'
 import { github_issue_url } from './github-issue-url'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
 
@@ -64,6 +65,7 @@ interface FollowupInput {
 	notify_config: GitNotifyConfig | undefined
 	coderabbit_ignore_reason: string | undefined
 	ai_review_ignore_reason: string | undefined
+	managed_config_ignore_reason: string | undefined
 	is_skip_watch: boolean
 	should_merge: boolean
 }
@@ -244,23 +246,13 @@ async function notify_completion(
 	)
 }
 
-// The three stages the Issue's own breakdown names as (1), (2) and (3), marked separately because
-// they answer different questions: the check wait is time GitHub took, and the two comment scans are
-// requests this command chose to make.
-async function run_review_checks(
+// The two comment scans, marked separately from the check wait because they answer a different
+// question: the wait is time GitHub took, and these are requests this command chose to make.
+async function run_comment_scans(
 	input: FollowupInput,
 	context: TelegramContext,
 	log: StageLog,
 ): Promise<Array<string>> {
-	const snapshot = await run_checks({
-		branch_name: input.branch_name,
-		is_skip_watch: input.is_skip_watch,
-	})
-
-	lap(log, STAGE.checks_wait)
-	const check_notes = read_coderabbit_skip_notes(snapshot)
-
-	log_skip_notes(check_notes)
 	const comment_notes = await git_pr_coderabbit.handle_coderabbit_findings({
 		branch_name: input.branch_name,
 		ignore_reason: input.coderabbit_ignore_reason,
@@ -275,7 +267,40 @@ async function run_review_checks(
 
 	lap(log, STAGE.ai_review_comments)
 
-	return [...check_notes, ...comment_notes, ...ai_review_notes]
+	return [...comment_notes, ...ai_review_notes]
+}
+
+// **The managed config-file gate runs first, ahead of the check wait** (joshuafolkken/kit#1578). It
+// reads the branch diff and nothing else, so a run that is going to stop stops in seconds rather
+// than after the whole of CI — the prose it replaces said "after CI status checks complete", which
+// spent the entire wait on an answer that never depended on a check result.
+//
+// **It laps no stage of its own.** The printed stage sequence is asserted as an exact list, and a
+// diff read this cheap is not what a measurement of `followup` is looking for; its cost lands inside
+// `checks-wait`, where it is indistinguishable from noise.
+async function run_review_checks(
+	input: FollowupInput,
+	context: TelegramContext,
+	log: StageLog,
+): Promise<Array<string>> {
+	const managed_notes = await git_pr_managed_config.handle_managed_config_changes({
+		branch_name: input.branch_name,
+		ignore_reason: input.managed_config_ignore_reason,
+		context,
+		should_merge: input.should_merge,
+	})
+	const snapshot = await run_checks({
+		branch_name: input.branch_name,
+		is_skip_watch: input.is_skip_watch,
+	})
+
+	lap(log, STAGE.checks_wait)
+	const check_notes = read_coderabbit_skip_notes(snapshot)
+
+	log_skip_notes(check_notes)
+	const scan_notes = await run_comment_scans(input, context, log)
+
+	return [...managed_notes, ...check_notes, ...scan_notes]
 }
 
 // **Answers with the issue number the run actually used** (joshuafolkken/kit#1539), which is the one

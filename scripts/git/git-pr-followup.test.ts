@@ -46,6 +46,17 @@ vi.mock('./git-pr-ai-review', () => ({
 	},
 }))
 
+// The gate reads the branch diff of whatever tree the suite happens to run in, so leaving it real
+// would make these tests pass or fail on the working copy — green today, red the moment the run
+// edits a distributed file (joshuafolkken/kit#1578). The implementation is passed to `vi.fn` rather
+// than set afterwards so it survives `clearAllMocks` / `resetAllMocks`; `run_review_checks` spreads
+// the result, and a bare `vi.fn()` would answer `undefined`.
+vi.mock('./git-pr-managed-config', () => ({
+	git_pr_managed_config: {
+		handle_managed_config_changes: vi.fn(async () => []),
+	},
+}))
+
 vi.mock('./telegram-notify', () => ({
 	telegram_notify: {
 		send: vi.fn(),
@@ -84,6 +95,7 @@ const BASE_INPUT: FollowupInput = {
 	notify_config: undefined,
 	coderabbit_ignore_reason: undefined,
 	ai_review_ignore_reason: undefined,
+	managed_config_ignore_reason: undefined,
 	is_skip_watch: true,
 	should_merge: false,
 }

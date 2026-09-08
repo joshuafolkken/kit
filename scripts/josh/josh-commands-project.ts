@@ -1,5 +1,9 @@
 import type { CommandEntry } from './josh-command-types'
 
+// Command names are the CLI's, not TypeScript's: a scoped one carries a colon (`sync:scope`), which
+// no identifier format allows. The same disable sits at the top of `josh-commands-maintenance.ts`
+// for the same reason.
+/* eslint-disable @typescript-eslint/naming-convention */
 const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 	init: {
 		script: 'scripts/init/init.ts',
@@ -7,6 +11,11 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Project',
 	},
 	sync: { script: 'scripts/sync/sync.ts', description: 'Sync config files', category: 'Project' },
+	'sync:scope': {
+		script: 'scripts/sync/managed-config-scope-cli.ts',
+		description: 'Say whether this change touches a file josh sync distributes',
+		category: 'Project',
+	},
 	propagate: {
 		script: 'scripts/propagate/propagate.ts',
 		description: 'Carry the published release into every consumer repository next to this one',
