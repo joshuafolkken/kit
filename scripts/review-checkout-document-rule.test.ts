@@ -23,6 +23,9 @@ const SCRIPT_PATH = 'scripts/review/review-attest-cli.ts'
 const COMMAND_DOC = 'docs/josh-commands.md'
 const REVIEW_PROMPT = 'prompts/review.md'
 const FOLLOWUP_SCRIPT = 'scripts-ai/git-followup-workflow.ts'
+// The run's tail moved out of the entry point with joshuafolkken/kit#1539, so the clear is asserted
+// where it now lives; the gate in front of the merge stayed behind and is still read above.
+const FINISH_SCRIPT = 'scripts-ai/git-followup-finish.ts'
 
 // Every document a run reads between a review's verdict and the merge it authorizes. `epicrun.md` is
 // on the list because a lane is where the defect fires; `SKILL.md` and `chain-rule.md` because they
@@ -93,6 +96,8 @@ describe('the merge gate asks before it merges', () => {
 	})
 
 	it('clears the record on a merged run, beside the round-1 snapshot', () => {
-		expect(source).toContain('clear_review_target(should_merge)')
+		const tail = readFileSync(package_file(FINISH_SCRIPT), 'utf8')
+
+		expect(tail).toContain('clear_review_target(should_merge)')
 	})
 })

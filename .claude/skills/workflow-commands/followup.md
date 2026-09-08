@@ -39,6 +39,23 @@ What one invocation does, in order:
   request. A run that stopped at the merge therefore has no Issue comment, and the missing comment —
   not a missing Telegram — is what a failed merge looks like from GitHub.
 - **Closes the epics the Issue completes**, on a merged run only.
+- **Nothing after the merge can end the run** (joshuafolkken/kit#1539). Once the pull request has
+  merged, every remaining step — the Issue comment, the epic close, the run report, the review
+  records and the working-tree hold release — runs on its own: one that fails is **reported by name,
+  with the command that finishes it by hand where one exists** — `pnpm josh run:release` for the
+  hold, `gh pr comment` or `gh api … /comments` for the completion report, whichever the notify target
+  named. The epic auto-close and the run report have
+  no command of their own and name none, rather than pointing at one that only reports. The steps
+  after a failure still run. Before the merge nothing
+  changes: a failure there still ends the run, because nothing irreversible has happened and
+  re-running the command is the whole recovery. **Three merged runs ended the other way** — #1197,
+  #1537 and #1319 each threw at the Issue comment and left the hold behind, and the non-zero exit
+  read to `epicrun` and `queue` as a failed child. **A reported cleanup failure is not a merge
+  failure**: read the ⚠ lines, run what they name, and do not re-run the merge.
+- **Recovers the issue number from the pull request body** when the invocation named none: the
+  `closes #N` keyword the closes-check stage already reads is what supplies it, so a completion
+  report, an epic close and a run report are still made for a run whose command line forgot the
+  number.
 - **Emits the run report and appends it to `.time-history.jsonl`**, on a merged run only
   (joshuafolkken/kit#1471). Until then the measurement only ever happened when a person typed `diag`,
   so a run nobody asked about left no record at all — and a measurement that is not continuous cannot
