@@ -57,6 +57,10 @@ describe('is_shell_evaluated_body — the quote on either side of `body=`', () =
 		'gh api repos/o/r/issues/1/comments -f "body=see `pnpm josh ms`"',
 		'gh api repos/o/r/issues/1/comments --field "body=$HOME is expanded"',
 		'gh api repos/o/r/issues/1/comments --raw-field "body=run `git status` first"',
+		// `gh` takes `=` between a flag and its value as readily as a space, and the backtick runs
+		// either way.
+		'gh api repos/o/r/issues/1/comments --raw-field=body="see `pnpm josh ms`"',
+		'gh api repos/o/r/issues/1/comments --field="body=run `git status` first"',
 	])(READS_AS_EVALUATED, (command) => {
 		expect(is_shell_evaluated_body(command)).toBe(true)
 	})
@@ -69,6 +73,8 @@ describe('is_shell_evaluated_body — the quote on either side of `body=`', () =
 		'gh api repos/o/r/issues/1/comments -f "body=<plan>"',
 		'gh api repos/o/r/issues/1/comments --field body=@$HOME/body.md --jq ".url"',
 		'gh api repos/o/r/issues/1/comments --field body=@/tmp/body.md -f "title=Fix"',
+		'gh api repos/o/r/issues/1/comments --field=body="<plan>"',
+		'gh api repos/o/r/issues/1/comments --field=body=@$HOME/body.md --jq ".url"',
 	])(LEAVES_ALONE, (command) => {
 		expect(is_shell_evaluated_body(command)).toBe(false)
 	})

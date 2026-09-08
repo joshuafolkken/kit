@@ -24,7 +24,11 @@ const MESSAGE_FLAGS = '(?:--body|--notify-message)'
 // **They are two alternatives rather than one optional quote on each side.** An optional quote after
 // `body=` would also match `--field body=@$HOME/b.md`, capture the unquoted path up to some later
 // quote, find the `$` in it and refuse the very file form this rule asks callers to use.
-const FIELD_OPENING = String.raw`${FIELD_FLAGS}\s*(?:'?body="|"body=)`
+//
+// **The separator is `=` as readily as whitespace**, because `gh` accepts `--field=body="…"` for the
+// same reason `--body=…` works — which `MESSAGE_OPENING` below has always allowed. A pattern that
+// only knew the space stayed silent on a call that executes the backtick.
+const FIELD_OPENING = String.raw`${FIELD_FLAGS}[\s=]*(?:'?body="|"body=)`
 const MESSAGE_OPENING = String.raw`${MESSAGE_FLAGS}[\s=]+"`
 
 // One command substitution nested inside another — the `$(pwd)` of `$(cat "$(pwd)/x.md")`. One level
