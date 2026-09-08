@@ -46,7 +46,7 @@ const SURFACE_MARKERS: ReadonlyArray<string> = [
 	'the resume command',
 	// joshuafolkken/kit#1132: the stop must not rest on an agent matching the label string by eye.
 	'Read the answer from `pnpm josh issue:state <N>`, never by matching the label string yourself',
-	// With no pull request there is no CI E2E job and `followup --merge` is never reached, so the gate
+	// With no pull request there is no CI E2E job and `followup` is never reached, so the gate
 	// closes only if the run executes the suite itself — `halfrun`'s situation exactly.
 	'Run `pnpm josh test:e2e` yourself before stopping',
 	// The delegated child comes back OPEN without `needs-decision`, which the failure branch would

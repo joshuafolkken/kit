@@ -18,7 +18,7 @@ import { adopt_toolkits } from './adopt-toolkits'
 // `propagate_run.run_target` — so the working-tree pre-check, the ordering and the return to the
 // default branch cannot drift between the two.
 //
-// It stops at the open pull request. Merging is what `pnpm josh followup --merge` does, under an
+// It stops at the open pull request. Merging is what `pnpm josh followup` does, under an
 // authorization a CLI does not have.
 
 const SUCCESS_EXIT_CODE = 0

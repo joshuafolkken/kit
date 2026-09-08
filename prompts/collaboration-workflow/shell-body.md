@@ -37,7 +37,7 @@ joshuafolkken/kit#1198 のコメントは `!` も発火すると書いていた�
 ```bash
 gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>
 gh api -X PATCH repos/{owner}/{repo}/issues/<N> --field body=@<path>
-pnpm josh followup "<title> #<N>" --merge --notify-message-file <path>
+pnpm josh followup "<title> #<N>" --notify-message-file <path>
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body-file <path>
 ```
 

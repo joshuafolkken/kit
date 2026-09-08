@@ -114,6 +114,10 @@ words:
   - sonarqube
   - sonarcloud
   - sonarqubecloud
+  # SonarCloud's own rule-key prefixes for the taint-analysis engine, cited by the S8707
+  # suppression in `sonar-project.properties`. Distributed, because `josh init` copies that file.
+  - tssecurity
+  - jssecurity
   - qualitygate
   - Dsonar
   - Stylesheet

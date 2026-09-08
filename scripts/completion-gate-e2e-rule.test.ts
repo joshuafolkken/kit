@@ -45,7 +45,7 @@ const RETIRED_PHRASINGS: ReadonlyArray<string> = [
 const RESIDENT_MARKERS: ReadonlyArray<string> = [
 	'**Never ask the user to run it, and never wait for their output.**',
 	CI_AUTHORITY,
-	'`pnpm josh followup --merge` is what enforces it',
+	'`pnpm josh followup` is what enforces it',
 	'**you** run `pnpm josh test:e2e` yourself and read what it prints',
 	'a skip you did not see printed is not one',
 	'`prompts/testing-guide.md` → "Closing the E2E gate without a human run"',
@@ -112,7 +112,7 @@ describe(`${TESTING_GUIDE} — carries the procedure the gate points at`, () => 
 
 	it.each([
 		'**Never ask the user to run it, in either row.**',
-		'`pnpm josh followup --merge` waits for the checks and refuses to merge',
+		'`pnpm josh followup` waits for the checks and refuses to merge',
 		'**skips and exits 0**',
 		'### The gate is not weakened',
 		'A skip you did not see printed is not one',

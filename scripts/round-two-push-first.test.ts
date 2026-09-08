@@ -14,7 +14,7 @@ import { read_unwrapped } from './ai-document-fixture'
 //
 //   - without the scoped check in front, the run keeps discovering a lint violation by paying for a
 //     red full gate, which is the most expensive way to learn it;
-//   - without the join before `followup --merge`, the local gate becomes advisory and a merge can be
+//   - without the join before `followup`, the local gate becomes advisory and a merge can be
 //     decided on a gate nobody read — the obligation moved, not removed;
 //   - without the red-gate paragraph, the cost of a superseded CI cycle is undocumented and reads as
 //     unbounded, when `ci.yml`'s concurrency group cancels it;
@@ -55,7 +55,7 @@ const PUSHED_FIRST = 'is pushed before its gate'
 const ORDER_MARKERS: ReadonlyArray<string> = [
 	PUSHED_FIRST,
 	'the single check the fix reaches',
-	'joined before `pnpm josh followup --merge`',
+	'joined before `pnpm josh followup`',
 	// The fix goes onto the branch that is already open. The version-bump half this list used to carry
 	// went with joshuafolkken/kit#1486, which took the bump out of the child flow altogether.
 	'a follow-up commit on the same branch',
@@ -102,7 +102,7 @@ describe(`${HALFRUN} — the stop before commit is untouched`, () => {
 // reaches without ever opening `prompts/review.md`. Left unchanged it states the superseded order.
 const TOPIC_MARKERS: ReadonlyArray<string> = [
 	'**その追加コミットは、ゲートより先に push する**',
-	'`pnpm josh followup --merge` の前に join する',
+	'`pnpm josh followup` の前に join する',
 	'マージ条件（必須チェック全緑・ゲート緑・変更要求なし）は一切緩めない',
 	SECTION_POINTER,
 ]

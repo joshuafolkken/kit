@@ -372,7 +372,7 @@ SECURITY.md         tsconfig.sonar.json
 > cannot be denied and is left to the prose rule. An entry carrying a colon would ship as a guard
 > that was never in force, which is why `claude-settings.test.ts` fails one.
 >
-> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup --merge` run git and gh from
+> **No josh step is affected.** `pnpm josh git` and `pnpm josh followup` run git and gh from
 > inside node scripts, so the only command string the Bash matcher ever sees is the `pnpm josh …`
 > wrapper — denying the direct forms leaves the entire commit-and-merge workflow intact. `git rm` is
 > denied whole rather than as `git rm --cached`, which would leave `git rm -r --cached` through; a
@@ -443,7 +443,7 @@ SECURITY.md         tsconfig.sonar.json
 > **`.claude/skills/workflow-commands/` and `.claude/skills/dependency-update/` hold what the AI
 > documents used to inline.** The rule document is read in full on every turn, and roughly
 > half of it was procedure for a workflow most turns never enter — the `kickoff` / `fullrun` /
-> `halfrun` / `queue` steps, the `/code-review` → `followup --merge` chain rule, and the checks that run
+> `halfrun` / `queue` steps, the `/code-review` → `followup` chain rule, and the checks that run
 > after a dependency update. joshuafolkken/kit#854 moved those into these two skills and left the
 > documents with the trigger, cutting each from roughly 83 KB to roughly 49 KB.
 >
