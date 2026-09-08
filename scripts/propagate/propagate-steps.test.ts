@@ -7,7 +7,7 @@ import { git_gh_issue_write } from '#scripts/git/git-gh-issue-write'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { GATE_TARGETS } from '#scripts/verification-gate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { propagate_run } from './propagate-run'
+import { propagate_run, type StepResult } from './propagate-run'
 import { propagate_steps } from './propagate-steps'
 import type { PropagateTarget } from './propagate-targets'
 
@@ -34,6 +34,7 @@ const TARGET: PropagateTarget = {
 const ISSUE_URL = `https://github.com/${TARGET.repo}/issues/42`
 const CONSUMER_ISSUES_PATH = `repos/${TARGET.repo}/issues`
 const HTML_URL_FILTER = '.html_url'
+const MISSING_CHECKOUT = '/nonexistent-propagate-consumer'
 const REFUSAL =
 	'gh: Validation Failed (HTTP 422)\n{"message":"Issues are disabled for this repository"}'
 
@@ -240,11 +241,36 @@ describe('propagate_steps.upgrade_command', () => {
 describe('propagate_steps.precheck_step', () => {
 	it('refuses a consumer whose checkout is not a git repository', () => {
 		const result = propagate_steps.precheck_step(
-			{ ...TARGET, path: '/nonexistent-propagate-consumer' },
+			{ ...TARGET, path: MISSING_CHECKOUT },
 			propagate_run.STEP_PRECHECK,
 		)
 
 		expect(result.is_ok).toBe(false)
+	})
+})
+
+// A command that fails to *spawn* leaves execa with no streams at all, and the failure attribution
+// reads them. Thrown from here the error escapes the whole run — every consumer after this one goes
+// unattempted and the end-of-run report is never printed (joshuafolkken/kit#1417).
+function run_pull_request_step(): StepResult {
+	const target: PropagateTarget = { ...TARGET, path: MISSING_CHECKOUT }
+	const runner = propagate_steps.create_step_runner({
+		releases: [{ package_name: KIT, version: VERSION, bin_name: 'josh' }],
+		origin: propagate_steps.PROPAGATE_ORIGIN,
+	})
+
+	runner(target, propagate_run.STEP_ISSUE)
+
+	return runner(target, propagate_run.STEP_PR)
+}
+
+describe('propagate_steps.create_step_runner — a pull-request step that could not spawn', () => {
+	it('reports the failure rather than throwing out of the run', () => {
+		expect(() => run_pull_request_step()).not.toThrow()
+	})
+
+	it('still names the step as failed', () => {
+		expect(run_pull_request_step().is_ok).toBe(false)
 	})
 })
 
