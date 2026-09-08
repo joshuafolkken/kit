@@ -111,6 +111,17 @@ interface SpawnOutcome {
 
 const NO_COMMAND = 'no command defined'
 
+// One captured stream, as a string whatever happened. **This is not defensive padding, and the type
+// it accepts is wider than execa's on purpose**: a command that fails to *spawn* at all — a consumer
+// whose `pnpm` is not on the path, or a checkout directory that is gone — reports no streams, and
+// both fields come back `undefined` against a declared type of `string`. Passed on as they are, the
+// tail would throw on its first `replaceAll`, and nothing between here and the report catches it:
+// the throw escapes the whole run, so every consumer after this one goes unattempted and the
+// end-of-run block is never printed — "one consumer's failure never stops another", lost to a crash.
+function captured(text: string | undefined): string {
+	return text ?? ''
+}
+
 function step_result(step: string, exit_code: number | undefined): StepResult {
 	if (exit_code === SUCCESS_EXIT_CODE) return { step, is_ok: true }
 
@@ -168,7 +179,10 @@ function spawn_captured(
 		timeout: STEP_TIMEOUT_MS,
 	})
 
-	return { result: step_result(step, spawned.exitCode), streams: [spawned.stdout, spawned.stderr] }
+	return {
+		result: step_result(step, spawned.exitCode),
+		streams: [captured(spawned.stdout), captured(spawned.stderr)],
+	}
 }
 
 // Refuse a consumer whose working tree is not clean, is not on its default branch, or is behind its
