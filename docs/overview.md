@@ -32,4 +32,5 @@
 - [authentication](./authentication.md) — one-time GitHub Packages auth setup
 - [cli](./cli.md) — install and use the global `josh` CLI
 - [package](./package.md) — use the kit as a project devDependency
+- [cloud session](./cloud-session.md) — network policy, osv-scanner, `gh`, and lane limits in an agent container
 - [troubleshooting](./troubleshooting.md) — common install and usage errors

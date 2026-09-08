@@ -310,7 +310,7 @@ The third option joshuafolkken/kit#1433 raised was replacing round 2 with a cate
 1. Label the Issue `review-round2-skipped`, created once per repository exactly as `in-progress` is: `gh api repos/{owner}/{repo}/labels -f name=review-round2-skipped -f color=c5def5 -f description="Review round 2 was skipped under the condition in prompts/review.md" --silent 2>/dev/null || true`, then `gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=review-round2-skipped'`.
 2. Post an Issue comment under the heading `## Round 2 skipped`, naming **which arm fired** and quoting **the reason line the command printed**, verbatim — it carries the fix delta on arm B and round 1's timestamp on arm A. The label is what makes the set countable in one query; the comment is what makes a defect found later attributable to a particular skipped delta.
 
-Counting them is then one command: `gh issue list --label review-round2-skipped --state all`.
+Counting them is then one command: `gh api "repos/{owner}/{repo}/issues?labels=review-round2-skipped&state=all&per_page=100" --paginate --jq '.[] | select(.pull_request == null) | .number' | wc -l`. The count is taken by `wc -l` rather than by jq's `length` because `--jq` runs **per page**, so a `length` would print one number per page once the label passes 100 Issues. It is written as REST rather than as a subcommand for the reason `prompts/collaboration-workflow/gh-rest.md` gives — the subcommand is GraphQL-backed and a cloud session is answered `403` — and `prompts/collaboration-workflow/wip-cap.md` counts open Issues with the same shape.
 
 #### When the condition is withdrawn
 
