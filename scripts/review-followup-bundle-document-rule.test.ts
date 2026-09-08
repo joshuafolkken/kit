@@ -96,7 +96,7 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 
 // joshuafolkken/kit#1239: the filing and the bundle used to run before the commit, so their seconds
 // were the run's own — `epic:bundle` 43s and `epic --add` 18s on kit#1229 — while the CI wait that
-// follows had nothing beside it: 78 of the 122 seconds kit#1238's `followup --merge` took. Neither
+// follows had nothing beside it: 78 of the 122 seconds kit#1238's `followup` took. Neither
 // step changes a line of code, so running them after the pull request is open leaves the CI already
 // running valid, and the bundle's only deadline is met because the parent Issue closes at the merge.
 //
@@ -107,7 +107,7 @@ const CI_WAIT_PLACEMENT = 'inside the CI wait'
 
 const CANONICAL_PLACEMENT_MARKERS: ReadonlyArray<string> = [
 	`**The three steps run ${CI_WAIT_PLACEMENT}, not before the commit.**`,
-	'after `pnpm josh git -y` and before `pnpm josh followup --merge`',
+	'after `pnpm josh git -y` and before `pnpm josh followup`',
 	// Without this the move reads as relaxing step 2 rather than as satisfying it elsewhere.
 	'**The deadline is unchanged**',
 	'**This is not "review during CI", which was decided against.**',
@@ -116,7 +116,7 @@ const CANONICAL_PLACEMENT_MARKERS: ReadonlyArray<string> = [
 
 const WORKFLOW_PROMPT_PLACEMENT_MARKERS: ReadonlyArray<string> = [
 	'**3 段は CI 待ちの中で実行する。コミットの前ではない。**',
-	'`pnpm josh git -y` の後・`pnpm josh followup --merge` の前に置く',
+	'`pnpm josh git -y` の後・`pnpm josh followup` の前に置く',
 	'**期限は変わらない**',
 	'**これは「レビューを CI と並走させる」ではない。**',
 ]
@@ -129,11 +129,11 @@ const WORKFLOW_PROMPT_PLACEMENT_MARKERS: ReadonlyArray<string> = [
 const PIPELINE_CHAINS: ReadonlyArray<readonly [string, string]> = [
 	[
 		`${SKILL_ROOT}/chain-rule.md`,
-		'`pnpm josh git -y` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup --merge`',
+		'`pnpm josh git -y` → the follow-up filing and `pnpm josh epic:bundle` → `pnpm josh followup`',
 	],
 	[
 		`${SKILL_ROOT}/fullrun.md`,
-		'`pnpm josh git -y` → **the follow-up filing and `pnpm josh epic:bundle`, run here so they sit inside the CI wait** → `pnpm josh followup --merge`',
+		'`pnpm josh git -y` → **the follow-up filing and `pnpm josh epic:bundle`, run here so they sit inside the CI wait** → `pnpm josh followup`',
 	],
 	[
 		`${SKILL_ROOT}/queue.md`,
@@ -246,12 +246,12 @@ describe('prompts/collaboration-workflow/plan-comment.md — the review still pr
 	const content = read_unwrapped('prompts/collaboration-workflow/plan-comment.md')
 
 	it('no longer says the review runs after the commit', () => {
-		expect(content).not.toContain('コミット後かつ `pnpm josh followup --merge` 実行前')
+		expect(content).not.toContain('コミット後かつ `pnpm josh followup` 実行前')
 	})
 
 	it('places the filing after the pull request instead', () => {
 		expect(content).toContain(
-			'**この起票と束ね直しは `pnpm josh git -y` の後・`pnpm josh followup --merge` の前に置く**',
+			'**この起票と束ね直しは `pnpm josh git -y` の後・`pnpm josh followup` の前に置く**',
 		)
 	})
 })

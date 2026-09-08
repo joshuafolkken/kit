@@ -109,7 +109,6 @@ Example 1 — the basic form (`fullrun` includes the merge):
 
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
-  --merge \
   --notify-message "Implemented <title>
 Cause: <why this was needed, in one plain sentence>
 Fix: <what was changed, in one plain sentence>
@@ -124,7 +123,6 @@ Example 2 — with a CodeRabbit ignore reason:
 
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
-  --merge \
   --notify-message "Implemented <title>
 Cause: ...
 Fix: ...
@@ -140,7 +138,6 @@ Example 3 — with an AI-review (Claude Review) blocker ignore reason:
 
 ```bash
 pnpm josh followup "<issue-title> #<issue-number>" \
-  --merge \
   --notify-message "Implemented <title>
 Cause: ...
 Fix: ...
@@ -196,16 +193,16 @@ pnpm josh notify --task-type confirmation --issue-url "<issue-url>" --body=$'CI 
 
 ## `auto-merge` — Default `fullrun` behavior
 
-Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup --merge`, which handles the full sequence internally: wait for CI → verify AI review findings → send completion notification → merge. The user does **not** need to add a keyword. Invoking `fullrun` is itself the explicit authorization to merge.
+Every `fullrun` / `fullrun new` invocation uses `pnpm josh followup`, which handles the full sequence internally: wait for CI → verify AI review findings → send completion notification → merge. The user does **not** need to add a keyword. Invoking `fullrun` is itself the explicit authorization to merge.
 
 ```bash
-pnpm josh followup "<title> #<N>" --merge --notify-message "..."
+pnpm josh followup "<title> #<N>" --notify-message "..."
 pnpm josh ms
 ```
 
-- **Always run `pnpm josh ms` after a successful merge.** `pnpm josh followup --merge` leaves the working tree on the merged feature branch; running `pnpm josh ms` (= checkout default branch + `git pull`) returns it to the default branch with the merge commit pulled. `fullrun` / `fullrun new` / `queue` always end on the default branch. Skip this step only if the merge itself failed (the workflow already stopped).
+- **Always run `pnpm josh ms` after a successful merge.** `pnpm josh followup` leaves the working tree on the merged feature branch; running `pnpm josh ms` (= checkout default branch + `git pull`) returns it to the default branch with the merge commit pulled. `fullrun` / `fullrun new` / `queue` always end on the default branch. Skip this step only if the merge itself failed (the workflow already stopped).
 - **In a lane, the terminal step is `pnpm josh lane:close <N>` instead, and `josh ms` refuses.** A lane is a linked work tree, and git allows one branch in one work tree at a time — checking the default branch out from a lane takes that lane out of `josh lane:list`, strands its port seat, and makes every other lane's `josh ms` fail with git's `already used by` refusal. `josh ms` therefore exits non-zero there and says so, which is the expected answer rather than a failure to recover from (joshuafolkken/kit#1535). The default-branch refresh is the parent's, in the primary checkout, exactly as `epicrun.md` already describes.
-- **AI review findings are checked automatically.** `pnpm josh followup --merge` scans for CodeRabbit / Claude Review findings before merging. If blockers are found, it sends a `confirmation` Telegram and exits non-zero — fix the findings and re-run `pnpm josh followup --merge`. **Green CI is not authorization to merge while AI review findings are open.** (SonarCloud findings are **not** scanned by `followup` the way CodeRabbit / Claude comments are. Instead the `sonar-qube.yml` CI workflow runs the scan with `sonar.qualitygate.wait=true`, so a red Quality Gate fails the required `SonarQube` check — which `followup` already waits on before merging.)
+- **AI review findings are checked automatically.** `pnpm josh followup` scans for CodeRabbit / Claude Review findings before merging. If blockers are found, it sends a `confirmation` Telegram and exits non-zero — fix the findings and re-run `pnpm josh followup`. **Green CI is not authorization to merge while AI review findings are open.** (SonarCloud findings are **not** scanned by `followup` the way CodeRabbit / Claude comments are. Instead the `sonar-qube.yml` CI workflow runs the scan with `sonar.qualitygate.wait=true`, so a red Quality Gate fails the required `SonarQube` check — which `followup` already waits on before merging.)
 - **CodeRabbit rate-limit is not a finding.** If the only CodeRabbit comment is a rate-limit warning (body contains `rate limited by coderabbit.ai` or `Rate limit exceeded`) and there is no substantive review, treat it as "no findings" and proceed. The same applies if CodeRabbit produced no comment at all on the latest commit.
 - **Verify CodeRabbit findings before bypassing.** When CodeRabbit posts a substantive finding, do not pass `--coderabbit-ignore-reason` reflexively — first verify whether the finding is correct. Concrete example: CodeRabbit may flag a GitHub Actions SHA pin like `pnpm/action-setup@<sha> # v6.0.8` as "not matching the tag", because it queried `gh api repos/<owner>/<repo>/git/ref/tags/v6.0.8` which returns the **annotated-tag-object SHA**, not the **commit SHA** that the tag points to. GitHub Actions pins use the commit SHA. Confirm with `gh api repos/<owner>/<repo>/commits/<tag> --jq '.sha'` — if that matches the pinned SHA, the finding is a false positive. Only then bypass with `--coderabbit-ignore-reason "<verification-based-reason>"`, citing the verification command and its output.
 - Merge goes through REST internally — the pull request's own merge endpoint with an explicit `merge_method`, a direct merge rather than GitHub's `--auto` flag (`gh pr merge` goes through GraphQL, which a cloud session is refused; joshuafolkken/kit#1029). All required checks are already green by this point. **That path is `followup`'s, not yours**: `.claude/settings.json` refuses `gh pr merge`, and since joshuafolkken/kit#1062 the `gh api` and `gh api graphql` spellings of the same merge as well — `followup` is unaffected because it calls gh from inside a node script, so the Bash matcher only ever sees `pnpm josh …`. The deny is the implementation; the prohibition in `CLAUDE.md` → "Git Rules" is the rule, and it is what covers any spelling the patterns still miss.
@@ -222,6 +219,6 @@ Never send `completion` Telegram notifications manually with `pnpm josh notify -
 
 **Always run `pnpm josh followup` in the foreground** (no `&` suffix, no shell backgrounding). It waits for CI — 32 minutes by default, about 34 worst case (see `docs/josh-commands.md`) — which can outlast one tool call, so give the call the largest timeout it accepts (in Claude Code, `timeout: 600000`, 10 min). Where the harness detaches an over-running command and reports when it finishes, wait for that report instead of re-running. Where it kills the call at the cap instead, the merge and the completion notification are lost with it: set `JOSH_CI_TIMEOUT_SECONDS` to a budget that fits inside the cap for that run and re-run `followup` once CI has settled. Shell backgrounding never works — a process started with `&` inside a tool call does not survive the call returning, so the command silently disappears and the PR stays unmerged.
 
-- Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh followup "<title> #<N>" --merge --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` each time you want to notify completion (notification is sent right before the merge).
+- Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh followup "<title> #<N>" --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` each time you want to notify completion (notification is sent right before the merge).
 - `pnpm josh notify` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications (no automated alternative exists for those).
 - **The count of unreleased merges is surfaced at completion — not a version.** When `pnpm josh followup` finishes it prints `🚚 unreleased merges on main: <n>` as the final console line and puts the same count in the `completion` Telegram body, so a release nobody has run stays visible (joshuafolkken/kit#1486). **Do not report a shipped version.** A child no longer bumps, so the project's `package.json` names the *previous* release rather than anything this run shipped, and what does ship is decided later by `pnpm josh release`. The Telegram is sent before the merge and says so; the console line is printed after it, from a freshly fetched default branch, and needs no such note. Surface the count as the closing line of your completion summary.

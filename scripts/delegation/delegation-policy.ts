@@ -48,7 +48,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		// row for the queue would be the clone `CLAUDE.md` prohibits.
 		does: "run one child of a batch end to end in an isolated unit — an epic's child under `epicrun` or one issue of a `queue` alike — plan, verification gate, PR, merge — and return only its summary to the parent loop",
 		verifier:
-			"the parent reads the child's state from GitHub with `pnpm josh issue:state`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup --merge` would touch the PR",
+			"the parent reads the child's state from GitHub with `pnpm josh issue:state`, not from the summary; a child reported done but not merged is still open, which is the failure showing rather than a run continuing, and its own gate, `/code-review` and CI ran inside the unit before `followup` would touch the PR",
 	},
 	{
 		name: 'survey',

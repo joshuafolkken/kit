@@ -192,7 +192,7 @@ pnpm josh delegate epic-child   # → delegate
 **The parent reads GitHub, never the summary.** That is `epic-child`'s verifier, and it is the whole
 reason the unit may be delegated at all: a unit that reports a child finished without its PR merged
 leaves that child open, and `pnpm josh issue:state <N>` says so in one call. The child's own
-gate, `/code-review` and CI run inside the unit, and `pnpm josh followup --merge` will not touch the
+gate, `/code-review` and CI run inside the unit, and `pnpm josh followup` will not touch the
 PR until they are green. **Never advance the loop on the summary alone** — that discards the
 verifier, and without it `epic-child` is not a delegatable unit.
 
@@ -275,9 +275,9 @@ send a `confirmation` Telegram naming the trace that failed, and stop. **It is n
 forbids.
 
 **Silence and no process, together — never either one alone.** Each has an innocent reading by
-itself: a unit inside a long check writes nothing for as long as the check runs — `pnpm josh followup
---merge` waits on CI for up to 32 minutes, which is longer than the window — and a unit that is only
-reading has no check process at all. Together they have no innocent reading. **Which way an error
+itself: a unit inside a long check writes nothing for as long as the check runs — `pnpm josh
+followup` waits on CI for up to 32 minutes, which is longer than the window — and a unit that is
+only reading has no check process at all. Together they have no innocent reading. **Which way an error
 falls is the whole design**: a live unit booked as stopped has its working work killed, while a
 stopped one booked as alive costs waiting — so **a trace that could not be read answers
 `undetermined`, never `stopped`**, and a process trace nobody gave is an unasked question rather than an
@@ -476,7 +476,7 @@ the one round whose invocation named no path is the one that reviewed a differen
 carry**: `pnpm josh review:brief` prints the lane's absolute root, branch and HEAD, hands over targets
 written `git -C <root> …`, and prints a nonce the review attests with
 `pnpm josh review:attest <nonce>` from the checkout it actually read. **The child asks
-`pnpm josh review:attest --check` before it counts a round**, and `pnpm josh followup --merge` asks
+`pnpm josh review:attest --check` before it counts a round**, and `pnpm josh followup` asks
 again before it merges; `missing` and `mismatch` are both refusals, because the defect's own signal
 is silence. A clean round is therefore the case to check hardest, not the case to skip the check on.
 
@@ -1506,7 +1506,7 @@ the repository that owns the epic.** It sends the epic completion summary, and i
 repository, so the two rules agree. Every other session finishes quietly when its own repository has
 no children left.
 
-Per-child completion notifications are unchanged: `pnpm josh followup --merge` sends one each, as in
+Per-child completion notifications are unchanged: `pnpm josh followup` sends one each, as in
 any `fullrun`.
 
 Send an epic **start** notification when the run begins, and an epic **completion** summary at the

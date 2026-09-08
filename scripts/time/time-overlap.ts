@@ -4,7 +4,7 @@ import type { Span } from './time-spans'
 // (joshuafolkken/kit#1268, joshuafolkken/kit#1285).
 //
 // Two readings of a run overlap by construction, and both were measured before the arithmetic was
-// written. `followup --merge` waits for CI *inside* a Bash tool span, so most of a pull request's
+// written. `followup` waits for CI *inside* a Bash tool span, so most of a pull request's
 // open→merge window is already counted as tool execution. And a session that delegates holds a tool
 // span for the whole time it waits on the unit, while the unit's own transcript records the same
 // wall clock as the work it actually did.

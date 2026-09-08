@@ -30,7 +30,7 @@ const SECTION_POINTER = 'A clean second round issues the merge in the same turn'
 
 const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	`### ${SECTION_POINTER}`,
-	'**So the turn that reads a clean second round is the turn that issues `pnpm josh followup --merge`.**',
+	'**So the turn that reads a clean second round is the turn that issues `pnpm josh followup`.**',
 	'**Nothing is skipped — only issued earlier.**',
 	'**A round 2 that fixed something in place is the other path, and this section does not apply to it.**',
 	'**This is the round-1 append check applied to the round that ends the run.**',
@@ -49,7 +49,7 @@ describe(`${REVIEW_PROMPT} — the single source states the rule`, () => {
 const UNWEAKENED_MARKERS: ReadonlyArray<string> = [
 	'**It does not authorize shortening the reading either**',
 	'the gate joined and green',
-	'which `pnpm josh followup --merge` waits on and which still block the merge',
+	'which `pnpm josh followup` waits on and which still block the merge',
 	// A confirmed High takes none of the three exits, so the branch-1 half of the test says nothing
 	// about it. Without this half a High that stopped short of being fixed reads as clean.
 	'**no confirmed High is standing**',
@@ -68,7 +68,7 @@ describe(`${REVIEW_PROMPT} — the merge still rests on what it rested on`, () =
 const POINTER_MARKERS: ReadonlyArray<string> = [
 	SECTION_POINTER,
 	'**A clean second round is not a turn boundary either**',
-	'the turn that reads it issues `pnpm josh followup --merge`',
+	'the turn that reads it issues `pnpm josh followup`',
 	'never in a turn of its own',
 ]
 

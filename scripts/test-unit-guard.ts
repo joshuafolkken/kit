@@ -20,7 +20,7 @@ const NODE_MODULES = 'node_modules'
 //   skip was written for, and it keeps it.
 // - **`vitest` present is the project declaring that it runs unit tests.** Zero matching files
 //   there is a broken state rather than a young one — a mis-scoped glob, or a suite that was
-//   deleted — and reporting it as a passing check hands `pnpm josh followup --merge`, which reads
+//   deleted — and reporting it as a passing check hands `pnpm josh followup`, which reads
 //   only the exit code, a verification that verified nothing. That half fails.
 //
 // Rejected: leaving both halves green — joshuafolkken/kit#1216's `--verbose` makes the zero count
