@@ -6,6 +6,7 @@ const APP_KIT = 'joshuafolkken/app-kit'
 const GAME_KIT = 'joshuafolkken/game-kit'
 const SITE = 'joshuafolkken/joshuafolkken-com'
 const LEFTOVER = 'left uncommitted'
+const MEASURED_LEFTOVER = 'left behind: the branch 295-upgrade'
 
 function ready(repo: string): PropagateTarget {
 	return { repo, path: `/Users/example/Development/${repo}`, state: 'ready' }
@@ -22,6 +23,14 @@ function fail_step(failing_repo: string, failing_step: string) {
 		step === failing_step && target.repo === failing_repo
 			? { step, is_ok: false, detail: 'exit 1' }
 			: { step, is_ok: true }
+}
+
+// The pull-request step is the one that can probe the consumer, so it is the one that reports a
+// measured leftover instead of leaving the standing note to speak for it.
+function fail_pr_step(_target: PropagateTarget, step: string): StepResult {
+	if (step !== propagate_run.STEP_PR) return { step, is_ok: true }
+
+	return { step, is_ok: false, detail: 'exit 1', leftover: MEASURED_LEFTOVER }
 }
 
 describe('propagate_run.run_target', () => {
@@ -60,6 +69,27 @@ describe('propagate_run.run_target', () => {
 		)
 
 		expect(result.reason).not.toContain(LEFTOVER)
+	})
+})
+
+// `josh git` reports one exit code for committing, pushing and opening the pull request alike, so
+// the standing note claimed the upgrade was sitting uncommitted even where it had been committed and
+// the consumer's own pre-push hook was what refused the push (joshuafolkken/kit#1417).
+describe('propagate_run.run_target — what the failure left behind', () => {
+	it('reports what the failing step measured rather than the standing note', () => {
+		const result = propagate_run.run_target(ready(APP_KIT), fail_pr_step)
+
+		expect(result.reason).toContain(MEASURED_LEFTOVER)
+		expect(result.reason).not.toContain(LEFTOVER)
+	})
+
+	it('keeps the standing note for a step that could not measure what it left', () => {
+		const result = propagate_run.run_target(
+			ready(APP_KIT),
+			fail_step(APP_KIT, propagate_run.STEP_VERIFY),
+		)
+
+		expect(result.reason).toContain(propagate_run.LEFTOVER_NOTE)
 	})
 })
 

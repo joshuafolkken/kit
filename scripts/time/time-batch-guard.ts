@@ -189,10 +189,17 @@ function should_block(text: string, call: GuardedCall, refused_at_ms: number): b
 	)
 }
 
+// **This guard's own name for its once-per-run record.** It lives beside the rule rather than in
+// `batch-guard.ts` because a second module now has to read the same record: `delivered-rules.ts`
+// stands aside for this guard and has to ask whether it has *already* refused, and a second copy of
+// the string is the clone that would let the two disagree about which file they are reading.
+const STAMP_PREFIX = 'josh-batch-guard-'
+
 const time_batch_guard = {
 	CONSECUTIVE_LIMIT,
 	REASON,
 	SEQUENCE_BEFORE_LIMIT,
+	STAMP_PREFIX,
 	is_guarded_call,
 	should_block,
 }
