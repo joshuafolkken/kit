@@ -16,21 +16,54 @@ const POINTER = 'prompts/collaboration-workflow/epicrun.md'
 const SINGLE_SOURCE: ReadonlyArray<string> = [SKILL]
 
 const COMMAND = 'pnpm josh cost --over 400000'
+// joshuafolkken/kit#1567: a merge is only half the seam. Under parallel lanes another child is
+// still in flight, and cutting there loses the reference to it rather than pausing it.
+const LANE_COMMAND = 'pnpm josh lane:list'
+
+const QUEUE = '.claude/skills/workflow-commands/queue.md'
+const DOCS = 'docs/josh-commands.md'
+const CITATION = '`epicrun.md` → "The hand-off"'
+
+// The moment is the whole safety argument: this child's work is written down only after a merge,
+// and another lane still running is what makes a merge alone insufficient.
+const AFTER_MERGE = 'immediately after its merge'
+const NEVER_MID_CHILD = 'never mid-child'
+const EVERY_MERGE = "is asked after every child's merge"
+const SAFE_SEAM = '`none` is the safe seam'
+const RESUME_LINE = 'Please run `epicrun #<E>` to continue this epic in a fresh session.'
+// `epic:next --lanes` keeps the seats full, so an idle pool never merely happens: the reading has to
+// drain to one, or the cut is unreachable on exactly the run joshuafolkken/kit#1567 measured.
+const DRAIN = 'Open no new lane and take no new child from `epic:next`'
+
+// A sibling entry point may say what happens; it may not restate when the check is asked, what makes
+// a seam safe, or what the stop report says. Those are the procedure, and a second copy drifts.
+const BODY_ONLY: ReadonlyArray<string> = [
+	AFTER_MERGE,
+	NEVER_MID_CHILD,
+	EVERY_MERGE,
+	SAFE_SEAM,
+	DRAIN,
+	RESUME_LINE,
+]
 
 // The directives, not the prose. A rewrite that keeps the section heading and drops one of these
 // leaves a run that hands off at the wrong moment, or never.
 const REQUIRED: ReadonlyArray<string> = [
 	COMMAND,
-	// The moment is the whole safety argument: nothing is in flight only just after a merge.
-	'immediately after its merge',
-	'never mid-child',
-	'Please run `epicrun #<E>` to continue this epic in a fresh session.',
+	LANE_COMMAND,
+	...BODY_ONLY,
+	// joshuafolkken/kit#1567. Reading the threshold and doing nothing with it is the failure this
+	// one names, and it is the half joshuafolkken/kit#1212 had removed.
+	'stop and ask the person to cut the session',
 	// A hand-off must not be mistaken for a park — they look alike and mean opposite things.
 	'not a failure and not a park',
 	'`needs-decision` is not applied',
 	// The resumed session runs `josh latest` again; skipping it would merge against stale deps.
 	'A resumed session is a new session',
 ]
+
+// Command names are signposts a contents list is allowed to carry; directive prose is not.
+const SIGNPOSTS: ReadonlySet<string> = new Set([COMMAND, LANE_COMMAND])
 
 describe.each(SINGLE_SOURCE)('%s — the hand-off is written down', (document_path) => {
 	const content = read_repo_file(document_path)
@@ -160,12 +193,82 @@ describe.each(SINGLE_SOURCE)('%s — each child runs in a delegated unit', (docu
 // joshuafolkken/kit#1176 lists what the skill holds, and naming the command in that list is a
 // signpost a reader follows — `eval-gate.md` names `pnpm josh eval:scope` the same way. Excluding it
 // is what keeps this suite checking for a body left behind rather than for a contents list.
-const POINTER_MUST_NOT_RESTATE = REQUIRED.filter((marker) => marker !== COMMAND)
+const POINTER_MUST_NOT_RESTATE = REQUIRED.filter((marker) => !SIGNPOSTS.has(marker))
 
 describe(`${POINTER} — keeps none of the hand-off body`, () => {
 	const unwrapped = read_unwrapped(POINTER)
 
 	it.each(POINTER_MUST_NOT_RESTATE)('does not restate %j', (marker) => {
 		expect(unwrapped).not.toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#1212's two qualifications, withdrawn by joshuafolkken/kit#1567. Left standing,
+// each one reads as correct — both cite a real measurement — and each one alone is enough for a run
+// to never ask the question or never act on the answer. So they are asserted absent by name.
+const WITHDRAWN: ReadonlyArray<string> = [
+	"The parent's context grew by that child's summary and nothing else",
+	'Do not ask the person to retype the command',
+	'A session that compacts is safe for this workflow',
+]
+
+describe.each(SINGLE_SOURCE)('%s — the withdrawn qualifications are gone', (document_path) => {
+	const unwrapped = read_unwrapped(document_path)
+
+	it.each(WITHDRAWN)('no longer states %j', (claim) => {
+		expect(unwrapped).not.toContain(claim)
+	})
+
+	// The removal has to be arguable from the document itself, or the next reader restores it.
+	it('carries the measurement that withdrew them', () => {
+		expect(unwrapped).toContain('joshuafolkken/kit#1567')
+		expect(unwrapped).toContain('732 requests')
+		expect(unwrapped).toContain('$0.241 per request')
+	})
+})
+
+// A queue accumulates in one session exactly as an epic does, so the boundary binds there too — and
+// the single-source pattern is what keeps it from becoming a second procedure that drifts.
+describe(`${QUEUE} — cites the hand-off instead of copying it`, () => {
+	const unwrapped = read_unwrapped(QUEUE)
+
+	it('asks the same check', () => {
+		expect(unwrapped).toContain(COMMAND)
+	})
+
+	// A queue runs one issue at a time, so its seam is idle already — and `lane:list` reads the
+	// repository's work trees rather than this run's units, so one lane an earlier `epicrun` left
+	// behind would disable a queue's cut permanently, and silently.
+	it('does not gate its cut on the lane listing', () => {
+		expect(unwrapped).toContain('There is no drain here, and no lane reading either')
+	})
+
+	it('cites the single source', () => {
+		expect(unwrapped).toContain(CITATION)
+	})
+
+	it.each(BODY_ONLY)('does not copy %j', (marker) => {
+		expect(unwrapped).not.toContain(marker)
+	})
+})
+
+describe(`${DOCS} — the narrowing is not still documented`, () => {
+	const unwrapped = read_unwrapped(DOCS)
+
+	// The command reference is what a reader checks when the skill and their memory disagree, so a
+	// withdrawn condition left here outlives its removal from the procedure.
+	it('no longer says the check is asked only after a child run in the parent context', () => {
+		expect(unwrapped).not.toContain(
+			"it asks only after a child that ran in the parent's own context",
+		)
+	})
+
+	it('names what removed it', () => {
+		expect(unwrapped).toContain('removed that narrowing')
+		expect(unwrapped).toContain('issues/1567')
+	})
+
+	it('routes the threshold to its single source', () => {
+		expect(unwrapped).toContain('→ "The hand-off"')
 	})
 })

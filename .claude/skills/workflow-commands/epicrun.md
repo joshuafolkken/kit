@@ -196,6 +196,51 @@ gate, `/code-review` and CI run inside the unit, and `pnpm josh followup` will n
 PR until they are green. **Never advance the loop on the summary alone** — that discards the
 verifier, and without it `epic-child` is not a delegatable unit.
 
+### What the summary carries, and how long it may be
+
+**The summary's only job is to carry what GitHub does not.** The parent reads the verdict from
+`pnpm josh issue:state <N>` and the work from the pull request, so anything already on GitHub is sent
+twice — once to the record, where it stays for free, and once into the parent's context, where it is
+re-billed on every remaining turn of the run. joshuafolkken/kit#1567 measured what that costs: one
+day's twenty children averaged **240,000 tokens each**, some of their reports ran to several hundred
+lines, and `tool_result` was **25.2%** of everything accumulated in the parent's conversation.
+
+**"Make it shorter" is not the rule, because it deletes the wrong half.** A report cut by feel loses
+the observation nobody else recorded and keeps the file list anyone could have fetched. So both lists
+are written out, and the brief hands them to the unit.
+
+**Always kept — five things, because none of them is anywhere else:**
+
+1. **`Cause` / `Fix` / `Result`**, the three plain lines — the parent's orientation, so it does not
+   have to open the pull request to know what happened.
+2. **Every verification result the run did not close in the ordinary way**, and **`josh eval`
+   answering `skip`, `unmeasured` or `unreachable` is one of them**, named as such. A measurement
+   nobody made must never reach the parent as a run that passed.
+3. **Observations that could bite later** — something noticed and not filed, a flaky check, a
+   surprising diff, work a later child will collide with.
+4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.
+5. **What was left undone**, and under whose authority — a dropped review finding, a skipped step, a
+   scope a comment moved to another Issue.
+
+**Always cut — three things, because GitHub already holds them:**
+
+1. **The changed-file enumeration.** It is the pull request's own file list.
+2. **The per-round review detail.** Each round's verdict is one line; the findings are on the pull
+   request.
+3. **Restatements of rules the parent already holds** — the gate's order, the round cap, what
+   `followup` does. The parent is running the same procedure.
+
+**The bound is 25 lines, and it is a number so that it is not a judgement.** A summary that cannot be
+said in 25 lines is describing the work rather than reporting it, and the description belongs on the
+pull request, where the parent can go and read it if the state it read back disagrees. **The brief
+states the bound**, because a unit never told it writes to the length its own report format suggests.
+
+**This does not shorten the person-facing completion report.**
+`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」 is unchanged, its
+changed-file list included: a person reading a finished run has no pull request open beside them, and
+that report is written once rather than re-read on every later turn. What is bounded here is the
+child's hand-back to the parent, and the reason is exactly that the hand-back is re-read.
+
 **Read the state directly rather than asking `epic:next` again.** A child that did not finish still
 carries `in-progress`, and `epic:next` classifies such a child as waiting on time before it consults
 any blocker — so it answers `wait`, not the number, and a loop that took that as its check would
@@ -215,8 +260,10 @@ invocation it descends from** — `epicrun #<E>`, the child number, and that the
 whole of what the rule asks. A brief that omits it is the defect: the unit is then guessing, and
 refusing is the correct answer to a guess.
 
-**Where no isolated unit exists, run the child in the parent's context.** The hand-off below is what
-covers that case — it is the backstop for delegation being unavailable, not an alternative to it.
+**Where no isolated unit exists, run the child in the parent's context.** The hand-off below covers
+that case — and, since joshuafolkken/kit#1567, every other case as well: it is asked at every merge
+rather than only where delegation is unavailable. Delegation keeps each child's own context small
+and the hand-off bounds the parent session's length, so it is not an alternative to it.
 
 ## A delegated unit that stopped without reporting
 
@@ -960,6 +1007,28 @@ result only you read is not one** — a gate run, a `gh` read, an edit — which
 discriminator this loop already applies, and marking on those would hide the silence the interval
 exists to measure.
 
+**What the run itself writes on a quiet tick.** The relayed line is already one line; what costs is
+the prose the run writes around it. joshuafolkken/kit#1567 measured the executing side's own text at
+**27.9%** of everything accumulated in a parent's conversation — the largest single source, ahead of
+tool results and ahead of thinking — so a progress turn that reprints the epic's table of remaining
+children pays for that table on every request the run has left.
+
+**A tick is quiet when none of the real reports happened since the last one**, which makes "no
+change" the complement of a set that is already enumerated — a child merged, a child parked, a stop,
+and for a single-issue run the four named above — and so it needs no second definition of its own.
+**Nothing else counts**: a gate that went green, a review round that ran, a file that was edited, a
+poll that answered `wait`. Those are the run working, which is what the silence interval already
+assumes.
+
+**On a quiet tick the turn is the relayed line plus at most two lines of the run's own prose**, and
+those two say only what changed stage and what is being waited on. **No table, no re-listing of the
+remaining children, no restating of the plan** — `epic:next`, the epic body and the progress comment
+hold all three, and a person who wants them opens the epic. A tick with genuinely nothing to add
+relays the line and writes nothing at all.
+
+**A real report is not bounded by that**, and `--mark` is why: it restarts the clock at every one, so
+a merge, a park or a stop is exactly where the run is allowed to be long.
+
 **`--output` is omitted in those runs, and `record` reads `unread`.** The flag fixes one set of
 transcripts for the watcher's whole life: a single-issue run in the session's own context has no
 delegated unit to name, and a queue's unit changes with every issue, so a path fixed at the start
@@ -1084,12 +1153,13 @@ per child, and treat a single non-numeric line as the verdict.
    **every** child's merge, not only when something is about to stop: see "The counters live in the
    conversation" below for why a session that carries on past a compaction loses them otherwise.
 
-   Then **ask whether the hand-off check applies at all** — it does only where **this child ran in
-   this session's own context**, immediately after the merge and `pnpm josh ms`. A child that ran in a
-   delegated unit is not measured: go straight back to step 1. Otherwise ask
-   `pnpm josh cost --over 400000` and go back to step 1 on `under`, or take the hand-off on `over`
-   (see "The hand-off" below). **Never read the condition off `pnpm josh delegate epic-child`** — it is
-   a static policy lookup that answers `delegate` everywhere, so a gate built on it never fires.
+   Then **ask the hand-off check — at every child's merge, delegated or not**, immediately after the
+   merge and `pnpm josh ms`: `pnpm josh cost --over 400000`, beside `pnpm josh lane:list` in the same
+   turn. Go back to step 1 on `under`; on `over` **the run drains** — no new child is taken, the lanes
+   already in flight are allowed to finish, and the cut is taken at the first reading where
+   `lane:list` answers `none` (see "The hand-off" below). **Never read the condition off
+   `pnpm josh delegate epic-child`** — it is a static policy lookup that answers `delegate` everywhere,
+   so a gate built on it never fires.
 3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
    repository has work but this one does not", which is a wait from here.
 4. **`stop`** — report the parked children and finish.
@@ -1216,10 +1286,12 @@ ran six children in one context, the billed input was 222k per request during th
 linear in the number of children; the k-th child re-reads the wreckage of the k-1 before it on every
 turn.
 
-**So the run reads the marginal cost off a line rather than feeling for it** — and since
-joshuafolkken/kit#1212 it reads that line **only where delegation is unavailable**, and crossing it
-**compacts rather than stops**. Both qualifications are stated in full below; a reader who stops at
-this paragraph would otherwise leave with the rule as it stood before them.
+**So the run reads the marginal cost off a line rather than feeling for it** — at **every** child's
+merge, and crossing it **stops the session and asks the person to cut it**. joshuafolkken/kit#1212
+qualified both halves — the line was read only where delegation was unavailable, and crossing it
+compacted rather than stopped — and joshuafolkken/kit#1567 removed both qualifications against a
+measurement neither of them had. Both removals are argued in full below; a reader who stops at this
+paragraph would otherwise leave with the rule as it stood before them.
 
 ```bash
 pnpm josh cost --over 400000
@@ -1233,79 +1305,108 @@ passed explicitly so a run cannot drift it by remembering it wrong.
 
 **400,000 が表しているのは、トークンと人の手数の釣り合いである。** 区切るたびに人が `epicrun #<E>` を打ち直すため、計測の答え（子ごとに区切る）をそのまま採ると無人性を失う。トークン対トークンではなく**トークン対人の手数**のトレードオフであり、そう書かれていなかった。
 
-**その釣り合いは、子 1 件を委譲するようになった今の親のループには当てはまらない。** 親の文脈には要約しか積まれないため、この閾値に達すること自体がまれである。現在の 400,000 は、**委譲が使えない環境で親の文脈が膨らんだ場合の保険**として残っている数字であって、計測が導いた最適値ではない。
+### The check is asked at every merge, and delegation does not excuse it
 
-**So the check fires only where delegation is unavailable, and what decides that is whether the child
-that just merged actually ran in a delegated unit** — never a judgement about how full the context
-feels.
+**A delegating parent reaches the threshold too, and joshuafolkken/kit#1567 measured it doing so.**
+`epicrun #1474` delegated every child and still billed **732 requests, $176, $0.241 per request**
+against the children's $0.080 — **the parent's request costs three times the child's** — on a cache
+read of **361,833 tokens per request** against the child's 93,657. Of the parent's billed input
+**85.0% was conversation history** and 15.0% resident. So the sentence this section used to carry —
+that a delegating parent's context "grew by that child's summary and nothing else" and would never
+reach the limit — is false, and the run that most needed the check was the one exempted from asking
+it.
 
-**It is not `pnpm josh delegate epic-child`'s answer, and wiring it to that would delete the
-insurance rather than condition it.** That command is a static policy lookup: `epic-child` is an entry
-in the enumeration (`scripts/delegation/delegation-policy.ts`), so it answers `delegate` on every
-machine and in every environment, forever — the codeblock above even annotates it `# → delegate`. It
-says whether the step **may** be delegated; this gate needs to know whether it **was**. A gate written
-on the command would never fire once, and the run that most needs the threshold — one in a harness
-with no isolated unit, where the measurement below is +120,000 tokens in a single step — is exactly
-the run that would sail past it.
+**joshuafolkken/kit#1212 measured one contributor and concluded about the total.** Its figure was
+right: across joshuafolkken/kit#1176 the parent went 128,675 to 155,069 over six delegated children,
+**4,000 to 5,000 per child**, and the one child run in the parent's own context added about 120,000
+in a single step, to 272,528. What it did not measure is everything the parent's own loop writes between those
+merges. joshuafolkken/kit#1567 decomposed exactly that: of what accumulated in the conversation,
+**the executing side's own prose was 27.9%**, tool_result 25.2%, thinking 21.6%, tool_use 14.4% and
+Bash command bodies 10.8% — so **the child summaries are the smallest of the five sources**, and a
+gate conditioned on them alone reads the one that moves the number least.
 
-**The parent already holds the fact.** It either handed the child to an isolated unit or ran it in
-its own context, which is the branch "Where no isolated unit exists, run the child in the parent's
-context" above already makes it take.
+**And the cost is not linear in the number of requests.** Every request re-reads the whole
+conversation, so n requests in one session bill about n²/2 — 732 requests in one session against
+about 100 in each of seven is roughly **7x**. A condition that delays the first cut therefore does
+not defer a fixed cost; it multiplies it.
 
-| The child that just merged ran | What to ask |
-| --- | --- |
-| in a delegated unit | **Nothing.** The parent's context grew by that child's summary and nothing else |
-| in this session's own context | `pnpm josh cost --over 400000`, exactly as before |
+**So there is no condition: `pnpm josh cost --over 400000` is asked after every child's merge**,
+delegated or not. It is one command against a merge that took tens of minutes, and the row it
+replaced was written to save that one command. **Never wire the question to
+`pnpm josh delegate epic-child`** — that is a static policy lookup answering `delegate` on every
+machine forever (`scripts/delegation/delegation-policy.ts`), so a gate built on it never fires; that
+was the defect joshuafolkken/kit#1212's own table already warned about, and making the check
+unconditional is what finally removes the surface it lived on.
 
-**Asking it while delegation is working measured nothing worth the turn it cost.** Across
-joshuafolkken/kit#1176 the parent's billed input per request went 128,675 at the start to 155,069
-after six delegated children — **4,000 to 5,000 per child**, some fifty children short of the
-threshold — while the one child run in the parent's own context added about 120,000 in a single step,
-to 272,528. **What pushes the figure up is not delegating, and the run asked anyway after every one
-of those merges, every time answering `under` (joshuafolkken/kit#1212).**
-
-`over` and `under` are not the only answers: the command also **exits 1 with empty standard output** when there is no transcript, or no request in it. **Neither is `under`.** Reading "could not measure" as "still cheap" is the same mistake as reading an unreadable comment listing as "no findings" — report that the check could not answer, and take `over`'s branch at that child: compact and continue, or stop where the session cannot continue at all. **What is forbidden is reading it as `under`, not continuing** — since joshuafolkken/kit#1212 `over` itself continues, so an unmeasurable check that stopped the run would stop it where a measured `over` would not.
+`over` and `under` are not the only answers: the command also **exits 1 with empty standard output** when there is no transcript, or no request in it. **Neither is `under`.** Reading "could not measure" as "still cheap" is the same mistake as reading an unreadable comment listing as "no findings" — report that the check could not answer, and take `over`'s branch at that child. **A session whose own cost cannot be read is one that has been running long enough to be worth cutting**, and the cut costs about 70,000 tokens against the millions the reading was there to catch, so the asymmetry runs the same way an unmeasurable check does.
 
 
 ### When to ask, and what to do
 
 **Ask once per child, immediately after its merge and `pnpm josh ms`** — never mid-child. That
-moment is the only one where nothing is in flight: the PR is merged, the working tree is on the
-default branch and clean, and the epic's state on GitHub is complete. A hand-off taken anywhere else
-would have to carry work that is not written down yet. **And ask it only where
-`pnpm josh delegate epic-child` answered `keep`** — above.
+moment is the only one where **this** child's work is all written down: the PR is merged, the working
+tree is on the default branch and clean, and the epic's state on GitHub is complete. A hand-off taken
+anywhere else would have to carry work that is not written down yet.
+
+**A merge is not by itself a safe seam, because another lane may still be running.** The session
+holds the reference to every unit it dispatched, so cutting it while one is in flight does not pause
+that child — the work stays in its lane and the reference to it does not, so what a resumed session
+can do is start it again rather than pick it up. **Read which it is rather than judging it:**
+
+```bash
+pnpm josh lane:list   # `none`, or one line per lane with its state
+```
+
+**`none` is the safe seam, and `over` is what sends the run to it.** The reading does not wait for an
+idle pool to happen; it drains to one.
 
 - **`under`** — go back to step 1 of the loop and run the next child.
-- **`over`** — **go back to step 1 and run the next child. Do not ask the person to retype the
-  command.** Post the epic progress comment naming what merged and what remains, so the reading is on
-  the record, and continue. **A session that compacts is safe for this workflow**, because nothing is
-  carried in the conversation (below): the next child comes from `epic:next`, the order from the epic
-  body and the content from the child Issue, so a summarized session answers all three exactly as a
-  fresh one does — and answers them without the roughly 70,000 tokens a fresh session spends
-  rewriting its resident documents and re-reading the epic, and without discarding a warm prompt
-  cache. **Retyping was never the cheaper of the two**; it was the only one written down. The run's
-  counters are already in that comment, written there at every child's merge — "The counters live in
-  the conversation" below.
-- **`over`, where the session cannot continue at all** — it cannot compact and its context is
-  exhausted, or the environment says the session is ending. **The escape route stays exactly as it
-  was**: finish the session. Post the epic progress comment, send a **`confirmation`** Telegram with
-  the resume command in its body — a hand-off waits for the person to type the next command, which is
-  what `confirmation` means; `completion` would announce an epic that has not completed — and stop
-  with:
+- **`over`** — **the run drains.** Open no new lane and take no new child from `epic:next`; let the
+  children already in flight finish, close each lane as its child merges or parks ("What happens to a
+  lane" above), and read `lane:list` again after each. Post the epic progress comment naming what
+  merged, what remains **and that the reading was `over`**, so the drain is on the record rather than
+  only in a context that may be compacted away. A run with no lanes reaches the next bullet at once,
+  because the child that just merged was the only one in flight.
+- **`none`, once drained** — **stop and ask the person to cut the session.** This is
+  joshuafolkken/kit#1567's change and it replaces "compact and continue": a session that compacts
+  still bills its whole history on every later request, which is how `epicrun #1474` reached $0.241 a
+  request while every one of its children ran in a unit. The cut costs about 70,000 tokens — roughly
+  56,000 to rewrite the resident documents in a fresh session plus about 15,000 to re-read the epic
+  and the child Issue — against a saving measured at about 14,500,000 per cut, **some 200 times more**.
+  Post the epic progress comment, send a **`confirmation`** Telegram with the resume command in its
+  body — a hand-off waits for the person to type the next command, which is what `confirmation`
+  means; `completion` would announce an epic that has not completed — and stop with:
 
   > Please run `epicrun #<E>` to continue this epic in a fresh session.
 
   **報告は完了報告の書式で書かない。** 区切りは完了でも park でも失敗でもない**第 4 の停止**であり、専用の書式が `prompts/collaboration-workflow/report-format.md` →「区切りの報告（完了報告と区別する・必須）」にある。`原因 / 対応 / 結果` の 3 行は使わない — それは finished なランの形であり、epic はまだ終わっていない。書くのは 4 つ、**終わったこと / 残っていること / 止めた理由 / 次に打つコマンド**である。Telegram 本文も同じ書式で書く。
 
-**The hand-off report belongs to the stop, not to the reading.** A run that answered `over` and
-carried on has not stopped, so it writes no hand-off report — the four lines say what is left for
+**Draining is what makes the cut reachable, and without it this rule would never fire on the run it
+was written for.** `epic:next --lanes` keeps the seats full, so under parallel lanes a merge almost
+never coincides with an idle pool — and `epicrun #1474`, the run joshuafolkken/kit#1567 measured, ran
+in lanes: gated on an idle pool that merely happened, it would have read `over` at all seven merges
+and cut at none of them, which is the never-fires failure this section already indicts
+`pnpm josh delegate epic-child` for. **The drain makes the moment rather than waiting for it**, and it
+is the allowance a `needs-human-review` stop already takes: no new lane is opened, and the ones in
+flight are allowed to finish. It costs at most the longest child already running.
+
+**The drain waits only on the lanes that can still finish.** `open` is one. A **`stranded`** lane has
+no work tree and so no running child — `pnpm josh lane:prune` closes it, and the reading is taken
+again. An **`unreadable`** one cannot be told apart from a running child, so it is neither waited on
+nor assumed idle: **the cut does not happen**, the lane is named in the epic progress comment so a
+person can see what is blocking it, and the run goes back to step 1. **Never assume idle.** The
+asymmetry runs the way it runs everywhere else here — a wrong cut abandons a child, a missed cut only
+costs tokens.
+
+**The hand-off report belongs to the stop, not to the reading.** A run that read `over` and is still
+draining has not stopped, so it writes no hand-off report — the four lines say what is left for
 somebody to pick up, and there is nobody to pick it up while the same session is still running. The
 epic progress comment is the record in that case. `report-format.md` → "区切りの報告" states the same
 boundary from the format's side.
 
-**This is not a failure and not a park** — neither branch of `over` is. No child needs a decision; the
-run is either cheaper to continue after a compaction or unable to continue at all. `needs-decision`
-is not applied, nothing is stashed, and no Issue is filed.
+**This is not a failure and not a park** — neither the drain nor the cut is. No child needs a
+decision; the run is either on its way to the seam or standing at it. `needs-decision` is not
+applied, nothing is stashed, and no Issue is filed.
 
 ### The counters live in the conversation
 
@@ -1586,12 +1687,12 @@ end naming what was merged, what was parked and why, and what was filed.
 3. `epic:next` reports `error` — a cyclic or contradictory graph.
 4. A guard above was reached.
 5. A timeout above elapsed.
-6. `pnpm josh cost --over 400000` answered `over` just after a child merged **and this session cannot
-   continue** — it cannot compact and its context is exhausted. The run is then cheaper to continue in
-   a fresh session, and the resume command is in the report. This is the one stopping condition that
-   is not a problem: nothing is parked, nothing is filed, and the epic is unchanged. **`over` on its
-   own is no longer on this list** — the run compacts and carries on, because the state it would hand
-   over lives on GitHub either way (joshuafolkken/kit#1212).
+6. `pnpm josh cost --over 400000` answered `over` — or could not answer — just after a child merged,
+   and the drain that reading starts has brought `pnpm josh lane:list` to `none`. The run is then
+   cheaper to continue in a fresh session, and the resume command is in the report. This is the one
+   stopping condition that is not a problem: nothing is parked, nothing is filed, and the epic is
+   unchanged. **The reading on its own is not on this list** — it starts a drain, and only the drain
+   arriving at `none` stops the run (joshuafolkken/kit#1567).
 
 **A child that needs a decision is not on this list.** It is parked, and the run continues.
 

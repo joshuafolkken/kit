@@ -139,3 +139,21 @@ Never advance the queue on the summary alone.
 - `josh latest` runs only once, before the first issue — and only when `pnpm josh latest:scope` answers `required` there, which is what makes the same hoist hold for a standalone `fullrun` too (`latest-gate.md`). If files were pre-staged when `queue` was invoked, they must be stashed before `josh latest` and restored after.
 - All `kickoff`/`fullrun` mid-workflow stop rules (confirmation notification, AI review blocker handling, etc.) apply within each issue's execution.
 
+## The session boundary
+
+**A queue accumulates in one session exactly as an epic does**, so the hand-off binds here too
+(joshuafolkken/kit#1567). Ask `pnpm josh cost --over 400000` after every issue's merge and
+`pnpm josh ms` — the same seam, one issue later — and stop there on `over`, asking the person to cut
+the session. **The resume command is the rest of the queue**, `queue #<next> #<after> …` from the
+first issue that has not run, never the whole queue again.
+
+**There is no drain here, and no lane reading either.** A queue runs one issue at a time, so the merge
+it has just read was the only thing it had in flight and the seam is idle already. And
+`pnpm josh lane:list` reports the **repository's** work trees rather than this run's units, so a lane
+some earlier `epicrun` left behind would gate a queue that never opened one — permanently, and
+silently. That reading belongs to the entry point that opens lanes.
+
+**Everything else is not repeated here.** When the check is asked, why delegation does not excuse it,
+what the stop report says and what carries over are all `epicrun.md` → "The hand-off", the single
+source for every entry point that runs more than one issue in one session.
+
