@@ -704,11 +704,23 @@ The steps, in the consumer's own directory:
 
 **Which toolkits are installed is read, not listed.** The scoped packages in `devDependencies` are the candidates; a candidate is a target only when its CLI shim is actually present in `node_modules/.bin`, and its CLI name comes from the installed package's own `bin` field rather than a table in kit. A fourth toolkit needs no edit here.
 
-`dependencies` is deliberately not read. The upgrade installs with `pnpm add -D`, so a toolkit declared there would be _relocated_ into `devDependencies` — a manifest rewrite nobody asked for, riding silently into the pull request. Such a toolkit is named on the console as skipped rather than passed over in silence.
+**A declared toolkit that cannot be carried refuses the run — it is never dropped from the plan** ([#1540](https://github.com/joshuafolkken/kit/issues/1540)). Both ways one falls out stop the run before anything writes, naming each package and the one command that fixes it:
+
+| What was found                                                                 | What happens                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| A runnable toolkit declared under `dependencies` rather than `devDependencies` | refused — move it with `pnpm add -D <toolkit>`                |
+| A declared package that is missing here, or whose CLI shim is not installed    | refused — `pnpm install` (either field)                       |
+| A scoped package that is installed and simply ships no CLI                     | **ignored** — it is a library, and nothing about it is broken |
+
+`dependencies` is deliberately not read for the plan: the upgrade installs with `pnpm add -D`, so a toolkit declared there would be _relocated_ into `devDependencies` — a manifest rewrite nobody asked for, riding silently into the pull request.
+
+**The refusal names only what it can prove**, which is why the third row exists. The `@joshuafolkken/` prefix says nothing about whether a package is a toolkit, so a shared config or a types package under that scope must not be told to reinstall — it is already installed — nor to move out of `dependencies`, which would break the build it is there to serve. A package counts as a toolkit only when its own installed `bin` field says so.
+
+**Continuing without one is worse than not running at all**, which is why this refuses rather than warning. The toolkits overlay files _derived_ from kit's (see [sync.md](./sync.md)), so a run that syncs kit without the overlay does not merely do less — it rewrites the overlay's paths back to kit's originals. That diff then arrives in the pull request wearing kit's own face, where a reviewer has nothing to notice. The refusal is also what the `--dry-run` reports, so what the dry run lists stays what the real run does.
 
 **`@joshuafolkken/kit` has to be one of them.** The verification gate and the pull request run through `pnpm josh`, and pnpm writes that shim only for a project's _direct_ dependencies — so a repository declaring only app-kit or game-kit would fail both steps _after_ the upgrade and the sync had written. That is refused up front, before anything writes.
 
-**Nothing to do is a skip, not a failure.** With no `@joshuafolkken/*` toolkit installed, or with every toolkit already current and the sync rewriting no file, the run reports the skip and opens neither an issue nor a pull request — exit code 0. A failed verification gate stops before the issue, so a red gate never produces one either.
+**Nothing to do is a skip, not a failure.** With no `@joshuafolkken/*` toolkit _declared_, or with every toolkit already current and the sync rewriting no file, the run reports the skip and opens neither an issue nor a pull request — exit code 0. A toolkit that is declared but cannot be carried is the refusal above, not this skip: nothing declared and something declared-but-unreachable are different states, and only the first is a no-op. A failed verification gate stops before the issue, so a red gate never produces one either.
 
 **It refuses to run inside kit's own repository**, the same boundary [`josh sync`](#josh-sync) draws ([#868](https://github.com/joshuafolkken/kit/issues/868)) and for the same reason: the sync would overwrite the distribution source with its own derived templates. The refusal comes before anything writes. Only kit is refused — app-kit and game-kit are themselves consumers of kit, which is exactly what this command is for.
 

@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/local-bin'
 import type { Release } from '#scripts/propagate/propagate-steps'
-import { propagate_targets } from '#scripts/propagate/propagate-targets'
+import { propagate_targets, type Manifest } from '#scripts/propagate/propagate-targets'
 import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { z } from 'zod'
 
@@ -60,15 +60,6 @@ function declared_toolkits(project_root: string): ReadonlyArray<string> {
 	return scoped_names(manifest?.devDependencies).toSorted(compare_toolkits)
 }
 
-function misplaced_toolkits(project_root: string): ReadonlyArray<string> {
-	const manifest = propagate_targets.read_manifest(project_root)
-	const development = new Set(scoped_names(manifest?.devDependencies))
-
-	return scoped_names(manifest?.dependencies).filter(
-		(package_name) => !development.has(package_name),
-	)
-}
-
 // npm accepts two shapes for `bin`. The string form names exactly one executable and its name is the
 // package's *unscoped* one — the rule `read_bin_entry` in `scripts/local-bin.ts` reads in the other
 // direction, from a name to a path. The object form is answered by that same unscoped name where it
@@ -81,17 +72,27 @@ function pick_bin_name(package_name: string, bin: string | Record<string, string
 	return Object.keys(bin)[0] ?? unscoped
 }
 
-// The CLI a toolkit installs, read from the installed package's own `bin` field. Deriving it means
-// `@joshuafolkken/app-kit` answers `josh-app` without anyone maintaining the mapping here.
-function read_bin_name(project_root: string, package_name: string): string | undefined {
-	const installed = propagate_targets.read_manifest(
-		path.join(project_root, NODE_MODULES, package_name),
-	)
-	if (installed === undefined) return undefined
+function read_installed_manifest(project_root: string, package_name: string): Manifest | undefined {
+	return propagate_targets.read_manifest(path.join(project_root, NODE_MODULES, package_name))
+}
+
+function bin_name_of(package_name: string, installed: Manifest): string | undefined {
 	const parsed = bin_schema.safeParse(installed)
 	const bin = parsed.success ? parsed.data.bin : undefined
 
 	return bin === undefined ? undefined : pick_bin_name(package_name, bin)
+}
+
+// The CLI a toolkit installs, read from the installed package's own `bin` field. Deriving it means
+// `@joshuafolkken/app-kit` answers `josh-app` without anyone maintaining the mapping here.
+function read_bin_name(project_root: string, package_name: string): string | undefined {
+	const installed = read_installed_manifest(project_root, package_name)
+
+	return installed === undefined ? undefined : bin_name_of(package_name, installed)
+}
+
+function has_runnable_cli(project_root: string, bin_name: string): boolean {
+	return find_local_bin_upwards(project_root, bin_name) !== undefined
 }
 
 // A declared toolkit is a target only when its CLI is actually runnable here. A dependency whose
@@ -100,15 +101,66 @@ function read_bin_name(project_root: string, package_name: string): string | und
 function resolve_toolkit(project_root: string, package_name: string): Release | undefined {
 	const bin_name = read_bin_name(project_root, package_name)
 	if (bin_name === undefined) return undefined
-	if (find_local_bin_upwards(project_root, bin_name) === undefined) return undefined
+	if (!has_runnable_cli(project_root, bin_name)) return undefined
 
 	return { package_name, version: LATEST_VERSION, bin_name }
+}
+
+// Unreachable and not-a-toolkit are two different answers, and collapsing them is what makes a
+// refusal give advice that is wrong. **Unreachable** is a broken install — the package is missing
+// here, or it declares a CLI whose shim is not installed — and `pnpm install` fixes it whatever the
+// package turns out to be. A package that is installed perfectly well and simply ships **no** CLI is
+// a scoped *library* rather than a toolkit: nothing about it is broken, so it is not this, and it is
+// not misplaced either. The `@joshuafolkken/` prefix alone cannot tell the two apart, which is why
+// the question is asked of the installed `bin` field (joshuafolkken/kit#1540 review round 1).
+function is_unreachable_toolkit(project_root: string, package_name: string): boolean {
+	const installed = read_installed_manifest(project_root, package_name)
+	if (installed === undefined) return true
+
+	const bin_name = bin_name_of(package_name, installed)
+
+	return bin_name !== undefined && !has_runnable_cli(project_root, bin_name)
+}
+
+// Only a package that is *demonstrably* a toolkit — installed, with its CLI runnable here — is
+// reported as misplaced. Telling the owner of a scoped runtime library to move it into
+// `devDependencies` would break the build it is there to serve, and one that is not installed at all
+// is answered by `unresolved_toolkits` instead, whose `pnpm install` is the fix that actually
+// applies. Naming only what can be proved is what keeps a refusal honest.
+function misplaced_toolkits(project_root: string): ReadonlyArray<string> {
+	const manifest = propagate_targets.read_manifest(project_root)
+	const development = new Set(scoped_names(manifest?.devDependencies))
+
+	return scoped_names(manifest?.dependencies).filter(
+		(name) => !development.has(name) && resolve_toolkit(project_root, name) !== undefined,
+	)
 }
 
 function discover_toolkits(project_root: string): ReadonlyArray<Release> {
 	return declared_toolkits(project_root)
 		.map((package_name) => resolve_toolkit(project_root, package_name))
 		.filter((release) => release !== undefined)
+}
+
+// Every scoped package this manifest declares, in either field. `unresolved_toolkits` reads both
+// because a broken install is a broken install wherever it was declared, and the fix it reports —
+// `pnpm install` — is right for a package under `dependencies` too.
+function all_declared_toolkits(project_root: string): ReadonlyArray<string> {
+	const manifest = propagate_targets.read_manifest(project_root)
+	const development = scoped_names(manifest?.devDependencies)
+
+	return [...new Set([...development, ...scoped_names(manifest?.dependencies)])]
+}
+
+// The other half of the same read: which declared packages the run cannot reach at all. Dropping
+// them silently is what let a partial install sync kit alone and revert the overlay tier
+// (joshuafolkken/kit#1540), so the caller refuses on this list rather than discovering it as a
+// shorter plan. A scoped library that ships no CLI appears in neither list, because nothing about it
+// is broken.
+function unresolved_toolkits(project_root: string): ReadonlyArray<string> {
+	return all_declared_toolkits(project_root).filter((package_name) =>
+		is_unreachable_toolkit(project_root, package_name),
+	)
 }
 
 const adopt_toolkits = {
@@ -120,8 +172,10 @@ const adopt_toolkits = {
 	misplaced_toolkits,
 	pick_bin_name,
 	read_bin_name,
+	is_unreachable_toolkit,
 	resolve_toolkit,
 	discover_toolkits,
+	unresolved_toolkits,
 }
 
 export { adopt_toolkits }

@@ -28,8 +28,6 @@ const DRY_RUN_FLAG = '--dry-run'
 const KNOWN_FLAGS: ReadonlyArray<string> = [DRY_RUN_FLAG]
 const DRY_RUN_REASON = 'would be adopted'
 const NOTHING_TO_ADOPT = 'No @joshuafolkken toolkit is installed here; nothing to adopt.'
-const MISPLACED_NOTE =
-	'Skipped, because the upgrade installs with `pnpm add -D` and would relocate them — move these to devDependencies to adopt them'
 const NO_ORIGIN =
 	'Refusing to adopt: this checkout has no GitHub `origin`, so there is nowhere to open the issue.'
 
@@ -68,13 +66,23 @@ function run_sequence(target: PropagateTarget, plan: ReleasePlan | undefined): n
 	return report(propagate_run.run_target(target, step, reason))
 }
 
-// A toolkit under `dependencies` is left out of the run, because the upgrade would relocate it into
-// `devDependencies`. Saying so is what keeps that omission from reading as "nothing is installed".
-function announce_misplaced(project_root: string): void {
-	const misplaced = adopt_toolkits.misplaced_toolkits(project_root)
-	if (misplaced.length === 0) return
+// A declared toolkit that cannot be carried stops the run, whichever of the two ways it fell out —
+// placed under `dependencies`, or declared with no runnable CLI here (joshuafolkken/kit#1540). The
+// refusal names each one and its cause, so the exclusion is still reported as it was before; what
+// changed is that it no longer leaves the run to sync kit alone and revert the overlay tier.
+//
+// It runs ahead of discovery, so a dry run refuses too: what the dry run lists has to be what the
+// real run does, and a plan it printed here would be a plan nothing will ever execute.
+function refuse_incomplete_plan(project_root: string): number | undefined {
+	const refusal = adopt_logic.refuse_incomplete_plan(
+		adopt_toolkits.misplaced_toolkits(project_root),
+		adopt_toolkits.unresolved_toolkits(project_root),
+	)
+	if (refusal === undefined) return undefined
 
-	console.warn(`${MISPLACED_NOTE}: ${misplaced.join(', ')}`)
+	console.error(refusal)
+
+	return FAILURE_EXIT_CODE
 }
 
 // Nothing installed is a skip; kit missing is a refusal. Both stop the run before anything writes,
@@ -114,7 +122,9 @@ function adopt_target(
 
 // The run once the repository has been accepted as a place to adopt into.
 function run_here(project_root: string, is_dry_run: boolean): number {
-	announce_misplaced(project_root)
+	const incomplete = refuse_incomplete_plan(project_root)
+	if (incomplete !== undefined) return incomplete
+
 	const releases = adopt_toolkits.discover_toolkits(project_root)
 	const stop = stop_reason(releases)
 
@@ -149,7 +159,6 @@ const adopt = {
 	DRY_RUN_REASON,
 	KNOWN_FLAGS,
 	NOTHING_TO_ADOPT,
-	MISPLACED_NOTE,
 	parse_options,
 	run_here,
 	run,
