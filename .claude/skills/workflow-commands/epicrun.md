@@ -570,9 +570,9 @@ pnpm --dir "$dir" install --frozen-lockfile
 
 The child runs as `fullrun #<N>` in a delegated unit, per "Each child runs in a delegated unit"
 above, with two additions to the brief: **the lane directory every command is to run in**, and that
-neither `josh latest` nor a progress watcher is to be started there. Everything else — the plan, the gate, `/code-review`,
-`pnpm josh git`, `pnpm josh followup` — is unchanged, and `pnpm josh followup` releases that lane's
-hold at the merge as it always has.
+neither `josh latest` nor a progress watcher is to be started there. Everything else — the plan, the
+gate, `/code-review`, `pnpm josh git`, `pnpm josh followup` — is unchanged, and
+`pnpm josh followup` releases that lane's hold at the merge as it always has.
 
 **Start each unit without blocking on it, and poll them all.** That is "A delegated unit that stopped
 without reporting" above applied N times rather than once, and
@@ -848,11 +848,15 @@ point at which the run is committed to running, which is the same place in the o
 step 1 of the loop" is here. Nothing is reported until the issue carries `in-progress`, so the
 window before the label costs nothing and needs no special case.
 
-**It is started in the checkout the hold was claimed in.** A cross-repository target — `fullrun
-joshuafolkken/app-kit#12` — claims its hold in that repository's checkout, and the watcher belongs
-there too: started in the session's own tree it would read *this* repository's `in-progress`
-listing, where the run's issue never appears, and the run would go silent for its whole length or
-report an unrelated issue that happens to carry the label as its own progress. Starting it there
+**It is started in the target repository's checkout, and `--mark` is run there too.** A
+cross-repository reference — `fullrun joshuafolkken/app-kit#12`, `queue joshuafolkken/app-kit#12
+#13` — is implemented in that repository's checkout, which is where a `fullrun` claims its hold and
+where a `queue` runs every one of its issues. Started in the session's own tree instead, the watcher
+would read *this* repository's `in-progress` listing, where none of the run's issues appear, and the
+run would go silent for its whole length or report an unrelated issue that happens to carry the
+label as its own progress. **`--mark` follows the watcher**, because the report record is kept per
+work tree: a mark written in the session's own tree leaves the watcher's clock untouched, and the
+heartbeat lands on the heels of the real report the mark exists to move it off. Starting it there
 also points the lanes, the load average and the transcript sample at the tree the run is editing,
 which `--repo` alone cannot do.
 

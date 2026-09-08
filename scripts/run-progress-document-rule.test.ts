@@ -69,7 +69,8 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'In a single-issue run it starts immediately after `pnpm josh run:hold` succeeds',
 	// The two a cross-repository target and a stopping run would otherwise get wrong silently: a
 	// watcher reading the wrong repository's listing, and one left reporting after the run stopped.
-	'It is started in the checkout the hold was claimed in',
+	"It is started in the target repository's checkout, and `--mark` is run there too",
+	'`--mark` follows the watcher',
 	'A run that merges needs no teardown, and a run that stops has to end the watcher itself',
 	// What a real report is once the run has one child instead of many — without it `--mark` is never
 	// called and a heartbeat lands on the heels of a real report.
