@@ -73,6 +73,16 @@
 						"timeout": 20
 					}
 				]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "pnpm josh rule:guard",
+						"timeout": 20
+					}
+				]
 			}
 		],
 		"PostToolUse": [

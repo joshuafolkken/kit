@@ -506,6 +506,18 @@ SECURITY.md         tsconfig.sonar.json
 > and `docs/josh-commands.md` carries which commands count as reading, the one-refusal-per-accumulation
 > bound and how to verify it.
 >
+> **A third `PreToolUse` hook runs `pnpm josh rule:guard`, on `Bash`** (joshuafolkken/kit#1524). It is
+> a dispatcher rather than a third rule: `scripts/rules/delivered-rules.ts` enumerates the rules whose
+> trigger can be named as one tool call, and each row is a spec of the same shell the two guards above
+> share. **This is what makes a rule cheaper to ship than to carry** — `CLAUDE.md` is read on every
+> turn and had run out of room, while a refusal costs nothing until the call that binds the rule and
+> cannot be skimmed past. Today it delivers the backlog WIP cap at the call that files an Issue; a
+> comment endpoint is not a filing and is left alone, and so — the trigger reads the command string —
+> is a filing whose title never appears in it. **That limit is why the rule keeps a one-line trigger
+> resident**: the line binds on every route, and the delivery reinforces it where it can see one.
+> `JOSH_RULE_GUARD=off` switches it off, and
+> `prompts/collaboration-workflow/rule-delivery.md` is the enumeration and the criterion behind it.
+>
 > **The trade-off is deliberate.** A deny entry has no exception for "the user asked for it in this
 > turn", so the one case the prompts allow — an explicit staging instruction — is blocked too. It is
 > blocked only for the agent: the user runs `git add` in their own terminal unchanged. A permanent

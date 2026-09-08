@@ -1,3 +1,4 @@
+import { time_batch_guard } from '#scripts/time/time-batch-guard'
 import { describe, expect, it } from 'vitest'
 import {
 	AI_DOCS,
@@ -13,42 +14,84 @@ import { SKILL_ENTRY_FILE, SKILL_ROOT } from './skill-fixture'
 // 66 turns they sat in cost 600–850, so the run's floor was set by the round trips rather than by
 // the work.
 //
-// The rule is resident because a tool call happens on any turn at all and no skill is loaded before
-// one — the same reason the file-editing prohibition is. So this suite guards two things at once:
-// the rule being in `CLAUDE.md` rather than on demand, and the reasoning staying at the pointer
-// rather than being pasted back beside it.
-const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/turn-batching.md`
+// joshuafolkken/kit#1524 took the rule out of `CLAUDE.md`: its trigger can be named as one tool
+// call, so it is delivered at that call instead of carried on every turn. **What pins it is
+// therefore firing, not residency** — the prose was resident through all four of the runs measured
+// above and moved none of them, which is the whole reason the criterion changed. So this suite
+// guards three things: the delivered text carrying every sentence that changes what an agent does,
+// the resident document no longer carrying a rule it does not hold, and the reasoning staying at the
+// pointer rather than being pasted back into either.
+const TOPIC_FILE = 'turn-batching.md'
+const CANONICAL = `${WORKFLOW_PROMPT_DIRECTORY}/${TOPIC_FILE}`
+const DELIVERY = `${WORKFLOW_PROMPT_DIRECTORY}/rule-delivery.md`
 const RESIDENCY = `${WORKFLOW_PROMPT_DIRECTORY}/residency.md`
 const WORKFLOW_SKILL_ENTRY = `${SKILL_ROOT}/workflow-commands/${SKILL_ENTRY_FILE}`
 const SUITE_PATH = 'scripts/turn-batching-rule.test.ts'
+// The trigger that now delivers the rule. Named once: the enumeration, both residency lists and this
+// suite have to agree on the command, and a string kept correct in one of four places is not kept.
+const GUARD_COMMAND = 'pnpm josh batch:guard'
 // The figures the issue was filed on. Quotable enough to be the first thing pasted back into an
 // always-loaded document, which is what makes them the marker for "the reasoning stayed put".
 const MEASUREMENTS: ReadonlyArray<string> = ['600〜850', '1.13']
 
-// Every sentence here changes what an agent does. Drop the first and the instruction is gone; drop
-// the criterion and it reads as a rule about reading, which a turn issuing one `Edit` at a time
-// walks straight past; drop the last and "fewer turns" reads as permission to skip a check.
-describe.each(AI_DOCS)('%s — keeps the one-turn instruction resident', (document_path) => {
+// Every sentence here changes what an agent does. Drop the criterion and it reads as a rule about
+// reading, which a turn issuing one `Edit` at a time walks straight past; drop the last and "fewer
+// turns" reads as permission to skip a check. **They are asserted against the delivered text**,
+// because that is the only place an agent now meets them.
+describe('the delivered text — what the refusal states', () => {
+	const delivered = time_batch_guard.REASON
+
+	it.each([
+		"needs another call's result",
+		'not what kind of call it is',
+		'edits are covered exactly as',
+		'never authorizes weakening a verification gate or a review',
+	])('carries %j', (marker) => {
+		expect(delivered).toContain(marker)
+	})
+
+	// A reference to `CLAUDE.md` names nothing once the rule has left it, and the pointer is where the
+	// reasoning actually is.
+	it('names the topic file rather than the document the rule left', () => {
+		expect(delivered).toContain(CANONICAL)
+		expect(delivered).not.toContain('CLAUDE.md')
+	})
+})
+
+// **The trigger and the criterion stay resident; the body does not.** A hook reaches this harness
+// alone — `AGENTS.md`, `GEMINI.md` and `.cursorrules` are pointers to `CLAUDE.md`, and a session
+// under any of them runs no hook — so a document with the line removed would leave those sessions
+// with no statement of the rule anywhere. What the relocation takes out is the reasoning.
+describe.each(AI_DOCS)('%s — keeps the trigger, not the body', (document_path) => {
 	const content = read_unwrapped(document_path)
 
 	it.each([
 		"**Put every call that does not depend on another's result in the same turn.**",
-		"A run's wall clock is set by how many times it stops to wait for a tool",
 		"**The criterion is whether this call's input needs another call's result, not what kind of call it is**",
 		'edits are covered exactly as reads are',
-		'**It never authorizes weakening a verification gate or a review**',
 	])('states %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 
-	it('routes to the canonical topic file', () => {
-		expect(content).toContain(`\`${CANONICAL}\``)
+	it.each(["A run's wall clock is set by how many times it stops to wait for a tool"])(
+		'leaves the reasoning %j at the pointer',
+		(marker) => {
+			expect(content).not.toContain(marker)
+			expect(read_unwrapped(CANONICAL)).toContain('費用は仕事の量ではなく往復の回数にある')
+		},
+	)
+
+	// The hook is what makes the rule fire, so the resident line has to name it — and the enumeration,
+	// so a reader learns there is a delivery channel and what a turn with no trigger means.
+	it('routes to the delivery enumeration and names the trigger', () => {
+		expect(content).toContain(DELIVERY)
+		expect(content).toContain(GUARD_COMMAND)
 	})
 
-	// A resident rule is a trigger plus a pointer. The measured breakdown is what makes the rule
-	// persuasive, not what makes it obeyed, so it belongs at the pointer — and it is the most quotable
-	// part, so it is the first thing that would be pasted back. The rule surface is searched rather
-	// than the document alone, and the residency lists with it: those are the likeliest paste targets.
+	// The measured breakdown is what makes the rule persuasive, not what makes it obeyed, so it
+	// belongs at the pointer — and it is the most quotable part, so it is the first thing that would
+	// be pasted back. The rule surface is searched rather than the document alone, and the residency
+	// lists with it: those are the likeliest paste targets.
 	it.each(MEASUREMENTS)('leaves the measurement %j at the pointer', (measurement) => {
 		expect(read_unwrapped_rule_surface(document_path)).not.toContain(measurement)
 		expect(read_unwrapped(RESIDENCY)).not.toContain(measurement)
@@ -89,17 +132,34 @@ describe(`${CANONICAL} — carries the criterion and the reasoning`, () => {
 	})
 })
 
-// The residency lists are the second half of the rule: a rule that passes the criterion and is not
-// listed has not been checked against it (`residency.md`).
-describe.each([RESIDENCY, WORKFLOW_SKILL_ENTRY])('%s — lists the rule as resident', (list_path) => {
-	const content = read_unwrapped(list_path)
+// The residency lists are the second half of the rule: a rule the criterion moved and that is not
+// listed as moved has not been checked against it (`residency.md`).
+describe.each([RESIDENCY, WORKFLOW_SKILL_ENTRY])(
+	'%s — lists the rule as delivered',
+	(list_path) => {
+		const content = read_unwrapped(list_path)
 
-	it('names the rule', () => {
-		expect(content).toContain('turn-batching.md')
-	})
+		it('names the rule', () => {
+			expect(content).toContain(TOPIC_FILE)
+		})
 
-	it('gives the reason it cannot move to a skill', () => {
-		expect(content).toContain('joshuafolkken/kit#1304')
+		it('names the trigger that delivers it', () => {
+			expect(content).toContain(GUARD_COMMAND)
+		})
+
+		// Recorded so the relocation cannot later read as a cull: the prose was resident and not obeyed, and
+		// that measurement is the reason it moved.
+		it('gives the reason it moved off residency', () => {
+			expect(content).toContain('joshuafolkken/kit#1524')
+		})
+	},
+)
+
+describe(`${DELIVERY} — the enumeration names this rule and its silent turn`, () => {
+	const content = read_unwrapped(DELIVERY)
+
+	it.each([TOPIC_FILE, GUARD_COMMAND, SUITE_PATH])('states %j', (marker) => {
+		expect(content).toContain(marker)
 	})
 })
 
