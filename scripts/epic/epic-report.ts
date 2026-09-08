@@ -30,8 +30,11 @@ interface EpicNextResult {
 	anomalies: ReadonlyArray<GraphAnomaly>
 }
 
-// Bundle by repository, repositories in name order and children in number order, so a run is
-// reproducible rather than dependent on the order GitHub happened to list the children in.
+// Bundle by repository, repositories in name order, so a run is reproducible rather than dependent
+// on the order GitHub happened to list the repositories in. **The children are not re-ordered at
+// all** since joshuafolkken/kit#1583 — they keep the order the epic's task list gave them, which is
+// how an epic says which of its runnable children goes first; the reasoning is at `bundle_by_repo`
+// below.
 // The discovery map is keyed lowercase — GitHub resolves owner and repository names
 // case-insensitively — so the lookup lowercases too. Without it any capital in a repository name
 // printed "no local checkout" for a repository that is checked out (joshuafolkken/kit#864).
@@ -59,11 +62,23 @@ function bundle_by_repo(
 
 	for (const [repo] of grouped) repos.push(repo)
 
+	// **The children keep the order they arrived in, which is the order the epic's task list names
+	// them** (joshuafolkken/kit#1583). They used to be re-sorted by issue number here, on the premise
+	// that number order is split order — true only of an epic whose children were all filed in one
+	// split, and false of every epic that grows as work is found: there the number order is *filing*
+	// order, and an epic had no way at all to say which of its runnable children should go first.
+	//
+	// Nothing else had to change to make the body order authoritative: `epic-fetch.ts` →
+	// `fetch_children` already reads the task list in body order and `epic-classify.ts` fills
+	// `runnable` in that order, so this sort was the one step discarding it.
+	//
+	// **The repositories are still sorted by name**, which is a different question — that is grouping,
+	// not the order work is offered in.
 	return repos
 		.toSorted((left, right) => left.localeCompare(right))
 		.map((repo) => ({
 			repo,
-			children: (grouped.get(repo) ?? []).toSorted((left, right) => left.number - right.number),
+			children: grouped.get(repo) ?? [],
 			...to_path_field(paths.get(repo.toLowerCase())),
 		}))
 }
@@ -99,8 +114,15 @@ function build_result(
 	}
 }
 
-// Every runnable child of one repository, in the order they would be offered. Lowest number first,
-// which is the order the children were split in.
+// Every runnable child of one repository, in the order they would be offered — **the order the
+// epic's own task list names them** (joshuafolkken/kit#1583). It was lowest number first until then,
+// on the premise that number order is split order; an epic that gains children as work is found has
+// no such property, and the epic could not express a priority at all.
+//
+// **Priority is not dependency, and this is the difference.** A child high in the list that is stuck
+// never reaches `runnable`, so it is skipped rather than blocking the ones below it — which is what a
+// declared `blocked-by` chain would do instead, and why an order recorded as a chain stops the batch
+// the moment one child needs a person.
 //
 // The whole bundle rather than only its head, because the confirmation walk needs the rest of it: a
 // candidate whose relations listing disagrees with its summary is withheld and the next one is

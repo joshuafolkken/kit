@@ -50,8 +50,11 @@ measured inside one epic, so a depth-2 child of a five-deep epic and a depth-2 c
 one make the same claim about entirely different amounts of remaining work, and there is no relation
 between two epics to normalize against. Argument order is the one ranking a person typed and can
 change, and it is readable from the output because `epic:next` heads each epic's block with its own
-reference. **Inside one epic nothing moves**: that epic's declared chain still decides which of its
-children is a candidate, and this order only decides whose candidate takes a free lane first.
+reference. **Inside one epic the order is that epic's own task list** (joshuafolkken/kit#1583): its
+declared chain still decides which children are *runnable*, and among those the task-list order
+decides which is offered first — so an epic says "this one first" by moving the row rather than by
+declaring a chain, which would stop every child behind a stuck one. This argument order only decides
+whose candidate takes a free lane when two epics both have one.
 
 **A child two epics both track is entered once.** One issue is one lane; entered twice it would open
 two work trees on it, two branches and two pull requests, the second merging over the first. Identity

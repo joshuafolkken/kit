@@ -155,8 +155,12 @@ free lanes fill from every named epic rather than from whichever was typed first
 **The priority order is the order the epics were named**: dependency
 depth does not compare across graphs, since depth is measured inside one epic and there is no
 relation between two epics to normalize against, while argument order is the one ranking a person
-typed and can change. Inside one epic nothing moves — its own declared chain still decides which of
-its children is a candidate. **A child two epics both track enters once**, keyed by
+typed and can change. **Inside one epic the order is that epic's own task list**
+(joshuafolkken/kit#1583): its declared chain still decides which children are *runnable*, and among
+those, the order the task list names them is the order they are offered — so an epic says "do this
+one first" by moving the row, not by declaring a chain, which would stop every child behind a stuck
+one. It was the lowest issue number until then, on the premise that number order is split order —
+false for any epic that gains children as work is found. **A child two epics both track enters once**, keyed by
 `owner/repo#number` and kept by the epic named earlier; withheld there, it stays withheld, because a
 `blocked-by` relation belongs to the issue rather than to the epic listing it. **One unusable graph
 refuses the whole answer**, and **one reference that does not parse fails the read** rather than

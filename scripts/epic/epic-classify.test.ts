@@ -192,6 +192,21 @@ describe('epic_classify.classify_children — every open child is accounted for'
 // read it — the row fell through to `from_blockers`, which minted `runnable`, so `epicrun` handed an
 // epic to `fullrun` as an ordinary issue. The cases below vary one property at a time, because the
 // refusal must key on the `epic` label and never on a row naming another repository — that one is
+// joshuafolkken/kit#1583. **Priority is not dependency**, and this is the pair that says so. Since
+// the epic's task-list order is the offer order, a child the epic lists *first* can be one that is
+// waiting on a person — and it simply does not reach `runnable`, so the one after it is offered. A
+// declared `blocked-by` chain, which was the only way to order two children before, would instead
+// have stopped everything behind the stuck one.
+describe('epic_classify.classify_children — a parked child ahead of a runnable one', () => {
+	it('skips it rather than holding back the child listed after it', () => {
+		const children = [child(1, { labels: [NEEDS_DECISION_LABEL] }), child(2)]
+		const result = epic_classify.classify_children(children)
+
+		expect(numbers(result.runnable)).toEqual([2])
+		expect(numbers(result.human)).toEqual([1])
+	})
+})
+
 // legitimate, and disables the epic auto-close by design.
 describe('epic_classify.classify_children — a child that is itself an epic', () => {
 	it('withholds it instead of offering it', () => {
