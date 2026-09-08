@@ -204,7 +204,7 @@ Read from the JSON, in this order:
   `by_invocation.durations_ms`: the commit the fix pushed, and the gate that then ran beside its CI.
   **The second CI cycle is the last row of the `CI cycles` block, read as its `naked` figure**
   ([#1465](https://github.com/joshuafolkken/kit/issues/1465)). The block prints one row per check
-  window — `11:44:43 → 11:46:26  1.7 min  naked 103.0 s` — and the naked figure is the part of that
+  window — `00:44:43 → 00:46:26  1.7 min  naked 103.0 s` — and the naked figure is the part of that
   cycle nothing but the merge command overlapped, which is exactly what the run waited.
   **The phase difference it replaces read low, and by more than half.** `ci` minus
   `categories.ci_ms` is `serial_ci_ms`: the part of a cycle the merge spans cover *and nothing else
