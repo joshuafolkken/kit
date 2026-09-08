@@ -53,6 +53,7 @@ const ALIASES: Record<string, string> = {
 	pt: 'port',
 	i: 'init',
 	sy: 'sync',
+	sys: 'sync:scope',
 	g: 'git',
 	gp: 'pr',
 	fu: 'followup',
