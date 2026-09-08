@@ -101,12 +101,19 @@ const INLINE_BODY_VALUE =
 // so it is deliberately absent: a rule that fired on every exclamation mark would be firing on turns
 // where nothing is wrong, which `prompts/collaboration-workflow/rule-delivery.md` names as worse than
 // no hook at all.
+const SHELL_EVALUATED = /[`$]/u
+
+// **The one exemption: a body that is *entirely* one command substitution.** `body="$(cat <path>)"`
+// is the rule already being kept — the substitution's output is not re-scanned by the shell, so a
+// body full of backticks reaches the command byte for byte, and refusing it would spend the run's one
+// delivery on a caller who had already moved the body into a file.
 //
-// **`$(` is excluded for that same reason.** `body="$(cat <path>)"` is the rule already being kept:
-// the substitution's output is not re-scanned by the shell, so a body full of backticks reaches the
-// command byte for byte. Refusing it would spend the run's one delivery on a caller who had already
-// moved the body into a file.
-const SHELL_EVALUATED = /`|\$(?!\()/u
+// **It is anchored to the whole value, not to the `$(` alone.** Excusing `$(` anywhere would let
+// `body="Result: run $(git log -1) to confirm"` through, and that one really is evaluated: the
+// substitution replaces the text and the command runs. The trade-off of anchoring is a delivery that
+// arrives on a safe call, which costs one reissue; the trade-off of not anchoring is a rule that
+// never fires on the case it exists for.
+const WHOLE_VALUE_SUBSTITUTION = /^\$\([^()]*\)$/u
 
 // A backslash escape makes the next character literal inside double quotes, so `\$` and `` \` `` are
 // safe. They are dropped before the test rather than excluded from it, which is the same thing in one
@@ -117,9 +124,17 @@ const ESCAPED_PAIR = /\\./gu
 // prompts passes a placeholder (`-f body="<plan>"`), which is inert; the moment a real body carrying
 // a backtick is substituted in, the call becomes the one that executes text. Keying on the flag would
 // refuse the inert examples too — firing on turns where the rule is already being kept.
+function is_evaluated_value(raw_value: string): boolean {
+	const literal = raw_value.replaceAll(ESCAPED_PAIR, '')
+
+	if (WHOLE_VALUE_SUBSTITUTION.test(literal)) return false
+
+	return SHELL_EVALUATED.test(literal)
+}
+
 function is_shell_evaluated_body(command: string): boolean {
 	for (const match of command.matchAll(INLINE_BODY_VALUE)) {
-		if (SHELL_EVALUATED.test((match[1] ?? '').replaceAll(ESCAPED_PAIR, ''))) return true
+		if (is_evaluated_value(match[1] ?? '')) return true
 	}
 
 	return false

@@ -154,6 +154,9 @@ describe('is_shell_evaluated_body', () => {
 		'gh api repos/{owner}/{repo}/issues/1/comments --field body="$HOME is expanded"',
 		'gh api repos/o/r/issues -f title="x" -f \'body=y\' -f body="`x`"',
 		'pnpm josh followup "t #1" --merge --notify-message="Result: `josh notify` ships it"',
+		// A substitution embedded in prose really is evaluated, so the `$(…)` exemption below is
+		// anchored to a value that is nothing else.
+		'gh api repos/o/r/issues/1/comments -f body="Result: run $(git log -1) to confirm"',
 	])('reads %j as an evaluated body', (command) => {
 		expect(delivered_rules.is_shell_evaluated_body(command)).toBe(true)
 	})
