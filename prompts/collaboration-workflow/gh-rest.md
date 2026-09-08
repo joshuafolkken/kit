@@ -40,8 +40,9 @@ GraphQL への依存であって、バイナリへの依存ではない。**`gh`
 
 `check_gh_installed` は `gh CLI is not installed` と明示するが、git remote からリポジトリを読む側の
 コマンド（`epic:next` / `epic:bundle` / `issue:scout` / `epic --add`）は「Could not read this
-repository from git remote」と出るため、原因が `gh` の不在であることが読み取りにくい。**そのメッセージを
-見たら、まず `gh` の有無を確かめる。**
+repository from `git remote`, so the children cannot be keyed by repository — check `gh auth status`
+and that this is a checkout with an `origin` remote.」と出るため、原因が `gh` の不在であることが読み取り
+にくい。**そのメッセージを見たら、まず `gh` の有無を確かめる。**
 
 環境ごとの前提と、開けるべきホストの一覧は
 [`docs/cloud-session.md`](https://github.com/joshuafolkken/kit/blob/main/docs/cloud-session.md) にある。

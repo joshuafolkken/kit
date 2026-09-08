@@ -120,10 +120,11 @@ over HTTPS succeeds and `GH_TOKEN` authenticates fine against `api.github.com`.
 repository from the git remote report instead:
 
 ```text
-Could not read this repository from `git remote`, so the children cannot be keyed by repository
+Could not read this repository from `git remote`, so the children cannot be keyed by repository —
+check `gh auth status` and that this is a checkout with an `origin` remote.
 ```
 
-which names the remote rather than the missing binary. `josh epic:next`, `josh epic:bundle`,
+which names the remote and the credential rather than the missing binary. `josh epic:next`, `josh epic:bundle`,
 `josh issue:scout` and `josh epic --add` all take that shape. **Check `gh` first when one of them
 says that.**
 
@@ -138,8 +139,9 @@ Neither is edited — both are closed — so the correction is recorded here:
 - **joshuafolkken/kit#1022 → "Out of scope: retiring `gh`"** reasoned that `gh api` inherits auth and
   proxy settings, so only the subcommand form needed replacing. That still holds as a _migration_
   decision, but it is not a statement that `gh` is always available. Retiring `gh` remains out of
-  scope and has not been filed; the reasons — `exec_gh_api_sync` needs a synchronous HTTP call node does not
-  have, and `--jq` takes arbitrary jq expressions across 31 call sites — are in joshuafolkken/kit#1505.
+  scope and has not been filed; the reasons — `exec_gh_api_sync` needs a synchronous HTTP call node
+  does not have, and `--jq` carries arbitrary jq expressions that TypeScript cannot reimplement — are
+  in joshuafolkken/kit#1505.
 
 ## Lane parallelism and `run:liveness`
 

@@ -18,7 +18,7 @@ const EPIC_SKILL = '.claude/skills/epic-commands/SKILL.md'
 const BATCHING = 'prompts/collaboration-workflow/turn-batching.md'
 
 const RULE_MARKERS: ReadonlyArray<[string, string]> = [
-	[RULES, 'GitHub operations are `gh api` (REST), never `gh issue` / `gh pr`'],
+	[RULES, 'GitHub operations are `gh api` (REST)'],
 	[RULES, 'instructing prose included'],
 	[TOPIC, '**GitHub への操作は `gh api`（REST）で書く。'],
 	[TOPIC, '読み手に 実行を指示する形であれば REST で書く。'],
@@ -53,9 +53,9 @@ describe('the two exceptions', () => {
 // The half a reader most often draws the wrong conclusion from: migrating to `gh api` removed the
 // GraphQL dependency, not the binary one, and a container without `gh` was measured.
 const BINARY_MARKERS: ReadonlyArray<[string, string]> = [
-	[RULES, '`gh` must be installed; environments with none exist'],
+	[RULES, 'need `gh` installed; some environments lack it'],
 	[TOPIC, 'REST 化は `gh` を不要にしない'],
-	[TOPIC, 'Could not read this repository from git remote'],
+	[TOPIC, 'Could not read this repository from'],
 	[CLOUD_DOC, 'REST does not make `gh` optional'],
 	[CLOUD_DOC, 'gh CLI is not installed'],
 ]
