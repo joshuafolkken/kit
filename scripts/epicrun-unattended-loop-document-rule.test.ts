@@ -33,25 +33,23 @@ const DELEGATE_COMMAND = 'pnpm josh delegate epic-child'
 const CONJUNCTION_RULE = 'Silence and no process, together — never either one alone'
 const WINDOW_ROW = '| Silent delegated unit | 30 min |'
 
-describe(`${SKILL} — the cost check fires only where delegation is unavailable`, () => {
+describe(`${SKILL} — the cost check is asked at every merge`, () => {
 	const unwrapped = read_unwrapped(SKILL)
 
-	// The condition is a fact the parent holds — whether it delegated this child — not a judgement
-	// about how full the context feels.
-	it('names what decides the firing condition', () => {
-		expect(unwrapped).toContain(
-			'what decides that is whether the child that just merged actually ran in a delegated unit',
-		)
+	// joshuafolkken/kit#1212 conditioned the check on the child having run in the parent's own
+	// context; joshuafolkken/kit#1567 measured a parent that delegated every child and reached the
+	// threshold anyway, so the condition exempted exactly the run that needed the check.
+	it('states that there is no delegation condition left', () => {
+		expect(unwrapped).toContain("is asked after every child's merge")
 	})
 
-	// The defect the first draft shipped: `epic-child` is a literal entry in the enumeration, so the
-	// command answers `delegate` on every machine forever. A gate wired to it never fires once, and
-	// the run that most needs the threshold — one with no isolated unit at all — sails past it.
+	// `epic-child` is a literal entry in the enumeration, so the command answers `delegate` on every
+	// machine forever. A gate wired to it never fires once — the defect the first draft shipped, and
+	// the reason the prohibition outlives the condition it was written against.
 	it('refuses the delegation command as the condition', () => {
 		expect(unwrapped).toContain(
-			"It is not `pnpm josh delegate epic-child`'s answer, and wiring it to that would delete the insurance rather than condition it.",
+			`Never wire the question to \`${DELEGATE_COMMAND}\`** — that is a static policy lookup`,
 		)
-		expect(unwrapped).toContain('static policy lookup')
 	})
 
 	// The rule has to be reachable by following the numbered steps, and the prohibition with it —
@@ -59,7 +57,7 @@ describe(`${SKILL} — the cost check fires only where delegation is unavailable
 	it('states the gate and its prohibition inside the loop', () => {
 		const step = epicrun_loop.per_child_step()
 
-		expect(step).toContain("it does only where **this child ran in this session's own context**")
+		expect(step).toContain("at every child's merge, delegated or not")
 		expect(step).toContain(COST_COMMAND)
 		expect(step).toContain(`Never read the condition off \`${DELEGATE_COMMAND}\``)
 	})
@@ -74,20 +72,24 @@ describe(`${SKILL} — the cost check fires only where delegation is unavailable
 	)
 })
 
-describe(`${SKILL} — reaching the threshold no longer sends the person back to the keyboard`, () => {
+describe(`${SKILL} — reaching the threshold drains the run to a safe seam`, () => {
 	const unwrapped = read_unwrapped(SKILL)
 
-	it('continues the loop on `over`', () => {
-		expect(unwrapped).toContain(
-			'go back to step 1 and run the next child. Do not ask the person to retype the command.',
-		)
+	it('drains instead of cutting while a child is in flight', () => {
+		expect(unwrapped).toContain('Open no new lane and take no new child from `epic:next`')
 	})
 
-	// The safety argument, not a preference: the loop reads every piece of its state back from
-	// GitHub, so a summarized session answers exactly what a fresh one does.
-	it('says why compacting is safe here', () => {
-		expect(unwrapped).toContain('A session that compacts is safe for this workflow')
-		expect(unwrapped).toContain('nothing is carried in the conversation')
+	// Without the drain the rule is unreachable under `--lanes`, which keeps the seats full: the run
+	// joshuafolkken/kit#1567 measured would have read `over` at every merge and cut at none of them.
+	it('says why the drain is what makes the cut reachable', () => {
+		expect(unwrapped).toContain('The drain makes the moment rather than waiting for it')
+		expect(unwrapped).toContain('it would have read `over` at all seven merges')
+	})
+
+	// An unreadable lane cannot be told apart from a running child, so it withholds the cut rather
+	// than being counted idle — a wrong cut abandons a child, a missed cut only costs tokens.
+	it('never reads an unreadable lane as idle', () => {
+		expect(unwrapped).toContain('**Never assume idle.**')
 	})
 
 	// The one thing the conversation *does* hold. `over` used to end the session, so the guard
@@ -118,22 +120,21 @@ describe(`${SKILL} — reaching the threshold no longer sends the person back to
 	})
 })
 
-// Continuing is the new default; stopping is what is left of the old rule. Both halves have to
-// survive, and the second is the one a reword drops — it strands a run whose context is genuinely
-// exhausted with no defined ending.
-describe(`${SKILL} — the escape route the hand-off keeps`, () => {
+// The drain is the means; the cut is the end of it. A reword that keeps only the first strands a run
+// that drains to an idle pool and then carries on with nothing left to wait for.
+describe(`${SKILL} — the cut the drain arrives at`, () => {
 	const unwrapped = read_unwrapped(SKILL)
 
-	it('keeps the stop for a session that cannot continue', () => {
-		expect(unwrapped).toContain('**`over`, where the session cannot continue at all**')
-		expect(unwrapped).toContain('The escape route stays exactly as it was')
+	it('stops and asks once the pool is idle', () => {
+		expect(unwrapped).toContain('**`none`, once drained**')
+		expect(unwrapped).toContain('stop and ask the person to cut the session')
 		expect(unwrapped).toContain(
 			'Please run `epicrun #<E>` to continue this epic in a fresh session.',
 		)
 	})
 
-	// The stopping conditions are read as the exhaustive list, so a condition that has gained a
-	// qualifier has to gain it there too — otherwise the list still says a bare `over` ends the run.
+	// The stopping conditions are read as the exhaustive list, so the qualifier has to be there too —
+	// otherwise the list says a bare `over` ends the run and a drained run has no ending at all.
 	it('qualifies the stopping condition rather than leaving it bare', () => {
 		const content = read_repo_file(SKILL)
 		const conditions = content
@@ -141,8 +142,8 @@ describe(`${SKILL} — the escape route the hand-off keeps`, () => {
 			.replaceAll(/\s+/gu, ' ')
 
 		expect(conditions).toContain(COST_COMMAND)
-		expect(conditions).toContain('and this session cannot continue')
-		expect(conditions).toContain('**`over` on its own is no longer on this list**')
+		expect(conditions).toContain('brought `pnpm josh lane:list` to `none`')
+		expect(conditions).toContain('**The reading on its own is not on this list**')
 	})
 })
 
@@ -298,7 +299,7 @@ describe('the hand-off report is tied to the stop, not to the reading', () => {
 		const unwrapped = read_unwrapped(FORMAT)
 
 		expect(unwrapped).toContain('この書式は「止まったとき」だけのものである')
-		expect(unwrapped).toContain('続行したランは区切りの報告を書かない')
+		expect(unwrapped).toContain('drain 中のランは区切りの報告を書かない')
 		expect(unwrapped).toContain('閾値を超えたこと自体は区切りではなく、停止したことが区切りである')
 	})
 })
@@ -309,8 +310,8 @@ describe(`${POINTER} — records the new rules without restating them`, () => {
 	const unwrapped = read_unwrapped(POINTER)
 
 	it.each([
-		'それを問うのが子を親の文脈で走らせたときだけであること',
-		'閾値を超えても停止せず続けること',
+		'子のマージごとに必ず問う',
+		'`over` で drain に入り',
 		'委譲した実行単位が報告せず停止したことを親が検知する手順',
 	])('names %j as something the skill holds', (marker) => {
 		expect(unwrapped).toContain(marker)

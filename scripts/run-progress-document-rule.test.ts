@@ -78,6 +78,13 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'a result nobody read must never be printed as one',
 	'It goes to the session only',
 	'Nothing is reported while no child is in flight',
+	// joshuafolkken/kit#1567. The relayed line was already one line; what cost was the run's own
+	// prose around it — 27.9% of everything a measured parent accumulated, the largest single
+	// source. A tick with no bound reprints the epic's table and pays for it on every later request.
+	"the executing side's own text at **27.9%**",
+	'A tick is quiet when none of the real reports happened since the last one',
+	"the relayed line plus at most two lines of the run's own prose",
+	'no re-listing of the remaining children',
 	// The scope, and the two decisions joshuafolkken/kit#1546 was filed to take.
 	'The scope is every implementing run, not this command alone',
 	'`halfrun` is included, and the reason is that the trigger is silence rather than command identity',

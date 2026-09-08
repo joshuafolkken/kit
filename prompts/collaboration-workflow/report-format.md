@@ -111,7 +111,7 @@ pnpm josh lines <path> [<path>...]   # コード行数 / 上限 / 残り、お�
 
 Telegram 本文も同じ書式で書き、**`--task-type confirmation` で送る**。区切りは人が次のコマンドを打つのを待つ停止であり、それが `confirmation` の意味である。`completion` で送ると、完了していない epic が完了として通知される — 書式を分けた意味がラベルの側で失われる。
 
-**この書式は「止まったとき」だけのものである。** joshuafolkken/kit#1212 以降、`pnpm josh cost --over 400000` が `over` と答えても、セッションが続けられる限りランは停止せず次の子へ進む。**続行したランは区切りの報告を書かない** — 4 行が答えているのは「誰が何を引き継ぐか」であり、同じセッションが走り続けているあいだ引き継ぐ人はいないからである。そのときの記録は epic の進捗コメントであって、この書式ではない。**閾値を超えたこと自体は区切りではなく、停止したことが区切りである。** 逃げ道（要約できず文脈も尽きた場合）に入って実際に停止したときだけ、この 4 行を書く。単一ソースは [`.claude/skills/workflow-commands/epicrun.md`](../../.claude/skills/workflow-commands/epicrun.md) →「The hand-off」。
+**この書式は「止まったとき」だけのものである。** joshuafolkken/kit#1567 以降、`pnpm josh cost --over 400000` が `over` と答えるとランは**drain に入る** — 新しい子を取らず、すでに走っている子の完了だけを待つ — が、drain 中はまだ停止していない。**drain 中のランは区切りの報告を書かない** — 4 行が答えているのは「誰が何を引き継ぐか」であり、同じセッションが走り続けているあいだ引き継ぐ人はいないからである。そのときの記録は epic の進捗コメントであって、この書式ではない。**閾値を超えたこと自体は区切りではなく、停止したことが区切りである。** `pnpm josh lane:list` が `none` に達して実際に停止したときだけ、この 4 行を書く。単一ソースは [`.claude/skills/workflow-commands/epicrun.md`](../../.claude/skills/workflow-commands/epicrun.md) →「The hand-off」。
 
 ### 概要 3 行の書き方（ここが本体）
 
