@@ -113,6 +113,8 @@ The lifecycle hooks (`lefthook install` + `fix-gh-packages`) live in **`prepare`
 
 **A `lefthook install` that runs and fails now says so on standard error** ([#1503](https://github.com/joshuafolkken/kit/issues/1503)). It still exits zero — a consumer's install must not die over a developer-only hook, which is what the `|| true` is for — but silence was never part of that bargain: a missing binary and a binary that failed were indistinguishable, so an install leaving **zero** hooks in place reported success and the developer went on committing for weeks with no pre-commit or pre-push check running at all. The warning sits **inside** the branch the binary check already gates, so the ordinary production install — where `lefthook` is simply absent — stays exactly as quiet as it was. When `josh init` appends the lifecycle to an existing `prepare` (e.g. `pnpm gen && svelte-kit sync`), those core steps stay fail-fast: if they fail, `prepare` still exits non-zero.
 
+**A project that was already initialized gets the same rewrite from `josh sync`** ([#1507](https://github.com/joshuafolkken/kit/issues/1507)). Re-running `josh init` is not how consumers upgrade, so the warning would otherwise have reached new projects only — leaving exactly the population the fix was written for on the silent install. `josh sync` matches the clause kit itself wrote and nothing else, and the change takes effect on the next `pnpm install`. See [sync.md](./sync.md#what-does-not-get-synced).
+
 When a `prepare` already exists, `josh init` appends the lifecycle to it rather than replacing it. If a script already runs `fix-gh-packages`, `josh init` skips re-adding the hook so re-running it never duplicates. A kit-managed `postinstall` from an earlier version (one that runs `fix-gh-packages`) is migrated to `prepare`; a custom `postinstall` of your own is left untouched.
 
 All other toolchain tasks are available as `pnpm josh <command>` subcommands — they are **not** added as separate package scripts. Existing scripts are never overwritten.
@@ -132,24 +134,24 @@ The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries ba
 
 ### Available `pnpm josh` subcommands
 
-| Command              | Runs                                                                            |
-| -------------------- | ------------------------------------------------------------------------------- |
-| `lint`               | `pnpm lint:prettier && pnpm lint:eslint`                                        |
-| `lint:prettier`      | `prettier --check .`                                                            |
-| `lint:eslint`        | `eslint . --cache --cache-strategy content`                                     |
-| `format`             | `pnpm format:prettier && pnpm format:eslint`                                    |
-| `format:prettier`    | `prettier --write .`                                                            |
-| `format:eslint`      | `eslint . --fix --cache --cache-strategy content`                               |
-| `cspell`             | `cspell lint ...`                                                               |
-| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache` |
-| `test:unit`          | `vitest run` (skips when vitest or test files absent)                           |
-| `lefthook:install`   | `lefthook install`                                                              |
-| `lefthook:uninstall` | `lefthook uninstall`                                                            |
-| `lefthook:commit`    | `lefthook run pre-commit`                                                       |
-| `lefthook:push`      | `lefthook run pre-push`                                                         |
-| `main:sync`          | `git checkout main && git pull`                                                 |
-| `main:merge`         | `git pull origin main`                                                          |
-| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                     |
+| Command              | Runs                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `lint`               | `pnpm lint:prettier && pnpm lint:eslint`                                               |
+| `lint:prettier`      | `prettier --check .`                                                                   |
+| `lint:eslint`        | `eslint . --cache --cache-strategy content`                                            |
+| `format`             | `pnpm format:prettier && pnpm format:eslint`                                           |
+| `format:prettier`    | `prettier --write .`                                                                   |
+| `format:eslint`      | `eslint . --fix --cache --cache-strategy content`                                      |
+| `cspell`             | `cspell lint ...`                                                                      |
+| `cspell:dot`         | `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`        |
+| `test:unit`          | `vitest run` (skips when vitest is absent; fails when it is present with no test file) |
+| `lefthook:install`   | `lefthook install`                                                                     |
+| `lefthook:uninstall` | `lefthook uninstall`                                                                   |
+| `lefthook:commit`    | `lefthook run pre-commit`                                                              |
+| `lefthook:push`      | `lefthook run pre-push`                                                                |
+| `main:sync`          | `git checkout main && git pull`                                                        |
+| `main:merge`         | `git pull origin main`                                                                 |
+| `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                            |
 
 SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.
 
