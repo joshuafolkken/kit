@@ -154,8 +154,10 @@ describe('run_wrapup — a run that merged nothing', () => {
 })
 
 // joshuafolkken/kit#1592. The completion report on the Issue is the managed config-file report's
-// second destination — the first is the completion notification, covered in `git-pr-followup.test.ts`.
-// Reaching only one of the two would leave the change invisible to whichever reader used the other.
+// second destination. What is pinned here is the **pass-through** — that this module hands the notes
+// on rather than dropping them; both destinations end to end are
+// `git-pr-followup-managed-report.test.ts`, which leaves the matcher real. Reaching only one of the
+// two would leave the change invisible to whichever reader used the other.
 // Written the way `managed_config_scope.format_hit` writes it — path, then the list that claimed it.
 const REPORT_LINE = '.claude/skills/workflow-commands/epicrun.md (AI_COPY_DIRECTORIES)'
 
