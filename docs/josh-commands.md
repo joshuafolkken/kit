@@ -97,15 +97,24 @@ Each block's header names the command that ran, not only the check, because the 
 ```bash
 pnpm josh gate --verbose   # every check's output, passing ones included
 pnpm josh gate --force     # run the four checks even on a tree already recorded green
+pnpm josh gate --no-unit   # the three static checks; the unit suite is running elsewhere
 ```
 
-`--verbose` and `--force` are the exceptions to the refusal below: the gate consumes them itself rather than forwarding them, so they cannot vanish into a sub-command the way a forwarded flag would. Every other argument is still refused, and the refusal names both the arguments it rejected and the flags it accepts:
+`--verbose`, `--force` and `--no-unit` are the exceptions to the refusal below: the gate consumes them itself rather than forwarding them, so they cannot vanish into a sub-command the way a forwarded flag would. Every other argument is still refused, and the refusal names both the arguments it rejected and the flags it accepts:
 
 ```
 josh gate takes no extra arguments — pass them to josh lint or josh check or josh cspell:dot or josh test:unit instead
   refused: --workers=1
-  accepted here: --verbose --force
+  accepted here: --verbose --force --no-unit
 ```
+
+**`--no-unit` has exactly one caller, and it is not a way to run a quicker gate** ([#1226](https://github.com/joshuafolkken/kit/issues/1226)). CI runs the unit suite on a runner of its own, because it is the only check that fans out across every core and a 4-core GitHub runner cannot host it beside the other three without all four losing: the single job took 121 seconds, 106 of them inside the gate step. So `.github/workflows/ci.yml` runs `pnpm josh gate --verbose --no-unit` on one job and `pnpm josh test:unit` on another. The plan line says which set ran:
+
+```
+plan: 3 of 3 checks at once, test:unit elsewhere (11 cores)
+```
+
+**A partial gate writes none of the records a whole one writes.** The green-gate record above, the in-flight marker `josh review:brief` reads, and the unit-run marker a sibling lane divides its workers by are all claims about the unit suite, and a `--no-unit` run makes none of them. That is what stops the flag from becoming a hole: a partial gate can never let a later full `pnpm josh gate` be skipped on its strength, nor tell a review agent that a suite it did not run has passed. Locally there is no reason to pass it — the completion gate is all four checks, and `pnpm josh gate` is what runs them.
 
 **The type check follows the application layer.** Three of the four checks are always the `josh` sub-command of the same name. The type check is not: a SvelteKit project type-checks with `svelte-check` behind `svelte-kit sync`, and `tsc --noEmit` there both misses every `.svelte` type error and fails on a clean checkout where `./$types` has not been generated. So the step is asked of the project's own toolkit:
 

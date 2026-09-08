@@ -399,10 +399,10 @@ describe('run_verification_gate — how long each check took', () => {
 const JOSH = 'josh'
 const UNIT_CAP = 7
 const NARROWEST_CONCURRENCY = 1
-const CAPPED_PLAN: GatePlan = { concurrency: GATE_STEPS.length, unit_worker_cap: UNIT_CAP }
-const UNCAPPED_PLAN: GatePlan = { concurrency: GATE_STEPS.length, unit_worker_cap: undefined }
+const CAPPED_PLAN: GatePlan = gate_plan.plan_of(GATE_STEPS.length, UNIT_CAP)
+const UNCAPPED_PLAN: GatePlan = gate_plan.plan_of(GATE_STEPS.length)
 // The narrowest plan any machine produces. Everything still has to run.
-const SERIAL_PLAN: GatePlan = { concurrency: NARROWEST_CONCURRENCY, unit_worker_cap: undefined }
+const SERIAL_PLAN: GatePlan = gate_plan.plan_of(NARROWEST_CONCURRENCY)
 
 function unit_step_args(steps: ReadonlyArray<GateStep>): ReadonlyArray<string> | undefined {
 	return steps.find((step) => step.label === gate_plan.UNIT_LABEL)?.command_args
