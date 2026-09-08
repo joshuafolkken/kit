@@ -803,15 +803,35 @@ child already carrying `in-progress`; a person asking by hand is being told wher
 
 ## Progress while the run is quiet
 
-**Start the progress watcher before step 1 of the loop, and do it without being asked.**
+**Start the progress step before step 1 of the loop, and do it without being asked.**
 
 ```bash
-pnpm josh run:progress --output <the transcript path of each delegated unit>   # in the background
+pnpm josh run:progress --wait --output <the transcript path of each delegated unit>   # in the background
 ```
 
-It is started **in the background** — the parent does not wait on it — and everything it prints on
-standard output is **relayed into the session as it appears**. The parent adds nothing to those
-lines and asks nothing to produce them.
+**`--wait` waits one silence interval out, prints one line and exits — and the exit is what makes
+the line arrive.** Standard output is relayed into the session as it appears **only where the
+harness streams it**; a harness that delivers a background command's output *when that command
+exits* — Claude Code is one — relays nothing at all from a watcher that never exits, so a run that
+followed the earlier wording started a watcher and then went 2h36m without a single progress line
+with children in flight (joshuafolkken/kit#1576). The long-running form, `pnpm josh run:progress`
+with no `--wait`, is still the right one where output really is streamed; it is not the one to start
+here. The parent adds nothing to the line and asks nothing to produce it.
+
+**The step the parent repeats, named so a session that has read only this can run it.** Every
+interval is these three moves and there is no fourth:
+
+1. Start `pnpm josh run:progress --wait --output <transcript paths>` **in the background**.
+2. When it exits, **relay what it printed into the session verbatim** — nothing added, nothing
+   summarized.
+3. **In that same turn, start the next one.** The interval is measured from the last report, so the
+   next `--wait` waits a full interval from the line just relayed and nothing else has to be timed.
+
+**It exits only when it has a line to hand over**, or when `--hours` runs out with the run never
+having gone quiet for a whole interval — and that second exit says so on standard error rather than
+printing a progress line. **Nothing in flight keeps it waiting rather than ending it**, because
+returning there would hand this loop an instant answer to restart, and step 3 would make that a poll
+instead of a heartbeat.
 
 **It starts by itself, and that is the requirement rather than a convenience.** Until
 joshuafolkken/kit#1520 the person had to type "give me progress reports" at the start of every run,
@@ -824,8 +844,8 @@ silence clock, which is what keeps a heartbeat from landing immediately behind a
 it would be noise rather than news. The clock is silence, never a timer; the command's own reference
 is `docs/josh-commands.md` → "`josh run:progress`".
 
-**Never arm a wait timer of your own, and the hook refuses one rather than asking you not to**
-(joshuafolkken/kit#1570). The watcher above owns the clock: it wakes on its own and prints when the
+**Do not keep a progress clock of your own, and the hook refuses an arm rather than asking you not
+to** (joshuafolkken/kit#1570). The step above owns the clock: it wakes on its own and prints when the
 run has been quiet for the interval, so a `Bash` call that only sleeps adds a second clock nobody
 reconciles. That is what happened — a timer was armed on the turn a timer fired **and** again on the
 turn a delegated child's completion woke the run, so two ran at once and each produced a report the
@@ -836,10 +856,25 @@ of the **arm** rather than in front of the report — a report is prose and no h
 while the call that sleeps is a call. `pnpm josh rule:guard` refuses it when a timer it allowed is
 still live, or when the report that timer would produce would land before the interval is up.
 
+**What the hook refuses, written exactly as it decides** (joshuafolkken/kit#1576).
+`scripts/rules/early-heartbeat.ts` → `decide` refuses a `Bash` call whose every segment is a `sleep`
+on three tests — a timer it already allowed is still live, the report that timer would produce would
+land before the interval is up, or the wait runs longer than the interval — so **a single
+correctly-spaced arm is allowed**, where this section used to say that none ever was. The document
+was the half that was wrong, and the cost of the disagreement was paid the obvious way: a run that
+obeyed the sentence went silent, and a run that broke it reported. **The allowance is still not the
+way to report** — it is what is left over after the three refusals, while the step above waits and
+prints without arming anything, and `pnpm josh run:progress --wait` is not a wait timer and never
+matches the trigger at all.
+
 **The default interval is twenty minutes, and it is overridable — by the person, not by the run.**
 Set `JOSH_PROGRESS_INTERVAL_MINUTES` and both sides move together: the guard reads that variable
 through the same reader the watcher does, so the floor it enforces is the interval the run was told
-to keep. **`--interval` moves the watcher alone** — a hook has no command line to read — so it can
+to keep. **The interval travels with the repository too**: `josh` → `progress_interval_minutes` in
+`package.json` is read by that same reader, one step below the variable, so a cadence set once is
+the cadence on every machine and in every cloud session — which a non-committed `.env` can never be
+(joshuafolkken/kit#1576). The variable still outranks it, because a person's own machine is allowed
+to differ from what the repository asks for. **`--interval` moves the watcher alone** — a hook has no command line to read — so it can
 only make the watcher quieter than the floor, never the guard stricter; a run that wants a different
 cadence sets the variable rather than the flag. Twenty rather than ten because a child measures 20–46
 minutes: one to two reports per child, each with a stage change in it.
@@ -932,11 +967,12 @@ would go on ageing a finished unit's file and report a run that had long moved o
 `unread` is the command's defined answer for "no path was given" rather than a guess, and every
 other field on the line is unaffected.
 
-**A run that merges needs no teardown, and a run that stops has to end the watcher itself.** The
-issue leaves the `in-progress` listing at the merge, so the watcher goes quiet on its own by the
-rule above and `--hours` expires it. **A stop keeps that label on purpose** — that is what makes the
-stop resumable — so the background process is stopped in the same turn as the stop notification, or
-it reports for up to eight more hours into a session that is waiting on a person. That covers
+**A run that merges needs no teardown, and a run that stops has to end the reporting itself.** The
+issue leaves the `in-progress` listing at the merge, so whatever is still waiting prints nothing by
+the rule above and `--hours` ends it. **A stop keeps that label on purpose** — that is
+what makes the stop resumable — so **no further `--wait` is started** after the stop notification,
+and any long-running watcher still in the background is stopped in the same turn, or it reports for
+up to eight more hours into a session that is waiting on a person. That covers
 `halfrun`'s stop before commit, a `needs-human-review` stop, a split or prerequisite stop, and
 `queue`'s failure stop.
 

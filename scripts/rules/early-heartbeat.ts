@@ -1,6 +1,7 @@
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { run_progress } from '#scripts/run/run-progress'
 import { run_progress_clock } from '#scripts/run/run-progress-clock'
+import { run_progress_config } from '#scripts/run/run-progress-config'
 import type { GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
 
@@ -128,7 +129,7 @@ function is_armed(target: string, now_ms: number): boolean {
  * measured the arm would refuse the one arm that is always right.
  */
 function landing_ms(command: string, now_ms: number, last_report_ms: number): number | undefined {
-	const interval_ms = run_progress.configured_interval_ms()
+	const interval_ms = run_progress_config.configured_interval_ms()
 	const duration_ms = wait_duration_ms(command)
 
 	if (duration_ms > interval_ms) return undefined
@@ -183,9 +184,10 @@ function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean 
 // is the half that makes the rule believable — the promise was kept and the interval was not.
 const EARLY_HEARTBEAT_REASON =
 	'⛔ early heartbeat: this call arms a wait timer of its own, and the progress clock is not yours ' +
-	'to keep. `pnpm josh run:progress` is already running in the background and prints one line once ' +
-	'the run has been quiet for the interval (`JOSH_PROGRESS_INTERVAL_MINUTES`, default 20 minutes) — ' +
-	'relay what it prints instead of sleeping and writing a report of your own. Two timers armed at ' +
+	'to keep. `pnpm josh run:progress --wait` waits the interval out for you ' +
+	'(`JOSH_PROGRESS_INTERVAL_MINUTES`, or `josh.progress_interval_minutes` in `package.json`, ' +
+	'default 20 minutes), prints one line and exits — start it in the background, relay the line it ' +
+	'printed when it exits, and start the next one. Two timers armed at ' +
 	'once is what produced reports 3–5 minutes apart on a 15-minute setting ' +
 	'(joshuafolkken/kit#1570): a new one was armed on the turn a timer fired and again on the turn a ' +
 	"child's completion woke the run, and `--mark` recorded each report without anything refusing the " +

@@ -184,34 +184,22 @@ function is_due(last_report_ms: number, now_ms: number, interval_ms: number): bo
 }
 
 /**
- * The interval, from the environment, with the default for everything that is not a positive number.
+ * One setting's minutes, or `undefined` for everything that is not a positive number.
  *
- * **Invalid falls back rather than throwing**, the reading `JOSH_CI_TIMEOUT_SECONDS` already uses: this
- * runs unattended in the background, and a run that dies on a typo in an optional setting has removed
- * the reporting the setting was there to tune.
+ * **Invalid answers `undefined` rather than throwing**, the reading `JOSH_CI_TIMEOUT_SECONDS` already
+ * uses: this runs unattended in the background, and a run that dies on a typo in an optional setting
+ * has removed the reporting the setting was there to tune. Which source is asked next, and in what
+ * order, is `run-progress-config.ts` → `resolve_interval_ms`; this module answers about one value and
+ * asks nothing else, which is what lets both the watcher and the guard read it the same way.
  */
-function interval_from(raw: string | undefined): number {
+function minutes_from(raw: string | undefined): number | undefined {
 	const minutes = Number(raw)
 
 	if (raw === undefined || raw.trim() === '' || !Number.isFinite(minutes) || minutes <= 0) {
-		return DEFAULT_INTERVAL_MS
+		return undefined
 	}
 
-	return minutes * MS_PER_MINUTE
-}
-
-/**
- * The interval in force, from the environment alone — the **floor** the guard enforces.
- *
- * **It is deliberately not the watcher's effective interval.** The watcher takes `--interval` on top
- * of the environment, and a hook has no command line to read; so rather than guessing, this answers
- * the one number both sides can see. A `--interval` above the floor makes the watcher quieter than
- * the guard requires, which is the harmless direction; below it, the watcher prints more often than
- * the guard would let the run arm a timer for — so a run that wants a different cadence sets
- * `JOSH_PROGRESS_INTERVAL_MINUTES`, which both read.
- */
-function configured_interval_ms(): number {
-	return interval_from(process.env[INTERVAL_KEY])
+	return minutes
 }
 
 const run_progress = {
@@ -220,13 +208,12 @@ const run_progress = {
 	INTERVAL_KEY,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
-	configured_interval_ms,
 	format_child,
 	format_lanes,
 	format_line,
 	format_record,
-	interval_from,
 	is_due,
+	minutes_from,
 	next_state,
 	observation_key,
 }

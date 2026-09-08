@@ -37,19 +37,19 @@ describe('is_due — the trigger is silence, not a clock', () => {
 	})
 })
 
-describe('interval_from — configurable, disable-able, and never fatal', () => {
-	it('defaults to twenty minutes, one to two reports per child', () => {
-		expect(run_progress.interval_from(undefined)).toBe(20 * MINUTE)
+describe('minutes_from — one setting read, and never fatal', () => {
+	it('keeps twenty minutes as the default, one to two reports per child', () => {
 		expect(run_progress.DEFAULT_INTERVAL_MINUTES).toBe(20)
+		expect(run_progress.DEFAULT_INTERVAL_MS).toBe(20 * MINUTE)
 	})
 
-	it('takes a positive number of minutes from the environment', () => {
-		expect(run_progress.interval_from('35')).toBe(35 * MINUTE)
+	it('takes a positive number of minutes', () => {
+		expect(run_progress.minutes_from('35')).toBe(35)
 	})
 
-	it('falls back rather than throwing, so a typo cannot end an unattended run', () => {
-		for (const raw of ['', '  ', 'ten', '0', '-5', 'NaN']) {
-			expect(run_progress.interval_from(raw)).toBe(run_progress.DEFAULT_INTERVAL_MS)
+	it('answers undefined rather than throwing, so a typo cannot end an unattended run', () => {
+		for (const raw of [undefined, '', '  ', 'ten', '0', '-5', 'NaN']) {
+			expect(run_progress.minutes_from(raw)).toBeUndefined()
 		}
 	})
 })

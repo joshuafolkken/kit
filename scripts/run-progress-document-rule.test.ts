@@ -59,11 +59,16 @@ const DOC_MARKERS: ReadonlyArray<string> = [
 	'an explicit ask is not a heartbeat',
 	'The fourth row is the early heartbeat',
 	'One delivery per run — except for a row whose subject is a recurring act',
+	// joshuafolkken/kit#1576. The form that reports where a long-running process cannot, and the
+	// second source for the interval — without the latter the setting exists and does not travel.
+	'`--wait` is that loop with an exit at the end, and it exists because relaying "what appears" is not always possible',
+	'relays nothing at all from a process built never to exit',
+	'josh.progress_interval_minutes',
 ]
 
 const SKILL_MARKERS: ReadonlyArray<string> = [
 	// The auto-start, and why being asked for it is a failure rather than a preference.
-	'Start the progress watcher before step 1 of the loop, and do it without being asked',
+	'Start the progress step before step 1 of the loop, and do it without being asked',
 	'It starts by itself, and that is the requirement rather than a convenience',
 	'A run that has to be asked has not solved it',
 	// What keeps the heartbeat off the heels of a real report.
@@ -82,7 +87,7 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	// watcher reading the wrong repository's listing, and one left reporting after the run stopped.
 	"It is started in the target repository's checkout, and `--mark` is run there too",
 	'`--mark` follows the watcher',
-	'A run that merges needs no teardown, and a run that stops has to end the watcher itself',
+	'A run that merges needs no teardown, and a run that stops has to end the reporting itself',
 	// What a real report is once the run has one child instead of many — without it `--mark` is never
 	// called and a heartbeat lands on the heels of a real report.
 	'any turn that puts a progress statement in front of the person',
@@ -98,11 +103,21 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'It is added, never substituted for the elapsed figure',
 	// joshuafolkken/kit#1570. The refusal in front of the arm, the three answers it turns on, and the
 	// measurement that makes it believable — the promise was kept and the interval was not.
-	'Never arm a wait timer of your own, and the hook refuses one rather than asking you not to',
+	'Do not keep a progress clock of your own, and the hook refuses an arm rather than asking you not to',
 	'The promise was kept and the interval was not',
 	'The default interval is twenty minutes, and it is overridable — by the person, not by the run.',
 	'An explicit ask is not a heartbeat, and it is exempt by construction rather than by exception.',
 	'A live timer is counted from the record the guard writes when it allows one',
+	// joshuafolkken/kit#1576. The three halves of the fix, each one a thing a reader would otherwise
+	// have to derive: why the form that exits is the one to start, the step the parent actually takes
+	// at every interval, and what the guard really refuses — the sentence this section used to get
+	// wrong, which is how obeying it produced silence.
+	'`--wait` waits one silence interval out, prints one line and exits — and the exit is what makes the line arrive.',
+	'The step the parent repeats, named so a session that has read only this can run it.',
+	'What the hook refuses, written exactly as it decides',
+	'a single correctly-spaced arm is allowed',
+	// The interval reaching another machine at all, which a non-committed `.env` cannot do.
+	'The interval travels with the repository too',
 ]
 
 // One case per file per marker: the section's body must live in exactly one file.
