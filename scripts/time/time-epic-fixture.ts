@@ -9,6 +9,7 @@ import type { TimeReport } from './time-report'
 import { time_rework } from './time-rework'
 import { time_single_checks } from './time-single-checks'
 import { time_tool_turns } from './time-tool-turns'
+import { time_windows } from './time-windows'
 
 // What the epic-aggregation suites read, written once rather than in each test file
 // (joshuafolkken/kit#1300).
@@ -114,6 +115,7 @@ function report_of(input: ReportInput): TimeReport {
 		// A child nothing was read for really does elapse nothing, so the fixture cannot assert a total
 		// that the aggregation could never produce.
 		elapsed_ms: is_timed ? model_ms + MINUTE_MS : 0,
+		windows: time_windows.NO_WINDOWS,
 		span_count,
 		turn_count,
 		...ZERO_COUNTS,

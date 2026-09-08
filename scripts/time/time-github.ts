@@ -511,6 +511,9 @@ const time_github = {
 	// at its length limit — not a second route to the API, which is why it reads through `GhReader` and
 	// `read_gh` above rather than reaching for `git_gh_exec` itself.
 	PULLS_PATH,
+	// Exported for the same reason `PULLS_PATH` is: `time-issue-window.ts` is this layer's third file
+	// (joshuafolkken/kit#1409), and it builds its path off this one string rather than restating it.
+	ISSUES_PATH,
 	read_gh,
 	read_issue_body,
 	parse_page,

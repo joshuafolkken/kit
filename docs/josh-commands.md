@@ -2390,7 +2390,7 @@ pnpm josh time --json           # the same figures, machine-readable
 
 Every issue filed to make `fullrun` faster has come out of a **hand measurement**: the session record restored by eye, a throwaway script written for that one run, and a classification that differed from the last one. `josh cost` reads what a run was billed and there was nothing on the other axis, so "did that change make a run shorter?" had no answer anyone could compare across two runs.
 
-**The sample below is one run end to end** — `pnpm josh time --issue 1379`, the run that shipped [#1379](https://github.com/joshuafolkken/kit/issues/1379) — so each block can be read against the ones around it: the price the `Bundling:` rows multiply out is the one the `Round trips:` block above them prints, and both divide by the same round-trip count. Blocks pasted from different runs read as one report and cannot be checked at all ([#1395](https://github.com/joshuafolkken/kit/issues/1395)). The segment and per-invocation tables the same invocation also prints are shown further down, on a different run that is named where they appear.
+**The sample below is one run end to end** — `pnpm josh time --issue 1379`, the run that shipped [#1379](https://github.com/joshuafolkken/kit/issues/1379) — so each block can be read against the ones around it: the price the `Bundling:` rows multiply out is the one the `Round trips:` block above them prints, and both divide by the same round-trip count. Blocks pasted from different runs read as one report and cannot be checked at all ([#1395](https://github.com/joshuafolkken/kit/issues/1395)). The segment and per-invocation tables the same invocation also prints are shown further down, on a different run that is named where they appear, and so is the three-window block that now opens every run report.
 
 ```
 issue #1379 — 27.2 min elapsed
@@ -2575,6 +2575,32 @@ Where the wall clock went:
   human wait               70.0 min   54.1%
   CI wait                   0.0 min   0.0%
 ```
+
+**One run is three nested windows, and the report opens with all three** ([#1409](https://github.com/joshuafolkken/kit/issues/1409)). A single `started_at` / `ended_at` pair could not say what the run itself controlled: run #1399 was 20.0 minutes of `fullrun` sitting inside a 24.6-minute issue, of which the pull request held 8.2, and nothing in the report separated the three. The block below is that run — a different one from the sample above, named here for the reason the segment tables are:
+
+```
+The three windows this run sits in:
+  run body                 20.0 min   06:52:19 → 07:12:17
+  pull request open         8.2 min   07:03:10 → 07:11:23
+  issue open               24.6 min   06:46:50 → 07:11:24
+```
+
+**The run body is the transcript's own span and nothing else.** `started_at` / `ended_at` bound everything either source knows about, the pull request's stamps included; the run body deliberately does not, so a checkout that holds no transcript for the issue reports it `not measured` rather than borrowing the pull request's 8.2 minutes and printing them as a run nobody measured.
+
+**The nesting is the reading, not an arithmetic containment.** That run went on to `josh ms` for 53 seconds after the merge closed the issue, so the run body's end sits past the issue's — the rows are ordered by the question each answers, and `diag` uses them to say which of the three a proposed saving is a saving _of_.
+
+**They are not the `pre-run` / `post-run` phases, and neither replaces the other.** Those two are transcript spans that fall _outside_ the run's window and are shares of `elapsed_ms`; these are wall windows the run falls _inside_ and cover no spans at all, so nothing here enters the phase table and adding them to it would double-count every minute in it.
+
+**Each window is read or withheld on its own**, so a half nobody could read never prints as `0.0 min`. `--session` has neither a pull request nor an issue, an issue with no pull request has no middle window, and one still open has no third — each prints `not measured`, the same distinction `span_count: 0` and `not detected` make everywhere else here:
+
+```
+The three windows this run sits in:
+  run body                 20.0 min   06:52:19 → 07:12:17
+  pull request open                   not measured
+  issue open                          not measured
+```
+
+The issue's own stamps are the one thing neither existing read carried, so they are a read of their own — `repos/{owner}/{repo}/issues/<N>`, issued beside the merged pull request's rather than after it, so a batch scope pays no extra serial request per child.
 
 **CI wait is the part of the open→merge window no span already covers**, not the window itself. `followup` waits for CI _inside_ a Bash tool span that is already counted, so adding the window whole would count it twice and leave the four shares summing to more than the run took — the property that makes two runs comparable. Where the run sat watching its own merge, the honest figure is therefore near zero, and the 3 minutes PR #1263 spent unattended is the case the category exists for. **No sample on this page still shows that case** — every `CI wait` row any of them prints reads `0.0 min` — and the reason is [#1285](https://github.com/joshuafolkken/kit/issues/1285) rather than a run that never waited: a delegated unit's own `pnpm josh followup` span now covers the whole open→merge window. The `ci` **phase** beside those rows is not zero, because the two answer different questions — the paragraph below. The per-check table is informational for the same reason the categories are not: CI jobs run in parallel, so their durations overlap and are never summed into a share.
 

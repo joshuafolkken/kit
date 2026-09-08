@@ -10,6 +10,7 @@ import type { TimeReport } from './time-report'
 import { time_rework } from './time-rework'
 import { time_single_checks } from './time-single-checks'
 import { time_tool_turns } from './time-tool-turns'
+import { time_windows } from './time-windows'
 
 // What the `josh time` CLI suites read (joshuafolkken/kit#1312).
 //
@@ -90,6 +91,7 @@ const RUN_REPORT: TimeReport = {
 	started_at: at(0),
 	ended_at: at(RUN_MINUTES),
 	elapsed_ms: RUN_MINUTES * MINUTE_MS,
+	windows: time_windows.NO_WINDOWS,
 	span_count: SPAN_COUNT,
 	turn_count: 1,
 	tool_call_count: 1,

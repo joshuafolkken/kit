@@ -7,6 +7,7 @@ import { time_report, type TimeReport } from './time-report'
 import { time_rework } from './time-rework'
 import { time_run, type RunSources } from './time-run'
 import { time_spans } from './time-spans'
+import { time_windows } from './time-windows'
 
 // Measuring several runs at once — the fan-out `--epic` and `--last` both go through
 // (joshuafolkken/kit#1312).
@@ -130,6 +131,7 @@ function failed_report(issue_number: number, error: unknown): TimeReport {
 		started_ms: 0,
 		ended_ms: 0,
 		ci: time_ci.NO_CI,
+		windows: time_windows.NO_WINDOWS,
 		diff: time_rework.NO_DIFF,
 		notes: [`issue #${String(issue_number)} could not be measured: ${reason}`],
 		by_check: [],

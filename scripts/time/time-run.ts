@@ -3,6 +3,7 @@ import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
+import { time_issue_window } from './time-issue-window'
 import type { Interval } from './time-overlap'
 import { time_phases } from './time-phases'
 import { time_pull_files, type PullFileList } from './time-pull-files'
@@ -11,6 +12,7 @@ import { time_report, type TimeReport } from './time-report'
 import { time_rework, type DiffFacts, type DiffState } from './time-rework'
 import { time_sessions, type ExcludedSession } from './time-sessions'
 import type { Span } from './time-spans'
+import { time_windows, type RunWindows, type TimeWindow } from './time-windows'
 
 // One `fullrun`, from the invocation to the merge (joshuafolkken/kit#1268).
 //
@@ -287,11 +289,23 @@ interface RunFacts {
 	// the note below is written from; `absent` is an issue with no merged pull request, where nothing was
 	// refused because nothing was asked.
 	diff: DiffFacts
+	// The outermost of the three windows — the issue's own opened→closed (joshuafolkken/kit#1409).
+	// Neither the transcript nor the pull-request listing carries it, so it is its own read.
+	issue_window: TimeWindow
 }
 
 // Everything a merged pull request adds to the facts. Split out of `gather` so that function stays the
 // two-branch answer it always was rather than growing a fetch inside one of them.
-type MergedFacts = Omit<RunFacts, 'issue_number' | 'found' | 'search'>
+type MergedFacts = Omit<RunFacts, 'issue_number' | 'found' | 'search' | 'issue_window'>
+
+// What an issue with no merged pull request has instead. Named rather than written inline, so the
+// branch below stays one expression and `gather` keeps both reads in one `Promise.all`.
+const NO_MERGED_FACTS: MergedFacts = {
+	checks: [],
+	is_check_read_failed: false,
+	ci: time_ci.NO_CI,
+	diff: time_rework.NO_DIFF,
+}
 
 // What one merged pull request is read with. A record rather than five positional parameters, which
 // the four-parameter limit forbids anyway (joshuafolkken/kit#1387).
@@ -346,19 +360,22 @@ interface RunInput {
 // found it: resolving it and then searching for it again pages the same listing twice, spends up to
 // ten requests where one would do, and lets the two reads disagree when a pull request merges
 // between them.
+//
+// **The issue's own window is read beside the merged half rather than after it** (joshuafolkken/kit#1409).
+// Neither needs the other's answer, and a batch scope would otherwise pay one more serial request per
+// child — the same reason `read_merged` issues its own two together.
 async function gather(input: RunInput): Promise<RunFacts> {
 	const { issue_number, found, search, read, cwd } = input
 	const { pull } = search
 	const merged_ms = pull?.merged_ms
-	const head = { issue_number, found, search }
+	const [issue_window, merged] = await Promise.all([
+		time_issue_window.read_issue_window(issue_number, read),
+		pull === undefined || merged_ms === undefined
+			? Promise.resolve(NO_MERGED_FACTS)
+			: read_merged({ pull, merged_ms, found, read, cwd }),
+	])
 
-	if (pull === undefined || merged_ms === undefined) {
-		const empty = { checks: [], is_check_read_failed: false, ci: time_ci.NO_CI }
-
-		return { ...head, ...empty, diff: time_rework.NO_DIFF }
-	}
-
-	return { ...head, ...(await read_merged({ pull, merged_ms, found, read, cwd })) }
+	return { issue_number, found, search, issue_window, ...merged }
 }
 
 // **The two CI figures differ by exactly the cycles the merge command sat on, and the note is what
@@ -379,10 +396,36 @@ function serial_note(report: TimeReport): Array<string> {
 // **`has_ci_data` is whether a merge was actually read, not whether an issue scope was asked for.**
 // Hardcoding it true printed `CI wait 0.0 min` directly beneath the note saying the CI wait is
 // unknown — the measured zero standing in for an unknown that the flag exists to prevent.
-function to_report(facts: RunFacts): TimeReport {
+// The middle of the three windows, from the pull request's own stamps (joshuafolkken/kit#1409). No
+// pull request and one still open both answer unread — `build_window` takes the `undefined` end that
+// `PullSummary.merged_ms` already carries for exactly that case.
+function pull_window(pull: PullSummary | undefined): TimeWindow {
+	return time_windows.build_window(pull?.created_ms ?? 0, pull?.merged_ms)
+}
+
+// **The innermost window is the transcript's alone** (joshuafolkken/kit#1409). `window_of` folds the
+// pull request's stamps in so `started_at` / `ended_at` bound everything either source knows about;
+// taking the run body from that pair printed a run nobody measured whenever the transcript was
+// missing — `run body 8.2 min 07:03:10 → 07:11:23`, byte-identical to the pull request row beneath
+// it — and an unmerged pull request with no spans made it a read, zero-length window, which is the
+// measured zero standing in for an unknown that `is_read` exists to prevent.
+function run_windows(facts: RunFacts): RunWindows {
+	const spans = window_of(facts.found.spans, undefined)
+
+	return {
+		run: time_windows.build_window(spans.started_ms, spans.ended_ms),
+		pull: pull_window(facts.search.pull),
+		issue: facts.issue_window,
+	}
+}
+
+// Everything the heading says about how the figures below it were read, in the order a reader meets
+// them. Lifted out of `to_report` so that function stays an assembly rather than an assembly plus a
+// list.
+function run_notes(facts: RunFacts): Array<string> {
 	const { found, search } = facts
-	const window = window_of(found.spans, search.pull)
-	const notes = [
+
+	return [
 		span_note(found, facts.issue_number),
 		...excluded_note(found),
 		...not_separated_note(found, facts.issue_number),
@@ -391,6 +434,12 @@ function to_report(facts: RunFacts): TimeReport {
 		...cycle_note(facts.ci, facts.issue_number),
 		...diff_note(facts.diff.state, facts.issue_number),
 	]
+}
+
+function to_report(facts: RunFacts): TimeReport {
+	const { found, search } = facts
+	const window = window_of(found.spans, search.pull)
+	const notes = run_notes(facts)
 	const report = time_report.build_from_spans({
 		scope: `issue #${String(facts.issue_number)}`,
 		spans: found.spans,
@@ -398,6 +447,7 @@ function to_report(facts: RunFacts): TimeReport {
 		ended_ms: window.ended_ms,
 		ci: facts.ci,
 		diff: facts.diff,
+		windows: run_windows(facts),
 		notes,
 		by_check: facts.checks,
 	})

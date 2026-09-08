@@ -3,6 +3,7 @@ import { time_report, type TimeReport } from './time-report'
 import { time_rework, type DiffFacts } from './time-rework'
 import { time_span_fixture } from './time-span-fixture'
 import { time_spans, type Span, type Timeline } from './time-spans'
+import { time_windows } from './time-windows'
 
 // The report a suite measures the rendering of, for the suites that read what `format_report` prints
 // (joshuafolkken/kit#1311).
@@ -79,6 +80,7 @@ function run_report_of(spans: ReadonlyArray<Span>, ci: CiFacts): TimeReport {
 		ended_ms: WINDOW_MINUTES * MINUTE_MS,
 		ci,
 		diff: DIFF,
+		windows: time_windows.NO_WINDOWS,
 		notes: [SESSION_NOTE],
 		by_check: [
 			{
