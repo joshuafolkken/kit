@@ -25,7 +25,6 @@ interface CliArguments {
 		'notify-mentions'?: string
 		'coderabbit-ignore-reason'?: string
 		'ai-review-ignore-reason'?: string
-		'managed-config-ignore-reason'?: string
 		'skip-watch'?: boolean
 		'no-merge'?: boolean
 		merge?: boolean
@@ -57,10 +56,6 @@ Options:
   --coderabbit-ignore-reason   Reason text when keeping CodeRabbit findings unresolved
   --ai-review-ignore-reason    Reason text when keeping AI reviewer (Claude Review / CodeRabbit
                                summary) findings unresolved
-  --managed-config-ignore-reason
-                               Reason text when merging a change to a file \`josh sync\` distributes.
-                               Without it the merge stops: the diff is compared against the three
-                               distribution lists, and a hit is a confirmation stop by mechanism
   --skip-watch                 Skip the two-minute check look-ahead and only evaluate latest status
   --no-merge                   Skip merging the PR (merge is on by default)
   --merge                      (Deprecated — merge is now the default; kept for backward compatibility)
@@ -82,7 +77,6 @@ function parse_cli_arguments(): CliArguments {
 			'notify-mentions': { type: 'string' },
 			'coderabbit-ignore-reason': { type: 'string' },
 			'ai-review-ignore-reason': { type: 'string' },
-			'managed-config-ignore-reason': { type: 'string' },
 			'skip-watch': { type: 'boolean' },
 			'no-merge': { type: 'boolean' },
 			merge: { type: 'boolean' },
@@ -169,7 +163,6 @@ async function main(): Promise<void> {
 		notify_config: build_notify_config(cli.values),
 		coderabbit_ignore_reason: cli.values['coderabbit-ignore-reason'],
 		ai_review_ignore_reason: cli.values['ai-review-ignore-reason'],
-		managed_config_ignore_reason: cli.values['managed-config-ignore-reason'],
 		is_skip_watch: cli.values['skip-watch'] === true,
 		should_merge,
 	})

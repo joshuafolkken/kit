@@ -104,16 +104,18 @@ describe('git_notify.build_notify_config — the message is passed on as it stan
 	})
 })
 
+const COMPLETION_MESSAGE = 'Done'
+
 describe('git_notify.build_completion_comment_body', () => {
 	it('formats body with message, issue, pr url, and mentions', () => {
 		const body = git_notify.build_completion_comment_body({
-			message: 'Done',
+			message: COMPLETION_MESSAGE,
 			issue_number: '42',
 			pr_url: 'https://example.com/pr/1',
 			mentions: ['@user'],
 		})
 
-		expect(body).toContain('✅ Done')
+		expect(body).toContain(`✅ ${COMPLETION_MESSAGE}`)
 		expect(body).toContain('Issue: #42')
 		expect(body).toContain('PR: https://example.com/pr/1')
 		expect(body).toContain('@user')
@@ -121,7 +123,7 @@ describe('git_notify.build_completion_comment_body', () => {
 
 	it('omits issue and pr lines when both are undefined', () => {
 		const body = git_notify.build_completion_comment_body({
-			message: 'Done',
+			message: COMPLETION_MESSAGE,
 			issue_number: undefined,
 			pr_url: undefined,
 			mentions: [],
@@ -129,5 +131,37 @@ describe('git_notify.build_completion_comment_body', () => {
 
 		expect(body).not.toContain('Issue:')
 		expect(body).not.toContain('PR:')
+	})
+})
+
+// joshuafolkken/kit#1592. `notes` is what the command has to say about the run beyond the message it
+// was handed, and today that is the managed config-file report. The line is written the way
+// `managed_config_scope.format_hit` writes it — path, then the list that claimed it — rather than
+// prettified here, so this stays a statement about the real report.
+describe('git_notify.build_completion_comment_body — the run’s own notes', () => {
+	const BASE = {
+		message: COMPLETION_MESSAGE,
+		issue_number: '42',
+		pr_url: undefined,
+		mentions: [],
+	}
+
+	const HIT_LINE = 'CLAUDE.md (AI_COPY_FILES)'
+
+	it('carries the notes it was given', () => {
+		const body = git_notify.build_completion_comment_body({
+			...BASE,
+			notes: ['Distributed paths in this diff:', HIT_LINE],
+		})
+
+		expect(body).toContain(HIT_LINE)
+	})
+
+	// The equality is the assertion: a run with nothing to note produces the byte-for-byte body it
+	// produced before this field existed, blank separator included.
+	it('adds nothing at all when there is nothing to note', () => {
+		expect(git_notify.build_completion_comment_body({ ...BASE, notes: [] })).toBe(
+			git_notify.build_completion_comment_body(BASE),
+		)
 	})
 })

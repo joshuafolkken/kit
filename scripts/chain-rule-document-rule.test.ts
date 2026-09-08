@@ -33,11 +33,11 @@ const TOOLING_VERDICT = 'not feasible at the tooling layer'
 const RULE_MARKERS: ReadonlyArray<string> = [
 	// Without this sentence the review output reads as a deliverable, and the run reports it and waits.
 	'the `/code-review` skill output is **not** a turn boundary',
-	// Exactly two, and the blockers exactly three: an open-ended list of "genuine blockers" is how a
+	// Exactly two, and the blockers exactly two: an open-ended list of "genuine blockers" is how a
 	// clean review became one.
 	'**`fullrun` STOPPING CONDITIONS** (the chain ends only here)',
 	'A CodeRabbit / Claude Review substantive finding that cannot be auto-verified as a false positive',
-	'The managed config-file confirmation gate',
+	'The managed config-file gate is no longer one of them',
 	'A CI failure that requires user input to resolve',
 	// The recommendation line is the thing most often mistaken for the verdict.
 	'**Severity of findings drives the decision, not the recommendation sentence.**',

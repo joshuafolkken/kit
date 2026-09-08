@@ -1,19 +1,17 @@
 import { managed_config_scope, type ManagedHit } from '#scripts/sync/managed-config-scope'
 import { changed_paths } from './changed-paths'
 import { git_command } from './git-command'
-import { git_gh_command } from './git-gh-command'
-import { git_pr_confirmation, type TelegramContext } from './git-pr-confirmation'
 
 // **The tracked diff against the merge base — untracked files excluded.**
 // `changed_paths.read_changed_paths(false)` appends the untracked files as well, and those are not in
-// the pull request: a stray untracked file under a distributed path would have blocked the merge with
-// a body asserting that *this pull request* changes a distributed file, which would be false.
+// the pull request: a stray untracked file under a distributed path would put a line in the report
+// asserting that *this pull request* changes a distributed file, which would be false.
 //
 // **What it compares is the merge base against the work tree, not against `HEAD`**, so an uncommitted
 // edit to a tracked file still counts. That is deliberate rather than overlooked: `followup` runs
-// straight after `josh git` has committed and pushed, so the two agree in the case this gate is for,
-// and where they disagree the error falls on the side of stopping — which is the direction a
-// confirmation gate should fail in.
+// straight after `josh git` has committed and pushed, so the two agree in the case this report is
+// for, and where they disagree the error falls on the side of naming a path that is about to be
+// committed rather than omitting one.
 //
 // The line splitting stays the shared helper's, so this answers from the same definition of a changed
 // path as the review level and the eval scope.
@@ -21,83 +19,51 @@ async function read_branch_paths(): Promise<Array<string>> {
 	return changed_paths.to_paths(await git_command.diff_main_names())
 }
 
-const BLOCKER_HEADING =
+const REPORT_HEADING =
 	'This pull request changes files that `josh sync` distributes to every consumer project.'
-const BLOCKER_PATHS_HEADING = 'Distributed paths in this diff:'
-const BLOCKER_INSTRUCTION =
-	'Review the changes, then re-run `pnpm josh followup` with ' +
-	'--managed-config-ignore-reason "<reason>" to proceed.'
+const REPORT_PATHS_HEADING = 'Distributed paths in this diff:'
 
-const IGNORE_HEADING =
-	'A `josh sync`-distributed file was changed and the managed config-file gate was bypassed.'
-
-// The audit note a bypassed run carries into its completion notification. Without it a run that
-// distributed a change reports exactly like one that touched nothing distributed.
-const MANAGED_CONFIG_BYPASS_NOTE =
-	'Managed config-file gate bypassed; a josh sync-distributed file was changed.'
-
-function build_blocker_body(hits: ReadonlyArray<ManagedHit>): string {
-	return [
-		BLOCKER_HEADING,
-		'',
-		BLOCKER_PATHS_HEADING,
-		managed_config_scope.format_hits(hits),
-		'',
-		BLOCKER_INSTRUCTION,
-	].join('\n')
+function build_report(hits: ReadonlyArray<ManagedHit>): Array<string> {
+	return [REPORT_HEADING, REPORT_PATHS_HEADING, managed_config_scope.format_hits(hits)]
 }
 
-function build_ignore_comment(reason: string, hits: ReadonlyArray<ManagedHit>): string {
-	return [
-		IGNORE_HEADING,
-		`Reason: ${reason.trim()}`,
-		BLOCKER_PATHS_HEADING,
-		managed_config_scope.format_hits(hits),
-	].join('\n')
-}
-
-// **The gate is a read of the diff, so it runs before the CI wait rather than after it.** The prose
-// it replaces said "after CI status checks complete", which spent the whole wait on a run that was
-// going to stop anyway; nothing in the answer depends on a check result (joshuafolkken/kit#1578).
+// **This reports; it does not stop the merge** (joshuafolkken/kit#1592). joshuafolkken/kit#1578 made
+// it a confirmation gate that exited non-zero ahead of the CI wait, and in kit the condition it tests
+// is nearly always true: kit is the distribution source, so every change to `CLAUDE.md`, to
+// `prompts/`, to `.claude/skills/` or to the distributed part of `docs/` is by definition a change to
+// a distributed path. Measured on `epicrun #1413`, **two of three children stopped here** — and in
+// both the distributed file was what the Issue's own acceptance criteria had ordered changed. The
+// gate was not catching an unintended edit; it was stopping the work.
 //
-// **Returns an audit note rather than a boolean** so a bypassed run reads like the AI-review bypass
-// it is modelled on: the reason lands on the pull request as a comment, and the note is folded into
-// the completion notification.
+// **There is deliberately no branch on which repository this is.** The alternative — stop in a
+// consumer, where editing a distributed file really is the mistake `CLAUDE.md` → "Route
+// distributed-doc / config changes upstream to kit" names, and stay quiet in kit — was weighed and
+// rejected on joshuafolkken/kit#1592: it needs a distribution-source test this package does not have,
+// no case is recorded of the gate saving a consumer's work, and the report below reaches a consumer's
+// reader just as well. `managed_config_scope` matches both ends of every mapping and distinguishes no
+// repository, and that property is kept rather than worked around.
+//
+// **What is left is the signal without the stop.** The claimed paths and the list that claimed each
+// one go into the completion notification and into the completion report on the Issue, so a
+// distributed change is still impossible to miss after the fact.
 async function handle_managed_config_changes(input: {
-	branch_name: string
-	ignore_reason: string | undefined
-	context: TelegramContext
 	should_merge: boolean
 }): Promise<Array<string>> {
-	// **Nothing to gate when nothing merges.** `--no-merge` already ends with the pull request open
-	// for a person to look at, which is what this gate asks for; stopping there would only withhold
-	// the completion notification and the wrap-up from a run that was never going to distribute.
+	// **Nothing to report when nothing merges.** `--no-merge` ends with the pull request open for a
+	// person to look at, and the distribution has not happened yet; the report belongs to the run that
+	// actually lands the change on the default branch.
 	if (!input.should_merge) return []
 
 	const hits = managed_config_scope.find_managed_paths(await read_branch_paths())
 
 	if (hits.length === 0) return []
 
-	if (git_pr_confirmation.has_ignore_reason(input.ignore_reason)) {
-		await git_gh_command.pr_comment(
-			input.branch_name,
-			build_ignore_comment(input.ignore_reason, hits),
-		)
-
-		return [MANAGED_CONFIG_BYPASS_NOTE]
-	}
-
-	const body = build_blocker_body(hits)
-
-	await git_pr_confirmation.notify_confirmation({ context: input.context, body })
-
-	throw new Error(body)
+	return build_report(hits)
 }
 
 const git_pr_managed_config = {
 	handle_managed_config_changes,
-	build_blocker_body,
-	build_ignore_comment,
+	build_report,
 }
 
-export { git_pr_managed_config, MANAGED_CONFIG_BYPASS_NOTE }
+export { git_pr_managed_config }

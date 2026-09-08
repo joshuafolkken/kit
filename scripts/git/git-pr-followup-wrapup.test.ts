@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_epic_close } from './git-epic-close'
 import { git_followup_stages } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
-import type { GitNotifyConfig } from './git-notify'
+import { git_notify, type GitNotifyConfig } from './git-notify'
 import {
 	git_pr_followup_wrapup,
 	post_notify_issue,
@@ -36,6 +36,7 @@ const BASE_INPUT: WrapupInput = {
 	notify_config: NOTIFY_CONFIG,
 	pr_url: 'https://github.com/owner/repo/pull/7',
 	should_merge: true,
+	managed_notes: [],
 }
 
 const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
@@ -149,5 +150,29 @@ describe('run_wrapup — a run that merged nothing', () => {
 		await run_wrapup({ should_merge: false })
 
 		expect(vi.mocked(git_gh_command.pr_merge)).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#1592. The completion report on the Issue is the managed config-file report's
+// second destination — the first is the completion notification, covered in `git-pr-followup.test.ts`.
+// Reaching only one of the two would leave the change invisible to whichever reader used the other.
+// Written the way `managed_config_scope.format_hit` writes it — path, then the list that claimed it.
+const REPORT_LINE = '.claude/skills/workflow-commands/epicrun.md (AI_COPY_DIRECTORIES)'
+
+function notes_passed(): ReadonlyArray<string> | undefined {
+	return vi.mocked(git_notify.build_completion_comment_body).mock.calls[0]?.[0]?.notes
+}
+
+describe('run_wrapup — the managed config-file report', () => {
+	it('hands the report to the completion comment body', async () => {
+		await run_wrapup({ managed_notes: [REPORT_LINE] })
+
+		expect(notes_passed()).toEqual([REPORT_LINE])
+	})
+
+	it('hands over an empty report unchanged, so the comment gains no section', async () => {
+		await run_wrapup({ managed_notes: [] })
+
+		expect(notes_passed()).toEqual([])
 	})
 })

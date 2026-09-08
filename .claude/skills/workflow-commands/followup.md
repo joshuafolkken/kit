@@ -1,6 +1,6 @@
 # Finishing a run — `pnpm josh followup`
 
-Everything between a green CI and a merged PR: what `followup` scans for, the two gates that stop
+Everything between a green CI and a merged PR: what `followup` scans for, the gate that stops
 a run, how auto-merge is authorized, and the Telegram notifications. `fullrun` and `queue` both end
 here; `halfrun` never reaches this file, because it stops before the commit.
 
@@ -198,19 +198,24 @@ Details:
 - **A comment listing that could not be read is treated exactly like a standing blocker.** A rate limit, expired auth, a dropped connection — every one of them used to arrive as an empty listing, so the gate passed without having read anything (joshuafolkken/kit#973). `confirmation` Telegram, non-zero exit, re-run once the read succeeds. `--ai-review-ignore-reason` still gets past it, because what it means is unchanged: a person has looked — and the run then carries an audit note saying the scan was bypassed.
 - **The CodeRabbit line-comment listing is the exception**: unreadable there is reported as an audit note rather than blocking, because kit#753 has CodeRabbit not blocking the merge at all. That reader also answers unreadable when the PR number itself would not resolve, which the top-level scan never has to do. Revert with kit#752.
 
-## Config file update check (inside `pnpm josh followup`)
+## Config file reporting (inside `pnpm josh followup`)
 
-**Nothing here asks you to compare anything by eye** (joshuafolkken/kit#1578). `pnpm josh followup` reads the tracked branch diff itself, matches every changed path against everything `josh sync` distributes — the three lists `AI_COPY_FILES`, `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, plus `SYNCED_PATHS`, the destinations `sync` writes directly (`playwright.config.ts`, `eslint.config.js`, the rest) — sends the `confirmation` Telegram itself, and **exits non-zero ahead of the CI wait** when any of them claims a path. The answer needs no check result, so a run that is going to stop stops in seconds. A run passing `--no-merge` is not gated: there is no merge to withhold.
+**Nothing here asks you to compare anything by eye** (joshuafolkken/kit#1578). `pnpm josh followup` reads the tracked branch diff itself and matches every changed path against everything `josh sync` distributes — the three lists `AI_COPY_FILES`, `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, plus `SYNCED_PATHS`, the destinations `sync` writes directly (`playwright.config.ts`, `eslint.config.js`, the rest).
 
-**The instruction it replaces was skipped in two runs out of three** on the day it was measured, and one of those two could not have succeeded by eye at all: `AI_COPY_DIRECTORIES` holds directories, so a distributed path such as `.claude/skills/workflow-commands/epicrun.md` appears in no list textually.
+**It stops nothing** (joshuafolkken/kit#1592). What it produces is a report: the claimed paths and the list that claimed each one go into **the completion notification and the completion report on the Issue**, and the run continues to the CI wait and the merge exactly as a run that distributes nothing does. A run passing `--no-merge` is not reported on, because nothing has been distributed yet.
+
+**It was a confirmation stop until joshuafolkken/kit#1592, and measurement is what removed it rather than preference.** In kit the condition is nearly always true, because kit is the distribution source: every change to `CLAUDE.md`, to `prompts/`, to `.claude/skills/` or to the distributed part of `docs/` is by definition a change to a distributed path. Measured on `epicrun #1413`, **two of three children stopped here** — and in both, the distributed file was the one that child's own acceptance criteria had ordered changed. The gate was not catching an unintended edit; it was stopping the work, and ending unattended execution until a person retyped one command.
+
+**There is deliberately no branch on which repository this is.** Stopping in a consumer project — where editing a distributed file really is the mistake `CLAUDE.md` → "Route distributed-doc / config changes upstream to kit" names, since the next `josh sync` overwrites it silently — while staying quiet in kit was weighed and rejected on joshuafolkken/kit#1592: it needs a distribution-source test this package does not have, no case is recorded of the gate having saved a consumer's work, and the report below reaches a consumer's reader just as well.
+
+**The matching itself is unchanged, and so is the reason it is mechanical.** The instruction the mechanical read replaced was skipped in two runs out of three on the day it was measured, and one of those two could not have succeeded by eye at all: `AI_COPY_DIRECTORIES` holds directories, so a distributed path such as `.claude/skills/workflow-commands/epicrun.md` appears in no list textually.
 
 ```bash
 pnpm josh sync:scope    # managed | clean, naming which list claimed each path; alias: josh sys
 ```
 
-- **Getting past it takes a reason, and the reason is auditable**: `pnpm josh followup --managed-config-ignore-reason "<reason>"` posts the reason and the claimed paths to the pull request and carries an audit note into the completion notification. A blank one is not a reason.
-- **Whether to pass it is the user's call, not the run's.** Report which paths were claimed and stop — the notification has already gone out.
-- This gate runs independently of AI reviewer comment scanning — both may fire in the same run
+- **There is no flag to pass and nothing to approve.** `--managed-config-ignore-reason` is gone with the stop it existed to get past.
+- This report is produced independently of AI reviewer comment scanning, which still stops the run on a standing blocker
 
 ## `auto-merge` — Default `fullrun` behavior
 

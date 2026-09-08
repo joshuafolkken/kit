@@ -2,16 +2,20 @@ import { read_repo_file, read_unwrapped } from '#scripts/ai-document-fixture'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 
-// joshuafolkken/kit#1578. The managed config-file confirmation stop was a paragraph telling the run
-// to compare `git diff main...HEAD` against three arrays in `scripts/init/init-logic.ts` by eye, and
-// over one epic's children two of the three pull requests that changed a distributed file merged
-// without the comparison being made at all. One of those two could not have succeeded by eye:
-// `AI_COPY_DIRECTORIES` holds directories, so the changed path matched no entry textually.
+// joshuafolkken/kit#1578 replaced an instruction telling the run to compare `git diff main...HEAD`
+// against three arrays in `scripts/init/init-logic.ts` by eye: over one epic's children, two of the
+// three pull requests that changed a distributed file merged without the comparison being made at
+// all, and one of those two could not have succeeded by eye — `AI_COPY_DIRECTORIES` holds
+// directories, so the changed path matched no entry textually.
 //
-// What these markers pin is that the answer is a command's and the stop is the merge command's —
-// the shape `josh review:level` and `josh latest:scope` already have. A reword that puts the
-// judgement back on the reader is the specific regression, so each marker is a sentence that would
-// have to survive one.
+// joshuafolkken/kit#1592 kept that mechanical read and removed the **stop** it fed. In kit the
+// condition it tests is nearly always true, because kit is the distribution source, so the
+// confirmation stopped two of three children of `epicrun #1413` over changes those Issues had
+// themselves ordered.
+//
+// What these markers pin is both halves: that the answer is still a command's rather than the
+// reader's, and that the answer is now a report rather than a merge gate. A reword that puts the
+// judgement back on the reader is one regression; one that quietly reinstates the stop is the other.
 
 const DOCS = 'docs/josh-commands.md'
 const FOLLOWUP_SKILL = '.claude/skills/workflow-commands/followup.md'
@@ -20,7 +24,12 @@ const CHAIN_RULE_SKILL = '.claude/skills/workflow-commands/chain-rule.md'
 const COMMAND = 'sync:scope'
 const ALIAS = 'sys'
 const SCRIPT_PATH = 'scripts/sync/managed-config-scope-cli.ts'
-const BYPASS_FLAG = '--managed-config-ignore-reason'
+// Gone with the stop it existed to get past (joshuafolkken/kit#1592). **Naming it is fine; offering
+// it is not** — the skill says it is gone, and that sentence is pinned below. What must not survive
+// anywhere is an invocation that passes it, which `parseArgs` now refuses mid-run.
+const REMOVED_FLAG = '--managed-config-ignore-reason'
+// Any `followup` invocation carrying the flag, on one line — the shape a documented example takes.
+const REMOVED_FLAG_INVOCATION = /pnpm josh followup[^\n]*--managed-config-ignore-reason/u
 
 // The four sources, named rather than paraphrased: a reader who has to go and find them is back to
 // the eye comparison this replaced. `SYNCED_PATHS` is the one a first pass left out, which made the
@@ -35,28 +44,32 @@ const LIST_NAMES: ReadonlyArray<string> = [
 const FOLLOWUP_MARKERS: ReadonlyArray<string> = [
 	// The instruction that replaced the eye comparison, stated as a prohibition on making one.
 	'Nothing here asks you to compare anything by eye',
-	// Which command raises the stop — the half that makes it impossible to skip. "tracked" is
-	// load-bearing: the untracked files are not in the pull request the body asserts about.
+	// Which command does the matching — the half that makes it impossible to skip. "tracked" is
+	// load-bearing: the untracked files are not in the pull request the report asserts about.
 	'`pnpm josh followup` reads the tracked branch diff itself',
-	// The one run the gate does not apply to, so it is not re-added as an unconditional stop.
-	'A run passing `--no-merge` is not gated',
-	// Why it precedes the CI wait rather than following it, so the ordering is not "tidied" back.
-	'exits non-zero ahead of the CI wait',
-	// The measurement, kept in the document so the rule is not read as precaution.
+	// joshuafolkken/kit#1592 itself. Without this sentence the section reads as a merge gate again.
+	'**It stops nothing**',
+	// Both destinations. Reaching only one leaves the change invisible to whichever reader used the
+	// other, which is the whole of what the report is for.
+	'the completion notification and the completion report on the Issue',
+	// The one run that is not reported on, so it is not re-added as an unconditional section.
+	'A run passing `--no-merge` is not reported on',
+	// The measurement, kept so the removal reads as a finding rather than a preference — and so it is
+	// not undone by someone who remembers only that a gate used to be there.
+	'two of three children stopped here',
+	// The rejected alternative, kept so it is not re-proposed as an improvement.
+	'There is deliberately no branch on which repository this is',
+	// joshuafolkken/kit#1578's own measurement, which the mechanical read still rests on.
 	'skipped in two runs out of three',
 	// The case an eye comparison structurally cannot catch.
 	'appears in no list textually',
-	// The bypass, and that it leaves a trail.
-	'the reason is auditable',
-	'A blank one is not a reason',
 ]
 
 const CHAIN_RULE_MARKERS: ReadonlyArray<string> = [
-	// The stopping condition itself, unchanged — `chain-rule-document-rule.test.ts` pins this too,
-	// deliberately: this file asserts the sentence that was *added* beside it, and would pass on a
-	// document that had lost the condition entirely.
-	'The managed config-file confirmation gate',
-	'`pnpm josh followup` raises this one itself',
+	// The stopping conditions are two now, and this sentence is what stops the third being restored
+	// from memory. `chain-rule-document-rule.test.ts` pins the list itself, and would pass on a
+	// document that had merely dropped the gate without saying so.
+	'The managed config-file gate is no longer one of them',
 ]
 
 describe('josh sync:scope is a registered command', () => {
@@ -84,12 +97,12 @@ describe('docs/josh-commands.md states how a path is matched', () => {
 		expect(read_repo_file(DOCS)).toContain('does **not** match')
 	})
 
-	it('documents the bypass flag on josh followup', () => {
-		expect(read_repo_file(DOCS)).toContain(BYPASS_FLAG)
+	it('shows no invocation passing the removed bypass flag', () => {
+		expect(read_repo_file(DOCS)).not.toMatch(REMOVED_FLAG_INVOCATION)
 	})
 })
 
-describe('the followup skill states the gate as a mechanism', () => {
+describe('the followup skill states the report as a mechanism', () => {
 	it.each(FOLLOWUP_MARKERS)('states %j', (marker) => {
 		expect(read_unwrapped(FOLLOWUP_SKILL)).toContain(marker)
 	})
@@ -104,8 +117,16 @@ describe('the followup skill states the gate as a mechanism', () => {
 		expect(read_unwrapped(FOLLOWUP_SKILL)).toContain('pnpm josh sync:scope')
 	})
 
-	it('names the bypass flag', () => {
-		expect(read_unwrapped(FOLLOWUP_SKILL)).toContain(BYPASS_FLAG)
+	// Named once, as a thing that is gone — and never as something to pass.
+	it('says the bypass flag is gone', () => {
+		expect(read_unwrapped(FOLLOWUP_SKILL)).toContain(`\`${REMOVED_FLAG}\` is gone`)
+	})
+
+	// **Read raw, not unwrapped**: `read_unwrapped` collapses the document to one line, so `[^\n]*`
+	// would span the whole file and match the command name in the title against the flag named in a
+	// paragraph — the regex needs the real line breaks to mean "on one line".
+	it('shows no invocation passing it', () => {
+		expect(read_repo_file(FOLLOWUP_SKILL)).not.toMatch(REMOVED_FLAG_INVOCATION)
 	})
 
 	// The old instruction sent the run to compose the notification itself. It does not any more, and
@@ -117,7 +138,7 @@ describe('the followup skill states the gate as a mechanism', () => {
 	})
 })
 
-describe('the chain rule keeps the stopping condition and says who raises it', () => {
+describe('the chain rule records that the gate is no longer a stopping condition', () => {
 	it.each(CHAIN_RULE_MARKERS)('states %j', (marker) => {
 		expect(read_unwrapped(CHAIN_RULE_SKILL)).toContain(marker)
 	})

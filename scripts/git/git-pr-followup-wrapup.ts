@@ -22,18 +22,24 @@ interface WrapupInput {
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
 	should_merge: boolean
+	// The managed config-file report, which reaches the completion report on the Issue as well as the
+	// completion notification (joshuafolkken/kit#1592). Empty on a run that changed nothing `josh sync`
+	// distributes, and an empty one adds no line.
+	managed_notes: ReadonlyArray<string>
 }
 
 function build_notify_body(input: {
 	notify_config: GitNotifyConfig
 	issue_number: string | undefined
 	pr_url: string | undefined
+	managed_notes: ReadonlyArray<string>
 }): string {
 	return git_notify.build_completion_comment_body({
 		message: input.notify_config.message,
 		issue_number: input.issue_number,
 		pr_url: input.pr_url,
 		mentions: input.notify_config.mentions,
+		notes: input.managed_notes,
 	})
 }
 
@@ -72,6 +78,7 @@ async function post_completion_notification(input: {
 	issue_number: string | undefined
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
+	managed_notes: ReadonlyArray<string>
 }): Promise<void> {
 	if (input.notify_config === undefined) return
 
@@ -79,6 +86,7 @@ async function post_completion_notification(input: {
 		notify_config: input.notify_config,
 		issue_number: input.issue_number,
 		pr_url: input.pr_url,
+		managed_notes: input.managed_notes,
 	})
 	const { target } = input.notify_config
 
@@ -105,6 +113,7 @@ async function notify_step(input: WrapupInput): Promise<void> {
 				issue_number: input.issue_number,
 				notify_config: input.notify_config,
 				pr_url: input.pr_url,
+				managed_notes: input.managed_notes,
 			})
 		},
 	})

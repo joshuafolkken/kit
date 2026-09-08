@@ -5,10 +5,11 @@ Within `fullrun` / `fullrun new` / `queue`, the `/code-review` skill output is *
 **`fullrun` STOPPING CONDITIONS** (the chain ends only here):
 
 1. **PR is merged, the `completion` Telegram notification has been sent, AND `pnpm josh ms` has returned the working tree to the default branch** — normal end state, report the PR URL and stop. **In a lane, `josh ms` refuses and that refusal is the answer**: a linked work tree cannot check the default branch out without taking it from another one, so the run ends at the merge and the lane is handed back for `pnpm josh lane:close <N>` (joshuafolkken/kit#1535).
-2. **A genuine blocker requires user judgment** — exactly three count:
+2. **A genuine blocker requires user judgment** — exactly two count:
    - A CodeRabbit / Claude Review substantive finding that cannot be auto-verified as a false positive.
-   - The managed config-file confirmation gate (`josh sync`-distributed files in the diff). **`pnpm josh followup` raises this one itself** — it matches the diff against the three distribution lists and exits non-zero ahead of the CI wait, so it is read rather than judged (joshuafolkken/kit#1578).
    - A CI failure that requires user input to resolve.
+
+   **The managed config-file gate is no longer one of them** (joshuafolkken/kit#1592). It was the third from joshuafolkken/kit#1578 until then, and it stopped two of three children of `epicrun #1413` over changes those Issues had themselves ordered — because kit is the distribution source, so nearly every change here claims a distributed path. `pnpm josh followup` now **reports** the claimed paths and the list that claimed each one, in the completion notification and in the completion report on the Issue, and merges: the change stays visible after the fact and nothing waits for a person to retype a command.
 
    When a blocker fires, send a `confirmation` Telegram **before** stopping.
 
