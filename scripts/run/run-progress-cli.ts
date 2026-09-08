@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { run_progress, type ProgressState } from './run-progress'
+import { run_progress_config } from './run-progress-config'
 import { run_progress_read, type ObservationRead } from './run-progress-read'
 
 // `josh run:progress` — the background watcher that breaks a long silence with one line of
@@ -49,11 +50,10 @@ const NO_RETRY = 0
 const DEFAULT_MAX_HOURS = 8
 const MS_PER_HOUR = 3_600_000
 const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
-const { INTERVAL_KEY } = run_progress
 const DISABLED_VALUE = '0'
 
 const USAGE =
-	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once] [--hours <hours>] | josh run:progress --mark'
+	'Usage: josh run:progress [--repo <owner/repo>] [--interval <minutes>] [--output <path>] [--once | --wait] [--hours <hours>] | josh run:progress --mark'
 const DISABLED_NOTICE = `\`${ENVIRONMENT_KEY}=${DISABLED_VALUE}\` is set, so no progress is reported.`
 const MARKED_NOTICE =
 	'Recorded a report at this moment. The next progress line waits a full interval from here, so a heartbeat cannot land immediately behind a real report.'
@@ -63,6 +63,8 @@ const UNREADABLE_NOTICE =
 	'The `in-progress` listing could not be read, so nothing is reported. That is not "nothing is running" — check `gh auth status` and ask again.'
 const FAILED_TICK_PREFIX =
 	'A progress reading failed, so nothing is reported for it. The watcher is still running, and will read again after the cooldown:'
+const WAIT_EXPIRED_NOTICE =
+	'The watch bound (`--hours`, 8 by default) ran out before the run had been quiet for a whole interval, so there is nothing to report. Starting another `--wait` resumes the same clock.'
 // The repository name is only ever printed, never written against, so the bounded lookup is the right
 // one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
 // watcher neither running nor saying so.
@@ -278,6 +280,48 @@ async function once(options: WatchOptions): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
+/**
+ * One interval of silence, one line, and then exit — the form that reports where a long-running
+ * command cannot (joshuafolkken/kit#1576).
+ *
+ * **The exit is the whole point.** A harness that only delivers a background command's standard
+ * output *when that command exits* — Claude Code is one — relays nothing at all from `watch`, which
+ * by design never exits: `epicrun #1474` was measured at 2h36m without a single progress line while
+ * children were in flight. This form waits the same clock out and then ends, so the line it printed
+ * is delivered; the caller relays it and starts the next one.
+ *
+ * **The clock is still this command's, not the caller's.** It is `watch`'s own loop, a tick at a time,
+ * rather than a second reading of the same record — so a real report elsewhere pushes the next line
+ * out, a declined reading takes the same cooldown, and two of these cannot double-report because the
+ * first to print records it. That is what keeps joshuafolkken/kit#1570 intact: the caller arms no
+ * timer of its own.
+ *
+ * **A decline is not an exit.** Nothing is reported while no child is in flight, so a quiet repository
+ * keeps the loop waiting instead of ending it — returning there would hand the caller an instant
+ * answer to restart, and the documented restart makes that a poll rather than a heartbeat.
+ */
+async function wait_once(options: WatchOptions): Promise<number> {
+	const target = await run_progress_read.stamp_target()
+	const started_ms = Date.now()
+	let loop: WatchLoop = {
+		...FRESH_LOOP,
+		last_ms: run_progress_read.read_last_report(target) ?? started_ms,
+	}
+
+	while (Date.now() - started_ms < options.max_ms) {
+		await sleep(options.tick_ms)
+		loop = await step(options, target, loop)
+
+		// `state` is set by the one branch of `step` that printed a line and by no other, so this asks
+		// "was anything reported" without keeping a second copy of the loop's own bookkeeping.
+		if (loop.state !== undefined) return SUCCESS_EXIT_CODE
+	}
+
+	console.error(WAIT_EXPIRED_NOTICE)
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function mark_now(): Promise<number> {
 	run_progress_read.mark(await run_progress_read.stamp_target(), Date.now())
 	console.error(MARKED_NOTICE)
@@ -292,6 +336,7 @@ const OPTIONS = {
 	once: { type: 'boolean' },
 	output: { type: 'string', multiple: true },
 	repo: { type: 'string' },
+	wait: { type: 'boolean' },
 } as const
 
 interface ParsedValues {
@@ -301,6 +346,7 @@ interface ParsedValues {
 	once?: boolean
 	output?: Array<string>
 	repo?: string
+	wait?: boolean
 }
 
 function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
@@ -311,11 +357,12 @@ function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
 	}
 }
 
-// A hand-typed `--interval` outranks the environment, and the environment outranks the ten-minute
-// default. Both go through the same reader, so an unusable value falls back rather than ending an
-// unattended run over an optional setting.
+// A hand-typed `--interval` outranks the environment, the environment outranks the interval the
+// repository commits, and that outranks the twenty-minute default. Every step goes through the same
+// reader, so an unusable value falls back rather than ending an unattended run over an optional
+// setting — `run-progress-config.ts` → `resolve_interval_ms` is where that order is written down.
 function to_interval_ms(raw: string | undefined): number {
-	return run_progress.interval_from(raw ?? process.env[INTERVAL_KEY])
+	return run_progress_config.resolve_interval_ms(raw)
 }
 
 function to_max_ms(raw: string | undefined): number {
@@ -343,8 +390,10 @@ async function run_watch(values: ParsedValues): Promise<number> {
 	const options = to_options(values)
 
 	if (options === undefined) return report_usage()
+	if (values.once === true) return await once(options)
+	if (values.wait === true) return await wait_once(options)
 
-	return values.once === true ? await once(options) : await watch(options)
+	return await watch(options)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -372,6 +421,7 @@ const run_progress_cli = {
 	TICK_SECONDS,
 	UNREADABLE_NOTICE,
 	USAGE,
+	WAIT_EXPIRED_NOTICE,
 	main,
 	read_arguments,
 	report_decline,
@@ -380,6 +430,7 @@ const run_progress_cli = {
 	to_interval_ms,
 	to_max_ms,
 	to_options,
+	wait_once,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))

@@ -77,10 +77,8 @@ afterAll(() => {
 })
 
 describe('the interval is configurable and disable-able', () => {
-	it('defaults to twenty minutes', () => {
-		expect(run_progress_cli.to_interval_ms(undefined)).toBe(20 * MINUTE)
-	})
-
+	// The whole order — flag, environment, the repository's committed field, then twenty — is
+	// `run-progress-config.test.ts`. What belongs here is only that the CLI asks for it.
 	it('takes the environment variable when no flag was typed', () => {
 		vi.stubEnv(INTERVAL_KEY, '25')
 

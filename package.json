@@ -7,6 +7,9 @@
 	"engines": {
 		"node": ">=22.19.0"
 	},
+	"josh": {
+		"progress_interval_minutes": 15
+	},
 	"bin": {
 		"josh": "dist/josh.js"
 	},

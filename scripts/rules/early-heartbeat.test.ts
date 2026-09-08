@@ -23,6 +23,9 @@ const NOW_MS = 1_700_000_000_000
 const TRANSCRIPTS = new Set<string>()
 
 const EXPLICIT_ASK = 'pnpm josh run:progress --once'
+// The form the caller is told to use instead of a sleep (joshuafolkken/kit#1576): it waits the same
+// interval out, but the clock it waits on is the command's, so it is not an arm and never matches.
+const WAITING_REPORT = 'pnpm josh run:progress --wait'
 // A timer armed for the whole interval — the one arm that is always legitimate, reused wherever a case
 // needs the early test to pass so that only the live-timer half is under examination.
 const FULL_INTERVAL_SLEEP = 'sleep 1200'
@@ -68,12 +71,13 @@ function payload_for(transcript: string, command: string): string {
 }
 
 // Assigned rather than deleted: an empty value is not one the disabled list recognizes, so the guard
-// reads as on exactly as it does on a fresh machine. The interval is blanked for the opposite reason
-// — `decide` reads the real environment, so a machine that exports the documented variable would
-// otherwise change the answer of every case below.
+// reads as on exactly as it does on a fresh machine. The interval is **pinned** rather than blanked,
+// for the opposite reason — `decide` reads the real environment *and* the interval this repository
+// commits in its own `package.json` (joshuafolkken/kit#1576), so blanking the variable would hand
+// every case below whatever cadence the repository happens to ask for.
 beforeEach(() => {
 	process.env[SWITCH_ENV_KEY] = ''
-	vi.stubEnv(run_progress.INTERVAL_KEY, '')
+	vi.stubEnv(run_progress.INTERVAL_KEY, String(INTERVAL_MS / MINUTE_MS))
 })
 
 afterEach(() => {
@@ -109,6 +113,7 @@ describe('is_wait_timer — the call whose whole purpose is to wait', () => {
 		'until gh pr checks 1; do sleep 30; done',
 		'sleep 5 && pnpm josh gate',
 		EXPLICIT_ASK,
+		WAITING_REPORT,
 		'pnpm josh followup',
 		'gh issue view 1570',
 	])('leaves %j alone', (command) => {
