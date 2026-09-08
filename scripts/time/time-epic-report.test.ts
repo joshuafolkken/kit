@@ -10,6 +10,7 @@ import { time_rework } from './time-rework'
 import { time_run } from './time-run'
 import { time_single_checks } from './time-single-checks'
 import { time_tool_turns } from './time-tool-turns'
+import { time_windows } from './time-windows'
 
 const MINUTE_MS = 60_000
 const EPIC = 1272
@@ -48,6 +49,17 @@ const DEFAULTS = {
 	turn_count: 1,
 }
 
+// The row tables no case here asserts on, held together so the builder below stays inside its length
+// limit rather than restating six empty arrays.
+const EMPTY_TABLES = {
+	phases: [],
+	segments: [],
+	by_tool: [],
+	by_josh_command: [],
+	by_invocation: [],
+	by_check: [],
+}
+
 function report_of(input: ChildInput): TimeReport {
 	const { issue_number, status, elapsed_minutes, model_minutes, turn_count } = {
 		...DEFAULTS,
@@ -61,6 +73,7 @@ function report_of(input: ChildInput): TimeReport {
 		started_at: '',
 		ended_at: '',
 		elapsed_ms: elapsed_minutes * MINUTE_MS,
+		windows: time_windows.NO_WINDOWS,
 		span_count: halves.span_count,
 		turn_count,
 		tool_call_count: 0,
@@ -71,12 +84,7 @@ function report_of(input: ChildInput): TimeReport {
 		categories: { model_ms, tool_ms: MINUTE_MS, human_ms: MINUTE_MS, ci_ms: MINUTE_MS },
 		has_ci_data: halves.has_ci_data,
 		notes: [],
-		phases: [],
-		segments: [],
-		by_tool: [],
-		by_josh_command: [],
-		by_invocation: [],
-		by_check: [],
+		...EMPTY_TABLES,
 
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },

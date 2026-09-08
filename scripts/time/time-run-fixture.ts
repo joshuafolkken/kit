@@ -26,6 +26,9 @@ const COMMITS_MARK = '/commits?'
 // The merged diff's file listing, which sits under `pulls/<n>/` like the commit listing does
 // (joshuafolkken/kit#1387). Matched on the query so it cannot collide with a path a test writes.
 const FILES_MARK = '/files?'
+// The issue's own opened→closed stamps, which is the third window's read (joshuafolkken/kit#1409).
+// Matched on the path segment: the pull listing sits under `/pulls`, so the two cannot collide.
+const ISSUE_MARK = '/issues/'
 const GH_REFUSAL = 'gh: 403'
 
 // One scripted `gh`. Each read has a refusal flag of its own, because they are separate requests and
@@ -36,9 +39,11 @@ interface GhScript {
 	checks_body?: string
 	commits_body?: string
 	files_body?: string
+	issue_body?: string
 	is_checks_refused?: boolean
 	is_commits_refused?: boolean
 	is_files_refused?: boolean
+	is_issue_refused?: boolean
 }
 
 const state = { home: '' }
@@ -89,6 +94,27 @@ function files_of(script: GhScript): string {
 	return script.files_body ?? '[]'
 }
 
+// **The default is an open issue, not the pull body.** Every run reads the issue's window now, and
+// letting that request fall through would hand the issue schema an array of pull requests — a read
+// every existing case would then report as unread for the wrong reason.
+function issue_of(script: GhScript): string {
+	if (script.is_issue_refused === true) throw new Error(GH_REFUSAL)
+
+	return script.issue_body ?? '{}'
+}
+
+function issue_body(created: number, closed_at: string): string {
+	return `{"created_at":"${at(created)}","closed_at":${closed_at}}`
+}
+
+function closed_issue(created: number, closed: number): string {
+	return issue_body(created, `"${at(closed)}"`)
+}
+
+function open_issue(created: number): string {
+	return issue_body(created, 'null')
+}
+
 function reader(script: GhScript, asked: Array<string> = []): GhReader {
 	return async (request_path: string) => {
 		asked.push(request_path)
@@ -96,6 +122,7 @@ function reader(script: GhScript, asked: Array<string> = []): GhReader {
 		if (request_path.includes(CHECK_RUNS_MARK)) return checks_of(script)
 		if (request_path.includes(COMMITS_MARK)) return commits_of(script)
 		if (request_path.includes(FILES_MARK)) return files_of(script)
+		if (request_path.includes(ISSUE_MARK)) return issue_of(script)
 
 		return script.pull_body
 	}
@@ -143,6 +170,8 @@ const time_run_fixture = {
 	SUCCESS,
 	GH_REFUSAL,
 	use_transcript_home,
+	closed_issue,
+	open_issue,
 	write_session,
 	write_unit,
 	reader,

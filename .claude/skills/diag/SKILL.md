@@ -74,6 +74,19 @@ printing a table of zeroes.
 
 Read from the JSON, in this order:
 
+- **the three nested windows** — `windows.run`, `windows.pull`, `windows.issue`
+  ([#1409](https://github.com/joshuafolkken/kit/issues/1409)). They are the frame everything below
+  sits in: the run body is what the run itself controlled, the pull request's open→merged is the
+  stretch the merge gate owned, and the issue's opened→closed is how long the work was outstanding at
+  all. **Read them before the shares**, because a saving is only ever a saving *of one of the three* —
+  a proposal that cuts two minutes of gate time cuts the run body and moves the issue window not at
+  all, and a table that does not say which one it acts on cannot be added up. **They are not phases
+  and never enter the phase table**: they cover no spans, so nothing here is a share of `elapsed_ms`,
+  and `pre-run` / `post-run` are the opposite question — transcript spans that fall *outside* the run
+  window rather than windows the run falls inside. **Each carries its own `is_read`, and a `false`
+  there is not a zero**: a `--session` scope has neither a pull request nor an issue, an issue with no
+  pull request has no middle window, and one still open has no third — the printed rows say
+  `not measured`, exactly as `span_count: 0` and `not detected` do elsewhere here.
 - **the four shares** — model wait, tool execution, human wait, CI wait. **A run with `span_count: 0`
   measured none of the first three**: the JSON still carries their milliseconds as `0`, and that zero
   is an unknown rather than a measurement — the printed table says so with `not measured`. Ranking a
@@ -352,8 +365,18 @@ with both figures beside it.
 
 ## 3. One ranked list — already-filed issues stay in it
 
+**Open the report with the three windows, then emit one table**
+([#1409](https://github.com/joshuafolkken/kit/issues/1409)). The header is the three lines step 1
+read — the run body, the pull request's open→merged, the issue's opened→closed — each with its
+length, or `not measured` where that window was not read. It goes above the table because it is what
+the table's numbers are lengths *of*: without it a reader cannot tell whether a five-minute saving is
+a quarter of the run or a fiftieth of the issue's life, and the two argue for very different work.
+
 Emit **one** table, ordered by the time each item would save per run, largest first. Estimate that
-saving from step 1's figures, not from how easy the work looks.
+saving from step 1's figures, not from how easy the work looks. **Every row names the window it acts
+on** — run body, pull request, or issue — because a saving is always a saving of one of the three, and
+rows against different windows do not add up. A row whose proposal reaches more than one names the
+innermost it actually cuts.
 
 **Do not drop an item because it is already filed.** Avoiding duplicates means not filing a second
 issue for the same work; it does not mean leaving the work out of the ranking. **A filed but

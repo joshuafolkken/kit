@@ -20,6 +20,7 @@ import {
 	type TurnTotals,
 } from './time-tool-turns'
 import { time_trips } from './time-trips'
+import { time_windows, type RunWindows } from './time-windows'
 
 // Aggregating timed spans into the report a person reads (joshuafolkken/kit#1267).
 //
@@ -105,6 +106,13 @@ interface TimeReport extends TurnSplit {
 	started_at: string
 	ended_at: string
 	elapsed_ms: number
+	// The same wall clock as the pair above, plus the two windows it nests inside: the pull request's
+	// open→merged and the issue's opened→closed (joshuafolkken/kit#1409). The pair above says when the
+	// run ran; only these say which of the three a proposal to cut minutes is a proposal about. Each
+	// window carries its own `is_read`, so a scope with no pull request or no issue withholds that row
+	// rather than printing a measured zero. Built and rendered by `time-windows.ts`, which also carries
+	// why these are not the `pre-run` / `post-run` phases.
+	windows: RunWindows
 	span_count: number
 	// **How many assistant messages the run's model spans came from**, which is what a per-turn figure
 	// is divided by (joshuafolkken/kit#1271). Carried on the report rather than recomputed by each
@@ -202,6 +210,11 @@ interface ReportInput {
 	// that changed nothing are two answers, and two fields that must agree are two a caller can hand
 	// over inconsistently (joshuafolkken/kit#1387).
 	diff: DiffFacts
+	// The three nested windows, built by the caller (joshuafolkken/kit#1409). **Not derived from
+	// `started_ms` / `ended_ms` above**: that pair bounds everything either source knows about — the
+	// pull request's own stamps included — so a run body taken from it would be a window nobody
+	// measured wherever the transcript was missing.
+	windows: RunWindows
 	notes: ReadonlyArray<string>
 	by_check: ReadonlyArray<CheckTotal>
 }
@@ -244,10 +257,6 @@ function totals_by(spans: ReadonlyArray<Span>, key_of: (span: Span) => string): 
 	for (const [, row] of totals) rows.push(row)
 
 	return rows.toSorted((left, right) => right.duration_ms - left.duration_ms)
-}
-
-function to_iso(timestamp_ms: number): string {
-	return timestamp_ms === 0 ? '' : new Date(timestamp_ms).toISOString()
 }
 
 function category_totals(spans: ReadonlyArray<Span>, ci_ms: number): CategoryTotals {
@@ -331,8 +340,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 
 	return {
 		scope: input.scope,
-		started_at: to_iso(input.started_ms),
-		ended_at: to_iso(input.ended_ms),
+		...time_windows.build_stamps(input.started_ms, input.ended_ms, input.windows),
 		elapsed_ms,
 		...counts,
 		...turns.split,
@@ -359,6 +367,11 @@ function build_report(session_id: string, timeline: Timeline): TimeReport {
 		ended_ms: timeline.ended_ms,
 		ci: time_ci.NO_CI,
 		diff: time_rework.NO_DIFF,
+		windows: time_windows.build_windows(
+			timeline.started_ms,
+			timeline.ended_ms,
+			time_windows.NO_OUTER_WINDOWS,
+		),
 		notes: [],
 		by_check: [],
 	})
@@ -427,10 +440,18 @@ function total_lines<Row extends RowTotal>(
 
 // The sentence names no particular transcript, because a run scope reaches here when no transcript
 // was found at all — "this transcript has fewer" would then be about a file nobody located.
+// What sits under the scope line in every report: the notes that qualify the figures, then the three
+// windows those figures are lengths inside of.
+function heading_lines(report: TimeReport): Array<string> {
+	return [...time_format.note_lines(report.notes), ...time_windows.window_lines(report.windows)]
+}
+
 function format_empty(report: TimeReport): string {
 	return [
 		`${report.scope} — no timed lines`,
-		...time_format.note_lines(report.notes),
+		// The windows are printed here too: an issue nobody worked on in this checkout can still have
+		// been filed and closed, and that is a measurement even where no span was read.
+		...heading_lines(report),
 		'',
 		'A span needs two dated lines to sit between, and nothing read here has a pair. So there is',
 		'no elapsed time to divide up.',
@@ -448,7 +469,7 @@ function format_report(report: TimeReport): string {
 
 	return [
 		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
-		...time_format.note_lines(report.notes),
+		...heading_lines(report),
 		'',
 		'Where the wall clock went:',
 		...category_lines(report),
