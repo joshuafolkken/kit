@@ -359,7 +359,14 @@ function build_from_spans(input: ReportInput): TimeReport {
 
 // One session, which is the shape `josh time --session` reports. It has no GitHub half, so the CI
 // share is zero and the row is withheld rather than printed as a measured zero.
-function build_report(session_id: string, timeline: Timeline): TimeReport {
+// **`notes` is a parameter because a session report can now be short of a transcript**
+// (joshuafolkken/kit#1439): naming one unit reads the session that delegated it too, and that
+// transcript can fail to read. Defaulted, so every existing caller is unchanged.
+function build_report(
+	session_id: string,
+	timeline: Timeline,
+	notes: ReadonlyArray<string> = [],
+): TimeReport {
 	return build_from_spans({
 		scope: `session ${session_id}`,
 		spans: timeline.spans,
@@ -372,7 +379,7 @@ function build_report(session_id: string, timeline: Timeline): TimeReport {
 			timeline.ended_ms,
 			time_windows.NO_OUTER_WINDOWS,
 		),
-		notes: [],
+		notes,
 		by_check: [],
 	})
 }

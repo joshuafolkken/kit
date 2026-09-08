@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { time_markers, type PhaseMarker } from './time-markers'
 import { time_overlap } from './time-overlap'
+import type { Span } from './time-spans'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 const { MINUTE_MS, span, total_span_ms: total_ms } = fixture
@@ -70,6 +72,52 @@ describe('time_overlap.resolve_delegated', () => {
 		const resolved = time_overlap.resolve_delegated([span('Agent', 10, 10)], delegated)
 
 		expect(resolved.filter((one) => one.label !== 'Agent')).toStrictEqual(delegated)
+	})
+})
+
+function marked(label: string, ended: number, duration: number, marker: PhaseMarker): Span {
+	return { ...span(label, ended, duration), marker }
+}
+
+function markers_of(resolved: ReadonlyArray<Span>, label: string): Array<PhaseMarker> {
+	return resolved.filter((one) => one.label === label).map((one) => one.marker)
+}
+
+// The parent holds one marked `Skill` call across the whole time the unit ran, and that call is the
+// only thing in either transcript that says those minutes were a review. Subtracting the parent
+// without carrying the marker across deletes the phase rather than moving it — run #1428's
+// 403-second review read as 141 milliseconds (joshuafolkken/kit#1439).
+describe('time_overlap.resolve_delegated — the phase a unit ran inside', () => {
+	it('gives an unmarked unit span the marker of the parent span it replaced', () => {
+		const resolved = time_overlap.resolve_delegated(
+			[marked('Skill', 10, 10, time_markers.REVIEW_MARKER)],
+			[span('Read', 4, 4)],
+		)
+
+		expect(markers_of(resolved, 'Read')).toStrictEqual([time_markers.REVIEW_MARKER])
+	})
+
+	// Several marked spans can enclose one unit, and the array is in the order the transcripts were
+	// read rather than in time order — so the first one found is not the one the unit ran inside.
+	it('takes the narrowest enclosing marked span, not the first one listed', () => {
+		const resolved = time_overlap.resolve_delegated(
+			[
+				marked('Skill', 20, 20, time_markers.WORKFLOW_MARKER),
+				marked('Skill', 10, 5, time_markers.REVIEW_MARKER),
+			],
+			[span('Read', 10, 2)],
+		)
+
+		expect(markers_of(resolved, 'Read')).toStrictEqual([time_markers.REVIEW_MARKER])
+	})
+
+	it('leaves a unit span that already says what it is', () => {
+		const resolved = time_overlap.resolve_delegated(
+			[marked('Skill', 10, 10, time_markers.REVIEW_MARKER)],
+			[marked('Edit', 4, 4, time_markers.EDIT_MARKER)],
+		)
+
+		expect(markers_of(resolved, 'Edit')).toStrictEqual([time_markers.EDIT_MARKER])
 	})
 })
 

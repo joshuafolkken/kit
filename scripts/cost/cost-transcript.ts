@@ -237,6 +237,15 @@ function read_raw(file: SessionFile): string {
 	return read_text(file.path) ?? ''
 }
 
+// The same read, with the failure left visible (joshuafolkken/kit#1439). **An unreadable transcript
+// and an empty one are different answers**, and `read_raw` folds both to `''` — right for a reader
+// that only wants lines to parse, and wrong for one that has to report a transcript as *not
+// measured* rather than as measured at zero. `is_readable` on `SessionUsage` is the same distinction
+// on the cost side; this is it for a caller that wants the text.
+function read_optional(file: SessionFile): string | undefined {
+	return read_text(file.path)
+}
+
 // What to say when the discovery above found nothing. It lives here rather than in either command
 // because both `josh cost` and `josh time` reach it, and a second copy would drift the moment one of
 // them learned something about where transcripts live (joshuafolkken/kit#1267). The message, not the
@@ -268,6 +277,7 @@ const cost_transcript = {
 	tally,
 	read_session,
 	read_raw,
+	read_optional,
 	missing_message,
 }
 

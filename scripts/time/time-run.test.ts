@@ -419,3 +419,26 @@ describe('time_run.build_run_report — sources the caller already collected', (
 		expect(report.span_count).toBe(2)
 	})
 })
+
+// A transcript nobody could read and one that cost nothing produce the same totals, and only this
+// sentence tells them apart (joshuafolkken/kit#1439).
+describe('time_run.unread_lines', () => {
+	it('says nothing when every transcript of the family was read', () => {
+		expect(time_run.unread_lines(0)).toStrictEqual([])
+	})
+
+	it('names how many were missed', () => {
+		const [note] = time_run.unread_lines(2)
+
+		expect(note).toContain('2 transcript(s) of this run could not be read')
+		expect(time_run.is_unread_note(note ?? '')).toBe(true)
+	})
+
+	// The two words at the end also close the refused pull-request listing's note, and a mark that
+	// matches a note it was not written for lets that note through a filter meant to hold it.
+	it('does not recognize the refused pull request listing as one of its own', () => {
+		expect(time_run.is_unread_note('the pull request listing could not be read for issue #1')).toBe(
+			false,
+		)
+	})
+})

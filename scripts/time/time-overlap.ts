@@ -1,3 +1,4 @@
+import { time_markers } from './time-markers'
 import type { Span } from './time-spans'
 
 // Interval arithmetic, and the one thing it is for: not counting the same wall clock twice
@@ -234,6 +235,48 @@ function without_self_overlap(delegated: ReadonlyArray<Span>): Array<Span> {
 // overlap of intervals at all: a resumed transcript copies a parent's `Agent` span into a second
 // session, and the copy has to be assigned to one session *before* this subtraction runs.
 // `time-duplicate.ts` is where that assignment is made, and why it cannot be a fold afterwards.
+function encloses(outer: Interval, inner: Interval): boolean {
+	return outer.started_ms <= inner.started_ms && inner.ended_ms <= outer.ended_ms
+}
+
+// **A unit's spans inherit the marker of the parent span they replace** (joshuafolkken/kit#1439).
+// The parent holds one `Skill(code-review)` call across the whole time the review agent ran, and that
+// call is the only thing in either transcript that says those minutes were a review: the unit's own
+// spans are `Read`s and `grep`s and carry no marker at all. So subtracting the parent's minutes
+// without carrying its marker across does not move the phase to the unit, it deletes the phase —
+// measured on run #1428, whose 403-second review read as 141 milliseconds the moment the units it
+// delegated were read at all.
+//
+// **Only an unmarked span inherits, and only from a parent span that encloses it.** A unit span that
+// already says what it is keeps its own answer, and a parent span that does not enclose the unit was
+// never what those minutes were spent inside. In practice that makes the rule fire exactly where it
+// was written for: the span a delegated unit runs inside is the parent's `Task`/`Agent` call, which
+// carries no marker, and a marked one is a `Skill` call the unit is genuinely a part of.
+// **The narrowest enclosing marked span, never the first one the array happens to hold.** Several
+// marked spans can enclose the same unit, and the array is in the order the transcripts were read
+// rather than in time order — so `find` would answer with whichever was parsed first and charge the
+// unit's minutes to the wrong phase. The innermost is the one the unit actually ran inside.
+// **The candidates are filtered and ordered once, not once per unit span.** Both halves are the same
+// question for every span asked about, and a corpus is thousands of spans on each side — so doing
+// them inside the lookup makes a `josh time` read quadratic with a sort inside the loop.
+function marked_narrowest_first(parent: ReadonlyArray<Span>): Array<Span> {
+	return parent
+		.filter((one) => one.marker !== time_markers.NO_MARKER)
+		.toSorted((left, right) => left.duration_ms - right.duration_ms)
+}
+
+function narrowest_marked(marked: ReadonlyArray<Span>, inner: Interval): Span | undefined {
+	return marked.find((one) => encloses(to_interval(one), inner))
+}
+
+function marked_by(span: Span, marked: ReadonlyArray<Span>): Span {
+	if (span.marker !== time_markers.NO_MARKER) return span
+
+	const found = narrowest_marked(marked, to_interval(span))
+
+	return found === undefined ? span : { ...span, marker: found.marker }
+}
+
 function resolve_delegated(
 	parent: ReadonlyArray<Span>,
 	delegated: ReadonlyArray<Span>,
@@ -242,8 +285,10 @@ function resolve_delegated(
 
 	const resolved = without_self_overlap(delegated)
 	const covered = covering_intervals(resolved)
+	const marked = marked_narrowest_first(parent)
+	const inherited = resolved.map((span) => marked_by(span, marked))
 
-	return [...parent.flatMap((span) => reconciled(span, covered)), ...resolved]
+	return [...parent.flatMap((span) => reconciled(span, covered)), ...inherited]
 }
 
 const time_overlap = {
@@ -251,6 +296,7 @@ const time_overlap = {
 	union_intervals,
 	covered_only_by_ms,
 	to_interval,
+	encloses,
 	resolve_delegated,
 }
 

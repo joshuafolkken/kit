@@ -187,6 +187,7 @@ function issue_spans(session_count: number): IssueSpans {
 		excluded: [],
 		is_separated: false,
 		attributed_count: session_count,
+		unread_count: 0,
 	}
 }
 
