@@ -38,6 +38,18 @@
 		"BASH_MAX_OUTPUT_LENGTH": "8000"
 	},
 	"hooks": {
+		"SessionStart": [
+			{
+				"matcher": "",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "pnpm josh audit:provision",
+						"timeout": 180
+					}
+				]
+			}
+		],
 		"UserPromptSubmit": [
 			{
 				"matcher": "",

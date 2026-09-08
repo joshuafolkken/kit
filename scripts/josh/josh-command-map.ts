@@ -69,6 +69,7 @@ const ALIASES: Record<string, string> = {
 	ad: 'adopt',
 	ov: 'overrides',
 	a: 'audit',
+	ap: 'audit:provision',
 	rt: 'reconcile-templates',
 	swp: 'sync-workflow-pins',
 	sdp: 'sync-dependabot-pins',

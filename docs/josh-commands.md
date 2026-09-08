@@ -1161,6 +1161,40 @@ Run a security audit against the lockfile.
 pnpm josh audit
 ```
 
+The scanner is looked up on `PATH` first, and only then in the directory `josh audit:provision` writes
+to (`node_modules/.cache/josh-tools/`). A machine that installed `osv-scanner` itself therefore keeps
+running exactly the binary it installed. With neither present the audit exits non-zero and prints how
+to get one — the check is never skipped or weakened.
+
+### `josh audit:provision`
+
+Install the pinned `osv-scanner` when `josh audit` cannot find one. Wired to the `SessionStart` hook of
+the distributed `.claude/settings.json`, so a machine or a cloud container that has never installed the
+scanner has one before the first `git push` reaches the pre-push audit.
+
+```bash
+pnpm josh audit:provision
+```
+
+- **No-op when a scanner is already there.** `PATH` first, then the managed directory; neither is
+  re-fetched, and nothing on an existing machine changes.
+- **The version is pinned and the download is verified.** The prebuilt release binary is fetched over
+  HTTPS and its SHA256 compared against the digest published for that tag; a mismatch installs nothing
+  and prints both digests. `go install` was rejected as the route because it presumes a Go toolchain
+  and takes about a minute.
+- **The download bound depends on how the command was reached.** The asset is about 55 MB, and a
+  session-start hook is waited on — so the automatic attempt gives up after a minute and prints the
+  command to run, while `pnpm josh audit:provision --force` allows ten. `--force` also ignores the
+  backoff record below, so it is the one command to type after fixing a network problem.
+- **A failure never stops the session, and is not repeated at every session start.** An unreachable
+  network, a non-OK response, a mismatched checksum and a host with no published build are each
+  reported and exit zero — the pre-push audit still fails on the missing binary, which is where a
+  missing scanner belongs. A failure is recorded, and the automatic attempt is skipped for six hours
+  afterwards rather than paying the timeout again on every startup, resume, clear and compact. A
+  provision that succeeds clears the record.
+- **The audit's own arguments are unchanged.** No offline vulnerability database is used: that would
+  weaken every consumer's answer to "what was known when the database was downloaded".
+
 ### `josh reconcile-templates`
 
 Keep the distributed templates in sync with the root files they come from. There are two kinds of pair:

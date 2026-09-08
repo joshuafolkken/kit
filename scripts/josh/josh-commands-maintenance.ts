@@ -19,6 +19,11 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run security audit',
 		category: 'Maintenance',
 	},
+	'audit:provision': {
+		script: 'scripts/security-audit-provision.ts',
+		description: 'Install the pinned osv-scanner when the audit cannot find one (no-op if present)',
+		category: 'Maintenance',
+	},
 	'reconcile-templates': {
 		script: 'scripts/sync/reconcile-templates.ts',
 		description: 'Record template source hashes (--check to verify drift)',

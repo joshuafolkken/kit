@@ -9,6 +9,7 @@ import {
 	type HooksBlock,
 } from './claude-settings-fixture'
 import { PROCESS_TIMEOUT_MS } from './format-edited-file'
+import { security_audit_provision_logic } from './security-audit-provision-logic'
 
 const GITIGNORE_PATH = fileURLToPath(new URL('../.gitignore', import.meta.url))
 
@@ -68,6 +69,16 @@ const RULE_GUARD_HOOK_COMMAND = 'pnpm josh rule:guard'
 // siblings of its turn applied and itself not, so every rule this dispatcher carries is one whose
 // binding moment is a shell call.
 const RULE_GUARD_TOOLS = ['Bash']
+// The audit provisioner (joshuafolkken/kit#1563). `SessionStart` is the one event that fires before
+// any work is attempted, which is what makes the pre-push audit's missing binary a solved problem
+// rather than a push that dies after the unit suite has already run.
+const PROVISION_HOOK_COMMAND = 'pnpm josh audit:provision'
+// Derived from the download's own bound for the reason the formatter's is: a harness kill lands
+// mid-write, and the staging file this script renames from is the only thing that makes that
+// survivable. Raising the download budget has to raise the declared timeout with it.
+const MINIMUM_PROVISION_TIMEOUT_SECONDS =
+	security_audit_provision_logic.SESSION_DOWNLOAD_TIMEOUT_MS / MS_PER_SECOND +
+	STARTUP_ALLOWANCE_SECONDS
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.
@@ -82,8 +93,14 @@ type HookEvent = keyof HooksBlock
 interface HookWiring {
 	event: HookEvent
 	command: string
-	tools: ReadonlyArray<string>
 	minimum_timeout_seconds: number
+}
+
+// A hook whose event carries a tool matcher. `SessionStart` does not — it fires on a session
+// beginning rather than on a call — so the tool assertions below are declared on this narrower shape
+// and the three properties every hook holds stay in the one block both kinds run.
+interface ToolHookWiring extends HookWiring {
+	tools: ReadonlyArray<string>
 }
 
 // This hook's matchers specifically, not every entry of its event and not every handler of the entry
@@ -107,7 +124,7 @@ function handlers_of(wiring: HookWiring): ReadonlyArray<HookHandler> {
 // The tools a hook's matchers name, read the way Claude Code reads them: an exact list. Split rather
 // than a substring test, because `BashOutput` contains `Bash` — a matcher that had drifted to the
 // wrong tool would satisfy an `includes` check for the right one.
-function tools_of(wiring: HookWiring): ReadonlySet<string> {
+function tools_of(wiring: ToolHookWiring): ReadonlySet<string> {
 	return new Set(
 		matchers_of(wiring).flatMap((entry) =>
 			entry.matcher.split(TOOL_SEPARATORS).map((tool) => tool.trim()),
@@ -115,14 +132,38 @@ function tools_of(wiring: HookWiring): ReadonlySet<string> {
 	)
 }
 
+// The three properties every hook in this file holds, whatever event it rides. Written once because
+// `SessionStart` (joshuafolkken/kit#1563) joined the tool hooks here and shares all three; the two
+// tool-matcher assertions stay with the tool hooks, which are the only ones a matcher means anything
+// to. `CLAUDE.md` → "No clones" is why this is a shared block rather than a second copy.
+function describe_shared_hook_properties(wiring: HookWiring): void {
+	it('is wired to its event through the josh subcommand', () => {
+		expect(matchers_of(wiring).length).toBeGreaterThan(0)
+	})
+
+	// Whatever the hook starts has to finish inside the budget the harness allows it, because a kill
+	// lands at a moment the script did not choose — inside `prettier --write` it truncates the file
+	// the agent just wrote. Declaring the budget here is what keeps each script's own limits binding.
+	it('declares a timeout the run it starts fits inside', () => {
+		const timeouts = handlers_of(wiring).map((handler) => handler.timeout ?? 0)
+
+		expect(timeouts.length).toBeGreaterThan(0)
+		expect(Math.min(...timeouts)).toBeGreaterThanOrEqual(wiring.minimum_timeout_seconds)
+	})
+
+	// The settings file names the subcommand as a string, so a rename on the josh side would leave a
+	// hook that fails on every call with nothing pointing at the cause.
+	it('names a subcommand josh actually has', () => {
+		expect(Object.keys(COMMAND_MAP)).toContain(wiring.command.split(' ').at(-1) ?? '')
+	})
+}
+
 // The five properties every tool hook in this file has to hold, written once. The second hook
 // (joshuafolkken/kit#1390) is what turned a single block into a duplicate of it, which is the moment
 // `CLAUDE.md` → "No clones" says to single-source rather than to copy.
-function describe_tool_hook(title: string, wiring: HookWiring): void {
+function describe_tool_hook(title: string, wiring: ToolHookWiring): void {
 	describe(title, () => {
-		it('is wired to its event through the josh subcommand', () => {
-			expect(matchers_of(wiring).length).toBeGreaterThan(0)
-		})
+		describe_shared_hook_properties(wiring)
 
 		// The exact set rather than each member: what a hook does *not* name is load-bearing too, and an
 		// inclusion test would pass a guard that had quietly grown the two edit tools back.
@@ -143,24 +184,28 @@ function describe_tool_hook(title: string, wiring: HookWiring): void {
 
 			for (const matcher of matchers) expect(matcher).toMatch(/^[\w\-, |]+$/u)
 		})
+	})
+}
 
-		// Whatever the hook starts has to finish inside the budget the harness allows it, because a kill
-		// lands at a moment the script did not choose — inside `prettier --write` it truncates the file
-		// the agent just wrote. Declaring the budget here is what keeps each script's own limits binding.
-		it('declares a timeout the run it starts fits inside', () => {
-			const timeouts = handlers_of(wiring).map((handler) => handler.timeout ?? 0)
+// `SessionStart` carries no tool matcher, so the two assertions above have nothing to check here.
+// What replaces them is the matcher's emptiness: Claude Code reads a `SessionStart` matcher as the
+// *reason* the session began — `startup`, `resume`, `clear`, `compact` — and naming one of them would
+// leave the other three starting a session whose audit tooling was never provisioned.
+function describe_session_hook(title: string, wiring: HookWiring): void {
+	describe(title, () => {
+		describe_shared_hook_properties(wiring)
 
-			expect(timeouts.length).toBeGreaterThan(0)
-			expect(Math.min(...timeouts)).toBeGreaterThanOrEqual(wiring.minimum_timeout_seconds)
-		})
-
-		// The settings file names the subcommand as a string, so a rename on the josh side would leave a
-		// hook that fails on every call with nothing pointing at the cause.
-		it('names a subcommand josh actually has', () => {
-			expect(Object.keys(COMMAND_MAP)).toContain(wiring.command.split(' ').at(-1) ?? '')
+		it('matches every session start rather than one start reason', () => {
+			expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual([''])
 		})
 	})
 }
+
+describe_session_hook('.claude/settings.json — session-start audit provisioning', {
+	event: 'SessionStart',
+	command: PROVISION_HOOK_COMMAND,
+	minimum_timeout_seconds: MINIMUM_PROVISION_TIMEOUT_SECONDS,
+})
 
 describe_tool_hook('.claude/settings.json — post-edit formatting hook', {
 	event: 'PostToolUse',
