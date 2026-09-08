@@ -204,7 +204,8 @@ describe('adopt_toolkits.unresolved_toolkits', () => {
 		expect(adopt_toolkits.unresolved_toolkits(state.project)).toEqual([APP_KIT])
 	})
 
-	// The two halves read the same `classify_toolkit`, so a resolved toolkit can never appear in both.
+	// `resolve_toolkit` and `is_unreachable_toolkit` share the same two primitives, so a resolved
+	// toolkit can never appear in both lists.
 	it('names nothing when every declared toolkit resolves', () => {
 		write_manifest(state.project, { name: 'consumer', devDependencies: { [KIT]: RANGE } })
 		install_toolkit(KIT, JOSH)
