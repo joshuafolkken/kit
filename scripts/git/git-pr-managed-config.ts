@@ -4,11 +4,19 @@ import { git_command } from './git-command'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_confirmation, type TelegramContext } from './git-pr-confirmation'
 
-// **The tracked branch diff, and only that.** `changed_paths.read_changed_paths(false)` appends the
-// untracked files as well, which are not in the pull request: a stray untracked file under a
-// distributed path would block the merge with a body asserting that *this pull request* changes a
-// distributed file, which would be false. The line splitting is still the shared helper's, so this
-// answers from the same definition of a changed path as the review level and the eval scope.
+// **The tracked diff against the merge base — untracked files excluded.**
+// `changed_paths.read_changed_paths(false)` appends the untracked files as well, and those are not in
+// the pull request: a stray untracked file under a distributed path would have blocked the merge with
+// a body asserting that *this pull request* changes a distributed file, which would be false.
+//
+// **What it compares is the merge base against the work tree, not against `HEAD`**, so an uncommitted
+// edit to a tracked file still counts. That is deliberate rather than overlooked: `followup` runs
+// straight after `josh git` has committed and pushed, so the two agree in the case this gate is for,
+// and where they disagree the error falls on the side of stopping — which is the direction a
+// confirmation gate should fail in.
+//
+// The line splitting stays the shared helper's, so this answers from the same definition of a changed
+// path as the review level and the eval scope.
 async function read_branch_paths(): Promise<Array<string>> {
 	return changed_paths.to_paths(await git_command.diff_main_names())
 }
