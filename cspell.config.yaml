@@ -120,6 +120,9 @@ words:
   # comment is about several of them at once — `process-identity-fixture.ts` and the suite that
   # exercises the reissued-pid case.
   - pids
+  # The `git log --oneline` flag, quoted in the read-only cases that pin what the piped-verification
+  # rule must not catch (joshuafolkken/kit#1556).
+  - oneline
   # GitHub's own name for the combined status of a commit's checks — the thing that counts a skipped
   # job as a passing one, which is why `.github/workflows/ci.yml` explains it twice
   # (joshuafolkken/kit#991, joshuafolkken/kit#1226). A dictionary cspell enables for markdown already
