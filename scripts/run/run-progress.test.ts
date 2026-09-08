@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_progress, type Observations } from './run-progress'
 
 // joshuafolkken/kit#1520. The two properties that make this a progress report rather than a timer:
@@ -17,6 +17,15 @@ function observations(overrides: Partial<Observations> = {}): Observations {
 		record_age_ms: 2 * MINUTE,
 		...overrides,
 	}
+}
+
+// The local half of the stamp, parsed back with the offset the line itself printed. Both round-trip
+// assertions below read it the same way, so the shape lives here rather than in each of them. A line
+// with no stamp parses to `NaN`, which fails the comparison rather than passing quietly.
+function parse_stamp(line: string): number {
+	const stamp = /at (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}[+-]\d{2}:\d{2}) \//u.exec(line)
+
+	return Date.parse(`${stamp?.[1] ?? ''}T${stamp?.[2] ?? ''}`)
 }
 
 describe('is_due — the trigger is silence, not a clock', () => {
@@ -177,38 +186,38 @@ describe('format_line — when the observation was taken', () => {
 	// the local half back with its own printed offset is what checks that, and it stays deterministic
 	// on every machine because the offset it is read with is the one the line just printed.
 	it('prints one instant twice, not two clocks that disagree', () => {
-		const stamp = /at (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}[+-]\d{2}:\d{2}) \//u.exec(LINE)
-		const minute_ms = 60_000
-
-		expect(stamp).not.toBeNull()
-		expect(Date.parse(`${stamp?.[1] ?? ''}T${stamp?.[2] ?? ''}`)).toBe(
-			Math.floor(NOW / minute_ms) * minute_ms,
-		)
+		expect(parse_stamp(LINE)).toBe(Math.floor(NOW / MINUTE) * MINUTE)
 	})
 })
 
 // A zone's offset is not always a whole number of minutes, and `NOW` is an instant in 1970 —
-// `Asia/Kathmandu` was `+05:41:16` then, which answers `-341.2666…`. Left unrounded the minutes field
-// printed `41.26666666666667`, so the stamp assertions above failed on any machine in such a zone
-// rather than on none of them.
+// `Asia/Kathmandu` was `+05:41:16` then, which answers `-341.2666…`. Two separate things break there,
+// and the machine running the suite is the only reason neither is normally seen: the minutes field
+// printed `41.26666666666667`, and the local clock read off `getHours` / `getMinutes` truncated the
+// seconds the offset beside it rounded, so the stamp no longer named the instant it was taken at.
 describe('format_line — a zone whose offset is not whole minutes', () => {
-	it('rounds the offset rather than printing a fraction of a minute', () => {
-		const KATHMANDU_1970_MINUTES = -341.2666666666667
-		const offset = vi
-			.spyOn(Date.prototype, 'getTimezoneOffset')
-			.mockReturnValue(KATHMANDU_1970_MINUTES)
+	const KATHMANDU_1970_MINUTES = -341.2666666666667
 
-		try {
-			expect(
-				run_progress.format_line(observations(), {
-					now_ms: NOW,
-					quiet_since_ms: NOW,
-					unchanged_since_ms: NOW,
-				}),
-			).toContain('+05:41 /')
-		} finally {
-			offset.mockRestore()
-		}
+	function line_in_kathmandu(): string {
+		vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(KATHMANDU_1970_MINUTES)
+
+		return run_progress.format_line(observations(), {
+			now_ms: NOW,
+			quiet_since_ms: NOW,
+			unchanged_since_ms: NOW,
+		})
+	}
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('rounds the offset rather than printing a fraction of a minute', () => {
+		expect(line_in_kathmandu()).toContain('+05:41 /')
+	})
+
+	it('still names the instant it was taken at, the clock and the offset agreeing', () => {
+		expect(parse_stamp(line_in_kathmandu())).toBe(NOW)
 	})
 })
 

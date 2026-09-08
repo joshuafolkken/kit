@@ -103,17 +103,21 @@ function pad(value: number): string {
 }
 
 /**
- * The local clock's offset from UTC, written `+HH:MM` or `-HH:MM`.
+ * The local clock's offset from UTC, in whole minutes, signed the way a reader expects to see it.
  *
- * `getTimezoneOffset` counts minutes the local zone is *behind* UTC, so the sign is inverted before it
- * is printed — a zone ahead of UTC answers a negative number there and has to read `+`.
+ * `getTimezoneOffset` counts minutes the local zone is *behind* UTC, so the sign is inverted here — a
+ * zone ahead of UTC answers a negative number there and has to read `+`.
  *
- * **It is rounded to whole minutes before it is split**, because a historic offset is not one:
- * `Asia/Kathmandu` was `+05:41:16` until 1986, so a stamp taken at an instant in that era answers
- * `-341.2666…` and the minutes field would print `41.26666666666667` rather than `41`.
+ * **It is rounded**, because a historic offset is not a whole number of minutes: `Asia/Kathmandu` was
+ * `+05:41:16` until 1986, so a stamp taken at an instant in that era answers `-341.2666…` and the
+ * minutes field would print `41.26666666666667` rather than `41`.
  */
-function format_offset(date: Date): string {
-	const total_minutes = Math.round(-date.getTimezoneOffset())
+function offset_minutes(date: Date): number {
+	return Math.round(-date.getTimezoneOffset())
+}
+
+/** That offset written `+HH:MM` or `-HH:MM`, from the same rounded minute total the stamp is built on. */
+function format_offset(total_minutes: number): string {
 	const sign = total_minutes < 0 ? '-' : '+'
 	const absolute = Math.abs(total_minutes)
 
@@ -134,15 +138,22 @@ function format_offset(date: Date): string {
  * both costs twenty-five characters and leaves neither reader guessing — the offset is what ties the
  * two halves together, so a reader on a third machine can place the local half as well.
  *
+ * **The local half is read off the instant shifted by that same rounded offset, never off `getHours`
+ * and `getMinutes`.** Those truncate the seconds of a sub-minute offset while the offset beside them
+ * is rounded, so the two would disagree by a minute in a zone such as `Africa/Monrovia` (`-00:44:30`
+ * in 1970) and the stamp would no longer parse back to the instant it was taken at. Shifting first and
+ * reading UTC fields off the result makes the two halves consistent by construction.
+ *
  * It reads the `now_ms` the line is already formatted against rather than calling a clock of its own,
  * so the stamp can never disagree with the elapsed figures printed beside it.
  */
 function format_observed_at(now_ms: number): string {
-	const date = new Date(now_ms)
-	const day = `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-	const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}${format_offset(date)}`
+	const minutes = offset_minutes(new Date(now_ms))
+	const local = new Date(now_ms + minutes * MS_PER_MINUTE)
+	const day = `${String(local.getUTCFullYear())}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`
+	const clock = `${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}${format_offset(minutes)}`
 
-	return `${day} ${clock} / ${date.toISOString().slice(0, STAMP_END)}Z`
+	return `${day} ${clock} / ${new Date(now_ms).toISOString().slice(0, STAMP_END)}Z`
 }
 
 /**
