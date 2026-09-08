@@ -43,9 +43,14 @@ describe('the priority order is stated with its rationale', () => {
 		expect(read_unwrapped(document_path)).toContain('depth')
 	})
 
-	// The counter-claim that keeps the change small: an epic's own chain is untouched.
-	it.each([EPICRUN, EPIC_COMMANDS])('%s says nothing moves inside one epic', (document_path) => {
-		expect(read_unwrapped(document_path)).toContain('Inside one epic nothing moves')
+	// The counter-claim that keeps the change small: this order decides between epics only. What
+	// decides *inside* one epic became the epic's own task list in joshuafolkken/kit#1583 — it was the
+	// declared chain alone before that, and both documents used to say so. The marker moved with the
+	// behavior rather than being dropped, so a document that reverts to either older claim fails.
+	it.each([EPICRUN, EPIC_COMMANDS])('%s says what decides inside one epic', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain(
+			"Inside one epic the order is that epic's own task list",
+		)
 	})
 })
 

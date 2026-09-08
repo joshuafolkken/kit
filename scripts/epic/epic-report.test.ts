@@ -32,10 +32,13 @@ describe('epic_report.bundle_by_repo', () => {
 		expect(bundles.map((bundle) => bundle.repo)).toEqual([APP_KIT, KIT])
 	})
 
-	it('orders repositories and children so a run is reproducible', () => {
+	// The repositories are sorted by name so a run is reproducible; the **children are not sorted at
+	// all** since joshuafolkken/kit#1583 — they keep the order the epic's task list gave them, which is
+	// the only way an epic can say which of its runnable children goes first.
+	it('leaves the children in the order they arrived, which is the epic’s', () => {
 		const bundles = epic_report.bundle_by_repo([child(2), child(1)])
 
-		expect(bundles[0]?.children.map((entry) => entry.number)).toEqual([1, 2])
+		expect(bundles[0]?.children.map((entry) => entry.number)).toEqual([2, 1])
 	})
 })
 
@@ -106,12 +109,29 @@ describe('epic_report.decide_verdict', () => {
 describe('epic_report.candidates_for_repo', () => {
 	// The whole bundle rather than its head: the confirmation walk offers the next candidate when the
 	// first is withheld (joshuafolkken/kit#1121).
-	it('returns every candidate for the repository, lowest number first', () => {
+	// joshuafolkken/kit#1583. The order is the epic's own: the bundle comes back in the order the task
+	// list names the children. The fixture is deliberately reversed against the numbers, so this pins
+	// that the number sort is gone rather than agreeing with the body by coincidence.
+	it('returns every candidate in the order the epic lists them, not by number', () => {
 		const result = epic_report.build_result(classification({ runnable: [child(2), child(1)] }), [])
 
 		expect(epic_report.candidates_for_repo(result, KIT).map((entry) => entry.number)).toEqual([
-			1, 2,
+			2, 1,
 		])
+	})
+
+	// **Priority is not dependency**, and the half of that guarantee which belongs here is narrow: the
+	// candidates are built from `runnable` alone, so nothing this module does can let a stuck child
+	// reach them. That a stuck child lands outside `runnable` in the first place is
+	// `epic-classify.ts`'s, and `epic-classify.test.ts` is where the pair is asserted together
+	// (joshuafolkken/kit#1583).
+	it('builds candidates from the runnable children alone', () => {
+		const result = epic_report.build_result(
+			classification({ runnable: [child(2)], human: [child(1)], time: [child(3)] }),
+			[],
+		)
+
+		expect(epic_report.candidates_for_repo(result, KIT).map((entry) => entry.number)).toEqual([2])
 	})
 
 	it('returns an empty bundle for a repository nothing is runnable in', () => {

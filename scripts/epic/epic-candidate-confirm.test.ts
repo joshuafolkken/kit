@@ -49,7 +49,8 @@ function context(
 	return { children, resolve: epic_classify.resolve_by_state, read_blockers: reader(listing) }
 }
 
-// The candidates `epic_report.candidates_for_repo` would hand over, picked by number.
+// The candidates `epic_report.candidates_for_repo` would hand over, in the order the epic lists them
+// (joshuafolkken/kit#1583). The numbers here select which children, not the order they come back in.
 function bundle(
 	children: ReadonlyArray<EpicChild>,
 	numbers: ReadonlyArray<number>,
