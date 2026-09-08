@@ -140,6 +140,14 @@ describe('decide — the mechanism, not the parent self-restraining', () => {
 		expect(arm('due', `sleep ${String((INTERVAL_MS - 5 * MINUTE_MS) / 1000)}`)).toBe(false)
 	})
 
+	// Nothing legitimate waits longer than one interval, and allowing one would mean recording an
+	// expiry shorter than the timer really has — which is the double-timer defect all over again.
+	it('refuses a timer that runs longer than the interval', () => {
+		with_last_report(INTERVAL_MS)
+
+		expect(arm('overlong', 'sleep 2400')).toBe(true)
+	})
+
 	// The half the Issue was filed on: the second arm is what produced reports minutes apart, and it
 	// is refused **again** rather than once per run.
 	it('refuses a second timer while the first is still live, every time it is armed', () => {

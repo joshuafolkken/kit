@@ -114,6 +114,31 @@ function is_armed(target: string, now_ms: number): boolean {
 }
 
 /**
+ * Where the report this timer produces would land, or `undefined` when the arm must be refused.
+ *
+ * **A timer longer than the interval is refused rather than trimmed.** The watcher reports on its own
+ * every interval, so nothing legitimate waits longer than one — and the alternative, recording a
+ * shorter expiry than the timer really has, would let a second timer be armed while the first was
+ * still running, which is the defect this rule exists to prevent. Refusing instead keeps every record
+ * exact **and** bounds a record that turns out to be wrong to one interval, since no arm can reach
+ * further than that.
+ *
+ * **The rest is applied to where the report lands, not to where the arm is made.** A timer armed the
+ * moment a real report went out is legitimate exactly when it runs the full interval, and a rule that
+ * measured the arm would refuse the one arm that is always right.
+ */
+function landing_ms(command: string, now_ms: number, last_report_ms: number): number | undefined {
+	const interval_ms = run_progress.configured_interval_ms()
+	const duration_ms = wait_duration_ms(command)
+
+	if (duration_ms > interval_ms) return undefined
+
+	const lands_ms = now_ms + duration_ms
+
+	return run_progress.is_due(last_report_ms, lands_ms, interval_ms) ? lands_ms : undefined
+}
+
+/**
  * The two conditions the Issue names, and one that scopes the rule to the runs it was written for.
  *
  * **No progress record means no clock, and no clock means no rule.** An ordinary conversational
@@ -126,16 +151,15 @@ function is_armed(target: string, now_ms: number): boolean {
  * killed with its shell would leave the count wrong for the rest of the run; a record that expires at
  * the instant the timer fires cannot.
  *
- * **The early test is applied to where the report lands, not to where the arm is made.** A timer armed
- * the moment a real report went out is legitimate exactly when it runs the full interval, and a rule
- * that measured the arm would refuse the one arm that is always right.
- *
  * **`can_record` is false where the call may never run.** The record is written at `PreToolUse`,
  * before the sleep starts, and nothing runs it back — so a call another hook is about to refuse would
  * leave a timer recorded as live that never existed, and lock out the legitimate arm that follows.
  * The caller answers that question, because it is the one that knows what the other hooks are doing.
  * **Refusing is unaffected**: a rule that also stayed silent there would be silent on exactly the lone
- * `Bash` call an arm always is.
+ * `Bash` call an arm always is. What it costs is the other direction — an arm that *was* allowed and
+ * did run inside that window is not recorded, so a second one before it fires is not caught. That is
+ * the lesser of the two, because a missing record loses one detection while a wrong one blocks every
+ * arm until it expires.
  */
 function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean {
 	const last_report_ms = run_progress_clock.read_last_report_sync()
@@ -146,15 +170,10 @@ function decide(call: GuardedCall, run: GuardRun, can_record: boolean): boolean 
 
 	if (is_armed(target, run.now_ms)) return true
 
-	const lands_ms = run.now_ms + wait_duration_ms(time_shell.bash_command(call.input))
-	const interval_ms = run_progress.configured_interval_ms()
+	const lands_ms = landing_ms(time_shell.bash_command(call.input), run.now_ms, last_report_ms)
 
-	if (!run_progress.is_due(last_report_ms, lands_ms, interval_ms)) return true
-	// **Capped at one interval, because the record can be wrong and must not be wrong for long.** A
-	// permission prompt the person declines, or a harness that blocks the call, leaves a timer recorded
-	// that never ran; bounding the record to the interval the rule is about keeps that mistake the same
-	// size as the rule's own subject rather than the size of whatever `sleep` was typed.
-	if (can_record) ARM_RECORD.record(target, Math.min(lands_ms, run.now_ms + interval_ms))
+	if (lands_ms === undefined) return true
+	if (can_record) ARM_RECORD.record(target, lands_ms)
 
 	return false
 }

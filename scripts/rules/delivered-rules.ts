@@ -290,6 +290,9 @@ function is_first_delivery(
 // what an armed timer always is, for the whole ten-second window and the reissue inside it. So the
 // refusal is asked unconditionally and the stand-aside is handed to the row as `can_record`: what must
 // not happen on a call another hook may stop is the *write*, which would record a timer that never ran.
+// **It is a trade, and the other side is named rather than hidden**: an arm allowed inside that window
+// that really does run is not recorded either, so a second one before it fires goes uncaught. A missing
+// record loses one detection; a wrong one blocks every arm until it expires.
 function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_block'] {
 	const { decide } = rule
 
