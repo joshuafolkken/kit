@@ -151,6 +151,12 @@ function to_interval(span: Span): Interval {
 // fragments are real intervals and both are summed.
 //
 // A span left with nothing yields nothing, rather than a row saying a call took no time.
+//
+// **`own_duration_ms` is deliberately not among the fields overwritten** (joshuafolkken/kit#1591).
+// The spread copies it onto every fragment, so what the call itself took survives a subtraction that
+// exists to price its *share*. Overwrite it here and the per-invocation table loses the only record
+// of the original length — the fragments cannot reconstruct it, because a covered end is gone and a
+// fully covered span yields no fragment at all.
 function trim(span: Span, covered: ReadonlyArray<Interval>): Array<Span> {
 	return uncovered_parts(to_interval(span), covered).map((part, index) => ({
 		...span,

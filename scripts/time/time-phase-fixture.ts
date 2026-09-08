@@ -36,9 +36,15 @@ const GATE_COMMAND = 'josh gate'
 const PR_COMMAND = 'josh git'
 const MERGE_COMMAND = 'josh followup'
 
-// Positioned by start minute so a test reads as a timeline rather than as a list of durations: the
-// windows are decided from when a span sits, and a helper that only carried lengths could not say.
-function span(start_minute: number, minutes: number, extra: Partial<Span> = {}): Span {
+// The one pairing `equal_durations` cannot enforce from inside the literal: `extra` is a
+// `Partial<Span>`, so a case overriding `duration_ms` alone would leave `own_duration_ms` at the
+// length this call was built with, and the drift would surface only as a wrong number in a
+// per-invocation assertion (joshuafolkken/kit#1591). Re-derived here unless the case named it.
+function paired(merged: Span, extra: Partial<Span>): Span {
+	return { ...merged, own_duration_ms: extra.own_duration_ms ?? merged.duration_ms }
+}
+
+function base_span(start_minute: number, minutes: number, extra: Partial<Span>): Span {
 	return {
 		category: time_spans.TOOL_CATEGORY,
 		label: '',
@@ -53,9 +59,15 @@ function span(start_minute: number, minutes: number, extra: Partial<Span> = {}):
 		outcome: time_spans.UNKNOWN_OUTCOME,
 		is_continuation: false,
 		ended_ms: (start_minute + minutes) * MINUTE_MS,
-		duration_ms: minutes * MINUTE_MS,
+		...time_spans.equal_durations(minutes * MINUTE_MS),
 		...extra,
 	}
+}
+
+// Positioned by start minute so a test reads as a timeline rather than as a list of durations: the
+// windows are decided from when a span sits, and a helper that only carried lengths could not say.
+function span(start_minute: number, minutes: number, extra: Partial<Span> = {}): Span {
+	return paired(base_span(start_minute, minutes, extra), extra)
 }
 
 // A span that closes at a typed prompt — the interval nobody was at the keyboard for. It carries no
