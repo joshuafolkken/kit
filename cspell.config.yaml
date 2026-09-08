@@ -110,3 +110,6 @@ words:
   # in the distributed dictionary beside `workerd`, because that fixture is one of the `*-fixture.ts`
   # files `package.json` keeps out of the published package — no consumer ever spell-checks it.
   - miniflare
+  # The `git log --oneline` flag, quoted in the read-only cases that pin what the piped-verification
+  # rule must not catch (joshuafolkken/kit#1556).
+  - oneline

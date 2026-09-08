@@ -1,5 +1,6 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { ALIASES } from '#scripts/josh/josh-command-map'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
 
@@ -63,10 +64,14 @@ function is_issue_filing(command: string): boolean {
 // **Only `Bash`, and the omission is deliberate** (joshuafolkken/kit#1390): Claude Code denies one
 // call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself
 // not. Every rule enumerated here is therefore one whose binding moment is a shell call.
-function is_filing_call(call: GuardedCall): boolean {
+function bash_call_matching(call: GuardedCall, is_match: (command: string) => boolean): boolean {
 	if (call.name !== cost_blocks.BASH_TOOL) return false
 
-	return is_issue_filing(time_shell.bash_command(call.input))
+	return is_match(time_shell.bash_command(call.input))
+}
+
+function is_filing_call(call: GuardedCall): boolean {
+	return bash_call_matching(call, is_issue_filing)
 }
 
 // The whole of the WIP cap, in the shape a refusal can carry: the count, the refusal, the two
@@ -83,8 +88,87 @@ const WIP_CAP_REASON =
 	'`prompts/collaboration-workflow/wip-cap.md`. Reissue this call once you have counted — it fires ' +
 	'once per run and cannot repeat on the call in hand.'
 
+// The josh subcommands whose result means pass or fail — the whole reach of the rule below, and no
+// more (joshuafolkken/kit#1556). **The read-only answers are absent deliberately.** `eval:scope`,
+// `latest:scope`, `review:level`, `review:brief` and `issue:state` print an answer rather than a
+// verdict, and `git log | head` or `gh issue list | head` are not josh calls at all — narrowing a
+// listing is the ordinary way to read one. A trigger wide enough to reach those would refuse on the
+// commonest shape in the transcript, and this file's own rule is that a hook firing on the wrong turn
+// is worse than no hook.
+//
+// **Two more kinds are out, and for reasons rather than by omission.** `pre-commit-type-check` and
+// `pre-push-unit` are run by lefthook rather than typed by anyone, so no call of theirs is ever
+// composed here; and `e2e:retry-check` *reports* whether the preview server crashed rather than
+// passing or failing on it, which puts it with the answers above.
+const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
+	'check',
+	'cspell',
+	'cspell:dot',
+	'eval',
+	'gate',
+	'lint',
+	'lint:eslint',
+	'lint:prettier',
+	'lint:related',
+	'overrides',
+	'ranges',
+	'test',
+	'test:e2e',
+	'test:related',
+	'test:unit',
+])
+
+// Both spellings of each check, **derived from the alias table rather than restated beside it**: a
+// second copy of the aliases stops matching the first time one is renamed, and `pnpm josh ga | tail`
+// masks a gate exactly as the long spelling does.
+const VERIFICATION_NAMES: ReadonlySet<string> = new Set([
+	...VERIFICATION_COMMANDS,
+	...Object.entries(ALIASES)
+		.filter(([, name]) => VERIFICATION_COMMANDS.has(name))
+		.map(([alias]) => alias),
+])
+
+function is_verification_command(segment: string): boolean {
+	const named = time_shell.josh_command_of(segment)
+
+	if (!named.startsWith(time_shell.JOSH_PREFIX)) return false
+
+	return VERIFICATION_NAMES.has(named.slice(time_shell.JOSH_PREFIX.length))
+}
+
+// A pipeline reports its last command's status, so a check in any earlier segment has its verdict
+// thrown away. `time_shell.discarded_commands` is what decides which segments those are — the shell
+// reading is one rule kept in one place, not a second parser written here.
+function is_masked_verification(command: string): boolean {
+	return time_shell.discarded_commands(command).some((segment) => is_verification_command(segment))
+}
+
+function is_masking_call(call: GuardedCall): boolean {
+	return bash_call_matching(call, is_masked_verification)
+}
+
+// The masking, the two ways out of it and the boundary, in the shape a refusal can carry
+// (joshuafolkken/kit#1556). **The way out travels with the refusal rather than being named**, because
+// a delivery saying only "do not pipe it" leaves the caller with the same long output and no
+// sanctioned way to read it, which is what put the pipe there in the first place.
+const PIPED_VERIFICATION_REASON =
+	"⛔ piped verification: a pipeline exits with its last command's status, so `pnpm josh gate | " +
+	'tail` reports success on a gate that failed, and the verdict is discarded before anything reads ' +
+	'it. Run the check without the pipe — josh prints its verdict line last, so the harness output cap ' +
+	'keeps it even when the middle is elided. Where the output genuinely has to be narrowed, redirect ' +
+	'it to a file and read ranges from that file, or prefix `set -o pipefail` so the pipeline carries ' +
+	"the check's status. Read the printed verdict either way, never the exit code alone. Read-only " +
+	'listings are untouched — this fires only on a command whose result means pass or fail. The rule ' +
+	'is in `prompts/collaboration-workflow/output-bounds.md`. Reissue this call with no pipe — it ' +
+	'fires once per run and cannot repeat on the call in hand.'
+
+// **The two triggers are disjoint.** Filing is a `gh` call with a title field and no pipe; masking is
+// a josh check standing before one. The single overlap a reader can construct — a check piped *into*
+// `gh issue create` — is not a shape anything writes, and `wip-cap` leading the list is the safe way
+// round it: the filing cap is the more consequential of the two to lose.
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	{ id: 'wip-cap', is_trigger: is_filing_call, reason: WIP_CAP_REASON },
+	{ id: 'piped-verification', is_trigger: is_masking_call, reason: PIPED_VERIFICATION_REASON },
 ]
 
 // **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
@@ -153,12 +237,14 @@ function is_enabled(): boolean {
 
 const delivered_rules = {
 	DELIVERED_RULES,
+	PIPED_VERIFICATION_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,
 	delivery,
 	delivery_path,
 	is_enabled,
 	is_issue_filing,
+	is_masked_verification,
 }
 
 export type { DeliveredRule }

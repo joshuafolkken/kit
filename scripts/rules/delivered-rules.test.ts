@@ -13,7 +13,18 @@ import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 // that does not.
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'rule-guard-'))
 const WIP_CAP = 'wip-cap'
+const PIPED_VERIFICATION = 'piped-verification'
+// Every rule's record has to be cleared, not the first one's: a stamp left behind silences the next
+// case exactly as it silences the next call, and a rule added without its id here would make the
+// suite pass on a delivery that had already been spent.
+const RULE_IDS: ReadonlyArray<string> = [WIP_CAP, PIPED_VERIFICATION]
 const NOW_MS = 1_700_000_000_000
+// The shape the Issue was filed on: a gate whose failure the pipeline reports as a success.
+const PIPED_GATE_COMMAND = 'pnpm josh gate 2>&1 | tail -40'
+// Case names shared by the two rules' blocks, so a literal is not repeated per rule.
+const LEAVES_ALONE = 'leaves %j alone'
+const CARRIES = 'carries %j'
+const ONCE_PER_RUN = 'delivers once per run rather than once per call'
 // The shortest command that really files an Issue, reused wherever a case needs the trigger to match
 // so that no case can pass on a spelling the others do not use.
 const FILING_COMMAND = 'gh issue create --title "x"'
@@ -61,7 +72,9 @@ beforeEach(() => {
 
 afterAll(() => {
 	for (const transcript of WRITTEN_TRANSCRIPTS) {
-		rmSync(delivered_rules.delivery_path(WIP_CAP, transcript), { force: true })
+		for (const rule_id of RULE_IDS) {
+			rmSync(delivered_rules.delivery_path(rule_id, transcript), { force: true })
+		}
 	}
 
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
@@ -88,7 +101,7 @@ describe('is_issue_filing', () => {
 		'gh api repos/joshuafolkken/kit/issues --jq length',
 		'gh issue list --state open --limit 100',
 		'gh pr create --title "x"',
-	])('leaves %j alone', (command) => {
+	])(LEAVES_ALONE, (command) => {
 		expect(delivered_rules.is_issue_filing(command)).toBe(false)
 	})
 })
@@ -112,7 +125,7 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		'a documented workflow cannot complete',
 		'data is lost or written outside the repository',
 		'`prompts/collaboration-workflow/wip-cap.md`',
-	])('carries %j', (marker) => {
+	])(CARRIES, (marker) => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain(marker)
 	})
 
@@ -122,11 +135,100 @@ describe('rule_delivery — the WIP cap at the call that files', () => {
 		expect(delivered_rules.WIP_CAP_REASON).toContain('Reissue this call once you have counted')
 	})
 
-	it('delivers once per run rather than once per call', () => {
+	it(ONCE_PER_RUN, () => {
 		const payload = payload_of('repeat', FILING_COMMAND)
 
 		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
 		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+	})
+})
+
+// The second trigger, judged from the command alone (joshuafolkken/kit#1556). **The half that decides
+// whether this hook is worth having is the second list**: narrowing a listing with `| head` is the
+// ordinary way to read one, and a guard that refused those would fire on the commonest shape in the
+// transcript.
+describe('is_masked_verification', () => {
+	it.each([
+		PIPED_GATE_COMMAND,
+		'pnpm josh lint:related a.ts | head -20',
+		'cd /tmp/lane && pnpm josh test:unit | tail -5',
+		'josh cspell:dot | grep -i error',
+		// The alias is the same command, and it is derived from the command map rather than restated.
+		'pnpm josh ga | tail',
+		'pnpm josh gate | tail -40 | grep failed',
+	])('reads %j as a masked verification', (command) => {
+		expect(delivered_rules.is_masked_verification(command)).toBe(true)
+	})
+
+	it.each([
+		// Read-only listings — the whole reason the trigger is scoped to pass/fail commands.
+		'git log --oneline -3 | head',
+		'gh issue list --state open | head -30',
+		'ls -la | wc -l',
+		// A verification command that keeps its own status: no pipe, the far side of a `||`, or the
+		// last segment of the pipeline, whose status *is* the pipeline's.
+		'pnpm josh gate 2>&1',
+		'pnpm josh gate > /tmp/gate.log 2>&1',
+		'pnpm josh gate || echo failed',
+		'echo a.ts | xargs pnpm josh lint:related',
+		// **The way out the refusal itself recommends.** Under `pipefail` the pipeline carries the
+		// check's status, so refusing this would deny the sanctioned form — and, because the shared
+		// shell stamps before it refuses, would spend the run's one delivery on a compliant call and
+		// leave a genuinely masked one later in the run without a refusal.
+		'set -o pipefail; pnpm josh gate | tail -40',
+		'set -euo pipefail && pnpm josh test:unit | tail -5',
+		// A command chain inside a quoted body is text: this repository's issue and comment bodies
+		// quote them constantly, and the chain split walks into the middle of one.
+		'gh issue comment 1556 --body "cd x && pnpm josh gate | tail で確認"',
+		// The commands that print an answer rather than a verdict. Refusing these would make the rule
+		// about josh rather than about verification.
+		'pnpm josh eval:scope | tail -1',
+		'pnpm josh review:brief | head -40',
+		'pnpm josh latest:scope | tail -1',
+		// A quoted command line is text, not a call — and this repository's issue bodies quote them
+		// constantly.
+		'git commit -m "ran pnpm josh gate | tail -40"',
+	])(LEAVES_ALONE, (command) => {
+		expect(delivered_rules.is_masked_verification(command)).toBe(false)
+	})
+})
+
+describe('rule_delivery — the masked verification at the call that pipes it', () => {
+	it('delivers the rule on the call that pipes a check', () => {
+		const reason = rule_delivery(payload_of('piped', PIPED_GATE_COMMAND), NOW_MS)
+
+		expect(reason).toBe(delivered_rules.PIPED_VERIFICATION_REASON)
+	})
+
+	// Each half changes what the reader does next: without the mechanism the refusal reads as a style
+	// note, without a sanctioned way to bound the output the caller is left with the problem that put
+	// the pipe there, and without the boundary the rule reads as covering every pipe.
+	it.each([
+		"a pipeline exits with its last command's status",
+		'Run the check without the pipe',
+		'redirect it to a file and read ranges from that file',
+		'`set -o pipefail`',
+		'never the exit code alone',
+		'Read-only listings are untouched',
+		'`prompts/collaboration-workflow/output-bounds.md`',
+		'Reissue this call with no pipe',
+	])(CARRIES, (marker) => {
+		expect(delivered_rules.PIPED_VERIFICATION_REASON).toContain(marker)
+	})
+
+	it(ONCE_PER_RUN, () => {
+		const payload = payload_of('piped-repeat', PIPED_GATE_COMMAND)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.PIPED_VERIFICATION_REASON)
+		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+	})
+
+	// The invariant `is_first_delivery` depends on, re-checked for this row as the enumeration's own
+	// comment requires: a trigger the batching guard also considers would put the silent collision back.
+	it('is not a call the batching guard may also refuse', () => {
+		const call = { name: 'Bash', input: { command: PIPED_GATE_COMMAND } }
+
+		expect(time_batch_guard.is_guarded_call(call)).toBe(false)
 	})
 })
 
@@ -208,8 +310,8 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it('names the WIP cap', () => {
-		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(WIP_CAP)
+	it.each(RULE_IDS)('names %j', (rule_id) => {
+		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(rule_id)
 	})
 
 	it('is on by default', () => {

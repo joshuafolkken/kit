@@ -514,7 +514,11 @@ SECURITY.md         tsconfig.sonar.json
 > cannot be skimmed past. Today it delivers the backlog WIP cap at the call that files an Issue; a
 > comment endpoint is not a filing and is left alone, and so — the trigger reads the command string —
 > is a filing whose title never appears in it. **That limit is why the rule keeps a one-line trigger
-> resident**: the line binds on every route, and the delivery reinforces it where it can see one.
+> resident**: the line binds on every route, and the delivery reinforces it where it can see one. It
+> delivers a second rule at the call that pipes a verification command (joshuafolkken/kit#1556): a
+> pipeline exits with its last command's status, so a red gate read through `| tail` came back as a
+> success. **Read-only listings are untouched** — the trigger names only the checks whose result means
+> pass or fail, and narrowing a listing with `| head` is how one is properly read.
 > `JOSH_RULE_GUARD=off` switches it off, and
 > `prompts/collaboration-workflow/rule-delivery.md` is the enumeration and the criterion behind it.
 >
