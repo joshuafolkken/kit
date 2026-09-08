@@ -188,14 +188,10 @@ describe('epic_classify.classify_children — every open child is accounted for'
 	})
 })
 
-// joshuafolkken/kit#1476: an epic's task list can hold a row pointing at another epic, and nothing
-// read it — the row fell through to `from_blockers`, which minted `runnable`, so `epicrun` handed an
-// epic to `fullrun` as an ordinary issue. The cases below vary one property at a time, because the
-// refusal must key on the `epic` label and never on a row naming another repository — that one is
 // joshuafolkken/kit#1583. **Priority is not dependency**, and this is the pair that says so. Since
-// the epic's task-list order is the offer order, a child the epic lists *first* can be one that is
-// waiting on a person — and it simply does not reach `runnable`, so the one after it is offered. A
-// declared `blocked-by` chain, which was the only way to order two children before, would instead
+// the epic's task-list order became the offer order, a child the epic lists *first* can be one that
+// is waiting on a person — and it simply does not reach `runnable`, so the one after it is offered.
+// A declared `blocked-by` chain, which was the only way to order two children before, would instead
 // have stopped everything behind the stuck one.
 describe('epic_classify.classify_children — a parked child ahead of a runnable one', () => {
 	it('skips it rather than holding back the child listed after it', () => {
@@ -207,6 +203,10 @@ describe('epic_classify.classify_children — a parked child ahead of a runnable
 	})
 })
 
+// joshuafolkken/kit#1476: an epic's task list can hold a row pointing at another epic, and nothing
+// read it — the row fell through to `from_blockers`, which minted `runnable`, so `epicrun` handed an
+// epic to `fullrun` as an ordinary issue. The cases below vary one property at a time, because the
+// refusal must key on the `epic` label and never on a row naming another repository — that one is
 // legitimate, and disables the epic auto-close by design.
 describe('epic_classify.classify_children — a child that is itself an epic', () => {
 	it('withholds it instead of offering it', () => {
