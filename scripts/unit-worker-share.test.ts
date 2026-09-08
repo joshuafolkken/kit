@@ -18,7 +18,8 @@ const LANE_COUNT = 6
 const PROBE_PREFIX = 'josh-unit-share-test-'
 // The pids no live process holds and the start time none can have — `process-identity-fixture.ts` for
 // why each is the value it is.
-const { DEAD_PID, FOREIGN_START, GROUP_PID, NEGATIVE_PID } = process_identity_fixture
+const { DEAD_PID, FOREIGN_START, GROUP_PID, NEGATIVE_PID, has_start_probe } =
+	process_identity_fixture
 
 const DEAD_MARKER = `${unit_worker_share.RUN_PREFIX}dead.json`
 const ALIVE_MARKER = `${unit_worker_share.RUN_PREFIX}alive.json`
@@ -152,21 +153,28 @@ describe('unit_worker_share.live_run_count — sweeping what it counted out', ()
 	// system handed that number to something else, the pid-only probe answered "alive", the marker was
 	// counted rather than swept, and every solo run on the machine stayed at one worker for good. The
 	// recorded start time is what tells the reissued process from the one that wrote the file.
-	it('counts out and removes the marker of a pid that was reissued', () => {
-		const directory = probe_directory()
+	//
+	// Skipped where the platform cannot report a start time: the pair cannot be told apart there, so
+	// the marker counts as live and is left alone — the load-safe direction this reader takes on the
+	// uncertain answer, and the specified behavior rather than a failure.
+	it.skipIf(!has_start_probe)(
+		'counts out and removes the marker of a pid that was reissued',
+		() => {
+			const directory = probe_directory()
 
-		try {
-			write_marker(directory, RECYCLED_MARKER, {
-				pid: process.pid,
-				process_start: FOREIGN_START,
-			})
+			try {
+				write_marker(directory, RECYCLED_MARKER, {
+					pid: process.pid,
+					process_start: FOREIGN_START,
+				})
 
-			expect(unit_worker_share.live_run_count(directory)).toBe(0)
-			expect(existsSync(path.join(directory, RECYCLED_MARKER))).toBe(false)
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
-	})
+				expect(unit_worker_share.live_run_count(directory)).toBe(0)
+				expect(existsSync(path.join(directory, RECYCLED_MARKER))).toBe(false)
+			} finally {
+				rmSync(directory, { recursive: true, force: true })
+			}
+		},
+	)
 })
 
 describe('unit_worker_share.live_run_count — what it leaves alone', () => {

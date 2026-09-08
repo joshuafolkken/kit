@@ -8,7 +8,7 @@ import { bench_guard } from './bench-guard'
 // A pid no live process holds, and a start time none can have — `process-identity-fixture.ts` for why
 // each is the value it is. Paired with this run's own pid, the second is what a marker looks like
 // after the operating system has reissued the pid its gate held (joshuafolkken/kit#1245).
-const { DEAD_PID, FOREIGN_START } = process_identity_fixture
+const { DEAD_PID, FOREIGN_START, has_start_probe } = process_identity_fixture
 
 // The identity fields rather than a bare pid, because since joshuafolkken/kit#1245 the guard asks who
 // the process is and not merely whether the number is taken.
@@ -56,10 +56,25 @@ describe('bench guard — a gate running on this tree stops the clearing', () =>
 	// The same marker after the operating system reissued its pid: the number is alive, the process
 	// behind it is not the gate's. A pid-only probe passed here and blocked `josh bench` for good
 	// (joshuafolkken/kit#1245).
-	it('lets the run proceed when the marker names a pid that was reissued', () => {
-		stub_marker({ pid: process.pid, process_start: FOREIGN_START })
+	//
+	// Skipped where the platform cannot report a start time: there the pair cannot be told apart, the
+	// guard refuses on the uncertain answer, and that refusal is the specified behavior rather than a
+	// failure — the case the sibling test below covers.
+	it.skipIf(!has_start_probe)(
+		'lets the run proceed when the marker names a pid that was reissued',
+		() => {
+			stub_marker({ pid: process.pid, process_start: FOREIGN_START })
 
-		expect(bench_guard.is_gate_running()).toBe(false)
+			expect(bench_guard.is_gate_running()).toBe(false)
+		},
+	)
+})
+
+// What the guard does with a marker it cannot resolve either way (joshuafolkken/kit#1245). Neither
+// case here needs the platform to report a start time, so neither is skipped.
+describe('bench guard — the answer it gives when it cannot identify the writer', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
 	})
 
 	it('lets the run proceed when the marker carries no process at all', () => {

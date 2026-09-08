@@ -2685,7 +2685,12 @@ open for the whole of it, so clearing them mid-flight would corrupt the run payi
 run is minutes long and clears a target's caches before each cold reading, so a check once at start-up
 would walk straight into a gate a hook or another session started after it; once a gate is running the
 readings are void anyway, and the run stops rather than finishing with figures nobody can use. The
-in-flight marker carries the gate's pid, so one left behind by a killed process blocks nothing.
+in-flight marker carries the gate's pid **and the time that process started**
+([#1245](https://github.com/joshuafolkken/kit/issues/1245)), so one left behind by a killed gate blocks
+nothing — and goes on blocking nothing after the operating system reissues that pid, which the pid on
+its own could not promise. **The uncertain answer refuses rather than clears**: where the start time
+cannot be read at all, a marker naming a live pid holds `josh bench` back, because being wrong the
+other way deletes the caches a running gate is reading.
 
 **Stopping keeps the readings it already took** ([#1369](https://github.com/joshuafolkken/kit/issues/1369)).
 The abort's rationale is that a reading taken beside a gate measures neither of them, and that does not
