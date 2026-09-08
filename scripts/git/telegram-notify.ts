@@ -36,11 +36,56 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	confirmation: { icon: '⏸️', label: 'Confirmation required' },
 }
 
+const NOT_CONFIGURED_PREFIX = 'Telegram is not configured'
+const SEND_FAILED_PREFIX = 'Telegram notification failed'
+const REDACTED = '<redacted>'
+const UNKNOWN_ERROR_TEXT = 'unknown error'
+
 function parse_environment_string(value: string | undefined): string {
 	return value?.trim() ?? ''
 }
 
-function load_config(): TelegramConfig | undefined {
+// Not `git_gh_helpers.get_error_message_with_stderr`, which the two nearest callers use: that one
+// appends the `stderr` an execa-shaped error carries, and nothing in this module runs a subprocess —
+// so it would pull a subprocess concern into an HTTP one and degrade to exactly this line anyway.
+// **The `cause` is read, not only the message.** A `fetch` rejection's own message is the bare string
+// `fetch failed`; what says whether this was DNS, a refused connection or a timeout lives one level
+// down. Reporting the top line alone would exit non-zero with nothing a reader can act on, which is
+// half of what joshuafolkken/kit#1564 set out to fix. Redaction runs over the joined text, so the
+// deeper line is covered exactly as the top one is.
+function join_cause(error: Error): string {
+	const { cause } = error
+
+	if (!(cause instanceof Error) || cause.message.length === 0) return error.message
+
+	return `${error.message}: ${cause.message}`
+}
+
+// A non-`Error` throw is stated rather than stringified: `String({})` is `[object Object]`, which
+// tells a reader nothing and is what `typescript:S6551` flags.
+function describe_error(error: unknown): string {
+	if (error instanceof Error) return join_cause(error)
+
+	return typeof error === 'string' ? error : UNKNOWN_ERROR_TEXT
+}
+
+// The request URL carries the bot token in its own path, so an error raised anywhere near the
+// request can carry a credential into a log. Both values are taken out of the text before it leaves
+// this module, so no caller has to remember to do it (joshuafolkken/kit#1564).
+function redact_credentials(text: string, config: TelegramConfig): string {
+	return text.split(config.bot_token).join(REDACTED).split(config.chat_id).join(REDACTED)
+}
+
+// **Missing credentials are a failure, not a skip** (joshuafolkken/kit#1564). This used to warn and
+// return `undefined`, and `send` then returned quietly — so a run with no credentials was
+// indistinguishable from one whose notification arrived. Until this Issue the mandatory
+// `--env-file=.env` flag on `josh notify` and `josh followup` made a machine without that file die
+// before node started, which was loud by accident; with the flag relaxed to the optional form, this
+// is where the noise has to come from instead.
+//
+// The message names the variables and never their values — the schema's own messages are the
+// variable names, so nothing read out of the environment reaches it.
+function load_config(): TelegramConfig {
 	const result = telegram_environment_schema.safeParse({
 		telegram_bot_token: parse_environment_string(process.env['TELEGRAM_BOT_TOKEN']),
 		telegram_chat_id: parse_environment_string(process.env['TELEGRAM_CHAT_ID']),
@@ -49,9 +94,7 @@ function load_config(): TelegramConfig | undefined {
 	if (!result.success) {
 		const error_list = result.error.issues.map((issue) => issue.message).join(', ')
 
-		console.warn(`⚠️  Telegram not configured: ${error_list}. Skipping.`)
-
-		return undefined
+		throw new Error(`${NOT_CONFIGURED_PREFIX}: ${error_list}`)
 	}
 
 	return { bot_token: result.data.telegram_bot_token, chat_id: result.data.telegram_chat_id }
@@ -115,25 +158,81 @@ async function post_message(config: TelegramConfig, text: string): Promise<void>
 	}
 }
 
+// **The cause is re-wrapped rather than passed through** (joshuafolkken/kit#1564). The chain is kept,
+// because a symptom error that drops its cause loses where the failure came from — but the original
+// is the one object on this path nothing has redacted, and `git_error.handle` prints a cause's own
+// message straight to the console. Both layers therefore carry the same already-redacted text.
+function build_send_failure(error: unknown, config: TelegramConfig): Error {
+	const reason = redact_credentials(describe_error(error), config)
+
+	return new Error(`${SEND_FAILED_PREFIX}: ${reason}`, { cause: new Error(reason) })
+}
+
+// **The strict form.** A caller whose whole job is the notification has nothing left to report when
+// this fails, so it throws and `pnpm josh notify` exits non-zero. joshuafolkken/kit#1564 measured
+// the state this replaces: three notifications lost to a `504 Gateway Time-out`, each one printing a
+// warning and exiting 0, so a message that reached nobody looked exactly like one that arrived.
+//
+// The failure it throws carries a `cause`, and that cause is redacted too — see `build_send_failure`.
 async function send(input: TelegramSendInput): Promise<void> {
 	const config = load_config()
-	if (config === undefined) return
-
 	const text = build_text(input)
 
 	try {
 		await post_message(config, text)
-		console.info('📱 Telegram notification sent.')
 	} catch (error) {
-		console.warn(
-			'⚠️  Telegram notification failed:',
-			error instanceof Error ? error.message : error,
-		)
+		throw build_send_failure(error, config)
+	}
+
+	console.info('📱 Telegram notification sent.')
+}
+
+// **The tolerant form**, for a caller whose job is something other than the notification.
+// `followup` sends the completion message on its way to the merge, and a gateway timeout at
+// Telegram is not a reason to leave a reviewed, green pull request unmerged — joshuafolkken/kit#1564
+// measured exactly that 504 with six lanes running at once. So the failure is reported and the run
+// carries on.
+//
+// **Reported under `❗` on stderr, in its own block, with the caller's own recovery line** — the bar
+// joshuafolkken/kit#1539 set for a step that failed and was not allowed to end the run. The `⚠️`
+// this used to print is what every routine notice prints, which is how the failure got buried.
+//
+// `recovery` is the caller's because only the caller knows one. It is `string | undefined` and not
+// optional for the reason `CleanupStep.recovery` is: a caller with no command that finishes the job
+// has to say so rather than leave the field off, and naming a command that would not work sends the
+// reader somewhere useless.
+//
+// **Not routed through `git_followup_cleanup`**, which is that Issue's mechanism: it guards the
+// steps a merge has already earned and says "failed after the merge" in its own wording, while this
+// send happens *before* the merge. Borrowing it would print a sentence that is not true.
+function report_send_failure(error: unknown, recovery: string | undefined): void {
+	console.error('')
+	console.error(`❗ ${describe_error(error)}`)
+	console.error('   Nobody was notified, and the run carried on.')
+
+	if (recovery !== undefined) console.error(`   Recovery: ${recovery}`)
+
+	console.error('')
+}
+
+async function send_or_report(
+	input: TelegramSendInput,
+	recovery: string | undefined,
+): Promise<boolean> {
+	try {
+		await send(input)
+
+		return true
+	} catch (error) {
+		report_send_failure(error, recovery)
+
+		return false
 	}
 }
 
 const telegram_notify = {
 	send,
+	send_or_report,
 }
 
 export { telegram_notify, build_text, TASK_DEFINITIONS, telegram_environment_schema }

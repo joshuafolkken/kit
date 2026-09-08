@@ -16,7 +16,8 @@ const PACKAGE_VERSION = (
 	JSON.parse(readFileSync(path.join(PACKAGE_DIR, 'package.json'), 'utf8')) as { version: string }
 ).version
 
-const ENV_FILE_FLAG = '--env-file=.env'
+const ENV_FILE_FLAG = '--env-file-if-exists=.env'
+const MANDATORY_ENV_FILE_FLAG = '--env-file=.env'
 const ALIAS_PAD_WIDTH = 2
 const CHECK_COMMIT_MESSAGE_CMD = 'check-commit-message'
 const UNKNOWN_CMD = 'not-a-command'
@@ -220,14 +221,19 @@ describe('resolve_alias', () => {
 	})
 })
 
+// joshuafolkken/kit#1564: the mandatory form is asserted absent as well as the optional one present.
+// A regression back to `--env-file=.env` is not a missing flag — it is a flag that kills both
+// commands before node starts on any machine with no `.env`, credentials in the environment or not.
 describe('COMMAND_MAP env-file commands', () => {
 	/* eslint-disable dot-notation -- Record<string, T> requires bracket notation per noPropertyAccessFromIndexSignature */
-	it('followup includes --env-file=.env tsx argument', () => {
+	it('followup reads .env only when it exists', () => {
 		expect(COMMAND_MAP['followup']?.tsx_arguments).toContain(ENV_FILE_FLAG)
+		expect(COMMAND_MAP['followup']?.tsx_arguments).not.toContain(MANDATORY_ENV_FILE_FLAG)
 	})
 
-	it('notify includes --env-file=.env tsx argument', () => {
+	it('notify reads .env only when it exists', () => {
 		expect(COMMAND_MAP['notify']?.tsx_arguments).toContain(ENV_FILE_FLAG)
+		expect(COMMAND_MAP['notify']?.tsx_arguments).not.toContain(MANDATORY_ENV_FILE_FLAG)
 	})
 	/* eslint-enable dot-notation */
 })

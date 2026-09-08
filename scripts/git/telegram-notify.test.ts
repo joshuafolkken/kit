@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { build_text, telegram_environment_schema, type TelegramSendInput } from './telegram-notify'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+	build_text,
+	telegram_environment_schema,
+	telegram_notify,
+	type TelegramSendInput,
+} from './telegram-notify'
 
 const ISSUE_URL = 'https://github.com/owner/repo/issues/1'
 const BOT_TOKEN = 'bot-token-123'
@@ -8,6 +13,48 @@ const PR_URL = 'https://github.com/owner/repo/pull/2'
 const REPO_NAME = 'joshuafolkken-com'
 const ISSUE_TITLE = 'Fix something important'
 const BODY = '- Added foo\n- Changed bar'
+
+const BOT_TOKEN_KEY = 'TELEGRAM_BOT_TOKEN'
+const CHAT_ID_KEY = 'TELEGRAM_CHAT_ID'
+const GATEWAY_TIMEOUT_STATUS = 504
+const REDACTION_MARKER = '<redacted>'
+const RECOVERY_HINT = 'send it by hand with `pnpm josh notify`'
+const DNS_FAILURE_TEXT = 'getaddrinfo ENOTFOUND api.telegram.org'
+const GATEWAY_TIMEOUT_TEXT = 'Gateway Time-out'
+const OK_STATUS = 200
+
+// A developer's own shell may carry these, so every case states exactly what it means to test.
+// `vi.stubEnv` removes the variable when handed `undefined`, and `vi.unstubAllEnvs` puts the
+// environment back whatever it held.
+function set_credentials(bot_token: string | undefined, chat_id: string | undefined): void {
+	vi.stubEnv(BOT_TOKEN_KEY, bot_token)
+	vi.stubEnv(CHAT_ID_KEY, chat_id)
+}
+
+function stub_fetch(response: { ok: boolean; status: number; statusText: string }): void {
+	vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
+}
+
+function stub_failing_fetch(error: Error): void {
+	vi.stubGlobal('fetch', vi.fn().mockRejectedValue(error))
+}
+
+function silence_console(): { errors: Array<string> } {
+	const errors: Array<string> = []
+
+	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	vi.spyOn(console, 'error').mockImplementation((...parts: Array<unknown>) => {
+		errors.push(parts.map(String).join(' '))
+	})
+
+	return { errors }
+}
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+	vi.unstubAllGlobals()
+	vi.restoreAllMocks()
+})
 
 function make_base(overrides: Partial<TelegramSendInput>): TelegramSendInput {
 	return {
@@ -135,5 +182,83 @@ describe('telegram_environment_schema', () => {
 
 		expect(result.success).toBe(false)
 		expect(result.error?.issues.at(0)?.message).toContain('TELEGRAM_CHAT_ID')
+	})
+})
+
+// joshuafolkken/kit#1564. Both of these paths used to warn and return, so a notification that
+// reached nobody exited 0 and was indistinguishable from one that arrived.
+describe('telegram_notify.send — a notification that reached nobody', () => {
+	it('throws naming the missing variable, never its value', async () => {
+		set_credentials(undefined, CHAT_ID)
+		silence_console()
+
+		await expect(telegram_notify.send(make_base({}))).rejects.toThrow(BOT_TOKEN_KEY)
+		await expect(telegram_notify.send(make_base({}))).rejects.not.toThrow(CHAT_ID)
+	})
+
+	it('throws carrying the status code when the request is refused', async () => {
+		set_credentials(BOT_TOKEN, CHAT_ID)
+		stub_fetch({ ok: false, status: GATEWAY_TIMEOUT_STATUS, statusText: GATEWAY_TIMEOUT_TEXT })
+		silence_console()
+
+		await expect(telegram_notify.send(make_base({}))).rejects.toThrow(
+			String(GATEWAY_TIMEOUT_STATUS),
+		)
+	})
+
+	// The request URL carries the bot token in its path, so an error formatted anywhere near the
+	// request can carry it out of the module. Nothing downstream redacts, so this does.
+	it('redacts the credentials out of an error that carried them', async () => {
+		set_credentials(BOT_TOKEN, CHAT_ID)
+		stub_failing_fetch(new Error(`fetch failed for /bot${BOT_TOKEN}/sendMessage to ${CHAT_ID}`))
+		silence_console()
+
+		await expect(telegram_notify.send(make_base({}))).rejects.toThrow(REDACTION_MARKER)
+		await expect(telegram_notify.send(make_base({}))).rejects.not.toThrow(BOT_TOKEN)
+		await expect(telegram_notify.send(make_base({}))).rejects.not.toThrow(CHAT_ID)
+	})
+})
+
+// The other half of the same Issue: inside `followup` the send happens on the way to the merge, so a
+// gateway timeout must not leave a reviewed, green pull request unmerged.
+describe('telegram_notify.send_or_report — reports and carries on', () => {
+	it("answers false and reports the caller's recovery instead of throwing", async () => {
+		set_credentials(BOT_TOKEN, CHAT_ID)
+		stub_fetch({ ok: false, status: GATEWAY_TIMEOUT_STATUS, statusText: GATEWAY_TIMEOUT_TEXT })
+		const { errors } = silence_console()
+
+		await expect(telegram_notify.send_or_report(make_base({}), RECOVERY_HINT)).resolves.toBe(false)
+		expect(errors.join('\n')).toContain(RECOVERY_HINT)
+		expect(errors.join('\n')).not.toContain(BOT_TOKEN)
+	})
+
+	// A caller with no command that finishes the job says so, rather than being given one that would
+	// not work — the completion notification `followup` sends is exactly that case.
+	it('prints no recovery line when the caller has none', async () => {
+		set_credentials(BOT_TOKEN, CHAT_ID)
+		stub_fetch({ ok: false, status: GATEWAY_TIMEOUT_STATUS, statusText: GATEWAY_TIMEOUT_TEXT })
+		const { errors } = silence_console()
+
+		await expect(telegram_notify.send_or_report(make_base({}), undefined)).resolves.toBe(false)
+		expect(errors.join('\n')).toContain(String(GATEWAY_TIMEOUT_STATUS))
+		expect(errors.join('\n')).not.toContain('Recovery')
+	})
+
+	// A `fetch` rejection's own message is the bare `fetch failed`; the diagnosis is one level down.
+	it('reports the cause, not only the top-level message', async () => {
+		set_credentials(BOT_TOKEN, CHAT_ID)
+		stub_failing_fetch(new Error('fetch failed', { cause: new Error(DNS_FAILURE_TEXT) }))
+		const { errors } = silence_console()
+
+		await expect(telegram_notify.send_or_report(make_base({}), undefined)).resolves.toBe(false)
+		expect(errors.join('\n')).toContain(DNS_FAILURE_TEXT)
+	})
+
+	it('answers true when the send succeeds', async () => {
+		set_credentials(BOT_TOKEN, CHAT_ID)
+		stub_fetch({ ok: true, status: OK_STATUS, statusText: 'OK' })
+		silence_console()
+
+		await expect(telegram_notify.send_or_report(make_base({}), RECOVERY_HINT)).resolves.toBe(true)
 	})
 })

@@ -854,7 +854,7 @@ On completion, the count of **unreleased merges on main** is included in the com
 
 **A merge that went ahead without CodeRabbit says so on the console.** Whenever the merge gate opens with a CodeRabbit check that is not passing, `followup` prints one `⏭ CodeRabbit check skipped (kit#753): <name> was <status> at merge time` line per such check and carries the same note into the completion Telegram body. The skip covers waiting only: CodeRabbit findings that have already been posted go through the unchanged AI-review scan below, and unresolved line comments are still recorded (joshuafolkken/kit#1217).
 
-Set `JOSH_CI_TIMEOUT_SECONDS` to a positive number of seconds to override it in either direction; anything else falls back to the default. `followup` runs with `--env-file=.env`, so the variable is read from the project's `.env` as well as from the shell — **a leftover `JOSH_CI_TIMEOUT_SECONDS` left in `.env` as a workaround for the old default keeps overriding the new one**, so remove it after upgrading.
+Set `JOSH_CI_TIMEOUT_SECONDS` to a positive number of seconds to override it in either direction; anything else falls back to the default. `followup` runs with `--env-file-if-exists=.env`, so the variable is read from the project's `.env` when there is one, as well as from the shell — **a leftover `JOSH_CI_TIMEOUT_SECONDS` left in `.env` as a workaround for the old default keeps overriding the new one**, so remove it after upgrading.
 
 An AI agent driving this command should give the tool call the longest timeout it allows and let the command finish: the wait can outlast a single tool call, and shell backgrounding (`&`) does not survive the call returning.
 
@@ -882,6 +882,10 @@ Task types: `planning` 📋 · `completion` ✅ · `failure` ❌ · `kickoff_ret
 **The repository in the header follows the URL the notification carries.** It is resolved in this order: an explicit `--repo-name`, then the repository the `--issue-url` names, then the repository the `--pr-url` names, then the repository the command is run in. The issue title is read from the `--issue-url`'s repository, so one URL is enough to describe an issue anywhere; a `--pr-url` names no issue, so it answers the repository only and no title is read from it (joshuafolkken/kit#994). Only a notification with no usable URL of either kind falls back to the working directory, which is what it always did. This matters wherever a workflow files an issue elsewhere and notifies about it — the upstream-interrupt rule opens the issue with `gh api repos/<owner>/<repo>/issues` and sends a `confirmation` right after, and the header used to name the repository the session happened to be running in while the link pointed upstream (joshuafolkken/kit#903).
 
 Note: do not use `--task-type completion` manually — always use `josh followup` instead, which automatically includes the PR URL.
+
+**A send that reached nobody exits non-zero** ([#1564](https://github.com/joshuafolkken/kit/issues/1564)). Missing credentials and a refused request are the same answer: the command _is_ the notification, so it has nothing left to report if the message did not go out, and a warning followed by exit 0 made a lost notification indistinguishable from a delivered one — measured as three `504 Gateway Time-out` sends that all exited 0. The message names the missing variables or the HTTP status, and never the value of `TELEGRAM_BOT_TOKEN` or `TELEGRAM_CHAT_ID`. A notification sent from _inside_ `josh followup` behaves differently on purpose: it reports the failure under `❗` and the run carries on to the merge, because a reviewed, green pull request must not be held back by a Telegram gateway.
+
+`.env` is read with `--env-file-if-exists`, so the command runs on a machine that has none as long as both variables are in the environment.
 
 ### `josh main:sync`
 

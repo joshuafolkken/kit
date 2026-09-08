@@ -226,12 +226,21 @@ async function notify_completion(
 	const lines = pending_line === undefined ? skip_notes : [pending_line, ...skip_notes]
 	const body = lines.join('\n')
 
-	await telegram_notify.send(
+	// **The tolerant send** (joshuafolkken/kit#1564): this runs on the way to the merge, so a Telegram
+	// gateway timeout must not leave a reviewed, green pull request unmerged. The failure is reported
+	// under `❗` and the run carries on.
+	//
+	// **No recovery line**, deliberately, in the same sense `git_followup_cleanup`'s epic-close step
+	// has none: a completion notification is never re-sent by hand — `pnpm josh notify --task-type
+	// completion` is prohibited because it populates no PR link — and re-running `followup` after the
+	// merge is not a re-send either. Naming either would send the reader somewhere useless.
+	await telegram_notify.send_or_report(
 		build_telegram_input({
 			task_type: 'completion',
 			context,
 			body,
 		}),
+		undefined,
 	)
 }
 
