@@ -18,12 +18,14 @@ const record_run_mock = vi.hoisted(() =>
 const clear_round_one_mock = vi.hoisted(() => vi.fn())
 const attest_clear_mock = vi.hoisted(() => vi.fn(async () => undefined))
 
+// The sentinel is set in `beforeEach` rather than here: a hoisted factory cannot read a constant
+// declared below it, and repeating the string would be two spellings of one value.
+const pending_release_mock = vi.hoisted(() =>
+	vi.fn<() => Promise<string | undefined>>().mockResolvedValue(undefined),
+)
+
 vi.mock('../scripts/git/git-followup-pending', () => ({
-	git_followup_pending: {
-		pending_release_line: vi
-			.fn<() => Promise<string | undefined>>()
-			.mockResolvedValue(PENDING_SENTINEL),
-	},
+	git_followup_pending: { pending_release_line: pending_release_mock },
 }))
 
 vi.mock('../scripts/git/git-next-issues', () => ({
@@ -68,6 +70,7 @@ beforeEach(() => {
 	worktree_directory_mock.mockResolvedValue(WORKTREE_DIRECTORY)
 	record_run_mock.mockResolvedValue([])
 	fetch_next_issue_lines_mock.mockResolvedValue([])
+	pending_release_mock.mockResolvedValue(PENDING_SENTINEL)
 	silence_console()
 })
 
@@ -274,5 +277,14 @@ describe('finish — one failing step does not discard the rest', () => {
 		await git_followup_finish.finish('#42', false)
 
 		expect(release_hold_mock).not.toHaveBeenCalled()
+	})
+
+	// The guard is what the merge earned: a `--no-merge` run has merged nothing, so a failure in its
+	// tail is a failure of the run and still ends it — reporting it as cleanup "after the merge" would
+	// describe a merge that never happened.
+	it('rejects on a --no-merge run, whose tail failure is a failure of the run', async () => {
+		pending_release_mock.mockRejectedValueOnce(FAILURE)
+
+		await expect(git_followup_finish.finish('#42', false)).rejects.toThrow(FAILURE)
 	})
 })

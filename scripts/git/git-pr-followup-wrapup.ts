@@ -6,6 +6,13 @@ import { git_notify, type GitNotifyConfig } from './git-notify'
 
 const { STAGE, lap } = git_followup_stages
 
+// **Both destinations, because the step writes to whichever the notify target names.** A hint that
+// only covered the issue would send the reader to the wrong place after a `--notify-target pr` run
+// failed, which is the same defect as naming a command that cannot do the step at all.
+const COMPLETION_COMMENT_RECOVERY =
+	'post the completion report by hand — `gh pr comment <branch>` for the pull request, ' +
+	'`gh api repos/{owner}/{repo}/issues/<N>/comments` for the issue'
+
 // Everything from the merge gate opening onwards. Split out of `git-pr-followup.ts` because that file
 // had eight code lines of headroom left, and cut here because this is where the run stops being able
 // to fail safely: past the merge, the branch is gone and re-running the command is not a recovery.
@@ -91,7 +98,7 @@ async function post_completion_notification(input: {
 async function notify_step(input: WrapupInput): Promise<void> {
 	await git_followup_cleanup.run_guarded_step(input.should_merge, {
 		label: 'The completion comment',
-		recovery: 'gh api repos/{owner}/{repo}/issues/<N>/comments -f body="<the completion report>"',
+		recovery: COMPLETION_COMMENT_RECOVERY,
 		run: async () => {
 			await post_completion_notification({
 				branch_name: input.branch_name,
