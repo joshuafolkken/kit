@@ -3,6 +3,7 @@ import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
 import { piped_verification } from './piped-verification'
+import { shell_body_trigger } from './shell-body-trigger'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
@@ -172,12 +173,37 @@ const ISSUE_COMMENTS_REASON =
 	'`.claude/skills/workflow-commands/SKILL.md` → "An Issue\'s comments are part of the Issue". It ' +
 	'fires once per run and cannot repeat on the call in hand.'
 
+// The reading of the call itself — which spellings carry a body inline, and what the shell does to
+// the value — is `shell-body-trigger.ts`, beside its own cases. A row states its trigger and its
+// text; a model of zsh quoting is more than a row.
+const { is_shell_evaluated_body } = shell_body_trigger
+
+// The instruction in the shape a refusal can carry: what the shell is about to do, the safe
+// spellings, and the reissue sentence every delivery needs. The damage is named because it is the
+// half that reads as unbelievable — the substituted text is *executed*, not discarded.
+const SHELL_BODY_REASON =
+	'⛔ shell-evaluated body: this command carries a body inline in double quotes, and that body ' +
+	'contains a backtick or a `$`. The shell evaluates both before the command runs, so the text is ' +
+	'executed rather than merely mangled — joshuafolkken/kit#1198 recorded a PR comment whose own ' +
+	"words ran as git commands and switched a lane's work tree onto main. Write the body to a file " +
+	'and pass it by path: `gh api repos/{owner}/{repo}/issues/<N>/comments --field body=@<path>` (a ' +
+	'PR comment is an issue comment), `pnpm josh followup --notify-message-file <path>`, `pnpm josh ' +
+	"notify --body-file <path>`, and `--body-file <path>` wherever a command offers it. `$'…'` " +
+	'quoting is the other safe form and is unchanged. The rule and what the trigger cannot see are in ' +
+	'`prompts/collaboration-workflow/shell-body.md`. Reissue this call once the body is in a file — ' +
+	'it fires once per run and cannot repeat on the call in hand.'
+
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	{ id: 'wip-cap', is_trigger: on_bash_command(is_issue_filing), reason: WIP_CAP_REASON },
 	{
 		id: 'issue-comments',
 		is_trigger: on_bash_command(is_body_only_issue_read),
 		reason: ISSUE_COMMENTS_REASON,
+	},
+	{
+		id: 'shell-body',
+		is_trigger: on_bash_command(is_shell_evaluated_body),
+		reason: SHELL_BODY_REASON,
 	},
 	{
 		id: 'piped-verification',
@@ -265,9 +291,17 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 
 // **The first entry whose delivery actually fires wins — not the first whose trigger matches.** Only
 // one refusal can leave a `PreToolUse` hook, so a rule that matched but has already been delivered
-// this run falls through and a later rule may speak on the same call. With one entry that cannot
-// happen; with the second row this file is built for it would be a mis-delivery, so a rule added
-// here has to be one whose trigger no other row also matches.
+// this run falls through and a later rule may speak on the same call. **A rule added here therefore
+// has to be one whose trigger no other row also matches**, and the enumeration's own suite asserts
+// that over every row's fixtures.
+//
+// **`shell-body` carries the one deliberate exception, and the order is what makes it safe**
+// (joshuafolkken/kit#1198). A filing whose body happens to contain a backtick —
+// `gh api …/issues -f title="…" -f body="… \`x\` …"` — is claimed by `wip-cap` as well. It is listed
+// first because it decides whether the Issue should exist at all, and rewriting a body into a file
+// for an Issue that must not be filed is wasted work. Nothing is lost by losing the race: the stamps
+// are keyed per `id`, so the reissued call is delivered the second rule. An overlap is admissible
+// only when that reading holds — that the losing rule's delivery is still correct one call later.
 function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
 	for (const guard of GUARDS.values()) {
 		const reason = guard.refusal(raw_payload, now_ms)
@@ -286,6 +320,7 @@ const delivered_rules = {
 	DELIVERED_RULES,
 	ISSUE_COMMENTS_REASON,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
+	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,
 	delivery,

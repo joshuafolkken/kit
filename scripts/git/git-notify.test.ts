@@ -3,6 +3,9 @@ import { git_notify } from './git-notify'
 
 const DEFAULT_MESSAGE = 'Implementation is complete. Please review.'
 const TARGET_PR = 'pr'
+// A message whose own escape produced the newlines at either end. Named because the assertion has to
+// be the same string as the input: what is pinned is that nothing between the two removes them.
+const EDGE_NEWLINE_MESSAGE = '\nline1\nline2\n'
 
 describe('git_notify.build_notify_config — valid targets', () => {
 	it('returns config with target pr', () => {
@@ -57,14 +60,47 @@ describe('git_notify.build_notify_config — message and mentions', () => {
 		expect(result?.mentions).toEqual(['@user1', '@user2'])
 	})
 
-	it(String.raw`replaces literal \n with newline in message`, () => {
+	// joshuafolkken/kit#1198 moved the `\n` expansion to `cli_body`, where the flag is read: a message
+	// arriving from `--notify-message-file` already holds real newlines, so a literal backslash-n in
+	// one is the author's text. Expanding it here would rewrite it, and the escape's own coverage now
+	// lives in `scripts/josh/cli-body.test.ts`.
+	it(String.raw`keeps a literal \n in the message it was handed`, () => {
 		const result = git_notify.build_notify_config({
 			raw_target: TARGET_PR,
 			raw_message: String.raw`line1\nline2`,
 			raw_mentions: undefined,
 		})
 
-		expect(result?.message).toBe('line1\nline2')
+		expect(result?.message).toBe(String.raw`line1\nline2`)
+	})
+})
+
+// **Trimming moved up with the expansion, and for the same reason.** This function used to read
+// `raw.trim().replaceAll(…)` — trim first, expand second. Keeping the trim here once the expansion
+// had moved reversed that order, so `--notify-message "…\n"` lost the newline its own escape had just
+// produced. The quoting slack is now removed by `cli_body` before the escape is expanded
+// (`scripts/josh/cli-body.test.ts`), and what arrives here is passed on as it stands.
+describe('git_notify.build_notify_config — the message is passed on as it stands', () => {
+	it('keeps the newlines at either end of the message it was handed', () => {
+		const result = git_notify.build_notify_config({
+			raw_target: TARGET_PR,
+			raw_message: EDGE_NEWLINE_MESSAGE,
+			raw_mentions: undefined,
+		})
+
+		expect(result?.message).toBe(EDGE_NEWLINE_MESSAGE)
+	})
+
+	// The negative control: `trim` survives as the emptiness test, where the whitespace is counted
+	// rather than removed, so a message of nothing but spaces is still no answer.
+	it('falls back to the default when the message is only whitespace', () => {
+		const result = git_notify.build_notify_config({
+			raw_target: TARGET_PR,
+			raw_message: '  \n  ',
+			raw_mentions: undefined,
+		})
+
+		expect(result?.message).toBe(DEFAULT_MESSAGE)
 	})
 })
 

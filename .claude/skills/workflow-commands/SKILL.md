@@ -914,7 +914,7 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
 
-**Three rules left this list at the first question, and are delivered by a hook instead**
+**Four rules left this list at the first question, and are delivered by a hook instead**
 (joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside it
 rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
 enumeration and the single source of what a turn where the trigger does not fire means.
@@ -937,6 +937,16 @@ enumeration and the single source of what a turn where the trigger does not fire
   on the reissue. §2g is the procedure and stays here, because a session that runs no hooks still
   owes the read (`prompts/collaboration-workflow/rule-delivery.md`,
   `scripts/rules/delivered-rules.test.ts`).
+- **The prohibition on putting a body inside shell double quotes** — `pnpm josh rule:guard` refuses
+  the `Bash` call whose inline body value carries a backtick or a `$`, the two characters this
+  harness's zsh was measured to evaluate there, and hands back the path-shaped spellings
+  (`--body-file`, `--field body=@<path>`, `--notify-message-file`). **The trigger reads the body, not
+  the flag**: every worked example in these documents passes a placeholder, which is inert, so keying
+  on the flag would refuse the turns where the rule is already kept. It is also the one row whose
+  trigger deliberately overlaps another — a filing whose body carries a backtick is `wip-cap`'s
+  first, and this one's on the reissue. A one-line trigger stays resident because a hook reaches
+  Claude Code alone (`prompts/collaboration-workflow/shell-body.md`,
+  `scripts/shell-body-rule.test.ts`, joshuafolkken/kit#1198).
 
 These do not pass it, and live in a skill instead: the split assessment (`split-assessment.md`), a
 prerequisite discovered mid-run (§2d, with each entry's branch in

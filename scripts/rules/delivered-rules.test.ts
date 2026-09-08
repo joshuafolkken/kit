@@ -48,6 +48,12 @@ const ONCE_PER_RUN = 'delivers once per run rather than once per call'
 const FILING_COMMAND = 'gh issue create --title "x"'
 // The `gh api` spelling of the same filing, used both as a trigger case and as a collision case.
 const FILING_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues -f title="x" -f body="y"'
+const SHELL_BODY = 'shell-body'
+// A comment body carrying the character the shell runs. It is a single-quoted TypeScript literal, so
+// the backtick is inert here and dangerous only in the command it describes. The endpoint is a
+// comment rather than a filing, so exactly one row claims it.
+const EVALUATED_BODY_COMMAND =
+	'gh api repos/joshuafolkken/kit/issues/1198/comments -f body="see `pnpm josh ms`"'
 const WRITTEN_TRANSCRIPTS = new Set<string>()
 const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
@@ -400,7 +406,33 @@ describe('rule_delivery — the two Bash guards never answer about the same call
 })
 
 // The enumeration is the mechanism: one row per relocated rule, and the next rule to leave residency
-// costs a row rather than a second delivery path.
+// costs a row rather than a second delivery path. The reading of the call itself is
+// `shell-body-trigger.test.ts`; what is pinned here is the row wired to it.
+describe('rule_delivery — the shell-body rule at the call that would execute text', () => {
+	it('delivers the rule on a comment whose body carries a backtick', () => {
+		const reason = rule_delivery(payload_of('evaluated', EVALUATED_BODY_COMMAND), NOW_MS)
+
+		expect(reason).toBe(delivered_rules.SHELL_BODY_REASON)
+	})
+
+	// What the reason *says* is pinned by `scripts/shell-body-rule.test.ts`, which the marker-test
+	// table in `shell-body.md` makes the owner of the delivery text. Restating those markers here
+	// would be the clone `CLAUDE.md` prohibits. This block owns firing and silence.
+	it(ONCE_PER_RUN, () => {
+		const payload = payload_of('shell-body-repeat', EVALUATED_BODY_COMMAND)
+
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.SHELL_BODY_REASON)
+		expect(rule_delivery(payload, NOW_MS + 1)).toBeUndefined()
+	})
+
+	// **Never wired to a write** (joshuafolkken/kit#1390), the same omission every row depends on.
+	it('says nothing about a write tool even when its input looks like an inline body', () => {
+		const payload = payload_of('body-write', EVALUATED_BODY_COMMAND, 'Edit')
+
+		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+	})
+})
+
 describe('DELIVERED_RULES — the enumeration', () => {
 	it('keys every rule uniquely, so one delivery never spends another rule budget', () => {
 		const ids = delivered_rules.DELIVERED_RULES.map((rule) => rule.id)
@@ -408,7 +440,7 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it.each([WIP_CAP, ISSUE_COMMENTS, PIPED_VERIFICATION])('names %j', (id) => {
+	it.each([WIP_CAP, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION])('names %j', (id) => {
 		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
 	})
 
@@ -417,9 +449,24 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		FILING_API_COMMAND,
 		BODY_READ_COMMAND,
 		BODY_READ_API_COMMAND,
+		EVALUATED_BODY_COMMAND,
 		PIPED_GATE_COMMAND,
 	])('is claimed by exactly one rule: %j', (command) => {
 		expect(rules_claiming(command)).toBe(1)
+	})
+
+	// **The one overlap the enumeration allows, and the order that makes it safe**
+	// (joshuafolkken/kit#1198). A filing whose body happens to carry a backtick is claimed by both
+	// `wip-cap` and `shell-body`; `wip-cap` is listed first because it decides whether the Issue
+	// should exist at all. Nothing is lost by losing the race — the stamps are keyed per `id`, so the
+	// reissued call is delivered the second rule, which is asserted here rather than assumed.
+	it('delivers the second rule on the reissue when a filing also carries an evaluated body', () => {
+		const command = 'gh api repos/o/r/issues -f title="x" -f body="see `pnpm josh ms`"'
+		const payload = payload_of('overlap', command)
+
+		expect(rules_claiming(command)).toBe(2)
+		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.WIP_CAP_REASON)
+		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.SHELL_BODY_REASON)
 	})
 
 	it('is on by default', () => {

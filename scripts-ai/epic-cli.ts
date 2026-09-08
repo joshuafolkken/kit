@@ -1,12 +1,10 @@
-import { readFileSync } from 'node:fs'
 import type { InsertKind, InsertPosition } from '../scripts/git/git-epic-chains'
 import { git_epic_parse, type ExternalChild } from '../scripts/git/git-epic-parse'
+import { cli_body } from '../scripts/josh/cli-body'
 
 // Parsing lives apart from the entry point so the argument rules can be asserted without spawning a
 // process or reaching GitHub. The entry point is then a thin shell around these two functions.
 
-const STDIN_PATH = '-'
-const STDIN_FD = 0
 const ORDERED_FLAG = '--ordered'
 const RATIONALE_FLAG = '--rationale-file'
 const ORIGIN_FLAG = '--origin'
@@ -326,12 +324,11 @@ function parse_check_argument(argv: ReadonlyArray<string>): number | undefined {
 	return Number(raw)
 }
 
-// `-` reads stdin, matching `gh issue create --body-file -`. Shared by the two `*-file` flags rather
-// than spelled out per flag, so the stdin form cannot come to mean one thing under `--rationale-file`
-// and another under `--decision-file`.
-function read_file_or_stdin(path: string): string {
-	return readFileSync(path === STDIN_PATH ? STDIN_FD : path, 'utf8')
-}
+// `-` reads stdin, matching `gh issue create --body-file -`. The reader is `cli_body`'s, shared with
+// `josh notify --body-file` and `josh followup --notify-message-file` rather than copied per entry
+// point (joshuafolkken/kit#1198), so the stdin form cannot come to mean one thing here and something
+// else there.
+const { read_file_or_stdin } = cli_body
 
 // An omitted path yields an empty rationale, which the body builder replaces with a visible
 // placeholder rather than a blank section.

@@ -6,6 +6,7 @@ import { git_followup_pending } from '../scripts/git/git-followup-pending'
 import { git_next_issues } from '../scripts/git/git-next-issues'
 import { git_notify, type GitNotifyConfig } from '../scripts/git/git-notify'
 import { git_pr_followup } from '../scripts/git/git-pr-followup'
+import { cli_body } from '../scripts/josh/cli-body'
 import { review_attest } from '../scripts/review/review-attest'
 import { review_stamps } from '../scripts/review/review-stamps'
 import { run_hold } from '../scripts/run/run-hold'
@@ -23,6 +24,7 @@ interface CliArguments {
 		'issue-number'?: string
 		'notify-target'?: string
 		'notify-message'?: string
+		'notify-message-file'?: string
 		'notify-mentions'?: string
 		'coderabbit-ignore-reason'?: string
 		'ai-review-ignore-reason'?: string
@@ -47,6 +49,9 @@ Options:
   --issue-number               Issue number for completion messages
   --notify-target              pr | issue | both
   --notify-message             Completion message header
+  --notify-message-file        Read the completion message from a file (\`-\` reads stdin). Use this
+                               whenever the message carries a backtick or a \`$\` — inside shell
+                               double quotes the shell evaluates them before this command runs
   --notify-mentions            Comma-separated mentions (user,org/team)
   --coderabbit-ignore-reason   Reason text when keeping CodeRabbit findings unresolved
   --ai-review-ignore-reason    Reason text when keeping AI reviewer (Claude Review / CodeRabbit
@@ -65,6 +70,7 @@ function parse_cli_arguments(): CliArguments {
 			'issue-number': { type: 'string' },
 			'notify-target': { type: 'string' },
 			'notify-message': { type: 'string' },
+			'notify-message-file': { type: 'string' },
 			'notify-mentions': { type: 'string' },
 			'coderabbit-ignore-reason': { type: 'string' },
 			'ai-review-ignore-reason': { type: 'string' },
@@ -93,10 +99,20 @@ async function resolve_branch_name(raw_branch: string | undefined): Promise<stri
 	return await git_branch.current()
 }
 
+// The message is resolved here rather than inside `git_notify`, so the file form reaches the config
+// as text and the config keeps one `message` field. `--notify-message-file` exists because the inline
+// form is a double-quoted shell argument: a backtick or a `$` in the body is evaluated before this
+// process starts, and joshuafolkken/kit#1198 recorded both halves of that — a Telegram body that
+// silently lost a word, and a comment body whose text ran as git commands.
 function build_notify_config(values: CliArguments['values']): GitNotifyConfig | undefined {
 	return git_notify.build_notify_config({
 		raw_target: values['notify-target'] ?? 'issue',
-		raw_message: values['notify-message'],
+		raw_message: cli_body.resolve({
+			inline: values['notify-message'],
+			file_path: values['notify-message-file'],
+			inline_flag: '--notify-message',
+			file_flag: '--notify-message-file',
+		}),
 		raw_mentions: values['notify-mentions'],
 	})
 }

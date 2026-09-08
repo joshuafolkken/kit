@@ -822,9 +822,12 @@ AI-assisted PR follow-up workflow: waits for CI, checks AI reviewer findings, se
 ```bash
 pnpm josh followup "PR title #N"
 pnpm josh followup "PR title #N" --notify-message "Implemented X:\n- change 1\n- change 2"
+pnpm josh followup "PR title #N" --notify-message-file completion.md
 pnpm josh followup "PR title #N" --ai-review-ignore-reason "false positive"
 pnpm josh followup "PR title #N" --no-merge
 ```
+
+**`--notify-message-file` is the form to reach for whenever the message carries a backtick or a `$`** ([#1198](https://github.com/joshuafolkken/kit/issues/1198)). Inside shell double quotes both are evaluated before this command starts: a completion body naming `` `owner/repo#` `` reached Telegram with the word gone, and on the `gh` side the same substitution ran a comment's own words as git commands. The file path is read as-is — `-` reads stdin — and no escape expansion happens to it, because a file already holds real newlines; the `\n` escape belongs to the inline `--notify-message` form, which still expands it. Passing both is refused rather than ranked, so a caller that meant the file never silently ships the inline string. The rule and the safe spellings for `gh` are in [`prompts/collaboration-workflow/shell-body.md`](https://github.com/joshuafolkken/kit/blob/main/prompts/collaboration-workflow/shell-body.md).
 
 On completion, the count of **unreleased merges on main** is included in the completion Telegram body (`🚚 unreleased merges on main: <n>`), so a release nobody has run stays visible ([#1486](https://github.com/joshuafolkken/kit/issues/1486)). It replaced the project version line, which read the local `package.json`: children no longer bump, so that value names the _previous_ release rather than what the run ships, and reporting it presented an unconfirmed shipping version as a fact. **The count is read from a freshly fetched default branch, never from `HEAD`.** `followup` runs on the feature branch, and `--first-parent` only reads as "main's line" when the walk starts on main — from a branch tip it walks that branch, and any merge main took after the branch was cut is not even an ancestor. So the number would be silently low while the line still said "on main". The Telegram is sent before the merge — the last point at which the run can still fail safely — so it says that this run's own merge is not yet in the count; the same line printed as the final console line after the merge carries no such note, because the fetch there brings the merge in. A count that cannot be read at all contributes no line, rather than a zero nobody measured.
 
@@ -856,7 +859,10 @@ Send a Telegram notification. Used for planning, confirmation, failure, and kick
 pnpm josh notify --task-type planning --issue-url "https://..." --body="- bullet 1\n- bullet 2"
 pnpm josh notify --task-type confirmation --issue-url "https://..." --body="Waiting for approval"
 pnpm josh notify --task-type failure --issue-url "https://..." --body="Build failed"
+pnpm josh notify --task-type confirmation --issue-url "https://..." --body-file reason.md
 ```
+
+**`--body-file` reads the body from a file (`-` reads stdin), and it is the form to use whenever the body carries a backtick or a `$`** ([#1198](https://github.com/joshuafolkken/kit/issues/1198)) — inside shell double quotes the shell evaluates both before this command runs. `--body=$'…'` is safe for the same reason and is unchanged, so the short bodies above stay as they are; the file route is what a report full of command names needs. `--body` and `--body-file` together are refused rather than ranked. The reader is shared with `josh followup --notify-message-file` and `josh epic --rationale-file` rather than copied per command.
 
 Task types: `planning` 📋 · `completion` ✅ · `failure` ❌ · `kickoff_retry` 🔄 · `confirmation` ⏸️
 
