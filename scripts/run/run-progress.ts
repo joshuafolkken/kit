@@ -190,7 +190,7 @@ function is_due(last_report_ms: number, now_ms: number, interval_ms: number): bo
  * uses: this runs unattended in the background, and a run that dies on a typo in an optional setting
  * has removed the reporting the setting was there to tune. Which source is asked next, and in what
  * order, is `run-progress-config.ts` → `resolve_interval_ms`; this module answers about one value and
- * keeps no reader of its own, so the hook that imports it stays free of the file system.
+ * asks nothing else, which is what lets both the watcher and the guard read it the same way.
  */
 function minutes_from(raw: string | undefined): number | undefined {
 	const minutes = Number(raw)

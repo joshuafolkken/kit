@@ -248,20 +248,45 @@ async function step(options: WatchOptions, target: string, loop: WatchLoop): Pro
 	}
 }
 
-async function watch(options: WatchOptions): Promise<number> {
+/**
+ * The loop both reporting forms are, with one difference between them.
+ *
+ * `watch` runs until `--hours` expires; `--wait` stops at the first line it prints
+ * (joshuafolkken/kit#1576). Everything else — where the clock is seeded from, the tick, the decline
+ * cooldown `step` keeps — is one implementation on purpose: two copies would let a fix to the bound or
+ * to the initial silence reach one form and not the other, and `--wait` is the form a run starts.
+ */
+// The silence this loop starts from: the record where there is one, and otherwise the moment it began
+// watching, so a first line on a tree with no record reports the wait it actually did.
+function seed_loop(target: string, started_ms: number): WatchLoop {
+	return { ...FRESH_LOOP, last_ms: run_progress_read.read_last_report(target) ?? started_ms }
+}
+
+// `state` is set by the one branch of `step` that printed a line and by no other, so this asks "was
+// anything reported" without keeping a second copy of the loop's own bookkeeping.
+function has_reported(loop: WatchLoop, should_stop_on_report: boolean): boolean {
+	return should_stop_on_report && loop.state !== undefined
+}
+
+async function drive(options: WatchOptions, should_stop_on_report: boolean): Promise<number> {
 	const target = await run_progress_read.stamp_target()
 	const started_ms = Date.now()
-	let loop: WatchLoop = {
-		...FRESH_LOOP,
-		last_ms: run_progress_read.read_last_report(target) ?? started_ms,
-	}
+	let loop = seed_loop(target, started_ms)
 
 	while (Date.now() - started_ms < options.max_ms) {
 		await sleep(options.tick_ms)
 		loop = await step(options, target, loop)
+
+		if (has_reported(loop, should_stop_on_report)) return SUCCESS_EXIT_CODE
 	}
 
+	if (should_stop_on_report) console.error(WAIT_EXPIRED_NOTICE)
+
 	return SUCCESS_EXIT_CODE
+}
+
+async function watch(options: WatchOptions): Promise<number> {
+	return await drive(options, false)
 }
 
 // The manual form of the same reading: one line now, whatever the clock says. An explicit ask is not
@@ -290,36 +315,21 @@ async function once(options: WatchOptions): Promise<number> {
  * children were in flight. This form waits the same clock out and then ends, so the line it printed
  * is delivered; the caller relays it and starts the next one.
  *
- * **The clock is still this command's, not the caller's.** It is `watch`'s own loop, a tick at a time,
- * rather than a second reading of the same record — so a real report elsewhere pushes the next line
- * out, a declined reading takes the same cooldown, and two of these cannot double-report because the
- * first to print records it. That is what keeps joshuafolkken/kit#1570 intact: the caller arms no
- * timer of its own.
+ * **The clock is still this command's, not the caller's.** It is the watch loop itself, a tick at a
+ * time, rather than a second reading of the same record — so a real report elsewhere pushes the next
+ * line out and a declined reading takes the same cooldown. That is what keeps joshuafolkken/kit#1570
+ * intact: the caller arms no timer of its own.
+ *
+ * **One at a time is the caller's part rather than this loop's.** The record is read before the `gh`
+ * reads and written after them, so two of these running at once could both find the same silence due
+ * and both print; `epicrun.md` starts exactly one, which is where that is guaranteed.
  *
  * **A decline is not an exit.** Nothing is reported while no child is in flight, so a quiet repository
  * keeps the loop waiting instead of ending it — returning there would hand the caller an instant
  * answer to restart, and the documented restart makes that a poll rather than a heartbeat.
  */
 async function wait_once(options: WatchOptions): Promise<number> {
-	const target = await run_progress_read.stamp_target()
-	const started_ms = Date.now()
-	let loop: WatchLoop = {
-		...FRESH_LOOP,
-		last_ms: run_progress_read.read_last_report(target) ?? started_ms,
-	}
-
-	while (Date.now() - started_ms < options.max_ms) {
-		await sleep(options.tick_ms)
-		loop = await step(options, target, loop)
-
-		// `state` is set by the one branch of `step` that printed a line and by no other, so this asks
-		// "was anything reported" without keeping a second copy of the loop's own bookkeeping.
-		if (loop.state !== undefined) return SUCCESS_EXIT_CODE
-	}
-
-	console.error(WAIT_EXPIRED_NOTICE)
-
-	return SUCCESS_EXIT_CODE
+	return await drive(options, true)
 }
 
 async function mark_now(): Promise<number> {
