@@ -5,6 +5,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs'
@@ -94,6 +95,26 @@ async function report_in(
 	return await security_audit_provision.report(project_root, platform, architecture, true)
 }
 
+function arm_offline_fetch(): ReturnType<typeof vi.fn> {
+	const fetch_spy = vi.fn().mockRejectedValue(new Error('offline'))
+
+	mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
+	vi.stubGlobal('fetch', fetch_spy)
+
+	return fetch_spy
+}
+
+// One failed attempt, which writes the backoff record, then one that installs — the sequence the
+// record has to survive the first of and not the second.
+async function fail_then_succeed(target_path: string): Promise<void> {
+	const asset = asset_with(sha256_of(PAYLOAD))
+
+	arm_offline_fetch()
+	await security_audit_provision.attempt(target_path, asset)
+	stub_response(true, PAYLOAD)
+	await security_audit_provision.attempt(target_path, asset)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 })
@@ -129,16 +150,15 @@ describe('security_audit_provision.provision — a download that verifies', () =
 		}).not.toThrow()
 	})
 
-	// Two sessions of one project run this concurrently — the SessionStart matcher is empty, so a
-	// `clear` during a startup's download is exactly that — and a shared staging name would let their
-	// writes interleave into the file both then rename into place.
-	it('stages under a name carrying this process id', async () => {
+	// The staging file is renamed onto the target, so none of it may survive the install — and the
+	// name itself is pinned by `build_staging_path`'s own tests rather than by its absence here.
+	it('leaves no staging file beside the installed binary', async () => {
 		const target_path = target_in('staging-name')
 
 		stub_response(true, PAYLOAD)
 		await provision_with(target_path, sha256_of(PAYLOAD))
 
-		expect(existsSync(`${target_path}.${String(process.pid)}.download`)).toBe(false)
+		expect(readdirSync(path.dirname(target_path))).toEqual([security_audit_logic.BINARY_NAME])
 	})
 })
 
@@ -214,6 +234,24 @@ describe('security_audit_provision.report', () => {
 	})
 })
 
+describe('security_audit_provision.attempt — recovery after a failure', () => {
+	// `pnpm install` wipes `node_modules/.cache`, and this design accepts that as costing one
+	// re-fetch. A record left behind by a failure that has since been resolved would answer that
+	// re-fetch with "run --force" for as long as the backoff runs, which is not one re-fetch.
+	it('stops backing off once a provision has succeeded', async () => {
+		const project_root = path.join(scratch, 'recovered')
+		const target_path = managed_path_in(project_root)
+
+		await fail_then_succeed(target_path)
+		rmSync(target_path)
+		const fetch_spy = arm_offline_fetch()
+
+		await security_audit_provision.report(project_root, LINUX_PLATFORM, X64_ARCHITECTURE, false)
+
+		expect(fetch_spy).toHaveBeenCalled()
+	})
+})
+
 describe('security_audit_provision.report — no build to fetch', () => {
 	it('reports the host instead of guessing a URL when no build is published for it', async () => {
 		mocked_execa_sync.mockReturnValue(fake_sync_result(undefined))
@@ -232,7 +270,7 @@ describe('security_audit_provision.report — a fetch that cannot happen at all'
 		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('getaddrinfo ENOTFOUND')))
 		const message = await report_in(project_root, LINUX_PLATFORM, X64_ARCHITECTURE)
 
-		expect(message).toContain('Could not provision osv-scanner')
+		expect(message).toContain('Could not fetch osv-scanner from')
 		expect(message).toContain('ENOTFOUND')
 	})
 

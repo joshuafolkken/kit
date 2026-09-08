@@ -154,6 +154,16 @@ describe('security_audit.is_executable_file', () => {
 	it('rejects a path with nothing at it', () => {
 		expect(security_audit.is_executable_file(path.join(scratch, 'absent'))).toBe(false)
 	})
+
+	// A traversable directory satisfies both other clauses — X_OK succeeds and its reported size is
+	// never zero — so it would pass as a provisioned scanner and be spawned.
+	it('rejects a directory sitting where the binary should be', () => {
+		const directory_path = path.join(scratch, 'directory')
+
+		mkdirSync(directory_path, { recursive: true })
+
+		expect(security_audit.is_executable_file(directory_path)).toBe(false)
+	})
 })
 
 describe('security_audit_logic.build_managed_binary_path', () => {

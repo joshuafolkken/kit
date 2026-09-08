@@ -8,6 +8,7 @@ const RELEASE_BASE_URL = 'https://github.com/google/osv-scanner/releases/downloa
 
 const WINDOWS_PLATFORM = 'win32'
 const WINDOWS_ASSET_SUFFIX = '.exe'
+const STAGING_SUFFIX = '.download'
 
 // A ~30 MB binary over a cold connection. Declared here rather than beside the `fetch` so the hook
 // suite can derive the harness budget from it: raising this without raising the declared timeout
@@ -72,6 +73,15 @@ function build_download_url(asset_name: string): string {
 	return `${RELEASE_BASE_URL}/v${SCANNER_VERSION}/${asset_name}`
 }
 
+// The staging file the download is written to before it is renamed onto the target. The process id
+// is what keeps two sessions of one project apart — the `SessionStart` matcher is empty, so a
+// `clear` during a startup's download is exactly that — and without it their writes interleave into
+// one file that both then rename into place, which the checksum cannot catch because each verified
+// its own buffer.
+function build_staging_path(target_path: string, process_id: number): string {
+	return `${target_path}.${String(process_id)}${STAGING_SUFFIX}`
+}
+
 // The whole "where do we fetch from" decision in one pure call, so the table above is testable
 // without a network round trip — which the unit suite forbids anyway (`test-network-guard.ts`).
 function resolve_asset(platform: string, architecture: string): ScannerAsset | undefined {
@@ -124,6 +134,7 @@ const security_audit_provision_logic = {
 	SCANNER_VERSION,
 	build_asset_name,
 	build_download_url,
+	build_staging_path,
 	format_already_present,
 	format_checksum_mismatch,
 	format_download_failure,

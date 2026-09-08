@@ -22,8 +22,11 @@ function is_binary_available(binary_name: string): boolean {
 function is_executable_file(candidate_path: string): boolean {
 	try {
 		accessSync(candidate_path, constants.X_OK)
+		const stats = statSync(candidate_path)
 
-		return statSync(candidate_path).size > 0
+		// `X_OK` succeeds on any traversable directory, and a directory's reported size is never zero,
+		// so both other clauses pass for one — reintroducing the very failure this check removes.
+		return stats.isFile() && stats.size > 0
 	} catch {
 		return false
 	}

@@ -9,18 +9,21 @@ import { security_audit_logic } from './security-audit-logic'
 import { security_audit_provision_logic, type ScannerAsset } from './security-audit-provision-logic'
 
 const EXECUTABLE_MODE = 0o755
-const STAGING_SUFFIX = '.download'
 const FAILURE_STAMP_PREFIX = 'josh-audit-provision-'
 const FORCE_FLAG = '--force'
 const PATH_LOCATION = 'on PATH'
 const { DOWNLOAD_TIMEOUT_MS, RETRY_INTERVAL_MS } = security_audit_provision_logic
 
-// `content` absent is the failure; `status` is carried either way so the reason names it. A 404 —
-// what a bumped version whose asset was renamed looks like, and the one failure that never fixes
-// itself — would otherwise read exactly like a transient 503.
+function describe_error(error: unknown): string {
+	return error instanceof Error ? error.message : String(error)
+}
+
+// `content` absent is the failure, and `reason` says which one. A 404 — what a bumped version whose
+// asset was renamed looks like, and the one failure that never fixes itself — would otherwise read
+// exactly like a transient 503, and a rejected request like neither.
 interface DownloadOutcome {
 	content?: Buffer
-	status: number
+	reason: string
 }
 
 interface ProvisionOutcome {
@@ -28,11 +31,18 @@ interface ProvisionOutcome {
 	is_installed: boolean
 }
 
+// The rejection is caught here rather than left to `attempt`: being offline, behind a proxy that
+// refuses the host, or past the timeout is a *fetch* failure, and reporting it through the generic
+// catch-all would drop the release URL out of the message that names where the fetch went.
 async function download(url: string): Promise<DownloadOutcome> {
-	const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
-	if (!response.ok) return { status: response.status }
+	try {
+		const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+		if (!response.ok) return { reason: `HTTP ${String(response.status)}` }
 
-	return { content: Buffer.from(await response.arrayBuffer()), status: response.status }
+		return { content: Buffer.from(await response.arrayBuffer()), reason: '' }
+	} catch (error) {
+		return { reason: describe_error(error) }
+	}
 }
 
 // Staged beside the target and renamed onto it, under a name carrying this process's id. A download
@@ -42,7 +52,7 @@ async function download(url: string): Promise<DownloadOutcome> {
 // file that both then rename into place, which the checksum cannot catch because it was verified
 // against each process's own buffer. The `finally` removes the staging file on every failing path.
 function install(target_path: string, content: Buffer): void {
-	const staging_path = `${target_path}.${String(process.pid)}${STAGING_SUFFIX}`
+	const staging_path = security_audit_provision_logic.build_staging_path(target_path, process.pid)
 
 	mkdirSync(path.dirname(target_path), { recursive: true })
 
@@ -77,9 +87,7 @@ async function provision(target_path: string, asset: ScannerAsset): Promise<Prov
 	const outcome = await download(asset.url)
 
 	if (outcome.content === undefined) {
-		const reason = `HTTP ${String(outcome.status)}`
-
-		return { is_installed: false, message: format_download_failure(asset.url, reason) }
+		return { is_installed: false, message: format_download_failure(asset.url, outcome.reason) }
 	}
 
 	const actual = stamp_file.digest(outcome.content)
@@ -101,14 +109,18 @@ async function provision(target_path: string, asset: ScannerAsset): Promise<Prov
 async function attempt(target_path: string, asset: ScannerAsset): Promise<string> {
 	try {
 		const outcome = await provision(target_path, asset)
+		if (!outcome.is_installed) return record_failure(target_path, outcome.message)
 
-		return outcome.is_installed ? outcome.message : record_failure(target_path, outcome.message)
+		// Cleared on success, or a `pnpm install` that wipes the cache directory — which this design
+		// treats as costing one re-fetch — would instead be answered by a stale record telling the
+		// reader to pass `--force` for as long as the backoff runs.
+		stamp_file.remove_stamp(failure_stamp_path(target_path))
+
+		return outcome.message
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error)
-
 		return record_failure(
 			target_path,
-			security_audit_provision_logic.format_provision_error(reason),
+			security_audit_provision_logic.format_provision_error(describe_error(error)),
 		)
 	}
 }
@@ -150,14 +162,12 @@ async function main(): Promise<void> {
 	try {
 		console.info(await report(PROJECT_ROOT, process.platform, process.arch, is_forced))
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error)
-
-		console.warn(security_audit_provision_logic.format_provision_error(reason))
+		console.warn(security_audit_provision_logic.format_provision_error(describe_error(error)))
 	}
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
-const security_audit_provision = { download, install, main, provision, report }
+const security_audit_provision = { attempt, download, install, main, provision, report }
 
 export { security_audit_provision }

@@ -5,6 +5,7 @@ const {
 	SCANNER_VERSION,
 	build_asset_name,
 	build_download_url,
+	build_staging_path,
 	format_already_present,
 	format_checksum_mismatch,
 	format_download_failure,
@@ -17,6 +18,7 @@ const SHA256_HEX_LENGTH = 64
 const SAMPLE_URL = 'https://example.test/asset'
 const LINUX_AMD64_ASSET = 'osv-scanner_linux_amd64'
 const DARWIN_ARM64_ASSET = 'osv-scanner_darwin_arm64'
+const STAGING_TARGET = '/tool/osv-scanner'
 
 describe('security_audit_provision_logic.build_asset_name', () => {
 	it('maps node platform and architecture names onto the release asset names', () => {
@@ -41,6 +43,25 @@ describe('security_audit_provision_logic.build_download_url', () => {
 	it('pins the URL to the tagged release rather than a moving latest', () => {
 		expect(build_download_url(LINUX_AMD64_ASSET)).toBe(
 			`https://github.com/google/osv-scanner/releases/download/v${SCANNER_VERSION}/${LINUX_AMD64_ASSET}`,
+		)
+	})
+})
+
+describe('security_audit_provision_logic.build_staging_path', () => {
+	const first_pid = 4321
+	const second_pid = 8765
+
+	it('names the staging file after the target and the process that is writing it', () => {
+		expect(build_staging_path(STAGING_TARGET, first_pid)).toBe(
+			`${STAGING_TARGET}.${String(first_pid)}.download`,
+		)
+	})
+
+	// The whole point of carrying the id: two sessions of one project download at once, and a shared
+	// staging name would let their writes interleave into the file both then rename into place.
+	it('gives two processes two different staging files', () => {
+		expect(build_staging_path(STAGING_TARGET, first_pid)).not.toBe(
+			build_staging_path(STAGING_TARGET, second_pid),
 		)
 	})
 })
