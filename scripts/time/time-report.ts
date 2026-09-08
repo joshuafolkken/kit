@@ -1,6 +1,8 @@
 import { time_bundles, type BundleTotals } from './time-bundles'
+import { time_category_table, type CategoryTotals } from './time-category-table'
 import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
+import { time_cycles, type CycleTotals } from './time-cycles'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
@@ -47,28 +49,6 @@ const { format_minutes, format_seconds, format_share, format_columns, format_row
 // below under the names they always had. The four category labels went to `time-format.ts` in the same
 // move, because that block's price row prints one of them and cannot import this file.
 const { MODEL_LABEL, TOOL_LABEL, HUMAN_LABEL, CI_LABEL, NO_CALLS } = time_format
-
-// `ci_ms` is the fourth share (joshuafolkken/kit#1268): the part of the pull request's
-// open→merge window that no transcript span covers. Disjoint from the other three by construction,
-// so the four still reconstruct the elapsed time exactly — the property that makes two runs
-// comparable, and the one a naive "add the PR window" would have broken, since `followup`
-// waits for CI *inside* a tool span that is already counted.
-//
-// **So the CI a run waited for inside `followup` is in `tool_ms`, and in no other field**
-// (joshuafolkken/kit#1406). It is the merge command's own execution, and `ci_ms` deliberately
-// excludes it — a hand read that saw the phase table's `ci` row beside a `CI wait 0.0 min` category
-// row could take the two for the same quantity and conclude a stretch had gone unmeasured. Nothing
-// is: the phase table charges that stretch to `ci` and subtracts it from `merge`
-// (`time-phases.ts` → `serial_ci_ms`), which moves it between two *phases* and never between
-// categories. `model_ms` is the total duration of every model span, `tool_ms` of every tool span,
-// `human_ms` of every human span — each a sum over spans, so no reattribution in the phase table can
-// reach them.
-interface CategoryTotals {
-	model_ms: number
-	tool_ms: number
-	human_ms: number
-	ci_ms: number
-}
 
 interface LabelTotal {
 	label: string
@@ -174,6 +154,11 @@ interface TimeReport extends TurnSplit {
 	// (joshuafolkken/kit#1269). Every span lands in exactly one phase and the CI share is its own, so
 	// these sum to `elapsed_ms` — `other` is what keeps that true rather than being discarded.
 	phases: Array<PhaseTotal>
+	// The `ci` phase one cycle at a time, each saying how much of it went on the wall clock and what
+	// the rest of it hid behind (joshuafolkken/kit#1465). The phase above is the whole wait; only this
+	// separates a cycle that ran behind the second review round — costing nothing — from one the run
+	// sat through. Built by `time-cycles.ts`, which also renders the block.
+	ci_cycles: CycleTotals
 	// The same elapsed time again, this time as the stretches it was spent in rather than as totals
 	// (joshuafolkken/kit#1311). Every span lands in exactly one segment, so these sum to the three
 	// transcript shares — the phase table's total without the CI share, which no span covers.
@@ -307,7 +292,7 @@ function per_round_trip_costs(
 // module owns, and only `by_tool` needs anything the totals computed.
 type ReportTables = Pick<
 	TimeReport,
-	'phases' | 'segments' | 'by_tool' | 'by_josh_command' | 'by_invocation' | 'by_check'
+	'phases' | 'ci_cycles' | 'segments' | 'by_tool' | 'by_josh_command' | 'by_invocation' | 'by_check'
 >
 
 function report_tables(input: ReportInput, turns: TurnTotals): ReportTables {
@@ -315,6 +300,7 @@ function report_tables(input: ReportInput, turns: TurnTotals): ReportTables {
 
 	return {
 		phases: time_phases.build_phases({ spans, ci: input.ci }),
+		ci_cycles: time_cycles.build_cycles(spans, input.ci),
 		segments: time_segments.build_segments(spans),
 		by_tool: time_tool_turns.with_turn_counts(
 			totals_by(spans, (span) => span.label),
@@ -384,36 +370,6 @@ function build_report(
 	})
 }
 
-function ci_line(report: TimeReport): Array<string> {
-	if (!report.has_ci_data) return []
-
-	const { ci_ms } = report.categories
-
-	return [format_row(CI_LABEL, ci_ms, format_share(ci_ms, report.elapsed_ms))]
-}
-
-// **The three transcript shares are withheld together when no span was read** (joshuafolkken/kit#1295).
-// A run whose transcript could not be attributed totals zero in all three because nothing was read,
-// not because nothing happened — and `CI wait 3.2 min 100.0%` directly beneath three `0.0 min` rows
-// reads as a run that spent its whole length in CI. The criterion is `time_spans.has_transcript_data`,
-// the same one the epic scope withholds its own category rows on and the `wait` phase is detected on.
-function transcript_row(report: TimeReport, label: string, duration_ms: number): string {
-	if (!time_spans.has_transcript_data(report.span_count)) return unmeasured_row(label)
-
-	return format_row(label, duration_ms, format_share(duration_ms, report.elapsed_ms))
-}
-
-function category_lines(report: TimeReport): Array<string> {
-	const { categories } = report
-
-	return [
-		transcript_row(report, MODEL_LABEL, categories.model_ms),
-		transcript_row(report, TOOL_LABEL, categories.tool_ms),
-		transcript_row(report, HUMAN_LABEL, categories.human_ms),
-		...ci_line(report),
-	]
-}
-
 // What the per-tool and per-`josh <cmd>` tables put in their third column: how many calls the row
 // totals. The check table answers something else entirely, which is why the column is a parameter.
 function call_suffix(row: LabelTotal): string {
@@ -471,22 +427,22 @@ function format_empty(report: TimeReport): string {
 function format_report(report: TimeReport): string {
 	if (report.span_count === 0 && report.categories.ci_ms === 0) return format_empty(report)
 
-	const { failures, tool_call_count } = report
-	const { tool_ms } = report.categories
+	const { failures, tool_call_count, categories } = report
 
 	return [
 		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
 		...heading_lines(report),
 		'',
 		'Where the wall clock went:',
-		...category_lines(report),
+		...time_category_table.category_lines(report),
 		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
+		...time_cycles.cycle_lines(report.ci_cycles),
 		...time_segments.segment_lines(report.segments),
 		...time_trips.trip_lines(report),
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_single_checks.single_check_lines(report.single_checks, report),
-		...time_failures.failure_lines(failures, tool_call_count, tool_ms),
+		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
 		...time_rework.rework_lines(report.rework),
 		...total_lines('By tool (descending):', report.by_tool, tool_suffix),
 		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
@@ -531,5 +487,8 @@ const time_report = {
 	format_report,
 }
 
-export type { CategoryTotals, LabelTotal, ReportInput, TimeReport, ToolTotal }
+// Re-exported from where the category block now lives, so every caller keeps asking this module for
+// the type it always asked for (joshuafolkken/kit#1465).
+export type { CategoryTotals } from './time-category-table'
+export type { LabelTotal, ReportInput, TimeReport, ToolTotal }
 export { time_report }

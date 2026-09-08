@@ -4,6 +4,7 @@ import path from 'node:path'
 import { cost_transcript } from '#scripts/cost/cost-transcript'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { time_bundles } from './time-bundles'
+import { time_cycles } from './time-cycles'
 import { time_failures } from './time-failures'
 import { time_gaps } from './time-gaps'
 import type { TimeReport } from './time-report'
@@ -113,6 +114,7 @@ const RUN_REPORT: TimeReport = {
 	by_josh_command: [],
 	by_invocation: [],
 	by_check: [],
+	ci_cycles: { ...time_cycles.NO_CYCLES },
 	gaps: { ...time_gaps.NO_GAPS },
 	bundles: { ...time_bundles.NO_BUNDLES },
 	single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },

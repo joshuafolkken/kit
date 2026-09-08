@@ -111,6 +111,26 @@ function covered_only_by_ms(
 	)
 }
 
+// The tighter of two intervals at each end — the stretch they hold in common, which is empty when
+// they hold none (`ended_ms` then sits before `started_ms`). Here rather than beside either caller
+// because interval arithmetic is this module's whole subject: a second copy written next to whoever
+// needs it is where one of them comes to read a negative overlap as a real one
+// (joshuafolkken/kit#1465). `time-family.ts` bounds a delegated unit's window with it.
+function narrowest(left: Interval, right: Interval): Interval {
+	return {
+		started_ms: Math.max(left.started_ms, right.started_ms),
+		ended_ms: Math.min(left.ended_ms, right.ended_ms),
+	}
+}
+
+// How much of the wall clock two intervals hold in common, and `0` where they hold none — the
+// interval above, measured and clamped, so the clamping exists once.
+function shared_ms(left: Interval, right: Interval): number {
+	const { started_ms, ended_ms } = narrowest(left, right)
+
+	return Math.max(ended_ms - started_ms, NO_DURATION)
+}
+
 const FIRST_PART = 0
 
 function to_interval(span: Span): Interval {
@@ -295,6 +315,8 @@ const time_overlap = {
 	uncovered_ms,
 	union_intervals,
 	covered_only_by_ms,
+	narrowest,
+	shared_ms,
 	to_interval,
 	encloses,
 	resolve_delegated,

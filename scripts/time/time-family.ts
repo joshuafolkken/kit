@@ -131,6 +131,11 @@ function window_of(spans: ReadonlyArray<Span>): Interval | undefined {
 	return { started_ms: lowest_start(parts), ended_ms: highest_end(parts) }
 }
 
+// **Strict on both ends, and not `shared_ms(one, other) > 0`** (joshuafolkken/kit#1465). The two
+// agree on every interval of some length and disagree on one of none: a span of zero duration shares
+// no milliseconds with anything, so the length reading would answer `false` for an instant sitting
+// inside a sibling's window — and that instant would then be attributed to this unit instead of
+// being subtracted from it. The question here is whether the two touch, not how long for.
 function overlaps(one: Interval, others: ReadonlyArray<Interval>): boolean {
 	return others.some((other) => one.started_ms < other.ended_ms && other.started_ms < one.ended_ms)
 }
@@ -219,16 +224,6 @@ function idle_intervals(spans: ReadonlyArray<Span>): Array<Interval> {
 		.map((span) => time_overlap.to_interval(span))
 }
 
-// Two bounds on the same minutes, taken together: whichever is tighter at each end. They answer
-// different questions — one about the parent's other children, one about the parent's own idleness —
-// and a run can need either.
-function narrowest(left: Interval, right: Interval): Interval {
-	return {
-		started_ms: Math.max(left.started_ms, right.started_ms),
-		ended_ms: Math.min(left.ended_ms, right.ended_ms),
-	}
-}
-
 // **A sibling that ran *beside* the unit bounds nothing, so it is subtracted instead.** The window
 // above only moves for a sibling wholly in front of or behind the unit; siblings launched together
 // overlap it, and the parent's `Task` span for one of those would otherwise be taken whole into this
@@ -283,7 +278,10 @@ function parent_relatives(parent: SessionFile, held: UnitWindows, read: SpanRead
 
 	if (spans === undefined) return { added: [], unread: [parent.session_id] }
 
-	const window = narrowest(
+	// Two bounds on the same minutes, taken together: whichever is tighter at each end. They answer
+	// different questions — one about the parent's other children, one about the parent's own
+	// idleness — and a run can need either.
+	const window = time_overlap.narrowest(
 		adjacency_window(held.inside, held.outside),
 		adjacency_window(held.inside, idle_intervals(spans)),
 	)

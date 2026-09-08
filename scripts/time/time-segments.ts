@@ -203,6 +203,12 @@ function segment_lines(segments: ReadonlyArray<Segment>): Array<string> {
 const time_segments = {
 	HEADING,
 	MIN_SEGMENT_MS,
+	// The empty label, and the "busiest key wins" rule that reads it. Exported so the CI cycle block
+	// names what a cycle hid behind through this module's answer rather than a second copy of the
+	// tie-break (joshuafolkken/kit#1465) — two copies is where one table names a busiest command the
+	// other does not.
+	NO_LEAD,
+	heaviest,
 	build_segments,
 	segment_lines,
 }
