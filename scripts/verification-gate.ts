@@ -232,8 +232,10 @@ async function record_green_gate(
 // **Both halves swallow their failure, and for the same reason `record_green_gate` does**: the
 // marker is a convenience for the next command and nothing about it may reach the gate's verdict. A
 // marker that could not be written costs a brief that says `Not verified`, which is the safe
-// direction; one that could not be cleared costs a brief that says a gate is running when none is —
-// which still claims no result, and which the next gate overwrites.
+// direction; one that could not be cleared costs nothing beyond the file itself, because since
+// joshuafolkken/kit#1245 the record names the writing process by pid **and** start time — so a marker
+// this gate leaves behind reads as not running from the moment the gate exits, however long it sits
+// there and whatever the operating system later does with that pid. The next gate overwrites it.
 function mark_gate_running(before: Record<string, string>, target?: string): void {
 	try {
 		review_stamps.in_flight_stamp.write(before, target)

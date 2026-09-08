@@ -39,6 +39,10 @@ interface StepResult {
 	// Set when the step succeeded *and* there is nothing left to do — an upgrade that changed no
 	// file, for instance. The sequence ends here as a skip rather than opening an empty pull request.
 	is_complete?: boolean
+	// What this failure actually left in the consumer, as the failing step measured it. Only the
+	// steps that can probe set it; for the rest the standing note below is what they always leave
+	// (joshuafolkken/kit#1417).
+	leftover?: string
 }
 
 interface TargetResult {
@@ -65,7 +69,7 @@ function skip_reason(target: PropagateTarget): string {
 	return SKIP_REASONS[target.state] ?? 'not eligible'
 }
 
-const LEFTOVER_NOTE = ' — upgrade/sync changes left uncommitted'
+const LEFTOVER_NOTE = 'upgrade/sync changes left uncommitted'
 
 // Whether the failure happened after a step that writes into the consumer. The pre-check writes
 // nothing, so a consumer refused there is untouched; everything later leaves changes behind, and a
@@ -74,13 +78,25 @@ function has_leftover_changes(steps: ReadonlyArray<StepResult>): boolean {
 	return steps.some((result) => result.step === STEP_UPGRADE)
 }
 
+// What to say the failure left behind. A step that measured it wins; the note above stands in only
+// where none did, which is every step before the commit — and there it is accurate, since nothing
+// has committed yet. Before joshuafolkken/kit#1417 it was appended to *every* failure after the
+// upgrade, including one whose commit had already been made, so a push refused by the consumer's
+// pre-push hook was reported as changes that were never committed.
+function leftover_of(result: StepResult, steps: ReadonlyArray<StepResult>): string | undefined {
+	if (!has_leftover_changes(steps)) return undefined
+
+	return result.leftover ?? LEFTOVER_NOTE
+}
+
 function failure_reason(result: StepResult, steps: ReadonlyArray<StepResult>): string {
 	const base =
 		result.detail === undefined
 			? `${result.step} failed`
 			: `${result.step} failed: ${result.detail}`
+	const leftover = leftover_of(result, steps)
 
-	return has_leftover_changes(steps) ? `${base}${LEFTOVER_NOTE}` : base
+	return leftover === undefined ? base : `${base} — ${leftover}`
 }
 
 // Run one consumer's sequence, stopping at its first failing step. Stopping is per consumer: a
@@ -165,6 +181,7 @@ const propagate_run = {
 	PROPAGATED_REASON,
 	LEFTOVER_NOTE,
 	has_leftover_changes,
+	leftover_of,
 	STEP_RETURN,
 	STEP_PRECHECK,
 	STEP_ISSUE,
