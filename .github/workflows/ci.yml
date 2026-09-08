@@ -163,12 +163,15 @@ jobs:
       # count is what says the suite actually ran, and without it a green log looks the same whether
       # vitest executed six thousand tests or none.
       #
-      # **The unit step goes through `josh test:unit`, which skips rather than fails when vitest is
-      # absent or nothing matches the test glob.** That is deliberate and not new — the distributed
-      # `templates/workflows/ci.yml` has routed through the same guard for exactly this reason, and
+      # **The unit step goes through `josh test:unit`, which decides between a skip and a failure.**
+      # Routing through the guard is deliberate and not new — the distributed
+      # `templates/workflows/ci.yml` has done it for exactly this reason, and
       # `scripts/ci-yml-unit-step.test.ts` pins it; this repository's own workflow was the one
-      # calling vitest directly. The skip prints its notice either way, and `--verbose` is what keeps
-      # the count beside it.
+      # calling vitest directly. What the guard answers was settled by
+      # https://github.com/joshuafolkken/kit/issues/1224: vitest absent is a project that has no unit
+      # suite yet, so it skips and the job stays green, while vitest present with nothing matching
+      # the test glob is a broken state and fails the job. The skip prints its notice, and
+      # `--verbose` is what keeps the count beside it.
       #
       # Two things are given up. GitHub's per-step timing and log grouping: the run shows one `Run
       # verification gate` step instead of five named ones, and the gate's own summary names which

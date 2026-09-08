@@ -12,10 +12,31 @@ const VITEST_PACKAGE = path.join('node_modules', 'vitest')
 const UNIT_GLOB = '**/*.{test,spec}.{ts,js}'
 const NODE_MODULES = 'node_modules'
 
-// `vitest` may be absent and the unit suite may be empty in a freshly-bootstrapped project, so
-// the CI unit step must skip — not fail — when either is missing. This mirrors the e2e guard so
-// the two suites behave symmetrically while still running vitest once both are present.
-type GuardAction = 'run' | 'skip-missing-package' | 'skip-no-tests'
+// **A unit check that executed nothing may report success only where the project has no unit suite
+// at all** (joshuafolkken/kit#1224). The two halves of "nothing ran" are not the same state:
+//
+// - **`vitest` absent is the young project.** `josh init` installs no vitest and writes no
+//   `test:unit` script, so a freshly-bootstrapped project always lands here — which is the case the
+//   skip was written for, and it keeps it.
+// - **`vitest` present is the project declaring that it runs unit tests.** Zero matching files
+//   there is a broken state rather than a young one — a mis-scoped glob, or a suite that was
+//   deleted — and reporting it as a passing check hands `pnpm josh followup --merge`, which reads
+//   only the exit code, a verification that verified nothing. That half fails.
+//
+// Rejected: leaving both halves green — joshuafolkken/kit#1216's `--verbose` makes the zero count
+// *readable* in the CI log, but nobody reads a green log and the merge gate reads only pass/fail;
+// and putting the failing half behind an opt-in such as `JOSH_REQUIRE_UNIT_TESTS`, which is off in
+// exactly the projects that need it. The full decision, including why the absent-vitest half is
+// deliberately left asymmetric, is on joshuafolkken/kit#1224.
+//
+// **`scripts/test-e2e-guard.ts` deliberately keeps both skips, and that divergence is not an
+// oversight.** The argument above rests on the package's presence being a declaration, and
+// `@playwright/test` is not one: it is an optional peer dependency that vitest's browser mode also
+// needs, so a project can legitimately have it installed with no `*.e2e.{ts,js}` file at all.
+const SKIP_ACTION = 'skip-missing-package'
+const FAIL_ACTION = 'fail-no-tests'
+
+type GuardAction = 'run' | typeof SKIP_ACTION | typeof FAIL_ACTION
 
 // The word the gate looks for to know a passing step did not actually run. Exported and reused on
 // both sides rather than matched by eye: joshuafolkken/kit#967 stopped printing a passing check's
@@ -23,14 +44,13 @@ type GuardAction = 'run' | 'skip-missing-package' | 'skip-no-tests'
 // that ran it.
 const SKIP_MARKER = '— skipping'
 
-const SKIP_REASONS: Record<Exclude<GuardAction, 'run'>, string> = {
-	'skip-missing-package': 'vitest is not installed',
-	'skip-no-tests': 'no *.{test,spec}.{ts,js} test files found',
-}
+const SKIP_REASON = 'vitest is not installed'
+const FAIL_REASON =
+	'vitest is installed but no *.{test,spec}.{ts,js} test file was found — refusing to report a unit check that ran nothing'
 
 function resolve_guard_action(is_installed: boolean, has_tests: boolean): GuardAction {
-	if (!is_installed) return 'skip-missing-package'
-	if (!has_tests) return 'skip-no-tests'
+	if (!is_installed) return SKIP_ACTION
+	if (!has_tests) return FAIL_ACTION
 
 	return 'run'
 }
@@ -85,6 +105,22 @@ async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<numb
 // either way: the gate reads that word, never the label.
 const UNIT_COMMAND_LABEL = 'test:unit'
 
+// The two non-running outcomes report through different streams and different exit codes, because
+// they mean different things: one says the project has no unit suite yet, the other says it has one
+// that could not be found (joshuafolkken/kit#1224). Only the first keeps `SKIP_MARKER`, so the
+// gate's "passed without running" handling still means exactly what it did.
+function report_no_run(action: Exclude<GuardAction, 'run'>, command_label: string): number {
+	if (action === FAIL_ACTION) {
+		console.error(`josh ${command_label}: ${FAIL_REASON}.`)
+
+		return FAIL_EXIT_CODE
+	}
+
+	console.info(`josh ${command_label}: ${SKIP_REASON} ${SKIP_MARKER} vitest unit tests.`)
+
+	return 0
+}
+
 // `announcement` is printed only on the branch that actually spawns vitest. A caller that wrote it
 // itself would claim a run before this guard had decided there would be one — the same "a passing
 // step did not actually run" ambiguity `SKIP_MARKER` exists for, reintroduced one layer up
@@ -99,15 +135,10 @@ async function run_guarded_vitest(
 	const has_tests = has_unit_tests(project_directory)
 	const action = resolve_guard_action(is_installed, has_tests)
 
-	if (action === 'run') {
-		if (announcement !== undefined) process.stdout.write(`${announcement}\n`)
+	if (action !== 'run') return report_no_run(action, command_label)
+	if (announcement !== undefined) process.stdout.write(`${announcement}\n`)
 
-		return await run_vitest(vitest_arguments)
-	}
-
-	console.info(`josh ${command_label}: ${SKIP_REASONS[action]} ${SKIP_MARKER} vitest unit tests.`)
-
-	return 0
+	return await run_vitest(vitest_arguments)
 }
 
 async function run_guarded_unit(
