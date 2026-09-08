@@ -15,6 +15,24 @@ import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-
 // is already running — the exact cost joshuafolkken/kit#1241 removed. **It asserts nothing about the
 // result**, only that a gate was started on this tree and the run joins it before committing.
 //
+// **The marker names its writer by pid *and* start time** (joshuafolkken/kit#1245). A pid on its own
+// is not a process: an interrupted gate leaves its marker behind, and once the operating system
+// reissues that pid the liveness probe passes again and the marker resumes asserting a gate that
+// ended. The pair closes that, because a reissued pid necessarily started after the record was
+// written. **The marker was not made weaker to fix it** — dropping it, or having the brief ignore it,
+// would put the re-run joshuafolkken/kit#1242 removed straight back.
+//
+// **A marker whose gate is gone is left where it is, and that is the decision rather than an
+// oversight** (joshuafolkken/kit#1245's second question). Three things make leaving it correct here.
+// The record is keyed per checkout, so exactly one file exists and nothing accumulates; the next
+// `josh gate` overwrites it, since `write_stamp` unlinks before it creates; and the identity check
+// makes a leftover inert for as long as it sits there. Removing it from the reader would buy none of
+// that and would cost the one thing that matters: the reader deletes on "not running", which is also
+// the answer a platform that cannot report a start time gives for a gate that **is** running — so the
+// sweep would delete live markers there, and the next brief of that same run would lose the in-flight
+// sentence. `unit-worker-share.ts` sweeps and is not inconsistent with this: its markers are keyed per
+// pid, so they accumulate without bound, and that is what a sweep is for.
+//
 // **The round-1 snapshot** is written by the brief itself, so that `--round 2` can name the fix
 // delta by comparison rather than by an agent recalling which files it edited.
 //

@@ -2,6 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { process_identity } from '#scripts/josh/process-identity'
+import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
@@ -45,18 +47,27 @@ function stamp_of(files: Tree): FileMapStamp {
 	return { taken_at: TAKEN_AT, files, base: BASE }
 }
 
-// A marker asserts a live process, so the fixture carries this one: without a pid the reader answers
-// "not running", which is the stale case rather than the running one.
+// A marker asserts a live process, so the fixture carries this run's whole identity — since
+// joshuafolkken/kit#1245 that is the pid **and** the start time of the process behind it, assembled by
+// the same helper a real record is written with. A fixture carrying only half of it is read as "not
+// running", which is the stale case rather than the running one.
 function started_stamp_of(files: Tree): FileMapStamp {
-	return { taken_at: STARTED_AT, files, pid: process.pid }
+	return { taken_at: STARTED_AT, files, ...process_identity.own_fields() }
 }
 
-// A pid above every platform's ceiling, so the liveness probe can only report it gone. Reusing a real
-// one that has exited would be a race against the operating system reassigning it.
-const DEAD_PID = 2_147_483_646
+// A pid no live process holds, and a start time none can have — `process-identity-fixture.ts` for why
+// each is the value it is.
+const { DEAD_PID, FOREIGN_START, has_start_probe } = process_identity_fixture
 
 function stale_stamp_of(files: Tree): FileMapStamp {
 	return { taken_at: STARTED_AT, files, pid: DEAD_PID }
+}
+
+// This run's own pid, which is unmistakably alive, paired with a start time that is not its own. That
+// pair is what a marker looks like from the reader's side once the operating system has reissued the
+// pid its gate held (joshuafolkken/kit#1245).
+function recycled_stamp_of(files: Tree): FileMapStamp {
+	return { taken_at: STARTED_AT, files, pid: process.pid, process_start: FOREIGN_START }
 }
 
 // A path no fixture file name is a substring of, so `not.toContain(FILE_B)` still means what it says
@@ -179,47 +190,62 @@ describe('review_brief.gate_line — the base the gate was green against', () =>
 // composed the checks are usually still running. Without a third state that is indistinguishable from
 // "no gate was ever run", and the review agent re-runs the unit suite the gate is running beside it —
 // the exact cost joshuafolkken/kit#1241 had just removed.
-describe('review_brief.gate_line — a gate still running is its own state', () => {
+//
+// **The block is skipped where the platform cannot report a process start time.** Since
+// joshuafolkken/kit#1245 a marker is believed only when its writer can be identified, and on such a
+// platform `own_fields` records no start time, so the brief correctly never reaches this state —
+// asserting it there would be asserting something the code does not promise.
+describe.skipIf(!has_start_probe)(
+	'review_brief.gate_line — a running gate is its own state',
+	() => {
+		const tree = { [FILE_A]: 'x', [FILE_B]: 'y' }
+
+		it('says a gate is running when the marker covers exactly this tree', () => {
+			const line = gate_line({ in_flight: started_stamp_of(tree) }, tree)
+
+			expect(line).toContain(RUNNING)
+			expect(line).toContain(STARTED_AT)
+		})
+
+		// The distinction the whole state exists for. A gate that has not finished has no result, so the
+		// sentence forbids the re-run without asserting a pass — and a reader scanning for "verified"
+		// must not find it here.
+		it('claims no result while the gate is running', () => {
+			const line = gate_line({ in_flight: started_stamp_of(tree) }, tree)
+
+			expect(line).not.toContain(VERIFIED)
+			expect(line).toContain('Nothing here claims any of them are green')
+		})
+
+		// A marker left behind by a gate that ended before these edits describes a different tree, and the
+		// safe answer is the same one a stale green stamp gets.
+		it('falls back to not-verified when the marker predates an edit', () => {
+			const line = gate_line({ in_flight: started_stamp_of(tree) }, { ...tree, [FILE_A]: EDITED })
+
+			expect(line).toContain(NOT_VERIFIED)
+			expect(line).not.toContain(RUNNING)
+		})
+
+		// A proven result outranks a running one. The tree has not moved, so the green stamp is still true
+		// and a second gate over it can only reach the same answer.
+		it('prefers a matching green stamp over a running gate', () => {
+			const line = gate_line({ gate: stamp_of(tree), in_flight: started_stamp_of(tree) }, tree)
+
+			expect(line).toContain(VERIFIED)
+			expect(line).not.toContain(RUNNING)
+		})
+
+		it('reaches the composed brief', () => {
+			expect(compose({ round: 1, tree, in_flight: started_stamp_of(tree) })).toContain(RUNNING)
+		})
+	},
+)
+
+// Every case here is a marker the brief must *not* believe, and none of them depends on the platform
+// being able to report a start time — a dead pid and a missing pid are decided before the probe is
+// reached, and the reissued one is decided by a start time the fixture supplies.
+describe('review_brief.gate_line — the marker must name the process that wrote it', () => {
 	const tree = { [FILE_A]: 'x', [FILE_B]: 'y' }
-
-	it('says a gate is running when the marker covers exactly this tree', () => {
-		const line = gate_line({ in_flight: started_stamp_of(tree) }, tree)
-
-		expect(line).toContain(RUNNING)
-		expect(line).toContain(STARTED_AT)
-	})
-
-	// The distinction the whole state exists for. A gate that has not finished has no result, so the
-	// sentence forbids the re-run without asserting a pass — and a reader scanning for "verified"
-	// must not find it here.
-	it('claims no result while the gate is running', () => {
-		const line = gate_line({ in_flight: started_stamp_of(tree) }, tree)
-
-		expect(line).not.toContain(VERIFIED)
-		expect(line).toContain('Nothing here claims any of them are green')
-	})
-
-	// A marker left behind by a gate that ended before these edits describes a different tree, and the
-	// safe answer is the same one a stale green stamp gets.
-	it('falls back to not-verified when the marker predates an edit', () => {
-		const line = gate_line({ in_flight: started_stamp_of(tree) }, { ...tree, [FILE_A]: EDITED })
-
-		expect(line).toContain(NOT_VERIFIED)
-		expect(line).not.toContain(RUNNING)
-	})
-
-	// A proven result outranks a running one. The tree has not moved, so the green stamp is still true
-	// and a second gate over it can only reach the same answer.
-	it('prefers a matching green stamp over a running gate', () => {
-		const line = gate_line({ gate: stamp_of(tree), in_flight: started_stamp_of(tree) }, tree)
-
-		expect(line).toContain(VERIFIED)
-		expect(line).not.toContain(RUNNING)
-	})
-
-	it('reaches the composed brief', () => {
-		expect(compose({ round: 1, tree, in_flight: started_stamp_of(tree) })).toContain(RUNNING)
-	})
 
 	// `josh gate` clears the marker in a `finally`, and a `finally` does not run when the gate is
 	// killed — Ctrl-C, Stop, SIGTERM. The file is then left behind describing the very tree it was
@@ -236,6 +262,18 @@ describe('review_brief.gate_line — a gate still running is its own state', () 
 	// rather than trusted — the same direction every other missing record takes.
 	it('falls back to not-verified when the marker carries no process at all', () => {
 		expect(gate_line({ in_flight: stamp_of(tree) }, tree)).toContain(NOT_VERIFIED)
+	})
+
+	// **The hole the pid alone left open** (joshuafolkken/kit#1245). A gate killed with Ctrl-C leaves
+	// its marker behind; the operating system then hands that pid to something unrelated, the liveness
+	// probe passes, and the digests still match because nobody edited the tree — so this line printed
+	// "a gate is running on this tree" about a gate that had ended. The recorded start time is what
+	// separates the reissued process from the one that wrote the record.
+	it('falls back to not-verified when the marker names a pid that was reissued', () => {
+		const line = gate_line({ in_flight: recycled_stamp_of(tree) }, tree)
+
+		expect(line).toContain(NOT_VERIFIED)
+		expect(line).not.toContain(RUNNING)
 	})
 })
 

@@ -49,7 +49,7 @@ The plan comes from one table in `scripts/gate-plan.ts`, where each check declar
   plan: 1 of 4 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)
   ```
 
-  The count is a marker per in-flight run in the temp directory, carrying the pid that wrote it; a run killed outright leaves its file behind and is ignored, because the pid rather than the file is what says a run is live. A number you pass yourself is never divided — `pnpm josh test:unit --maxWorkers=4` is left as typed.
+  The count is a marker per in-flight run in the temp directory, carrying the pid that wrote it **and the time that process started** ([#1245](https://github.com/joshuafolkken/kit/issues/1245)); a run killed outright leaves its file behind and is ignored, because the process rather than the file is what says a run is live. The start time is there because a pid alone is not a process: once the operating system reissues the number, a leaked marker would pass a pid-only liveness probe and hold every later run on the machine at one worker. A marker recording no start time — written by an older version, or on a platform where it cannot be read — still counts as live, which is the direction that costs a narrower share rather than an oversubscribed machine. A number you pass yourself is never divided — `pnpm josh test:unit --maxWorkers=4` is left as typed.
 
 The bigger saving is in round trips. A serial gate stops at the first failure, so a tree with a lint error _and_ a type error costs two full runs to discover. `josh gate` runs every check to completion even when one fails, prints each check as one block in the order above — buffered, never interleaved — and ends with a single summary naming every check that failed:
 
@@ -2685,7 +2685,12 @@ open for the whole of it, so clearing them mid-flight would corrupt the run payi
 run is minutes long and clears a target's caches before each cold reading, so a check once at start-up
 would walk straight into a gate a hook or another session started after it; once a gate is running the
 readings are void anyway, and the run stops rather than finishing with figures nobody can use. The
-in-flight marker carries the gate's pid, so one left behind by a killed process blocks nothing.
+in-flight marker carries the gate's pid **and the time that process started**
+([#1245](https://github.com/joshuafolkken/kit/issues/1245)), so one left behind by a killed gate blocks
+nothing — and goes on blocking nothing after the operating system reissues that pid, which the pid on
+its own could not promise. **The uncertain answer refuses rather than clears**: where the start time
+cannot be read at all, a marker naming a live pid holds `josh bench` back, because being wrong the
+other way deletes the caches a running gate is reading.
 
 **Stopping keeps the readings it already took** ([#1369](https://github.com/joshuafolkken/kit/issues/1369)).
 The abort's rationale is that a reading taken beside a gate measures neither of them, and that does not

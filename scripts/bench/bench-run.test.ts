@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { process_identity } from '#scripts/josh/process-identity'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { bench_guard } from './bench-guard'
@@ -25,7 +26,7 @@ function mark_gate_running(): void {
 	vi.spyOn(review_stamps.in_flight_stamp, 'read').mockReturnValue({
 		taken_at: new Date().toISOString(),
 		files: {},
-		pid: process.pid,
+		...process_identity.own_fields(),
 	})
 }
 

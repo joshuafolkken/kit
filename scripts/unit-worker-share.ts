@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs'
 import { availableParallelism, tmpdir } from 'node:os'
 import path from 'node:path'
 import { z } from 'zod'
+import { process_identity } from './josh/process-identity'
 import { stamp_file } from './josh/stamp-file'
 
 // How wide one vitest run may fan out when it is not the only one on the machine
@@ -37,40 +38,44 @@ const WORKER_FLAGS: ReadonlyArray<string> = [WORKER_FLAG, '--max-workers']
 const MIN_WORKERS = 1
 // One run in flight is this run alone, which is the case that changes nothing.
 const SOLO_RUNS = 1
-// `process.kill(pid, 0)` tests for a process without signalling it.
-const LIVENESS_PROBE = 0
-// Below this a pid is not a process: `0` is the caller's own process group and anything negative is
-// another group. See `is_running`.
-const LOWEST_REAL_PID = 1
 
-const run_marker_schema = z.object({ pid: z.number() })
+// `process_start` is optional because a marker written before joshuafolkken/kit#1245, or on a platform
+// whose start time cannot be read, carries only the pid — and that case has an answer of its own
+// below rather than being rejected here.
+const run_marker_schema = z.object({ pid: z.number(), process_start: z.string().optional() })
+
+type RunMarker = z.infer<typeof run_marker_schema>
 
 function marker_path(pid: number = process.pid): string {
 	return stamp_file.stamp_path(RUN_PREFIX, String(pid))
 }
 
-// **A marker is evidence, and the pid is the test.** A run killed outright leaves its file behind, and
-// a count that trusted the file alone would hold every later run down to one worker for good — the
-// failure mode `run-hold.ts` answers with an expiry, which cannot be sized here because a unit suite
-// under six-way load already takes minutes. The process that writes this marker is the long-lived one,
-// so unlike a `run:hold` record its pid is a liveness test rather than a note for the reader.
-// **A pid that is not positive is never a live run, and the check is not cosmetic.** `process.kill(0,
-// …)` addresses the caller's own process group rather than a process, and a negative pid addresses
-// another group — so a marker carrying either, from a truncated write or a hand-edited file, would
-// answer "alive" forever and hold every run on the machine at one worker.
-function is_running(pid: number): boolean {
-	if (pid < LOWEST_REAL_PID) return false
-
-	try {
-		process.kill(pid, LIVENESS_PROBE)
-
-		return true
-	} catch {
-		return false
-	}
+// **A marker is evidence, and the process behind it is the test.** A run killed outright leaves its
+// file behind, and a count that trusted the file alone would hold every later run down to one worker
+// for good — the failure mode `run-hold.ts` answers with an expiry, which cannot be sized here because
+// a unit suite under six-way load already takes minutes. The process that writes this marker is the
+// long-lived one, so unlike a `run:hold` record its identity is a liveness test rather than a note for
+// the reader.
+//
+// **The pid alone was not that identity** (joshuafolkken/kit#1245). The section below already named
+// what goes wrong — a reissued pid turns a leaked marker into a permanent phantom — and answered it by
+// sweeping, which only ever collected the markers whose pid had *not* yet been reissued. Since the
+// record now carries the writing process's start time beside its pid, a reissued pid is recognized as
+// a different process and swept like any other dead one. A pid that is not positive is caught by the
+// same check, inside `process_identity`: `process.kill(0, …)` addresses the caller's own process group
+// rather than a process, so a truncated or hand-edited marker would otherwise answer "alive" forever.
+//
+// **"Cannot tell" counts as live here, which is the opposite of what the in-flight gate marker's
+// readers do with it, and deliberately so.** A marker with no recorded start time — written before the
+// field existed, or on a platform where it cannot be read — resolves toward *more* sharing: being
+// wrong that way costs this run a narrower share of the machine, while being wrong the other way puts
+// six unit suites on eleven cores, which is the oversubscription joshuafolkken/kit#1515 measured at a
+// load average of 209.
+function is_running(marker: RunMarker): boolean {
+	return process_identity.is_same_process(marker.pid, marker.process_start) !== false
 }
 
-function read_marker_pid(source: string): number | undefined {
+function read_marker(source: string): RunMarker | undefined {
 	const raw = stamp_file.read_stamp_text(source)
 
 	if (raw === undefined) return undefined
@@ -78,7 +83,7 @@ function read_marker_pid(source: string): number | undefined {
 	try {
 		const parsed = run_marker_schema.safeParse(JSON.parse(raw))
 
-		return parsed.success ? parsed.data.pid : undefined
+		return parsed.success ? parsed.data : undefined
 	} catch {
 		return undefined
 	}
@@ -116,10 +121,10 @@ function sweep_marker(source: string): void {
 // which is worse than the leak this sweep exists for. Unreadable therefore counts as not-live and is
 // left alone, exactly as it was before the sweep existed.
 function is_marker_live(source: string): boolean {
-	const pid = read_marker_pid(source)
+	const marker = read_marker(source)
 
-	if (pid === undefined) return false
-	if (is_running(pid)) return true
+	if (marker === undefined) return false
+	if (is_running(marker)) return true
 
 	sweep_marker(source)
 
@@ -197,7 +202,7 @@ function worker_arguments(
 // error here would fail a unit suite over bookkeeping.
 function mark_run_started(target: string): void {
 	try {
-		stamp_file.write_stamp(target, { pid: process.pid })
+		stamp_file.write_stamp(target, process_identity.own_fields())
 	} catch {
 		/* a missing marker costs a wide share, never a wrong result */
 	}
@@ -234,10 +239,11 @@ const unit_worker_share = {
 	live_run_count,
 	marker_files,
 	marker_path,
-	read_marker_pid,
+	read_marker,
 	resolve_unit_workers,
 	with_run_marker,
 	worker_arguments,
 }
 
+export type { RunMarker }
 export { unit_worker_share }
