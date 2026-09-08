@@ -103,18 +103,23 @@ function span_note(found: IssueSpans, issue_number: number): string {
 // The phrase the unread note is recognized by, written once for the reason `OVERLAP_MARK` is: a run
 // whose family lost a transcript still read its merge, so `--epic` would print a figure short by
 // however long that transcript was with no sentence saying so.
-// **The whole phrase, not the two words at the end of it.** `could not be read` alone also matches
-// the refused pull-request listing and the refused diff, and a mark that matches a note it was not
-// written for lets that note through a filter that was meant to hold it.
-const UNREAD_MARK = 'transcript(s) of this run could not be read'
+// **The whole phrase, not the two words at the end of it.** `could not be measured` alone would also
+// match a note written about something else, and a mark that matches a note it was not written for
+// lets that note through a filter that was meant to hold it. It is kept clear of `2 transcript(s)`
+// for the same reason from the other side: the span note above must not be swallowed by this one.
+// **It says unmeasured rather than unread** (joshuafolkken/kit#1599). Two causes reach this sentence
+// — a transcript that would not open, and one that opened onto no parseable span — and naming only
+// the first would assert of the second that it could not be read, which is untrue of a file the run
+// did read. What the reader needs is the consequence, and that is identical for both.
+const UNREAD_MARK = 'transcript(s) of this run could not be measured'
 
 function is_unread_note(note: string): boolean {
 	return note.includes(UNREAD_MARK)
 }
 
-// **A transcript nobody could read and one that cost nothing are different answers, and only one of
-// them is a measurement** (joshuafolkken/kit#1439). `span_note` counts what contributed, so an
-// unreadable member of the run's own family is invisible there — the count stands above figures that
+// **A transcript nobody could measure and one that cost nothing are different answers, and only one
+// of them is a measurement** (joshuafolkken/kit#1439). `span_note` counts what contributed, so an
+// unmeasured member of the run's own family is invisible there — the count stands above figures that
 // are short by exactly what it held, and `2 transcript(s)` hides the third one's absence.
 // **The sentence itself, taking a count rather than a scope.** The session scope reaches the same
 // state — naming one unit reads the session that delegated it — and a second spelling of this note

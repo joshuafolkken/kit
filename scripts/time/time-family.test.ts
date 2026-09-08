@@ -246,19 +246,26 @@ describe('time_family.for_session on a transcript with no family', () => {
 	})
 })
 
+// One parent bracketing two units with an `Agent` span each: the one this run holds, and a sibling
+// whose transcript is whatever the caller passes. Shared so the readable, the unreadable and the
+// spanless sibling are all measured against the same parent rather than three that drifted apart.
+function write_bracketing_parent(sibling_lines: ReadonlyArray<string>): void {
+	fixture.write_session(state.home, 'parent', [
+		fixture.call_line(0, MAIN_BRANCH, 'Agent', 'g'),
+		fixture.result_line(3, MAIN_BRANCH, 'g'),
+		fixture.call_line(4, MAIN_BRANCH, 'Agent', 'h'),
+		fixture.result_line(8, MAIN_BRANCH, 'h'),
+	])
+	fixture.write_unit(state.home, 'parent', HELD_UNIT, fixture.issue_lines(0))
+	fixture.write_unit(state.home, 'parent', UNIT_NAME, sibling_lines)
+}
+
 // The concurrent-sibling subtraction (joshuafolkken/kit#1439). A sibling that overlaps the held unit
 // moves the adjacency window not at all, so without this the parent's spans bracketing that sibling
 // are taken whole into a run whose corpus holds nothing to subtract them.
 describe('time_family on a sibling unit that ran beside the one this run holds', () => {
 	beforeEach(() => {
-		fixture.write_session(state.home, 'parent', [
-			fixture.call_line(0, MAIN_BRANCH, 'Agent', 'g'),
-			fixture.result_line(3, MAIN_BRANCH, 'g'),
-			fixture.call_line(4, MAIN_BRANCH, 'Agent', 'h'),
-			fixture.result_line(8, MAIN_BRANCH, 'h'),
-		])
-		fixture.write_unit(state.home, 'parent', HELD_UNIT, fixture.issue_lines(0))
-		fixture.write_unit(state.home, 'parent', UNIT_NAME, fixture.issue_lines(2, OTHER_BRANCH))
+		write_bracketing_parent(fixture.issue_lines(2, OTHER_BRANCH))
 	})
 
 	it('leaves the parent minutes that bracket the sibling out of this run', () => {
@@ -280,6 +287,29 @@ describe('time_family on a sibling unit that ran beside the one this run holds',
 
 		expect(found.unread_count).toBe(1)
 		expect(fixture.total_span_ms(found.spans)).toBe(3 * fixture.MINUTE_MS)
+	})
+})
+
+// **A sibling that opened onto no span is the case joshuafolkken/kit#1439's fix left behind**
+// (joshuafolkken/kit#1599). Nothing failed to read, so the unread answer never fired for it; it
+// simply had no window, and a unit with no window left `inside` and `outside` alike — bounding the
+// adjacency window not at all and subtracting nothing, which is the same over-count from a second
+// cause. A transcript holding one prompt line and nothing else is exactly that shape.
+describe('time_family on a sibling unit whose transcript parses to no span', () => {
+	beforeEach(() => {
+		write_bracketing_parent([fixture.prompt_line(4, OTHER_BRANCH)])
+	})
+
+	it('leaves the parent minutes that bracket it out of this run', () => {
+		const found = time_corpus.collect_issue_spans(CWD, ISSUE)
+
+		expect(fixture.total_span_ms(found.spans)).toBe(3 * fixture.MINUTE_MS)
+	})
+
+	// Reported rather than dropped in silence: the run is short by whatever the parent held around
+	// that sibling, which is what the note above the report exists to say.
+	it('counts it as unmeasured, exactly as an unreadable sibling is', () => {
+		expect(time_corpus.collect_issue_spans(CWD, ISSUE).unread_count).toBe(1)
 	})
 })
 

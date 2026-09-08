@@ -26,8 +26,8 @@ const INDENT = ' '.repeat(INDENT_WIDTH)
 // are this run's. The refused-check note says the empty `By CI check` table is a refusal
 // rather than a run GitHub recorded no checks for (joshuafolkken/kit#1352). The refused-diff note says
 // the same of the withheld change size (joshuafolkken/kit#1387). The unread note says a transcript of
-// the row's own family could not be read, so the row is short by however long it held rather than
-// measuring it as zero (joshuafolkken/kit#1439). Every completed row has `has_ci_data`, which is to
+// the row's own family could not be measured, so the row is short by however long it held rather
+// than measuring it as zero (joshuafolkken/kit#1439). Every completed row has `has_ci_data`, which is to
 // say the filter below hides all five from exactly the rows that carry them.
 function is_kept_note(note: string): boolean {
 	if (time_run.is_overlap_note(note) || time_run.is_session_note(note)) return true
