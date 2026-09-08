@@ -61,7 +61,7 @@ The two that behave in ways worth knowing before you hit them:
 - **`PORT_SEED`** lets several kit projects run their servers at once. Unset or blank means `0` — the historical `5173` / `4173`, which is what keeps CI and un-migrated projects unaffected. **An invalid value is a hard error, never a silent fall back to the shared default**, and a busy port still fails loudly with no retry on another port. `josh port` and `playwright.config.ts` both read the seed from `.env`, so the E2E suite waits on the same port the preview script starts. See [`josh port`](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md#josh-port).
 - **`JOSH_REPO_PATHS`** is only for the exceptions — discovery is automatic, keyed by each work tree's `origin` remote and never by its directory name. **The owner restriction is unconditional and cannot be overridden**: an entry naming a different owner is dropped exactly like a discovered sibling would be. `josh doctor` prints the resulting map. See [`josh doctor`](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md#josh-doctor).
 
-**GitHub operations are `gh api` (REST) — instructing prose included — and need `gh` installed; some environments lack it.** Auth: `GH_TOKEN`. See `prompts/collaboration-workflow/gh-rest.md`.
+**GitHub operations are `gh api` (REST) — instructing prose included — and need `gh` installed; some environments lack it.** Auth: `gh auth login`; `GH_TOKEN` in CI/cloud. See `prompts/collaboration-workflow/gh-rest.md`.
 
 ## Critical Conventions (non-standard — always apply)
 
