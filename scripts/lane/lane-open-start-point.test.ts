@@ -13,7 +13,7 @@ import { lane_paths } from './lane-paths'
 // already pins.
 //
 // The fixture stands in for a merge by advancing `refs/remotes/origin/main` past `refs/heads/main`,
-// which is the exact shape this repository is in after `pnpm josh followup --merge`: the remote-
+// which is the exact shape this repository is in after `pnpm josh followup`: the remote-
 // tracking ref moves on the next fetch, and the local branch — checked out in no work tree — never
 // does. Measured on 2026-09-07 in this repository: `refs/heads/main` `e3a68c04`,
 // `refs/remotes/origin/main` `78f746f9`.

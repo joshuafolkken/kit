@@ -33,7 +33,7 @@ PR マージ・ブランチ削除・force push・共有ブランチへの push�
 - `fullrun` の auto-merge は `fullrun` の指示自体に含まれるため許可される（本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)）。それ以外の状況で勝手にマージしてはならない
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
 - 「チェックが全部 green だから次のステップに進む」は承認ではない
-- **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `deny`（`Bash(gh pr merge*)`）で機械的に遮断されている。** `fullrun` の auto-merge は `pnpm josh followup --merge` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけである。**ただし deny は実装であって規則ではない** — パターンが取りこぼす綴りを禁じているのは本節の規則のほうである
+- **`gh pr merge` の直接実行は kit 配布の `.claude/settings.json` の `deny`（`Bash(gh pr merge*)`）で機械的に遮断されている。** `fullrun` の auto-merge は `pnpm josh followup` が node スクリプト内部から gh を起動するため影響を受けない — Bash マッチャに見えるのは `pnpm josh …` だけである。**ただし deny は実装であって規則ではない** — パターンが取りこぼす綴りを禁じているのは本節の規則のほうである
 - **同じ規則が禁じる force push とブランチ削除も deny に載っている**（joshuafolkken/kit#1062）。`Bash(git push *--force*)` / `Bash(git push * -f)` はフラグを引数の後ろに書いた綴りを、`Bash(git push *--delete*)` / `Bash(git branch -d*)` / `Bash(git branch -D*)` / `Bash(gh api *DELETE*git/refs/heads/*)` はブランチ削除を止める。**それでも deny は規則より狭い** — `git -C` を前置した綴り、短縮フラグをまとめた綴り（`git push -uf`）は全エントリを素通りし、ルール文字列は `:` をリテラルとして照合できないため `git push origin :branch` も拒否されない。**「マージ経路は deny が保証している」とは読まないこと**
 - **共有状態に影響する操作（このセクションの対象＝Tier C）は迷ったら確認する。** 確認のコストは低いが、意図しない操作の巻き戻しは高コスト
 - ただしこの「迷ったら確認」は Tier C に限る。**可逆な実装・設計判断（Tier A）は別ルール**（CLAUDE.md「Decision autonomy」の3層ポリシー）に従い、明確に優位な選択肢は確認せず自動で選んで記録する — 本当に甲乙つけがたい（Tier B）ときだけ確認する。下記「意思決定の自律ポリシー」を参照

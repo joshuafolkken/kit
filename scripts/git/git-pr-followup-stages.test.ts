@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_followup_stages } from './git-followup-stages'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
-// joshuafolkken/kit#1349: nobody knew what `followup --merge` spent its 44 seconds on, because the
+// joshuafolkken/kit#1349: nobody knew what `followup` spent its 44 seconds on, because the
 // command timed none of its own stages. What is pinned here is that every stage reaches the console,
 // in the order it ran — including on the **failed** run, which is the invocation whose wait is
 // longest and the one a block withheld would hide.

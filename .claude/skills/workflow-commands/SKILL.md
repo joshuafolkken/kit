@@ -1,6 +1,6 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` — planning, implementation, the verification gate, unattended epic execution, the `/code-review` → `followup --merge` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` — planning, implementation, the verification gate, unattended epic execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
@@ -85,7 +85,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   rests on covers the exact tree it carries and round 2's brief still reads `Already verified`.
   **A finding round 2 fixes in place is pushed before its gate**
   (joshuafolkken/kit#1326): the single check the fix reaches, then a follow-up commit on the same
-  branch, then its own `pnpm josh gate` **joined before `pnpm josh followup --merge`**
+  branch, then its own `pnpm josh gate` **joined before `pnpm josh followup`**
   — so the CI that commit re-runs has the gate beside it rather than in front of it. A red gate there is
   fixed, re-checked with the same single check and pushed again; the superseded cycle is cancelled by
   `ci.yml`'s concurrency group, and the merge still waits on the head commit's checks
@@ -93,7 +93,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   "The pull request opens between the rounds, so CI runs beside round 2" is the single source; a clean
   round 1 has no second round and its order is unchanged.
   **A clean second round is not a turn boundary either**: the turn that reads it issues
-  `pnpm josh followup --merge`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a
+  `pnpm josh followup`, after any branch-2 filing and `pnpm josh epic:bundle` and never in a
   turn of its own — the 19 seconds of dead air joshuafolkken/kit#1333 measured between the two
   (`prompts/review.md` → "A clean second round issues the merge in the same turn", the single source).
   While the checks are in flight the brief says so
@@ -116,7 +116,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   answer is already in hand and the call buys a second copy of it. `pnpm josh time`'s `Single checks:`
   block is what says whether the run held to it; the rule is `prompts/review.md` → "A single check
   answers once per tree".
-  **The rule-compliance measurement is read after the review and before `pnpm josh followup --merge`,
+  **The rule-compliance measurement is read after the review and before `pnpm josh followup`,
   never inside `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval`
   is five real Claude sessions. The anchor is the merge rather than the commit because the commit now
   sits between the rounds, and `blocked` has always stopped the merge rather than the commit
@@ -127,7 +127,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   not but is reported, and a run nobody saw hold is never reported as green. `eval-gate.md` carries
   the trigger set, the cost ceiling, and why an epic's completion does not run it a second time.
   **E2E closes after that, and never by asking the user**: where the command ends in a pull request
-  (`fullrun` / `queue` / `epicrun`) the CI E2E job is the result and `pnpm josh followup --merge`
+  (`fullrun` / `queue` / `epicrun`) the CI E2E job is the result and `pnpm josh followup`
   is what enforces it; where it does not (`halfrun`), you run `pnpm josh test:e2e` yourself before
   the stop. `CLAUDE.md` → "Completion gate" carries the rule, `prompts/testing-guide.md` → "Closing
   the E2E gate without a human run" the procedure.
@@ -136,7 +136,7 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   tree holding the previous child's already-merged code, find nothing wrong, and have that silence
   read as a clean round (joshuafolkken/kit#1522). `pnpm josh review:brief` names the checkout and
   prints the nonce the review attests with; `missing` and `mismatch` are both refusals, and
-  `pnpm josh followup --merge` refuses the merge on either. `prompts/review.md` → "The brief names the
+  `pnpm josh followup` refuses the merge on either. `prompts/review.md` → "The brief names the
   checkout, and a review that read another one is refused" is the single source.
 - **An interrupt whose subject is a defect in the verification path runs alone**, and a batch resumes
   only once it has merged — decided from an enumeration (the verification gate, the code review, the
@@ -200,7 +200,7 @@ does nothing whatever — an epic's children run without it.
 - **Implementation and the verification gate run normally** — refactor, `pnpm josh gate`,
   `/code-review`, `pnpm josh eval:scope`, exactly as for any other child.
 - **Run `pnpm josh test:e2e` yourself before stopping.** With no pull request there is no CI E2E job,
-  and `pnpm josh followup --merge` — the thing that blocks a merge on it — is never reached. This is
+  and `pnpm josh followup` — the thing that blocks a merge on it — is never reached. This is
   `halfrun`'s situation exactly, and `CLAUDE.md` → "Completion gate" gives it the same answer: where
   no pull request is open, you run it and read what it prints. A printed skip is the answer for a
   project with no E2E suite; a skip nobody saw printed is not.
@@ -530,7 +530,7 @@ epicrun joshuafolkken/kit#858
   checked out rather than cloning it, and a dirty tree holds work that is not yours to stash or
   discard (each entry's own "stash what is in the tree" step covers the session's repository, never
   someone else's checkout). Otherwise the commands that act
-  on the target, from `git switch main && git pull` to `pnpm josh followup --merge`, execute in that
+  on the target, from `git switch main && git pull` to `pnpm josh followup`, execute in that
   checkout — **a command naming a different repository still runs where that repository is**, which
   is why a cross-repository `into` insertion runs in the epic's checkout (§2a).
 - **`epicrun` is exempt from the whole bullet above**: `owner/repo#E` names where the *epic* lives,

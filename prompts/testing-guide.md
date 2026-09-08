@@ -190,10 +190,10 @@ waited on, so it can be relied on.
 
 Decided by whether a pull request is open, never by judgement:
 
-| Situation                                                                                    | What closes the gate                                                                                                     |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| A pull request is open — `fullrun`, `queue`, `epicrun`                                       | The CI E2E job. `pnpm josh followup --merge` waits for the checks and refuses to merge while any of them is non-passing. |
-| No pull request — `halfrun`'s stop before commit, a completion reported outside any workflow | `pnpm josh test:e2e`, run by **you**, output read by you.                                                                |
+| Situation                                                                                    | What closes the gate                                                                                             |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| A pull request is open — `fullrun`, `queue`, `epicrun`                                       | The CI E2E job. `pnpm josh followup` waits for the checks and refuses to merge while any of them is non-passing. |
+| No pull request — `halfrun`'s stop before commit, a completion reported outside any workflow | `pnpm josh test:e2e`, run by **you**, output read by you.                                                        |
 
 **Never ask the user to run it, in either row.** A completion report is not allowed to depend on
 somebody being at the keyboard; that dependency is what made a `fullrun` chain stall at its last
