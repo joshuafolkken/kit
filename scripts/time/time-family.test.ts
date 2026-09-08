@@ -12,6 +12,8 @@ const { CWD, ISSUE, BRANCH } = fixture
 const MAIN_BRANCH = 'main'
 const NO_INSTANT = 0
 const SECOND_CALL_ID = 'b'
+const OTHER_BRANCH = '999-elsewhere'
+const HELD_UNIT = 'agent-held'
 const UNIT_NAME = 'agent-a1'
 const UNIT_ID = `parent/${UNIT_NAME}`
 
@@ -211,6 +213,10 @@ describe('time_family on a transcript it could not read', () => {
 		])
 	})
 
+	// **The parent's own failure is not recorded when the named unit could not be read either**, because
+	// `upward` has no unit window to bound the handoff by and returns before it reaches the parent. The
+	// note then says one transcript where two failed. Asserted as it stands rather than left unsaid: with
+	// the unit unreadable, nothing proves the parent belongs to this run at all.
 	it('names it when the unit itself is the transcript named', () => {
 		expect(time_family.for_session(listing(), named(UNIT_ID)).unread).toStrictEqual([UNIT_ID])
 	})
@@ -237,5 +243,47 @@ describe('time_family.for_session on a transcript with no family', () => {
 
 		expect(found.spans).toHaveLength(2)
 		expect(found.unread).toStrictEqual([])
+	})
+})
+
+// The concurrent-sibling subtraction (joshuafolkken/kit#1439). A sibling that overlaps the held unit
+// moves the adjacency window not at all, so without this the parent's spans bracketing that sibling
+// are taken whole into a run whose corpus holds nothing to subtract them.
+describe('time_family on a sibling unit that ran beside the one this run holds', () => {
+	beforeEach(() => {
+		fixture.write_session(state.home, 'parent', [
+			fixture.call_line(0, MAIN_BRANCH, 'Agent', 'g'),
+			fixture.result_line(3, MAIN_BRANCH, 'g'),
+			fixture.call_line(4, MAIN_BRANCH, 'Agent', 'h'),
+			fixture.result_line(8, MAIN_BRANCH, 'h'),
+		])
+		fixture.write_unit(state.home, 'parent', HELD_UNIT, fixture.issue_lines(0))
+		fixture.write_unit(state.home, 'parent', UNIT_NAME, fixture.issue_lines(2, OTHER_BRANCH))
+	})
+
+	it('leaves the parent minutes that bracket the sibling out of this run', () => {
+		const found = time_corpus.collect_issue_spans(CWD, ISSUE)
+
+		expect(fixture.total_span_ms(found.spans)).toBe(3 * fixture.MINUTE_MS)
+	})
+})
+
+// A unit whose spans all close on the same instant has a window of no length, and `uncovered_ms`
+// answers zero for one of those whatever it is measured against — including nothing at all.
+describe('time_family on a unit whose spans share one instant', () => {
+	it('does not claim it for a session with no attributed minutes of its own', () => {
+		fixture.write_session(state.home, 'parent', [
+			fixture.call_line(0, MAIN_BRANCH, 'Agent', 'g'),
+			fixture.result_line(3, MAIN_BRANCH, 'g'),
+		])
+		fixture.write_unit(state.home, 'parent', HELD_UNIT, fixture.issue_lines(0))
+		fixture.write_unit(state.home, 'parent', UNIT_NAME, [
+			fixture.call_line(20, OTHER_BRANCH, 'Glob', 'z'),
+			fixture.result_line(20, OTHER_BRANCH, 'z'),
+		])
+
+		const labels = time_corpus.collect_issue_spans(CWD, ISSUE).spans.map((one) => one.label)
+
+		expect(labels).not.toContain('Glob')
 	})
 })
