@@ -101,9 +101,10 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	'**`pnpm josh latest` is never run inside a lane, whatever `latest:scope` answers there.**',
 	// With no child in the primary checkout, the rewritten lock file has nothing to commit it.
 	'The rewritten lock file still has to reach a pull request',
-	// A linked work tree starts with no `node_modules`, and the lane root is a sibling rather than a
-	// child of the repository, so nothing above it resolves either.
-	'**The install is not optional.**',
+	// joshuafolkken/kit#1554: `lane:open` now installs, so what has to be pinned is no longer "do not
+	// skip the install" but which line owns it — a runner that still reads the third line as *the*
+	// install would take a lane that already works for one that needs finishing.
+	'**`lane:open` installs; the third line is a *re*-install, and only the popping lane needs it**',
 	// joshuafolkken/kit#1497: `pnpm josh git` compares on the `<N>-` prefix, so the lane branch leads
 	// with the issue number — and the obvious way round the old `lane/<N>` is still the trap. The
 	// registry identifies a lane *by* that branch (`lane-registry.ts` → `branch_issue`), so switching
@@ -118,9 +119,10 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	// the one that gets copied, and a run copying it does one child at a time for no reason.
 	'--repo joshuafolkken/kit --lanes',
 	'**`--lanes` is the form to use.**',
-	// The pop carries the lock file the install has to build against; installed first, the first
-	// child's gate runs against `node_modules` from the previous lock while committing the new one.
-	'**The install comes after the stash pop, never before it.**',
+	// The pop carries the lock file the gate has to build against; left at what `lane:open` installed,
+	// the first child's gate runs against `node_modules` from the previous lock while committing the
+	// new one — which is why that one lane installs twice rather than once.
+	'**What the pop changes is the lock, which is why that one lane installs twice.**',
 	// Every lane's HEAD is off the default branch, so `run:preflight` answers `reclaim` on all of
 	// them and prints a recovery a linked work tree cannot run.
 	"**`pnpm josh run:preflight` is not asked in a lane; `lane:open`'s own answer replaces it.**",
