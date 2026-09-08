@@ -3,7 +3,7 @@ import { UNREADABLE_CR_NOTE } from './git-pr-coderabbit'
 import {
 	build_issue_url,
 	git_pr_followup,
-	post_notify_issue,
+	parse_closes_issue_number,
 	warn_if_missing_closes,
 	type FollowupInput,
 } from './git-pr-followup'
@@ -87,9 +87,6 @@ const BASE_INPUT: FollowupInput = {
 	should_merge: false,
 }
 
-const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
-const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
-const mocked_comment = vi.mocked(git_gh_command.issue_comment)
 const mocked_pr_get_body = vi.mocked(git_gh_command.pr_get_body)
 
 // The body of the completion notification the run sent, or undefined when it sent none.
@@ -123,48 +120,56 @@ function setup_skip_policy_mocks(): void {
 	setup_run_mocks()
 }
 
-describe('post_notify_issue — blank body uses edit, non-blank uses comment', () => {
-	const ISSUE_NUMBER = '42'
-	const NOTIFY_BODY = 'Completion notification'
+// joshuafolkken/kit#1539: the issue number used to reach the notification from the command line
+// alone, and an invocation that omitted it threw after the merge had already landed. The stage that
+// warns about a missing `closes #N` reads the pull request body anyway, so that read is what recovers
+// the number.
+const CLOSES_KEYWORD = 'closes #1539'
+const BODY_WITHOUT_CLOSES = '## Summary\nNo issue link here'
 
-	beforeEach(() => {
-		vi.clearAllMocks()
+describe('parse_closes_issue_number — the number the pull request closes', () => {
+	it('reads the number out of the closes keyword', () => {
+		expect(parse_closes_issue_number(`## Summary\n\n${CLOSES_KEYWORD}\n`)).toBe('1539')
 	})
 
-	it('calls issue_edit_body when issue body is blank', async () => {
-		mocked_get_body.mockResolvedValue('')
-		mocked_edit_body.mockResolvedValue('')
-
-		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
-
-		expect(mocked_edit_body).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
-		expect(mocked_comment).not.toHaveBeenCalled()
+	it('matches the keyword whatever its case', () => {
+		expect(parse_closes_issue_number('Closes #42')).toBe('42')
 	})
 
-	it('calls issue_comment when issue body is non-blank', async () => {
-		mocked_get_body.mockResolvedValue('existing content')
-		mocked_comment.mockResolvedValue('')
-
-		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
-
-		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
-		expect(mocked_edit_body).not.toHaveBeenCalled()
+	it('answers undefined when the body has no closes keyword', () => {
+		expect(parse_closes_issue_number(BODY_WITHOUT_CLOSES)).toBeUndefined()
 	})
 
-	it('falls back to issue_comment when body fetch fails (undefined)', async () => {
-		mocked_get_body.mockResolvedValue(undefined)
-		mocked_comment.mockResolvedValue('')
+	it('answers undefined when the body could not be read', () => {
+		expect(parse_closes_issue_number(undefined)).toBeUndefined()
+	})
+})
 
-		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })
+describe('git_pr_followup.run — the issue number an invocation omitted', () => {
+	beforeEach(setup_skip_policy_mocks)
 
-		expect(mocked_comment).toHaveBeenCalledWith(ISSUE_NUMBER, NOTIFY_BODY)
-		expect(mocked_edit_body).not.toHaveBeenCalled()
+	it('recovers it from the pull request body', async () => {
+		mocked_pr_get_body.mockResolvedValue(CLOSES_KEYWORD)
+
+		await expect(
+			git_pr_followup.run({ ...BASE_INPUT, issue_number: undefined, should_merge: true }),
+		).resolves.toBe('1539')
 	})
 
-	it('throws when issue_number is undefined', async () => {
-		await expect(post_notify_issue({ issue_number: undefined, body: NOTIFY_BODY })).rejects.toThrow(
-			'Issue number is required for issue notification.',
-		)
+	it('keeps the number the invocation named', async () => {
+		mocked_pr_get_body.mockResolvedValue(CLOSES_KEYWORD)
+
+		await expect(
+			git_pr_followup.run({ ...BASE_INPUT, issue_number: '42', should_merge: true }),
+		).resolves.toBe('42')
+	})
+
+	it('answers undefined when neither the invocation nor the body carried one', async () => {
+		mocked_pr_get_body.mockResolvedValue(BODY_WITHOUT_CLOSES)
+
+		await expect(
+			git_pr_followup.run({ ...BASE_INPUT, issue_number: undefined, should_merge: true }),
+		).resolves.toBeUndefined()
 	})
 })
 
@@ -177,7 +182,7 @@ describe('warn_if_missing_closes', () => {
 	})
 
 	it('prints a warning when PR body has no closes keyword', async () => {
-		mocked_pr_get_body.mockResolvedValue('## Summary\nNo issue link here')
+		mocked_pr_get_body.mockResolvedValue(BODY_WITHOUT_CLOSES)
 
 		await warn_if_missing_closes(BRANCH)
 

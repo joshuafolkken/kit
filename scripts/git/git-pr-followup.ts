@@ -1,20 +1,23 @@
-import { git_epic_close } from './git-epic-close'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
 import { git_gh_helpers } from './git-gh-helpers'
-import { git_notify, type GitNotifyConfig } from './git-notify'
+import type { GitNotifyConfig } from './git-notify'
 import { git_pr_ai_review, type TelegramContext } from './git-pr-ai-review'
 import { git_pr_checks } from './git-pr-checks'
 import { is_coderabbit_check } from './git-pr-checks-eval'
 import { CHECK_STATUS_PASS, git_pr_checks_parse, type PrStateSnapshot } from './git-pr-checks-parse'
 import { git_pr_coderabbit } from './git-pr-coderabbit'
+import { git_pr_followup_wrapup } from './git-pr-followup-wrapup'
 import { github_issue_url } from './github-issue-url'
 import { telegram_notify, type TelegramSendInput, type TelegramTaskType } from './telegram-notify'
 
 const { STAGE, lap } = git_followup_stages
 
-const CLOSES_PATTERN = /closes\s+#\d+/iu
+// Captures the number, so the one pattern answers both questions the run asks of a PR body: whether
+// the linked issue will auto-close, and — since joshuafolkken/kit#1539 — which issue that is when the
+// invocation did not say. A second pattern here would be two readings of "closes #N" to disagree.
+const CLOSES_PATTERN = /closes\s+#(\d+)/iu
 // Named so a test can pin the note without restating it (joshuafolkken/kit#999).
 const WATCH_FAILED_NOTE = 'pr checks --watch failed; falling through to polling'
 const REPO_NAME_SEPARATOR = '/'
@@ -65,16 +68,26 @@ interface FollowupInput {
 	should_merge: boolean
 }
 
-function has_closes_keyword(body: string | undefined): boolean {
-	if (body === undefined) return false
+function parse_closes_issue_number(body: string | undefined): string | undefined {
+	if (body === undefined) return undefined
 
-	return CLOSES_PATTERN.test(body)
+	return CLOSES_PATTERN.exec(body)?.[1]
 }
 
-async function warn_if_missing_closes(branch_name: string): Promise<void> {
-	const body = await git_gh_command.pr_get_body(branch_name)
+function has_closes_keyword(body: string | undefined): boolean {
+	return parse_closes_issue_number(body) !== undefined
+}
 
-	if (has_closes_keyword(body)) return
+// **Returns the number it warned about the absence of** (joshuafolkken/kit#1539). The issue number
+// used to reach the notification from the command line alone, so an invocation that omitted it threw
+// after the merge had already landed. This stage reads the pull request body anyway, and that body
+// carries the number in its `closes #N` keyword — so the read the warning already makes is what
+// recovers it, at no extra request.
+async function warn_if_missing_closes(branch_name: string): Promise<string | undefined> {
+	const body = await git_gh_command.pr_get_body(branch_name)
+	const closes_number = parse_closes_issue_number(body)
+
+	if (closes_number !== undefined) return closes_number
 
 	console.warn('')
 	console.warn(
@@ -82,73 +95,8 @@ async function warn_if_missing_closes(branch_name: string): Promise<void> {
 	)
 	console.warn('   Recovery: pnpm josh pr  (or: pnpm josh git -y --skip-commit --skip-push)')
 	console.warn('')
-}
 
-function build_notify_body(input: {
-	notify_config: GitNotifyConfig
-	issue_number: string | undefined
-	pr_url: string | undefined
-}): string {
-	return git_notify.build_completion_comment_body({
-		message: input.notify_config.message,
-		issue_number: input.issue_number,
-		pr_url: input.pr_url,
-		mentions: input.notify_config.mentions,
-	})
-}
-
-function is_blank_issue_body(body: string | undefined): boolean {
-	if (body === undefined) return true
-
-	return body.trim().length === 0
-}
-
-async function post_notify_issue(input: {
-	issue_number: string | undefined
-	body: string
-}): Promise<void> {
-	if (input.issue_number === undefined) {
-		throw new Error('Issue number is required for issue notification.')
-	}
-
-	const current_body = await git_gh_command.issue_get_body(input.issue_number)
-	const should_edit_body = current_body !== undefined && is_blank_issue_body(current_body)
-
-	await (should_edit_body
-		? git_gh_command.issue_edit_body(input.issue_number, input.body)
-		: git_gh_command.issue_comment(input.issue_number, input.body))
-}
-
-function should_notify_pr(target: GitNotifyConfig['target']): boolean {
-	return target === 'pr' || target === 'both'
-}
-
-function should_notify_issue(target: GitNotifyConfig['target']): boolean {
-	return target === 'issue' || target === 'both'
-}
-
-async function post_completion_notification(input: {
-	branch_name: string
-	issue_number: string | undefined
-	notify_config: GitNotifyConfig | undefined
-	pr_url: string | undefined
-}): Promise<void> {
-	if (input.notify_config === undefined) return
-
-	const body = build_notify_body({
-		notify_config: input.notify_config,
-		issue_number: input.issue_number,
-		pr_url: input.pr_url,
-	})
-	const { target } = input.notify_config
-
-	if (should_notify_pr(target)) {
-		await git_gh_command.pr_comment(input.branch_name, body)
-	}
-
-	if (should_notify_issue(target)) {
-		await post_notify_issue({ issue_number: input.issue_number, body })
-	}
+	return undefined
 }
 
 // The watch is a look ahead, not a gate. It fails when **any** check has failed — CodeRabbit
@@ -321,43 +269,17 @@ async function run_review_checks(
 	return [...check_notes, ...comment_notes, ...ai_review_notes]
 }
 
-// Everything after the merge gate opened. Split out of `run_stages` so each half stays inside the
-// per-function line limit, and cut at the notification because that is where the run stops being able
-// to fail safely: the Telegram has gone out and the merge is next.
-async function run_wrapup(
-	input: FollowupInput,
-	context: TelegramContext,
-	log: StageLog,
-): Promise<void> {
-	if (input.should_merge) {
-		await git_gh_command.pr_merge(input.branch_name)
-		lap(log, STAGE.merge)
-	}
-
-	await post_completion_notification({
-		branch_name: input.branch_name,
-		issue_number: input.issue_number,
-		notify_config: input.notify_config,
-		pr_url: context.pr_url,
-	})
-
-	lap(log, STAGE.completion_comment)
-	await git_epic_close.close_completed_epics({
-		issue_number: input.issue_number,
-		is_merged: input.should_merge,
-	})
-
-	lap(log, STAGE.epic_close)
-}
-
-async function run_stages(input: FollowupInput, log: StageLog): Promise<void> {
-	await warn_if_missing_closes(input.branch_name)
+// **Answers with the issue number the run actually used** (joshuafolkken/kit#1539), which is the one
+// the invocation named or, failing that, the one the pull request body closes. Everything downstream
+// takes it from here rather than from the input, so the Telegram context, the completion comment and
+// the epic close all name the same issue — and so the caller's own tail can record a run whose number
+// only the pull request knew.
+async function run_stages(input: FollowupInput, log: StageLog): Promise<string | undefined> {
+	const closes_number = await warn_if_missing_closes(input.branch_name)
+	const issue_number = input.issue_number ?? closes_number
 
 	lap(log, STAGE.closes_check)
-	const context = await fetch_telegram_context({
-		branch_name: input.branch_name,
-		issue_number: input.issue_number,
-	})
+	const context = await fetch_telegram_context({ branch_name: input.branch_name, issue_number })
 
 	lap(log, STAGE.context)
 	const skip_notes = await run_review_checks(input, context, log)
@@ -365,7 +287,18 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<void> {
 	await notify_completion(context, skip_notes, input.should_merge)
 
 	lap(log, STAGE.telegram)
-	await run_wrapup(input, context, log)
+	await git_pr_followup_wrapup.run_wrapup(
+		{
+			branch_name: input.branch_name,
+			issue_number,
+			notify_config: input.notify_config,
+			pr_url: context.pr_url,
+			should_merge: input.should_merge,
+		},
+		log,
+	)
+
+	return issue_number
 }
 
 // **The stage block is printed on the way out of every run, failed ones included**
@@ -373,11 +306,11 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<void> {
 // the invocation whose wait was longest, and one that printed nothing would leave the measurement
 // blind to exactly those. The `catch` marks the lap that was still running so the failing stage is
 // reported rather than dropped, and rethrows unchanged — a silent run is still a failed run.
-async function run(input: FollowupInput): Promise<void> {
+async function run(input: FollowupInput): Promise<string | undefined> {
 	const log = git_followup_stages.new_log()
 
 	try {
-		await run_stages(input, log)
+		return await run_stages(input, log)
 	} catch (error) {
 		lap(log, STAGE.interrupted)
 
@@ -397,10 +330,9 @@ export {
 	run_checks,
 	build_issue_url,
 	parse_repo_name,
-	is_blank_issue_body,
-	post_notify_issue,
 	build_telegram_input,
 	has_closes_keyword,
+	parse_closes_issue_number,
 	warn_if_missing_closes,
 	read_coderabbit_skip_notes,
 	log_skip_notes,

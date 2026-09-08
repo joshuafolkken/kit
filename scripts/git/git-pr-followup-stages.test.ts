@@ -158,6 +158,49 @@ describe('git_pr_followup.run — the stage block on a run that finished', () =>
 	})
 })
 
+// joshuafolkken/kit#1539: a step after the merge is cleanup, and the merge cannot be taken back. Its
+// failure used to end the process, which discarded the steps after it — the working-tree hold release
+// among them — and returned a non-zero exit that `epicrun` and `queue` read as a failed child.
+describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
+	const FAILURE = new Error('502 Bad Gateway')
+
+	beforeEach(() => {
+		vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+	})
+
+	it('resolves, so a merged run is not reported as a failed one', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await expect(git_pr_followup.run({ ...BASE_INPUT, should_merge: true })).resolves.toBeDefined()
+	})
+
+	it('reports every stage, so the block still names where the run went', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(printed_stages()).toStrictEqual([...MERGED_RUN_STAGES])
+	})
+
+	it('names the step that failed rather than passing silently', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		const warned = vi.mocked(console.warn).mock.calls.map(([line]) => String(line))
+
+		expect(warned.join('\n')).toContain('The epic auto-close')
+	})
+
+	it('keeps merging the pull request', async () => {
+		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+	})
+})
+
 describe('git_pr_followup.run — the stage block on a run that failed', () => {
 	const FAILURE = new Error('AI review blocker')
 

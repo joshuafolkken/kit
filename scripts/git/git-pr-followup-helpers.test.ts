@@ -3,12 +3,12 @@ import { CODE_RABBIT, make_pr_snapshot, SONAR_QUBE } from './git-pr-checks-fixtu
 import {
 	build_telegram_input,
 	has_closes_keyword,
-	is_blank_issue_body,
 	log_skip_notes,
 	parse_repo_name,
 	read_coderabbit_skip_notes,
 	type TelegramContext,
 } from './git-pr-followup'
+import { is_blank_issue_body } from './git-pr-followup-wrapup'
 
 // The pure half of `git-pr-followup`: functions that answer from their arguments alone. Kept apart
 // from the run tests, which need the whole `gh` surface mocked before the module is even imported.
