@@ -1,6 +1,7 @@
 import { cost_attribute } from '#scripts/cost/cost-attribute'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
 import { time_duplicate, type SessionSpans } from './time-duplicate'
+import { time_family, type Family, type SpanReader } from './time-family'
 import { time_overlap } from './time-overlap'
 import { time_sessions, type ExcludedSession } from './time-sessions'
 import { time_spans, type Span } from './time-spans'
@@ -33,6 +34,7 @@ import { time_spans, type Span } from './time-spans'
 
 const NO_ISSUES = 0
 const NO_SESSIONS = 0
+const NO_SPANS = 0
 
 // A session that never wrote a line on the issue's branch can contribute nothing, because the
 // fill-forward walk only ever carries a branch that session actually declared. So the test is exact
@@ -63,6 +65,10 @@ interface IssueSpans {
 	excluded: Array<ExcludedSession>
 	is_separated: boolean
 	attributed_count: number
+	// The transcripts of this run's own family that could not be read (joshuafolkken/kit#1439). Kept
+	// apart from `session_count` because a transcript nobody could read contributed no span, and
+	// folding the two would report a run that is missing minutes as one that spent none.
+	unread_count: number
 }
 
 // Drained with a loop rather than a spread of `Map#values()`: `Iterator#toArray` is not in this
@@ -94,10 +100,21 @@ interface Collector {
 	by_session: Map<string, SessionSpans>
 	counted: Map<string, Span>
 	transcripts: Map<string, number>
+	// Which transcripts this issue took spans from, and which of its family could not be read
+	// (joshuafolkken/kit#1439). The first is what the family expansion grows from — a session id
+	// alone cannot say whether it was the session's own file or one of its units that contributed.
+	contributed: Set<string>
+	unread: Set<string>
 }
 
 function new_collector(): Collector {
-	return { by_session: new Map(), counted: new Map(), transcripts: new Map() }
+	return {
+		by_session: new Map(),
+		counted: new Map(),
+		transcripts: new Map(),
+		contributed: new Set(),
+		unread: new Set(),
+	}
 }
 
 // **Grouped by the session a transcript belongs with, not pooled.** A unit's work overlaps the wait
@@ -123,9 +140,42 @@ function absorb_spans(collector: Collector, file: SessionFile, spans: ReadonlyAr
 	const owner = cost_transcript.owning_session_id(file)
 	const group = group_for(collector.by_session, owner)
 
+	if (spans.length > NO_SPANS) collector.contributed.add(file.session_id)
+
 	absorb(file.is_delegated ? group.delegated : group.own, spans)
 
 	if (absorb(collector.counted, spans)) count_transcript(collector.transcripts, owner)
+}
+
+// What the run's own transcripts said, per session, so the family expansion can ask which minutes
+// the parent was executing this issue in. Read from `own` alone: a unit's spans are what the
+// downward test is *about*, and folding them in would let one unit vouch for the next.
+function attributed_spans(collector: Collector): Map<string, ReadonlyArray<Span>> {
+	const found = new Map<string, ReadonlyArray<Span>>()
+
+	for (const [owner, group] of collector.by_session) found.set(owner, values_of(group.own))
+
+	return found
+}
+
+// **The second pass — the family of what the first pass read** (joshuafolkken/kit#1439). It runs
+// after the walk rather than inside it because which transcripts are relatives is not known until
+// the whole listing has been attributed: a unit is claimed by the minutes of a parent that may be
+// read later in the directory order.
+function absorb_relatives(
+	collector: Collector,
+	families: ReadonlyMap<string, Family>,
+	read: SpanReader,
+): void {
+	const found = time_family.collect({
+		families,
+		contributed: collector.contributed,
+		attributed: attributed_spans(collector),
+		read,
+	})
+
+	for (const one of found.added) absorb_spans(collector, one.file, one.spans)
+	for (const session_id of found.unread) collector.unread.add(session_id)
 }
 
 // Each session's spans resolved against its own units, then folded together under the same key — a
@@ -182,6 +232,7 @@ function to_issue_spans(collector: Collector): IssueSpans {
 		excluded: split.excluded,
 		is_separated: split.is_separated,
 		attributed_count: split.attributed_count,
+		unread_count: collector.unread.size,
 	}
 }
 
@@ -193,6 +244,7 @@ function empty_spans(): IssueSpans {
 		excluded: [],
 		is_separated: false,
 		attributed_count: NO_SESSIONS,
+		unread_count: NO_SESSIONS,
 	}
 }
 
@@ -261,6 +313,11 @@ function collect_for_issues(
 	const files = cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd))
 
 	for (const file of files) absorb_file(collectors, file)
+
+	const families = time_family.group(files)
+	const read = time_family.memo_reader()
+
+	for (const [, collector] of collectors) absorb_relatives(collector, families, read)
 
 	return to_results(collectors)
 }
