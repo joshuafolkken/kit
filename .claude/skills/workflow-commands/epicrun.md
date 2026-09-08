@@ -824,6 +824,34 @@ silence clock, which is what keeps a heartbeat from landing immediately behind a
 it would be noise rather than news. The clock is silence, never a timer; the command's own reference
 is `docs/josh-commands.md` → "`josh run:progress`".
 
+**Never arm a wait timer of your own, and the hook refuses one rather than asking you not to**
+(joshuafolkken/kit#1570). The watcher above owns the clock: it wakes on its own and prints when the
+run has been quiet for the interval, so a `Bash` call that only sleeps adds a second clock nobody
+reconciles. That is what happened — a timer was armed on the turn a timer fired **and** again on the
+turn a delegated child's completion woke the run, so two ran at once and each produced a report the
+other knew nothing about; the interval was set to fifteen minutes and reports arrived 3–5 minutes
+apart. **The promise was kept and the interval was not**: `--mark` was called at every real report,
+and nothing read the marked clock before the next report was written. So the refusal is put in front
+of the **arm** rather than in front of the report — a report is prose and no hook can see it coming,
+while the call that sleeps is a call. `pnpm josh rule:guard` refuses it when a timer it allowed is
+still live, or when the report that timer would produce would land before the interval is up.
+
+**The default interval is twenty minutes, and it is overridable — by the person, not by the run.**
+Set `JOSH_PROGRESS_INTERVAL_MINUTES` and both sides move together: the guard reads that variable
+through the same reader the watcher does, so the floor it enforces is the interval the run was told
+to keep. **`--interval` moves the watcher alone** — a hook has no command line to read — so it can
+only make the watcher quieter than the floor, never the guard stricter; a run that wants a different
+cadence sets the variable rather than the flag. Twenty rather than ten because a child measures 20–46
+minutes: one to two reports per child, each with a stage change in it.
+
+**An explicit ask is not a heartbeat, and it is exempt by construction rather than by exception.**
+What is refused is arming a *timer*. A person asking "how is it going" arrives as a turn with no timer
+in front of it, and `pnpm josh run:progress --once` prints one line whatever the clock says — so there
+is no exception to write and none to get wrong. **A live timer is counted from the record the guard
+writes when it allows one**, never from the `sleep` processes on the machine: a process count cannot
+tell a heartbeat timer from a build step that sleeps, and a timer killed with its shell would leave
+the count wrong for the rest of the run.
+
 **Every report this run writes opens with the time the observation was taken.** Not only how long it
 has been quiet: the heading carries an absolute instant, in the same form the watcher prints —
 `at YYYY-MM-DDTHH:MMZ`. A relative figure means something only while the reports keep coming, and
@@ -847,7 +875,7 @@ verification result** — no gate, no CI, no check rollup — because the comman
 a result nobody read must never be printed as one.
 
 **It goes to the session only.** No Telegram: the existing `confirmation` and `completion` messages
-are what interrupt a person, and a heartbeat every ten minutes beside them would cheapen both.
+are what interrupt a person, and a heartbeat every twenty minutes beside them would cheapen both.
 
 **Nothing is reported while no child is in flight**, so a run parked on a decision goes quiet rather
 than repeating itself, and the first child to start is reported at once.

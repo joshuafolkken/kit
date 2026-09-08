@@ -1,7 +1,8 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
-import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
+import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
+import { early_heartbeat } from './early-heartbeat'
 import { piped_verification } from './piped-verification'
 import { shell_body_trigger } from './shell-body-trigger'
 
@@ -40,6 +41,14 @@ interface DeliveredRule {
 	// What the model is told. The deny reason is the only text that reaches it, so it carries the
 	// instruction and the pointer rather than a summary of either.
 	reason: string
+	// **A rule that has to bind on every occurrence supplies this, and once-per-run stops applying to
+	// it** (joshuafolkken/kit#1570). Once per run is right for a rule a run then obeys — read the
+	// comments, count the Issues, put the body in a file — because the refusal changes what the run
+	// knows. It is wrong for one whose subject is a *recurring* act: refused once and free
+	// afterwards, the enforcement is back to the parent's self-restraint, which is the thing that
+	// failed. A row with this field is asked it instead, and it is asked on every candidate call —
+	// `can_record` is what the batching stand-aside becomes for such a row (see `delivery_decision`).
+	decide?: (call: GuardedCall, run: GuardRun, can_record: boolean) => boolean
 }
 
 const STAMP_PREFIX = 'josh-rule-guard-'
@@ -210,6 +219,12 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: on_bash_command(piped_verification.is_masked_verification),
 		reason: piped_verification.PIPED_VERIFICATION_REASON,
 	},
+	{
+		id: 'early-heartbeat',
+		is_trigger: on_bash_command(early_heartbeat.is_wait_timer),
+		reason: early_heartbeat.EARLY_HEARTBEAT_REASON,
+		decide: early_heartbeat.decide,
+	},
 ]
 
 // **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
@@ -268,12 +283,34 @@ function is_first_delivery(
 	return !will_batch_guard_refuse(tail, call, run)
 }
 
+// **For a row that decides for itself, the stand-aside changes what it protects.** For a once-per-run
+// row it protects the *record*, because a lost race spends the one delivery the run gets. A recurring
+// row cannot be silently deleted that way — it fires again — and standing aside from the refusal would
+// instead make it silent on precisely the lone `Bash` call the batching guard also claims, which is
+// what an armed timer always is, for the whole ten-second window and the reissue inside it. So the
+// refusal is asked unconditionally and the stand-aside is handed to the row as `can_record`: what must
+// not happen on a call another hook may stop is the *write*, which would record a timer that never ran.
+function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_block'] {
+	const { decide } = rule
+
+	if (decide === undefined) return is_first_delivery
+
+	return function should_block(
+		tail: string,
+		call: GuardedCall,
+		_delivered_at_ms: number,
+		run: GuardRun,
+	): boolean {
+		return decide(call, run, !will_batch_guard_refuse(tail, call, run))
+	}
+}
+
 function guard_of(rule: DeliveredRule): ReturnType<typeof hook_decision.create_transcript_guard> {
 	return hook_decision.create_transcript_guard({
 		prefix: `${STAMP_PREFIX}${rule.id}-`,
 		switch_key: SWITCH_ENV_KEY,
 		is_candidate: rule.is_trigger,
-		should_block: is_first_delivery,
+		should_block: delivery_decision(rule),
 		reason: rule.reason,
 	})
 }
@@ -318,6 +355,7 @@ function is_enabled(): boolean {
 
 const delivered_rules = {
 	DELIVERED_RULES,
+	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
 	ISSUE_COMMENTS_REASON,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
 	SHELL_BODY_REASON,
@@ -329,6 +367,7 @@ const delivered_rules = {
 	is_enabled,
 	is_issue_filing,
 	is_masked_verification: piped_verification.is_masked_verification,
+	is_wait_timer: early_heartbeat.is_wait_timer,
 }
 
 export type { DeliveredRule }

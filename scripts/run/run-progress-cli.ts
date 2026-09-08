@@ -21,7 +21,7 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 // Notices go to standard error.
 //
 // **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
-// `scripts/git/telegram-notify`, which is the only egress there is. A heartbeat every ten minutes on
+// `scripts/git/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
 // a phone is notification fatigue, and it would cheapen the `confirmation` and `completion` messages
 // that do need to interrupt someone.
 
@@ -39,7 +39,7 @@ const TICK_SECONDS = 30
 // same property re-reads GitHub every 30 seconds for the watcher's whole life: roughly 960 listings
 // over eight idle hours, which is secondary-rate-limit territory and would itself start producing the
 // unreadable listings this branch exists to handle. Two minutes keeps "reported at once" true to
-// within a fraction of the ten-minute interval and takes the call count down with it.
+// within a fraction of the twenty-minute interval and takes the call count down with it.
 const DECLINE_RETRY_SECONDS = 120
 // The clock a fresh loop starts with: nothing has declined yet, so nothing is being waited out.
 const NO_RETRY = 0
@@ -49,7 +49,7 @@ const NO_RETRY = 0
 const DEFAULT_MAX_HOURS = 8
 const MS_PER_HOUR = 3_600_000
 const ENVIRONMENT_KEY = 'JOSH_PROGRESS'
-const INTERVAL_KEY = 'JOSH_PROGRESS_INTERVAL_MINUTES'
+const { INTERVAL_KEY } = run_progress
 const DISABLED_VALUE = '0'
 
 const USAGE =

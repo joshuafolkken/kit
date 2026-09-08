@@ -17,6 +17,7 @@ const SKILL = '.claude/skills/workflow-commands/epicrun.md'
 const FULLRUN = '.claude/skills/workflow-commands/fullrun.md'
 const QUEUE = '.claude/skills/workflow-commands/queue.md'
 const HALFRUN = '.claude/skills/workflow-commands/halfrun.md'
+const RULE_DELIVERY = 'prompts/collaboration-workflow/rule-delivery.md'
 const COMMAND = 'run:progress'
 const ALIAS = 'rg'
 const SCRIPT_PATH = 'scripts/run/run-progress-cli.ts'
@@ -50,6 +51,14 @@ const DOC_MARKERS: ReadonlyArray<string> = [
 	'A repository with nothing in flight is told apart from one whose listing could not be read',
 	// joshuafolkken/kit#1560. The absolute observation time, and the three decisions behind it.
 	'When the observation was taken, with its date, in UTC',
+	// joshuafolkken/kit#1570. The moved default, the argument for it, and the row that enforces the
+	// interval against the run's own prose rather than only against this command's own lines.
+	'Why twenty minutes.',
+	'The silence interval in minutes. Default 20.',
+	'The `early-heartbeat` row of `josh rule:guard` refuses the `Bash` call that arms such a timer',
+	'an explicit ask is not a heartbeat',
+	'The fourth row is the early heartbeat',
+	'One delivery per run — except for a row whose subject is a recurring act',
 ]
 
 const SKILL_MARKERS: ReadonlyArray<string> = [
@@ -87,6 +96,13 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'The date is part of it',
 	'The zone is UTC, and never the one the reader happens to be in',
 	'It is added, never substituted for the elapsed figure',
+	// joshuafolkken/kit#1570. The refusal in front of the arm, the three answers it turns on, and the
+	// measurement that makes it believable — the promise was kept and the interval was not.
+	'Never arm a wait timer of your own, and the hook refuses one rather than asking you not to',
+	'The promise was kept and the interval was not',
+	'The default interval is twenty minutes, and it is overridable — by the person, not by the run.',
+	'An explicit ask is not a heartbeat, and it is exempt by construction rather than by exception.',
+	'A live timer is counted from the record the guard writes when it allows one',
 ]
 
 // One case per file per marker: the section's body must live in exactly one file.
@@ -145,6 +161,20 @@ describe('the other entry points reference the section instead of copying it', (
 describe('a batch parent tells its unit not to start a second watcher', () => {
 	it.each(BATCH_PARENTS)('%s writes the exception into the brief', (skill) => {
 		expect(read_unwrapped(skill)).toContain(WATCHER_EXCEPTION)
+	})
+})
+
+// joshuafolkken/kit#1570. The mechanism half of the Issue: the enumeration's own topic file has to
+// carry the row and the once-per-run exception, or a future row copies the exception by accident.
+describe(`${RULE_DELIVERY} — the row and its exception are written down`, () => {
+	const content = read_unwrapped(RULE_DELIVERY)
+
+	it.each(['早すぎる進捗報告', '例外 — 繰り返す行為を止める行は毎回発火する'])(STATES, (marker) => {
+		expect(content).toContain(marker)
+	})
+
+	it('sends the reader to the section that carries the procedure', () => {
+		expect(content).toContain(SECTION)
 	})
 })
 

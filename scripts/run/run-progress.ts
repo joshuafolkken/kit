@@ -10,9 +10,16 @@
 //
 // **A line that could say "still running" is a line not worth printing.** Five minutes was measured in
 // live use on 2026-09-07 and 6 of 15 reports carried no changed number at all, which is the same
-// information as silence. The default is therefore ten minutes, and every field below is re-read on
-// each tick rather than remembered — a child's labels, whether a pull request exists yet, which lanes
-// are open, the load average, and how long the whole set has been identical.
+// information as silence. Ten was measured next and was still short of a stage change, so the default
+// is twenty minutes (joshuafolkken/kit#1570): a child measures 20–46 minutes, and twenty gives one to
+// two reports per child rather than a run of lines saying what the last one said. Every field below is
+// re-read on each tick rather than remembered — a child's labels, whether a pull request exists yet,
+// which lanes are open, the load average, and how long the whole set has been identical.
+//
+// **The interval is kept here so one number answers for both halves of the mechanism.** The watcher
+// asks `is_due` before it prints, and the trigger-delivered rule that refuses an early heartbeat
+// (`scripts/rules/early-heartbeat.ts`) asks the same two functions rather than carrying a second copy
+// of the clock — a guard that could disagree with the watcher it guards is worse than no guard.
 //
 // **Nothing here reports a verification result.** No gate conclusion, no CI conclusion, no check
 // rollup: this module reads none of them, and a result nobody read must never be printed as one. What
@@ -34,7 +41,10 @@
 //   when the observation was taken are two different facts, and neither can be reconstructed from the
 //   other without knowing the answer already.
 
-const DEFAULT_INTERVAL_MINUTES = 10
+const DEFAULT_INTERVAL_MINUTES = 20
+// The one name for the setting, so the watcher and the guard read the same variable rather than two
+// spellings of it.
+const INTERVAL_KEY = 'JOSH_PROGRESS_INTERVAL_MINUTES'
 const MS_PER_MINUTE = 60_000
 const MS_PER_SECOND = 1000
 const DEFAULT_INTERVAL_MS = DEFAULT_INTERVAL_MINUTES * MS_PER_MINUTE
@@ -190,11 +200,27 @@ function interval_from(raw: string | undefined): number {
 	return minutes * MS_PER_MINUTE
 }
 
+/**
+ * The interval in force, from the environment alone — the **floor** the guard enforces.
+ *
+ * **It is deliberately not the watcher's effective interval.** The watcher takes `--interval` on top
+ * of the environment, and a hook has no command line to read; so rather than guessing, this answers
+ * the one number both sides can see. A `--interval` above the floor makes the watcher quieter than
+ * the guard requires, which is the harmless direction; below it, the watcher prints more often than
+ * the guard would let the run arm a timer for — so a run that wants a different cadence sets
+ * `JOSH_PROGRESS_INTERVAL_MINUTES`, which both read.
+ */
+function configured_interval_ms(): number {
+	return interval_from(process.env[INTERVAL_KEY])
+}
+
 const run_progress = {
 	DEFAULT_INTERVAL_MINUTES,
 	DEFAULT_INTERVAL_MS,
+	INTERVAL_KEY,
 	MS_PER_MINUTE,
 	MS_PER_SECOND,
+	configured_interval_ms,
 	format_child,
 	format_lanes,
 	format_line,
