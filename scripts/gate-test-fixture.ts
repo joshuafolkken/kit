@@ -63,6 +63,7 @@ function capture_stdout(): CapturedOutput {
 interface SuiteRecords {
 	stamp_path: string
 	marker_path: string
+	log_path: string
 	clear: () => void
 }
 
@@ -78,17 +79,23 @@ interface SuiteRecords {
 // Keyed on the label and the pid together, so two suites in parallel workers cannot answer for each
 // other, and `clear` comes back with the paths rather than being written out per suite — three suites
 // removing two files each is where the fourth one forgets the marker.
+// The gate log is the third destination and is here for the same reason (joshuafolkken/kit#1227):
+// every run writes it, so a suite left on the shared path would overwrite the live gate's own log
+// with the output of four checks that never ran.
 function suite_records(label: string): SuiteRecords {
 	const suite_key = `${label}-${String(process.pid)}`
 	const stamp_path = path.join(tmpdir(), `josh-gate-suite-stamp-${suite_key}.json`)
 	const marker_path = path.join(tmpdir(), `josh-gate-suite-running-${suite_key}.json`)
+	const log_path = path.join(tmpdir(), `josh-gate-suite-log-${suite_key}.log`)
 
 	return {
 		stamp_path,
 		marker_path,
+		log_path,
 		clear: (): void => {
 			rmSync(stamp_path, { force: true })
 			rmSync(marker_path, { force: true })
+			rmSync(log_path, { force: true })
 		},
 	}
 }

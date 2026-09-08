@@ -3,6 +3,7 @@ import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { bounded_pool } from './bounded-pool'
 import { buffered_process, FAIL_EXIT_CODE, type BufferedProcessResult } from './buffered-process'
+import { gate_log } from './gate-log'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { gate_skip } from './gate-skip'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -152,12 +153,18 @@ function format_seconds(elapsed_ms: number): string {
 // The duration goes at the **end** of the header, after the command. The header's first job is
 // naming the one command to re-run while fixing (`docs/josh-commands.md` → `josh gate`), and a
 // number spliced in front of it would push that name out of the place a reader scans for it.
-function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
+//
+// Built rather than inlined because the log file names each section with the same string
+// (joshuafolkken/kit#1227): a header written twice is a header the two copies can disagree about,
+// and the log exists precisely to be read when the console's copy has been elided.
+function gate_step_header(result: GateStepResult): string {
 	const icon = is_gate_step_failed(result) ? FAIL_ICON : PASS_ICON
 
-	process.stdout.write(
-		`\n${icon} ${result.label} (pnpm ${result.command}) ${format_seconds(result.elapsed_ms)}\n`,
-	)
+	return `${icon} ${result.label} (pnpm ${result.command}) ${format_seconds(result.elapsed_ms)}`
+}
+
+function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
+	process.stdout.write(`\n${gate_step_header(result)}\n`)
 
 	if (should_print_body(result, is_verbose) && result.output) {
 		process.stdout.write(`${result.output}\n`)
@@ -168,20 +175,22 @@ function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
 // so a sum would report about three times what the caller waited. It is what the four are read
 // against: four checks at 9s, 5s, 3s and 15s against a total of 23s says the fan-out is working,
 // and the same four against 80s says the machine was contended rather than any check being slow.
+//
+// The log path is printed with the summary and immediately **above** the verdict line, which stays
+// last for the reason `josh-verdict.ts` gives (joshuafolkken/kit#1227).
 function print_gate_summary(
 	failed_labels: ReadonlyArray<string>,
 	elapsed_ms: number,
 	step_count: string,
+	log_path?: string,
 ): void {
 	const total = format_seconds(elapsed_ms)
+	const verdict =
+		failed_labels.length === 0
+			? josh_verdict.format_gate_passed(step_count, total)
+			: josh_verdict.format_gate_failed(failed_labels.join(', '), total)
 
-	if (failed_labels.length === 0) {
-		process.stdout.write(`\n${josh_verdict.format_gate_passed(step_count, total)}\n`)
-
-		return
-	}
-
-	process.stdout.write(`\n${josh_verdict.format_gate_failed(failed_labels.join(', '), total)}\n`)
+	process.stdout.write(`\n${gate_log.format_log_notice(log_path)}${verdict}\n`)
 }
 
 // The record `josh review:brief` reads, written only on a fully green run and only with the tree it
@@ -352,6 +361,10 @@ interface GateOptions {
 	is_unit_included?: boolean
 	stamp_path?: string
 	marker_path?: string
+	// The gate log's destination, a parameter for the same reason the two above are: this suite runs
+	// inside `pnpm josh gate`, so a test writing to the shared path would overwrite the live gate's
+	// own log with the output of four checks that never ran.
+	log_path?: string
 }
 
 // **A partial gate records nothing green, and this is the same rule as the skip one layer out**
@@ -371,6 +384,33 @@ async function record_whole_gate(
 	await record_green_gate(results, tree.files, options.stamp_path, tree.base)
 }
 
+// Everything a finished run says, in the order a reader meets it: the four blocks, then the log the
+// blocks may have been elided out of, then the verdict. **Every check's whole output goes into the
+// log, the ones the console dropped included** — a passing body is noise on the console
+// (joshuafolkken/kit#967), and suppressed output that exists nowhere is what a `--verbose` re-run is
+// otherwise for.
+function report_gate_steps(
+	results: ReadonlyArray<GateStepResult>,
+	options: GateOptions,
+	elapsed_ms: number,
+	step_count: string,
+): ReadonlyArray<string> {
+	for (const result of results) print_gate_step(result, options.is_verbose ?? false)
+
+	const entries = results.map((result) => ({
+		header: gate_step_header(result),
+		output: result.output,
+	}))
+	const failed_labels = results
+		.filter((result) => is_gate_step_failed(result))
+		.map((result) => result.label)
+	const log_path = gate_log.write_gate_log(entries, options.log_path)
+
+	print_gate_summary(failed_labels, elapsed_ms, step_count, log_path)
+
+	return failed_labels
+}
+
 // The plan line is printed by the checked path alone. A run that announced a four-way fan-out and
 // then skipped would be describing something that never happened, and the skip's own line already
 // says everything there is to say about a gate that started no process.
@@ -388,14 +428,12 @@ async function run_checked_gate(
 	// the next lane asks; the guard inside the spawned `josh test:unit` sees the handoff and adds no
 	// second marker for the same run (joshuafolkken/kit#1515).
 	const results = await run_planned_gate_steps(tree.files, plan, options.marker_path)
-
-	for (const result of results) print_gate_step(result, options.is_verbose ?? false)
-
-	const failed_labels = results
-		.filter((result) => is_gate_step_failed(result))
-		.map((result) => result.label)
-
-	print_gate_summary(failed_labels, performance.now() - started_at, String(plan.checks.length))
+	const failed_labels = report_gate_steps(
+		results,
+		options,
+		performance.now() - started_at,
+		String(plan.checks.length),
+	)
 
 	if (failed_labels.length > 0) return FAIL_EXIT_CODE
 
