@@ -245,3 +245,28 @@ describe('time_overlap.covered_only_by_ms', () => {
 		expect(time_overlap.covered_only_by_ms(windows, all, [])).toBe(10)
 	})
 })
+
+describe('time_overlap.shared_ms', () => {
+	it('reports the wall clock two intervals hold in common', () => {
+		const left = { started_ms: 0, ended_ms: 10 }
+		const right = { started_ms: 4, ended_ms: 20 }
+
+		expect(time_overlap.shared_ms(left, right)).toBe(6)
+	})
+
+	// A negative difference read as a real overlap is the one mistake a hand-written clamp makes, and
+	// it would name a cycle as hidden behind work that ran after it finished.
+	it('reports nothing for two intervals that never meet', () => {
+		const left = { started_ms: 0, ended_ms: 10 }
+		const right = { started_ms: 30, ended_ms: 40 }
+
+		expect(time_overlap.shared_ms(left, right)).toBe(0)
+	})
+
+	it('reports the whole of an interval that another encloses', () => {
+		const left = { started_ms: 4, ended_ms: 6 }
+		const right = { started_ms: 0, ended_ms: 10 }
+
+		expect(time_overlap.shared_ms(left, right)).toBe(2)
+	})
+})

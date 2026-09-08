@@ -1,6 +1,7 @@
 import { expect } from 'vitest'
 import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
+import { time_cycles } from './time-cycles'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import { time_gaps } from './time-gaps'
@@ -63,6 +64,7 @@ type Breakdown = Pick<
 	| 'segments'
 	| 'by_invocation'
 	| 'by_check'
+	| 'ci_cycles'
 	| 'gaps'
 	| 'bundles'
 	| 'single_checks'
@@ -81,6 +83,7 @@ function empty_breakdown(): Breakdown {
 		by_josh_command: [],
 		by_invocation: [],
 		by_check: [],
+		ci_cycles: { ...time_cycles.NO_CYCLES },
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },

@@ -1,6 +1,7 @@
 import { time_bundles, type BundleTotals } from './time-bundles'
 import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
+import { time_cycles, type CycleTotals } from './time-cycles'
 import { time_failures, type FailureTotals } from './time-failures'
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
@@ -166,6 +167,11 @@ interface TimeReport extends TurnSplit {
 	// (joshuafolkken/kit#1269). Every span lands in exactly one phase and the CI share is its own, so
 	// these sum to `elapsed_ms` — `other` is what keeps that true rather than being discarded.
 	phases: Array<PhaseTotal>
+	// The `ci` phase one cycle at a time, each saying how much of it went on the wall clock and what
+	// the rest of it hid behind (joshuafolkken/kit#1465). The phase above is the whole wait; only this
+	// separates a cycle that ran behind the second review round — costing nothing — from one the run
+	// sat through. Built by `time-cycles.ts`, which also renders the block.
+	ci_cycles: CycleTotals
 	// The same elapsed time again, this time as the stretches it was spent in rather than as totals
 	// (joshuafolkken/kit#1311). Every span lands in exactly one segment, so these sum to the three
 	// transcript shares — the phase table's total without the CI share, which no span covers.
@@ -298,7 +304,7 @@ function per_round_trip_costs(
 // module owns, and only `by_tool` needs anything the totals computed.
 type ReportTables = Pick<
 	TimeReport,
-	'phases' | 'segments' | 'by_tool' | 'by_josh_command' | 'by_invocation' | 'by_check'
+	'phases' | 'ci_cycles' | 'segments' | 'by_tool' | 'by_josh_command' | 'by_invocation' | 'by_check'
 >
 
 function report_tables(input: ReportInput, turns: TurnTotals): ReportTables {
@@ -306,6 +312,7 @@ function report_tables(input: ReportInput, turns: TurnTotals): ReportTables {
 
 	return {
 		phases: time_phases.build_phases({ spans, ci: input.ci }),
+		ci_cycles: time_cycles.build_cycles(spans, input.ci),
 		segments: time_segments.build_segments(spans),
 		by_tool: time_tool_turns.with_turn_counts(
 			totals_by(spans, (span) => span.label),
@@ -443,8 +450,7 @@ function format_empty(report: TimeReport): string {
 function format_report(report: TimeReport): string {
 	if (report.span_count === 0 && report.categories.ci_ms === 0) return format_empty(report)
 
-	const { failures, tool_call_count } = report
-	const { tool_ms } = report.categories
+	const { failures, tool_call_count, categories } = report
 
 	return [
 		`${report.scope} — ${format_minutes(report.elapsed_ms)} elapsed`,
@@ -453,12 +459,13 @@ function format_report(report: TimeReport): string {
 		'Where the wall clock went:',
 		...category_lines(report),
 		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
+		...time_cycles.cycle_lines(report.ci_cycles),
 		...time_segments.segment_lines(report.segments),
 		...time_trips.trip_lines(report),
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_single_checks.single_check_lines(report.single_checks, report),
-		...time_failures.failure_lines(failures, tool_call_count, tool_ms),
+		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
 		...time_rework.rework_lines(report.rework),
 		...total_lines('By tool (descending):', report.by_tool, tool_suffix),
 		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),

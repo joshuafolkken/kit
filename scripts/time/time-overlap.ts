@@ -110,6 +110,17 @@ function covered_only_by_ms(
 	)
 }
 
+// How much of the wall clock two intervals hold in common, and `0` where they hold none. Here rather
+// than beside its caller because interval arithmetic is this module's whole subject: a second
+// clamping written next to whoever needs it is where one of them comes to read a negative overlap as
+// a real one (joshuafolkken/kit#1465).
+function shared_ms(left: Interval, right: Interval): number {
+	const started_ms = Math.max(left.started_ms, right.started_ms)
+	const ended_ms = Math.min(left.ended_ms, right.ended_ms)
+
+	return Math.max(ended_ms - started_ms, NO_DURATION)
+}
+
 const FIRST_PART = 0
 
 function to_interval(span: Span): Interval {
@@ -250,6 +261,7 @@ const time_overlap = {
 	uncovered_ms,
 	union_intervals,
 	covered_only_by_ms,
+	shared_ms,
 	to_interval,
 	resolve_delegated,
 }

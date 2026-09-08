@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { time_bundles } from './time-bundles'
 import type { CheckTotal } from './time-checks'
 import { time_cli } from './time-cli'
+import { time_cycles } from './time-cycles'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
 import { time_gaps } from './time-gaps'
@@ -103,6 +104,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		ms_per_round_trip: MINUTE_MS,
 		model_ms_per_round_trip: MINUTE_MS,
 		categories: { model_ms: MINUTE_MS, tool_ms: 0, human_ms: 0, ci_ms: 0 },
+		ci_cycles: { ...time_cycles.NO_CYCLES },
 		has_ci_data: false,
 		notes: [...notes],
 		phases: [],
