@@ -1,4 +1,4 @@
-import { IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_classify, type DependencyVerdict } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -188,7 +188,66 @@ describe('epic_classify.classify_children — every open child is accounted for'
 	})
 })
 
+// joshuafolkken/kit#1476: an epic's task list can hold a row pointing at another epic, and nothing
+// read it — the row fell through to `from_blockers`, which minted `runnable`, so `epicrun` handed an
+// epic to `fullrun` as an ordinary issue. The cases below vary one property at a time, because the
+// refusal must key on the `epic` label and never on a row naming another repository — that one is
+// legitimate, and disables the epic auto-close by design.
+describe('epic_classify.classify_children — a child that is itself an epic', () => {
+	it('withholds it instead of offering it', () => {
+		const result = epic_classify.classify_children([child(1, { labels: [EPIC_LABEL] })])
+
+		expect(result.runnable).toEqual([])
+		expect(numbers(result.human)).toEqual([1])
+	})
+
+	it('still offers a child in another repository that is not an epic', () => {
+		const result = epic_classify.classify_children([child(1, { repo: CONSUMER })])
+
+		expect(numbers(result.runnable)).toEqual([1])
+	})
+
+	it('withholds one in another repository that is an epic', () => {
+		const nested = child(1, { repo: CONSUMER, labels: [EPIC_LABEL] })
+		const result = epic_classify.classify_children([nested])
+
+		expect(result.runnable).toEqual([])
+		expect(numbers(result.human)).toEqual([1])
+	})
+
+	it('names it on standard error, since the report prints a bare number', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		epic_classify.reset_reported()
+		epic_classify.classify_children([child(7, { labels: [EPIC_LABEL] })])
+
+		expect(warn.mock.calls.join('\n')).toContain('#7')
+		expect(warn.mock.calls.join('\n')).toContain('is itself an epic')
+		warn.mockRestore()
+	})
+
+	it('says nothing about a closed one, which nobody has to act on', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+		epic_classify.reset_reported()
+		epic_classify.classify_children([child(8, { labels: [EPIC_LABEL], state: 'CLOSED' })])
+
+		expect(warn).not.toHaveBeenCalled()
+		warn.mockRestore()
+	})
+})
+
 describe('epic_classify.local_category', () => {
+	it('matches a label whatever casing the repository created it with', () => {
+		expect(epic_classify.local_category(child(1, { labels: ['Epic'] }))).toBe('human')
+	})
+
+	it('prefers the epic label over the running one', () => {
+		const nested = child(1, { labels: [IN_PROGRESS_LABEL, EPIC_LABEL] })
+
+		expect(epic_classify.local_category(nested)).toBe('human')
+	})
+
 	it('prefers the parked label over the running one', () => {
 		const parked = child(1, { labels: [IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL] })
 

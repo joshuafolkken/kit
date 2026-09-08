@@ -570,9 +570,9 @@ pnpm --dir "$dir" install --frozen-lockfile
 
 The child runs as `fullrun #<N>` in a delegated unit, per "Each child runs in a delegated unit"
 above, with two additions to the brief: **the lane directory every command is to run in**, and that
-`josh latest` is not to be run there. Everything else — the plan, the gate, `/code-review`,
-`pnpm josh git`, `pnpm josh followup` — is unchanged, and `pnpm josh followup` releases that lane's
-hold at the merge as it always has.
+neither `josh latest` nor a progress watcher is to be started there. Everything else — the plan, the
+gate, `/code-review`, `pnpm josh git`, `pnpm josh followup` — is unchanged, and
+`pnpm josh followup` releases that lane's hold at the merge as it always has.
 
 **Start each unit without blocking on it, and poll them all.** That is "A delegated unit that stopped
 without reporting" above applied N times rather than once, and
@@ -824,9 +824,65 @@ are what interrupt a person, and a heartbeat every ten minutes beside them would
 **Nothing is reported while no child is in flight**, so a run parked on a decision goes quiet rather
 than repeating itself, and the first child to start is reported at once.
 
-**The scope is this command.** A standalone `fullrun` or `queue` does not start it — the Issue that
-added it left that undecided, and widening it without a decision would print progress for a run
-nobody is watching unattended, which is the opposite of what the silence trigger is for.
+**The scope is every implementing run, not this command alone** (joshuafolkken/kit#1546). `fullrun`,
+`queue` and `halfrun` start the same watcher under the same rules, and this section is the single
+source for all four entry points: what changes between them is only where the watcher starts and
+what counts as a real report, and both are written here rather than in each command's own file,
+because three copies of one procedure drift. `kickoff` starts none — it plans and stops, so there is
+no silence to break.
+
+**`halfrun` is included, and the reason is that the trigger is silence rather than command
+identity.** It stops before the commit, so it never waits on CI and never merges — but it still
+implements, runs the whole gate, takes both review rounds and runs `pnpm josh test:e2e` itself,
+which is most of the 20–46 minutes a `fullrun` was measured at. It also ends by asking the person
+for something, so a signal that the stop is coming is worth more there than less.
+
+**One watcher per run, and the outermost invocation is the one that starts it.** A `fullrun` running
+as a `queue` issue or an `epicrun` child starts none: the brief names the invocation it descends
+from, so a unit can always tell that it is not the outermost, and a watcher started there would
+print into the unit's context instead of the session the person is watching. `queue` therefore
+starts one for the whole batch, before its first issue, and never one per issue.
+
+**In a single-issue run it starts immediately after `pnpm josh run:hold` succeeds** — the first
+point at which the run is committed to running, which is the same place in the order that "before
+step 1 of the loop" is here. Nothing is reported until the issue carries `in-progress`, so the
+window before the label costs nothing and needs no special case.
+
+**It is started in the target repository's checkout, and `--mark` is run there too.** A
+cross-repository reference — `fullrun joshuafolkken/app-kit#12`, `queue joshuafolkken/app-kit#12
+#13` — is implemented in that repository's checkout, which is where a `fullrun` claims its hold and
+where a `queue` runs every one of its issues. Started in the session's own tree instead, the watcher
+would read *this* repository's `in-progress` listing, where none of the run's issues appear, and the
+run would go silent for its whole length or report an unrelated issue that happens to carry the
+label as its own progress. **`--mark` follows the watcher**, because the report record is kept per
+work tree: a mark written in the session's own tree leaves the watcher's clock untouched, and the
+heartbeat lands on the heels of the real report the mark exists to move it off. Starting it there
+also points the lanes, the load average and the transcript sample at the tree the run is editing,
+which `--repo` alone cannot do.
+
+**What counts as a real report when the run has one issue.** A child merged or parked is this loop's
+unit and a `fullrun` has exactly one child, so the unit there is instead **any turn that puts a
+progress statement in front of the person**. There are four, and `pnpm josh run:progress --mark` is
+run in the same turn as each: **the Step 0 work summary, the pull request opening, each review
+round's verdict, and any `confirmation` / `failure` / `completion` notification or stop.** **A tool
+result only you read is not one** — a gate run, a `gh` read, an edit — which is the same
+discriminator this loop already applies, and marking on those would hide the silence the interval
+exists to measure.
+
+**`--output` is omitted in those runs, and `record` reads `unread`.** The flag fixes one set of
+transcripts for the watcher's whole life: a single-issue run in the session's own context has no
+delegated unit to name, and a queue's unit changes with every issue, so a path fixed at the start
+would go on ageing a finished unit's file and report a run that had long moved on as stuck.
+`unread` is the command's defined answer for "no path was given" rather than a guess, and every
+other field on the line is unaffected.
+
+**A run that merges needs no teardown, and a run that stops has to end the watcher itself.** The
+issue leaves the `in-progress` listing at the merge, so the watcher goes quiet on its own by the
+rule above and `--hours` expires it. **A stop keeps that label on purpose** — that is what makes the
+stop resumable — so the background process is stopped in the same turn as the stop notification, or
+it reports for up to eight more hours into a session that is waiting on a person. That covers
+`halfrun`'s stop before commit, a `needs-human-review` stop, a split or prerequisite stop, and
+`queue`'s failure stop.
 
 ## The loop
 
@@ -861,8 +917,10 @@ per child, and treat a single non-numeric line as the verdict.
    the child then runs as `fullrun #<N>` does, through the verification gate and the
    merge, **in a delegated unit where one is available** (`pnpm josh delegate epic-child` →
    `delegate`; see "Each child runs in a delegated unit" above) and **in this session's own context
-   where none is**, **except that `josh latest` is not run** — it runs once, before this session's
-   first child, and not again (above).
+   where none is**, **except that `josh latest` is not run** and **no progress watcher is started** —
+   the first runs once, before this session's first child, and not again (above); the second is this
+   loop's, started before step 1, and a child that started its own would share this work tree's
+   silence clock and mute the parent's line (joshuafolkken/kit#1546).
    `git switch main && git pull` runs per child in whichever context implements it, **and again in
    this session afterwards** when the child was delegated — otherwise the parent's checkout never
    receives that merge and the next child starts on a stale default branch. **In a lane the child

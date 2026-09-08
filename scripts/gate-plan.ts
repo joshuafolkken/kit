@@ -66,6 +66,11 @@ const MEASURED_CORES = 11
 // At least one check at a time, whatever the machine reports.
 const MIN_CONCURRENCY = 1
 
+// At least one core to plan against, however many gates are sharing the machine. Without it a
+// twelfth lane would divide 11 cores to zero and admit nothing, and `MIN_CONCURRENCY` would be
+// covering for an arithmetic accident rather than for a genuinely tiny machine.
+const MIN_SHARED_CORES = 1
+
 interface GatePlan {
 	// How many checks run at once.
 	concurrency: number
@@ -73,17 +78,60 @@ interface GatePlan {
 	unit_worker_cap: number | undefined
 }
 
-// Admit checks in declaration order while the running set's reserved cores still fit the machine.
-// It bites only below four cores — the three reserving checks want four between them — and there
-// it is the difference between two checks sharing a core and four fighting over it.
-function resolve_concurrency(available_cores: number): number {
+// This gate's share of the machine — the cores it may plan against once the other gates in flight
+// have theirs (joshuafolkken/kit#1547).
+//
+// **At one run this is the identity, and that is the whole argument that solo behavior is
+// unchanged.** `Math.floor(cores / 1)` is `cores`, so a solo gate and a CI runner hand the admission
+// below exactly the number they always handed it — not a number that happens to come out the same,
+// the same number, by arithmetic — and no branch, flag or environment probe stands between the two
+// cases to be got wrong later.
+//
+// **A run count that is not a number leaves the machine undivided, and the clamp is not cosmetic.**
+// `Math.max` propagates `NaN` rather than clamping it, so an unusable count would sail through
+// `MIN_SHARED_CORES`, make every `reserved > share` comparison false and admit all four checks —
+// the exact opposite of what this function is for. `bounded-pool.ts` closes the same hole for the
+// same reason. A count below one is nonsense too and is read as one run, which is the direction
+// that leaves behavior where it was rather than throttling a gate on a bad input.
+function shared_cores(available_cores: number, concurrent_runs: number): number {
+	const runs = Number.isFinite(concurrent_runs)
+		? Math.max(unit_worker_share.SOLO_RUNS, concurrent_runs)
+		: unit_worker_share.SOLO_RUNS
+
+	return Math.max(MIN_SHARED_CORES, Math.floor(available_cores / runs))
+}
+
+// Admit checks in declaration order while the running set's reserved cores still fit **this run's
+// share** of the machine. On a machine running one gate that share is the machine, so this bites
+// only below four cores — the three reserving checks want four between them — and there it is the
+// difference between two checks sharing a core and four fighting over it.
+//
+// **Under concurrency it is the only lever there is, and that is a measurement rather than a
+// preference** (joshuafolkken/kit#1547). `josh gate` starts four checks at once and joshuafolkken/kit#1515
+// sized only the fourth, so six lanes put 18 unbounded checks on 11 cores: measured on that machine,
+// one gate took 254.1s with lint alone at 252.9s against the 5.2s the table above records for it
+// solo. The obvious repair — hand each of the other three a worker count the way the unit suite gets
+// one — **does not exist to be applied**: eslint 10's `--concurrency` defaults to `off` and is
+// already single-threaded, `tsc` is one process, and cspell's CLI exposes no thread count at all.
+// Nothing in those three takes a number, so how many of them run beside each other is the only
+// quantity the gate controls, and dividing the machine before admitting them is how it controls it.
+//
+// **Narrowing is not skipping.** Every one of the four checks still runs, over the same files, and
+// the gate still reports every failure in one pass — `bounded_pool` queues what it does not start,
+// and no check ever rejects (see `run_marked_gate_steps`). What changes is how many are in flight at
+// once, which is scheduling and never coverage.
+function resolve_concurrency(
+	available_cores: number,
+	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
+): number {
+	const share = shared_cores(available_cores, concurrent_runs)
 	let admitted = 0
 	let reserved = 0
 
 	for (const check of GATE_CHECKS) {
 		reserved += check.reserved_cores
 
-		if (reserved > available_cores) break
+		if (reserved > share) break
 
 		admitted += 1
 	}
@@ -112,6 +160,12 @@ function resolve_concurrency(available_cores: number): number {
 // oversubscription for an unmeasured starvation is not an improvement anyone can defend. What *is*
 // measured is the unit half — six concurrent suites went from ten timeouts to none at this share.
 //
+// **joshuafolkken/kit#1547 narrowed `resolve_concurrency` and deliberately left this number alone.**
+// A narrowed gate no longer runs its three siblings *beside* its unit step, so the paragraph above
+// now over-states what the share is competing with — which is an argument for widening it, and
+// widening it is exactly the unmeasured move that paragraph refuses. The number #1515 measured stays
+// until something measures a better one on this machine.
+//
 // **The count is a parameter rather than a read.** This module stays a pure function of its inputs, so
 // its own assertions are about arithmetic and not about what happened to be running while they ran;
 // `verification-gate.ts` is where the machine is asked.
@@ -134,7 +188,7 @@ function resolve_gate_plan(
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
 ): GatePlan {
 	return {
-		concurrency: resolve_concurrency(available_cores),
+		concurrency: resolve_concurrency(available_cores, concurrent_runs),
 		unit_worker_cap: resolve_unit_worker_cap(available_cores, concurrent_runs),
 	}
 }

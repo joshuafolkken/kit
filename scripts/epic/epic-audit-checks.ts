@@ -5,8 +5,10 @@ import {
 	type ReferenceState,
 } from './epic-audit'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
+import { epic_nested } from './epic-nested'
 
-// The four cross-child checks. Each takes the children with their bodies and returns findings.
+// The five cross-child checks. Each takes the children and returns findings — four of them reading
+// the bodies, and the fifth (joshuafolkken/kit#1476) reading a child's labels instead.
 //
 // Warnings and errors are kept apart deliberately. An error is a contradiction that will stall the
 // implementation whatever anyone decides — an acceptance criterion that needs something built later.
@@ -24,6 +26,7 @@ const IMPLICIT_DEPENDENCY = 'implicit dependency'
 const ORDER_CONTRADICTION = 'order contradiction'
 const UNRESOLVED_REFERENCE = 'unresolved reference'
 const ORPHAN_CHILD = 'orphan child'
+const NESTED_EPIC = 'nested epic'
 
 // A child with its body, which the graph type does not carry.
 interface AuditChild extends EpicChild {
@@ -329,16 +332,55 @@ function find_orphans(
 		}))
 }
 
+// Check 5 — a task-list row pointing at another epic (joshuafolkken/kit#1476). What the question is,
+// and what it deliberately is not, is `epic-nested.ts`; this half is what the audit does with the
+// answer.
+//
+// **A warning rather than an error**, for the reason `order_level` gives about its own demotions: an
+// error fails the audit `epicrun` runs before its first child, so it would stop the whole batch —
+// and the batch is already safe without that, because `epic-classify.ts` withholds the row instead
+// of offering it. What is left is a thing a person has to look at, which is what a warning is for.
+//
+// **A closed one is reported too**, unlike the classification's notice, which skips it. The
+// auto-close consequence in the message is about the parent and outlives the child epic finishing —
+// it is in fact the moment it bites — so a reader looking at an epic that will not close has to find
+// the row that explains why.
+function nested_epic_message(child: AuditChild, current_repo: string): string {
+	const named = shown(child, current_repo)
+
+	return (
+		`${named} is itself an epic, so it is not work a run can implement — epic:next withholds it ` +
+		`rather than offering it. This epic will not auto-close from ${named} finishing either: the ` +
+		'auto-close only evaluates epics that directly track the issue a merge just closed, so a ' +
+		'grandchild merging never reaches this one.'
+	)
+}
+
+function find_nested_epics(
+	children: ReadonlyArray<AuditChild>,
+	current_repo: string,
+): Array<AuditFinding> {
+	return children
+		.filter((child) => epic_nested.is_nested_epic(child))
+		.map((child) => ({
+			level: 'warning' as const,
+			check: NESTED_EPIC,
+			message: nested_epic_message(child, current_repo),
+		}))
+}
+
 const epic_audit_checks = {
 	IMPLICIT_DEPENDENCY,
 	ORDER_CONTRADICTION,
 	UNRESOLVED_REFERENCE,
 	ORPHAN_CHILD,
+	NESTED_EPIC,
 	reported_pairs,
 	find_implicit_dependencies,
 	find_order_contradictions,
 	find_unresolved_references,
 	find_orphans,
+	find_nested_epics,
 }
 
 export type { AuditChild }
