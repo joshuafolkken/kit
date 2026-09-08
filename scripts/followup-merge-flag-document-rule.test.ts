@@ -28,6 +28,13 @@ const DOCUMENTS: ReadonlyArray<string> = [...routing_documents(), CURSOR_RULES]
 
 const FOLLOWUP_SKILL = '.claude/skills/workflow-commands/followup.md'
 const FOLLOWUP_CALL = 'josh followup'
+// The ban scans for the bare command word, not for `josh followup`. Most of what this change removed
+// never carried the prefix — the skill's YAML `description`, the `` `/code-review` → `followup
+// --merge` `` headings in both chain-rule files, the decision-table row, the anti-pattern quotes and
+// several Japanese paragraphs in `prompts/review.md` all wrote it bare. A guard keyed on the prefix
+// would cover the spelling that was easiest to fix by hand and miss the one that dominated the
+// defect. The window below is what keeps the shorter word from over-matching.
+const FOLLOWUP_WORD = 'followup'
 
 const BANNED_FLAG = '--merge'
 // **Not an adjacency check.** A runnable example puts the quoted `"<title> #<N>"` positional and a
@@ -47,7 +54,7 @@ function flagged_invocations(content: string): ReadonlyArray<string> {
 	return parts
 		.slice(0, -1)
 		.map((part) => part.slice(-COMMAND_WINDOW))
-		.filter((prefix) => prefix.includes(FOLLOWUP_CALL))
+		.filter((prefix) => prefix.includes(FOLLOWUP_WORD))
 }
 
 // Read unwrapped, so a spelling broken across a line wrap is caught too — which is how `epicrun.md`

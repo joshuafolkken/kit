@@ -806,7 +806,7 @@ pnpm josh git -y "title"  # set commit message prefix
 
 AI-assisted PR follow-up workflow: waits for CI, checks AI reviewer findings, sends a completion notification, and merges.
 
-**Merging is the default, and `--no-merge` is the only thing that stops it** ([#1204](https://github.com/joshuafolkken/kit/issues/1204)). The command resolves it as "merge unless `--no-merge` was passed", so an invocation carrying no flags at all merges — every example below except the last one does. `--merge` is still accepted as a deprecated no-op for compatibility, and is deliberately written nowhere in these documents: read as the switch that starts a merge, it makes "I left the flag off, so nothing merged" a safe-looking conclusion that is exactly backwards about a Tier C action.
+**Merging is the default, and `--no-merge` is the only thing that stops it** ([#1204](https://github.com/joshuafolkken/kit/issues/1204)). The command resolves it as "merge unless `--no-merge` was passed", so an invocation carrying no flags at all merges — every example below except the last one does. `--merge` is still accepted as a deprecated no-op for compatibility, but no document writes it beside a `followup` invocation any more, and a marker test enforces that (`scripts/followup-merge-flag-document-rule.test.ts`). Read as the switch that starts a merge, it makes "I left the flag off, so nothing merged" a safe-looking conclusion that is exactly backwards about a Tier C action. The skill still names the flag where it explains the deprecation, which is the one place saying it is useful.
 
 ```bash
 pnpm josh followup "PR title #N"
