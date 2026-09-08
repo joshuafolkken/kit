@@ -18,6 +18,21 @@
 // rollup: this module reads none of them, and a result nobody read must never be printed as one. What
 // it prints about a pull request is that one exists and what state GitHub calls it — which is a read
 // it actually performs.
+//
+// **The line also says *when* it was observed, and not only how long the silence had run**
+// (joshuafolkken/kit#1560). A relative figure means something only while the reports keep coming: an
+// `epicrun` suspended overnight resumed and read its own `quiet 11m` as if no time had passed, and
+// concluded the machine's clock was broken when it matched GitHub's `Date` header to the second. Three
+// decisions follow from that, and each is a decision rather than a default:
+//
+// - **The date is carried, not just the clock time.** The confusion above happened across a day
+//   boundary, so an `HH:MM` alone would have left the same hole open.
+// - **UTC, never the reader's zone.** The line is read from other machines and from cloud sessions, and
+//   joshuafolkken/kit#1245 already paid for a timestamp rendered in the reader's zone making one
+//   process look like a stranger. `toISOString` is what every other stamp in this repository uses.
+// - **It is added beside the elapsed figures, never in place of them.** How long it has been quiet and
+//   when the observation was taken are two different facts, and neither can be reconstructed from the
+//   other without knowing the answer already.
 
 const DEFAULT_INTERVAL_MINUTES = 10
 const MS_PER_MINUTE = 60_000
@@ -55,6 +70,9 @@ interface ProgressState {
 
 const NO_LANES = 'none'
 const QUIET_MARKER = '⏳'
+// `1970-01-01T00:00:00.000Z` cut after the minutes. Seconds are dropped because the interval this line
+// breaks is measured in minutes, and a heartbeat that claims a precision nobody uses is noise.
+const STAMP_END = 16
 
 function to_minutes(elapsed_ms: number): number {
 	return Math.floor(elapsed_ms / MS_PER_MINUTE)
@@ -62,6 +80,17 @@ function to_minutes(elapsed_ms: number): number {
 
 function format_minutes(elapsed_ms: number): string {
 	return `${String(to_minutes(elapsed_ms))}m`
+}
+
+/**
+ * The instant this observation was taken, with its date, in UTC.
+ *
+ * It reads the `now_ms` the line is already formatted against rather than calling a clock of its own,
+ * so the stamp can never disagree with the elapsed figures printed beside it — and the module stays
+ * deterministic, which is what lets the test pin an exact string with no fake timer.
+ */
+function format_observed_at(now_ms: number): string {
+	return `${new Date(now_ms).toISOString().slice(0, STAMP_END)}Z`
 }
 
 /**
@@ -119,15 +148,19 @@ interface LineTiming {
 /**
  * One line, and it is one line on purpose: it is relayed into a session that is otherwise showing the
  * run's own output, and a block would compete with the thing the person is waiting to read.
+ *
+ * The observation time leads, because it is the field that says whether anything after it is still
+ * about now — a stamp read after the elapsed figures is read too late to reframe them.
  */
 function format_line(observations: Observations, timing: LineTiming): string {
+	const observed_at = format_observed_at(timing.now_ms)
 	const quiet = format_minutes(timing.now_ms - timing.quiet_since_ms)
 	const unchanged = format_minutes(timing.now_ms - timing.unchanged_since_ms)
 	const children = observations.children.map((child) => format_child(child)).join(' · ')
 	const lanes = format_lanes(observations.lanes)
 	const load = observations.load_average.toFixed(1)
 
-	return `${QUIET_MARKER} quiet ${quiet} · ${children} · lanes ${lanes} · load ${load} · record ${format_record(observations.record_age_ms)} · unchanged ${unchanged}`
+	return `${QUIET_MARKER} at ${observed_at} · quiet ${quiet} · ${children} · lanes ${lanes} · load ${load} · record ${format_record(observations.record_age_ms)} · unchanged ${unchanged}`
 }
 
 /**
