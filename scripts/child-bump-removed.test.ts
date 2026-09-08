@@ -57,7 +57,12 @@ const BEFORE_FIX: Record<string, string> = { [GATE_SOURCE]: 'digest-one' }
 const AFTER_FIX: Record<string, string> = { [GATE_SOURCE]: 'digest-two' }
 
 const RECORDS = gate_test_fixture.suite_records('child-bump-removed')
-const { clear: clear_records, marker_path: MARKER_PATH, stamp_path: STAMP_PATH } = RECORDS
+const {
+	clear: clear_records,
+	log_path: LOG_PATH,
+	marker_path: MARKER_PATH,
+	stamp_path: STAMP_PATH,
+} = RECORDS
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -74,6 +79,7 @@ async function run_gate(): Promise<number> {
 	return await verification_gate.run_verification_gate({
 		stamp_path: STAMP_PATH,
 		marker_path: MARKER_PATH,
+		log_path: LOG_PATH,
 	})
 }
 

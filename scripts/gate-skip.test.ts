@@ -61,10 +61,17 @@ const ADVANCED_BASE = 'e5f6a7b8'
 
 // Records of this suite's own. `josh gate` and `josh review:brief` share both by design, and this
 // suite runs *inside* `pnpm josh gate` — a test writing to the shared marker would clear the live
-// gate's own, which is the record telling the review beside it not to re-run the unit suite. The pair
-// is built by `gate_test_fixture.suite_records`, which every gate suite now shares.
+// gate's own, which is the record telling the review beside it not to re-run the unit suite. The gate
+// log is the third of them (joshuafolkken/kit#1227), and left shared a run here would overwrite the
+// live gate's log with the output of checks that never ran. All three are built by
+// `gate_test_fixture.suite_records`, which every gate suite now shares.
 const RECORDS = gate_test_fixture.suite_records('skip')
-const { clear: clear_records, marker_path: MARKER_PATH, stamp_path: STAMP_PATH } = RECORDS
+const {
+	clear: clear_records,
+	log_path: LOG_PATH,
+	marker_path: MARKER_PATH,
+	stamp_path: STAMP_PATH,
+} = RECORDS
 
 // Which check ran is `verification-gate.test.ts`'s subject; here every one passes and what is counted
 // is how many were started at all. The body matters in one case only — a check that passed with
@@ -82,6 +89,7 @@ async function run_gate(is_forced = false, body = ''): Promise<[number, string]>
 			is_forced,
 			stamp_path: STAMP_PATH,
 			marker_path: MARKER_PATH,
+			log_path: LOG_PATH,
 		})
 
 		return [code, stdout.text()]
@@ -272,6 +280,7 @@ describe('run_gate_command — the force flag', () => {
 			const code = await verification_gate.run_gate_command([gate_skip.FORCE_FLAG], {
 				stamp_path: STAMP_PATH,
 				marker_path: MARKER_PATH,
+				log_path: LOG_PATH,
 			})
 
 			expect(code).toBe(0)
@@ -293,6 +302,7 @@ describe('run_gate_command — the force flag', () => {
 			await verification_gate.run_gate_command([FORWARDED_FLAG], {
 				stamp_path: STAMP_PATH,
 				marker_path: MARKER_PATH,
+				log_path: LOG_PATH,
 			})
 
 			expect(stderr.join('')).toContain(verification_gate.ACCEPTED_FLAGS.join(' '))

@@ -58,12 +58,14 @@ plan: 4 of 4 checks at once, test:unit at 7 workers (11 cores)
 ✔ lint (pnpm josh lint) 9.0s
 ✗ check (pnpm josh-app check:ci) 4.6s
 …
+full output: /var/folders/x1/…/josh-gate-log-3f2a91c07b4d5e68.log
 ✗ verification gate failed: lint, cspell (23.0s)
 ```
 
 or, on a green one:
 
 ```
+full output: /var/folders/x1/…/josh-gate-log-3f2a91c07b4d5e68.log
 ✔ verification gate passed (4 checks) in 23.0s.
 ```
 
@@ -76,6 +78,15 @@ Each block's header names the command that ran, not only the check, because the 
 **That single re-run is what an implementation loop is meant to use, and the whole gate is not.** A workflow run starts one gate, beside the review ([#1242](https://github.com/joshuafolkken/kit/issues/1242)), and re-runs a check by name until that point — ten whole gates cost 8.2 minutes of a 49.1-minute run, six of them before the review had started and every one of those answered by one check ([#1246](https://github.com/joshuafolkken/kit/issues/1246)). The rule itself is `prompts/review.md` → "The gate runs beside this review, not in front of it"; what this command contributes is the header line that names the one command to repeat. **Two of the checks that loop repeats are scoped**: [`josh lint:related`](#josh-lintrelated) checks only the changed files ([#1298](https://github.com/joshuafolkken/kit/issues/1298)) and [`josh test:related`](#josh-testrelated) runs only the tests related to them ([#1257](https://github.com/joshuafolkken/kit/issues/1257)); the gate itself keeps running `josh lint` and `josh test:unit` over everything.
 
 **Only a check with something to say prints its output.** A green gate prints four header lines and the summary and nothing else — what a passing run has to say is "all four passed", which the summary already says, while the four bodies (vitest's per-file listing among them) run to tens of kilobytes that then sit in the conversation and are re-read on every later turn ([#967](https://github.com/joshuafolkken/kit/issues/967)). The gate runs more than once per Issue, so that is a cost per run rather than per Issue. A failing check keeps its whole output — that is the one time the body is the answer, and one failure does not drag the other three bodies back in. **Two passing cases keep theirs too**: a check that exited 0 _without running_ (`josh test:unit` skips when vitest is absent, and a gate that ran zero tests must not look like one that ran them all — the other empty case, vitest present with no test file, [fails](#josh-testunit) rather than passing since [#1224](https://github.com/joshuafolkken/kit/issues/1224)), and a check that passed with warnings (`josh lint` runs eslint without `--max-warnings 0`, so warnings do not fail — but they are still something to read).
+
+**Every run also writes all four bodies to a file, and prints where it is** ([#1227](https://github.com/joshuafolkken/kit/issues/1227)). The console is not the only copy any more. `BASH_MAX_OUTPUT_LENGTH` caps what one command may carry into an agent's context at 8,000 characters ([#1173](https://github.com/joshuafolkken/kit/issues/1173)), against a measured p99 of 15,989 for a Bash call — and what an elision takes is the **middle**, which is where a failing check says what it was. A red gate can still never read as green, because the verdict is the last line; what was lost was the reason behind it, leaving "re-run one of the four by hand" as a judgement made about output nobody could see.
+
+- **The path is printed immediately above the verdict, not below it.** The verdict stays the gate's last line — `scripts/josh-verdict.ts` builds two readers on that, the rework detector's scan and the `2>&1 | tail -40` in `prompts/collaboration-workflow/output-bounds.md` — so the path survives a `tail` exactly as the verdict does.
+- **It is written on a green run too.** Writing only on failure would make the file a judgement about which runs are worth keeping, and the judgement is wrong for the two cases that already print a body on a green gate: a check that passed with warnings, and one that passed without running. The file is overwritten in place, so a green run leaves exactly as many files behind as a red one.
+- **It holds every check's whole output, the suppressed passing ones included** — which is what makes it different from the console, where a passing body is dropped as noise (below). `pnpm josh gate --verbose` is no longer the only way to see one.
+- **The temp directory, one file per checkout, a deterministic name** — the convention `scripts/josh/stamp-file.ts` already defines for the green-gate record and the in-flight marker. A file inside the repository would need a `.gitignore` entry here and in every consumer `josh sync` reaches, bought for something nobody is meant to keep. Nothing accumulates: the next gate overwrites it.
+- **A write that fails never changes the verdict** — the rule the other two records follow. The summary says `full output: could not be written; re-run with \`> gate.log 2>&1\`` and the gate's exit code is whatever the four checks made it.
+- **A gate that reused a recorded green result (below) writes nothing**, because it started no check and has no output to keep. The log from the run that record came from is still where it was.
 
 **A tree the gate was already green on is not checked again** ([#1328](https://github.com/joshuafolkken/kit/issues/1328)). Every green run records the digest of each changed file it passed on — the record `josh review:brief` reads to print `Already verified` ([#1241](https://github.com/joshuafolkken/kit/issues/1241)). The gate now reads it back at start-up, and where nothing that record covers has moved it prints the recorded result and exits 0 without starting a process:
 

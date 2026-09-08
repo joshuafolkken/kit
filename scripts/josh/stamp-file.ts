@@ -45,10 +45,18 @@ function digest(content: Buffer | string): string {
 // *project* must key on `PROJECT_ROOT` instead: a globally installed `josh` has one `PACKAGE_DIR`
 // for every project on the machine, so keying on it would let a run in one project answer for
 // another (joshuafolkken/kit#1215).
-function stamp_path(prefix: string, root: string = PACKAGE_DIR): string {
+//
+// **`suffix` is what the file is, not decoration.** Every record here was JSON until `josh gate`
+// needed to keep another tool's output verbatim (joshuafolkken/kit#1227), and a log named `.json`
+// tells every reader — a person, an editor, a `less` — that it is something it is not.
+function stamp_path(
+	prefix: string,
+	root: string = PACKAGE_DIR,
+	suffix: string = STAMP_SUFFIX,
+): string {
 	const key = digest(root).slice(0, STAMP_KEY_LENGTH)
 
-	return path.join(tmpdir(), `${prefix}${key}${STAMP_SUFFIX}`)
+	return path.join(tmpdir(), `${prefix}${key}${suffix}`)
 }
 
 // **The write unlinks first, then creates exclusively.** `rmSync` removes a symlink rather than
@@ -57,11 +65,24 @@ function stamp_path(prefix: string, root: string = PACKAGE_DIR): string {
 // failed write leaves no record, and no record is the safe answer for every reader here. On a sticky
 // temp directory a file another account owns cannot be unlinked at all, so that case fails here too
 // rather than being silently trusted later.
-function write_stamp(target: string, payload: unknown): string {
+function write_exclusively(target: string, content: string): string {
 	rmSync(target, { force: true })
-	writeFileSync(target, JSON.stringify(payload), { flag: STAMP_WRITE_FLAG, mode: STAMP_FILE_MODE })
+	writeFileSync(target, content, { flag: STAMP_WRITE_FLAG, mode: STAMP_FILE_MODE })
 
 	return target
+}
+
+function write_stamp(target: string, payload: unknown): string {
+	return write_exclusively(target, JSON.stringify(payload))
+}
+
+// The same write for a payload that is already text. `josh gate`'s log is another tool's output read
+// by a person or by an agent's `tail` (joshuafolkken/kit#1227), and JSON-encoding it would put `\n`
+// escapes between the reader and the thing they came to read. **It shares the body above rather than
+// repeating it**: the unlink-then-create-exclusively pair is the symlink defense, and a second copy
+// of it is the clone `CLAUDE.md` prohibits.
+function write_text_stamp(target: string, text: string): string {
+	return write_exclusively(target, text)
 }
 
 // `write_stamp` for a record whose *absence* is what the caller checked, and which two processes may
@@ -128,6 +149,7 @@ const stamp_file = {
 	remove_stamp,
 	stamp_path,
 	write_stamp,
+	write_text_stamp,
 }
 
 export { stamp_file }
