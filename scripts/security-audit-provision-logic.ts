@@ -10,10 +10,22 @@ const WINDOWS_PLATFORM = 'win32'
 const WINDOWS_ASSET_SUFFIX = '.exe'
 const STAGING_SUFFIX = '.download'
 
-// A ~30 MB binary over a cold connection. Declared here rather than beside the `fetch` so the hook
-// suite can derive the harness budget from it: raising this without raising the declared timeout
-// would have the harness kill the request at a moment the script did not choose.
-const DOWNLOAD_TIMEOUT_MS = 120_000
+// The asset is ~55 MB, and a link delivering it at 300 KB/s — measured, not hypothetical — takes
+// over three minutes. A `SessionStart` hook is waited on, so a single bound generous enough to
+// finish that download would be a three-minute stall at session start, and one short enough not to
+// stall would abort every slow link for ever.
+//
+// So the bound depends on how the command was reached. The automatic attempt gives up quickly and
+// says what to run; `--force` is a person typing a command in the foreground, where waiting for a
+// large download is exactly what was asked for. Declared here rather than beside the `fetch` so the
+// hook suite can derive the harness budget from the session bound: raising that without raising the
+// declared timeout would have the harness kill the request at a moment the script did not choose.
+const SESSION_DOWNLOAD_TIMEOUT_MS = 60_000
+const FORCED_DOWNLOAD_TIMEOUT_MS = 600_000
+
+function build_download_timeout(is_forced: boolean): number {
+	return is_forced ? FORCED_DOWNLOAD_TIMEOUT_MS : SESSION_DOWNLOAD_TIMEOUT_MS
+}
 
 // How long a failed attempt suppresses the next one. Without it an offline machine — or one behind a
 // proxy that blocks release assets — pays the whole download timeout again at every session start,
@@ -102,8 +114,11 @@ function format_unsupported_platform(platform: string, architecture: string): st
 	return `No pinned osv-scanner build for ${platform}/${architecture}; install it manually to run the pre-push audit.`
 }
 
+// The `--force` hint is on this message rather than only on the backoff one because the failure this
+// most often reports is the session bound running out on a slow link, and the command that finishes
+// that download is the one thing the reader needs.
 function format_download_failure(url: string, reason: string): string {
-	return `Could not fetch osv-scanner from ${url}: ${reason}. The pre-push audit will report the missing binary.`
+	return `Could not fetch osv-scanner from ${url}: ${reason}. Run \`pnpm josh audit:provision --force\` to retry with a longer timeout; until then the pre-push audit will report the missing binary.`
 }
 
 // The mismatch is reported with both digests because the two things it can mean — a re-cut release
@@ -129,10 +144,12 @@ function format_provision_error(reason: string): string {
 }
 
 const security_audit_provision_logic = {
-	DOWNLOAD_TIMEOUT_MS,
+	FORCED_DOWNLOAD_TIMEOUT_MS,
 	RETRY_INTERVAL_MS,
+	SESSION_DOWNLOAD_TIMEOUT_MS,
 	SCANNER_VERSION,
 	build_asset_name,
+	build_download_timeout,
 	build_download_url,
 	build_staging_path,
 	format_already_present,

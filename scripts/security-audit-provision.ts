@@ -12,7 +12,7 @@ const EXECUTABLE_MODE = 0o755
 const FAILURE_STAMP_PREFIX = 'josh-audit-provision-'
 const FORCE_FLAG = '--force'
 const PATH_LOCATION = 'on PATH'
-const { DOWNLOAD_TIMEOUT_MS, RETRY_INTERVAL_MS } = security_audit_provision_logic
+const { RETRY_INTERVAL_MS } = security_audit_provision_logic
 
 function describe_error(error: unknown): string {
 	return error instanceof Error ? error.message : String(error)
@@ -34,9 +34,9 @@ interface ProvisionOutcome {
 // The rejection is caught here rather than left to `attempt`: being offline, behind a proxy that
 // refuses the host, or past the timeout is a *fetch* failure, and reporting it through the generic
 // catch-all would drop the release URL out of the message that names where the fetch went.
-async function download(url: string): Promise<DownloadOutcome> {
+async function download(url: string, timeout_ms: number): Promise<DownloadOutcome> {
 	try {
-		const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+		const response = await fetch(url, { signal: AbortSignal.timeout(timeout_ms) })
 		if (!response.ok) return { reason: `HTTP ${String(response.status)}` }
 
 		return { content: Buffer.from(await response.arrayBuffer()), reason: '' }
@@ -81,10 +81,14 @@ function record_failure(target_path: string, message: string): string {
 	return message
 }
 
-async function provision(target_path: string, asset: ScannerAsset): Promise<ProvisionOutcome> {
+async function provision(
+	target_path: string,
+	asset: ScannerAsset,
+	timeout_ms: number,
+): Promise<ProvisionOutcome> {
 	const { format_checksum_mismatch, format_download_failure, format_installed } =
 		security_audit_provision_logic
-	const outcome = await download(asset.url)
+	const outcome = await download(asset.url, timeout_ms)
 
 	if (outcome.content === undefined) {
 		return { is_installed: false, message: format_download_failure(asset.url, outcome.reason) }
@@ -106,9 +110,13 @@ async function provision(target_path: string, asset: ScannerAsset): Promise<Prov
 
 // The one place a failure is recorded, so the backoff covers a rejected fetch, a bad checksum and a
 // write that could not land alike — every reason the next session start would otherwise repeat.
-async function attempt(target_path: string, asset: ScannerAsset): Promise<string> {
+async function attempt(
+	target_path: string,
+	asset: ScannerAsset,
+	timeout_ms: number,
+): Promise<string> {
 	try {
-		const outcome = await provision(target_path, asset)
+		const outcome = await provision(target_path, asset, timeout_ms)
 		if (!outcome.is_installed) return record_failure(target_path, outcome.message)
 
 		// Cleared on success, or a `pnpm install` that wipes the cache directory — which this design
@@ -150,7 +158,7 @@ async function report(
 	if (asset === undefined) return logic.format_unsupported_platform(platform, architecture)
 	if (!is_forced && is_in_backoff(target_path)) return logic.format_recent_failure()
 
-	return await attempt(target_path, asset)
+	return await attempt(target_path, asset, logic.build_download_timeout(is_forced))
 }
 
 // Every failure is a printed line and a zero exit, deliberately: this runs at session start, and a

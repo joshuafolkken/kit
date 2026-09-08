@@ -1169,9 +1169,16 @@ pnpm josh audit:provision
   HTTPS and its SHA256 compared against the digest published for that tag; a mismatch installs nothing
   and prints both digests. `go install` was rejected as the route because it presumes a Go toolchain
   and takes about a minute.
-- **A failure never stops the session.** An unreachable network, a non-OK response, a mismatched
-  checksum and a host with no published build are each reported and exit zero — the pre-push audit
-  still fails on the missing binary, which is where a missing scanner belongs.
+- **The download bound depends on how the command was reached.** The asset is about 55 MB, and a
+  session-start hook is waited on — so the automatic attempt gives up after a minute and prints the
+  command to run, while `pnpm josh audit:provision --force` allows ten. `--force` also ignores the
+  backoff record below, so it is the one command to type after fixing a network problem.
+- **A failure never stops the session, and is not repeated at every session start.** An unreachable
+  network, a non-OK response, a mismatched checksum and a host with no published build are each
+  reported and exit zero — the pre-push audit still fails on the missing binary, which is where a
+  missing scanner belongs. A failure is recorded, and the automatic attempt is skipped for six hours
+  afterwards rather than paying the timeout again on every startup, resume, clear and compact. A
+  provision that succeeds clears the record.
 - **The audit's own arguments are unchanged.** No offline vulnerability database is used: that would
   weaken every consumer's answer to "what was known when the database was downloaded".
 

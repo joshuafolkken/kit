@@ -77,7 +77,8 @@ const PROVISION_HOOK_COMMAND = 'pnpm josh audit:provision'
 // mid-write, and the staging file this script renames from is the only thing that makes that
 // survivable. Raising the download budget has to raise the declared timeout with it.
 const MINIMUM_PROVISION_TIMEOUT_SECONDS =
-	security_audit_provision_logic.DOWNLOAD_TIMEOUT_MS / MS_PER_SECOND + STARTUP_ALLOWANCE_SECONDS
+	security_audit_provision_logic.SESSION_DOWNLOAD_TIMEOUT_MS / MS_PER_SECOND +
+	STARTUP_ALLOWANCE_SECONDS
 
 // Compared as sets, so the two sides are ordered the same way first. `localeCompare` rather than the
 // default, which sorts by code unit and is what the lint rule here is about.

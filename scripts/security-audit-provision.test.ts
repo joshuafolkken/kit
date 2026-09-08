@@ -32,6 +32,7 @@ const ASSET_URL = `https://example.test/${ASSET_NAME}`
 const ALREADY_PRESENT = 'already available'
 const WRONG_CHECKSUM = 'deadbeef'
 const EXECUTABLE_MODE = 0o755
+const TEST_TIMEOUT_MS = 5000
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'kit-audit-provision-'))
 
@@ -77,7 +78,11 @@ function write_executable(target_path: string, content: string): void {
 }
 
 async function provision_with(target_path: string, sha256: string): Promise<string> {
-	const outcome = await security_audit_provision.provision(target_path, asset_with(sha256))
+	const outcome = await security_audit_provision.provision(
+		target_path,
+		asset_with(sha256),
+		TEST_TIMEOUT_MS,
+	)
 
 	return outcome.message
 }
@@ -110,9 +115,9 @@ async function fail_then_succeed(target_path: string): Promise<void> {
 	const asset = asset_with(sha256_of(PAYLOAD))
 
 	arm_offline_fetch()
-	await security_audit_provision.attempt(target_path, asset)
+	await security_audit_provision.attempt(target_path, asset, TEST_TIMEOUT_MS)
 	stub_response(true, PAYLOAD)
-	await security_audit_provision.attempt(target_path, asset)
+	await security_audit_provision.attempt(target_path, asset, TEST_TIMEOUT_MS)
 }
 
 beforeEach(() => {

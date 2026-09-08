@@ -4,6 +4,7 @@ import { security_audit_provision_logic } from './security-audit-provision-logic
 const {
 	SCANNER_VERSION,
 	build_asset_name,
+	build_download_timeout,
 	build_download_url,
 	build_staging_path,
 	format_already_present,
@@ -19,6 +20,7 @@ const SAMPLE_URL = 'https://example.test/asset'
 const LINUX_AMD64_ASSET = 'osv-scanner_linux_amd64'
 const DARWIN_ARM64_ASSET = 'osv-scanner_darwin_arm64'
 const STAGING_TARGET = '/tool/osv-scanner'
+const SESSION_BOUND_CEILING_MS = 90_000
 
 describe('security_audit_provision_logic.build_asset_name', () => {
 	it('maps node platform and architecture names onto the release asset names', () => {
@@ -44,6 +46,19 @@ describe('security_audit_provision_logic.build_download_url', () => {
 		expect(build_download_url(LINUX_AMD64_ASSET)).toBe(
 			`https://github.com/google/osv-scanner/releases/download/v${SCANNER_VERSION}/${LINUX_AMD64_ASSET}`,
 		)
+	})
+})
+
+// Measured: the asset is ~55 MB and a 300 KB/s link needs over three minutes for it. A SessionStart
+// hook is waited on, so the automatic attempt gives up long before that and says what to run, while
+// `--force` is someone asking for the download and willing to wait for it.
+describe('security_audit_provision_logic.build_download_timeout', () => {
+	it('gives an explicitly forced run far longer than the one at session start', () => {
+		expect(build_download_timeout(true)).toBeGreaterThan(build_download_timeout(false))
+	})
+
+	it('keeps the session-start bound short enough not to stall a session start', () => {
+		expect(build_download_timeout(false)).toBeLessThanOrEqual(SESSION_BOUND_CEILING_MS)
 	})
 })
 
