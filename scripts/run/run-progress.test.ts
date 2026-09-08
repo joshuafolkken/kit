@@ -38,13 +38,13 @@ describe('is_due — the trigger is silence, not a clock', () => {
 })
 
 describe('interval_from — configurable, disable-able, and never fatal', () => {
-	it('defaults to ten minutes, the value live use settled on', () => {
-		expect(run_progress.interval_from(undefined)).toBe(10 * MINUTE)
-		expect(run_progress.DEFAULT_INTERVAL_MINUTES).toBe(10)
+	it('defaults to twenty minutes, one to two reports per child', () => {
+		expect(run_progress.interval_from(undefined)).toBe(20 * MINUTE)
+		expect(run_progress.DEFAULT_INTERVAL_MINUTES).toBe(20)
 	})
 
 	it('takes a positive number of minutes from the environment', () => {
-		expect(run_progress.interval_from('20')).toBe(20 * MINUTE)
+		expect(run_progress.interval_from('35')).toBe(35 * MINUTE)
 	})
 
 	it('falls back rather than throwing, so a typo cannot end an unattended run', () => {

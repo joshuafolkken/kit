@@ -77,8 +77,8 @@ afterAll(() => {
 })
 
 describe('the interval is configurable and disable-able', () => {
-	it('defaults to ten minutes', () => {
-		expect(run_progress_cli.to_interval_ms(undefined)).toBe(10 * MINUTE)
+	it('defaults to twenty minutes', () => {
+		expect(run_progress_cli.to_interval_ms(undefined)).toBe(20 * MINUTE)
 	})
 
 	it('takes the environment variable when no flag was typed', () => {

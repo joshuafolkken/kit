@@ -2,13 +2,12 @@ import { loadavg } from 'node:os'
 import { epic_busy } from '#scripts/epic/epic-busy'
 import { git_command } from '#scripts/git/git-command'
 import type { OpenIssueData } from '#scripts/git/schemas'
-import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_report } from '#scripts/lane/lane-report'
-import { z } from 'zod'
 import { run_liveness } from './run-liveness'
 import { run_preflight } from './run-preflight'
 import type { ChildObservation, LaneObservation, Observations } from './run-progress'
+import { run_progress_clock } from './run-progress-clock'
 
 // Everything `josh run:progress` reads: the last-report record that makes the clock a silence clock,
 // and the observations one tick puts on the line (joshuafolkken/kit#1520).
@@ -23,10 +22,13 @@ import type { ChildObservation, LaneObservation, Observations } from './run-prog
 // **The record is kept per work tree**, keyed the way `run_hold` keys its own: two lanes of one
 // repository are two runs, and one lane's report must not silence the other's clock.
 
-const PROGRESS_PREFIX = 'josh-run-progress-'
-const FIRST_LOAD_AVERAGE = 0
+// The record itself — its name, its shape, and how it is read and written — lives in
+// `run-progress-clock.ts`, because the trigger-delivered rule that refuses an early heartbeat reads
+// the same record from inside a `PreToolUse` hook and cannot await the git call this file makes
+// (joshuafolkken/kit#1570). What stays here is the asynchronous way of naming the work tree.
+const { PROGRESS_PREFIX, mark, parse_stamp, read_last_report } = run_progress_clock
 
-const report_stamp_schema = z.object({ reported_at: z.string() })
+const FIRST_LOAD_AVERAGE = 0
 
 // A listing that arrived and had holders, a listing that arrived empty, and a listing that did not
 // arrive. All three end in no line being printed, and they are kept apart anyway: only the middle one
@@ -41,43 +43,9 @@ const UNREADABLE_READ: ObservationRead = { kind: 'unreadable' }
 // The first of the two paths git prints is this work tree's own; the second is the common directory
 // every work tree shares, which is exactly what must not be the key.
 async function stamp_target(): Promise<string> {
-	const directories = await git_command.git_directories()
+	const [git_directory] = await git_command.git_directories()
 
-	return stamp_file.stamp_path(PROGRESS_PREFIX, directories[0])
-}
-
-function parse_stamp(raw: string): number | undefined {
-	const parsed = report_stamp_schema.safeParse(JSON.parse(raw))
-
-	if (!parsed.success) return undefined
-
-	const reported_at = Date.parse(parsed.data.reported_at)
-
-	return Number.isNaN(reported_at) ? undefined : reported_at
-}
-
-/**
- * When the run last reported anything — a real report through `--mark`, or a line this command
- * printed.
- *
- * `undefined` for every unreadable shape, and the caller falls back to the moment it started
- * watching. That direction is the safe one here: it delays the first line by at most one interval,
- * where trusting a broken record could print one immediately behind a real report.
- */
-function read_last_report(target: string): number | undefined {
-	const raw = stamp_file.read_stamp_text(target)
-
-	if (raw === undefined) return undefined
-
-	try {
-		return parse_stamp(raw)
-	} catch {
-		return undefined
-	}
-}
-
-function mark(target: string, now_ms: number): void {
-	stamp_file.write_stamp(target, { reported_at: new Date(now_ms).toISOString() })
+	return run_progress_clock.stamp_target_of(git_directory)
 }
 
 function to_labels(issue: OpenIssueData): Array<string> {
