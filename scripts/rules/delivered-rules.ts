@@ -1,5 +1,5 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
-import { hook_decision } from '#scripts/josh/hook-decision'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
 
@@ -62,11 +62,15 @@ function is_issue_filing(command: string): boolean {
 
 // **Only `Bash`, and the omission is deliberate** (joshuafolkken/kit#1390): Claude Code denies one
 // call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself
-// not. Every rule enumerated here is therefore one whose binding moment is a shell call.
-function is_filing_call(call: GuardedCall): boolean {
-	if (call.name !== cost_blocks.BASH_TOOL) return false
+// not. Every rule enumerated here is therefore one whose binding moment is a shell call — so the
+// tool-name guard belongs to the enumeration rather than to each row, and a row states only what it
+// looks for in the command.
+function on_bash_command(is_match: (command: string) => boolean): (call: GuardedCall) => boolean {
+	return function is_trigger(call: GuardedCall): boolean {
+		if (call.name !== cost_blocks.BASH_TOOL) return false
 
-	return is_issue_filing(time_shell.bash_command(call.input))
+		return is_match(time_shell.bash_command(call.input))
+	}
 }
 
 // The whole of the WIP cap, in the shape a refusal can carry: the count, the refusal, the two
@@ -82,6 +86,90 @@ const WIP_CAP_REASON =
 	'finding is discretionary and waits. The count command and both procedures are in ' +
 	'`prompts/collaboration-workflow/wip-cap.md`. Reissue this call once you have counted — it fires ' +
 	'once per run and cannot repeat on the call in hand.'
+
+// **A shell line carries several commands, and the subcommand has to be the one being invoked.**
+// Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
+// view <N> …"` is read as the write it is rather than as the read it quotes. A bare `|` is not a
+// separator here: it appears inside a `--jq` filter far more often than between two `gh` calls.
+const SEGMENT_SEPARATOR = /&&|\|\||;|\n/u
+// Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped.
+const GH_FLAGS = String.raw`(?:-{1,2}[\w-]+(?:[= ][^\s]+)?\s+)*`
+const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}issue\s+view\s`, 'u')
+const GH_API_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}api\s`, 'u')
+// `…/issues/<N>` — **one** Issue's body. The number has to end the path, so the listing
+// (`…/issues`) and every sub-resource under it (`…/issues/1319/comments`) are left alone.
+const ISSUE_BODY_PATH = /repos\/[^\s'"]*\/issues\/\d+(?=$|["'\s])/u
+// **A write to that path is not a read of it.** `gh api` sends POST as soon as any field flag
+// appears, and `kickoff` PATCHes `…/issues/<N>` to normalize a title and to fill a blank body — so
+// without this the delivery would be spent refusing a write, and the genuine body read later in the
+// same run would never be guarded.
+const API_METHOD = /(?:^|\s)(?:--method|-X)[= ]([A-Za-z]+)/u
+const API_FIELD = /(?:^|\s)(?:--raw-field|--field|--input|-F|-f)(?:[= ]|$)/u
+// A segment that fetches comments: the flag, a `comments` field in a `--json` projection, or the
+// comments endpoint. The short `-c` is deliberately absent — it belongs to `wc`, `grep` and `sort`
+// far more often than to `gh`, and reading it as "comments included" silenced the rule on any line
+// that ended in a pipe. A run that types it pays one round trip instead.
+const FETCHES_COMMENTS = /--comments\b|--json\s[\w,]*\bcomments\b|\/comments\b/u
+const ISSUES_PATH = /repos\/[^\s'"]*\/issues\//u
+
+function is_api_read(segment: string): boolean {
+	const method = API_METHOD.exec(segment)?.[1]
+
+	if (method !== undefined) return method.toUpperCase() === 'GET'
+
+	return !API_FIELD.test(segment)
+}
+
+function is_body_read_segment(segment: string): boolean {
+	if (ISSUE_VIEW_COMMAND.test(segment)) return true
+
+	return GH_API_COMMAND.test(segment) && ISSUE_BODY_PATH.test(segment) && is_api_read(segment)
+}
+
+// **An Issue's comments, not just any comments.** Batching pushes a run to fetch the body and the
+// comments on one line, so the allowance has to reach across segments — but `gh pr view 42 --json
+// comments` says nothing about whether *this* Issue was read whole, so the segment doing the
+// fetching has to be an Issue read itself.
+function fetches_issue_comments(segment: string): boolean {
+	if (!FETCHES_COMMENTS.test(segment)) return false
+
+	return (
+		ISSUE_VIEW_COMMAND.test(segment) || (GH_API_COMMAND.test(segment) && ISSUES_PATH.test(segment))
+	)
+}
+
+// **The trigger is the body read, not the start of implementation.** The moment an Issue's body
+// reaches a run is the moment the rule binds, and it is one shell call — the test
+// `prompts/collaboration-workflow/rule-delivery.md` sets for leaving residency.
+function is_body_only_issue_read(command: string): boolean {
+	const segments = command.split(SEGMENT_SEPARATOR).map((segment) => segment.trim())
+
+	if (segments.some((segment) => fetches_issue_comments(segment))) return false
+
+	return segments.some((segment) => is_body_read_segment(segment))
+}
+
+// **The refusal hands over the command that fixes it**, because reading is not the same as
+// obeying: a sentence saying "also read the comments" is prose of exactly the kind
+// joshuafolkken/kit#1344 measured as moving nothing, while a refused body read leaves the run
+// holding the reissue that makes the comments *present*. The conflict rule ships with it — a
+// delivery that said only "read them" would hand back the deciding at the moment nothing else is
+// open to read, the mistake joshuafolkken/kit#1518 corrected for the WIP cap.
+const ISSUE_COMMENTS_REASON =
+	"⛔ an Issue's comments are part of the Issue: read them before implementing, not only the body. " +
+	'A decision recorded after the body was written lives only in a comment — a corrected diagnosis ' +
+	'(joshuafolkken/kit#1537), a changed default and an added acceptance criterion ' +
+	'(joshuafolkken/kit#1520), a scope handed to another Issue (joshuafolkken/kit#1304) — and ' +
+	'nothing in the body says it was superseded, so a body-only reader builds the wrong thing and ' +
+	'sees no contradiction. Reissue this read with the comments included: ' +
+	"`gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, " +
+	"body}'` beside the body read, or `gh issue view <N> --comments` where GraphQL is reachable. " +
+	'Then the later text is the agreement in force — a comment supersedes the body it contradicts — ' +
+	"except for two answers that are not the run's to make: work a comment reassigns to another " +
+	'Issue is out of scope and is not implemented, and a comment saying the Issue no longer has a ' +
+	'reason to exist stops the run with a `confirmation` Telegram. The procedure is ' +
+	'`.claude/skills/workflow-commands/SKILL.md` → "An Issue\'s comments are part of the Issue". It ' +
+	'fires once per run and cannot repeat on the call in hand.'
 
 // A body handed to a command as an inline double-quoted argument, in the spellings a run reaches for:
 // `gh`'s field flags (`-f` / `-F` / `--field` / `--raw-field` with `body=`), `gh`'s own `--body`, and
@@ -110,9 +198,7 @@ const SHELL_EVALUATED = /[`$]/u
 //
 // **It is anchored to the whole value, not to the `$(` alone.** Excusing `$(` anywhere would let
 // `body="Result: run $(git log -1) to confirm"` through, and that one really is evaluated: the
-// substitution replaces the text and the command runs. The trade-off of anchoring is a delivery that
-// arrives on a safe call, which costs one reissue; the trade-off of not anchoring is a rule that
-// never fires on the case it exists for.
+// substitution replaces the text and the command runs.
 const WHOLE_VALUE_SUBSTITUTION = /^\$\([^()]*\)$/u
 
 // A backslash escape makes the next character literal inside double quotes, so `\$` and `` \` `` are
@@ -120,10 +206,6 @@ const WHOLE_VALUE_SUBSTITUTION = /^\$\([^()]*\)$/u
 // pass and keeps `SHELL_EVALUATED` readable.
 const ESCAPED_PAIR = /\\./gu
 
-// **The trigger is the body's content, not the flag.** Every worked example in this repository's
-// prompts passes a placeholder (`-f body="<plan>"`), which is inert; the moment a real body carrying
-// a backtick is substituted in, the call becomes the one that executes text. Keying on the flag would
-// refuse the inert examples too — firing on turns where the rule is already being kept.
 function is_evaluated_value(raw_value: string): boolean {
 	const literal = raw_value.replaceAll(ESCAPED_PAIR, '')
 
@@ -132,6 +214,10 @@ function is_evaluated_value(raw_value: string): boolean {
 	return SHELL_EVALUATED.test(literal)
 }
 
+// **The trigger is the body's content, not the flag.** Every worked example in this repository's
+// prompts passes a placeholder (`-f body="<plan>"`), which is inert; the moment a real body carrying
+// a backtick is substituted in, the call becomes the one that executes text. Keying on the flag would
+// refuse the inert examples too — firing on turns where the rule is already being kept.
 function is_shell_evaluated_body(command: string): boolean {
 	for (const match of command.matchAll(INLINE_BODY_VALUE)) {
 		if (is_evaluated_value(match[1] ?? '')) return true
@@ -140,13 +226,7 @@ function is_shell_evaluated_body(command: string): boolean {
 	return false
 }
 
-function is_inline_body_call(call: GuardedCall): boolean {
-	if (call.name !== cost_blocks.BASH_TOOL) return false
-
-	return is_shell_evaluated_body(time_shell.bash_command(call.input))
-}
-
-// The instruction in the shape a refusal can carry: what the shell is about to do, the four safe
+// The instruction in the shape a refusal can carry: what the shell is about to do, the safe
 // spellings, and the reissue sentence every delivery needs. The damage is named because it is the
 // half that reads as unbelievable — the substituted text is *executed*, not discarded.
 const SHELL_BODY_REASON =
@@ -162,8 +242,17 @@ const SHELL_BODY_REASON =
 	'it fires once per run and cannot repeat on the call in hand.'
 
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
-	{ id: 'wip-cap', is_trigger: is_filing_call, reason: WIP_CAP_REASON },
-	{ id: 'shell-body', is_trigger: is_inline_body_call, reason: SHELL_BODY_REASON },
+	{ id: 'wip-cap', is_trigger: on_bash_command(is_issue_filing), reason: WIP_CAP_REASON },
+	{
+		id: 'issue-comments',
+		is_trigger: on_bash_command(is_body_only_issue_read),
+		reason: ISSUE_COMMENTS_REASON,
+	},
+	{
+		id: 'shell-body',
+		is_trigger: on_bash_command(is_shell_evaluated_body),
+		reason: SHELL_BODY_REASON,
+	},
 ]
 
 // **Once per run, never once per call.** A rule delivered again on the next call would wedge a run
@@ -179,15 +268,47 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 // on**: nothing is recorded (the shared shell stamps only after `should_block` answers true), the
 // batching guard's own reason says to reissue the call, and this rule delivers on the reissue.
 //
-// **Inert for today's only row, and deliberately kept.** The batching guard does not treat a filing
-// call as a candidate at all, so the branch never fires for `wip-cap`; `delivered-rules.test.ts`
-// pins that invariant, and it is what any new row has to be re-checked against. Erring toward
-// standing aside costs at most one call's delay, while erring the other way costs the rule for the
-// whole run.
-function is_first_delivery(tail: string, call: GuardedCall, delivered_at_ms: number): boolean {
+// **Inert for `wip-cap` and live for `issue-comments`, which is why it was written before either
+// needed it.** The batching guard does not treat a filing call as a candidate at all, so the branch
+// never fires for `wip-cap`; it *does* treat `gh issue view` as one, so the second row genuinely
+// stands aside on a turn the batching guard is about to refuse and delivers on the reissue.
+// `delivered-rules.test.ts` pins both halves, and it is what any new row has to be re-checked
+// against. Erring toward standing aside costs at most one call's delay, while erring the other way
+// costs the rule for the whole run.
+// The batching guard's own record for this run, read through the same shell that writes it.
+const BATCH_STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
+
+// **A record this young is the batching guard speaking about the call in hand.** The two hooks are
+// separate processes started for the same `PreToolUse` event with no ordering between them, and the
+// shared shell writes its stamp *before* it returns a reason — so presence alone cannot answer "has
+// it refused?" without making the stand-aside depend on which process won the race. A record older
+// than this window is a refusal about an earlier call, which that guard will not repeat on the same
+// open sequence, and this rule is free to speak.
+const BATCH_REFUSAL_WINDOW_MS = 10_000
+
+// **The question is what the batching guard will do on this call, not what it would do from a clean
+// slate.** Asked with `NEVER_MS` in place of its record, the answer stayed `true` for the whole of an
+// open sequence it had *already* refused — and since that guard will not refuse the same sequence
+// twice, a run that kept single-calling after being refused had neither hook speak, and this rule was
+// lost for the run with nothing recorded to say so. That is the silent deletion the stand-aside
+// exists to prevent, arrived at from the other side.
+function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
+	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
+
+	if (run.now_ms - refused_at_ms < BATCH_REFUSAL_WINDOW_MS) return true
+
+	return time_batch_guard.should_block(tail, call, refused_at_ms)
+}
+
+function is_first_delivery(
+	tail: string,
+	call: GuardedCall,
+	delivered_at_ms: number,
+	run: GuardRun,
+): boolean {
 	if (delivered_at_ms !== hook_decision.NEVER_MS) return false
 
-	return !time_batch_guard.should_block(tail, call, hook_decision.NEVER_MS)
+	return !will_batch_guard_refuse(tail, call, run)
 }
 
 function guard_of(rule: DeliveredRule): ReturnType<typeof hook_decision.create_transcript_guard> {
@@ -213,15 +334,17 @@ function delivery_path(rule_id: string, transcript_path: string): string {
 
 // **The first entry whose delivery actually fires wins — not the first whose trigger matches.** Only
 // one refusal can leave a `PreToolUse` hook, so a rule that matched but has already been delivered
-// this run falls through and a later rule may speak on the same call.
+// this run falls through and a later rule may speak on the same call. **A rule added here therefore
+// has to be one whose trigger no other row also matches**, and the enumeration's own suite asserts
+// that over every row's fixtures.
 //
-// **The two rows can both match one call, and the order is the answer rather than a defect**
-// (joshuafolkken/kit#1198). A `gh api …/issues -f title="…" -f body="… \`x\` …"` is a filing *and* an
-// inline body. `wip-cap` is listed first because it decides whether the Issue should exist at all,
-// and a body rewritten into a file for an Issue that must not be filed is wasted work. Nothing is
-// lost by losing the race: the stamps are keyed per `id`, so the reissued call is delivered the
-// second rule. A row whose trigger overlaps an existing one is therefore admissible only when this
-// same reading holds — that its delivery is still correct one call later.
+// **`shell-body` carries the one deliberate exception, and the order is what makes it safe**
+// (joshuafolkken/kit#1198). A filing whose body happens to contain a backtick —
+// `gh api …/issues -f title="…" -f body="… \`x\` …"` — is claimed by `wip-cap` as well. It is listed
+// first because it decides whether the Issue should exist at all, and rewriting a body into a file
+// for an Issue that must not be filed is wasted work. Nothing is lost by losing the race: the stamps
+// are keyed per `id`, so the reissued call is delivered the second rule. An overlap is admissible
+// only when that reading holds — that the losing rule's delivery is still correct one call later.
 function delivery(raw_payload: string, now_ms: number = Date.now()): string | undefined {
 	for (const guard of GUARDS.values()) {
 		const reason = guard.refusal(raw_payload, now_ms)
@@ -238,11 +361,13 @@ function is_enabled(): boolean {
 
 const delivered_rules = {
 	DELIVERED_RULES,
+	ISSUE_COMMENTS_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,
 	delivery,
 	delivery_path,
+	is_body_only_issue_read,
 	is_enabled,
 	is_issue_filing,
 	is_shell_evaluated_body,
