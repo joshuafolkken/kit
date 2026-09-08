@@ -1,11 +1,15 @@
 import { ENV_FILE_NAME } from '#ports'
 
-// The filename comes from the module that reads the same file from inside `playwright.config.ts`,
-// so the two readers of `.env` cannot end up pointed at two different files (#820).
-const ENV_FILE_FLAGS: ReadonlyArray<string> = [`--env-file=${ENV_FILE_NAME}`]
-// The same file, loaded only when it is there. `doctor` is run from anywhere — a home directory, a
-// clone of an unrelated project — where `.env` need not exist, and the hard flag above aborts the
-// command when the file is missing (joshuafolkken/kit#869).
+// The file, loaded only when it is there. The filename comes from the module that reads the same
+// file from inside `playwright.config.ts`, so the two readers of `.env` cannot end up pointed at two
+// different files (#820).
+//
+// **There is no mandatory counterpart any more.** `--env-file=.env` aborts before the script's first
+// line when the file is missing, which is wrong for every command kit ships: `doctor` runs from
+// anywhere, including a directory with no project at all (joshuafolkken/kit#869), and `notify` /
+// `followup` run in cloud sessions that carry their credentials as environment variables and keep no
+// `.env` at all (joshuafolkken/kit#1564). A command that needs a value to be present says so itself,
+// where it can name what is missing.
 const OPTIONAL_ENV_FILE_FLAGS: ReadonlyArray<string> = [`--env-file-if-exists=${ENV_FILE_NAME}`]
 
 type CommandCategory =
@@ -134,7 +138,6 @@ export type { CommandCategory, CommandEntry }
 export {
 	CSPELL_CACHE_FILE,
 	CSPELL_CACHE_FLAGS,
-	ENV_FILE_FLAGS,
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,

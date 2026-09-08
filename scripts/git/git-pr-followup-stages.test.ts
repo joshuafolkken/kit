@@ -42,7 +42,7 @@ vi.mock('./git-pr-ai-review', () => ({
 }))
 
 vi.mock('./telegram-notify', () => ({
-	telegram_notify: { send: vi.fn() },
+	telegram_notify: { send: vi.fn(), send_or_report: vi.fn() },
 }))
 
 // Mocked rather than left real: the auto-close reads GitHub, and a timing suite that reached the
@@ -104,7 +104,7 @@ function answer_every_call(): void {
 		review_decision: undefined,
 	})
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
-	vi.mocked(telegram_notify.send).mockResolvedValue()
+	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
 	vi.mocked(git_epic_close.close_completed_epics).mockResolvedValue()
 }
 
@@ -194,6 +194,38 @@ describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 
 	it('keeps merging the pull request', async () => {
 		vi.mocked(git_epic_close.close_completed_epics).mockRejectedValue(FAILURE)
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(BASE_INPUT.branch_name)
+	})
+})
+
+// joshuafolkken/kit#1564: the completion notification is sent on the way to the merge, where a throw
+// would leave a reviewed, green pull request unmerged. It goes through the tolerant send, which
+// reports the failure and answers `false`; the throwing form belongs to `pnpm josh notify`, whose
+// whole job is the notification.
+describe('git_pr_followup.run — a notification that reached nobody', () => {
+	it('sends through the tolerant form rather than the throwing one', async () => {
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(telegram_notify.send_or_report)).toHaveBeenCalledTimes(1)
+		expect(vi.mocked(telegram_notify.send)).not.toHaveBeenCalled()
+	})
+
+	// A completion notification is never re-sent by hand: `--task-type completion` populates no PR
+	// link, and re-running `followup` after the merge is not a re-send. So this caller passes none.
+	it('offers no recovery command for a completion notification', async () => {
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(vi.mocked(telegram_notify.send_or_report)).toHaveBeenCalledWith(
+			expect.objectContaining({ task_type: 'completion' }),
+			undefined,
+		)
+	})
+
+	it('merges the pull request even when the notification was not delivered', async () => {
+		vi.mocked(telegram_notify.send_or_report).mockResolvedValue(false)
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 

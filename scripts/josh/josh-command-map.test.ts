@@ -10,6 +10,7 @@ const TEST_UNIT_COMMAND = 'test:unit'
 const HEALTH_COMMAND = 'health'
 const ALL_ALIAS_KEYS = Object.keys(ALIASES)
 const DEVELOPMENT_CATEGORY = 'Development'
+const OPTIONAL_ENV_FILE_FLAG = '--env-file-if-exists=.env'
 
 function get_command(name: string): CommandEntry | undefined {
 	return COMMAND_MAP[name]
@@ -125,17 +126,20 @@ describe('COMMAND_MAP — new dev commands', () => {
 })
 
 describe('COMMAND_MAP — tsx_arguments', () => {
-	it('followup command has tsx_arguments with env-file flag', () => {
+	// joshuafolkken/kit#1564: the optional form, not merely "an env-file flag". Both commands are run
+	// where no `.env` exists — a cloud session carries `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` as
+	// environment variables — and the mandatory form aborts before the script's first line there.
+	it('followup command reads .env only when it exists', () => {
 		const entry = get_command('followup')
 
 		expect(entry?.tsx_arguments).toBeDefined()
-		expect(entry?.tsx_arguments?.some((flag) => flag.includes('env-file'))).toBe(true)
+		expect(entry?.tsx_arguments).toContain(OPTIONAL_ENV_FILE_FLAG)
 	})
 
-	it('notify command has tsx_arguments with env-file flag', () => {
+	it('notify command reads .env only when it exists', () => {
 		const entry = get_command('notify')
 
-		expect(entry?.tsx_arguments?.some((flag) => flag.includes('env-file'))).toBe(true)
+		expect(entry?.tsx_arguments).toContain(OPTIONAL_ENV_FILE_FLAG)
 	})
 
 	// #820 put a `--env-file-if-exists=.env` flag here so `josh port` and `playwright.config.ts`

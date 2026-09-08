@@ -17,6 +17,7 @@ vi.mock('./git-gh-command', () => ({
 vi.mock('./telegram-notify', () => ({
 	telegram_notify: {
 		send: vi.fn(),
+		send_or_report: vi.fn(),
 	},
 }))
 
@@ -24,7 +25,9 @@ const { git_gh_command } = await import('./git-gh-command')
 const { telegram_notify } = await import('./telegram-notify')
 const mocked_pr_get_comments = vi.mocked(git_gh_command.pr_get_comments)
 const mocked_pr_comment = vi.mocked(git_gh_command.pr_comment)
-const mocked_telegram_send = vi.mocked(telegram_notify.send)
+// joshuafolkken/kit#1564: the tolerant form. What stops the run here is the blocker the
+// notification is about, raised by the caller — so a failed send must not replace that diagnosis.
+const mocked_telegram_send = vi.mocked(telegram_notify.send_or_report)
 
 const BRANCH = 'feature-branch'
 const IGNORE_REASON = 'Tracked in follow-up Issue #999'
@@ -193,8 +196,11 @@ describe('handle_ai_review_findings — comments that could not be read', () => 
 		mocked_pr_get_comments.mockResolvedValue(undefined)
 
 		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow()
+		// The second argument is the recovery line: a `confirmation` is exactly what `josh notify` is
+		// for, so this caller — unlike the completion one — has a command worth naming.
 		expect(mocked_telegram_send).toHaveBeenCalledWith(
 			expect.objectContaining({ task_type: 'confirmation' }),
+			expect.stringContaining('pnpm josh notify'),
 		)
 	})
 

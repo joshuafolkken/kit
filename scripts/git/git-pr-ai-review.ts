@@ -9,6 +9,13 @@ import { parse_json_array_or_undefined } from './parse-json-array'
 import { ai_review_pull_comment_schema } from './schemas'
 import { telegram_notify, type TelegramSendInput } from './telegram-notify'
 
+// What to type when the confirmation notification itself could not be delivered
+// (joshuafolkken/kit#1564). The `--body-file` spelling rather than `--body`, because the body names
+// commands and a backtick inside shell double quotes is evaluated before the command runs.
+const CONFIRMATION_RECOVERY =
+	'send it by hand — `pnpm josh notify --task-type confirmation --issue-url <url> ' +
+	'--body-file <path>`'
+
 interface TelegramContext {
 	repo_name: string | undefined
 	issue_title: string | undefined
@@ -105,7 +112,13 @@ async function notify_ai_review_confirmation(input: {
 	context: TelegramContext
 	body: string
 }): Promise<void> {
-	await telegram_notify.send(build_confirmation_input(input))
+	// **The tolerant send** (joshuafolkken/kit#1564). What stops the run here is the blocker this
+	// notification is *about*, and it is raised by the caller — so a failed send must not replace that
+	// diagnosis with a Telegram error. It is reported and the caller's own stop still happens.
+	//
+	// Unlike the completion notification, this one *has* a recovery: a `confirmation` is exactly what
+	// `josh notify` is for, and the run stops here anyway, so re-sending it by hand loses nothing.
+	await telegram_notify.send_or_report(build_confirmation_input(input), CONFIRMATION_RECOVERY)
 }
 
 function has_ignore_reason(reason: string | undefined): reason is string {

@@ -49,6 +49,7 @@ vi.mock('./git-pr-ai-review', () => ({
 vi.mock('./telegram-notify', () => ({
 	telegram_notify: {
 		send: vi.fn(),
+		send_or_report: vi.fn(),
 	},
 }))
 
@@ -91,7 +92,7 @@ const mocked_pr_get_body = vi.mocked(git_gh_command.pr_get_body)
 
 // The body of the completion notification the run sent, or undefined when it sent none.
 function notify_body(): string | undefined {
-	return (vi.mocked(telegram_notify.send).mock.calls[0] ?? [])[0]?.body
+	return (vi.mocked(telegram_notify.send_or_report).mock.calls[0] ?? [])[0]?.body
 }
 
 function silence_warnings(): void {
@@ -110,7 +111,7 @@ function setup_run_mocks(): void {
 	})
 	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
 	vi.mocked(git_pr_ai_review.handle_ai_review_findings).mockResolvedValue([])
-	vi.mocked(telegram_notify.send).mockResolvedValue()
+	vi.mocked(telegram_notify.send_or_report).mockResolvedValue(true)
 	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
 }
 
@@ -212,7 +213,7 @@ describe('git_pr_followup.run — --merge flag', () => {
 	it('calls notify before pr_merge when should_merge is true', async () => {
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		const [notify_order] = vi.mocked(telegram_notify.send).mock.invocationCallOrder
+		const [notify_order] = vi.mocked(telegram_notify.send_or_report).mock.invocationCallOrder
 		const [merge_order] = vi.mocked(git_gh_command.pr_merge).mock.invocationCallOrder
 
 		expect(notify_order).toBeLessThan(merge_order ?? Infinity)

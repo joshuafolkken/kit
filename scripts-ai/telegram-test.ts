@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { git_error } from '../scripts/git/git-error'
 import { git_gh_issue_read } from '../scripts/git/git-gh-issue-read'
 import { git_gh_repo } from '../scripts/git/git-gh-repo'
 import { github_issue_url, type IssueUrlTarget } from '../scripts/git/github-issue-url'
@@ -104,8 +105,26 @@ async function main(): Promise<void> {
 	await telegram_notify.send(input)
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+// **A notification nobody received must not read as success** (joshuafolkken/kit#1564). This command
+// *is* the notification, so a failed send is its result and the exit code has to say so — the state
+// that Issue measured was three lost messages, each printing a warning and exiting 0.
+//
+// `git_error.handle` is what every other script in this directory ends with: it prints the message
+// and exits non-zero. Both the message and the `cause` whose text `handle` also prints reach it
+// already free of the bot token and the chat id — `telegram_notify` redacts each before throwing.
+//
+// Separated from the `import.meta.url` guard so the wiring is reachable from a unit test; the guard
+// itself stays the canonical one the in-process dispatcher matches on.
+async function run_cli(): Promise<void> {
+	try {
+		await main()
+	} catch (error) {
+		git_error.handle(error)
+	}
+}
 
-const telegram_test = { fetch_repo_name, fetch_issue_title, resolve_context }
+if (process.argv[1] === fileURLToPath(import.meta.url)) await run_cli()
+
+const telegram_test = { fetch_repo_name, fetch_issue_title, resolve_context, run_cli }
 
 export { telegram_test }
