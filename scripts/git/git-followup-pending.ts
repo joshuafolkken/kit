@@ -19,10 +19,11 @@ import { git_command } from './git-command'
 // **The Telegram is sent before the merge**, deliberately: `git-pr-followup.ts` cuts its wrap-up
 // there because that is the last point at which the run can still fail safely. So the count taken
 // there cannot include this run's own merge, and a bare number would be understated by exactly one.
-// Saying so is the honest form of the same measurement. **The Telegram is the only place this line
-// goes** — there is no post-merge console call, and `followup.md` no longer claims one
-// (joshuafolkken/kit#1582). What a run does about the count is `pnpm josh release:scope`, asked
-// after the merge, which reads `read_pending` below rather than this line.
+// Saying so is the honest form of the same measurement. The console line printed after the merge
+// passes `false` and carries no note, because by then the merge is on the remote and the fetch below
+// brings it in; `scripts-ai/git-followup-finish.ts` is that caller, so **both branches of this flag
+// are live**. What a run *does* about the count is `pnpm josh release:scope`, asked after the merge,
+// which reads `read_pending` below rather than this line (joshuafolkken/kit#1582).
 const MERGE_PENDING_NOTE = "— this run's merge is not counted; it lands next"
 
 interface PendingReadOptions {
@@ -44,8 +45,8 @@ interface PendingLineOptions extends PendingReadOptions {
 // feature branch, and `--first-parent` from a branch tip walks that branch rather than main — every
 // merge main took after the branch was cut is not even an ancestor, so the number would be silently
 // low and the line still say "on main". Fetching first is what makes it current, which is also what
-// lets `pnpm josh release:scope` — asked after the merge, from a lane or a feature branch — count
-// the merge that just landed (joshuafolkken/kit#1582).
+// lets the post-merge console line — and `pnpm josh release:scope`, asked from a lane or a feature
+// branch — count the merge that just landed (joshuafolkken/kit#1582).
 async function read_tip(options: PendingReadOptions): Promise<string> {
 	if (options.tip !== undefined) return options.tip
 
