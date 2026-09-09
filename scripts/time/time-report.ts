@@ -500,6 +500,9 @@ const time_report = {
 	CI_LABEL,
 	build_from_spans,
 	build_report,
+	// Exported so a block built outside this file divides by the same model wait the category table
+	// prints, rather than re-deriving the sum and coming to disagree with it (joshuafolkken/kit#1477).
+	category_ms,
 	format_minutes,
 	format_seconds,
 	format_share,
