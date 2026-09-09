@@ -12,6 +12,9 @@ import type { LaneInfo } from './lane-registry'
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
+		branch_exists: vi.fn(),
+		branch_names_remote: vi.fn(),
+		ls_remote_branch: vi.fn(),
 		default_branch_reference: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
@@ -88,6 +91,12 @@ function lanes_are(lanes: ReadonlyArray<LaneInfo>): void {
 function git_answers(): void {
 	vi.mocked(git_command.get_default_branch).mockResolvedValue('main')
 	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
+	// No branch of the lane's name anywhere, which is what opening a lane for a fresh child finds
+	// (joshuafolkken/kit#1627). The suite that drives the other two answers is
+	// `lane-open-start-point.test.ts`, against real git.
+	vi.mocked(git_command.branch_exists).mockResolvedValue(false)
+	vi.mocked(git_command.branch_names_remote).mockResolvedValue([])
+	vi.mocked(git_command.ls_remote_branch).mockResolvedValue('')
 	vi.mocked(git_command.default_branch_reference).mockResolvedValue(START_POINT)
 	// Stands in for what `git worktree add` does to the filesystem, so the `.env` write that follows
 	// it has somewhere to land.
@@ -225,5 +234,22 @@ describe('refusing to open a lane', () => {
 		install_answers(false, INSTALL_FAILURE)
 
 		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(new RegExp(INSTALL_FAILURE, 'u'))
+	})
+})
+
+// joshuafolkken/kit#1627: a branch that is already here is attached to rather than created, and the
+// absent start point is how that reaches git. Which of the three answers `lane_start_point` gives is
+// its own suite's; what belongs here is that `lane:open` passes it straight through.
+describe('opening a lane on a branch that already exists', () => {
+	it('asks git for no start point, so the work tree lands on that branch', async () => {
+		vi.mocked(git_command.branch_exists).mockResolvedValue(true)
+
+		await lane_open.open_lane(ISSUE)
+
+		expect(vi.mocked(git_command.worktree_add)).toHaveBeenCalledWith(
+			path.join(LANE_ROOT, ISSUE),
+			'1490-lane',
+			undefined,
+		)
 	})
 })

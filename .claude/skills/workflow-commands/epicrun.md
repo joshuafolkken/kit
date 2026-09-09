@@ -614,6 +614,15 @@ pnpm --dir "$dir" install --frozen-lockfile                 # only after a pop, 
   **it runs only where a pop actually happened**; every other lane is finished when `lane:open`
   returns. **A pop that fails stops the lane** rather than re-installing anyway, which is the same
   failure by a different route.
+- **A `<N>-lane` that already exists is attached to, and `lane:open` says so on standard error**
+  (joshuafolkken/kit#1627). That is what makes `lane:open <N>` the way back to a child parked after
+  it pushed: a local branch of that name gets the work tree put on it, and where there is none the
+  **remote itself** is asked — `ls-remote`, not the remote-tracking refs, which nothing prunes — and
+  the lane is cut from `origin/<N>-lane` only where the branch is still there, fetched first so it
+  starts at the tip. With the branch gone from origin, or never there, the lane is cut from the
+  default branch as any new one is. **A reused branch is not a fresh lane** — it starts on commits
+  somebody already pushed, which is why the reuse is printed rather than left to be noticed. Nothing
+  deletes a branch to open a lane, so a reopen cannot cost the pushed work.
 - **Nothing switches the lane's branch.** The reason is at the top of this section: the registry
   identifies a lane by that branch, so a switch costs the lane its seat, its listing and its
   isolation. **Nor is there anything to switch it for** — `<N>-lane` is already a name
@@ -667,9 +676,11 @@ that has been pushed. **The merge direction is `origin/main` into the lane's bra
 — a rebase would rewrite pushed commits and need a force push, which this package denies.
 
 1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, and
-   resolve in place. Do not close the lane, do not open another, do not switch its branch —
-   `pnpm josh lane:open` cannot reattach to a pushed branch (joshuafolkken/kit#1627), and staying put
-   is what keeps the run clear of that.
+   resolve in place. Do not close the lane, do not open another, do not switch its branch — reopening
+   costs the re-install and the seat, and a switched branch drops the lane out of the registry
+   entirely. **`pnpm josh lane:open` can now reattach to a pushed branch** (joshuafolkken/kit#1627),
+   so a lane closed by mistake here is recoverable rather than lost; staying put is still what keeps
+   the run clear of the question.
 2. **Re-run the whole gate.** The tree changed, so the green recorded before the conflict is void:
    `pnpm josh lint:related` and `pnpm josh test:related`, then `pnpm josh gate`.
 3. **Review the resolution, one round.** Brief it with `pnpm josh review:brief` and run
@@ -730,28 +741,34 @@ which is exactly the hazard that made this section refuse to resolve at all.
 | The child **merged** | `pnpm josh lane:close <N>` | `followup` released the hold and the branch is on `main`; nothing in that tree is wanted |
 | The child was **parked before its commit** | `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work with it. Closing is what keeps the seat free, and it has to happen: `epic:next` already counts a parked child's lane as released, so a lane left open would hold a seat the count believes is free |
 | The child was **parked after its commit and push** | **Left open**, its directory and its held seat recorded on the Issue | The stash step is a **no-op**: the tree is clean because the work is already committed. What `lane:close` would take is the **local branch**, and that branch is the resume path — the two sentences under this table are why |
-| The child hit a **merge conflict** | **Left open** — the resolution happens in it | The child resolves in place rather than parking ("Conflicts are not predicted" above), so the lane is the one place the work can be finished. Closing it would delete the branch the pull request already carries, and `lane:open` cannot put that branch back (joshuafolkken/kit#1627). A park under one of that section's four conditions takes the row above, unchanged |
+| The child hit a **merge conflict** | **Left open** — the resolution happens in it | The child resolves in place rather than parking ("Conflicts are not predicted" above), so the lane is the one place the work can be finished. Closing it would delete the local branch the pull request already carries, and cost the re-install and the seat to get back — **`lane:open` does now put that branch back** (joshuafolkken/kit#1627), so a lane closed here by mistake is recoverable rather than lost. A park under one of that section's four conditions takes the row above, unchanged |
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at, so nothing is stashed and nothing is closed. Name the lane directory in the stop report and in the Telegram, or the person is told to look at a tree and not told where it is |
 | The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | Same reasoning; only the counter differs. **A merge conflict is not this row**, though `followup` reports it as a failed check: it takes the row above, and it is not counted ("Conflicts are not predicted") |
 | **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | The work tree was created and its seat allocated before the install ran, so a lane exists that no `pnpm josh …` runs in and the next `lane:open` answers `already-open` rather than retrying (joshuafolkken/kit#1554). Closing frees the seat; parking is right because the causes — an outdated lock, an unreachable registry — are ones a person fixes. Carry pnpm's reason, printed on standard error, into the park note |
 | The run was **interrupted** | Nothing to do — the work tree survives on disk | The next session's `pnpm josh lane:prune` closes what git no longer has a tree for, and `lane:open` answers `already-open` for what is still there. **Park that child**, naming the lane and `pnpm josh lane:close <N>` as the way out: resuming somebody's half-finished lane unattended is the judgement `run:preflight` refuses to make on its own, and in a lane there is no command to make it |
 
-**A committed child's lane is kept because closing it deletes the branch its resume needs, and no
-command puts that branch back** (joshuafolkken/kit#1587). Three mechanics decide it, none of them a
-judgement. `lane:close` does not stop at the work tree: `remove_lane` follows the removal with
-`git_command.branch_delete(targets.branch)`, which runs `git branch -D <N>-lane`
+**A committed child's lane is kept because it is the cheapest resume, not because closing it is
+final** (joshuafolkken/kit#1587, corrected by joshuafolkken/kit#1627). Two mechanics decide it, and
+neither is a judgement. `lane:close` does not stop at the work tree: `remove_lane` follows the
+removal with `git_command.branch_delete(targets.branch)`, which runs `git branch -D <N>-lane`
 (`scripts/lane/lane-close.ts` → `remove_lane`, `scripts/git/git-command.ts` → `branch_delete`) — the
 force flag is there precisely so an unmerged lane branch, which is every parked one, goes too.
 Resume for this child is a re-run of `pnpm josh followup`, and that reads the branch **locally**:
 `read_branch_paths` is `changed_paths.to_paths(await git_command.diff_main_names())`
 (`scripts/git/git-pr-managed-config.ts`), a `git diff` against the merge base in the work tree, so
-with no local branch the gate cannot be re-evaluated at all. And `pnpm josh lane:open <N>` is not the
-way back: `materialize` passes the start point to `worktree_add`, which hardcodes
-`['add', '--no-track', '-b', branch_name]` off `origin/<default>` (`scripts/lane/lane-open.ts`,
-`scripts/git/git-command.ts` → `worktree_add`), so it would cut a **fresh, empty** branch of that
-name rather than restore the pushed one. Nothing in `pnpm josh lane:*` reaches
-`git worktree add <dir> <existing-branch>`, and rebuilding one by hand gets a tree with no seat and
-no `node_modules` — which is to say no `pnpm josh followup` either.
+with no local branch the gate cannot be re-evaluated at all. **Keeping the lane is therefore worth a
+seat**: the tree, the branch and its `node_modules` are all still there, and the resume is one
+command.
+
+**What is no longer true is that closing it is unrecoverable** (joshuafolkken/kit#1627). Until then
+`pnpm josh lane:open <N>` hardcoded `['add', '--no-track', '-b', branch_name]` off `origin/<default>`
+and would cut a **fresh, empty** branch of that name over the pushed one — silently, once
+`branch_delete` had removed the local branch. It now attaches to a `<N>-lane` that exists locally and
+creates one from `origin/<N>-lane` where only the remote has it, saying on standard error which it
+reused ("Opening one lane" above). So a lane closed by accident after a push is reopened rather than
+lost, and what closing it costs is the re-install and the seat rather than the work. **The branch
+still has to have reached the remote for that to hold** — a child parked before its commit has
+nothing on `origin`, which is why that row stashes first and this one does not.
 
 **Which of these rows a child takes is decided by what `followup` printed, not by reading the
 situation.**
