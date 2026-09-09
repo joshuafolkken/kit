@@ -105,6 +105,46 @@ describe(`${ENTRY_SKILL} — the entry point's own declarations`, () => {
 	})
 })
 
+// joshuafolkken/kit#1652: the run reports its plan before it starts anything, and then settles what
+// the plan can settle. Each marker is one sentence whose loss changes what a run does — a plan that
+// is not reported, a decision pass that becomes a research task, or a label a run stops applying,
+// which is what makes the next plan cheap.
+const PLAN_MARKERS: ReadonlyArray<string> = [
+	// Without this, the plan is optional and a run dispatches straight into the loop.
+	'**A `backlogrun` reports its plan before it starts anything.**',
+	// Without this, a second plan is derived by hand and can promise an order the run does not take.
+	'**the plan cannot promise an order the run does not take**',
+	// Without this, the per-repository grouping reads as formatting rather than the run's width.
+	'**The grouping is the parallelism**',
+	// Without this, the four sections are reported to nobody, in whichever language happened to fit.
+	'**Report all four to the person, in the session language, before the first child starts.**',
+	// Without this, the decisions are taken one interrupt at a time, which is what the plan prevents.
+	'**Every `needs-decision` issue the plan listed is settled in one pass at the start',
+	// Without this, the front-loading pass grows into benchmarking and the whole backlog waits on it.
+	'**Never measure in order to decide.**',
+	// Without this, the label is never applied and every later plan re-reads the bodies instead.
+	'**The next plan then classifies it by reading the label alone**',
+]
+
+describe(`${ENTRY_SKILL} — reports the plan before it starts anything`, () => {
+	const entry = read_unwrapped(ENTRY_SKILL)
+
+	it.each(PLAN_MARKERS)('states %j', (marker) => {
+		expect(entry).toContain(marker)
+	})
+
+	it('names the command the plan comes from', () => {
+		expect(entry).toContain('pnpm josh backlog:plan')
+	})
+
+	// The two labels a run must never apply are what this pass could most easily be read as widening.
+	it('keeps the label a run may apply apart from the two it may not', () => {
+		expect(entry).toContain(
+			'**`needs-decision` is the one workflow label a run may apply, and it is neither `auto-ok` nor',
+		)
+	})
+})
+
 describe(`${ENTRY_SKILL} — references the child procedures instead of restating them`, () => {
 	const entry = read_unwrapped(ENTRY_SKILL)
 

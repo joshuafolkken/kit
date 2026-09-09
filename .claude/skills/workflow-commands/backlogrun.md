@@ -57,6 +57,63 @@ once, the run.**
 
 A Tier C action inside a child still stops that child, exactly as under `epicrun`.
 
+## The plan, before the first child starts
+
+**A `backlogrun` reports its plan before it starts anything.** Nothing is dispatched, no lane is
+opened and no issue is picked up until the plan has been reported and the decision pass below has
+run (joshuafolkken/kit#1652).
+
+**The plan is one command's output, not an assembly of several:**
+
+```bash
+pnpm josh backlog:plan          # alias: josh blp
+```
+
+**It renders the same classified pool `backlog:next` answers from**, through that command's own
+`context_of` and `resolve` — so **the plan cannot promise an order the run does not take**. It is a
+separate command rather than a flag because `backlog:next`'s standard output is one bare token per
+line and a plan printed there would break the loop below. Its four sections are:
+
+- **Ready now** — the runnable children, grouped by repository. **The grouping is the parallelism**,
+  not a presentational choice: a lane is per repository, so the bundles are how wide this run can go.
+- **Waiting** — every withheld child, each naming **what it is waiting on**: the blocking issue
+  numbers, a run that already has it, or that it is ready but past the offer this ask could make.
+- **Waiting on a person** — the `needs-decision` children, which is the next subsection's input.
+- **Out of scope** — every open issue the backlog will **not** run, with the reason. That half was
+  silent before: an issue without `auto-ok` never enters the pool, so nothing distinguished "not
+  opted in" from "not reached yet".
+
+**Report all four to the person, in the session language, before the first child starts.** Epic
+children are enumerated individually rather than summarized under their root, because the pool has
+already classified each one — the detail costs nothing (joshuafolkken/kit#1652). A `⚠` about a
+truncated listing is reported with them: the plan is then partial, and saying so is what keeps it
+from reading as complete.
+
+### Resolve what the plan can resolve, before starting
+
+**Every `needs-decision` issue the plan listed is settled in one pass at the start, rather than one
+stop at a time.** The point is to spend a person's attention once, up front, instead of interrupting
+an unattended run over and over.
+
+- **Decide everything decidable from the issue itself.** Read the issue's body **and its comments**
+  (`SKILL.md` → §2g), and where the answer is already there, record it as an Issue comment and
+  **remove the label** — `CLAUDE.md` → "Decision autonomy" already makes that Tier A, and a child
+  whose decision is recorded while its label still stands is parked for no reason.
+- **Never measure in order to decide.** A question needing a benchmark, a profile, or a run of the
+  thing itself is not settled here: it stays labelled and the plan says so. This pass is a cheap
+  read, not a research task, and turning it into one would put the whole backlog behind it.
+- **Label what you find.** An issue that turns out to need a person's judgement has `needs-decision`
+  applied — the same label a parked child gets, applied the way `epicrun.md` → "park and continue"
+  applies it. **The next plan then classifies it by reading the label alone**, never by reading the
+  body again, so the cost of this pass falls on every subsequent ask instead of repeating.
+- **Then start the loop.** Whatever is still labelled is reported as parked and left standing; the
+  run does not wait on it.
+
+**`needs-decision` is the one workflow label a run may apply, and it is neither `auto-ok` nor
+`needs-human-review`.** Those two widen or withhold what may be *executed* and stay a person's alone
+(`epicrun.md`, `SKILL.md` → §2z). This one records only that a person's answer is needed, which is a
+finding rather than an authorization — which is why a run parks with it and a person clears it.
+
 ## The loop
 
 The answer comes from one command, and the command is the single source of what may start:

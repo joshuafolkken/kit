@@ -2012,6 +2012,36 @@ The command is read-only and never applies or removes a label.
 
 **The entry point that consumes this answer is `backlogrun`** ([#1631](https://github.com/joshuafolkken/kit/issues/1631)) — the shorthand keyword that runs the opted-in backlog without naming an epic, defined in `.claude/skills/workflow-commands/backlogrun.md`. It is a separate keyword rather than an argument to `epicrun` because the two declare different authorizations: `epicrun #E` approves one epic's children, and `backlogrun` approves everything a person has opted in with `auto-ok`. Its loop is written against the contract above — the tokens are bare numbers scoped to this repository, `error` is told apart by reading the token rather than the exit status, and every merged issue is fed back through `--exclude`. Which issues may run stays a person's decision; the order and the parallelism are the run's.
 
+### `josh backlog:plan`
+
+The whole backlog as a plan a person reads before a run starts ([#1652](https://github.com/joshuafolkken/kit/issues/1652)).
+
+```bash
+pnpm josh backlog:plan                       # alias: josh blp
+pnpm josh backlog:plan --exclude 1630        # after #1630 merged
+```
+
+`backlog:next` answers the **next** question — which numbers may start now — and its output is a contract a loop branches on. This answers the **whole** one, for a person: four sections in one ask, on standard output.
+
+| Section             | What it holds                                              |
+| ------------------- | ---------------------------------------------------------- |
+| Ready now           | The runnable children, grouped by repository               |
+| Waiting             | Every withheld child, each naming what it is waiting on    |
+| Waiting on a person | The `needs-decision` children                              |
+| Out of scope        | Every open issue the backlog will not run, with the reason |
+
+**The plan cannot promise an order the run does not take.** The classification is `backlog:next`'s own — the same two functions, `context_of` and `resolve` — so this command renders that answer rather than deriving a second one. It is a separate command rather than a flag because `backlog:next`'s standard output is one bare token per line, and a plan printed there would break every loop reading it.
+
+**The grouping is the parallelism, not a presentational choice.** A lane is per repository, so the per-repository bundles are exactly how wide the run can go.
+
+**"Waiting" names the blocker.** The dependency edges were always read — they decide the classification — and were never shown; a row now carries the issue numbers it waits on, or says that a run already has it, or that it is ready but past the offer this ask could make.
+
+**"Out of scope" is a subtraction, never a second membership rule.** Every open issue the pool did not classify is listed with the reason read off its labels: not opted in, an epic root without `auto-ok`, an opted-in epic root (a container, whose children are planned instead of it), or opted in but past the listing cap. Before this, that exclusion was silent — nothing distinguished "not opted in" from "not reached yet".
+
+**A failed read of the open listing is reported, not rendered around.** An empty out-of-scope section built on a listing that could not be read is a confident absence; the command exits 1 and says so instead.
+
+**The entry point that consumes this is `backlogrun`**, which reports the plan before its first child starts and then resolves what the plan can resolve — `.claude/skills/workflow-commands/backlogrun.md` → "The plan, before the first child starts".
+
 ### `josh backlog:budget`
 
 Say whether a `backlogrun` may start more work, keep watching, or finish ([#1632](https://github.com/joshuafolkken/kit/issues/1632)).
