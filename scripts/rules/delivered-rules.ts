@@ -4,7 +4,9 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-gua
 import { time_shell } from '#scripts/time/time-shell'
 import { early_heartbeat } from './early-heartbeat'
 import { piped_verification } from './piped-verification'
+import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
+import { shell_segments } from './shell-segments'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
@@ -100,9 +102,8 @@ const WIP_CAP_REASON =
 
 // **A shell line carries several commands, and the subcommand has to be the one being invoked.**
 // Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
-// view <N> …"` is read as the write it is rather than as the read it quotes. A bare `|` is not a
-// separator here: it appears inside a `--jq` filter far more often than between two `gh` calls.
-const SEGMENT_SEPARATOR = /&&|\|\||;|\n/u
+// view <N> …"` is read as the write it is rather than as the read it quotes. The cut itself is
+// `shell-segments.ts`, shared with the triggers that need the same one.
 // Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped.
 const GH_FLAGS = String.raw`(?:-{1,2}[\w-]+(?:[= ][^\s]+)?\s+)*`
 const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}issue\s+view\s`, 'u')
@@ -153,7 +154,7 @@ function fetches_issue_comments(segment: string): boolean {
 // reaches a run is the moment the rule binds, and it is one shell call — the test
 // `prompts/collaboration-workflow/rule-delivery.md` sets for leaving residency.
 function is_body_only_issue_read(command: string): boolean {
-	const segments = command.split(SEGMENT_SEPARATOR).map((segment) => segment.trim())
+	const segments = shell_segments.segments_of(command)
 
 	if (segments.some((segment) => fetches_issue_comments(segment))) return false
 
@@ -224,6 +225,17 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: on_bash_command(early_heartbeat.is_wait_timer),
 		reason: early_heartbeat.EARLY_HEARTBEAT_REASON,
 		decide: early_heartbeat.decide,
+	},
+	// **The one row whose trigger reads a field of the input beside the command**, so it supplies its
+	// own tool-name check rather than going through `on_bash_command`: a push step already issued with
+	// `run_in_background` is the rule obeyed, and refusing it would charge a run for doing the right
+	// thing. It supplies `decide` because a push is a recurring act — one per child in a batch, and a
+	// second inside one `fullrun` when round 2 fixes a finding in place.
+	{
+		id: 'run-tail',
+		is_trigger: run_tail.is_foreground_push_step,
+		reason: run_tail.RUN_TAIL_REASON,
+		decide: run_tail.decide,
 	},
 ]
 
@@ -361,6 +373,7 @@ const delivered_rules = {
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
 	ISSUE_COMMENTS_REASON,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
+	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,

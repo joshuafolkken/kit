@@ -143,3 +143,6 @@ words:
   # what keeps the two in step.
   - worktrees
   - evals
+  # How `SKILL.md` → §2h and `eval-gate.md` name a command already sent to the background
+  # (joshuafolkken/kit#1510). Both are skills `josh sync` copies, so the word has to resolve here.
+  - backgrounded
