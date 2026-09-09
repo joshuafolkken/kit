@@ -64,7 +64,14 @@ function parse_epic_issue(raw: string | undefined): EpicIssue | undefined {
 // read in. REST names the blocker's repository in `repository_url`, and a relation may cross one — so
 // keeping only the number resolved every blocker against the blocked issue's own repository, which
 // named a different issue or none at all.
-function blocker_references_of(issue: EpicIssue, fallback_repo = ''): Array<IssueReference> {
+//
+// The parameter is narrowed to the one field this reads, so a caller holding a differently-shaped
+// issue — `backlog-pool.ts`'s standalone rows arrive as `OpenIssueData` — resolves through this same
+// function instead of repeating the `repository_url` unwrapping (joshuafolkken/kit#1654).
+function blocker_references_of(
+	issue: Pick<EpicIssue, 'blockedBy'>,
+	fallback_repo = '',
+): Array<IssueReference> {
 	return (issue.blockedBy?.nodes ?? []).map((blocker) => ({
 		repo: git_gh_issue_rest.repo_of_url(blocker.repository_url) ?? fallback_repo,
 		number: blocker.number,
