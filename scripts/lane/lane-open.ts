@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
-import { git_command } from '#scripts/git/git-command'
+import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_environment } from './lane-environment'
 import { lane_install, type InstallResult } from './lane-install'
 import { lane_paths } from './lane-paths'
@@ -120,7 +120,7 @@ async function materialize(plan: LanePlan): Promise<void> {
 
 	const start_point = await lane_start_point.resolve_for_branch(plan.lane.branch)
 
-	await git_command.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
+	await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
 	writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
 	guard_install(plan.lane, await lane_install.install_dependencies(plan.lane.directory))
 }

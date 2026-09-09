@@ -11,8 +11,12 @@ import type { LaneInfo } from './lane-registry'
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
-		branch_delete: vi.fn(),
 		branch_exists: vi.fn(),
+	},
+}))
+vi.mock('#scripts/git/git-worktree', () => ({
+	git_worktree: {
+		branch_delete: vi.fn(),
 		worktree_prune: vi.fn(),
 		worktree_remove: vi.fn(),
 	},
@@ -27,6 +31,7 @@ vi.mock('./lane-registry', () => ({
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
+const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_registry } = await import('./lane-registry')
 const { lane_close } = await import('./lane-close')
 
@@ -75,11 +80,11 @@ beforeEach(() => {
 	process.env[lane_paths.LANE_ROOT_KEY] = LANE_ROOT
 	lanes_are([])
 	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
-	vi.mocked(git_command.worktree_prune).mockResolvedValue('')
-	vi.mocked(git_command.branch_delete).mockResolvedValue('')
+	vi.mocked(git_worktree.worktree_prune).mockResolvedValue('')
+	vi.mocked(git_worktree.branch_delete).mockResolvedValue('')
 	vi.mocked(git_command.branch_exists).mockResolvedValue(false)
 	// What `git worktree remove --force` does: unregisters and deletes, uncommitted work and all.
-	vi.mocked(git_command.worktree_remove).mockImplementation(async (directory: string) => {
+	vi.mocked(git_worktree.worktree_remove).mockImplementation(async (directory: string) => {
 		rmSync(directory, { force: true, recursive: true })
 
 		return ''
@@ -96,7 +101,7 @@ describe('closing a lane', () => {
 
 		expect(outcome.kind).toBe('closed')
 		expect(existsSync(lane.directory)).toBe(false)
-		expect(vi.mocked(git_command.branch_delete)).toHaveBeenCalledWith(LANE_BRANCH)
+		expect(vi.mocked(git_worktree.branch_delete)).toHaveBeenCalledWith(LANE_BRANCH)
 	})
 
 	// The state a crash between `worktree add` and the `.env` write leaves: the issue number still
@@ -114,12 +119,12 @@ describe('closing a lane', () => {
 		const lane = open_on_disk(ISSUE, SEED)
 
 		lanes_are([lane])
-		vi.mocked(git_command.worktree_remove).mockRejectedValue(new Error('not a working tree'))
+		vi.mocked(git_worktree.worktree_remove).mockRejectedValue(new Error('not a working tree'))
 
 		await lane_close.close_lane(ISSUE)
 
 		expect(existsSync(lane.directory)).toBe(false)
-		expect(vi.mocked(git_command.branch_delete)).toHaveBeenCalledWith(LANE_BRANCH)
+		expect(vi.mocked(git_worktree.branch_delete)).toHaveBeenCalledWith(LANE_BRANCH)
 	})
 
 	it('answers none for a lane that was never opened, rather than failing', async () => {
@@ -134,7 +139,7 @@ describe('judging a close by what is left', () => {
 	// legitimate path, and a branch that survived sends the next `lane:open` into git's own refusal.
 	it('reports the close as incomplete when the branch survives, naming what is left', async () => {
 		lanes_are([open_on_disk(ISSUE, SEED)])
-		vi.mocked(git_command.branch_delete).mockRejectedValue(new Error('ref lock'))
+		vi.mocked(git_worktree.branch_delete).mockRejectedValue(new Error('ref lock'))
 		vi.mocked(git_command.branch_exists).mockResolvedValue(true)
 
 		const outcome = await lane_close.close_lane(ISSUE)
