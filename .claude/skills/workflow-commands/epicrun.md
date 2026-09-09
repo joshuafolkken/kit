@@ -1710,6 +1710,14 @@ commits nothing and stashes nothing — so `git status` there is the decisive re
 the hold is real, and the answer is to leave the label alone and report, never to strip it and start
 a second child on top of that work.
 
+**A closed issue's labels are neither a finding nor something to clean up.** Everything above is
+about an **open** issue, and the reason is mechanical rather than stylistic: a closed issue holds no
+lane — `epic-busy.ts` counts holders from the open listing alone — and `epic:next` never offers it,
+so `in-progress` left behind on one changes nothing about what any run can do next. **Do not report
+it, and do not strip it** (joshuafolkken/kit#1649). Reporting it is worse than merely useless: a
+report is read as something that needs attention, so a run that lists non-findings is a run whose
+real findings are harder to see.
+
 ```bash
 gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
 ```
