@@ -4,7 +4,9 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-gua
 import { time_shell } from '#scripts/time/time-shell'
 import { early_heartbeat } from './early-heartbeat'
 import { piped_verification } from './piped-verification'
+import { run_tail } from './run-tail'
 import { shell_body_trigger } from './shell-body-trigger'
+import { shell_segments } from './shell-segments'
 
 // The enumeration of rules delivered at the moment they bind, rather than carried resident in
 // `CLAUDE.md` on every turn (joshuafolkken/kit#1524).
@@ -49,6 +51,14 @@ interface DeliveredRule {
 	// failed. A row with this field is asked it instead, and it is asked on every candidate call —
 	// `can_record` is what the batching stand-aside becomes for such a row (see `delivery_decision`).
 	decide?: (call: GuardedCall, run: GuardRun, can_record: boolean) => boolean
+	// **What keeping this rule looks like, as a call** (joshuafolkken/kit#1525). It names the act the
+	// rule asks for, so a run that made it *before* the trigger fired can be told apart from one that
+	// complied only because the refusal made it. `scripts/rules/rule-value.ts` reads that difference
+	// off recorded sessions to score what the rule's carried text earns unaided; a row that declares
+	// none is reported unmeasured rather than scored, because "never kept" and "always kept" are both
+	// claims the absence of a predicate does not support. It lives here rather than in the
+	// measurement so a rule's trigger and its compliance test stay one definition.
+	keeps?: (call: GuardedCall) => boolean
 }
 
 const STAMP_PREFIX = 'josh-rule-guard-'
@@ -100,9 +110,8 @@ const WIP_CAP_REASON =
 
 // **A shell line carries several commands, and the subcommand has to be the one being invoked.**
 // Each segment is judged on its own, anchored at its start, so `gh issue comment <N> -b "… gh issue
-// view <N> …"` is read as the write it is rather than as the read it quotes. A bare `|` is not a
-// separator here: it appears inside a `--jq` filter far more often than between two `gh` calls.
-const SEGMENT_SEPARATOR = /&&|\|\||;|\n/u
+// view <N> …"` is read as the write it is rather than as the read it quotes. The cut itself is
+// `shell-segments.ts`, shared with the triggers that need the same one.
 // Global flags may precede the subcommand (`gh --repo o/r issue view 1`), so they are skipped.
 const GH_FLAGS = String.raw`(?:-{1,2}[\w-]+(?:[= ][^\s]+)?\s+)*`
 const ISSUE_VIEW_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}issue\s+view\s`, 'u')
@@ -153,7 +162,7 @@ function fetches_issue_comments(segment: string): boolean {
 // reaches a run is the moment the rule binds, and it is one shell call — the test
 // `prompts/collaboration-workflow/rule-delivery.md` sets for leaving residency.
 function is_body_only_issue_read(command: string): boolean {
-	const segments = command.split(SEGMENT_SEPARATOR).map((segment) => segment.trim())
+	const segments = shell_segments.segments_of(command)
 
 	if (segments.some((segment) => fetches_issue_comments(segment))) return false
 
@@ -202,12 +211,51 @@ const SHELL_BODY_REASON =
 	'`prompts/collaboration-workflow/shell-body.md`. Reissue this call once the body is in a file — ' +
 	'it fires once per run and cannot repeat on the call in hand.'
 
+// **Keeping the WIP cap is counting the open Issues**, which is the one act the rule asks for before
+// a filing.
+//
+// **It has to be Issues, open, and a listing — all three, in one segment.** A pattern that took any
+// of them alone scored `gh pr list --state open` and `epic:bundle`'s candidate search as the count,
+// and those inflate exactly the ratio the retirement decision reads. `gh issue list` alone is not
+// enough either: the cap is about *open* Issues, and a listing that does not say so is some other
+// question. Segment-wise like the comments predicate, so a spelling quoted inside a filing's body
+// is not read as the count that filing skipped.
+const ISSUE_LISTING = /^gh\s+(?:-{1,2}[\w-]+(?:[= ]\S+)?\s+)*issue\s+list\b/u
+const ISSUES_QUERY = /repos\/[^\s'"]*\/issues\?[^\s'"]*state=open/u
+const OPEN_STATE = /--state[= ]open|state=open/u
+// **A label filter makes it a different question.** `gh issue list --label epic --state open` and
+// `…/issues?labels=epic&state=open` ask which epics are open, which is what `epic:bundle` and the
+// Issue template do; counting either as the WIP count would credit the cap as kept by a run that
+// never counted the backlog. The residual the pattern cannot separate is named in
+// `docs/josh-commands.md`: the inventory command in the `diag` skill is byte-identical to the count
+// command in `wip-cap.md`, so no pattern can tell those two apart.
+const LABEL_FILTER = /--label\b|[?&]labels=/u
+
+function counts_open_issues(command: string): boolean {
+	return shell_segments.segments_of(command).some((segment) => {
+		if (LABEL_FILTER.test(segment)) return false
+
+		return (ISSUE_LISTING.test(segment) && OPEN_STATE.test(segment)) || ISSUES_QUERY.test(segment)
+	})
+}
+
+// **Keeping the comments rule is fetching them**, in any of the spellings the refusal hands back.
+function reads_issue_comments(command: string): boolean {
+	return shell_segments.segments_of(command).some((segment) => fetches_issue_comments(segment))
+}
+
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
-	{ id: 'wip-cap', is_trigger: on_bash_command(is_issue_filing), reason: WIP_CAP_REASON },
+	{
+		id: 'wip-cap',
+		is_trigger: on_bash_command(is_issue_filing),
+		reason: WIP_CAP_REASON,
+		keeps: on_bash_command(counts_open_issues),
+	},
 	{
 		id: 'issue-comments',
 		is_trigger: on_bash_command(is_body_only_issue_read),
 		reason: ISSUE_COMMENTS_REASON,
+		keeps: on_bash_command(reads_issue_comments),
 	},
 	{
 		id: 'shell-body',
@@ -224,6 +272,17 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: on_bash_command(early_heartbeat.is_wait_timer),
 		reason: early_heartbeat.EARLY_HEARTBEAT_REASON,
 		decide: early_heartbeat.decide,
+	},
+	// **The one row whose trigger reads a field of the input beside the command**, so it supplies its
+	// own tool-name check rather than going through `on_bash_command`: a push step already issued with
+	// `run_in_background` is the rule obeyed, and refusing it would charge a run for doing the right
+	// thing. It supplies `decide` because a push is a recurring act — one per child in a batch, and a
+	// second inside one `fullrun` when round 2 fixes a finding in place.
+	{
+		id: 'run-tail',
+		is_trigger: run_tail.is_foreground_push_step,
+		reason: run_tail.RUN_TAIL_REASON,
+		decide: run_tail.decide,
 	},
 ]
 
@@ -361,6 +420,7 @@ const delivered_rules = {
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
 	ISSUE_COMMENTS_REASON,
 	PIPED_VERIFICATION_REASON: piped_verification.PIPED_VERIFICATION_REASON,
+	RUN_TAIL_REASON: run_tail.RUN_TAIL_REASON,
 	SHELL_BODY_REASON,
 	SWITCH_ENV_KEY,
 	WIP_CAP_REASON,

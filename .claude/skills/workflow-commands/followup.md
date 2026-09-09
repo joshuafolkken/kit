@@ -30,7 +30,10 @@ What one invocation does, in order:
   an exception is re-thrown as-is with **no** Telegram sent — so a silent run is a failed run, never
   a quiet success. **It fires before the merge, not after it**: a merge rejected by a branch
   protection or a conflict leaves the ✅ already sent, so never read a received completion Telegram
-  as proof the pull request merged. Read what the command printed.
+  as proof the pull request merged. Read what the command printed. **It is not the only message the
+  command can send**: the run report below adds a `warning` Telegram (⚠️) after the merge when the
+  run could not be recorded in the time history — so a ⚠️ arriving after a ✅ for the same issue is
+  one run, not two.
 - **Merges** — unless `--no-merge` was passed. **Merging is the default**, and `--merge` is a
   deprecated no-op kept for compatibility: passing nothing merges just the same. `--no-merge` is the
   only thing that stops it.
@@ -63,9 +66,21 @@ What one invocation does, in order:
   or a `queue`, ends here, which is why this one seam covers all of them. **It measures nothing of its
   own**: the report is built by the same builder `josh time` calls, and what is printed is a short
   block — elapsed, turns, round trips, the per-round-trip cost, and the same figures against the
-  previous recorded run. **It cannot fail a run**: the merge has already happened by the time it runs,
-  so a history that cannot be read or written prints one line saying the measurement was unavailable
-  and names the `pnpm josh time --issue <N>` that would take it. `JOSH_TIME_HISTORY=0` turns it off,
+  previous recorded run. **It is written against the *session's* checkout, not the process's**
+  (joshuafolkken/kit#1628): a child running in a lane work tree resolves back to the main checkout
+  first, the same normalization the read side has applied since joshuafolkken/kit#1617. Without it
+  the lane looked for its own transcripts under a project directory that has never existed, came back
+  unmeasured, and appended nothing at all — thirteen consecutive merges were lost that way, and had
+  they been appended they would have gone to a file `pnpm josh lane:close` deletes. **It cannot fail a
+  run**: the merge has already happened by the time it runs, so a history that cannot be read or
+  written prints one line saying the measurement was unavailable and names the
+  `pnpm josh time --issue <N>` that would take it — **and, since joshuafolkken/kit#1628, sends that
+  same fact as a `warning` Telegram (⚠️)**, because thirteen runs lost their record with the printed
+  line sitting unread in every one of their console logs. **The warning is not a `failure`**: the run
+  merged, and only its measurement did not land. A send that itself fails is reported on stderr and
+  the run still carries on. **It never fires for a history that was switched off** — `JOSH_TIME_HISTORY=0`
+  is an answer, not a gap, and warning once per merge about an opted-out feature is how a warning
+  channel stops being read. `JOSH_TIME_HISTORY=0` turns the whole step off,
   and the full tables stay where they were — `pnpm josh time`, and the `diag` skill that reads them.
   **What reads the accumulation back is `pnpm josh time --period <days>`**
   (joshuafolkken/kit#1470): it groups the recorded runs into lanes by the wall clock they occupied and
@@ -104,8 +119,10 @@ followup stages total:                    39.3 s
   command line the title read waits for the body that names it, and only that read waits.
   **`checks-wait` is untouched**, which is the point — what was overlapped was never a wait.
 - **The total is the sum of the stages, not the command's whole wall clock.** What sits outside it is
-  the tail the workflow script prints afterwards — the next-issue listing and the version line — so a
-  `pnpm josh time` reading of the same span is a second or two longer, and that gap is the tail.
+  the tail the workflow script runs afterwards — the run report, the review-record clears, the hold
+  release, the next-issue listing and the version line — so a `pnpm josh time` reading of the same
+  span is longer, and that gap is the tail. It is normally a second or two; a run whose record could
+  not be written adds a Telegram round trip to it.
 - **What was measured is on joshuafolkken/kit#1349**, and cutting any of it is deliberately not this
   block's business: the required-check wait and the AI-review scan are the merge gate, and narrowing
   either to make a number smaller is the workaround `CLAUDE.md` prohibits.
@@ -249,8 +266,35 @@ The portable, cross-AI wording of this section used to sit in `prompts/collabora
 
 Never send `completion` Telegram notifications manually with `pnpm josh notify --task-type completion ...`. Always use `pnpm josh followup` — it fetches the PR URL through REST (`repos/{owner}/{repo}/pulls/{N}`) and always includes it, whereas the manual CLI does not auto-populate `--pr-url` and will produce a Telegram message missing the PR link.
 
-**Always run `pnpm josh followup` in the foreground** (no `&` suffix, no shell backgrounding). It waits for CI — 32 minutes by default, about 34 worst case (see `docs/josh-commands.md`) — which can outlast one tool call, so give the call the largest timeout it accepts (in Claude Code, `timeout: 600000`, 10 min). Where the harness detaches an over-running command and reports when it finishes, wait for that report instead of re-running. Where it kills the call at the cap instead, the merge and the completion notification are lost with it: set `JOSH_CI_TIMEOUT_SECONDS` to a budget that fits inside the cap for that run and re-run `followup` once CI has settled. Shell backgrounding never works — a process started with `&` inside a tool call does not survive the call returning, so the command silently disappears and the PR stays unmerged.
+**Always run `pnpm josh followup` in the foreground** (no `&` suffix, no shell backgrounding). **It is the deliberate exception to `SKILL.md` → §2h**, which sends every other minutes-long command to the background: nearly every step after this one reads its result, so detaching it would move the reading rather than overlap anything, and would buy an empty turn (joshuafolkken/kit#1510). A tail *does* follow the merge — this paragraph used to say nothing did, and joshuafolkken/kit#1462 measured 3.0 min of it — but what to do about that belongs to §2h and is not restated here. The commands that do go to the background — `pnpm josh git -y` above all — and what runs beside each of them are §2h's, and are not restated here. It waits for CI — 32 minutes by default, about 34 worst case (see `docs/josh-commands.md`) — which can outlast one tool call, so give the call the largest timeout it accepts (in Claude Code, `timeout: 600000`, 10 min). Where the harness detaches an over-running command and reports when it finishes, wait for that report instead of re-running. Where it kills the call at the cap instead, the merge and the completion notification are lost with it: set `JOSH_CI_TIMEOUT_SECONDS` to a budget that fits inside the cap for that run and re-run `followup` once CI has settled. Shell backgrounding never works — a process started with `&` inside a tool call does not survive the call returning, so the command silently disappears and the PR stays unmerged.
 
 - Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh followup "<title> #<N>" --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` each time you want to notify completion (notification is sent right before the merge).
 - `pnpm josh notify` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications (no automated alternative exists for those).
-- **The count of unreleased merges is surfaced at completion — not a version.** When `pnpm josh followup` finishes it prints `🚚 unreleased merges on main: <n>` as the final console line and puts the same count in the `completion` Telegram body, so a release nobody has run stays visible (joshuafolkken/kit#1486). **Do not report a shipped version.** A child no longer bumps, so the project's `package.json` names the *previous* release rather than anything this run shipped, and what does ship is decided later by `pnpm josh release`. The Telegram is sent before the merge and says so; the console line is printed after it, from a freshly fetched default branch, and needs no such note. Surface the count as the closing line of your completion summary.
+- **The count of unreleased merges is surfaced at completion — not a version.** When `pnpm josh followup` finishes it prints `🚚 unreleased merges on main: <n>` as the final console line and puts the same count in the `completion` Telegram body, so a release nobody has run stays visible (joshuafolkken/kit#1486). **Do not report a shipped version.** A child no longer bumps, so the project's `package.json` names the *previous* release rather than anything this run shipped, and what does ship is decided later by `pnpm josh release`. The Telegram is sent before the merge and says so; the console line is printed after it, from a freshly fetched default branch, and needs no such note. **Surfacing the count was never enough on its own** — both of those carried it while 53 merges accumulated unreleased (joshuafolkken/kit#1582), because a number nobody is told to act on is a number nobody acts on. What the run *does* about it is the section below, and that is what closes the completion summary.
+
+## When `pnpm josh release` runs
+
+**The release point is a position plus a command's answer, never a judgement** (joshuafolkken/kit#1582). joshuafolkken/kit#1169 took the version off the branch and put it behind one command a person types; nothing said *when* to type it, and because nothing fails when nobody does — CI green, every pull request merged, every Issue closed — 53 merges reached main unreleased and no consumer of this package saw one of them.
+
+**The position: once per invocation, after the last merge.** Ask when `pnpm josh followup` has merged the last pull request *this invocation* authorized — a lone `fullrun`'s only one, a `queue`'s or an `epicrun`'s **last** child, never once per child. In a lane the parent asks it, in the primary checkout, after the last lane is closed. Asked per child it would cut a release in the middle of a batch whose remaining children are still moving main.
+
+**The answer: `pnpm josh release:scope`.**
+
+```bash
+pnpm josh release:scope          # → required | skip | unknown ; alias: josh res
+pnpm josh release:scope --json   # the same answer as one JSON object
+```
+
+| It answers | What it means                                                    | What the run does                                                               |
+| ---------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `required` | main has taken at least one merge since the version last changed | Close the completion report with the release request, naming `pnpm josh release` |
+| `skip`     | the count is zero — nothing is waiting to ship                    | Say so in one line and finish                                                     |
+| `unknown`  | the count could not be read                                      | **Report it as `unknown`** — it is never read as `skip`                          |
+
+**The threshold is one, and that is deliberate.** joshuafolkken/kit#1582's own complaint is that accumulating makes a single version larger and its contents harder to trace afterwards, so a release per invocation is the cadence rather than a compromise — and it is the cadence that already held while every child bumped, before joshuafolkken/kit#1486 removed that. What keeps it from firing per child is the position above, not a larger number.
+
+**The run never types `pnpm josh release` itself.** That command opens a pull request of its own, merges it, and starts the tag → publish → `production` chain: outward-facing and effectively irreversible, so it is Tier C (`CLAUDE.md` → "Decision autonomy"). Typing `fullrun` authorizes merging *this Issue's* pull request and nothing past it. On `required` the run reports the request as its closing line and stops there; a person types the command in the primary checkout, on the default branch, with a clean tree.
+
+**`pnpm josh release --dry-run` was checked first and does not answer this.** It refuses off the default branch and on a dirty working tree, and it counts against `HEAD` rather than `origin/<default>` — and every position above is a feature branch or a lane, which is exactly where it throws. So `release:scope` adds **no counting of its own**: it reads `git_followup_pending.read_pending`, the same fetch-then-count `pnpm josh followup` already uses for the Telegram line, and the two therefore cannot disagree.
+
+**This section is the single source.** `fullrun.md`, `queue.md` and `epicrun.md` point here rather than restating it, and `docs/josh-commands.md` → "`josh release:scope`" documents the command itself.

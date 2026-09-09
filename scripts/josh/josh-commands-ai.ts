@@ -67,6 +67,23 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print the next opted-in issue an unattended run may pick up outside an epic',
 		category: 'AI tools',
 	},
+	'backlog:next': {
+		script: 'scripts/backlog/backlog-next.ts',
+		description:
+			'Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epics',
+		category: 'AI tools',
+	},
+	'backlog:plan': {
+		script: 'scripts/backlog/backlog-plan-cli.ts',
+		description:
+			'Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope',
+		category: 'AI tools',
+	},
+	'backlog:budget': {
+		script: 'scripts/backlog/backlog-budget-cli.ts',
+		description: 'Say whether a backlogrun may start more work, keep watching, or finish',
+		category: 'AI tools',
+	},
 	cost: {
 		script: 'scripts/cost/cost-cli.ts',
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",
@@ -172,6 +189,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// declaring any disqualifies a command from in-process dispatch, and this one runs in front of
 		// every read. The script calls `process.loadEnvFile` itself instead, through
 		// `hook-decision.ts`.
+	},
+	'rule:value': {
+		script: 'scripts/rules/rule-value-cli.ts',
+		description:
+			"What each trigger-delivered rule's carried text earns unaided, read off this checkout's recorded sessions",
+		category: 'AI tools',
 	},
 	'rule:guard': {
 		script: 'scripts/rules/rule-guard.ts',

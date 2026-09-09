@@ -120,6 +120,20 @@ pnpm josh review:brief --round 2  # the verification pass, scoped to the fix del
 
 **This document carries the rule, and `pnpm josh time` is what says whether it held.** Its `Single checks:` block counts the calls, how many sat in the fix phase, how many repeated an earlier command _and its arguments_, and how many of those had no edit between them. **On the run the issue was filed from, that last figure is zero**: all three repeats there followed an edit, so the estimate the issue carried — two calls definitely removable — does not survive being measured, and what it had found was the batching joshuafolkken/kit#1344 already measures. That is why no mechanism is built here. The one worth building is the reuse `pnpm josh gate` already has (joshuafolkken/kit#1328) and never another warning — joshuafolkken/kit#1344 measured three consecutive runs in which one moved nothing — and it is filed as joshuafolkken/kit#1420, to be built if the measured figure stays non-zero rather than on the assumption that it will.
 
+### The scoped checks answer on the last edit
+
+**The section above says how often a single check may run, and said nothing about when the last one has to be** (joshuafolkken/kit#1511). Measured on `fullrun #1503`: the run started `pnpm josh gate` and review round 1 on a tree `pnpm josh lint:related` and `pnpm josh test:related` had **never once been green on**, and then spent 282 seconds — 31% of a 905-second run — picking up the consequences one at a time. Three findings arrived on three separate round trips with fourteen edits between them; the one call that ran both checks together produced two of them at once, in 13.8 seconds. **The review read a tree that was edited fourteen more times after it.**
+
+**So the scoped pair runs on the last edit, before the gate and the review are started** — not after them, and not per edit. That is one call, and it is the same one either way:
+
+```bash
+pnpm josh lint:related && pnpm josh test:related
+```
+
+**`pnpm josh review:brief` enforces it rather than asking.** Each of those two commands writes down the digests it was green on, against the same change base the green-gate record uses; the brief compares them exactly as `pnpm josh gate` compares its own record, and where either is missing or no longer describes this tree it puts a refusal on stderr and exits non-zero instead of composing a brief. **No brief means no round**: the brief is where `pnpm josh review:attest`'s nonce is minted, and a round that cannot attest does not count (`.claude/skills/workflow-commands/SKILL.md` → §2). Run the pair, reissue the command, and the run continues — the refusal costs one round trip, never the run.
+
+**It changes when the checks run, and nothing else.** Nothing is skipped, narrowed, reused in place of a check, or reinterpreted; `pnpm josh gate` still runs its four checks over the same tree afterwards. The refusal is on the brief rather than on the gate because CI runs `pnpm josh gate --verbose --no-unit` with no scoped check in front of it, and an empty file map, an unresolvable change base or `JOSH_SCOPED_GREEN=off` each allow rather than refuse. The full behavior is `docs/josh-commands.md` → "`josh review:brief`".
+
 ### The pull request opens between the rounds, so CI runs beside round 2
 
 **`pnpm josh git -y` sits between the two review rounds** (joshuafolkken/kit#1261). Measured on joshuafolkken/kit#1251: the second round ran 171 seconds and the CI that followed it ran 98, and through those 98 seconds nothing else in the run was happening. The same reasoning the gate got one section up applies here — the pull request's checks and the verification pass read the same branch, so paying for them one after the other was pure waiting.
@@ -208,6 +222,12 @@ The severity rule above is not a stopping condition on its own. Every fix create
 **Two rounds is the ceiling, not the schedule.** Whether the second one is due at all is `pnpm josh review:round2`'s answer — see "When round 2 is skipped entirely, and when it is not" below, which is the single source of that condition (joshuafolkken/kit#1433).
 
 This is measured, not theorized. On joshuafolkken/kit#854 four rounds produced 18 findings; on joshuafolkken/kit#855 two rounds produced 19. Almost none of them was a repeat: each round found new things, and many of those were about code the **previous round's fix** had just written. One fix replaced a line-based check with a proximity window, and the next two rounds each found a new defect in that window. Another moved a rule into a skill, and a later round moved it back. Two rounds of that is diligence; a third is the review chasing its own tail.
+
+### A merge-conflict resolution review is not one of the two
+
+**When `pnpm josh followup` reports `PR checks failed (merge conflict)`, the child resolves the conflict in its own lane and reviews the resolution — and that round does not count against the cap** (joshuafolkken/kit#1623). The cap bounds re-reading _the change under review_, because it is that change's fixes which create the new surface making the loop above unbounded. A resolution review reads a different subject: not the change, but what merging a moved `main` into it did. Charging it to the cap would mean a child that spent both rounds must merge its resolution unreviewed — the exact outcome the cap exists to prevent, reached from the other side.
+
+**It is one round, over the resolution diff only, and it terminates.** What bounds it is not the cap but the procedure that calls it: a child resolves at most once, and a second conflict parks it. `.claude/skills/workflow-commands/epicrun.md` → "Conflicts are not predicted" is the single source of the procedure and of the four conditions under which the run steps back instead of resolving. `pnpm josh review:attest --check` must answer `ok` before the merge is re-issued, exactly as for the rounds this one does not count against, and a confirmed High parks the child rather than buying it a further round.
 
 ### The second round is a verification pass, not a second full review
 

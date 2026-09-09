@@ -16,6 +16,9 @@ const CWD = '/Users/someone/Development/kit'
 const MINUTE_MS = 60_000
 const ISSUE = 1268
 const BRANCH = '1268-measure-a-run'
+// The branch a lane run's session stays on for the whole of it, since the lane is a checkout the
+// session only ever shells into.
+const DEFAULT_BRANCH = 'main'
 const CALL_ID = 'a'
 const AGENT_CALL_ID = 'g'
 // The skill whose load `time-markers.ts` reads as the instant a run opens.
@@ -78,12 +81,15 @@ function call_line(minute: number, branch: string, name = 'Read', id = CALL_ID):
 	})
 }
 
-function result_line(minute: number, branch: string, id = CALL_ID): string {
+// `content` is a parameter so a suite can hand the result a body worth reading — the stage block
+// `pnpm josh followup` prints, which `time-followup-stage.ts` reads back off it
+// (joshuafolkken/kit#1445). Defaulted, so every existing caller is unchanged.
+function result_line(minute: number, branch: string, id = CALL_ID, content = 'ok'): string {
 	return JSON.stringify({
 		type: 'user',
 		timestamp: at(minute),
 		gitBranch: branch,
-		message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+		message: { content: [{ type: 'tool_result', tool_use_id: id, content }] },
 	})
 }
 
@@ -155,6 +161,24 @@ function run_lines(offset: number, branch: string = BRANCH): Array<string> {
 		prompt_line(offset, branch),
 		skill_call_line(offset + CALL_MINUTE, branch, WORKFLOW_SKILL),
 		result_line(offset + RESULT_MINUTE, branch),
+	]
+}
+
+// The call in which a run states, in its own transcript, which issue it is running.
+function label_command(issue: number): string {
+	return `gh api repos/joshuafolkken/kit/issues/${String(issue)}/labels -f 'labels[]=in-progress'`
+}
+
+// The shape a lane run leaves behind (joshuafolkken/kit#1617): the same three minutes as
+// `issue_lines`, but every one of them on the **default** branch, because the session writing the
+// transcript never left it — the work ran in a linked work tree the session only shelled into. So the
+// `in-progress` label call is the one line naming the issue, and being the workflow marker as well it
+// makes this a session `time_sessions.separate` keeps rather than excludes.
+function lane_lines(offset: number, issue: number = ISSUE): Array<string> {
+	return [
+		prompt_line(offset, DEFAULT_BRANCH),
+		josh_call_line(offset + CALL_MINUTE, DEFAULT_BRANCH, label_command(issue)),
+		result_line(offset + RESULT_MINUTE, DEFAULT_BRANCH),
 	]
 }
 
@@ -307,9 +331,11 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		targets: [],
 		writes: [],
 		message_id: time_spans.NO_MESSAGE_ID,
+		issue: time_markers.NO_ISSUE,
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,
+		followup_stages: [],
 		is_continuation: false,
 		ended_ms: ended_minute * MINUTE_MS,
 		...time_spans.equal_durations(duration_minutes * MINUTE_MS),
@@ -338,6 +364,8 @@ const time_transcript_fixture = {
 	target_turn_lines,
 	density_text,
 	issue_lines,
+	lane_lines,
+	label_command,
 	run_lines,
 	delegating_lines,
 	concurrent_lines,

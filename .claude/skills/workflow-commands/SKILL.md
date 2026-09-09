@@ -1,12 +1,12 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` — planning, implementation, the verification gate, unattended epic execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` are the shorthand commands this package's
-collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md` because
+`kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` and `backlogrun` are the shorthand commands this
+package's collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md` because
 each one applies only while its own command is running — keeping them resident spent context on
 every turn to describe a workflow most turns never enter.
 
@@ -15,7 +15,7 @@ operational procedure, and the two must agree.
 
 ## 0. The rule that fires before any of them — explicit invocation
 
-**Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` workflow (including their
+**Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` / `backlogrun` workflow (including their
 `#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
 resident in the AI documents, because it has to hold when this skill has *not* been loaded.
 
@@ -43,6 +43,13 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
 | `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 | `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
+| `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
+
+**`backlogrun` reads `epicrun.md` too, and that is the point rather than an omission.** It changes
+only which issues are offered and by what authorization; every procedure for *running* one of them —
+lanes, park-and-continue, the `needs-human-review` stop, a prerequisite discovered mid-run, the
+delegated unit, the preflight, the progress watcher, the hand-off check and the guards — stays
+`epicrun.md`'s and is referenced from `backlogrun.md` rather than restated there.
 
 ## 2. What every one of them shares
 
@@ -116,6 +123,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   answer is already in hand and the call buys a second copy of it. `pnpm josh time`'s `Single checks:`
   block is what says whether the run held to it; the rule is `prompts/review.md` → "A single check
   answers once per tree".
+  **And the last of them runs on the last edit, in front of the gate and the review rather than after
+  them** (joshuafolkken/kit#1511): `pnpm josh lint:related && pnpm josh test:related`, one call.
+  `pnpm josh review:brief` refuses to compose a brief on a tree neither has been green on — and no
+  brief means no attestable round — so the enforcement is the command's rather than a judgement.
+  `prompts/review.md` → "The scoped checks answer on the last edit" is the single source.
   **The rule-compliance measurement is read after the review and before `pnpm josh followup`,
   never inside `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval`
   is five real Claude sessions. The anchor is the merge rather than the commit because the commit now
@@ -144,6 +156,14 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   children are dispatched, so `epicrun.md` → "Lanes" carries it for the parallel case and
   `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 is the single source
   (joshuafolkken/kit#1518).
+- **A command that can take minutes is issued in the background, and the turn never ends at the
+  push** — §2h. It is where a run's idle time collects: joshuafolkken/kit#1510 measured 25 idle
+  minutes in a 45-minute run, 6m28s of it a foreground `pnpm josh git -y` the harness detached at its
+  own cap, and 6m06s of it CI that had already gone green. `pnpm josh followup` is the one that stays
+  in the foreground, because nearly every step after it reads its result — and a tail *does* follow
+  the merge, measured at 3.0 min and 5.9% of a run (joshuafolkken/kit#1462), which §2h empties by
+  composing the merge-independent work beforehand. Which steps those are, and the one exception, are
+  §2h's.
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
   §2z. It is the one *child's* stop `epicrun` does not turn into a park — an `epic:audit` error and
   the consecutive-failure abort end a run too, but neither is a child asking for something.
@@ -152,6 +172,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   **not** an epic — running it as a `fullrun`, and building the epic around it only if a prerequisite
   or a split turns up (`epicrun.md` → "When `#N` is not an epic"). Both follow from what the keyword
   authorizes: a batch, decided once at the start.
+- **`backlogrun` takes those same two and moves the boundary.** It authorizes every issue a person
+  has opted in with `auto-ok` rather than one epic's children, so what changes is which issues are
+  offered — by `pnpm josh backlog:next` — and nothing about how one of them is run
+  (`backlogrun.md`). It is a separate keyword rather than an argument to `epicrun` **because the two
+  declare different authorizations**, and membership stays a person's to decide.
 - **The working-tree hold is claimed before anything else** — `pnpm josh run:hold`, at every typed
   entry point, ahead of the split assessment and ahead of a `new` entry's filing. §2f.
 - **The split assessment** runs before any work starts, at *every* entry point, from the one
@@ -717,8 +742,8 @@ expiry was written for — and a stop whose work is already committed and pushed
 by a standing High finding, is deliberately in that second group: the branch is safe on the remote,
 so freeing the tree after eight hours loses nothing.
 
-**The batch entry points claim per child, not per batch.** `epicrun` and `queue` never call it
-themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh followup`
+**The batch entry points claim per child, not per batch.** `epicrun`, `queue` and `backlogrun` never
+call it themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh followup`
 releases it at that child's merge, leaving the tree free for the next child and held against anything
 else for the whole time a child is in flight.
 
@@ -797,6 +822,97 @@ rule at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`,
 run, so **this section is the rule and the hook is what makes it hard to walk past** — a session
 that runs no hooks still owes the read.
 
+## 2h. A command that can take minutes is issued in the background
+
+**A run's idle time collects in its tail, and the two ways it collects there are one mistake**
+(joshuafolkken/kit#1510). `fullrun #1501` ran 45m03s on about 17 minutes of work. Of the 25 minutes
+nothing was running, **6m28s** was a `pnpm josh git -y` issued in the **foreground** with a
+900-second tool timeout — above the harness's own 600-second cap, so the harness detached it at the
+cap and nothing read the output file for six and a half minutes afterwards — and **6m06s** was bare
+CI: the push landed, the turn ended, and the merge started only once the person asked whether it was
+merging. Both halves handed the deciding of *when to look back* to something that was never going to
+decide it.
+
+**Issue it in the background, and never give a foreground call a timeout above the harness cap.**
+The cap decides how long a foreground call waits, not the number passed to it, so a number above the
+cap chooses the detached path without choosing the completion notification that should come with it.
+A call issued detached from the start re-invokes the run when it exits — which is what makes the
+completion *delivered* rather than something to remember to poll for.
+
+**Which commands, and the one that is deliberately not among them:**
+
+- **`pnpm josh git -y` — background.** Commit, the pre-push hook's unit suite, the push (120 seconds
+  with one automatic retry, `scripts/git/git-push-transport.ts`) and the pull request. It is about a
+  minute in the ordinary case and reached 19m26s once, on a transport fault.
+- **`pnpm josh gate` — background, and already so.** It is *started* when `/code-review` starts and
+  *joined* before the commit (§2, joshuafolkken/kit#1242); that is backgrounding under an older name,
+  and nothing about it changes here.
+- **`pnpm josh eval` — background**, started with the review and read after it, on `required` only
+  (`eval-gate.md`).
+- **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nearly
+  every step after it reads its result — the one that does not is named below — so detaching it
+  would move the reading rather than overlap anything, and would buy an empty turn. `followup.md` →
+  "Always run `pnpm josh followup` in the foreground" stays exactly as it is, and shell `&`
+  backgrounding is a different thing again — it never works at all.
+
+**A tail does follow the merge, and it is not small** (joshuafolkken/kit#1462). This section first
+gave a different reason for that last bullet — that the merge ends the run, leaving no tail to
+overlap — and the measurement says otherwise. `pnpm josh time` charges to **`post-run`** exactly what runs
+after the last `followup` span ends: **3.0 min, 5.9% of a 50.5-minute run**, in the lane child
+`--issue 1599` (PR #1602); **2 min 31 s, 14% of 20m15s**, in the plain `fullrun #1597` (PR #1603);
+**3.1 min** hand-measured in run #1441's delegated child, which is where this Issue started. **What
+was wrong is the premise, not the conclusion** — `followup` stays foreground, and what changes is
+*where the tail's work is done*.
+
+**So the tail is emptied before `followup` is issued, rather than worked through after it returns.**
+One question decides each step, and it is asked of the step rather than judged: **does it read the
+merge result?**
+
+- **It does — the step stays after `followup`.** `pnpm josh ms`, `pnpm josh issue:state <N>`,
+  `pnpm josh epic:next`, `pnpm josh auto-ok:next --exclude <N>`, and `pnpm josh lane:close` /
+  `pnpm josh lane:list`. Each is a verifier or is keyed to a merge that has to have happened, and
+  bringing one forward would have it read a state nobody has reached yet. **De-duplicating a step is
+  not removing it**: the parent reads the child's state from GitHub *because* a summary is not a
+  verifier ("Each child runs in a delegated unit"), so none of these may be dropped or answered from
+  memory.
+- **It does not — the step is composed in the turn that issues `followup`.** The epic progress
+  comment's counter *values* (children run, Issues filed, consecutive failures, `auto-ok` pickups,
+  the run's start time) are all counted inside the run, and the completion report body is already
+  placed beside `pnpm josh git -y` in the table below. **Only the write follows the merge.** The
+  comment exists because a compaction takes the counters at a moment nobody chooses (`epicrun.md` →
+  "The counters live in the conversation"), so composing the values earlier moves no write and loses
+  no counter.
+- **`pnpm josh cost --over 400000` stays after the merge, and reads nothing from it.** It measures
+  this session's own transcript, so the question above would bring it forward — but its answer grows
+  with the session, and asking it a call early under-reads the very number the hand-off is decided
+  on. It is seconds of tail against a guard on session size, so it keeps its documented seam
+  (`epicrun.md` → "The check is asked at every merge").
+
+**What runs beside a backgrounded command is the work that writes nothing to the working tree.** That
+is the whole test, and it is the same one that lets the gate and the review overlap (§2): a step that
+edits makes the background command's result stale, so it is not something to overlap with. Applied to
+the three waits a run actually has:
+
+| While this runs | Do this beside it |
+| --------------- | ----------------- |
+| `pnpm josh gate` | `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
+| `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
+| CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
+| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 400000` |
+
+**The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
+resumes the run, and the turn that reads it goes straight through any branch-2 filing and
+`pnpm josh epic:bundle` to `pnpm josh followup`. joshuafolkken/kit#1333 had already settled that end
+state for a clean second round, and symptom 2 above is its regression — **so the guarantee is a
+mechanism and not only the procedure**: `pnpm josh rule:guard` refuses the foreground push step and
+states both halves at that call (`prompts/collaboration-workflow/rule-delivery.md`). A turn *ending*
+is the absence of a call and no `PreToolUse` hook can see one, so the last call before the seam is
+where the rule can be put; the push reissued detached is not refused again, so a run that obeys pays
+nothing.
+
+This section is the single source of the rule. `followup.md`, `eval-gate.md`, `chain-rule.md` and
+`epicrun.md` → "Progress while the run is quiet" route here for it rather than restating it.
+
 ## 3. What stays resident, and what is read from here
 
 **The first question is whether the rule's trigger can be named** (joshuafolkken/kit#1524):
@@ -852,10 +968,28 @@ turn where the pointer is never opened.** If dropping a sentence would let an ag
 rather than merely proceed less well informed, that sentence is part of the trigger. If dropping it
 only costs context, it belongs at the pointer.
 
-**Trimming is moving, never deleting.** Before a sentence leaves `CLAUDE.md` it has to exist at the
-pointer, and the marker suite that pinned it has to be re-pointed there rather than dropped. A
-canonical section that is thinner than the resident copy is the normal case, not a reason to delete
-— the resident text is then the fuller version, and it is moved in before it is cut out.
+**Trimming is moving, and deleting is the exception that has to be earned.** Before a sentence leaves
+`CLAUDE.md` it has to exist at the pointer, and the marker suite that pinned it has to be re-pointed
+there rather than dropped. A canonical section that is thinner than the resident copy is the normal
+case, not a reason to delete — the resident text is then the fuller version, and it is moved in
+before it is cut out.
+
+**A system that can only move eventually jams, so one route out exists — and it is narrow**
+(joshuafolkken/kit#1525). A rule is *retired* rather than moved only where deleting it cannot change
+what any agent does, and that has to be shown rather than argued:
+
+1. **It is a clone of text that has a declared single source**, and the source is named in the same
+   document. Where the two differ the copy is the wrong one, so nothing can correctly depend on it.
+2. **It carries no sentence that exists nowhere else** — checked against the source it duplicates,
+   not against a memory of it.
+3. **No marker suite pins it**, so no assertion is being dropped along with it.
+
+**"It looks redundant" satisfies none of the three, and a rule with a firing test, a marker, or a
+measured effect is not a candidate at all.** Every rule in these documents was written after a
+specific failure; one that changes nothing today may simply be one whose failure has not recurred
+*because it is there*. When the three do not all hold, the finding is recorded as a candidate with
+its evidence and left standing — a listed candidate costs nothing and can be taken up later, while a
+wrongly deleted rule fails silently, months later, in a run nobody is watching.
 
 **The scope of this list is every resident rule that has an on-demand counterpart** — a skill or an
 on-demand prompt carrying the procedure the resident text routes to. Those are the rules the
@@ -914,10 +1048,15 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
 
-**Four rules left this list at the first question, and are delivered by a hook instead**
+**These left this list at the first question, and are delivered by a hook instead**
 (joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside it
 rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
-enumeration and the single source of what a turn where the trigger does not fire means.
+enumeration and the single source of what a turn where the trigger does not fire means. **The four
+described below are not the whole set** — the enumeration has grown to eight rows, of which
+`scripts/rules/delivered-rules.ts` carries six and two are their own binaries. The count that used to
+open this paragraph said `Four` and had been wrong since the fifth row landed, which is what a
+restated count does; it is gone rather than corrected, because a number kept in two places drifts
+again (joshuafolkken/kit#1525).
 
 - **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
   `Bash` call that would make a third consecutive single-call turn, and states the criterion there.
@@ -962,6 +1101,33 @@ opens none of them is a turn on which the label is never reached, so residency w
 
 **The criterion is not advisory.** `scripts/workflow-skills.test.ts` caps each document at
 `RESIDENT_CEILING_BYTES` and requires headroom under it, so a procedure restated resident costs
-budget that the next genuinely-resident rule then has to take back out of existing prose. When a
-rule is edited by deleting a neighboring sentence to keep a byte count, the deletion is chosen by
-what was not pinned by a marker rather than by what matters (joshuafolkken/kit#951).
+budget that the next genuinely-resident rule then has to take back out of existing prose.
+
+**What leaves when the budget binds is decided by measurement, not by which sentence a marker
+happened to pin** (joshuafolkken/kit#1525). The old order was the reverse: a rule edited to keep a
+byte count lost whichever neighboring sentence was not pinned by a marker, so the least-defended
+text went rather than the least-useful one, and the bias grew with every rule added
+(joshuafolkken/kit#951). `pnpm josh rule:value` replaces that with a reading — over this checkout's
+recorded sessions it reports, per trigger-delivered rule, how often the run had already kept the rule
+at the moment the trigger fired. **That window is the rule's absence**, because the hook has said
+nothing yet and only the carried text is asking; the ratio is what the carried text earns unaided.
+
+**The first reading refused the deletion it was built to justify, which is why the measurement runs
+first.** Over 220 recorded runs the WIP cap — which keeps a resident copy — was kept unaided in 55% of
+the runs that reached it, while the Issue-comments rule, which has **no** resident copy, managed
+15%. The resident text was the obvious candidate on a reading of the prose, since the refusal repeats
+it almost word for word; the number says it is doing a great deal of work and must stay.
+
+**The three tests then refused every remaining candidate, and that is the route working rather than
+failing.** The four resident one-liners left behind by trigger delivery all fail test 2: the
+paragraph above records why a line stays behind when the hook reaches one harness, so each carries a
+sentence that exists nowhere else. The duplicate list of delivered rules in
+`prompts/collaboration-workflow/residency.md` looked like a clean test-1 case — a stale summary
+sitting directly beneath a pointer to its own single source — and fails test 3, because
+`scripts/shell-body-rule.test.ts` and `scripts/turn-batching-rule.test.ts` each assert that a
+delivered rule is listed there. **Being pinned is what test 3 is for**: that assertion is the design
+requirement it looks like an accident of. Only the restated count above was retired. **A run that
+finds nothing retirable records the candidates with their evidence and stops there**, rather than
+lowering the bar until a deletion appears. A rule
+scoring `-` has declared no compliance test and is **unmeasured, never zero** — it is not thereby a
+candidate.

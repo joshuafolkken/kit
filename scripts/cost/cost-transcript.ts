@@ -42,6 +42,52 @@ function transcript_directory(cwd: string, home: string = homedir()): string {
 	return path.join(home, TRANSCRIPT_ROOT, project_slug(cwd))
 }
 
+// The checkout a session's transcripts are filed under, which is not always the one a command runs
+// in (joshuafolkken/kit#1617).
+//
+// **A lane is a checkout no session ever ran in.** `epicrun` gives each child a linked work tree and
+// the child prefixes every command with it, but the Claude session itself stays in the main checkout
+// — so the transcripts are filed under the main checkout's slug while `pnpm josh time` invoked from
+// the lane asked for `~/.claude/projects/-Users-…--kit-lanes-1617`, a directory that does not exist.
+// `read_directory` swallows a missing directory, so the walk listed nothing and every
+// transcript-derived row reported as unmeasured — with no line anywhere saying the directory was
+// absent rather than empty. Measured on 2026-09-09: six of six merged runs read `no transcript` from
+// a lane, and `--issue 1597` read four transcripts from the main checkout in the same minute.
+//
+// **Git's own record says which checkout is the main one, and reading it needs no subprocess.** A
+// linked work tree's `.git` is a *file* holding `gitdir: <main>/.git/worktrees/<name>`, so the main
+// checkout is the text in front of that marker. A main checkout has a `.git` directory instead and
+// comes back unchanged, and so does anything this cannot parse — the fallback is exactly the
+// behavior it replaces, which is why a non-repository cwd is unaffected.
+const GIT_ENTRY = '.git'
+const GITDIR_PREFIX = 'gitdir:'
+const WORKTREE_SEGMENT = `/${GIT_ENTRY}/worktrees/`
+const NOT_FOUND = -1
+
+function linked_worktree_gitdir(cwd: string): string {
+	try {
+		const contents = readFileSync(path.join(cwd, GIT_ENTRY), 'utf8').trim()
+
+		return contents.startsWith(GITDIR_PREFIX) ? contents.slice(GITDIR_PREFIX.length).trim() : ''
+	} catch {
+		return ''
+	}
+}
+
+// **The pointer is resolved against the work tree before it is read.** Git writes a relative one
+// whenever `worktree.useRelativePaths` is set or the tree was added with `--relative-paths`, and
+// `gitdir: ../../kit/.git/worktrees/1617` sliced as text yields `../../kit` — which slugs to
+// `------kit` and points the walk at a directory that does not exist, reproducing the very failure
+// above with a nonsense path in the `No transcripts found under …` message. `path.resolve` returns an
+// absolute pointer unchanged, so the common case is untouched.
+function session_cwd(cwd: string): string {
+	const gitdir = linked_worktree_gitdir(cwd)
+	const absolute = gitdir === '' ? '' : path.resolve(cwd, gitdir)
+	const segment = absolute.indexOf(WORKTREE_SEGMENT)
+
+	return segment === NOT_FOUND ? cwd : absolute.slice(0, segment)
+}
+
 interface SessionFile {
 	session_id: string
 	path: string
@@ -270,6 +316,7 @@ const cost_transcript = {
 	TRANSCRIPT_EXTENSION,
 	project_slug,
 	transcript_directory,
+	session_cwd,
 	unit_directory,
 	list_sessions,
 	owning_session_id,
