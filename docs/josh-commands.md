@@ -2630,7 +2630,7 @@ Bundling:
   recoverable round trips        25   24.8% of 101 round trip(s)
   recoverable wait          3.4 min   at 8.1 s model time per round trip
   recoverable by tool             3   25 of 25 attributed
-    Edit                         13   in 4 sequence(s)
+    Edit                         13   in 7 sequence(s)
     Bash: grep                    9   in 6 sequence(s)
     Read                          3   in 2 sequence(s)
 

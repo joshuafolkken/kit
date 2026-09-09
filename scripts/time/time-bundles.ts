@@ -383,9 +383,16 @@ function saving_line(totals: BundleTotals, model_ms_per_round_trip: number): str
 	return time_format.format_row(SAVING_LABEL, saved_ms, rate)
 }
 
-// **The suffix is the reconciliation, printed whether or not it balances.** The Issue this block was
-// widened for asks for the residue to be visible rather than for the table to be trusted, and a row
-// reading `11 of 13 attributed` is the two trips whose call named no tool — not a rounding.
+// **The suffix is the reconciliation, printed whether or not it balances** — and on a real transcript
+// it always balances, for the reason `BundleTotals` gives. It is printed rather than asserted because
+// this table is read by a person deciding what to batch: a row reading `23 of 25 attributed` is the
+// walk and the attribution having come apart, which is the one failure that table cannot show on its
+// own. **It is not a count of unlabelled calls** — reading it as one is what the rows beneath it and
+// the two documents quoting them were corrected away from.
+//
+// **Derived from the recorded residue rather than re-summed from the rows**, so a drift between the
+// record and the table is what the row prints instead of being hidden by recomputing one from the
+// other.
 function by_tool_suffix(totals: BundleTotals): string {
 	const attributed = totals.recoverable_round_trips - totals.unattributed_round_trips
 
