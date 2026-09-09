@@ -86,14 +86,21 @@ how this loop is written:**
 4. **Exit code 0 covers all four verdicts, and 1 means the listing could not be read** — no answer at
    all. **`error` cannot be told apart by exit code, so read the token rather than the status.**
 
-| Answer | What to do |
-| --- | --- |
-| One or more issue numbers | Start each one as a child, up to the free lanes — `epicrun.md` → "Lanes" and "Each child runs in a delegated unit", unchanged. Then **ask the command again**, with the merged numbers added to `--exclude` |
-| `wait` | Everything opted in is blocked or already running. Sleep the polling interval and **ask the command again** — `epicrun.md` → "Waiting, and never waiting forever". **The exception is a `wait` this checkout can never resolve**: where the only candidates the command reported on standard error are in other repositories and this run has nothing of its own in flight, waiting cannot change the answer. Report those candidates with their checkouts and finish, rather than polling until the whole-run bound |
-| `stop` | Nothing can proceed without a person. Report the parked issues and finish |
-| `error` | The graph could not be resolved — report what the command printed on standard error and finish. **Never re-ask hoping for a different answer**, and never fall back to picking an issue by hand: that would be the run choosing its own membership |
-| `none` | Nothing opted in is left. Finish |
-| Exit 1, empty standard output | The listing could not be read. Report it and finish — **it is not `none`**, and reading it as one would report an empty backlog that was never seen |
+**What the answer means is this table's; whether the run may act on it is `pnpm josh backlog:budget`'s**
+(joshuafolkken/kit#1632). The right-hand column ends in the word each answer is handed to that
+command as, and the next subsection is where the two budgets and every termination live. Nothing here
+decides an ending on its own any more — a count and an elapsed time kept in an agent's head are the
+one-shot judgement joshuafolkken/kit#1460 measured a run walking straight past.
+
+| Answer | What to do | Budget answer |
+| --- | --- | --- |
+| One or more issue numbers | Start each one as a child, up to the free lanes — `epicrun.md` → "Lanes" and "Each child runs in a delegated unit", unchanged. Then **ask the command again**, with the merged numbers added to `--exclude` | `candidates` |
+| `wait`, with something of this run's own still in flight | Everything opted in is blocked or already running, so waiting can still change the answer. Sleep the polling interval and **ask the command again** — `epicrun.md` → "Waiting, and never waiting forever" | `blocked` |
+| `wait` this checkout can never resolve — the only candidates the command reported on standard error are in other repositories, and this run has nothing of its own in flight | Report those candidates with their checkouts. **Waiting cannot resolve them, but a person opting a new issue in here still can**, so the ending is the idle watch's rather than this row's | `exhausted` |
+| `stop` | Nothing can proceed without a person. Report the parked issues and finish | `parked` |
+| `error` | The graph could not be resolved — report what the command printed on standard error and finish. **Never re-ask hoping for a different answer**, and never fall back to picking an issue by hand: that would be the run choosing its own membership | `unreadable` |
+| `none` | Nothing opted in is left | `exhausted` |
+| Exit 1, empty standard output | The listing could not be read. Report it and finish — **it is not `none`**, and reading it as one would report an empty backlog that was never seen | `unreadable` |
 
 **Feed every issue this run has merged back through `--exclude`.** GitHub applies `closes #N`
 asynchronously, so a just-merged issue can still read as open on the next ask and be offered a second
@@ -113,13 +120,73 @@ than worked around; do not assert the opposite anywhere.
 labels on every ask, so an issue filed and opted in while the run is going is offered on the next
 iteration.
 
+### The two budgets
+
+**A `backlogrun` may declare how long it will watch an empty backlog and how many issues it may
+take** (joshuafolkken/kit#1632). Both are written on the keyword, and **both are off by default**, so
+`backlogrun` with neither behaves exactly as it did before they existed:
+
+```
+backlogrun
+backlogrun --idle 30
+backlogrun --max 5
+backlogrun --idle 30 --max 5
+```
+
+| Budget | Written | Default | What it does |
+| --- | --- | --- | --- |
+| Idle watch | `--idle <minutes>` | off | After the candidates run out, keep polling this long for a new one. A candidate that appears restarts the watch from that moment |
+| Maximum issues | `--max <count>` | unlimited | How many issues this invocation may take. On reaching it the run reports and finishes |
+
+**Why an idle watch is safe, and why it is not a way in.** A new issue is never implemented the
+moment it is filed: to become a candidate at all it needs `auto-ok`, which only a person applies, and
+that opt-in is the safety valve. There is no route by which an unreviewed issue is picked up during a
+watch.
+
+**Ask `pnpm josh backlog:budget` on every iteration and act on what it answers** — after
+`backlog:next`, with the word the table above maps its answer to:
+
+```bash
+verdict=$(pnpm josh backlog:budget --answer <word> --started "$started" --active "$active" \
+  --merged <count> --running <count> [--idle <minutes>] [--max <count>])
+```
+
+| Verdict | What the loop does |
+| --- | --- |
+| `run` | Start what `backlog:next` offered, up to the free lanes. The reason names how many more the maximum still allows; start no more than that |
+| `watch` | Sleep the polling interval and ask both commands again. **Nothing is held while watching** — the working tree's hold was released at the last child's merge and each drained lane was closed there, so a watching run blocks no other run |
+| `stop` | Report and finish. The reason it printed **is** the termination reason the completion report carries |
+
+`--started` is when the invocation began; `--active` is when it last had work — the most recent ask
+that was **not** `exhausted`, and the run start before there is one. **Refreshing `--active` is what
+restarts the idle watch**, so an issue opted in mid-watch is picked up and the watch begins again at
+its full budget rather than at whatever was left. Both are ordinary ISO-8601 timestamps
+(`date -u +%FT%TZ`), and `--idle` without `--active` is refused rather than measured from the run's
+start. `--merged` is what has merged and `--running` what is still in a lane; **both count against
+the maximum**, since a wave started before the first one merged would otherwise take the run past the
+number the person declared. **No ending abandons a lane**: whatever would have ended the run answers
+`watch` while `--running` is above zero, so the lanes drain and their merges reach the report. The
+full contract is `docs/josh-commands.md` → "`josh backlog:budget`".
+
+**The completion report names three things the budgets make meaningful**: how many issues this run
+took, how many of them were picked up during an idle watch, and the termination reason — quoted from
+what `backlog:budget` printed rather than paraphrased.
+
 ### Where the run stops
 
 Termination is decided by what the loop is told, never by a judgement that enough has been done:
 
-- **`none`, `stop`, or an unreadable listing** — the three answers above that end the loop.
+- **`pnpm josh backlog:budget` answering `stop`** — the single decision, covering the backlog
+  emptying with no idle watch, an idle watch running out, the maximum being reached, a parked
+  backlog, an unreadable listing, and the whole-run bound.
+- **The whole-run 8-hour bound is unchanged and outranks both budgets**, and the idle watch lives
+  inside it: `epicrun.md` → "Waiting, and never waiting forever" is still where the figure is stated,
+  and `backlog:budget` is what applies it, so a run at the bound stops with candidates in hand and a
+  watch still open.
 - **The guards in `epicrun.md` → "Guards"** apply unchanged, counted over the whole `backlogrun`
-  rather than per epic: children per run, Issues filed per run, and consecutive child failures.
+  rather than per epic: children per run, Issues filed per run, and consecutive child failures. The
+  maximum above is a person's declaration of scale and does not replace any of them — whichever binds
+  first ends the run.
 - **A `needs-human-review` child stops the whole run** before its commit — `SKILL.md` → §2z, which is
   the single source, and `epicrun.md` → "`needs-human-review` — the one stop that is not a park" for
   what happens to its lane.

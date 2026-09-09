@@ -47,7 +47,12 @@ const CONTRACT_MARKERS: ReadonlyArray<string> = [
 	// The standalone half is capped at five rows, so a short offer is not an empty backlog.
 	'A short offer is not proof the backlog is empty.',
 	// A `wait` whose only candidates are elsewhere never resolves here, so polling it is a dead end.
-	'**The exception is a `wait` this checkout can never resolve**',
+	// joshuafolkken/kit#1632 reconciled that arm with the idle watch rather than layering one on top:
+	// waiting still cannot resolve those candidates, but a person opting a new issue in here can, so
+	// the row hands the case to `backlog:budget` as `exhausted` and the ending is the watch's. With no
+	// watch asked for, `exhausted` still answers `stop` and the run finishes exactly as it did.
+	'`wait` this checkout can never resolve',
+	'so the ending is the idle watch',
 ]
 
 // The known limit joshuafolkken/kit#1633 recorded rather than fixed. Asserting the opposite anywhere
