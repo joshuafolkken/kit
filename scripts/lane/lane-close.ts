@@ -1,5 +1,6 @@
 import { existsSync, rmSync } from 'node:fs'
 import { git_command } from '#scripts/git/git-command'
+import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_paths } from './lane-paths'
 import { lane_registry, type LaneInfo } from './lane-registry'
 
@@ -64,10 +65,10 @@ function remove_directory(directory: string): void {
 // registration whose directory someone deleted by hand; and the branch goes last, because git
 // refuses to delete one that is still checked out in a registered work tree.
 async function remove_lane(targets: LaneTargets): Promise<void> {
-	await ignore_failure(async () => await git_command.worktree_remove(targets.directory))
+	await ignore_failure(async () => await git_worktree.worktree_remove(targets.directory))
 	remove_directory(targets.directory)
-	await ignore_failure(async () => await git_command.worktree_prune())
-	await ignore_failure(async () => await git_command.branch_delete(targets.branch))
+	await ignore_failure(async () => await git_worktree.worktree_prune())
+	await ignore_failure(async () => await git_worktree.branch_delete(targets.branch))
 }
 
 /**

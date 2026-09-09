@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_command } from '#scripts/git/git-command'
+import { git_worktree } from '#scripts/git/git-worktree'
 import { lane_environment } from './lane-environment'
 import { lane_paths } from './lane-paths'
 
@@ -128,7 +129,7 @@ function is_lane(lane: LaneInfo | undefined): lane is LaneInfo {
 }
 
 async function worktree_blocks(): Promise<Array<string>> {
-	const listing = await git_command.worktree_list()
+	const listing = await git_worktree.worktree_list()
 
 	return listing.split(BLOCK_SEPARATOR)
 }

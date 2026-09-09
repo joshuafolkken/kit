@@ -126,10 +126,13 @@ describe(`${WORKFLOW_SKILL} — carries the origin and the entry condition`, () 
 		expect(unwrapped).toContain('the nearest written rule was the one that parks')
 	})
 
-	// The table is the rule's entry condition: an agent that cannot tell the three apart applies the
-	// wrong procedure before reaching any of the steps.
-	it('separates the three kinds of other work a run can discover', () => {
-		expect(unwrapped).toContain('Three kinds of other work turn up mid-run')
+	// The table is the rule's entry condition: an agent that cannot tell them apart applies the
+	// wrong procedure before reaching any of the steps. joshuafolkken/kit#1649 added a fourth row —
+	// an observation, which files and carries on — and the fourth's own markers are in
+	// `mid-run-observation-document-rule.test.ts`; what stays here is that the prerequisite row is
+	// still one of a set the table separates rather than the only thing in it.
+	it('separates the kinds of other work a run can discover', () => {
+		expect(unwrapped).toContain('Four kinds of other work turn up mid-run')
 		expect(unwrapped).toContain('A defect originating in **another package**')
 		expect(unwrapped).toContain('This Issue was really **several** (a split)')
 		expect(unwrapped).toContain('has to land first (**a prerequisite**)')

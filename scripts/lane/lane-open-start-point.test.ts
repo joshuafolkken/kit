@@ -2,6 +2,7 @@ import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
+import { git_worktree } from '#scripts/git/git-worktree'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_install } from './lane-install'
 import { lane_open } from './lane-open'
@@ -100,7 +101,7 @@ async function configured_upstream(branch_name: string): Promise<string> {
 // `pnpm install` would fail on a manifest that was never the subject.
 function stub_what_the_fixture_cannot_do(): void {
 	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
-	vi.spyOn(git_command, 'ls_remote_branch').mockResolvedValue('')
+	vi.spyOn(git_worktree, 'ls_remote_branch').mockResolvedValue('')
 	vi.spyOn(lane_install, 'install_dependencies').mockResolvedValue({
 		is_installed: true,
 		output: '',
@@ -231,7 +232,7 @@ describe('reopening a lane whose branch is only on the remote', () => {
 		async () => {
 			await build_pushed_lane_branch()
 			await drop_local_lane_branch()
-			vi.spyOn(git_command, 'ls_remote_branch').mockResolvedValue(`sha\trefs/heads/${LANE_BRANCH}`)
+			vi.spyOn(git_worktree, 'ls_remote_branch').mockResolvedValue(`sha\trefs/heads/${LANE_BRANCH}`)
 
 			const outcome = await lane_open.open_lane(ISSUE)
 

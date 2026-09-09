@@ -11,14 +11,19 @@ vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
 		branch_exists: vi.fn(),
 		branch_names_remote: vi.fn(),
-		ls_remote_branch: vi.fn(),
 		default_branch_reference: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
 	},
 }))
+vi.mock('#scripts/git/git-worktree', () => ({
+	git_worktree: {
+		ls_remote_branch: vi.fn(),
+	},
+}))
 
 const { git_command } = await import('#scripts/git/git-command')
+const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_start_point } = await import('./lane-start-point')
 
 const MAIN = 'main'
@@ -30,7 +35,7 @@ const fetch_branch = vi.mocked(git_command.fetch_branch)
 const default_branch_reference = vi.mocked(git_command.default_branch_reference)
 const branch_exists = vi.mocked(git_command.branch_exists)
 const branch_names_remote = vi.mocked(git_command.branch_names_remote)
-const ls_remote_branch = vi.mocked(git_command.ls_remote_branch)
+const ls_remote_branch = vi.mocked(git_worktree.ls_remote_branch)
 
 const LANE_BRANCH = '1446-lane'
 const LANE_TRACKING_REF = 'refs/remotes/origin/1446-lane'

@@ -11,9 +11,9 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 // Only `worktree_list` is stubbed, and that is load-bearing: `list_lanes` reading the lane root from
 // `repository_root()` again would answer the *current* work tree, which inside a lane is the lane —
 // and every test here would fail on the missing stub rather than passing on a wrong root.
-vi.mock('#scripts/git/git-command', () => ({ git_command: { worktree_list: vi.fn() } }))
+vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { worktree_list: vi.fn() } }))
 
-const { git_command } = await import('#scripts/git/git-command')
+const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_registry } = await import('./lane-registry')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-registry-test-'))
@@ -55,7 +55,7 @@ function open_on_disk(issue: string, seed: string | undefined): void {
 function list_of(...blocks: ReadonlyArray<string>): void {
 	const listing = [main_block(), ...blocks].join('\n\n')
 
-	vi.mocked(git_command.worktree_list).mockResolvedValue(`${listing}\n`)
+	vi.mocked(git_worktree.worktree_list).mockResolvedValue(`${listing}\n`)
 }
 
 beforeEach(() => {

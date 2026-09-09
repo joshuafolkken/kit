@@ -219,6 +219,9 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
 - **A prerequisite discovered mid-run is a dependency rather than a park**, at every entry point —
   §2d. It is the third thing a run can discover, beside an upstream defect and a split, and the one
   whose procedure is neither of theirs.
+- **An observation worth filing is filed without asking, and the run carries on** — §2i. It is the
+  fourth thing a run can discover and the only one that changes nothing about the Issue in hand, so
+  it is the one route whose whole procedure is "file it and keep going".
 - **The pre-implementation reading goes to a delegated unit once the count of subject files reaches
   the threshold §2b names** — §2b →
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
@@ -616,19 +619,25 @@ pointer to it (joshuafolkken/kit#1182 rollout of the joshuafolkken/kit#1174 patt
 *this* repository has to land first is a third situation, distinct from an upstream defect and from a
 split: the Issue in hand is still one deliverable, it just needs another one before it.
 
-**Three kinds of other work turn up mid-run, and the procedure differs for each.** Reading one as
-another is the failure this section exists to prevent: a prerequisite was the only one of the three
-with no procedure of its own, and the two it sits between both end in a stop, so the nearest written
-rule was the one that parks (joshuafolkken/kit#891).
+**Four kinds of other work turn up mid-run, and the procedure differs for each.** Reading one as
+another is the failure this section exists to prevent: a prerequisite was the only one of the first
+three with no procedure of its own, and the two it sits between both end in a stop, so the nearest
+written rule was the one that parks (joshuafolkken/kit#891). **The fourth had no procedure either,
+and its fallback was worse than a park** — a plain observation belongs to none of the three, changes
+nothing about the Issue in hand, and a run reaching it handed the judgement back to a person; §2i is
+its procedure (joshuafolkken/kit#1649).
 
 | What turned up                                                              | What to do                                                                                                              |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
 | This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `epicrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
+| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i) |
 
-**File it with the `route:tier-a` label**, so a Tier A filing made during implementation stays
-countable by filing route afterwards (joshuafolkken/kit#1083):
+**File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during
+implementation stays countable by filing route afterwards (joshuafolkken/kit#1083). **This paragraph
+belongs to the prerequisite row, not to the table** — the label means a filing the run is *blocked
+by*, so the observation row carries no `route:` label of its own (§2i):
 
 ```bash
 gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f body="<body>"
@@ -942,6 +951,50 @@ nothing.
 
 This section is the single source of the rule. `followup.md`, `eval-gate.md`, `chain-rule.md` and
 `epicrun.md` → "Progress while the run is quiet" route here for it rather than restating it.
+
+## 2i. An observation worth filing is filed without asking
+
+**A run that judges something worth filing files it, and does not ask.** The three routes in §2d all
+cover work that changes what the run does — an upstream defect stops it, a split replaces it, a
+prerequisite goes in front of it. **A plain observation changes none of that**: the Issue in hand is
+untouched, and what the run holds is a finding it would be a loss to forget. That case had no
+procedure at all, so a run reaching it fell back on the most cautious-looking thing available and
+handed the judgement to a person (joshuafolkken/kit#1649).
+
+**Handing it over is wrong twice.** Filing into a first-party repository is **Tier A** — reversible,
+and `CLAUDE.md` → "Decision autonomy" already settles it; the upstream route and the prerequisite
+route both file without confirmation, and there is no reason a lone observation should be the one
+filing that needs a person. And it breaks the premise `epicrun` and `backlogrun` run on: nobody is
+watching, so a run that stops for an answer has parked itself without saying so — the very outcome
+those commands' park-and-continue rule exists to avoid.
+
+- **File it, without asking, the moment you judge it worth filing.** A **first-party** target — its
+  owner equal to this session's repository owner, decided by
+  `gh api repos/{owner}/{repo} --jq .owner.login` rather than by judgement — is Tier A. **A
+  third-party target is Tier C and is never filed** (`CLAUDE.md` → "Third-party repositories are
+  Tier C").
+- **It carries no `route:` label of its own.** `route:tier-a` means a filing the run is *blocked by*
+  — an upstream defect or a prerequisite — and an observation blocks nothing
+  (`scripts/git/issue-labels.ts`). Where one of the interrupt tests is met the filing is an interrupt
+  and takes `route:interrupt`; otherwise it is an ordinary discretionary filing and takes neither.
+- **Both ceilings apply to this route exactly as they do to the other three.** §2d's **10 Issues per
+  run** counts this filing too: it is what replaced the removed confirmation, so a route that escaped
+  it would be the chain of false positives the ceiling exists to stop. So does the backlog **WIP
+  cap** — an observation that does not block the run is *discretionary*, which is the branch the cap
+  bites on, so with more than 30 open Issues in the target repository, close one first, and nothing
+  honestly closable means do not file (`prompts/collaboration-workflow/wip-cap.md`).
+- **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
+  tracks is one `epic:next` never offers, so an unbundled observation is parked rather than recorded.
+- **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent, and the Issue in
+  hand is implemented as it was. Name what was filed in the completion report.
+
+**What stays a judgement is whether it is worth filing, not whether to ask.** An observation nobody
+would act on is not filed at all — dropping it costs nothing, and the WIP cap is what makes dropping
+the default at the margin. What this section removes is only the confirmation stop between deciding
+to file and filing.
+
+This section is the single source of the rule; nothing under `prompts/collaboration-workflow/`
+restates it (joshuafolkken/kit#1649).
 
 ## 3. What stays resident, and what is read from here
 

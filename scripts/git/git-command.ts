@@ -1,39 +1,9 @@
-import { execa } from 'execa'
-import { git_utilities } from './constants'
-import { create_spawn_error, get_exit_code } from './git-execa-error'
+import { PORCELAIN_FLAG } from './constants'
 import { git_push_transport } from './git-push-transport'
-
-async function exec_git_command_read(arguments_: Array<string>): Promise<string> {
-	const git_cmd = git_utilities.get_git_command_for_spawn()
-	// execa runs the binary directly with an argument array and no `shell` option, so CLI
-	// args cannot break out of a shell sandbox; the git command and args are internally
-	// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-	const { stdout } = await execa(git_cmd, arguments_) // NOSONAR
-
-	return stdout.trimEnd()
-}
-
-async function exec_git_command_with_output(
-	command: string,
-	arguments_list: Array<string>,
-): Promise<void> {
-	const git_command_bin = git_utilities.get_git_command_for_spawn()
-
-	try {
-		// execa runs the binary directly with an argument array and no `shell` option, so CLI
-		// args cannot break out of a shell sandbox; the git command and args are internally
-		// controlled, never untrusted input. tssecurity:S8705 is a false positive here.
-		await execa(git_command_bin, [command, ...arguments_list], { stdio: 'inherit' }) // NOSONAR
-	} catch (error) {
-		throw create_spawn_error(command, get_exit_code(error))
-	}
-}
-
-// git's machine-readable output, asked for by the two readers below that parse rather than display.
-const PORCELAIN_FLAG = '--porcelain'
+import { git_spawn } from './git-spawn'
 
 async function branch(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', '--abbrev-ref', 'HEAD'])
+	return await git_spawn.read(['rev-parse', '--abbrev-ref', 'HEAD'])
 }
 
 // **`--untracked-files=normal` is passed rather than inherited** (joshuafolkken/kit#1381). Every
@@ -44,7 +14,7 @@ async function branch(): Promise<string> {
 // pre-push hook reuses a record for a commit that does not contain them. Naming git's own default
 // makes the reading answer to this codebase rather than to whoever ran it.
 async function status(): Promise<string> {
-	return await exec_git_command_read(['status', PORCELAIN_FLAG, '--untracked-files=normal'])
+	return await git_spawn.read(['status', PORCELAIN_FLAG, '--untracked-files=normal'])
 }
 
 // The absolute path every other git command's output is relative to. Asking git rather than reading
@@ -52,7 +22,7 @@ async function status(): Promise<string> {
 // onto the working directory resolves to nothing, and a digest map built that way collapses to
 // "every file absent" — which compares *equal* to another such map (joshuafolkken/kit#1241).
 async function repository_root(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', '--show-toplevel'])
+	return await git_spawn.read(['rev-parse', '--show-toplevel'])
 }
 
 // The commit this checkout is sitting on, as opposed to `change_base_commit`'s commit a change is
@@ -60,7 +30,7 @@ async function repository_root(): Promise<string> {
 // briefed on, so a review that read a different one can be told apart from one that read this one
 // (joshuafolkken/kit#1522).
 async function head_commit(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', 'HEAD'])
+	return await git_spawn.read(['rev-parse', 'HEAD'])
 }
 
 // Both git directories this checkout has, absolute, one per line. In the main work tree they are the
@@ -69,7 +39,7 @@ async function head_commit(): Promise<string> {
 // a directory named `.git` is what makes a bare repository and a `--separate-git-dir` clone answer
 // correctly too (joshuafolkken/kit#1106).
 async function git_directories(): Promise<Array<string>> {
-	const output = await exec_git_command_read([
+	const output = await git_spawn.read([
 		'rev-parse',
 		'--absolute-git-dir',
 		'--path-format=absolute',
@@ -80,7 +50,7 @@ async function git_directories(): Promise<Array<string>> {
 }
 
 async function diff_cached(file_path: string): Promise<string> {
-	return await exec_git_command_read(['diff', '--cached', file_path])
+	return await git_spawn.read(['diff', '--cached', file_path])
 }
 
 const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
@@ -89,7 +59,7 @@ const DEFAULT_BRANCH_FALLBACK = 'main'
 
 async function get_default_branch(): Promise<string> {
 	try {
-		const output = await exec_git_command_read(['symbolic-ref', 'refs/remotes/origin/HEAD'])
+		const output = await git_spawn.read(['symbolic-ref', 'refs/remotes/origin/HEAD'])
 		const trimmed = output.trim()
 
 		if (trimmed.startsWith(REFS_REMOTES_ORIGIN_PREFIX)) {
@@ -118,7 +88,7 @@ const MERGE_BASE_COMMAND = 'merge-base'
 // `prevent-main-commit.ts` exists to stop.
 async function reference_exists(reference: string): Promise<boolean> {
 	try {
-		await exec_git_command_read(['rev-parse', '--verify', '--quiet', reference])
+		await git_spawn.read(['rev-parse', '--verify', '--quiet', reference])
 
 		return true
 	} catch {
@@ -162,14 +132,14 @@ async function change_base(): Promise<string> {
 	const default_branch = await default_branch_reference()
 
 	try {
-		return await exec_git_command_read([MERGE_BASE_COMMAND, default_branch, 'HEAD'])
+		return await git_spawn.read([MERGE_BASE_COMMAND, default_branch, 'HEAD'])
 	} catch {
 		return default_branch
 	}
 }
 
 async function diff_main(file_path: string): Promise<string> {
-	return await exec_git_command_read(['diff', await change_base(), '--', file_path])
+	return await git_spawn.read(['diff', await change_base(), '--', file_path])
 }
 
 // Names only, for callers that classify a change rather than read it — `josh review:level` decides
@@ -222,11 +192,11 @@ const NO_RENAME_DETECTION = '--no-renames'
 // merging into the shared default branch no longer does, because it moves neither
 // (joshuafolkken/kit#1527).
 async function change_base_commit(): Promise<string> {
-	return await exec_git_command_read(['rev-parse', await change_base()])
+	return await git_spawn.read(['rev-parse', await change_base()])
 }
 
 async function diff_main_names(): Promise<string> {
-	return await exec_git_command_read([
+	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'diff',
 		NAME_ONLY_FLAG,
@@ -238,7 +208,7 @@ async function diff_main_names(): Promise<string> {
 }
 
 async function diff_cached_names(): Promise<string> {
-	return await exec_git_command_read([
+	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'diff',
 		'--cached',
@@ -263,7 +233,7 @@ async function diff_cached_names(): Promise<string> {
 const WHOLE_TREE_PATHSPEC = ':/'
 
 async function untracked_names(): Promise<string> {
-	return await exec_git_command_read([
+	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'ls-files',
 		'--others',
@@ -287,7 +257,7 @@ async function untracked_names(): Promise<string> {
 async function fetch_branch(branch_name: string): Promise<string> {
 	const refspec = `+refs/heads/${branch_name}:refs/remotes/origin/${branch_name}`
 
-	return await exec_git_command_read(['fetch', 'origin', refspec])
+	return await git_spawn.read(['fetch', 'origin', refspec])
 }
 
 // The fast-forward `gh pr checkout` ran after its fetch, for the case the branch is already local.
@@ -298,19 +268,19 @@ async function fetch_branch(branch_name: string): Promise<string> {
 // `--ff-only` is the whole point — a branch that has diverged fails loudly rather than growing a
 // merge commit nobody asked for, which is the behavior the CLI had.
 async function merge_fast_forward(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['merge', '--ff-only', `origin/${branch_name}`])
+	return await git_spawn.read(['merge', '--ff-only', `origin/${branch_name}`])
 }
 
 async function checkout_b(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['checkout', '-b', branch_name])
+	return await git_spawn.read(['checkout', '-b', branch_name])
 }
 
 async function checkout(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['checkout', branch_name])
+	return await git_spawn.read(['checkout', branch_name])
 }
 
 async function commit(message: string): Promise<void> {
-	await exec_git_command_with_output('commit', ['-m', message])
+	await git_spawn.with_output('commit', ['-m', message])
 }
 
 function is_exit_code_128(cause: unknown): boolean {
@@ -326,7 +296,7 @@ function is_upstream_not_set_error(error: unknown): boolean {
 	return cause !== undefined && is_exit_code_128(cause)
 }
 
-// Both pushes go through `git_push_transport` rather than `exec_git_command_with_output`, which is
+// Both pushes go through `git_push_transport` rather than `git_spawn.with_output`, which is
 // what gives them a timeout and an SSH keepalive the local git commands beside them do not need
 // (joshuafolkken/kit#1251). The thrown error keeps the same `cause.exit_code` shape, so the 128
 // fallback below reads it exactly as it did.
@@ -351,7 +321,7 @@ async function push(): Promise<void> {
 }
 
 async function pull(): Promise<void> {
-	await exec_git_command_with_output('pull', [])
+	await git_spawn.with_output('pull', [])
 }
 
 // Every local branch matching a `git branch --list` pattern, one name per line. The boolean below is
@@ -366,7 +336,7 @@ async function list_branches(
 	pattern: string,
 ): Promise<Array<string>> {
 	try {
-		const output: string = await exec_git_command_read([
+		const output: string = await git_spawn.read([
 			'branch',
 			'--list',
 			SHORT_NAME_FORMAT,
@@ -398,11 +368,11 @@ async function branch_exists(branch_name: string): Promise<boolean> {
 }
 
 async function add_tracked(): Promise<void> {
-	await exec_git_command_read(['add', '-u'])
+	await git_spawn.read(['add', '-u'])
 }
 
 async function add_path(file_path: string): Promise<void> {
-	await exec_git_command_with_output('add', ['--', file_path])
+	await git_spawn.with_output('add', ['--', file_path])
 }
 
 // Main's own line of history. Both reads below restrict themselves to it, and for one reason: a
@@ -424,7 +394,7 @@ async function log_first_parent(
 	file_path: string,
 	tip = 'HEAD',
 ): Promise<Array<string>> {
-	const output = await exec_git_command_read([
+	const output = await git_spawn.read([
 		'log',
 		FIRST_PARENT_FLAG,
 		'--format=%H',
@@ -441,7 +411,7 @@ async function log_first_parent(
 // One blob at one revision — `git show <ref>:<path>`. It throws when the path is absent there, which
 // the caller reads as "no version at this revision" rather than as an error.
 async function show_file(spec: string): Promise<string> {
-	return await exec_git_command_read(['show', spec])
+	return await git_spawn.read(['show', spec])
 }
 
 // **`--first-parent` is what makes this a count of pull requests rather than of merge commits.**
@@ -465,90 +435,14 @@ function merge_count_arguments(range: string): Array<string> {
 // throws**, as every read here does; the `isFinite` guard is only for output that is not a number,
 // and zero is the safe answer there because zero means "nothing to release".
 async function count_merges(range: string): Promise<number> {
-	const output = await exec_git_command_read(merge_count_arguments(range))
+	const output = await git_spawn.read(merge_count_arguments(range))
 	const parsed = Number(output.trim())
 
 	return Number.isFinite(parsed) ? parsed : 0
 }
 
-// The four worktree reads and writes a lane's lifecycle needs (joshuafolkken/kit#1490). They live
-// beside the other git commands rather than in `scripts/lane/` because `exec_git_command_read` is
-// what resolves the git binary and turns a non-zero exit into an error — a second spawn helper next
-// to it would be the clone `CLAUDE.md` prohibits.
-const WORKTREE = 'worktree'
-
-// Every registered work tree of this repository, in git's own machine-readable form: one `worktree
-// <path>` / `HEAD <sha>` / `branch <ref>` block per tree, blocks separated by a blank line. Parsing
-// it is the caller's, so this module keeps one shape for every reader.
-async function worktree_list(): Promise<string> {
-	return await exec_git_command_read([WORKTREE, 'list', PORCELAIN_FLAG])
-}
-
-// `-b` creates the branch as part of the add, so there is no window in which the directory exists on
-// a detached HEAD; `start_point` is passed explicitly rather than left to `HEAD`, because a lane is
-// branched from the default branch whatever the checkout that opened it happens to be sitting on.
-//
-// **`--no-track` is load-bearing now that the start point is a remote-tracking ref**
-// (joshuafolkken/kit#1535). Branching from `refs/remotes/origin/<default>` makes git's default
-// `branch.autoSetupMerge` set `branch.<lane>.merge=refs/heads/<default>`, and a bare `git push` from
-// the lane then fails with "the upstream branch of your current branch does not match the name of
-// your current branch" — which is *not* the missing-upstream error `push()` retries as
-// `--set-upstream`, so every lane's `pnpm josh git` would stop there. Measured against git 2.x.
-//
-// **An absent `start_point` attaches the tree to the branch that is already there, and neither flag
-// is passed then** (joshuafolkken/kit#1627). `-b` refuses a branch that exists, so a lane whose child
-// had already pushed could not be reopened at all; deleting the branch first to get `-b` back would
-// discard those commits and orphan the pull request. `--no-track` cannot ride along either — git
-// answers `--[no-]track can only be used if a new branch is created` — and it has nothing to do here:
-// whatever upstream the branch was given when it was created is still on it.
-async function worktree_add(
-	directory: string,
-	branch_name: string,
-	start_point: string | undefined,
-): Promise<string> {
-	const flags = start_point === undefined ? ['add'] : ['add', '--no-track', '-b', branch_name]
-
-	return await exec_git_command_read([WORKTREE, ...flags, directory, start_point ?? branch_name])
-}
-
-// **`--force` is the point, not a convenience.** A lane is closed after a park, a failure or an
-// interruption as readily as after a success, and in each of those the tree still holds uncommitted
-// or untracked work. Refusing to remove it there would leave exactly the debris the close exists to
-// prevent.
-async function worktree_remove(directory: string): Promise<string> {
-	return await exec_git_command_read([WORKTREE, 'remove', '--force', directory])
-}
-
-// Drops the registrations whose directories are already gone — what makes a lane whose directory was
-// deleted by hand recoverable rather than a permanent `worktree add` refusal on that path.
-async function worktree_prune(): Promise<string> {
-	return await exec_git_command_read([WORKTREE, 'prune'])
-}
-
-// **Asked of the remote itself, because nothing prunes the remote-tracking refs**
-// (joshuafolkken/kit#1627). `lane:close` deletes the local branch, GitHub deletes the remote one at
-// the merge, and `refs/remotes/origin/<N>-lane` outlives both: this repository carried sixteen of
-// them for branches the remote no longer had. Empty output on a zero exit is therefore "not on the
-// remote", which a stale ref cannot say, and a non-zero exit is "could not ask" — a different answer
-// again, and the reason the caller cannot use `fetch` for this: `fetch` fails identically for a
-// branch that is gone and for a network that is down, and prunes neither (measured on git 2.x).
-async function ls_remote_branch(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['ls-remote', '--heads', 'origin', branch_name])
-}
-
-// `-D` rather than `-d`: a lane branch is deleted whatever state its work reached, and `-d` refuses
-// one that was never merged — which is every lane closed after a park or a failure.
-async function branch_delete(branch_name: string): Promise<string> {
-	return await exec_git_command_read(['branch', '-D', branch_name])
-}
-
 const git_command = {
 	branch,
-	branch_delete,
-	worktree_add,
-	worktree_list,
-	worktree_prune,
-	worktree_remove,
 	status,
 	repository_root,
 	head_commit,
@@ -572,7 +466,6 @@ const git_command = {
 	branch_exists,
 	branch_names,
 	branch_names_remote,
-	ls_remote_branch,
 	add_tracked,
 	add_path,
 	log_first_parent,

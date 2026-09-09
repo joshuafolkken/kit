@@ -750,8 +750,8 @@ which is exactly the hazard that made this section refuse to resolve at all.
 **A committed child's lane is kept because it is the cheapest resume, not because closing it is
 final** (joshuafolkken/kit#1587, corrected by joshuafolkken/kit#1627). Two mechanics decide it, and
 neither is a judgement. `lane:close` does not stop at the work tree: `remove_lane` follows the
-removal with `git_command.branch_delete(targets.branch)`, which runs `git branch -D <N>-lane`
-(`scripts/lane/lane-close.ts` → `remove_lane`, `scripts/git/git-command.ts` → `branch_delete`) — the
+removal with `git_worktree.branch_delete(targets.branch)`, which runs `git branch -D <N>-lane`
+(`scripts/lane/lane-close.ts` → `remove_lane`, `scripts/git/git-worktree.ts` → `branch_delete`) — the
 force flag is there precisely so an unmerged lane branch, which is every parked one, goes too.
 Resume for this child is a re-run of `pnpm josh followup`, and that reads the branch **locally**:
 `read_branch_paths` is `changed_paths.to_paths(await git_command.diff_main_names())`
@@ -1709,6 +1709,14 @@ leave uncommitted work in the checkout** — the `needs-human-review` stop by sp
 commits nothing and stashes nothing — so `git status` there is the decisive read: a dirty tree means
 the hold is real, and the answer is to leave the label alone and report, never to strip it and start
 a second child on top of that work.
+
+**A closed issue's labels are neither a finding nor something to clean up.** Everything above is
+about an **open** issue, and the reason is mechanical rather than stylistic: a closed issue holds no
+lane — `epic-busy.ts` counts holders from the open listing alone — and `epic:next` never offers it,
+so `in-progress` left behind on one changes nothing about what any run can do next. **Do not report
+it, and do not strip it** (joshuafolkken/kit#1649). Reporting it is worse than merely useless: a
+report is read as something that needs attention, so a run that lists non-findings is a run whose
+real findings are harder to see.
 
 ```bash
 gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true

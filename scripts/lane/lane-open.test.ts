@@ -7,17 +7,22 @@ import type { LaneInfo } from './lane-registry'
 
 // joshuafolkken/kit#1490: opening a lane has to produce a work tree that carries **its own** port
 // seed and the root's other settings. `git_command` is mocked because the assertions are about what
-// this module asks git for and what it writes beside it, not about git itself — `git-command.test.ts`
-// pins the flags of the four worktree calls, and `lane-registry.test.ts` the reading of the seats.
+// this module asks git for and what it writes beside it, not about git itself —
+// `git-worktree.test.ts` pins the flags of the worktree calls, and `lane-registry.test.ts` the
+// reading of the seats.
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
 		branch_exists: vi.fn(),
 		branch_names_remote: vi.fn(),
-		ls_remote_branch: vi.fn(),
 		default_branch_reference: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
+	},
+}))
+vi.mock('#scripts/git/git-worktree', () => ({
+	git_worktree: {
+		ls_remote_branch: vi.fn(),
 		worktree_add: vi.fn(),
 	},
 }))
@@ -38,6 +43,7 @@ vi.mock('./lane-registry', () => ({
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
+const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_install } = await import('./lane-install')
 const { lane_registry } = await import('./lane-registry')
 const { lane_open } = await import('./lane-open')
@@ -96,11 +102,11 @@ function git_answers(): void {
 	// `lane-open-start-point.test.ts`, against real git.
 	vi.mocked(git_command.branch_exists).mockResolvedValue(false)
 	vi.mocked(git_command.branch_names_remote).mockResolvedValue([])
-	vi.mocked(git_command.ls_remote_branch).mockResolvedValue('')
+	vi.mocked(git_worktree.ls_remote_branch).mockResolvedValue('')
 	vi.mocked(git_command.default_branch_reference).mockResolvedValue(START_POINT)
 	// Stands in for what `git worktree add` does to the filesystem, so the `.env` write that follows
 	// it has somewhere to land.
-	vi.mocked(git_command.worktree_add).mockImplementation(async (directory: string) => {
+	vi.mocked(git_worktree.worktree_add).mockImplementation(async (directory: string) => {
 		mkdirSync(directory, { recursive: true })
 
 		return ''
@@ -125,7 +131,7 @@ describe('opening a lane', () => {
 		const outcome = await lane_open.open_lane(ISSUE)
 
 		expect(outcome.kind).toBe('opened')
-		expect(vi.mocked(git_command.worktree_add)).toHaveBeenCalledWith(
+		expect(vi.mocked(git_worktree.worktree_add)).toHaveBeenCalledWith(
 			path.join(LANE_ROOT, ISSUE),
 			'1490-lane',
 			START_POINT,
@@ -194,7 +200,7 @@ describe('refusing to open a lane', () => {
 		const outcome = await lane_open.open_lane(ISSUE)
 
 		expect(outcome.kind).toBe('already-open')
-		expect(vi.mocked(git_command.worktree_add)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
 	})
 
 	it('refuses once every seat in the band is taken, rather than reusing one', async () => {
@@ -205,7 +211,7 @@ describe('refusing to open a lane', () => {
 		const outcome = await lane_open.open_lane(ISSUE)
 
 		expect(outcome.kind).toBe('full')
-		expect(vi.mocked(git_command.worktree_add)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
 	})
 
 	// Read as free, that lane's seat would go to the new lane while its ports are still bound.
@@ -213,7 +219,7 @@ describe('refusing to open a lane', () => {
 		lanes_are([live_lane(OTHER_ISSUE, undefined)])
 
 		await expect(lane_open.open_lane(ISSUE)).rejects.toThrow(/#1491/u)
-		expect(vi.mocked(git_command.worktree_add)).not.toHaveBeenCalled()
+		expect(vi.mocked(git_worktree.worktree_add)).not.toHaveBeenCalled()
 	})
 
 	// Reported as a success, the caller would capture the directory and type the first `pnpm josh …`
@@ -246,7 +252,7 @@ describe('opening a lane on a branch that already exists', () => {
 
 		await lane_open.open_lane(ISSUE)
 
-		expect(vi.mocked(git_command.worktree_add)).toHaveBeenCalledWith(
+		expect(vi.mocked(git_worktree.worktree_add)).toHaveBeenCalledWith(
 			path.join(LANE_ROOT, ISSUE),
 			'1490-lane',
 			undefined,

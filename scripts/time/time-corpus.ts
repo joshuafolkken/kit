@@ -177,6 +177,13 @@ function attributed_spans(collector: Collector): Map<string, ReadonlyArray<Span>
 // after the walk rather than inside it because which transcripts are relatives is not known until
 // the whole listing has been attributed: a unit is claimed by the minutes of a parent that may be
 // read later in the directory order.
+// **The family expansion is deliberately not filtered by which issue a relative names**
+// (joshuafolkken/kit#1648). Screening it that way was tried and withdrawn: `time_family.collect`
+// returns the *parent* as a relative too — the handoff and teardown minutes joshuafolkken/kit#1439
+// added — and a dispatching parent's window routinely holds another child's declaration, so one span
+// naming a sibling dropped the parent's whole contribution and restored the very symptom #1439 fixed.
+// Separating pooled children is `time-sessions.ts`'s, where the run's own declaration bounds it on
+// both sides rather than rejecting a transcript whole.
 function absorb_relatives(
 	collector: Collector,
 	families: ReadonlyMap<string, Family>,
@@ -238,8 +245,8 @@ function transcripts_in(
 // them** (joshuafolkken/kit#1428). Both of those resolve overlaps *within* a run, and a foreign
 // session's spans are not an overlap to resolve — they are somebody else's work, and leaving them in
 // until the arithmetic has run only means the arithmetic ran over a corpus that was never this run's.
-function to_issue_spans(collector: Collector): IssueSpans {
-	const split = time_sessions.separate(collector.by_session)
+function to_issue_spans(collector: Collector, issue_number: number): IssueSpans {
+	const split = time_sessions.separate(collector.by_session, issue_number)
 
 	return {
 		spans: resolved_spans(split.kept),
@@ -303,7 +310,7 @@ function to_results(collectors: ReadonlyMap<number, Collector>): Map<number, Iss
 	const found = new Map<number, IssueSpans>()
 
 	for (const [issue_number, collector] of collectors) {
-		found.set(issue_number, to_issue_spans(collector))
+		found.set(issue_number, to_issue_spans(collector, issue_number))
 	}
 
 	return found

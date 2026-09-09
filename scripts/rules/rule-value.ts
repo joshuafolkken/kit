@@ -36,7 +36,13 @@ const PERCENT = 100
 // **A refusal is an errored result, which is what separates it from a read of the file it is written
 // in.** Every signature exists verbatim in `scripts/rules/delivered-rules.ts`, so a session that
 // merely opened that file carries the text too — and did so in a result whose `is_error` is false.
-const ERRORED_RESULT = '"is_error":true'
+//
+// **That fact is read off the parsed block, never off the raw line** (joshuafolkken/kit#1642). The
+// test it replaced was `line.includes('"is_error":true')`, which is two mistakes at once: it is
+// whitespace- and key-order-sensitive, so a serializer emitting `"is_error": true` would take every
+// rule's `refused` column to zero — indistinguishable from a hook that never fired — and it is
+// scoped to the *line* rather than to the block, so an errored result sitting beside a successful
+// one lent the successful one's text its failure.
 
 interface RuleReading {
 	id: string
@@ -44,11 +50,13 @@ interface RuleReading {
 	// says nothing about whether the rule would have been kept. **The trigger is that situation only
 	// for a rule whose trigger is a neutral act** — filing an Issue, reading one — which a run keeping
 	// the rule still performs. Where the trigger is the violation itself, a run that kept the rule
-	// never trips it, so the row declares `reaches` and the denominator counts that instead
+	// never trips it, so the row declares `reaches` and a run counts once it has reached *either* —
+	// the union, which equals `reaches` for every row whose trigger it covers
 	// (joshuafolkken/kit#1643).
 	sessions: number
-	// Of those, the runs that had already kept the rule at the moment the trigger fired — the
-	// compliance the carried text earns with no help from the hook.
+	// Of those, the runs that kept the rule unaided — before the trigger fired, or without it firing
+	// at all, which is the ordinary case for a row that declares `reaches`. The compliance the carried
+	// text earns with no help from the hook.
 	unaided_kept: number
 	// Of those, the runs in which a refusal was actually delivered.
 	refusals: number
@@ -95,12 +103,12 @@ function observe_call(rule: DeliveredRule, state: RuleState, call: IssuedCall): 
 	observe_before_trigger(rule, state, call)
 }
 
-// One transcript line, parsed once. The raw text is kept beside it because a refusal is identified
-// by the reason the harness wrote back, which the parsed block deliberately discards.
+// One transcript line, parsed once, as the two things a reading is taken from: the calls it issued
+// and the bodies of the results the harness wrote back as failures.
 interface DatedLine {
-	line: string
 	at_ms: number
 	calls: Array<IssuedCall>
+	errors: Array<string>
 }
 
 function calls_of(parsed: TranscriptLine): Array<IssuedCall> {
@@ -109,32 +117,69 @@ function calls_of(parsed: TranscriptLine): Array<IssuedCall> {
 		.map((block) => ({ name: block.name, input: block.input }))
 }
 
+// `is_error` is three-valued, so the comparison is against `true` rather than a truthiness test: a
+// block that carried no such field is a tool that reports no outcome, not a call that failed.
+function errors_of(parsed: TranscriptLine): Array<string> {
+	return parsed.blocks
+		.filter((block) => block.is_error === true)
+		.map((block) => block.error_text)
+		.filter((text) => text !== '')
+}
+
 function dated_line(line: string): DatedLine | undefined {
 	const parsed = line === '' ? undefined : time_transcript_line.parse_line(line)
 
 	if (parsed === undefined) return undefined
 
-	return { line, at_ms: parsed.timestamp_ms, calls: calls_of(parsed) }
+	return { at_ms: parsed.timestamp_ms, calls: calls_of(parsed), errors: errors_of(parsed) }
 }
 
-function observe_refusal(rule: DeliveredRule, state: RuleState, line: string): void {
-	if (!line.includes(ERRORED_RESULT)) return
+// **A refusal's body is the reason and nothing else, from its first character.** The hook denies a
+// call on behalf of the one row whose trigger fired and writes that row's reason back as the whole
+// result, which is why the speaker is identified by what the body *opens* with rather than by what
+// it carries somewhere inside.
+//
+// **That is what stops a dump of the enumeration being read as a refusal by every rule at once**
+// (joshuafolkken/kit#1642). One `cat scripts/rules/delivered-rules.ts && false` writes a single
+// errored result carrying all six reasons verbatim, and a containment test credited a refusal to
+// each of them; the file opens with its imports, so under this test nothing claims it. Position is
+// what separates the two, so no count of how many signatures appear is needed — and a body naming
+// several can no longer be attributed to any of them.
+function refused_id(text: string): string | undefined {
+	const found = delivered_rules.DELIVERED_RULES.find((rule) =>
+		text.trimStart().startsWith(rule.reason.slice(0, REASON_SIGNATURE_LENGTH)),
+	)
 
-	if (line.includes(rule.reason.slice(0, REASON_SIGNATURE_LENGTH))) state.is_refused = true
+	return found?.id
 }
 
-function observe_for_rule(rule: DeliveredRule, state: RuleState, entry: DatedLine): void {
-	for (const call of entry.calls) observe_call(rule, state, call)
+function observe_error(states: Map<string, RuleState>, text: string): void {
+	const id = refused_id(text)
+	const state = id === undefined ? undefined : states.get(id)
 
-	observe_refusal(rule, state, entry.line)
+	if (state !== undefined) state.is_refused = true
 }
 
-function observe_line(states: Map<string, RuleState>, entry: DatedLine): void {
+function observe_for_rule(
+	rule: DeliveredRule,
+	state: RuleState,
+	calls: ReadonlyArray<IssuedCall>,
+): void {
+	for (const call of calls) observe_call(rule, state, call)
+}
+
+function observe_calls(states: Map<string, RuleState>, calls: ReadonlyArray<IssuedCall>): void {
 	for (const rule of delivered_rules.DELIVERED_RULES) {
 		const state = states.get(rule.id)
 
-		if (state !== undefined) observe_for_rule(rule, state, entry)
+		if (state !== undefined) observe_for_rule(rule, state, calls)
 	}
+}
+
+function observe_line(states: Map<string, RuleState>, entry: DatedLine): void {
+	observe_calls(states, entry.calls)
+
+	for (const text of entry.errors) observe_error(states, text)
 }
 
 // **One timeline, ordered by timestamp — not the files read back to back.** "Kept before the
@@ -223,7 +268,7 @@ function measure(runs: Iterable<ReadonlyArray<string>>): ReadonlyArray<RuleReadi
 	)
 }
 
-const rule_value = { ERRORED_RESULT, REASON_SIGNATURE_LENGTH, measure, unaided_rate }
+const rule_value = { REASON_SIGNATURE_LENGTH, measure, unaided_rate }
 
 export type { RuleReading }
 export { rule_value }
