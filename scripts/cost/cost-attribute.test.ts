@@ -104,3 +104,57 @@ describe('cost_attribute.records_for_issue', () => {
 		])
 	})
 })
+
+// A lane run's session stays on the default branch for the whole of it, so the branch names no issue
+// on any line and the record has to say so itself (joshuafolkken/kit#1617).
+describe('cost_attribute.declared_issue', () => {
+	it('prefers what a record declares over the branch it was written on', () => {
+		expect(cost_attribute.declared_issue({ branch: 'main', issue: 1617 })).toBe(1617)
+	})
+
+	it('falls back to the branch where a record declares nothing', () => {
+		expect(cost_attribute.declared_issue({ branch: ISSUE_BRANCH })).toBe(962)
+	})
+
+	it('falls back to the branch where the declaration is the unattributed sentinel', () => {
+		const record_on_branch = { branch: ISSUE_BRANCH, issue: cost_attribute.UNATTRIBUTED_KEY }
+
+		expect(cost_attribute.declared_issue(record_on_branch)).toBe(962)
+	})
+})
+
+describe('cost_attribute.attribute on a run whose branch never named the issue', () => {
+	// The declaration is carried by the existing fill-forward walk rather than by a second one, which
+	// is why one declaring record is enough for the whole run.
+	it('carries a declared issue across the records that declare nothing', () => {
+		const attributed = cost_attribute.attribute([
+			{ branch: 'main' },
+			{ branch: 'main', issue: 1617 },
+			{ branch: 'main' },
+		])
+
+		expect(attributed).toStrictEqual([1617, 1617, 1617])
+	})
+
+	// A declaration sits at the *start* of the run it names — the `in-progress` label is the first
+	// thing a run writes — where a branch sits at the end. Carried backwards like a branch, the first
+	// child's work in a transcript covering two children would all be charged to the second.
+	it('gives the work between two declarations to the one that precedes it', () => {
+		const attributed = cost_attribute.attribute([
+			{ branch: 'main', issue: 1617 },
+			{ branch: 'main' },
+			{ branch: 'main', issue: 1462 },
+			{ branch: 'main' },
+		])
+
+		expect(attributed).toStrictEqual([1617, 1617, 1462, 1462])
+	})
+
+	// The guarantee for every record `josh cost` reads: `UsageRecord` declares nothing, so the branch
+	// rules are exactly what they were.
+	it('leaves a branch-bearing session attributed exactly as before', () => {
+		const attributed = cost_attribute.attribute([record('main', 'a'), record(ISSUE_BRANCH)])
+
+		expect(attributed).toStrictEqual([962, 962])
+	})
+})

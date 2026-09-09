@@ -358,7 +358,16 @@ async function dispatch(options: Options, cwd: string): Promise<number> {
 	return await run_issue(options.issue, cwd, options)
 }
 
-async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
+// **The default is the *session's* checkout, not this process's.** Every command of a lane child runs
+// with the lane as its cwd while the session writing the transcripts stays in the main checkout, so a
+// raw `process.cwd()` sent the whole walk to a project directory that does not exist
+// (joshuafolkken/kit#1617). Normalizing here rather than at each of the six `transcript_directory`
+// call sites keeps one answer to "which directory" — the one the `No transcripts found under …`
+// message prints.
+async function run(
+	argv: ReadonlyArray<string>,
+	cwd: string = cost_transcript.session_cwd(process.cwd()),
+): Promise<number> {
 	const options = parse_options(argv)
 
 	if (options === undefined) {

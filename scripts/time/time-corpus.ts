@@ -40,8 +40,22 @@ const NO_SPANS = 0
 // fill-forward walk only ever carries a branch that session actually declared. So the test is exact
 // rather than a heuristic, and it is a *superset* of the real match — a prose mention costs one
 // parse and never a missed session, which is the direction a filter is allowed to be wrong in.
+//
+// **The second form is the second thing the walk now carries** (joshuafolkken/kit#1617). A lane run
+// declares its issue through the `in-progress` label call rather than through a branch, so a filter
+// testing only for a branch would drop every transcript the declaration was added to reach — the
+// parse that would have found it never runs. It stays a superset for the same reason the first form
+// does: this is the API path, so a run's own quote of the issue number elsewhere does not match it.
+const LABEL_PATH_PREFIX = '/issues/'
+const LABEL_PATH_SUFFIX = '/labels'
+
 function may_mention_issue(text: string, issue_number: number): boolean {
-	return text.includes(`"${String(issue_number)}-`)
+	const number = String(issue_number)
+
+	return (
+		text.includes(`"${number}-`) ||
+		text.includes(`${LABEL_PATH_PREFIX}${number}${LABEL_PATH_SUFFIX}`)
+	)
 }
 
 // One session's spans folded in, answering whether it contributed anything the run had not already

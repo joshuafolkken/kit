@@ -106,6 +106,11 @@ const NO_RESULT: ResultFacts = {
 // reads — `investigation-reads.ts` — had nothing to subtract for `MultiEdit` / `NotebookEdit`, and
 // nothing at all to tell an in-place `sed -i` from the `sed -n` it shares a label with.
 // `time-writes.ts` decides it, from the input this span is about to discard.
+// `issue` is the seventh, and it is the one `branch` could not carry (joshuafolkken/kit#1617). Under
+// lanes the session writing the transcript stays on the default branch while the work runs in a linked
+// work tree, so `branch` names no issue on any line of the run; the `in-progress` label call does, and
+// like every field above it that answer is read off the *input* a span is about to discard.
+// `time_markers.NO_ISSUE` for every call that declares nothing, which is all but one call per run.
 interface ToolCall {
 	label: string
 	josh_command: string
@@ -115,6 +120,7 @@ interface ToolCall {
 	targets: ReadonlyArray<string>
 	writes: ReadonlyArray<string>
 	message_id: string
+	issue: number
 }
 
 const NO_CALL: ToolCall = {
@@ -124,6 +130,7 @@ const NO_CALL: ToolCall = {
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
 	writes: [],
+	issue: time_markers.NO_ISSUE,
 	...time_bundle_call.not_bundleable(),
 }
 const UNKNOWN_CALL: ToolCall = {
@@ -133,6 +140,7 @@ const UNKNOWN_CALL: ToolCall = {
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
 	writes: [],
+	issue: time_markers.NO_ISSUE,
 	...time_bundle_call.not_bundleable(),
 }
 
@@ -187,20 +195,22 @@ interface Timeline {
 	spans: Array<Span>
 }
 
-function to_tool_call(name: string, input: unknown, message_id: string): ToolCall {
-	if (name !== cost_blocks.BASH_TOOL) {
-		return {
-			label: name,
-			josh_command: '',
-			check_key: time_single_check.NO_CHECK,
-			marker: time_markers.tool_marker(name, input),
-			message_id,
-			writes: time_writes.tool_writes(name, input),
-			...time_bundle_call.tool_facts(name, input),
-		}
+// Everything but Bash: the tool's own name is the label, and nothing it runs is a shell command to
+// read a check key, a josh command or a declared issue off.
+function non_bash_call(name: string, input: unknown, message_id: string): ToolCall {
+	return {
+		label: name,
+		josh_command: '',
+		check_key: time_single_check.NO_CHECK,
+		marker: time_markers.tool_marker(name, input),
+		message_id,
+		writes: time_writes.tool_writes(name, input),
+		issue: time_markers.NO_ISSUE,
+		...time_bundle_call.tool_facts(name, input),
 	}
+}
 
-	const command = time_shell.bash_command(input)
+function bash_call(command: string, message_id: string): ToolCall {
 	const josh_command = time_shell.josh_command_of(command)
 
 	return {
@@ -210,8 +220,15 @@ function to_tool_call(name: string, input: unknown, message_id: string): ToolCal
 		marker: time_markers.bash_marker(command),
 		message_id,
 		writes: time_writes.bash_writes(command),
+		issue: time_markers.bash_issue(command),
 		...time_bundle_call.bash_facts(command),
 	}
+}
+
+function to_tool_call(name: string, input: unknown, message_id: string): ToolCall {
+	if (name !== cost_blocks.BASH_TOOL) return non_bash_call(name, input, message_id)
+
+	return bash_call(time_shell.bash_command(input), message_id)
 }
 
 // Identified calls only. A `tool_use` written without an `id` would otherwise be registered under
@@ -353,6 +370,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		targets: event.targets,
 		writes: event.writes,
 		message_id: event.message_id,
+		issue: event.issue,
 		branch: event.branch,
 		call_id: event.call_id,
 		outcome: event.outcome,

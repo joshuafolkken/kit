@@ -42,6 +42,16 @@ afterAll(() => {
 	rmSync(ABSENT_ROOT, { recursive: true, force: true })
 })
 
+// A linked work tree as git leaves one: its `.git` is a *file* naming the main checkout's worktree
+// registration, which is what says where the session's transcripts are actually filed.
+function make_worktree(gitdir: string): string {
+	const root = mkdtempSync(path.join(tmpdir(), 'cost-worktree-'))
+
+	writeFileSync(path.join(root, '.git'), `gitdir: ${gitdir}\n`)
+
+	return root
+}
+
 function sessions_in(home: string): ReturnType<typeof cost_transcript.list_sessions> {
 	return cost_transcript.list_sessions(cost_transcript.transcript_directory(CWD, home))
 }
@@ -218,5 +228,39 @@ describe('cost_transcript.tally', () => {
 
 		expect(tallied.malformed_lines).toBe(0)
 		expect(tallied.no_usage_lines).toBe(0)
+	})
+})
+
+// The store is keyed on the *session's* working directory, and a lane is a checkout no session ever
+// ran in: `epicrun` gives each child a linked work tree and the child prefixes every command with it,
+// while the Claude session stays in the main checkout. So `pnpm josh time` invoked from a lane asked
+// for a project directory that does not exist, `read_directory` swallowed the miss, and every
+// transcript-derived row reported as unmeasured (joshuafolkken/kit#1617).
+describe('cost_transcript.session_cwd', () => {
+	it('resolves a linked work tree to the checkout its transcripts are filed under', () => {
+		const lane = make_worktree(`${CWD}/.git/worktrees/1617`)
+
+		expect(cost_transcript.session_cwd(lane)).toBe(CWD)
+	})
+
+	// Git writes a relative pointer under `worktree.useRelativePaths`, or for a tree added with
+	// `--relative-paths`. Sliced as text that yields `../../kit`, which slugs to `------kit` and finds
+	// no transcripts at all — the same failure, with a nonsense path in the message reporting it.
+	it('resolves a relative work tree pointer against the work tree itself', () => {
+		const lane = make_worktree('../kit/.git/worktrees/1617')
+
+		expect(cost_transcript.session_cwd(lane)).toBe(path.resolve(lane, '..', 'kit'))
+	})
+
+	it('leaves a main checkout alone, whose .git is a directory rather than a pointer', () => {
+		expect(cost_transcript.session_cwd(CWD)).toBe(CWD)
+	})
+
+	// A submodule's `.git` is a pointer too, and it names no work tree registration — so the fallback
+	// has to be the cwd itself rather than whatever prefix a looser parse would find.
+	it('leaves a pointer that names no work tree registration alone', () => {
+		const submodule = make_worktree(`${CWD}/.git/modules/vendor`)
+
+		expect(cost_transcript.session_cwd(submodule)).toBe(submodule)
 	})
 })

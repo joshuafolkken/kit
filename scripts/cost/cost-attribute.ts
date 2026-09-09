@@ -27,14 +27,37 @@ const ISSUE_BRANCH_PATTERN = /^(\d+)-/u
 const UNATTRIBUTED_KEY = -1
 
 // Everything the attribution reads. `UsageRecord` satisfies it, and so does a timed span.
+//
+// **`issue` is the branch's answer where the branch cannot give one** (joshuafolkken/kit#1617). The
+// paragraph above assumes the session and the work share a checkout, and under lanes they do not: a
+// child's commands run in a linked work tree on `<N>-lane` while the session writing the transcript
+// sits on the default branch, so every line of a lane run reads `gitBranch: "main"` and no fill
+// direction has an issue branch to carry. Measured on 2026-09-09: issues 1445, 1510 and 1511 each
+// merged from a lane and left not one `<N>-` branch anywhere in the corpus.
+//
+// **It is a declaration, not a second walk.** The record says which issue it names and the existing
+// fill-forward carries it exactly as it carries a branch — the alternative was a lane-aware copy of
+// `attribute`, which is the clone `CLAUDE.md` prohibits in the one place a drift would make
+// `josh cost --issue` and `josh time --issue` disagree. `UsageRecord` declares nothing and is
+// unaffected.
 interface BranchBearing {
 	branch: string
+	issue?: number
 }
 
 function issue_from_branch(branch: string): number {
 	const matched = ISSUE_BRANCH_PATTERN.exec(branch)
 
 	return matched?.[1] === undefined ? UNATTRIBUTED_KEY : Number(matched[1])
+}
+
+// What a record says it belongs to. A declaration wins over the branch because it is the stronger
+// evidence: the branch is the checkout's and may be shared by every run of the day, while a
+// declaration was written by the run itself about itself.
+function declared_issue(record: BranchBearing): number {
+	const declared = record.issue ?? UNATTRIBUTED_KEY
+
+	return declared === UNATTRIBUTED_KEY ? issue_from_branch(record.branch) : declared
 }
 
 // The nearest declared issue in one direction, carried across the gaps. Both directions are the
@@ -54,19 +77,46 @@ function fill(declared: ReadonlyArray<number>, is_reverse: boolean): Array<numbe
 	return filled
 }
 
-function pick(own: number, next: number | undefined, previous: number | undefined): number {
-	if (own !== UNATTRIBUTED_KEY) return own
-	if (next !== undefined && next !== UNATTRIBUTED_KEY) return next
+// **A declaration is carried forward, and it outranks both branch directions.** The preference for
+// `next` above is a statement about *branches*: work precedes the branch it will be committed to, so
+// the branch sits at the end of the run it names. A declaration sits at the *start* — the
+// `in-progress` label is the first thing a run writes — so carrying it backwards would give one
+// child's work to the next child declared after it, which is exactly the shape a lane transcript
+// holding two children has. `carried` is therefore the forward fill of declarations alone, and a
+// corpus with no declaration leaves every value `UNATTRIBUTED_KEY` and this branch inert.
+function is_attributed(value: number | undefined): value is number {
+	return value !== undefined && value !== UNATTRIBUTED_KEY
+}
+
+function pick(
+	own: number,
+	carried: number,
+	next: number | undefined,
+	previous: number | undefined,
+): number {
+	if (is_attributed(own)) return own
+	if (is_attributed(carried)) return carried
+	if (is_attributed(next)) return next
 
 	return previous ?? UNATTRIBUTED_KEY
 }
 
+function announcements(records: ReadonlyArray<BranchBearing>): Array<number> {
+	return fill(
+		records.map((record) => record.issue ?? UNATTRIBUTED_KEY),
+		false,
+	)
+}
+
 function attribute(records: ReadonlyArray<BranchBearing>): Array<number> {
-	const declared = records.map((record) => issue_from_branch(record.branch))
+	const declared = records.map((record) => declared_issue(record))
+	const carried = announcements(records)
 	const next = fill(declared, true)
 	const previous = fill(declared, false)
 
-	return declared.map((own, index) => pick(own, next[index], previous[index]))
+	return declared.map((own, index) =>
+		pick(own, carried[index] ?? UNATTRIBUTED_KEY, next[index], previous[index]),
+	)
 }
 
 interface IssueGroup {
@@ -107,6 +157,7 @@ function records_for_issue<Item extends BranchBearing>(
 const cost_attribute = {
 	UNATTRIBUTED_KEY,
 	issue_from_branch,
+	declared_issue,
 	fill,
 	attribute,
 	group_by_issue,

@@ -400,7 +400,12 @@ function report_over(reports: ReadonlyArray<CostReport>, limit: number): number 
 	return 0
 }
 
-function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): number {
+// The session's checkout rather than this process's, for the reason `time-cli.ts` gives: a lane's
+// commands run in a work tree no session ever wrote a transcript from (joshuafolkken/kit#1617).
+function run(
+	argv: ReadonlyArray<string>,
+	cwd: string = cost_transcript.session_cwd(process.cwd()),
+): number {
 	const options = parse_options(argv)
 
 	if (options === undefined) {
