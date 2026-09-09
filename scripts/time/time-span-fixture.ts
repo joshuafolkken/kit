@@ -14,6 +14,29 @@ import { time_spans, type Span, type SpanOutcome } from './time-spans'
 const MINUTE_MS = 60_000
 const DEFAULT_MINUTES = 1
 
+// The fields no case in either suite varies. Written once so a new `Span` field lands in one literal
+// rather than in each of them, and so the builder below stays inside the per-function line limit.
+//
+// No message id, which is the state every case predating joshuafolkken/kit#1406 was written in: the
+// round trips are then read by the adjacency fallback exactly as they were. A case about turns
+// overrides it, which is what makes the two rules testable apart.
+const UNVARIED = {
+	check_key: '',
+	marker: time_markers.NO_MARKER,
+	is_bundleable: false,
+	is_writing: false,
+	targets: [],
+	writes: [],
+	message_id: time_spans.NO_MESSAGE_ID,
+	issue: time_markers.NO_ISSUE,
+	branch: 'main',
+	call_id: '',
+	outcome: time_spans.UNKNOWN_OUTCOME,
+	followup_stages: [],
+	is_continuation: false,
+	ended_ms: 0,
+} satisfies Partial<Span>
+
 function span(
 	category: Span['category'],
 	minutes: number = DEFAULT_MINUTES,
@@ -24,20 +47,7 @@ function span(
 		category,
 		label,
 		josh_command,
-		check_key: '',
-		marker: time_markers.NO_MARKER,
-		is_bundleable: false,
-		is_writing: false,
-		targets: [],
-		// No message id, which is the state every case predating joshuafolkken/kit#1406 was written in:
-		// the round trips are then read by the adjacency fallback exactly as they were. A case about
-		// turns overrides it, which is what makes the two rules testable apart.
-		message_id: time_spans.NO_MESSAGE_ID,
-		branch: 'main',
-		call_id: '',
-		outcome: time_spans.UNKNOWN_OUTCOME,
-		is_continuation: false,
-		ended_ms: 0,
+		...UNVARIED,
 		...time_spans.equal_durations(minutes * MINUTE_MS),
 	}
 }

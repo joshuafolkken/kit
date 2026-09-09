@@ -19,6 +19,6 @@
 - kit#753 / kit#752 による CodeRabbit 非ブロッキングの暫定措置と、その revert 条件
 - `josh sync` が管理・配布する設定ファイルが PR に含まれていたときの確認停止
 - **auto-merge が `fullrun` の既定であり、`fullrun` と打つこと自体がマージの承認である**こと。**CI がオールグリーンでも未対応の AI レビュー指摘があるならマージしない**こと。CodeRabbit のレート制限は指摘ではないこと、指摘を反射的にバイパスしないこと、マージ経路が `followup` のものであってエージェントのものではないこと、マージ戦略・ブランチ削除・失敗時の扱い、マージ後の `pnpm josh ms`
-- **`completion` 通知は `pnpm josh followup` 経由のみ**であり、`pnpm josh notify --task-type completion` を手で打たないこと（手動 CLI は PR URL を自動で埋めない）。`pnpm josh notify` は `planning` / `confirmation` / `kickoff_retry` / `failure` 専用であること
+- **`completion` 通知は `pnpm josh followup` 経由のみ**であり、`pnpm josh notify --task-type completion` を手で打たないこと（手動 CLI は PR URL を自動で埋めない）。`pnpm josh notify` は `planning` / `confirmation` / `kickoff_retry` / `failure` 専用であること。`warning`（⚠️）も同じく手で打たない — マージは成功したが実行記録を残せなかったことを `pnpm josh followup` 自身が送る種別である（joshuafolkken/kit#1628）
 - **`pnpm josh followup` は前景で実行し、`&` でバックグラウンドにしない**こと。CI 待ち時間の予算と、ツール呼び出しの上限に当たったときの対処
 - 完了時にプロジェクトのバージョンが最終行に印字され、完了 Telegram にも入ること

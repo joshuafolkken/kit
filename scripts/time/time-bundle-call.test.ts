@@ -3,6 +3,10 @@ import { time_bundle_call } from './time-bundle-call'
 
 const READ_PATH = 'scripts/time/time-spans.ts'
 const OTHER_PATH = 'scripts/time/time-report.ts'
+// The one operand of a `gh` line that sits outside its quotes (joshuafolkken/kit#1611).
+const ENDPOINT = '/issues/1'
+// The shape the measured genuine loss takes: an absolute path quoted for its length, not for a space.
+const ABSOLUTE_PATH = '/Users/example/.claude/projects/kit/tool-results/b5qsy8wac.txt'
 
 describe('time_bundle_call.tool_facts', () => {
 	it('reads a path-naming tool as bundleable and keeps its target', () => {
@@ -90,6 +94,49 @@ describe('time_bundle_call.bash_facts — what a command names', () => {
 
 	it('keeps a flag and a bare word out of the targets', () => {
 		expect(time_bundle_call.bash_facts(`grep -rn foo ${READ_PATH}`).targets).toEqual([READ_PATH])
+	})
+
+	// joshuafolkken/kit#1611. A quote is a separator to `words_of` and `/` is not a separator at all,
+	// so the substitution script came out as the path-shaped word `s/old/new` — a file no edit can ever
+	// name, left pending in `investigation-reads.ts` for the rest of the run.
+	it('takes no target from a quoted substitution script', () => {
+		const facts = time_bundle_call.bash_facts(`sed -i '' 's/old/new/' ${READ_PATH}`)
+
+		expect(facts.targets).toEqual([READ_PATH])
+	})
+
+	// The daily case in this repository: a path named inside a body being written to an Issue is prose
+	// about a file, not a call on one, and counting it made unrelated calls look ordered.
+	it('takes no target from a path quoted inside an argument', () => {
+		const facts = time_bundle_call.bash_facts(`gh api ${ENDPOINT} --jq "${OTHER_PATH}"`)
+
+		expect(facts.targets).toEqual([ENDPOINT])
+	})
+
+	// **The cost of stripping quotes rather than parsing them, asserted so it stays deliberate.** A
+	// path quoted for any reason is lost, and the second case below is a genuine loss rather than a
+	// tidy-up: `cat "<a long absolute path>"` really was reading that file, and with no target left the
+	// dependency veto in `time-batch-guard.ts` no longer covers the search-then-read pair that produced
+	// it.
+	//
+	// **Measured before it was accepted** (joshuafolkken/kit#1611), over 1,195 local transcripts and
+	// 10,257 bundleable `Bash` calls: 2,094 calls change target set, and of the calls left naming
+	// nothing at all, 579 lost words are phantoms — `*.ts` 76 times, `/##` 65, `.author.login` 46 —
+	// against roughly 16 that were a quoted absolute path being read, every one of them under a
+	// `tool-results` or `tasks` directory outside the repository. The phantoms are worse than noise:
+	// two unrelated calls both quoting `*.ts` shared a target and looked *ordered*, which suppressed
+	// the refusal this guard exists to make.
+	//
+	// **Parsing the quotes instead does not separate the two cases.** `'s/old/new/'` and `"*.ts"` are
+	// whole-word quoted operands exactly as `"scripts/x.ts"` is, so unquoting a whole word rather than
+	// dropping it keeps every phantom above. The shell line does not carry which is which — which is
+	// why the alternative that would have was a second `targets` field on `Span`, rejected in the
+	// Issue for leaving every reader to choose between them.
+	it.each([
+		['quoted because it holds a space', `cat 'scripts/a b.ts'`],
+		['quoted because it is long', `cat "${ABSOLUTE_PATH}"`],
+	])('loses a path %s', (_label, command) => {
+		expect(time_bundle_call.bash_facts(command).targets).toEqual([])
 	})
 
 	// A line naming twenty paths says nothing more about what it depends on than its first few do, and

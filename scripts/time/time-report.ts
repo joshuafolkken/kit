@@ -4,6 +4,7 @@ import { time_checks, type CheckTotal } from './time-checks'
 import { time_ci, type CiFacts } from './time-ci'
 import { time_cycles, type CycleTotals } from './time-cycles'
 import { time_failures, type FailureTotals } from './time-failures'
+import { time_followup_stages, type FollowupStageTotals } from './time-followup-stages'
 import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_invocations, type InvocationTotal } from './time-invocations'
@@ -137,6 +138,10 @@ interface TimeReport extends TurnSplit {
 	// question whose answer the run already had. Built by `time-single-checks.ts`, which also renders
 	// the block — the shape `time-bundles.ts` and `time-failures.ts` already have.
 	single_checks: SingleCheckTotals
+	// How long each of `followup`'s own stages took (joshuafolkken/kit#1445). The command prints the
+	// rows itself; only this keeps them past the run that printed them, which is what lets two runs be
+	// compared stage by stage. Built by `time-followup-stages.ts`, which also renders the block.
+	followup_stages: FollowupStageTotals
 	// Which of the run's edits never reached the merged diff, and how large that diff was
 	// (joshuafolkken/kit#1387). The blocks above measure how a run spent its turns; only this says how
 	// much of the work was thrown away, and how much change the elapsed time bought — without which two
@@ -341,6 +346,7 @@ function build_from_spans(input: ReportInput): TimeReport {
 		gaps: time_gaps.build_gaps(spans),
 		bundles: time_bundles.build_bundles(spans),
 		single_checks: time_single_checks.build_single_checks(spans),
+		followup_stages: time_followup_stages.build_followup_stages(spans),
 		rework: time_rework.build_rework(spans, input.diff),
 		categories,
 		has_ci_data: ci.has_ci_data,
@@ -428,6 +434,21 @@ function format_empty(report: TimeReport): string {
 	].join('\n')
 }
 
+// The page's closing half: the tables that rank an open set of rows, largest first. Split out
+// because the budget the note below describes was spent by the tenth block, and the next one would
+// have had nowhere to go either (joshuafolkken/kit#1445). The split is along the seam the page
+// already has — every block above is about the run's own shape, every one here ranks a list — so the
+// order of the printed page is still the order of two lists read one after the other.
+function ranked_tables(report: TimeReport): Array<string> {
+	return [
+		...total_lines('By tool (descending):', report.by_tool, tool_suffix),
+		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
+		...time_invocations.invocation_lines(report.by_invocation),
+		...total_lines(time_checks.CHECK_HEADING, report.by_check, time_checks.check_suffix),
+		...time_checks.merge_wait_lines(report.by_check),
+	]
+}
+
 // **The failure block's three arguments are read off the report before the list rather than inside
 // it**, which is what keeps this function inside its length limit as blocks are added
 // (joshuafolkken/kit#1387). Each block below is one line, and the page is the order of those lines.
@@ -449,13 +470,10 @@ function format_report(report: TimeReport): string {
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_single_checks.single_check_lines(report.single_checks, report),
+		...time_followup_stages.followup_stage_lines(report.followup_stages),
 		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
 		...time_rework.rework_lines(report.rework),
-		...total_lines('By tool (descending):', report.by_tool, tool_suffix),
-		...total_lines('By josh command (descending):', report.by_josh_command, call_suffix),
-		...time_invocations.invocation_lines(report.by_invocation),
-		...total_lines(time_checks.CHECK_HEADING, report.by_check, time_checks.check_suffix),
-		...time_checks.merge_wait_lines(report.by_check),
+		...ranked_tables(report),
 	].join('\n')
 }
 
@@ -482,6 +500,9 @@ const time_report = {
 	CI_LABEL,
 	build_from_spans,
 	build_report,
+	// Exported so a block built outside this file divides by the same model wait the category table
+	// prints, rather than re-deriving the sum and coming to disagree with it (joshuafolkken/kit#1477).
+	category_ms,
 	format_minutes,
 	format_seconds,
 	format_share,

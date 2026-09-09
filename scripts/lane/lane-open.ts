@@ -106,7 +106,9 @@ function build_plan(
 //
 // The start point comes from `lane_start_point` rather than from the default branch's bare name:
 // that name resolves to a local ref nothing advances, and the lane would start without the work
-// merged just before it (joshuafolkken/kit#1535).
+// merged just before it (joshuafolkken/kit#1535). **It answers `undefined` when a branch of this
+// lane's name already exists**, which puts the work tree on that branch instead of creating one —
+// the only route back to a child that was parked after pushing (joshuafolkken/kit#1627).
 //
 // **The install is the last step rather than a caller's, because a lane without it is unusable**
 // (joshuafolkken/kit#1554). Leaving it to whoever opened the lane made it a step nothing enforced,
@@ -116,7 +118,7 @@ function build_plan(
 async function materialize(plan: LanePlan): Promise<void> {
 	mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
 
-	const start_point = await lane_start_point.resolve()
+	const start_point = await lane_start_point.resolve_for_branch(plan.lane.branch)
 
 	await git_command.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
 	writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)

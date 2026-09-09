@@ -1,16 +1,15 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { bounded_pool } from '#scripts/bounded-pool'
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import type { IssueReference } from '#scripts/git/git-epic-reference'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
+import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
 import { epic_issue } from './epic-issue'
 
 // `josh epic:bundle <N>` — after an issue is filed, look at the open backlog and say whether it
@@ -29,27 +28,15 @@ const USAGE = 'Usage: josh epic:bundle <issue-number>'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the backlog cannot be keyed by repository — check `gh auth status` and that this is a checkout with an `origin` remote.'
 
-const epic_schema = z.object({ number: z.number(), body: z.string().nullable() })
 // The backlog listing asks for the title too (joshuafolkken/kit#1252). Kept apart from the epic
 // listing's schema rather than made optional on one: the epic listing does not ask for the field, and
 // a schema that tolerates its absence everywhere would let a missing title pass unnoticed here.
 const backlog_schema = epic_schema.extend({ title: z.string().nullable() })
 
-// Which epic tracks each issue, from the epics' own task lists. An issue belongs to at most one,
-// because that is what a task list can express.
-function build_epic_index(
-	epics: ReadonlyArray<{ number: number; body: string }>,
-): Map<number, number> {
-	const index = new Map<number, number>()
-
-	for (const epic of epics) {
-		for (const child of git_epic_parse.parse_task_list_issue_numbers(epic.body)) {
-			index.set(child, epic.number)
-		}
-	}
-
-	return index
-}
+// The epic index is `epic-index.ts`'s, shared with the `auto-ok` pickup since
+// joshuafolkken/kit#1633: both commands ask which epic tracks an issue, and a second copy of the
+// task-list read would answer differently the first time that shape moved.
+const { build_epic_index } = epic_index
 
 function to_epic_field(epic: number | undefined): { epic?: number } {
 	return epic === undefined ? {} : { epic }
@@ -205,32 +192,11 @@ function headline(decision: BundleDecision): string {
 	return ACTION_LINES[decision.action] ?? ''
 }
 
-interface FetchedEpics {
-	epics: Array<{ number: number; body: string }>
-	// The listing is cut short like the backlog's. An epic past the cut is invisible, so the issue it
-	// tracks reads as tracked by nothing and the command recommends creating a second epic over it —
-	// the duplicate that joshuafolkken/kit#943 exists to prevent, arriving with exit 0
-	// (joshuafolkken/kit#950).
-	cutoff: ScanCutoff
-}
-
-// The epics currently open, so a candidate can be matched to the one already tracking it.
-//
-// A failed read is reported rather than treated as "there are no epics": without the list, the
-// guard that keeps an epic out of its own children's candidates is off, and an issue an epic already
-// tracks is told to create a second one — confidently, and with exit 0.
+// The epics currently open, at this command's own listing limit. A failed read stays `undefined` and
+// is reported: without the list, an issue an epic already tracks is told to create a second one —
+// confidently, and with exit 0 (joshuafolkken/kit#950).
 async function fetch_epics(): Promise<FetchedEpics | undefined> {
-	const { json, is_capped } = await git_gh_command.issue_list_by_label(EPIC_LABEL, BACKLOG_LIMIT)
-	if (json === undefined) return undefined
-	// Not `parse_json_array_safe`: it answers `[]` for a response that is not JSON at all, which is
-	// indistinguishable from "no epics are open" — the silent absence this whole rule is about.
-	const rows = parse_json_array_or_undefined(json, epic_schema)
-	if (rows === undefined) return undefined
-
-	return {
-		cutoff: cutoff_of(rows.length, BACKLOG_LIMIT, is_capped),
-		epics: rows.map((row) => ({ number: row.number, body: row.body ?? '' })),
-	}
+	return await epic_index.fetch_epics(BACKLOG_LIMIT)
 }
 
 function format_numbers(numbers: ReadonlyArray<number>): string {

@@ -501,7 +501,9 @@ describe('the workflow skill defines how much of a resident rule is resident', (
 	it.each([
 		'**A resident rule is written as its trigger plus a pointer.**',
 		'The test is whether the resident text still produces correct behavior on a turn where the pointer is never opened.',
-		'**Trimming is moving, never deleting.**',
+		// Re-pointed by joshuafolkken/kit#1525: trimming is still moving, but a narrow retirement
+		// route now exists beside it, so the sentence that used to close the door names the exception.
+		'**Trimming is moving, and deleting is the exception that has to be earned.**',
 	])('states %j', (marker) => {
 		expect(skill).toContain(marker)
 	})

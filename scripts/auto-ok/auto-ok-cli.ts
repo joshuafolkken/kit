@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
+import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { SUMMARY_FIELDS } from '#scripts/git/git-gh-issue'
@@ -78,7 +80,12 @@ function truncated_cause(cutoff: ScanCutoff): string | undefined {
 }
 
 const NONE_OPTED_IN_MESSAGE = `No open issue carries \`${AUTO_OK_LABEL}\`.`
+// The epic listing failing is not "no epic tracks anything". Read that way, every child of every
+// epic reads as a standalone candidate and the pickup hands one back out of its epic's order — the
+// single failure joshuafolkken/kit#1633 is about, arriving with exit 0 and nothing said.
+const EPICS_UNREADABLE_MESSAGE = `Could not read the epic listing, so which issues an epic already tracks is unknown. That is not "no epic tracks anything" — an opted-in child would be handed back outside its epic's order, so no answer is given. Check \`gh auth status\` and ask again.`
 const CLOSED_STATE = 'CLOSED'
+const NO_CUTOFF: ScanCutoff = 'none'
 
 // The issue just merged, so the next answer cannot be it again. GitHub applies the `closes #N` side
 // effect asynchronously, so for a few seconds after a merge the issue is still listed as open —
@@ -125,12 +132,16 @@ function parse_pair(argv: ReadonlyArray<string>, index: number): ReadonlyArray<n
 // `--exclude` may also be repeated, so a loop can add one number per pickup without rebuilding a
 // list. Anything that is not a `--exclude` pair is a usage error rather than a silently ignored
 // argument.
-function parse_options(argv: ReadonlyArray<string>): NextOptions {
+//
+// `usage` is a parameter so a second command with the same `--exclude` grammar reuses this rather
+// than copying the loop — `josh backlog:next` does (joshuafolkken/kit#1630). Only the line printed on
+// a bad argument differs between them, and a caller that passes nothing gets this command's own.
+function parse_options(argv: ReadonlyArray<string>, usage: string = USAGE): NextOptions {
 	const exclude: Array<number> = []
 
 	for (let index = 0; index < argv.length; index += EXCLUDE_PAIR_SIZE) {
 		const parsed = parse_pair(argv, index)
-		if (parsed === undefined) return { usage: USAGE }
+		if (parsed === undefined) return { usage }
 		exclude.push(...parsed)
 	}
 
@@ -248,6 +259,44 @@ function is_unblocked(issue: OpenIssueData): boolean {
 	return (issue.blockedBy?.nodes ?? []).every((blocker) => is_closed(blocker))
 }
 
+// Which issues an epic already tracks, or that the epic listing could not be read.
+//
+// **The question is membership, not a label** (joshuafolkken/kit#1633). An epic's child carries none
+// of `epic` / `in-progress` / `needs-decision`, so the label comparison inside `prioritize` never
+// saw one — and `auto-ok` on a child put that child in the standalone candidate set, where the
+// epic's `blockedBy` ordering is never consulted. The epics themselves are still found by the `epic`
+// label, exactly as `epic:bundle` finds them, so this does not survive an epic that never received
+// it — what it removes is the *child's* labels deciding, which is the half that was failing.
+type TrackingRead =
+	{ kind: 'read'; tracked: ReadonlySet<number>; cutoff: ScanCutoff } | { kind: 'epics_unreadable' }
+
+async function read_open_epics(): Promise<FetchedEpics | undefined> {
+	try {
+		return await epic_index.fetch_epics(LISTING_LIMIT)
+	} catch {
+		return undefined
+	}
+}
+
+// Nothing opted in means no candidate an epic could be tracking, so the listing is not paid for at
+// all — the ordinary answer on a repository that has never used the label.
+//
+// **The rejection is caught, not left to escape.** `parse_json_array_or_undefined` answers
+// `undefined` only for a response that is not a JSON array at all and *rethrows* a schema mismatch —
+// so a changed field mapping in `git-gh-issue-rest.ts` would take this command down with a stack
+// trace and an empty standard output, which `answer=$(pnpm josh auto-ok:next)` reads as the empty
+// string. The opted-in listing already refuses that through `read_json_listing`; this one refuses it
+// here, and both gaps land on the same message because both mean the same thing: the tracking is
+// unknown, so no answer is given.
+async function fetch_tracking(count: number): Promise<TrackingRead> {
+	if (count === 0) return { kind: 'read', tracked: new Set(), cutoff: NO_CUTOFF }
+	const open_epics = await read_open_epics()
+	if (open_epics === undefined) return { kind: 'epics_unreadable' }
+	const tracked = new Set(epic_index.build_epic_index(open_epics.epics).keys())
+
+	return { kind: 'read', tracked, cutoff: open_epics.cutoff }
+}
+
 // The pickup *order* is `git_next_issues.prioritize` itself, not a copy of it: newest first, with the
 // `epic` / `in-progress` / `needs-decision` exclusions. Its display cap does not reach this caller,
 // which reads only the first row.
@@ -268,11 +317,26 @@ function is_unblocked(issue: OpenIssueData): boolean {
 // The `🗒 Next issues` display is deliberately *not* filtered this way; `git-next-issues.ts` records
 // why, and the short version is that a person can see a blocked issue and choose to start it anyway
 // while an unattended run cannot (joshuafolkken/kit#1005).
+//
+// An issue an epic tracks is dropped here for the same reason and by the same rule: the epic's order
+// is the only thing that sequences its children, and the standalone path reads none of it
+// (joshuafolkken/kit#1633).
+function is_runnable(
+	issue: OpenIssueData,
+	tracked: ReadonlySet<number>,
+	exclude: ReadonlyArray<number>,
+): boolean {
+	if (tracked.has(issue.number)) return false
+
+	return is_unblocked(issue) && !exclude.includes(issue.number)
+}
+
 function pick_next(
 	issues: ReadonlyArray<OpenIssueData>,
+	tracked: ReadonlySet<number> = new Set(),
 	exclude: ReadonlyArray<number> = [],
 ): OpenIssueData | undefined {
-	const runnable = issues.filter((issue) => is_unblocked(issue) && !exclude.includes(issue.number))
+	const runnable = issues.filter((issue) => is_runnable(issue, tracked, exclude))
 
 	return git_next_issues.prioritize(runnable)[0]
 }
@@ -283,7 +347,7 @@ function pick_next(
 function none_reason(count: number): string {
 	if (count === 0) return NONE_OPTED_IN_MESSAGE
 
-	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — an epic, already in progress, parked, blocked by an open issue, or the one just merged.`
+	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an epic, an epic itself, already in progress, parked, blocked by an open issue, or the one just merged.`
 }
 
 // Said only when the cap actually bit, and worded from the answer rather than before it: the one run
@@ -297,15 +361,33 @@ function truncation_note(cutoff: ScanCutoff, has_answer: boolean): string | unde
 	return `⚠ The listing ${cause}, so the oldest \`${AUTO_OK_LABEL}\` issues are not in it${tail}`
 }
 
-function report(
-	issues: ReadonlyArray<OpenIssueData>,
-	cutoff: ScanCutoff,
-	exclude?: ReadonlyArray<number>,
-): number {
-	const next = pick_next(issues, exclude)
-	const note = truncation_note(cutoff, next !== undefined)
+// What the two listings could not see. The epic gap is `epic:bundle`'s own wording rather than a
+// second copy of it: the sentence says an epic past the cut was not considered, which is the same
+// fact here — and here it means a child of that epic reads as standalone.
+function warn_gaps(context: PickupContext, has_answer: boolean): void {
+	const note = truncation_note(context.cutoff, has_answer)
 
 	if (note !== undefined) console.error(note)
+	const epic_note = epic_bundle_gaps.epic_gap(context.epic_cutoff, LISTING_LIMIT)
+
+	if (epic_note !== undefined) console.error(epic_note)
+}
+
+// Grouped rather than passed one by one: the pickup now answers from two listings, and the
+// parameter limit is four.
+interface PickupContext {
+	issues: ReadonlyArray<OpenIssueData>
+	cutoff: ScanCutoff
+	tracked: ReadonlySet<number>
+	epic_cutoff: ScanCutoff
+	exclude: ReadonlyArray<number> | undefined
+}
+
+function report(context: PickupContext): number {
+	const { issues } = context
+	const next = pick_next(issues, context.tracked, context.exclude)
+
+	warn_gaps(context, next !== undefined)
 
 	if (next === undefined) {
 		console.error(none_reason(issues.length))
@@ -318,6 +400,29 @@ function report(
 	console.info(String(next.number))
 
 	return SUCCESS_EXIT_CODE
+}
+
+// The second listing runs only once the first one has an answer to filter, and its failure is
+// reported rather than folded into "no epic tracks anything" (joshuafolkken/kit#1633).
+async function answer(
+	read: { issues: Array<OpenIssueData>; cutoff: ScanCutoff },
+	exclude?: ReadonlyArray<number>,
+): Promise<number> {
+	const tracking = await fetch_tracking(read.issues.length)
+
+	if (tracking.kind !== 'read') {
+		console.error(EPICS_UNREADABLE_MESSAGE)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return report({
+		issues: read.issues,
+		cutoff: read.cutoff,
+		tracked: tracking.tracked,
+		epic_cutoff: tracking.cutoff,
+		exclude,
+	})
 }
 
 // The gap that stopped the read decides the message, so a changed field list does not send anyone to
@@ -345,7 +450,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return report(read.issues, read.cutoff, options.exclude)
+	return await answer(read, options.exclude)
 }
 
 // `process.exitCode` rather than `process.exit()`: the answer is written with `console.info`, and on
@@ -363,6 +468,7 @@ const auto_ok_cli = {
 	UNREADABLE_MESSAGE,
 	UNEXPECTED_SHAPE_MESSAGE,
 	BLOCKERS_UNREADABLE_MESSAGE,
+	EPICS_UNREADABLE_MESSAGE,
 	TRUNCATED_WITH_ANSWER,
 	TRUNCATED_WITHOUT_ANSWER,
 	NONE_OPTED_IN_MESSAGE,
@@ -376,6 +482,8 @@ const auto_ok_cli = {
 	is_page_complete,
 	is_closed,
 	is_unblocked,
+	fetch_tracking,
+	is_runnable,
 	pick_next,
 	truncation_note,
 	none_reason,
@@ -387,4 +495,4 @@ const auto_ok_cli = {
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { auto_ok_cli }
-export type { NextOptions, OptedInRead }
+export type { NextOptions, OptedInRead, PickupContext, TrackingRead }

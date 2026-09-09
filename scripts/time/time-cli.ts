@@ -2,10 +2,12 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript'
+import { cost_usage } from '#scripts/cost/cost-usage'
 import { time_batch, type RunTiming } from './time-batch'
 import { time_epic } from './time-epic'
 import { time_epic_report } from './time-epic-report'
 import { time_family } from './time-family'
+import { time_instructions, type InstructionLoad } from './time-instructions'
 import { time_last } from './time-last'
 import { time_last_report } from './time-last-report'
 import { time_period } from './time-period'
@@ -13,7 +15,7 @@ import { time_period_report } from './time-period-report'
 import { time_report, type TimeReport } from './time-report'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
-import type { Span, Timeline } from './time-spans'
+import { time_spans, type Span, type Timeline } from './time-spans'
 
 // `josh time` — where a run's wall clock went, read from Claude Code's own session transcripts and,
 // for the part no transcript records, from GitHub (joshuafolkken/kit#1267, joshuafolkken/kit#1268).
@@ -34,11 +36,20 @@ const FAILURE_EXIT_CODE = 1
 const NO_INSTANT = 0
 const JSON_INDENT = 2
 const USAGE =
-	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--json]'
+	'Usage: josh time [--issue <number>] [--session <id>] [--epic <number>] [--last <runs>] [--period <days>] [--top <rows>] [--instructions] [--json]'
 const NO_MERGED_RUN =
 	'No merged pull request could be resolved, so there is no run to report on. Name one with --issue <number>, or a session with --session <id>.'
 const ONE_SCOPE =
 	'Give one of --issue, --session, --epic, --last or --period: they name different things.'
+// **`--instructions` needs a named session, and is refused rather than ignored without one**
+// (joshuafolkken/kit#1477). The share it reports divides one transcript's carried instruction text by
+// that same transcript's own billed input; the run scopes assemble spans from several transcripts and
+// never read the usage lines to divide by. A flag silently dropped there would print a report that
+// reads as "this run carries no instruction text", which is the one answer that is never true.
+const INSTRUCTIONS_SCOPE =
+	'--instructions reports on one transcript, so name it with --session <id>.'
+const INSTRUCTIONS_FLAG = '--instructions'
+const SESSION_FLAG = '--session'
 // Two causes, and naming only the first sent a reader looking for a file that is sitting right
 // there: a checkout upgraded to joshuafolkken/kit#1470 has a full history in which no record yet
 // carries the wall-clock window the lane table is built from.
@@ -67,13 +78,17 @@ interface Options {
 	// How many rows of the per-tool and per-`josh <cmd>` tables to carry, or `undefined` for all of
 	// them (joshuafolkken/kit#1301). It is not a scope: it narrows whichever scope was asked for.
 	top: number | undefined
+	// Whether to report what the run's loaded rules and procedures weigh, and what share of its model
+	// wait they account for (joshuafolkken/kit#1477). Off by default because it re-reads the transcript
+	// and sizes every instruction document from disk, which the wall-clock tables need none of.
+	is_instructions: boolean
 	is_json: boolean
 }
 
 // What `print_scope` needs to know, which is how to render and how much to carry — never which scope
 // produced the payload. Kept as a slice of `Options` rather than a second pair of parameters, so a
 // third output-shaping flag reaches every scope by being added once.
-type Output = Pick<Options, 'top' | 'is_json'>
+type Output = Pick<Options, 'top' | 'is_json' | 'is_instructions'>
 
 const PARSE_ARGS_OPTIONS = {
 	session: { type: 'string' },
@@ -82,6 +97,7 @@ const PARSE_ARGS_OPTIONS = {
 	last: { type: 'string' },
 	period: { type: 'string' },
 	top: { type: 'string' },
+	instructions: { type: 'boolean', default: false },
 	json: { type: 'boolean', default: false },
 } as const
 
@@ -108,6 +124,10 @@ interface RawValues {
 	last?: string
 	period?: string
 	top?: string
+	// The one boolean the refusal reads. It is not a scope, so it is absent from `NUMBER_KEYS` and
+	// `SCOPE_KEYS` — what it needs is a scope already named, which `is_refused` checks against
+	// `session` directly (joshuafolkken/kit#1477).
+	instructions?: boolean
 }
 
 // The four flags that carry a number, parsed. Grouped so the refusal below asks one question of one
@@ -145,6 +165,7 @@ function named_scopes(values: RawValues): number {
 // `--last 0` goes the same way: a distribution over no run is not a smaller answer, it is none.
 function is_refused(values: RawValues, parsed: ParsedNumbers): boolean {
 	if (has_unparsed(values, parsed)) return true
+	if (values.instructions === true && values.session === undefined) return true
 
 	return named_scopes(values) > 1
 }
@@ -164,7 +185,12 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 
 		if (is_refused(values, parsed)) return undefined
 
-		return { session: values.session, ...parsed, is_json: values.json }
+		return {
+			session: values.session,
+			...parsed,
+			is_instructions: values.instructions,
+			is_json: values.json,
+		}
 	} catch {
 		return undefined
 	}
@@ -180,7 +206,13 @@ function has_flag(argv: ReadonlyArray<string>, name: string): boolean {
 function usage_lines(argv: ReadonlyArray<string>): Array<string> {
 	const named = SCOPE_FLAGS.filter((flag) => has_flag(argv, flag)).length
 
-	return named > 1 ? [ONE_SCOPE] : [USAGE]
+	if (named > 1) return [ONE_SCOPE]
+
+	if (has_flag(argv, INSTRUCTIONS_FLAG) && !has_flag(argv, SESSION_FLAG)) {
+		return [INSTRUCTIONS_SCOPE]
+	}
+
+	return [USAGE]
 }
 
 function pick_session(cwd: string, session_id: string): SessionFile | undefined {
@@ -239,10 +271,39 @@ function print_scope(payload: unknown, text: () => string, is_json: boolean): vo
 // whole report as JSON while the text table showed a capped one would make `--top` mean two different
 // things depending on `--json`, and the note that says how many rows were withheld rides in `notes`,
 // which both renderings already print.
-function print_report(report: TimeReport, output: Output): void {
-	const capped = time_row_cap.cap_report(report, output.top)
+function report_text(report: TimeReport, load: InstructionLoad | undefined): string {
+	const text = time_report.format_report(report)
 
-	print_scope(capped, () => time_report.format_report(capped), output.is_json)
+	return load === undefined ? text : `${text}\n${time_instructions.format_instructions(load)}`
+}
+
+function print_report(report: TimeReport, output: Output, load: InstructionLoad | undefined): void {
+	const capped = time_row_cap.cap_report(report, output.top)
+	const payload = load === undefined ? capped : { ...capped, instructions: load }
+
+	print_scope(payload, () => report_text(capped, load), output.is_json)
+}
+
+// **The named transcript alone, not the family the wall-clock report is built from.** A delegated
+// unit carries its own context, so folding its requests in would divide one session's instruction
+// weight by another session's billed input and report a share belonging to neither.
+function instructions_of(file: SessionFile, output: Output): InstructionLoad | undefined {
+	if (!output.is_instructions) return undefined
+
+	const content = cost_transcript.read_raw(file)
+	const usage = cost_transcript.tally(content)
+	const { spans } = time_spans.parse_timeline(content)
+
+	return time_instructions.build({
+		spans,
+		resident_tokens: usage.baseline_tokens,
+		billed_input_tokens: usage.records.reduce(
+			(total, record) => total + cost_usage.billed_input(record.totals),
+			time_instructions.NO_TOKENS,
+		),
+		request_count: usage.records.length,
+		model_wait_ms: time_report.category_ms(spans, time_spans.MODEL_CATEGORY),
+	})
 }
 
 function run_session(session_id: string, cwd: string, output: Output): number {
@@ -250,7 +311,7 @@ function run_session(session_id: string, cwd: string, output: Output): number {
 
 	if (file === undefined) return report_empty(cwd, session_id)
 
-	print_report(build_session_report(cwd, file), output)
+	print_report(build_session_report(cwd, file), output, instructions_of(file, output))
 
 	return 0
 }
@@ -274,7 +335,7 @@ async function run_issue(issue: number | undefined, cwd: string, output: Output)
 		return FAILURE_EXIT_CODE
 	}
 
-	print_report(report, output)
+	print_report(report, output, undefined)
 
 	return 0
 }
@@ -358,7 +419,16 @@ async function dispatch(options: Options, cwd: string): Promise<number> {
 	return await run_issue(options.issue, cwd, options)
 }
 
-async function run(argv: ReadonlyArray<string>, cwd: string = process.cwd()): Promise<number> {
+// **The default is the *session's* checkout, not this process's.** Every command of a lane child runs
+// with the lane as its cwd while the session writing the transcripts stays in the main checkout, so a
+// raw `process.cwd()` sent the whole walk to a project directory that does not exist
+// (joshuafolkken/kit#1617). Normalizing here rather than at each of the six `transcript_directory`
+// call sites keeps one answer to "which directory" — the one the `No transcripts found under …`
+// message prints.
+async function run(
+	argv: ReadonlyArray<string>,
+	cwd: string = cost_transcript.session_cwd(process.cwd()),
+): Promise<number> {
 	const options = parse_options(argv)
 
 	if (options === undefined) {
@@ -384,6 +454,7 @@ const time_cli = {
 	NO_RUNS,
 	NO_PERIOD,
 	ONE_SCOPE,
+	INSTRUCTIONS_SCOPE,
 	parse_options,
 	pick_session,
 	report_empty,

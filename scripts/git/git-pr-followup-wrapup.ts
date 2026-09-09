@@ -135,18 +135,48 @@ async function epic_close_step(input: WrapupInput): Promise<void> {
 	})
 }
 
+// **The two steps after the merge are issued together** (joshuafolkken/kit#1446). The completion
+// comment writes to the issue or the pull request and the auto-close reads the open epics; neither
+// needs the other's answer, and measured serially they were 1.9 s and 3.1 s of `followup`'s own
+// clock. Past the merge neither can reject either — `run_guarded_step` reports the failure and
+// answers instead — so the two settle independently and the stage costs the longer of them rather
+// than their sum.
+//
+// **A run that merged nothing keeps them in sequence, because there is nothing to overlap.**
+// `close_completed_epics` returns immediately without `is_merged`, so the second step is a no-op on
+// exactly the path that stays serial — and there the guard is off, so a failure still ends the run
+// and re-running the command is the whole recovery (`git-followup-cleanup.ts`), which is easier to
+// read as one sequence than as a settled pair.
+//
+// **What the overlap costs, stated rather than glossed**: two mutating requests now go out at once
+// against one repository — a comment write beside an auto-close that comments on and closes epics —
+// which is what GitHub's secondary rate limit guidance is about. Past the merge both are guarded, so
+// the worst case is a cleanup reported as unfinished rather than a failed run, and the pair is two
+// requests rather than a fan-out. **Their console output can interleave too**: the guard's warning
+// and its recovery line are printed as they happen, so an auto-close progress line can land between
+// them. The recovery line names its own command and stands on its own, so it is still readable out
+// of order — and the alternative, buffering one step's output until the other settles, would hold
+// back a warning about work that has already failed.
+async function run_tail_steps(input: WrapupInput): Promise<void> {
+	if (!input.should_merge) {
+		await notify_step(input)
+		await epic_close_step(input)
+
+		return
+	}
+
+	await Promise.all([notify_step(input), epic_close_step(input)])
+}
+
 async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {
 	if (input.should_merge) {
 		await git_gh_command.pr_merge(input.branch_name)
 		lap(log, STAGE.merge)
 	}
 
-	await notify_step(input)
+	await run_tail_steps(input)
 
-	lap(log, STAGE.completion_comment)
-	await epic_close_step(input)
-
-	lap(log, STAGE.epic_close)
+	lap(log, STAGE.completion_and_epic_close)
 }
 
 const git_pr_followup_wrapup = {

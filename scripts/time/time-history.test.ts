@@ -61,6 +61,12 @@ async function build_unmeasured(): Promise<ReturnType<typeof time_report_fixture
 	return time_report_fixture.run_report([], 0)
 }
 
+// The same unmeasured shape, stripped of its notes: the fixture always supplies one, so the empty
+// case the fallback exists for is unreachable through it.
+async function build_unexplained(): Promise<ReturnType<typeof time_report_fixture.run_report>> {
+	return { ...(await build_unmeasured()), notes: [] }
+}
+
 function now(): string {
 	return RECORDED_AT
 }
@@ -270,20 +276,21 @@ describe('time_history.format_block — the run that just finished', () => {
 
 describe('time_history.record_run', () => {
 	it('records the finished run and renders it', async () => {
-		const lines = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_report, now)
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_report, now)
 
 		expect(time_history.read_records(WORK_ROOT).map((entry) => entry.issue)).toStrictEqual([
 			CURRENT_ISSUE,
 		])
-		expect(lines.join('\n')).toContain(`issue #${String(CURRENT_ISSUE)}`)
+		expect(outcome.lines.join('\n')).toContain(`issue #${String(CURRENT_ISSUE)}`)
+		expect(outcome.is_recorded).toBe(true)
 	})
 
 	// The call happens after the merge, so a failure here is reported and never raised: a finished
 	// run must not be made to look broken by the measurement taken of it.
 	it('reports an unavailable measurement instead of throwing', async () => {
-		const lines = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, fail_to_build, now)
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, fail_to_build, now)
 
-		expect(lines.join('\n')).toContain(BUILD_FAILURE)
+		expect(outcome.lines.join('\n')).toContain(BUILD_FAILURE)
 		expect(time_history.read_records(WORK_ROOT)).toStrictEqual([])
 	})
 
@@ -291,18 +298,56 @@ describe('time_history.record_run', () => {
 	// is compared against — and `signed_share`'s divide-by-zero guard would hide the percentage that
 	// is the only sign anything is wrong.
 	it('does not record a run nothing was measured for', async () => {
-		const lines = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_unmeasured, now)
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_unmeasured, now)
 
 		expect(time_history.read_records(WORK_ROOT)).toStrictEqual([])
-		expect(lines.join('\n')).toContain('unavailable')
+		expect(outcome.lines.join('\n')).toContain('unavailable')
 	})
 
 	it('writes nothing when JOSH_TIME_HISTORY is 0', async () => {
 		vi.stubEnv('JOSH_TIME_HISTORY', '0')
 
-		expect(
-			await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_report, now),
-		).toStrictEqual([])
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_report, now)
+
+		expect(outcome.lines).toStrictEqual([])
 		expect(time_history.read_records(WORK_ROOT)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#1628. Printing was the whole of the report, so a caller with somewhere louder to
+// put the fact — the completion notification — had to match the rendered text to find it. The answer
+// is carried instead, with the reason attached so the notification can name it.
+describe('record_run answers whether a line reached the file', () => {
+	it('reports a build failure as unrecorded, with the reason', async () => {
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, fail_to_build, now)
+
+		expect(outcome.is_recorded).toBe(false)
+		expect(outcome.reason).toContain(BUILD_FAILURE)
+	})
+
+	it('reports an unmeasured run as unrecorded', async () => {
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_unmeasured, now)
+
+		expect(outcome.is_recorded).toBe(false)
+	})
+
+	// An unmeasured report normally says why in `notes`, but the field can come back empty — and the
+	// blank then rendered as `unavailable for issue #42 () —`, which is the one thing the reason is
+	// carried for. Both the line and the notification must name the absence instead.
+	it('names the absence when an unmeasured run gave no reason', async () => {
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_unexplained, now)
+
+		expect(outcome.reason).not.toBe('')
+		expect(outcome.lines.join('\n')).not.toContain('()')
+	})
+
+	// Nothing was written, so a caller asking "is this run in the file" must not be told yes because
+	// the switch was off.
+	it('reports a disabled history as unrecorded', async () => {
+		vi.stubEnv('JOSH_TIME_HISTORY', '0')
+
+		const outcome = await time_history.record_run(CURRENT_ISSUE, WORK_ROOT, build_report, now)
+
+		expect(outcome.is_recorded).toBe(false)
 	})
 })

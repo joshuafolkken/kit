@@ -72,6 +72,30 @@ describe('time_corpus.collect_issue_spans', () => {
 	})
 })
 
+// A lane run's session never checks the issue branch out — the work happens in a linked work tree the
+// session only shells into — so the fill-forward walk has no issue branch to carry in either
+// direction, and before joshuafolkken/kit#1617 the whole run reported as `no transcript`. Measured on
+// 2026-09-09: six of six merged runs, and issues 1445, 1510 and 1511 left no `<N>-` branch anywhere in
+// the corpus.
+describe('time_corpus.collect_issue_spans on a run that never checked the issue branch out', () => {
+	it('attributes a session that named the issue only through the in-progress label', () => {
+		write_session('lane', fixture.lane_lines(0))
+
+		const found = collect()
+
+		expect(found.session_count).toBe(1)
+		expect(found.spans).toHaveLength(SPANS_PER_SESSION)
+	})
+
+	// The declaration names one issue, so it must not hand the run to an adjacent one — which is what
+	// a filter loose enough to match the number anywhere in the text would have done.
+	it('leaves that session out of an issue it never named', () => {
+		write_session('lane', fixture.lane_lines(0))
+
+		expect(collect(OTHER_ISSUE).session_count).toBe(0)
+	})
+})
+
 // Resuming or forking a session copies the earlier lines into a new transcript file, so one span can
 // appear in several. Counted twice, a run spanning sessions reports time nobody spent.
 describe('time_corpus.collect_issue_spans on a resumed transcript', () => {

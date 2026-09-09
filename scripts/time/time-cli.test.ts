@@ -5,6 +5,7 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'
 import { time_cli_fixture } from './time-cli-fixture'
+import { time_instructions } from './time-instructions'
 import { time_run } from './time-run'
 
 // The console capture, the temporary transcript home and the one run report are
@@ -15,6 +16,7 @@ const { CWD, MINUTE_MS, ISSUE, RUN_SCOPE, RUN_REPORT, at, output, errors } = tim
 time_cli_fixture.capture_console()
 
 const SESSION = 'session-one'
+const INSTRUCTIONS_FLAG = '--instructions'
 
 function prompt_line(minute: number): string {
 	return JSON.stringify({ type: 'user', timestamp: at(minute), message: { content: 'go' } })
@@ -57,18 +59,23 @@ describe('josh time registration', () => {
 
 describe('time_cli.parse_options', () => {
 	it('defaults to the most recently merged run and the text report', () => {
-		expect(time_cli.parse_options([])).toEqual({ is_json: false })
+		expect(time_cli.parse_options([])).toEqual({ is_instructions: false, is_json: false })
 	})
 
 	it('reads --session and --json', () => {
 		expect(time_cli.parse_options(['--session', 'abc', '--json'])).toEqual({
 			session: 'abc',
+			is_instructions: false,
 			is_json: true,
 		})
 	})
 
 	it('reads --issue as a number', () => {
-		expect(time_cli.parse_options(['--issue', '1268'])).toEqual({ issue: 1268, is_json: false })
+		expect(time_cli.parse_options(['--issue', '1268'])).toEqual({
+			issue: 1268,
+			is_instructions: false,
+			is_json: false,
+		})
 	})
 
 	// A refusal, not a silent default: a mistyped flag must not report some other scope's time as
@@ -97,6 +104,7 @@ describe('time_cli.parse_options — the row cap', () => {
 		expect(time_cli.parse_options(['--issue', '1268', '--top', '5'])).toEqual({
 			issue: 1268,
 			top: 5,
+			is_instructions: false,
 			is_json: false,
 		})
 	})
@@ -264,5 +272,37 @@ describe('time_cli.run — one run', () => {
 	it('names the both-scopes mistake in the equals form too', async () => {
 		expect(await time_cli.run(['--issue=1', '--session=abc'], CWD)).toBe(1)
 		expect(errors()).toContain(time_cli.ONE_SCOPE)
+	})
+})
+
+describe('time_cli — the instruction-load block', () => {
+	it('is withheld unless it was asked for', () => {
+		expect(time_cli.parse_options(['--session', SESSION])?.is_instructions).toBe(false)
+	})
+
+	it('reads --instructions beside a named session', () => {
+		const options = time_cli.parse_options(['--session', SESSION, INSTRUCTIONS_FLAG])
+
+		expect(options?.is_instructions).toBe(true)
+	})
+
+	// **Refused rather than ignored.** The run scopes assemble spans from several transcripts without
+	// reading the usage lines the share divides by, so a flag dropped there would print a report that
+	// reads as "this run carries no instruction text" — the one answer that is never true.
+	it('refuses --instructions when no session was named', async () => {
+		expect(await time_cli.run([INSTRUCTIONS_FLAG], CWD)).toBe(1)
+		expect(errors()).toContain(time_cli.INSTRUCTIONS_SCOPE)
+	})
+
+	it('refuses --instructions beside a run scope', async () => {
+		expect(await time_cli.run(['--issue=1', INSTRUCTIONS_FLAG], CWD)).toBe(1)
+		expect(errors()).toContain(time_cli.INSTRUCTIONS_SCOPE)
+	})
+
+	it('prints the block under the wall-clock report for a named session', async () => {
+		write_session()
+
+		expect(await time_cli.run(['--session', SESSION, INSTRUCTIONS_FLAG], CWD)).toBe(0)
+		expect(output()).toContain(time_instructions.HEADING)
 	})
 })

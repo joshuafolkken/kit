@@ -25,6 +25,7 @@ const WORKSPACE_PREFIX = 'lane-open-start-point-'
 const MERGED_FILE = 'merged-after-the-lane-base.txt'
 const PRIMARY = 'primary'
 const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
+const UPDATE_REF = 'update-ref'
 const { git, MAIN_BRANCH } = git_fixture_workspace
 
 const fixture: FixtureWorkspace & { repository_root: string } = {
@@ -57,7 +58,7 @@ async function advance_origin_past_local_main(): Promise<void> {
 	const root = fixture.repository_root
 
 	await declare_origin()
-	await git(root, ['update-ref', ORIGIN_MAIN_REF, 'refs/heads/main'])
+	await git(root, [UPDATE_REF, ORIGIN_MAIN_REF, 'refs/heads/main'])
 	await git(root, ['symbolic-ref', 'refs/remotes/origin/HEAD', ORIGIN_MAIN_REF])
 	await git(root, ['reset', '--hard', 'HEAD~1'])
 }
@@ -90,6 +91,22 @@ async function configured_upstream(branch_name: string): Promise<string> {
 	}
 }
 
+// What the fixture cannot do for itself. The two git reads talk to a remote, which the unit suite's
+// network guard refuses outright — and neither is what is under test: the assertions are about which
+// ref the lane is cut from. `ls_remote_branch` answers empty, which is "not on the remote", the state
+// every test here starts from; the one that reopens a pushed branch says otherwise
+// (joshuafolkken/kit#1627). The install is stubbed for the reason git is not
+// (joshuafolkken/kit#1554): this fixture commits text files and no `package.json`, so a real
+// `pnpm install` would fail on a manifest that was never the subject.
+function stub_what_the_fixture_cannot_do(): void {
+	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
+	vi.spyOn(git_command, 'ls_remote_branch').mockResolvedValue('')
+	vi.spyOn(lane_install, 'install_dependencies').mockResolvedValue({
+		is_installed: true,
+		output: '',
+	})
+}
+
 beforeEach(async () => {
 	const opened = git_fixture_workspace.open_workspace(WORKSPACE_PREFIX)
 
@@ -100,14 +117,7 @@ beforeEach(async () => {
 	Reflect.deleteProperty(process.env, lane_paths.LANE_ROOT_KEY)
 	// The fetch is the one step this fixture cannot take — the suite's network guard refuses it — and
 	// it is not what is under test: the assertion is which ref the lane is cut from.
-	vi.spyOn(git_command, 'fetch_branch').mockResolvedValue('')
-	// The install is stubbed for the same reason git is not (joshuafolkken/kit#1554): this fixture
-	// commits two text files and no `package.json`, so a real `pnpm install` there would fail on a
-	// manifest that was never the subject. `lane-install.test.ts` pins what it asks pnpm for.
-	vi.spyOn(lane_install, 'install_dependencies').mockResolvedValue({
-		is_installed: true,
-		output: '',
-	})
+	stub_what_the_fixture_cannot_do()
 
 	await build_repository()
 	process.chdir(fixture.repository_root)
@@ -152,6 +162,93 @@ describe('the commit a new lane starts from', () => {
 			await lane_open.open_lane(ISSUE)
 
 			expect(lane_holds('.env')).toBe(true)
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#1627: the same fixture, asked the other question. A child parked after pushing
+// leaves `<N>-lane` behind carrying commits that are on no other ref, and `lane:close` deletes the
+// local branch while the remote one and the pull request stay. Reopening its lane has to land on
+// those commits — real git again, because what is under test is whether `worktree add` put the tree
+// on the branch that was there rather than on a new one of the same name.
+const LANE_BRANCH = lane_paths.lane_branch(ISSUE)
+const MAIN = 'main'
+const PUSHED_FILE = 'work-the-child-already-pushed.txt'
+
+async function build_pushed_lane_branch(): Promise<void> {
+	const root = fixture.repository_root
+
+	await git(root, ['checkout', '-q', '--no-track', '-b', LANE_BRANCH, ORIGIN_MAIN_REF])
+	writeFileSync(path.join(root, PUSHED_FILE), 'pushed\n')
+	await commit_all('work the child already pushed')
+	await git(root, ['checkout', '-q', MAIN])
+}
+
+// What `lane:close` leaves: `remove_lane` runs `git branch -D`, and nothing deletes the
+// remote-tracking ref the push created.
+async function drop_local_lane_branch(): Promise<void> {
+	const root = fixture.repository_root
+	const pushed = await git(root, ['rev-parse', LANE_BRANCH])
+
+	await git(root, [UPDATE_REF, `refs/remotes/origin/${LANE_BRANCH}`, pushed])
+	await git(root, ['branch', '-D', LANE_BRANCH])
+}
+
+describe('reopening a lane whose branch already exists', () => {
+	it(
+		'attaches to the local branch, so the commits the child pushed are in the tree',
+		async () => {
+			await build_pushed_lane_branch()
+
+			const outcome = await lane_open.open_lane(ISSUE)
+
+			expect(outcome.kind).toBe('opened')
+			expect(lane_holds(PUSHED_FILE)).toBe(true)
+		},
+		TIMEOUT_MS,
+	)
+
+	// The acceptance criterion that rules out the easy implementation: deleting the branch to get
+	// `-b` back would open the lane and lose exactly what the reopen was for.
+	it(
+		'leaves the branch pointing where it did, rather than deleting and recreating it',
+		async () => {
+			await build_pushed_lane_branch()
+			const before = await git(fixture.repository_root, ['rev-parse', LANE_BRANCH])
+
+			await lane_open.open_lane(ISSUE)
+
+			expect(await git(fixture.repository_root, ['rev-parse', LANE_BRANCH])).toBe(before)
+		},
+		TIMEOUT_MS,
+	)
+})
+
+describe('reopening a lane whose branch is only on the remote', () => {
+	it(
+		'cuts from origin/<N>-lane when the local branch has already been deleted',
+		async () => {
+			await build_pushed_lane_branch()
+			await drop_local_lane_branch()
+			vi.spyOn(git_command, 'ls_remote_branch').mockResolvedValue(`sha\trefs/heads/${LANE_BRANCH}`)
+
+			const outcome = await lane_open.open_lane(ISSUE)
+
+			expect(outcome.kind).toBe('opened')
+			expect(lane_holds(PUSHED_FILE)).toBe(true)
+		},
+		TIMEOUT_MS,
+	)
+
+	// The third path, stated as its own assertion: with neither branch there, nothing is reused.
+	it(
+		'carries no such work into a lane whose branch never existed',
+		async () => {
+			const outcome = await lane_open.open_lane(ISSUE)
+
+			expect(outcome.kind).toBe('opened')
+			expect(lane_holds(PUSHED_FILE)).toBe(false)
 		},
 		TIMEOUT_MS,
 	)

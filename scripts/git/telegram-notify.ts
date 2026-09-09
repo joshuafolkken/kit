@@ -7,7 +7,13 @@ const telegram_environment_schema = z.object({
 	telegram_chat_id: z.string().min(1, { message: 'TELEGRAM_CHAT_ID is required' }),
 })
 
-type TelegramTaskType = 'planning' | 'completion' | 'failure' | 'kickoff_retry' | 'confirmation'
+// **`warning` is not `failure`** (joshuafolkken/kit#1628). It names a run that finished and merged,
+// alongside something that did not work — the run report that never reached `.time-history.jsonl` is
+// the first of them. Sending `failure` (❌) there would say the merge failed, which is false and is
+// the more expensive lie of the two; sending `completion` (✅) twice says nothing went wrong, which
+// is the silence this type exists to end.
+type TelegramTaskType =
+	'planning' | 'completion' | 'failure' | 'warning' | 'kickoff_retry' | 'confirmation'
 
 interface TelegramSendInput {
 	task_type: TelegramTaskType
@@ -32,6 +38,7 @@ const TASK_DEFINITIONS: Record<TelegramTaskType, TaskDefinition> = {
 	planning: { icon: '📋', label: 'Planning' },
 	completion: { icon: '✅', label: 'Completion' },
 	failure: { icon: '❌', label: 'Failure' },
+	warning: { icon: '⚠️', label: 'Completed with a warning' },
 	kickoff_retry: { icon: '🔄', label: 'Kickoff retry' },
 	confirmation: { icon: '⏸️', label: 'Confirmation required' },
 }

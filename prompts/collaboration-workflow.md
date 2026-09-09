@@ -29,6 +29,7 @@
 | `josh epic:plan` — EPIC の判断を計画段階に前倒しする                           | [`epic-plan.md`](./collaboration-workflow/epic-plan.md)                                 |
 | `josh epic:audit` — 子 Issue 群を横断して矛盾を検出する                        | [`epic-audit.md`](./collaboration-workflow/epic-audit.md)                               |
 | `epicrun` — EPIC 配下の子 Issue を無人で実行する                               | [`epicrun.md`](./collaboration-workflow/epicrun.md)                                     |
+| 実行の波を依存宣言で組む（と、組んではいけないとき）                           | [`execution-waves.md`](./collaboration-workflow/execution-waves.md)                     |
 | 別パッケージ起因の問題は割り込み Issue で対応する                              | [`upstream-interrupt.md`](./collaboration-workflow/upstream-interrupt.md)               |
 | クローン禁止・単一ソース化（パッケージ境界を越えても）                         | [`no-clones.md`](./collaboration-workflow/no-clones.md)                                 |
 | 相談と実行を区別する（議論中にファイルを編集しない）                           | [`consultation-vs-execution.md`](./collaboration-workflow/consultation-vs-execution.md) |

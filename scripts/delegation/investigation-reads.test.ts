@@ -7,8 +7,16 @@ import { investigation_reads } from './investigation-reads'
 // is that the count is taken from the transcript rather than remembered — a delegation clears it, an
 // edit takes its file back out of it, and the same accumulation reached twice refuses twice.
 
-const { BRANCH, edit_call_line, josh_call_line, call_line, result_line, ms, target_turn_lines } =
-	time_transcript_fixture
+const {
+	BRANCH,
+	edit_call_line,
+	josh_call_line,
+	call_line,
+	result_line,
+	ms,
+	target_turn_lines,
+	tool_call_line,
+} = time_transcript_fixture
 
 const THRESHOLD = delegation_policy.INVESTIGATION_FILE_THRESHOLD
 const BELOW_THRESHOLD = THRESHOLD - 1
@@ -113,6 +121,64 @@ describe('investigation_reads.tally_of — reads and edits', () => {
 		expect(investigation_reads.tally_of(bash_text(`grep -n thing ${FIRST_FILE}`)).pending).toEqual(
 			[],
 		)
+	})
+})
+
+// joshuafolkken/kit#1472: a span keeps no tool input, so two kinds of write could not be subtracted
+// at all and the count of unedited files was too large — one false refusal per accumulation.
+describe('investigation_reads.tally_of — a write the transcript could not describe', () => {
+	// Symptom 1. `sed` is in the read set because `sed -n` is how this repository reads, and a span
+	// cannot tell that spelling from `sed -i` — so a file written in place was counted as read and
+	// never taken back out. `CLAUDE.md` allows a small `sed -i` explicitly, so this is daily.
+	//
+	// **Asserted as an empty set since joshuafolkken/kit#1611.** It had to be written as an absence
+	// while the *read* half of the same span still tokenized the whole line: the quoted substitution
+	// left the path-shaped fragment `s/old/new` pending, so the set was not empty even once the real
+	// file came out of it. `bash_facts` now strips the quoted spans first, and the whole-set assertion
+	// is what would catch that third over-count coming back.
+	it('does not leave a file written in place by sed pending', () => {
+		const text = bash_text(`sed -i '' 's/old/new/' ${FIRST_FILE}`)
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([])
+	})
+
+	// The other half of the same case: subtracting the write must not swallow the read that shares the
+	// command name, or the guard stops counting the reading it exists to count.
+	it('still counts a file read with sed -n', () => {
+		const text = bash_text(`sed -n '1,40p' ${FIRST_FILE}`)
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([resolve(FIRST_FILE)])
+	})
+
+	// The over-claim that direction risks: a later segment's `-i` must not make the first segment's
+	// read look like a write, because subtracting deletes a file the run really did read.
+	it('counts the read when a later pipeline segment carries the -i', () => {
+		const text = bash_text(`sed -n '1,40p' ${FIRST_FILE} | grep -i thing`)
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([resolve(FIRST_FILE)])
+	})
+
+	// Symptom 2. Both tools carry `EDIT_MARKER` and neither is in `BUNDLEABLE_TOOLS`, so their spans
+	// used to arrive naming nothing at all and the subtraction had nothing to subtract. Measured on
+	// PR #1468: `Edit` and `Write` emptied `pending`, these two left the file in it.
+	//
+	// Each tool is given the field it really names — `NotebookEdit` sends `notebook_path` — so the case
+	// would fail if that field stopped being read, rather than passing on the other tool's field.
+	it.each([
+		['MultiEdit', 'file_path'],
+		['NotebookEdit', 'notebook_path'],
+	])('takes a file back out once %s has written it', (name, field) => {
+		const text = [
+			...target_turn_lines(0, SUBJECT_FILES),
+			tool_call_line(READ_MINUTE, BRANCH, {
+				name,
+				input: { [field]: resolve(FIRST_FILE) },
+				id: EDIT_ID,
+			}),
+			result_line(READ_MINUTE + 1, BRANCH, EDIT_ID),
+		].join('\n')
+
+		expect(investigation_reads.tally_of(text).pending).toEqual([resolve(SECOND_FILE)])
 	})
 })
 

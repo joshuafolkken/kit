@@ -22,12 +22,19 @@ import {
 // authentication, and `--exclude` taking a single number.
 
 vi.mock('#scripts/git/git-gh-command', () => ({
-	git_gh_command: { issue_list_by_label_summary: vi.fn() },
+	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
 }))
 
 const { git_gh_command } = await import('#scripts/git/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
-const { issue, blocked_issue, capped_listing, record } = auto_ok_fixture
+// The second listing, added in joshuafolkken/kit#1633: the open epics, whose task lists say which
+// issues are already tracked. Every case that is not about tracking gets a backlog with no epic.
+const epic_list = vi.mocked(git_gh_command.issue_list_by_label)
+const { issue, blocked_issue, capped_listing, epic_listing, console_streams, two_issues } =
+	auto_ok_fixture
+
+const streams = console_streams()
+const { stdout, stderr } = streams
 
 // The two answers the probe cases queue over and over: a read that failed, and one that arrived
 // empty. Named so a three-call sequence fits on one line and reads as a sequence.
@@ -38,17 +45,6 @@ const READ_EMPTY = listing_outcome('[]')
 // at a time, which pushed these cases past the function-length limit.
 function serve(...answers: ReadonlyArray<ReturnType<typeof listing_outcome>>): void {
 	for (const answer of answers) issue_list.mockResolvedValueOnce(answer)
-}
-
-const stdout_lines: Array<string> = []
-const stderr_lines: Array<string> = []
-
-function stdout(): string {
-	return stdout_lines.join('\n')
-}
-
-function stderr(): string {
-	return stderr_lines.join('\n')
 }
 
 // A blocker carrying `state`, and one reported without it — the second is what a `gh` answer missing
@@ -112,15 +108,8 @@ async function run_until_probe(): Promise<{ listing: ProbeCall; probe: ProbeCall
 	return { listing: describe_call(listing), probe: describe_call(probe) }
 }
 
-function two_issues(): string {
-	return JSON.stringify([
-		issue(NEW_ISSUE_NUMBER, CREATED_LATER),
-		issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
-	])
-}
-
-vi.spyOn(console, 'info').mockImplementation(record(stdout_lines))
-vi.spyOn(console, 'error').mockImplementation(record(stderr_lines))
+vi.spyOn(console, 'info').mockImplementation(streams.info)
+vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -128,8 +117,8 @@ beforeEach(() => {
 	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
 	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
 	issue_list.mockResolvedValue(listing_outcome(undefined))
-	stdout_lines.length = 0
-	stderr_lines.length = 0
+	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
+	streams.reset()
 })
 
 // `auto-ok` says the issue needs no decision. It says nothing about ordering, so without a

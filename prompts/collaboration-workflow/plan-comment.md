@@ -8,7 +8,8 @@
    pnpm josh notify --task-type planning --issue-url "<issue-url>" --body=$'- <bullet1>\n- <bullet2>'
    ```
 
-   - `--task-type` はヘッダーのアイコンを決める（`planning` 📋 / `completion` ✅ / `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️）
+   - `--task-type` はヘッダーのアイコンを決める（`planning` 📋 / `completion` ✅ / `failure` ❌ / `warning` ⚠️ / `kickoff_retry` 🔄 / `confirmation` ⏸️）
+   - `warning` は **`pnpm josh followup` が自分で送る種別** であり、手で打つものではない（マージは成功したが実行記録を残せなかった場合など、`failure` と呼ぶと嘘になる事象のための種別: joshuafolkken/kit#1628）
    - `--repo-name` と `--issue-title` は未指定なら `gh` から自動取得される
    - Issue URL を必ず含める
    - 箇条書きの間に改行を入れて読みやすくする

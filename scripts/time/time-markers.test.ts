@@ -120,3 +120,45 @@ describe('time_markers.bash_marker — what is not the workflow boundary', () =>
 		expect(time_markers.bash_marker(command)).toBe(time_markers.NO_MARKER)
 	})
 })
+
+// The one line of a lane run's transcript that names the issue it is running: the branch cannot,
+// because the session writing the transcript never leaves the default one (joshuafolkken/kit#1617).
+describe('time_markers.bash_issue', () => {
+	it('reads the issue number the in-progress label call names', () => {
+		const command = `gh api ${ISSUE_PATH}/labels -f 'labels[]=in-progress'`
+
+		expect(time_markers.bash_issue(command)).toBe(1269)
+	})
+
+	it('reads no issue from removing the label, which ends a run rather than opening one', () => {
+		const command = `gh api -X DELETE ${ISSUE_PATH}/labels/in-progress`
+
+		expect(time_markers.bash_issue(command)).toBe(time_markers.NO_ISSUE)
+	})
+
+	// Under lanes this declaration is the only evidence there is, so taking the leftmost issue path in
+	// the command would hand the whole run to the issue it was handing back rather than taking up.
+	it('reads the issue being labelled, not one whose label the same call removed first', () => {
+		const removal = 'gh api -X DELETE repos/{owner}/{repo}/issues/1600/labels/in-progress'
+		const command = `${removal} || true; gh api ${ISSUE_PATH}/labels -f 'labels[]=in-progress'`
+
+		expect(time_markers.bash_issue(command)).toBe(1269)
+	})
+
+	// Parking one child and starting another can chain both label calls into one command, and the
+	// first of them is an add too — so the removal lookahead alone does not decide this one.
+	it('reads the issue labelled in-progress, not one the same call labelled something else', () => {
+		const parked = `gh api ${ISSUE_PATH}/labels -f 'labels[]=needs-decision'`
+		const started = "gh api repos/{owner}/{repo}/issues/1300/labels -f 'labels[]=in-progress'"
+
+		expect(time_markers.bash_issue(`${parked} && ${started}`)).toBe(1300)
+	})
+
+	// Every other call against an issue names one the session is not running — an epic insertion, a
+	// plan comment, a completion comment.
+	it('reads no issue from a call against the issue that is not the label add', () => {
+		const command = `gh api ${ISSUE_PATH}/comments --jq '.[].body'`
+
+		expect(time_markers.bash_issue(command)).toBe(time_markers.NO_ISSUE)
+	})
+})

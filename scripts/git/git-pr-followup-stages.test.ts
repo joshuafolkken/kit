@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred_answer, type DeferredAnswer } from './deferred-answer-fixture'
 import { git_followup_stages } from './git-followup-stages'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
@@ -85,6 +86,9 @@ const { git_epic_close } = await import('./git-epic-close')
 const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
 
 const PR_URL = 'https://github.com/owner/repo/pull/1'
+// The pull request body every case here answers with, so the `closes #N` keyword and the issue number
+// in `BASE_INPUT` cannot drift apart.
+const CLOSES_BODY = 'closes #42'
 
 const BASE_INPUT: FollowupInput = {
 	branch_name: 'test-branch',
@@ -100,7 +104,7 @@ function answer_github_reads(): void {
 	vi.mocked(git_gh_command.repo_get_name_with_owner).mockResolvedValue('owner/repo')
 	vi.mocked(git_gh_command.issue_get_title).mockResolvedValue('Test issue')
 	vi.mocked(git_gh_command.pr_get_url).mockResolvedValue(PR_URL)
-	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue('closes #42')
+	vi.mocked(git_gh_command.pr_get_body).mockResolvedValue(CLOSES_BODY)
 	vi.mocked(git_gh_command.pr_get_review_comments).mockResolvedValue('[]')
 	vi.mocked(git_gh_command.pr_merge).mockResolvedValue()
 }
@@ -130,15 +134,13 @@ function printed_stages(): Array<string> {
 }
 
 const MERGED_RUN_STAGES: ReadonlyArray<string> = [
-	STAGE.closes_check,
-	STAGE.context,
+	STAGE.closes_and_context,
 	STAGE.checks_wait,
 	STAGE.coderabbit_comments,
 	STAGE.ai_review_comments,
 	STAGE.telegram,
 	STAGE.merge,
-	STAGE.completion_comment,
-	STAGE.epic_close,
+	STAGE.completion_and_epic_close,
 ]
 
 beforeEach(() => {
@@ -242,6 +244,53 @@ describe('git_pr_followup.run — a notification that reached nobody', () => {
 	})
 })
 
+// joshuafolkken/kit#1446: the four reads in front of the check wait need nothing from one another,
+// and were sent one at a time for 5.5 of `followup`'s measured 45.8 seconds. **What is pinned is the
+// property, not the wall clock** — a duration measured on a mocked call is not a fact about
+// anything, so the batch is observed by answering the body read last and asking what had already
+// gone out.
+describe('git_pr_followup.run — the reads in front of the check wait', () => {
+	// The number only the pull request body knows, so the recovered case cannot pass on the input's.
+	const RECOVERED_ISSUE = '77'
+	let body_read: DeferredAnswer<string>
+
+	beforeEach(() => {
+		body_read = deferred_answer<string>()
+		vi.mocked(git_gh_command.pr_get_body).mockReturnValue(body_read.promise)
+	})
+
+	it('issues the notification reads while the body read is still outstanding', async () => {
+		const run = git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		await vi.waitFor(() => {
+			expect(vi.mocked(git_gh_command.repo_get_name_with_owner)).toHaveBeenCalled()
+			expect(vi.mocked(git_gh_command.pr_get_url)).toHaveBeenCalled()
+			expect(vi.mocked(git_gh_command.issue_get_title)).toHaveBeenCalledWith(
+				BASE_INPUT.issue_number,
+			)
+		})
+		body_read.answer(CLOSES_BODY)
+		await run
+	})
+
+	// The one genuine dependency of the batch (joshuafolkken/kit#1539): with no number on the command
+	// line, the pull request body is what names the issue, so this read alone waits for it — and the
+	// other three still do not.
+	it('waits for the body only where the issue number has to come from it', async () => {
+		const run = git_pr_followup.run({ ...BASE_INPUT, issue_number: undefined, should_merge: true })
+
+		await vi.waitFor(() => {
+			expect(vi.mocked(git_gh_command.repo_get_name_with_owner)).toHaveBeenCalled()
+		})
+
+		expect(vi.mocked(git_gh_command.issue_get_title)).not.toHaveBeenCalled()
+		body_read.answer(`closes #${RECOVERED_ISSUE}`)
+		await run
+
+		expect(vi.mocked(git_gh_command.issue_get_title)).toHaveBeenCalledWith(RECOVERED_ISSUE)
+	})
+})
+
 describe('git_pr_followup.run — the stage block on a run that failed', () => {
 	const FAILURE = new Error('AI review blocker')
 
@@ -255,8 +304,7 @@ describe('git_pr_followup.run — the stage block on a run that failed', () => {
 		)
 
 		expect(printed_stages()).toStrictEqual([
-			STAGE.closes_check,
-			STAGE.context,
+			STAGE.closes_and_context,
 			STAGE.checks_wait,
 			STAGE.coderabbit_comments,
 			STAGE.interrupted,

@@ -1,10 +1,13 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
+import type { FollowupStage } from '#scripts/git/git-followup-stages'
 import { time_bundle_call } from './time-bundle-call'
+import { time_followup_stage } from './time-followup-stage'
 import { time_markers, type PhaseMarker } from './time-markers'
 import { time_reported_failure } from './time-reported-failure'
 import { time_shell } from './time-shell'
 import { time_single_check } from './time-single-check'
 import { time_transcript_line, type Block, type TranscriptLine } from './time-transcript-line'
+import { time_writes } from './time-writes'
 
 const { NO_MESSAGE_ID, parse_line } = time_transcript_line
 
@@ -62,9 +65,18 @@ const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
 interface ResultFacts {
 	call_id: string
 	outcome: SpanOutcome
+	// The stage rows a `pnpm josh followup` call printed into its own output
+	// (joshuafolkken/kit#1445). Third field for the reason the two above are here: the result block is
+	// gone by the time anything aggregates, so what a table wants from it has to be read off it now.
+	// Empty for every span that is not a measured `followup` invocation.
+	followup_stages: ReadonlyArray<FollowupStage>
 }
 
-const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
+const NO_RESULT: ResultFacts = {
+	call_id: '',
+	outcome: UNKNOWN_OUTCOME,
+	followup_stages: time_followup_stage.NO_STAGES,
+}
 
 // What a tool span is labelled with. `josh_command` is empty for everything that is not a
 // `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
@@ -87,6 +99,18 @@ const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
 // (joshuafolkken/kit#1406). It is read off the line the `tool_use` block sat on rather than off the
 // result that closes the span, because a `tool_result` line carries no message id at all — so a span
 // that did not keep it here could never be attributed to the turn that issued it.
+//
+// `writes` is the sixth, and it is what `targets` could not say (joshuafolkken/kit#1472). `targets`
+// names what a call mentioned; `marker` says a call was *an* edit but not of what, and for a tool
+// outside `BUNDLEABLE_TOOLS` it arrived with no target at all. So a consumer subtracting edits from
+// reads — `investigation-reads.ts` — had nothing to subtract for `MultiEdit` / `NotebookEdit`, and
+// nothing at all to tell an in-place `sed -i` from the `sed -n` it shares a label with.
+// `time-writes.ts` decides it, from the input this span is about to discard.
+// `issue` is the seventh, and it is the one `branch` could not carry (joshuafolkken/kit#1617). Under
+// lanes the session writing the transcript stays on the default branch while the work runs in a linked
+// work tree, so `branch` names no issue on any line of the run; the `in-progress` label call does, and
+// like every field above it that answer is read off the *input* a span is about to discard.
+// `time_markers.NO_ISSUE` for every call that declares nothing, which is all but one call per run.
 interface ToolCall {
 	label: string
 	josh_command: string
@@ -98,7 +122,9 @@ interface ToolCall {
 	// second write to one file is independent work, a read of a file just written is not
 	// (joshuafolkken/kit#1509).
 	is_writing: boolean
+	writes: ReadonlyArray<string>
 	message_id: string
+	issue: number
 }
 
 const NO_CALL: ToolCall = {
@@ -107,6 +133,8 @@ const NO_CALL: ToolCall = {
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
+	writes: [],
+	issue: time_markers.NO_ISSUE,
 	...time_bundle_call.not_bundleable(),
 }
 const UNKNOWN_CALL: ToolCall = {
@@ -115,6 +143,8 @@ const UNKNOWN_CALL: ToolCall = {
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
+	writes: [],
+	issue: time_markers.NO_ISSUE,
 	...time_bundle_call.not_bundleable(),
 }
 
@@ -169,19 +199,22 @@ interface Timeline {
 	spans: Array<Span>
 }
 
-function to_tool_call(name: string, input: unknown, message_id: string): ToolCall {
-	if (name !== cost_blocks.BASH_TOOL) {
-		return {
-			label: name,
-			josh_command: '',
-			check_key: time_single_check.NO_CHECK,
-			marker: time_markers.tool_marker(name, input),
-			message_id,
-			...time_bundle_call.tool_facts(name, input),
-		}
+// Everything but Bash: the tool's own name is the label, and nothing it runs is a shell command to
+// read a check key, a josh command or a declared issue off.
+function non_bash_call(name: string, input: unknown, message_id: string): ToolCall {
+	return {
+		label: name,
+		josh_command: '',
+		check_key: time_single_check.NO_CHECK,
+		marker: time_markers.tool_marker(name, input),
+		message_id,
+		writes: time_writes.tool_writes(name, input),
+		issue: time_markers.NO_ISSUE,
+		...time_bundle_call.tool_facts(name, input),
 	}
+}
 
-	const command = time_shell.bash_command(input)
+function bash_call(command: string, message_id: string): ToolCall {
 	const josh_command = time_shell.josh_command_of(command)
 
 	return {
@@ -190,8 +223,16 @@ function to_tool_call(name: string, input: unknown, message_id: string): ToolCal
 		check_key: time_single_check.check_key(josh_command, command),
 		marker: time_markers.bash_marker(command),
 		message_id,
+		writes: time_writes.bash_writes(command),
+		issue: time_markers.bash_issue(command),
 		...time_bundle_call.bash_facts(command),
 	}
+}
+
+function to_tool_call(name: string, input: unknown, message_id: string): ToolCall {
+	if (name !== cost_blocks.BASH_TOOL) return non_bash_call(name, input, message_id)
+
+	return bash_call(time_shell.bash_command(input), message_id)
 }
 
 // Identified calls only. A `tool_use` written without an `id` would otherwise be registered under
@@ -264,7 +305,11 @@ function outcome_of(result: Block, call: ToolCall): SpanOutcome {
 }
 
 function facts_of(result: Block, call: ToolCall): ResultFacts {
-	return { call_id: result.result_id, outcome: outcome_of(result, call) }
+	return {
+		call_id: result.result_id,
+		outcome: outcome_of(result, call),
+		followup_stages: result.followup_stages,
+	}
 }
 
 // A user line is one of two things, and only its blocks tell them apart: a tool result the harness
@@ -328,10 +373,13 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		is_bundleable: event.is_bundleable,
 		targets: event.targets,
 		is_writing: event.is_writing,
+		writes: event.writes,
 		message_id: event.message_id,
+		issue: event.issue,
 		branch: event.branch,
 		call_id: event.call_id,
 		outcome: event.outcome,
+		followup_stages: event.followup_stages,
 		is_continuation: false,
 		ended_ms: event.timestamp_ms,
 		...equal_durations(event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms)),

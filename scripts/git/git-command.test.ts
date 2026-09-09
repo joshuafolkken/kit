@@ -380,3 +380,21 @@ describe('git_command worktree calls', () => {
 		expect(execa_mock.state.last_arguments).toStrictEqual(['worktree', 'list', '--porcelain'])
 	})
 })
+
+// joshuafolkken/kit#1627: attaching is the only way back to a child parked after it pushed. `-b`
+// refuses the branch that is already there, and deleting it to get `-b` back would take the pushed
+// commits with it. `--no-track` belongs to the branch creation, and git rejects it on this form.
+describe('git_command worktree add on an existing branch', () => {
+	it('passes neither --no-track nor -b when given no start point', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.worktree_add(LANE_DIRECTORY, LANE_BRANCH, undefined)
+
+		expect(execa_mock.state.last_arguments).toStrictEqual([
+			'worktree',
+			'add',
+			LANE_DIRECTORY,
+			LANE_BRANCH,
+		])
+	})
+})

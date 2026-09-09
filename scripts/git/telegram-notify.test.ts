@@ -100,6 +100,17 @@ describe('build_text — kickoff_retry header', () => {
 	})
 })
 
+// joshuafolkken/kit#1628. A run that merged and lost its time-history record is neither a failure
+// nor a plain completion, and labelling it either way is the whole problem: ❌ says the merge broke,
+// a second ✅ says nothing went wrong.
+describe('build_text — warning header', () => {
+	it('uses ⚠️ + the completed-with-a-warning label', () => {
+		const result = build_text(make_base({ task_type: 'warning' }))
+
+		expect(result).toBe(`⚠️ ${REPO_NAME}: Completed with a warning\n${ISSUE_TITLE}`)
+	})
+})
+
 describe('build_text — confirmation header', () => {
 	it('uses ⏸️ + Confirmation required label', () => {
 		const result = build_text(make_base({ task_type: 'confirmation' }))
