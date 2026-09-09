@@ -21,11 +21,12 @@ import { git_command } from './git-command'
 // there cannot include this run's own merge, and a bare number would be understated by exactly one.
 // Saying so is the honest form of the same measurement. The console line printed after the merge
 // passes `false` and carries no note, because by then the merge is on the remote and the fetch below
-// brings it in.
+// brings it in; `scripts-ai/git-followup-finish.ts` is that caller, so **both branches of this flag
+// are live**. What a run *does* about the count is `pnpm josh release:scope`, asked after the merge,
+// which reads `read_pending` below rather than this line (joshuafolkken/kit#1582).
 const MERGE_PENDING_NOTE = "— this run's merge is not counted; it lands next"
 
-interface PendingLineOptions {
-	is_merge_pending: boolean
+interface PendingReadOptions {
 	cwd?: string
 	reader?: HistoryReader
 	// Only a test passes this. Production always resolves the tip itself, so no caller can quietly
@@ -33,12 +34,20 @@ interface PendingLineOptions {
 	tip?: string
 }
 
+// **The note belongs to the line, not to the count** (joshuafolkken/kit#1582). `read_pending`
+// returns a number and has no sentence to annotate, so `pnpm josh release:scope` — which wants the
+// number alone — would otherwise have to pass a flag about wording it never prints.
+interface PendingLineOptions extends PendingReadOptions {
+	is_merge_pending: boolean
+}
+
 // **The count is read from the fetched default branch, never from `HEAD`.** `followup` runs on the
 // feature branch, and `--first-parent` from a branch tip walks that branch rather than main — every
 // merge main took after the branch was cut is not even an ancestor, so the number would be silently
 // low and the line still say "on main". Fetching first is what makes it current, which is also what
-// lets the post-merge console line count the merge that just landed.
-async function read_tip(options: PendingLineOptions): Promise<string> {
+// lets the post-merge console line — and `pnpm josh release:scope`, asked from a lane or a feature
+// branch — count the merge that just landed (joshuafolkken/kit#1582).
+async function read_tip(options: PendingReadOptions): Promise<string> {
 	if (options.tip !== undefined) return options.tip
 
 	const default_branch = await git_command.get_default_branch()
@@ -56,7 +65,7 @@ async function read_tip(options: PendingLineOptions): Promise<string> {
 // `existsSync` passed — EACCES, EISDIR, a racing write — and this function is called from
 // `notify_completion`, which runs *before* `pr_merge`: an escaping rejection there would abort the
 // run and lose a merge over a cosmetic line.
-async function read_pending(options: PendingLineOptions): Promise<number | undefined> {
+async function read_pending(options: PendingReadOptions): Promise<number | undefined> {
 	try {
 		const current_version = version_targets.read_workspace_version(options.cwd ?? process.cwd())
 
@@ -84,4 +93,4 @@ async function pending_release_line(options: PendingLineOptions): Promise<string
 const git_followup_pending = { MERGE_PENDING_NOTE, pending_release_line, read_pending }
 
 export { git_followup_pending }
-export type { PendingLineOptions }
+export type { PendingLineOptions, PendingReadOptions }

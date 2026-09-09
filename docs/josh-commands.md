@@ -964,6 +964,8 @@ After bumping, update `docs/` to reflect any behavior changes before committing.
 
 Release everything main has taken since the version last changed — one command, run by a person ([#1169](https://github.com/joshuafolkken/kit/issues/1169)).
 
+**When it is typed is `josh release:scope`'s answer, not a judgement** ([#1582](https://github.com/joshuafolkken/kit/issues/1582)). A run asks that command once, after the last merge its invocation authorized, and reports the release rather than cutting one; the rule is `.claude/skills/workflow-commands/followup.md` → "When `pnpm josh release` runs", its single source.
+
 ```bash
 pnpm josh release
 pnpm josh release --dry-run   # count and report, write nothing
@@ -997,6 +999,27 @@ Release after three merges and `1.339.0` becomes `1.342.0` with **one** tag, `v1
 - The working tree must be clean and the checkout on the default branch — the count is only meaningful there, and the release commit is made on top of it. Both are checked before anything is read. A real run then pulls; **`--dry-run` does not**, because a pull is a write.
 - It searches back through the last 30 commits that touched `package.json` for the one that moved the version, and **a revision whose `package.json` cannot be read stops it declaring a base there** rather than being compared against a version several commits older. Finding no base at all, it says so and exits non-zero rather than picking one.
 - A `release/v<version>` branch that already exists is reported as a previous attempt that got as far as opening one — the wait for CI can throw and leave the branch and its pull request behind — rather than failing as git's `a branch named … already exists`.
+
+### `josh release:scope`
+
+Say whether a release is owed, so the moment one is cut stops being a judgement ([#1582](https://github.com/joshuafolkken/kit/issues/1582)).
+
+```bash
+pnpm josh release:scope          # → required | skip | unknown ; alias: josh res
+pnpm josh release:scope --json   # {"scope":"…","reason":"…"} on one line
+```
+
+| It answers | When                                                             |
+| ---------- | ---------------------------------------------------------------- |
+| `required` | main has taken at least one merge since the version last changed |
+| `skip`     | the count is zero                                                |
+| `unknown`  | the count could not be read                                      |
+
+**The verdict alone goes to stdout, the reason to stderr**, so `$(pnpm josh release:scope)` reads the word and a person still sees why. The exit code is 0 for every verdict and 1 only for an unknown flag; `unknown` is a verdict rather than a failure, and it is **never** read as `skip` — an unreadable version, a fetch that could not run or a base the search cannot resolve is not "nothing is waiting to ship".
+
+**`josh release --dry-run` cannot answer this question.** It refuses off the default branch and on a dirty working tree and counts against `HEAD`, while every position a run asks from is a feature branch or a lane. So this command was added rather than the existing flag reused — and it **counts nothing of its own**: it reads `git_followup_pending.read_pending`, the same fetch-then-count that already supplies `🚚 unreleased merges on main: <n>` in the completion Telegram and in the console line `josh followup` prints after the merge, so the three cannot disagree.
+
+**53 merges reached main unreleased before this existed** — [#1169](https://github.com/joshuafolkken/kit/issues/1169) moved the version off the branch and nothing said when to type the replacement, so nobody did and nothing reported a failure. The count was already on every completion notification; a number nobody is told to act on is a number nobody acts on, which is why the answer is a verdict a procedure branches on rather than one more line to read.
 
 ### `josh version`
 
