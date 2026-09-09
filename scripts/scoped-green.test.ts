@@ -2,9 +2,16 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { gate_tree } from './gate-tree'
 import { hook_decision } from './josh/hook-decision'
 import { review_stamps } from './review/review-stamps'
 import { scoped_green, type ScopedSources } from './scoped-green'
+
+// **Mocked so nothing here reaches git — and so `record_if_green` can be exercised at all.** Its
+// verdict turns on a reading taken after the checks, which a fixture cannot otherwise supply.
+vi.mock('./gate-tree', () => ({ gate_tree: { read_gate_tree: vi.fn() } }))
+
+const mocked_tree = vi.mocked(gate_tree.read_gate_tree)
 
 // joshuafolkken/kit#1511: `fullrun #1503` started `josh gate` and review round 1 on a tree neither
 // `lint:related` nor `test:related` had ever been green on, and paid 282 seconds — 31% of the run —
@@ -49,8 +56,12 @@ function plant_both(digest: string = DIGEST, base: string = BASE): ScopedSources
 	return planted
 }
 
+const BEFORE = { files: tree_of(), base: BASE }
+
 beforeEach(() => {
+	vi.clearAllMocks()
 	mkdirSync(DIRECTORY, { recursive: true })
+	mocked_tree.mockResolvedValue({ files: tree_of(), base: BASE })
 })
 
 afterEach(() => {
@@ -144,6 +155,10 @@ describe('is_recordable_scope', () => {
 })
 
 describe('read_before', () => {
+	it('reads the tree for a bare invocation, before the checks start', async () => {
+		await expect(scoped_green.read_before(NO_ARGUMENTS)).resolves.toStrictEqual(BEFORE)
+	})
+
 	it('reads nothing for a narrowed run, so no record can follow it', async () => {
 		await expect(scoped_green.read_before([CHANGED_FILE])).resolves.toBeUndefined()
 	})
@@ -172,12 +187,41 @@ describe('is_unmoved', () => {
 })
 
 describe('record_if_green', () => {
+	it('writes the record when a green run left the tree where it found it', async () => {
+		const target = path.join(DIRECTORY, 'green.json')
+
+		await scoped_green.record_if_green(review_stamps.lint_related_stamp, {
+			before: BEFORE,
+			exit_code: SUCCESS_EXIT_CODE,
+			target,
+		})
+
+		expect(review_stamps.lint_related_stamp.read(target)?.base).toBe(BASE)
+	})
+
+	it('writes nothing when a file changed while the checks were in flight', async () => {
+		const target = path.join(DIRECTORY, 'moved.json')
+
+		mocked_tree.mockResolvedValue({ files: tree_of(EDITED_DIGEST), base: BASE })
+
+		await scoped_green.record_if_green(review_stamps.lint_related_stamp, {
+			before: BEFORE,
+			exit_code: SUCCESS_EXIT_CODE,
+			target,
+		})
+
+		expect(review_stamps.lint_related_stamp.read(target)).toBeUndefined()
+	})
+})
+
+describe('record_if_green — what withholds the record', () => {
 	it('writes nothing when the run failed', async () => {
 		const target = path.join(DIRECTORY, 'red.json')
 
 		await scoped_green.record_if_green(review_stamps.lint_related_stamp, {
-			before: { files: tree_of(), base: BASE },
+			before: BEFORE,
 			exit_code: FAILED_EXIT_CODE,
+			target,
 		})
 
 		expect(review_stamps.lint_related_stamp.read(target)).toBeUndefined()
@@ -189,6 +233,7 @@ describe('record_if_green', () => {
 		await scoped_green.record_if_green(review_stamps.lint_related_stamp, {
 			before: undefined,
 			exit_code: SUCCESS_EXIT_CODE,
+			target,
 		})
 
 		expect(review_stamps.lint_related_stamp.read(target)).toBeUndefined()

@@ -183,15 +183,21 @@ function record_green(stamp: FileMapStampAccess, tree: GateTree, target?: string
 interface GreenRecord {
 	before: GateTree | undefined
 	exit_code: number
+	// Where the record lands, defaulted by the stamp itself. It exists for the same reason
+	// `record_green` and `gate_skip.reusable_green_gate` take one: without it this function can only
+	// write the real per-checkout record, so a suite exercising it would vouch for the surrounding
+	// run's own tree — the second-writer trap joshuafolkken/kit#1437 and joshuafolkken/kit#1441
+	// closed for the gate and round-1 records.
+	target?: string
 }
 
 async function record_if_green(stamp: FileMapStampAccess, record: GreenRecord): Promise<void> {
-	const { before, exit_code } = record
+	const { before, exit_code, target } = record
 
 	if (before === undefined || exit_code !== SUCCESS_EXIT_CODE) return
 	if (!is_unmoved(before, await gate_tree.read_gate_tree())) return
 
-	record_green(stamp, before)
+	record_green(stamp, before, target)
 }
 
 const scoped_green = {
