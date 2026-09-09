@@ -271,6 +271,21 @@ describe('git_command.fetch_branch', () => {
 	})
 })
 
+// joshuafolkken/kit#1659: `josh main:merge` needs the opposite of `merge_fast_forward`. `--ff-only`
+// here would reproduce the `git pull` abort it replaced, on the diverged branch that is the only
+// reason to run the command at all.
+describe('git_command.merge_branch', () => {
+	const DEFAULT_BRANCH = 'main'
+
+	it('merges the branch without restricting it to a fast-forward', async () => {
+		const { git_command } = await import('./git-command')
+
+		await git_command.merge_branch(DEFAULT_BRANCH)
+
+		expect(execa_mock.state.last_arguments).toStrictEqual(['merge', `origin/${DEFAULT_BRANCH}`])
+	})
+})
+
 // joshuafolkken/kit#926: `run:preflight` needs the branch an interrupted run left, not merely whether
 // one exists, so the boolean is expressed on top of the listing rather than beside it.
 describe('git_command.branch_names', () => {

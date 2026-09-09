@@ -648,18 +648,17 @@ $ pnpm josh test --workers=1
 josh test takes no extra arguments — pass them to josh test:unit or josh test:e2e instead
 ```
 
-| Composite    | Pass arguments to instead                        |
-| ------------ | ------------------------------------------------ |
-| `test`       | `test:unit`, `test:e2e`                          |
-| `format`     | `format:prettier`, `format:eslint`               |
-| `latest`     | `latest:corepack`, `latest:update`, `audit`      |
-| `main:merge` | — (chains raw `git` calls; nothing is forwarded) |
+| Composite | Pass arguments to instead                   |
+| --------- | ------------------------------------------- |
+| `test`    | `test:unit`, `test:e2e`                     |
+| `format`  | `format:prettier`, `format:eslint`          |
+| `latest`  | `latest:corepack`, `latest:update`, `audit` |
 
 Every other command — the ones that invoke a single tool or script — forwards extra arguments exactly as before; `pnpm josh test:e2e --workers=1` reaches Playwright unchanged.
 
 The refusal is driven by the **shape** of the command rather than a per-command opt-in, so a composite added later cannot reintroduce the silent discard by forgetting to declare itself. A unit test audits the whole command map on every commit.
 
-The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before. [`josh main:sync`](#josh-mainsync) refuses the same way for the same reason: it left the table above when it became a script, not because it started accepting arguments.
+The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before. [`josh main:sync`](#josh-mainsync) and [`josh main:merge`](#josh-mainmerge) refuse the same way for the same reason: both left the table above when they became scripts, not because either started accepting arguments.
 
 ---
 
@@ -969,11 +968,21 @@ Note that [`josh lane:open`](#josh-laneopen--josh-laneclose--josh-lanelist--josh
 
 ### `josh main:merge`
 
-Pull the latest changes from `origin main` into the current branch.
+Bring the repository's default branch into the branch this checkout is on.
 
 ```bash
 pnpm josh main:merge
 ```
+
+It fetches `origin/<default>` and merges it into the current branch. **The merge strategy is named by the command rather than read out of your git configuration**, which is the whole of joshuafolkken/kit#1659: it used to run `git pull origin <default>`, and `git pull` with neither `pull.rebase` nor `pull.ff` set — the state of a checkout nobody has configured — aborts the moment the two sides have each moved:
+
+```
+fatal: Need to specify how to reconcile divergent branches
+```
+
+Divergence is not an edge case for this command; it is the reason to type it. A lane whose branch has fallen behind `origin/<default>` has commits of its own on it by definition, so **the one state the command exists for was the one state it could not run in**.
+
+Merging rather than rebasing follows joshuafolkken/kit#1446 and is not a fresh decision: a rebase rewrites commits that are already pushed, so it needs a force push, which the distributed `.claude/settings.json` denies. A conflicting merge leaves git's own report on screen and exits non-zero; resolve it as you would any merge.
 
 ---
 
