@@ -317,7 +317,17 @@ Read from the JSON, in this order:
   than assumed from the floor. **Rank a batching proposal on this, never on the floor arithmetic**:
   on the run this was built from, bundling every call to 1.50 implied 33 round trips and the measured
   figure was 25. Multiply it by `model_ms_per_round_trip`, which is what the block's third row already
-  prints. `is_measured: false` withholds it on the same criterion the shares are withheld on, and
+  prints. **`by_tool` inside it names whose turns those trips were**
+  ([#1607](https://github.com/joshuafolkken/kit/issues/1607)): one row per tool, carrying how many of
+  the recoverable trips were its and how many separate sequences to go and look at — so **the tool a
+  batching proposal names is read off this block rather than reconstructed from the transcript by
+  hand**, which is what it cost before the breakdown existed. The `recoverable by tool` row prints the
+  reconciliation — `13 of 13 attributed` — and **it balances on every real run**, because only a
+  bundleable call enters a sequence and every one of those carries a label. **So a shortfall is a
+  defect in the report, not a bucket of unlabelled calls**: report it rather than ranking off the
+  table beneath it. `is_measured: false` withholds it on the
+  same criterion the shares are withheld on — **the breakdown included, which is why an empty
+  `by_tool` is never read as "nothing to batch"** — and
   `recoverable_round_trips: 0` on a measured run is a real answer — a run that batched everything
   had nothing to recover, which is not the same as a run nobody could read.
 - **the work that was thrown away, and how much change the run bought** — `rework`
@@ -348,7 +358,12 @@ Read from the JSON, in this order:
   candidate; "the density is 1.07" is not one, and a proposal written from the density alone is what
   three consecutive runs failed to move. Multiply that row's alone count by
   `model_ms_per_round_trip` to rank it, and check it against `recoverable_round_trips` — the bundling
-  block says how many of those turns could actually have been one. `by_josh_command` carries neither
+  block says how many of those turns could actually have been one.
+  **Name the tool from `bundles.by_tool`, and use this table as the check on it**
+  ([#1607](https://github.com/joshuafolkken/kit/issues/1607)): `alone_in_turn_count` counts calls that
+  were alone in their turn, which includes every one that had nothing it could have gone out beside,
+  while the bundling breakdown counts only the turns that could actually have been one — so the two
+  disagree by design, and it is the smaller of them a proposal is sized on. `by_josh_command` carries neither
   count on purpose: a `josh` subcommand is a `Bash` call under another name, so its round trips are
   already the `Bash` row's. These are two of the four tables `--top`
   caps, so read the `notes` line beside them before saying a command is absent from the run
@@ -405,6 +420,17 @@ saving from step 1's figures, not from how easy the work looks. **Every row name
 on** — run body, pull request, or issue — because a saving is always a saving of one of the three, and
 rows against different windows do not add up. A row whose proposal reaches more than one names the
 innermost it actually cuts.
+
+**A batching row names the tool, never the density**
+([#1607](https://github.com/joshuafolkken/kit/issues/1607)). Take it from step 1's
+`bundles.by_tool` — the heaviest row is the proposal, and its `sequence_count` says how many separate
+places in the run to go and look at — and size the saving from that row's own
+`recoverable_round_trips` times `model_ms_per_round_trip`, never from the whole block's total, which
+belongs to every tool at once. **"The density is 1.39, so batch harder" is not a row**: nothing in it
+says what to change, and it is what three consecutive runs failed to move. Where the breakdown is
+withheld (`is_measured: false`), say so and rank the row on the evidence that is left rather than
+reporting a tool the block did not name. A `recoverable by tool` row that does not balance is a defect
+in the report itself — say so and do not rank off the table beneath it.
 
 **Every row carries both units — minutes per run and dollars per run — and names which one it acts on** ([#1609](https://github.com/joshuafolkken/kit/issues/1609)). A table ordered by minutes alone has no column a cost row could appear in, which is why the 2026-09-09 report emitted no cost row at all. **The two do not follow from one another and are never converted between**: cutting a CI wait saves wall clock and no money whatever, because nothing is billed while a check runs, and cutting what every request carries in its prompt saves money on all of them while moving the wall clock by an amount no run can resolve. So a row states its saving in the unit it acts on and `—` in the other, and a row that genuinely acts on both states two figures.
 

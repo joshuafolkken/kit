@@ -35,6 +35,23 @@ function turn_of(message_id: string, target: string): Array<Span> {
 	return [{ ...MODEL, message_id }, call_of(message_id, target)]
 }
 
+// The same call, named with the tool that issued it — which is what the per-tool breakdown keys on
+// (joshuafolkken/kit#1607). The cases above leave the label empty on purpose: an unnamed call is what
+// the breakdown reports as unattributed rather than as a bucket.
+function named_call(label: string, target: string): Span {
+	return { ...call([target]), label }
+}
+
+// A run of consecutive single-call turns, one per pair — the shape every attribution case is built
+// from, so a case reads as its labels rather than as a span list.
+function named_turns(calls: ReadonlyArray<[string, string]>): Array<Span> {
+	return calls.flatMap(([label, target]) => [MODEL, named_call(label, target)])
+}
+
+const EDIT = 'Edit'
+const READ = 'Read'
+const GREP = 'Bash: grep'
+
 // Sharing a target is a proxy for "the later call needed the earlier one's result". These four cases
 // are the whole of what the proxy now says (joshuafolkken/kit#1509).
 describe('time_bundles.is_dependent — what sharing a target is evidence of', () => {
@@ -213,6 +230,88 @@ describe('time_bundles.build_bundles — measured against unread', () => {
 	})
 })
 
+// What the count could never say on its own: which tool's turns the avoidable trips were
+// (joshuafolkken/kit#1607).
+describe('time_bundles.build_bundles — which tool the recoverable trips belong to', () => {
+	it('attributes a sequence of one tool to that tool', () => {
+		const spans = named_turns([
+			[EDIT, 'a.ts'],
+			[EDIT, 'b.ts'],
+			[EDIT, 'c.ts'],
+		])
+
+		expect(time_bundles.build_bundles(spans).by_tool).toEqual([
+			{ label: EDIT, sequence_count: 1, recoverable_round_trips: 2 },
+		])
+	})
+
+	// The shape a real run makes: the trip goes to the call that made it its own turn, so a mixed
+	// sequence still names both tools rather than falling out of the table entirely.
+	it('attributes each trip to the call that made it its own turn', () => {
+		const spans = named_turns([
+			[GREP, 'a.ts'],
+			[GREP, 'b.ts'],
+			[EDIT, 'c.ts'],
+		])
+
+		expect(time_bundles.build_bundles(spans).by_tool).toEqual([
+			{ label: GREP, sequence_count: 1, recoverable_round_trips: 1 },
+			{ label: EDIT, sequence_count: 1, recoverable_round_trips: 1 },
+		])
+	})
+})
+
+describe('time_bundles.build_bundles — how the per-tool rows are counted and ordered', () => {
+	// A tool that appears twice inside one sequence is one place to go and look at, not two.
+	it('counts a sequence once per tool however many trips it held there', () => {
+		const first = named_turns([
+			[EDIT, 'a.ts'],
+			[EDIT, 'b.ts'],
+		])
+		const second = named_turns([
+			[EDIT, 'c.ts'],
+			[EDIT, 'd.ts'],
+		])
+		const [row] = time_bundles.build_bundles([...first, HUMAN, ...second]).by_tool
+
+		expect(row).toEqual({ label: EDIT, sequence_count: 2, recoverable_round_trips: 2 })
+	})
+
+	it('ranks the heaviest tool first', () => {
+		const spans = named_turns([
+			[EDIT, 'a.ts'],
+			[EDIT, 'b.ts'],
+			[EDIT, 'c.ts'],
+			[READ, 'd.ts'],
+		])
+
+		expect(time_bundles.build_bundles(spans).by_tool.map((row) => row.label)).toEqual([EDIT, READ])
+	})
+})
+
+// The reconciliation the breakdown is required to hold. **On a real transcript the residue is always
+// `0`** — only a bundleable call enters a sequence and every one of those is labelled — so these two
+// build the unlabelled call deliberately: what is pinned is that a trip with nowhere to go is
+// *reported* rather than dropped, which is how the row catches the walk and the attribution coming
+// apart. Neither case describes a state `pnpm josh time` reaches.
+describe('time_bundles.build_bundles — the trips it could not attribute', () => {
+	it('reports a trip whose call named no tool rather than dropping it', () => {
+		const totals = time_bundles.build_bundles([MODEL, call(['a.ts']), MODEL, call(['b.ts'])])
+
+		expect(totals.by_tool).toEqual([])
+		expect(totals.unattributed_round_trips).toBe(1)
+		expect(totals.recoverable_round_trips).toBe(1)
+	})
+
+	it('leaves the rows and the residue summing to the recoverable count', () => {
+		const named = named_turns([[EDIT, 'a.ts']])
+		const totals = time_bundles.build_bundles([...named, MODEL, call(['b.ts'])])
+		const attributed = totals.by_tool.reduce((sum, row) => sum + row.recoverable_round_trips, 0)
+
+		expect(attributed + totals.unattributed_round_trips).toBe(totals.recoverable_round_trips)
+	})
+})
+
 describe('time_bundles.bundle_lines', () => {
 	it('prints the sequences, the trips they hold and what the model wait would return', () => {
 		const spans = [MODEL, call(['a.ts']), MODEL, call(['b.ts']), MODEL, call(['c.ts'])]
@@ -246,6 +345,39 @@ describe('time_bundles.bundle_lines', () => {
 
 		expect(lines.join('\n')).toContain('not measured')
 		expect(lines.join('\n')).not.toContain('round trip(s)')
+	})
+})
+
+describe('time_bundles.bundle_lines — the per-tool breakdown', () => {
+	it('names the tool the recoverable trips belong to and reconciles the total', () => {
+		const spans = named_turns([
+			[EDIT, 'a.ts'],
+			[EDIT, 'b.ts'],
+			[EDIT, 'c.ts'],
+		])
+		const text = time_bundles.bundle_lines(time_bundles.build_bundles(spans), PRICE).join('\n')
+
+		expect(text).toContain(time_bundles.BY_TOOL_LABEL)
+		expect(text).toContain('2 of 2 attributed')
+		expect(text).toContain('in 1 sequence(s)')
+		expect(text).toContain(EDIT)
+	})
+
+	// The residue is printed rather than rounded away, so a reader sees that the trips had no tool to
+	// go to instead of reading the table as the whole answer.
+	it('shows the residue where a trip named no tool', () => {
+		const totals = time_bundles.build_bundles([MODEL, call(['a.ts']), MODEL, call(['b.ts'])])
+
+		expect(time_bundles.bundle_lines(totals, PRICE).join('\n')).toContain('0 of 1 attributed')
+	})
+
+	// Withheld beside the three counts rather than printed empty beneath them: an unread transcript
+	// has no per-tool answer either, and an empty table would read as nothing to batch.
+	it('withholds the breakdown too where no span was read', () => {
+		const text = time_bundles.bundle_lines(time_bundles.NO_BUNDLES, PRICE).join('\n')
+
+		expect(text).toContain(time_bundles.BY_TOOL_LABEL)
+		expect(text).not.toContain('attributed')
 	})
 })
 

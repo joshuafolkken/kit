@@ -37,20 +37,60 @@ const RECOVERABLE_LABEL = 'recoverable round trips'
 // of this report filters its rows by a substring — a label holding that phrase would be counted as a
 // fourth category share by anything looking for the three.
 const SAVING_LABEL = 'recoverable wait'
+// The breakdown's own row, withheld beside the three above rather than beneath them: an unread
+// transcript has no per-tool answer either, and a table printed under a `not measured` heading would
+// be the empty-means-nothing-to-recover reading this block refuses everywhere else.
+const BY_TOOL_LABEL = 'recoverable by tool'
+// The per-tool rows sit one level under that row. Two spaces rather than a separate column, because
+// `format_columns` lays out one label column and a sub-table with its own would not line up with it.
+const ROW_INDENT = '  '
 // Two turns is the smallest thing that could have been one. A sequence of one is a turn that had
 // nothing to go out beside, which is not a finding.
 const MIN_SEQUENCE = 2
 const ONE_CALL = 1
 const NONE = 0
 const PATH_SEPARATOR = '/'
+// The first call of a sequence is the turn the rest could have gone out in, so it is the one call
+// that costs nothing — the attribution starts after it.
+const FIRST_CALL = 1
+// The label a span carries when nothing could be read off the call. Left out of the breakdown rather
+// than printed as a bucket, which is the answer `time-report.ts` already gives an empty label — and
+// what it leaves out is exactly what `unattributed_round_trips` below then reports.
+const NO_LABEL = ''
+
+// One tool's share of what the run could have recovered (joshuafolkken/kit#1607). `sequence_count` is
+// the number of sequences this tool contributed a recoverable trip to, not the number of calls it
+// made — a tool appearing four times inside one sequence is one sequence to go and look at.
+interface BundleToolRow {
+	label: string
+	sequence_count: number
+	recoverable_round_trips: number
+}
 
 // What the walk established about a run. **`is_measured` is not `sequence_count > 0`**: a run that
 // batched everything genuinely has no sequence, and a run whose transcript was never read has none
 // either — printing `0` for both would report the first as though it were the second.
+//
+// **`by_tool` is what makes the count actionable** (joshuafolkken/kit#1607). `recoverable_round_trips`
+// says how many turns could have been one and nothing about *whose* turns they were, so a diag that
+// read only it could name a density and never a tool — and the tool was then found by reading the
+// transcript by hand, once per run.
+//
+// **`unattributed_round_trips` is a reconciliation rather than a second bucket, and on a real
+// transcript it is always `0`.** Only a bundleable call can enter a sequence and every one of those
+// carries a label — `non_bash_call` takes the tool's own name, `bash_label` falls back to `Bash`, and
+// the two unlabelled `ToolCall`s are both `not_bundleable()` — so the rows and the residue sum to
+// `recoverable_round_trips` by construction and the residue has nothing to hold. **What it catches is
+// the two halves coming apart**: this block is read by a person deciding what to batch, and a table
+// that had quietly stopped covering its own total is the one failure they could not otherwise see.
+// **Do not read a `0` here as "every call was labelled" evidence** — it is the expected state, and the
+// documentation that quotes this row quotes it balanced for that reason.
 interface BundleTotals {
 	sequence_count: number
 	longest_sequence: number
 	recoverable_round_trips: number
+	by_tool: ReadonlyArray<BundleToolRow>
+	unattributed_round_trips: number
 	is_measured: boolean
 }
 
@@ -58,6 +98,8 @@ const NO_BUNDLES: BundleTotals = {
 	sequence_count: 0,
 	longest_sequence: 0,
 	recoverable_round_trips: 0,
+	by_tool: [],
+	unattributed_round_trips: 0,
 	is_measured: false,
 }
 
@@ -135,19 +177,24 @@ function is_turn_boundary(span: Span): boolean {
 }
 
 // The walk's three running pieces: the calls of the round trip currently open, the sequence being
-// extended, and the sizes of the sequences already closed.
+// extended, and the sequences already closed.
+//
+// **`closed` keeps the calls rather than their lengths** (joshuafolkken/kit#1607). A length is all the
+// three totals need, and it is also everything the per-tool breakdown cannot be rebuilt from — the
+// labels are gone by the time anything asks. Retaining the spans is what lets one walk answer both,
+// and a second walk over the same rule would be the clone `CLAUDE.md` prohibits.
 interface Walk {
 	pending: Array<Span>
 	sequence: Array<Span>
-	sizes: Array<number>
+	closed: Array<Array<Span>>
 }
 
 function new_walk(): Walk {
-	return { pending: [], sequence: [], sizes: [] }
+	return { pending: [], sequence: [], closed: [] }
 }
 
 function flush(walk: Walk): void {
-	if (walk.sequence.length >= MIN_SEQUENCE) walk.sizes.push(walk.sequence.length)
+	if (walk.sequence.length >= MIN_SEQUENCE) walk.closed.push(walk.sequence)
 
 	walk.sequence = []
 }
@@ -213,6 +260,75 @@ function recoverable_of(sizes: ReadonlyArray<number>): number {
 	return sizes.reduce((sum, size) => sum + size - ONE_CALL, NONE)
 }
 
+function sizes_of(closed: ReadonlyArray<ReadonlyArray<Span>>): Array<number> {
+	return closed.map((sequence) => sequence.length)
+}
+
+interface ToolTally {
+	sequence_count: number
+	recoverable_round_trips: number
+}
+
+function tally_for(tallies: Map<string, ToolTally>, label: string): ToolTally {
+	const found = tallies.get(label)
+
+	if (found !== undefined) return found
+
+	const created = { sequence_count: NONE, recoverable_round_trips: NONE }
+
+	tallies.set(label, created)
+
+	return created
+}
+
+// **Attribution is per call, not per sequence** (joshuafolkken/kit#1607). A sequence of `n` calls
+// holds `n - 1` avoidable trips, and the call that made each of them its own turn is the one after
+// the first — so each trip goes to *that* call's tool. Attributing a whole sequence to one tool would
+// have named a tool only where every call in the sequence shared one, and a real run's sequences are
+// mixed: `grep`, `sed`, `Read` in a row is the shape, and the reading that has to come out of it is
+// still "batch the `grep` calls". The alternative leaves that sequence entirely unattributed, which is
+// the reading this block exists to stop having to do by hand.
+//
+// **A label counts a sequence once however many trips it held there**, so the row says how many
+// separate places in the run to go and look at rather than repeating the trip count.
+function count_trip(tallies: Map<string, ToolTally>, counted: Set<string>, label: string): void {
+	const tally = tally_for(tallies, label)
+
+	tally.recoverable_round_trips += ONE_CALL
+	if (!counted.has(label)) tally.sequence_count += ONE_CALL
+	counted.add(label)
+}
+
+function tally_sequence(tallies: Map<string, ToolTally>, sequence: ReadonlyArray<Span>): void {
+	const counted = new Set<string>()
+
+	for (const span of sequence.slice(FIRST_CALL)) {
+		if (span.label !== NO_LABEL) count_trip(tallies, counted, span.label)
+	}
+}
+
+// Heaviest first, because the row a batching proposal is written from is the top one; ties settle on
+// the label so two runs of the same shape print the same table.
+function by_weight(left: BundleToolRow, right: BundleToolRow): number {
+	if (left.recoverable_round_trips !== right.recoverable_round_trips) {
+		return right.recoverable_round_trips - left.recoverable_round_trips
+	}
+
+	return left.label.localeCompare(right.label)
+}
+
+function tool_rows(closed: ReadonlyArray<ReadonlyArray<Span>>): Array<BundleToolRow> {
+	const tallies = new Map<string, ToolTally>()
+
+	for (const sequence of closed) tally_sequence(tallies, sequence)
+
+	return [...tallies].map(([label, tally]) => ({ label, ...tally })).toSorted(by_weight)
+}
+
+function attributed_of(rows: ReadonlyArray<BundleToolRow>): number {
+	return rows.reduce((sum, row) => sum + row.recoverable_round_trips, NONE)
+}
+
 // **Ordered before it is walked, for the reason `time-failures.ts` states.** A run's spans do not
 // arrive in time order: a delegated unit's are appended after the parent's, and `time_corpus`
 // concatenates one session after another. Walked in array order, two turns from different sessions
@@ -227,10 +343,16 @@ function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 	close_trip(walk)
 	flush(walk)
 
+	const sizes = sizes_of(walk.closed)
+	const by_tool = tool_rows(walk.closed)
+	const recoverable_round_trips = recoverable_of(sizes)
+
 	return {
-		sequence_count: walk.sizes.length,
-		longest_sequence: longest_of(walk.sizes),
-		recoverable_round_trips: recoverable_of(walk.sizes),
+		sequence_count: sizes.length,
+		longest_sequence: longest_of(sizes),
+		recoverable_round_trips,
+		by_tool,
+		unattributed_round_trips: recoverable_round_trips - attributed_of(by_tool),
 		is_measured: time_spans.has_transcript_data(spans.length),
 	}
 }
@@ -287,6 +409,43 @@ function saving_line(totals: BundleTotals, model_ms_per_round_trip: number): str
 	return time_format.format_row(SAVING_LABEL, saved_ms, rate)
 }
 
+// **The suffix is the reconciliation, printed whether or not it balances** — and on a real transcript
+// it always balances, for the reason `BundleTotals` gives. It is printed rather than asserted because
+// this table is read by a person deciding what to batch: a row reading `23 of 25 attributed` is the
+// walk and the attribution having come apart, which is the one failure that table cannot show on its
+// own. **It is not a count of unlabelled calls** — reading it as one is what the rows beneath it and
+// the two documents quoting them were corrected away from.
+//
+// **Derived from the recorded residue rather than re-summed from the rows**, so a drift between the
+// record and the table is what the row prints instead of being hidden by recomputing one from the
+// other.
+function by_tool_suffix(totals: BundleTotals): string {
+	const attributed = totals.recoverable_round_trips - totals.unattributed_round_trips
+
+	return `${String(attributed)} of ${String(totals.recoverable_round_trips)} attributed`
+}
+
+function tool_row(row: BundleToolRow): string {
+	return time_format.format_columns(
+		`${ROW_INDENT}${row.label}`,
+		String(row.recoverable_round_trips),
+		`in ${String(row.sequence_count)} sequence(s)`,
+	)
+}
+
+// Capped like every other table this report prints, and for the reason `time-format.ts` gives beside
+// the cap: `--json` carries every row, so what a long run loses here is a table nobody reads.
+function by_tool_lines(totals: BundleTotals): Array<string> {
+	const heading = time_format.format_columns(
+		BY_TOOL_LABEL,
+		String(totals.by_tool.length),
+		by_tool_suffix(totals),
+	)
+	const rows = totals.by_tool.slice(NONE, time_format.MAX_ROWS).map((row) => tool_row(row))
+
+	return [heading, ...rows, ...time_format.overflow_line(totals.by_tool.length)]
+}
+
 function measured_lines(totals: BundleTotals, price: TripPrice): Array<string> {
 	return [
 		time_format.format_columns(
@@ -300,10 +459,11 @@ function measured_lines(totals: BundleTotals, price: TripPrice): Array<string> {
 			recoverable_suffix(totals, price.round_trip_count),
 		),
 		saving_line(totals, price.model_ms_per_round_trip),
+		...by_tool_lines(totals),
 	]
 }
 
-const LABELS = [SEQUENCE_LABEL, RECOVERABLE_LABEL, SAVING_LABEL]
+const LABELS = [SEQUENCE_LABEL, RECOVERABLE_LABEL, SAVING_LABEL, BY_TOOL_LABEL]
 
 // **A transcript that was read but called no tool has nothing to divide by, and says so** — the same
 // answer, in the same words, the round-trip block's own price row gives. Without this the block
@@ -334,6 +494,7 @@ const time_bundles = {
 	SEQUENCE_LABEL,
 	RECOVERABLE_LABEL,
 	SAVING_LABEL,
+	BY_TOOL_LABEL,
 	MIN_SEQUENCE,
 	NO_BUNDLES,
 	build_bundles,
@@ -343,5 +504,5 @@ const time_bundles = {
 	shares_target,
 }
 
-export type { BundleTotals, TargetFacts, TripPrice }
+export type { BundleToolRow, BundleTotals, TargetFacts, TripPrice }
 export { time_bundles }

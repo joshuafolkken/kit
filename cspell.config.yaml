@@ -75,7 +75,6 @@ words:
   - commondir
   - precheck
   - backlinks
-  - bundleable
   # A call the investigation guard is allowed to refuse at all (joshuafolkken/kit#1460). It reaches no
   # distributed file — only `scripts/delegation/` — so it stays in this config rather than the
   # dictionary `josh sync` publishes.

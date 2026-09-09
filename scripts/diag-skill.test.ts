@@ -69,6 +69,23 @@ describe(`${SKILL_PATH} — caps the two tables it ranks off`, () => {
 	})
 })
 
+// joshuafolkken/kit#1607. `recoverable_round_trips` counted the avoidable turns and attributed none
+// of them, so the skill's own "name the tool to batch" had no measured field behind it and the tool
+// was found by reading the transcript by hand, once per run. The markers pin both ends: step 1 reads
+// the breakdown and its reconciliation, and step 3's ranked row is written from a tool name.
+describe(`${SKILL_PATH} — names the tool a recoverable trip belongs to`, () => {
+	it.each([
+		'**`by_tool` inside it names whose turns those trips were**',
+		'defect in the report, not a bucket of unlabelled calls**',
+		'`13 of 13 attributed`',
+		'row that does not balance is a defect',
+		'**Name the tool from `bundles.by_tool`, and use this table as the check on it**',
+		'**A batching row names the tool, never the density**',
+	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
 // joshuafolkken/kit#1307. The round-trip *count* reached the report first, and a count cannot be
 // ranked in a table ordered by minutes saved — which is how the 2026-09-04 run left round-trip
 // reduction off its candidate table entirely. So the step that reads the JSON has to name the unit
