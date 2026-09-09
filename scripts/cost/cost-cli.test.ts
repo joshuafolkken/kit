@@ -270,8 +270,11 @@ describe('cost_cli.run missing-data scoping', () => {
 // per request during the first child, 645k during the sixth — the same work at 2.9x the price. The
 // hand-off is decided by that ratio, not by whether the run feels long.
 describe('cost_cli.parse_options — the hand-off threshold', () => {
+	// Deliberately not the figure the documents ship (joshuafolkken/kit#1605 moved it to 150,000):
+	// the parser has no dependency on the threshold, so coupling this case to it would fail a
+	// parsing test for a non-parsing reason the next time the line moves.
 	it('reads a threshold', () => {
-		expect(cost_cli.parse_options(['--over', '400000'])?.over).toBe(400_000)
+		expect(cost_cli.parse_options(['--over', '123456'])?.over).toBe(123_456)
 	})
 
 	it('refuses a threshold that is not a number', () => {

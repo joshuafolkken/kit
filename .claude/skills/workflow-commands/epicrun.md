@@ -1293,7 +1293,7 @@ per child, and treat a single non-numeric line as the verdict.
    conversation" below for why a session that carries on past a compaction loses them otherwise.
 
    Then **ask the hand-off check — at every child's merge, delegated or not**, immediately after the
-   merge and `pnpm josh ms`: `pnpm josh cost --over 400000`, beside `pnpm josh lane:list` in the same
+   merge and `pnpm josh ms`: `pnpm josh cost --over 150000`, beside `pnpm josh lane:list` in the same
    turn. Go back to step 1 on `under`; on `over` **the run drains** — no new child is taken, the lanes
    already in flight are allowed to finish, and the cut is taken at the first reading where
    `lane:list` answers `none` (see "The hand-off" below). **Never read the condition off
@@ -1448,16 +1448,20 @@ measurement neither of them had. Both removals are argued in full below; a reade
 paragraph would otherwise leave with the rule as it stood before them.
 
 ```bash
-pnpm josh cost --over 400000
+pnpm josh cost --over 150000
 ```
 
 It prints `over` or `under` on standard output and the measured figure on standard error. `over`
 means the next turn of this session costs more than the threshold in billed input, and the number is
 passed explicitly so a run cannot drift it by remembering it wrong.
 
-**閾値 400,000 は計測が出した数字ではない。** joshuafolkken/kit#968 がそう書いたのは誤りで、joshuafolkken/kit#984 で訂正した。計測が支持するのは**ほぼ即座に区切ること**である — 50 リクエスト（≒ 子 1 件）ごとに区切れば課金入力は実測の 33% に収まり、区切り 1 回の費用（新しいセッションで常駐を書き直す約 56,000 ＋ EPIC と子 Issue の読み直し約 15,000 で概ね 70,000 トークン）に対して 1 回あたりの節約は約 14,500,000 トークン、**およそ 200 倍**の開きがある。損益分岐は最初の子の途中で既に超えており、400,000 に達した時点では割高な状態で数百ターン走った後である。
+**閾値 150,000 は 223 セッションの実測から引いた。** joshuafolkken/kit#1605 が、このリポジトリに記録された 223 本のセッションを `josh cost` と同じ定義（課金入力 ÷ リクエスト数、`message.id` で重複を除く）で測り直した。常駐だけを載せた最初のリクエストは中央値 **54,974**、1 リクエストあたりの課金入力は中央値 **121,514**、p90 が 256,106、p95 が 336,569 である。**旧閾値 400,000 を超えたのは 223 本中 4 本（2%）**にすぎず、`run:hold` を含む 21 本に限れば **95% が一度も区切りに到達しない**。発火しない閾値は引かれていないのと同じである。
 
-**400,000 が表しているのは、トークンと人の手数の釣り合いである。** 区切るたびに人が `epicrun #<E>` を打ち直すため、計測の答え（子ごとに区切る）をそのまま採ると無人性を失う。トークン対トークンではなく**トークン対人の手数**のトレードオフであり、そう書かれていなかった。
+**150,000 は下限と上限を実測で挟んで決めた。** 下限は誤停止である — 候補を 130,000 や 110,000 まで下げると、測定した 21 本のうち 5% が**そのセッション最初のランが終わる前に**区切りへ落ちる。引き継ぐものが何も無い停止であり、それが 0% になる最小の候補が 150,000 である。上限は効きである — 一度も区切らないセッションの割合は 400,000 で 95%、300,000 で 81%、200,000 で 52%、150,000 で 33% になる。**区切りまでに終わるランの数は 400,000 の中央値 6 本に対して 150,000 で 5 本**であり、`epicrun` / `queue` のマージ後判定が子ごとに止まるようにはならない。joshuafolkken/kit#968 が 400,000 を引いた根拠である 6 子目の 645,000 は、新しい閾値でも当然 `over` に落ちる。
+
+**それでも 150,000 は「計測が最も安いと言う点」ではない。** 計測が支持するのは**ほぼ即座に区切ること**である — 50 リクエスト（≒ 子 1 件）ごとに区切れば課金入力は実測の 33% に収まり、区切り 1 回の費用（新しいセッションで常駐を書き直す約 56,000 ＋ EPIC と子 Issue の読み直し約 15,000 で概ね 70,000 トークン）に対して 1 回あたりの節約は約 14,500,000 トークン、**およそ 200 倍**の開きがある。損益分岐は最初の子の途中で既に超えており、150,000 に達した時点でも既に割高な状態でしばらく走った後である（joshuafolkken/kit#984）。
+
+**閾値が表しているのは、トークンと人の手数の釣り合いである。** 区切るたびに人がコマンドを打ち直すため、計測の答え（子ごとに区切る）をそのまま採ると無人性を失う。トークン対トークンではなく**トークン対人の手数**のトレードオフであり、joshuafolkken/kit#968 の時点ではそう書かれていなかった。joshuafolkken/kit#1605 が変えたのは、そのトレードオフを `epicrun` 1 本のスケールではなく、`fullrun` を含む 223 セッションの分布の上で引き直したことである。
 
 ### The check is asked at every merge, and delegation does not excuse it
 
@@ -1484,7 +1488,7 @@ conversation, so n requests in one session bill about n²/2 — 732 requests in 
 about 100 in each of seven is roughly **7x**. A condition that delays the first cut therefore does
 not defer a fixed cost; it multiplies it.
 
-**So there is no condition: `pnpm josh cost --over 400000` is asked after every child's merge**,
+**So there is no condition: `pnpm josh cost --over 150000` is asked after every child's merge**,
 delegated or not. It is one command against a merge that took tens of minutes, and the row it
 replaced was written to save that one command. **Never wire the question to
 `pnpm josh delegate epic-child`** — that is a static policy lookup answering `delegate` on every
@@ -1855,7 +1859,7 @@ never `skip`.
 3. `epic:next` reports `error` — a cyclic or contradictory graph.
 4. A guard above was reached.
 5. A timeout above elapsed.
-6. `pnpm josh cost --over 400000` answered `over` — or could not answer — just after a child merged,
+6. `pnpm josh cost --over 150000` answered `over` — or could not answer — just after a child merged,
    and the drain that reading starts has brought `pnpm josh lane:list` to `none`. The run is then
    cheaper to continue in a fresh session, and the resume command is in the report. This is the one
    stopping condition that is not a problem: nothing is parked, nothing is filed, and the epic is
