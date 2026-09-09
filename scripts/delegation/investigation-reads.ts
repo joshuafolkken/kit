@@ -3,7 +3,6 @@ import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_bundle_call } from '#scripts/time/time-bundle-call'
-import { time_markers } from '#scripts/time/time-markers'
 import { time_shell } from '#scripts/time/time-shell'
 import { time_spans, type Span } from '#scripts/time/time-spans'
 import { delegation_policy } from './delegation-policy'
@@ -147,6 +146,13 @@ function delete_all(pending: Set<string>, targets: ReadonlyArray<string>): void 
 // say whether a file will be edited, and #1426 keeps an edit target's read in the main line on
 // purpose. Subtracting afterwards is what makes the set mean "read and not edited" without asking the
 // run to declare its intentions.
+//
+// **What was written is subtracted after what was read is added, and from the same span**
+// (joshuafolkken/kit#1472). One `sed -i` both reads a file and writes it back, and it labels as
+// `Bash: sed` exactly as a `sed -n` read does — so the two branches cannot be exclusive, and the
+// write has to be the one that stands. Reading `span.writes` rather than `span.marker` and
+// `span.targets` is also what makes `MultiEdit` and `NotebookEdit` subtract at all: they carry the
+// edit marker but, being outside `BUNDLEABLE_TOOLS`, arrive naming nothing.
 function apply_span(pending: Set<string>, span: Span): void {
 	if (DELEGATION_TOOLS.has(span.label)) {
 		pending.clear()
@@ -154,13 +160,9 @@ function apply_span(pending: Set<string>, span: Span): void {
 		return
 	}
 
-	if (is_content_read(span.label)) {
-		add_all(pending, subject_targets(span.targets))
+	if (is_content_read(span.label)) add_all(pending, subject_targets(span.targets))
 
-		return
-	}
-
-	if (span.marker === time_markers.EDIT_MARKER) delete_all(pending, subject_targets(span.targets))
+	delete_all(pending, subject_targets(span.writes))
 }
 
 function last_delegation_ms(spans: ReadonlyArray<Span>): number {

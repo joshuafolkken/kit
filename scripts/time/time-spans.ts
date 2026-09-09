@@ -5,6 +5,7 @@ import { time_reported_failure } from './time-reported-failure'
 import { time_shell } from './time-shell'
 import { time_single_check } from './time-single-check'
 import { time_transcript_line, type Block, type TranscriptLine } from './time-transcript-line'
+import { time_writes } from './time-writes'
 
 const { NO_MESSAGE_ID, parse_line } = time_transcript_line
 
@@ -87,6 +88,13 @@ const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
 // (joshuafolkken/kit#1406). It is read off the line the `tool_use` block sat on rather than off the
 // result that closes the span, because a `tool_result` line carries no message id at all — so a span
 // that did not keep it here could never be attributed to the turn that issued it.
+//
+// `writes` is the sixth, and it is what `targets` could not say (joshuafolkken/kit#1472). `targets`
+// names what a call mentioned; `marker` says a call was *an* edit but not of what, and for a tool
+// outside `BUNDLEABLE_TOOLS` it arrived with no target at all. So a consumer subtracting edits from
+// reads — `investigation-reads.ts` — had nothing to subtract for `MultiEdit` / `NotebookEdit`, and
+// nothing at all to tell an in-place `sed -i` from the `sed -n` it shares a label with.
+// `time-writes.ts` decides it, from the input this span is about to discard.
 interface ToolCall {
 	label: string
 	josh_command: string
@@ -94,6 +102,7 @@ interface ToolCall {
 	marker: PhaseMarker
 	is_bundleable: boolean
 	targets: ReadonlyArray<string>
+	writes: ReadonlyArray<string>
 	message_id: string
 }
 
@@ -103,6 +112,7 @@ const NO_CALL: ToolCall = {
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
+	writes: [],
 	...time_bundle_call.not_bundleable(),
 }
 const UNKNOWN_CALL: ToolCall = {
@@ -111,6 +121,7 @@ const UNKNOWN_CALL: ToolCall = {
 	check_key: time_single_check.NO_CHECK,
 	marker: time_markers.NO_MARKER,
 	message_id: NO_MESSAGE_ID,
+	writes: [],
 	...time_bundle_call.not_bundleable(),
 }
 
@@ -173,6 +184,7 @@ function to_tool_call(name: string, input: unknown, message_id: string): ToolCal
 			check_key: time_single_check.NO_CHECK,
 			marker: time_markers.tool_marker(name, input),
 			message_id,
+			writes: time_writes.tool_writes(name, input),
 			...time_bundle_call.tool_facts(name, input),
 		}
 	}
@@ -186,6 +198,7 @@ function to_tool_call(name: string, input: unknown, message_id: string): ToolCal
 		check_key: time_single_check.check_key(josh_command, command),
 		marker: time_markers.bash_marker(command),
 		message_id,
+		writes: time_writes.bash_writes(command),
 		...time_bundle_call.bash_facts(command),
 	}
 }
@@ -323,6 +336,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		marker: event.marker,
 		is_bundleable: event.is_bundleable,
 		targets: event.targets,
+		writes: event.writes,
 		message_id: event.message_id,
 		branch: event.branch,
 		call_id: event.call_id,

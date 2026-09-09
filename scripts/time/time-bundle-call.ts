@@ -278,6 +278,11 @@ const time_bundle_call = {
 	bash_facts,
 	call_facts,
 	tool_facts,
+	// Exported for `time-writes.ts` (joshuafolkken/kit#1472), which asks what a call *wrote* rather
+	// than what it named. The extraction is the same one either way — a second copy of it would let a
+	// path be recognized as a target when read and missed when written.
+	targets_in,
+	tool_targets,
 	// Exported for the batching guard's own word scan (joshuafolkken/kit#1390), so the two scanners
 	// cannot come to disagree about where one word of a shell line ends and the next begins.
 	words_of,

@@ -105,40 +105,46 @@ function delegating_lines(branch: string = BRANCH): Array<string> {
 	]
 }
 
-// A `pnpm josh <cmd>` call, which is what a phase is read off (joshuafolkken/kit#1384). `call_line`
-// above carries no tool input, so every span it writes belongs to no command phase at all — and a
-// suite measuring where the merge command sat cannot express its subject without one.
-function josh_call_line(minute: number, branch: string, command: string, id = CALL_ID): string {
+// One `tool_use` line carrying its input, named by the tool (joshuafolkken/kit#1472). `call_line`
+// above carries no input at all, and the three builders below each used to write this same object
+// with one field changed — a clone that would have needed a fourth copy the moment a suite wanted a
+// tool none of them names, which `MultiEdit` and `NotebookEdit` now do.
+interface ToolLine {
+	name: string
+	input: unknown
+	id?: string
+}
+
+function tool_call_line(minute: number, branch: string, call: ToolLine): string {
 	return JSON.stringify({
 		type: 'assistant',
 		timestamp: at(minute),
 		gitBranch: branch,
-		message: { content: [{ type: 'tool_use', name: 'Bash', id, input: { command } }] },
+		message: {
+			content: [{ type: 'tool_use', name: call.name, id: call.id ?? CALL_ID, input: call.input }],
+		},
 	})
+}
+
+// A `pnpm josh <cmd>` call, which is what a phase is read off (joshuafolkken/kit#1384). `call_line`
+// above carries no tool input, so every span it writes belongs to no command phase at all — and a
+// suite measuring where the merge command sat cannot express its subject without one.
+function josh_call_line(minute: number, branch: string, command: string, id = CALL_ID): string {
+	return tool_call_line(minute, branch, { name: 'Bash', input: { command }, id })
 }
 
 // An `Edit` call naming the file it edits (joshuafolkken/kit#1387). `call_line` above carries no tool
 // input, so every span it writes names no target at all — and a suite measuring which edits reached the
 // merged diff cannot express its subject without one.
 function edit_call_line(minute: number, branch: string, file_path: string, id = CALL_ID): string {
-	return JSON.stringify({
-		type: 'assistant',
-		timestamp: at(minute),
-		gitBranch: branch,
-		message: { content: [{ type: 'tool_use', name: 'Edit', id, input: { file_path } }] },
-	})
+	return tool_call_line(minute, branch, { name: 'Edit', input: { file_path }, id })
 }
 
 // A `Skill` call, which is what the `workflow` boundary is read off (joshuafolkken/kit#1428). The
 // skill name rides in the tool input, exactly as `time-markers.ts` reads it — so a suite about which
 // session actually ran a run cannot express its subject without one.
 function skill_call_line(minute: number, branch: string, skill: string, id = CALL_ID): string {
-	return JSON.stringify({
-		type: 'assistant',
-		timestamp: at(minute),
-		gitBranch: branch,
-		message: { content: [{ type: 'tool_use', name: 'Skill', id, input: { skill } }] },
-	})
+	return tool_call_line(minute, branch, { name: 'Skill', input: { skill }, id })
 }
 
 // The same three minutes as `issue_lines`, opened by the workflow marker every entry point writes —
@@ -299,6 +305,7 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
 		targets: [],
+		writes: [],
 		message_id: time_spans.NO_MESSAGE_ID,
 		branch: 'main',
 		call_id: '',
@@ -324,6 +331,7 @@ const time_transcript_fixture = {
 	josh_call_line,
 	result_line,
 	skill_call_line,
+	tool_call_line,
 	turn_call_line,
 	turn_lines,
 	open_turn_lines,

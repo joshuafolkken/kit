@@ -145,12 +145,21 @@ function leading_word(command: string): string {
 //
 // **A pipeline under `set -o pipefail` discards nothing**, so it is not this function's business —
 // answering otherwise would name the very form a caller is told to use instead.
+// Quoted text replaced by a space, which is what a reader walking into the middle of a chain has to
+// do before it can trust an operator it finds there. Exported because `time-writes.ts` needs the same
+// removal for a different reason — a quoted `sed` script holds `|` and slashes that read as a
+// pipeline and as paths — and two spellings of "remove the quotes" would disagree the first time one
+// of them learned about a quoting form the other did not.
+function unquoted(command: string): string {
+	return command.replaceAll(QUOTED_SPAN_PATTERN, ' ')
+}
+
 function discarded_commands(command: string): Array<string> {
-	const unquoted = command.replaceAll(QUOTED_SPAN_PATTERN, ' ')
+	const plain = unquoted(command)
 
-	if (PIPEFAIL_PATTERN.test(unquoted)) return []
+	if (PIPEFAIL_PATTERN.test(plain)) return []
 
-	return unquoted
+	return plain
 		.split(PIPE_PATTERN)
 		.slice(0, -1)
 		.map((segment) => segment.split(CHAIN_PATTERN).at(-1) ?? '')
@@ -234,10 +243,12 @@ const time_shell = {
 	JOSH_PREFIX,
 	bash_command,
 	bash_label,
+	command_segment,
 	discarded_commands,
 	josh_arguments,
 	josh_command_of,
 	leading_word,
+	unquoted,
 }
 
 export { time_shell }
