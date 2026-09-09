@@ -1,5 +1,5 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
-import { time_transcript_line } from '#scripts/time/time-transcript-line'
+import { time_transcript_line, type TranscriptLine } from '#scripts/time/time-transcript-line'
 import { delivered_rules, type DeliveredRule } from './delivered-rules'
 
 // What a rule is worth on the channel that carries it when its delivery has not fired
@@ -81,12 +81,26 @@ function observe_call(rule: DeliveredRule, state: RuleState, call: IssuedCall): 
 	if (rule.is_trigger(call)) state.is_triggered = true
 }
 
-function calls_in_line(line: string): Array<IssuedCall> {
-	const parsed = line === '' ? undefined : time_transcript_line.parse_line(line)
+// One transcript line, parsed once. The raw text is kept beside it because a refusal is identified
+// by the reason the harness wrote back, which the parsed block deliberately discards.
+interface DatedLine {
+	line: string
+	at_ms: number
+	calls: Array<IssuedCall>
+}
 
-	return (parsed?.blocks ?? [])
+function calls_of(parsed: TranscriptLine): Array<IssuedCall> {
+	return parsed.blocks
 		.filter((block) => block.type === cost_blocks.TOOL_USE_TYPE)
 		.map((block) => ({ name: block.name, input: block.input }))
+}
+
+function dated_line(line: string): DatedLine | undefined {
+	const parsed = line === '' ? undefined : time_transcript_line.parse_line(line)
+
+	if (parsed === undefined) return undefined
+
+	return { line, at_ms: parsed.timestamp_ms, calls: calls_of(parsed) }
 }
 
 function observe_refusal(rule: DeliveredRule, state: RuleState, line: string): void {
@@ -95,25 +109,36 @@ function observe_refusal(rule: DeliveredRule, state: RuleState, line: string): v
 	if (line.includes(rule.reason.slice(0, REASON_SIGNATURE_LENGTH))) state.is_refused = true
 }
 
-function observe_for_rule(
-	rule: DeliveredRule,
-	state: RuleState,
-	calls: ReadonlyArray<IssuedCall>,
-	line: string,
-): void {
-	for (const call of calls) observe_call(rule, state, call)
+function observe_for_rule(rule: DeliveredRule, state: RuleState, entry: DatedLine): void {
+	for (const call of entry.calls) observe_call(rule, state, call)
 
-	observe_refusal(rule, state, line)
+	observe_refusal(rule, state, entry.line)
 }
 
-function observe_line(states: Map<string, RuleState>, line: string): void {
-	const calls = calls_in_line(line)
-
+function observe_line(states: Map<string, RuleState>, entry: DatedLine): void {
 	for (const rule of delivered_rules.DELIVERED_RULES) {
 		const state = states.get(rule.id)
 
-		if (state !== undefined) observe_for_rule(rule, state, calls, line)
+		if (state !== undefined) observe_for_rule(rule, state, entry)
 	}
+}
+
+// **One timeline, ordered by timestamp — not the files read back to back.** "Kept before the
+// trigger" is a question about *when*, and a run's texts arrive newest-file-first from
+// `list_sessions`. Concatenating them would let a filing in the parent precede the count made inside
+// a unit that returned before it, scoring the run "trigger reached, not kept" — the same miscount
+// the fold was introduced to remove, arrived at from the other side.
+function dated_lines_of(text: string): Array<DatedLine> {
+	return text
+		.split('\n')
+		.map((line) => dated_line(line))
+		.filter((entry): entry is DatedLine => entry !== undefined)
+}
+
+function timeline_of(texts: ReadonlyArray<string>): Array<DatedLine> {
+	const entries = texts.flatMap((text) => dated_lines_of(text))
+
+	return entries.toSorted((left, right) => left.at_ms - right.at_ms)
 }
 
 // Every text belonging to one run — the session transcript and the transcripts of the units it
@@ -121,9 +146,7 @@ function observe_line(states: Map<string, RuleState>, line: string): void {
 function read_run(texts: ReadonlyArray<string>): Map<string, RuleState> {
 	const states = blank_states()
 
-	for (const text of texts) {
-		for (const line of text.split('\n')) observe_line(states, line)
-	}
+	for (const entry of timeline_of(texts)) observe_line(states, entry)
 
 	return states
 }

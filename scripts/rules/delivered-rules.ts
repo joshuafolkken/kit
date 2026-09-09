@@ -223,14 +223,20 @@ const SHELL_BODY_REASON =
 const ISSUE_LISTING = /^gh\s+(?:-{1,2}[\w-]+(?:[= ]\S+)?\s+)*issue\s+list\b/u
 const ISSUES_QUERY = /repos\/[^\s'"]*\/issues\?[^\s'"]*state=open/u
 const OPEN_STATE = /--state[= ]open|state=open/u
+// **A label filter makes it a different question.** `gh issue list --label epic --state open` and
+// `…/issues?labels=epic&state=open` ask which epics are open, which is what `epic:bundle` and the
+// Issue template do; counting either as the WIP count would credit the cap as kept by a run that
+// never counted the backlog. The residual the pattern cannot separate is named in
+// `docs/josh-commands.md`: the inventory command in the `diag` skill is byte-identical to the count
+// command in `wip-cap.md`, so no pattern can tell those two apart.
+const LABEL_FILTER = /--label\b|[?&]labels=/u
 
 function counts_open_issues(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some(
-			(segment) =>
-				(ISSUE_LISTING.test(segment) && OPEN_STATE.test(segment)) || ISSUES_QUERY.test(segment),
-		)
+	return shell_segments.segments_of(command).some((segment) => {
+		if (LABEL_FILTER.test(segment)) return false
+
+		return (ISSUE_LISTING.test(segment) && OPEN_STATE.test(segment)) || ISSUES_QUERY.test(segment)
+	})
 }
 
 // **Keeping the comments rule is fetching them**, in any of the spellings the refusal hands back.

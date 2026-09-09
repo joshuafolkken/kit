@@ -42,7 +42,7 @@ describe('the retirement route', () => {
 		const content = read_unwrapped(SKILL)
 
 		expect(content).toContain('220 recorded runs')
-		expect(content).toContain('58%')
+		expect(content).toContain('55%')
 		expect(content).toContain('15%')
 	})
 })

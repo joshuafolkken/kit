@@ -1063,7 +1063,7 @@ at the moment the trigger fired. **That window is the rule's absence**, because 
 nothing yet and only the carried text is asking; the ratio is what the carried text earns unaided.
 
 **The first reading refused the deletion it was built to justify, which is why the measurement runs
-first.** Over 220 recorded runs the WIP cap — which keeps a resident copy — was kept unaided in 58% of
+first.** Over 220 recorded runs the WIP cap — which keeps a resident copy — was kept unaided in 55% of
 the runs that reached it, while the Issue-comments rule, which has **no** resident copy, managed
 15%. The resident text was the obvious candidate on a reading of the prose, since the refusal repeats
 it almost word for word; the number says it is doing a great deal of work and must stay.

@@ -12,10 +12,10 @@ const BODY_READ = 'gh api repos/o/r/issues/12'
 const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 
 // One transcript line carrying one tool call, in the shape `time_transcript_line.parse_line` reads.
-function call_line(command: string): string {
+function call_line(command: string, timestamp: string = TIMESTAMP): string {
 	return JSON.stringify({
 		type: 'assistant',
-		timestamp: TIMESTAMP,
+		timestamp,
 		message: {
 			id: 'msg_1',
 			content: [{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command } }],
@@ -54,6 +54,17 @@ describe('rule_value.measure — what the carried text earns unaided', () => {
 		const reading = reading_for(WIP_CAP, [[session(COUNT), session(FILING)]])
 
 		expect(reading.sessions).toBe(1)
+		expect(reading.unaided_kept).toBe(1)
+	})
+
+	it('orders a run by timestamp, not by the order its transcripts were handed in', () => {
+		// `list_sessions` returns newest first, so the parent that filed can arrive ahead of the unit
+		// that counted. Read back to back that scores "trigger reached, not kept"; read as one
+		// timeline it is a run that kept the rule.
+		const filed = call_line(FILING, '2026-09-09T00:00:09.000Z')
+		const counted = call_line(COUNT, '2026-09-09T00:00:01.000Z')
+		const reading = reading_for(WIP_CAP, [[filed, counted]])
+
 		expect(reading.unaided_kept).toBe(1)
 	})
 
@@ -140,6 +151,17 @@ describe('rule_value.measure — rules nothing can score', () => {
 
 	it('survives a line that is not JSON', () => {
 		expect(() => rule_value.measure([[`not json\n${session(FILING)}`]])).not.toThrow()
+	})
+
+	it('keeps every reason signature distinct, so refusals are not cross-attributed', () => {
+		// `observe_refusal` identifies the speaker by the first REASON_SIGNATURE_LENGTH characters. If
+		// two reasons ever shared an opening that long, one rule's refusals would be credited to the
+		// other with nothing failing.
+		const signatures = delivered_rules.DELIVERED_RULES.map((rule) =>
+			rule.reason.slice(0, rule_value.REASON_SIGNATURE_LENGTH),
+		)
+
+		expect(new Set(signatures).size).toBe(signatures.length)
 	})
 
 	it('reads every enumerated rule, so a new row is measured rather than silently skipped', () => {

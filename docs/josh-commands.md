@@ -358,7 +358,7 @@ pnpm josh rule:value /path/to/checkout     # a lane has no sessions of its own; 
 | Column    | Meaning                                                                                                                                                                             |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `runs`    | Runs in which the rule's trigger was actually reached. A run that never reaches it says nothing about the rule. A run's delegated units are folded into it, never counted beside it |
-| `kept`    | Of those, the sessions that had **already** kept the rule when the trigger fired                                                                                                    |
+| `kept`    | Of those, the runs that had **already** kept the rule when the trigger fired. Runs are ordered by timestamp, so a unit's call counts before a later one in the parent               |
 | `refused` | Of those, the runs in which a refusal was delivered                                                                                                                                 |
 | `unaided` | `kept / runs` — what the carried text earns with no help from the hook, or `-`                                                                                                      |
 
@@ -366,7 +366,7 @@ pnpm josh rule:value /path/to/checkout     # a lane has no sessions of its own; 
 
 **`-` means unmeasured, never zero.** Naming the act that counts as keeping a rule is the rule's own business, so it sits on the enumeration beside the trigger as `keeps`; a row that declares none cannot be scored, and reporting `0` would assert "never kept" while `100` would assert the opposite.
 
-**Use it to decide what leaves when the resident budget binds**, in place of the old order in which the sentence no marker pinned was the one that went ([#951](https://github.com/joshuafolkken/kit/issues/951)). The first reading refused the deletion it was built to justify: over 220 recorded runs the WIP cap, which keeps a resident copy, scored 58%, while the Issue-comments rule, which has none, scored 15% — so the resident text that looked most redundant on a reading of the prose is doing the most work. The retirement route the reading feeds is `.claude/skills/workflow-commands/SKILL.md` → §3.
+**Use it to decide what leaves when the resident budget binds**, in place of the old order in which the sentence no marker pinned was the one that went ([#951](https://github.com/joshuafolkken/kit/issues/951)). The first reading refused the deletion it was built to justify: over 220 recorded runs the WIP cap, which keeps a resident copy, scored 55%, while the Issue-comments rule, which has none, scored 15% — so the resident text that looked most redundant on a reading of the prose is doing the most work. The retirement route the reading feeds is `.claude/skills/workflow-commands/SKILL.md` → §3.
 
 ### `josh rule:guard`
 

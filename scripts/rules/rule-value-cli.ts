@@ -52,12 +52,11 @@ function add_run(runs: Array<Array<SessionFile>>, file: SessionFile): Array<Sess
 }
 
 // Every transcript file grouped under the run it belongs to, the units with their parent.
-function runs_in(cwd: string): Array<Array<SessionFile>> {
-	const directory = cost_transcript.transcript_directory(cwd)
+function group_runs(files: ReadonlyArray<SessionFile>): Array<Array<SessionFile>> {
 	const grouped = new Map<string, Array<SessionFile>>()
 	const runs: Array<Array<SessionFile>> = []
 
-	for (const file of cost_transcript.list_sessions(directory)) {
+	for (const file of files) {
 		const owner = cost_transcript.owning_session_id(file)
 		const existing = grouped.get(owner)
 
@@ -66,6 +65,10 @@ function runs_in(cwd: string): Array<Array<SessionFile>> {
 	}
 
 	return runs
+}
+
+function runs_in(cwd: string): Array<Array<SessionFile>> {
+	return group_runs(cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd)))
 }
 
 // One run's texts, read only while that run is being scored.
@@ -97,6 +100,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	for (const line of lines) console.info(line)
 }
 
-const rule_value_cli = { UNMEASURED, report, run }
+const rule_value_cli = { UNMEASURED, group_runs, report, run }
 
 export { rule_value_cli }
