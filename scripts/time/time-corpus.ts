@@ -3,7 +3,7 @@ import { cost_transcript, type SessionFile } from '#scripts/cost/cost-transcript
 import { time_duplicate, type SessionSpans } from './time-duplicate'
 import { time_family, type Family, type SpanReader } from './time-family'
 import { time_overlap } from './time-overlap'
-import { time_sessions, type ExcludedSession } from './time-sessions'
+import { time_sessions, type SessionMinutes } from './time-sessions'
 import { time_spans, type Span } from './time-spans'
 
 // The project's transcripts, read once and attributed to every issue asked about
@@ -76,8 +76,13 @@ interface IssueSpans {
 	// The sessions attributed to the issue that no workflow marker says ran it, left out of `spans`
 	// above (joshuafolkken/kit#1428). Empty is both "nothing was concurrent" and "nothing could be
 	// separated", which is why the flag below is carried beside it rather than derived from it.
-	excluded: Array<ExcludedSession>
+	excluded: Array<SessionMinutes>
+	// The minutes trimmed off a session that **was** kept (joshuafolkken/kit#1673). Gone from `spans`
+	// exactly as `excluded` is, and carried apart from it because the report has to say which of the
+	// two happened rather than call this run's own transcript a stranger's.
+	narrowed: Array<SessionMinutes>
 	is_separated: boolean
+	has_other_run_markers: boolean
 	attributed_count: number
 	// The transcripts of this run's own family whose minutes could not be measured — unreadable, or
 	// read and holding no parseable span (joshuafolkken/kit#1439, joshuafolkken/kit#1599). Kept apart
@@ -252,7 +257,9 @@ function to_issue_spans(collector: Collector, issue_number: number): IssueSpans 
 		spans: resolved_spans(split.kept),
 		session_count: transcripts_in(collector.transcripts, split.kept),
 		excluded: split.excluded,
+		narrowed: split.narrowed,
 		is_separated: split.is_separated,
+		has_other_run_markers: split.has_other_run_markers,
 		attributed_count: split.attributed_count,
 		unread_count: collector.unread.size,
 	}
@@ -264,7 +271,9 @@ function empty_spans(): IssueSpans {
 		spans: [],
 		session_count: NO_SESSIONS,
 		excluded: [],
+		narrowed: [],
 		is_separated: false,
+		has_other_run_markers: false,
 		attributed_count: NO_SESSIONS,
 		unread_count: NO_SESSIONS,
 	}
