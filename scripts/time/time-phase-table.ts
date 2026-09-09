@@ -40,7 +40,22 @@ const WITHHELD_LABEL = 'withheld from the rows'
 // missing from the rows; what a reader cannot otherwise tell is that they are still inside the total
 // every share above was taken against.
 const WITHHELD_NOTE = 'counted in the elapsed total'
+// What a row says when its command was taken into the background and nothing read the output back
+// (joshuafolkken/kit#1662). **The minutes beside it are real and the command's own runtime is not
+// among them**: what the transcript holds for such a launch is the two or three seconds the launch
+// call took, and printing that as how long the command ran is the confident zero the row above
+// refuses one question earlier. The note is appended rather than replacing the duration, because
+// unlike a withheld row this one did measure something — just not the command.
+const UNREAD_BACKGROUND_NOTE = 'background runtime not measured'
 const NONE = 0
+
+function share_suffix(phase: PhaseTotal, elapsed_ms: number): string {
+	const share = format_share(phase.duration_ms, elapsed_ms)
+
+	if (!phase.has_unread_background) return share
+
+	return [share, UNREAD_BACKGROUND_NOTE].join(SUFFIX_SEPARATOR)
+}
 
 // **A phase whose marker never appeared says so rather than printing `0.0 min`.** "Did not run" and
 // "this transcript could not be read for it" are different answers, and a measured zero asserts the
@@ -49,7 +64,7 @@ const NONE = 0
 function phase_line(phase: PhaseTotal, elapsed_ms: number): string {
 	if (!phase.is_detected) return format_columns(phase.phase, '', NOT_DETECTED)
 
-	return format_row(phase.phase, phase.duration_ms, format_share(phase.duration_ms, elapsed_ms))
+	return format_row(phase.phase, phase.duration_ms, share_suffix(phase, elapsed_ms))
 }
 
 // The withheld rows that actually hold time. **A withheld row of zero minutes is left out**: it takes
@@ -91,6 +106,7 @@ function phase_lines(phases: ReadonlyArray<PhaseTotal>, elapsed_ms: number): Arr
 const time_phase_table = {
 	HEADING,
 	NOT_DETECTED,
+	UNREAD_BACKGROUND_NOTE,
 	WITHHELD_LABEL,
 	WITHHELD_NOTE,
 	phase_lines,

@@ -42,6 +42,12 @@ const NO_DURATION = 0
 // seconds while the review beside it runs for minutes: at half a minute the four `josh gate` calls of
 // issue #1309's run stop cutting the review into pieces, and every stage that took a person or a
 // command any real time still opens a row of its own.
+//
+// **The flicker that calibrated it is gone, and the constant is kept for the ones that are not**
+// (joshuafolkken/kit#1662). A backgrounded gate's window is now the gate's phase, so those four calls
+// no longer alternate with the review at all — but a phase change of a few seconds still arrives from
+// every other direction, and half a minute is the threshold that was measured rather than one derived
+// from the case that no longer occurs.
 const MIN_SEGMENT_MS = 30_000
 
 interface Segment {

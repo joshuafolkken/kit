@@ -1,49 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { time_line_fixture } from './time-line-fixture'
 import { time_markers } from './time-markers'
 import { time_spans, type Span } from './time-spans'
 
-const ASSISTANT = 'assistant'
-const USER = 'user'
-const MINUTE_MS = 60_000
+// The line builders are `time-line-fixture.ts`'s, shared with the background suite that joined this
+// module in joshuafolkken/kit#1662 — a second copy of them beside that suite is the clone `CLAUDE.md`
+// prohibits, in the one place a drift would let two suites disagree about what a transcript line is.
+
+const { ASSISTANT_LINE: ASSISTANT, MINUTE_MS } = time_line_fixture
+const { at, assistant_text, prompt, tool_result, tool_use } = time_line_fixture
+
 const PNPM_LABEL = 'Bash: pnpm'
-
-function at(minute: number): string {
-	return new Date(Date.UTC(2026, 0, 1, 0, minute)).toISOString()
-}
-
-function assistant_text(minute: number): string {
-	return JSON.stringify({
-		type: ASSISTANT,
-		timestamp: at(minute),
-		message: { content: [{ type: 'text', text: 'hello' }] },
-	})
-}
-
-function tool_use(minute: number, name: string, id: string, input: unknown = {}): string {
-	return JSON.stringify({
-		type: ASSISTANT,
-		timestamp: at(minute),
-		message: { content: [{ type: 'tool_use', name, id, input }] },
-	})
-}
-
-// `is_error` is left off entirely when none was given, because that is the third case a transcript
-// actually holds: the tools that report no outcome write the field nowhere rather than writing
-// `false` (joshuafolkken/kit#1309).
-function tool_result(minute: number, id: string, is_error?: boolean): string {
-	const result = { type: 'tool_result', tool_use_id: id, content: 'done' }
-
-	return JSON.stringify({
-		type: USER,
-		timestamp: at(minute),
-
-		message: { content: [is_error === undefined ? result : { ...result, is_error }] },
-	})
-}
-
-function prompt(minute: number): string {
-	return JSON.stringify({ type: USER, timestamp: at(minute), message: { content: 'do the thing' } })
-}
 
 function minutes_of(spans: ReadonlyArray<Span>, category: string): number {
 	return spans

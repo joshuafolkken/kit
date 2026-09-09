@@ -18,11 +18,17 @@ const WITHHELD_MS = 5 * MINUTE_MS
 const MERGE_MS = 20 * MINUTE_MS
 
 function detected(phase: PhaseName, duration_ms: number): PhaseTotal {
-	return { phase, duration_ms, is_detected: true }
+	return { phase, duration_ms, is_detected: true, has_unread_background: false }
 }
 
 function withheld(phase: PhaseName, duration_ms: number): PhaseTotal {
-	return { phase, duration_ms, is_detected: false }
+	return { phase, duration_ms, is_detected: false, has_unread_background: false }
+}
+
+// A phase whose command was backgrounded and never read back: the minutes are real, and the command's
+// own runtime is not among them.
+function unread_background(phase: PhaseName, duration_ms: number): PhaseTotal {
+	return { phase, duration_ms, is_detected: true, has_unread_background: true }
 }
 
 // The state the issue is about: the cycles could not be read, so `ci` prints no figure while its five
@@ -59,6 +65,20 @@ describe('time_phase_table.phase_lines — the rows', () => {
 
 	it('says nothing at all where there are no phases', () => {
 		expect(time_phase_table.phase_lines([], ELAPSED_MS)).toEqual([])
+	})
+
+	// joshuafolkken/kit#1662: the minutes on such a row are the seconds the launch call took, and
+	// printing them alone claims the command ran for that long when nothing in the transcript says
+	// what it ran for.
+	it('says a backgrounded command nobody read back was not measured', () => {
+		const rows = [unread_background(time_phases.GATE_PHASE, MERGE_MS)]
+
+		expect(rendered(rows)).toContain(time_phase_table.UNREAD_BACKGROUND_NOTE)
+	})
+
+	// The note is a claim about one row, so a table with nothing outstanding must not carry it.
+	it('leaves the note off a phase whose command was read back', () => {
+		expect(rendered(UNREAD_CYCLES)).not.toContain(time_phase_table.UNREAD_BACKGROUND_NOTE)
 	})
 })
 

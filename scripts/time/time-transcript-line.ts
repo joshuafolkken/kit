@@ -1,6 +1,7 @@
 import type { FollowupStage } from '#scripts/git/git-followup-stages'
 import { json_value } from '#scripts/json-value'
 import { z } from 'zod'
+import { time_background } from './time-background'
 import { time_followup_stage } from './time-followup-stage'
 import { time_instant } from './time-instant'
 import { time_reported_failure } from './time-reported-failure'
@@ -86,6 +87,12 @@ interface Block {
 	// `"is_error":true` against the raw line, a test one whitespace in the serializer defeats and
 	// which cannot tell one errored block from another on the same line.
 	error_text: string
+	// The id the harness assigned to a command it took into the background, and `''` for every other
+	// block (joshuafolkken/kit#1662). It is the fourth field read off the body under the same
+	// prohibition as the three above — what is kept is the id, never the text it was read from — and
+	// it is what pairs a launch with the call that later reads its output, so the minutes the command
+	// actually ran can be placed on the timeline instead of only the seconds its launch call took.
+	background_id: string
 }
 
 interface TranscriptLine {
@@ -127,6 +134,7 @@ function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
 		has_failure_line: time_reported_failure.has_failure_line(text),
 		followup_stages: time_followup_stage.read_stages(text),
 		error_text: raw.is_error === true ? text.slice(0, ERROR_TEXT_LIMIT) : '',
+		background_id: time_background.launch_id(text),
 	}
 }
 
