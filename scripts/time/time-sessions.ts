@@ -35,9 +35,31 @@ import type { Span } from './time-spans'
 // **A delegated unit follows the session that delegated it.** The map this reads is keyed by owning
 // session, so a unit is never weighed on its own: its parent holds the marker, and an `epicrun` child
 // implemented entirely inside a unit is kept with it.
+//
+// **The marker names an issue and sits in one half, and reading only its presence discarded both**
+// (joshuafolkken/kit#1648). `time_markers.bash_issue` captures the number the `in-progress` call
+// declared — that capture is why `label_issue` exists — and the two things thrown away produced two
+// symptoms of one judgement. A session whose only declaring marker names a *different* run was kept
+// as this one's: run #1630 kept a session that had opened #1481 four hours earlier, and its window
+// began at 01:12 for a run that started at 05:21. And a session whose declaring marker sits in a
+// **delegated** unit was kept **whole**, so the parent's coordination minutes — dispatching the
+// previous child, reading the backlog — were counted as the child's run: #1654, #1609 and #1607 all
+// recorded the identical `started_at` of their parent's first span.
+//
+// **So a marker that names this issue decides, and the presence test is what is left for the runs
+// no marker names.** The skill-load marker carries no number, so a run that never wrote the label is
+// still separated exactly as it was — the fallback is the old rule untouched, not a degraded one.
+// **Why #1633 looked correct while #1630 did not** is the same defect twice: both were units of one
+// parent, and #1633's marker happened to fall four minutes after the session's first attributed span
+// while #1630's fell forty-one minutes after it, behind a sibling child that had already run.
 
 const NO_DURATION = 0
 const NO_SESSIONS = 0
+// "No marker named this issue here", which is never a real instant: the epoch is not a time any
+// transcript records, so a floor of zero keeps every span exactly as no floor would — and a ceiling
+// of infinity is the same answer read forwards.
+const NO_START = 0
+const NO_END = Infinity
 // Below this there is nothing to separate: one session is the run's whether or not it left a marker.
 const AMBIGUOUS_MINIMUM = 2
 
@@ -72,6 +94,83 @@ function is_run_session(session: SessionSpans): boolean {
 	return has_workflow_marker(session.own) || has_workflow_marker(session.delegated)
 }
 
+function span_start(span: Span): number {
+	return span.ended_ms - span.duration_ms
+}
+
+// **`NO_ISSUE` is not a declaration**: the skill-load marker says a run opened without saying whose,
+// so it belongs to the presence test above and to nothing here.
+function is_declaring(span: Span): boolean {
+	return span.marker === time_markers.WORKFLOW_MARKER && span.issue !== time_markers.NO_ISSUE
+}
+
+// Every marker in this half that names an issue, as the issue it named and the instant it opened.
+// One walk answers both questions asked of it — which issues a half declares, and when — so the two
+// cannot drift apart.
+function declarations(spans: ReadonlyMap<string, Span>): Array<[number, number]> {
+	const found: Array<[number, number]> = []
+
+	for (const [, span] of spans) {
+		if (is_declaring(span)) found.push([span.issue, span_start(span)])
+	}
+
+	return found
+}
+
+function issues_in(declared: ReadonlyArray<[number, number]>): Set<number> {
+	return new Set(declared.map(([issue_number]) => issue_number))
+}
+
+function starts_naming(
+	declared: ReadonlyArray<[number, number]>,
+	issue_number: number,
+): Array<number> {
+	return declared.filter(([named]) => named === issue_number).map(([, started]) => started)
+}
+
+function starts_naming_others(
+	declared: ReadonlyArray<[number, number]>,
+	issue_number: number,
+): Array<number> {
+	return declared.filter(([named]) => named !== issue_number).map(([, started]) => started)
+}
+
+function earliest(starts: ReadonlyArray<number>): number {
+	return starts.length === NO_SESSIONS ? NO_START : Math.min(...starts)
+}
+
+function earliest_after(starts: ReadonlyArray<number>, after_ms: number): number {
+	const later = starts.filter((one) => one > after_ms)
+
+	return later.length === NO_SESSIONS ? NO_END : Math.min(...later)
+}
+
+// Where a delegated run began and where the next child's declaration ends it. **The parent's units
+// are pooled under one key**, so a session that ran several children holds every one of their
+// transcripts in this half — and a research unit inside a sibling declares no issue at all, so
+// identity cannot tell the two apart. Position can, and the marker was put there to carry it:
+// `time-markers.ts` calls it "the run starts here". **A floor without a ceiling only removes the
+// siblings that ran first**, which left the first child of a parent absorbing every later one (a
+// review finding on joshuafolkken/kit#1648) — so the same evidence is read forwards as well.
+function run_window(spans: ReadonlyMap<string, Span>, issue_number: number): [number, number] {
+	const declared = declarations(spans)
+	const start_ms = earliest(starts_naming(declared, issue_number))
+
+	return [start_ms, earliest_after(starts_naming_others(declared, issue_number), start_ms)]
+}
+
+function within_run(spans: ReadonlyMap<string, Span>, one: Marked): Map<string, Span> {
+	const kept = new Map<string, Span>()
+
+	for (const [key, span] of spans) {
+		if (span_start(span) >= one.run_start_ms && span_start(span) < one.run_end_ms) {
+			kept.set(key, span)
+		}
+	}
+
+	return kept
+}
+
 function spans_of(spans: ReadonlyMap<string, Span>): Array<Span> {
 	const drained: Array<Span> = []
 
@@ -103,16 +202,68 @@ interface Marked {
 	session_id: string
 	session: SessionSpans
 	is_own: boolean
+	// Whether a workflow marker in this session names the issue being reported on. This is the
+	// evidence the presence test above cannot give: it says *whose* run, not merely that one opened.
+	names_issue: boolean
+	// Whether it declares issues and none of them is this one. **This is the only thing that overrides
+	// the presence test**, because it is evidence about a different run — and a session that declares
+	// nothing keeps the older rule, which every transcript recorded before the declaration existed
+	// still needs.
+	names_only_others: boolean
+	// ...and whether only a delegated unit named it. Then the unit is the run and the session around
+	// it is the parent that dispatched it, whose own spans are coordination rather than this work.
+	is_delegated_run: boolean
+	// The window that unit declared, which its spans are taken from.
+	run_start_ms: number
+	run_end_ms: number
 }
 
-function mark(by_session: ReadonlyMap<string, SessionSpans>): Array<Marked> {
+function mark_one(session_id: string, session: SessionSpans, issue_number: number): Marked {
+	const own = issues_in(declarations(session.own))
+	const is_named_by_own = own.has(issue_number)
+	const [run_start_ms, run_end_ms] = run_window(session.delegated, issue_number)
+	const is_named = is_named_by_own || run_start_ms !== NO_START
+
+	return {
+		session_id,
+		session,
+		is_own: is_run_session(session),
+		names_issue: is_named,
+		names_only_others: !is_named && own.size + issues_in(declarations(session.delegated)).size > 0,
+		is_delegated_run: is_named && !is_named_by_own,
+		run_start_ms,
+		run_end_ms,
+	}
+}
+
+function mark(by_session: ReadonlyMap<string, SessionSpans>, issue_number: number): Array<Marked> {
 	const marked: Array<Marked> = []
 
 	for (const [session_id, session] of by_session) {
-		marked.push({ session_id, session, is_own: is_run_session(session) })
+		marked.push(mark_one(session_id, session, issue_number))
 	}
 
 	return marked
+}
+
+// What of a kept session is this run's. **The identity everywhere except the delegated case**, which
+// is the whole of the narrowing: dropping the parent's own spans is what stops a child inheriting the
+// minutes its parent spent before the child existed.
+function narrow(one: Marked): SessionSpans {
+	if (!one.is_delegated_run) return one.session
+
+	return { own: new Map(), delegated: within_run(one.session.delegated, one) }
+}
+
+// **A session is this run's unless it declared a different one.** Naming the issue keeps it; naming
+// only other issues excludes it however plainly it opened a workflow; and naming nothing falls back
+// to the presence test. Deciding it once per corpus instead — "some session named it, so only named
+// sessions count" — excluded the un-named half of a run that spanned two sessions, of which only the
+// first had written the label (a review finding on joshuafolkken/kit#1648).
+function is_this_run(one: Marked): boolean {
+	if (one.names_issue) return true
+
+	return !one.names_only_others && one.is_own
 }
 
 // Longest first, then by session id. Ordered from the spans rather than left as the order the
@@ -124,15 +275,32 @@ function compare_excluded(left: ExcludedSession, right: ExcludedSession): number
 	return left.session_id < right.session_id ? -1 : 1
 }
 
+// What narrowing a kept session dropped. **Reported beside the sessions left out whole, so the note
+// and the arithmetic still agree**: minutes in neither `kept` nor `excluded` are minutes the report
+// cannot account for, and the parent of a delegated run loses real ones here (a review finding on
+// joshuafolkken/kit#1648).
+function narrowed_loss(one: Marked): Array<ExcludedSession> {
+	if (!one.is_delegated_run) return []
+
+	const duration_ms = session_ms(one.session) - session_ms(narrow(one))
+
+	return duration_ms > NO_DURATION ? [{ session_id: one.session_id, duration_ms }] : []
+}
+
 function to_excluded(marked: ReadonlyArray<Marked>): Array<ExcludedSession> {
-	return marked
-		.filter((one) => !one.is_own)
+	const whole = marked
+		.filter((one) => !is_this_run(one))
 		.map((one) => ({ session_id: one.session_id, duration_ms: session_ms(one.session) }))
-		.toSorted(compare_excluded)
+
+	const trimmed = marked.filter((one) => is_this_run(one)).flatMap((one) => narrowed_loss(one))
+
+	return [...whole, ...trimmed].toSorted(compare_excluded)
 }
 
 function to_kept(marked: ReadonlyArray<Marked>): Map<string, SessionSpans> {
-	return new Map(marked.filter((one) => one.is_own).map((one) => [one.session_id, one.session]))
+	return new Map(
+		marked.filter((one) => is_this_run(one)).map((one) => [one.session_id, narrow(one)]),
+	)
 }
 
 function not_separated(
@@ -146,8 +314,11 @@ function not_separated(
 // session**, which is the overwhelming majority: one session marked is one session kept, and one
 // session unmarked is `not_separated` over a corpus with nothing to separate — either way every span
 // comes back.
-function separate(by_session: ReadonlyMap<string, SessionSpans>): SessionSplit {
-	const marked = mark(by_session)
+function separate(
+	by_session: ReadonlyMap<string, SessionSpans>,
+	issue_number: number,
+): SessionSplit {
+	const marked = mark(by_session, issue_number)
 	const kept = to_kept(marked)
 
 	if (kept.size === NO_SESSIONS) return not_separated(by_session, marked.length)
