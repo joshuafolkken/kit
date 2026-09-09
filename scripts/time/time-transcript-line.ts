@@ -56,6 +56,10 @@ const LINE_SCHEMA = z.object({
 
 const UNKNOWN_BRANCH = ''
 const NO_MESSAGE_ID = ''
+// How much of an errored body is kept (joshuafolkken/kit#1642). A refusal's body *is* the reason the
+// harness wrote back, from its first character, so an opening this long identifies the speaker
+// without retaining the output of every failed command a session ran.
+const ERROR_TEXT_LIMIT = 256
 
 interface Block {
 	type: string
@@ -75,6 +79,13 @@ interface Block {
 	// prohibition: what is kept is the ten-odd parsed laps, never the body they were read from. Empty
 	// for every other tool result, which is nearly all of them.
 	followup_stages: ReadonlyArray<FollowupStage>
+	// The opening of the body of a result the harness wrote back as a failure, and `''` for every
+	// other block (joshuafolkken/kit#1642). It obeys the same prohibition as the two fields above —
+	// what is kept is a bounded opening, never the whole body — and it exists so a reader asking
+	// which refusal a line carried can be answered from the parsed block rather than by matching
+	// `"is_error":true` against the raw line, a test one whitespace in the serializer defeats and
+	// which cannot tell one errored block from another on the same line.
+	error_text: string
 }
 
 interface TranscriptLine {
@@ -115,6 +126,7 @@ function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
 		is_error: raw.is_error ?? undefined,
 		has_failure_line: time_reported_failure.has_failure_line(text),
 		followup_stages: time_followup_stage.read_stages(text),
+		error_text: raw.is_error === true ? text.slice(0, ERROR_TEXT_LIMIT) : '',
 	}
 }
 
@@ -158,7 +170,7 @@ function parse_line(line: string): TranscriptLine | undefined {
 	return parsed.success ? to_line(parsed.data) : undefined
 }
 
-const time_transcript_line = { NO_MESSAGE_ID, parse_line }
+const time_transcript_line = { ERROR_TEXT_LIMIT, NO_MESSAGE_ID, parse_line }
 
 export type { Block, TranscriptLine }
 export { time_transcript_line }
