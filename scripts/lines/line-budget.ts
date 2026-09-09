@@ -1,10 +1,11 @@
+import { createHash } from 'node:crypto'
 import { statSync } from 'node:fs'
 import path from 'node:path'
-import { code_quality_rules } from '#eslint/rules/code-quality.js'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { find_local_bin_upwards } from '#scripts/local-bin'
 import { execa } from 'execa'
 import { z } from 'zod'
+import { effective_limit, type LineRuleOptions } from './effective-limit'
 
 // joshuafolkken/kit#1425: the file line limit was only ever reported *after* the writing was done.
 // Measured by hand from run #1406's transcript (PR #1422, 45.8 minutes), 19.8% of the whole run —
@@ -27,6 +28,14 @@ import { z } from 'zod'
 // hashbang, so an in-process count would have been quietly wrong for most of this package while the
 // gate went on failing at a number the report never showed. Spawning costs a process; agreeing with
 // the gate is the whole point of the report.
+//
+// **joshuafolkken/kit#1454: the limit and the counting options come from the same place the count
+// does.** They used to be read from kit's own `eslint/rules/code-quality.js` while the count was asked
+// of the project's eslint — identical in kit, and two different rules in a consumer that overrides
+// `max-lines` after `create_base_config`. `effective-limit.ts` resolves the entry the project's own
+// eslint applies **to each file**, and nothing in this file reads kit's copy any more. Where no entry
+// can be resolved there is no budget, and the count is reported without one: falling back to kit's
+// number would restore the defect and do it silently.
 
 const MAX_LINES_RULE = 'max-lines'
 // The rule reports when the count is **greater than** `max`, and 0 is the lowest value its own schema
@@ -77,17 +86,18 @@ const RULE_FLAG = '--rule'
 // `josh lines` calls at once in one repository — routine with parallel agents here — would then be two
 // unsynchronized writers of one file. A cold run is a couple of seconds against the 543 this report
 // exists to save, so the cache is not worth a shared-state hazard.
+//
+// **The path is per probe, not per call** (joshuafolkken/kit#1454). Since the counting method decides
+// how many probes one call starts, two of them can now run concurrently — and each deletes whatever
+// `--cache-location` names as it starts, so one shared path would have them racing to unlink the file
+// the other just made. The option set's own key is folded into the name, which makes the paths
+// distinct exactly when the probes are.
 const CACHE_PREFIX = 'josh-lines-eslint-cache-'
 const CACHE_LOCATION_FLAG = '--cache-location'
+const CACHE_KEY_LENGTH = 8
 // Bounded so a hung child ends the call rather than holding it open. A cold type-aware lint of a few
 // files is seconds; this is two orders of magnitude beyond that.
 const PROCESS_TIMEOUT_MS = 180_000
-
-// The rule entry as `eslint/rules/code-quality.js` writes it. Read through a schema rather than an
-// assertion: the options are handed straight back to eslint, so a shape that drifted would otherwise
-// reach the probe as a silently different rule configuration.
-const options_schema = z.looseObject({ max: z.number().int().positive() })
-const rule_entry_schema = z.tuple([z.string(), options_schema])
 
 // Only the two fields this reads. `ruleId` is nullable on a parse error or an ignore warning, and
 // both of those are answers — "no count for this path" — rather than failures.
@@ -96,8 +106,6 @@ const results_schema = z.array(
 	z.object({ filePath: z.string(), messages: z.array(message_schema) }),
 )
 
-type LineRuleOptions = z.infer<typeof options_schema>
-
 interface LineBudget {
 	code_lines: number
 	limit: number
@@ -105,26 +113,35 @@ interface LineBudget {
 	is_near_limit: boolean
 }
 
+// `limit` is carried beside the budget, and it is not the same thing as `budget.limit`: a path this
+// project enforces no `max-lines` on has no limit at all, and the caller has to be able to say that
+// rather than say the count failed (joshuafolkken/kit#1454).
 interface FileBudget {
 	file_path: string
+	limit: number | undefined
 	budget: LineBudget | undefined
 }
 
-// The limit and the skip options both come from the rule that enforces them, so there is no second
-// definition of either to drift. Lowering `max` is the only change the probe makes.
-function max_lines_options(): LineRuleOptions {
-	return rule_entry_schema.parse(code_quality_rules[MAX_LINES_RULE])[1]
+// The paths that share one counting method, and therefore one eslint run. `key` identifies that
+// method — it is what the paths were grouped by, and what keeps two concurrent probes off one cache
+// path.
+interface ProbeGroup {
+	key: string
+	options: LineRuleOptions
+	paths: Array<string>
 }
 
-function configured_limit(): number {
-	return max_lines_options().max
-}
-
-function near_limit_threshold(limit: number = configured_limit()): number {
+function near_limit_threshold(limit: number): number {
 	return Math.ceil(limit * NEAR_LIMIT_FRACTION)
 }
 
-function budget_of(code_lines: number, limit: number = configured_limit()): LineBudget {
+// The share of the limit at which "near the limit" begins, for a report that has no single limit to
+// state the boundary as a line count against.
+function near_limit_percent(): number {
+	return Math.round(NEAR_LIMIT_FRACTION * PERCENT)
+}
+
+function budget_of(code_lines: number, limit: number): LineBudget {
 	return {
 		code_lines,
 		limit,
@@ -133,20 +150,28 @@ function budget_of(code_lines: number, limit: number = configured_limit()): Line
 	}
 }
 
-function probe_rule(): string {
+// The counting options are the project's own, so a consumer that turns `skipComments` off is counted
+// its way. Lowering `max` is the only change the probe makes.
+function probe_rule(options: LineRuleOptions): string {
 	return JSON.stringify({
-		[MAX_LINES_RULE]: [PROBE_SEVERITY, { ...max_lines_options(), max: PROBE_MAX }],
+		[MAX_LINES_RULE]: [PROBE_SEVERITY, { ...options, max: PROBE_MAX }],
 	})
 }
 
-function probe_arguments(file_paths: ReadonlyArray<string>, project_root: string): Array<string> {
+function cache_prefix(key: string): string {
+	const digest = createHash('sha256').update(key).digest('hex').slice(0, CACHE_KEY_LENGTH)
+
+	return `${CACHE_PREFIX}${digest}-`
+}
+
+function probe_arguments(group: ProbeGroup, project_root: string): Array<string> {
 	return [
 		...FORMAT_FLAGS,
 		RULE_FLAG,
-		probe_rule(),
+		probe_rule(group.options),
 		CACHE_LOCATION_FLAG,
-		stamp_file.stamp_path(CACHE_PREFIX, project_root),
-		...file_paths,
+		stamp_file.stamp_path(cache_prefix(group.key), project_root),
+		...group.paths,
 	]
 }
 
@@ -163,13 +188,10 @@ function probe_command(project_root: string, probe_args: ReadonlyArray<string>):
 
 // `execa` directly rather than through `buffered-process.ts`: that helper merges stderr into stdout
 // and forces color, both of which a JSON reader cannot use.
-async function run_probe(
-	file_paths: ReadonlyArray<string>,
-	project_root: string,
-): Promise<string | undefined> {
+async function run_probe(group: ProbeGroup, project_root: string): Promise<string | undefined> {
 	const [bin, ...command_arguments] = probe_command(
 		project_root,
-		probe_arguments(file_paths, project_root),
+		probe_arguments(group, project_root),
 	)
 
 	try {
@@ -261,24 +283,80 @@ function lintable_paths(file_paths: ReadonlyArray<string>): ReadonlyArray<string
 	return file_paths.filter((file_path) => is_lintable_path(file_path))
 }
 
-// One eslint run for every path asked about, rather than one per path. The cost of this report is a
-// process start, so the number of paths is the one thing that must not multiply it.
+// One eslint run per *distinct counting method*, rather than one per path. The cost of this report is
+// a process start, so the number of paths is the one thing that must not multiply it — and the number
+// of distinct `max-lines` option sets in one project is one, in every configuration that does not
+// deliberately count two groups of files differently (joshuafolkken/kit#1454).
+// The keys are sorted before they are written out, so two config blocks that state the same options in
+// a different order are one group rather than two. Unsorted, a purely cosmetic difference would split
+// the probe in two and cost a second eslint process for nothing.
+function options_key(options: LineRuleOptions): string {
+	return JSON.stringify(
+		options,
+		Object.keys(options).toSorted((left, right) => left.localeCompare(right)),
+	)
+}
+
+function grouped(
+	options_by_path: ReadonlyMap<string, LineRuleOptions>,
+): ReadonlyMap<string, ProbeGroup> {
+	const groups = new Map<string, ProbeGroup>()
+
+	for (const [file_path, options] of options_by_path) {
+		const key = options_key(options)
+		const group = groups.get(key) ?? { key, options, paths: [] }
+
+		group.paths.push(file_path)
+		groups.set(key, group)
+	}
+
+	return groups
+}
+
+async function counts_for(
+	options_by_path: ReadonlyMap<string, LineRuleOptions>,
+	project_root: string,
+): Promise<ReadonlyMap<string, number>> {
+	const groups: Array<ProbeGroup> = []
+
+	for (const [, group] of grouped(options_by_path)) groups.push(group)
+
+	const outputs = await Promise.all(
+		groups.map(async (group) => await run_probe(group, project_root)),
+	)
+	const counts = new Map<string, number>()
+
+	for (const output of outputs) {
+		for (const [file_path, code_lines] of parse_counts(output)) counts.set(file_path, code_lines)
+	}
+
+	return counts
+}
+
+function budget_for(
+	code_lines: number | undefined,
+	limit: number | undefined,
+): LineBudget | undefined {
+	if (code_lines === undefined || limit === undefined) return undefined
+
+	return budget_of(code_lines, limit)
+}
+
+// A path is counted only where its limit is known, because a count with nothing to compare it against
+// is reported as a bare number rather than as a budget — so probing it would buy nothing.
 async function budgets_for(
 	file_paths: ReadonlyArray<string>,
 	project_root: string,
 ): Promise<ReadonlyArray<FileBudget>> {
-	const present = lintable_paths(file_paths)
-	const raw_output = present.length === 0 ? undefined : await run_probe(present, project_root)
-	const counts = parse_counts(raw_output)
-	const limit = configured_limit()
+	const options = await effective_limit.options_for(lintable_paths(file_paths), project_root)
+	const counts = await counts_for(options, project_root)
 
 	return file_paths.map((file_path) => {
-		const code_lines = counts.get(path.resolve(file_path))
+		const resolved = path.resolve(file_path)
+		const code_lines = counts.get(resolved)
+		const limit = options.get(resolved)?.max
 
-		return {
-			file_path,
-			budget: code_lines === undefined ? undefined : budget_of(code_lines, limit),
-		}
+		return { file_path, limit, budget: budget_for(code_lines, limit) }
 	})
 }
 
@@ -311,9 +389,9 @@ const line_budget = {
 	advice,
 	budget_of,
 	budgets_for,
-	configured_limit,
 	describe,
 	is_lintable_path,
+	near_limit_percent,
 	near_limit_threshold,
 	parse_counts,
 	probe_arguments,
