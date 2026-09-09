@@ -190,12 +190,15 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   changes. **Only the seam and the branch differ.** `under`, and the run continues. `over` — or a
   run the check could not answer for — and the run **stops before the work starts**: send a
   `confirmation` Telegram carrying the figure the command printed on standard error and the resume
-  command (`fullrun #<N>` / `halfrun #<N>`, unchanged, in a fresh session), run
+  command — **the invocation as it was typed, in a fresh session**, so a `#N` entry resumes as
+  `fullrun #<N>` / `halfrun #<N>` and a `new` entry resumes as `fullrun new` / `halfrun new`, since
+  the stop happens before the Issue is filed and there is no number to name — then run
   `pnpm josh run:release`, and stop. Nothing has been filed, branched, edited or pushed yet, which is
   what makes the entry the cheapest stop a run has and the reason the question is asked here rather
   than after the plan. **A fresh session is structurally `under`** — its first request carries the
-  resident preamble alone, measured at a median of 54,974 against the 150,000 line — so this never
-  stops a run that had nothing to hand off. **A dispatched child does not ask it, and that is a
+  resident preamble alone, well below the 150,000 line (the measured median is in `epicrun.md` →
+  "The hand-off", with the rest of the derivation) — so this never stops a run that had nothing to
+  hand off. **A dispatched child does not ask it, and that is a
   prohibition rather than an omission.** `epicrun`, `queue` and `backlogrun` already own this
   question at their own seam — `epicrun.md` → "The hand-off" — where the drain, the lane reading and
   the resume command that continues the batch all live. A child that asked at its own entry would

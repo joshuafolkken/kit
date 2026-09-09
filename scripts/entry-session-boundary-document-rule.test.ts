@@ -31,7 +31,10 @@ const HANDOFF_CITATION = '`epicrun.md` → "The hand-off"'
 // so the branch has to be attached to the answer in words.
 const NOT_A_JUDGEMENT = 'never on a judgement about how long the session feels'
 
-// The threshold's derivation belongs to the single source. An entry that restates it drifts, and
+const RESUME_TITLE = 'resumes as the invocation that was typed, number or not'
+const NO_DERIVATION_TITLE = 'does not copy the derivation %j'
+
+// The threshold's derivation belongs to the single source. A document that restates it drifts, and
 // the next reader cannot tell which copy the number was actually drawn from.
 const DERIVATION_ONLY: ReadonlyArray<string> = ['223 セッションの実測', '54,974', '121,514']
 
@@ -52,12 +55,23 @@ describe(`${SKILL} — the entry application is defined once`, () => {
 		expect(unwrapped).toContain('before anything else is started')
 	})
 
+	// Anchored on the clause that carries the release, not on the bare command: `run:release` occurs
+	// elsewhere in this document, so a bare substring stays green after the step is deleted.
 	it('releases the tree on the stop rather than keeping the hold', () => {
-		expect(unwrapped).toContain(RELEASE_COMMAND)
+		expect(unwrapped).toContain(`then run \`${RELEASE_COMMAND}\`, and stop`)
+	})
+
+	// A `new` entry stops before the Issue exists, so a resume command naming a number is unusable.
+	it(RESUME_TITLE, () => {
+		expect(unwrapped).toContain('a `new` entry resumes as `fullrun new` / `halfrun new`')
 	})
 
 	it('routes the check itself to its single source instead of restating it', () => {
 		expect(unwrapped).toContain(HANDOFF_CITATION)
+	})
+
+	it.each(DERIVATION_ONLY)(NO_DERIVATION_TITLE, (marker) => {
+		expect(unwrapped).not.toContain(marker)
 	})
 
 	// A batch owns this question at its own seam, with the drain and the resume command that
@@ -83,10 +97,21 @@ describe.each(ENTRIES)('%s — asks the boundary at its entry', (document_path) 
 	})
 
 	// `over` at the entry is a stop with an empty tree, which is the one stop that both notifies and
-	// hands the tree back.
+	// hands the tree back. Both markers are clauses unique to this paragraph: `confirmation` and
+	// `run:release` each occur elsewhere in these documents, so bare substrings would stay green
+	// after the notification or the release was deleted from it.
 	it('stops with a confirmation notification and releases the tree', () => {
-		expect(unwrapped).toContain('confirmation')
-		expect(unwrapped).toContain(RELEASE_COMMAND)
+		expect(unwrapped).toContain(
+			'send a `confirmation` Telegram carrying the figure printed on standard error',
+		)
+		expect(unwrapped).toContain(
+			`run \`${RELEASE_COMMAND}\` — the tree carries nothing at this point`,
+		)
+	})
+
+	// A `new` entry stops before its Issue is filed, so `#<N>` names nothing.
+	it(RESUME_TITLE, () => {
+		expect(unwrapped).toContain('which has no number to name yet')
 	})
 
 	// Without this half the check fires inside a batch, where it stops the wrong run.
@@ -99,7 +124,7 @@ describe.each(ENTRIES)('%s — asks the boundary at its entry', (document_path) 
 		expect(unwrapped).toContain(HANDOFF_CITATION)
 	})
 
-	it.each(DERIVATION_ONLY)('does not copy the derivation %j', (marker) => {
+	it.each(DERIVATION_ONLY)(NO_DERIVATION_TITLE, (marker) => {
 		expect(unwrapped).not.toContain(marker)
 	})
 })
