@@ -1,7 +1,5 @@
-import { cost_blocks } from '#scripts/cost/cost-blocks'
 import { time_bundle_call, type BundleFacts } from './time-bundle-call'
 import { time_bundles } from './time-bundles'
-import { time_shell } from './time-shell'
 import { time_spans, type Span } from './time-spans'
 
 // Whether the call about to go out should be refused because the run has stopped batching
@@ -91,21 +89,20 @@ interface GuardedCall {
 //
 // **It is held here rather than at the hook's matcher, which names `Bash` alone.** A matcher is
 // settings a consumer can widen; this is the guarantee, and it has to hold whatever the wiring says.
-const WRITING_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'NotebookEdit'])
-// The write words, matched **anywhere in the line rather than as its leading word**. A chain is
-// labelled by its first segment — `cat notes.md && sed -i '' s/a/b/ src/x.ts` reads as `cat` — so the
-// leading word says nothing about what the rest of the line does. That is the same shape, and the same
-// reason, as `time-bundle-call.ts`'s own mutation-word scan, and the tokenizer is reused from there so
-// the two cannot disagree about where a word ends.
 //
-// `sed` is on that module's read list deliberately — an in-place edit is what `Edit` does, and a turn
-// may issue several. Here it is excluded outright rather than tested for `-i`: a read-only `sed` is
-// then never refused, which is a call allowed that could have been refused.
-const WRITING_WORDS: ReadonlySet<string> = new Set(['dd', 'sed', 'tee'])
-// A redirection, tested as a character rather than a token, because `a.json>b.json` needs no spaces
-// around it. It matches a `->` inside a grep pattern too, which again only allows a call that could
-// have been refused — the direction every rule here leans.
-const REDIRECTION = '>'
+// **The set itself lives in `time-bundle-call.ts`** since joshuafolkken/kit#1509, beside the rest of
+// what a call is, because the sequence builder needs the same answer and a second copy here is what
+// let the two disagree — the builder had no way to ask at all, so it read a run of edits to one file
+// as a chain of dependent calls and no sequence ever formed.
+//
+// **Widening the matcher to `Edit` was considered and rejected there, on measured cost.** A run of
+// edits reaches the guard through the transcript it reads, not through being matched: the spans are
+// already in the window, and joshuafolkken/kit#1509's fix is what lets them accumulate into a sequence
+// the next guarded call is refused against. Matching `Edit` as well would add a `pnpm josh` dispatch —
+// about 2.4 s measured on this checkout — to every edit a run makes, and buy nothing a refusal could
+// use, because `is_guarded_call` answers `false` for every write and always will. The only thing left
+// for it to emit is an advisory, and that is the `PostToolUse` mechanism joshuafolkken/kit#1344 already
+// measured at 38 notices and no change in the number.
 
 // One line, and it says four things: what happened, what to do instead, where the rule is written, and
 // what to do when the turn was already batching or the call really is alone. **The last of those is not
@@ -122,24 +119,15 @@ const REASON =
 	`genuinely has nothing to go beside it, reissue it as it was: this fires once per run of ` +
 	`single-call turns and cannot repeat on the call in hand.`
 
-function is_writing_command(command: string): boolean {
-	if (command.includes(REDIRECTION)) return true
-
-	return time_bundle_call.words_of(command).some((word) => WRITING_WORDS.has(word))
-}
-
-function is_writing_call(call: GuardedCall): boolean {
-	if (WRITING_TOOLS.has(call.name)) return true
-	if (call.name !== cost_blocks.BASH_TOOL) return false
-
-	return is_writing_command(time_shell.bash_command(call.input))
-}
-
 // Whether this call is one the guard could ever refuse, asked before any transcript is read. **The
 // caller uses it to skip that read**: a quarter-megabyte read inside a hook that holds every call is
 // not worth paying on a `pnpm josh` invocation the answer can never be about.
 function is_guarded_call(call: GuardedCall): boolean {
-	return time_bundle_call.call_facts(call.name, call.input).is_bundleable && !is_writing_call(call)
+	const facts = time_bundle_call.call_facts(call.name, call.input)
+
+	// **`may_write`, not `is_writing`** — this is the refusal test, and it is the one that has to
+	// over-call. The dependency test reads the other field, which may not (joshuafolkken/kit#1509).
+	return facts.is_bundleable && !facts.may_write
 }
 
 // **A shared target is a dependency, and it is what keeps the guard off the search-then-read pair.**
@@ -147,7 +135,7 @@ function is_guarded_call(call: GuardedCall): boolean {
 // inside of — as ordered, and reuses that test here so a call the report would never have counted as
 // recoverable is never refused either.
 function depends_on_sequence(sequence: ReadonlyArray<Span>, facts: BundleFacts): boolean {
-	return sequence.some((span) => time_bundles.shares_target(span.targets, facts.targets))
+	return sequence.some((span) => time_bundles.is_dependent(span, facts))
 }
 
 // The instant the open sequence began, as far as the window shows. An empty sequence answers `NONE`,

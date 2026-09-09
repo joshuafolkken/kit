@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { time_bundle_call } from './time-bundle-call'
+import { time_writes } from './time-writes'
 
 const READ_PATH = 'scripts/time/time-spans.ts'
 const OTHER_PATH = 'scripts/time/time-report.ts'
@@ -13,6 +14,8 @@ describe('time_bundle_call.tool_facts', () => {
 		expect(time_bundle_call.tool_facts('Read', { file_path: READ_PATH })).toEqual({
 			is_bundleable: true,
 			targets: [READ_PATH],
+			is_writing: false,
+			may_write: false,
 		})
 	})
 
@@ -26,6 +29,8 @@ describe('time_bundle_call.tool_facts', () => {
 		expect(time_bundle_call.tool_facts('Task', { file_path: READ_PATH })).toEqual({
 			is_bundleable: false,
 			targets: [],
+			is_writing: false,
+			may_write: false,
 		})
 	})
 
@@ -43,6 +48,8 @@ describe('time_bundle_call.bash_facts — which commands count', () => {
 		expect(time_bundle_call.bash_facts(`cat ${READ_PATH}`)).toEqual({
 			is_bundleable: true,
 			targets: [READ_PATH],
+			is_writing: false,
+			may_write: false,
 		})
 	})
 
@@ -56,6 +63,8 @@ describe('time_bundle_call.bash_facts — which commands count', () => {
 		expect(time_bundle_call.bash_facts(`cat ${READ_PATH} && rm ${OTHER_PATH}`)).toEqual({
 			is_bundleable: false,
 			targets: [],
+			is_writing: false,
+			may_write: false,
 		})
 	})
 
@@ -141,6 +150,79 @@ describe('time_bundle_call.bash_facts — what a command names', () => {
 	})
 })
 
+// **Whether a call writes is two questions, not one** (joshuafolkken/kit#1509). `may_write` feeds the
+// refusal test and has to over-call, because refusing a write leaves a turn half applied. `is_writing`
+// feeds the dependency test and must not, because a read wrongly called a write has its dependency
+// *removed*. Same bias, opposite consequences.
+describe('time_bundle_call — which calls write', () => {
+	it.each([
+		['Edit', true],
+		['Write', true],
+		['NotebookEdit', true],
+		['Read', false],
+		['Grep', false],
+	])('reads the tool %s as writing: %s', (name, is_expected) => {
+		const facts = time_bundle_call.tool_facts(name, { file_path: READ_PATH })
+
+		expect(facts.is_writing).toBe(is_expected)
+		expect(facts.may_write).toBe(is_expected)
+	})
+
+	// **The case the two fields exist for.** `sed` is on the read list because `sed -n` prints, so the
+	// flag is the whole of the difference — and a `sed -n` counted as a certain write would have two
+	// reads of one file read as independent, which is exactly the dependency the shared-target proxy
+	// is kept for.
+	it.each([
+		[`sed -i '' s/a/b/ ${READ_PATH}`, true],
+		[`sed -i.bak s/a/b/ ${READ_PATH}`, true],
+		[`sed --in-place=.bak s/a/b/ ${READ_PATH}`, true],
+		[`sed -n '1,200p' ${READ_PATH}`, false],
+		[`cat ${READ_PATH}`, false],
+		[`grep -rn 'a->b' ${READ_PATH}`, false],
+		[`awk '$1 > 5' ${READ_PATH}`, false],
+		// A bundled short flag is the spelling this repository's own instructions produce, and a
+		// prefix test on `-i` alone missed it — leaving one span carrying a written path in `writes`
+		// beside `is_writing: false`.
+		[`sed -ni 's/a/b/p' ${READ_PATH}`, true],
+		// Only the segment that runs the command answers. Scanned whole, any single-dash `i`
+		// downstream — `grep -i`, `find -iname`, `diff -i` — made a pure read into a certain write,
+		// and a read wrongly called a write has its dependency removed.
+		[`sed -n '1,200p' ${READ_PATH} | grep -i handler`, false],
+		[`sed -n 's/x -input/y/p' ${READ_PATH}`, false],
+	])('reads the shell line %s as certainly writing: %s', (command, is_expected) => {
+		expect(time_bundle_call.bash_facts(command).is_writing).toBe(is_expected)
+	})
+
+	// The conservative half stays wide: everything it over-calls is a call allowed that could have been
+	// refused, which is the safe direction for the refusal test and for nothing else.
+	it.each([
+		[`sed -n '1,200p' ${READ_PATH}`, true],
+		[`cat a.ts > ${READ_PATH}`, true],
+		[`cat ${READ_PATH}`, false],
+	])('reads the shell line %s as possibly writing: %s', (command, is_expected) => {
+		expect(time_bundle_call.bash_facts(command).may_write).toBe(is_expected)
+	})
+})
+
+// **The two halves of one `sed` line may never disagree** (joshuafolkken/kit#1509). `time-writes.ts`
+// names *which* files an in-place `sed` wrote and this module answers *whether* it wrote at all; a
+// span carrying a path in `writes` beside `is_writing: false` is a contradiction on one row, and it is
+// exactly what two separate implementations of the test produced — one read the whole line and called
+// a piped `grep -i` a write, the other missed a bundled `sed -ni`. They share one predicate now, and
+// this suite is what would notice a second copy appearing again.
+describe('time_bundle_call — the write question is answered once', () => {
+	it.each([
+		`sed -i '' s/a/b/ ${READ_PATH}`,
+		`sed -ni 's/a/b/p' ${READ_PATH}`,
+		`sed -n '1,200p' ${READ_PATH} | grep -i handler`,
+		`sed -n '1,200p' ${READ_PATH}`,
+	])('agrees with time_writes about whether %s wrote', (command) => {
+		const has_writes = time_writes.bash_writes(command).length > 0
+
+		expect(time_bundle_call.bash_facts(command).is_writing).toBe(has_writes)
+	})
+})
+
 // The entry a caller holding a raw tool invocation uses — a `PreToolUse` payload, which has not had
 // the shell command read out of its input the way `time-spans.ts` has by the time it asks
 // (joshuafolkken/kit#1390).
@@ -148,7 +230,12 @@ describe('time_bundle_call.call_facts', () => {
 	it('unwraps a Bash input before classifying it', () => {
 		const facts = time_bundle_call.call_facts('Bash', { command: `cat ${READ_PATH}` })
 
-		expect(facts).toEqual({ is_bundleable: true, targets: [READ_PATH] })
+		expect(facts).toEqual({
+			is_bundleable: true,
+			targets: [READ_PATH],
+			is_writing: false,
+			may_write: false,
+		})
 	})
 
 	it('refuses a Bash input that writes', () => {
@@ -161,6 +248,8 @@ describe('time_bundle_call.call_facts', () => {
 		expect(time_bundle_call.call_facts('Read', { file_path: OTHER_PATH })).toEqual({
 			is_bundleable: true,
 			targets: [OTHER_PATH],
+			is_writing: false,
+			may_write: false,
 		})
 	})
 

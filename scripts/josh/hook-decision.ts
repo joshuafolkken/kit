@@ -41,6 +41,7 @@ const DENY_DECISION = 'deny'
 // No record means nothing has been refused yet, and every span began after instant zero — which is
 // the answer wanted: the first qualifying accumulation of a run is refused.
 const NEVER_MS = 0
+const MISSING_FILE = 'ENOENT'
 
 // More than one spelling, because the mistake on this side is silent: a value meant to disable a
 // guard that the list does not recognize leaves it on, and the person sees refusals they asked to
@@ -69,6 +70,56 @@ function deny_envelope(reason: string): string {
 			permissionDecisionReason: reason,
 		},
 	})
+}
+
+// **A notice, not a decision.** It carries no `permissionDecision`, so the call proceeds exactly as it
+// would have; `additionalContext` is what reaches the model, and `systemMessage` is what the person
+// watching sees. Both are filled because either channel alone leaves one of the two blind — and the
+// whole point of this envelope is that a guard which cannot look stops being invisible.
+function notice_envelope(notice: string): string {
+	return JSON.stringify({
+		systemMessage: notice,
+		hookSpecificOutput: { hookEventName: HOOK_EVENT_NAME, additionalContext: notice },
+	})
+}
+
+// Named after the guard that raised it rather than after any one of them: `create_transcript_guard` is
+// the shell three hooks are built from, and a fault that announced the wrong origin would send whoever
+// reads it to the wrong file.
+function stamp_fault(switch_key: string): string {
+	return (
+		`⚠ ${switch_key}: the run is past the limit but the refusal stamp could not be written, so this ` +
+		`call was allowed rather than refused. Without the stamp a refusal could repeat and wedge the ` +
+		`run. Batch the calls that do not need each other anyway, and check the temp directory is writable.`
+	)
+}
+
+// **A transcript that does not exist yet is not a fault.** A delegated unit's own file is named before
+// anything is written under it, so a fork's first guarded calls read a path with no file behind it —
+// `time-hook-transcript.ts` states that "no history" is the honest verdict there. Reported as a fault
+// it would print on every early call of every fork, which is the routine case drowning the signal this
+// exists to raise (joshuafolkken/kit#1509).
+function is_missing_file(error: unknown): boolean {
+	if (!(error instanceof Error) || !('code' in error)) return false
+
+	return typeof error.code === 'string' && error.code === MISSING_FILE
+}
+
+function error_text(error: unknown): string {
+	if (error instanceof Error) return error.message
+
+	return typeof error === 'string' ? error : 'a value that is not an error'
+}
+
+function fault_notice(switch_key: string, error: unknown): string | undefined {
+	if (is_missing_file(error)) return undefined
+
+	const detail = error_text(error)
+
+	return (
+		`⚠ ${switch_key}: the guard could not read the run's history, so this call was allowed without ` +
+		`being checked — silence here is not evidence that the run is batching. Cause: ${detail}`
+	)
 }
 
 interface RefusalStamp {
@@ -156,10 +207,22 @@ interface TranscriptGuardSpec {
 	reason: string
 }
 
+// What one hook invocation decided. **`fault` is the half that did not exist** (joshuafolkken/kit#1509):
+// every failure still allows the call, but a failure that nobody can see is indistinguishable from a
+// run that was batching properly — so the guard could be dead for two hours and read as satisfied.
+// `reason` refuses; `fault` allows and says so.
+interface GuardOutcome {
+	reason: string | undefined
+	fault: string | undefined
+}
+
+const NO_OUTCOME: GuardOutcome = { reason: undefined, fault: undefined }
+
 interface TranscriptGuard {
 	is_enabled: () => boolean
 	refusal_path: (transcript_path: string) => string
 	refusal: (raw_payload: string, now_ms?: number) => string | undefined
+	outcome: (raw_payload: string, now_ms?: number) => GuardOutcome
 }
 
 function guard_reason_for_payload(
@@ -167,10 +230,10 @@ function guard_reason_for_payload(
 	stamp: RefusalStamp,
 	payload: HookPayload,
 	now_ms: number,
-): string | undefined {
+): GuardOutcome {
 	const call = { name: payload.tool_name, input: payload.tool_input }
 
-	if (!spec.is_candidate(call)) return undefined
+	if (!spec.is_candidate(call)) return NO_OUTCOME
 
 	// A hook firing inside a delegated unit is handed the *parent's* path, so the fork's own file is
 	// derived here rather than judged from the parent's frozen timeline (joshuafolkken/kit#1424).
@@ -180,21 +243,26 @@ function guard_reason_for_payload(
 
 	const run = { transcript, now_ms }
 
-	if (!spec.should_block(tail, call, stamp.last_ms(target), run)) return undefined
-	if (!stamp.record(target, now_ms)) return undefined
+	if (!spec.should_block(tail, call, stamp.last_ms(target), run)) return NO_OUTCOME
 
-	return spec.reason
+	// A refusal that cannot be recorded is not made — the argument that a refusal cannot repeat rests
+	// on the stamp, so refusing without one risks the wedge. It is reported instead of being swallowed.
+	if (!stamp.record(target, now_ms)) {
+		return { reason: undefined, fault: stamp_fault(spec.switch_key) }
+	}
+
+	return { reason: spec.reason, fault: undefined }
 }
 
-function guard_reason(
+function guard_outcome(
 	spec: TranscriptGuardSpec,
 	stamp: RefusalStamp,
 	raw_payload: string,
 	now_ms: number,
-): string | undefined {
+): GuardOutcome {
 	const payload = parse_hook_payload(raw_payload)
 
-	if (payload === undefined || !is_switch_enabled(spec.switch_key)) return undefined
+	if (payload === undefined || !is_switch_enabled(spec.switch_key)) return NO_OUTCOME
 
 	return guard_reason_for_payload(spec, stamp, payload, now_ms)
 }
@@ -214,25 +282,46 @@ function create_transcript_guard(spec: TranscriptGuardSpec): TranscriptGuard {
 	// half-written tail, a temp directory that cannot be written — each ends as "no refusal", for the
 	// same reason `format-edited-file.ts` swallows a formatter it could not start: a hook that failed
 	// closed would stop a run over its own plumbing.
-	function refusal(raw_payload: string, now_ms: number = Date.now()): string | undefined {
+	//
+	// **What changed is that it no longer does so in silence** (joshuafolkken/kit#1509). The call still
+	// goes through — failing open is the right call and is not being revisited — but the fault comes
+	// back as text the run can see, so "the guard said nothing" and "the guard could not look" stop
+	// being the same observation.
+	function outcome(raw_payload: string, now_ms: number = Date.now()): GuardOutcome {
 		try {
-			return guard_reason(spec, stamp, raw_payload, now_ms)
-		} catch {
-			return undefined
+			return guard_outcome(spec, stamp, raw_payload, now_ms)
+		} catch (error) {
+			return { reason: undefined, fault: fault_notice(spec.switch_key, error) }
 		}
 	}
 
-	return { is_enabled, refusal, refusal_path }
+	function refusal(raw_payload: string, now_ms: number = Date.now()): string | undefined {
+		return outcome(raw_payload, now_ms).reason
+	}
+
+	return { is_enabled, outcome, refusal, refusal_path }
 }
 
 // Nothing at all reaches stdout on the ordinary call, so what the harness parses stays empty unless
 // the call is being refused.
-function write_decision(raw_payload: string, refusal: (raw: string) => string | undefined): void {
+function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutcome): void {
 	load_environment_file()
 
-	const reason = refusal(raw_payload)
+	const { reason, fault } = outcome(raw_payload)
 
 	if (reason !== undefined) process.stdout.write(`${deny_envelope(reason)}\n`)
+	else if (fault !== undefined) process.stdout.write(`${notice_envelope(fault)}\n`)
+}
+
+// The refusal-only shape, kept so the guards not yet moved across keep working unchanged. It is a
+// wrapper rather than a second implementation, so both paths write the same envelopes.
+//
+// **A guard still calling this discards any fault it raised** — `investigation-guard.ts` is the one
+// that does, so a stamp it could not write there is still silent. That is the same gap
+// joshuafolkken/kit#1509 closed for the batching guard, left standing deliberately: this Issue's
+// subject is the batching guard, and moving another hook across belongs with its own test.
+function write_decision(raw_payload: string, refusal: (raw: string) => string | undefined): void {
+	write_outcome(raw_payload, (raw) => ({ reason: refusal(raw), fault: undefined }))
 }
 
 // Run from a terminal there is no payload coming, and waiting for one looks like a hang.
@@ -248,12 +337,23 @@ const hook_decision = {
 	create_refusal_stamp,
 	create_transcript_guard,
 	deny_envelope,
+	fault_notice,
 	is_switch_enabled,
 	load_environment_file,
+	notice_envelope,
 	parse_hook_payload,
 	report_no_payload,
+	stamp_fault,
 	write_decision,
+	write_outcome,
 }
 
-export type { GuardRun, HookPayload, RefusalStamp, TranscriptGuard, TranscriptGuardSpec }
+export type {
+	GuardOutcome,
+	GuardRun,
+	HookPayload,
+	RefusalStamp,
+	TranscriptGuard,
+	TranscriptGuardSpec,
+}
 export { hook_decision }

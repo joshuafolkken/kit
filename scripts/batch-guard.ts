@@ -43,15 +43,17 @@ const GUARD = hook_decision.create_transcript_guard({
 })
 
 const batch_refusal = GUARD.refusal
+const batch_outcome = GUARD.outcome
 const { is_enabled, refusal_path } = GUARD
 const { deny_envelope, load_environment_file, DISABLED_VALUES } = hook_decision
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	if (process.stdin.isTTY) hook_decision.report_no_payload('batch:guard')
-	else hook_decision.write_decision(await text(process.stdin), batch_refusal)
+	else hook_decision.write_outcome(await text(process.stdin), batch_outcome)
 }
 
 export {
+	batch_outcome,
 	batch_refusal,
 	deny_envelope,
 	is_enabled,

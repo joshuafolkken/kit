@@ -24,6 +24,7 @@ const UNVARIED = {
 	check_key: '',
 	marker: time_markers.NO_MARKER,
 	is_bundleable: false,
+	is_writing: false,
 	targets: [],
 	writes: [],
 	message_id: time_spans.NO_MESSAGE_ID,

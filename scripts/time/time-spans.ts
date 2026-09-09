@@ -118,6 +118,10 @@ interface ToolCall {
 	marker: PhaseMarker
 	is_bundleable: boolean
 	targets: ReadonlyArray<string>
+	// Carried beside `targets` because sharing a target means something different depending on it: a
+	// second write to one file is independent work, a read of a file just written is not
+	// (joshuafolkken/kit#1509).
+	is_writing: boolean
 	writes: ReadonlyArray<string>
 	message_id: string
 	issue: number
@@ -368,6 +372,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		marker: event.marker,
 		is_bundleable: event.is_bundleable,
 		targets: event.targets,
+		is_writing: event.is_writing,
 		writes: event.writes,
 		message_id: event.message_id,
 		issue: event.issue,
