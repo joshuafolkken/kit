@@ -204,6 +204,11 @@ interface Span extends ToolCall, ResultFacts {
 	// seen — so it has `is_continuation`'s shape rather than `marker`'s: every span the walk yields is
 	// empty, and only `time_background.positioned` sets it.
 	background_command: string
+	// When the harness said the command this span launched had finished, and `NO_FINISH` where nothing
+	// said (joshuafolkken/kit#1696). It is the notice's own instant rather than a reading's, so it is
+	// keyed to the launch by id at parse time — the notice sits on a line of its own, which is why no
+	// field read off this span's own result could carry it.
+	background_ended_ms: number
 }
 
 interface TimelineEvent extends ToolCall, ResultFacts {
@@ -390,19 +395,44 @@ function equal_durations(duration_ms: number): Pick<Span, 'duration_ms' | 'own_d
 	return { duration_ms, own_duration_ms: duration_ms }
 }
 
-// The three background fields of a span nothing backgrounded, which is every span a test builds
+// The four background fields of a span nothing backgrounded, which is every span a test builds
 // (joshuafolkken/kit#1662). Written once here for the reason `equal_durations` above is: three
 // fixtures assemble a `Span` literal, and a field added to two of them is a drift that surfaces only
 // as a table disagreeing with the transcript it was read from.
-type NoBackground = Pick<Span, 'background_id' | 'reads_background' | 'background_command'>
+type BackgroundFields = Pick<
+	Span,
+	'background_id' | 'reads_background' | 'background_command' | 'background_ended_ms'
+>
 
-function no_background(): NoBackground {
+function no_background(): BackgroundFields {
 	const none = time_background.NO_BACKGROUND
 
-	return { background_id: none, reads_background: none, background_command: none }
+	return {
+		background_id: none,
+		reads_background: none,
+		background_command: none,
+		background_ended_ms: time_background.NO_FINISH,
+	}
 }
 
-function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
+// When the harness said each backgrounded command ended, keyed by the id it assigned. Named so the
+// signature below fits the line, and because the map is a fact about the whole transcript rather than
+// about any one span.
+type FinishedAt = ReadonlyMap<string, number>
+
+// The same four fields on a span the walk yields, which is where three of them are still empty:
+// `background_command` is resolved after the walk by `time_background.positioned`, and the instant the
+// command ended comes from a notification line of its own rather than from this event.
+function background_fields(event: TimelineEvent, finished: FinishedAt): BackgroundFields {
+	return {
+		background_id: event.background_id,
+		reads_background: event.reads_background,
+		background_command: time_background.NO_BACKGROUND,
+		background_ended_ms: finished.get(event.background_id) ?? time_background.NO_FINISH,
+	}
+}
+
+function to_spans(events: ReadonlyArray<TimelineEvent>, finished: FinishedAt): Array<Span> {
 	return events.slice(1).map((event, index) => ({
 		category: event.category,
 		label: event.label,
@@ -418,11 +448,9 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		branch: event.branch,
 		call_id: event.call_id,
 		outcome: event.outcome,
-		background_id: event.background_id,
-		reads_background: event.reads_background,
 		followup_stages: event.followup_stages,
 		is_continuation: false,
-		background_command: time_background.NO_BACKGROUND,
+		...background_fields(event, finished),
 		ended_ms: event.timestamp_ms,
 		...equal_durations(event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms)),
 	}))
@@ -441,7 +469,7 @@ function parse_timeline(text: string): Timeline {
 		// **The positioning happens here rather than in a caller** (joshuafolkken/kit#1662): a launch and
 		// the call that reads its output are in one transcript, and by the time spans have been merged
 		// across sessions and trimmed they are fragments rather than calls.
-		spans: time_background.positioned(to_spans(events)),
+		spans: time_background.positioned(to_spans(events, time_background.finished_at(lines))),
 	}
 }
 

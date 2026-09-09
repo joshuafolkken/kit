@@ -52,10 +52,21 @@ const LINE_SCHEMA = z.object({
 	// branch `<N>-<slug>`. Read here rather than re-parsed by a second reader so `josh time --issue`
 	// and `josh cost --issue` answer from the same field (joshuafolkken/kit#1268).
 	gitBranch: z.string().nullish(),
+	// The two fields outside `message` that the harness writes an end-of-task notice on
+	// (joshuafolkken/kit#1696). **Both are read as `unknown` rather than as strings**: a schema
+	// insisting on a string here would reject every line whose `content` is a list of blocks — which is
+	// most of them — and a rejected line is dropped from the timeline entirely, so the shares would stop
+	// reconstructing the elapsed time. The shape is checked at the read below instead.
+	content: z.unknown().nullish(),
+	attachment: z.unknown().nullish(),
 	message: MESSAGE_SCHEMA.nullish(),
 })
 
 const UNKNOWN_BRANCH = ''
+// The field an attachment line carries the notice in. Named rather than written as a literal for the
+// reason `time-background.ts`'s `BASH_ID_KEY` is: `dot-notation` rewrites `record['prompt']` into
+// `record.prompt`, which a value read as an index-signature record does not have.
+const PROMPT_KEY = 'prompt'
 const NO_MESSAGE_ID = ''
 // How much of an errored body is kept (joshuafolkken/kit#1642). A refusal's body *is* the reason the
 // harness wrote back, from its first character, so an opening this long identifies the speaker
@@ -99,6 +110,12 @@ interface TranscriptLine {
 	type: string
 	timestamp_ms: number
 	branch: string
+	// The background run this line is the harness's end-of-task notice for, and `''` for every other
+	// line (joshuafolkken/kit#1696). It is read here rather than downstream for the reason every
+	// derived field above is: the notice is the line's whole content, which a span does not keep, and
+	// it is the only thing in a transcript that says a command had *finished* rather than merely been
+	// looked at.
+	finished_background: string
 	// The assistant message this line is one block of, or `''` where the line carries none — a user
 	// line, or an assistant line written without an id. The empty string is never treated as a group:
 	// every line lacking an id would otherwise fall into one bucket spanning the whole file.
@@ -157,6 +174,20 @@ function message_fields(
 	return { message_id: message?.id ?? NO_MESSAGE_ID, blocks: to_blocks(message?.content) }
 }
 
+// **One notice reaches the transcript on any of three line kinds, and which of them a session holds
+// varies** (joshuafolkken/kit#1696). The harness writes it on a `queue-operation` line when the notice
+// is generated, on an `attachment` line when it is delivered, and on a `user` line where it enters the
+// conversation — and a run measured against one carrier alone came back unmeasured whenever the
+// session happened to hold a different one. All three are read, and `time_background.finished_at`
+// keeps the earliest instant per id, so what is paired with the launch is when the task *ended* rather
+// than when the run was told about it.
+function notice_text(data: z.infer<typeof LINE_SCHEMA>): string {
+	const attachment = json_value.is_record(data.attachment) ? data.attachment[PROMPT_KEY] : undefined
+	const carried = [data.message?.content, data.content, attachment]
+
+	return carried.find((one): one is string => typeof one === 'string') ?? ''
+}
+
 // A line without a parseable timestamp is dropped rather than dated: it has no place on a timeline,
 // and inventing one would move every span around it.
 function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined {
@@ -168,6 +199,7 @@ function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined 
 		type: data.type ?? '',
 		timestamp_ms,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
+		finished_background: time_background.finished_id(notice_text(data)),
 		...message_fields(data.message),
 	}
 }

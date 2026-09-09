@@ -13,11 +13,19 @@ import type { Span } from './time-spans'
 // launch call and nothing else: run #1597's `gate` read 4.4 s beside a last-8 median of 32.4 s,
 // which is a foreground reading and a launch reading averaged together.
 //
-// **The transcript does record enough to place it, in two halves that have to be read at once.**
-// The launch's result body says `Command running in background with ID: <id>`, and the call that
-// later reads the output names `…/tasks/<id>.output` in its command string. Neither survives on its
-// own: a span keeps no input and no body, so both are read at parse time and carried as fields, the
-// same rule `marker`, `check_key` and `writes` already follow.
+// **The transcript does record enough to place it, in three halves that have to be read at once.**
+// The launch's result body says `Command running in background with ID: <id>`; the call that later
+// reads the output names `…/tasks/<id>.output` in its command string, or carries the shell id in a
+// field; and the task-notification line the harness writes when the command ends names the same id in
+// `<task-id>` (joshuafolkken/kit#1696). None survives on its own: a span keeps no input and no body,
+// so all three are read at parse time and carried as fields, the same rule `marker`, `check_key` and
+// `writes` already follow.
+//
+// **The third is what tells a join from a progress poll.** Until joshuafolkken/kit#1696 the window
+// closed at the first call that read the output at all, which was right while the only way to read one
+// was to `tail` it after the fact — and wrong the moment joshuafolkken/kit#1662 made a `BashOutput`
+// join detectable, because `BashOutput` is the tool a run *polls* with. A poll thirty seconds into an
+// eight-minute gate then closed the window and, worse, marked it measured.
 //
 // **What is positioned is `own_duration_ms`, never `duration_ms`.** The four category shares
 // reconstruct the elapsed time exactly, and that invariant is what makes two runs comparable — so
@@ -34,10 +42,26 @@ import type { Span } from './time-spans'
 // joshuafolkken/kit#1608 could not build while the span was the launch call.
 
 const NO_BACKGROUND = ''
+// No notice said this command had finished, which is a different fact from finishing at instant zero:
+// the window then has no reading that can be known to have seen the end, and the run is reported as
+// not measured rather than closed at whichever call happened to look first.
+const NO_FINISH = 0
 
 // The launch's own result body, which is the only place the harness writes the id it assigns. Read
 // as a derived fact and the body discarded, exactly as `has_failure_line` and `followup_stages` are.
 const LAUNCH_PATTERN = /running in background with ID:\s*([\w-]+)/iu
+// The notice the harness writes when a task it took into the background ends
+// (joshuafolkken/kit#1696). It is anchored at the start because the whole content of that line *is*
+// the notice — a body merely quoting one is text, the same hazard `read_id` unquotes for — and it
+// keys on `<task-id>`, which the harness fills with the very id the launch's own body announced, so
+// the pairing needs no second key and no lookup through the call id.
+//
+// **The status is deliberately not read.** A task-notification is written when the task ends; the
+// status says *how* it ended — `completed`, `failed`, `killed` and `stopped` were all observed, and
+// every one of them means the command is no longer running. Branching on the word would mean keeping
+// an enumeration of the harness's spellings, and a spelling it added later would silently start
+// reporting finished commands as never finished.
+const FINISH_PATTERN = /^<task-notification>[\s\S]*?<task-id>([\w-]+)<\/task-id>/u
 // The output file every reader of a backgrounded command names, whichever command it uses to read
 // it — `tail`, `cat`, `sed`, `grep`, or the `Monitor` tool, all of which carry the path.
 const OUTPUT_PATTERN = /tasks\/([\w-]+)\.output/u
@@ -72,6 +96,37 @@ function launch_id(text: string): string {
 	return LAUNCH_PATTERN.exec(text)?.[1] ?? NO_BACKGROUND
 }
 
+// The background run a task-notification line reports the end of, or nothing for every other line —
+// which is nearly all of them, since only one line kind in a transcript carries this notice.
+function finished_id(text: string): string {
+	return FINISH_PATTERN.exec(text)?.[1] ?? NO_BACKGROUND
+}
+
+// One line, as much of it as this reading needs. Taken structurally rather than as a `TranscriptLine`
+// so the import stays one-way: `time-transcript-line.ts` already imports this module to read the two
+// ids off a body, and asking for its type back would close the cycle.
+interface FinishNotice {
+	finished_background: string
+	timestamp_ms: number
+}
+
+// When the harness said each backgrounded command finished, keyed by the id it assigned.
+//
+// **The earliest instant for an id wins, and that is what makes the answer the *end* of the task.**
+// One notice reaches the transcript on three line kinds at three different moments — generated,
+// delivered, consumed — and a run resumed under the same id notifies again later still. The first of
+// those is when the command stopped running; every later one is when something got round to it.
+// Sorted latest first so the earliest entry is the *last* one written for its key, which is the one a
+// `Map` built from pairs keeps. The sort is over the notices alone, which is a handful of lines in a
+// transcript of thousands.
+function finished_at(lines: ReadonlyArray<FinishNotice>): Map<string, number> {
+	const notices = lines
+		.filter((one) => one.finished_background !== NO_BACKGROUND)
+		.toSorted((left, right) => right.timestamp_ms - left.timestamp_ms)
+
+	return new Map(notices.map((one) => [one.finished_background, one.timestamp_ms]))
+}
+
 // One backgrounded command, from the instant it was launched to the instant its result was read.
 //
 // `is_read` is the fourth field rather than an `ended_ms` of `undefined`, because the two answers
@@ -92,13 +147,41 @@ function started_ms(span: Span): number {
 	return span.ended_ms - span.duration_ms
 }
 
-// The first call that reads this launch's output, or nothing. **The first, not the last**: a run
-// reads one output file several times — the sample this was written from read it four times, a
-// `tail` then three `grep`s — and every reading after the first is work done on a result already in
-// hand rather than time spent waiting for it.
+// The first call that read this launch's output **after the harness said the command had finished**,
+// or nothing (joshuafolkken/kit#1696).
+//
+// **The first of those, not the last**: a run reads one output file several times — the sample this
+// was written from read it four times, a `tail` then three `grep`s — and every reading after the
+// first is work done on a result already in hand rather than time spent waiting for it. Extending the
+// window to the last reading was weighed and refused for exactly that: it would charge the command
+// with every `grep` a run made of a result it already held.
+//
+// **And not merely the first reading of any kind**, which is what this was until joshuafolkken/kit#1696.
+// `BashOutput` is the tool a run polls progress with, so once joshuafolkken/kit#1662 made that spelling
+// detectable a poll thirty seconds in closed the window on a gate that ran eight minutes — and closed
+// it *confidently*, because `is_read` then said the runtime had been measured and no
+// `background runtime not measured` note was emitted.
+//
+// **A launch no notice named is unread**, rather than falling back to the first reading. The
+// direction of the error is the one this module already takes for a join written inside quotes: a
+// missed reading is reported as not measured, while a wrong instant is reported as a measurement.
+//
+// **A reading qualifies by where it *ends*, never by where it starts.** The two differ for the one
+// join shape this repository recommends: a blocking wait — an `until grep -q … <output>` loop, or the
+// `Monitor` until-loop the Bash tool directs a run to, since foreground `sleep` is refused — is issued
+// *before* the command finishes and returns *after* it. Tested by its start it would be discarded, and
+// a run whose only join was that shape would report `background runtime not measured` — the very
+// regression this module exists to remove. Measured over this checkout's transcripts, 32 of 345
+// launches have readings that all begin before the notice, and the blocking wait is why. **The poll
+// is still rejected**, because a thirty-second look at an eight-minute gate both begins and ends long
+// before the notice; and a poll straddling the notice closes the window within seconds of the true
+// end, which is the answer rather than an error.
 function read_end_ms(spans: ReadonlyArray<Span>, run: Span): number | undefined {
+	if (run.background_ended_ms === NO_FINISH) return undefined
+
 	const found = spans.find(
-		(span) => span.reads_background === run.background_id && started_ms(span) >= run.ended_ms,
+		(span) =>
+			span.reads_background === run.background_id && span.ended_ms >= run.background_ended_ms,
 	)
 
 	return found?.ended_ms
@@ -203,7 +286,10 @@ function unread_phases(spans: ReadonlyArray<Span>): Set<PhaseName> {
 
 const time_background = {
 	NO_BACKGROUND,
+	NO_FINISH,
 	launch_id,
+	finished_id,
+	finished_at,
 	read_id,
 	read_id_of,
 	runs,
