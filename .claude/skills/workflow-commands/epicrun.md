@@ -220,7 +220,10 @@ are written out, and the brief hands them to the unit.
    answering `skip`, `unmeasured` or `unreachable` is one of them**, named as such. A measurement
    nobody made must never reach the parent as a run that passed.
 3. **Observations that could bite later** — something noticed and not filed, a flaky check, a
-   surprising diff, work a later child will collide with.
+   surprising diff, work a later child will collide with. **This is the only route a child's
+   discretionary observation has** (joshuafolkken/kit#1698): a child files `route:tier-a` and
+   `route:interrupt` only, and the parent files what survives — `SKILL.md` → §2i, the single source,
+   carries the depth test it is filed under and why a child cannot count the ceiling.
 4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.
 5. **What was left undone**, and under whose authority — a dropped review finding, a skipped step, a
    scope a comment moved to another Issue.

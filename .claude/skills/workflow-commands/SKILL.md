@@ -221,7 +221,10 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   whose procedure is neither of theirs.
 - **An observation worth filing is filed without asking, and the run carries on** — §2i. It is the
   fourth thing a run can discover and the only one that changes nothing about the Issue in hand, so
-  it is the one route whose whole procedure is "file it and keep going".
+  it is the one route whose whole procedure is "file it and keep going". **Two things narrow which
+  observations reach it**, and both are §2i's: a filing at depth 1 or deeper cites the depth-0 work
+  it blocked, and **a delegated child does not take this route at all** — it returns the observation
+  to the parent (joshuafolkken/kit#1698).
 - **The pre-implementation reading goes to a delegated unit once the count of subject files reaches
   the threshold §2b names** — §2b →
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
@@ -632,7 +635,7 @@ its procedure (joshuafolkken/kit#1649).
 | A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
 | This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `epicrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
-| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i) |
+| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked — both §2i's |
 
 **File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during
 implementation stays countable by filing route afterwards (joshuafolkken/kit#1083). **This paragraph
@@ -991,7 +994,57 @@ those commands' park-and-continue rule exists to avoid.
 **What stays a judgement is whether it is worth filing, not whether to ask.** An observation nobody
 would act on is not filed at all — dropping it costs nothing, and the WIP cap is what makes dropping
 the default at the margin. What this section removes is only the confirmation stop between deciding
-to file and filing.
+to file and filing. **The two subsections below take most of that judgement back out**, because left
+whole it resolved one way every time.
+
+### The depth test — a discretionary filing cites the product work it blocked
+
+**A run that has just spent an hour inside the workflow tooling files findings about the workflow
+tooling** (joshuafolkken/kit#1698). Measured on the `backlogrun` of 2026-09-09: 5 Issues shipped and
+15 filed, of which 13 were discretionary — and all 20 were about this package's own run
+orchestration or the tools that measure it, with not one change a consumer of the package would see.
+**A listing that measures itself has no natural stopping condition**, because every measurement
+creates something new to measure. So the condition comes from outside, and **depth is what supplies
+it — read off the subject rather than judged**:
+
+| Depth | The subject | Where it lives |
+| --- | --- | --- |
+| **0** | What a consumer of this package touches | A `josh` command's behavior, a distributed document or config, the published package |
+| **1** | The run orchestration that executes an Issue | `fullrun` / `epicrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
+| **2** | What measures a run | `diag`, `josh time`, `josh eval`, `josh cost`, `josh rule:value` |
+
+- **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
+  it stopped or delayed** — named as an Issue number or a run, never as "this would slow runs down".
+  **Cannot cite one, it is not filed**: it goes in the completion report and waits for the blockage
+  to happen. Pull rather than push — the fix follows the jam, not the sighting.
+- **A depth-0 observation does not take this test.** That is the product, and the two ceilings above
+  stay its only limits.
+- **`route:tier-a` and `route:interrupt` do not take it either**, at any depth: a filing the run
+  cannot proceed without is already citing its own blockage.
+
+**It governs this route only — the fourth row of §2d's table.** A review finding routed to branch 2
+of `prompts/review.md` → "Review round cap" is filed under that section's own bar — a confirmed
+defect reaching a runtime path, with a written failure scenario — and **does not take the depth
+test**: a defect in a `josh` command's behavior is depth 0 by construction, so gating it on a
+citation would drop the one kind of finding both documents agree is never dropped.
+
+**This is not the count cap that was rejected.** A cap is rationing — past the number the finding is
+lost, and nothing about it says which findings were worth having. This changes what counts as a
+finding at all, so what it excludes is excluded for a reason a reader can check.
+
+### A delegated child does not take this route
+
+**A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary
+observations are not filed by the child at all: they go back in the summary's "Observations that
+could bite later" line (`epicrun.md` → "What the summary carries, and how long it may be"), and the
+parent files what survives — under the depth test above, and inside the run's ceiling.
+
+**Two reasons, and a child can solve neither for itself.** It holds one Issue's worth of context, so
+**it cannot tell its observation from the one a sibling filed twenty minutes earlier** — the 15
+filings of 2026-09-09 were collapsed to 12 within that same day, which means they were collapsible
+at the moment they were made. And **the 10-per-run ceiling for this route is the parent's to
+count**: six children counting two or three filings each never reach it, which is why it did not
+fire once on the run that filed fifteen.
 
 This section is the single source of the rule; nothing under `prompts/collaboration-workflow/`
 restates it (joshuafolkken/kit#1649).
