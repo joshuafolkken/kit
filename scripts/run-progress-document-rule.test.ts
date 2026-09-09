@@ -131,9 +131,10 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'a single correctly-spaced arm is allowed',
 	// The interval reaching another machine at all, which a non-committed `.env` cannot do.
 	'The interval travels with the repository too',
-	// joshuafolkken/kit#1650. The verbatim rule handed over eight unlabelled `·`-joined values, which
-	// protected the content and lost the reader — so the presentation is labelled, while the half the
-	// verbatim rule was actually defending is restated as a rule of its own.
+	// joshuafolkken/kit#1650. The verbatim rule handed over an unlabelled `·`-joined run of values —
+	// six fixed fields plus one per child in flight — which protected the content and lost the reader.
+	// So the presentation is labelled, while the half the verbatim rule was actually defending is
+	// restated as a rule of its own.
 	'The line is presented with a label in front of every field, never handed over as it was printed',
 	'handing over an unreadable line does not achieve it',
 	'Four field lines, in this order, and a fifth for the next report time',

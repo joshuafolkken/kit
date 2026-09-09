@@ -1009,8 +1009,8 @@ interval is these three moves and there is no fourth:
    next `--wait` waits a full interval from the line just relayed and nothing else has to be timed.
 
 **The line is presented with a label in front of every field, never handed over as it was printed.**
-What the command emits is one `·`-joined run of values with no labels on any of them — seven fixed
-fields and one further segment per child in flight —
+What the command emits is one `·`-joined run of values with no labels on any of them — six fixed
+fields and one further segment per child in flight, so the count moves with the run —
 `⏳ at 2026-09-09 13:27+07:00 / 2026-09-09T06:27Z · quiet 29m · #1631 in-progress,route:split PR:open · lanes none · load 4.7 · record unread · unchanged 0m` —
 and a person reading that cannot say what `record unread` or `unchanged 0m` refers to
 (joshuafolkken/kit#1650). The verbatim rule this replaces was protecting something real — that the
@@ -1195,8 +1195,8 @@ result only you read is not one** — a gate run, a `gh` read, an edit — which
 discriminator this loop already applies, and marking on those would hide the silence the interval
 exists to measure.
 
-**What the run itself writes on a quiet tick.** The relayed line is already one line; what costs is
-the prose the run writes around it. joshuafolkken/kit#1567 measured the executing side's own text at
+**What the run itself writes on a quiet tick.** The presentation of the line is already bounded at
+five lines by the rule above; what costs beyond it is the prose the run writes around it. joshuafolkken/kit#1567 measured the executing side's own text at
 **27.9%** of everything accumulated in a parent's conversation — the largest single source, ahead of
 tool results and ahead of thinking — so a progress turn that reprints the epic's table of remaining
 children pays for that table on every request the run has left.
