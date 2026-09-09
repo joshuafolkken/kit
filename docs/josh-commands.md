@@ -2010,6 +2010,8 @@ Standard output carries one token per line — the runnable issues, in the order
 
 The command is read-only and never applies or removes a label.
 
+**The entry point that consumes this answer is `backlogrun`** ([#1631](https://github.com/joshuafolkken/kit/issues/1631)) — the shorthand keyword that runs the opted-in backlog without naming an epic, defined in `.claude/skills/workflow-commands/backlogrun.md`. It is a separate keyword rather than an argument to `epicrun` because the two declare different authorizations: `epicrun #E` approves one epic's children, and `backlogrun` approves everything a person has opted in with `auto-ok`. Its loop is written against the contract above — the tokens are bare numbers scoped to this repository, `error` is told apart by reading the token rather than the exit status, and every merged issue is fed back through `--exclude`. Which issues may run stays a person's decision; the order and the parallelism are the run's.
+
 ### `needs-human-review` — the opposite label
 
 `auto-ok` widens unattended execution past an epic's edge; **`needs-human-review` withholds its last step** ([#1125](https://github.com/joshuafolkken/kit/issues/1125)). An issue carrying it is implemented and taken through the verification gate as usual, and then nothing is committed, pushed, opened as a pull request or merged: the working tree is left uncommitted and unstashed, a `confirmation` notification goes out carrying the resume command, and the run stops there rather than starting the next issue.
