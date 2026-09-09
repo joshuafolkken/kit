@@ -549,8 +549,10 @@ written.
 **Running unattended gets harder, not easier, and that is the honest trade.** Six lanes make the overlap
 between children real — two open issues touching `scripts/git/git-epic-*` and two touching
 `scripts/eval/*` are very likely to be in flight together — and every overlap that becomes a conflict
-parks a child, which waits for a person. The run finishes more work per hour **and** asks for a
-person more often. Do not report the first without the second.
+costs the child that loses the race a resolution, a re-run gate and a review it would not otherwise
+have paid ("Conflicts are not predicted" below), and parks it outright under that section's four
+conditions. The run finishes more work per hour **and** spends more of each child's budget on merge
+races. Do not report the first without the second.
 
 ### Once per repository, before the first lane opens
 
@@ -667,17 +669,23 @@ that has been pushed. **The merge direction is `origin/main` into the lane's bra
 1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, and
    resolve in place. Do not close the lane, do not open another, do not switch its branch —
    `pnpm josh lane:open` cannot reattach to a pushed branch (joshuafolkken/kit#1627), and staying put
-   is what keeps the run clear of that. **Record the resolution on the Issue as you make it** — a
-   comment naming the conflicting paths — because condition 3 below counts resolutions, and a merge
-   commit sitting on a lane branch is not something a later poll, or a session resuming after an
-   interrupt, can count.
+   is what keeps the run clear of that.
 2. **Re-run the whole gate.** The tree changed, so the green recorded before the conflict is void:
    `pnpm josh lint:related` and `pnpm josh test:related`, then `pnpm josh gate`.
 3. **Review the resolution, one round.** Brief it with `pnpm josh review:brief` and run
    `/code-review` over the resolution diff, then require `pnpm josh review:attest --check` to answer
    `ok`. That round is a different subject from the change under review and does not spend one of the
    two the cap allows — `prompts/review.md` → "Review round cap" carries the exception.
-4. **Merge**, by re-running `pnpm josh followup` exactly as before.
+4. **Conclude the merge and push it, with `pnpm josh git -y`.** Without this step nothing changes on
+   `origin`: GitHub still returns `mergeStateStatus: DIRTY`, step 5 reports the same conflict, and
+   condition 3 reads that as a second one and parks the child for good. Nothing else can do it either
+   — the distributed `.claude/settings.json` denies `Bash(git commit*)` and `Bash(git add*)`, so the
+   only sanctioned way to conclude a merge is the node script. **Record the resolution on the Issue
+   in this same step** — a comment naming the conflicting paths — because condition 3 counts
+   resolutions and a merge commit on a lane branch is not something a later poll, or a session
+   resuming after an interrupt, can count. Recording it *here* rather than at step 1 is what keeps an
+   attempt that ended in a park from leaving a count behind.
+5. **Merge**, by re-running `pnpm josh followup` exactly as before.
 
 **The safeguard is the re-run verification, not who holds the pen.** What is dangerous about a
 resolution is unreviewed code merging onto a branch whose review has already converged, and that
@@ -696,7 +704,7 @@ carries no judgement.**
    of the conflict hunks, so it needs no interpretation.
 3. **A second conflict on the same child.** One resolution per child; `main` keeps moving, and
    without this bound the child could retry without end. The count is read off the Issue comments
-   step 1 writes, never off memory, so it survives an interrupt.
+   step 4 writes, never off memory, so it survives an interrupt.
 4. **The re-run gate did not come back green, or the resolution review returned a High.** Not only a
    High: a lint error, a failing test or a spell-check hit that merging a moved `main` introduced is
    this condition too. Fixing one would be writing new code after the review had converged, which is
@@ -706,11 +714,14 @@ Meeting any of the four, the child is parked — `needs-decision` plus a comment
 four it was, exactly as "park and continue" below — and its lane is **kept**, because the pushed
 branch is the resume path and nothing rebuilds it (the table below).
 
-**Leave the tree clean before parking.** Conditions 1 and 2 are read mid-merge, so the work tree is
-still carrying conflict markers when they fire: run `git merge --abort` before the park. The pushed
-branch is untouched by that, and the table row this park takes justifies itself on the tree being
-clean — parked mid-merge, the lane hands the next poll a half-merged tree, which is exactly the
-hazard that made this section refuse to resolve at all.
+**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or
+4.** Which of them fired does not change the answer, because none of the three has reached step 4 —
+conditions 1 and 2 are read mid-merge with conflict markers still in the tree, and condition 4 is
+read after a merge that is resolved but not yet committed. Condition 3 is the one exception, and it
+is mechanical rather than a judgement: it fires before any merge is started, so there is nothing to
+abort. The pushed branch is untouched by the abort, and the table row these parks take justifies
+itself on the tree being clean — parked mid-merge, the lane hands the next poll a half-merged tree,
+which is exactly the hazard that made this section refuse to resolve at all.
 
 ### What happens to a lane
 

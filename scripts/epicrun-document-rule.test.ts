@@ -154,7 +154,7 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	'**A second conflict on the same child.**',
 	// The bound condition 3 asserts is only real if something durable records the resolution. A merge
 	// commit on a lane branch is not that: a session resuming after an interrupt cannot count them.
-	'The count is read off the Issue comments step 1 writes, never off memory',
+	'never off memory, so it survives an interrupt',
 	// Condition 4 has to cover an ordinary red gate, not only a High. A merged `main` can introduce a
 	// lint error or a failing test, and a list declared exhaustive that has no exit for the most
 	// likely outcome of step 2 sends the agent back to judgement at the moment it must not.
@@ -191,10 +191,21 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	// which wins. Without it the failed row's consecutive-failure count is charged to a lost merge
 	// race, which is the abort the prose two sections up explicitly forbids.
 	'**A merge conflict is not this row**',
-	// A park read mid-merge leaves conflict markers in a lane that is kept, and the row it takes
-	// justifies itself on the tree being clean. The abort is what makes those two agree.
-	'**Leave the tree clean before parking.**',
-	'`git merge --abort` before the park',
+	// A park read before step 4 leaves an unconcluded merge in a lane that is kept, and the row it
+	// takes justifies itself on the tree being clean. The abort is what makes those two agree, and it
+	// has to name which conditions it covers — scoped to 1 and 2 it left condition 4 holding a
+	// resolved-but-uncommitted merge, which is the same hazard from the other side.
+	'**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or 4.**',
+	// Without a step that concludes and pushes the merge, `origin` never changes: step 5 reads the
+	// same conflict, condition 3 counts it as the second, and the child is parked for good. The
+	// procedure could not reach a merge at all. The deny is pinned with it because an agent that
+	// reaches for `git commit` by hand is refused and has nowhere documented to go.
+	'**Conclude the merge and push it, with `pnpm josh git -y`.**',
+	'denies `Bash(git commit*)` and `Bash(git add*)`',
+	// The recording moved from step 1 to step 4 so that an attempt ending in a park leaves no count
+	// behind — recorded at step 1, an aborted merge still spent the child's one resolution.
+	'Recording it *here* rather than at step 1',
+	'The count is read off the Issue comments step 4 writes',
 	// The seat is the reason the old row closed unconditionally, so keeping a lane has to answer it
 	// rather than ignore it.
 	'**A kept lane holds its seat, and that is the price rather than an oversight.**',
@@ -248,6 +259,11 @@ const WITHDRAWN_PREMISES: ReadonlyArray<string> = [
 	// and announced a carve-out the three sentences after it had just withdrawn — a reader going
 	// top-down still reached for `lane:close`.
 	'**The exception is decided by what `followup` printed, not by reading the situation.**',
+	// The unattended-trade paragraph is three sections above the conflict rule and was written when a
+	// conflict parked. Left standing it tells a reader arriving top-down that every overlap waits for
+	// a person, which is the opposite of what that rule now says.
+	'parks a child, which waits for a person',
+	'asks for a person more often',
 ]
 
 // joshuafolkken/kit#913: a child is run as `fullrun #<N>`, and `fullrun` requires `josh latest`
