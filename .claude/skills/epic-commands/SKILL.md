@@ -241,10 +241,14 @@ The lines go into the epic body unfenced, with real numbers.
 `blocked-by` relation is the `declaration_mismatch` that `find_anomalies` reports, and it stops
 `epic:next` and `epicrun` outright; the rule further down — record the order in `blocked-by` **and**
 in `Dependencies` — is what a wave has to satisfy, and editing the body alone satisfies half of it.
-**`--before <hub>` is refused once the hub sits in more than one chain**, which is exactly what a
-wave's hub is: `chains_containing` finds two indices and raises `ambiguous_position_error`
-(`scripts/git/git-epic-chains.ts`). `--after <hub>` branches a new line and is unaffected; past that,
-edit the declaration by hand and record the matching relations so the two still agree.
+**`--before <hub>` and `--after <hub>` are both refused while the hub sits in more than one chain
+with nothing after it** — which is exactly what a hub is the moment the earlier wave has been chained
+into it. `chains_containing` finds several indices; `is_branching_after` does not hold, because it
+requires a successor in **every** chain naming the target and a hub has none in any of them; so
+`ambiguous_position_error` is raised (`scripts/git/git-epic-chains.ts`). **The first child of the
+next wave therefore goes into the declaration by hand**, with its `blocked-by` recorded to match.
+Once the hub has a successor, `--after <hub>` branches a new line and the rest of that wave goes in
+with it.
 
 **Nothing in the parsing or the consistency check forbids this.** `DECLARED_CHAIN_LINE` in `scripts/git/git-epic-parse.ts`
 asks only that a line be *nothing but* a chain, so there may be any number of chain lines and **one
