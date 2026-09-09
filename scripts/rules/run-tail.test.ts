@@ -18,6 +18,9 @@ const RUN_TAIL = 'run-tail'
 const FOREGROUND_PUSH = 'pnpm josh git -y "Stop a run tail idling #1510"'
 // The documented recovery path: the push already landed, so this only opens the pull request.
 const SKIPPED_PUSH = 'pnpm josh git -y --skip-commit --skip-push'
+// A josh subcommand whose name starts with the same letters — outside the trigger and outside the
+// denominator alike.
+const NOT_THE_PUSH_STEP = 'pnpm josh gate'
 const NOW_MS = 1_700_000_000_000
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'run-tail-'))
 const WRITTEN_TRANSCRIPTS = new Set<string>()
@@ -91,7 +94,7 @@ describe('is_push_step', () => {
 		// Anchoring is what keeps a quoted mention out: the segment's command is `git`, not `josh`.
 		['git commit -m "ran pnpm josh git -y"'],
 		// A different subcommand whose name starts with the same letters.
-		['pnpm josh gate'],
+		[NOT_THE_PUSH_STEP],
 		['pnpm josh followup "a title"'],
 		// The documented recovery path: the push already landed, so there is no tail to save.
 		[SKIPPED_PUSH],
@@ -126,6 +129,31 @@ describe('is_foreground_push_step', () => {
 
 	it('says nothing when the input carries no command', () => {
 		expect(run_tail.is_foreground_push_step({ name: BASH, input: undefined })).toBe(false)
+	})
+})
+
+// **The compliance side of the same rule** (joshuafolkken/kit#1643). The trigger above fires only on
+// the foreground spelling, so `rule-value.ts` needs the act in either spelling for its denominator and
+// the detached one for its numerator — without the first, a run that backgrounded every push would
+// drop out of the reading and the rate would be taken over runs that pushed in the foreground.
+describe('is_push_step_call and is_backgrounded_push_step', () => {
+	const BACKGROUND_FIELDS: ReadonlyArray<boolean | undefined> = [undefined, true, false]
+
+	it.each(BACKGROUND_FIELDS)('reaches the rule whatever run_in_background says (%j)', (field) => {
+		expect(run_tail.is_push_step_call(call_of(FOREGROUND_PUSH, field))).toBe(true)
+	})
+
+	it('leaves a call that is not the push step out of the denominator', () => {
+		const write = { name: 'Edit', input: { command: FOREGROUND_PUSH } }
+
+		expect(run_tail.is_push_step_call(call_of(NOT_THE_PUSH_STEP))).toBe(false)
+		expect(run_tail.is_push_step_call(write)).toBe(false)
+	})
+
+	it('credits the push step only once it is issued detached', () => {
+		expect(run_tail.is_backgrounded_push_step(call_of(FOREGROUND_PUSH, true))).toBe(true)
+		expect(run_tail.is_backgrounded_push_step(call_of(FOREGROUND_PUSH))).toBe(false)
+		expect(run_tail.is_backgrounded_push_step(call_of(SKIPPED_PUSH, true))).toBe(false)
 	})
 })
 

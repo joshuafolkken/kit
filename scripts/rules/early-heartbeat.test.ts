@@ -94,6 +94,43 @@ afterAll(() => {
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
+// **The compliance side of the same rule** (joshuafolkken/kit#1643). The trigger fires only on the
+// hand-armed timer, so `rule-value.ts` needs the act in either spelling for its denominator and the
+// watcher for its numerator — without the first, a run that always let the watcher wait would drop out
+// of the reading and the rate would be taken over runs that armed a timer at least once.
+describe('is_progress_watch and waits_for_progress', () => {
+	it.each([WAITING_REPORT, EXPLICIT_ASK, 'pnpm josh rg --wait'])(
+		'reads %j as letting the watcher hold the clock',
+		(command) => {
+			expect(early_heartbeat.is_progress_watch(command)).toBe(true)
+		},
+	)
+
+	it.each([
+		// `--mark` records a report that has already gone out rather than waiting for the next one, and
+		// crediting it would score every run that reported at all as having kept a rule about waiting.
+		'pnpm josh run:progress --mark',
+		FULL_INTERVAL_SLEEP,
+		'pnpm josh followup "t #1"',
+	])('does not read %j as the watcher waiting', (command) => {
+		expect(early_heartbeat.is_progress_watch(command)).toBe(false)
+	})
+
+	it.each([WAITING_REPORT, EXPLICIT_ASK, FULL_INTERVAL_SLEEP, EARLY_SLEEP])(
+		'reads %j as a run that reached the rule at all',
+		(command) => {
+			expect(early_heartbeat.waits_for_progress(command)).toBe(true)
+		},
+	)
+
+	it.each(['pnpm josh gate', 'until pnpm josh followup; do sleep 30; done'])(
+		'leaves %j out of the denominator',
+		(command) => {
+			expect(early_heartbeat.waits_for_progress(command)).toBe(false)
+		},
+	)
+})
+
 describe('is_wait_timer — the call whose whole purpose is to wait', () => {
 	it.each([
 		'sleep 600',

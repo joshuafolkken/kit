@@ -4,6 +4,7 @@ import { run_progress_clock } from '#scripts/run/run-progress-clock'
 import { run_progress_config } from '#scripts/run/run-progress-config'
 import type { GuardedCall } from '#scripts/time/time-batch-guard'
 import { time_shell } from '#scripts/time/time-shell'
+import { shell_segments } from './shell-segments'
 
 // The trigger and the decision behind the `early-heartbeat` row of `delivered-rules.ts`
 // (joshuafolkken/kit#1570).
@@ -198,12 +199,41 @@ const EARLY_HEARTBEAT_REASON =
 	'the run is quiet". **This rule fires on every early arm, not once per run**, so reissuing the ' +
 	'same sleep will be refused again.'
 
+// **Keeping this rule is letting the watcher hold the clock** — `pnpm josh run:progress --wait` waits
+// the interval out, and `--once` answers an explicit ask. `--mark` is neither: it records a report
+// that has already gone out rather than waiting for the next one, and crediting it would score every
+// run that reported at all as having kept a rule about waiting.
+// Both spellings, derived from the alias table by the same helper `piped-verification.ts` uses.
+const PROGRESS_NAMES: ReadonlySet<string> = shell_segments.josh_names(['run:progress'])
+const WATCH_FLAG = /(?:^|\s)--(?:wait|once)(?=\s|$)/u
+
+function is_progress_watch_segment(segment: string): boolean {
+	return shell_segments.is_josh_command(segment, PROGRESS_NAMES) && WATCH_FLAG.test(segment)
+}
+
+// The quoted spans are blanked first: this separator set cuts on `\n`, so a notify body carrying the
+// watcher's own command on a line of its own would otherwise be credited as the watcher running.
+function is_progress_watch(command: string): boolean {
+	return segments_of(time_shell.unquoted(command)).some((segment) =>
+		is_progress_watch_segment(segment),
+	)
+}
+
+// **The occasion this rule governs: waiting for the run's next progress report**, in either spelling
+// (joshuafolkken/kit#1643). The trigger fires only on the hand-armed timer, so a run that always let
+// the watcher wait would never appear in the reading at all.
+function waits_for_progress(command: string): boolean {
+	return is_wait_timer(command) || is_progress_watch(command)
+}
+
 const early_heartbeat = {
 	ARM_PREFIX,
 	EARLY_HEARTBEAT_REASON,
 	decide,
+	is_progress_watch,
 	is_wait_timer,
 	wait_duration_ms,
+	waits_for_progress,
 }
 
 export { early_heartbeat }

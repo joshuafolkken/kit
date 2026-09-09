@@ -118,6 +118,70 @@ function is_shell_evaluated_body(command: string): boolean {
 	return false
 }
 
-const shell_body_trigger = { is_shell_evaluated_body }
+// **The safe spellings, which is what keeping this rule looks like** (joshuafolkken/kit#1643). They
+// are the ones the refusal hands back: the `*-file` flags, a field whose value is a file reference,
+// and `$'…'` quoting. The `*-file` flags cannot reach `INLINE_BODY_VALUE` at all — the note at the top
+// of this file records why — so they are read straight off the command rather than out of a value.
+const FILE_FLAG = /(?:--body-file|--notify-message-file)(?:[\s=]|$)/u
+const FIELD_FILE_REFERENCE = new RegExp(String.raw`${FIELD_FLAGS}[\s=]*body=@\S`, 'u')
+// **`$'…'` is the other form the refusal sanctions**, because zsh expands neither a backtick nor a `$`
+// inside it. It is read off the raw command: blanking the single-quoted span is exactly what would
+// hide it.
+const ANSI_C_BODY = /(?:(?:--body|--notify-message)[\s=]+|body=)\$'/u
+
+// **Any spelling that hands a command a body, whatever the quoting.** The trigger above reads double
+// quotes alone, because those are the ones the shell evaluates; the occasion the rule governs is
+// wider, and leaving a `$'…'` or single-quoted body out of it would drop from the denominator exactly
+// the compliant runs this predicate was added to keep in it.
+const BODY_FLAG = new RegExp(
+	String.raw`${FIELD_FLAGS}[\s=]*'?"?body=|${MESSAGE_FLAGS}[\s=]|--body-file[\s=]|--notify-message-file[\s=]`,
+	'u',
+)
+
+// **A flag is only a flag outside the quotes**, the same reading `run-tail.ts` takes of a pull-request
+// title. This repository's own refusal text names `--body-file <path>`, so a `grep` or an `echo`
+// quoting it would otherwise be scored as a run that passed a body by path. The quoted spellings of
+// the same thing are not lost by blanking: `--field "body=@<path>"` is a whole-value file reference,
+// which the literal branch below reads.
+const QUOTED_SPAN = /"[^"]*"|'[^']*'/gu
+
+function inline_body_literals(command: string): Array<string> {
+	return Array.from(command.matchAll(INLINE_BODY_VALUE), (match) =>
+		(match[1] ?? '').replaceAll(ESCAPED_PAIR, ''),
+	)
+}
+
+function is_safe_body_form(command: string): boolean {
+	if (ANSI_C_BODY.test(command)) return true
+
+	const flags = command.replaceAll(QUOTED_SPAN, ' ')
+
+	if (FILE_FLAG.test(flags) || FIELD_FILE_REFERENCE.test(flags)) return true
+
+	return inline_body_literals(command).some((literal) => is_body_already_in_a_file(literal))
+}
+
+// **A call that passes its body safely and executes none inline.** The measurement asks a call whether
+// it kept the rule before it asks whether it broke it, so a call doing both would be credited for the
+// half it got right; requiring the absence of an evaluated body is what stops that.
+function keeps_body_safe(command: string): boolean {
+	return is_safe_body_form(command) && !is_shell_evaluated_body(command)
+}
+
+// **The occasion this rule governs: a body handed to a command at all**, in every spelling. It is the
+// denominator `rule-value.ts` reads, and it exists because this rule's trigger fires only on the
+// violation — a run that passed every body safely would otherwise never appear in the reading.
+function carries_a_body(command: string): boolean {
+	if (BODY_FLAG.test(command.replaceAll(QUOTED_SPAN, ' '))) return true
+
+	return inline_body_literals(command).length > 0
+}
+
+const shell_body_trigger = {
+	carries_a_body,
+	is_safe_body_form,
+	is_shell_evaluated_body,
+	keeps_body_safe,
+}
 
 export { shell_body_trigger }

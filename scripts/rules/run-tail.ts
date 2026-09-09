@@ -90,18 +90,35 @@ function is_backgrounded(input: unknown): boolean {
 }
 
 /**
- * The trigger: the push step issued in the foreground.
+ * The occasion this rule governs: the push step, in either spelling (joshuafolkken/kit#1643).
  *
- * **The tool name is checked here rather than through `on_bash_command`**, because the exemption
- * reads a second field of the input and that helper hands over only the command string. Refusing a
- * write tool is out of the question for the reason `delivered-rules.ts` gives — a denied `Edit`
- * leaves its siblings applied and itself not.
+ * It is the denominator `scripts/rules/rule-value.ts` reads for this row, because the trigger below
+ * fires only on the foreground spelling — a run that detached every push never trips it, so the rate
+ * would otherwise be taken over runs that pushed in the foreground at least once.
+ *
+ * **The tool name is checked here rather than through `on_bash_command`**, because the trigger and
+ * the compliance test both read a second field of the input and that helper hands over only the
+ * command string. Refusing a write tool is out of the question for the reason `delivered-rules.ts`
+ * gives — a denied `Edit` leaves its siblings applied and itself not.
  */
-function is_foreground_push_step(call: GuardedCall): boolean {
+function is_push_step_call(call: GuardedCall): boolean {
 	if (call.name !== cost_blocks.BASH_TOOL) return false
-	if (is_backgrounded(call.input)) return false
 
 	return is_push_step(time_shell.bash_command(call.input))
+}
+
+/** Keeping the rule: the same push step, issued detached. */
+function is_backgrounded_push_step(call: GuardedCall): boolean {
+	if (!is_backgrounded(call.input)) return false
+
+	return is_push_step_call(call)
+}
+
+/** The trigger: the push step issued in the foreground. */
+function is_foreground_push_step(call: GuardedCall): boolean {
+	if (is_backgrounded(call.input)) return false
+
+	return is_push_step_call(call)
 }
 
 /**
@@ -151,8 +168,10 @@ const RUN_TAIL_REASON =
 const run_tail = {
 	RUN_TAIL_REASON,
 	decide,
+	is_backgrounded_push_step,
 	is_foreground_push_step,
 	is_push_step,
+	is_push_step_call,
 }
 
 export { run_tail }

@@ -16,11 +16,26 @@ const LEAVES_ALONE = 'leaves %j alone'
 // The exemption's reason for existing: the whole body is one file read, so the shell hands it over
 // byte for byte. Named because two suites below need the same call to stay silent.
 const FILE_READ_BODY = 'gh api repos/o/r/issues/1/comments -f body="$(cat /tmp/body.md)"'
+// The fixtures the compliance suites share with the trigger suites: the inert placeholder every prompt
+// in this repository writes, the spelling that really is evaluated, the three path-borne forms the
+// refusal hands back, and two commands that carry no body at all.
+const INERT_PLACEHOLDER_BODY = 'gh api repos/{owner}/{repo}/issues/1198/comments -f body="<plan>"'
+const INLINE_EVALUATED_BODY = 'gh issue comment 1198 --body "ran `git switch main`"'
+const FIELD_FILE_BODY = 'gh api repos/o/r/issues/1/comments --field body=@/tmp/body.md'
+const QUOTED_FIELD_FILE_BODY = 'gh api repos/o/r/issues/1/comments --field "body=@$HOME/body.md"'
+const NOTIFY_FILE_BODY = 'pnpm josh followup "t #1" --notify-message-file /tmp/body.md'
+const BRANCH_FLAG_COMMAND = 'git checkout -b "feature-$USER"'
+const NO_BODY_COMMAND = 'ls -la'
+// The two quote forms `INLINE_BODY_VALUE` cannot see. The first is the form `CLAUDE.md`'s own
+// mid-workflow stop command uses and the refusal calls the other safe form; the second is neither
+// evaluated nor sanctioned, so it reaches the rule without keeping it.
+const ANSI_C_QUOTED_BODY = "pnpm josh notify --task-type confirmation --body=$'stopped: waiting'"
+const SINGLE_QUOTED_BODY = "gh api repos/o/r/issues/1/comments -f body='plain text'"
 
 describe('is_shell_evaluated_body — the spellings the shell evaluates', () => {
 	it.each([
 		'gh api repos/{owner}/{repo}/issues/1198/comments -f body="Cause: `pnpm josh ms` ran"',
-		'gh issue comment 1198 --body "ran `git switch main`"',
+		INLINE_EVALUATED_BODY,
 		'gh api repos/{owner}/{repo}/issues/1/comments --field body="$HOME is expanded"',
 		'pnpm josh followup "t #1" --merge --notify-message="Result: `josh notify` ships it"',
 		// A substitution embedded in prose really is evaluated, so the `$(…)` exemption is anchored to
@@ -32,18 +47,18 @@ describe('is_shell_evaluated_body — the spellings the shell evaluates', () => 
 
 	it.each([
 		// The shape every prompt in this repository actually writes — inert, and left alone.
-		'gh api repos/{owner}/{repo}/issues/1198/comments -f body="<plan>"',
+		INERT_PLACEHOLDER_BODY,
 		'gh issue comment 1198 --body "Implemented the gate. Done!"',
 		// Already safe: the body never reaches the shell as text. The `*-file` spellings end in `-`
 		// where the pattern needs whitespace or `=`, so they cannot match it.
-		'gh api repos/o/r/issues/1/comments --field body=@/tmp/body.md',
+		FIELD_FILE_BODY,
 		'pnpm josh followup "t #1" --merge --notify-message-file /tmp/body.md',
 		// A whole-value substitution's output is not re-scanned, so the body arrives byte for byte.
 		FILE_READ_BODY,
 		// A backslash makes the next character literal inside double quotes.
 		String.raw`gh issue comment 1 --body "costs \$5 and a \` mark"`,
 		// `-b` is `git checkout`'s branch flag as often as it is `gh`'s body flag.
-		'git checkout -b "feature-$USER"',
+		BRANCH_FLAG_COMMAND,
 	])(LEAVES_ALONE, (command) => {
 		expect(is_shell_evaluated_body(command)).toBe(false)
 	})
@@ -107,12 +122,12 @@ describe('is_shell_evaluated_body — what the whole-value exemption covers', ()
 // pattern; with the quote one character to the left it does, and the `$` in a path like
 // `@$HOME/body.md` would refuse a caller who had already done what the rule asked.
 describe('is_shell_evaluated_body — a whole value that is a file reference', () => {
-	it.each([
-		'gh api repos/o/r/issues/1/comments --field "body=@$HOME/body.md"',
-		'gh api repos/o/r/issues/1/comments -F "body=@/tmp/body.md"',
-	])(LEAVES_ALONE, (command) => {
-		expect(is_shell_evaluated_body(command)).toBe(false)
-	})
+	it.each([QUOTED_FIELD_FILE_BODY, 'gh api repos/o/r/issues/1/comments -F "body=@/tmp/body.md"'])(
+		LEAVES_ALONE,
+		(command) => {
+			expect(is_shell_evaluated_body(command)).toBe(false)
+		},
+	)
 
 	// The negative control: a body that merely opens with an `@mention` is not a file reference, and a
 	// backtick after it is executed exactly as it would be anywhere else.
@@ -143,4 +158,63 @@ describe('is_shell_evaluated_body — a quote nested inside the substitution', (
 	])(READS_AS_EVALUATED, (command) => {
 		expect(is_shell_evaluated_body(command)).toBe(true)
 	})
+})
+
+// **The compliance side of the same rule** (joshuafolkken/kit#1643). `rule-value.ts` needs two more
+// answers about a call: whether it passed a body at all, and whether it passed one safely. The trigger
+// fires only on the violation, so without the first a run that always passed bodies safely would drop
+// out of the reading and the rate would be taken over runs that broke the rule.
+describe('keeps_body_safe — the spellings the refusal hands back', () => {
+	it.each([
+		FIELD_FILE_BODY,
+		QUOTED_FIELD_FILE_BODY,
+		NOTIFY_FILE_BODY,
+		'pnpm josh notify --task-type confirmation --body-file /tmp/body.md',
+		FILE_READ_BODY,
+		// **`$'…'` is the other sanctioned form**, and it is the one `CLAUDE.md`'s own mid-workflow stop
+		// command uses — left out, every run that stopped correctly would be scored as having broken the
+		// rule it kept.
+		ANSI_C_QUOTED_BODY,
+		String.raw`gh api repos/o/r/issues/1/comments -f body=$'Cause: x\nFix: y'`,
+	])('reads %j as a body passed safely', (command) => {
+		expect(shell_body_trigger.keeps_body_safe(command)).toBe(true)
+	})
+
+	it.each([
+		// An inline body is not the compliant spelling, inert or not: the rule asks for a path.
+		INERT_PLACEHOLDER_BODY,
+		// A single-quoted body is not evaluated, but it is not one of the forms the refusal names
+		// either — it reaches the rule without keeping it.
+		SINGLE_QUOTED_BODY,
+		// A call doing both is not credited for the half it got right — the measurement asks whether the
+		// rule was kept before it asks whether it was broken.
+		'pnpm josh followup --notify-message-file /tmp/b.md -f body="see `git log -1`"',
+		// **The refusal text itself names `--body-file <path>`**, so a command that merely quotes the
+		// flag is a run reading this repository rather than one passing a body by path.
+		'grep -rn "--body-file" scripts/rules',
+		NO_BODY_COMMAND,
+	])('does not read %j as a body passed safely', (command) => {
+		expect(shell_body_trigger.keeps_body_safe(command)).toBe(false)
+	})
+})
+
+describe('carries_a_body — the occasion the rule governs', () => {
+	it.each([
+		INERT_PLACEHOLDER_BODY,
+		NOTIFY_FILE_BODY,
+		INLINE_EVALUATED_BODY,
+		// The two quote forms the trigger cannot see. Both reach the rule, and dropping them would bias the
+		// published rate upward by removing compliant runs from the denominator.
+		ANSI_C_QUOTED_BODY,
+		SINGLE_QUOTED_BODY,
+	])('reads %j as a call that passes a body', (command) => {
+		expect(shell_body_trigger.carries_a_body(command)).toBe(true)
+	})
+
+	it.each([BRANCH_FLAG_COMMAND, 'pnpm josh gate', NO_BODY_COMMAND])(
+		'leaves %j out of the denominator',
+		(command) => {
+			expect(shell_body_trigger.carries_a_body(command)).toBe(false)
+		},
+	)
 })

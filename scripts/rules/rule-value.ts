@@ -40,8 +40,12 @@ const ERRORED_RESULT = '"is_error":true'
 
 interface RuleReading {
 	id: string
-	// Runs in which the rule's trigger occurred at all. The denominator: a run that never reaches the
-	// trigger says nothing about whether the rule would have been kept.
+	// Runs that reached the situation the rule governs. The denominator: a run that never reaches it
+	// says nothing about whether the rule would have been kept. **The trigger is that situation only
+	// for a rule whose trigger is a neutral act** — filing an Issue, reading one — which a run keeping
+	// the rule still performs. Where the trigger is the violation itself, a run that kept the rule
+	// never trips it, so the row declares `reaches` and the denominator counts that instead
+	// (joshuafolkken/kit#1643).
 	sessions: number
 	// Of those, the runs that had already kept the rule at the moment the trigger fired — the
 	// compliance the carried text earns with no help from the hook.
@@ -59,6 +63,7 @@ interface IssuedCall {
 
 interface RuleState {
 	is_kept: boolean
+	is_reached: boolean
 	is_triggered: boolean
 	is_refused: boolean
 }
@@ -66,7 +71,7 @@ interface RuleState {
 function blank_states(): Map<string, RuleState> {
 	const entries = delivered_rules.DELIVERED_RULES.map((rule): [string, RuleState] => [
 		rule.id,
-		{ is_kept: false, is_triggered: false, is_refused: false },
+		{ is_kept: false, is_reached: false, is_triggered: false, is_refused: false },
 	])
 
 	return new Map(entries)
@@ -74,11 +79,20 @@ function blank_states(): Map<string, RuleState> {
 
 // **Keeping only counts before the trigger.** After the refusal the run complies because it was made
 // to, which is the delivery's contribution and not the carried text's.
-function observe_call(rule: DeliveredRule, state: RuleState, call: IssuedCall): void {
+function observe_before_trigger(rule: DeliveredRule, state: RuleState, call: IssuedCall): void {
 	if (state.is_triggered) return
 
 	if (rule.keeps?.(call) === true) state.is_kept = true
 	if (rule.is_trigger(call)) state.is_triggered = true
+}
+
+// **Reaching the situation is recorded whenever it happens, before the trigger or after.** It is the
+// denominator, not the compliance: a run that pushed compliantly and then pushed again in the
+// foreground still reached the situation exactly once as far as the reading is concerned.
+function observe_call(rule: DeliveredRule, state: RuleState, call: IssuedCall): void {
+	if (rule.reaches?.(call) === true) state.is_reached = true
+
+	observe_before_trigger(rule, state, call)
 }
 
 // One transcript line, parsed once. The raw text is kept beside it because a refusal is identified
@@ -162,7 +176,7 @@ function reading_to_credit(
 	id: string,
 	state: RuleState,
 ): RuleReading | undefined {
-	return state.is_triggered ? readings.get(id) : undefined
+	return state.is_triggered || state.is_reached ? readings.get(id) : undefined
 }
 
 function apply_run(readings: Map<string, RuleReading>, states: Map<string, RuleState>): void {
