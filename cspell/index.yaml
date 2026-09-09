@@ -51,6 +51,10 @@ words:
   # The phase `josh time` reports for everything a run does once its pull request is open
   # (joshuafolkken/kit#1299). Distributed, because the `diag` skill `josh sync` copies names it.
   - wrapup
+  # What `josh time`'s bundling block calls a call that could have gone out beside another
+  # (joshuafolkken/kit#1607). Distributed, because the `diag` skill reads that block and now explains
+  # why its per-tool breakdown always balances — only a bundleable call enters a sequence.
+  - bundleable
   # What `josh run:preflight` is and `josh run:hold` is not (joshuafolkken/kit#926): a question that
   # may be put again once the tree it read has been reclaimed. Distributed, because `epicrun.md`
   # names it and `josh sync` copies that skill. cspell derives neither this nor "re-askable" from
