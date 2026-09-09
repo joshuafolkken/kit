@@ -55,6 +55,7 @@ function base_span(start_minute: number, minutes: number, extra: Partial<Span>):
 		targets: [],
 		writes: [],
 		message_id: time_spans.NO_MESSAGE_ID,
+		issue: time_markers.NO_ISSUE,
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,
