@@ -13,31 +13,23 @@ import {
 	SUCCESS_EXIT_CODE,
 } from './auto-ok-fixture'
 
-const { issue, record } = auto_ok_fixture
+const { issue, epic_listing, console_streams } = auto_ok_fixture
 
 vi.mock('#scripts/git/git-gh-command', () => ({
-	git_gh_command: { issue_list_by_label_summary: vi.fn() },
+	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
 }))
 
 const { git_gh_command } = await import('#scripts/git/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
+// The epic listing the pickup reads to drop a child of an epic (joshuafolkken/kit#1633). These cases
+// are about the token and the flags, so the default is a backlog with no epic in it.
+const epic_list = vi.mocked(git_gh_command.issue_list_by_label)
 
-// The two streams the contract is about: one token on standard output for a loop to branch on, and
-// every explanation on standard error. Captured as text rather than read off the spy, which types
-// its calls as `any`.
-const stdout_lines: Array<string> = []
-const stderr_lines: Array<string> = []
+const streams = console_streams()
+const { stdout, stderr } = streams
 
-vi.spyOn(console, 'info').mockImplementation(record(stdout_lines))
-vi.spyOn(console, 'error').mockImplementation(record(stderr_lines))
-
-function stdout(): string {
-	return stdout_lines.join('\n')
-}
-
-function stderr(): string {
-	return stderr_lines.join('\n')
-}
+vi.spyOn(console, 'info').mockImplementation(streams.info)
+vi.spyOn(console, 'error').mockImplementation(streams.error)
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -45,8 +37,8 @@ beforeEach(() => {
 	// `{ json, is_capped }` since joshuafolkken/kit#1067, so a bare `vi.fn()` returning `undefined`
 	// is a shape no caller can be handed — and the failed-read path is what an unqueued call means.
 	issue_list.mockResolvedValue(listing_outcome(undefined))
-	stdout_lines.length = 0
-	stderr_lines.length = 0
+	epic_list.mockResolvedValue(listing_outcome(epic_listing([])))
+	streams.reset()
 })
 
 describe('josh auto-ok:next — the token on standard output', () => {

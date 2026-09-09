@@ -1395,6 +1395,21 @@ pickup side, so `auto-ok:next` can refuse an issue that `🗒 Next issues` is sh
 list. That difference is deliberate: a person can see the issue is blocked and decide to start it
 anyway, and an unattended run has no such judgement to exercise.
 
+**An epic's child is never picked up standalone**, whatever labels it carries (joshuafolkken/kit#1633).
+`auto-ok` widens unattended execution past an epic's edge; it does not widen it past an epic's
+*order*, and the standalone path reads none of the `blocked-by` graph `epic:next` builds its waves
+from. So an issue an epic tracks runs through that epic and nowhere else — one sentence:
+
+> An issue an epic tracks is only ever run through that epic.
+
+**It is decided by whether an epic's task list names the issue, not by the issue's own labels.** A
+child carries none of `epic` / `in-progress` / `needs-decision`, which is exactly why the label set
+never caught one. `auto-ok:next` reads the open epics for this, only when something is opted in, and
+**refuses to answer when that listing cannot be read** — treating a failed read as "no epic tracks
+anything" would hand back every tracked child at once. The epics themselves are still found by the
+`epic` label, exactly as `epic:bundle` finds them, so an epic that never received it is invisible to
+both and its children can still be picked up; `pnpm josh epic:audit` is what surfaces that.
+
 **Everything a child gets, a picked-up Issue gets**: the split assessment, the two-layer work
 summary, `josh latest` staying hoisted to the session, park-and-continue, and the hand-off check after
 each merge — **on the same condition, which is that `pnpm josh delegate epic-child` answered `keep`**;

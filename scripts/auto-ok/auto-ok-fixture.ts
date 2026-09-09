@@ -11,6 +11,8 @@ const CREATED_LATER = '2026-08-02T00:00:00Z'
 const OLD_ISSUE_NUMBER = 700
 const NEW_ISSUE_NUMBER = 900
 const BLOCKER_NUMBER = 500
+// The epic whose task list tracks a child in the tracking cases (joshuafolkken/kit#1633).
+const EPIC_NUMBER = 800
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 const IN_PROGRESS_SPELLING = 'in-progress'
@@ -41,10 +43,32 @@ function blocked_issue(
 	return { ...issue(number, created_at), blockedBy: { nodes: [...blockers] } }
 }
 
+// The newest and the oldest opted-in issue, the pair every ordering and exclusion case is built on.
+function two_issues(): string {
+	return JSON.stringify([
+		issue(NEW_ISSUE_NUMBER, CREATED_LATER),
+		issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
+	])
+}
+
 // A listing exactly at the cap, so the truncation notice fires.
 function capped_listing(limit: number, labels: ReadonlyArray<string>): string {
 	return JSON.stringify(
 		Array.from({ length: limit }, (_value, index) => issue(index + 1, CREATED_EARLIER, labels)),
+	)
+}
+
+// The epic listing the pickup reads to answer "does an epic already track this issue?"
+// (joshuafolkken/kit#1633). Each entry becomes one epic whose body is the task list naming its
+// children, because a task-list row is the only thing that records tracking.
+function epic_listing(
+	epics: ReadonlyArray<{ number: number; children: ReadonlyArray<number> }>,
+): string {
+	return JSON.stringify(
+		epics.map((epic) => ({
+			number: epic.number,
+			body: epic.children.map((child) => `- [ ] #${String(child)}`).join('\n'),
+		})),
 	)
 }
 
@@ -56,7 +80,47 @@ function record(lines: Array<string>): (...args: Array<unknown>) => void {
 	}
 }
 
-const auto_ok_fixture = { issue, blocked_issue, capped_listing, record }
+// The two streams the contract is about: one token on standard output for a loop to branch on, and
+// every explanation on standard error. Held here because every `auto-ok` suite asserts on the same
+// two, and a copy per suite is the clone `CLAUDE.md` prohibits (joshuafolkken/kit#1633). The suite
+// hands `info` and `error` to `vi.spyOn`, which is the only part that needs vitest.
+interface ConsoleStreams {
+	info: (...args: Array<unknown>) => void
+	error: (...args: Array<unknown>) => void
+	stdout: () => string
+	stderr: () => string
+	reset: () => void
+}
+
+function console_streams(): ConsoleStreams {
+	const stdout_lines: Array<string> = []
+	const stderr_lines: Array<string> = []
+
+	return {
+		info: record(stdout_lines),
+		error: record(stderr_lines),
+		stdout: function stdout(): string {
+			return stdout_lines.join('\n')
+		},
+		stderr: function stderr(): string {
+			return stderr_lines.join('\n')
+		},
+		reset: function reset(): void {
+			stdout_lines.length = 0
+			stderr_lines.length = 0
+		},
+	}
+}
+
+const auto_ok_fixture = {
+	issue,
+	blocked_issue,
+	capped_listing,
+	console_streams,
+	epic_listing,
+	record,
+	two_issues,
+}
 
 export {
 	auto_ok_fixture,
@@ -64,6 +128,7 @@ export {
 	CLOSED_SPELLING,
 	CREATED_EARLIER,
 	CREATED_LATER,
+	EPIC_NUMBER,
 	FAILURE_EXIT_CODE,
 	IN_PROGRESS_SPELLING,
 	NEW_ISSUE_NUMBER,

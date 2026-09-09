@@ -84,6 +84,25 @@ describe('the order the pickup runs in', () => {
 	})
 })
 
+// joshuafolkken/kit#1633: `auto-ok` on an epic's child used to put that child in the standalone
+// candidate set, where the epic's ordering is never read. Both documents have to say that an epic's
+// child is excluded, and that the exclusion is membership rather than a label — the second half is
+// what stops the fix being re-implemented as a fourth entry in `NOT_DIRECTLY_RUNNABLE_LABELS`.
+describe('an issue an epic already tracks', () => {
+	it.each([
+		[SKILL, "**An epic's child is never picked up standalone**"],
+		[COMMAND_DOC, '**An issue an epic tracks is never a standalone candidate**'],
+	])('%s excludes it from the pickup', (document_path, marker) => {
+		expect(read_unwrapped(document_path)).toContain(marker)
+	})
+
+	it.each(EVERY_DOCUMENT)('%s decides it by membership, not by a label', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain(
+			"decided by whether an epic's task list names the issue, not by the issue's own labels",
+		)
+	})
+})
+
 // Pinned with the row text rather than the bare number: a lone `5` appears throughout these
 // documents and would keep this green after the whole row was deleted.
 describe('the cap on a single run', () => {
