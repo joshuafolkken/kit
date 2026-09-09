@@ -271,6 +271,17 @@ async function merge_fast_forward(branch_name: string): Promise<string> {
 	return await git_spawn.read(['merge', '--ff-only', `origin/${branch_name}`])
 }
 
+// The merge `josh main:merge` runs, and the deliberate opposite of the one above: **no `--ff-only`**,
+// because the branch it is called on has diverged whenever the command is worth typing at all
+// (joshuafolkken/kit#1659). Naming the strategy here is the whole fix — `git pull` decides it from
+// `pull.rebase` / `pull.ff`, and with neither set it decides nothing and aborts.
+//
+// `with_output` rather than `read`: a merge that conflicts has to put git's own report in front of
+// the person, which is what the `git pull` this replaced did.
+async function merge_branch(branch_name: string): Promise<void> {
+	await git_spawn.with_output('merge', [`origin/${branch_name}`])
+}
+
 async function checkout_b(branch_name: string): Promise<string> {
 	return await git_spawn.read(['checkout', '-b', branch_name])
 }
@@ -458,6 +469,7 @@ const git_command = {
 	default_branch_reference,
 	fetch_branch,
 	merge_fast_forward,
+	merge_branch,
 	checkout_b,
 	checkout,
 	commit,
