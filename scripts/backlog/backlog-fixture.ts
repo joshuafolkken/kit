@@ -2,6 +2,7 @@ import { auto_ok_fixture } from '#scripts/auto-ok/auto-ok-fixture'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_schema } from '#scripts/epic/epic-index'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
@@ -17,6 +18,11 @@ import { vi } from 'vitest'
 
 const REPO = 'joshuafolkken/kit'
 const CHECKOUT_PATH = '/checkouts/kit'
+
+// GitHub answering normally, which is the sixth question the command asks — and the only one that is
+// asked of the network rather than of a stub, so leaving it out would let a case that reaches the
+// `error` verdict spawn a real `gh` (joshuafolkken/kit#1663). A case about the transport overrides it.
+const REACHABLE_STATUS = 200
 
 interface ChildInput {
 	number: number
@@ -78,11 +84,9 @@ function child_texts(children: ReadonlyArray<ChildInput>): Map<string, string> {
 	return new Map(children.map((child) => [String(child.number), gh_child(child)]))
 }
 
-function stub_backlog(input: BacklogInput): void {
-	const epics = input.epics ?? []
-	const bodies = epic_bodies(epics)
-	const children = child_texts(input.children ?? [])
-
+// Where this checkout is, who it is, and that GitHub is answering — the three the backlog itself
+// says nothing about.
+function stub_environment(): void {
 	// The checkout map `epic_report` fills `RepoCandidates.path` from. Stubbed with a real entry so a
 	// case can tell "this repository has no checkout here" — which would be a misreport — apart from
 	// the map simply being empty.
@@ -90,6 +94,15 @@ function stub_backlog(input: BacklogInput): void {
 		new Map([[REPO, CHECKOUT_PATH]]),
 	)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
+	vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(REACHABLE_STATUS)
+}
+
+function stub_backlog(input: BacklogInput): void {
+	const epics = input.epics ?? []
+	const bodies = epic_bodies(epics)
+	const children = child_texts(input.children ?? [])
+
+	stub_environment()
 	vi.spyOn(git_gh_command, 'issue_list_by_label_summary').mockResolvedValue(
 		listing_outcome(JSON.stringify(input.opted_in ?? [])),
 	)
@@ -107,8 +120,10 @@ function stub_backlog(input: BacklogInput): void {
 
 const backlog_fixture = {
 	CHECKOUT_PATH,
+	REACHABLE_STATUS,
 	REPO,
 	gh_child,
+	stub_environment,
 	stub_backlog,
 }
 

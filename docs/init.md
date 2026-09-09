@@ -149,8 +149,8 @@ The three `prettier-plugin-*` / `@ianvs/prettier-plugin-sort-imports` entries ba
 | `lefthook:uninstall` | `lefthook uninstall`                                                                   |
 | `lefthook:commit`    | `lefthook run pre-commit`                                                              |
 | `lefthook:push`      | `lefthook run pre-push`                                                                |
-| `main:sync`          | `git checkout main && git pull`                                                        |
-| `main:merge`         | `git pull origin main`                                                                 |
+| `main:sync`          | `git checkout <default> && git pull` (refuses inside a linked work tree)               |
+| `main:merge`         | `git fetch origin <default>` then `git merge origin/<default>`                         |
 | `check`              | `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo`                            |
 
 SvelteKit type-checking is no longer part of kit's framework-agnostic `josh` CLI. SvelteKit projects get `josh-app check` / `josh-app check:ci` from [`@joshuafolkken/app-kit`](https://github.com/joshuafolkken/app-kit) instead.

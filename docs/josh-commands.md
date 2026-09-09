@@ -648,18 +648,17 @@ $ pnpm josh test --workers=1
 josh test takes no extra arguments — pass them to josh test:unit or josh test:e2e instead
 ```
 
-| Composite    | Pass arguments to instead                        |
-| ------------ | ------------------------------------------------ |
-| `test`       | `test:unit`, `test:e2e`                          |
-| `format`     | `format:prettier`, `format:eslint`               |
-| `latest`     | `latest:corepack`, `latest:update`, `audit`      |
-| `main:merge` | — (chains raw `git` calls; nothing is forwarded) |
+| Composite | Pass arguments to instead                   |
+| --------- | ------------------------------------------- |
+| `test`    | `test:unit`, `test:e2e`                     |
+| `format`  | `format:prettier`, `format:eslint`          |
+| `latest`  | `latest:corepack`, `latest:update`, `audit` |
 
 Every other command — the ones that invoke a single tool or script — forwards extra arguments exactly as before; `pnpm josh test:e2e --workers=1` reaches Playwright unchanged.
 
 The refusal is driven by the **shape** of the command rather than a per-command opt-in, so a composite added later cannot reintroduce the silent discard by forgetting to declare itself. A unit test audits the whole command map on every commit.
 
-The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before. [`josh main:sync`](#josh-mainsync) refuses the same way for the same reason: it left the table above when it became a script, not because it started accepting arguments.
+The shape rule reads `shell` entries, which leaves one case outside it: a **script** that fans out to several sub-commands and forwards nothing, as [`josh gate`](#josh-gate) does. Such a script refuses for itself, reusing the message above so the two read identically — a `script` entry that runs a single tool still forwards its arguments as before. [`josh main:sync`](#josh-mainsync) and [`josh main:merge`](#josh-mainmerge) refuse the same way for the same reason: both left the table above when they became scripts, not because either started accepting arguments.
 
 ---
 
@@ -969,11 +968,21 @@ Note that [`josh lane:open`](#josh-laneopen--josh-laneclose--josh-lanelist--josh
 
 ### `josh main:merge`
 
-Pull the latest changes from `origin main` into the current branch.
+Bring the repository's default branch into the branch this checkout is on.
 
 ```bash
 pnpm josh main:merge
 ```
+
+It fetches `origin/<default>` and merges it into the current branch. **The merge strategy is named by the command rather than read out of your git configuration**, which is the whole of joshuafolkken/kit#1659: it used to run `git pull origin <default>`, and `git pull` with neither `pull.rebase` nor `pull.ff` set — the state of a checkout nobody has configured — aborts the moment the two sides have each moved:
+
+```
+fatal: Need to specify how to reconcile divergent branches
+```
+
+Divergence is not an edge case for this command; it is the reason to type it. A lane whose branch has fallen behind `origin/<default>` has commits of its own on it by definition, so **the one state the command exists for was the one state it could not run in**.
+
+Merging rather than rebasing follows joshuafolkken/kit#1446 and is not a fresh decision: a rebase rewrites commits that are already pushed, so it needs a force push, which the distributed `.claude/settings.json` denies. A conflicting merge leaves git's own report on screen and exits non-zero; resolve it as you would any merge.
 
 ---
 
@@ -2008,11 +2017,14 @@ Standard output carries one token per line — the runnable issues, in the order
 | `<number>…` | Each line is an issue a run may start; they may start beside each other | 0         |
 | `wait`      | Nothing is runnable yet, but something resolves on its own              | 0         |
 | `stop`      | Nothing will resolve on its own — something needs a person              | 0         |
+| `retry`     | GitHub could not be reached; the graph itself may be fine               | 0         |
 | `error`     | A dependency graph is unusable; nothing is offered                      | 0         |
 | `none`      | The backlog holds nothing opted in, or nothing left to hand back        | 0         |
 | _(nothing)_ | A listing could not be read — **not** the same as `none`                | 1         |
 
 `none` is `epic:next`'s `complete` under `auto-ok:next`'s spelling: a backlog is never finished the way one epic is, and a loop reading either command branches on the same word.
+
+**`retry` is the one word `epic:next` has no counterpart for, and it exists because `error` was answering two different questions** (joshuafolkken/kit#1663). A child the command could not read produced `error` whether the graph was genuinely unresolvable or the connection had simply dropped, and an unattended run may never re-ask on `error` — so one `getaddrinfo ENOTFOUND` ended a run with thirteen runnable issues still in the backlog. When the read of a child fails, the command now asks GitHub once whether it is answering at all: no HTTP status reached, a 429 or a 5xx makes the answer `retry`, and anything else GitHub actually answered leaves it `error`. **403 is deliberately on the `error` side**: GitHub spells some secondary rate limits that way, but a SAML-SSO-unauthorized token, an IP allowlist and an org policy answer 403 too, and reporting one of those as a connection problem is this Issue's own misdirection pointed the other way. **The question is asked only on that failure path**, so a healthy run makes no extra request, and it is decided on the status code rather than on gh's wording for the same reason the 404 classification is — a message is prose that can be reworded between releases. Everything under `retry` has already read three listings through `gh`, so a probe that then reaches no status at all is neither a missing binary nor an expired token.
 
 `--exclude <N>` drops issues from the answer, and it drops them from **every** bucket rather than only from the offer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — left in the waiting bucket, it would answer `wait` for a backlog with nothing left to wait for. It takes a comma-separated list and may be repeated.
 
@@ -2083,7 +2095,7 @@ Standard output carries the single verdict word and standard error the reason, s
 | `stop`      | Report and finish. The reason is the termination reason the completion report carries                                                                            | 0         |
 | _(nothing)_ | The invocation could not be read — a missing or unrecognized `--answer`, an unparseable timestamp, a non-numeric count. Usage is printed and nothing is answered | 1         |
 
-`--answer` is `backlog:next`'s own answer in the words this decision needs, and the mapping is mechanical: issue numbers are `candidates`; `wait` is `blocked` while this run has children in flight and `exhausted` when it has none; `none` is `exhausted`; `stop` is `parked`; `error` or a failed listing is `unreadable`. `--started` is when the invocation began and `--active` when it last had work — the most recent ask that was not `exhausted`. Refreshing `--active` is what restarts the idle watch, so a candidate picked up mid-watch gets the whole budget again rather than the remainder; on the first ask it is the run's start. **`--idle` without `--active` is refused rather than measured from `--started`**: a run already working longer than the budget would stop on its first empty backlog and print that the backlog stayed empty for the whole watch — an emptiness it never saw.
+`--answer` is `backlog:next`'s own answer in the words this decision needs, and the mapping is mechanical: issue numbers are `candidates`; `wait` is `blocked` while this run has children in flight and `exhausted` when it has none; `none` is `exhausted`; `stop` is `parked`; `retry` is `blocked` while this run still has consecutive retries left and `unreadable` once they are spent; `error` or a failed listing is `unreadable`. `--started` is when the invocation began and `--active` when it last had work — the most recent ask that was not `exhausted`. Refreshing `--active` is what restarts the idle watch, so a candidate picked up mid-watch gets the whole budget again rather than the remainder; on the first ask it is the run's start. **`--idle` without `--active` is refused rather than measured from `--started`**: a run already working longer than the budget would stop on its first empty backlog and print that the backlog stayed empty for the whole watch — an emptiness it never saw.
 
 `--merged` and `--running` are both counted against `--max`, because children run in lanes: a maximum measured on merges alone would let a second wave start before the first had merged and take the run past the number the person declared. **No ending abandons a lane**: whatever would have ended the run — the maximum, a parked backlog, an unreadable listing, an expired watch, the whole-run bound — answers `watch` while `--running` is above zero, so the lanes drain and their merges reach the report. The reason names the ending it is draining towards.
 
@@ -2400,7 +2412,7 @@ pnpm josh run:progress --wait                       # wait out one interval, pri
 pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 ```
 
-**This is the one josh command meant to be started and left running.** Every other one answers once and the caller's own loop drives it. That shape was rejected here deliberately: a parent that waits and reports spends one of its own turns per heartbeat — 36 of them in a three-hour run, taken at the point its context is largest and most expensive. The loop lives inside the command, an agent starts it in the background, and all the agent does is relay what appears.
+**This is the one josh command meant to be started and left running.** Every other one answers once and the caller's own loop drives it. That shape was rejected here deliberately: a parent that waits and reports spends one of its own turns per heartbeat — 36 of them in a three-hour run, taken at the point its context is largest and most expensive. The loop lives inside the command, an agent starts it in the background, and all the agent does with what appears is put a label in front of each field and close with the next report time — the presentation rule in `.claude/skills/workflow-commands/epicrun.md` → "Progress while the run is quiet", which changes no value the command printed.
 
 **`--wait` is that loop with an exit at the end, and it exists because relaying "what appears" is not always possible** ([#1576](https://github.com/joshuafolkken/kit/issues/1576)). A harness that delivers a background command's standard output only **when that command exits** — Claude Code is one — relays nothing at all from a process built never to exit, and `epicrun #1474` was measured at 2h36m of silence with children in flight. So `--wait` waits the same clock out, prints one line and returns, and the caller starts the next one when it does. **The clock is still this command's**: the record `--mark` writes is re-read on every tick, so a real report elsewhere pushes the next line out, and two of these cannot double-report because the first to print records it. `--hours` bounds it the same way — a wait that outlives the bound reports nothing and exits 0. **A tick that finds nothing in flight does not end it either**: the caller is told to restart it the moment it exits, so returning on a quiet repository would turn the pair into a poll rather than a heartbeat.
 

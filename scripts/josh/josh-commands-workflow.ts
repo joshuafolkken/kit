@@ -48,13 +48,13 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Checkout default branch and pull latest (refuses inside a lane)',
 		category: 'Workflow',
 	},
+	// A script rather than an `sh -c` chain, because the strategy has to be named rather than left to
+	// the caller's git configuration: the `git pull` this replaced aborted with `Need to specify how
+	// to reconcile divergent branches` on exactly the diverged branch the command exists for
+	// (joshuafolkken/kit#1659).
 	'main:merge': {
-		shell: [
-			'sh',
-			'-c',
-			'DEFAULT=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed "s|refs/remotes/origin/||"); git pull origin "${DEFAULT:-main}"',
-		],
-		description: 'Pull latest from origin default branch',
+		script: 'scripts/git/main-merge.ts',
+		description: 'Merge origin default branch into the current branch',
 		category: 'Workflow',
 	},
 }

@@ -8,6 +8,7 @@ import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { gh_reachability } from '#scripts/git/git-gh-reachability'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { backlog_pool } from './backlog-pool'
 
@@ -40,14 +41,31 @@ const READ_FAILURES: Readonly<Record<Exclude<OptedInRead['kind'], 'read'>, strin
 	unreadable: auto_ok_cli.UNREADABLE_MESSAGE,
 }
 
-// `epic:next`'s verdicts, in this command's spelling.
+// What `retry` says that `error` cannot (joshuafolkken/kit#1663).
+//
+// The anomaly `epic:next` raises for a child it could not read tells the reader to check
+// `gh auth status` and that the issue exists — correct for the failure it was written for, and
+// actively misleading for a name resolution that never reached GitHub at all. Neither the issue nor
+// the credentials were the problem there, and the graph itself may be perfectly resolvable.
+const RETRY_MESSAGE =
+	'GitHub did not answer, so a child of the dependency graph could not be read. This is a transport failure and not an unusable graph — the listings this command already read prove `gh` and the credentials work. Ask again after a short wait.'
+
+// `epic:next`'s verdicts, in this command's spelling, plus the one it has no word for.
 //
 // `complete` becomes `none` because a backlog is never finished the way one epic is — the token says
 // "nothing to hand back", which is the same thing `auto-ok:next` prints, so a loop reading either
 // command branches on one word. `run` never reaches standard output at all: the numbers do.
-const VERDICT_TOKENS: Readonly<Record<EpicVerdict, string>> = {
+//
+// **`retry` is this command's own and is deliberately not added to `EpicVerdict`.** `epic:next` has
+// no failure path that could emit it, so widening the shared union would give every consumer of it a
+// member none of them can produce — and `VERDICT_LINES` a line nothing ever prints. The token is a
+// backlog-level answer about the transport, not a reading of one epic's graph.
+type BacklogVerdict = EpicVerdict | 'retry'
+
+const VERDICT_TOKENS: Readonly<Record<BacklogVerdict, string>> = {
 	complete: auto_ok_cli.NONE_TOKEN,
 	error: 'error',
+	retry: 'retry',
 	run: 'run',
 	stop: 'stop',
 	wait: 'wait',
@@ -87,12 +105,19 @@ function tokens_of(result: EpicNextResult, repo: string): ReadonlyArray<string> 
 
 // A listing that was cut short is reported rather than answered from silently: an opted-in issue
 // past the cut is still runnable, and an epic past the cut leaves its children reading as untracked.
-function warn_gaps(context: PoolContext, has_answer: boolean): void {
-	const listing = auto_ok_cli.truncation_note(context.opted_in.cutoff, has_answer)
+// An epic past the cut leaves its children reading as untracked, which is true of any answer this
+// command reaches — including one that never read a graph at all.
+function warn_epic_gap(context: PoolContext): void {
 	const epics = epic_bundle_gaps.epic_gap(context.tracking.cutoff, auto_ok_cli.LISTING_LIMIT)
 
-	if (listing !== undefined) console.error(listing)
 	if (epics !== undefined) console.error(epics)
+}
+
+function warn_gaps(context: PoolContext, has_answer: boolean): void {
+	const listing = auto_ok_cli.truncation_note(context.opted_in.cutoff, has_answer)
+
+	if (listing !== undefined) console.error(listing)
+	warn_epic_gap(context)
 }
 
 function report(result: EpicNextResult, context: PoolContext): number {
@@ -162,10 +187,40 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 	return combine(views_from(reads), context)
 }
 
+// Whether the `error` verdict is really a transport failure wearing the graph's clothes.
+//
+// Only the `error` verdict is asked about, and the probe is one request made **after** the answer is
+// otherwise final — so a healthy run pays nothing for it. Everything below `error` in this file has
+// already read the opted-in listing, the epic listing and this repository's name through `gh`, so a
+// probe that then reaches no HTTP status at all is not a missing binary and not an expired token: it
+// is the connection. That is why the classification is safe here and would not be at the entry.
+async function is_transport_failure(result: EpicNextResult): Promise<boolean> {
+	if (result.verdict !== 'error') return false
+
+	return (await gh_reachability.probe()) === 'unreachable'
+}
+
+// The unusable-graph report is withheld here rather than printed beside the retry: its anomaly lines
+// name issues and credentials, which is exactly the wrong place to send the reader. **The epic gap is
+// not withheld with it** — it says nothing about issues or credentials, and a run that spends its
+// retries and then ends still has to have been told its epic listing was cut short.
+//
+// The opted-in listing's own truncation note is withheld, because both of its tails assert something
+// this path did not do: one says an answer was produced, the other that every issue in the listing
+// was excluded. Nothing was excluded here — the graph was never read.
+function report_retry(context: PoolContext): number {
+	warn_epic_gap(context)
+	console.error(RETRY_MESSAGE)
+	console.info(VERDICT_TOKENS.retry)
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function answer_pool(context: PoolContext): Promise<number> {
 	const result = await resolve(context)
 
 	if (result === undefined) return FAILURE_EXIT_CODE
+	if (await is_transport_failure(result)) return report_retry(context)
 
 	return report(result, context)
 }
@@ -245,14 +300,18 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 const backlog_next = {
 	USAGE,
 	REPO_UNREADABLE_MESSAGE,
+	RETRY_MESSAGE,
 	READ_FAILURES,
 	VERDICT_TOKENS,
 	tokens_of,
+	warn_epic_gap,
 	warn_gaps,
 	report,
 	combine,
 	views_from,
 	resolve,
+	is_transport_failure,
+	report_retry,
 	context_of,
 	answer_pool,
 	report_none,
@@ -264,4 +323,4 @@ const backlog_next = {
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { backlog_next }
-export type { OptedIn, PoolContext }
+export type { BacklogVerdict, OptedIn, PoolContext }
