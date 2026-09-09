@@ -695,11 +695,11 @@ name rather than restore the pushed one. Nothing in `pnpm josh lane:*` reaches
 no `node_modules` — which is to say no `pnpm josh followup` either.
 
 **The exception is decided by what `followup` printed, not by reading the situation.**
-`mergeStateStatus: DIRTY` — the spelling `git-pr-checks-eval.ts` compares against and the one
-"Conflicts are not predicted" above already uses, reported as the named failure
-`PR checks failed (merge conflict)` — means the branch as pushed no longer merges and has to be
-rebuilt on a current `main`, so the local one is not the resume path and keeping it holds a seat for
-nothing. That child's lane is closed, with nothing to stash, which is what that section already
+**What it prints is `PR checks failed (merge conflict)`** — that string, and nothing else, is what
+reaches you; `mergeStateStatus: DIRTY` is the internal spelling `git-pr-checks-eval.ts` compares
+against and the one "Conflicts are not predicted" above uses, never an output line to search for.
+The named failure means the branch as pushed no longer merges and has to be rebuilt on a current
+`main`, so the local one is not the resume path and keeping it holds a seat for nothing. That child's lane is closed, with nothing to stash, which is what that section already
 prescribes. Do not grep the output for `mergeable_state`: that is the REST field name, normalized
 away by `git-gh-pr-snapshot.ts` before anything prints it. Every other after-commit park — a gate this run may not waive, a standing High finding, a
 Tier B or Tier C decision — resumes from the branch exactly as it stands, and keeps its lane.

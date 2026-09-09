@@ -163,6 +163,10 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	// the warning rather than the spelling, which the conflict section above already contains — an
 	// agent told to decide from output that never appears falls back to judgement.
 	'Do not grep the output for `mergeable_state`',
+	// The paragraph has to lead with the string that actually reaches the operator. Leading with the
+	// internal comparison spelling sends an agent searching for output that is never written, which
+	// is the same fallback-to-judgement the paragraph exists to remove.
+	'**What it prints is `PR checks failed (merge conflict)`**',
 	// The Issue's acceptance criterion is that the CI-concurrency question is answered either way and
 	// which way is recorded. Dropping this leaves the criterion satisfied by silence.
 	'CI concurrency — recorded as to-be-measured',
