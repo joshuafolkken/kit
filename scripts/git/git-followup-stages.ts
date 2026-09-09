@@ -4,13 +4,17 @@ import { time_format } from '#scripts/time/time-format'
 //
 // joshuafolkken/kit#1333 removed 19 seconds of dead air between reading a clean review and issuing
 // the merge, and left the next stretch of the same 134 seconds unexamined: the **44 seconds
-// `followup` spends on itself**. One invocation does nine things in order — the `closes #N`
+// `followup` spends on itself**. One invocation did nine things in order — the `closes #N`
 // check, the three GitHub reads the notification needs, the required-check wait, the CodeRabbit line
 // comments, the AI reviewers' top-level comments, the completion Telegram, the merge request, the
 // completion comment and the epic auto-close — and not one of them had ever been timed. So every
 // proposal to shorten it was a guess, and a guess made under time pressure falls on whichever stretch
 // is easiest to cut rather than on the one that is long: the notification and the auto-close, which is
 // exactly where the merge gate lives.
+//
+// **Those nine are seven printed rows now** (joshuafolkken/kit#1446): the four reads in front of the
+// wait go out together and so do the two steps after the merge, and a lap measures an interval rather
+// than a call. `STAGE` below is the list; the two names carrying `and` are the batches.
 //
 // **Laps, not a wrapper per stage.** The alternative was a `measure(name, () => …)` closure around
 // each call, which reads well and rewrites every call site in the file it instruments — nine
@@ -35,9 +39,12 @@ import { time_format } from '#scripts/time/time-format'
 
 const STAGE_LINE_PREFIX = 'followup stage: '
 const STAGE_TOTAL_PREFIX = 'followup stages total: '
-// Wide enough for the longest name below, so the durations line up in one column without the reader
-// having to count. Parsing is unaffected: the fields are whitespace-separated either way.
-const STAGE_NAME_WIDTH = 20
+// One wider than the longest name below, so the durations line up in one column without the reader
+// having to count. **The extra one is load-bearing**: `padEnd` adds nothing once a name reaches the
+// width, and `completion-and-epic-close` is 25 characters, so at 25 that row alone would run its
+// duration straight onto its name (joshuafolkken/kit#1446). Parsing is unaffected either way — the
+// fields are whitespace-separated.
+const STAGE_NAME_WIDTH = 26
 // Where the duration column starts, so the total lands under the stage durations rather than beside
 // the label. Derived from the two constants above instead of written out, which is what keeps the
 // block aligned when a longer stage name widens it.
@@ -46,16 +53,22 @@ const NO_DURATION = 0
 
 // The stages, named once. They are the units a proposal to shorten `followup` would be written
 // against, so a rename has to move the printer and whatever reads it together.
+//
+// **Two names say `and` because two stages became one** (joshuafolkken/kit#1446). Requests that need
+// nothing from one another are now issued together, and a lap records an interval rather than a
+// call — so a batch is one interval, and what it holds has to be readable from its name or the
+// shortening becomes invisible to the very measurement that found it. `closes-and-context` is the
+// former `closes-check` and `context`; `completion-and-epic-close` the former `completion-comment`
+// and `epic-close`. **`checks-wait` is untouched, and deliberately so**: it is the merge gate, and
+// this change only ever moved time that was not a wait.
 const STAGE = {
-	closes_check: 'closes-check',
-	context: 'context',
+	closes_and_context: 'closes-and-context',
 	checks_wait: 'checks-wait',
 	coderabbit_comments: 'coderabbit-comments',
 	ai_review_comments: 'ai-review-comments',
 	telegram: 'telegram',
 	merge: 'merge',
-	completion_comment: 'completion-comment',
-	epic_close: 'epic-close',
+	completion_and_epic_close: 'completion-and-epic-close',
 	// The lap that was still running when a stage threw. `followup` exits non-zero on an AI-review
 	// blocker and on a red check, and those are the runs whose wait is longest — reporting nothing for
 	// them would leave the measurement blind to exactly the invocations worth measuring.

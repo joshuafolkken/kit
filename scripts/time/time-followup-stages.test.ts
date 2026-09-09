@@ -74,7 +74,7 @@ describe('time_followup_stages.build_followup_stages', () => {
 })
 
 describe('time_followup_stages.followup_stage_lines', () => {
-	// A heading over ten `not measured` rows would assert the question was asked of something.
+	// A heading over a column of `not measured` rows would assert the question was asked of something.
 	it('prints nothing where the window held no followup call', () => {
 		expect(lines_of([time_span_fixture.span(time_spans.TOOL_CATEGORY)])).toEqual([])
 	})

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { deferred_answer, type DeferredAnswer } from './deferred-answer-fixture'
 import { git_epic_close } from './git-epic-close'
 import { git_followup_stages } from './git-followup-stages'
 import { git_gh_command } from './git-gh-command'
@@ -134,6 +135,45 @@ describe('run_wrapup — a step that fails after the merge', () => {
 		mocked_close_epics.mockRejectedValue(FAILURE)
 
 		await expect(run_wrapup({})).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1446: the completion comment and the epic auto-close need nothing from one
+// another, and measured serially they were 1.9 s and 3.1 s of `followup`'s own clock. Observed by
+// answering the comment last and asking whether the auto-close had already gone out — the property,
+// not a duration a mocked call cannot supply.
+describe('run_wrapup — the two steps after the merge', () => {
+	let comment_post: DeferredAnswer<string>
+
+	beforeEach(() => {
+		comment_post = deferred_answer<string>()
+		mocked_comment.mockReturnValue(comment_post.promise)
+	})
+
+	it('issues the epic auto-close while the completion comment is still outstanding', async () => {
+		const run = run_wrapup({})
+
+		await vi.waitFor(() => {
+			expect(mocked_close_epics).toHaveBeenCalledOnce()
+		})
+		comment_post.answer('')
+		await run
+	})
+
+	// The serial path, kept on purpose: without `is_merged` the auto-close returns at once, so there
+	// is nothing to overlap, and a failure there must still end the run.
+	it('keeps them in sequence on a run that merged nothing', async () => {
+		const run = run_wrapup({ should_merge: false })
+
+		await vi.waitFor(() => {
+			expect(mocked_comment).toHaveBeenCalledOnce()
+		})
+
+		expect(mocked_close_epics).not.toHaveBeenCalled()
+		comment_post.answer('')
+		await run
+
+		expect(mocked_close_epics).toHaveBeenCalledOnce()
 	})
 })
 

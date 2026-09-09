@@ -27,8 +27,8 @@ import { git_followup_stages, type FollowupStage } from '#scripts/git/git-follow
 const LINE_SEPARATOR = '\n'
 // **The row is read from its end, not from the gap in its middle.** The printer pads the stage name
 // to a fixed width so the durations line up, and reading the two as whitespace-separated fields works
-// only for as long as every name is shorter than that width — `coderabbit-comments` is already 19 of
-// the 20. A name that reached it would make `padEnd` a no-op, the printer would emit
+// only for as long as every name is shorter than that width — `completion-and-epic-close` is already
+// 25 of the 26. A name that reached it would make `padEnd` a no-op, the printer would emit
 // `some-very-long-stage12.3 s`, and a field split would take `some-very-long-stage12.3` for the name
 // and `NaN` for the seconds — dropping the row silently, which is the going-quiet-without-failing this
 // module's header argues against. The duration and its unit are `time_format.format_seconds`'s output,

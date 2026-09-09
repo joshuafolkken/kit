@@ -42,10 +42,10 @@ describe('time_followup_stage.read_stages', () => {
 
 describe('time_followup_stage.read_stages — rows the alignment could break', () => {
 	it('reads a row the harness indented, because the printer indents none', () => {
-		const row = `  ${git_followup_stages.STAGE_LINE_PREFIX}${git_followup_stages.STAGE.context}  0.5 s`
+		const row = `  ${git_followup_stages.STAGE_LINE_PREFIX}${git_followup_stages.STAGE.closes_and_context}  0.5 s`
 
 		expect(time_followup_stage.read_stages(row)).toEqual([
-			{ name: git_followup_stages.STAGE.context, duration_ms: 0.5 * SECOND_MS },
+			{ name: git_followup_stages.STAGE.closes_and_context, duration_ms: 0.5 * SECOND_MS },
 		])
 	})
 
@@ -67,7 +67,7 @@ describe('time_followup_stage.read_stages — rows the alignment could break', (
 	// A body the harness truncated mid-row is the common cause, and a zero there would read as a lap
 	// that ran and took no time.
 	it('drops a row whose duration is not a number', () => {
-		const row = `${git_followup_stages.STAGE_LINE_PREFIX}${git_followup_stages.STAGE.epic_close}`
+		const row = `${git_followup_stages.STAGE_LINE_PREFIX}${git_followup_stages.STAGE.completion_and_epic_close}`
 
 		expect(time_followup_stage.read_stages(row)).toEqual([])
 	})

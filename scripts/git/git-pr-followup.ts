@@ -199,20 +199,65 @@ function log_skip_notes(notes: ReadonlyArray<string>): void {
 	}
 }
 
-async function fetch_telegram_context(input: {
+// **The one read of the four that can depend on another.** Without an issue number on the command
+// line it is the pull request body that names it (joshuafolkken/kit#1539), so the title read waits
+// for exactly that one and for nothing else. With a number in hand the `??` short-circuits and the
+// promise is never awaited at all, which is what lets this read go out in the same tick as the other
+// three.
+async function read_issue_title(
+	issue_number: string | undefined,
+	closes_number: Promise<string | undefined>,
+): Promise<string | undefined> {
+	const number = issue_number ?? (await closes_number)
+	if (number === undefined) return undefined
+
+	return await git_gh_command.issue_get_title(number)
+}
+
+interface RunContext {
+	issue_number: string | undefined
+	context: TelegramContext
+}
+
+// **The four reads in front of the check wait are issued together** (joshuafolkken/kit#1446). Not one
+// of them is a wait on anything: the `closes #N` check reads the pull request body, and the
+// notification needs the repository name, the issue title and the pull request URL — four requests
+// that were sent one at a time for 5.5 of `followup`'s measured 45.8 seconds, purely because they
+// were written as consecutive statements.
+//
+// **This overlaps requests; it decides nothing differently.** The `closes #N` warning still fires on
+// the same body, the context still carries the same four fields, and the required-check wait and the
+// AI-review scan below — the merge gate itself — are untouched. Overlapping two reads that do not
+// depend on each other is the whole of the change; skipping one would be a different thing entirely.
+//
+// **Every promise is handed to `Promise.all` in the same synchronous block**, so a rejection has a
+// handler attached in the tick it was created — the first failure still ends the run, and no other
+// read is left rejecting into nothing.
+async function read_run_context(input: {
 	branch_name: string
 	issue_number: string | undefined
-}): Promise<TelegramContext> {
-	const name_with_owner = await git_gh_command.repo_get_name_with_owner()
-	const repo_name = parse_repo_name(name_with_owner)
-	const issue_title =
-		input.issue_number === undefined
-			? undefined
-			: await git_gh_command.issue_get_title(input.issue_number)
-	const pr_url = await git_gh_command.pr_get_url(input.branch_name)
-	const issue_url = build_issue_url(pr_url, input.issue_number)
+}): Promise<RunContext> {
+	const closes = warn_if_missing_closes(input.branch_name)
+	const owner = git_gh_command.repo_get_name_with_owner()
+	const url = git_gh_command.pr_get_url(input.branch_name)
+	const title = read_issue_title(input.issue_number, closes)
+	const [closes_number, name_with_owner, pr_url, issue_title] = await Promise.all([
+		closes,
+		owner,
+		url,
+		title,
+	])
+	const issue_number = input.issue_number ?? closes_number
 
-	return { repo_name, issue_title, issue_url, pr_url }
+	return {
+		issue_number,
+		context: {
+			repo_name: parse_repo_name(name_with_owner),
+			issue_title,
+			issue_url: build_issue_url(pr_url, issue_number),
+			pr_url,
+		},
+	}
 }
 
 // The pending count replaces the project version line (joshuafolkken/kit#1486): children no longer
@@ -310,13 +355,9 @@ async function run_review_checks(
 // the epic close all name the same issue — and so the caller's own tail can record a run whose number
 // only the pull request knew.
 async function run_stages(input: FollowupInput, log: StageLog): Promise<string | undefined> {
-	const closes_number = await warn_if_missing_closes(input.branch_name)
-	const issue_number = input.issue_number ?? closes_number
+	const { issue_number, context } = await read_run_context(input)
 
-	lap(log, STAGE.closes_check)
-	const context = await fetch_telegram_context({ branch_name: input.branch_name, issue_number })
-
-	lap(log, STAGE.context)
+	lap(log, STAGE.closes_and_context)
 	const checks = await run_review_checks(input, context, log)
 
 	await notify_completion(context, checks.notes, input.should_merge)

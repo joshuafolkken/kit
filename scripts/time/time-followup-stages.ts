@@ -13,7 +13,7 @@ import type { Span } from './time-spans'
 //
 // **The rows are printed in the order a run passes them, not by descending duration.** Every other
 // table here ranks, because its rows are an open set and the question is which is largest. These are
-// a closed set of ten named laps, and the question the block exists for is *which stage of this run
+// a closed set of named laps, and the question the block exists for is *which stage of this run
 // was slower than the same stage of that one* — a table that reorders itself between two runs cannot
 // be read down the column, which is exactly the comparison joshuafolkken/kit#1445 was filed for.
 //
@@ -23,8 +23,8 @@ import type { Span } from './time-spans'
 // which is the reading `time-format.ts`'s `NOT_MEASURED` exists to keep a report out of.
 //
 // **The block is withheld entirely where the window holds no `followup` call at all** — a heading
-// over ten `not measured` rows would assert the question was asked of something, and the answer for
-// a session that never merged anything is that there was nothing to ask.
+// over a column of `not measured` rows would assert the question was asked of something, and the
+// answer for a session that never merged anything is that there was nothing to ask.
 
 const HEADING = 'Followup stages (in run order):'
 const NOTE = 'read from the rows followup printed into the transcript'
