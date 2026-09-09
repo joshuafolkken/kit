@@ -112,7 +112,7 @@ async function refresh_lane_branch(branch_name: string): Promise<void> {
 	try {
 		await git_command.fetch_branch(branch_name)
 	} catch {
-		report_unverified(branch_name)
+		console.error(`Could not fetch ${branch_name} from origin.`)
 	}
 }
 
@@ -122,16 +122,38 @@ async function tracking_reference(branch_name: string): Promise<string | undefin
 	return names.length > 0 ? `${REFS_REMOTES_ORIGIN_PREFIX}${branch_name}` : undefined
 }
 
+/**
+ * The ref for a branch origin still has — fetched first, so the lane starts at the tip rather than
+ * at whatever this checkout last saw.
+ *
+ * **A `present` answer is authoritative, so this arm never degrades to a new branch.** With the
+ * fetch failed and no remote-tracking ref to fall back on — a second machine, a fresh clone — a
+ * fall-through would cut `<N>-lane` from the default branch over commits origin demonstrably has,
+ * which is the silent orphan this module exists to prevent. The Issue asks for an explicit report
+ * in place of a silent new branch, and refusing is that report: both ways out are named, and
+ * `lane:open` already fails this way for a seat it cannot read and an install it cannot finish.
+ */
+async function present_reference(branch_name: string): Promise<string> {
+	await refresh_lane_branch(branch_name)
+
+	const reference = await tracking_reference(branch_name)
+
+	if (reference !== undefined) return reference
+
+	throw new Error(
+		`origin has ${branch_name}, but it could not be fetched, so this lane cannot be opened on the commits already pushed to it. Fetch it — \`git fetch origin ${branch_name}\` — and run \`pnpm josh lane:open\` again.`,
+	)
+}
+
 // `absent` is the one answer that refuses the ref: the branch is gone from origin, so a ref still
-// pointing at it is stale and the lane is cut from the default branch as any new one is. `present`
-// fetches first, so the lane starts at the tip rather than at whatever this checkout last saw.
+// pointing at it is stale and the lane is cut from the default branch as any new one is.
 async function remote_reference_for(branch_name: string): Promise<string | undefined> {
 	const answer = await ask_remote(branch_name)
 
 	if (answer === 'absent') return undefined
+	if (answer === 'present') return await present_reference(branch_name)
 
-	if (answer === 'present') await refresh_lane_branch(branch_name)
-	else report_unverified(branch_name)
+	report_unverified(branch_name)
 
 	return await tracking_reference(branch_name)
 }

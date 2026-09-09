@@ -201,6 +201,18 @@ describe('resolving the start point when the remote no longer has the branch', (
 		expect(console.error).not.toHaveBeenCalledWith(expect.stringContaining('Reusing'))
 	})
 
+	// A checkout that has never seen the branch has no ref to fall back on, so a fall-through would
+	// cut `<N>-lane` fresh over commits origin demonstrably has. Refusing is the explicit report the
+	// Issue asks for in place of a silent new branch.
+	it('refuses the open when origin has the branch but it could not be fetched', async () => {
+		ls_remote_branch.mockResolvedValue(LANE_HEAD)
+		fetch_branch.mockRejectedValue(new Error(OFFLINE_MESSAGE))
+
+		await expect(lane_start_point.resolve_for_branch(LANE_BRANCH)).rejects.toThrow(
+			/could not be fetched/u,
+		)
+	})
+
 	// Offline is not the same answer, and resolving it the same way would cut a fresh branch over
 	// commits somebody pushed — the silent failure this module exists to remove.
 	it('still reuses the ref when origin cannot be reached, and says it could not check', async () => {
