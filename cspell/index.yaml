@@ -41,6 +41,10 @@ ignorePaths:
   #   - '**/*.min.js'
   #   - '**/*.svg'
 words:
+  # The POSIX call named in the shell error a lane close leaves behind when it removes the directory
+  # the shell is sitting in (joshuafolkken/kit#1587). Distributed, because `epicrun.md` quotes that
+  # message so the failure can be searched for, and `josh sync` copies that skill.
+  - getcwd
   # The process-listing command `epicrun.md` names among the traces a stopped delegated unit leaves
   # (joshuafolkken/kit#1212). Distributed, because the skill that names it is copied by `josh sync`.
   - pgrep
@@ -142,6 +146,9 @@ words:
   # through this dictionary (joshuafolkken/kit#1092). `scripts/cspell-distributed-words.test.ts` is
   # what keeps the two in step.
   - worktrees
+  # The singular joined it once `epicrun.md` had to name the git subcommand itself — `git worktree
+  # add <dir> <existing-branch>`, the restore no `josh lane:*` command reaches (joshuafolkken/kit#1587).
+  - worktree
   - evals
   # How `SKILL.md` → §2h and `eval-gate.md` name a command already sent to the background
   # (joshuafolkken/kit#1510). Both are skills `josh sync` copies, so the word has to resolve here.

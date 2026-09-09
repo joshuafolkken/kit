@@ -135,9 +135,38 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	'**Rebasing the loser automatically is deliberately not done.**',
 	// What a lane does on each ending — the four the Issue asked to have written down.
 	'What happens to a lane',
-	"**A parked child's lane is stashed and closed, never left open.**",
 	'**Its lane is left open and untouched**',
 	"The next session's `pnpm josh lane:prune` closes what git no longer has a tree for",
+	// joshuafolkken/kit#1587: a park was one row, written for a child whose work is uncommitted. A
+	// child parked *after* its commit and push inverts every step of it — the stash is a no-op, and
+	// the close deletes the local branch the resume reads — so the two states are pinned separately.
+	// Pinning only the phrase "parked" would let either row satisfy the assertion.
+	'The child was **parked before its commit**',
+	'The child was **parked after its commit and push**',
+	// The reasons have to stay beside the rows: without them the kept lane reads as an exemption
+	// somebody granted, and the next run closes it back.
+	"**A committed child's lane is kept because closing it deletes the branch its resume needs, and no command puts that branch back**",
+	'`git branch -D <N>-lane`',
+	'so it would cut a **fresh, empty** branch of that',
+	// The one arm that still closes, and what decides it. Left to judgement this contradicts
+	// "Conflicts are not predicted", which already sends a lost merge race back to a current `main`.
+	'**The exception is decided by what `followup` printed, not by reading the situation.**',
+	// The seat is the reason the old row closed unconditionally, so keeping a lane has to answer it
+	// rather than ignore it.
+	'**A kept lane holds its seat, and that is the price rather than an oversight.**',
+	// `followup` releases the hold at the merge, and a parked child never reaches one.
+	'**Release the hold on either parked arm, and leave the lane before closing it.**',
+	// joshuafolkken/kit#1587 round 2: a `needs-human-review` stop keeps its hold, so a release stated
+	// for "every ending" would send the next run over the uncommitted tree a person has to look at.
+	'**A `needs-human-review` stop is not a park and keeps its hold**',
+	// `followup` prints the normalized `mergeStateStatus`, never the REST `mergeable_state`. Pinned on
+	// the warning rather than the spelling, which the conflict section above already contains — an
+	// agent told to decide from output that never appears falls back to judgement.
+	'Do not grep the output for `mergeable_state`',
+	// The paragraph has to lead with the string that actually reaches the operator. Leading with the
+	// internal comparison spelling sends an agent searching for output that is never written, which
+	// is the same fallback-to-judgement the paragraph exists to remove.
+	'**What it prints is `PR checks failed (merge conflict)`**',
 	// The Issue's acceptance criterion is that the CI-concurrency question is answered either way and
 	// which way is recorded. Dropping this leaves the criterion satisfied by silence.
 	'CI concurrency — recorded as to-be-measured',
