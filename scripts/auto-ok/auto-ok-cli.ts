@@ -267,8 +267,14 @@ function is_unblocked(issue: OpenIssueData): boolean {
 // epic's `blockedBy` ordering is never consulted. The epics themselves are still found by the `epic`
 // label, exactly as `epic:bundle` finds them, so this does not survive an epic that never received
 // it — what it removes is the *child's* labels deciding, which is the half that was failing.
+//
+// **The whole index is carried rather than its key set** (joshuafolkken/kit#1668). Which epic tracks
+// a child decides both whether the standalone half withholds it — `epic_index.withheld_children` —
+// and, when it is withheld, the number `backlog:plan` names as the reason. Flattening to a `Set`
+// here threw that number away, so the plan reported a listing cap it had never reached.
 type TrackingRead =
-	{ kind: 'read'; tracked: ReadonlySet<number>; cutoff: ScanCutoff } | { kind: 'epics_unreadable' }
+	| { kind: 'read'; index: ReadonlyMap<number, number>; cutoff: ScanCutoff }
+	| { kind: 'epics_unreadable' }
 
 async function read_open_epics(): Promise<FetchedEpics | undefined> {
 	try {
@@ -289,12 +295,15 @@ async function read_open_epics(): Promise<FetchedEpics | undefined> {
 // here, and both gaps land on the same message because both mean the same thing: the tracking is
 // unknown, so no answer is given.
 async function fetch_tracking(count: number): Promise<TrackingRead> {
-	if (count === 0) return { kind: 'read', tracked: new Set(), cutoff: NO_CUTOFF }
+	if (count === 0) return { kind: 'read', index: new Map(), cutoff: NO_CUTOFF }
 	const open_epics = await read_open_epics()
 	if (open_epics === undefined) return { kind: 'epics_unreadable' }
-	const tracked = new Set(epic_index.build_epic_index(open_epics.epics).keys())
 
-	return { kind: 'read', tracked, cutoff: open_epics.cutoff }
+	return {
+		kind: 'read',
+		index: epic_index.build_epic_index(open_epics.epics),
+		cutoff: open_epics.cutoff,
+	}
 }
 
 // The pickup *order* is `git_next_issues.prioritize` itself, not a copy of it: newest first, with the
@@ -318,12 +327,17 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // why, and the short version is that a person can see a blocked issue and choose to start it anyway
 // while an unattended run cannot (joshuafolkken/kit#1005).
 //
-// An issue an epic tracks is dropped here for the same reason and by the same rule: the epic's order
-// is the only thing that sequences its children, and the standalone path reads none of it
-// (joshuafolkken/kit#1633).
+// A child of an epic that is itself opted in is dropped here for the same reason and by the same
+// rule: that epic's declared order sequences its children, and it is going to offer them, so a
+// standalone offer would skip the order and hand the same issue over twice (joshuafolkken/kit#1633).
+// **A child of an epic that is *not* opted in is no longer dropped** — no path would ever offer it,
+// which made a person's `auto-ok` on the child silently inert, and the order it does have is carried
+// by the native `blockedBy` relations `is_unblocked` already refuses to run past
+// (joshuafolkken/kit#1668). `tracked` is the narrowed set `epic_index.withheld_children` builds, not
+// every tracked child; this function only applies it.
 function is_runnable(
 	issue: OpenIssueData,
-	tracked: ReadonlySet<number>,
+	tracked: ReadonlyMap<number, number>,
 	exclude: ReadonlyArray<number>,
 ): boolean {
 	if (tracked.has(issue.number)) return false
@@ -333,7 +347,7 @@ function is_runnable(
 
 function pick_next(
 	issues: ReadonlyArray<OpenIssueData>,
-	tracked: ReadonlySet<number> = new Set(),
+	tracked: ReadonlyMap<number, number> = new Map(),
 	exclude: ReadonlyArray<number> = [],
 ): OpenIssueData | undefined {
 	const runnable = issues.filter((issue) => is_runnable(issue, tracked, exclude))
@@ -347,7 +361,7 @@ function pick_next(
 function none_reason(count: number): string {
 	if (count === 0) return NONE_OPTED_IN_MESSAGE
 
-	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an epic, an epic itself, already in progress, parked, blocked by an open issue, or the one just merged.`
+	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an opted-in epic, an epic itself, already in progress, parked, blocked by an open issue, or the one just merged.`
 }
 
 // Said only when the cap actually bit, and worded from the answer rather than before it: the one run
@@ -378,7 +392,7 @@ function warn_gaps(context: PickupContext, has_answer: boolean): void {
 interface PickupContext {
 	issues: ReadonlyArray<OpenIssueData>
 	cutoff: ScanCutoff
-	tracked: ReadonlySet<number>
+	tracked: ReadonlyMap<number, number>
 	epic_cutoff: ScanCutoff
 	exclude: ReadonlyArray<number> | undefined
 }
@@ -419,7 +433,7 @@ async function answer(
 	return report({
 		issues: read.issues,
 		cutoff: read.cutoff,
-		tracked: tracking.tracked,
+		tracked: epic_index.withheld_children(tracking.index, read.issues),
 		epic_cutoff: tracking.cutoff,
 		exclude,
 	})

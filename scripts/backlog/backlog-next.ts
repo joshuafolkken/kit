@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
+import { epic_index } from '#scripts/epic/epic-index'
 import { epic_next } from '#scripts/epic/epic-next'
 import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
@@ -139,7 +140,11 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 	)
 	const from_standalone = backlog_pool.classify_standalone(
 		backlog_pool.standalone_rows(context.opted_in.issues),
-		{ tracked: context.tracking.tracked, exclude: context.exclude, repo: context.repo },
+		{
+			tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
+			exclude: context.exclude,
+			repo: context.repo,
+		},
 	)
 
 	// The same checkout map `epic:next` hands `build_result`. Without it every bundle heading reads

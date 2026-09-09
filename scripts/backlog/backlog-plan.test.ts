@@ -31,6 +31,10 @@ const READY_CHILD = 901
 const BLOCKED_CHILD = 902
 const PARKED_CHILD = 903
 const OUTSIDER = 904
+// Opted in, but the `auto-ok` listing stopped before it — the one case the cap wording is true of.
+const PAST_THE_CAP = 905
+// An epic that never opted in, so it offers none of the children its task list names.
+const OTHER_EPIC = 906
 const CYCLE_MESSAGE = 'cycle: #901 → #902'
 
 const streams = console_streams()
@@ -85,6 +89,21 @@ function stub_backlog(): void {
 		open_row(BLOCKED_CHILD),
 		open_row(PARKED_CHILD),
 		open_row(OUTSIDER, []),
+	])
+}
+
+// An opted-in epic whose child has closed since the open listing was read — the few seconds in which
+// the two reads disagree. `epic:next` places nothing for it, so the plan has to say why it is absent
+// from every section, and the epic is the fact worth naming (joshuafolkken/kit#1668).
+function stub_closed_child(): void {
+	backlog_fixture.stub_backlog({
+		opted_in: [open_row(EPIC_NUMBER, [AUTO_OK_LABEL, EPIC_LABEL])],
+		epics: [{ number: EPIC_NUMBER, children: [READY_CHILD] }],
+		children: [{ number: READY_CHILD, state: 'CLOSED' }],
+	})
+	stub_open([
+		open_row(EPIC_NUMBER, [AUTO_OK_LABEL, EPIC_LABEL]),
+		open_row(READY_CHILD, [AUTO_OK_LABEL]),
 	])
 }
 
@@ -217,6 +236,82 @@ describe('the issues the backlog will not run', () => {
 		const scope = stdout().split(backlog_plan.SCOPE_HEADING)[1] ?? ''
 
 		expect(scope).not.toContain(`#${String(READY_CHILD)}`)
+	})
+})
+
+// joshuafolkken/kit#1668. Both of these used to read as the cap, which a person acts on: "past the
+// cap" says the next ask will offer it. Only one of them is ever going to be offered.
+describe('the reason an opted-in issue is not in the plan', () => {
+	// joshuafolkken/kit#1668: the epic root is still not offered, and the sentence no longer speaks for
+	// its children — the child below is offered in the same plan that prints this.
+	it('says an epic root without auto-ok offers no children, while a child carrying it is offered', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [open_row(READY_CHILD, [AUTO_OK_LABEL])],
+			epics: [{ number: EPIC_NUMBER, children: [READY_CHILD] }],
+			children: [{ number: READY_CHILD, labels: [AUTO_OK_LABEL] }],
+		})
+		stub_open([open_row(EPIC_NUMBER, [EPIC_LABEL]), open_row(READY_CHILD, [AUTO_OK_LABEL])])
+
+		await backlog_plan_cli.run([])
+
+		const plan = stdout()
+
+		expect(plan).toContain(backlog_scope.EPIC_NOT_OPTED_IN_REASON)
+		expect(plan.split(backlog_plan.SCOPE_HEADING)[0]).toContain(`#${String(READY_CHILD)}`)
+	})
+
+	it('names the cap for an issue past the opted-in listing, and only the cap', async () => {
+		stub_backlog()
+		stub_open([
+			open_row(EPIC_NUMBER, [AUTO_OK_LABEL, EPIC_LABEL]),
+			open_row(READY_CHILD),
+			open_row(BLOCKED_CHILD),
+			open_row(PARKED_CHILD),
+			open_row(PAST_THE_CAP, [AUTO_OK_LABEL]),
+		])
+
+		await backlog_plan_cli.run([])
+
+		expect(stdout()).toContain(backlog_scope.OPTED_IN_UNPLACED_REASON)
+	})
+
+	it('names the epic, not the cap, for a child an opted-in epic did not place', async () => {
+		stub_closed_child()
+
+		await backlog_plan_cli.run([])
+
+		const plan = stdout()
+
+		expect(plan).toContain(backlog_scope.epic_tracked_reason(EPIC_NUMBER))
+		expect(plan).not.toContain(backlog_scope.OPTED_IN_UNPLACED_REASON)
+	})
+})
+
+// The misreport this change removes, moved one layer along rather than removed: handing the scope
+// layer every tracked child instead of the withheld ones names an epic that is offering nothing.
+describe('an epic that is not opted in never appears as a reason', () => {
+	// The epic below has no `auto-ok`, so it will never offer this child — the cap is the true reason.
+	it('names the cap, not the epic, when the epic tracking it is not opted in', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [open_row(EPIC_NUMBER, [AUTO_OK_LABEL, EPIC_LABEL])],
+			epics: [
+				{ number: EPIC_NUMBER, children: [READY_CHILD] },
+				{ number: OTHER_EPIC, children: [PAST_THE_CAP] },
+			],
+			children: [{ number: READY_CHILD }],
+		})
+		stub_open([
+			open_row(EPIC_NUMBER, [AUTO_OK_LABEL, EPIC_LABEL]),
+			open_row(READY_CHILD),
+			open_row(PAST_THE_CAP, [AUTO_OK_LABEL]),
+		])
+
+		await backlog_plan_cli.run([])
+
+		const plan = stdout()
+
+		expect(plan).toContain(backlog_scope.OPTED_IN_UNPLACED_REASON)
+		expect(plan).not.toContain(backlog_scope.epic_tracked_reason(OTHER_EPIC))
 	})
 })
 

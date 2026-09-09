@@ -1447,12 +1447,23 @@ pickup side, so `auto-ok:next` can refuse an issue that `🗒 Next issues` is sh
 list. That difference is deliberate: a person can see the issue is blocked and decide to start it
 anyway, and an unattended run has no such judgement to exercise.
 
-**An epic's child is never picked up standalone**, whatever labels it carries (joshuafolkken/kit#1633).
-`auto-ok` widens unattended execution past an epic's edge; it does not widen it past an epic's
-*order*, and the standalone path reads none of the `blocked-by` graph `epic:next` builds its waves
-from. So an issue an epic tracks runs through that epic and nowhere else — one sentence:
+**An epic's child is never picked up standalone while that epic is the one offering it**, whatever
+labels the child carries (joshuafolkken/kit#1633, narrowed by joshuafolkken/kit#1668). `auto-ok`
+widens unattended execution past an epic's edge; it does not widen it past an epic's *order*, and an
+epic carrying `auto-ok` is going to hand its children over in the order its `blocked-by` graph
+declares. Offering one standalone as well would both skip that order and hand the same issue over
+twice — one sentence:
 
-> An issue an epic tracks is only ever run through that epic.
+> An issue is run through the epic that is going to offer it, and never beside it.
+
+**An epic that did not opt in is offering nothing, and there the child's own `auto-ok` decides.** The
+epic half never reads an epic without the label, so under the rule before that narrowing such a child was
+withheld from every path at once: a person could label it, watch nothing happen, and be told the
+listing cap was the reason (joshuafolkken/kit#1668). It is offered now, and the order it does have
+still holds — `josh epic --ordered` records an epic's declared order as native `blocked-by`
+relations on the children themselves, and the standalone path refuses a candidate whose prerequisite
+is still open. That refusal is what makes the narrowing safe, and it is the half of
+joshuafolkken/kit#1633 that did not change: **opting in says nothing about order.**
 
 **It is decided by whether an epic's task list names the issue, not by the issue's own labels.** A
 child carries none of `epic` / `in-progress` / `needs-decision`, which is exactly why the label set
@@ -1460,7 +1471,9 @@ never caught one. `auto-ok:next` reads the open epics for this, only when someth
 **refuses to answer when that listing cannot be read** — treating a failed read as "no epic tracks
 anything" would hand back every tracked child at once. The epics themselves are still found by the
 `epic` label, exactly as `epic:bundle` finds them, so an epic that never received it is invisible to
-both and its children can still be picked up; `pnpm josh epic:audit` is what surfaces that.
+both and its children read as tracked by nothing at all; `pnpm josh epic:audit` is what surfaces
+that. **That is a different case from an epic that has the label and not `auto-ok`** — the second is
+seen, and its children are offered on their own labels rather than on nobody having noticed it.
 
 **Everything a child gets, a picked-up Issue gets**: the split assessment, the two-layer work
 summary, `josh latest` staying hoisted to the session, park-and-continue, and the hand-off check after

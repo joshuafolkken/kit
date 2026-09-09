@@ -1,4 +1,4 @@
-import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
 
 // Fixtures shared by the `auto-ok:next` suites. Split out when the pickup gained its dependency
@@ -41,6 +41,13 @@ function blocked_issue(
 	blockers: ReadonlyArray<{ number: number; state?: string }>,
 ): OpenIssueData {
 	return { ...issue(number, created_at), blockedBy: { nodes: [...blockers] } }
+}
+
+// The epic root opted in for its children — the row that decides whether a tracked child is this
+// epic's to sequence or the standalone half's to offer (joshuafolkken/kit#1668). It is a row of the
+// opted-in listing itself, which is how the two halves read one answer rather than two.
+function opted_in_epic(): OpenIssueData {
+	return issue(EPIC_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, EPIC_LABEL])
 }
 
 // The newest and the oldest opted-in issue, the pair every ordering and exclusion case is built on.
@@ -118,6 +125,7 @@ const auto_ok_fixture = {
 	capped_listing,
 	console_streams,
 	epic_listing,
+	opted_in_epic,
 	record,
 	two_issues,
 }
