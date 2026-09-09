@@ -125,21 +125,45 @@ function unique_children(children: ReadonlyArray<EpicChild>): Array<EpicChild> {
 	return unique
 }
 
+function without(children: ReadonlyArray<EpicChild>, taken: ReadonlySet<string>): Array<EpicChild> {
+	return children.filter((child) => !taken.has(epic_graph.key_of(child)))
+}
+
+function keys_of(children: ReadonlyArray<EpicChild>): Set<string> {
+	return new Set(children.map((child) => epic_graph.key_of(child)))
+}
+
 // The epic half, already classified. `epic:next` decided each of these — the `blocked-by` graph, the
 // wave, the anomalies — so this only flattens the per-repository bundles back into one list, in the
 // order the epics' own task lists gave them.
+//
+// **Withholding wins across the buckets, not only within one.** Two epics can classify the same child
+// differently — one tracks the blocker and calls it `time`, the other does not track it and calls it
+// `runnable` — and a child offered on standard output while standard error lists it as waiting is
+// work a loop would start against a dependency that is still standing. So `human` is settled first,
+// `time` next, and `runnable` keeps only what neither claimed.
 function epic_classification(views: ReadonlyArray<EpicView>): Classification {
+	const human = unique_children(views.flatMap((view) => view.result.blocked_on_people))
+	const time = without(
+		unique_children(views.flatMap((view) => view.result.waiting)),
+		keys_of(human),
+	)
+	const offered = views.flatMap((view) =>
+		view.result.candidates.flatMap((bundle) => bundle.children),
+	)
+
 	return {
-		runnable: unique_children(
-			views.flatMap((view) => view.result.candidates.flatMap((bundle) => bundle.children)),
-		),
-		time: unique_children(views.flatMap((view) => view.result.waiting)),
-		human: unique_children(views.flatMap((view) => view.result.blocked_on_people)),
+		runnable: without(unique_children(offered), keys_of([...human, ...time])),
+		time,
+		human,
 	}
 }
 
-function is_kept(child: EpicChild, exclude: ReadonlyArray<number>): boolean {
-	return !exclude.includes(child.number)
+// `--exclude` takes bare numbers, and a bare number names an issue of the repository the command is
+// running in. A child elsewhere with the same number is a different issue, so the comparison carries
+// the repository rather than the number alone.
+function is_kept(child: EpicChild, exclude: ReadonlyArray<number>, repo: string): boolean {
+	return child.repo !== repo || !exclude.includes(child.number)
 }
 
 // A child that merged moments ago still reads as open until GitHub applies `closes #N`, so an
@@ -148,11 +172,12 @@ function is_kept(child: EpicChild, exclude: ReadonlyArray<number>): boolean {
 function drop_excluded(
 	classification: Classification,
 	exclude: ReadonlyArray<number>,
+	repo: string,
 ): Classification {
 	return {
-		runnable: classification.runnable.filter((child) => is_kept(child, exclude)),
-		time: classification.time.filter((child) => is_kept(child, exclude)),
-		human: classification.human.filter((child) => is_kept(child, exclude)),
+		runnable: classification.runnable.filter((child) => is_kept(child, exclude, repo)),
+		time: classification.time.filter((child) => is_kept(child, exclude, repo)),
+		human: classification.human.filter((child) => is_kept(child, exclude, repo)),
 	}
 }
 
@@ -171,6 +196,7 @@ const backlog_pool = {
 	drop_excluded,
 	epic_classification,
 	is_epic_row,
+	keys_of,
 	merge_classifications,
 	opted_in_epics,
 	standalone_rows,

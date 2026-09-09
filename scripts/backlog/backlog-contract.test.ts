@@ -1,6 +1,7 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import {
 	auto_ok_fixture,
+	BLOCKER_NUMBER,
 	CREATED_EARLIER,
 	CREATED_LATER,
 	EPIC_NUMBER,
@@ -24,7 +25,8 @@ const COMMAND_NAME = 'backlog:next'
 const CHILD = 901
 const SECOND_EPIC = 810
 const FOREIGN_NUMBER = 903
-const FOREIGN_CHILD = `joshuafolkken/app-kit#${String(FOREIGN_NUMBER)}`
+const FOREIGN_REPO = 'joshuafolkken/app-kit'
+const FOREIGN_CHILD = `${FOREIGN_REPO}#${String(FOREIGN_NUMBER)}`
 
 const streams = console_streams()
 const { stdout, stderr } = streams
@@ -60,7 +62,7 @@ describe('the output contract', () => {
 })
 
 describe('what a token names', () => {
-	it('qualifies a child in another repository, so a bare number cannot be misread here', async () => {
+	it('keeps a child in another repository out of the tokens but names it on standard error', async () => {
 		backlog_fixture.stub_backlog({
 			opted_in: [issue(EPIC_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, EPIC_LABEL])],
 			epics: [{ number: EPIC_NUMBER, children: [CHILD], external: [FOREIGN_CHILD] }],
@@ -68,8 +70,39 @@ describe('what a token names', () => {
 		})
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout().split('\n')).toContain(FOREIGN_CHILD)
-		expect(stdout().split('\n')).toContain(String(CHILD))
+		expect(stdout()).toBe(String(CHILD))
+		expect(stderr()).toContain(FOREIGN_REPO)
+	})
+
+	it('answers wait when the only runnable child is in another repository', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [issue(EPIC_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, EPIC_LABEL])],
+			epics: [{ number: EPIC_NUMBER, children: [], external: [FOREIGN_CHILD] }],
+			children: [{ number: FOREIGN_NUMBER }],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
+	})
+})
+
+describe('a child two epics classify differently', () => {
+	it('is withheld when either epic says it is blocked', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [
+				issue(EPIC_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, EPIC_LABEL]),
+				issue(SECOND_EPIC, CREATED_EARLIER, [AUTO_OK_LABEL, EPIC_LABEL]),
+			],
+			epics: [
+				{ number: EPIC_NUMBER, children: [CHILD] },
+				{ number: SECOND_EPIC, children: [BLOCKER_NUMBER, CHILD] },
+			],
+			children: [{ number: BLOCKER_NUMBER }, { number: CHILD, blocked_by: [BLOCKER_NUMBER] }],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout().split('\n')).toContain(String(BLOCKER_NUMBER))
+		expect(stdout().split('\n')).not.toContain(String(CHILD))
 	})
 
 	it('offers a child two auto-ok epics both track exactly once', async () => {
@@ -88,7 +121,9 @@ describe('what a token names', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(CHILD))
 	})
+})
 
+describe('the report a person reads', () => {
 	it('names the checkout of this repository rather than reporting it as absent', async () => {
 		backlog_fixture.stub_backlog({ opted_in: [issue(OLD_ISSUE_NUMBER, CREATED_EARLIER)] })
 

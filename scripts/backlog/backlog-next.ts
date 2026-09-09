@@ -2,7 +2,6 @@ import { fileURLToPath } from 'node:url'
 import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
-import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_next } from '#scripts/epic/epic-next'
 import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
@@ -64,23 +63,25 @@ interface PoolContext {
 	exclude: ReadonlyArray<number>
 }
 
-// A child elsewhere is named `owner/repo#N`, and only a child of this repository is a bare number.
-// An epic may track a child in another repository, and a bare number would send the loop reading
-// this to *this* repository's issue of that number — a different issue entirely
-// (joshuafolkken/kit#1016). The qualified spelling is the one every entry point already accepts.
-function token_of(child: EpicChild, repo: string): string {
-	return child.repo === repo ? String(child.number) : `${child.repo}#${String(child.number)}`
-}
-
-// One token per line on standard output: the runnable issues in the order they may be started, or
-// the single verdict word when there is nothing to offer. Every explanation is on standard error, so
-// `answers=$(pnpm josh backlog:next)` captures something a loop can branch on.
+// One token per line on standard output: the runnable issue numbers of **this** repository, in the
+// order they may be started, or the single verdict word when there is nothing to offer here. Every
+// explanation is on standard error, so `answers=$(pnpm josh backlog:next)` captures something a loop
+// can branch on.
+//
+// **The tokens are scoped to this repository, which is `epic:next --repo`'s shape exactly.** An epic
+// may track a child elsewhere, and a bare number would send the loop reading this to *this*
+// repository's issue of that number — a different issue (joshuafolkken/kit#1016). Qualifying it
+// instead was tried and is worse: `--exclude` parses bare integers, so a loop feeding a qualified
+// token back would be answered with a usage error rather than an exclusion. So a child elsewhere
+// stays out of the tokens, and `run` becomes `wait` when this repository has none — the same mapping
+// `epic_next.repo_verdict` makes, and for the same reason: the work is real, it is simply not work
+// this checkout can start. It is still on standard error, under its own repository and checkout.
 function tokens_of(result: EpicNextResult, repo: string): ReadonlyArray<string> {
 	if (result.verdict !== 'run') return [VERDICT_TOKENS[result.verdict]]
+	const here = epic_report.candidates_for_repo(result, repo)
+	if (here.length === 0) return [VERDICT_TOKENS.wait]
 
-	return result.candidates.flatMap((bundle) =>
-		bundle.children.map((child) => token_of(child, repo)),
-	)
+	return here.map((child) => String(child.number))
 }
 
 // A listing that was cut short is reported rather than answered from silently: an opted-in issue
@@ -109,6 +110,7 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 	const from_epics = backlog_pool.drop_excluded(
 		backlog_pool.epic_classification(views),
 		context.exclude,
+		context.repo,
 	)
 	const from_standalone = backlog_pool.classify_standalone(
 		backlog_pool.standalone_rows(context.opted_in.issues),
@@ -125,8 +127,9 @@ function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNext
 	)
 }
 
-// Nothing to classify means no epic was read, so the checkout map `views_of` builds is not needed
-// either — and building it walks the filesystem.
+// Nothing to classify means no epic was read, so `views_of`'s registry resets and its own checkout
+// discovery are not needed. `combine` builds the map either way, so what this saves is the second
+// walk rather than the only one.
 function views_from(reads: ReadonlyArray<EpicRead>): ReadonlyArray<EpicView> {
 	return reads.length === 0 ? [] : epic_next.views_of(reads)
 }
