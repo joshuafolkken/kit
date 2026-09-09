@@ -205,6 +205,18 @@ describe('time_sessions.separate when a marker names the issue', () => {
 describe('time_sessions.separate on what a named marker leaves behind', () => {
 	const RUN_MINUTE = 10
 	const EARLY_MINUTE = 2
+	const LATER_MINUTE = 20
+
+	// The parent took the next issue up in-session, so that declaration sits in its own half — and a
+	// ceiling read from the units alone never closed, so the next run's units were counted as this
+	// child's.
+	it('ends the unit half at a next declaration made in the parent own half', () => {
+		const own = [naming(LATER_MINUTE, OTHER_ISSUE)]
+		const parent = session(own, [naming(EARLY_MINUTE, ISSUE), work(LATER_MINUTE)])
+		const split = separate([[RUN_SESSION, parent]])
+
+		expect(split.kept.get(RUN_SESSION)?.delegated.size).toBe(ONE_SPAN)
+	})
 
 	// A run that spanned two sessions where only the first wrote the label: the second carries the
 	// number-less skill-load marker alone, and deciding the test once per corpus dropped it.

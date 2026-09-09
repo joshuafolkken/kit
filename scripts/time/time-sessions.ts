@@ -152,11 +152,19 @@ function earliest_after(starts: ReadonlyArray<number>, after_ms: number): number
 // `time-markers.ts` calls it "the run starts here". **A floor without a ceiling only removes the
 // siblings that ran first**, which left the first child of a parent absorbing every later one (a
 // review finding on joshuafolkken/kit#1648) — so the same evidence is read forwards as well.
-function run_window(spans: ReadonlyMap<string, Span>, issue_number: number): [number, number] {
-	const declared = declarations(spans)
-	const start_ms = earliest(starts_naming(declared, issue_number))
+// **The ceiling is read from both halves, the floor from the unit's.** A parent can dispatch this
+// child and then take the next issue up in-session, writing that declaration in its own file — and a
+// ceiling that looked only at the units would never close, so the research units of that next run,
+// which declare nothing, were counted as this child's.
+function run_window(session: SessionSpans, issue_number: number): [number, number] {
+	const delegated = declarations(session.delegated)
+	const start_ms = earliest(starts_naming(delegated, issue_number))
+	const others = [
+		...starts_naming_others(delegated, issue_number),
+		...starts_naming_others(declarations(session.own), issue_number),
+	]
 
-	return [start_ms, earliest_after(starts_naming_others(declared, issue_number), start_ms)]
+	return [start_ms, earliest_after(others, start_ms)]
 }
 
 function within_run(spans: ReadonlyMap<string, Span>, one: Marked): Map<string, Span> {
@@ -221,7 +229,7 @@ interface Marked {
 function mark_one(session_id: string, session: SessionSpans, issue_number: number): Marked {
 	const own = issues_in(declarations(session.own))
 	const is_named_by_own = own.has(issue_number)
-	const [run_start_ms, run_end_ms] = run_window(session.delegated, issue_number)
+	const [run_start_ms, run_end_ms] = run_window(session, issue_number)
 	const is_named = is_named_by_own || run_start_ms !== NO_START
 
 	return {
