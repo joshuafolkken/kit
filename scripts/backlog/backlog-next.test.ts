@@ -9,6 +9,7 @@ import {
 	OLD_ISSUE_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
+import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,12 +26,22 @@ const CHILD = 901
 const SECOND_CHILD = 902
 const IN_PROGRESS = 'in-progress'
 const NEEDS_DECISION = 'needs-decision'
+const RATE_LIMITED_STATUS = 429
 
 const streams = console_streams()
 const { stdout, stderr } = streams
 
 function opted_in_epic(): OpenIssueData {
 	return issue(EPIC_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, EPIC_LABEL])
+}
+
+// A backlog whose one epic child cannot be read — the shape that reaches the `error` verdict, and so
+// the only one the transport question is asked on.
+function unreadable_child(): void {
+	backlog_fixture.stub_backlog({
+		opted_in: [opted_in_epic(), issue(NEW_ISSUE_NUMBER, CREATED_LATER)],
+		epics: [{ number: EPIC_NUMBER, children: [CHILD] }],
+	})
 }
 
 beforeEach(() => {
@@ -214,11 +225,8 @@ describe('the verdicts, in epic:next meanings', () => {
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.stop)
 	})
 
-	it('says error and offers nothing when a child could not be read', async () => {
-		backlog_fixture.stub_backlog({
-			opted_in: [opted_in_epic(), issue(NEW_ISSUE_NUMBER, CREATED_LATER)],
-			epics: [{ number: EPIC_NUMBER, children: [CHILD] }],
-		})
+	it('says error and offers nothing when a child could not be read and GitHub is answering', async () => {
+		unreadable_child()
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.error)
@@ -229,5 +237,42 @@ describe('the verdicts, in epic:next meanings', () => {
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.complete)
+	})
+})
+
+// joshuafolkken/kit#1663: an unattended run may never re-ask on `error`, so a dropped connection
+// answering `error` ended a run with thirteen runnable issues still in the backlog.
+describe('a transport failure, told apart from an unusable graph', () => {
+	it('says retry rather than error when GitHub was never reached', async () => {
+		unreadable_child()
+		vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(undefined)
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.retry)
+	})
+
+	it('says retry when GitHub answered but the answer was a rate limit', async () => {
+		unreadable_child()
+		vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(RATE_LIMITED_STATUS)
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.retry)
+	})
+
+	it('sends the reader at the connection instead of at gh auth status and the issue', async () => {
+		unreadable_child()
+		vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(undefined)
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stderr()).toContain(backlog_next.RETRY_MESSAGE)
+		expect(stderr()).not.toContain('gh auth status')
+	})
+
+	it('never asks the transport question on a verdict that is not error', async () => {
+		backlog_fixture.stub_backlog({ opted_in: [issue(OLD_ISSUE_NUMBER, CREATED_EARLIER)] })
+		const status = vi.spyOn(git_gh_exec, 'exec_gh_api_status')
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(status).not.toHaveBeenCalled()
 	})
 })

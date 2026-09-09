@@ -2,6 +2,11 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # The C library call Node names in a name-resolution failure, and the error code it carries. The
+  # `backlog:next` reference quotes one verbatim as the failure that used to be reported as an
+  # unusable dependency graph (joshuafolkken/kit#1663) — the literal text a reader greps for.
+  - getaddrinfo
+  - ENOTFOUND
   # The registry host `docs/cloud-session.md` lists among the outbound hosts a cloud container has to
   # allow (joshuafolkken/kit#1565). It is the domain `registry.npmjs.org`, not a prose word.
   - npmjs
