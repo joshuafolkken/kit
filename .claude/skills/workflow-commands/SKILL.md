@@ -116,6 +116,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   answer is already in hand and the call buys a second copy of it. `pnpm josh time`'s `Single checks:`
   block is what says whether the run held to it; the rule is `prompts/review.md` → "A single check
   answers once per tree".
+  **And the last of them runs on the last edit, in front of the gate and the review rather than after
+  them** (joshuafolkken/kit#1511): `pnpm josh lint:related && pnpm josh test:related`, one call.
+  `pnpm josh review:brief` refuses to compose a brief on a tree neither has been green on — and no
+  brief means no attestable round — so the enforcement is the command's rather than a judgement.
+  `prompts/review.md` → "The scoped checks answer on the last edit" is the single source.
   **The rule-compliance measurement is read after the review and before `pnpm josh followup`,
   never inside `pnpm josh gate`**: the gate repeats every fix round and every child, and one `josh eval`
   is five real Claude sessions. The anchor is the merge rather than the commit because the commit now

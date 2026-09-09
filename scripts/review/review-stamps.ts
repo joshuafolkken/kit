@@ -47,6 +47,15 @@ import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-
 // to "every file absent" on both sides and compares equal, so `review-tree.ts` asks git for the
 // repository root instead.
 
+// **The two scoped records** answer "were `josh lint:related` and `josh test:related` green on this
+// exact tree" (joshuafolkken/kit#1511). They are separate from the gate stamp because they claim
+// something narrower — the changed files rather than the whole project, and two checks rather than
+// four — and folding them into one record would let a green from either half stand for the other.
+// They are read by `scoped-green.ts`, which is where what they mean is written down; they live here
+// because a stamp prefix declared anywhere else is a second place to look for the same kind of file.
+const LINT_RELATED_PREFIX = 'josh-lint-related-stamp-'
+const TEST_RELATED_PREFIX = 'josh-test-related-stamp-'
+
 const GATE_PREFIX = 'josh-gate-stamp-'
 const IN_FLIGHT_PREFIX = 'josh-gate-running-'
 const ROUND_ONE_PREFIX = 'josh-review-round1-'
@@ -54,6 +63,14 @@ const ROUND_ONE_PREFIX = 'josh-review-round1-'
 const gate_stamp: FileMapStampAccess = file_map_stamp.create(GATE_PREFIX, PROJECT_ROOT)
 const in_flight_stamp: FileMapStampAccess = file_map_stamp.create(IN_FLIGHT_PREFIX, PROJECT_ROOT)
 const round_one_stamp: FileMapStampAccess = file_map_stamp.create(ROUND_ONE_PREFIX, PROJECT_ROOT)
+const lint_related_stamp: FileMapStampAccess = file_map_stamp.create(
+	LINT_RELATED_PREFIX,
+	PROJECT_ROOT,
+)
+const test_related_stamp: FileMapStampAccess = file_map_stamp.create(
+	TEST_RELATED_PREFIX,
+	PROJECT_ROOT,
+)
 
 // **The round-1 snapshot's lifetime is one run, and something has to end it**
 // (joshuafolkken/kit#1441). Since the record is written once and never retaken, one left on disk
@@ -85,8 +102,12 @@ const review_stamps = {
 	gate_stamp,
 	IN_FLIGHT_PREFIX,
 	in_flight_stamp,
+	LINT_RELATED_PREFIX,
+	lint_related_stamp,
 	ROUND_ONE_PREFIX,
 	round_one_stamp,
+	TEST_RELATED_PREFIX,
+	test_related_stamp,
 }
 
 export { review_stamps }

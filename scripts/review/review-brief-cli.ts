@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
+import { scoped_green } from '#scripts/scoped-green'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -157,20 +158,44 @@ async function read_bases(): Promise<{ base: string; commit: string | undefined 
 	return { base: commit ?? (await git_command.change_base()), commit }
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const round = parse_round(argv)
+// **The refusal goes to stderr and the exit code, never into the brief** (joshuafolkken/kit#1511).
+// A line printed inside a brief is read by the review agent as one more fact about the tree; what has
+// to happen here is that no brief is composed at all, since composing one is what starts round 1 —
+// and this command is where `review:attest` mints the nonce a round is counted against, so there is
+// no countable round that does not pass through it. Nothing is recorded either: writing the round-1
+// snapshot against a tree the scoped checks have never read would measure round 2's delta from it.
+function report_error(message: string): number {
+	console.error(message)
 
-	if (round === undefined) {
-		console.error(USAGE)
+	return FAILURE_EXIT_CODE
+}
 
-		return FAILURE_EXIT_CODE
-	}
+interface ChangeReading {
+	base: string
+	commit: string | undefined
+	paths: ReadonlyArray<string>
+	tree: Record<string, string>
+}
 
-	// One reading, used for both halves. Read twice, the level could describe a different change from
-	// the digests printed beside it — and it would cost four git spawns to do so.
+// One reading, used by every half below. Read twice, the level could describe a different change from
+// the digests printed beside it — and it would cost four git spawns to do so.
+async function read_change(): Promise<ChangeReading> {
 	const { base, commit } = await read_bases()
 	const paths = await changed_paths.read_changed_paths(false)
 	const tree = await review_tree.read_changed_tree(paths)
+
+	return { base, commit, paths, tree }
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	const round = parse_round(argv)
+
+	if (round === undefined) return report_error(USAGE)
+
+	const { base, commit, paths, tree } = await read_change()
+	const refusal = scoped_green.refusal_for(tree, commit)
+
+	if (refusal !== undefined) return report_error(refusal)
 
 	console.info(await compose_brief(round, paths, tree, base))
 	record_round_one(round, tree, commit)
@@ -189,6 +214,7 @@ const review_brief_cli = {
 	main,
 	parse_round,
 	record_round_one,
+	report_error,
 	run,
 	USAGE,
 }
