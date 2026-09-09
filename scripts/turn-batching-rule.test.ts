@@ -132,6 +132,36 @@ describe(`${CANONICAL} — carries the criterion and the reasoning`, () => {
 	})
 })
 
+// joshuafolkken/kit#1452: the first rejection above read as a rejection of `PreToolUse` itself, which
+// this package ships as `pnpm josh batch:guard` (joshuafolkken/kit#1390). What was rejected is
+// judging independence from the single call in hand; the guard judges from closed history instead.
+// **The reconciliation has to sit with the rejection**, not 30 lines below it: a reader who stops at
+// the bullet meets a distributed mechanism described as impossible to build, and then reads the
+// refusal it issues as unexpected behavior.
+describe(`${CANONICAL} — reconciles the rejection with the shipped guard`, () => {
+	const content = read_unwrapped(CANONICAL)
+
+	// The limitation is named because the correction is about the record, not about the mechanism
+	// working: #1509 is open, so a reader told only that the guard ships would read it as effective.
+	it.each([
+		'却下したのはこの判定のしかたであって、`PreToolUse` という機構そのものではない。',
+		'joshuafolkken/kit#1390',
+		'**閉じた履歴**',
+		'joshuafolkken/kit#1509',
+	])('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+
+	// The exact sentence the document carried until #1452. Asserted as absent because every presence
+	// marker above passes beside it — the reconciliation can be added without the false claim being
+	// taken out, and that half-fix is the regression this pins.
+	it('no longer calls the distributed mechanism unavailable', () => {
+		expect(content).not.toContain(
+			'**PreToolUse フックが「2 ターン連続で単発呼び出し」を拒否する。** 採れない。',
+		)
+	})
+})
+
 // The residency lists are the second half of the rule: a rule the criterion moved and that is not
 // listed as moved has not been checked against it (`residency.md`).
 describe.each([RESIDENCY, WORKFLOW_SKILL_ENTRY])(
