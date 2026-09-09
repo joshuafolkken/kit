@@ -29,10 +29,6 @@ import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
 // than remembered as an absence.
 const pr_number_by_branch = new Map<string, number>()
 
-function forget_pr_numbers(): void {
-	pr_number_by_branch.clear()
-}
-
 // Newest first, and spelled out rather than left to the endpoint's default: `select_pull` falls back
 // to the first row when no open pull request is on the branch, and that fallback only means "the
 // most recent one" while this ordering holds.
@@ -87,10 +83,10 @@ async function fetch_pr_number(branch_name: string): Promise<number | undefined>
 type PullNumberRead =
 	{ kind: 'read'; pr_number: number } | { kind: 'missing' } | { kind: 'unreadable'; cause: unknown }
 
-async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
-	const cached = pr_number_by_branch.get(branch_name)
-	if (cached !== undefined) return { kind: 'read', pr_number: cached }
+// The lookups still in flight, keyed the same way the resolved numbers are.
+const pending_pr_number_by_branch = new Map<string, Promise<PullNumberRead>>()
 
+async function fetch_pr_number_read(branch_name: string): Promise<PullNumberRead> {
 	try {
 		const pr_number = await fetch_pr_number(branch_name)
 		if (pr_number === undefined) return { kind: 'missing' }
@@ -100,6 +96,45 @@ async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
 	} catch (error) {
 		return { kind: 'unreadable', cause: error }
 	}
+}
+
+// **The lookup in flight is shared, not only the number it resolves to** (joshuafolkken/kit#1446).
+// The memo above answers a caller arriving *after* the first lookup returned, which was every caller
+// while the branch-keyed reads were issued one at a time. `josh followup` now asks `pr_get_body` and
+// `pr_get_url` about the same branch in the same tick, and two callers that both miss an empty map
+// each fire their own `GET /pulls?head=…` — the second request this memo exists to remove,
+// reappearing the moment the callers stopped being serial. Overlapping the reads must not cost a
+// request it was meant to save.
+//
+// **A pending entry is dropped as soon as it settles**, so the property stated above is untouched:
+// only a resolved number is *remembered*, and a `missing` or `unreadable` lookup is re-tried by the
+// next caller rather than remembered as an absence.
+async function start_pr_number_read(branch_name: string): Promise<PullNumberRead> {
+	const pending = pending_pr_number_by_branch.get(branch_name)
+	if (pending !== undefined) return await pending
+
+	const lookup = fetch_pr_number_read(branch_name)
+
+	pending_pr_number_by_branch.set(branch_name, lookup)
+
+	try {
+		return await lookup
+	} finally {
+		pending_pr_number_by_branch.delete(branch_name)
+	}
+}
+
+// Defined after the map it clears, so the two memos are declared before anything reaches them.
+function forget_pr_numbers(): void {
+	pr_number_by_branch.clear()
+	pending_pr_number_by_branch.clear()
+}
+
+async function read_pr_number(branch_name: string): Promise<PullNumberRead> {
+	const cached = pr_number_by_branch.get(branch_name)
+	if (cached !== undefined) return { kind: 'read', pr_number: cached }
+
+	return await start_pr_number_read(branch_name)
 }
 
 // `undefined` covers both "this branch has no pull request" and "the lookup failed", which is the

@@ -53,7 +53,7 @@ What one invocation does, in order:
   read to `epicrun` and `queue` as a failed child. **A reported cleanup failure is not a merge
   failure**: read the ⚠ lines, run what they name, and do not re-run the merge.
 - **Recovers the issue number from the pull request body** when the invocation named none: the
-  `closes #N` keyword the closes-check stage already reads is what supplies it, so a completion
+  `closes #N` keyword the closes-and-context stage already reads is what supplies it, so a completion
   report, an epic close and a run report are still made for a run whose command line forgot the
   number.
 - **Emits the run report and appends it to `.time-history.jsonl`**, on a merged run only
@@ -79,16 +79,14 @@ Since joshuafolkken/kit#1349 the command closes with one row per stage and a tot
 `followup` spend its time" is read rather than guessed. The shape, with illustrative durations:
 
 ```
-followup stage: closes-check        0.7 s
-followup stage: context             2.1 s
-followup stage: checks-wait         28.4 s
-followup stage: coderabbit-comments 1.3 s
-followup stage: ai-review-comments  2.0 s
-followup stage: telegram            1.1 s
-followup stage: merge               2.6 s
-followup stage: completion-comment  1.4 s
-followup stage: epic-close          1.2 s
-followup stages total:              40.8 s
+followup stage: closes-and-context        1.5 s
+followup stage: checks-wait               28.4 s
+followup stage: coderabbit-comments       1.3 s
+followup stage: ai-review-comments        2.0 s
+followup stage: telegram                  1.1 s
+followup stage: merge                     2.6 s
+followup stage: completion-and-epic-close 2.4 s
+followup stages total:                    39.3 s
 ```
 
 - **The block is printed on a failed run too**, up to and including the stage that threw, which is
@@ -97,6 +95,14 @@ followup stages total:              40.8 s
   exactly those. **A short block there is the run stopping early, not the printer breaking**: the
   stages after the failure never ran, so they have no duration to report.
 - **The `merge` row appears only on a run that merged**, so a `--no-merge` block is a row shorter.
+- **Two rows say `and` because the requests behind them go out together** (joshuafolkken/kit#1446).
+  `closes-and-context` is the former `closes-check` plus `context` — the pull request body, the
+  repository name, the pull request URL and the issue title, four reads that need nothing from one
+  another; `completion-and-epic-close` is the former `completion-comment` plus `epic-close`. A lap
+  records an interval rather than a call, so a batch is one row, and the name is what says which
+  stages it holds. **The one dependency inside the batch is kept**: with no issue number on the
+  command line the title read waits for the body that names it, and only that read waits.
+  **`checks-wait` is untouched**, which is the point — what was overlapped was never a wait.
 - **The total is the sum of the stages, not the command's whole wall clock.** What sits outside it is
   the tail the workflow script prints afterwards — the next-issue listing and the version line — so a
   `pnpm josh time` reading of the same span is a second or two longer, and that gap is the tail.
