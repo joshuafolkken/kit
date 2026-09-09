@@ -12,6 +12,10 @@ const COUNT = 'gh api repos/o/r/issues?state=open --jq length'
 const BODY_READ = 'gh api repos/o/r/issues/12'
 const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 
+// A rule whose trigger is the violation itself, so it declares `reaches` (joshuafolkken/kit#1643).
+const SHELL_BODY = 'shell-body'
+const BODY_BY_PATH = 'pnpm josh followup --notify-message-file /tmp/body.md'
+
 // One transcript line carrying one tool call, in the shape `time_transcript_line.parse_line` reads.
 function call_line(command: string, timestamp: string = TIMESTAMP): string {
 	return JSON.stringify({
@@ -81,7 +85,28 @@ describe('rule_value.measure — what the carried text earns unaided', () => {
 		expect(reading.sessions).toBe(1)
 		expect(reading.unaided_kept).toBe(0)
 	})
+})
 
+// **The denominator is the situation the rule governs, which is its trigger only where that trigger
+// is a neutral act** (joshuafolkken/kit#1643).
+describe('rule_value.measure — the situation a rule governs', () => {
+	it('leaves the denominator at the trigger for a rule that declares no reached-situation test', () => {
+		// wip-cap's trigger is the filing, which a run keeping the rule makes too — so a run that
+		// counted and never filed never reached the rule at all and must stay out of the denominator.
+		expect(reading_for(WIP_CAP, [[session(COUNT)]]).sessions).toBe(0)
+	})
+
+	it('counts a run that reached the situation compliantly, though its trigger never fired', () => {
+		// shell-body fires only on the violation, so without `reaches` a run that passed every body by
+		// path would drop out of the reading and the rate would be taken over runs that broke the rule.
+		const reading = reading_for(SHELL_BODY, [[session(BODY_BY_PATH)]])
+
+		expect(reading.sessions).toBe(1)
+		expect(reading.unaided_kept).toBe(1)
+	})
+})
+
+describe('rule_value.measure — the comments rule', () => {
 	it('scores the comments rule from a comments read that preceded the body read', () => {
 		const kept = reading_for(ISSUE_COMMENTS, [[session(COMMENTS_READ, BODY_READ)]])
 		const missed = reading_for(ISSUE_COMMENTS, [[session(BODY_READ)]])
@@ -181,12 +206,27 @@ describe('rule_value.measure — a refusal is read from the block, not from the 
 describe('rule_value.measure — rules nothing can score', () => {
 	it('reports a rule that declares no compliance test as unmeasured, never as zero', () => {
 		// Scoring it 0 would read as "never kept", which is a claim the missing predicate cannot make.
-		const reading = reading_for('shell-body', [[session('echo hi')]])
+		// Every enumerated row declares one since joshuafolkken/kit#1643, so the guarantee is asserted
+		// against the reading rather than against whichever row happened to lack a predicate.
+		const unmeasured: RuleReading = {
+			id: 'unmeasured',
+			sessions: 3,
+			unaided_kept: 0,
+			refusals: 0,
+			is_measurable: false,
+		}
 
-		expect(reading.is_measurable).toBe(false)
-		expect(rule_value.unaided_rate(reading)).toBeUndefined()
+		expect(rule_value.unaided_rate(unmeasured)).toBeUndefined()
 	})
 
+	it('declares a compliance test on every enumerated rule, so none of them reads as unmeasured', () => {
+		const readings = rule_value.measure([[session(FILING)]])
+
+		expect(readings.filter((reading) => !reading.is_measurable)).toStrictEqual([])
+	})
+})
+
+describe('rule_value.measure — the rates it reports', () => {
 	it('gives no rate for a rule no session reached', () => {
 		const reading = reading_for(WIP_CAP, [[session('ls')]])
 

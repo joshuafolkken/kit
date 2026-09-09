@@ -59,6 +59,15 @@ interface DeliveredRule {
 	// claims the absence of a predicate does not support. It lives here rather than in the
 	// measurement so a rule's trigger and its compliance test stay one definition.
 	keeps?: (call: GuardedCall) => boolean
+	// **The occasion the rule governs, read in either spelling** (joshuafolkken/kit#1643).
+	// `is_trigger` is the right denominator for a rule whose trigger is a *neutral* act — filing an
+	// Issue, reading one — because a run that keeps the rule makes that call too. It is the wrong one
+	// for a rule whose trigger is the violation itself: a run that backgrounded every push never trips
+	// `run-tail`, so it drops out of the reading altogether and the rate is taken over runs that broke
+	// the rule at least once. Such a row declares this instead, and `scripts/rules/rule-value.ts`
+	// counts a run that reached it whether or not the trigger fired. Absent, the denominator stays
+	// `is_trigger` and the row's reading is exactly what it was.
+	reaches?: (call: GuardedCall) => boolean
 }
 
 const STAMP_PREFIX = 'josh-rule-guard-'
@@ -194,7 +203,7 @@ const ISSUE_COMMENTS_REASON =
 // The reading of the call itself — which spellings carry a body inline, and what the shell does to
 // the value — is `shell-body-trigger.ts`, beside its own cases. A row states its trigger and its
 // text; a model of zsh quoting is more than a row.
-const { is_shell_evaluated_body } = shell_body_trigger
+const { carries_a_body, is_shell_evaluated_body, keeps_body_safe } = shell_body_trigger
 
 // The instruction in the shape a refusal can carry: what the shell is about to do, the safe
 // spellings, and the reissue sentence every delivery needs. The damage is named because it is the
@@ -261,17 +270,23 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		id: 'shell-body',
 		is_trigger: on_bash_command(is_shell_evaluated_body),
 		reason: SHELL_BODY_REASON,
+		keeps: on_bash_command(keeps_body_safe),
+		reaches: on_bash_command(carries_a_body),
 	},
 	{
 		id: 'piped-verification',
 		is_trigger: on_bash_command(piped_verification.is_masked_verification),
 		reason: piped_verification.PIPED_VERIFICATION_REASON,
+		keeps: on_bash_command(piped_verification.keeps_verdict_intact),
+		reaches: on_bash_command(piped_verification.runs_verification),
 	},
 	{
 		id: 'early-heartbeat',
 		is_trigger: on_bash_command(early_heartbeat.is_wait_timer),
 		reason: early_heartbeat.EARLY_HEARTBEAT_REASON,
 		decide: early_heartbeat.decide,
+		keeps: on_bash_command(early_heartbeat.is_progress_watch),
+		reaches: on_bash_command(early_heartbeat.waits_for_progress),
 	},
 	// **The one row whose trigger reads a field of the input beside the command**, so it supplies its
 	// own tool-name check rather than going through `on_bash_command`: a push step already issued with
@@ -283,6 +298,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		is_trigger: run_tail.is_foreground_push_step,
 		reason: run_tail.RUN_TAIL_REASON,
 		decide: run_tail.decide,
+		keeps: run_tail.is_backgrounded_push_step,
+		reaches: run_tail.is_push_step_call,
 	},
 ]
 

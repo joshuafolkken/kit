@@ -1,5 +1,5 @@
-import { ALIASES } from '#scripts/josh/josh-command-map'
 import { time_shell } from '#scripts/time/time-shell'
+import { shell_segments } from './shell-segments'
 
 // The rule delivered at the call that pipes a verification command (joshuafolkken/kit#1556).
 //
@@ -55,20 +55,12 @@ const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 
 // Both spellings of each check, **derived from the alias table rather than restated beside it**: a
 // second copy of the aliases stops matching the first time one is renamed, and `pnpm josh ga | tail`
-// masks a gate exactly as the long spelling does.
-const VERIFICATION_NAMES: ReadonlySet<string> = new Set([
-	...VERIFICATION_COMMANDS,
-	...Object.entries(ALIASES)
-		.filter(([, name]) => VERIFICATION_COMMANDS.has(name))
-		.map(([alias]) => alias),
-])
+// masks a gate exactly as the long spelling does. The derivation itself is `shell-segments.ts`, shared
+// with the watcher `early-heartbeat.ts` names (joshuafolkken/kit#1643).
+const VERIFICATION_NAMES: ReadonlySet<string> = shell_segments.josh_names(VERIFICATION_COMMANDS)
 
 function is_verification_command(segment: string): boolean {
-	const named = time_shell.josh_command_of(segment)
-
-	if (!named.startsWith(time_shell.JOSH_PREFIX)) return false
-
-	return VERIFICATION_NAMES.has(named.slice(time_shell.JOSH_PREFIX.length))
+	return shell_segments.is_josh_command(segment, VERIFICATION_NAMES)
 }
 
 // A pipeline reports its last command's status, so a check in any earlier segment has its verdict
@@ -95,10 +87,41 @@ const PIPED_VERIFICATION_REASON =
 	'is in `prompts/collaboration-workflow/output-bounds.md`. Reissue this call with no pipe — it ' +
 	'fires once per run and cannot repeat on the call in hand.'
 
+// Every command position on the line: the chain cut `shell_segments` makes, each piece of a pipeline
+// inside it taken on its own.
+//
+// **The quoted spans are blanked first, exactly as `time_shell.discarded_commands` blanks them.** A
+// command chain quoted inside a body is text rather than a call, and this repository's issue bodies
+// quote them constantly — without the blanking the two halves disagree, and
+// `gh issue comment 1 --body "… | pnpm josh gate | …"` reads as a check whose verdict survived.
+function command_pieces(command: string): Array<string> {
+	return shell_segments
+		.segments_of(time_shell.unquoted(command))
+		.flatMap((segment) => segment.split('|'))
+		.map((piece) => piece.trim())
+}
+
+// **The occasion this rule governs: a check whose result means pass or fail, run at all**
+// (joshuafolkken/kit#1643). The trigger fires only on the masked spelling, so a run that never piped
+// one would drop out of the reading entirely and the rate would be taken over runs that masked at
+// least once.
+function runs_verification(command: string): boolean {
+	return command_pieces(command).some((piece) => is_verification_command(piece))
+}
+
+// **Keeping the rule is running that check with its verdict intact** — no pipe, the last position in
+// one, or `set -o pipefail` in front. Judged over the whole command, so a line that masks one check
+// while running another unmasked is not credited for the half it got right.
+function keeps_verdict_intact(command: string): boolean {
+	return runs_verification(command) && !is_masked_verification(command)
+}
+
 const piped_verification = {
 	PIPED_VERIFICATION_REASON,
 	VERIFICATION_COMMANDS,
 	is_masked_verification,
+	keeps_verdict_intact,
+	runs_verification,
 }
 
 export { piped_verification }

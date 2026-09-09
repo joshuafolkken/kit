@@ -1201,6 +1201,26 @@ the runs that reached it, while the Issue-comments rule, which has **no** reside
 15%. The resident text was the obvious candidate on a reading of the prose, since the refusal repeats
 it almost word for word; the number says it is doing a great deal of work and must stay.
 
+**The second reading covers every rule, and it found no candidate either** (joshuafolkken/kit#1643).
+The first reading could score only two rows, so nobody could tell whether the candidates were
+exhausted or merely unmeasured. All six now declare a compliance test, and over 225 recorded runs they
+read: `shell-body` 81%, `early-heartbeat` 67%, `wip-cap` 57%, `issue-comments` 15%,
+`piped-verification` 13%, `run-tail` 4%. **The two rules that keep a resident copy are the two at the
+top** — `shell-body` at 81% and `wip-cap` at 57% — and exactly one rule without a copy sits between
+them: `early-heartbeat`, at 67% over **18 runs**, the smallest denominator in the table by a factor of
+five. So the resident copies are earning their place, and **nothing is retired on this reading**. The
+figures move as the corpus grows, so the next run of this question re-reads them rather than quoting
+these.
+
+**Measuring the four needed a distinction the first reading did not have, and it is the half worth
+carrying forward.** A rule's denominator is the situation it governs, and that is the trigger only
+where the trigger is a *neutral* act — filing an Issue, reading one — which a run keeping the rule
+performs anyway. The other four fire only on the violation: a run that backgrounded every push never
+trips `run-tail`. Scored against the trigger they would all have read near zero, and near zero reads
+as "the carried text earns nothing" — **a manufactured retirement candidate, which is the one outcome
+this measurement exists to prevent**. Such a row declares `reaches` instead, the governed act in
+either spelling; `docs/josh-commands.md` → "`josh rule:value`" carries the column meanings.
+
 **The three tests then refused every remaining candidate, and that is the route working rather than
 failing.** The four resident one-liners left behind by trigger delivery all fail test 2: the
 paragraph above records why a line stays behind when the hook reaches one harness, so each carries a
