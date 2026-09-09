@@ -2012,6 +2012,45 @@ The command is read-only and never applies or removes a label.
 
 **The entry point that consumes this answer is `backlogrun`** ([#1631](https://github.com/joshuafolkken/kit/issues/1631)) — the shorthand keyword that runs the opted-in backlog without naming an epic, defined in `.claude/skills/workflow-commands/backlogrun.md`. It is a separate keyword rather than an argument to `epicrun` because the two declare different authorizations: `epicrun #E` approves one epic's children, and `backlogrun` approves everything a person has opted in with `auto-ok`. Its loop is written against the contract above — the tokens are bare numbers scoped to this repository, `error` is told apart by reading the token rather than the exit status, and every merged issue is fed back through `--exclude`. Which issues may run stays a person's decision; the order and the parallelism are the run's.
 
+### `josh backlog:budget`
+
+Say whether a `backlogrun` may start more work, keep watching, or finish ([#1632](https://github.com/joshuafolkken/kit/issues/1632)).
+
+```bash
+pnpm josh backlog:budget --answer candidates --started 2026-09-09T11:00:00Z   # alias: josh bb
+pnpm josh backlog:budget --answer exhausted --started "$started" --active "$active" --idle 30
+pnpm josh backlog:budget --answer candidates --started "$started" --merged 3 --running 2 --max 5
+pnpm josh backlog:budget --answer blocked --started "$started" --json
+```
+
+**`backlog:next` says what may start; it says nothing about when the run itself should end.** Before this existed a `backlogrun` had exactly two endings and neither could be declared in advance: it finished the moment the backlog read empty, so an issue a person opted in three minutes later needed a whole new session, or it ran to the 8-hour whole-run bound, which is a limit on waiting rather than a statement of scale.
+
+**Both budgets are off by default.** With neither flag given the answer is exactly the behavior a `backlogrun` already had: it finishes when the backlog empties, and it takes as many issues as the backlog holds.
+
+| Budget         | Flag               | Default   | Meaning                                                                                                         |
+| -------------- | ------------------ | --------- | --------------------------------------------------------------------------------------------------------------- |
+| Idle watch     | `--idle <minutes>` | off       | After the candidates run out, keep polling this long for a new one. A candidate that appears restarts the watch |
+| Maximum issues | `--max <count>`    | unlimited | How many issues one invocation may take. On reaching it the run reports and finishes                            |
+
+Standard output carries the single verdict word and standard error the reason, so `verdict=$(pnpm josh backlog:budget …)` captures something a loop can branch on. `--json` collapses both into `{"budget": "<verdict>", "reason": "…"}`.
+
+| Answer      | Meaning                                                                                                                                                          | Exit code |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `run`       | Start what `backlog:next` offered. The reason names how many more the maximum still allows                                                                       | 0         |
+| `watch`     | Sleep the polling interval and ask both commands again                                                                                                           | 0         |
+| `stop`      | Report and finish. The reason is the termination reason the completion report carries                                                                            | 0         |
+| _(nothing)_ | The invocation could not be read — a missing or unrecognized `--answer`, an unparseable timestamp, a non-numeric count. Usage is printed and nothing is answered | 1         |
+
+`--answer` is `backlog:next`'s own answer in the words this decision needs, and the mapping is mechanical: issue numbers are `candidates`; `wait` is `blocked` while this run has children in flight and `exhausted` when it has none; `none` is `exhausted`; `stop` is `parked`; `error` or a failed listing is `unreadable`. `--started` is when the invocation began and `--active` when it last had work — the most recent ask that was not `exhausted`. Refreshing `--active` is what restarts the idle watch, so a candidate picked up mid-watch gets the whole budget again rather than the remainder; on the first ask it is the run's start. **`--idle` without `--active` is refused rather than measured from `--started`**: a run already working longer than the budget would stop on its first empty backlog and print that the backlog stayed empty for the whole watch — an emptiness it never saw.
+
+`--merged` and `--running` are both counted against `--max`, because children run in lanes: a maximum measured on merges alone would let a second wave start before the first had merged and take the run past the number the person declared. Reaching the maximum with children still running answers `watch` rather than `stop`, so the lanes drain instead of being abandoned.
+
+**The whole-run bound is decided here too, rather than by an agent reading a clock.** `epicrun.md` carried the 8 hours as prose, and prose is what joshuafolkken/kit#1460 measured a run walking past. It outranks both budgets, so a run at the bound stops with candidates in hand and an idle watch still open. **What outranks the bound in turn is a `parked` or `unreadable` answer**: the reason printed here is quoted verbatim into the completion report, so a budget reason in front of one of those would report a tidy ending for a run whose backlog actually broke.
+
+**A flag that was given but could not be read makes the whole invocation unreadable.** A mistyped `--idle` is never defaulted to "no idle watch" — that would end the run at the first empty backlog, answering a question nobody asked. This is `path_decision.has_unknown_flag`'s contract, and the printer is the one every mechanically-decided command in this repository shares.
+
+**The entry point that consumes this answer is `backlogrun`**, defined in `.claude/skills/workflow-commands/backlogrun.md` → "The two budgets". The command is read-only, holds no state of its own, and never applies or removes a label.
+
 ### `needs-human-review` — the opposite label
 
 `auto-ok` widens unattended execution past an epic's edge; **`needs-human-review` withholds its last step** ([#1125](https://github.com/joshuafolkken/kit/issues/1125)). An issue carrying it is implemented and taken through the verification gate as usual, and then nothing is committed, pushed, opened as a pull request or merged: the working tree is left uncommitted and unstashed, a `confirmation` notification goes out carrying the resume command, and the run stops there rather than starting the next issue.
