@@ -6,6 +6,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import { time_bundles } from './time-bundles'
 import { time_cycles } from './time-cycles'
 import { time_failures } from './time-failures'
+import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
 import type { TimeReport } from './time-report'
 import { time_rework } from './time-rework'
@@ -118,6 +119,7 @@ const RUN_REPORT: TimeReport = {
 	gaps: { ...time_gaps.NO_GAPS },
 	bundles: { ...time_bundles.NO_BUNDLES },
 	single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
+	followup_stages: { ...time_followup_stages.NO_FOLLOWUP_STAGES },
 	rework: { ...time_rework.NO_REWORK },
 	failures: { ...time_failures.NO_FAILURES },
 }

@@ -58,6 +58,7 @@ function base_span(start_minute: number, minutes: number, extra: Partial<Span>):
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,
+		followup_stages: [],
 		is_continuation: false,
 		ended_ms: (start_minute + minutes) * MINUTE_MS,
 		...time_spans.equal_durations(minutes * MINUTE_MS),

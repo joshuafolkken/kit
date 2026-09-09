@@ -78,12 +78,15 @@ function call_line(minute: number, branch: string, name = 'Read', id = CALL_ID):
 	})
 }
 
-function result_line(minute: number, branch: string, id = CALL_ID): string {
+// `content` is a parameter so a suite can hand the result a body worth reading — the stage block
+// `pnpm josh followup` prints, which `time-followup-stage.ts` reads back off it
+// (joshuafolkken/kit#1445). Defaulted, so every existing caller is unchanged.
+function result_line(minute: number, branch: string, id = CALL_ID, content = 'ok'): string {
 	return JSON.stringify({
 		type: 'user',
 		timestamp: at(minute),
 		gitBranch: branch,
-		message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
+		message: { content: [{ type: 'tool_result', tool_use_id: id, content }] },
 	})
 }
 
@@ -310,6 +313,7 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		branch: 'main',
 		call_id: '',
 		outcome: time_spans.UNKNOWN_OUTCOME,
+		followup_stages: [],
 		is_continuation: false,
 		ended_ms: ended_minute * MINUTE_MS,
 		...time_spans.equal_durations(duration_minutes * MINUTE_MS),

@@ -1,5 +1,7 @@
+import type { FollowupStage } from '#scripts/git/git-followup-stages'
 import { json_value } from '#scripts/json-value'
 import { z } from 'zod'
+import { time_followup_stage } from './time-followup-stage'
 import { time_instant } from './time-instant'
 import { time_reported_failure } from './time-reported-failure'
 
@@ -68,6 +70,11 @@ interface Block {
 	// reads (joshuafolkken/kit#1361). The text itself is deliberately not kept: a field holding it
 	// would retain every byte the session's tools printed for the length of the parse.
 	has_failure_line: boolean
+	// The stage rows a `pnpm josh followup` call printed into its own output
+	// (joshuafolkken/kit#1445). Read here for the same reason the bit above is, and it obeys the same
+	// prohibition: what is kept is the ten-odd parsed laps, never the body they were read from. Empty
+	// for every other tool result, which is nearly all of them.
+	followup_stages: ReadonlyArray<FollowupStage>
 }
 
 interface TranscriptLine {
@@ -95,12 +102,19 @@ function block_names(
 	}
 }
 
+// **The body is flattened once and both readers are handed the text.** `result_text` is what turns a
+// content field that may be a string or a list of blocks into one string, and it is idempotent on a
+// string — so passing its own output back to `has_failure_line` reads exactly as passing the raw
+// field did, at one flattening instead of two (joshuafolkken/kit#1445).
 function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
+	const text = time_reported_failure.result_text(raw.content)
+
 	return {
 		...block_names(raw),
 		input: raw.input,
 		is_error: raw.is_error ?? undefined,
-		has_failure_line: time_reported_failure.has_failure_line(raw.content),
+		has_failure_line: time_reported_failure.has_failure_line(text),
+		followup_stages: time_followup_stage.read_stages(text),
 	}
 }
 

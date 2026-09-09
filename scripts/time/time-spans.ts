@@ -1,5 +1,7 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
+import type { FollowupStage } from '#scripts/git/git-followup-stages'
 import { time_bundle_call } from './time-bundle-call'
+import { time_followup_stage } from './time-followup-stage'
 import { time_markers, type PhaseMarker } from './time-markers'
 import { time_reported_failure } from './time-reported-failure'
 import { time_shell } from './time-shell'
@@ -63,9 +65,18 @@ const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
 interface ResultFacts {
 	call_id: string
 	outcome: SpanOutcome
+	// The stage rows a `pnpm josh followup` call printed into its own output
+	// (joshuafolkken/kit#1445). Third field for the reason the two above are here: the result block is
+	// gone by the time anything aggregates, so what a table wants from it has to be read off it now.
+	// Empty for every span that is not a measured `followup` invocation.
+	followup_stages: ReadonlyArray<FollowupStage>
 }
 
-const NO_RESULT: ResultFacts = { call_id: '', outcome: UNKNOWN_OUTCOME }
+const NO_RESULT: ResultFacts = {
+	call_id: '',
+	outcome: UNKNOWN_OUTCOME,
+	followup_stages: time_followup_stage.NO_STAGES,
+}
 
 // What a tool span is labelled with. `josh_command` is empty for everything that is not a
 // `pnpm josh <cmd>` invocation, and the report drops empty labels rather than printing a bucket.
@@ -273,7 +284,11 @@ function outcome_of(result: Block, call: ToolCall): SpanOutcome {
 }
 
 function facts_of(result: Block, call: ToolCall): ResultFacts {
-	return { call_id: result.result_id, outcome: outcome_of(result, call) }
+	return {
+		call_id: result.result_id,
+		outcome: outcome_of(result, call),
+		followup_stages: result.followup_stages,
+	}
 }
 
 // A user line is one of two things, and only its blocks tell them apart: a tool result the harness
@@ -341,6 +356,7 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		branch: event.branch,
 		call_id: event.call_id,
 		outcome: event.outcome,
+		followup_stages: event.followup_stages,
 		is_continuation: false,
 		ended_ms: event.timestamp_ms,
 		...equal_durations(event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms)),

@@ -4,6 +4,7 @@ import type { CheckTotal } from './time-checks'
 import { time_cycles } from './time-cycles'
 import { time_epic, type EpicTimeReport } from './time-epic'
 import { time_failures } from './time-failures'
+import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
 import type { PhaseTotal } from './time-phases'
 import type { TimeReport } from './time-report'
@@ -69,6 +70,7 @@ type Breakdown = Pick<
 	| 'gaps'
 	| 'bundles'
 	| 'single_checks'
+	| 'followup_stages'
 	| 'rework'
 	| 'failures'
 >
@@ -88,6 +90,7 @@ function empty_breakdown(): Breakdown {
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
+		followup_stages: { ...time_followup_stages.NO_FOLLOWUP_STAGES },
 		rework: { ...time_rework.NO_REWORK },
 		failures: { ...time_failures.NO_FAILURES },
 	}
