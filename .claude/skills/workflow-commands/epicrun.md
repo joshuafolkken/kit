@@ -654,7 +654,9 @@ a **failure** rather than polling through it (joshuafolkken/kit#1232) — so `pn
 that child with a named conflict in about ten seconds rather than running its 32-minute budget out.
 
 **That child is parked**: `needs-decision` plus a comment naming the conflict, exactly as "park and
-continue" below, its lane closed after its work is stashed (the table below), and the loop goes on.
+continue" below, its lane closed rather than kept — the one park after a commit that still closes,
+because the branch has to be rebuilt on a current `main` either way, and with the work committed
+there is nothing to stash (the table below) — and the loop goes on.
 It is **not** counted against the consecutive-failure guard — a lost merge race is an ordinary
 outcome of running six lanes, and counting it would abort the run for working as designed.
 
@@ -668,11 +670,60 @@ leaves a half-rebased lane for the next poll to misread. A person re-runs the ch
 | When | The lane | Why |
 | --- | --- | --- |
 | The child **merged** | `pnpm josh lane:close <N>` | `followup` released the hold and the branch is on `main`; nothing in that tree is wanted |
-| The child was **parked** | `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work with it. Closing is what keeps the seat free, and it has to happen: `epic:next` already counts a parked child's lane as released, so a lane left open would hold a seat the count believes is free |
+| The child was **parked before its commit** | `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work with it. Closing is what keeps the seat free, and it has to happen: `epic:next` already counts a parked child's lane as released, so a lane left open would hold a seat the count believes is free |
+| The child was **parked after its commit and push** | **Left open**, its directory and its held seat recorded on the Issue — *unless* the park was a lost merge race, which is closed instead, with nothing to stash | The stash step is a **no-op**: the tree is clean because the work is already committed. What `lane:close` would take is the **local branch**, and that branch is the resume path — the two sentences under this table are why |
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at, so nothing is stashed and nothing is closed. Name the lane directory in the stop report and in the Telegram, or the person is told to look at a tree and not told where it is |
-| The child **failed** | The parked row, plus the consecutive-failure count | Same reasoning; only the counter differs |
+| The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | Same reasoning; only the counter differs |
 | **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | The work tree was created and its seat allocated before the install ran, so a lane exists that no `pnpm josh …` runs in and the next `lane:open` answers `already-open` rather than retrying (joshuafolkken/kit#1554). Closing frees the seat; parking is right because the causes — an outdated lock, an unreachable registry — are ones a person fixes. Carry pnpm's reason, printed on standard error, into the park note |
 | The run was **interrupted** | Nothing to do — the work tree survives on disk | The next session's `pnpm josh lane:prune` closes what git no longer has a tree for, and `lane:open` answers `already-open` for what is still there. **Park that child**, naming the lane and `pnpm josh lane:close <N>` as the way out: resuming somebody's half-finished lane unattended is the judgement `run:preflight` refuses to make on its own, and in a lane there is no command to make it |
+
+**A committed child's lane is kept because closing it deletes the branch its resume needs, and no
+command puts that branch back** (joshuafolkken/kit#1587). Three mechanics decide it, none of them a
+judgement. `lane:close` does not stop at the work tree: `remove_lane` follows the removal with
+`git_command.branch_delete(targets.branch)`, which runs `git branch -D <N>-lane`
+(`scripts/lane/lane-close.ts` → `remove_lane`, `scripts/git/git-command.ts` → `branch_delete`) — the
+force flag is there precisely so an unmerged lane branch, which is every parked one, goes too.
+Resume for this child is a re-run of `pnpm josh followup`, and that reads the branch **locally**:
+`read_branch_paths` is `changed_paths.to_paths(await git_command.diff_main_names())`
+(`scripts/git/git-pr-managed-config.ts`), a `git diff` against the merge base in the work tree, so
+with no local branch the gate cannot be re-evaluated at all. And `pnpm josh lane:open <N>` is not the
+way back: `materialize` passes the start point to `worktree_add`, which hardcodes
+`['add', '--no-track', '-b', branch_name]` off `origin/<default>` (`scripts/lane/lane-open.ts`,
+`scripts/git/git-command.ts` → `worktree_add`), so it would cut a **fresh, empty** branch of that
+name rather than restore the pushed one. Nothing in `pnpm josh lane:*` reaches
+`git worktree add <dir> <existing-branch>`, and rebuilding one by hand gets a tree with no seat and
+no `node_modules` — which is to say no `pnpm josh followup` either.
+
+**The exception is decided by what `followup` printed, not by reading the situation.**
+`mergeStateStatus: DIRTY` — the spelling `git-pr-checks-eval.ts` compares against and the one
+"Conflicts are not predicted" above already uses, reported as the named failure
+`PR checks failed (merge conflict)` — means the branch as pushed no longer merges and has to be
+rebuilt on a current `main`, so the local one is not the resume path and keeping it holds a seat for
+nothing. That child's lane is closed, with nothing to stash, which is what that section already
+prescribes. Do not grep the output for `mergeable_state`: that is the REST field name, normalized
+away by `git-gh-pr-snapshot.ts` before anything prints it. Every other after-commit park — a gate this run may not waive, a standing High finding, a
+Tier B or Tier C decision — resumes from the branch exactly as it stands, and keeps its lane.
+
+**A kept lane holds its seat, and that is the price rather than an oversight.** Seats are not kept in
+a ledger; they are read back out of the live work trees (`scripts/lane/lane-registry.ts`), so the
+allocator itself stays honest and `lane:open` answers `full` rather than handing out ports twice. The
+optimism is `epic:next`'s alone — it counts a parked child as having released its lane — and what it
+costs is one child offered that cannot get a lane, which is visible and recoverable. **Say it in the
+park comment**: the lane directory, that its seat is held, and `pnpm josh lane:close <N>` as the way
+to give the seat back once the child is finished or abandoned. A seat held by a lane nobody recorded
+is the failure here, not the holding.
+
+**Release the hold on either parked arm, and leave the lane before closing it.**
+`pnpm josh followup` releases the working-tree hold at the **merge**, so a parked child's is still
+held: run `pnpm josh run:release` in the lane, whether that lane is then closed or kept. **A
+`needs-human-review` stop is not a park and keeps its hold** — the uncommitted work still in that
+tree is exactly what a second run would trample, which is the rule `halfrun`'s stop before commit
+already carries. `lane:close` does not do it for you — the record is a
+file in the system temp directory keyed to the work tree's git directory
+(`scripts/run/run-hold.ts` → `hold_path`), so removing the tree strands it, and the next run for that
+issue is answered `busy` by a lane that no longer exists. And `cd` out of the lane **before**
+`pnpm josh lane:close <N>`: the close removes the directory the shell is sitting in, and every
+command after it fails with `getcwd: cannot access parent directories`.
 
 **A `needs-human-review` stop ends the run, and the lanes already in flight are allowed to finish.**
 No new lane is opened — "the remaining children are not started" is unchanged — but killing units
@@ -1503,12 +1554,16 @@ exactly as the classification does, so the next child is offered normally.
 Then return to step 1. The other children are unaffected unless they depend on this one, and
 `epic:next` works that out.
 
-**A parked child's lane is stashed and closed, never left open.** `epic:next` already counts a parked
-child as having released its lane, so a lane left standing holds a seat the count believes is free —
-and `lane:close` removes the work tree by force, so the work goes first:
-`git -C <dir> stash push -u -m "epicrun: parked #<N>"`, the stash recorded on the Issue, then
-`pnpm josh lane:close <N>`. The full table, including the two states where a lane is *not* closed, is
-"What happens to a lane" above.
+**What happens to a parked child's lane depends on whether it had committed, and the two answers are
+opposite.** **Parked before its commit**, the lane is stashed and closed, never left open:
+`epic:next` already counts a parked child as having released its lane, so a lane left standing holds
+a seat the count believes is free — and `lane:close` removes the work tree by force, so the work goes
+first: `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, the stash recorded on the Issue, then
+`pnpm josh lane:close <N>`. **Parked after its commit and push**, the lane is *kept*: there is
+nothing to stash, and closing would delete the local branch the resume needs with no command able to
+put it back — the one exception being a lost merge race, whose branch has to be rebuilt anyway. Both
+rows, that exception, the seat it costs and the `pnpm josh run:release` every parked ending owes
+are "What happens to a lane" above, which is the single source.
 
 **Parking replaces stopping the session, not the rule that produced the stop.** An upstream defect
 is still filed immediately and unconditionally (Tier A for a first-party target), and a workaround

@@ -68,9 +68,9 @@ words:
   - issuecomment
   - frontmatter
   - toolkits
-  # `worktrees` is not here: it appears in a skill `josh sync` copies, so it lives in the
-  # distributed dictionary instead (joshuafolkken/kit#1092). The singular reaches no copied file.
-  - worktree
+  # Neither `worktrees` nor `worktree` is here: both appear in skills `josh sync` copies, so they
+  # live in the distributed dictionary instead (joshuafolkken/kit#1092, joshuafolkken/kit#1587 for
+  # the singular, which `epicrun.md` needs to name the `git worktree add` git refuses to reach).
   - gitdir
   - commondir
   - precheck
