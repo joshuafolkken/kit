@@ -1685,6 +1685,14 @@ any `fullrun`.
 Send an epic **start** notification when the run begins, and an epic **completion** summary at the
 end naming what was merged, what was parked and why, and what was filed.
 
+**That same session asks `pnpm josh release:scope` once, after the last child has merged** — in the
+primary checkout, after the last lane is closed, and never once per child: a release cut mid-batch
+would ship a version while the remaining children are still moving main. `followup.md` → "When
+`pnpm josh release` runs" is the single source for the position, the three answers and why the run
+reports the release rather than cutting one (joshuafolkken/kit#1582). On `required` the epic
+completion summary closes with the request and the exact command; on `unknown` it says `unknown`,
+never `skip`.
+
 ## Stopping conditions
 
 `epicrun` stops only here:

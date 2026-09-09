@@ -247,4 +247,31 @@ Never send `completion` Telegram notifications manually with `pnpm josh notify -
 
 - Applies to the initial PR and every follow-up commit (CodeRabbit fixes, re-review iterations, merges from main, etc.) — re-run `pnpm josh followup "<title> #<N>" --notify-message "Implemented <title>\nCause: ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"` each time you want to notify completion (notification is sent right before the merge).
 - `pnpm josh notify` remains the right tool for `planning`, `confirmation`, `kickoff_retry`, and `failure` notifications (no automated alternative exists for those).
-- **The count of unreleased merges is surfaced at completion — not a version.** When `pnpm josh followup` finishes it prints `🚚 unreleased merges on main: <n>` as the final console line and puts the same count in the `completion` Telegram body, so a release nobody has run stays visible (joshuafolkken/kit#1486). **Do not report a shipped version.** A child no longer bumps, so the project's `package.json` names the *previous* release rather than anything this run shipped, and what does ship is decided later by `pnpm josh release`. The Telegram is sent before the merge and says so; the console line is printed after it, from a freshly fetched default branch, and needs no such note. Surface the count as the closing line of your completion summary.
+- **The count of unreleased merges is surfaced at completion — not a version.** `pnpm josh followup` puts `🚚 unreleased merges on main: <n>` in the `completion` Telegram body, so a release nobody has run stays visible (joshuafolkken/kit#1486). **Do not report a shipped version.** A child no longer bumps, so the project's `package.json` names the *previous* release rather than anything this run shipped, and what does ship is decided later by `pnpm josh release`. The Telegram is sent before the merge and says so, which is why the count it carries excludes this run's own merge. **The count alone was never enough** — it was carried on every completion notification while 53 merges accumulated unreleased (joshuafolkken/kit#1582), because a number nobody is told to act on is a number nobody acts on. What the run does about it is the section below, and that is what closes the completion summary.
+
+## When `pnpm josh release` runs
+
+**The release point is a position plus a command's answer, never a judgement** (joshuafolkken/kit#1582). joshuafolkken/kit#1169 took the version off the branch and put it behind one command a person types; nothing said *when* to type it, and because nothing fails when nobody does — CI green, every pull request merged, every Issue closed — 53 merges reached main unreleased and no consumer of this package saw one of them.
+
+**The position: once per invocation, after the last merge.** Ask when `pnpm josh followup` has merged the last pull request *this invocation* authorized — a lone `fullrun`'s only one, a `queue`'s or an `epicrun`'s **last** child, never once per child. In a lane the parent asks it, in the primary checkout, after the last lane is closed. Asked per child it would cut a release in the middle of a batch whose remaining children are still moving main.
+
+**The answer: `pnpm josh release:scope`.**
+
+```bash
+pnpm josh release:scope          # → required | skip | unknown ; alias: josh res
+pnpm josh release:scope --json   # the same answer as one JSON object
+```
+
+| It answers | What it means                                                    | What the run does                                                               |
+| ---------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `required` | main has taken at least one merge since the version last changed | Close the completion report with the release request, naming `pnpm josh release` |
+| `skip`     | the count is zero — nothing is waiting to ship                    | Say so in one line and finish                                                     |
+| `unknown`  | the count could not be read                                      | **Report it as `unknown`** — it is never read as `skip`                          |
+
+**The threshold is one, and that is deliberate.** joshuafolkken/kit#1582's own complaint is that accumulating makes a single version larger and its contents harder to trace afterwards, so a release per invocation is the cadence rather than a compromise — and it is the cadence that already held while every child bumped, before joshuafolkken/kit#1486 removed that. What keeps it from firing per child is the position above, not a larger number.
+
+**The run never types `pnpm josh release` itself.** That command opens a pull request of its own, merges it, and starts the tag → publish → `production` chain: outward-facing and effectively irreversible, so it is Tier C (`CLAUDE.md` → "Decision autonomy"). Typing `fullrun` authorizes merging *this Issue's* pull request and nothing past it. On `required` the run reports the request as its closing line and stops there; a person types the command in the primary checkout, on the default branch, with a clean tree.
+
+**`pnpm josh release --dry-run` was checked first and does not answer this.** It refuses off the default branch and on a dirty working tree, and it counts against `HEAD` rather than `origin/<default>` — and every position above is a feature branch or a lane, which is exactly where it throws. So `release:scope` adds **no counting of its own**: it reads `git_followup_pending.read_pending`, the same fetch-then-count `pnpm josh followup` already uses for the Telegram line, and the two therefore cannot disagree.
+
+**This section is the single source.** `fullrun.md`, `queue.md` and `epicrun.md` point here rather than restating it, and `docs/josh-commands.md` → "`josh release:scope`" documents the command itself.

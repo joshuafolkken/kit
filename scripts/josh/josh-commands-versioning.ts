@@ -34,6 +34,14 @@ const VERSIONING_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Release the merges main has taken since the version last changed',
 		category: 'Versioning',
 	},
+	// The read-only half of the one above (joshuafolkken/kit#1582). `release --dry-run` cannot
+	// answer this question: it refuses off the default branch and on a dirty tree, which is every
+	// position a run asks it from. A `script` entry for the same reason `release` is one.
+	'release:scope': {
+		script: 'scripts/release/release-scope-cli.ts',
+		description: 'Say whether a release is owed, from the unreleased merges on main',
+		category: 'Versioning',
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
