@@ -48,6 +48,10 @@ const ONCE_PER_RUN = 'delivers once per run rather than once per call'
 const FILING_COMMAND = 'gh issue create --title "x"'
 // The `gh api` spelling of the same filing, used both as a trigger case and as a collision case.
 const FILING_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues -f title="x" -f body="y"'
+const RUN_TAIL = 'run-tail'
+// The commit-push-PR step as a run issues it, reused wherever a case needs the sixth row's trigger to
+// match so that no case can pass on a spelling the others do not use.
+const FOREGROUND_PUSH_COMMAND = 'pnpm josh git -y "Stop a run tail idling #1510"'
 const SHELL_BODY = 'shell-body'
 // A comment body carrying the character the shell runs. It is a single-quoted TypeScript literal, so
 // the backtick is inert here and dangerous only in the command it describes. The endpoint is a
@@ -440,7 +444,7 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it.each([WIP_CAP, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION])('names %j', (id) => {
+	it.each([WIP_CAP, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION, RUN_TAIL])('names %j', (id) => {
 		expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
 	})
 
@@ -451,6 +455,7 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		BODY_READ_API_COMMAND,
 		EVALUATED_BODY_COMMAND,
 		PIPED_GATE_COMMAND,
+		FOREGROUND_PUSH_COMMAND,
 	])('is claimed by exactly one rule: %j', (command) => {
 		expect(rules_claiming(command)).toBe(1)
 	})

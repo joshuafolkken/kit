@@ -149,6 +149,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   children are dispatched, so `epicrun.md` → "Lanes" carries it for the parallel case and
   `prompts/collaboration-workflow/wip-cap.md` → 「実行のしかた」 is the single source
   (joshuafolkken/kit#1518).
+- **A command that can take minutes is issued in the background, and the turn never ends at the
+  push** — §2h. It is where a run's idle time collects: joshuafolkken/kit#1510 measured 25 idle
+  minutes in a 45-minute run, 6m28s of it a foreground `pnpm josh git -y` the harness detached at its
+  own cap, and 6m06s of it CI that had already gone green. `pnpm josh followup` is the one that stays
+  in the foreground, because nothing follows it.
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
   §2z. It is the one *child's* stop `epicrun` does not turn into a park — an `epic:audit` error and
   the consecutive-failure abort end a run too, but neither is a child asking for something.
@@ -801,6 +806,62 @@ rule at the moment they bind (`prompts/collaboration-workflow/rule-delivery.md`,
 `scripts/rules/delivered-rules.test.ts`). The refusal reaches Claude Code alone and fires once per
 run, so **this section is the rule and the hook is what makes it hard to walk past** — a session
 that runs no hooks still owes the read.
+
+## 2h. A command that can take minutes is issued in the background
+
+**A run's idle time collects in its tail, and the two ways it collects there are one mistake**
+(joshuafolkken/kit#1510). `fullrun #1501` ran 45m03s on about 17 minutes of work. Of the 25 minutes
+nothing was running, **6m28s** was a `pnpm josh git -y` issued in the **foreground** with a
+900-second tool timeout — above the harness's own 600-second cap, so the harness detached it at the
+cap and nothing read the output file for six and a half minutes afterwards — and **6m06s** was bare
+CI: the push landed, the turn ended, and the merge started only once the person asked whether it was
+merging. Both halves handed the deciding of *when to look back* to something that was never going to
+decide it.
+
+**Issue it in the background, and never give a foreground call a timeout above the harness cap.**
+The cap decides how long a foreground call waits, not the number passed to it, so a number above the
+cap chooses the detached path without choosing the completion notification that should come with it.
+A call issued detached from the start re-invokes the run when it exits — which is what makes the
+completion *delivered* rather than something to remember to poll for.
+
+**Which commands, and the one that is deliberately not among them:**
+
+- **`pnpm josh git -y` — background.** Commit, the pre-push hook's unit suite, the push (120 seconds
+  with one automatic retry, `scripts/git/git-push-transport.ts`) and the pull request. It is about a
+  minute in the ordinary case and reached 19m26s once, on a transport fault.
+- **`pnpm josh gate` — background, and already so.** It is *started* when `/code-review` starts and
+  *joined* before the commit (§2, joshuafolkken/kit#1242); that is backgrounding under an older name,
+  and nothing about it changes here.
+- **`pnpm josh eval` — background**, started with the review and read after it, on `required` only
+  (`eval-gate.md`).
+- **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nothing
+  follows it, so there is nothing to overlap: it is the run's last call, and backgrounding it would
+  buy an empty turn. `followup.md` → "Always run `pnpm josh followup` in the foreground" stays exactly
+  as it is, and shell `&` backgrounding is a different thing again — it never works at all.
+
+**What runs beside a backgrounded command is the work that writes nothing to the working tree.** That
+is the whole test, and it is the same one that lets the gate and the review overlap (§2): a step that
+edits makes the background command's result stale, so it is not something to overlap with. Applied to
+the three waits a run actually has:
+
+| While this runs | Do this beside it |
+| --------------- | ----------------- |
+| `pnpm josh gate` | `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
+| `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
+| CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
+
+**The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
+resumes the run, and the turn that reads it goes straight through any branch-2 filing and
+`pnpm josh epic:bundle` to `pnpm josh followup`. joshuafolkken/kit#1333 had already settled that end
+state for a clean second round, and symptom 2 above is its regression — **so the guarantee is a
+mechanism and not only the procedure**: `pnpm josh rule:guard` refuses the foreground push step and
+states both halves at that call (`prompts/collaboration-workflow/rule-delivery.md`). A turn *ending*
+is the absence of a call and no `PreToolUse` hook can see one, so the last call before the seam is
+where the rule can be put; the push reissued detached is not refused again, so a run that obeys pays
+nothing.
+
+This section is the single source of the rule. `followup.md`, `eval-gate.md`, `chain-rule.md` and
+`epicrun.md` → "Progress while the run is quiet" route here for it rather than restating it.
 
 ## 3. What stays resident, and what is read from here
 
