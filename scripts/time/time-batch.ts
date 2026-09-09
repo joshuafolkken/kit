@@ -207,6 +207,8 @@ async function build_timings(input: BatchInput): Promise<Array<RunTiming>> {
 			await build_one(issue_number, cwd, read, {
 				found: found.get(issue_number),
 				search: searches.get(issue_number),
+				// A batch never prices its children: the corpus walk would be paid once per child.
+				priced_of: undefined,
 			}),
 	)
 }

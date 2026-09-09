@@ -1,4 +1,5 @@
 import { json_value } from '#scripts/json-value'
+import { time_instant } from '#scripts/time/time-instant'
 import { z } from 'zod'
 
 // Reading Claude Code's own session transcripts for what a run actually cost
@@ -68,6 +69,16 @@ interface UsageRecord {
 	request_id: string
 	model: string
 	branch: string
+	// When the request was sent, as epoch milliseconds — `undefined` where the line carried no
+	// readable timestamp (joshuafolkken/kit#1606). The transcript has always carried it and the
+	// schema has always parsed it; only the dedupe fallback key used it, so a priced request could
+	// not be placed anywhere in time and cost had no axis to be attributed along.
+	//
+	// **`undefined` rather than a sentinel, for the reason `time_instant` exists**: a request whose
+	// instant cannot be read belongs in the unattributed bucket, and a `0` would place it at the
+	// epoch — inside whichever phase window happens to open first, which is the confident wrong
+	// answer this field is meant to avoid.
+	at_ms: number | undefined
 	totals: UsageTotals
 }
 
@@ -147,6 +158,7 @@ function to_record(data: ParsedLine, usage: RawUsage): UsageRecord {
 		request_id: request_id_of(data, usage),
 		model: data.message?.model ?? UNKNOWN_MODEL,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
+		at_ms: time_instant.parse_instant(data.timestamp),
 		totals: to_totals(usage),
 	}
 }

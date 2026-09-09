@@ -34,9 +34,34 @@ function record(request_id: string, output_tokens: number): UsageRecord {
 		request_id,
 		model: OPUS,
 		branch: 'main',
+		at_ms: undefined,
 		totals: { ...cost_usage.EMPTY_TOTALS, output_tokens },
 	}
 }
+
+// joshuafolkken/kit#1606: the instant a request was sent is what lets a phase claim its cost.
+const AT = '2026-09-09T01:00:00.000Z'
+
+describe('cost_usage.parse_line on the request instant', () => {
+	it('keeps the timestamp the line carried', () => {
+		const outcome = cost_usage.parse_line(line({ timestamp: AT }))
+
+		expect(outcome.kind === 'record' && outcome.record.at_ms).toBe(Date.parse(AT))
+	})
+
+	// Never a zero, which would place the request at the epoch — inside whichever phase opens first.
+	it('reports an unreadable timestamp as unknown rather than as the epoch', () => {
+		const outcome = cost_usage.parse_line(line({ timestamp: 'not a date' }))
+
+		expect(outcome.kind === 'record' && outcome.record.at_ms).toBeUndefined()
+	})
+
+	it('reports a line with no timestamp at all as unknown', () => {
+		const outcome = cost_usage.parse_line(line())
+
+		expect(outcome.kind === 'record' && outcome.record.at_ms).toBeUndefined()
+	})
+})
 
 describe('cost_usage.parse_line', () => {
 	it('reads the billed quantities from an assistant line', () => {

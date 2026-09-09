@@ -6,7 +6,13 @@ const ISSUE_BRANCH = '962-report-the-token-and-credit-cost-of-a-run'
 const NEXT_BRANCH = '963-single-source-the-three-ai-documents'
 
 function record(branch: string, request_id = branch): UsageRecord {
-	return { request_id, model: 'claude-opus-5', branch, totals: cost_usage.EMPTY_TOTALS }
+	return {
+		request_id,
+		model: 'claude-opus-5',
+		branch,
+		at_ms: undefined,
+		totals: cost_usage.EMPTY_TOTALS,
+	}
 }
 
 describe('cost_attribute.issue_from_branch', () => {

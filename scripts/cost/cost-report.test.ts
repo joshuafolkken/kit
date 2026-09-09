@@ -15,6 +15,7 @@ function record(request_id: string, overrides: Partial<UsageTotals> = {}): Usage
 		request_id,
 		model: OPUS,
 		branch: 'main',
+		at_ms: undefined,
 		totals: { ...cost_usage.EMPTY_TOTALS, ...overrides },
 	}
 }

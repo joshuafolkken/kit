@@ -72,7 +72,7 @@ pnpm josh cost --session <id> --json  # one session, or one delegated unit as <s
 
 **Read `missing` before quoting any of them, and a non-zero count is unmeasured rather than zero.** Its three counters — `no_usage_lines`, `malformed_lines`, `unreadable_sessions` — say how much of the corpus could not be priced at all, and on an `--issue` scope they are the **whole corpus's** rather than that issue's, deliberately: a line nobody could parse carries no branch, so it cannot be ruled out of the issue either. This is the same distinction `span_count: 0` and `not detected` make everywhere else here — **withheld is not measured as zero** — so a `cost_usd` reported beside a non-zero `missing` is a floor and is labelled one, never quoted as the run's cost. A non-empty `unpriced_models` is a second floor, and that one the command flags itself.
 
-**There is no phase axis to read, and inventing one is the mistake to avoid here.** The record attributes a request to an issue and to nothing finer, so a dollar cannot be charged to `gate` or `review` the way a minute can; a per-phase figure would be a guess wearing a measurement's clothes. Attributing cost to phases is [#1606](https://github.com/joshuafolkken/kit/issues/1606), which follows this reading rather than being part of it — until it lands, what step 3 ranks on is the run total and the two per-request prices.
+**The phase axis is `josh time`'s, not this command's, and it is read from there** ([#1606](https://github.com/joshuafolkken/kit/issues/1606)). `josh cost`'s own record attributes a request to an issue and to nothing finer, so nothing here charges a dollar to `gate` or `review`; what does is `phase_costs` on the run-scope `josh time` report, which places each billed request's own instant inside the phase window that contains it. Read the money per phase there and the run total here, and never construct a per-phase figure by taking a share of `cost_usd` — that is the guess wearing a measurement's clothes this paragraph was written against, and it is the same error the ranking rule in step 3 forbids.
 
 **`--top 5` is part of the call, not a nicety** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). Without it the JSON carries every row of the per-tool and per-`josh <cmd>` tables, and an epic pays for both once per child — epic #1262 measured 47.7 KB at 9 children and had more than doubled by 18. What this skill ranks off those tables is the handful of rows at the top, so the tail is read into the context and never used. Everything else the steps below quote — the four shares, every phase, the round trips and their price — is unaffected: the cap reaches the **row tables** and nothing else.
 
@@ -129,6 +129,17 @@ Read from the JSON, in this order:
   measured zero. Never rank a phase you did not measure. `wait`, `wait-outside` and `other` rest on
   no marker, so they are `false` only where no span was read — the same state the three transcript
   shares are withheld in.
+- **`phase_costs` — what each stage cost in dollars** (joshuafolkken/kit#1606). `by_phase` carries a
+  `request_count` and a `cost_usd` per phase, placed by each billed request's own instant falling
+  inside that phase's window; it is the dollar column beside the minutes column above, and it is what
+  lets a proposal against `review` or `gate` be ranked in money rather than only in wall clock.
+  **`unattributed` is a bucket, not a rounding error**: a request inside no phase window — and one
+  whose timestamp could not be read — is counted there and **never prorated into the phases**, the
+  same treatment `wait-outside` and `pre-run` get in the phase table, so it is reported and never
+  ranked. **`is_measured: false` means the cost corpus was not read for this scope, not that the run
+  spent nothing** — only `--issue` and the no-argument latest-run scope read it, because pricing walks
+  the whole transcript directory and `--epic` / `--last` would pay that walk once per child. A phase
+  with minutes and no row here had no billed request of its own inside it, which is a real answer.
 - **the two review rounds against each other** — `segments`, read as one pair rather than as two rows
   ([#1412](https://github.com/joshuafolkken/kit/issues/1412)). The listing already carries both rounds
   of a two-round run, and a report that prints them as two numbers converts nothing into a reading: on
@@ -298,7 +309,15 @@ Read from the JSON, in this order:
   ranks by minutes saved per run, and a count is not minutes. Multiply the price by the trips a
   proposed change would remove, and rank the product against the phases. **The model share is the
   part batching actually removes**, because a tool's own execution is paid whichever turn it was
-  issued from. **The price is not a share of `elapsed_ms`** — human wait, CI wait and the turns that
+  issued from. **`usd_per_round_trip` is the same reading in money** (joshuafolkken/kit#1606), on
+  **the same denominator** — `round_trip_count`, so one recoverable-trip figure multiplies both and a
+  bundling proposal enters step 3's table with a minutes column and a dollars column rather than one.
+  **What differs is the numerator's unit of work, and the block prints both counts so it cannot be
+  missed**: minutes are measured over the spans a turn issued, while dollars are measured over billed
+  requests, and a run has more requests than round trips because every assistant message is billed
+  whether or not it called anything. So `usd_per_round_trip` × trips removed is the saving; `cost_usd`
+  ÷ `request_count` × requests removed is the other reading, and the two answer different questions.
+  **The price is not a share of `elapsed_ms`** — human wait, CI wait and the turns that
   called nothing are all outside it, so the product can be ranked beside the `wait` and `ci` rows
   without counting the same minutes twice. It is withheld rather than zeroed where there was no round
   trip to divide by
@@ -435,6 +454,8 @@ in the report itself — say so and do not rank off the table beneath it.
 **Every row carries both units — minutes per run and dollars per run — and names which one it acts on** ([#1609](https://github.com/joshuafolkken/kit/issues/1609)). A table ordered by minutes alone has no column a cost row could appear in, which is why the 2026-09-09 report emitted no cost row at all. **The two do not follow from one another and are never converted between**: cutting a CI wait saves wall clock and no money whatever, because nothing is billed while a check runs, and cutting what every request carries in its prompt saves money on all of them while moving the wall clock by an amount no run can resolve. So a row states its saving in the unit it acts on and `—` in the other, and a row that genuinely acts on both states two figures.
 
 **Order by whichever unit the report was asked for, and say which at the head of the table.** "Why is `fullrun` slow" orders by minutes; "what is the backlog costing" orders by dollars. Neither ordering hides the other column, so a row that ranks second on the chosen axis is still visible on the one it wins.
+
+**A row against one stage takes its dollars from that stage's own `phase_costs` row, not from the run total** ([#1606](https://github.com/joshuafolkken/kit/issues/1606)). A proposal that cuts work out of `review` is worth what `review` cost, exactly as it is ranked on what `review` took in minutes; taking a share of `cost_usd` instead re-imports the error the next paragraph names. **A stage carrying no row was not free** — it had no billed request of its own inside it — and a scope whose `phase_costs.is_measured` is `false` was never priced at all, so both take `not measured` rather than a zero. **The unattributed bucket is never spread across the rows to make them add up**: it is quoted as its own figure where it is large enough to matter, and no row is ranked off it.
 
 **Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.** Dollars per request multiplied by the requests a change removes is a saving; a percentage of the total is not, because the total covers work the change leaves exactly where it is — the same error as ranking a phase off a run's `elapsed_ms`. A change that removes carried tokens rather than requests is ranked on the resident and history shares instead, which is the arithmetic the round-trip price above already does for minutes. **Where `missing` was non-zero, a row that has a dollar saving still prints one and is never blanked.** Withholding it there would be the wrong reading of the same rule: on an `--issue` scope those counters are the whole corpus's, so a single malformed line in any unrelated session would empty the dollar column of every row and reproduce exactly the missing cost row this reading was added to end. **Label such a figure approximate rather than as a bound.** The run total `cost_usd` is a floor because it can only fall short of the true figure, but the dollars per request derived from it is an average over the priced subset alone and can sit either side of the true one — so a `≥` on a per-row saving claims more than the arithmetic gives. `not measured` is kept for the case that earns it, a scope with no priced record at all, and **a row that saves no money keeps the `—` the rule above gives it** — none of this reaches a cell that was empty by design.
 

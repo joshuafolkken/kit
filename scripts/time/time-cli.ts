@@ -13,6 +13,7 @@ import { time_last_report } from './time-last-report'
 import { time_period } from './time-period'
 import { time_period_report } from './time-period-report'
 import { time_report, type TimeReport } from './time-report'
+import { time_request_costs } from './time-request-costs'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
 import { time_spans, type Span, type Timeline } from './time-spans'
@@ -321,9 +322,11 @@ function run_session(session_id: string, cwd: string, output: Output): number {
 // other scope's figures — and it resolves the pull request and the report in one pass, so the pulls
 // listing is paged once rather than twice.
 async function build(issue: number | undefined, cwd: string): Promise<TimeReport | undefined> {
-	if (issue === undefined) return await time_run.build_latest_run_report(cwd)
+	const sources = time_request_costs.PRICED_SOURCES
 
-	return await time_run.build_run_report(issue, cwd)
+	if (issue === undefined) return await time_run.build_latest_run_report(cwd, undefined, sources)
+
+	return await time_run.build_run_report(issue, cwd, undefined, sources)
 }
 
 async function run_issue(issue: number | undefined, cwd: string, output: Output): Promise<number> {
