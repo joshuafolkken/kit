@@ -13,6 +13,9 @@ const ONE_MINUTE = 1
 const TWO_MINUTES = 2
 const ONE_SESSION = 1
 const TWO_SESSIONS = 2
+const NO_SPANS = 0
+const ONE_SPAN = 1
+const TWO_SPANS = 2
 
 function span(label: string, minutes: number, marker: PhaseMarker = time_markers.NO_MARKER): Span {
 	return { ...fixture.span(label, minutes, minutes), marker }
@@ -36,8 +39,30 @@ function bystander(minutes: number): SessionSpans {
 	return session([span('Bash: gh', minutes)])
 }
 
-function separate(entries: ReadonlyArray<[string, SessionSpans]>): SessionSplit {
-	return time_sessions.separate(new Map(entries))
+// The issue the run under test is reporting on. The fixtures above declare no issue at all, which is
+// the shape of every transcript recorded before the `in-progress` capture existed — so they take the
+// presence test and this number never matches one of them.
+const ISSUE = 1630
+const OTHER_ISSUE = 1481
+
+function separate(
+	entries: ReadonlyArray<[string, SessionSpans]>,
+	issue_number: number = ISSUE,
+): SessionSplit {
+	return time_sessions.separate(new Map(entries), issue_number)
+}
+
+// A marker that names the issue it opened, which is what the `in-progress` call writes.
+function naming(ended_minute: number, issue: number): Span {
+	return {
+		...fixture.span('Bash: gh', ended_minute, ONE_MINUTE),
+		marker: time_markers.WORKFLOW_MARKER,
+		issue,
+	}
+}
+
+function work(ended_minute: number): Span {
+	return fixture.span('Read', ended_minute, ONE_MINUTE)
 }
 
 describe('time_sessions.separate', () => {
@@ -121,6 +146,111 @@ describe('time_sessions.separate with no marker anywhere', () => {
 
 		expect(split.attributed_count).toBe(ONE_SESSION)
 		expect(split.attributed_count).toBeLessThan(time_sessions.AMBIGUOUS_MINIMUM)
+	})
+})
+
+// joshuafolkken/kit#1648. The presence test alone kept a session that had opened a different run, and
+// kept a dispatching parent whole — so #1630 was recorded at 361 minutes against about 45, and three
+// children of one parent recorded the identical start.
+describe('time_sessions.separate when a marker names the issue', () => {
+	const RUN_MINUTE = 10
+	const SIBLING_MINUTE = 4
+	const EARLY_MINUTE = 2
+	const LATER_MINUTE = 20
+
+	it('leaves out a session whose only marker names another run', () => {
+		const split = separate([
+			[RUN_SESSION, session([naming(RUN_MINUTE, ISSUE)])],
+			[OTHER_SESSION, session([naming(EARLY_MINUTE, OTHER_ISSUE)])],
+		])
+
+		expect(split.kept.size).toBe(ONE_SESSION)
+		expect(split.kept.has(RUN_SESSION)).toBe(true)
+		expect(split.is_separated).toBe(true)
+	})
+
+	// The parent dispatched this child; its own spans are the batch's coordination, and counting them
+	// gave every child of one parent that parent's `started_at`.
+	it('drops the dispatching parent own spans when only a unit named the issue', () => {
+		const parent = session([work(EARLY_MINUTE)], [naming(RUN_MINUTE, ISSUE)])
+		const split = separate([[RUN_SESSION, parent]])
+
+		expect(split.kept.get(RUN_SESSION)?.own.size).toBe(NO_SPANS)
+		expect(split.kept.get(RUN_SESSION)?.delegated.size).toBe(ONE_SPAN)
+	})
+
+	// A parent's units are pooled under one key, so the sibling that ran first is in the same half. The
+	// marker says where this run began, which is the only thing that tells the two apart.
+	it('takes the unit half from the run declaration, leaving an earlier sibling out', () => {
+		const parent = session([], [work(SIBLING_MINUTE), naming(RUN_MINUTE, ISSUE), work(RUN_MINUTE)])
+		const split = separate([[RUN_SESSION, parent]])
+
+		expect(split.kept.get(RUN_SESSION)?.delegated.size).toBe(TWO_SPANS)
+	})
+
+	// The floor alone left the child that ran *first* absorbing every later sibling, so the next
+	// declaration closes the window as well.
+	it('ends the unit half at the next declaration, leaving a later sibling out', () => {
+		const later = LATER_MINUTE
+		const parent = session(
+			[],
+			[naming(EARLY_MINUTE, ISSUE), naming(later, OTHER_ISSUE), work(later)],
+		)
+		const split = separate([[RUN_SESSION, parent]])
+
+		expect(split.kept.get(RUN_SESSION)?.delegated.size).toBe(ONE_SPAN)
+	})
+})
+
+describe('time_sessions.separate on what a named marker leaves behind', () => {
+	const RUN_MINUTE = 10
+	const EARLY_MINUTE = 2
+	const LATER_MINUTE = 20
+
+	// The parent took the next issue up in-session, so that declaration sits in its own half — and a
+	// ceiling read from the units alone never closed, so the next run's units were counted as this
+	// child's.
+	it('ends the unit half at a next declaration made in the parent own half', () => {
+		const own = [naming(LATER_MINUTE, OTHER_ISSUE)]
+		const parent = session(own, [naming(EARLY_MINUTE, ISSUE), work(LATER_MINUTE)])
+		const split = separate([[RUN_SESSION, parent]])
+
+		expect(split.kept.get(RUN_SESSION)?.delegated.size).toBe(ONE_SPAN)
+	})
+
+	// A run that spanned two sessions where only the first wrote the label: the second carries the
+	// number-less skill-load marker alone, and deciding the test once per corpus dropped it.
+	it('keeps a session of the same run that declared no issue at all', () => {
+		const split = separate([
+			[RUN_SESSION, session([naming(RUN_MINUTE, ISSUE)])],
+			[OTHER_SESSION, run_session()],
+		])
+
+		expect(split.kept.size).toBe(TWO_SESSIONS)
+		expect(split.excluded).toStrictEqual([])
+	})
+
+	// The parent of a delegated run keeps its own spans out of the child, and they have to show up as
+	// excluded — minutes in neither half are minutes the report cannot account for.
+	it('reports the parent minutes the narrowing dropped as excluded', () => {
+		const parent = session([work(EARLY_MINUTE)], [naming(RUN_MINUTE, ISSUE)])
+		const split = separate([[RUN_SESSION, parent]])
+
+		expect(split.excluded).toStrictEqual([
+			{ session_id: RUN_SESSION, duration_ms: ONE_MINUTE * MINUTE_MS },
+		])
+	})
+
+	// A session that opened the workflow but never wrote the label names nothing, so the presence test
+	// is still what decides — the older rule kept behind the newer one, not replaced by it.
+	it('falls back to the presence test when no marker names the issue', () => {
+		const split = separate([
+			[RUN_SESSION, run_session()],
+			[OTHER_SESSION, bystander(TWO_MINUTES)],
+		])
+
+		expect(split.kept.has(RUN_SESSION)).toBe(true)
+		expect(split.excluded).toHaveLength(ONE_SESSION)
 	})
 })
 

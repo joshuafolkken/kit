@@ -39,6 +39,10 @@ function collect(issue_number: number = ISSUE): IssueSpans {
 	return time_corpus.collect_issue_spans(CWD, issue_number)
 }
 
+function earliest_start(found: IssueSpans): number {
+	return Math.min(...found.spans.map((one) => one.ended_ms - one.duration_ms))
+}
+
 describe('time_corpus.collect_issue_spans', () => {
 	// A run is not a session: the `fullrun` for issue #1256 ran in a different one from the session
 	// that reported it, so a command reading one transcript reports half a run.
@@ -93,6 +97,68 @@ describe('time_corpus.collect_issue_spans on a run that never checked the issue 
 		write_session('lane', fixture.lane_lines(0))
 
 		expect(collect(OTHER_ISSUE).session_count).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#1648. An `epicrun` or a `backlogrun` runs its children in delegated units of one
+// session, and the units are pooled under that session's key — so the whole batch was handed to every
+// child. Run #1630 recorded 361 minutes against about 45 and 421 turns against about 130, while its
+// sibling #1633, run in the same parent minutes earlier, recorded correctly: the same defect, visible
+// only in the child whose declaration fell furthest from the session's first span.
+describe('time_corpus.collect_issue_spans on a parent that ran several children', () => {
+	const SIBLING_ISSUE = 1633
+	const SIBLING_OFFSET = 0
+	const RUN_OFFSET = 20
+	const DEFAULT_BRANCH = 'main'
+	// How far apart the two declarations sit, which is what the child's start has to move by.
+	const DECLARATION_GAP_MS = RUN_OFFSET * fixture.MINUTE_MS
+
+	function write_batch(): void {
+		write_session('batch', fixture.issue_lines(SIBLING_OFFSET, DEFAULT_BRANCH))
+		write_unit('batch', 'first', fixture.lane_lines(SIBLING_OFFSET, SIBLING_ISSUE))
+		write_unit('batch', 'second', fixture.lane_lines(RUN_OFFSET, ISSUE))
+	}
+
+	// The sibling ran first, so under the old reading both children started where the parent's own
+	// spans did and the two rows opened at the same instant — which is what made #1630's row 361
+	// minutes long. Both shapes are asserted rather than only the broken one, because the pair is the
+	// evidence: the same defect produced a wrong row and a right-looking one.
+	it('starts each child at its own declaration rather than at the parent', () => {
+		write_batch()
+
+		const found = collect()
+
+		// `earliest_start` is `Math.min()` of an empty list — `Infinity` — so a narrowing that dropped
+		// the child entirely would satisfy every comparison below. The count is what rules that out.
+		expect(found.spans.length).toBeGreaterThan(0)
+		expect(earliest_start(found) - earliest_start(collect(SIBLING_ISSUE))).toBeGreaterThanOrEqual(
+			DECLARATION_GAP_MS,
+		)
+	})
+
+	// A floor alone only removes the sibling that ran first, so the child that ran first absorbed every
+	// later one — including a research unit inside them, which declares no issue to be told apart by.
+	it('leaves a later sibling out of the child that ran before it', () => {
+		write_batch()
+
+		const found = collect(SIBLING_ISSUE)
+		const run_started = earliest_start(collect())
+
+		expect(found.spans.length).toBeGreaterThan(0)
+		expect(Math.max(...found.spans.map((one) => one.ended_ms))).toBeLessThan(run_started)
+	})
+
+	// **Measured from the declaration, so the unit's own minutes before it are `pre-run`** — the same
+	// line `time-phases.ts` already draws for a session, and the only line that separates two children
+	// pooled under one key: a research unit inside the sibling declares no issue at all.
+	it('leaves the sibling unit out of the child that ran after it', () => {
+		write_batch()
+
+		const found = collect()
+		const sibling_ended = Math.max(...collect(SIBLING_ISSUE).spans.map((one) => one.ended_ms))
+
+		expect(found.spans.length).toBeGreaterThan(0)
+		expect(earliest_start(found)).toBeGreaterThan(sibling_ended)
 	})
 })
 
