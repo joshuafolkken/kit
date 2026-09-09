@@ -11,8 +11,18 @@ const TURN = 'msg-1'
 
 // One call of a single-call turn. The two fields the grouping reads are the two `time-bundle-call.ts`
 // puts on the span; everything else about it is the shared fixture's.
-function call(targets: Array<string>, is_bundleable = true): Span {
-	return { ...time_span_fixture.span(time_spans.TOOL_CATEGORY), is_bundleable, targets }
+function call(targets: Array<string>, is_bundleable = true, is_writing = false): Span {
+	return {
+		...time_span_fixture.span(time_spans.TOOL_CATEGORY),
+		is_bundleable,
+		targets,
+		is_writing,
+	}
+}
+
+// An edit of one file, which is the call the whole of joshuafolkken/kit#1509 is about.
+function edit(target: string): Span {
+	return call([target], true, true)
 }
 
 // The same call, tagged with the turn that issued it (joshuafolkken/kit#1406).
@@ -41,6 +51,29 @@ function named_turns(calls: ReadonlyArray<[string, string]>): Array<Span> {
 const EDIT = 'Edit'
 const READ = 'Read'
 const GREP = 'Bash: grep'
+
+// Sharing a target is a proxy for "the later call needed the earlier one's result". These four cases
+// are the whole of what the proxy now says (joshuafolkken/kit#1509).
+describe('time_bundles.is_dependent — what sharing a target is evidence of', () => {
+	const READS = { targets: ['a.ts'], is_writing: false }
+	const WRITES = { targets: ['a.ts'], is_writing: true }
+
+	it('reads two writes of one file as independent', () => {
+		expect(time_bundles.is_dependent(WRITES, WRITES)).toBe(false)
+	})
+
+	it('reads a write after a read of one file as dependent', () => {
+		expect(time_bundles.is_dependent(READS, WRITES)).toBe(true)
+	})
+
+	it('reads a read after a write of one file as dependent', () => {
+		expect(time_bundles.is_dependent(WRITES, READS)).toBe(true)
+	})
+
+	it('reads two calls naming different files as independent however they touch them', () => {
+		expect(time_bundles.is_dependent(WRITES, { targets: ['b.ts'], is_writing: true })).toBe(false)
+	})
+})
 
 describe('time_bundles.build_bundles — what counts as a sequence', () => {
 	it('reads consecutive single-call turns with disjoint targets as one sequence', () => {
@@ -72,7 +105,41 @@ describe('time_bundles.build_bundles — what counts as a sequence', () => {
 
 		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(0)
 	})
+})
 
+describe('time_bundles.build_bundles — a run touching one file', () => {
+	// **The case joshuafolkken/kit#1509 was filed for.** Before the fix, sharing a target flushed the
+	// sequence whatever the two calls were, so a stretch of single-call turns all editing one file
+	// could never take the run past a length of 1 — and the guard, which needs 2, stayed silent for a
+	// whole run. A second edit needs nothing from the first: the text is already held.
+	it('reads consecutive single-call edits of one file as one sequence', () => {
+		const spans = [MODEL, edit('a.ts'), MODEL, edit('a.ts'), MODEL, edit('a.ts')]
+		const totals = time_bundles.build_bundles(spans)
+
+		expect(totals.sequence_count).toBe(1)
+		expect(totals.longest_sequence).toBe(3)
+		expect(totals.recoverable_round_trips).toBe(2)
+	})
+
+	// The counter-case, kept deliberately: two reads of one file *can* depend — a grep that finds a
+	// line number and a `sed -n` that prints around it — so the shared-target proxy still earns its
+	// place there and this stays at zero.
+	it('still breaks a sequence where one read follows another of the same file', () => {
+		const spans = [MODEL, call(['a.ts']), MODEL, call(['a.ts']), MODEL, call(['a.ts'])]
+
+		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(0)
+	})
+
+	// A write after a read of the same file is the `Read` → `Edit` pair, which is a real dependency:
+	// the edit's `old_string` came from the read.
+	it('breaks a sequence where an edit follows a read of the same file', () => {
+		const spans = [MODEL, call(['a.ts']), MODEL, edit('a.ts')]
+
+		expect(time_bundles.build_bundles(spans).recoverable_round_trips).toBe(0)
+	})
+})
+
+describe('time_bundles.build_bundles — what else breaks a sequence', () => {
 	// The tail of a call whose middle went to a delegated unit. The unit ran between the two turns, so
 	// they were not consecutive at all.
 	it('breaks a sequence at the tail of a call split around a delegated unit', () => {

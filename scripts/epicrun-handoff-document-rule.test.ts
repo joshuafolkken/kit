@@ -15,7 +15,7 @@ const SKILL = EPICRUN_SKILL
 const POINTER = 'prompts/collaboration-workflow/epicrun.md'
 const SINGLE_SOURCE: ReadonlyArray<string> = [SKILL]
 
-const COMMAND = 'pnpm josh cost --over 400000'
+const COMMAND = 'pnpm josh cost --over 150000'
 // joshuafolkken/kit#1567: a merge is only half the seam. Under parallel lanes another child is
 // still in flight, and cutting there loses the reference to it rather than pausing it.
 const LANE_COMMAND = 'pnpm josh lane:list'
@@ -130,9 +130,10 @@ describe('the threshold cites the measurement it came from', () => {
 	})
 })
 
-// joshuafolkken/kit#984: the measurement supports breaking almost immediately, not 400,000 — the
-// number is a tokens-against-human-touches trade-off. A document that keeps claiming the
-// measurement produced it sends the next reader to defend a figure the data does not support.
+// joshuafolkken/kit#984: the measurement supports breaking almost immediately, and 400,000 was a
+// tokens-against-human-touches trade-off rather than a measured figure. joshuafolkken/kit#1605 kept
+// the trade-off and re-drew it over 223 recorded sessions, so the document now has to carry the
+// derivation itself — a figure with no derivation beside it is one the next run lowers on a feeling.
 describe('the threshold is not passed off as the measurement’s own answer', () => {
 	it.each(SINGLE_SOURCE)('%s does not repeat the corrected claim', (document_path) => {
 		expect(read_unwrapped(document_path)).not.toContain(
@@ -140,12 +141,27 @@ describe('the threshold is not passed off as the measurement’s own answer', ()
 		)
 	})
 
-	it.each(SINGLE_SOURCE)(
-		'%s says outright that the measurement did not produce it',
-		(document_path) => {
-			expect(read_unwrapped(document_path)).toContain('閾値 400,000 は計測が出した数字ではない')
-		},
-	)
+	it.each(SINGLE_SOURCE)('%s says where the threshold was drawn from', (document_path) => {
+		const unwrapped = read_unwrapped(document_path)
+
+		expect(unwrapped).toContain('閾値 150,000 は 223 セッションの実測から引いた')
+		expect(unwrapped).toContain('54,974')
+		expect(unwrapped).toContain('121,514')
+	})
+
+	// Both bounds, because either one alone reads as an arbitrary pick: too low stops a session
+	// with nothing to hand off, too high never fires at all.
+	it.each(SINGLE_SOURCE)('%s names both bounds it was squeezed between', (document_path) => {
+		const unwrapped = read_unwrapped(document_path)
+
+		expect(unwrapped).toContain('223 本中 4 本（2%）')
+		expect(unwrapped).toContain('そのセッション最初のランが終わる前に')
+	})
+
+	// Lowering the line must not turn the post-merge check into a stop after every child.
+	it.each(SINGLE_SOURCE)('%s shows the post-merge check is not weakened', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('645,000')
+	})
 
 	// Naming what the number *is* matters as much as denying what it is not: without it the figure
 	// reads as arbitrary and the next run lowers it on a feeling.

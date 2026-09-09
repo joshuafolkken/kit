@@ -133,8 +133,34 @@ function shares_target(left: ReadonlyArray<string>, right: ReadonlyArray<string>
 	return left.some((one) => right.some((other) => is_related(one, other)))
 }
 
+// What sharing a target is evidence *of*. Sharing one is the proxy for "the later call needed the
+// earlier one's result", and for a read after a write it is a good one — an `Edit`'s `old_string`
+// came from the `Read` before it.
+//
+// **Between two writes it is not** (joshuafolkken/kit#1509). A second edit to a file already held
+// needs nothing from the first, so both belong in one turn — and treating the pair as dependent is
+// what kept the guard silent for a whole run. `extend` below does not merely decline to count such a
+// pair: it *flushes* the sequence and restarts it at the conflicting call, so a stretch of single-call
+// turns all editing one file could never take `sequence.length` past 1, and the refusal at
+// `time-batch-guard.ts` — which needs 2 — could never fire however long the stretch ran. Measured on
+// `fullrun #1503`: 17 such stretches, 108 seconds, and zero refusals in two hours.
+//
+// **Read-after-read keeps the old reading deliberately.** Two reads of one file can genuinely depend
+// — a `grep` that finds a line number and a `sed -n` that prints around it — so the proxy still earns
+// its place there. Only the write-write pair has no such counter-case.
+interface TargetFacts {
+	targets: ReadonlyArray<string>
+	is_writing: boolean
+}
+
+function is_dependent(earlier: TargetFacts, later: TargetFacts): boolean {
+	if (earlier.is_writing && later.is_writing) return false
+
+	return shares_target(earlier.targets, later.targets)
+}
+
 function conflicts(span: Span, sequence: ReadonlyArray<Span>): boolean {
-	return sequence.some((earlier) => shares_target(earlier.targets, span.targets))
+	return sequence.some((earlier) => is_dependent(earlier, span))
 }
 
 // A call, as opposed to the tail of one. A continuation is the remainder of a call whose middle went
@@ -473,9 +499,10 @@ const time_bundles = {
 	NO_BUNDLES,
 	build_bundles,
 	bundle_lines,
+	is_dependent,
 	open_sequence,
 	shares_target,
 }
 
-export type { BundleToolRow, BundleTotals, TripPrice }
+export type { BundleToolRow, BundleTotals, TargetFacts, TripPrice }
 export { time_bundles }

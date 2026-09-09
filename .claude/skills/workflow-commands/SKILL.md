@@ -179,6 +179,36 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   declare different authorizations**, and membership stays a person's to decide.
 - **The working-tree hold is claimed before anything else** — `pnpm josh run:hold`, at every typed
   entry point, ahead of the split assessment and ahead of a `new` entry's filing. §2f.
+- **The session boundary is asked at the entry as well, not only after a merge** —
+  `pnpm josh cost --over 150000`, in the same turn as `pnpm josh run:hold` and before anything else
+  is started, so a session already carrying an earlier Issue's whole conversation is cut before it
+  pays for one more (joshuafolkken/kit#1605 measured 88,481 tokens of carried conversation riding on
+  all 49 requests of one `fullrun`, 24% of that run's cost). **It is the same one rule at a second
+  application point, and not a second rule**: what the check measures, why the number is passed
+  explicitly, what an exit 1 with empty standard output means, and where 150,000 comes from are all
+  `epicrun.md` → "The hand-off", the single source — nothing about the post-merge application
+  changes. **Only the seam and the branch differ.** `under`, and the run continues. `over` — or a
+  run the check could not answer for — and the run **stops before the work starts**: send a
+  `confirmation` Telegram carrying the figure the command printed on standard error and the resume
+  command — **the invocation as it was typed, in a fresh session**, so a `#N` entry resumes as
+  `fullrun #<N>` / `halfrun #<N>` and a `new` entry resumes as `fullrun new` / `halfrun new`, since
+  the stop happens before the Issue is filed and there is no number to name — then run
+  `pnpm josh run:release`, and stop. Nothing has been filed, branched, edited or pushed yet, which is
+  what makes the entry the cheapest stop a run has and the reason the question is asked here rather
+  than after the plan. **A fresh session is structurally `under`** — its first request carries the
+  resident preamble alone, well below the 150,000 line (the measured median is in `epicrun.md` →
+  "The hand-off", with the rest of the derivation) — so this never stops a run that had nothing to
+  hand off. **A dispatched child does not ask it, and that is a
+  prohibition rather than an omission.** `epicrun`, `queue` and `backlogrun` already own this
+  question at their own seam — `epicrun.md` → "The hand-off" — where the drain, the lane reading and
+  the resume command that continues the batch all live. A child that asked at its own entry would
+  answer for whichever session the transcript reader picks — the parent's, in which case every child
+  of a long batch stops at once, or its own, in which case a freshly dispatched unit is always
+  `under` and the ask buys nothing — and either way its stop would fire a per-child Telegram, release
+  a hold the batch owns and hand the person a resume command that abandons the rest of the batch. So
+  **the entry ask belongs to a `fullrun` or a `halfrun` a person typed**, and nothing else. `kickoff`
+  is exempt for the reason it is exempt from the dependency update: it never implements, so it never
+  reaches the band this line was drawn against.
 - **The split assessment** runs before any work starts, at *every* entry point, from the one
   definition in `split-assessment.md`. **The default is not to split**: separability and a scope that
   clearly exceeds what one verification gate can confirm in one pass — the guide is about 10 changed
@@ -882,7 +912,7 @@ merge result?**
   comment exists because a compaction takes the counters at a moment nobody chooses (`epicrun.md` →
   "The counters live in the conversation"), so composing the values earlier moves no write and loses
   no counter.
-- **`pnpm josh cost --over 400000` stays after the merge, and reads nothing from it.** It measures
+- **`pnpm josh cost --over 150000` stays after the merge, and reads nothing from it.** It measures
   this session's own transcript, so the question above would bring it forward — but its answer grows
   with the session, and asking it a call early under-reads the very number the hand-off is decided
   on. It is seconds of tail against a guard on session size, so it keeps its documented seam
@@ -898,7 +928,7 @@ the three waits a run actually has:
 | `pnpm josh gate` | `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
 | CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
-| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 400000` |
+| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 150000` |
 
 **The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
 resumes the run, and the turn that reads it goes straight through any branch-2 filing and

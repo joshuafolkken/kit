@@ -1,6 +1,6 @@
 ---
 name: diag
-description: The procedure behind `diag fullrun` / `diag epicrun` / `diag #<N>` (and `/diag`) — measure where a run's wall clock actually went with `pnpm josh time`, say whether the last speedup issue worked, and rank what to cut next as one table that keeps the already-filed issues in it. Read this whenever asked how long a run took, why `fullrun` is slow, what to do to make it faster, or to check whether a speedup landed.
+description: The procedure behind `diag fullrun` / `diag epicrun` / `diag #<N>` (and `/diag`) — measure where a run's wall clock actually went with `pnpm josh time` and what it cost in dollars with `pnpm josh cost`, say whether the last speedup issue worked, and rank what to cut next as one table that keeps the already-filed issues in it. Read this whenever asked how long a run took, what a run cost, why `fullrun` is slow, what to do to make it faster, or to check whether a speedup landed.
 ---
 
 # `diag` — read the timing report, propose the next speedup
@@ -45,7 +45,7 @@ session transcript attributed — only the CI wait is known) and `not merged` ar
 zero, and the batch totals withhold any half no child contributed to. A child named in one of those
 states is reported as unmeasured, never counted as zero.
 
-## 1. Measure with `pnpm josh time`, never by hand
+## 1. Measure with `pnpm josh time` and `pnpm josh cost`, never by hand
 
 ```bash
 pnpm josh time --top 5 --json               # alias: josh tm
@@ -58,6 +58,21 @@ pnpm josh time --period <N> --top 5 --json  # the backlog over the last N days �
 **One reading is not `josh time`'s, and asking it for one is how the repetition stays invisible** ([#1313](https://github.com/joshuafolkken/kit/issues/1313)). Which checks run in more than one verification layer — `josh gate`, the pre-commit hook, the pre-push hook, CI — cannot be read from a session transcript at all: a hook's seconds are buried inside `josh git`'s, and CI's appear only as a per-check duration with nothing to compare them against. Run `pnpm josh layers` (alias `josh ly`) when a candidate is about removing work rather than about overlapping it; it reads the configuration files and re-derives the answer, so it stays true when a hook changes. It measures no seconds, so a row it produces is ranked below in step 3 on what the repeated check costs in `josh time`'s own tables.
 
 **A second reading is not `josh time`'s either: whether a slow check was slow or merely cold** ([#1314](https://github.com/joshuafolkken/kit/issues/1314)). A transcript records one run of a command in whatever cache state that run happened to be in, so a 133-second `josh gate` in the tables says nothing about whether the next one costs 133 seconds or 17. Run `pnpm josh bench <target>` (alias `josh bn`) before proposing a saving on a verification command: it clears that target's own caches, runs it, runs it again, and prints the pair — `eslint --cache` measured 128.4 s cold against 2.9 s warm. **Rank the candidate on the figure the run will actually pay.** A row whose cold reading dominates is a cache problem, not a check to remove, and a proposal to delete a check because the transcript happened to catch it cold is the mistake this reading exists to prevent. It runs real commands and costs real minutes, so ask it about the one or two rows in question rather than the default set.
+
+**A third reading is not `josh time`'s either, and it is the one every report has been missing whole: what the run cost in dollars** ([#1609](https://github.com/joshuafolkken/kit/issues/1609)). `josh time` measures wall clock and nothing else, so a `diag` table ordered off it alone can only ever rank minutes — and the 2026-09-09 report did exactly that, on a backlog whose own epic ([#1262](https://github.com/joshuafolkken/kit/issues/1262)) records credit rather than wall clock as the larger of the two costs. **The figures were already shipping and nobody was reading them.** Take them with the scope flag:
+
+```bash
+pnpm josh cost --issue <N> --json     # this run's cost; alias: josh co
+pnpm josh cost --session <id> --json  # one session, or one delegated unit as <session-id>/agent-<agent-id>
+```
+
+**`--over` is not the flag this step wants, and the command refuses it beside `--issue`, `--all` and `--json` alike** — it answers a different question, whether *this* session has grown too large to hand off, so it reads the session it is already in rather than a scope and exits with the usage line rather than reconciling the two. `diag` reads a scope, so what it passes is the scope flag with `--json` beside it, never `--over`.
+
+**The output is an array of reports even where the scope is one issue**, so read `[0]` rather than the document. Four fields carry the reading — `request_count`, `cost_usd`, `breakdown` and `missing` — and the `breakdown` half is `resident_baseline_tokens`, `resident_billed_tokens`, `history_billed_tokens` and `billed_input_tokens`. **Four derived readings come out of them, and the JSON prints none of them**: the resident and history shares of `billed_input_tokens`, the tokens per request, and the dollars per request. The human-readable report prints the two shares and `--over` prints the tokens per request — but `diag` reads the JSON, so derive all four here rather than taking a second reading in another mode to get two of them. Run #1597 read 92 requests and **$13.16**, resident **32.7%** against history **67.3%**, **168,919** tokens per request and **$0.143** per request — the numbers a hand measurement re-derived that same day, which is what this reading exists to stop.
+
+**Read `missing` before quoting any of them, and a non-zero count is unmeasured rather than zero.** Its three counters — `no_usage_lines`, `malformed_lines`, `unreadable_sessions` — say how much of the corpus could not be priced at all, and on an `--issue` scope they are the **whole corpus's** rather than that issue's, deliberately: a line nobody could parse carries no branch, so it cannot be ruled out of the issue either. This is the same distinction `span_count: 0` and `not detected` make everywhere else here — **withheld is not measured as zero** — so a `cost_usd` reported beside a non-zero `missing` is a floor and is labelled one, never quoted as the run's cost. A non-empty `unpriced_models` is a second floor, and that one the command flags itself.
+
+**There is no phase axis to read, and inventing one is the mistake to avoid here.** The record attributes a request to an issue and to nothing finer, so a dollar cannot be charged to `gate` or `review` the way a minute can; a per-phase figure would be a guess wearing a measurement's clothes. Attributing cost to phases is [#1606](https://github.com/joshuafolkken/kit/issues/1606), which follows this reading rather than being part of it — until it lands, what step 3 ranks on is the run total and the two per-request prices.
 
 **`--top 5` is part of the call, not a nicety** ([#1301](https://github.com/joshuafolkken/kit/issues/1301)). Without it the JSON carries every row of the per-tool and per-`josh <cmd>` tables, and an epic pays for both once per child — epic #1262 measured 47.7 KB at 9 children and had more than doubled by 18. What this skill ranks off those tables is the handful of rows at the top, so the tail is read into the context and never used. Everything else the steps below quote — the four shares, every phase, the round trips and their price — is unaffected: the cap reaches the **row tables** and nothing else.
 
@@ -417,6 +432,12 @@ withheld (`is_measured: false`), say so and rank the row on the evidence that is
 reporting a tool the block did not name. A `recoverable by tool` row that does not balance is a defect
 in the report itself — say so and do not rank off the table beneath it.
 
+**Every row carries both units — minutes per run and dollars per run — and names which one it acts on** ([#1609](https://github.com/joshuafolkken/kit/issues/1609)). A table ordered by minutes alone has no column a cost row could appear in, which is why the 2026-09-09 report emitted no cost row at all. **The two do not follow from one another and are never converted between**: cutting a CI wait saves wall clock and no money whatever, because nothing is billed while a check runs, and cutting what every request carries in its prompt saves money on all of them while moving the wall clock by an amount no run can resolve. So a row states its saving in the unit it acts on and `—` in the other, and a row that genuinely acts on both states two figures.
+
+**Order by whichever unit the report was asked for, and say which at the head of the table.** "Why is `fullrun` slow" orders by minutes; "what is the backlog costing" orders by dollars. Neither ordering hides the other column, so a row that ranks second on the chosen axis is still visible on the one it wins.
+
+**Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.** Dollars per request multiplied by the requests a change removes is a saving; a percentage of the total is not, because the total covers work the change leaves exactly where it is — the same error as ranking a phase off a run's `elapsed_ms`. A change that removes carried tokens rather than requests is ranked on the resident and history shares instead, which is the arithmetic the round-trip price above already does for minutes. **Where `missing` was non-zero, a row that has a dollar saving still prints one and is never blanked.** Withholding it there would be the wrong reading of the same rule: on an `--issue` scope those counters are the whole corpus's, so a single malformed line in any unrelated session would empty the dollar column of every row and reproduce exactly the missing cost row this reading was added to end. **Label such a figure approximate rather than as a bound.** The run total `cost_usd` is a floor because it can only fall short of the true figure, but the dollars per request derived from it is an average over the priced subset alone and can sit either side of the true one — so a `≥` on a per-row saving claims more than the arithmetic gives. `not measured` is kept for the case that earns it, a scope with no priced record at all, and **a row that saves no money keeps the `—` the rule above gives it** — none of this reaches a cell that was empty by design.
+
 **Do not drop an item because it is already filed.** Avoiding duplicates means not filing a second
 issue for the same work; it does not mean leaving the work out of the ranking. **A filed but
 un-started issue is usually the highest-priority action in the table** — it needs no filing at all,
@@ -590,8 +611,11 @@ pnpm josh issue:scout "<title>" --body "<one line, citing the issue this follows
 
 - It does not implement anything, and it opens no pull request.
 - It does not run `fullrun` / `epicrun` on what it ranks. It prints the command; the person types it.
-- It does not measure anything itself. Every figure in its report came out of `pnpm josh time`, and
-  the two things no transcript records came out of the two commands built for them: which check runs
-  in more than one verification layer, from `pnpm josh layers`, which reads the configuration files
-  and measures no seconds either; and what a check costs cold against warm, from `pnpm josh bench`,
-  which is the one source here that re-runs a command instead of reading a record of one.
+- It does not measure anything itself. **Every figure in its report came out of one of four
+  commands**, and none is re-derived here. The wall clock is `pnpm josh time`'s and the dollars are
+  `pnpm josh cost`'s — two readings of the same recorded sessions, which is why they can be quoted
+  side by side. The two things no transcript records came out of the two commands built for them:
+  which check runs in more than one verification layer, from `pnpm josh layers`, which reads the
+  configuration files and measures no seconds either; and what a check costs cold against warm, from
+  `pnpm josh bench`, which is the one source here that re-runs a command instead of reading a record
+  of one.
