@@ -169,9 +169,16 @@ same five rows the `🗒 Next issues` display shows, so a sixth opted-in issue s
 next ask. An epic's children are not capped that way — they come through the epic's own graph.
 
 **The epic side is found server-side by the `epic` label.** An epic that never received the label is
-invisible to the listing, and its children can still be offered as standalone issues where they carry
-`auto-ok` of their own (joshuafolkken/kit#1633). This is a known limit of the listing, recorded rather
-than worked around; do not assert the opposite anywhere.
+invisible to the listing, so nothing knows it tracks anything at all (joshuafolkken/kit#1633). This is
+a known limit of the listing, recorded rather than worked around; do not assert the opposite anywhere.
+
+**A child is offered on its own `auto-ok` unless the epic tracking it is opted in**
+(joshuafolkken/kit#1668). That is a rule rather than a limit, and it covers the epic above as well as
+one that carries `epic` and not `auto-ok`: an epic that is not going to offer its children does not
+withhold them either, because withholding them left a person's label on the child inert with nothing
+said. An epic that **is** opted in still owns its children entirely — it sequences them, so offering
+one beside it would skip that order and hand the same issue over twice. Ordering survives the
+standalone route on the children's own `blocked-by` relations, which is what `--ordered` records.
 
 **New work is picked up without restarting anything.** The command re-derives its pool from GitHub
 labels on every ask, so an issue filed and opted in while the run is going is offered on the next

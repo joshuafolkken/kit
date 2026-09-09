@@ -59,10 +59,14 @@ describe('the document keeps every decision the command rests on', () => {
 })
 
 // The candidate table is the acceptance criteria in one place: the two sources, and the rule that a
-// child's own label neither adds it nor makes it standalone.
+// child's own label neither adds it nor makes it standalone while its epic is the one offering it.
+// joshuafolkken/kit#1668 is where the exclusion narrowed to the opted-in epics, and the marker says
+// so — the bare "no epic tracks it" is the sentence that made a person's label silently inert.
 describe('the candidate table', () => {
 	it('names the standalone source and its epic exclusion', () => {
-		expect(read_unwrapped(COMMAND_DOC)).toContain('It carries `auto-ok`, and no epic tracks it')
+		expect(read_unwrapped(COMMAND_DOC)).toContain(
+			'It carries `auto-ok`, and no **opted-in** epic tracks it',
+		)
 	})
 
 	it('names the epic source and refuses to require a child label', () => {

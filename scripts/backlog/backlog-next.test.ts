@@ -9,17 +9,17 @@ import {
 	OLD_ISSUE_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
-import { AUTO_OK_LABEL, EPIC_LABEL } from '#scripts/git/issue-labels'
-import type { OpenIssueData } from '#scripts/git/schemas'
+import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
 
 // The candidate table joshuafolkken/kit#1630 defines, and the two rules that decide it: an epic
-// root's `auto-ok` stands for every child, and a child's own `auto-ok` never makes it a standalone
-// candidate.
+// root's `auto-ok` stands for every child, and a child's own `auto-ok` makes it a standalone
+// candidate only where the epic tracking it is not opted in and so will never offer it
+// (joshuafolkken/kit#1668, narrowing joshuafolkken/kit#1633).
 
-const { issue, blocked_issue, console_streams } = auto_ok_fixture
+const { issue, blocked_issue, console_streams, opted_in_epic } = auto_ok_fixture
 
 const CHILD = 901
 const SECOND_CHILD = 902
@@ -28,10 +28,6 @@ const NEEDS_DECISION = 'needs-decision'
 
 const streams = console_streams()
 const { stdout, stderr } = streams
-
-function opted_in_epic(): OpenIssueData {
-	return issue(EPIC_NUMBER, CREATED_LATER, [AUTO_OK_LABEL, EPIC_LABEL])
-}
 
 beforeEach(() => {
 	vi.restoreAllMocks()
@@ -64,7 +60,22 @@ describe('the candidate table', () => {
 		expect(stdout()).toBe(String(CHILD))
 	})
 
-	it('withholds a child of an epic without auto-ok even when the child carries it', async () => {
+	it('withholds a child of an epic without auto-ok when neither carries it', async () => {
+		backlog_fixture.stub_backlog({ epics: [{ number: EPIC_NUMBER, children: [CHILD] }] })
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.complete)
+		expect(stderr()).toContain('No open issue carries')
+	})
+})
+
+// joshuafolkken/kit#1668: a child of an epic that will never offer it falls to the standalone half on
+// its own label, and the order it has is still the one its `blocked-by` relations record.
+describe('a child of an epic that is not opted in', () => {
+	// joshuafolkken/kit#1668 replaced this expectation. Under joshuafolkken/kit#1633 the child was
+	// withheld, and no other path offered it either — the epic is not opted in, so the epic half never
+	// reads it — which made the person's `auto-ok` on the child silently inert.
+	it('offers a child of an epic without auto-ok when the child carries it', async () => {
 		backlog_fixture.stub_backlog({
 			opted_in: [issue(CHILD, CREATED_EARLIER)],
 			epics: [{ number: EPIC_NUMBER, children: [CHILD] }],
@@ -72,15 +83,21 @@ describe('the candidate table', () => {
 		})
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.complete)
+		expect(stdout()).toBe(String(CHILD))
 	})
 
-	it('withholds a child of an epic without auto-ok when neither carries it', async () => {
-		backlog_fixture.stub_backlog({ epics: [{ number: EPIC_NUMBER, children: [CHILD] }] })
+	// Opting in says nothing about order, and that half of joshuafolkken/kit#1633 is unchanged: the
+	// standalone route still refuses a candidate whose prerequisite is open, which is how an epic's
+	// declared order survives being reached from outside the epic.
+	it('withholds such a child while its own prerequisite is still open', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [blocked_issue(CHILD, CREATED_EARLIER, [{ number: BLOCKER_NUMBER }])],
+			epics: [{ number: EPIC_NUMBER, children: [CHILD] }],
+			children: [{ number: CHILD, labels: [AUTO_OK_LABEL] }],
+		})
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.complete)
-		expect(stderr()).toContain('No open issue carries')
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.wait)
 	})
 })
 

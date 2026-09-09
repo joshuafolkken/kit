@@ -1,17 +1,20 @@
 import { git_epic_parse } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { EPIC_LABEL } from '#scripts/git/issue-labels'
+import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
+import type { OpenIssueData } from '#scripts/git/schemas'
 import { z } from 'zod'
 
 // Which epic tracks which issue — the one answer, in one place (joshuafolkken/kit#1633).
 //
 // `epic:bundle` has asked it since joshuafolkken/kit#873, to keep an issue an epic already tracks
 // from being recommended a second one. The `auto-ok` pickup needs the same answer for the opposite
-// reason: an issue an epic tracks must run through that epic's order and never be picked up
-// standalone. Two callers, one question, so the read and the index live here rather than in either
-// command — a second copy would drift the first time the task-list shape moved.
+// reason: an issue tracked by an epic that will offer it must run through that epic's order and
+// never be picked up standalone. Two callers, one question, so the read and the index live here
+// rather than in either command — a second copy would drift the first time the task-list shape
+// moved. `withheld_children` below is where the *second* half of that answer lives: which of the
+// tracked children the standalone half actually has to hold back.
 
 const epic_schema = z.object({ number: z.number(), body: z.string().nullable() })
 
@@ -39,6 +42,43 @@ function build_epic_index(
 	return index
 }
 
+const EPIC_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL])
+
+// Which epics in the opted-in listing stand for their children. An epic that carries `auto-ok` is a
+// row of that listing which also carries `epic`, so no second read of an epic's labels is made.
+function opted_in_epic_numbers(issues: ReadonlyArray<OpenIssueData>): ReadonlySet<number> {
+	return new Set(
+		issues.filter((issue) => has_any_label(issue.labels, EPIC_LABELS)).map((issue) => issue.number),
+	)
+}
+
+// **Which wins when an epic's declared order and a child's own `auto-ok` disagree — the single
+// source** (joshuafolkken/kit#1668, narrowing joshuafolkken/kit#1633).
+//
+// The epic wins wherever the epic is actually going to offer the child, and only there. So the
+// standalone half withholds a tracked child when the epic tracking it carries `auto-ok`: that epic's
+// `blocked-by` graph sequences its children, and offering the child standalone as well would both
+// skip that order and hand the same issue over twice.
+//
+// It withholds nothing when the tracking epic is **not** opted in. joshuafolkken/kit#1633 dropped
+// that child too, on the ground that the standalone path read none of the ordering graph — which has
+// since stopped being true: `auto_ok_cli.is_runnable` refuses a candidate whose `blockedBy` is still
+// open, and `josh epic --ordered` records an epic's declared order as exactly those native
+// relations. So the order survives the standalone route, while the old rule left a person's `auto-ok`
+// on the child silently inert — no path offered it at all, because the epic side never reads an epic
+// that did not opt in.
+// **It answers with the epic, not merely with membership**, because the withholding and the sentence
+// `backlog:plan` prints about it have to come from one answer. Handing the scope layer the whole
+// index instead let it name an epic that was not withholding anything — the same misreport, moved.
+function withheld_children(
+	index: ReadonlyMap<number, number>,
+	opted_in: ReadonlyArray<OpenIssueData>,
+): ReadonlyMap<number, number> {
+	const epics = opted_in_epic_numbers(opted_in)
+
+	return new Map([...index].filter(([, epic]) => epics.has(epic)))
+}
+
 // The epics currently open, so an issue can be matched to the one already tracking it.
 //
 // A failed read is reported rather than treated as "there are no epics": without the list, every
@@ -61,6 +101,8 @@ async function fetch_epics(limit: number): Promise<FetchedEpics | undefined> {
 const epic_index = {
 	build_epic_index,
 	fetch_epics,
+	opted_in_epic_numbers,
+	withheld_children,
 }
 
 export { epic_index, epic_schema }

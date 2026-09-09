@@ -1,10 +1,12 @@
 import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import type { OpenIssueData } from '#scripts/git/schemas'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { auto_ok_cli } from './auto-ok-cli'
 import {
 	auto_ok_fixture,
 	BLOCKER_NUMBER,
+	CREATED_EARLIER,
 	CREATED_LATER,
 	EPIC_NUMBER,
 	FAILURE_EXIT_CODE,
@@ -18,6 +20,10 @@ import {
 // candidate set, where the epic's own `blocked-by` ordering is never read. Its own suite because the
 // pickup file is at its line budget and this is a second question: `auto-ok-pickup.test.ts` asks
 // whether a candidate is ready to run, this one asks whether it is this path's to hand back at all.
+//
+// joshuafolkken/kit#1668 narrowed the exclusion to the epics that will actually offer their children,
+// so every case here now says which side of that line its epic is on: an epic in the opted-in listing
+// keeps its children, and one absent from it keeps none.
 
 vi.mock('#scripts/git/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_summary: vi.fn(), issue_list_by_label: vi.fn() },
@@ -27,7 +33,16 @@ const { git_gh_command } = await import('#scripts/git/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_summary)
 // The second listing: the open epics, whose task lists say which issues are already tracked.
 const epic_list = vi.mocked(git_gh_command.issue_list_by_label)
-const { issue, epic_listing, console_streams, two_issues } = auto_ok_fixture
+const { issue, epic_listing, console_streams, opted_in_epic, two_issues } = auto_ok_fixture
+
+// The opted-in listing with the epic root in it, which is what makes the epic the sequencer of its
+// children (joshuafolkken/kit#1668). Without this row the epic offers nothing, and its children fall
+// to this path instead.
+function opted_in_under_epic(
+	rows: ReadonlyArray<OpenIssueData>,
+): ReturnType<typeof listing_outcome> {
+	return listing_outcome(JSON.stringify([opted_in_epic(), ...rows]))
+}
 
 const streams = console_streams()
 const { stdout, stderr } = streams
@@ -58,21 +73,55 @@ beforeEach(() => {
 	streams.reset()
 })
 
-describe('josh auto-ok:next — an issue an epic already tracks', () => {
-	it('does not answer a child of an open epic', async () => {
-		issue_list.mockResolvedValueOnce(listing_outcome(two_issues()))
+describe('josh auto-ok:next — an issue an opted-in epic already tracks', () => {
+	it('does not answer a child of an open epic that is opted in', async () => {
+		issue_list.mockResolvedValueOnce(
+			opted_in_under_epic([
+				issue(NEW_ISSUE_NUMBER, CREATED_LATER),
+				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
+			]),
+		)
 		epic_list.mockResolvedValueOnce(tracking([NEW_ISSUE_NUMBER]))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
 	})
 
-	it('answers `none` when every opted-in issue is tracked', async () => {
-		issue_list.mockResolvedValueOnce(listing_outcome(two_issues()))
+	it('answers `none` when every opted-in issue is tracked by an opted-in epic', async () => {
+		issue_list.mockResolvedValueOnce(
+			opted_in_under_epic([
+				issue(NEW_ISSUE_NUMBER, CREATED_LATER),
+				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
+			]),
+		)
 		epic_list.mockResolvedValueOnce(tracking([NEW_ISSUE_NUMBER, OLD_ISSUE_NUMBER]))
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
+	})
+
+	// The exclusion is membership, not a label: the child carries `auto-ok` and nothing else, which is
+	// exactly the row `NOT_DIRECTLY_RUNNABLE_LABELS` cannot see.
+	it('excludes a child the label comparison would have handed back', async () => {
+		issue_list.mockResolvedValueOnce(
+			opted_in_under_epic([issue(NEW_ISSUE_NUMBER, CREATED_LATER, [AUTO_OK_LABEL])]),
+		)
+		epic_list.mockResolvedValueOnce(tracking([NEW_ISSUE_NUMBER]))
+
+		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
+	})
+})
+
+// joshuafolkken/kit#1668. An epic absent from the opted-in listing will never offer its children, so
+// withholding them here left the person's `auto-ok` on the child inert with nothing said.
+describe('josh auto-ok:next — an epic that is not opted in', () => {
+	it('hands back a child it tracks', async () => {
+		issue_list.mockResolvedValueOnce(listing_outcome(two_issues()))
+		epic_list.mockResolvedValueOnce(tracking([NEW_ISSUE_NUMBER, OLD_ISSUE_NUMBER]))
+
+		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
 	})
 
 	// The other half of the acceptance: an issue no epic tracks behaves exactly as it did.
@@ -82,18 +131,6 @@ describe('josh auto-ok:next — an issue an epic already tracks', () => {
 
 		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
-	})
-
-	// The exclusion is membership, not a label: the child carries `auto-ok` and nothing else, which is
-	// exactly the row `NOT_DIRECTLY_RUNNABLE_LABELS` cannot see.
-	it('excludes a child the label comparison would have handed back', async () => {
-		const opted_in_only = [issue(NEW_ISSUE_NUMBER, CREATED_LATER, [AUTO_OK_LABEL])]
-
-		issue_list.mockResolvedValueOnce(listing_outcome(JSON.stringify(opted_in_only)))
-		epic_list.mockResolvedValueOnce(tracking([NEW_ISSUE_NUMBER]))
-
-		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(stdout()).toBe(auto_ok_cli.NONE_TOKEN)
 	})
 })
 

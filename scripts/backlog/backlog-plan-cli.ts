@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import { epic_index } from '#scripts/epic/epic-index'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { read_json_listing } from '#scripts/git/parse-json-array'
@@ -44,6 +45,12 @@ interface Plan {
 	result: EpicNextResult
 	repo: string
 	exclude: ReadonlyArray<number>
+	// Which **opted-in** epic is withholding which issue, narrowed by the same function the pool
+	// decided membership with (joshuafolkken/kit#1668). Without it the scope layer had no branch for
+	// "an epic is offering this one instead", so every opted-in row it could not place was reported as
+	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
+	// than remove it: the sentence would name an epic that is withholding nothing.
+	tracked: ReadonlyMap<number, number>
 }
 
 // The listing plus whether it was cut. Carried together because the rows alone cannot say whether
@@ -65,7 +72,14 @@ async function classify(
 
 	const result = await backlog_next.resolve(context)
 
-	return result === undefined ? undefined : { result, repo: context.repo, exclude }
+	if (result === undefined) return undefined
+
+	return {
+		result,
+		repo: context.repo,
+		exclude,
+		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
+	}
 }
 
 // Every open issue, read once. It carries both halves the plan needs and the pool does not hold: the
@@ -86,7 +100,7 @@ function print_plan(
 	open_issues: ReadonlyArray<OpenIssueData>,
 	is_capped: boolean,
 ): void {
-	const scope = { repo: plan.repo, exclude: plan.exclude }
+	const scope = { repo: plan.repo, exclude: plan.exclude, tracked: plan.tracked }
 	const rows = backlog_scope.out_of_scope(open_issues, plan.result, scope)
 	// A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is
 	// switched off rather than fed a set that would silently report standing blockers as gone.

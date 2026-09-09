@@ -88,10 +88,17 @@ describe('the order the pickup runs in', () => {
 // candidate set, where the epic's ordering is never read. Both documents have to say that an epic's
 // child is excluded, and that the exclusion is membership rather than a label — the second half is
 // what stops the fix being re-implemented as a fourth entry in `NOT_DIRECTLY_RUNNABLE_LABELS`.
-describe('an issue an epic already tracks', () => {
+//
+// joshuafolkken/kit#1668 narrowed the exclusion to the epics that will actually offer their children,
+// so the markers name that condition. A document restating the rule before that narrowing would send a person to
+// label a child and watch nothing happen, which is the failure that Issue was filed for.
+describe('an issue an opted-in epic already tracks', () => {
 	it.each([
-		[SKILL, "**An epic's child is never picked up standalone**"],
-		[COMMAND_DOC, '**An issue an epic tracks is never a standalone candidate**'],
+		[
+			SKILL,
+			"**An epic's child is never picked up standalone while that epic is the one offering it**",
+		],
+		[COMMAND_DOC, '**An issue an opted-in epic tracks is never a standalone candidate**'],
 	])('%s excludes it from the pickup', (document_path, marker) => {
 		expect(read_unwrapped(document_path)).toContain(marker)
 	})
@@ -100,6 +107,14 @@ describe('an issue an epic already tracks', () => {
 		expect(read_unwrapped(document_path)).toContain(
 			"decided by whether an epic's task list names the issue, not by the issue's own labels",
 		)
+	})
+
+	// The half joshuafolkken/kit#1668 added: an epic that is not going to offer its children does not
+	// withhold them either. Without this pinned, a later edit reverts to the sentence it replaced and
+	// the label goes silently inert again.
+	it.each(EVERY_DOCUMENT)('%s says a child of a non-opted-in epic is offered', (document_path) => {
+		expect(read_unwrapped(document_path)).toContain('joshuafolkken/kit#1668')
+		expect(read_unwrapped(document_path)).toContain('says nothing about order')
 	})
 })
 

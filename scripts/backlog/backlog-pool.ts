@@ -1,6 +1,7 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { Classification } from '#scripts/epic/epic-classify'
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
+import { epic_index } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { git_next_issues } from '#scripts/git/git-next-issues'
@@ -19,10 +20,14 @@ import type { OpenIssueData } from '#scripts/git/schemas'
 const EPIC_LABELS: ReadonlySet<string> = new Set([EPIC_LABEL])
 const DECISION_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL])
 
-// What decides whether a standalone row is offered: the issues an epic already tracks, the ones the
-// caller has named as done, and the repository the rows belong to.
+// What decides whether a standalone row is offered: the children an opted-in epic is going to offer
+// instead, the ones the caller has named as done, and the repository the rows belong to.
+//
+// `tracked` is the narrowed set `epic_index.withheld_children` builds, not every child an epic
+// tracks (joshuafolkken/kit#1668) — the narrowing itself is defined there, once, for this half and
+// `auto-ok:next` alike.
 interface StandaloneContext {
-	tracked: ReadonlySet<number>
+	tracked: ReadonlyMap<number, number>
 	exclude: ReadonlyArray<number>
 	repo: string
 }
@@ -64,7 +69,7 @@ function to_children(issues: ReadonlyArray<OpenIssueData>, repo: string): Array<
 // is never asked for one of its own — the root's label is the approval, exactly as typing
 // `epicrun #<E>` approves every merge inside `#<E>`.
 function opted_in_epics(issues: ReadonlyArray<OpenIssueData>): ReadonlyArray<number> {
-	return issues.filter((issue) => is_epic_row(issue)).map((issue) => issue.number)
+	return [...epic_index.opted_in_epic_numbers(issues)]
 }
 
 // The rows that stand for themselves. An epic root is a container rather than work, so it is never a
@@ -74,9 +79,11 @@ function standalone_rows(issues: ReadonlyArray<OpenIssueData>): ReadonlyArray<Op
 	return issues.filter((issue) => !is_epic_row(issue))
 }
 
-// A row an epic tracks belongs to that epic's order and never to the standalone half — the rule
-// joshuafolkken/kit#1633 established, applied here for the same reason. A row the caller excluded is
-// out of the pool entirely rather than merely unoffered: it has just merged.
+// A row an **opted-in** epic tracks belongs to that epic's order and never to the standalone half —
+// the rule joshuafolkken/kit#1633 established, narrowed by joshuafolkken/kit#1668 to the epics that
+// are actually going to offer their children and applied here for the same reason. Which rows those
+// are is `epic_index.withheld_children`'s answer, not a second test made here. A row the caller
+// excluded is out of the pool entirely rather than merely unoffered: it has just merged.
 function is_considered(issue: OpenIssueData, context: StandaloneContext): boolean {
 	return !context.tracked.has(issue.number) && !context.exclude.includes(issue.number)
 }
