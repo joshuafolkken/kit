@@ -24,8 +24,7 @@ import type { Span } from './time-spans'
 //
 // **The block is withheld entirely where the window holds no `followup` call at all** — a heading
 // over a column of `not measured` rows would assert the question was asked of something, and the
-// answer for
-// a session that never merged anything is that there was nothing to ask.
+// answer for a session that never merged anything is that there was nothing to ask.
 
 const HEADING = 'Followup stages (in run order):'
 const NOTE = 'read from the rows followup printed into the transcript'

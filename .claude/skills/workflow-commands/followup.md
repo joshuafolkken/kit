@@ -94,14 +94,14 @@ Since joshuafolkken/kit#1349 the command closes with one row per stage and a tot
 `followup` spend its time" is read rather than guessed. The shape, with illustrative durations:
 
 ```
-followup stage: closes-and-context        1.5 s
+followup stage: closes-and-context        2.1 s
 followup stage: checks-wait               28.4 s
 followup stage: coderabbit-comments       1.3 s
 followup stage: ai-review-comments        2.0 s
 followup stage: telegram                  1.1 s
 followup stage: merge                     2.6 s
-followup stage: completion-and-epic-close 2.4 s
-followup stages total:                    39.3 s
+followup stage: completion-and-epic-close 1.4 s
+followup stages total:                    38.9 s
 ```
 
 - **The block is printed on a failed run too**, up to and including the stage that threw, which is

@@ -152,7 +152,11 @@ async function epic_close_step(input: WrapupInput): Promise<void> {
 // against one repository — a comment write beside an auto-close that comments on and closes epics —
 // which is what GitHub's secondary rate limit guidance is about. Past the merge both are guarded, so
 // the worst case is a cleanup reported as unfinished rather than a failed run, and the pair is two
-// requests rather than a fan-out.
+// requests rather than a fan-out. **Their console output can interleave too**: the guard's warning
+// and its recovery line are printed as they happen, so an auto-close progress line can land between
+// them. The recovery line names its own command and stands on its own, so it is still readable out
+// of order — and the alternative, buffering one step's output until the other settles, would hold
+// back a warning about work that has already failed.
 async function run_tail_steps(input: WrapupInput): Promise<void> {
 	if (!input.should_merge) {
 		await notify_step(input)
