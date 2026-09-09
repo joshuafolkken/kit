@@ -193,7 +193,18 @@ describe('RUN_TAIL_REASON', () => {
 		['joshuafolkken/kit#1333'],
 		// A recurring rule has to say so, or a reader treats one refusal as the whole of it.
 		['fires on every foreground push, not once per run'],
+		// joshuafolkken/kit#1462 measured the tail this rule used to say did not exist, so the rule
+		// carries what to do with it — not only that `followup` stays in the foreground.
+		['joshuafolkken/kit#1462'],
+		['read the merge result stay after'],
 	])('carries %j', (marker) => {
 		expect(run_tail.RUN_TAIL_REASON).toContain(marker)
+	})
+
+	// The retracted premise, kept as a negative assertion rather than deleted quietly: an agent told
+	// there is nothing to overlap after the merge leaves the whole tail where joshuafolkken/kit#1462
+	// measured it (joshuafolkken/kit#1510 wrote it, joshuafolkken/kit#1462 disproved it).
+	it.each([['nothing follows it'], ['nothing to overlap']])('no longer claims %j', (retracted) => {
+		expect(run_tail.RUN_TAIL_REASON).not.toContain(retracted)
 	})
 })

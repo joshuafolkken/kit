@@ -153,7 +153,10 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   push** — §2h. It is where a run's idle time collects: joshuafolkken/kit#1510 measured 25 idle
   minutes in a 45-minute run, 6m28s of it a foreground `pnpm josh git -y` the harness detached at its
   own cap, and 6m06s of it CI that had already gone green. `pnpm josh followup` is the one that stays
-  in the foreground, because nothing follows it.
+  in the foreground, because nearly every step after it reads its result — and a tail *does* follow
+  the merge, measured at 3.0 min and 5.9% of a run (joshuafolkken/kit#1462), which §2h empties by
+  composing the merge-independent work beforehand. Which steps those are, and the one exception, are
+  §2h's.
 - **A child carrying `needs-human-review` stops the run before its commit**, at every entry point —
   §2z. It is the one *child's* stop `epicrun` does not turn into a park — an `epic:audit` error and
   the consecutive-failure abort end a run too, but neither is a child asking for something.
@@ -834,10 +837,44 @@ completion *delivered* rather than something to remember to poll for.
   and nothing about it changes here.
 - **`pnpm josh eval` — background**, started with the review and read after it, on `required` only
   (`eval-gate.md`).
-- **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nothing
-  follows it, so there is nothing to overlap: it is the run's last call, and backgrounding it would
-  buy an empty turn. `followup.md` → "Always run `pnpm josh followup` in the foreground" stays exactly
-  as it is, and shell `&` backgrounding is a different thing again — it never works at all.
+- **`pnpm josh followup` — foreground, and that is the boundary rather than an exception.** Nearly
+  every step after it reads its result — the one that does not is named below — so detaching it
+  would move the reading rather than overlap anything, and would buy an empty turn. `followup.md` →
+  "Always run `pnpm josh followup` in the foreground" stays exactly as it is, and shell `&`
+  backgrounding is a different thing again — it never works at all.
+
+**A tail does follow the merge, and it is not small** (joshuafolkken/kit#1462). This section first
+gave a different reason for that last bullet — that the merge ends the run, leaving no tail to
+overlap — and the measurement says otherwise. `pnpm josh time` charges to **`post-run`** exactly what runs
+after the last `followup` span ends: **3.0 min, 5.9% of a 50.5-minute run**, in the lane child
+`--issue 1599` (PR #1602); **2 min 31 s, 14% of 20m15s**, in the plain `fullrun #1597` (PR #1603);
+**3.1 min** hand-measured in run #1441's delegated child, which is where this Issue started. **What
+was wrong is the premise, not the conclusion** — `followup` stays foreground, and what changes is
+*where the tail's work is done*.
+
+**So the tail is emptied before `followup` is issued, rather than worked through after it returns.**
+One question decides each step, and it is asked of the step rather than judged: **does it read the
+merge result?**
+
+- **It does — the step stays after `followup`.** `pnpm josh ms`, `pnpm josh issue:state <N>`,
+  `pnpm josh epic:next`, `pnpm josh auto-ok:next --exclude <N>`, and `pnpm josh lane:close` /
+  `pnpm josh lane:list`. Each is a verifier or is keyed to a merge that has to have happened, and
+  bringing one forward would have it read a state nobody has reached yet. **De-duplicating a step is
+  not removing it**: the parent reads the child's state from GitHub *because* a summary is not a
+  verifier ("Each child runs in a delegated unit"), so none of these may be dropped or answered from
+  memory.
+- **It does not — the step is composed in the turn that issues `followup`.** The epic progress
+  comment's counter *values* (children run, Issues filed, consecutive failures, `auto-ok` pickups,
+  the run's start time) are all counted inside the run, and the completion report body is already
+  placed beside `pnpm josh git -y` in the table below. **Only the write follows the merge.** The
+  comment exists because a compaction takes the counters at a moment nobody chooses (`epicrun.md` →
+  "The counters live in the conversation"), so composing the values earlier moves no write and loses
+  no counter.
+- **`pnpm josh cost --over 400000` stays after the merge, and reads nothing from it.** It measures
+  this session's own transcript, so the question above would bring it forward — but its answer grows
+  with the session, and asking it a call early under-reads the very number the hand-off is decided
+  on. It is seconds of tail against a guard on session size, so it keeps its documented seam
+  (`epicrun.md` → "The check is asked at every merge").
 
 **What runs beside a backgrounded command is the work that writes nothing to the working tree.** That
 is the whole test, and it is the same one that lets the gate and the review overlap (§2): a step that
@@ -849,6 +886,7 @@ the three waits a run actually has:
 | `pnpm josh gate` | `/code-review` with the brief `pnpm josh review:brief` prints, and `pnpm josh eval` where `eval:scope` answered `required` |
 | `pnpm josh git -y` | Write the completion notification body to a file for `--notify-message-file`, and settle the three-way disposition of any remaining non-High finding |
 | CI, after the push | The second review round where one is due, the branch-2 filing, and `pnpm josh epic:bundle <new>` (`prompts/review.md` → "Review round cap") |
+| `pnpm josh followup` | Nothing — it is foreground and holds the session. **The post-merge tail is what overlaps here, and it is taken before the call rather than beside it**: compose the epic progress counters first, and leave after the merge only the steps that read its result, plus `pnpm josh cost --over 400000` |
 
 **The turn never ends at the push.** The completion notification for `pnpm josh git -y` is what
 resumes the run, and the turn that reads it goes straight through any branch-2 filing and
