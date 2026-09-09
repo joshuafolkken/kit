@@ -178,6 +178,7 @@ const REDIRECTION = '>'
 // the whole of the difference.
 const IN_PLACE_COMMAND = 'sed'
 const IN_PLACE_FLAG = '-i'
+const LONG_IN_PLACE_FLAG = '--in-place'
 
 // What a span carries so the sequences can be found later.
 interface BundleFacts {
@@ -236,10 +237,17 @@ function may_write_command(command: string): boolean {
 // else answers `false` — a genuine write missed here only leaves a sequence broken the way it already
 // was, while a read caught here would have its dependency removed, which is the failure that matters
 // (joshuafolkken/kit#1509).
+// `-i`, `-i.bak` and `--in-place` are all the same flag: GNU takes the backup suffix glued to the
+// short form, and `words_of` splits `--in-place=.bak` at the `=`. Matched by prefix so all three read
+// alike — `sed` has no other flag starting `-i`, so the prefix cannot widen this past in-place edits.
+function is_in_place_flag(word: string): boolean {
+	return word.startsWith(IN_PLACE_FLAG) || word.startsWith(LONG_IN_PLACE_FLAG)
+}
+
 function is_in_place_edit(command: string): boolean {
 	if (time_shell.leading_word(command) !== IN_PLACE_COMMAND) return false
 
-	return words_of(command).includes(IN_PLACE_FLAG)
+	return words_of(command).some((word) => is_in_place_flag(word))
 }
 
 // `./scripts/x.ts` and `scripts/x.ts` are the same file, and a trailing slash on a directory is

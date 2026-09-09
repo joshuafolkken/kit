@@ -126,6 +126,8 @@ describe('time_bundle_call — which calls write', () => {
 	// is kept for.
 	it.each([
 		[`sed -i '' s/a/b/ ${READ_PATH}`, true],
+		[`sed -i.bak s/a/b/ ${READ_PATH}`, true],
+		[`sed --in-place=.bak s/a/b/ ${READ_PATH}`, true],
 		[`sed -n '1,200p' ${READ_PATH}`, false],
 		[`cat ${READ_PATH}`, false],
 		[`grep -rn 'a->b' ${READ_PATH}`, false],

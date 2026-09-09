@@ -102,7 +102,7 @@ function stamp_fault(switch_key: string): string {
 function is_missing_file(error: unknown): boolean {
 	if (!(error instanceof Error) || !('code' in error)) return false
 
-	return String(error.code) === MISSING_FILE
+	return typeof error.code === 'string' && error.code === MISSING_FILE
 }
 
 function error_text(error: unknown): string {
@@ -313,8 +313,13 @@ function write_outcome(raw_payload: string, outcome: (raw: string) => GuardOutco
 	else if (fault !== undefined) process.stdout.write(`${notice_envelope(fault)}\n`)
 }
 
-// The refusal-only shape, kept for the guards that have no fault to report. It is a wrapper rather
-// than a second implementation so both paths write the same envelopes.
+// The refusal-only shape, kept so the guards not yet moved across keep working unchanged. It is a
+// wrapper rather than a second implementation, so both paths write the same envelopes.
+//
+// **A guard still calling this discards any fault it raised** — `investigation-guard.ts` is the one
+// that does, so a stamp it could not write there is still silent. That is the same gap
+// joshuafolkken/kit#1509 closed for the batching guard, left standing deliberately: this Issue's
+// subject is the batching guard, and moving another hook across belongs with its own test.
 function write_decision(raw_payload: string, refusal: (raw: string) => string | undefined): void {
 	write_outcome(raw_payload, (raw) => ({ reason: refusal(raw), fault: undefined }))
 }
