@@ -40,7 +40,7 @@ import { shell_segments } from './shell-segments'
 // package-manager wrapper in either of its spellings. Left out, `JOSH_CI_TIMEOUT_SECONDS=600 pnpm
 // josh git -y` and `(pnpm josh git -y)` are silently not the push step, and the run pays the tail the
 // rule exists to stop. `g` is the alias `josh-command-map.ts` resolves to `git`.
-const SEGMENT_PREFIX = String.raw`(?:\(\s*)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:pnpm\s+(?:exec\s+|run\s+)?)?`
+const SEGMENT_PREFIX = String.raw`(?:\(\s*)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:npx\s+|pnpm\s+(?:exec\s+|run\s+)?)?`
 // A closing parenthesis ends a word as a space does, so every boundary below admits it — without
 // that, a subshell defeats the flag test even where it does not defeat the command test.
 const WORD_END = String.raw`(?=\s|$|\))`
@@ -57,11 +57,25 @@ const SKIPS_THE_PUSH = new RegExp(String.raw`(?:^|\s)--skip-push${WORD_END}`, 'u
 // the completion notification exists, so nothing has to remember to look.
 const BACKGROUND_KEY = 'run_in_background'
 
+// **A flag is only a flag outside the quotes**, and `josh git` takes the pull-request title as a
+// positional argument — so this repository's own titles quote flag names constantly. Left in, the
+// commit that shipped this very rule (`… "Exclude --skip-push from the run-tail trigger #1510"`)
+// would have exempted itself from it. Quoted spans are blanked rather than removed, so two words
+// either side of one cannot be joined into a third.
+const QUOTED_SPAN = /"[^"]*"|'[^']*'/gu
+
+function flags_of(segment: string): string {
+	return segment.replaceAll(QUOTED_SPAN, ' ')
+}
+
 function is_push_step_segment(segment: string): boolean {
 	if (!PUSH_STEP_SEGMENT.test(segment)) return false
-	if (SKIPS_THE_PUSH.test(segment)) return false
 
-	return CONFIRMED_FLAG.test(segment)
+	const flags = flags_of(segment)
+
+	if (SKIPS_THE_PUSH.test(flags)) return false
+
+	return CONFIRMED_FLAG.test(flags)
 }
 
 /** Whether this command runs the commit, push and pull-request step. Judged from the call alone. */

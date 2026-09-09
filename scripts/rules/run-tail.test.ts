@@ -76,6 +76,11 @@ describe('is_push_step', () => {
 		// of it, and a subshell whose closing parenthesis ends the flag.
 		['JOSH_CI_TIMEOUT_SECONDS=600 pnpm josh git -y "a title"'],
 		['(pnpm josh git -y)'],
+		['npx josh git -y "a title"'],
+		// **A flag named inside the title is not a flag.** `josh git` takes the title positionally, and
+		// this repository quotes flag names in titles constantly — the commit that shipped this rule is
+		// itself such a title, and would have exempted itself from it.
+		['pnpm josh git -y "Exclude --skip-push from the run-tail trigger #1510"'],
 	])('matches %j', (command) => {
 		expect(run_tail.is_push_step(command)).toBe(true)
 	})
@@ -90,6 +95,8 @@ describe('is_push_step', () => {
 		['pnpm josh followup "a title"'],
 		// The documented recovery path: the push already landed, so there is no tail to save.
 		[SKIPPED_PUSH],
+		// The confirmation flag quoted inside the title is not the confirmation flag either.
+		['pnpm josh git "a title with -y in it"'],
 		[''],
 	])('leaves %j alone', (command) => {
 		expect(run_tail.is_push_step(command)).toBe(false)
