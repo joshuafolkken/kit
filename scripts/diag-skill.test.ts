@@ -133,7 +133,9 @@ describe(`${SKILL_PATH} — ranks in minutes and dollars, not minutes alone`, ()
 		'**The two do not follow from one another and are never converted between**',
 		'**Order by whichever unit the report was asked for, and say which at the head of the table.**',
 		"**Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.**",
-		'**Where `missing` was non-zero the dollar cell carries the floor and is labelled one — `≥ $X` — rather than the figure or a blank.**',
+		'**Where `missing` was non-zero, a row that has a dollar saving still prints one and is never blanked.**',
+		'**Label such a figure approximate rather than as a bound.**',
+		'**a row that saves no money keeps the `—` the rule above gives it**',
 	])('ranks in both units: %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
