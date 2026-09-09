@@ -130,15 +130,16 @@ describe('investigation_reads.tally_of — a write the transcript could not desc
 	// Symptom 1. `sed` is in the read set because `sed -n` is how this repository reads, and a span
 	// cannot tell that spelling from `sed -i` — so a file written in place was counted as read and
 	// never taken back out. `CLAUDE.md` allows a small `sed -i` explicitly, so this is daily.
-	// Asserted as an absence rather than an empty set: the *read* half of the same span still reads
-	// `targets` off the whole line through `time_bundle_call.bash_facts`, so a quoted substitution
-	// leaves a path-shaped fragment (`s/old/new`) pending. That is a third over-count with the same
-	// root, and narrowing `bash_facts` would move what joshuafolkken/kit#1390 measures — filed
-	// separately rather than widened into this change.
+	//
+	// **Asserted as an empty set since joshuafolkken/kit#1611.** It had to be written as an absence
+	// while the *read* half of the same span still tokenized the whole line: the quoted substitution
+	// left the path-shaped fragment `s/old/new` pending, so the set was not empty even once the real
+	// file came out of it. `bash_facts` now strips the quoted spans first, and the whole-set assertion
+	// is what would catch that third over-count coming back.
 	it('does not leave a file written in place by sed pending', () => {
 		const text = bash_text(`sed -i '' 's/old/new/' ${FIRST_FILE}`)
 
-		expect(investigation_reads.tally_of(text).pending).not.toContain(resolve(FIRST_FILE))
+		expect(investigation_reads.tally_of(text).pending).toEqual([])
 	})
 
 	// The other half of the same case: subtracting the write must not swallow the read that shares the

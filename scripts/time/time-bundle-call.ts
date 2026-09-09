@@ -250,12 +250,28 @@ function tool_facts(name: string, input: unknown): BundleFacts {
 // The facts for a `Bash` call. The leading command comes from `time-shell.ts` rather than from a
 // second reader here — the two answers have to be the same one, or a call could be labelled by one
 // command and classified by another.
+//
+// **The quoted spans come off before the targets are read** (joshuafolkken/kit#1611). `words_of`
+// treats a quote as a separator rather than as a boundary, and `/` is not a separator at all — so
+// `sed -i '' 's/old/new/' scripts/one.ts` yielded `s/old/new` beside the real path, and
+// `investigation-reads.ts` then held a file that no edit could ever name pending for the rest of the
+// run. **The write half of the same line already did this**, in `time-writes.ts` → `write_segment`;
+// only the read half was left scanning the raw line, and the two halves of one `sed -i` disagreeing
+// about what it named is the whole of the over-count.
+//
+// **It is done here rather than inside `targets_in`, which stays a plain tokenizer.** Both of its
+// callers are shell lines and both now strip first, so the invariant its export comment states — one
+// extraction, read and written alike — holds at the boundary instead of being hidden inside it.
+//
+// **`has_mutation` deliberately still reads the raw line.** Unquoting there would let a mutating word
+// hide inside a quoted argument and make the call look bundleable, which is the loosening direction;
+// this one only ever removes targets.
 function bash_facts(command: string): BundleFacts {
 	if (!READ_COMMANDS.has(time_shell.leading_word(command)) || has_mutation(command)) {
 		return not_bundleable()
 	}
 
-	return { is_bundleable: true, targets: targets_in(command) }
+	return { is_bundleable: true, targets: targets_in(time_shell.unquoted(command)) }
 }
 
 // The facts for one call named the way a caller holding a raw tool invocation names it — a tool and
