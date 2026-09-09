@@ -36,6 +36,11 @@ const ROUTING_MARKERS: ReadonlyArray<string> = [
 	'Something worth filing that is **none of the three** (**an observation**)',
 	'**An observation worth filing is filed without asking, and the run carries on** — §2i',
 	'## 2i. An observation worth filing is filed without asking',
+	// joshuafolkken/kit#1698: both places that route here have to carry the two limits as well.
+	// A run reaching the table row or the §2 bullet has already been told what to do, and never opens
+	// §2i — which is how a child would go on filing after the section below forbade it.
+	'**A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked',
+	'**a delegated child does not take this route at all**',
 ]
 
 // The rule itself. "Without asking" is the whole point, so it is pinned in the section's own words
@@ -84,6 +89,56 @@ const CONTINUATION_MARKERS: ReadonlyArray<string> = [
 	'**What stays a judgement is whether it is worth filing, not whether to ask.**',
 ]
 
+// joshuafolkken/kit#1698: removing the confirmation left one judgement behind — "is it worth
+// filing" — and an agent an hour deep in the workflow tooling answers yes to almost anything about
+// the workflow tooling. The 2026-09-09 `backlogrun` shipped 5 and filed 15 without one change a
+// consumer would see. These markers pin the two things that take that judgement back out: the depth
+// table, which is read off the subject so it cannot be argued with, and the citation it demands.
+const DEPTH_TEST_MARKERS: ReadonlyArray<string> = [
+	'### The depth test — a discretionary filing cites the product work it blocked',
+	'**A listing that measures itself has no natural stopping condition**',
+	'**depth is what supplies it — read off the subject rather than judged**',
+	'| **0** | What a consumer of this package touches |',
+	'| **1** | The run orchestration that executes an Issue |',
+	'| **2** | What measures a run |',
+	'it stopped or delayed** — named as an Issue number or a run',
+	'**Cannot cite one, it is not filed**',
+]
+
+// The exclusions are the half a reword loses first, because they read as omissions rather than as
+// decisions. Without them the test bites on the product it exists to protect, and on the two routes
+// that file precisely because the run cannot continue.
+const DEPTH_EXCLUSION_MARKERS: ReadonlyArray<string> = [
+	'**A depth-0 observation does not take this test.**',
+	`\`${TIER_A_ROUTE_LABEL}\` and \`${INTERRUPT_ROUTE_LABEL}\` do not take it either`,
+	'already citing its own blockage',
+	// The boundary against `prompts/review.md`'s branch 2. Without it the depth test reads as
+	// governing every filing route, and a confirmed defect in a `josh` command — depth 0, and the one
+	// finding both documents agree is never dropped — could be gated on a citation it cannot make.
+	"**It governs this route only — the fourth row of §2d's table.**",
+	'**does not take the depth test**',
+	// The rejected alternative, kept so the next reader proposes something else rather than
+	// re-deriving a cap whose overflow disappears silently.
+	'**This is not the count cap that was rejected.**',
+]
+
+// The second mechanism. A child that files on its own defeats both ceilings at once: it cannot see
+// a sibling's filing, and the per-run count it would be measured against is the parent's.
+const DELEGATED_CHILD_MARKERS: ReadonlyArray<string> = [
+	'### A delegated child does not take this route',
+	`**A delegated child files \`${TIER_A_ROUTE_LABEL}\` and \`${INTERRUPT_ROUTE_LABEL}\` only.**`,
+	'**it cannot tell its observation from the one a sibling filed twenty minutes earlier**',
+	"**the 10-per-run ceiling for this route is the parent's to count**",
+	'which is why it did not fire once on the run that filed fifteen',
+]
+
+// `epicrun.md` holds the return path itself, so it has to say that the path is the only one — a
+// child reading the summary list alone would find no reason not to file as well.
+const CHILD_RETURN_MARKERS: ReadonlyArray<string> = [
+	"**This is the only route a child's discretionary observation has**",
+	'`SKILL.md` → §2i, the single source',
+]
+
 // The single-source declaration. Without it the next rollout adds a topic file under
 // `prompts/collaboration-workflow/` and the two copies drift.
 const SINGLE_SOURCE_MARKER =
@@ -123,6 +178,22 @@ describe(`${WORKFLOW_SKILL} — the ceilings that replace the confirmation`, () 
 	})
 })
 
+describe(`${WORKFLOW_SKILL} — a discretionary filing cites the product work it blocked`, () => {
+	it.each(DEPTH_TEST_MARKERS)('states the depth test: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+
+	it.each(DEPTH_EXCLUSION_MARKERS)('keeps the exclusions explicit: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+})
+
+describe(`${WORKFLOW_SKILL} — a delegated child returns the observation instead`, () => {
+	it.each(DELEGATED_CHILD_MARKERS)('withholds the route from a child: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+})
+
 describe(`${WORKFLOW_SKILL} — the run is not stopped by an observation`, () => {
 	it.each(CONTINUATION_MARKERS)('states that the run carries on: %j', (marker) => {
 		expect(skill_text).toContain(marker)
@@ -135,6 +206,12 @@ describe(`${WORKFLOW_SKILL} — the run is not stopped by an observation`, () =>
 
 describe(`${EPICRUN_SKILL} — a closed issue's labels are not a finding`, () => {
 	it.each(CLOSED_ISSUE_MARKERS)('states the closed-issue carve-out: %j', (marker) => {
+		expect(epicrun_text).toContain(marker)
+	})
+
+	// The child's return path, pinned where it is written rather than only where it is ruled on: a
+	// summary list that does not say it is the only route reads as one option among two.
+	it.each(CHILD_RETURN_MARKERS)('names the summary as the only route: %j', (marker) => {
 		expect(epicrun_text).toContain(marker)
 	})
 
