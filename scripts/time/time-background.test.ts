@@ -17,9 +17,22 @@ const GATE_ID = 'b3sods4bd'
 const OTHER_ID = 'second-run'
 const LAUNCH_BODY = `Command running in background with ID: ${GATE_ID}. Output is being written to: /tmp/tasks/${GATE_ID}.output`
 const JOIN_COMMAND = `tail -25 /private/tmp/claude-501/proj/session/tasks/${GATE_ID}.output`
+const FINISH_NOTICE = `<task-notification>\n<task-id>${GATE_ID}</task-id>\n<tool-use-id>toolu_01W</tool-use-id>\n<status>completed</status>\n</task-notification>`
 
-function launch(start_minute: number, minutes: number, id = GATE_ID, command = GATE_COMMAND): Span {
-	return span(start_minute, minutes, { josh_command: command, background_id: id })
+function at(minute: number): number {
+	return minute * MINUTE_MS
+}
+
+// A launch whose command the harness said had finished the moment the launch call returned, which is
+// the shape every case predating joshuafolkken/kit#1696 was written in: the first reading of any kind
+// is then a reading that saw it end. A case about a poll names a later instant instead.
+function launch(start_minute: number, minutes: number, extra: Partial<Span> = {}): Span {
+	return span(start_minute, minutes, {
+		josh_command: GATE_COMMAND,
+		background_id: GATE_ID,
+		background_ended_ms: at(start_minute + minutes),
+		...extra,
+	})
 }
 
 function join(start_minute: number, minutes: number, id = GATE_ID): Span {
@@ -39,10 +52,18 @@ const OVERLAPPED: ReadonlyArray<Span> = [launch(0, 1), span(1, 6, { label: 'Skil
 // minute 7; the pull request is launched at minute 2 and runs to minute 11.
 const OVERLAPPING: ReadonlyArray<Span> = [
 	launch(0, 1),
-	launch(2, 1, OTHER_ID, PR_COMMAND),
+	launch(2, 1, { background_id: OTHER_ID, josh_command: PR_COMMAND }),
 	span(4, 1),
 	join(6, 1),
 	join(10, 1, OTHER_ID),
+]
+
+// The shape joshuafolkken/kit#1696 is about: the gate is launched, polled at minute 2 while it is
+// still running, and read back only after the notice at minute 8 said it had ended.
+const POLLED: ReadonlyArray<Span> = [
+	launch(0, 1, { background_ended_ms: at(8) }),
+	join(2, 1),
+	join(8, 1),
 ]
 
 describe('time_background.launch_id', () => {
@@ -54,6 +75,47 @@ describe('time_background.launch_id', () => {
 	// about a background run has to answer with nothing rather than with its first word.
 	it('answers with nothing for a body that launched nothing', () => {
 		expect(time_background.launch_id('done')).toBe(time_background.NO_BACKGROUND)
+	})
+})
+
+describe('time_background.finished_id', () => {
+	it('reads the id out of the notice the harness writes when the task ends', () => {
+		expect(time_background.finished_id(FINISH_NOTICE)).toBe(GATE_ID)
+	})
+
+	// Every user line goes through the same reader, and a body that merely quotes a notice is text —
+	// the same hazard the join reader unquotes for. Anchoring at the start is what tells them apart.
+	it('ignores a notice quoted inside a longer body', () => {
+		expect(time_background.finished_id(`see ${FINISH_NOTICE}`)).toBe(time_background.NO_BACKGROUND)
+	})
+
+	it('answers with nothing for a line that is not a notice', () => {
+		expect(time_background.finished_id('do the thing')).toBe(time_background.NO_BACKGROUND)
+	})
+})
+
+describe('time_background.finished_at', () => {
+	it('keys the instant a task ended by the id the launch announced', () => {
+		const lines = [{ finished_background: GATE_ID, timestamp_ms: at(8) }]
+
+		expect(time_background.finished_at(lines).get(GATE_ID)).toBe(at(8))
+	})
+
+	// The harness resumes a task under the same id where one can be resumed, so a second notice
+	// belongs to work done after the run a launch started rather than to that run.
+	it('keeps the first notice for an id rather than the last', () => {
+		const lines = [
+			{ finished_background: GATE_ID, timestamp_ms: at(8) },
+			{ finished_background: GATE_ID, timestamp_ms: at(20) },
+		]
+
+		expect(time_background.finished_at(lines).get(GATE_ID)).toBe(at(8))
+	})
+
+	it('holds nothing for a session in which no task ended', () => {
+		const lines = [{ finished_background: time_background.NO_BACKGROUND, timestamp_ms: at(1) }]
+
+		expect(time_background.finished_at(lines).size).toBe(0)
 	})
 })
 
@@ -99,10 +161,44 @@ describe('time_background.runs', () => {
 
 	// A run reads one output file several times — a `tail` and then a few `grep`s — and every reading
 	// after the first is work on a result already in hand rather than time spent waiting for it.
-	it('closes the run at the first reading rather than the last', () => {
+	it('closes the run at the first reading after it ended rather than the last', () => {
 		const [run] = time_background.runs([launch(0, 1), join(3, 1), join(6, 2)])
 
 		expect(minutes_of(run?.ended_ms ?? 0)).toBe(4)
+	})
+
+	// joshuafolkken/kit#1696: `BashOutput` is the tool a run polls progress with, so once that spelling
+	// became detectable a look thirty seconds in closed the window on a command that ran for minutes.
+	it('does not close the run at a reading made before it ended', () => {
+		const [run] = time_background.runs(POLLED)
+
+		expect(minutes_of(run?.ended_ms ?? 0)).toBe(9)
+	})
+
+	// The join shape this repository recommends for a wait — an `until grep -q … <output>` loop, or a
+	// `Monitor` until-loop — is issued before the command finished and returns after it. Judged by
+	// where the reading *starts* it would be discarded, and a run whose only join was that shape would
+	// go from measured to not measured, which is the regression this module exists to remove.
+	it('closes the run at a blocking wait that returned after it ended', () => {
+		const spans = [launch(0, 1, { background_ended_ms: at(8) }), join(2, 7)]
+
+		expect(minutes_of(time_background.runs(spans)[0]?.ended_ms ?? 0)).toBe(9)
+	})
+
+	// The worse half of the same defect: the short number was reported as measured, so no
+	// `background runtime not measured` note said the reading could not be trusted.
+	it('reports a run read only before it ended as unread', () => {
+		const [run] = time_background.runs([launch(0, 1, { background_ended_ms: at(8) }), join(2, 1)])
+
+		expect(run?.is_read).toBe(false)
+	})
+
+	// Nothing in the transcript then says when the command ended, so no reading can be known to have
+	// seen it — the same answer as a launch nobody read at all, rather than the first reading's instant.
+	it('reports a launch no notice named as unread', () => {
+		const spans = [launch(0, 1, { background_ended_ms: time_background.NO_FINISH }), join(7, 1)]
+
+		expect(time_background.runs(spans)[0]?.is_read).toBe(false)
 	})
 
 	it('reports a launch nobody read back as unread', () => {
@@ -154,7 +250,11 @@ describe('time_background.positioned — two commands outstanding at once', () =
 	// An unread launch inside another command's window is still its own run: resolved by the window it
 	// merely sits in, it would be stamped with a second command and its minutes charged to that phase.
 	it('does not stamp an unread launch with the enclosing command', () => {
-		const spans = [launch(0, 1), launch(2, 1, OTHER_ID, PR_COMMAND), join(6, 1)]
+		const spans = [
+			launch(0, 1),
+			launch(2, 1, { background_id: OTHER_ID, josh_command: PR_COMMAND }),
+			join(6, 1),
+		]
 
 		expect(time_background.positioned(spans)[1]?.background_command).toBe(PR_COMMAND)
 	})
@@ -179,7 +279,19 @@ describe('time_background.unread_phases', () => {
 		expect([...unread]).toEqual([time_phases.GATE_PHASE])
 	})
 
+	// The note joshuafolkken/kit#1696 restores: a phase whose command was only ever polled has no
+	// runtime in the transcript, and saying so is what stops the launch call's seconds reading as one.
+	it('names the phase whose command was only polled while it ran', () => {
+		const spans = [launch(0, 1, { background_ended_ms: at(8) }), join(2, 1)]
+
+		expect([...time_background.unread_phases(spans)]).toEqual([time_phases.GATE_PHASE])
+	})
+
 	it('names nothing where the command was read back', () => {
 		expect([...time_background.unread_phases(OVERLAPPED)]).toEqual([])
+	})
+
+	it('names nothing where the command was read back after a poll', () => {
+		expect([...time_background.unread_phases(POLLED)]).toEqual([])
 	})
 })
