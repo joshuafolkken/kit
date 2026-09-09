@@ -130,12 +130,30 @@ function is_in_progress_label(command: string): boolean {
 // **Only the `in-progress` add form counts**, exactly as the marker above: the `-X DELETE` form ends a
 // run's hold rather than opening one, and every other `issues/<N>/…` call a session makes — an epic
 // insertion, a plan comment, a completion comment — names an issue it is not running.
-function bash_issue(command: string): number {
-	if (!is_in_progress_label(command)) return NO_ISSUE
+// **The declaration is read from the one chained command that makes it, not from the call as a
+// whole.** `&&`, `||` and `;` join independent commands into a single Bash call, and only one of them
+// is the add — so a call that touched another issue's labels first (parking one child and starting
+// another, or removing the label before adding it) would have its *leftmost* issue path captured. The
+// lookahead on the pattern above rules out the removal form; splitting rules out every other one, and
+// it has to be ruled out here rather than corrected later, because under lanes this declaration is
+// the only evidence there is.
+// The surrounding whitespace is deliberately not matched: neither test below is anchored, so the
+// spaces a split leaves on a part change nothing, and `\s*` on both sides of an alternation is the
+// shape `sonarjs/super-linear-regex` refuses.
+const COMMAND_SEPARATOR = /&&|\|\||;/u
 
-	const matched = ISSUE_LABELS_PATTERN.exec(command)
+function label_issue(part: string): number {
+	const matched = ISSUE_LABELS_PATTERN.exec(part)
 
 	return matched?.[1] === undefined ? NO_ISSUE : Number(matched[1])
+}
+
+function bash_issue(command: string): number {
+	for (const part of command.split(COMMAND_SEPARATOR)) {
+		if (is_in_progress_label(part)) return label_issue(part)
+	}
+
+	return NO_ISSUE
 }
 
 // A Bash call's boundary, read from the command it runs. Two are detected here — writing a body to

@@ -145,6 +145,15 @@ describe('time_markers.bash_issue', () => {
 		expect(time_markers.bash_issue(command)).toBe(1269)
 	})
 
+	// Parking one child and starting another can chain both label calls into one command, and the
+	// first of them is an add too — so the removal lookahead alone does not decide this one.
+	it('reads the issue labelled in-progress, not one the same call labelled something else', () => {
+		const parked = `gh api ${ISSUE_PATH}/labels -f 'labels[]=needs-decision'`
+		const started = "gh api repos/{owner}/{repo}/issues/1300/labels -f 'labels[]=in-progress'"
+
+		expect(time_markers.bash_issue(`${parked} && ${started}`)).toBe(1300)
+	})
+
 	// Every other call against an issue names one the session is not running — an epic insertion, a
 	// plan comment, a completion comment.
 	it('reads no issue from a call against the issue that is not the label add', () => {

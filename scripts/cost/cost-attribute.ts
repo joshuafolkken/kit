@@ -77,17 +77,17 @@ function fill(declared: ReadonlyArray<number>, is_reverse: boolean): Array<numbe
 	return filled
 }
 
+function is_attributed(value: number | undefined): value is number {
+	return value !== undefined && value !== UNATTRIBUTED_KEY
+}
+
 // **A declaration is carried forward, and it outranks both branch directions.** The preference for
-// `next` above is a statement about *branches*: work precedes the branch it will be committed to, so
+// `next` below is a statement about *branches*: work precedes the branch it will be committed to, so
 // the branch sits at the end of the run it names. A declaration sits at the *start* — the
 // `in-progress` label is the first thing a run writes — so carrying it backwards would give one
 // child's work to the next child declared after it, which is exactly the shape a lane transcript
 // holding two children has. `carried` is therefore the forward fill of declarations alone, and a
 // corpus with no declaration leaves every value `UNATTRIBUTED_KEY` and this branch inert.
-function is_attributed(value: number | undefined): value is number {
-	return value !== undefined && value !== UNATTRIBUTED_KEY
-}
-
 function pick(
 	own: number,
 	carried: number,
