@@ -140,6 +140,16 @@ describe('time_instructions.format_instructions', () => {
 		expect(text).toContain(time_instructions.SESSION_SCOPE)
 	})
 
+	// The sizes are read from disk and do not depend on the usage lines parsing, so a transcript whose
+	// billing could not be read still reports what it loaded rather than going silent about it.
+	it('still lists what was read when nothing was billed', () => {
+		const load = time_instructions.build(input_of([read_span([RULE_DOCUMENT])], NO_TOKENS))
+		const text = time_instructions.format_instructions(load)
+
+		expect(text).toContain(RULE_DOCUMENT)
+		expect(text).toContain(time_instructions.NO_BILLING)
+	})
+
 	it('says so rather than printing a share when nothing was billed', () => {
 		const text = time_instructions.format_instructions(
 			time_instructions.build(input_of([], NO_TOKENS)),
