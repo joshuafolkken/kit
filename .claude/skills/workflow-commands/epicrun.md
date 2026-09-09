@@ -473,7 +473,7 @@ cannot tell which of them was solved and which was merely stopped being mentione
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Two children would collide over the version     | **Gone.** A child no longer picks a version at all — `pnpm josh release` decides it from main's own history (joshuafolkken/kit#1169, joshuafolkken/kit#1486), so there is nothing to collide over |
 | One checkout cannot hold two branches           | **Gone.** A lane is its own linked work tree with its own branch, its own `.env` and its own ports (joshuafolkken/kit#1490), and `josh latest` runs once before any of them opens        |
-| Two children touching one file need prediction  | **Not built, deliberately.** Overlap is surfaced at the merge, where GitHub already reports it, and the child that loses the race is parked — "Conflicts are not predicted" below       |
+| Two children touching one file need prediction  | **Not built, deliberately.** Overlap is surfaced at the merge, where GitHub already reports it, and the child that loses the race resolves it in its own lane — "Conflicts are not predicted" below  |
 
 **So the guard is a ceiling rather than a prohibition.** It was always scoped to the resource rather
 than to the epic — `epic-classify.ts` sorts only the children the epic tracks, so a second `epicrun`
@@ -549,8 +549,10 @@ written.
 **Running unattended gets harder, not easier, and that is the honest trade.** Six lanes make the overlap
 between children real — two open issues touching `scripts/git/git-epic-*` and two touching
 `scripts/eval/*` are very likely to be in flight together — and every overlap that becomes a conflict
-parks a child, which waits for a person. The run finishes more work per hour **and** asks for a
-person more often. Do not report the first without the second.
+costs the child that loses the race a resolution, a re-run gate and a review it would not otherwise
+have paid ("Conflicts are not predicted" below), and parks it outright under that section's four
+conditions. The run finishes more work per hour **and** spends more of each child's budget on merge
+races. Do not report the first without the second.
 
 ### Once per repository, before the first lane opens
 
@@ -653,17 +655,73 @@ conflicts with its base comes back `mergeStateStatus: DIRTY`, which `git-pr-chec
 a **failure** rather than polling through it (joshuafolkken/kit#1232) — so `pnpm josh followup` ends
 that child with a named conflict in about ten seconds rather than running its 32-minute budget out.
 
-**That child is parked**: `needs-decision` plus a comment naming the conflict, exactly as "park and
-continue" below, its lane closed rather than kept — the one park after a commit that still closes,
-because the branch has to be rebuilt on a current `main` either way, and with the work committed
-there is nothing to stash (the table below) — and the loop goes on.
-It is **not** counted against the consecutive-failure guard — a lost merge race is an ordinary
-outcome of running six lanes, and counting it would abort the run for working as designed.
+**That child does not stop: it resolves the conflict in its own lane** (joshuafolkken/kit#1623).
+Parking is the exception now, not the answer. It is **not** counted against the consecutive-failure
+guard either way — a lost merge race is an ordinary outcome of running six lanes, and counting it
+would abort the run for working as designed.
 
-**Rebasing the loser automatically is deliberately not done.** A rebase that resolves cleanly puts
-work nobody reviewed onto a branch whose review has already converged, and one that does not resolve
-leaves a half-rebased lane for the next poll to misread. A person re-runs the child on a current
-`main`, which is one `pnpm josh lane:close <N>` and one label removal away.
+**Nothing is at risk while it resolves, because the work is already committed and pushed.** That is
+the premise the whole procedure rests on: the pull request holds the branch whatever the resolution
+does to the work tree, `git merge --abort` puts that tree back, and no step below rewrites a commit
+that has been pushed. **The merge direction is `origin/main` into the lane's branch, never a rebase**
+— a rebase would rewrite pushed commits and need a force push, which this package denies.
+
+1. **Resolve in the lane.** `git fetch origin main`, merge `origin/main` into the lane's branch, and
+   resolve in place. Do not close the lane, do not open another, do not switch its branch —
+   `pnpm josh lane:open` cannot reattach to a pushed branch (joshuafolkken/kit#1627), and staying put
+   is what keeps the run clear of that.
+2. **Re-run the whole gate.** The tree changed, so the green recorded before the conflict is void:
+   `pnpm josh lint:related` and `pnpm josh test:related`, then `pnpm josh gate`.
+3. **Review the resolution, one round.** Brief it with `pnpm josh review:brief` and run
+   `/code-review` over the resolution diff, then require `pnpm josh review:attest --check` to answer
+   `ok`. That round is a different subject from the change under review and does not spend one of the
+   two the cap allows — `prompts/review.md` → "Review round cap" carries the exception.
+4. **Conclude the merge and push it, with `pnpm josh git -y`.** Without this step nothing changes on
+   `origin`: GitHub still returns `mergeStateStatus: DIRTY`, step 5 reports the same conflict, and
+   condition 3 reads that as a second one and parks the child for good. Nothing else can do it either
+   — the distributed `.claude/settings.json` denies `Bash(git commit*)` and `Bash(git add*)`, so the
+   only sanctioned way to conclude a merge is the node script. **Record the resolution on the Issue
+   in this same step** — a comment naming the conflicting paths — because condition 3 counts
+   resolutions and a merge commit on a lane branch is not something a later poll, or a session
+   resuming after an interrupt, can count. Recording it *here* rather than at step 1 is what keeps an
+   attempt that ended in a park from leaving a count behind.
+5. **Merge**, by re-running `pnpm josh followup` exactly as before.
+
+**The safeguard is the re-run verification, not who holds the pen.** What is dangerous about a
+resolution is unreviewed code merging onto a branch whose review has already converged, and that
+happens identically whichever hand did the work — so routing the decision to a person does not
+address it, while re-running the gate and the review does. **In this repository routing it to a
+person does not even resolve it**: the user does not read code, so a code-level conflict handed over
+is a deferral rather than a decision, and the same steps get run later anyway.
+
+**The run steps back under these four conditions, and under no others. The list is exhaustive and
+carries no judgement.**
+
+1. **The resolution requires deleting the other side's change.** Keeping one side and discarding the
+   other decides intended behavior, not text. It goes to the user as a **specification** question —
+   "behavior A or behavior B" — never as a diff.
+2. **Both sides rewrote the same lines** — overlapping, not adjacent. This is read off the structure
+   of the conflict hunks, so it needs no interpretation.
+3. **A second conflict on the same child.** One resolution per child; `main` keeps moving, and
+   without this bound the child could retry without end. The count is read off the Issue comments
+   step 4 writes, never off memory, so it survives an interrupt.
+4. **The re-run gate did not come back green, or the resolution review returned a High.** Not only a
+   High: a lint error, a failing test or a spell-check hit that merging a moved `main` introduced is
+   this condition too. Fixing one would be writing new code after the review had converged, which is
+   the thing this section exists to keep out of a merge.
+
+Meeting any of the four, the child is parked — `needs-decision` plus a comment naming which of the
+four it was, exactly as "park and continue" below — and its lane is **kept**, because the pushed
+branch is the resume path and nothing rebuilds it (the table below).
+
+**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or
+4.** Which of them fired does not change the answer, because none of the three has reached step 4 —
+conditions 1 and 2 are read mid-merge with conflict markers still in the tree, and condition 4 is
+read after a merge that is resolved but not yet committed. Condition 3 is the one exception, and it
+is mechanical rather than a judgement: it fires before any merge is started, so there is nothing to
+abort. The pushed branch is untouched by the abort, and the table row these parks take justifies
+itself on the tree being clean — parked mid-merge, the lane hands the next poll a half-merged tree,
+which is exactly the hazard that made this section refuse to resolve at all.
 
 ### What happens to a lane
 
@@ -671,9 +729,10 @@ leaves a half-rebased lane for the next poll to misread. A person re-runs the ch
 | --- | --- | --- |
 | The child **merged** | `pnpm josh lane:close <N>` | `followup` released the hold and the branch is on `main`; nothing in that tree is wanted |
 | The child was **parked before its commit** | `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, record it on the Issue, then `pnpm josh lane:close <N>` | The stash is a repository-level ref, so it outlives the work tree — and `lane:close` is a **forced** removal that would otherwise take the work with it. Closing is what keeps the seat free, and it has to happen: `epic:next` already counts a parked child's lane as released, so a lane left open would hold a seat the count believes is free |
-| The child was **parked after its commit and push** | **Left open**, its directory and its held seat recorded on the Issue — *unless* the park was a lost merge race, which is closed instead, with nothing to stash | The stash step is a **no-op**: the tree is clean because the work is already committed. What `lane:close` would take is the **local branch**, and that branch is the resume path — the two sentences under this table are why |
+| The child was **parked after its commit and push** | **Left open**, its directory and its held seat recorded on the Issue | The stash step is a **no-op**: the tree is clean because the work is already committed. What `lane:close` would take is the **local branch**, and that branch is the resume path — the two sentences under this table are why |
+| The child hit a **merge conflict** | **Left open** — the resolution happens in it | The child resolves in place rather than parking ("Conflicts are not predicted" above), so the lane is the one place the work can be finished. Closing it would delete the branch the pull request already carries, and `lane:open` cannot put that branch back (joshuafolkken/kit#1627). A park under one of that section's four conditions takes the row above, unchanged |
 | The child stopped on **`needs-human-review`** | **Left open and untouched** | The uncommitted work *is* the artifact a person has to look at, so nothing is stashed and nothing is closed. Name the lane directory in the stop report and in the Telegram, or the person is told to look at a tree and not told where it is |
-| The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | Same reasoning; only the counter differs |
+| The child **failed** | Whichever of the two parked rows applies, plus the consecutive-failure count | Same reasoning; only the counter differs. **A merge conflict is not this row**, though `followup` reports it as a failed check: it takes the row above, and it is not counted ("Conflicts are not predicted") |
 | **`lane:open` failed on the install** | `pnpm josh lane:close <N>`, then park the child | The work tree was created and its seat allocated before the install ran, so a lane exists that no `pnpm josh …` runs in and the next `lane:open` answers `already-open` rather than retrying (joshuafolkken/kit#1554). Closing frees the seat; parking is right because the causes — an outdated lock, an unreachable registry — are ones a person fixes. Carry pnpm's reason, printed on standard error, into the park note |
 | The run was **interrupted** | Nothing to do — the work tree survives on disk | The next session's `pnpm josh lane:prune` closes what git no longer has a tree for, and `lane:open` answers `already-open` for what is still there. **Park that child**, naming the lane and `pnpm josh lane:close <N>` as the way out: resuming somebody's half-finished lane unattended is the judgement `run:preflight` refuses to make on its own, and in a lane there is no command to make it |
 
@@ -694,15 +753,18 @@ name rather than restore the pushed one. Nothing in `pnpm josh lane:*` reaches
 `git worktree add <dir> <existing-branch>`, and rebuilding one by hand gets a tree with no seat and
 no `node_modules` — which is to say no `pnpm josh followup` either.
 
-**The exception is decided by what `followup` printed, not by reading the situation.**
+**Which of these rows a child takes is decided by what `followup` printed, not by reading the
+situation.**
 **What it prints is `PR checks failed (merge conflict)`** — that string, and nothing else, is what
 reaches you; `mergeStateStatus: DIRTY` is the internal spelling `git-pr-checks-eval.ts` compares
 against and the one "Conflicts are not predicted" above uses, never an output line to search for.
-The named failure means the branch as pushed no longer merges and has to be rebuilt on a current
-`main`, so the local one is not the resume path and keeping it holds a seat for nothing. That child's lane is closed, with nothing to stash, which is what that section already
-prescribes. Do not grep the output for `mergeable_state`: that is the REST field name, normalized
-away by `git-gh-pr-snapshot.ts` before anything prints it. Every other after-commit park — a gate this run may not waive, a standing High finding, a
-Tier B or Tier C decision — resumes from the branch exactly as it stands, and keeps its lane.
+**What that string names is no longer a park at all** (joshuafolkken/kit#1623): the named failure
+sends the child to resolve the conflict in the lane it is already standing in, so the pushed branch
+is precisely the resume path and the lane is kept — the row for it above. Do not grep the output for
+`mergeable_state`: that is the REST field name, normalized away by `git-gh-pr-snapshot.ts` before
+anything prints it. **Every after-commit park now keeps its lane, with no exception left in this
+table** — one of the four conditions in that section, a gate this run may not waive, a standing High
+finding, a Tier B or Tier C decision: each resumes from the branch exactly as it stands.
 
 **A kept lane holds its seat, and that is the price rather than an oversight.** Seats are not kept in
 a ledger; they are read back out of the live work trees (`scripts/lane/lane-registry.ts`), so the
@@ -1561,9 +1623,11 @@ a seat the count believes is free — and `lane:close` removes the work tree by 
 first: `git -C <dir> stash push -u -m "epicrun: parked #<N>"`, the stash recorded on the Issue, then
 `pnpm josh lane:close <N>`. **Parked after its commit and push**, the lane is *kept*: there is
 nothing to stash, and closing would delete the local branch the resume needs with no command able to
-put it back — the one exception being a lost merge race, whose branch has to be rebuilt anyway. Both
-rows, that exception, the seat it costs and the `pnpm josh run:release` every parked ending owes
-are "What happens to a lane" above, which is the single source.
+put it back. **A lost merge race is not one of these rows** — it resolves in its lane rather than
+parking at all ("Conflicts are not predicted" above), and parks only under that section's four
+conditions, which take the after-commit row unchanged. Both rows, the seat a kept lane costs and the
+`pnpm josh run:release` every parked ending owes are "What happens to a lane" above, which is the
+single source.
 
 **Parking replaces stopping the session, not the rule that produced the stop.** An upstream defect
 is still filed immediately and unconditionally (Tier A for a first-party target), and a workaround
