@@ -128,13 +128,32 @@ describe(`${SKILL_PATH} — reads what the run cost, not only how long it took`,
 		expect(read_skill()).toContain(marker)
 	})
 
-	// The record attributes a request to an issue and to nothing finer, so a per-phase dollar figure
-	// would be invented rather than measured. joshuafolkken/kit#1606 is the issue that builds that axis,
-	// and it follows this reading instead of being assumed by it.
+	// joshuafolkken/kit#1606 built the axis this reading used to defer: `josh cost` still attributes a
+	// request to an issue and to nothing finer, and the per-phase figure is `josh time`'s `phase_costs`.
+	// The markers pin where each half is read from, so neither is re-derived as a share of the total.
 	it.each([
-		'**There is no phase axis to read, and inventing one is the mistake to avoid here.**',
+		"**The phase axis is `josh time`'s, not this command's, and it is read from there**",
 		'https://github.com/joshuafolkken/kit/issues/1606',
-	])('leaves the phase axis to the issue that builds it: %j', (marker) => {
+	])('reads the phase axis from the command that owns it: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#1606. `josh time` knew the phases and `josh cost` knew the money, and the two met
+// nowhere — so step 3 could rank a proposal in minutes and never in dollars. The markers pin the two
+// new readings and, more importantly, the three ways of misreading them: an unattributed request is
+// never prorated, an unread corpus is not a run that spent nothing, and a per-phase saving comes from
+// that phase's own row rather than from a share of the run total.
+describe(`${SKILL_PATH} — attributes the money to the phases it was spent in`, () => {
+	it.each([
+		'**`phase_costs` — what each stage cost in dollars**',
+		'**`unattributed` is a bucket, not a rounding error**',
+		'**`is_measured: false` means the cost corpus was not read for this scope',
+		'**`usd_per_round_trip` is the same reading in money**',
+		'**the same denominator**',
+		"**A row against one stage takes its dollars from that stage's own `phase_costs` row, not from the run total**",
+		'**The unattributed bucket is never spread across the rows to make them add up**',
+	])('states %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
 })

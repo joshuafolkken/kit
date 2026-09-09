@@ -5,10 +5,12 @@ import { time_corpus, type IssueSpans } from './time-corpus'
 import { time_github, type GhReader, type PullSearch, type PullSummary } from './time-github'
 import { time_issue_window } from './time-issue-window'
 import type { Interval } from './time-overlap'
+import { time_phase_costs, type PricedRequest } from './time-phase-costs'
 import { time_phases } from './time-phases'
 import { time_pull_files, type PullFileList } from './time-pull-files'
 import { time_pull_index } from './time-pull-index'
 import { time_report, type TimeReport } from './time-report'
+import { time_request_costs, type PricedReader } from './time-request-costs'
 import { time_rework, type DiffFacts, type DiffState } from './time-rework'
 import { time_sessions, type ExcludedSession } from './time-sessions'
 import type { Span } from './time-spans'
@@ -328,11 +330,14 @@ interface RunFacts {
 	// The outermost of the three windows — the issue's own opened→closed (joshuafolkken/kit#1409).
 	// Neither the transcript nor the pull-request listing carries it, so it is its own read.
 	issue_window: TimeWindow
+	// This run's billed requests, priced and stamped, or `undefined` where the caller did not ask for
+	// the cost corpus to be read (joshuafolkken/kit#1606).
+	priced: ReadonlyArray<PricedRequest> | undefined
 }
 
 // Everything a merged pull request adds to the facts. Split out of `gather` so that function stays the
 // two-branch answer it always was rather than growing a fetch inside one of them.
-type MergedFacts = Omit<RunFacts, 'issue_number' | 'found' | 'search' | 'issue_window'>
+type MergedFacts = Omit<RunFacts, 'issue_number' | 'found' | 'search' | 'issue_window' | 'priced'>
 
 // What an issue with no merged pull request has instead. Named rather than written inline, so the
 // branch below stays one expression and `gather` keeps both reads in one `Promise.all`.
@@ -390,6 +395,7 @@ interface RunInput {
 	read: GhReader
 	search: PullSearch
 	cwd: string
+	priced: ReadonlyArray<PricedRequest> | undefined
 }
 
 // The pull request is passed in rather than looked up here, because the no-argument path has already
@@ -411,7 +417,7 @@ async function gather(input: RunInput): Promise<RunFacts> {
 			: read_merged({ pull, merged_ms, found, read, cwd }),
 	])
 
-	return { issue_number, found, search, issue_window, ...merged }
+	return { issue_number, found, search, issue_window, priced: input.priced, ...merged }
 }
 
 // **The two CI figures differ by exactly the cycles the merge command sat on, and the note is what
@@ -489,8 +495,13 @@ function to_report(facts: RunFacts): TimeReport {
 		by_check: facts.checks,
 	})
 	const found_notes = [...window_note(window, report.elapsed_ms), ...serial_note(report)]
+	const phase_costs = time_phase_costs.build({
+		spans: found.spans,
+		requests: facts.priced,
+		round_trip_count: report.round_trip_count,
+	})
 
-	return { ...report, notes: [...notes, ...found_notes] }
+	return { ...report, notes: [...notes, ...found_notes], phase_costs }
 }
 
 // What a batch caller has already read for this child, so neither source is read once per child
@@ -502,10 +513,21 @@ function to_report(facts: RunFacts): TimeReport {
 interface RunSources {
 	found: IssueSpans | undefined
 	search: PullSearch | undefined
+	// How to price this run's requests, or `undefined` to leave the phase costs unmeasured
+	// (joshuafolkken/kit#1606). **A reader rather than the records themselves**, because the latest-run
+	// path does not know which issue it is reporting on until it has resolved the merged pull request.
+	//
+	// **It is a third source rather than an unconditional read** for the reason the other two are
+	// passed in: pricing walks the whole transcript directory, so a batch doing it per child pays that
+	// walk once per child. `--issue` and the latest-run path opt in through `PRICED_SOURCES`; the
+	// epic, last-N and history paths leave it unset and report the block as not measured. What the two
+	// single-run paths pass is `time_request_costs.PRICED_SOURCES`, which lives beside the reader it
+	// names rather than here, so nothing in this file has to import the corpus walk.
+	priced_of: PricedReader | undefined
 }
 
-// What `--issue` passes: nothing was collected, so both halves are read here.
-const NO_SOURCES: RunSources = { found: undefined, search: undefined }
+// What the batch paths pass: nothing was collected, and the cost corpus is not read.
+const NO_SOURCES: RunSources = { found: undefined, search: undefined, priced_of: undefined }
 
 // One issue's whole run. Never throws for a missing half: an issue with no pull request, an open
 // one, a listing that could not be read, and a run with no transcript each report what is known and
@@ -523,8 +545,9 @@ async function build_run_report(
 ): Promise<TimeReport> {
 	const search = sources.search ?? (await time_pull_index.pull_for_issue(issue_number, read))
 	const found = sources.found ?? time_corpus.collect_issue_spans(cwd, issue_number)
+	const priced = time_request_costs.priced_for(sources, cwd, issue_number)
 
-	return to_report(await gather({ issue_number, found, read, search, cwd }))
+	return to_report(await gather({ issue_number, found, read, search, cwd, priced }))
 }
 
 function issue_of(pull: PullSummary | undefined): number | undefined {
@@ -544,6 +567,7 @@ function issue_of(pull: PullSummary | undefined): number | undefined {
 async function build_latest_run_report(
 	cwd: string,
 	read: GhReader = time_github.read_gh,
+	sources: RunSources = NO_SOURCES,
 ): Promise<TimeReport | undefined> {
 	const search = await time_github.latest_merged_pull(read)
 	const issue_number = issue_of(search.pull)
@@ -551,8 +575,9 @@ async function build_latest_run_report(
 	if (issue_number === undefined) return undefined
 
 	const found = time_corpus.collect_issue_spans(cwd, issue_number)
+	const priced = time_request_costs.priced_for(sources, cwd, issue_number)
 
-	return to_report(await gather({ issue_number, found, read, search, cwd }))
+	return to_report(await gather({ issue_number, found, read, search, cwd, priced }))
 }
 
 const time_run = {

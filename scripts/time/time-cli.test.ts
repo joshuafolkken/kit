@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { time_cli } from './time-cli'
 import { time_cli_fixture } from './time-cli-fixture'
 import { time_instructions } from './time-instructions'
+import { time_request_costs } from './time-request-costs'
 import { time_run } from './time-run'
 
 // The console capture, the temporary transcript home and the one run report are
@@ -254,7 +255,9 @@ describe('time_cli.run — one run', () => {
 		const build = vi.spyOn(time_run, 'build_latest_run_report').mockResolvedValue(RUN_REPORT)
 
 		expect(await time_cli.run([], CWD)).toBe(0)
-		expect(build).toHaveBeenCalledWith(CWD)
+		// The third argument is what opts the single-run paths into the cost read that the phase
+		// attribution needs (joshuafolkken/kit#1606); the batch paths pass nothing.
+		expect(build).toHaveBeenCalledWith(CWD, undefined, time_request_costs.PRICED_SOURCES)
 		expect(output()).toContain(RUN_SCOPE)
 	})
 

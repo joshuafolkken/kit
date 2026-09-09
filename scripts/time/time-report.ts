@@ -9,6 +9,7 @@ import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_model_gaps } from './time-model-gaps'
+import { time_phase_costs, type PhaseCostFacts } from './time-phase-costs'
 import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseTotal } from './time-phases'
 import { time_rework, type DiffFacts, type ReworkTotals } from './time-rework'
@@ -122,6 +123,11 @@ interface TimeReport extends TurnSplit {
 	// trip to divide by — the withheld answer the counts themselves give, never a measured zero.
 	ms_per_round_trip: number
 	model_ms_per_round_trip: number
+	// What each phase cost and what one round trip cost in dollars (joshuafolkken/kit#1606). **An
+	// optional key rather than a zeroed record**, because only the run scopes read the cost corpus:
+	// absent here means the question was never asked, while a present record with `is_measured: false`
+	// means it was asked and the corpus could not answer.
+	phase_costs?: PhaseCostFacts
 	// The same model wait as `model_ms_per_round_trip`, as the spread it was a mean of
 	// (joshuafolkken/kit#1386). The mean above says what a trip cost typically; only this says whether
 	// a run was slow everywhere or slow once — and the two need opposite fixes, since batching removes
@@ -464,6 +470,7 @@ function format_report(report: TimeReport): string {
 		'Where the wall clock went:',
 		...time_category_table.category_lines(report),
 		...time_phase_table.phase_lines(report.phases, report.elapsed_ms),
+		...time_phase_costs.cost_lines(report.phase_costs),
 		...time_cycles.cycle_lines(report.ci_cycles),
 		...time_segments.segment_lines(report.segments),
 		...time_trips.trip_lines(report),
