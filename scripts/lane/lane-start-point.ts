@@ -1,4 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
+import { git_worktree } from '#scripts/git/git-worktree'
 
 // Where a lane is cut from (joshuafolkken/kit#1535).
 //
@@ -20,7 +21,7 @@ const REFS_REMOTES_ORIGIN_PREFIX = 'refs/remotes/origin/'
 // A fetch *failure* is reported and stepped over rather than raised. `lane:open` has to keep working
 // with no network at all — offline, and on a clone with no `origin` — and what it degrades to is
 // whatever `origin/<default>` already holds, which is still never *behind* the local branch. Note
-// what this does not cover: `fetch_branch` runs through `exec_git_command_read`, which sets no
+// what this does not cover: `fetch_branch` runs through `git_spawn.read`, which sets no
 // timeout, so a connection that hangs rather than failing blocks here instead of degrading.
 async function refresh_default_branch(default_branch: string): Promise<void> {
 	try {
@@ -100,7 +101,7 @@ type RemoteAnswer = 'absent' | 'present' | 'unreachable'
 // gone from a remote that cannot be reached.
 async function ask_remote(branch_name: string): Promise<RemoteAnswer> {
 	try {
-		const heads = await git_command.ls_remote_branch(branch_name)
+		const heads = await git_worktree.ls_remote_branch(branch_name)
 
 		return heads.trim() === '' ? 'absent' : 'present'
 	} catch {

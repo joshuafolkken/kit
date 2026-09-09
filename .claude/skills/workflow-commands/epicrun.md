@@ -750,8 +750,8 @@ which is exactly the hazard that made this section refuse to resolve at all.
 **A committed child's lane is kept because it is the cheapest resume, not because closing it is
 final** (joshuafolkken/kit#1587, corrected by joshuafolkken/kit#1627). Two mechanics decide it, and
 neither is a judgement. `lane:close` does not stop at the work tree: `remove_lane` follows the
-removal with `git_command.branch_delete(targets.branch)`, which runs `git branch -D <N>-lane`
-(`scripts/lane/lane-close.ts` → `remove_lane`, `scripts/git/git-command.ts` → `branch_delete`) — the
+removal with `git_worktree.branch_delete(targets.branch)`, which runs `git branch -D <N>-lane`
+(`scripts/lane/lane-close.ts` → `remove_lane`, `scripts/git/git-worktree.ts` → `branch_delete`) — the
 force flag is there precisely so an unmerged lane branch, which is every parked one, goes too.
 Resume for this child is a re-run of `pnpm josh followup`, and that reads the branch **locally**:
 `read_branch_paths` is `changed_paths.to_paths(await git_command.diff_main_names())`
