@@ -80,6 +80,7 @@ words:
   # distributed file — only `scripts/delegation/` — so it stays in this config rather than the
   # dictionary `josh sync` publishes.
   - refusable
+  - runnability
   - fromjson
   - dryrun
   - overridability

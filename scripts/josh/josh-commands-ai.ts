@@ -67,6 +67,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Print the next opted-in issue an unattended run may pick up outside an epic',
 		category: 'AI tools',
 	},
+	'backlog:next': {
+		script: 'scripts/backlog/backlog-next.ts',
+		description:
+			'Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epics',
+		category: 'AI tools',
+	},
 	cost: {
 		script: 'scripts/cost/cost-cli.ts',
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",

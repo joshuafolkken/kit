@@ -1966,6 +1966,50 @@ gh api repos/{owner}/{repo}/labels -f name=auto-ok -f color=0e8a16 -f descriptio
 
 The listing is capped at 200 issues, and the paging behind it stops after 500 rows whatever the cap says ([#1067](https://github.com/joshuafolkken/kit/issues/1067)). The listing is newest first, so either cut drops the oldest opted-in issues — reported as a `⚠` on standard error rather than ranked silently, because the answer is still an opted-in issue but may not be the one the order promises. The warning names which cut stopped it: a reader who wants the answer widened reaches for the command's own cap in one case and for the paging's ceiling in the other.
 
+### `josh backlog:next`
+
+Order the whole opted-in backlog in one command ([#1630](https://github.com/joshuafolkken/kit/issues/1630)).
+
+```bash
+pnpm josh backlog:next                 # alias: josh bl
+pnpm josh backlog:next --exclude 1630  # skip the issue just merged
+pnpm josh backlog:next --exclude 1630,1631 --exclude 1632   # skip several
+```
+
+**The answer used to be split in two, and neither half could give it.** `epic:next` has the dependency graph and the execution wave, but its input is one epic's task list. `auto-ok:next` sees the whole backlog, but it orders by the newest-first display ranking and reads no dependency at all — and it returns one issue. So there was no route that asked the backlog itself what may start, and what may start beside it.
+
+Two sources feed one pool:
+
+| Candidate          | Condition                                                                                                                                |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| A standalone issue | It carries `auto-ok`, and no epic tracks it                                                                                              |
+| An epic's child    | **The epic's root carries `auto-ok`.** The child needs no `auto-ok` of its own, and carrying one does not make it a standalone candidate |
+
+**An epic root's `auto-ok` stands for every child.** That is the same meaning `epicrun #<E>` already has — typing it once approves every merge inside that epic — so a per-child label is not asked for. Requiring one would (1) turn a forgotten label into a hole in the dependency graph, leaving whatever depends on that child waiting for good, (2) make bulk application the habit and the gate a rubber stamp, and (3) stack a thinner approval on top of work that has already been through `epic:plan` and `epic:audit`. A child that needs a decision or a person's eye is handled by `needs-decision` and `needs-human-review`, which are the exits; `auto-ok` is the entrance, and they are different questions.
+
+**Nothing here re-implements the graph or the wave.** Each `auto-ok` epic is read and classified by `epic:next`'s own pipeline, unchanged, and the verdict comes from the same `decide_verdict` — so a word this command prints cannot drift from what `epic:next` means by it. The standalone half is `auto-ok:next`'s own listing and runnability rules, ranked with the same `prioritize` the `🗒 Next issues` display uses, so there is no second ordering here either.
+
+Standard output carries one token per line — the runnable issues, in the order they may be started, or a single verdict word. Every explanation goes to standard error, so `answers=$(pnpm josh backlog:next)` captures something a loop can branch on. **The tokens are scoped to the repository the command runs in**, which is `epic:next --repo`'s shape exactly. An epic may track a child elsewhere, and a bare number would name _this_ repository's issue of that number — a different issue entirely. Qualifying it as `owner/repo#N` instead was tried and is worse: `--exclude` parses bare integers, so a loop feeding a qualified token back would get a usage error rather than an exclusion. So a runnable child elsewhere stays out of the tokens and the answer is `wait` when this repository has none of its own — the mapping `epic:next` already makes for its per-repository form, and for the same reason: the work is real, it is simply not work this checkout can start. It is still reported on standard error, under its own repository and checkout.
+
+| Answer      | Meaning                                                                 | Exit code |
+| ----------- | ----------------------------------------------------------------------- | --------- |
+| `<number>…` | Each line is an issue a run may start; they may start beside each other | 0         |
+| `wait`      | Nothing is runnable yet, but something resolves on its own              | 0         |
+| `stop`      | Nothing will resolve on its own — something needs a person              | 0         |
+| `error`     | A dependency graph is unusable; nothing is offered                      | 0         |
+| `none`      | The backlog holds nothing opted in, or nothing left to hand back        | 0         |
+| _(nothing)_ | A listing could not be read — **not** the same as `none`                | 1         |
+
+`none` is `epic:next`'s `complete` under `auto-ok:next`'s spelling: a backlog is never finished the way one epic is, and a loop reading either command branches on the same word.
+
+`--exclude <N>` drops issues from the answer, and it drops them from **every** bucket rather than only from the offer. GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge the issue that just shipped is still listed as open — left in the waiting bucket, it would answer `wait` for a backlog with nothing left to wait for. It takes a comma-separated list and may be repeated.
+
+**The standalone half is capped at the same five rows the `🗒 Next issues` display shows.** It is ranked with `prioritize`, cap included, rather than with a second ordering of this command's own — so a sixth runnable standalone issue is reported as waiting rather than offered, and the next ask offers it once one of the five above it merges. Nothing is lost; the backlog drains a round later. An epic's children are not capped that way: they come through the epic's own graph.
+
+**The epics are found by the `epic` label, exactly as `epic:bundle` and `auto-ok:next` find them.** An epic that never received that label is invisible here too: its children are not offered through it, and they still read as untracked to the standalone half. That is one of the things `josh epic:audit` is for. Both listings are capped, and a cut is reported as a `⚠` on standard error rather than answered from silently.
+
+The command is read-only and never applies or removes a label.
+
 ### `needs-human-review` — the opposite label
 
 `auto-ok` widens unattended execution past an epic's edge; **`needs-human-review` withholds its last step** ([#1125](https://github.com/joshuafolkken/kit/issues/1125)). An issue carrying it is implemented and taken through the verification gate as usual, and then nothing is committed, pushed, opened as a pull request or merged: the working tree is left uncommitted and unstashed, a `confirmation` notification goes out carrying the resume command, and the run stops there rather than starting the next issue.

@@ -132,12 +132,16 @@ function parse_pair(argv: ReadonlyArray<string>, index: number): ReadonlyArray<n
 // `--exclude` may also be repeated, so a loop can add one number per pickup without rebuilding a
 // list. Anything that is not a `--exclude` pair is a usage error rather than a silently ignored
 // argument.
-function parse_options(argv: ReadonlyArray<string>): NextOptions {
+//
+// `usage` is a parameter so a second command with the same `--exclude` grammar reuses this rather
+// than copying the loop — `josh backlog:next` does (joshuafolkken/kit#1630). Only the line printed on
+// a bad argument differs between them, and a caller that passes nothing gets this command's own.
+function parse_options(argv: ReadonlyArray<string>, usage: string = USAGE): NextOptions {
 	const exclude: Array<number> = []
 
 	for (let index = 0; index < argv.length; index += EXCLUDE_PAIR_SIZE) {
 		const parsed = parse_pair(argv, index)
-		if (parsed === undefined) return { usage: USAGE }
+		if (parsed === undefined) return { usage }
 		exclude.push(...parsed)
 	}
 
