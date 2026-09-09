@@ -164,12 +164,20 @@ function find_implicit_dependencies(
 // depend on `#860` — a forward reference, and satisfiable exactly as written. Verified against the
 // real epic: without this, four of the run's five errors were forward references of that shape.
 //
-// The level depends on whether either end still has execution left. What makes an undeclared order a
-// contradiction is that the criteria's child *can run first*; once both children are closed that
-// sentence is simply false, and an epic that ever forgot to declare an order would otherwise fail its
-// audit forever — which stops every future `epicrun` on it at the first step, for something that can
-// no longer stall anything (joshuafolkken/kit#1010). Confirmed on the real epic: `epic:next` handed
-// back a runnable child while the audit was red.
+// The level depends on whether the pair can still run out of order. What makes an undeclared order a
+// contradiction is that the criteria's child *can run first*, and **either end closing is enough to
+// make that sentence false**: a closed naming child has already run, and a closed named child has
+// already delivered what the criteria ask for, so nothing is left to run before it. An epic that ever
+// forgot to declare an order would otherwise fail its audit forever — which stops every future
+// `epicrun` on it at the first step, for something that can no longer stall anything. Confirmed on the
+// real epic: `epic:next` handed back a runnable child while the audit was red.
+//
+// **The condition used to be both ends closed**, and that was stricter than the sentence it encodes
+// (joshuafolkken/kit#1597). It bit on the ordinary way an epic's children cite each other — a closed
+// child's criteria naming an open sibling **as evidence** — and there is no way out of it once the
+// naming child has closed: the alternatives are editing a closed body to remove the numbers or
+// declaring an order nobody decided, and both destroy the record. joshuafolkken/kit#1262 sat red on
+// exactly that shape while nothing in it could run out of order.
 //
 // **Demoted rather than dropped**, and the choice is not cosmetic. Dropping the finding does not
 // shorten the report: the acceptance criteria are part of the body, so the same pair falls straight
@@ -181,8 +189,20 @@ function find_implicit_dependencies(
 // Closed is asserted, never inferred: `epic_issue.normalize_state` maps everything that is not
 // `CLOSED` — `MERGED` included — to `OPEN`, so a state this cannot confirm keeps the error. The
 // unknown case falls to the loud side, which is the only side it may fall to.
-function are_both_closed(child: AuditChild, target: AuditChild): boolean {
-	return child.state === 'CLOSED' && target.state === 'CLOSED'
+function is_closed(child: AuditChild): boolean {
+	return child.state === 'CLOSED'
+}
+
+function is_pair_settled(child: AuditChild, target: AuditChild): boolean {
+	return is_closed(child) || is_closed(target)
+}
+
+// Which end already ran, in the words the settled message needs. Naming the wrong end would be worse
+// than saying nothing: the reader checks the state of whichever issue the sentence points at.
+function settled_clause(child: AuditChild, other: AuditChild, current_repo: string): string {
+	if (is_closed(child) && is_closed(other)) return 'both are closed'
+
+	return `${shown(is_closed(child) ? child : other, current_repo)} is closed`
 }
 
 // Both wordings open with the same clause, and deliberately so: `reported_pairs` reads the first two
@@ -197,7 +217,7 @@ function order_message(
 	const named = `${shown(child, current_repo)} names ${shown(other, current_repo)} in its acceptance criteria`
 
 	if (is_settled) {
-		return `${named} with nothing ordering the two, but both are closed — neither can run first any more.`
+		return `${named} with nothing ordering the two, but ${settled_clause(child, other, current_repo)} — the order can no longer be broken.`
 	}
 
 	return `${named}, but nothing orders the two — it can run first.`
@@ -208,8 +228,8 @@ function order_message(
 //
 // Two cases are deliberately warnings, and they are warnings for different reasons.
 //
-// **Both children closed**: neither can run first any more, so the finding cannot describe anything
-// that will happen.
+// **Either child closed**: the pair can no longer run out of order, so the finding cannot describe
+// anything that will happen.
 //
 // **A pair in two repositories** (joshuafolkken/kit#1128): that order only became recordable with
 // joshuafolkken/kit#1126, so an error would fail the audit `epicrun` runs before its first child and
@@ -231,7 +251,7 @@ function order_level(child: AuditChild, other: AuditChild, is_settled: boolean):
 function order_finding(child: AuditChild, other: AuditChild, current_repo: string): AuditFinding {
 	// Decided once and handed to both. Asked twice — once for the level, once for the wording — the
 	// two could disagree, and the report would carry a level that contradicts the sentence under it.
-	const is_settled = are_both_closed(child, other)
+	const is_settled = is_pair_settled(child, other)
 
 	return {
 		level: order_level(child, other, is_settled),

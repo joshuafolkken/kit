@@ -112,13 +112,15 @@ adds is reading *inside* the children:
 real missing dependency; failing on both would make design notes unwritable. A forward reference the
 other child *already depends on* is not reported at all.
 
-**A pair whose children are both closed is a warning, not an error.** What makes an undeclared order
-a contradiction is that the criteria's child *can run first*, and neither child has any execution
-left — so an epic that once forgot to declare an order would otherwise fail its audit forever, which
-stops every future `epicrun` on it at the first step. It is demoted rather than dropped because
-dropping it hands the same pair to the first check, which reports it as an implicit dependency
-instead: the same one line, minus the detail that the name is in the acceptance criteria
-(joshuafolkken/kit#1010).
+**A pair with either child closed is a warning, not an error.** What makes an undeclared order a
+contradiction is that the criteria's child *can run first*, and one end closing is enough to make
+that false: a closed naming child has already run, and a closed named child has already delivered
+what the criteria ask for — so an epic that once forgot to declare an order would otherwise fail its
+audit forever, which stops every future `epicrun` on it at the first step. It is demoted rather than
+dropped because dropping it hands the same pair to the first check, which reports it as an implicit
+dependency instead: the same one line, minus the detail that the name is in the acceptance criteria
+(joshuafolkken/kit#1010, widened from both-closed to either-closed by joshuafolkken/kit#1597 after a
+closed child citing an open sibling **as evidence** held an epic red at step one).
 
 **Fixing what it finds is Tier A** — re-pointing a dependency or correcting prose is reversible and
 will otherwise stall the work. Park with `needs-decision` only when the contradiction is a design
