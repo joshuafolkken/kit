@@ -149,6 +149,15 @@ describe('what a waiting child is waiting on', () => {
 		expect(backlog_plan.waiting_note(child, plan_context([]))).toBe(backlog_plan.PAST_OFFER_NOTE)
 	})
 
+	// Absence from a cut listing is "not read", never "closed". Read as closed, a standing blocker
+	// disappears and the row claims the child is merely next in line while the run keeps waiting.
+	it('names every blocker when the open listing could not be read to the end', () => {
+		const child = epic_child([READY_CHILD], [])
+		const unknown = { repo: backlog_fixture.REPO, titles: new Map(), open_numbers: undefined }
+
+		expect(backlog_plan.waiting_note(child, unknown)).toBe(`waiting on #${String(READY_CHILD)}`)
+	})
+
 	it('says a child is merely next in line when it declares nothing and carries no label', () => {
 		const child = epic_child([], [])
 

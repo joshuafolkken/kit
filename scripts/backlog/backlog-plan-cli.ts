@@ -38,7 +38,7 @@ const OPEN_UNREADABLE_MESSAGE =
 // A cut listing is a cut *set difference*, which is not the ignorable prefix a display's cap is: an
 // open issue past the cut is missing from the out-of-scope section and its title is missing from
 // every other one. Reported as a gap, the way `backlog:next` reports its own truncated listings.
-const OPEN_TRUNCATED_MESSAGE = `⚠ The open-issue listing stopped at ${String(auto_ok_cli.LISTING_LIMIT)} rows, so the out-of-scope section is partial and some titles are missing. The plan below is incomplete.`
+const OPEN_TRUNCATED_MESSAGE = `⚠ The open-issue listing stopped at ${String(auto_ok_cli.LISTING_LIMIT)} rows, so the out-of-scope section is partial, some titles are missing, and a blocker that has since closed can still be named. The plan below is incomplete.`
 
 interface Plan {
 	result: EpicNextResult
@@ -81,13 +81,19 @@ async function fetch_open(): Promise<OpenListing | undefined> {
 	return read.kind === 'read' ? { rows: read.rows, is_capped } : undefined
 }
 
-function print_plan(plan: Plan, open_issues: ReadonlyArray<OpenIssueData>): void {
+function print_plan(
+	plan: Plan,
+	open_issues: ReadonlyArray<OpenIssueData>,
+	is_capped: boolean,
+): void {
 	const scope = { repo: plan.repo, exclude: plan.exclude }
 	const rows = backlog_scope.out_of_scope(open_issues, plan.result, scope)
+	// A cut listing cannot say an issue is closed, only that it was not read — so the blocker filter is
+	// switched off rather than fed a set that would silently report standing blockers as gone.
 	const context = {
 		repo: plan.repo,
 		titles: backlog_scope.titles_of(open_issues),
-		open_numbers: backlog_scope.open_numbers_of(open_issues),
+		open_numbers: is_capped ? undefined : backlog_scope.open_numbers_of(open_issues),
 	}
 
 	console.info(backlog_plan.format_plan(plan.result, rows, context))
@@ -103,7 +109,7 @@ async function report(plan: Plan): Promise<number> {
 	}
 
 	if (listing.is_capped) console.error(OPEN_TRUNCATED_MESSAGE)
-	print_plan(plan, listing.rows)
+	print_plan(plan, listing.rows, listing.is_capped)
 
 	return SUCCESS_EXIT_CODE
 }

@@ -35,10 +35,15 @@ const PAST_OFFER_NOTE = 'ready, but past the offer this ask could make'
 interface PlanContext {
 	repo: string
 	titles: ReadonlyMap<number, string>
-	// The open issues of this repository, by number. A `blocked_by` edge keeps a blocker that has since
-	// closed — `backlog-pool.ts`'s `to_child` drops the node's state — so without this a waiting row
-	// names a blocker nobody is waiting for.
-	open_numbers: ReadonlySet<number>
+	// The open issues of this repository by number, or `undefined` when the listing was cut short and
+	// absence from it therefore proves nothing.
+	//
+	// A `blocked_by` edge keeps a blocker that has since closed — `backlog-pool.ts`'s `to_child` drops
+	// the node's state — so with a complete listing this is what tells a standing blocker from a
+	// closed one. **With an incomplete one every blocker is named**, because the two errors are not
+	// symmetric: naming a closed blocker sends a person to an issue that turns out to be done, while
+	// dropping a standing one reports the child as merely next in line when the run will keep waiting.
+	open_numbers: ReadonlySet<number> | undefined
 }
 
 // A child elsewhere is qualified, because a bare number would name *this* repository's issue of that
@@ -69,9 +74,17 @@ function row_of(child: EpicChild, context: PlanContext, note: string): string {
 // Why this one is not offered yet. The blocker numbers are the answer whenever there are any — that
 // is the dependency the report has never shown — and the two label-free cases are told apart so
 // "waiting" does not read as "blocked" for an issue that is simply next in line.
+// A blocker is dropped only where it is *known* closed: this repository's, and absent from a listing
+// that was read to the end. Anything else is named.
+function is_standing(edge: IssueReference, context: PlanContext): boolean {
+	if (context.open_numbers === undefined) return true
+
+	return edge.repo !== context.repo || context.open_numbers.has(edge.number)
+}
+
 function open_blockers(child: EpicChild, context: PlanContext): Array<string> {
 	return child.blocked_by
-		.filter((edge) => edge.repo !== context.repo || context.open_numbers.has(edge.number))
+		.filter((edge) => is_standing(edge, context))
 		.map((edge) => reference_of(edge, context.repo))
 }
 
