@@ -41,13 +41,42 @@ function cancelled(): data.ExpressionData {
 const STATUS_FUNCTIONS = [{ name: 'cancelled', minArgs: 0, maxArgs: 0, call: cancelled }]
 const STATUS_FUNCTION_MAP = new Map(STATUS_FUNCTIONS.map((status) => [status.name, status]))
 
-function evaluate_condition(condition: string, context: ContextTree): boolean {
-	const lexed = new Lexer(condition).lex()
+function evaluate(expression: string, context: ContextTree): data.ExpressionData {
+	const lexed = new Lexer(expression).lex()
 	const parsed = new Parser(lexed.tokens, Object.keys(context), STATUS_FUNCTIONS).parse()
-	const result = new Evaluator(parsed, to_dictionary(context), STATUS_FUNCTION_MAP).evaluate()
+
+	return new Evaluator(parsed, to_dictionary(context), STATUS_FUNCTION_MAP).evaluate()
+}
+
+function evaluate_condition(condition: string, context: ContextTree): boolean {
+	const result = evaluate(condition, context)
 	if (result.kind !== data.Kind.Boolean) throw new Error('the gate is not a boolean expression')
 
 	return result.value
+}
+
+// A workflow value such as a concurrency group is a template rather than a single expression:
+// GitHub interpolates each `${{ … }}` segment into the literal text around it. **Non-greedy is
+// load-bearing**: a greedy match would run from the first `${{` to the last `}}` and swallow the
+// literal text between two segments, so a value built from several of them — which the concurrency
+// group is — would be lexed as one malformed expression rather than interpolated piece by piece.
+const INTERPOLATION = /\$\{\{(.*?)\}\}/gu
+
+// Every value GitHub interpolates is coerced to a string, so the segments are evaluated and
+// concatenated the same way. This is what lets a guard assert on the group two events resolve to
+// rather than on the text of the clause that produces it.
+function evaluate_template(template: string, context: ContextTree): string {
+	let rendered = ''
+	let consumed = 0
+
+	for (const match of template.matchAll(INTERPOLATION)) {
+		const expression = match[1] ?? ''
+
+		rendered += template.slice(consumed, match.index) + evaluate(expression, context).coerceString()
+		consumed = match.index + match[0].length
+	}
+
+	return rendered + template.slice(consumed)
 }
 
 const workflow_expression_fixture = {
@@ -55,6 +84,7 @@ const workflow_expression_fixture = {
 	GITHUB_CONTEXT,
 	OUTPUTS_KEY,
 	evaluate_condition,
+	evaluate_template,
 }
 
 export { workflow_expression_fixture, type ContextTree }
