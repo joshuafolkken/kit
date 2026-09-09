@@ -1,6 +1,7 @@
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { Classification } from '#scripts/epic/epic-classify'
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
+import { epic_issue } from '#scripts/epic/epic-issue'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { git_next_issues } from '#scripts/git/git-next-issues'
 import { EPIC_LABEL, has_any_label, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
@@ -36,13 +37,19 @@ function needs_decision(issue: OpenIssueData): boolean {
 
 // An opted-in row as the graph's node type. Both halves of the pool are then the same shape, so one
 // classification covers all of them and the verdict is decided once rather than per source.
+//
+// `repo` stamps the row itself, never its blockers: issue numbers are unique per repository, so a
+// blocker read bare resolves against the *reading* repository and names a different issue there
+// (joshuafolkken/kit#1654). `epic_issue.blocker_references_of` is the epic side's own resolution —
+// `repository_url` when the node names one, this repository only as the fallback an unqualified
+// relation has always meant — and it is reused rather than repeated.
 function to_child(issue: OpenIssueData, repo: string): EpicChild {
 	return {
 		number: issue.number,
 		repo,
 		state: 'OPEN',
 		labels: (issue.labels ?? []).map((label) => label.name),
-		blocked_by: (issue.blockedBy?.nodes ?? []).map((node) => ({ repo, number: node.number })),
+		blocked_by: epic_issue.blocker_references_of(issue, repo),
 	}
 }
 
