@@ -144,10 +144,14 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	'The child was **parked before its commit**',
 	'The child was **parked after its commit and push**',
 	// The reasons have to stay beside the rows: without them the kept lane reads as an exemption
-	// somebody granted, and the next run closes it back.
-	"**A committed child's lane is kept because closing it deletes the branch its resume needs, and no command puts that branch back**",
+	// somebody granted, and the next run closes it back. joshuafolkken/kit#1627 changed which reason
+	// applies — `lane:open` now attaches to a branch that already exists — so what is pinned is the
+	// cost of closing rather than the impossibility of reopening, which is no longer true.
+	"**A committed child's lane is kept because it is the cheapest resume, not because closing it is final**",
 	'`git branch -D <N>-lane`',
-	'so it would cut a **fresh, empty** branch of that',
+	// The correction itself, pinned so a later reword cannot quietly restore the claim that a closed
+	// lane is unrecoverable — a run believing that parks where it could resume.
+	'**What is no longer true is that closing it is unrecoverable**',
 	// The one arm that still closes, and what decides it. Left to judgement this contradicts
 	// "Conflicts are not predicted", which already sends a lost merge race back to a current `main`.
 	'**The exception is decided by what `followup` printed, not by reading the situation.**',

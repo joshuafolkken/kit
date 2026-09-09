@@ -64,6 +64,105 @@ async function resolve(): Promise<string> {
 	return start_point
 }
 
-const lane_start_point = { resolve }
+// **A branch that already exists is attached to, never cut afresh** (joshuafolkken/kit#1627). Its
+// commits are a child's finished work: `epicrun` leaves a lane's branch behind whenever a child is
+// parked after pushing, and `lane:close` deletes the local branch while the remote one and the pull
+// request stay. Cutting a new `<N>-lane` from the default branch there orphans both — and it did so
+// **silently**, because `worktree add -b` succeeds once the local branch is gone. The loud half of
+// the same defect was `fatal: a branch named '<N>-lane' already exists`, which at least stopped.
+//
+// The reuse is said out loud for the same reason the local fallback above is: a lane that starts on
+// somebody's pushed commits is not the lane a fresh open produces, and reading the two as one is how
+// the work gets overwritten.
+function report_reuse(branch_name: string, where: string): void {
+	console.error(
+		`Reusing the existing ${where} branch ${branch_name}; this lane starts at that branch's own commits rather than at the default branch.`,
+	)
+}
+
+// Said when the remote could not be consulted, so a lane that may be behind it is not mistaken for
+// one that is current. The ref is still used: the alternative is cutting a fresh branch over commits
+// somebody pushed, which is the silent failure this whole module exists to remove, and starting on a
+// stale ref is loud and recoverable where that is neither.
+function report_unverified(branch_name: string): void {
+	console.error(
+		`Could not refresh ${REFS_REMOTES_ORIGIN_PREFIX}${branch_name} from origin; using it as it stands, which may be behind the remote.`,
+	)
+}
+
+type RemoteAnswer = 'absent' | 'present' | 'unreachable'
+
+// **The remote-tracking ref is not evidence that the remote still has the branch.** Nothing in the
+// lane lifecycle prunes it — `lane:close` removes the work tree and the local branch, and GitHub
+// deletes the remote branch at the merge — so the ref survives both, and reading one as "the child's
+// work is on origin" would cut a lane from a commit that merged long ago. `ls-remote` is asked
+// instead, because it separates the two answers a `fetch` failure runs together: a branch that is
+// gone from a remote that cannot be reached.
+async function ask_remote(branch_name: string): Promise<RemoteAnswer> {
+	try {
+		const heads = await git_command.ls_remote_branch(branch_name)
+
+		return heads.trim() === '' ? 'absent' : 'present'
+	} catch {
+		return 'unreachable'
+	}
+}
+
+async function refresh_lane_branch(branch_name: string): Promise<void> {
+	try {
+		await git_command.fetch_branch(branch_name)
+	} catch {
+		report_unverified(branch_name)
+	}
+}
+
+async function tracking_reference(branch_name: string): Promise<string | undefined> {
+	const names = await git_command.branch_names_remote(`origin/${branch_name}`)
+
+	return names.length > 0 ? `${REFS_REMOTES_ORIGIN_PREFIX}${branch_name}` : undefined
+}
+
+// `absent` is the one answer that refuses the ref: the branch is gone from origin, so a ref still
+// pointing at it is stale and the lane is cut from the default branch as any new one is. `present`
+// fetches first, so the lane starts at the tip rather than at whatever this checkout last saw.
+async function remote_reference_for(branch_name: string): Promise<string | undefined> {
+	const answer = await ask_remote(branch_name)
+
+	if (answer === 'absent') return undefined
+
+	if (answer === 'present') await refresh_lane_branch(branch_name)
+	else report_unverified(branch_name)
+
+	return await tracking_reference(branch_name)
+}
+
+/**
+ * What `git worktree add` should be given for a lane on `branch_name`.
+ *
+ * `undefined` means **attach**: the branch is already here, so the work tree is put on it and no
+ * branch is created. Every other answer is a commit-ish a new branch is cut from — the remote-tracking
+ * ref of the lane branch when only the remote has it, and the default branch's when neither does,
+ * which is the behavior every lane had before joshuafolkken/kit#1627.
+ *
+ * **Nothing here deletes a branch to simplify the call.** That is what would lose the commits this
+ * function exists to keep.
+ */
+async function resolve_for_branch(branch_name: string): Promise<string | undefined> {
+	if (await git_command.branch_exists(branch_name)) {
+		report_reuse(branch_name, 'local')
+
+		return undefined
+	}
+
+	const remote_reference = await remote_reference_for(branch_name)
+
+	if (remote_reference === undefined) return await resolve()
+
+	report_reuse(branch_name, 'origin')
+
+	return remote_reference
+}
+
+const lane_start_point = { resolve, resolve_for_branch }
 
 export { lane_start_point }

@@ -494,14 +494,21 @@ async function worktree_list(): Promise<string> {
 // the lane then fails with "the upstream branch of your current branch does not match the name of
 // your current branch" — which is *not* the missing-upstream error `push()` retries as
 // `--set-upstream`, so every lane's `pnpm josh git` would stop there. Measured against git 2.x.
+//
+// **An absent `start_point` attaches the tree to the branch that is already there, and neither flag
+// is passed then** (joshuafolkken/kit#1627). `-b` refuses a branch that exists, so a lane whose child
+// had already pushed could not be reopened at all; deleting the branch first to get `-b` back would
+// discard those commits and orphan the pull request. `--no-track` cannot ride along either — git
+// answers `--[no-]track can only be used if a new branch is created` — and it has nothing to do here:
+// whatever upstream the branch was given when it was created is still on it.
 async function worktree_add(
 	directory: string,
 	branch_name: string,
-	start_point: string,
+	start_point: string | undefined,
 ): Promise<string> {
-	const flags = ['add', '--no-track', '-b', branch_name]
+	const flags = start_point === undefined ? ['add'] : ['add', '--no-track', '-b', branch_name]
 
-	return await exec_git_command_read([WORKTREE, ...flags, directory, start_point])
+	return await exec_git_command_read([WORKTREE, ...flags, directory, start_point ?? branch_name])
 }
 
 // **`--force` is the point, not a convenience.** A lane is closed after a park, a failure or an
@@ -516,6 +523,17 @@ async function worktree_remove(directory: string): Promise<string> {
 // deleted by hand recoverable rather than a permanent `worktree add` refusal on that path.
 async function worktree_prune(): Promise<string> {
 	return await exec_git_command_read([WORKTREE, 'prune'])
+}
+
+// **Asked of the remote itself, because nothing prunes the remote-tracking refs**
+// (joshuafolkken/kit#1627). `lane:close` deletes the local branch, GitHub deletes the remote one at
+// the merge, and `refs/remotes/origin/<N>-lane` outlives both: this repository carried sixteen of
+// them for branches the remote no longer had. Empty output on a zero exit is therefore "not on the
+// remote", which a stale ref cannot say, and a non-zero exit is "could not ask" — a different answer
+// again, and the reason the caller cannot use `fetch` for this: `fetch` fails identically for a
+// branch that is gone and for a network that is down, and prunes neither (measured on git 2.x).
+async function ls_remote_branch(branch_name: string): Promise<string> {
+	return await exec_git_command_read(['ls-remote', '--heads', 'origin', branch_name])
 }
 
 // `-D` rather than `-d`: a lane branch is deleted whatever state its work reached, and `-d` refuses
@@ -554,6 +572,7 @@ const git_command = {
 	branch_exists,
 	branch_names,
 	branch_names_remote,
+	ls_remote_branch,
 	add_tracked,
 	add_path,
 	log_first_parent,
