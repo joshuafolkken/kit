@@ -76,6 +76,7 @@ describe('backlog_budget_cli.build_input — an unreadable invocation is refused
 			'an idle watch with nothing to measure it from',
 			[...REQUIRED, '--idle', String(IDLE_MINUTES)],
 		],
+		['an idle watch of zero minutes', [...REQUIRED, '--active', ACTIVE, '--idle', '0']],
 	])('refuses %s', (_name, argv) => {
 		expect(build(argv)).toBeUndefined()
 	})

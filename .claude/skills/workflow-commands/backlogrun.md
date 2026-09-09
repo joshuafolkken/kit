@@ -164,9 +164,9 @@ its full budget rather than at whatever was left. Both are ordinary ISO-8601 tim
 (`date -u +%FT%TZ`), and `--idle` without `--active` is refused rather than measured from the run's
 start. `--merged` is what has merged and `--running` what is still in a lane; **both count against
 the maximum**, since a wave started before the first one merged would otherwise take the run past the
-number the person declared. Reaching the maximum with children still running answers `watch`, so the
-lanes drain rather than being abandoned. The full contract is `docs/josh-commands.md` → "`josh
-backlog:budget`".
+number the person declared. **No ending abandons a lane**: whatever would have ended the run answers
+`watch` while `--running` is above zero, so the lanes drain and their merges reach the report. The
+full contract is `docs/josh-commands.md` → "`josh backlog:budget`".
 
 **The completion report names three things the budgets make meaningful**: how many issues this run
 took, how many of them were picked up during an idle watch, and the termination reason — quoted from

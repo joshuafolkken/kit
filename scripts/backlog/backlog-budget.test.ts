@@ -140,7 +140,25 @@ describe('backlog_budget.decide — reaching the maximum', () => {
 		)
 
 		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
-		expect(decision.reason).toBe(backlog_budget.max_draining_reason(running, MAX_ISSUES))
+		expect(decision.reason).toBe(
+			backlog_budget.draining_reason(
+				running,
+				backlog_budget.max_reached_reason(MERGED_UNDER_MAX, MAX_ISSUES),
+			),
+		)
+	})
+})
+
+describe('backlog_budget.decide — no ending abandons a lane', () => {
+	it('drains the running children on an unreadable listing too', () => {
+		const decision = backlog_budget.decide(
+			input_of({ answer: 'unreadable', running: MERGED_UNDER_MAX }),
+		)
+
+		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
+		expect(decision.reason).toBe(
+			backlog_budget.draining_reason(MERGED_UNDER_MAX, backlog_budget.UNREADABLE_REASON),
+		)
 	})
 
 	it('finishes with the reason named once the maximum is reached', () => {

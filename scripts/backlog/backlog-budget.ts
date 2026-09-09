@@ -91,8 +91,8 @@ function max_reached_reason(merged: number, max_issues: number): string {
 	return `This run's maximum of ${String(max_issues)} is reached, with ${String(merged)} merged. Report what was done, including how many were picked up during an idle watch, and finish.`
 }
 
-function max_draining_reason(running: number, max_issues: number): string {
-	return `This run's maximum of ${String(max_issues)} is taken, with ${String(running)} still running. Start nothing more; poll until they merge, then report and finish.`
+function draining_reason(running: number, reason: string): string {
+	return `Start nothing more and poll until the running children merge (running: ${String(running)}). Then report and finish — ${reason}`
 }
 
 function idle_expired_reason(idle_budget_ms: number): string {
@@ -140,21 +140,25 @@ function stop_reason(input: BudgetInput): string | undefined {
 	return ANSWER_STOP_REASONS[input.answer] ?? whole_run_reason(input)
 }
 
+// Every ending goes through here, so no ending abandons a lane. Children already started have to
+// merge and be reported whatever ended the run — the maximum, a parked backlog, a listing that could
+// not be read, or the whole-run bound — so a `stop` while any of them is still running would leave
+// open lanes behind and merged work unmentioned.
+function stopping(input: BudgetInput, reason: string): BudgetDecision {
+	if (input.running === 0) return { verdict: STOP_VERDICT, reason }
+
+	return { verdict: WATCH_VERDICT, reason: draining_reason(input.running, reason) }
+}
+
 // The maximum is checked before the answer, so reaching it ends the run whatever `backlog:next` was
 // about to offer. The acceptance criterion is that reaching it reports and finishes, and a run that
 // first finished the wave it had already started would report a number the person never approved.
-// **Reaching it while children are still running drains them rather than abandoning them**: a `stop`
-// there would leave lanes open and merged work unreported.
 function max_decision(input: BudgetInput): BudgetDecision | undefined {
 	const { max_issues } = input
 
 	if (max_issues === undefined || taken_by(input) < max_issues) return undefined
 
-	if (input.running > 0) {
-		return { verdict: WATCH_VERDICT, reason: max_draining_reason(input.running, max_issues) }
-	}
-
-	return { verdict: STOP_VERDICT, reason: max_reached_reason(input.merged, max_issues) }
+	return stopping(input, max_reached_reason(input.merged, max_issues))
 }
 
 // An empty backlog with no idle watch is the run's ordinary ending, and that stays the default. With
@@ -163,11 +167,11 @@ function max_decision(input: BudgetInput): BudgetDecision | undefined {
 function idle_decision(input: BudgetInput): BudgetDecision {
 	const { idle_budget_ms } = input
 
-	if (idle_budget_ms === undefined) return { verdict: STOP_VERDICT, reason: NO_IDLE_WATCH_REASON }
+	if (idle_budget_ms === undefined) return stopping(input, NO_IDLE_WATCH_REASON)
 
 	const left_ms = idle_budget_ms - (input.now_ms - input.active_at_ms)
 
-	if (left_ms <= 0) return { verdict: STOP_VERDICT, reason: idle_expired_reason(idle_budget_ms) }
+	if (left_ms <= 0) return stopping(input, idle_expired_reason(idle_budget_ms))
 
 	return { verdict: WATCH_VERDICT, reason: idle_watch_reason(left_ms) }
 }
@@ -175,7 +179,7 @@ function idle_decision(input: BudgetInput): BudgetDecision {
 function decide(input: BudgetInput): BudgetDecision {
 	const reason = stop_reason(input)
 
-	if (reason !== undefined) return { verdict: STOP_VERDICT, reason }
+	if (reason !== undefined) return stopping(input, reason)
 
 	const capped = max_decision(input)
 
@@ -202,9 +206,9 @@ const backlog_budget = {
 	WHOLE_RUN_BUDGET_MS,
 	WHOLE_RUN_REASON,
 	decide,
+	draining_reason,
 	idle_expired_reason,
 	idle_watch_reason,
-	max_draining_reason,
 	max_reached_reason,
 	run_reason,
 	taken_by,

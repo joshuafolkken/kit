@@ -98,12 +98,21 @@ function to_idle_ms(idle_minutes: number | undefined): number | undefined {
 	return idle_minutes === undefined ? undefined : idle_minutes * backlog_budget.MS_PER_MINUTE
 }
 
-// An idle watch measured from the run's start is not the watch that was asked for. A run already
-// working for longer than the budget would answer `stop` on its very first empty backlog, printing
-// that the backlog "stayed empty for the whole watch" — an emptiness it never saw. So `--idle`
-// without `--active` is an unreadable invocation rather than a defaulted one.
+// `--idle 0` is not how the watch is turned off — omitting the flag is. A zero budget expires the
+// instant it starts, so the run would stop reporting that the backlog "stayed empty for the whole
+// 0-minute idle watch", a watch that never happened.
+const MINIMUM_IDLE_MINUTES = 1
+
+// An idle watch measured from the run's start is not the watch that was asked for either. A run
+// already working for longer than the budget would answer `stop` on its very first empty backlog,
+// printing an emptiness it never saw. So `--idle` without `--active` is an unreadable invocation
+// rather than a defaulted one.
 function is_watch_readable(values: ParsedValues): boolean {
-	return text_of(values.idle) === undefined || text_of(values.active) !== undefined
+	const raw = text_of(values.idle)
+
+	if (raw === undefined) return true
+
+	return text_of(values.active) !== undefined && (to_count(raw) ?? 0) >= MINIMUM_IDLE_MINUTES
 }
 
 function are_values_readable(values: ParsedValues): boolean {
