@@ -1,6 +1,7 @@
 import type { RunTiming } from './time-batch'
 import { time_row_cap } from './time-row-cap'
 import { time_run } from './time-run'
+import { time_session_notes } from './time-session-notes'
 
 // Which of a batch row's own notes the table prints beneath it (joshuafolkken/kit#1352).
 //
@@ -30,7 +31,7 @@ const INDENT = ' '.repeat(INDENT_WIDTH)
 // than measuring it as zero (joshuafolkken/kit#1439). Every completed row has `has_ci_data`, which is to
 // say the filter below hides all five from exactly the rows that carry them.
 function is_kept_note(note: string): boolean {
-	if (time_run.is_overlap_note(note) || time_run.is_session_note(note)) return true
+	if (time_run.is_overlap_note(note) || time_session_notes.is_session_note(note)) return true
 	if (time_run.is_unread_note(note)) return true
 
 	return time_run.is_check_read_note(note) || time_run.is_diff_read_note(note)

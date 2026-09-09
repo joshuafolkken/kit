@@ -230,17 +230,6 @@ describe('time_sessions.separate on what a named marker leaves behind', () => {
 		expect(split.excluded).toStrictEqual([])
 	})
 
-	// The parent of a delegated run keeps its own spans out of the child, and they have to show up as
-	// excluded — minutes in neither half are minutes the report cannot account for.
-	it('reports the parent minutes the narrowing dropped as excluded', () => {
-		const parent = session([work(EARLY_MINUTE)], [naming(RUN_MINUTE, ISSUE)])
-		const split = separate([[RUN_SESSION, parent]])
-
-		expect(split.excluded).toStrictEqual([
-			{ session_id: RUN_SESSION, duration_ms: ONE_MINUTE * MINUTE_MS },
-		])
-	})
-
 	// A session that opened the workflow but never wrote the label names nothing, so the presence test
 	// is still what decides — the older rule kept behind the newer one, not replaced by it.
 	it('falls back to the presence test when no marker names the issue', () => {
@@ -251,6 +240,53 @@ describe('time_sessions.separate on what a named marker leaves behind', () => {
 
 		expect(split.kept.has(RUN_SESSION)).toBe(true)
 		expect(split.excluded).toHaveLength(ONE_SESSION)
+	})
+})
+
+// A narrowed session is one the run **kept**, so its dropped minutes are not an exclusion
+// (joshuafolkken/kit#1673). They still have to be reported — minutes in neither half are minutes the
+// report cannot account for — but from their own list, or the note names the transcript the figures
+// had just come out of as a stranger's.
+describe('time_sessions.separate on what narrowing a kept session dropped', () => {
+	const RUN_MINUTE = 10
+	const EARLY_MINUTE = 2
+
+	it('reports the parent minutes as narrowed rather than excluded', () => {
+		const parent = session([work(EARLY_MINUTE)], [naming(RUN_MINUTE, ISSUE)])
+		const split = separate([[RUN_SESSION, parent]])
+
+		expect(split.narrowed).toStrictEqual([
+			{ session_id: RUN_SESSION, duration_ms: ONE_MINUTE * MINUTE_MS },
+		])
+		expect(split.excluded).toStrictEqual([])
+		expect(split.kept.has(RUN_SESSION)).toBe(true)
+	})
+})
+
+// Nothing kept is two states rather than one, and the report prints a different sentence for each
+// (joshuafolkken/kit#1673). Requiring a marker to *name* the issue made the second reachable: every
+// session can carry one and every one of them name a different run.
+describe('time_sessions.separate on why nothing could be separated', () => {
+	const RUN_MINUTE = 10
+
+	it('says the markers name other runs when every declaration belongs to another issue', () => {
+		const split = separate([
+			[RUN_SESSION, session([naming(RUN_MINUTE, OTHER_ISSUE)])],
+			[OTHER_SESSION, session([naming(RUN_MINUTE, OTHER_ISSUE)])],
+		])
+
+		expect(split.is_separated).toBe(false)
+		expect(split.has_other_run_markers).toBe(true)
+	})
+
+	it('says nothing about other runs when no session carries a marker at all', () => {
+		const split = separate([
+			[RUN_SESSION, bystander(ONE_MINUTE)],
+			[OTHER_SESSION, bystander(TWO_MINUTES)],
+		])
+
+		expect(split.is_separated).toBe(false)
+		expect(split.has_other_run_markers).toBe(false)
 	})
 })
 

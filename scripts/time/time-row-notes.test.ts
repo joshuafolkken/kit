@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { time_row_notes } from './time-row-notes'
 import { time_run_fixture, type GhScript } from './time-run-fixture'
+import { time_session_notes } from './time-session-notes'
 import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 
 // The batch rows print a child's own notes only where the GitHub half is missing, so a note about a
@@ -10,6 +11,9 @@ import { time_transcript_fixture as fixture } from './time-transcript-fixture'
 const { write_session, report_of } = time_run_fixture
 const NO_PULL_SCRIPT: GhScript = { pull_body: '[]' }
 const NOTE_SEPARATOR = '\n'
+const ISSUE = 1673
+const ONE_MINUTE_MS = 60_000
+const ONE_SESSION = 1
 
 time_run_fixture.use_transcript_home()
 
@@ -32,6 +36,24 @@ describe('time_row_notes.is_kept_note', () => {
 		write_session('other', fixture.concurrent_lines())
 
 		expect(await kept_notes()).toContain('could not be separated from them')
+	})
+
+	// The third sentence the separation can print (joshuafolkken/kit#1673). A batch row that let the
+	// other two through and not this one would show a corrected figure with nothing saying the parent's
+	// coordination minutes had been taken out of it.
+	it('keeps the note naming what narrowing a kept session dropped', () => {
+		const narrowed = time_session_notes.session_notes(
+			{
+				excluded: [],
+				narrowed: [{ session_id: 'parent', duration_ms: ONE_MINUTE_MS }],
+				is_separated: true,
+				has_other_run_markers: false,
+				attributed_count: ONE_SESSION,
+			},
+			ISSUE,
+		)
+
+		expect(narrowed.every((note) => time_row_notes.is_kept_note(note))).toBe(true)
 	})
 
 	// The transcript count is not one of them: it says nothing a row's own columns do not, and letting

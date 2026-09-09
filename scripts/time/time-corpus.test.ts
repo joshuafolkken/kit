@@ -338,7 +338,9 @@ describe('time_corpus.collect_for_issues — one pass, however many issues', () 
 			spans: [],
 			session_count: 0,
 			excluded: [],
+			narrowed: [],
 			is_separated: false,
+			has_other_run_markers: false,
 			attributed_count: 0,
 			unread_count: 0,
 		})

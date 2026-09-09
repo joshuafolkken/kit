@@ -63,18 +63,32 @@ const NO_END = Infinity
 // Below this there is nothing to separate: one session is the run's whether or not it left a marker.
 const AMBIGUOUS_MINIMUM = 2
 
-// One session left out of a run, named so a reader can open the transcript and check.
-interface ExcludedSession {
+// Minutes this run's figures do not hold, named by the session they came out of so a reader can open
+// the transcript and check. **The shape is neutral about why they were dropped**, because the two
+// reasons print as different sentences and a name that asserted one of them — `ExcludedSession`, as
+// this was called — made the report say the wrong one of a session it had kept
+// (joshuafolkken/kit#1673).
+interface SessionMinutes {
 	session_id: string
 	duration_ms: number
 }
 
 interface SessionSplit {
 	kept: Map<string, SessionSpans>
-	excluded: Array<ExcludedSession>
+	// Sessions dropped whole: attributed to the issue, and no marker says they ran it.
+	excluded: Array<SessionMinutes>
+	// What narrowing a **kept** session dropped — the coordination minutes a parent spent around the
+	// delegated unit that is this run. Carried apart from `excluded` because the session is in `kept`:
+	// reporting it as one left out names the run's own transcript as a stranger's.
+	narrowed: Array<SessionMinutes>
 	// Whether a workflow marker named at least one session as this run's. **False is not "nothing was
 	// excluded"** — it is "nothing could be", and the two print differently.
 	is_separated: boolean
+	// Whether any attributed session carries a workflow marker that names a *different* run. Only read
+	// where `is_separated` is false, and there it is the difference between "no session carries a
+	// marker" and "every marker here belongs to somebody else" — two states one sentence used to claim
+	// to be the first of (joshuafolkken/kit#1673).
+	has_other_run_markers: boolean
 	// How many sessions were attributed before the split, which is what says whether a run no marker
 	// named had anything to be separated from in the first place.
 	attributed_count: number
@@ -277,7 +291,7 @@ function is_this_run(one: Marked): boolean {
 // Longest first, then by session id. Ordered from the spans rather than left as the order the
 // transcript directory happened to list the files in, for the reason `time-overlap.ts` orders its
 // delegated spans: an answer that depends on directory order is one that changes with a file's mtime.
-function compare_excluded(left: ExcludedSession, right: ExcludedSession): number {
+function compare_minutes(left: SessionMinutes, right: SessionMinutes): number {
 	if (left.duration_ms !== right.duration_ms) return right.duration_ms - left.duration_ms
 
 	return left.session_id < right.session_id ? -1 : 1
@@ -286,8 +300,8 @@ function compare_excluded(left: ExcludedSession, right: ExcludedSession): number
 // What narrowing a kept session dropped. **Reported beside the sessions left out whole, so the note
 // and the arithmetic still agree**: minutes in neither `kept` nor `excluded` are minutes the report
 // cannot account for, and the parent of a delegated run loses real ones here (a review finding on
-// joshuafolkken/kit#1648).
-function narrowed_loss(one: Marked): Array<ExcludedSession> {
+// joshuafolkken/kit#1648). **Beside, and not among**: the session it names is one this run kept.
+function narrowed_loss(one: Marked): Array<SessionMinutes> {
 	if (!one.is_delegated_run) return []
 
 	const duration_ms = session_ms(one.session) - session_ms(narrow(one))
@@ -295,14 +309,24 @@ function narrowed_loss(one: Marked): Array<ExcludedSession> {
 	return duration_ms > NO_DURATION ? [{ session_id: one.session_id, duration_ms }] : []
 }
 
-function to_excluded(marked: ReadonlyArray<Marked>): Array<ExcludedSession> {
-	const whole = marked
+function to_excluded(marked: ReadonlyArray<Marked>): Array<SessionMinutes> {
+	return marked
 		.filter((one) => !is_this_run(one))
 		.map((one) => ({ session_id: one.session_id, duration_ms: session_ms(one.session) }))
+		.toSorted(compare_minutes)
+}
 
-	const trimmed = marked.filter((one) => is_this_run(one)).flatMap((one) => narrowed_loss(one))
+function to_narrowed(marked: ReadonlyArray<Marked>): Array<SessionMinutes> {
+	return marked
+		.filter((one) => is_this_run(one))
+		.flatMap((one) => narrowed_loss(one))
+		.toSorted(compare_minutes)
+}
 
-	return [...whole, ...trimmed].toSorted(compare_excluded)
+// Whether any attributed session opened a workflow on some *other* issue. Read only where nothing
+// was kept, and there it is the whole difference between the two sentences that state can print.
+function has_other_run_markers(marked: ReadonlyArray<Marked>): boolean {
+	return marked.some((one) => one.names_only_others)
 }
 
 function to_kept(marked: ReadonlyArray<Marked>): Map<string, SessionSpans> {
@@ -313,9 +337,16 @@ function to_kept(marked: ReadonlyArray<Marked>): Map<string, SessionSpans> {
 
 function not_separated(
 	by_session: ReadonlyMap<string, SessionSpans>,
-	attributed_count: number,
+	marked: ReadonlyArray<Marked>,
 ): SessionSplit {
-	return { kept: new Map(by_session), excluded: [], is_separated: false, attributed_count }
+	return {
+		kept: new Map(by_session),
+		excluded: [],
+		narrowed: [],
+		is_separated: false,
+		has_other_run_markers: has_other_run_markers(marked),
+		attributed_count: marked.length,
+	}
 }
 
 // The run's own sessions, and what leaving the rest out cost. **The identity for a run measured in one
@@ -329,17 +360,19 @@ function separate(
 	const marked = mark(by_session, issue_number)
 	const kept = to_kept(marked)
 
-	if (kept.size === NO_SESSIONS) return not_separated(by_session, marked.length)
+	if (kept.size === NO_SESSIONS) return not_separated(by_session, marked)
 
 	return {
 		kept,
 		excluded: to_excluded(marked),
+		narrowed: to_narrowed(marked),
 		is_separated: true,
+		has_other_run_markers: has_other_run_markers(marked),
 		attributed_count: marked.length,
 	}
 }
 
 const time_sessions = { AMBIGUOUS_MINIMUM, separate }
 
-export type { ExcludedSession, SessionSplit }
+export type { SessionMinutes, SessionSplit }
 export { time_sessions }
