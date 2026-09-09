@@ -918,10 +918,28 @@ turn where the pointer is never opened.** If dropping a sentence would let an ag
 rather than merely proceed less well informed, that sentence is part of the trigger. If dropping it
 only costs context, it belongs at the pointer.
 
-**Trimming is moving, never deleting.** Before a sentence leaves `CLAUDE.md` it has to exist at the
-pointer, and the marker suite that pinned it has to be re-pointed there rather than dropped. A
-canonical section that is thinner than the resident copy is the normal case, not a reason to delete
-— the resident text is then the fuller version, and it is moved in before it is cut out.
+**Trimming is moving, and deleting is the exception that has to be earned.** Before a sentence leaves
+`CLAUDE.md` it has to exist at the pointer, and the marker suite that pinned it has to be re-pointed
+there rather than dropped. A canonical section that is thinner than the resident copy is the normal
+case, not a reason to delete — the resident text is then the fuller version, and it is moved in
+before it is cut out.
+
+**A system that can only move eventually jams, so one route out exists — and it is narrow**
+(joshuafolkken/kit#1525). A rule is *retired* rather than moved only where deleting it cannot change
+what any agent does, and that has to be shown rather than argued:
+
+1. **It is a clone of text that has a declared single source**, and the source is named in the same
+   document. Where the two differ the copy is the wrong one, so nothing can correctly depend on it.
+2. **It carries no sentence that exists nowhere else** — checked against the source it duplicates,
+   not against a memory of it.
+3. **No marker suite pins it**, so no assertion is being dropped along with it.
+
+**"It looks redundant" satisfies none of the three, and a rule with a firing test, a marker, or a
+measured effect is not a candidate at all.** Every rule in these documents was written after a
+specific failure; one that changes nothing today may simply be one whose failure has not recurred
+*because it is there*. When the three do not all hold, the finding is recorded as a candidate with
+its evidence and left standing — a listed candidate costs nothing and can be taken up later, while a
+wrongly deleted rule fails silently, months later, in a run nobody is watching.
 
 **The scope of this list is every resident rule that has an on-demand counterpart** — a skill or an
 on-demand prompt carrying the procedure the resident text routes to. Those are the rules the
@@ -980,10 +998,15 @@ is pinned differently** — by what its refusal says and by the trigger firing, 
   does, so the resident instruction covers it in one clause and the three cases that justify writing
   a file whole stay at the pointer (joshuafolkken/kit#1260).
 
-**Four rules left this list at the first question, and are delivered by a hook instead**
+**These left this list at the first question, and are delivered by a hook instead**
 (joshuafolkken/kit#1524). None lost a sentence; each is pinned by the firing test named beside it
 rather than by a residency marker, and `prompts/collaboration-workflow/rule-delivery.md` is the
-enumeration and the single source of what a turn where the trigger does not fire means.
+enumeration and the single source of what a turn where the trigger does not fire means. **The four
+described below are not the whole set** — the enumeration has grown to eight rows, of which
+`scripts/rules/delivered-rules.ts` carries six and two are their own binaries. The count that used to
+open this paragraph said `Four` and had been wrong since the fifth row landed, which is what a
+restated count does; it is gone rather than corrected, because a number kept in two places drifts
+again (joshuafolkken/kit#1525).
 
 - **The instruction to put independent calls in one turn** — `pnpm josh batch:guard` refuses the
   `Bash` call that would make a third consecutive single-call turn, and states the criterion there.
@@ -1028,6 +1051,33 @@ opens none of them is a turn on which the label is never reached, so residency w
 
 **The criterion is not advisory.** `scripts/workflow-skills.test.ts` caps each document at
 `RESIDENT_CEILING_BYTES` and requires headroom under it, so a procedure restated resident costs
-budget that the next genuinely-resident rule then has to take back out of existing prose. When a
-rule is edited by deleting a neighboring sentence to keep a byte count, the deletion is chosen by
-what was not pinned by a marker rather than by what matters (joshuafolkken/kit#951).
+budget that the next genuinely-resident rule then has to take back out of existing prose.
+
+**What leaves when the budget binds is decided by measurement, not by which sentence a marker
+happened to pin** (joshuafolkken/kit#1525). The old order was the reverse: a rule edited to keep a
+byte count lost whichever neighboring sentence was not pinned by a marker, so the least-defended
+text went rather than the least-useful one, and the bias grew with every rule added
+(joshuafolkken/kit#951). `pnpm josh rule:value` replaces that with a reading — over this checkout's
+recorded sessions it reports, per trigger-delivered rule, how often the run had already kept the rule
+at the moment the trigger fired. **That window is the rule's absence**, because the hook has said
+nothing yet and only the carried text is asking; the ratio is what the carried text earns unaided.
+
+**The first reading refused the deletion it was built to justify, which is why the measurement runs
+first.** Over 220 recorded runs the WIP cap — which keeps a resident copy — was kept unaided in 58% of
+the runs that reached it, while the Issue-comments rule, which has **no** resident copy, managed
+15%. The resident text was the obvious candidate on a reading of the prose, since the refusal repeats
+it almost word for word; the number says it is doing a great deal of work and must stay.
+
+**The three tests then refused every remaining candidate, and that is the route working rather than
+failing.** The four resident one-liners left behind by trigger delivery all fail test 2: the
+paragraph above records why a line stays behind when the hook reaches one harness, so each carries a
+sentence that exists nowhere else. The duplicate list of delivered rules in
+`prompts/collaboration-workflow/residency.md` looked like a clean test-1 case — a stale summary
+sitting directly beneath a pointer to its own single source — and fails test 3, because
+`scripts/shell-body-rule.test.ts` and `scripts/turn-batching-rule.test.ts` each assert that a
+delivered rule is listed there. **Being pinned is what test 3 is for**: that assertion is the design
+requirement it looks like an accident of. Only the restated count above was retired. **A run that
+finds nothing retirable records the candidates with their evidence and stops there**, rather than
+lowering the bar until a deletion appears. A rule
+scoring `-` has declared no compliance test and is **unmeasured, never zero** — it is not thereby a
+candidate.

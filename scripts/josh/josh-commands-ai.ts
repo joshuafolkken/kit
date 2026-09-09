@@ -173,6 +173,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		// every read. The script calls `process.loadEnvFile` itself instead, through
 		// `hook-decision.ts`.
 	},
+	'rule:value': {
+		script: 'scripts/rules/rule-value-cli.ts',
+		description:
+			"What each trigger-delivered rule's carried text earns unaided, read off this checkout's recorded sessions",
+		category: 'AI tools',
+	},
 	'rule:guard': {
 		script: 'scripts/rules/rule-guard.ts',
 		description:
