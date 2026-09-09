@@ -33,7 +33,7 @@ describe(`${SKILL_PATH} — the row and the skill it points at ship together`, (
 // so a skill missing any of them ships the same drift under a keyword.
 describe(`${SKILL_PATH} — carries the four steps`, () => {
 	it.each([
-		'## 1. Measure with `pnpm josh time`, never by hand',
+		'## 1. Measure with `pnpm josh time` and `pnpm josh cost`, never by hand',
 		'## 2. Say whether the last speedup actually worked',
 		'## 3. One ranked list — already-filed issues stay in it',
 		'## 4. File only through `pnpm josh issue:scout`',
@@ -80,6 +80,72 @@ describe(`${SKILL_PATH} — reads the price of a round trip, not only the count`
 		'`model_ms_per_round_trip`',
 		"without it the round trips cannot enter step 3's table at all",
 	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#1609. `josh cost` shipped and `grep -c 'josh cost'` over this skill returned 0,
+// so every table it emitted was ordered by minutes alone — on a backlog whose own epic records credit
+// as the larger of the two costs. The markers pin the call, the scope flag it is *not* passed with,
+// and the derived readings, because a figure re-derived by hand each time is the repetition #1609 was
+// filed to end.
+describe(`${SKILL_PATH} — reads what the run cost, not only how long it took`, () => {
+	it.each([
+		'**A third reading is not `josh time`',
+		'pnpm josh cost --issue <N> --json',
+		'**`--over` is not the flag this step wants, and the command refuses it beside `--issue`, `--all` and `--json` alike**',
+		'**The output is an array of reports even where the scope is one issue**',
+		'**Four derived readings come out of them, and the JSON prints none of them**',
+	])('states %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// The `missing` counters are the cost side of the distinction the rest of this skill already makes
+	// for `span_count: 0` and `not detected`: a corpus that could not be priced is unmeasured, and a
+	// `cost_usd` quoted beside one is a floor rather than the run's cost.
+	it.each([
+		'**Read `missing` before quoting any of them, and a non-zero count is unmeasured rather than zero.**',
+		'`no_usage_lines`, `malformed_lines`, `unreadable_sessions`',
+		'**withheld is not measured as zero**',
+	])('does not read an unpriced corpus as zero dollars: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// The record attributes a request to an issue and to nothing finer, so a per-phase dollar figure
+	// would be invented rather than measured. joshuafolkken/kit#1606 is the issue that builds that axis,
+	// and it follows this reading instead of being assumed by it.
+	it.each([
+		'**There is no phase axis to read, and inventing one is the mistake to avoid here.**',
+		'https://github.com/joshuafolkken/kit/issues/1606',
+	])('leaves the phase axis to the issue that builds it: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+})
+
+// The other half of joshuafolkken/kit#1609: a reading nothing ranks off is one nobody takes. Kept as
+// its own suite because the two halves fail for different reasons — the one above loses the figures,
+// this one loses the column they would go in.
+describe(`${SKILL_PATH} — ranks in minutes and dollars, not minutes alone`, () => {
+	// The two units are not interchangeable: a CI wait is minutes at no cost, and a carried prompt is
+	// cost at no measurable wall clock. A table that converted between them would rank one as the other.
+	it.each([
+		'**Every row carries both units — minutes per run and dollars per run — and names which one it acts on**',
+		'**The two do not follow from one another and are never converted between**',
+		'**Order by whichever unit the report was asked for, and say which at the head of the table.**',
+		"**Estimate the dollar saving from step 1's per-request figures, never as a share of `cost_usd`.**",
+		'**Where `missing` was non-zero, a row that has a dollar saving still prints one and is never blanked.**',
+		'**Label such a figure approximate rather than as a bound.**',
+		'**a row that saves no money keeps the `—` the rule above gives it**',
+	])('ranks in both units: %j', (marker) => {
+		expect(read_skill()).toContain(marker)
+	})
+
+	// The closing enumeration is what a reader checks the report's provenance against, so it has to
+	// name every source the steps above actually read — it named three while step 1 read four.
+	it.each([
+		'**Every figure in its report came out of one of four',
+		"`pnpm josh cost`'s — two readings of the same recorded sessions",
+	])('counts its own sources correctly: %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
 })
