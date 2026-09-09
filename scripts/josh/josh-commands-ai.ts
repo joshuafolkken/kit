@@ -73,6 +73,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			'Order the whole opted-in backlog: auto-ok issues and the children of auto-ok epics',
 		category: 'AI tools',
 	},
+	'backlog:plan': {
+		script: 'scripts/backlog/backlog-plan-cli.ts',
+		description:
+			'Print the whole backlog as a plan: ready now, waiting on what, waiting on a person, out of scope',
+		category: 'AI tools',
+	},
 	'backlog:budget': {
 		script: 'scripts/backlog/backlog-budget-cli.ts',
 		description: 'Say whether a backlogrun may start more work, keep watching, or finish',

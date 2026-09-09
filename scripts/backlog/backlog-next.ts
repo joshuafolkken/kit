@@ -134,7 +134,13 @@ function views_from(reads: ReadonlyArray<EpicRead>): ReadonlyArray<EpicView> {
 	return reads.length === 0 ? [] : epic_next.views_of(reads)
 }
 
-async function answer_pool(context: PoolContext): Promise<number> {
+// The reads and the classification, with none of the printing `backlog:next` then does with them.
+//
+// `backlog:plan` renders this same pool as a plan a person reads before the run starts
+// (joshuafolkken/kit#1652), so the seam is cut here rather than a second read-and-classify path
+// being written beside it: the plan and the run cannot disagree about what may start, because there
+// is one answer and two renderings of it. `undefined` is the refusal — already reported.
+async function resolve(context: PoolContext): Promise<EpicNextResult | undefined> {
 	const references = backlog_pool
 		.opted_in_epics(context.opted_in.issues)
 		.map((number) => ({ number }))
@@ -145,10 +151,18 @@ async function answer_pool(context: PoolContext): Promise<number> {
 	if (refusal !== undefined) {
 		console.error(refusal)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
-	return report(combine(views_from(reads), context), context)
+	return combine(views_from(reads), context)
+}
+
+async function answer_pool(context: PoolContext): Promise<number> {
+	const result = await resolve(context)
+
+	if (result === undefined) return FAILURE_EXIT_CODE
+
+	return report(result, context)
 }
 
 // A backlog nobody has opted into answers `none` before either listing below is asked for.
@@ -159,15 +173,20 @@ function report_none(): number {
 	return SUCCESS_EXIT_CODE
 }
 
-async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
-	if (opted_in.issues.length === 0) return report_none()
-
+// The two reads that stand between the opted-in listing and the pool. Extracted for the same reason
+// `resolve` is: `backlog:plan` needs the identical context, and a second copy of these two failure
+// branches would be a second place for them to be worded differently. `undefined` is the failure —
+// already reported.
+async function context_of(
+	opted_in: OptedIn,
+	exclude: ReadonlyArray<number>,
+): Promise<PoolContext | undefined> {
 	const tracking = await auto_ok_cli.fetch_tracking(opted_in.issues.length)
 
 	if (tracking.kind !== 'read') {
 		console.error(auto_ok_cli.EPICS_UNREADABLE_MESSAGE)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
 	const repo = await git_gh_command.repo_get_name_with_owner()
@@ -175,10 +194,20 @@ async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promis
 	if (repo === undefined) {
 		console.error(REPO_UNREADABLE_MESSAGE)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
-	return await answer_pool({ opted_in, tracking, repo, exclude })
+	return { opted_in, tracking, repo, exclude }
+}
+
+async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
+	if (opted_in.issues.length === 0) return report_none()
+
+	const context = await context_of(opted_in, exclude)
+
+	if (context === undefined) return FAILURE_EXIT_CODE
+
+	return await answer_pool(context)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -218,6 +247,8 @@ const backlog_next = {
 	report,
 	combine,
 	views_from,
+	resolve,
+	context_of,
 	answer_pool,
 	report_none,
 	answer,
@@ -228,4 +259,4 @@ const backlog_next = {
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { backlog_next }
-export type { PoolContext }
+export type { OptedIn, PoolContext }
