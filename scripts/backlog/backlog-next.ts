@@ -104,12 +104,19 @@ function tokens_of(result: EpicNextResult, repo: string): ReadonlyArray<string> 
 
 // A listing that was cut short is reported rather than answered from silently: an opted-in issue
 // past the cut is still runnable, and an epic past the cut leaves its children reading as untracked.
-function warn_gaps(context: PoolContext, has_answer: boolean): void {
-	const listing = auto_ok_cli.truncation_note(context.opted_in.cutoff, has_answer)
+// An epic past the cut leaves its children reading as untracked, which is true of any answer this
+// command reaches — including one that never read a graph at all.
+function warn_epic_gap(context: PoolContext): void {
 	const epics = epic_bundle_gaps.epic_gap(context.tracking.cutoff, auto_ok_cli.LISTING_LIMIT)
 
-	if (listing !== undefined) console.error(listing)
 	if (epics !== undefined) console.error(epics)
+}
+
+function warn_gaps(context: PoolContext, has_answer: boolean): void {
+	const listing = auto_ok_cli.truncation_note(context.opted_in.cutoff, has_answer)
+
+	if (listing !== undefined) console.error(listing)
+	warn_epic_gap(context)
 }
 
 function report(result: EpicNextResult, context: PoolContext): number {
@@ -189,11 +196,15 @@ async function is_transport_failure(result: EpicNextResult): Promise<boolean> {
 }
 
 // The unusable-graph report is withheld here rather than printed beside the retry: its anomaly lines
-// name issues and credentials, which is exactly the wrong place to send the reader. **The truncation
-// warnings are not withheld with it** — they say nothing about issues or credentials, and a run that
-// spends its retries and then ends still has to have been told its listing was cut short.
+// name issues and credentials, which is exactly the wrong place to send the reader. **The epic gap is
+// not withheld with it** — it says nothing about issues or credentials, and a run that spends its
+// retries and then ends still has to have been told its epic listing was cut short.
+//
+// The opted-in listing's own truncation note is withheld, because both of its tails assert something
+// this path did not do: one says an answer was produced, the other that every issue in the listing
+// was excluded. Nothing was excluded here — the graph was never read.
 function report_retry(context: PoolContext): number {
-	warn_gaps(context, false)
+	warn_epic_gap(context)
 	console.error(RETRY_MESSAGE)
 	console.info(VERDICT_TOKENS.retry)
 
@@ -288,6 +299,7 @@ const backlog_next = {
 	READ_FAILURES,
 	VERDICT_TOKENS,
 	tokens_of,
+	warn_epic_gap,
 	warn_gaps,
 	report,
 	combine,
