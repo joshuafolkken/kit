@@ -1,3 +1,4 @@
+import { time_transcript_line } from '#scripts/time/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'
@@ -125,6 +126,55 @@ describe('rule_value.measure — refusals and unmeasurable rules', () => {
 		const reading = reading_for(WIP_CAP, [[text]])
 
 		expect(reading.refusals).toBeLessThanOrEqual(reading.sessions)
+	})
+})
+
+describe('rule_value.measure — a refusal is read from the block, not from the raw line', () => {
+	it('reads a refusal whose errored flag was serialized with a space after the colon', () => {
+		// The test this replaced matched `"is_error":true` against the raw line, so one whitespace in
+		// the serializer would take every rule's `refused` column to zero — indistinguishable from a
+		// hook that never fired (joshuafolkken/kit#1642).
+		const spaced = `{"type":"user","timestamp":"${TIMESTAMP}","message":{"content":[{"type":"tool_result","content":${JSON.stringify(delivered_rules.WIP_CAP_REASON)},"is_error": true}]}}`
+
+		expect(reading_for(WIP_CAP, [[`${session(FILING)}\n${spaced}`]]).refusals).toBe(1)
+	})
+
+	it('does not lend an errored block its successful neighbor on the same line', () => {
+		// Two results in one line: the refusal text sits in the one that succeeded. Matching the line
+		// rather than the block scored it a refusal.
+		const mixed = JSON.stringify({
+			type: 'user',
+			timestamp: TIMESTAMP,
+			message: {
+				content: [
+					{ type: 'tool_result', content: 'unrelated failure', is_error: true },
+					{ type: 'tool_result', content: delivered_rules.WIP_CAP_REASON, is_error: false },
+				],
+			},
+		})
+
+		expect(reading_for(WIP_CAP, [[`${session(FILING)}\n${mixed}`]]).refusals).toBe(0)
+	})
+
+	it('does not read one errored dump of the enumeration as a refusal by every rule', () => {
+		// `cat scripts/rules/delivered-rules.ts && false` writes one errored result carrying every
+		// rule's reason verbatim, and the containment test credited a refusal to all six at once. A
+		// refusal opens with its reason; the source file opens with its imports.
+		const reasons = delivered_rules.DELIVERED_RULES.map((rule) => rule.reason).join('\n')
+		const file_dump = `import { z } from 'zod'\n\n${reasons}\n`
+		const dump = [[`${session(FILING, BODY_READ)}\n${result_line(file_dump)}`]]
+
+		for (const reading of rule_value.measure(dump)) expect(reading.refusals).toBe(0)
+	})
+
+	it('keeps enough of an errored body for a reason signature to be recognized in it', () => {
+		// A cross-module invariant with nothing else asserting it: `ERROR_TEXT_LIMIT` bounds retention
+		// and lives in a module that knows nothing about rule signatures, so lowering it below
+		// REASON_SIGNATURE_LENGTH would make `startsWith` never match and take every `refused` column
+		// silently to zero — the very reading this change exists to make trustworthy.
+		expect(time_transcript_line.ERROR_TEXT_LIMIT).toBeGreaterThanOrEqual(
+			rule_value.REASON_SIGNATURE_LENGTH,
+		)
 	})
 })
 

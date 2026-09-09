@@ -1,5 +1,6 @@
 import type { SessionFile } from '#scripts/cost/cost-transcript'
 import { describe, expect, it } from 'vitest'
+import type { RuleReading } from './rule-value'
 import { rule_value_cli } from './rule-value-cli'
 
 // The regression test for the defect that made the first published reading wrong
@@ -57,5 +58,49 @@ describe('rule_value_cli.group_runs', () => {
 		const grouped = rule_value_cli.group_runs(files).flat()
 
 		expect(grouped).toHaveLength(files.length)
+	})
+})
+
+describe('rule_value_cli.has_own_transcript — a group orphaned by pruning is not a run', () => {
+	it('rejects a group holding only delegated units', () => {
+		// A project whose session files were pruned while their `subagents/` survived. Scored as a run,
+		// its units go back into the denominator that joshuafolkken/kit#1525 took them out of.
+		const orphaned = rule_value_cli.group_runs([
+			session_file(UNIT_ONE, 2),
+			session_file(UNIT_TWO, 1),
+		])
+
+		expect(orphaned).toHaveLength(1)
+		expect(rule_value_cli.has_own_transcript(orphaned[0] ?? [])).toBe(false)
+	})
+
+	it('accepts a group whose session transcript survived', () => {
+		const kept = rule_value_cli.group_runs([session_file(PARENT, 2), session_file(UNIT_ONE, 1)])
+
+		expect(rule_value_cli.has_own_transcript(kept[0] ?? [])).toBe(true)
+	})
+})
+
+function reading_of(is_measurable: boolean, sessions: number, unaided_kept: number): RuleReading {
+	return { id: 'demo', sessions, unaided_kept, refusals: 0, is_measurable }
+}
+
+describe('rule_value_cli.rate_cell — an empty cell says which fact it is', () => {
+	it('reports a rule that declares no compliance test as unmeasured', () => {
+		expect(rule_value_cli.rate_cell(reading_of(false, 0, 0))).toBe(rule_value_cli.UNMEASURED)
+	})
+
+	it('reports a measurable rule no run reached as unreached, not as unmeasured', () => {
+		// The two used to print the same `-`, and the documented reading of that cell is the first one
+		// — so a rule the corpus simply never exercised read as one nothing can score.
+		expect(rule_value_cli.rate_cell(reading_of(true, 0, 0))).toBe(rule_value_cli.UNREACHED)
+	})
+
+	it('keeps the two empty cells distinguishable from each other', () => {
+		expect(rule_value_cli.UNREACHED).not.toBe(rule_value_cli.UNMEASURED)
+	})
+
+	it('reports a percentage where the rule was both measurable and reached', () => {
+		expect(rule_value_cli.rate_cell(reading_of(true, 4, 1))).toBe('25%')
 	})
 })

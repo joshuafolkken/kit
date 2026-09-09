@@ -17,6 +17,11 @@ import { rule_value, type RuleReading } from './rule-value'
 // reached its trigger. `owning_session_id` is the same fold `time-family.ts` applies.
 
 const UNMEASURED = '-'
+// **`-` and this are two different facts, and one cell used to carry both** (joshuafolkken/kit#1642).
+// `unaided_rate` is `undefined` for a rule that declares no `keeps` predicate *and* for one no run
+// ever reached, and `docs/josh-commands.md` asserts only the first reading — so a rule the corpus
+// simply never exercised was read as one nothing can score.
+const UNREACHED = 'no runs'
 const ID_WIDTH = 20
 const NUMBER_WIDTH = 9
 // `process.argv` is `[node, script, ...arguments]`, so the first real argument sits here.
@@ -26,7 +31,9 @@ const HEADINGS: ReadonlyArray<string> = ['runs', 'kept', 'refused', 'unaided']
 function rate_cell(reading: RuleReading): string {
 	const rate = rule_value.unaided_rate(reading)
 
-	return rate === undefined ? UNMEASURED : `${String(rate)}%`
+	if (rate !== undefined) return `${String(rate)}%`
+
+	return reading.is_measurable ? UNREACHED : UNMEASURED
 }
 
 function row_of(reading: RuleReading): string {
@@ -71,6 +78,24 @@ function runs_in(cwd: string): Array<Array<SessionFile>> {
 	return group_runs(cost_transcript.list_sessions(cost_transcript.transcript_directory(cwd)))
 }
 
+// **A group holding only delegated units is not a run** (joshuafolkken/kit#1642). `cost-transcript.ts`
+// documents the state that produces one — a project whose session files were pruned while their
+// `subagents/` directories survived — and there `group_runs` keys the units under a parent that no
+// longer exists, so each orphaned group is scored as a run of its own. That puts subagent
+// transcripts back into the denominator, which is the miscount joshuafolkken/kit#1525 closed,
+// reached from the other side. They are dropped rather than folded into a neighbor: nothing records
+// which run they belonged to.
+function has_own_transcript(files: ReadonlyArray<SessionFile>): boolean {
+	return files.some((file) => !file.is_delegated)
+}
+
+// **Dropping them silently would be the same failure one layer down**, so the count is printed: a
+// corpus that lost half its sessions to pruning reads as a smaller corpus rather than as a broken
+// one, and the reader can tell which.
+function orphan_line(orphaned: number): Array<string> {
+	return orphaned === 0 ? [] : [`orphaned unit groups skipped: ${String(orphaned)}`]
+}
+
 // One run's texts, read only while that run is being scored.
 function* read_runs(runs: ReadonlyArray<ReadonlyArray<SessionFile>>): Generator<Array<string>> {
 	for (const files of runs) {
@@ -80,14 +105,20 @@ function* read_runs(runs: ReadonlyArray<ReadonlyArray<SessionFile>>): Generator<
 	}
 }
 
+// **The orphan count is composed before the empty check, not after it.** A project whose session
+// files were all pruned is the state where *every* group is an orphan, so an early return that built
+// the line later would say "no recorded sessions" about a corpus it had just discarded — the silent
+// drop this reporting exists to prevent, in the one case it matters most.
 function run(cwd: string): Array<string> {
-	const runs = runs_in(cwd)
+	const grouped = runs_in(cwd)
+	const runs = grouped.filter((files) => has_own_transcript(files))
+	const orphans = orphan_line(grouped.length - runs.length)
 
-	if (runs.length === 0) return ['no recorded sessions for this checkout']
+	if (runs.length === 0) return ['no recorded sessions for this checkout', ...orphans]
 
 	const readings = rule_value.measure(read_runs(runs))
 
-	return [`runs read: ${String(runs.length)}`, ...report(readings)]
+	return [`runs read: ${String(runs.length)}`, ...orphans, ...report(readings)]
 }
 
 // **A checkout may be named, because a lane has no sessions of its own.** A worktree cut for one
@@ -100,6 +131,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	for (const line of lines) console.info(line)
 }
 
-const rule_value_cli = { UNMEASURED, group_runs, report, run }
+const rule_value_cli = {
+	UNMEASURED,
+	UNREACHED,
+	group_runs,
+	has_own_transcript,
+	rate_cell,
+	report,
+	run,
+}
 
 export { rule_value_cli }
