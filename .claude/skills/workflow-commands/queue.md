@@ -142,7 +142,7 @@ Never advance the queue on the summary alone.
 ## The session boundary
 
 **A queue accumulates in one session exactly as an epic does**, so the hand-off binds here too
-(joshuafolkken/kit#1567). Ask `pnpm josh cost --over 400000` after every issue's merge and
+(joshuafolkken/kit#1567). Ask `pnpm josh cost --over 150000` after every issue's merge and
 `pnpm josh ms` — the same seam, one issue later — and stop there on `over`, asking the person to cut
 the session. **The resume command is the rest of the queue**, `queue #<next> #<after> …` from the
 first issue that has not run, never the whole queue again.
