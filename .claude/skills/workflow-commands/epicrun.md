@@ -699,8 +699,9 @@ every run (joshuafolkken/kit#1349) and every merged run is appended to `.time-hi
 (joshuafolkken/kit#1471), so the comparison is `pnpm josh time --period <days>` before and after: a
 `checks-wait` that grows with the lane count **is** the queueing, and one that does not is the answer
 that no throttle is needed. **One thing about the workflow is already right** — `ci.yml`'s
-concurrency group is `${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`, so
-N lanes on N branches are N independent groups and no lane cancels another's run.
+concurrency group is keyed on `${{ github.ref }}`, with the commit sha appended on a push to the
+default branch (joshuafolkken/kit#1481), so N lanes on N branches are N independent groups and no
+lane cancels another's run — nor does one lane's merge cancel the main run of the merge before it.
 
 ### The wall-clock comparison, and the half of it that is still missing
 

@@ -7,8 +7,14 @@ on:
   pull_request:
     branches: [main]
 
+# A push run is grouped by the commit it carries, so a later push to main never cancels an earlier
+# one. Without the sha every push to main shares one group — `github.ref` is `refs/heads/main` for
+# all of them — and the run that reaches `notify-auto-tag` for the commit that changed the version
+# disappears: no tag, no publish, and nothing reported as failed (joshuafolkken/kit#1481).
+# The sha is added for `push` only: added unconditionally it would also stop a new push to a pull
+# request from cancelling that pull request's older runs, which is the saving this block exists for.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'push' && format('-{0}', github.sha) || '' }}
   cancel-in-progress: true
 
 # Which browsers the plain-runner fallback downloads when the MCR image could not be resolved.

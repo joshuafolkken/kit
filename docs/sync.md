@@ -286,9 +286,18 @@ SECURITY.md         tsconfig.sonar.json
 > that found nothing upstream-managed in the diff, was overtaken by a force-push that added one, and
 > reached its arming step after the newer run had already reconciled, would arm auto-merge on a diff
 > kit overwrites — with nothing left to run afterwards to undo it. Both copies therefore declare
-> `group: ${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`, the same grouping
-> `ci.yml` uses; `github.ref` is the pull request's own merge ref, so a superseded run is cancelled
-> without one bump waiting on another's.
+> `group: ${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: true`; `github.ref` is
+> the pull request's own merge ref, so a superseded run is cancelled without one bump waiting on
+> another's.
+>
+> **`ci.yml`'s group is no longer the same expression, and it is not one to reconcile with.** Since
+> joshuafolkken/kit#1481 it appends the commit sha on a `push` event, so that every commit landing on
+> the default branch runs to completion instead of being cancelled by the next one. This workflow is
+> triggered by `pull_request` alone, so that clause can never fire here: copied verbatim it renders
+> to the empty string and buys nothing. Copied **without** its `github.event_name == 'push'` guard it
+> would be actively wrong — the merge ref's sha moves with every push to the branch, so each push
+> would get a group of its own and no superseded run would ever be cancelled, which is the whole of
+> what this block buys.
 >
 > In kit's **own** repository the same workflow deliberately has no upstream-managed exclusion — and so
 > has nothing to withdraw, which is why it keeps a plain arming step and the narrower `github.actor`
