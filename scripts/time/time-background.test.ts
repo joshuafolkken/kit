@@ -143,6 +143,22 @@ describe('time_background.positioned', () => {
 		expect(minutes_of(placed?.own_duration_ms ?? 0)).toBe(1)
 	})
 
+	it('leaves a run that backgrounded nothing exactly as it was', () => {
+		const plain = [span(0, 1), span(1, 2)]
+
+		expect(time_background.positioned(plain)).toEqual(plain)
+	})
+})
+
+describe('time_background.positioned — two commands outstanding at once', () => {
+	// An unread launch inside another command's window is still its own run: resolved by the window it
+	// merely sits in, it would be stamped with a second command and its minutes charged to that phase.
+	it('does not stamp an unread launch with the enclosing command', () => {
+		const spans = [launch(0, 1), launch(2, 1, OTHER_ID, PR_COMMAND), join(6, 1)]
+
+		expect(time_background.positioned(spans)[1]?.background_command).toBe(PR_COMMAND)
+	})
+
 	it('charges a span to the run launched most recently before it', () => {
 		expect(time_background.positioned(OVERLAPPING)[2]?.background_command).toBe(PR_COMMAND)
 	})
@@ -153,12 +169,6 @@ describe('time_background.positioned', () => {
 		const placed = time_background.positioned(OVERLAPPING)
 
 		expect(minutes_of(placed[1]?.own_duration_ms ?? 0)).toBe(9)
-	})
-
-	it('leaves a run that backgrounded nothing exactly as it was', () => {
-		const plain = [span(0, 1), span(1, 2)]
-
-		expect(time_background.positioned(plain)).toEqual(plain)
 	})
 })
 

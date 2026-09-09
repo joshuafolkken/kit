@@ -150,14 +150,23 @@ function latest_first(all: ReadonlyArray<BackgroundRun>): Array<BackgroundRun> {
 // thing only while one command is outstanding: launch a second inside the first's window, and an
 // enclosing lookup hands the second launch the first command's length — the wrong number for both,
 // and precisely the two-outstanding-commands case this module is written for.
-function own_run(span: Span, ordered: ReadonlyArray<BackgroundRun>): BackgroundRun | undefined {
-	return is_launch(span) ? ordered.find((run) => run.id === span.background_id) : undefined
+//
+// **It searches every run, not only the ones read back.** An unread launch resolves to its own run
+// too — one whose `ended_ms` is the launch's own, so nothing is widened — and that is what keeps it
+// out of the enclosing branch below. Searched over the read runs alone it would fall through and be
+// stamped with a *different* command, which `time-phases.ts` would then charge its minutes to.
+function own_run(span: Span, all: ReadonlyArray<BackgroundRun>): BackgroundRun | undefined {
+	return is_launch(span) ? all.find((run) => run.id === span.background_id) : undefined
 }
 
 // A launch keeps its own share of the wall clock and gains the length of what it started. Every other
 // span in the window is stamped with the command it ran beside, which is what `time-phases.ts` reads.
-function placed(span: Span, ordered: ReadonlyArray<BackgroundRun>): Span {
-	const own = own_run(span, ordered)
+function placed(
+	span: Span,
+	all: ReadonlyArray<BackgroundRun>,
+	ordered: ReadonlyArray<BackgroundRun>,
+): Span {
+	const own = own_run(span, all)
 	const run = own ?? ordered.find((one) => is_within(span, one))
 
 	if (run === undefined) return span
@@ -177,7 +186,7 @@ function positioned(spans: ReadonlyArray<Span>): Array<Span> {
 
 	const ordered = latest_first(all)
 
-	return spans.map((span) => placed(span, ordered))
+	return spans.map((span) => placed(span, all, ordered))
 }
 
 // The phases whose backgrounded command was never read back, so nothing in the transcript says how
