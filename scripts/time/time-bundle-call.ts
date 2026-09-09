@@ -177,8 +177,15 @@ const REDIRECTION = '>'
 // The one bundleable shell spelling of an edit. `sed -n` prints and `sed -i` rewrites, so the flag is
 // the whole of the difference.
 const IN_PLACE_COMMAND = 'sed'
-const IN_PLACE_FLAG = '-i'
-const LONG_IN_PLACE_FLAG = '--in-place'
+
+// The in-place flags, matched against one word at a time. `-i`, `-i.bak`, `--in-place=.bak` and a
+// bundled `-ni` all write; `-n`, `-E` and `--expression` do not. The long form is anchored on its own
+// because the short alternative cannot match a second leading dash.
+//
+// **A prefix test on `-i` alone missed the bundled spelling**, which is the one this repository's own
+// instructions produce — `sed -ni 's/a/b/p'` wrote a file that `time-writes.ts` named in `writes`
+// while this half answered `is_writing: false`, so one span contradicted itself.
+const IN_PLACE_FLAG_PATTERN = /^--in-place\b|^-[A-Za-z]*i/u
 
 // What a span carries so the sequences can be found later.
 interface BundleFacts {
@@ -237,17 +244,28 @@ function may_write_command(command: string): boolean {
 // else answers `false` — a genuine write missed here only leaves a sequence broken the way it already
 // was, while a read caught here would have its dependency removed, which is the failure that matters
 // (joshuafolkken/kit#1509).
-// `-i`, `-i.bak` and `--in-place` are all the same flag: GNU takes the backup suffix glued to the
-// short form, and `words_of` splits `--in-place=.bak` at the `=`. Matched by prefix so all three read
-// alike — `sed` has no other flag starting `-i`, so the prefix cannot widen this past in-place edits.
-function is_in_place_flag(word: string): boolean {
-	return word.startsWith(IN_PLACE_FLAG) || word.startsWith(LONG_IN_PLACE_FLAG)
+// **The one segment that runs the command, with its quoted text removed first — never the whole
+// line.** Each half closes an over-call, and this predicate feeds the dependency test, so an
+// over-call removes a dependency that is really there:
+//
+// - Scanned whole, `sed -n '1,200p' x.ts | grep -i handler` is an in-place write, because `grep`'s
+//   `-i` is a word of the line. Any single-dash `i` downstream does it — `grep -i`, `find -iname`,
+//   `diff -i`. `command_segment` is the same reader that decides what the span's own label is, so a
+//   later segment cannot answer for the first one.
+// - Unquoted, a `sed` script's own `|` would be read as a pipeline before the segment is picked.
+function write_segment(command: string): string {
+	return time_shell.command_segment(time_shell.unquoted(command))
 }
 
-function is_in_place_edit(command: string): boolean {
-	if (time_shell.leading_word(command) !== IN_PLACE_COMMAND) return false
+// **The certain half of the write question, asked in one place for both readers.** `time-writes.ts`
+// answers *which* files an in-place `sed` wrote and this module answers *whether* it wrote at all;
+// they were two implementations of the same test and disagreed in both directions
+// (joshuafolkken/kit#1509). The predicate lives here because `time-writes.ts` already imports this
+// module, so the reverse direction would be a cycle.
+function is_in_place_sed(segment: string): boolean {
+	if (time_shell.leading_word(segment) !== IN_PLACE_COMMAND) return false
 
-	return words_of(command).some((word) => is_in_place_flag(word))
+	return words_of(segment).some((word) => IN_PLACE_FLAG_PATTERN.test(word))
 }
 
 // `./scripts/x.ts` and `scripts/x.ts` are the same file, and a trailing slash on a directory is
@@ -331,7 +349,10 @@ function tool_facts(name: string, input: unknown): BundleFacts {
 // hide inside a quoted argument and make the call look bundleable, which is the loosening direction;
 // this one only ever removes targets.
 function bash_facts(command: string): BundleFacts {
-	const writes = { is_writing: is_in_place_edit(command), may_write: may_write_command(command) }
+	const writes = {
+		is_writing: is_in_place_sed(write_segment(command)),
+		may_write: may_write_command(command),
+	}
 
 	if (!READ_COMMANDS.has(time_shell.leading_word(command)) || has_mutation(command)) {
 		return { ...not_bundleable(), ...writes }
@@ -368,6 +389,11 @@ const time_bundle_call = {
 	// Exported for the batching guard's own word scan (joshuafolkken/kit#1390), so the two scanners
 	// cannot come to disagree about where one word of a shell line ends and the next begins.
 	words_of,
+	// Exported for `time-writes.ts` (joshuafolkken/kit#1509), which needs the same two answers to say
+	// *which* files an in-place `sed` wrote. Two copies of this test disagreed in both directions at
+	// once — one called a piped `grep -i` a write, the other missed a bundled `sed -ni`.
+	write_segment,
+	is_in_place_sed,
 }
 
 export type { BundleFacts }

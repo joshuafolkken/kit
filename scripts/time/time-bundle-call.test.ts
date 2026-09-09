@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { time_bundle_call } from './time-bundle-call'
+import { time_writes } from './time-writes'
 
 const READ_PATH = 'scripts/time/time-spans.ts'
 const OTHER_PATH = 'scripts/time/time-report.ts'
@@ -179,6 +180,15 @@ describe('time_bundle_call — which calls write', () => {
 		[`cat ${READ_PATH}`, false],
 		[`grep -rn 'a->b' ${READ_PATH}`, false],
 		[`awk '$1 > 5' ${READ_PATH}`, false],
+		// A bundled short flag is the spelling this repository's own instructions produce, and a
+		// prefix test on `-i` alone missed it — leaving one span carrying a written path in `writes`
+		// beside `is_writing: false`.
+		[`sed -ni 's/a/b/p' ${READ_PATH}`, true],
+		// Only the segment that runs the command answers. Scanned whole, any single-dash `i`
+		// downstream — `grep -i`, `find -iname`, `diff -i` — made a pure read into a certain write,
+		// and a read wrongly called a write has its dependency removed.
+		[`sed -n '1,200p' ${READ_PATH} | grep -i handler`, false],
+		[`sed -n 's/x -input/y/p' ${READ_PATH}`, false],
 	])('reads the shell line %s as certainly writing: %s', (command, is_expected) => {
 		expect(time_bundle_call.bash_facts(command).is_writing).toBe(is_expected)
 	})
@@ -191,6 +201,25 @@ describe('time_bundle_call — which calls write', () => {
 		[`cat ${READ_PATH}`, false],
 	])('reads the shell line %s as possibly writing: %s', (command, is_expected) => {
 		expect(time_bundle_call.bash_facts(command).may_write).toBe(is_expected)
+	})
+})
+
+// **The two halves of one `sed` line may never disagree** (joshuafolkken/kit#1509). `time-writes.ts`
+// names *which* files an in-place `sed` wrote and this module answers *whether* it wrote at all; a
+// span carrying a path in `writes` beside `is_writing: false` is a contradiction on one row, and it is
+// exactly what two separate implementations of the test produced — one read the whole line and called
+// a piped `grep -i` a write, the other missed a bundled `sed -ni`. They share one predicate now, and
+// this suite is what would notice a second copy appearing again.
+describe('time_bundle_call — the write question is answered once', () => {
+	it.each([
+		`sed -i '' s/a/b/ ${READ_PATH}`,
+		`sed -ni 's/a/b/p' ${READ_PATH}`,
+		`sed -n '1,200p' ${READ_PATH} | grep -i handler`,
+		`sed -n '1,200p' ${READ_PATH}`,
+	])('agrees with time_writes about whether %s wrote', (command) => {
+		const has_writes = time_writes.bash_writes(command).length > 0
+
+		expect(time_bundle_call.bash_facts(command).is_writing).toBe(has_writes)
 	})
 })
 

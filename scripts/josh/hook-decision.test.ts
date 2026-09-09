@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { hook_decision, type TranscriptGuard } from './hook-decision'
 
 // joshuafolkken/kit#1460: the shell two refusing `PreToolUse` hooks share. Asserted here rather than
@@ -150,8 +150,13 @@ function guard_over(prefix: string, will_block: boolean): TranscriptGuard {
 }
 
 describe('hook_decision — a fault is reported instead of being swallowed', () => {
-	it('allows the call and names the fault where the history cannot be read', () => {
+	// Set per test rather than once in the first one: every case below reads this switch, and taking it
+	// from whatever a preceding case left behind makes each of them pass only in file order.
+	beforeEach(() => {
 		process.env[OTHER_SWITCH_KEY] = UNSET
+	})
+
+	it('allows the call and names the fault where the history cannot be read', () => {
 		mkdirSync(UNREADABLE_TRANSCRIPT, { recursive: true })
 
 		const raw = payload_text(UNREADABLE_TRANSCRIPT)
