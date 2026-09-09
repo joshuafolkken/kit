@@ -346,6 +346,28 @@ The refusal leaves through `hookSpecificOutput.permissionDecision`, the only sha
 
 **Verify it the way #1390 asks to be verified**: run `pnpm josh time --issue <N>` afterwards and compare the pre-implementation phase — `plan` plus `setup`, or the run start to the first `Edit` where the phase table charges a delegated run to `pre-run` — against run #1441's hand-measured 15.4 min and 34%.
 
+### `josh rule:value`
+
+Report what each trigger-delivered rule's carried text earns **unaided** ([#1525](https://github.com/joshuafolkken/kit/issues/1525)). It reads this checkout's recorded sessions — the same corpus `josh time` and `josh cost` read — and prints one row per rule in `scripts/rules/delivered-rules.ts`:
+
+```
+pnpm josh rule:value                       # this checkout
+pnpm josh rule:value /path/to/checkout     # a lane has no sessions of its own; name the primary one
+```
+
+| Column    | Meaning                                                                                                                                                                             |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runs`    | Runs in which the rule's trigger was actually reached. A run that never reaches it says nothing about the rule. A run's delegated units are folded into it, never counted beside it |
+| `kept`    | Of those, the runs that had **already** kept the rule when the trigger fired. Runs are ordered by timestamp, so a unit's call counts before a later one in the parent               |
+| `refused` | Of those, the runs in which a refusal was delivered                                                                                                                                 |
+| `unaided` | `kept / runs` — what the carried text earns with no help from the hook, or `-`                                                                                                      |
+
+**The window before the delivery fires is the rule's absence.** A rule refuses at most once per run, so every session holds a stretch in which the hook has said nothing and only the carried text — the resident copy, where there is one — is asking for compliance. Compliance credited _after_ the trigger is the delivery's contribution, not the text's, and is deliberately not counted.
+
+**`-` means unmeasured, never zero.** Naming the act that counts as keeping a rule is the rule's own business, so it sits on the enumeration beside the trigger as `keeps`; a row that declares none cannot be scored, and reporting `0` would assert "never kept" while `100` would assert the opposite.
+
+**Use it to decide what leaves when the resident budget binds**, in place of the old order in which the sentence no marker pinned was the one that went ([#951](https://github.com/joshuafolkken/kit/issues/951)). The first reading refused the deletion it was built to justify: over 220 recorded runs the WIP cap, which keeps a resident copy, scored 55%, while the Issue-comments rule, which has none, scored 15% — so the resident text that looked most redundant on a reading of the prose is doing the most work. The retirement route the reading feeds is `.claude/skills/workflow-commands/SKILL.md` → §3.
+
 ### `josh rule:guard`
 
 Deliver a rule at the tool call that binds it, instead of carrying it resident in `CLAUDE.md` on every turn ([#1524](https://github.com/joshuafolkken/kit/issues/1524)). Like the other two guards it is not run by hand: `.claude/settings.json` wires it to `PreToolUse` and Claude Code pipes the call it is about to run to it as JSON on stdin.
