@@ -8,9 +8,13 @@ import { create_spawn_error, get_exit_code } from './git-execa-error'
 // and turns a non-zero exit into an error, and a second spawn helper beside it would be the clone
 // `CLAUDE.md` prohibits, so a new caller imports this one instead of growing its own.
 //
-// **`git-push-transport.ts` is the one deliberate exception** and is not a second helper of this
-// kind: a push needs a timeout and a transport-fault retry that no other command has, so it spawns
-// git itself. Anyone auditing spawn sites has exactly these two files to read, and no others.
+// **`git-push-transport.ts` is the one deliberate exception among the command modules** and is not a
+// second helper of this kind: a push needs a timeout and a transport-fault retry that no other
+// command has, so it spawns git itself. Those two files are the spawn sites of the ordinary command
+// modules — the claim stops there. Other parts of this package spawn git for their own purposes
+// (`scripts/run/run-progress-clock.ts`, `scripts/propagate/propagate-git.ts`,
+// `scripts/doctor/doctor-io.ts`, `scripts/git/git-fixture-workspace.ts`), and an audit of how the git
+// binary is resolved has to read those too.
 
 async function read(arguments_: Array<string>): Promise<string> {
 	const git_cmd = git_utilities.get_git_command_for_spawn()
