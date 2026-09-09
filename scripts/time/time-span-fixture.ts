@@ -34,6 +34,7 @@ const UNVARIED = {
 	outcome: time_spans.UNKNOWN_OUTCOME,
 	followup_stages: [],
 	is_continuation: false,
+	...time_spans.no_background(),
 	ended_ms: 0,
 } satisfies Partial<Span>
 

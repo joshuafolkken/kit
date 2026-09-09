@@ -1,3 +1,4 @@
+import { time_background } from './time-background'
 import type { CiFacts } from './time-ci'
 import { time_markers } from './time-markers'
 import { time_overlap } from './time-overlap'
@@ -120,6 +121,12 @@ interface PhaseTotal {
 	// zero, and only this flag tells them apart. The report prints "not detected" rather than
 	// `0.0 min` for the difference.
 	is_detected: boolean
+	// Whether this phase's command was taken into the background and its output never read back
+	// (joshuafolkken/kit#1662). The launch call's own seconds are a real interval and stay in the
+	// total, but they are not how long the command ran and nothing in the transcript says what that
+	// was — so the row carries the note rather than presenting the launch as the measurement. It is
+	// not `is_detected`: the marker did appear, and the minutes below it are real.
+	has_unread_background: boolean
 }
 
 interface PhaseInput {
@@ -219,10 +226,17 @@ function run_end_ms(spans: ReadonlyArray<Span>): number {
 
 // A command's own phase, which wins over whichever window the span sits in. Without that precedence
 // the gate spans now running beside the review would be charged to the review.
+//
+// **A backgrounded command's window is the same precedence one step further** (joshuafolkken/kit#1662).
+// A span sitting inside it and carrying no phase of its own is time the run spent with that command
+// outstanding, and without this it fell to whichever window it happened to open in — so `gate`
+// counted the seconds the launch call took and the minutes the gate actually ran were reported as
+// rework. A span that *does* carry a phase keeps it, which is what leaves the review beside the gate
+// untouched and makes the remaining `gate` minutes the ones nothing else was measured in.
 function command_phase(span: Span): PhaseName | undefined {
 	if (span.marker === time_markers.REVIEW_MARKER) return REVIEW_PHASE
 
-	return COMMAND_PHASES.get(span.josh_command)
+	return COMMAND_PHASES.get(span.josh_command) ?? COMMAND_PHASES.get(span.background_command)
 }
 
 function is_after(span: Span, start_ms: number | undefined): boolean {
@@ -584,6 +598,7 @@ function duration_of(phase: PhaseName, found: Detection): number {
 
 function build_phases(input: PhaseInput): Array<PhaseTotal> {
 	const windows = build_windows(input.spans)
+	const unread = time_background.unread_phases(input.spans)
 	const found: Detection = {
 		windows,
 		totals: totals_of(input.spans, windows),
@@ -596,6 +611,7 @@ function build_phases(input: PhaseInput): Array<PhaseTotal> {
 		phase,
 		duration_ms: duration_of(phase, found),
 		is_detected: is_detected(phase, found),
+		has_unread_background: unread.has(phase),
 	}))
 }
 

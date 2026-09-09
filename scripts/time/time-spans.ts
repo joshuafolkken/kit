@@ -1,5 +1,6 @@
 import { cost_blocks } from '#scripts/cost/cost-blocks'
 import type { FollowupStage } from '#scripts/git/git-followup-stages'
+import { time_background } from './time-background'
 import { time_bundle_call } from './time-bundle-call'
 import { time_followup_stage } from './time-followup-stage'
 import { time_markers, type PhaseMarker } from './time-markers'
@@ -65,6 +66,11 @@ const UNKNOWN_OUTCOME: SpanOutcome = 'unknown'
 interface ResultFacts {
 	call_id: string
 	outcome: SpanOutcome
+	// The id the harness assigned when it took this call's command into the background, and `''` for
+	// every other result (joshuafolkken/kit#1662). Fourth field for the reason the others are here:
+	// the launch's body is the only place the id is written, and the body is gone by the time
+	// anything places the command on the timeline.
+	background_id: string
 	// The stage rows a `pnpm josh followup` call printed into its own output
 	// (joshuafolkken/kit#1445). Third field for the reason the two above are here: the result block is
 	// gone by the time anything aggregates, so what a table wants from it has to be read off it now.
@@ -75,6 +81,7 @@ interface ResultFacts {
 const NO_RESULT: ResultFacts = {
 	call_id: '',
 	outcome: UNKNOWN_OUTCOME,
+	background_id: time_background.NO_BACKGROUND,
 	followup_stages: time_followup_stage.NO_STAGES,
 }
 
@@ -125,6 +132,11 @@ interface ToolCall {
 	writes: ReadonlyArray<string>
 	message_id: string
 	issue: number
+	// The background run this call reads the output of, and `''` for every other call
+	// (joshuafolkken/kit#1662). It is the eighth field carried for the reason the seven above are:
+	// the id sits in the command string, which a span does not keep, and it is the only thing that
+	// says a `tail` two turns later is the join of a command started minutes ago.
+	reads_background: string
 }
 
 const NO_CALL: ToolCall = {
@@ -135,6 +147,7 @@ const NO_CALL: ToolCall = {
 	message_id: NO_MESSAGE_ID,
 	writes: [],
 	issue: time_markers.NO_ISSUE,
+	reads_background: time_background.NO_BACKGROUND,
 	...time_bundle_call.not_bundleable(),
 }
 const UNKNOWN_CALL: ToolCall = {
@@ -145,6 +158,7 @@ const UNKNOWN_CALL: ToolCall = {
 	message_id: NO_MESSAGE_ID,
 	writes: [],
 	issue: time_markers.NO_ISSUE,
+	reads_background: time_background.NO_BACKGROUND,
 	...time_bundle_call.not_bundleable(),
 }
 
@@ -184,6 +198,12 @@ interface Span extends ToolCall, ResultFacts {
 	// the per-tool table's `call_count` both do. Every span the transcript itself yields is `false`;
 	// only the subtraction sets it.
 	is_continuation: boolean
+	// The `pnpm josh <cmd>` this span ran *beside*, where it sits inside a backgrounded command's
+	// window, and `''` everywhere else (joshuafolkken/kit#1662). It is resolved after the walk rather
+	// than read off a call, because the window is not known until the join that closes it has been
+	// seen — so it has `is_continuation`'s shape rather than `marker`'s: every span the walk yields is
+	// empty, and only `time_background.positioned` sets it.
+	background_command: string
 }
 
 interface TimelineEvent extends ToolCall, ResultFacts {
@@ -210,11 +230,16 @@ function non_bash_call(name: string, input: unknown, message_id: string): ToolCa
 		message_id,
 		writes: time_writes.tool_writes(name, input),
 		issue: time_markers.NO_ISSUE,
+		// A non-Bash tool joins a backgrounded command too — `BashOutput` carries the shell id in a
+		// field of its own, `Monitor` names the same `…/tasks/<id>.output` path in a command — so the
+		// same reader is asked here rather than the field being left empty for every tool but `Bash`.
+		reads_background: time_background.read_id_of(input),
 		...time_bundle_call.tool_facts(name, input),
 	}
 }
 
-function bash_call(command: string, message_id: string): ToolCall {
+function bash_call(input: unknown, message_id: string): ToolCall {
+	const command = time_shell.bash_command(input)
 	const josh_command = time_shell.josh_command_of(command)
 
 	return {
@@ -225,6 +250,7 @@ function bash_call(command: string, message_id: string): ToolCall {
 		message_id,
 		writes: time_writes.bash_writes(command),
 		issue: time_markers.bash_issue(command),
+		reads_background: time_background.read_id_of(input),
 		...time_bundle_call.bash_facts(command),
 	}
 }
@@ -232,7 +258,7 @@ function bash_call(command: string, message_id: string): ToolCall {
 function to_tool_call(name: string, input: unknown, message_id: string): ToolCall {
 	if (name !== cost_blocks.BASH_TOOL) return non_bash_call(name, input, message_id)
 
-	return bash_call(time_shell.bash_command(input), message_id)
+	return bash_call(input, message_id)
 }
 
 // Identified calls only. A `tool_use` written without an `id` would otherwise be registered under
@@ -308,6 +334,7 @@ function facts_of(result: Block, call: ToolCall): ResultFacts {
 	return {
 		call_id: result.result_id,
 		outcome: outcome_of(result, call),
+		background_id: result.background_id,
 		followup_stages: result.followup_stages,
 	}
 }
@@ -363,6 +390,18 @@ function equal_durations(duration_ms: number): Pick<Span, 'duration_ms' | 'own_d
 	return { duration_ms, own_duration_ms: duration_ms }
 }
 
+// The three background fields of a span nothing backgrounded, which is every span a test builds
+// (joshuafolkken/kit#1662). Written once here for the reason `equal_durations` above is: three
+// fixtures assemble a `Span` literal, and a field added to two of them is a drift that surfaces only
+// as a table disagreeing with the transcript it was read from.
+type NoBackground = Pick<Span, 'background_id' | 'reads_background' | 'background_command'>
+
+function no_background(): NoBackground {
+	const none = time_background.NO_BACKGROUND
+
+	return { background_id: none, reads_background: none, background_command: none }
+}
+
 function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 	return events.slice(1).map((event, index) => ({
 		category: event.category,
@@ -379,8 +418,11 @@ function to_spans(events: ReadonlyArray<TimelineEvent>): Array<Span> {
 		branch: event.branch,
 		call_id: event.call_id,
 		outcome: event.outcome,
+		background_id: event.background_id,
+		reads_background: event.reads_background,
 		followup_stages: event.followup_stages,
 		is_continuation: false,
+		background_command: time_background.NO_BACKGROUND,
 		ended_ms: event.timestamp_ms,
 		...equal_durations(event.timestamp_ms - (events[index]?.timestamp_ms ?? event.timestamp_ms)),
 	}))
@@ -396,7 +438,10 @@ function parse_timeline(text: string): Timeline {
 	return {
 		started_ms: events[0]?.timestamp_ms ?? 0,
 		ended_ms: events.at(-1)?.timestamp_ms ?? 0,
-		spans: to_spans(events),
+		// **The positioning happens here rather than in a caller** (joshuafolkken/kit#1662): a launch and
+		// the call that reads its output are in one transcript, and by the time spans have been merged
+		// across sessions and trimmed they are fragments rather than calls.
+		spans: time_background.positioned(to_spans(events)),
 	}
 }
 
@@ -424,6 +469,7 @@ const time_spans = {
 	UNKNOWN_TOOL,
 	has_transcript_data,
 	equal_durations,
+	no_background,
 	// Re-exported so the suites that measure how a command is read keep asking one namespace, and so
 	// `time-shell.ts` moving out of this file changed no call site (joshuafolkken/kit#1344).
 	bash_label: time_shell.bash_label,

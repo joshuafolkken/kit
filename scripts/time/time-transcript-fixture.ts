@@ -338,6 +338,7 @@ function span(label: string, ended_minute: number, duration_minutes: number): Sp
 		outcome: time_spans.UNKNOWN_OUTCOME,
 		followup_stages: [],
 		is_continuation: false,
+		...time_spans.no_background(),
 		ended_ms: ended_minute * MINUTE_MS,
 		...time_spans.equal_durations(duration_minutes * MINUTE_MS),
 	}

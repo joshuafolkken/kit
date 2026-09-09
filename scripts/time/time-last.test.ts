@@ -74,7 +74,12 @@ function run_of(index: number): MergedRun {
 }
 
 function gate_phase(minutes: number): PhaseTotal {
-	return { phase: GATE, duration_ms: minutes * MINUTE_MS, is_detected: minutes > 0 }
+	return {
+		phase: GATE,
+		duration_ms: minutes * MINUTE_MS,
+		is_detected: minutes > 0,
+		has_unread_background: false,
+	}
 }
 
 function unit_check(minutes: number): CheckTotal {

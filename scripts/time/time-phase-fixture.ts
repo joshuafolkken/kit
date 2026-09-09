@@ -62,6 +62,7 @@ function base_span(start_minute: number, minutes: number, extra: Partial<Span>):
 		outcome: time_spans.UNKNOWN_OUTCOME,
 		followup_stages: [],
 		is_continuation: false,
+		...time_spans.no_background(),
 		ended_ms: (start_minute + minutes) * MINUTE_MS,
 		...time_spans.equal_durations(minutes * MINUTE_MS),
 		...extra,
