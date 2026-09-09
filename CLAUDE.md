@@ -232,7 +232,7 @@ Before every `git commit` — including follow-up commits on the same branch —
 
 ### Shorthand Commands
 
-`kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill (`.claude/skills/workflow-commands/`), which also carries the `/code-review` → `followup` chain rule, the auto-merge authorization and the Telegram notification formats. **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do, as does the follow-up filing step in Pre-commit Self-Review. Everything a run reaches only after it has read the skill is routed to, never restated. See `.claude/skills/workflow-commands/SKILL.md` → "What stays resident, and what is read from here".
+`kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` and `backlogrun` are the Issue-driven shorthand commands. **Their procedures are not resident** — they live in the `workflow-commands` skill (`.claude/skills/workflow-commands/`). **What stays here is decided by one question: must the rule fire on a turn where no skill was loaded?** Explicit invocation, the mid-workflow stop notification, the `overrides` / `devEngines` prohibitions, the UI-verification gate and the three `epic:*` rules below all do, as does the follow-up filing step in Pre-commit Self-Review. Everything a run reaches only after it has read the skill is routed to, never restated. See `.claude/skills/workflow-commands/SKILL.md` → "What stays resident, and what is read from here".
 
 **Read the skill before running any part of a command — including the first `gh` call.** Acting from the table below alone is not enough: the table says which command was typed, not how to run it.
 
@@ -243,9 +243,8 @@ Before every `git commit` — including follow-up commits on the same branch —
 | `halfrun [#N \| new]`             | Implement + verification gate, then **stop before commit** for manual verification                                          | `.claude/skills/workflow-commands/SKILL.md` + `halfrun.md` + `split-assessment.md`                                   |
 | `queue #N1 #N2 …`                 | `fullrun` for each Issue in the given order, stopping at the first failure                                                  | `.claude/skills/workflow-commands/SKILL.md` + `queue.md` + the `fullrun` set                                         |
 | `epicrun #E…`                     | Run an epic's children unattended — or one ordinary Issue, growing an epic if the work does — parking what needs a decision | `.claude/skills/workflow-commands/SKILL.md` + `epicrun.md` + `split-assessment.md` + the `fullrun` set               |
+| `backlogrun`                      | Run the opted-in backlog unattended — dependency order, lanes, no epic named                                                | `.claude/skills/workflow-commands/SKILL.md` + `backlogrun.md` + the `epicrun` set                                    |
 | `diag [fullrun \| epicrun \| #N]` | Measure where a run's time went with `pnpm josh time` and rank what to cut next — analysis only, starts no workflow         | `.claude/skills/diag/SKILL.md`                                                                                       |
-
-The canonical extended reference stays `prompts/collaboration-workflow/` (indexed by `prompts/collaboration-workflow.md`); the skill is the operational procedure, and the two must agree.
 
 **Three rules decide what a run does when the work turns out not to be one Issue** — the split assessment every entry point applies identically (**its default is not to split**: separability **and** a scope clearly exceeding one verification gate — about 10 changed files, about 400 changed lines — must both hold), a prerequisite discovered mid-run (filed and recorded as a dependency, not parked), and `epicrun` accepting an Issue that is not an epic. All three bind only after a command has started, so all three are read from `.claude/skills/workflow-commands/`: `split-assessment.md` for the assessment itself, `SKILL.md` → §2d for the prerequisite and `epicrun.md` → "When `#N` is not an epic" for the bare-Issue entry — all three single sources, cited directly because their canonical topic files are now pointers to them — and `fullrun.md` / `halfrun.md` / `epicrun.md` for the branch each entry takes.
 
@@ -253,7 +252,7 @@ The canonical extended reference stays `prompts/collaboration-workflow/` (indexe
 
 #### Explicit invocation required (MANDATORY)
 
-Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` workflow (including their `#N` and `new` variants) unless the user has typed the keyword in the **current turn's prompt**.
+Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` / `backlogrun` workflow (including their `#N` and `new` variants) unless the user has typed the keyword in the **current turn's prompt**.
 
 - Conversational requests like "implement X", "fix Y", "open a PR for Z" are **NOT** implicit invocations. Even if the task clearly fits one of these workflows, do not infer authorization from the request shape.
 - Do **NOT** ask confirmation questions like "May I proceed with `halfrun new`?" or "Shall I run `fullrun`?". A confirmation prompt is not an acceptable substitute for explicit invocation.

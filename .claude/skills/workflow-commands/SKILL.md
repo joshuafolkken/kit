@@ -1,12 +1,12 @@
 ---
 name: workflow-commands
-description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` — planning, implementation, the verification gate, unattended epic execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
+description: The procedures for the Issue-driven shorthand commands `kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` and `backlogrun` — planning, implementation, the verification gate, unattended epic and backlog execution, the `/code-review` → `followup` chain rule, auto-merge and the Telegram notifications. Read this the moment the user types one of those keywords (with or without `#N` / `new`), before running any command, and read it too when asked what one of them does or when a run of one has to be resumed or repaired.
 ---
 
 # Issue-driven workflow commands
 
-`kickoff`, `fullrun`, `halfrun`, `queue` and `epicrun` are the shorthand commands this package's
-collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md` because
+`kickoff`, `fullrun`, `halfrun`, `queue`, `epicrun` and `backlogrun` are the shorthand commands this
+package's collaboration workflow is built on. Their procedures live here rather than in `CLAUDE.md` because
 each one applies only while its own command is running — keeping them resident spent context on
 every turn to describe a workflow most turns never enter.
 
@@ -15,7 +15,7 @@ operational procedure, and the two must agree.
 
 ## 0. The rule that fires before any of them — explicit invocation
 
-**Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` workflow (including their
+**Never start a `kickoff` / `halfrun` / `fullrun` / `queue` / `epicrun` / `backlogrun` workflow (including their
 `#N` and `new` variants) unless the user has typed the keyword in the current turn's prompt.** This rule is also
 resident in the AI documents, because it has to hold when this skill has *not* been loaded.
 
@@ -43,6 +43,13 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
 | `halfrun` / `halfrun #N` / `halfrun new` | `halfrun.md` + `split-assessment.md`        |
 | `queue #N1 #N2 …`                        | `queue.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
 | `epicrun #E…`                            | `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
+| `backlogrun`                             | `backlogrun.md` + `epicrun.md` + `split-assessment.md` + `fullrun.md` + `chain-rule.md` + `followup.md` |
+
+**`backlogrun` reads `epicrun.md` too, and that is the point rather than an omission.** It changes
+only which issues are offered and by what authorization; every procedure for *running* one of them —
+lanes, park-and-continue, the `needs-human-review` stop, a prerequisite discovered mid-run, the
+delegated unit, the preflight, the progress watcher, the hand-off check and the guards — stays
+`epicrun.md`'s and is referenced from `backlogrun.md` rather than restated there.
 
 ## 2. What every one of them shares
 
@@ -165,6 +172,11 @@ Read this file, then the one for the command that was typed. `fullrun` and `queu
   **not** an epic — running it as a `fullrun`, and building the epic around it only if a prerequisite
   or a split turns up (`epicrun.md` → "When `#N` is not an epic"). Both follow from what the keyword
   authorizes: a batch, decided once at the start.
+- **`backlogrun` takes those same two and moves the boundary.** It authorizes every issue a person
+  has opted in with `auto-ok` rather than one epic's children, so what changes is which issues are
+  offered — by `pnpm josh backlog:next` — and nothing about how one of them is run
+  (`backlogrun.md`). It is a separate keyword rather than an argument to `epicrun` **because the two
+  declare different authorizations**, and membership stays a person's to decide.
 - **The working-tree hold is claimed before anything else** — `pnpm josh run:hold`, at every typed
   entry point, ahead of the split assessment and ahead of a `new` entry's filing. §2f.
 - **The split assessment** runs before any work starts, at *every* entry point, from the one
@@ -730,8 +742,8 @@ expiry was written for — and a stop whose work is already committed and pushed
 by a standing High finding, is deliberately in that second group: the branch is safe on the remote,
 so freeing the tree after eight hours loses nothing.
 
-**The batch entry points claim per child, not per batch.** `epicrun` and `queue` never call it
-themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh followup`
+**The batch entry points claim per child, not per batch.** `epicrun`, `queue` and `backlogrun` never
+call it themselves; each child runs the `fullrun` procedure, so it claims on entry and `pnpm josh followup`
 releases it at that child's merge, leaving the tree free for the next child and held against anything
 else for the whole time a child is in flight.
 
