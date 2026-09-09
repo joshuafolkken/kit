@@ -99,6 +99,7 @@ const ALIASES: Record<string, string> = {
 	el: 'epic:plan',
 	eb: 'epic:bundle',
 	ao: 'auto-ok:next',
+	bl: 'backlog:next',
 	co: 'cost',
 	tm: 'time',
 	ly: 'layers',
