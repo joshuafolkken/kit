@@ -138,9 +138,11 @@ how this loop is written:**
    an exclusion (joshuafolkken/kit#1630). Report the other repository's candidates in the run summary
    and leave them to a session running there — the same one-session-per-repository shape
    `epicrun.md` → "Concurrency" already has.
-3. **The verdict words are `wait`, `stop`, `error` and `none`** — `none` is `epic:next`'s `complete`
-   under this command's spelling, and there is no `complete` here.
-4. **Exit code 0 covers all four verdicts, and 1 means the listing could not be read** — no answer at
+3. **The verdict words are `wait`, `stop`, `retry`, `error` and `none`** — `none` is `epic:next`'s
+   `complete` under this command's spelling, and there is no `complete` here. **`retry` is the one
+   with no `epic:next` counterpart**: it says GitHub did not answer, which is a statement about the
+   connection and not about the graph (joshuafolkken/kit#1663).
+4. **Exit code 0 covers all five verdicts, and 1 means the listing could not be read** — no answer at
    all. **`error` cannot be told apart by exit code, so read the token rather than the status.**
 
 **What the answer means is this table's; whether the run may act on it is `pnpm josh backlog:budget`'s**
@@ -155,9 +157,22 @@ one-shot judgement joshuafolkken/kit#1460 measured a run walking straight past.
 | `wait`, with something of this run's own still in flight | Everything opted in is blocked or already running, so waiting can still change the answer. Sleep the polling interval and **ask the command again** — `epicrun.md` → "Waiting, and never waiting forever" | `blocked` |
 | `wait` this checkout can never resolve — the only candidates the command reported on standard error are in other repositories, and this run has nothing of its own in flight | Report those candidates with their checkouts. **Waiting cannot resolve them, but a person opting a new issue in here still can**, so the ending is the idle watch's rather than this row's | `exhausted` |
 | `stop` | Nothing can proceed without a person. Report the parked issues and finish | `parked` |
+| `retry`, on fewer than three consecutive asks | GitHub did not answer, so the graph was never read. Sleep the polling interval and **ask the command again** — this is the one answer re-asking is allowed on, and the count is consecutive: any other answer resets it to zero | `blocked` |
+| `retry` for a third consecutive time | The outage is not a hiccup. Report what the command printed on standard error and finish | `unreadable` |
 | `error` | The graph could not be resolved — report what the command printed on standard error and finish. **Never re-ask hoping for a different answer**, and never fall back to picking an issue by hand: that would be the run choosing its own membership | `unreadable` |
 | `none` | Nothing opted in is left | `exhausted` |
 | Exit 1, empty standard output | The listing could not be read. Report it and finish — **it is not `none`**, and reading it as one would report an empty backlog that was never seen | `unreadable` |
+
+**Re-asking on `retry` is not the exception to the `error` rule — it is what that rule was protecting**
+(joshuafolkken/kit#1663). What `error` forbids is a run answering its own question: re-asking there
+would mean hoping a graph the command already read would read differently, and picking an issue by
+hand would mean choosing the membership. `retry` says the command never got an answer to read, so
+asking again is the same question rather than a second opinion, and the run still takes whatever the
+command then says. The counting is what keeps it finite: **three consecutive `retry` answers end the
+run**, and any other answer puts the count back to zero, so an outage cannot be waited out forever
+and a single dropped connection cannot end a run with the backlog untouched. The count is the run's
+own — `backlog:budget` is told `blocked` while it has retries left and `unreadable` on the third, which
+is how the ending still comes from the budget rather than from a clock kept in an agent's head.
 
 **Feed every issue this run has merged back through `--exclude`.** GitHub applies `closes #N`
 asynchronously, so a just-merged issue can still read as open on the next ask and be offered a second
