@@ -30,7 +30,10 @@ What one invocation does, in order:
   an exception is re-thrown as-is with **no** Telegram sent — so a silent run is a failed run, never
   a quiet success. **It fires before the merge, not after it**: a merge rejected by a branch
   protection or a conflict leaves the ✅ already sent, so never read a received completion Telegram
-  as proof the pull request merged. Read what the command printed.
+  as proof the pull request merged. Read what the command printed. **It is not the only message the
+  command can send**: the run report below adds a `warning` Telegram (⚠️) after the merge when the
+  run could not be recorded in the time history — so a ⚠️ arriving after a ✅ for the same issue is
+  one run, not two.
 - **Merges** — unless `--no-merge` was passed. **Merging is the default**, and `--merge` is a
   deprecated no-op kept for compatibility: passing nothing merges just the same. `--no-merge` is the
   only thing that stops it.
@@ -63,9 +66,21 @@ What one invocation does, in order:
   or a `queue`, ends here, which is why this one seam covers all of them. **It measures nothing of its
   own**: the report is built by the same builder `josh time` calls, and what is printed is a short
   block — elapsed, turns, round trips, the per-round-trip cost, and the same figures against the
-  previous recorded run. **It cannot fail a run**: the merge has already happened by the time it runs,
-  so a history that cannot be read or written prints one line saying the measurement was unavailable
-  and names the `pnpm josh time --issue <N>` that would take it. `JOSH_TIME_HISTORY=0` turns it off,
+  previous recorded run. **It is written against the *session's* checkout, not the process's**
+  (joshuafolkken/kit#1628): a child running in a lane work tree resolves back to the main checkout
+  first, the same normalization the read side has applied since joshuafolkken/kit#1617. Without it
+  the lane looked for its own transcripts under a project directory that has never existed, came back
+  unmeasured, and appended nothing at all — thirteen consecutive merges were lost that way, and had
+  they been appended they would have gone to a file `pnpm josh lane:close` deletes. **It cannot fail a
+  run**: the merge has already happened by the time it runs, so a history that cannot be read or
+  written prints one line saying the measurement was unavailable and names the
+  `pnpm josh time --issue <N>` that would take it — **and, since joshuafolkken/kit#1628, sends that
+  same fact as a `warning` Telegram (⚠️)**, because thirteen runs lost their record with the printed
+  line sitting unread in every one of their console logs. **The warning is not a `failure`**: the run
+  merged, and only its measurement did not land. A send that itself fails is reported on stderr and
+  the run still carries on. **It never fires for a history that was switched off** — `JOSH_TIME_HISTORY=0`
+  is an answer, not a gap, and warning once per merge about an opted-out feature is how a warning
+  channel stops being read. `JOSH_TIME_HISTORY=0` turns the whole step off,
   and the full tables stay where they were — `pnpm josh time`, and the `diag` skill that reads them.
   **What reads the accumulation back is `pnpm josh time --period <days>`**
   (joshuafolkken/kit#1470): it groups the recorded runs into lanes by the wall clock they occupied and
@@ -98,8 +113,10 @@ followup stages total:              40.8 s
   stages after the failure never ran, so they have no duration to report.
 - **The `merge` row appears only on a run that merged**, so a `--no-merge` block is a row shorter.
 - **The total is the sum of the stages, not the command's whole wall clock.** What sits outside it is
-  the tail the workflow script prints afterwards — the next-issue listing and the version line — so a
-  `pnpm josh time` reading of the same span is a second or two longer, and that gap is the tail.
+  the tail the workflow script runs afterwards — the run report, the review-record clears, the hold
+  release, the next-issue listing and the version line — so a `pnpm josh time` reading of the same
+  span is longer, and that gap is the tail. It is normally a second or two; a run whose record could
+  not be written adds a Telegram round trip to it.
 - **What was measured is on joshuafolkken/kit#1349**, and cutting any of it is deliberately not this
   block's business: the required-check wait and the AI-review scan are the merge gate, and narrowing
   either to make a number smaller is the workaround `CLAUDE.md` prohibits.

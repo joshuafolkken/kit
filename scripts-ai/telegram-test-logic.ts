@@ -22,6 +22,7 @@ const VALID_TASK_TYPES: ReadonlyArray<TelegramTaskType> = [
 	'planning',
 	'completion',
 	'failure',
+	'warning',
 	'kickoff_retry',
 	'confirmation',
 ]

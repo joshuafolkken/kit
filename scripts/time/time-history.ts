@@ -34,6 +34,7 @@ const DISABLED_VALUE = '0'
 const PERCENT_SCALE = 100
 const PERCENT_DECIMALS = 1
 const NO_PREVIOUS = 'no earlier run recorded'
+const NO_REASON_GIVEN = 'nothing was measured and no reason was given'
 const HEADING_PREFIX = '📈 Run report'
 
 // Only the figures two runs are actually compared on. The full report stays reachable through
@@ -60,6 +61,22 @@ const record_schema = z.object({
 })
 
 type RunTimeRecord = z.infer<typeof record_schema>
+
+// What `record_run` answers. `lines` is what the caller prints, unchanged; `is_recorded` says
+// whether a line actually reached `.time-history.jsonl`, and `reason` carries why it did not so a
+// notification can name it without re-deriving it from the rendered text.
+//
+// **`reason` is absent, not `undefined`, whenever there is nothing to explain** —
+// `exactOptionalPropertyTypes` is on — and its absence carries meaning of its own: a run that was
+// *not* recorded because the history is switched off is not a gap anybody needs telling about. So a
+// caller deciding whether to raise the alarm branches on `reason`, not on `is_recorded` alone;
+// `is_recorded` answers the narrower question of whether a line reached the file.
+interface RunRecordOutcome {
+	is_recorded: boolean
+	lines: Array<string>
+	reason?: string
+}
+
 type ReportBuilder = (issue_number: number, cwd: string) => Promise<TimeReport>
 type Clock = () => string
 
@@ -243,13 +260,13 @@ function is_disabled(): boolean {
 	return process.env[ENVIRONMENT_KEY] === DISABLED_VALUE
 }
 
-function unavailable_lines(issue_number: number, reason: string): Array<string> {
+// The one shape a caller acts on: nothing reached the file, the line that says so, and the reason on
+// its own so a notification can name it without parsing the rendered text back apart.
+function not_recorded(issue_number: number, reason: string): RunRecordOutcome {
 	const issue = String(issue_number)
+	const line = `${HEADING_PREFIX} unavailable for issue #${issue} (${reason}) — run \`pnpm josh time --issue ${issue}\` to measure it.`
 
-	return [
-		'',
-		`${HEADING_PREFIX} unavailable for issue #${issue} (${reason}) — run \`pnpm josh time --issue ${issue}\` to measure it.`,
-	]
+	return { is_recorded: false, lines: ['', line], reason }
 }
 
 function reason_of(error: unknown): string {
@@ -277,29 +294,43 @@ function measured_lines(
 	cwd: string,
 	report: TimeReport,
 	now: Clock,
-): Array<string> {
-	if (!is_measured(report)) return unavailable_lines(issue_number, report.notes.join('; '))
+): RunRecordOutcome {
+	// An unmeasured report normally says why in `notes`, but the field defaults to empty — and an
+	// empty reason renders as `unavailable for issue #42 () —`, which is the one thing the reason is
+	// carried for. So the absence is named rather than left blank.
+	if (!is_measured(report)) {
+		const reason = report.notes.join('; ')
+
+		return not_recorded(issue_number, reason.length > 0 ? reason : NO_REASON_GIVEN)
+	}
 
 	const kept = append_record(cwd, to_record(issue_number, report, now()))
 
-	return format_block(kept)
+	return { is_recorded: true, lines: format_block(kept) }
 }
 
 // The whole feature, as one call the caller prints: measure the finished run, keep the record, and
 // render it beside the one before it. Never throws — a run that merged has finished, and a failure
 // here is reported rather than raised.
+//
+// **The outcome is returned, not only the lines** (joshuafolkken/kit#1628). Printing was the whole
+// of the report for one release, and thirteen consecutive runs lost their record with nothing but a
+// line in a scrollback nobody re-reads to say so. A caller that has somewhere louder to put the fact
+// — the completion notification — cannot find it by matching the rendered text, so the answer is
+// carried as a field. `is_recorded` is false for a disabled history too: nothing was written, and a
+// caller asking "is this run in the file" must not be told yes because the switch was off.
 async function record_run(
 	issue_number: number,
 	cwd: string,
 	build: ReportBuilder = build_default,
 	now: Clock = now_default,
-): Promise<Array<string>> {
-	if (is_disabled()) return []
+): Promise<RunRecordOutcome> {
+	if (is_disabled()) return { is_recorded: false, lines: [] }
 
 	try {
 		return measured_lines(issue_number, cwd, await build(issue_number, cwd), now)
 	} catch (error) {
-		return unavailable_lines(issue_number, reason_of(error))
+		return not_recorded(issue_number, reason_of(error))
 	}
 }
 
@@ -316,4 +347,4 @@ const time_history = {
 }
 
 export { time_history }
-export type { RunTimeRecord }
+export type { RunRecordOutcome, RunTimeRecord }
