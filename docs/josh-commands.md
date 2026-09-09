@@ -355,12 +355,12 @@ pnpm josh rule:value                       # this checkout
 pnpm josh rule:value /path/to/checkout     # a lane has no sessions of its own; name the primary one
 ```
 
-| Column    | Meaning                                                                                                                                                                                                                               |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `runs`    | Runs that reached the situation the rule governs — its trigger, or `reaches` where the row declares one. A run that never reaches it says nothing about the rule. A run's delegated units are folded into it, never counted beside it |
-| `kept`    | Of those, the runs that had **already** kept the rule when the trigger fired. Runs are ordered by timestamp, so a unit's call counts before a later one in the parent                                                                 |
-| `refused` | Of those, the runs in which a refusal was delivered                                                                                                                                                                                   |
-| `unaided` | `kept / runs` — what the carried text earns with no help from the hook, or `-`                                                                                                                                                        |
+| Column    | Meaning                                                                                                                                                                                                                                                          |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runs`    | Runs that reached the situation the rule governs — its trigger, or `reaches` where the row declares one. A run that never reaches it says nothing about the rule. A run's delegated units are folded into it, never counted beside it                            |
+| `kept`    | Of those, the runs that kept the rule **unaided** — before the trigger fired, or without it firing at all, which is the ordinary case for a row that declares `reaches`. Runs are ordered by timestamp, so a unit's call counts before a later one in the parent |
+| `refused` | Of those, the runs in which a refusal was delivered                                                                                                                                                                                                              |
+| `unaided` | `kept / runs` — what the carried text earns with no help from the hook, or `-`                                                                                                                                                                                   |
 
 **The window before the delivery fires is the rule's absence.** A rule refuses at most once per run, so every session holds a stretch in which the hook has said nothing and only the carried text — the resident copy, where there is one — is asking for compliance. Compliance credited _after_ the trigger is the delivery's contribution, not the text's, and is deliberately not counted.
 

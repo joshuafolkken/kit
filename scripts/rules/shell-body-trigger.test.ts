@@ -189,9 +189,10 @@ describe('keeps_body_safe — the spellings the refusal hands back', () => {
 		// A call doing both is not credited for the half it got right — the measurement asks whether the
 		// rule was kept before it asks whether it was broken.
 		'pnpm josh followup --notify-message-file /tmp/b.md -f body="see `git log -1`"',
-		// **The refusal text itself names `--body-file <path>`**, so a command that merely quotes the
-		// flag is a run reading this repository rather than one passing a body by path.
+		// **The refusal text itself names `--body-file <path>` and `$'…'`**, so a command that merely
+		// quotes either is a run reading this repository rather than one passing a body safely.
 		'grep -rn "--body-file" scripts/rules',
+		`grep -rn "--body=$'" scripts/rules`,
 		NO_BODY_COMMAND,
 	])('does not read %j as a body passed safely', (command) => {
 		expect(shell_body_trigger.keeps_body_safe(command)).toBe(false)

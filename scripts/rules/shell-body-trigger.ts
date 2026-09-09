@@ -125,9 +125,11 @@ function is_shell_evaluated_body(command: string): boolean {
 const FILE_FLAG = /(?:--body-file|--notify-message-file)(?:[\s=]|$)/u
 const FIELD_FILE_REFERENCE = new RegExp(String.raw`${FIELD_FLAGS}[\s=]*body=@\S`, 'u')
 // **`$'…'` is the other form the refusal sanctions**, because zsh expands neither a backtick nor a `$`
-// inside it. It is read off the raw command: blanking the single-quoted span is exactly what would
-// hide it.
+// inside it. Only the **double**-quoted spans are blanked before it is read: blanking the single-quoted
+// span is exactly what would hide the form itself, while leaving the double-quoted ones would credit
+// `grep -rn "--body=$'" scripts/rules` — a run reading this repository — as one that passed a body.
 const ANSI_C_BODY = /(?:(?:--body|--notify-message)[\s=]+|body=)\$'/u
+const DOUBLE_QUOTED_SPAN = /"[^"]*"/gu
 
 // **Any spelling that hands a command a body, whatever the quoting.** The trigger above reads double
 // quotes alone, because those are the ones the shell evaluates; the occasion the rule governs is
@@ -152,7 +154,7 @@ function inline_body_literals(command: string): Array<string> {
 }
 
 function is_safe_body_form(command: string): boolean {
-	if (ANSI_C_BODY.test(command)) return true
+	if (ANSI_C_BODY.test(command.replaceAll(DOUBLE_QUOTED_SPAN, ' '))) return true
 
 	const flags = command.replaceAll(QUOTED_SPAN, ' ')
 
