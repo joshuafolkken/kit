@@ -27,6 +27,7 @@ function span(
 		check_key: '',
 		marker: time_markers.NO_MARKER,
 		is_bundleable: false,
+		is_writing: false,
 		targets: [],
 		// No message id, which is the state every case predating joshuafolkken/kit#1406 was written in:
 		// the round trips are then read by the adjacency fallback exactly as they were. A case about

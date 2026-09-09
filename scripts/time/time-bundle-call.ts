@@ -163,10 +163,39 @@ const FLAG_PREFIX = '-'
 const PATH_SEPARATOR = '/'
 const MIN_TARGET_LENGTH = 3
 
+// The tools that write. **Kept here rather than in the guard** (joshuafolkken/kit#1509): the guard
+// held its own copy, and the sequence builder had no way to ask at all — so a run of edits to one
+// file was read as a chain of dependent calls and no sequence ever formed. One answer, one place.
+const WRITING_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'NotebookEdit'])
+
+// A shell line that writes even though its leading word reads. `sed` is the one that matters — it is
+// in `READ_COMMANDS` because `sed -n` is a read, so `sed -i` would otherwise be classified as one.
+const WRITING_WORDS: ReadonlySet<string> = new Set(['dd', 'sed', 'tee'])
+
+const REDIRECTION = '>'
+
+// The one bundleable shell spelling of an edit. `sed -n` prints and `sed -i` rewrites, so the flag is
+// the whole of the difference.
+const IN_PLACE_COMMAND = 'sed'
+const IN_PLACE_FLAG = '-i'
+
 // What a span carries so the sequences can be found later.
 interface BundleFacts {
 	is_bundleable: boolean
 	targets: ReadonlyArray<string>
+	// Whether the call **certainly** rewrites what it names. **Two writes to one file do not depend on
+	// each other** — the text is already held, so both belong in one turn — while a write after a read
+	// of the same file genuinely does. `time-bundles.ts` reads this to tell the two apart
+	// (joshuafolkken/kit#1509).
+	is_writing: boolean
+	// Whether the call **might** write, which is a different question and needs the opposite bias.
+	//
+	// **The two were one field and that was a defect.** Refusing a write leaves a turn half applied, so
+	// the refusal test must over-call a line a write: a read wrongly excluded costs one un-refused
+	// call. The dependency test needs the opposite — a read wrongly called a write would have its
+	// dependency *removed*, so `sed -n '1,200p' x.ts` twice would read as a bundleable pair when the
+	// second may well have needed the first. Same bias, opposite consequences, so they are two fields.
+	may_write: boolean
 }
 
 // A function rather than a shared constant, so no two calls end up holding one `targets` array —
@@ -174,7 +203,7 @@ interface BundleFacts {
 // span constants in `time-spans.ts` are module-level and would otherwise share one array between
 // every model and human span of a run.
 function not_bundleable(): BundleFacts {
-	return { is_bundleable: false, targets: [] }
+	return { is_bundleable: false, targets: [], is_writing: false, may_write: false }
 }
 
 function words_of(command: string): Array<string> {
@@ -187,6 +216,30 @@ function words_of(command: string): Array<string> {
 // call under-counted, which is the direction this module leans everywhere.
 function has_mutation(command: string): boolean {
 	return words_of(command).some((word) => MUTATION_WORDS.has(word))
+}
+
+// **The conservative half.** A redirection writes whatever follows it, and the three words above
+// write their argument. Kept wider than `has_mutation` deliberately, because it feeds the refusal
+// test: over-calling a line a write costs one un-refused call, while under-calling it risks refusing
+// an edit whose siblings would then land alone. It matches `>` as a character rather than a token, so
+// `awk '$1 > 5'` is caught too — a call allowed that could have been refused, which is the safe
+// direction here and **only** here.
+function may_write_command(command: string): boolean {
+	if (command.includes(REDIRECTION)) return true
+
+	return words_of(command).some((word) => WRITING_WORDS.has(word))
+}
+
+// **The certain half**, which the dependency test reads and which therefore may not over-call. The
+// one shell line that certainly rewrites a file *and* is bundleable is the in-place `sed`: `sed` is on
+// the read list because `sed -n` prints, so the flag is what separates the two spellings. Everything
+// else answers `false` — a genuine write missed here only leaves a sequence broken the way it already
+// was, while a read caught here would have its dependency removed, which is the failure that matters
+// (joshuafolkken/kit#1509).
+function is_in_place_edit(command: string): boolean {
+	if (time_shell.leading_word(command) !== IN_PLACE_COMMAND) return false
+
+	return words_of(command).includes(IN_PLACE_FLAG)
 }
 
 // `./scripts/x.ts` and `scripts/x.ts` are the same file, and a trailing slash on a directory is
@@ -242,20 +295,25 @@ function tool_targets(input: unknown): Array<string> {
 // The facts for a call that is not `Bash`. The tool name decides the kind; the input decides the
 // targets, and a tool that is not bundleable still has none read — nothing ever asks.
 function tool_facts(name: string, input: unknown): BundleFacts {
-	if (!BUNDLEABLE_TOOLS.has(name)) return not_bundleable()
+	// A tool names what it does, so here the two questions have the same answer.
+	const writes = { is_writing: WRITING_TOOLS.has(name), may_write: WRITING_TOOLS.has(name) }
 
-	return { is_bundleable: true, targets: tool_targets(input) }
+	if (!BUNDLEABLE_TOOLS.has(name)) return { ...not_bundleable(), ...writes }
+
+	return { is_bundleable: true, targets: tool_targets(input), ...writes }
 }
 
 // The facts for a `Bash` call. The leading command comes from `time-shell.ts` rather than from a
 // second reader here — the two answers have to be the same one, or a call could be labelled by one
 // command and classified by another.
 function bash_facts(command: string): BundleFacts {
+	const writes = { is_writing: is_in_place_edit(command), may_write: may_write_command(command) }
+
 	if (!READ_COMMANDS.has(time_shell.leading_word(command)) || has_mutation(command)) {
-		return not_bundleable()
+		return { ...not_bundleable(), ...writes }
 	}
 
-	return { is_bundleable: true, targets: targets_in(command) }
+	return { is_bundleable: true, targets: targets_in(command), ...writes }
 }
 
 // The facts for one call named the way a caller holding a raw tool invocation names it — a tool and
