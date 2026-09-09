@@ -113,6 +113,23 @@ describe('time_phase_costs — requests the price table could not cost', () => {
 	})
 })
 
+// The corpus concatenates spans per session, so a run worked in two sessions arrives with its spans
+// out of time order — which is what the sort in `regions_of` is for. Reversed here so that sort is
+// load-bearing: read in array order, the implement span would claim the boundary instead.
+const REVERSED: ReadonlyArray<Span> = [span(6, 2, { marker: time_markers.EDIT_MARKER }), span(0, 6)]
+
+describe('time_phase_costs.build — spans that did not arrive in time order', () => {
+	it('charges a boundary instant to the phase that ends there, whatever order they came in', () => {
+		const facts = time_phase_costs.build({
+			spans: REVERSED,
+			requests: [at(6, 4)],
+			round_trip_count: ROUND_TRIPS,
+		})
+
+		expect(facts.by_phase.map((row) => row.phase)).toEqual([time_phases.SETUP_PHASE])
+	})
+})
+
 describe('time_phase_costs.build — the price of one round trip', () => {
 	// The same denominator `ms_per_round_trip` uses, so a bundling proposal can be ranked by
 	// multiplying either figure by the recoverable round trips it names.
