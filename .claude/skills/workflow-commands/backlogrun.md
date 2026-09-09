@@ -41,7 +41,8 @@ authorization:
 **One `backlogrun` approves every merge of every issue a person has opted in with `auto-ok`** — the
 issues carrying the label, every child of an epic whose root carries it, and the issues the run files
 itself — **filing them, not running them**: an issue this run creates carries no `auto-ok`, so
-`backlog:next` never offers it and no later iteration picks it up. That is `epicrun`'s authorization with the epic boundary taken off, and it is why this is a
+`backlog:next` never offers it and no later iteration picks it up **unless a person opts it in**.
+That is `epicrun`'s authorization with the epic boundary taken off, and it is why this is a
 **separate keyword rather than an argument to `epicrun`**: `epicrun #E` declares "the children of
 `#E`" and `backlogrun` declares "everything opted in". The declaration *is* the statement of what may
 be executed unattended, and that is the one thing a run must not leave ambiguous. An argument would
