@@ -13,6 +13,8 @@ const { open_turn_lines, target_turn_lines, ms } = time_transcript_fixture
 
 const NEVER_REFUSED = 0
 const FRESH_PATH = 'scripts/fresh.ts'
+// A path-shaped word that appears only inside quotes (joshuafolkken/kit#1611).
+const QUOTED_PATTERN = 'scripts/time'
 const FRESH_CALL = { name: 'Read', input: { file_path: FRESH_PATH } }
 // The two calls both tables below name, and their labels, so neither the fixture nor the wording is
 // written twice.
@@ -168,6 +170,25 @@ describe('time_batch_guard.should_block — one refusal per sequence', () => {
 		const after_the_sequence_began = ms(3)
 
 		expect(time_batch_guard.should_block(text, FRESH_CALL, after_the_sequence_began)).toBe(false)
+	})
+
+	// joshuafolkken/kit#1611. The dependency veto above is the one thing `targets` decides here, so
+	// narrowing what a line names moves it — and this is the direction that move takes. A quoted
+	// search pattern names nothing: `grep -rn "scripts/time" scripts/fresh.ts` looks for that text
+	// *inside* `scripts/fresh.ts` and does not need whatever earlier call read `scripts/time`. While
+	// `bash_facts` tokenized the quotes, the pair shared a word and the veto let this call through;
+	// now it is refused, which is the answer the sequence had all along.
+	it('refuses a call whose only shared word was a quoted search pattern', () => {
+		const text = transcript(
+			target_turn_lines(0, ['a.ts']),
+			target_turn_lines(1, [QUOTED_PATTERN]),
+			open_turn_lines(2, ['c.ts']),
+		)
+		const command = `grep -rn "${QUOTED_PATTERN}" ${FRESH_PATH}`
+
+		expect(
+			time_batch_guard.should_block(text, { name: 'Bash', input: { command } }, NEVER_REFUSED),
+		).toBe(true)
 	})
 
 	// Once a batched turn has broken the run, what follows is a new sequence and the guard speaks again.

@@ -140,7 +140,10 @@ const RUN_TAIL_REASON =
 	'only because the person asked; joshuafolkken/kit#1333 had already settled that the merge is ' +
 	'issued in the turn the review closes. While the push runs, do the work that writes nothing — ' +
 	'drafting the completion body to a file, deciding the branch-2 disposition. `pnpm josh followup` ' +
-	'itself stays in the **foreground**: nothing follows it, so there is nothing to overlap. The ' +
+	'itself stays in the **foreground** — nearly every step after it reads its result. But a tail ' +
+	'does follow the merge, measured at 3.0 min and 5.9% of a run (joshuafolkken/kit#1462), so ' +
+	'empty it beforehand: the steps that read the merge result stay after `followup`, and the rest ' +
+	'are composed in the turn that issues it, bar the one exception §2h names. The ' +
 	'procedure is `.claude/skills/workflow-commands/SKILL.md` → §2h, "A command that can take minutes ' +
 	'is issued in the background". **This rule fires on every foreground push, not once per run**, so ' +
 	'reissuing the same call in the foreground will be refused again.'

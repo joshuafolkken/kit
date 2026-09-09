@@ -35,6 +35,11 @@ const SINGLE_SOURCE_MARKERS: ReadonlyArray<string> = [
 	'**Issue it in the background, and never give a foreground call a timeout above the harness cap.**',
 	`**${PUSH_COMMAND} — background.**`,
 	'**`pnpm josh followup` — foreground, and that is the boundary rather than an exception.**',
+	// joshuafolkken/kit#1462: the bullet above kept its conclusion and lost its reason. Both halves of
+	// the correction are pinned, because dropping either leaves the section asserting a tail that the
+	// measurement found — 3.0 min, 5.9% of a run — does not exist.
+	'**A tail does follow the merge, and it is not small**',
+	'**So the tail is emptied before `followup` is issued, rather than worked through after it returns.**',
 	OVERLAP_TEST,
 	'**The turn never ends at the push.**',
 	'**so the guarantee is a mechanism and not only the procedure**',
@@ -69,6 +74,16 @@ describe(`${SKILL} — §2h is the single source`, () => {
 		'names %j as a wait with work beside it',
 		(wait) => {
 			expect(read_unwrapped(SKILL)).toContain(wait)
+		},
+	)
+
+	// The retracted premise, asserted absent rather than deleted quietly. Left standing anywhere in the
+	// section it contradicts the correction above, and a reader who stops at it does the whole tail
+	// after the merge (joshuafolkken/kit#1510 wrote it, joshuafolkken/kit#1462 disproved it).
+	it.each([["it is the run's last call"], ['so there is nothing to overlap']])(
+		'no longer claims %j',
+		(retracted) => {
+			expect(read_unwrapped(SKILL)).not.toContain(retracted)
 		},
 	)
 

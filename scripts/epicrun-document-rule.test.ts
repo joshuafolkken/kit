@@ -132,7 +132,40 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	// A lost merge race is what six lanes produce on purpose; counted as a failure it aborts the run
 	// for working as designed.
 	'It is **not** counted against the consecutive-failure guard',
-	'**Rebasing the loser automatically is deliberately not done.**',
+	// joshuafolkken/kit#1623: the child resolves the conflict rather than being parked. The premise
+	// that makes it safe to try is pinned beside the instruction — an agent that reads the steps
+	// without reading why the work survives them will reach for a park at the first refusal.
+	'**That child does not stop: it resolves the conflict in its own lane**',
+	'**Nothing is at risk while it resolves, because the work is already committed and pushed.**',
+	// The direction is load-bearing: a rebase rewrites pushed commits and needs a force push, which
+	// this package denies outright, so a document that says only "take main" describes a dead end.
+	"**The merge direction is `origin/main` into the lane's branch, never a rebase**",
+	// The rule's whole point. Written as "a person decides" it reads as a safety measure, which is
+	// the reasoning joshuafolkken/kit#1623 found misdirected: the danger is unreviewed code merging,
+	// and that is answered by re-running the verification, not by changing whose hand resolves.
+	'**The safeguard is the re-run verification, not who holds the pen.**',
+	'**In this repository routing it to a person does not even resolve it**',
+	// The four exits, pinned individually. A list pinned only by its heading can lose a row silently,
+	// and each row here is what keeps the decision off the agent's judgement at a cost-pressured
+	// moment — which is exactly when a missing row gets filled in with "it seemed fine".
+	'**The run steps back under these four conditions, and under no others. The list is exhaustive and carries no judgement.**',
+	"**The resolution requires deleting the other side's change.**",
+	'**Both sides rewrote the same lines**',
+	'**A second conflict on the same child.**',
+	// The bound condition 3 asserts is only real if something durable records the resolution. A merge
+	// commit on a lane branch is not that: a session resuming after an interrupt cannot count them.
+	'never off memory, so it survives an interrupt',
+	// Condition 4 has to cover an ordinary red gate, not only a High. A merged `main` can introduce a
+	// lint error or a failing test, and a list declared exhaustive that has no exit for the most
+	// likely outcome of step 2 sends the agent back to judgement at the moment it must not.
+	'**The re-run gate did not come back green, or the resolution review returned a High.**',
+	// The one step-back that is not a code decision has to say what shape it takes, or it becomes a
+	// diff mailed to somebody who does not read diffs.
+	'"behavior A or behavior B" — never as a diff',
+	// The lane row for a conflict, and the exception joshuafolkken/kit#1623 removed from the table.
+	'| The child hit a **merge conflict** |',
+	'**Every after-commit park now keeps its lane, with no exception left in this table**',
+	'**A lost merge race is not one of these rows**',
 	// What a lane does on each ending — the four the Issue asked to have written down.
 	'What happens to a lane',
 	'**Its lane is left open and untouched**',
@@ -150,11 +183,35 @@ const LANE_MARKERS: ReadonlyArray<string> = [
 	"**A committed child's lane is kept because it is the cheapest resume, not because closing it is final**",
 	'`git branch -D <N>-lane`',
 	// The correction itself, pinned so a later reword cannot quietly restore the claim that a closed
-	// lane is unrecoverable — a run believing that parks where it could resume.
+	// lane is unrecoverable — a run believing that parks where it could resume. It replaces the
+	// pinned sentence "so it would cut a **fresh, empty** branch of that", which described
+	// `lane:open`'s old behavior and is not in the document any more (joshuafolkken/kit#1627).
 	'**What is no longer true is that closing it is unrecoverable**',
-	// The one arm that still closes, and what decides it. Left to judgement this contradicts
-	// "Conflicts are not predicted", which already sends a lost merge race back to a current `main`.
-	'**The exception is decided by what `followup` printed, not by reading the situation.**',
+	// Which row a child takes, and what decides it. Left to judgement it contradicts "Conflicts are
+	// not predicted", which now sends a lost merge race to a resolution in the lane it is already in.
+	// joshuafolkken/kit#1623 reworded this from "the exception" — the exception it named was the one
+	// arm that still closed, and that arm is gone, so the old sentence announced a carve-out its own
+	// paragraph had just abolished.
+	'**Which of these rows a child takes is decided by what `followup` printed, not by reading the situation.**',
+	// The conflict row and the failure row both match one `followup` outcome, so the table has to say
+	// which wins. Without it the failed row's consecutive-failure count is charged to a lost merge
+	// race, which is the abort the prose two sections up explicitly forbids.
+	'**A merge conflict is not this row**',
+	// A park read before step 4 leaves an unconcluded merge in a lane that is kept, and the row it
+	// takes justifies itself on the tree being clean. The abort is what makes those two agree, and it
+	// has to name which conditions it covers — scoped to 1 and 2 it left condition 4 holding a
+	// resolved-but-uncommitted merge, which is the same hazard from the other side.
+	'**Leave the tree clean before parking: `git merge --abort` precedes a park under conditions 1, 2 or 4.**',
+	// Without a step that concludes and pushes the merge, `origin` never changes: step 5 reads the
+	// same conflict, condition 3 counts it as the second, and the child is parked for good. The
+	// procedure could not reach a merge at all. The deny is pinned with it because an agent that
+	// reaches for `git commit` by hand is refused and has nowhere documented to go.
+	'**Conclude the merge and push it, with `pnpm josh git -y`.**',
+	'denies `Bash(git commit*)` and `Bash(git add*)`',
+	// The recording moved from step 1 to step 4 so that an attempt ending in a park leaves no count
+	// behind — recorded at step 1, an aborted merge still spent the child's one resolution.
+	'Recording it *here* rather than at step 1',
+	'The count is read off the Issue comments step 4 writes',
 	// The seat is the reason the old row closed unconditionally, so keeping a lane has to answer it
 	// rather than ignore it.
 	'**A kept lane holds its seat, and that is the price rather than an oversight.**',
@@ -195,6 +252,24 @@ const WITHDRAWN_PREMISES: ReadonlyArray<string> = [
 	'Until it lands, ask `epic:next`',
 	'**The snippet shows the one-at-a-time form deliberately.**',
 	'add --lanes once joshuafolkken/kit#1497 lands',
+	// joshuafolkken/kit#1623 withdrew the refusal to resolve. These are pinned absent rather than
+	// merely unpinned because the failure mode is a half-edit: an agent that adds the resolution
+	// procedure and leaves the old refusal standing ships a document that both instructs and forbids
+	// the same act, and the positive markers above would all still pass.
+	'**Rebasing the loser automatically is deliberately not done.**',
+	'A person re-runs the child on a current',
+	'its lane closed rather than kept',
+	// The table's removed exception. Left behind, it closes the very lane the resolution runs in.
+	'the park was a lost merge race, which is closed instead',
+	// The sentence that framed that exception. It survived the first edit of joshuafolkken/kit#1623
+	// and announced a carve-out the three sentences after it had just withdrawn — a reader going
+	// top-down still reached for `lane:close`.
+	'**The exception is decided by what `followup` printed, not by reading the situation.**',
+	// The unattended-trade paragraph is three sections above the conflict rule and was written when a
+	// conflict parked. Left standing it tells a reader arriving top-down that every overlap waits for
+	// a person, which is the opposite of what that rule now says.
+	'parks a child, which waits for a person',
+	'asks for a person more often',
 ]
 
 // joshuafolkken/kit#913: a child is run as `fullrun #<N>`, and `fullrun` requires `josh latest`

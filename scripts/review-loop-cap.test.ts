@@ -22,6 +22,13 @@ const CANONICAL_MARKERS: ReadonlyArray<string> = [
 	'A confirmed High is never deferred.',
 	'Blocking the merge is not the same as buying more rounds.',
 	'do not start a third',
+	// joshuafolkken/kit#1623: the one carve-out from the count. Without it a child that spent both
+	// rounds and then hit a merge conflict has to merge its resolution unreviewed — the cap producing
+	// the outcome it exists to prevent. Both halves are pinned: the exemption, and the bound that
+	// keeps it from being a way back to an unbounded loop.
+	'### A merge-conflict resolution review is not one of the two',
+	'that round does not count against the cap',
+	'**It is one round, over the resolution diff only, and it terminates.**',
 ]
 
 const RESIDENT_MARKERS: ReadonlyArray<string> = [
