@@ -131,6 +131,25 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	'a single correctly-spaced arm is allowed',
 	// The interval reaching another machine at all, which a non-committed `.env` cannot do.
 	'The interval travels with the repository too',
+	// joshuafolkken/kit#1650. The verbatim rule handed over eight unlabelled `·`-joined values, which
+	// protected the content and lost the reader — so the presentation is labelled, while the half the
+	// verbatim rule was actually defending is restated as a rule of its own.
+	'The line is presented with a label in front of every field, never handed over as it was printed',
+	'handing over an unreadable line does not achieve it',
+	'Four field lines, in this order, and a fifth for the next report time',
+	'Every value is carried across unchanged; the presentation adds a label and nothing else',
+	'Naming a field is not interpreting it',
+	// A field the command did not measure must not be presented as one that came back clean.
+	'Never present an unmeasured field as a measurement',
+	'never as *not stalled*, which is a measurement the command did not take',
+	// The question a heartbeat is asked every time it does not answer it — and the two conditions that
+	// keep the answer a schedule rather than a claim.
+	'The presentation closes with the next report time, written as an absolute instant in both clocks',
+	'It is derived, not observed',
+	'a real report arriving first resets the clock through `--mark` and supersedes it',
+	'The next report time is the one instant the presentation does derive',
+	// The volume budget is unchanged: the five lines stand where the one line stood.
+	'The presentation stands where the relayed line stood, and is not an addition to it',
 ]
 
 // One case per file per marker: the section's body must live in exactly one file.

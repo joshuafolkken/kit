@@ -997,16 +997,62 @@ exits* — Claude Code is one — relays nothing at all from a watcher that neve
 followed the earlier wording started a watcher and then went 2h36m without a single progress line
 with children in flight (joshuafolkken/kit#1576). The long-running form, `pnpm josh run:progress`
 with no `--wait`, is still the right one where output really is streamed; it is not the one to start
-here. The parent adds nothing to the line and asks nothing to produce it.
+here. The parent changes no value on the line and asks nothing to produce it.
 
 **The step the parent repeats, named so a session that has read only this can run it.** Every
 interval is these three moves and there is no fourth:
 
 1. Start `pnpm josh run:progress --wait --output <transcript paths>` **in the background**.
-2. When it exits, **relay what it printed into the session verbatim** — nothing added, nothing
-   summarized.
+2. When it exits, **present what it printed in the labelled form below**, and close that
+   presentation with the next report time.
 3. **In that same turn, start the next one.** The interval is measured from the last report, so the
    next `--wait` waits a full interval from the line just relayed and nothing else has to be timed.
+
+**The line is presented with a label in front of every field, never handed over as it was printed.**
+What the command emits is one `·`-joined run of values with no labels on any of them — seven fixed
+fields and one further segment per child in flight —
+`⏳ at 2026-09-09 13:27+07:00 / 2026-09-09T06:27Z · quiet 29m · #1631 in-progress,route:split PR:open · lanes none · load 4.7 · record unread · unchanged 0m` —
+and a person reading that cannot say what `record unread` or `unchanged 0m` refers to
+(joshuafolkken/kit#1650). The verbatim rule this replaces was protecting something real — that the
+run must not dress up what it observed — but **handing over an unreadable line does not achieve
+it**, because a report nobody can parse informs nobody. Presentation and content are two questions,
+and only the second one the verbatim rule was ever about.
+
+**Four field lines, in this order, and a fifth for the next report time.** The grouping is fixed so
+that a reader who has seen one report can find a field in the next without re-reading it:
+
+1. **the observation instant** — the `at` stamp, copied across exactly as printed, local first and
+   UTC beside it;
+2. **how long it has been quiet**, and **how long the observation has been unchanged**;
+3. **the children in flight** — each one's number, its labels and its pull request state;
+4. **the lanes, the load average, and the unit-output age** (the `record` field).
+
+**Every value is carried across unchanged; the presentation adds a label and nothing else.** No
+rounding, no rephrasing of a value into a state, no figure the line did not carry. **Naming a field
+is not interpreting it**, and the boundary between the two is the whole of what the verbatim rule
+was defending: `quiet 29m` may be labelled *quiet* and may not become *stalled*.
+
+**Never present an unmeasured field as a measurement.** `record unread` means **no `--output` path
+was given**, and it is presented as that — never as *not stalled*, which is a measurement the
+command did not take. `lanes none` is *no lane is open*, never *nothing is running*. The section
+already forbids printing a verification result the command never read, and this is that same rule
+arriving at the fields it actually reads.
+
+**The presentation closes with the next report time, written as an absolute instant in both
+clocks** — `2026-09-09 13:42+07:00 / 2026-09-09T06:42Z`, the same form the stamp itself uses. What a
+person wants from a heartbeat is when to look again, and a run that leaves it out is asked for it
+every time. **It is derived, not observed**: the `at` stamp on the line just presented plus the
+interval in force — `--interval`, else `JOSH_PROGRESS_INTERVAL_MINUTES`, else
+`josh` → `progress_interval_minutes`, else twenty — so it is labelled as a schedule rather than
+reported as a fact. **Two conditions ride with it in the same line**: it is the time *if the silence
+continues*, and a real report arriving first resets the clock through `--mark` and supersedes it.
+
+**The presentation stands where the relayed line stood, and is not an addition to it.** Its five
+lines are that one line rendered readably, and the two lines of the run's own prose that "What the
+run itself writes on a quiet tick" allows below are counted separately and are unchanged. **The turn
+does grow — about one line to about five — and the fixed shape is what stops it growing further**:
+joshuafolkken/kit#1567 measured the *run's own* prose as the expensive half, and five lines with no
+table and no re-listing of children is a cost that does not compound with the run's length.
 
 **It exits only when it has a line to hand over**, or when `--hours` runs out with the run never
 having gone quiet for a whole interval — and that second exit says so on standard error rather than
@@ -1086,8 +1132,11 @@ machines and read in cloud sessions, and joshuafolkken/kit#1245 already paid for
 in the reader's zone making one process look like a stranger. Printing both costs twenty-five characters
 and leaves neither reader guessing, which is why neither half is dropped. **It is added, never substituted for the elapsed figure**:
 how long it has been quiet and when the observation was taken are two different facts, and neither
-can be reconstructed from the other. **The relayed lines need nothing added to them** — `josh
-run:progress` prints the same stamp itself, so the rule above still holds exactly as written.
+can be reconstructed from the other. **The presented line needs no stamp computed for it** — `josh
+run:progress` prints this one itself, so the presentation's observation field copies that stamp
+across rather than deriving a second one, and the rule above still holds exactly as written. **The
+next report time is the one instant the presentation does derive**, and it is labelled as a schedule
+for exactly that reason.
 
 **The line carries observations, never "still running".** Children in flight with their labels and
 their pull request state, the open lanes, the load average, how long the newest unit transcript has
@@ -1160,10 +1209,13 @@ poll that answered `wait`. Those are the run working, which is what the silence 
 assumes.
 
 **On a quiet tick the turn is the relayed line plus at most two lines of the run's own prose**, and
-those two say only what changed stage and what is being waited on. **No table, no re-listing of the
-remaining children, no restating of the plan** — `epic:next`, the epic body and the progress comment
-hold all three, and a person who wants them opens the epic. A tick with genuinely nothing to add
-relays the line and writes nothing at all.
+those two say only what changed stage and what is being waited on. **"The relayed line" there is the
+presentation defined above**, whose four field lines and closing next-report line are that one line
+rendered readably rather than an addition to it; the two prose lines are the run's own and are
+counted apart from it. **No table, no re-listing of the remaining children, no restating of the
+plan** — `epic:next`, the epic body and the progress comment hold all three, and a person who wants
+them opens the epic. A tick with genuinely nothing to add presents the line and writes nothing at
+all.
 
 **A real report is not bounded by that**, and `--mark` is why: it restarts the clock at every one, so
 a merge, a park or a stop is exactly where the run is allowed to be long.
