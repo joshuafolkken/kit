@@ -456,10 +456,19 @@ All of these are `epicrun.md`'s, and are reached here in the same order and for 
 | `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
 
 **Two more run once per session and are this file's own, not `epicrun.md`'s**:
-`pnpm josh run:carry --begin "<the invocation as typed>" --owner "$PPID"` before the plan and
+`pnpm josh run:carry --begin "<the invocation, single-spaced>" --owner "$PPID"` before the plan and
 `pnpm josh run:carry --end` when the run finishes, and beside each of them
 `pnpm josh run:wake --start` and `pnpm josh run:wake --stop` — the supervisor that continues the run
 across a cut. Both pairs are "The session cut is inside the invocation" above.
+
+**Record the invocation in the form the supervisor can rebuild: one space between tokens, and a plain
+integer for each budget value** — `backlogrun --max 3`, never `backlogrun  --max 03`. What the
+supervisor hands the next session is composed from constants and the validated integers rather than
+copied out of the record, and it refuses to wake on a record its own rebuild would rewrite, because the
+woken session hands that text straight back to `run:carry --begin` to be compared character for
+character. A record written some other way is not lost quietly — the first cut ends the run with a
+`warning` Telegram — but it ends the run, so write the canonical form rather than the keystrokes
+(joshuafolkken/kit#1719).
 
 **`pnpm josh epic:audit` is not run.** There is no epic to audit — the run began from the backlog, the
 same reason `epicrun.md` skips it when it began from a bare Issue. The dependency graph the loop acts
