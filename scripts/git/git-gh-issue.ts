@@ -1,12 +1,20 @@
 import { git_gh_issue_list, type IssueListOutcome } from './git-gh-issue-list'
 import { git_gh_issue_read } from './git-gh-issue-read'
+import { BLOCKED_BY_COUNT_FIELD } from './git-gh-issue-rest'
 import { git_gh_issue_write } from './git-gh-issue-write'
 
 const NUMBER_AND_BODY_FIELDS = 'number,body'
 // The backlog scan's fields. The title rides along because the pre-filing scan compares titles
 // (joshuafolkken/kit#1252) and it costs nothing: the same listing request already carries it, so the
 // two consumers share one read rather than each making their own.
-const NUMBER_TITLE_AND_BODY_FIELDS = 'number,title,body'
+//
+// `blocked_by_count` rides along for the same reason and is the one field here that `gh --json`
+// never had: it is read out of the `issue_dependencies_summary` the listing response already
+// carries, so it costs no request at all (joshuafolkken/kit#1736). It is what lets `epic:bundle`
+// tell a row with no blockers from one with some **before** deciding whether that row is worth a
+// per-issue read — the read it used to make for every open issue in the repository. Absent on a row
+// whose summary is missing, which must not be read as zero; `git-gh-issue-rest.ts` states why.
+const BACKLOG_SCAN_FIELDS = `number,title,body,${BLOCKED_BY_COUNT_FIELD}`
 // The recently-closed scan's fields (joshuafolkken/kit#1679). It compares titles like the scan above
 // and never reads a body, and it needs the labels to tell an epic from a deliverable — the open half
 // gets that from the epic listing, which by construction holds no closed epic.
@@ -55,7 +63,7 @@ async function issue_list_recent(limit: number): Promise<IssueListOutcome> {
 // `issue:scout` to compare titles before one is filed; a search with an empty term is not a listing,
 // and asking `gh` for one produced a partial and arbitrary answer (joshuafolkken/kit#873).
 async function issue_list_open_bodies(limit: number): Promise<IssueListOutcome> {
-	return await issue_list({ json_fields: NUMBER_TITLE_AND_BODY_FIELDS, limit })
+	return await issue_list({ json_fields: BACKLOG_SCAN_FIELDS, limit })
 }
 
 // The issues that closed most recently, for the duplicate half of `issue:scout`

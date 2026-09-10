@@ -36,7 +36,21 @@ const UNKNOWN_REPO_MESSAGE =
 // The backlog listing asks for the title too (joshuafolkken/kit#1252). Kept apart from the epic
 // listing's schema rather than made optional on one: the epic listing does not ask for the field, and
 // a schema that tolerates its absence everywhere would let a missing title pass unnoticed here.
-const backlog_schema = epic_schema.extend({ title: z.string().nullable() })
+//
+// `blocked_by_count` is the blocker count GitHub already puts in the listing response
+// (joshuafolkken/kit#1736). It is **nullish rather than defaulted**, and that is the whole safety of
+// the read below: a row the listing carries no summary for must not be read as a row with no
+// blockers, because that reading is what would silently drop a relation instead of costing a
+// request. Nothing in today's pipeline is expected to arrive without one — the response carries the
+// summary on every issue, and `git-gh-issue-list.ts` filters pull requests, which are what lack it,
+// out client-side — so this tolerates a shape the listing is not supposed to hand over rather than
+// describing one it does.
+const backlog_schema = epic_schema.extend({
+	title: z.string().nullable(),
+	blocked_by_count: z.number().nullish(),
+})
+
+type BacklogRow = z.infer<typeof backlog_schema>
 
 // The epic index is `epic-index.ts`'s, shared with the `auto-ok` pickup since
 // joshuafolkken/kit#1633: both commands ask which epic tracks an issue, and a second copy of the
@@ -60,14 +74,15 @@ async function epic_issue_relations(
 	return parsed === undefined ? undefined : epic_issue.blocker_references_of(parsed, repo)
 }
 
-// One read per backlog issue, a few at a time.
+// One read per backlog issue *that has blockers*, a few at a time.
 //
 // Since joshuafolkken/kit#1024 a read is `gh api`: one REST request for the issue, and a second to
 // its `dependencies/blocked_by` endpoint unless the issue's own dependency summary reports exactly
-// zero blockers — an absent summary is not a zero, so it pays too. The backlog rows are issues
-// rather than pull requests — the issue listing endpoint serves both, and `git-gh-issue-list.ts`
-// filters the pull requests out client-side — so every row here carries that summary, and a
-// backlog with no declared blockers costs exactly one request per issue.
+// zero blockers. That second request was already skipped on a zero; the first one was not, so the
+// command still paid one request for every open issue in the repository — a cost that grows with the
+// backlog and made the command heavier exactly as more issues made it more useful
+// (joshuafolkken/kit#1736). The listing that produced these rows already carries that same summary,
+// so the zero is known *before* the read rather than inside it, and the read is skipped outright.
 //
 // One read would do if `gh` exposed the reverse of `blockedBy`, but it does not (`blocks` is not a
 // JSON field), so a dependency declared on the *other* issue is only visible by asking that issue.
@@ -77,15 +92,24 @@ async function epic_issue_relations(
 // read from passing as an answer (joshuafolkken/kit#873). The pool itself is `bounded-pool.ts`,
 // shared with the reference reads below it and with the eval suite (joshuafolkken/kit#1144).
 const RELATION_CONCURRENCY = 8
+const NO_BLOCKERS = 0
 
+// GitHub's own count, not an inference from what was read. Strictly `=== 0`, so a row carrying no
+// summary at all answers `false` and keeps its read: an absent count says nothing about whether the
+// issue has blockers, and treating the two alike is the one way this shortcut could lose a
+// relation. Skipping is cheap and wrong-in-silence; reading is a request and always right.
+function has_no_blockers(row: BacklogRow): boolean {
+	return row.blocked_by_count === NO_BLOCKERS
+}
+
+// Every row still gets an entry, in order, so the index alignment `fetch_backlog` relies on is the
+// same whether a row was read or answered from the listing.
 async function fetch_relations(
-	numbers: ReadonlyArray<number>,
+	rows: ReadonlyArray<BacklogRow>,
 	repo: string,
 ): Promise<Array<Array<IssueReference> | undefined>> {
-	return await bounded_pool.bounded_map(
-		numbers,
-		RELATION_CONCURRENCY,
-		async (number) => await epic_issue_relations(String(number), repo),
+	return await bounded_pool.bounded_map(rows, RELATION_CONCURRENCY, async (row) =>
+		has_no_blockers(row) ? [] : await epic_issue_relations(String(row.number), repo),
 	)
 }
 
@@ -139,13 +163,13 @@ interface BacklogOptions {
 // The relations, or an empty list each when the caller asked for none. Every issue still gets a row,
 // so the index alignment `fetch_backlog` relies on holds either way.
 async function read_relations(
-	numbers: ReadonlyArray<number>,
+	rows: ReadonlyArray<BacklogRow>,
 	repo: string,
 	options: BacklogOptions | undefined,
 ): Promise<Array<Array<IssueReference> | undefined>> {
-	if (options?.include_relations === false) return numbers.map(() => [])
+	if (options?.include_relations === false) return rows.map(() => [])
 
-	return await fetch_relations(numbers, repo)
+	return await fetch_relations(rows, repo)
 }
 
 async function fetch_backlog(
@@ -161,11 +185,7 @@ async function fetch_backlog(
 	// Same reason as `fetch_epics`: an unparseable listing is not an empty backlog.
 	const rows = parse_json_array_or_undefined(json, backlog_schema)
 	if (rows === undefined) return { issues: [], unreadable: [], is_readable: false }
-	const relations = await read_relations(
-		rows.map((row) => row.number),
-		repo,
-		options,
-	)
+	const relations = await read_relations(rows, repo, options)
 
 	return {
 		is_readable: true,
