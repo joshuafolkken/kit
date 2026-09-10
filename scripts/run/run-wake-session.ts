@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type SpawnOptions } from 'node:child_process'
 import { backlog_budget_cli } from '#scripts/backlog/backlog-budget-cli'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 
@@ -247,16 +247,40 @@ function launched(pid: number): LaunchResult {
 // already returned. It reports rather than decides — the grace window in `run-wake.ts` is what turns a failed
 // launch into a verdict, so that one detector covers a missing binary, a session that dies during boot
 // and a session that runs without ever picking the run up.
+// Lifted out of the call so the `spawn` fits on one line, which is where the suppression below has to
+// sit: SonarQube's marker applies to the line the issue is raised on and to nothing else.
+function spawn_options(cwd: string): SpawnOptions {
+	return {
+		cwd,
+		detached: true,
+		stdio: 'ignore',
+		env: { ...process.env, ...agent_session_environment.removed_environment() },
+	}
+}
+
+// **`tssecurity:S8705` is suppressed on the `spawn` line, and this is the reason it is allowed to be.**
+// The rule's premise is a shell escape — it fires where untrusted text can become shell syntax. There
+// is no shell on this path to escape from: `spawn` is handed a command and an argument **array**,
+// `shell` is left at its default of false, so nothing here is ever parsed by `sh`. And every element of
+// that array is a constant or an integer this module composed, because `safe_invocation` takes the
+// recorded invocation apart and rebuilds it rather than passing it on.
+//
+// **It is what was left after the flow was actually broken, not something used instead of breaking
+// it.** Three earlier rounds tried to satisfy the rule by inspecting the string harder and moved it not
+// at all; the rebuild is what severed the flow, and the same change retired the pattern CodeQL had
+// found an exponential backtrack in — **`js/redos` is gone from this file rather than suppressed, and
+// this marker covers nothing of it.** What the rule still sees is the shape of a `spawn` reached from a
+// file that was read, and that shape is the design: starting a process from a record is the whole of
+// what a supervisor does.
+//
+// Scoped to that one line on the user's explicit instruction of 2026-09-10 (joshuafolkken/kit#1719).
+// No project-wide exclusion and no change to the Sonar configuration.
 function launch(request: LaunchRequest, on_error: (note: string) => void): LaunchResult {
 	if (!is_safe_argv(request.argv)) return { kind: 'failed', note: UNSAFE_NOTE }
 
 	try {
-		const child = spawn(request.argv.command, [...request.argv.args], {
-			cwd: request.cwd,
-			detached: true,
-			stdio: 'ignore',
-			env: { ...process.env, ...agent_session_environment.removed_environment() },
-		})
+		const { command, args } = request.argv
+		const child = spawn(command, [...args], spawn_options(request.cwd)) // NOSONAR — see above
 
 		child.on('error', (error) => {
 			on_error(note_of(error))
