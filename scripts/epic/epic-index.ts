@@ -26,17 +26,39 @@ interface FetchedEpics {
 	cutoff: ScanCutoff
 }
 
-// Which epic tracks each issue, from the epics' own task lists. An issue belongs to at most one,
-// because that is what a task list can express.
+// Which epics track each issue, from the epics' own task lists. **A child can be named by more than
+// one** (joshuafolkken/kit#1694): a task list expresses at most one epic per row, and nothing stops
+// two epics writing the same row — `epic_lane_offer.dedupe_pools` has handled exactly that collision
+// on the `epic:next` side since it was written. So the tracking is recorded whole here, and each
+// caller collapses it for its own question rather than losing the other epics at build time.
+//
+// A child a single epic lists twice repeats that epic's number, which neither caller distinguishes
+// from listing it once.
+function build_tracking_index(
+	epics: ReadonlyArray<{ number: number; body: string }>,
+): Map<number, ReadonlyArray<number>> {
+	const index = new Map<number, ReadonlyArray<number>>()
+
+	for (const epic of epics) {
+		for (const child of git_epic_parse.parse_task_list_issue_numbers(epic.body)) {
+			index.set(child, [...(index.get(child) ?? []), epic.number])
+		}
+	}
+
+	return index
+}
+
+// Which *one* epic tracks each issue — `epic:bundle`'s question, which asks whether the issue is
+// already in an epic and names it. The last epic to list the child wins, exactly as it did when this
+// was built by a single `index.set` per row, so a collision answers as it always has.
 function build_epic_index(
 	epics: ReadonlyArray<{ number: number; body: string }>,
 ): Map<number, number> {
 	const index = new Map<number, number>()
 
-	for (const epic of epics) {
-		for (const child of git_epic_parse.parse_task_list_issue_numbers(epic.body)) {
-			index.set(child, epic.number)
-		}
+	for (const [child, tracked_by] of build_tracking_index(epics)) {
+		const winner = tracked_by.at(-1)
+		if (winner !== undefined) index.set(child, winner)
 	}
 
 	return index
@@ -70,13 +92,26 @@ function opted_in_epic_numbers(issues: ReadonlyArray<OpenIssueData>): ReadonlySe
 // **It answers with the epic, not merely with membership**, because the withholding and the sentence
 // `backlog:plan` prints about it have to come from one answer. Handing the scope layer the whole
 // index instead let it name an epic that was not withholding anything — the same misreport, moved.
+//
+// **Any one opted-in epic withholds the child** (joshuafolkken/kit#1694). It reads the whole tracking
+// rather than one collapsed winner because the two are not the same answer when two epics name the
+// same child: collapsed, an opted-in epic that merely came earlier in the listing is gone, the child
+// reads as tracked by nobody who would offer it, and the standalone half hands it over while the
+// opted-in epic hands it over too. The epic named as the reason is the first opted-in one in listing
+// order — any of them is withholding it, and picking by position keeps the sentence deterministic.
 function withheld_children(
-	index: ReadonlyMap<number, number>,
+	index: ReadonlyMap<number, ReadonlyArray<number>>,
 	opted_in: ReadonlyArray<OpenIssueData>,
 ): ReadonlyMap<number, number> {
 	const epics = opted_in_epic_numbers(opted_in)
+	const withheld = new Map<number, number>()
 
-	return new Map([...index].filter(([, epic]) => epics.has(epic)))
+	for (const [child, tracked_by] of index) {
+		const epic = tracked_by.find((candidate) => epics.has(candidate))
+		if (epic !== undefined) withheld.set(child, epic)
+	}
+
+	return withheld
 }
 
 // The epics currently open, so an issue can be matched to the one already tracking it.
@@ -100,6 +135,7 @@ async function fetch_epics(limit: number): Promise<FetchedEpics | undefined> {
 
 const epic_index = {
 	build_epic_index,
+	build_tracking_index,
 	fetch_epics,
 	opted_in_epic_numbers,
 	withheld_children,
