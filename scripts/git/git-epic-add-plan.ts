@@ -43,6 +43,16 @@ interface AddPlan {
 	relocations: ReadonlyArray<number>
 	added: ReadonlyArray<DependencyLink>
 	removed: ReadonlyArray<DependencyLink>
+	// Every link the declaration dropped, whether or not GitHub had recorded it natively — which is what
+	// separates it from `removed` above (joshuafolkken/kit#1711). `removed` is a work list for `gh` and
+	// is therefore filtered down to relations that exist to be removed; this is the *report*, and a
+	// declared-but-unrecorded order the caller re-pointed is exactly as much a replacement as a recorded
+	// one. Reporting from `removed` let those vanish without a word.
+	replaced: ReadonlyArray<DependencyLink>
+	// The `--decision-file` record as it will be written, with `replaced` appended. Carried on the plan
+	// rather than recomposed by the caller so the epic's `## Decisions` and the child comments cannot
+	// end up with two different texts.
+	decision?: string | undefined
 }
 
 type PlanOutcome = { plan: AddPlan } | { error: string }
@@ -228,24 +238,34 @@ interface PlanContext {
 	chains_after: ReadonlyArray<ReadonlyArray<number>>
 }
 
-function to_rewrite_input(context: PlanContext): RewriteInput {
+function to_rewrite_input(context: PlanContext, decision: string | undefined): RewriteInput {
 	return {
 		body: context.input.body ?? '',
 		placed: context.placed,
 		position: context.input.position,
 		chains_after: context.chains_after,
-		decision: context.input.decision,
+		decision,
 	}
 }
 
 // The write itself, once every refusal above has passed. Split out so `build_plan` stays a list of
 // checks rather than a function that both checks and composes.
+//
+// **The replacements are folded into the decision record before the body is rewritten**, because the
+// epic's `## Decisions` half rides on that same edit (joshuafolkken/kit#1350) — composing it afterwards
+// would put the line on the child comments and leave the epic without it. The caller-supplied record
+// has already been validated by `find_decision_error`; what is appended here is generated, not read
+// from a file.
 function to_plan(context: PlanContext): PlanOutcome {
-	const rewritten = git_epic_add_body.rewrite_body(to_rewrite_input(context))
+	const { removed: replaced } = git_epic_chains.diff_links(
+		context.chains_before,
+		context.chains_after,
+	)
+	const decision = git_epic_decision.append_replacements(context.input.decision, replaced)
+	const rewritten = git_epic_add_body.rewrite_body(to_rewrite_input(context, decision))
 	if ('error' in rewritten) return { error: rewritten.error }
 
 	const links_after = git_epic_chains.links_of(context.chains_after)
-	const { removed } = git_epic_chains.diff_links(context.chains_before, context.chains_after)
 
 	return {
 		plan: {
@@ -253,7 +273,9 @@ function to_plan(context: PlanContext): PlanOutcome {
 			additions: context.additions,
 			relocations: context.relocations,
 			added: epic_graph.missing_relations(links_after, context.input.recorded, context.input.repo),
-			removed: to_removed_links(removed, context.input.recorded, context.input.repo),
+			removed: to_removed_links(replaced, context.input.recorded, context.input.repo),
+			replaced,
+			decision,
 		},
 	}
 }

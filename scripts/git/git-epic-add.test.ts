@@ -1,5 +1,5 @@
 import { epic_fetch } from '#scripts/epic/epic-fetch'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { git_epic_add } from './git-epic-add'
 import { EPIC_FIXTURE_REPO, git_epic_add_fixture } from './git-epic-add-fixture'
 import { UNORDERED_DEPENDENCIES } from './git-epic-parse'
@@ -32,6 +32,8 @@ const EPIC_NUMBER = 893
 const DEPENDENCIES_HEADING = '## Dependencies'
 const PROGRESS_HEADING = '## Progress'
 const ROW_890 = '- [ ] #890'
+const ROW_891 = '- [ ] #891'
+const CHAIN_890_891 = '#890 -> #891'
 const CHILD = 894
 const BLANK = ''
 const RECORD = ['### Where #894 goes', BLANK, '- 理由: 主題が同じ'].join('\n')
@@ -138,7 +140,7 @@ const PAIR_BODY = [
 	PROGRESS_HEADING,
 	BLANK,
 	ROW_890,
-	'- [ ] #891',
+	ROW_891,
 	BLANK,
 ].join('\n')
 
@@ -182,6 +184,88 @@ describe('git_epic_add.add_children — a child the epic already tracks', () => 
 		stub_pair_epic()
 
 		expect(await move_891_after_890()).toBe(SUCCESS_EXIT_CODE)
-		expect(mocked_edit.mock.calls[0]?.[1]).toContain('#890 -> #891')
+		expect(mocked_edit.mock.calls[0]?.[1]).toContain(CHAIN_890_891)
+	})
+})
+
+// The `blocked-by` relation a positioned insertion discards (joshuafolkken/kit#1711). On
+// joshuafolkken/kit#1703 two positioned adds overwrote a decision whose reasoning was written down,
+// and nothing that outlives the console said what had been replaced — so both halves are pinned here:
+// the line itself, and the record it now rides into.
+const ORDERED_BODY = [
+	DEPENDENCIES_HEADING,
+	BLANK,
+	CHAIN_890_891,
+	BLANK,
+	PROGRESS_HEADING,
+	BLANK,
+	ROW_890,
+	ROW_891,
+	BLANK,
+].join('\n')
+
+const REPLACED_LINE = `Replaced blocked-by: \`${CHAIN_890_891}\`.`
+
+function stub_ordered_epic(): void {
+	mocked_read.mockResolvedValue(
+		JSON.stringify({ number: EPIC_NUMBER, labels: [{ name: 'epic' }], body: ORDERED_BODY }),
+	)
+	mocked_fetch.mockResolvedValue({
+		children: [child(890), child(891, [890])],
+		unreadable: [],
+		skipped: [],
+		unreachable_count: 0,
+	})
+}
+
+async function insert_before_891(decision?: string): Promise<number> {
+	return await git_epic_add.add_children({
+		epic_number: EPIC_NUMBER,
+		children: [CHILD],
+		position: { kind: 'before', target: 891 },
+		decision,
+	})
+}
+
+function info_lines(spy: MockInstance): Array<string> {
+	return spy.mock.calls.map((call) => String(call[0]))
+}
+
+describe('git_epic_add.add_children — the relation a position replaces', () => {
+	it('names it on stdout', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		stub_ordered_epic()
+
+		expect(await insert_before_891()).toBe(SUCCESS_EXIT_CODE)
+
+		const lines = info_lines(info)
+
+		info.mockRestore()
+		expect(lines).toContain(`↪ ${REPLACED_LINE}`)
+	})
+
+	// Both halves of the record, because they are written by different calls: the epic's `## Decisions`
+	// rides on the body edit, the child's arrives as a comment. One carrying it without the other is the
+	// disagreement this whole command exists to prevent.
+	it('carries it into the epic record and the child comment alike', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		stub_ordered_epic()
+
+		expect(await insert_before_891(RECORD)).toBe(SUCCESS_EXIT_CODE)
+		expect(mocked_edit.mock.calls[0]?.[1]).toContain(REPLACED_LINE)
+		expect(mocked_comment.mock.calls[0]?.[1]).toContain(REPLACED_LINE)
+	})
+
+	it('adds neither the line nor the record entry when nothing was replaced', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await add(RECORD)).toBe(SUCCESS_EXIT_CODE)
+
+		const lines = info_lines(info)
+
+		info.mockRestore()
+		expect(lines.some((line) => line.startsWith('↪'))).toBe(false)
+		expect(mocked_comment.mock.calls[0]?.[1]).toBe(RECORD)
 	})
 })
