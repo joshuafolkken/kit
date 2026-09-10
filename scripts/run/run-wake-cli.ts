@@ -54,6 +54,8 @@ const UNSAFE_INVOCATION_NOTE =
 const WARNING_TITLE = 'backlogrun supervisor'
 const WARNING_BODY = 'The supervisor could not continue the run and has stopped.'
 const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh run:wake --start\`.`
+const SUPERSEDED_NOTE =
+	'another supervisor now holds the record, so it was left alone; this loop is the superseded one'
 
 const USAGE = 'Usage: josh run:wake --start | --list | --stop | --loop [--interval <seconds>]'
 
@@ -240,6 +242,21 @@ function start(context: WakeContext, interval: string | undefined): number {
 	return spawn_supervisor(context, interval)
 }
 
+// **The loop removes its record on the way out, and only its own** (joshuafolkken/kit#1727). A loop
+// that ended after its record was taken over used to delete the *successor's* record here, and the
+// run then went on with nobody watching it.
+//
+// **The skip is announced, because the two ways of ending look identical otherwise.** A `--stop` and
+// a take-over both leave this loop reporting `stopped` at exit 0, so a supervisor that was superseded
+// would leave no trace of that anywhere. The note is written only where a record is still there and
+// is somebody else's — after an ordinary `--stop` there is no record at all, and nothing to say.
+function tidy_up(target: string): void {
+	if (run_wake.remove_own_wake(target)) return
+	if (run_wake.read_wake(target) === undefined) return
+
+	note_to_stderr(SUPERSEDED_NOTE)
+}
+
 async function loop(context: WakeContext, interval_ms: number): Promise<number> {
 	const read = run_carry.read_carry(context.carry_target)
 
@@ -251,7 +268,7 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 
 	const stop = await run_wake_loop.run_loop(context.wake_target, ports_for(context), interval_ms)
 
-	run_wake.remove_wake(context.wake_target)
+	tidy_up(context.wake_target)
 
 	return await finish(stop)
 }

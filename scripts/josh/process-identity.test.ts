@@ -57,6 +57,37 @@ describe('process_identity — reading a start time', () => {
 	})
 })
 
+// joshuafolkken/kit#1727: liveness and ownership are different questions, and a record's writer
+// answering the first one about itself is what let a replaced supervisor overwrite its successor.
+describe('process_identity.is_own_process — whether a record is the caller’s own', () => {
+	it('recognizes the pair this process would write', () => {
+		const own = process_identity.own_fields()
+
+		expect(process_identity.is_own_process(own.pid, own.process_start)).toBe(true)
+	})
+
+	// **The assertion the Issue was filed for.** A successor's record names a process that is
+	// unmistakably alive, so every liveness reading of it is `true`; only the identity comparison
+	// separates it from this process's own.
+	it('refuses a live pid that is not this process', () => {
+		expect(process_identity.is_own_process(DEAD_PID, process_identity.own_start())).toBe(false)
+	})
+
+	it.skipIf(!has_start_probe)('refuses this pid paired with another process’s start time', () => {
+		expect(process_identity.is_own_process(process.pid, FOREIGN_START)).toBe(false)
+	})
+
+	// A record written before the start time existed knows less than this process does, so it is not
+	// claimed as this process's — the safe direction, since a refused write costs one pass.
+	it.skipIf(!has_start_probe)('refuses a record that carries no start time', () => {
+		expect(process_identity.is_own_process(process.pid, undefined)).toBe(false)
+	})
+
+	it('refuses a record that names no process at all', () => {
+		expect(process_identity.is_own_process(undefined, process_identity.own_start())).toBe(false)
+	})
+})
+
 describe('process_identity.own_fields — the identity a record carries', () => {
 	it('names this process', () => {
 		expect(process_identity.own_fields().pid).toBe(process.pid)

@@ -26,6 +26,16 @@ function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 
 const NO_ATTEMPTS = 0
 
+// What a successor's record looks like to the loop it replaced (joshuafolkken/kit#1727): the pid is
+// this very process, so every liveness reading of it answers "running", and only the start time
+// separates it from a record this process wrote. It is the state that cannot be produced any other
+// way without racing the operating system into reissuing a pid.
+const SUCCESSOR = {
+	...run_wake.fresh_wake(INVOCATION, NOW),
+	pid: process.pid,
+	process_start: DEAD_START,
+}
+
 // The predecessor is gone by default, which is the ordinary case: `--cut` is the cutting session's
 // last write and its process exits directly afterwards.
 function input(read: CarryRead, woke_at?: string, attempts = NO_ATTEMPTS): WakeDecisionInput {
@@ -317,9 +327,51 @@ describe('run_wake.claim — the wake state a restart keeps', () => {
 
 		expect(run_wake.update_wake(scratch.target, wake)).toBe(true)
 	})
-
 	it('keys on the given directory, so one repository has one supervisor', () => {
 		expect(run_wake.wake_path('/a/.git')).not.toBe(run_wake.wake_path('/b/.git'))
 		expect(run_wake.wake_path('/a/.git')).toBe(run_wake.wake_path('/a/.git'))
+	})
+})
+
+// joshuafolkken/kit#1727. Ownership and existence come apart exactly when it matters: a successor's
+// record is there, and is live, and is not this process's — so the existence check reads it as a
+// perfectly good target.
+describe('run_wake — a record that belongs to another supervisor', () => {
+	it('refuses to write back a record another supervisor owns', () => {
+		run_wake.write_wake(scratch.target, SUCCESSOR)
+
+		expect(run_wake.update_wake(scratch.target, run_wake.fresh_wake(INVOCATION, NOW))).toBe(false)
+		expect(run_wake.read_wake(scratch.target)?.process_start).toBe(DEAD_START)
+	})
+
+	// The old loop deleting the record on its way out is what left the run unwatched, with nothing
+	// anywhere saying so.
+	it('refuses to remove a record another supervisor owns', () => {
+		run_wake.write_wake(scratch.target, SUCCESSOR)
+
+		expect(run_wake.remove_own_wake(scratch.target)).toBe(false)
+		expect(run_wake.read_wake(scratch.target)).toBeDefined()
+	})
+
+	it('removes its own record, which is the ordinary end of a loop', () => {
+		run_wake.write_wake(scratch.target, run_wake.fresh_wake(INVOCATION, NOW))
+
+		expect(run_wake.remove_own_wake(scratch.target)).toBe(true)
+		expect(run_wake.read_wake(scratch.target)).toBeUndefined()
+	})
+
+	// `read_wake` still answers, because `--list` and `--stop` are about whatever record is there.
+	it('reads its own record and not another supervisor’s', () => {
+		run_wake.write_wake(scratch.target, SUCCESSOR)
+
+		expect(run_wake.read_own_wake(scratch.target)).toBeUndefined()
+		expect(run_wake.read_wake(scratch.target)).toBeDefined()
+	})
+
+	// An ordinary `--stop` also leaves nothing to remove, and the two must stay distinguishable: the
+	// caller writes a superseded note for one of them and not the other.
+	it('answers false for an absent record too, which is the ordinary stop', () => {
+		expect(run_wake.remove_own_wake(scratch.target)).toBe(false)
+		expect(run_wake.read_wake(scratch.target)).toBeUndefined()
 	})
 })

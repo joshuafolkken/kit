@@ -118,6 +118,8 @@ words:
   - mnemecha
   - waneccha
   - ENOENT
+  # The errno a `--stop` gets when it may not signal the supervisor it just unrecorded
+  - EPERM
   - ELIFECYCLE
   # The id prefix the API gives a tool_use block. The eval suite's directory name, `evals`, is in
   # the distributed dictionary instead — a copied skill cites it (joshuafolkken/kit#1092).

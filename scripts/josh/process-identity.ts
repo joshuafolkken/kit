@@ -143,8 +143,28 @@ function is_same_process(
 	return compare_start(pid, recorded_start)
 }
 
+// **Whether a record is the caller's own, which is a different question from whether its writer is
+// alive** (joshuafolkken/kit#1727). `is_same_process` asks about the recorded process; this asks
+// whether that process *is this one*. A supervisor that has been replaced reads its successor's
+// record as perfectly live, so liveness alone can never tell a hand-over from an ordinary pass — and
+// a writer deciding by liveness overwrites whatever it finds.
+//
+// **Compared against `own_fields()`, so the two can never disagree about what identity means.** The
+// pair a record carries is written there and read here, which is why this lives beside it rather
+// than in each record's own module.
+//
+// **A start time neither side can read leaves the pid as the whole comparison, and that is the
+// correct fallback rather than a gap.** Where the platform answers for nobody, both sides are
+// `undefined` and equal; where it answers for one and not the other, they differ and the record is
+// treated as someone else's — the safe direction, since refusing to write a record that is in fact
+// this process's own costs one supervisor pass, and writing over another's costs the run.
+function is_own_process(pid: number | undefined, recorded_start: string | undefined): boolean {
+	return pid === process.pid && recorded_start === own_start()
+}
+
 const process_identity = {
 	is_live_pid,
+	is_own_process,
 	is_same_process,
 	own_fields,
 	own_start,

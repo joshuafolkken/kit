@@ -331,12 +331,74 @@ function clear_wake_mark(wake: RunWake): RunWake {
 	return { ...wake, woke_at: undefined, attempts: undefined, held_at: undefined }
 }
 
-// **Writes only where the record is still there.** `--stop` removes it, and the loop's pass is not
-// instantaneous — it spawns a process — so an unconditional write-back can recreate a record a person
-// has just deleted, leaving a supervisor that outlives its own stop. The check narrows that window
-// rather than closing it outright; what closes it is that the next pass reads the record again.
+// **Whether the record at the target is this process's own** (joshuafolkken/kit#1727). Everything
+// below that decides a write or a removal asks this rather than asking whether a record is there.
+//
+// **Existence was standing in for ownership, and the two come apart exactly when it matters.** A
+// `--stop` that removes the record but does not reach the process — `EPERM`, or a liveness read that
+// calls a running process dead — followed by a person's `--start` leaves the old loop awake beside a
+// new supervisor's record. Asked only whether *a* record is there, the old loop writes its own pid
+// and counters into the new one, and two supervisors then wake two sessions into one carry budget:
+// the state `claim`'s exclusive create exists to prevent, reached after the create rather than
+// through it. Asked whether the record is *its own*, it finds it is not and does nothing.
+//
+// **The precedent is `run-carry.ts` alone**, whose `is_owned_by` compares a record's `owner_pid` and
+// `owner_start` against the owner the caller declares, and whose `is_foreign_live_owner` is that
+// comparison deciding what a caller may touch. `run-hold.ts` is **not** a precedent and reading it as
+// one is the mistake this note exists to prevent: it records a pid for the person reading the stop
+// message and explicitly never reads it back (`run-hold.ts` → `describe_hold`), which is the
+// distinction `RunWake.pid` above already draws.
+//
+// The one difference from `run-carry.ts` is who the owner is. There the owner is declared from
+// outside, because the process spending the budget is not the one writing the record; here the writer
+// *is* the owner, so the declaration is `process_identity.own_fields()` and the comparison is against
+// this process.
+function is_own_wake(wake: RunWake): boolean {
+	return process_identity.is_own_process(wake.pid, wake.process_start)
+}
+
+// The record only where it is this process's own. It is what the loop reads at the top of each pass,
+// so a supervisor whose record has been taken over ends **before** it decides anything — refusing the
+// write-back alone would still have spawned a session for a run somebody else is already watching.
+function read_own_wake(target: string): RunWake | undefined {
+	const wake = read_wake(target)
+
+	return wake !== undefined && is_own_wake(wake) ? wake : undefined
+}
+
+// **Removes only this process's own record.** `--stop` and the dead-marker sweep in `reclaim` keep
+// using `remove_wake`, and that is deliberate: a person stopping the supervisor is removing someone
+// else's record on purpose, and a sweep is removing a record whose writer is gone. What must not
+// happen is the loop's own tidy-up taking a live successor's record with it, which leaves the run
+// unwatched with nothing anywhere saying so.
+//
+// **Read-then-remove, so a take-over landing between the two still costs the successor its record.**
+// The same residual window `update_wake` has, and closing it needs an exclusive operation the stamp
+// layer does not offer. What this removes is the case that was certain — the loop ending after a
+// take-over it had already noticed — rather than the one that needs the hand-over to land inside two
+// statements.
+function remove_own_wake(target: string): boolean {
+	if (read_own_wake(target) === undefined) return false
+
+	remove_wake(target)
+
+	return true
+}
+
+// **Writes only where the record is still there *and* is this process's own.** `--stop` removes it,
+// and the loop's pass is not instantaneous — it spawns a process — so an unconditional write-back can
+// recreate a record a person has just deleted, leaving a supervisor that outlives its own stop; the
+// presence check narrows that window rather than closing it outright, and what closes it is that the
+// next pass reads the record again. The ownership check is the second half: a foreign record is
+// never written back, however long the pass took.
+//
+// **That is a claim about the write and about nothing else.** A take-over landing mid-pass is still
+// narrowed rather than closed — the pass spawns a process, so a session can go out for a cut the
+// successor is also serving, and only the write-back that follows it is refused. What closes the
+// window at the top of a pass is `read_own_wake`, and what closes it inside one is nothing here:
+// this is a refusal to make the damage permanent, not a lock.
 function update_wake(target: string, wake: RunWake): boolean {
-	if (read_wake(target) === undefined) return false
+	if (read_own_wake(target) === undefined) return false
 
 	write_wake(target, wake)
 
@@ -355,7 +417,9 @@ const run_wake = {
 	is_supervisor_live,
 	mark_wait,
 	parse_wake,
+	read_own_wake,
 	read_wake,
+	remove_own_wake,
 	remove_wake,
 	update_wake,
 	wake_path,
