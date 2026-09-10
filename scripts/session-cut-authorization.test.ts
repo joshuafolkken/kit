@@ -1,4 +1,4 @@
-import { read_unwrapped } from '#scripts/ai-document-fixture'
+import { CANONICAL_DOC, read_unwrapped } from '#scripts/ai-document-fixture'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it } from 'vitest'
 
@@ -13,13 +13,14 @@ import { describe, expect, it } from 'vitest'
 // and `epicrun.md` states the hand-off the reading deliberately does **not** change. A rule written in
 // one of them is a rule the run reading another never reaches — which is what these markers pin.
 //
-// **`CLAUDE.md` is deliberately not among them.** The resident budget had 1,050 bytes free against
-// the 1,000-byte guard floor `scripts/workflow-skills.test.ts` asserts, so no formulation of this
-// rule fits, and `prompts/collaboration-workflow/residency.md` → "上限を引き上げてよい条件" makes
-// raising the ceiling Tier C and requires a measured recovery pass first. The resident §0 already
-// names `SKILL.md` → §0 as this rule's single source, so the two do not contradict; adding the
-// resident line is tracked separately rather than paid for by deleting an unpinned sentence, which is
-// the failure joshuafolkken/kit#1275 wrote that floor to prevent.
+// **`CLAUDE.md` carries it too, since joshuafolkken/kit#1720.** The rule decides whether a run
+// continues at all, so it binds on a turn where no skill has been loaded — the residency criterion's
+// `yes` — while §0 is reached only after a keyword has been typed. Room for the line was made by
+// moving the `PORT_SEED` / `JOSH_REPO_PATHS` behavior prose to the command reference those bullets
+// already pointed at, not by relaxing the budget constants, which
+// `prompts/collaboration-workflow/residency.md` → "上限を引き上げてよい条件" makes Tier C, and not by
+// deleting an unpinned sentence, which is the failure joshuafolkken/kit#1275 wrote that floor to
+// prevent.
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const BACKLOGRUN = '.claude/skills/workflow-commands/backlogrun.md'
@@ -35,13 +36,34 @@ const CARRY_ALIAS = 'rc'
 const BUSY_ROW = '| `busy`'
 const STANDING_ROW = '| `standing`'
 
+// The scope clause both documents owe the reader. It is the same sentence in each on purpose: a copy
+// that softened it in one of them would license exactly the cut the decision does not cover.
+const SCOPE_MARKER = 'an `epicrun` or `fullrun` cut still waits for the keyword'
+
+// The precondition. Without it the permission reads as unconditional, and a session resuming a run
+// whose budget is spent — or that never declared one — takes it as license to carry on with no
+// keyword, which is the one thing the "earlier turn" bullet it sits under still forbids.
+const BUDGET_MARKER = 'no budget left, or none begun, has nothing to carry'
+
 // §0 is where the explicit-invocation rule is single-sourced, so the reading has to sit beside it
 // rather than only downstream — and it has to say that the "earlier turn" bullet above it still
 // stands, since that bullet is what a reader would otherwise take the reading to have repealed.
 const SKILL_MARKERS: ReadonlyArray<string> = [
 	'A session cut inside a declared budget is not a new invocation** (joshuafolkken/kit#1714)',
-	'no budget left, or none begun, has nothing to carry',
-	'an `epicrun` or `fullrun` cut still waits for the keyword',
+	BUDGET_MARKER,
+	SCOPE_MARKER,
+]
+
+// The resident copy is a trigger plus a pointer and nothing else. The scope marker is not
+// decoration: without it a reader carries the reading into an `epicrun` or a `fullrun`, which is the
+// one thing the decision does not license — so dropping that clause would let a run proceed wrongly
+// rather than merely less well informed.
+const AI_DOC_MARKERS: ReadonlyArray<string> = [
+	'**A session cut inside a declared budget is not a new invocation**',
+	BUDGET_MARKER,
+	'**`backlogrun` alone**',
+	SCOPE_MARKER,
+	'`.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation"',
 ]
 
 // The procedure. Every marker here is a step a run would otherwise have to invent: where the record
@@ -93,6 +115,14 @@ describe('the workflow skill states it beside the rule it qualifies', () => {
 	const content = read_unwrapped(SKILL)
 
 	it.each(SKILL_MARKERS)('says %s', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+describe('the resident document states the reading on a turn that loaded no skill', () => {
+	const content = read_unwrapped(CANONICAL_DOC)
+
+	it.each(AI_DOC_MARKERS)('says %s', (marker) => {
 		expect(content).toContain(marker)
 	})
 })
