@@ -173,9 +173,10 @@ const LEDGER_MARKERS: ReadonlyArray<string> = [
 	'**Cannot cite one, it is not filed**: it goes to the ledger below',
 	`**The destination is \`${OBSERVATION_LEDGER}\` in the repository the observation is about**`,
 	'**It is append-only.**',
-	// The depths that reach the ledger are this package's own subjects, so a run inside a consumer's
-	// repository that appended where it stood would scatter one phenomenon across every consumer.
-	'**Depth 1 and depth 2 name subjects that belong to this package**',
+	// A run inside a consumer's repository that appended where it stood would scatter one phenomenon
+	// across every consumer, and no key would ever reach a count of two.
+	"**The count and the append are both run in that repository's checkout**",
+	'**The subject decides, never the working directory**',
 	'the append follows the subject, never the working directory',
 	'**A third-party target gets no line either**',
 	// An append-only file conflicts on every parallel lane, and the wrong resolution silently deletes
@@ -201,7 +202,10 @@ const LEDGER_GRAMMAR_MARKERS: ReadonlyArray<string> = [
 	// `grep -c` exits non-zero on a count of zero, which is the first-sighting branch and the common
 	// one — so the documented command has to carry the guard, not just the prose around it.
 	'**The `|| true` is not decoration**',
-	`grep -c '^- k:<slug> |' ${OBSERVATION_LEDGER} || true`,
+	// `grep` exits 2 on a missing file and prints nothing, which the guard would otherwise launder
+	// into a first sighting — the one reading that makes the promotion unreachable.
+	'**A missing file is not a count of zero, though**',
+	`grep -c '^- k:<slug> |' <that repository's checkout>/${OBSERVATION_LEDGER} || true`,
 ]
 
 // The promotion. A count, not a judgement — which is what lets it stand in for the depth-0 citation
@@ -210,7 +214,9 @@ const LEDGER_GRAMMAR_MARKERS: ReadonlyArray<string> = [
 const SECOND_SIGHTING_MARKERS: ReadonlyArray<string> = [
 	'### The second sighting is what files it',
 	'**A repeat is the citation.**',
-	'**On the count answering `1` or more, the observation is filed**',
+	// Exactly `1`, never "1 or more": at a higher count the Issue is already open, and a run reading
+	// the looser threshold would file a duplicate on every third and later sighting.
+	'**On the count answering exactly `1`, the observation is filed**',
 	"**The Issue quotes the ledger's own dates — the first sighting's and this one's**",
 	'**Both ceilings still apply**',
 	'**A third and later sighting appends a line and files nothing more.**',
@@ -244,7 +250,10 @@ const LEDGER_FILE_MARKERS: ReadonlyArray<string> = [
 // The grammar, written once and asserted against both the documented sample and every real entry. A
 // format defined in prose that no entry is checked against drifts on the first hand-written line.
 const LEDGER_LINE_PATTERN =
-	/^- k:[a-z0-9]+(?:-[a-z0-9]+)* \| d[1-2] \| \d{4}-\d{2}-\d{2} \| [^|]+ \| [^|]+$/u
+	// `d[1-9]` rather than `d[1-2]`: the prose says "depth 1 or deeper" in three places, and a grammar
+	// pinned to today's two-row depth table would reject a line that prose authorizes the day a third
+	// row is added. `d0` stays excluded, because that one is filed outright and never reaches here.
+	/^- k:[a-z0-9]+(?:-[a-z0-9]+)* \| d[1-9] \| \d{4}-\d{2}-\d{2} \| [^|]+ \| [^|]+$/u
 const LEDGER_SAMPLE =
 	'- k:example | d1 | 2026-09-10 | pnpm josh run:progress | The report printed a fill-in placeholder where a clock time belonged'
 const LEDGER_SECTION_HEADING = '\n## Ledger\n'

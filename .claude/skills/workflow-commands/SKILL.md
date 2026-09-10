@@ -232,12 +232,12 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   whose procedure is neither of theirs.
 - **An observation worth filing is filed without asking, and the run carries on** — §2i. It is the
   fourth thing a run can discover and the only one that changes nothing about the Issue in hand, so
-  it is the one route whose whole procedure is "file it and keep going". **Three things shape which
-  observations reach it**, and all three are §2i's: a filing at depth 1 or deeper cites the depth-0 work
+  it is the one route whose whole procedure is "file it and keep going". **Two things narrow which
+  observations reach it**, and both are §2i's: a filing at depth 1 or deeper cites the depth-0 work
   it blocked, and **a delegated child does not take this route at all** — it returns the observation
   to the parent (joshuafolkken/kit#1698). **What the narrowing turns away is recorded rather than
-  dropped**: it goes to `docs/observations.md` as one append-only line, and a **second** line under
-  the same key files it (joshuafolkken/kit#1728).
+  dropped**, which is §2i's as well: it goes to `docs/observations.md` as one append-only line, and a
+  **second** line under the same key files it (joshuafolkken/kit#1728).
 - **The pre-implementation reading goes to a delegated unit once the count of subject files reaches
   the threshold §2b names** — §2b →
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
@@ -648,7 +648,7 @@ its procedure (joshuafolkken/kit#1649).
 | A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
 | This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `epicrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
-| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; **one that cannot cite it goes to `docs/observations.md` and is filed on its second sighting** rather than being dropped — all three §2i's |
+| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; **one that cannot cite it goes to `docs/observations.md` and is filed on its second sighting** rather than being dropped — all of them §2i's |
 
 **File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during
 implementation stays countable by filing route afterwards (joshuafolkken/kit#1083). **This paragraph
@@ -1067,12 +1067,13 @@ and it was filed anyway, because **discarding it was the only alternative on off
 (joshuafolkken/kit#1728).
 
 - **The destination is `docs/observations.md` in the repository the observation is about** — the same
-  repository the Issue would have been filed into, resolved to its checkout the way §2c resolves any
-  cross-repository target, and created on the first append where that repository has none. **Depth 1
-  and depth 2 name subjects that belong to this package**, so an observation seen while running in a
-  consumer's repository is still recorded in this one: the append follows the subject, never the
-  working directory. **A third-party target gets no line either** — Tier C covers the ledger exactly
-  as it covers the Issue that would otherwise have been filed there.
+  repository the Issue would have been filed into. **The count and the append are both run in that
+  repository's checkout**, resolved the way §2c resolves any cross-repository target, and the file is
+  created on the first append where that repository has none. **The subject decides, never the
+  working directory**: an observation about this package's own orchestration, seen while a run is
+  inside a repository that consumes it, is recorded here rather than there — the append follows the
+  subject, never the working directory. **A third-party target gets no line either** — Tier C covers
+  the ledger exactly as it covers the Issue that would otherwise have been filed there.
 - **It is append-only.** A line is never edited and never deleted, because the count of lines
   carrying one key is what says whether an observation has recurred; a second sighting is a second
   line, not a rewrite of the first. **A merge conflict in it is resolved by keeping both sides** —
@@ -1091,7 +1092,7 @@ space on either side.**
 | Field          | What it holds                                                                                                             |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `k:<slug>`     | The identity key — lowercase letters and digits, in words joined by `-`. This is what makes a repeat machine-readable      |
-| `d<n>`         | The depth of the subject, `d1` or `d2`. **There is no `d0` line**: a depth-0 observation is filed outright and never reaches the ledger |
+| `d<n>`         | The depth of the subject — `d1`, `d2`, or whatever deeper depth the table above may one day name. **There is no `d0` line**: a depth-0 observation is filed outright and never reaches the ledger |
 | `<YYYY-MM-DD>` | The date of **this** sighting                                                                                             |
 | `<where>`      | One file path or one command — where the thing was seen                                                                   |
 | `<what>`       | The phenomenon, one sentence, carrying no vertical bar of its own                                                         |
@@ -1110,12 +1111,14 @@ leave every consumer's ledger shaped by hand.
 
 **The identity key is the whole of the repeat test — never a similarity judgement about the prose.**
 Choose the key from the phenomenon rather than from the run, then count what the ledger already holds
-for it. **The `|| true` is not decoration**: `grep -c` exits non-zero on a count of zero, which is
-the first-sighting branch and the common one, so without it the step reads as a failed command
-wherever an exit status is being watched.
+for it, in that repository's checkout rather than the working directory. **The `|| true` is not
+decoration**: `grep -c` exits non-zero on a count of zero, which is the first-sighting branch and the
+common one, so without it the step reads as a failed command wherever an exit status is being
+watched. **A missing file is not a count of zero, though** — there `grep` exits 2 and prints no
+number at all, so an empty answer means create the ledger, never that this is a first sighting.
 
 ```bash
-grep -c '^- k:<slug> |' docs/observations.md || true
+grep -c '^- k:<slug> |' <that repository's checkout>/docs/observations.md || true
 ```
 
 Free-text comparison is what the key exists to replace, so two lines that read alike under different
@@ -1134,8 +1137,10 @@ blockage rather than pushed by a sighting; an observation recorded twice has bee
 back on its own, which no single sighting can demonstrate. So the gate has a second way through, and
 it is counted rather than judged:
 
-- **On the count answering `1` or more, the observation is filed**, at depth 1 or deeper, with no
-  depth-0 citation. The ledger line is appended as well, because the ledger stays append-only.
+- **On the count answering exactly `1`, the observation is filed**, at depth 1 or deeper, with no
+  depth-0 citation — `1` and not "1 or more", because a higher count means the Issue was already
+  opened by the sighting that answered `1`. The ledger line is appended as well, because the ledger
+  stays append-only.
 - **The Issue quotes the ledger's own dates — the first sighting's and this one's** — so the reader
   can check the promotion against the file instead of taking the run's word for it.
 - **Both ceilings still apply**, exactly as they do above: the 10-per-run cap counts a promoted
