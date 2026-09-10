@@ -49,7 +49,7 @@ const LISTING_LIMIT = 200
 // already refuses to repeat for the blocker relations, left standing one constant above it.
 const UNREADABLE_MESSAGE = `Could not read the \`${AUTO_OK_LABEL}\` listing. That is not "nothing is opted in" — check \`gh auth status\` and ask again.`
 const UNEXPECTED_SHAPE_MESSAGE = `Read the \`${AUTO_OK_LABEL}\` listing but could not parse it. That is not "nothing is opted in" — the rows came back in a shape this command does not recognize, so check the fields it asks for and the REST field mapping in \`scripts/git/git-gh-issue-rest.ts\` rather than your authentication.`
-// The blocker relations failing takes the whole listing with them, and `issue_list_open` swallows
+// The blocker relations failing takes the whole listing with them, and `issue_list` swallows
 // the error — so the read looks exactly like an access failure and sends the reader to
 // `gh auth status`, which is green. That is the misdirection joshuafolkken/kit#996 added the message
 // above to remove, walked straight back in by the field the same change started asking for
@@ -162,7 +162,7 @@ type OptedInRead =
 // The two gaps `read_json_listing` names, carried through unchanged. Since joshuafolkken/kit#1025
 // `raw` is the JSON `git-gh-issue-list.ts` assembles from the REST rows rather than a CLI's stdout,
 // so a transport failure — a rate limit, a dropped connection — never reaches this parser at all:
-// `issue_list_open` catches it into `json === undefined` and `classify_failed_read` decides what it
+// `issue_list` catches it into `json === undefined` and `classify_failed_read` decides what it
 // was. What does reach here is the rethrown zod rejection, meaning the listing arrived and its
 // *fields* were not what was asked for. `unreadable` is passed on rather than folded away because
 // reading a gap as an empty listing is the confident absence kit#950 exists to prevent, and this is
@@ -199,7 +199,7 @@ async function reads_without_blocked_by(): Promise<boolean> {
 // **The relations are blamed only when they fail twice and the form without them succeeds.** One
 // success of that form is not enough on its own: a network blip or a passing rate limit on the first
 // read clears by the time the probe runs, and the run would then send someone whose host serves
-// dependencies perfectly well to look at it. `issue_list_open` swallows the underlying error, so
+// dependencies perfectly well to look at it. `issue_list` swallows the underlying error, so
 // repeating the original read is what separates a transient failure from a standing one
 // (joshuafolkken/kit#1005).
 async function classify_failed_read(): Promise<OptedInRead> {

@@ -59,6 +59,48 @@ describe('issue_scout.find_duplicates — a duplicate exists', () => {
 	})
 })
 
+// joshuafolkken/kit#1679: the work most likely to be filed twice is the work that just finished, so
+// the rows handed in may be closed. They rank with the open ones — which listing a row came out of
+// says nothing about how well it matches — and the candidate carries its state so the caller can
+// say which exit it points at.
+describe('issue_scout.find_duplicates — a closed row', () => {
+	it('scores a closed issue exactly as an open one', () => {
+		const issues = [{ number: NEAR_DUPLICATE_NUMBER, title: NEAR_DUPLICATE_TITLE, is_closed: true }]
+
+		expect(numbers_of(DRAFT_TITLE, issues)).toStrictEqual([NEAR_DUPLICATE_NUMBER])
+	})
+
+	it('reports the candidate as closed', () => {
+		const issues = [{ number: NEAR_DUPLICATE_NUMBER, title: NEAR_DUPLICATE_TITLE, is_closed: true }]
+		const [candidate] = candidates_of(DRAFT_TITLE, issues)
+
+		expect(candidate?.is_closed).toBe(true)
+	})
+
+	// The field is absent rather than `false` on an open row, so nothing downstream has to distinguish
+	// "open" from "not said".
+	it('leaves an open candidate unmarked', () => {
+		const issues = [{ number: NEAR_DUPLICATE_NUMBER, title: NEAR_DUPLICATE_TITLE }]
+		const [candidate] = candidates_of(DRAFT_TITLE, issues)
+
+		expect(candidate?.is_closed).toBeUndefined()
+	})
+
+	// A closed epic is still a container, so it is still never a duplicate of a deliverable.
+	it('still excludes an epic', () => {
+		const issues = [
+			{
+				number: NEAR_DUPLICATE_NUMBER,
+				title: NEAR_DUPLICATE_TITLE,
+				is_epic: true,
+				is_closed: true,
+			},
+		]
+
+		expect(numbers_of(DRAFT_TITLE, issues)).toStrictEqual([])
+	})
+})
+
 describe('issue_scout.find_duplicates — nothing to report', () => {
 	it('answers with no candidate rather than the closest miss', () => {
 		const issues = [{ number: UNRELATED_NUMBER, title: UNRELATED_TITLE }]

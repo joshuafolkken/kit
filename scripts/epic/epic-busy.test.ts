@@ -5,6 +5,7 @@ import {
 	listing_outcome,
 } from '#scripts/git/git-gh-issue-list-fixture'
 import {
+	ALREADY_DONE_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
@@ -122,6 +123,17 @@ describe('epic_busy.read_repository — a parked issue', () => {
 		const parked = issue(HOLDER_NUMBER, CREATED_EARLIER, [NEEDS_DECISION_LABEL.toUpperCase()])
 
 		expect(epic_busy.is_parked(parked)).toBe(true)
+	})
+
+	// joshuafolkken/kit#1679: the run that applied `already-done` committed nothing and left a clean
+	// checkout, so there is no uncommitted work for the next child to start on top of — which is what
+	// separates it from `needs-human-review` below.
+	it('does not hold the repository for an already-done issue', async () => {
+		issue_list.mockResolvedValueOnce(
+			listing_of([issue(HOLDER_NUMBER, CREATED_EARLIER, [IN_PROGRESS_LABEL, ALREADY_DONE_LABEL])]),
+		)
+
+		expect(await epic_busy.read_repository(REPO)).toEqual({ kind: 'idle' })
 	})
 })
 

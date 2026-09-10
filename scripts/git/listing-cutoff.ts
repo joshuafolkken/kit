@@ -3,7 +3,7 @@ import { MAX_SCANNED } from './git-gh-issue-list'
 // Why an open-issue listing stopped short of the end of the backlog, or that it did not
 // (joshuafolkken/kit#1067).
 //
-// Every caller of `issue_list_open` asks this same question, and before this the answer was written
+// Every caller of `issue_list` asks this same question, and before this the answer was written
 // out again at each of them — `rows.length >= LIMIT` in `epic:bundle` and the `auto-ok` pickup, a
 // near-identical `cutoff_of` in `epic:audit`, and nothing at all in the two that most needed it. One
 // definition instead, so a caller cannot quietly disagree with the others about what "I saw

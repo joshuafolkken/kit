@@ -186,7 +186,7 @@ describe('josh auto-ok:next — what the guard is given', () => {
 	})
 
 	// joshuafolkken/kit#1005: the blocker relations failing takes the listing with them, and
-	// `issue_list_open` swallows the error — so the read looked exactly like an access failure and
+	// `issue_list` swallows the error — so the read looked exactly like an access failure and
 	// sent the reader to `gh auth status`, which is green. That is the misdirection kit#996's message
 	// was added to remove, walked back in by the field the same change started asking for.
 	it('blames the blocker relations when the field-bearing listing fails twice', async () => {

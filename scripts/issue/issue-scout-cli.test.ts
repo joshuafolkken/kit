@@ -1,5 +1,6 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { listing_of, listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
+import { EPIC_LABEL } from '#scripts/git/issue-labels'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_scout_cli } from './issue-scout-cli'
 
@@ -34,23 +35,27 @@ function row(number: number, title: string, body = ''): ListingRow {
 
 const EPIC_ROW = { number: EPIC_NUMBER, body: `- [ ] #${String(RELATED_NUMBER)}` }
 
-// The two listings the command reads, plus the repository name. Every case supplies its own backlog;
-// the epic listing defaults to the one epic that tracks #1246.
+// The three listings the command reads, plus the repository name. Every case supplies its own
+// backlog; the epic listing defaults to the one epic that tracks #1246, and the recently-closed
+// listing to empty — the answer every case written before joshuafolkken/kit#1679 assumed.
 function stub_reads(
 	backlog: ReadonlyArray<ListingRow>,
 	epics: ReadonlyArray<unknown> = [EPIC_ROW],
+	closed: ReadonlyArray<unknown> = [],
 ): void {
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(REPO)
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(listing_of(epics))
 	vi.spyOn(git_gh_command, 'issue_list_open_bodies').mockResolvedValue(listing_of(backlog))
+	vi.spyOn(git_gh_command, 'issue_list_recently_closed').mockResolvedValue(listing_of(closed))
 }
 
 async function printed(
 	argv: ReadonlyArray<string>,
 	backlog: ReadonlyArray<ListingRow>,
 	epics: ReadonlyArray<unknown> = [EPIC_ROW],
+	closed: ReadonlyArray<unknown> = [],
 ): Promise<string> {
-	stub_reads(backlog, epics)
+	stub_reads(backlog, epics, closed)
 
 	const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
@@ -78,6 +83,95 @@ describe('issue_scout_cli.run — a duplicate is already open', () => {
 		const output = await printed([DRAFT_TITLE], [row(UNRELATED_NUMBER, UNRELATED_TITLE)])
 
 		expect(output).toContain(issue_scout_cli.NO_DUPLICATE_LINE)
+	})
+})
+
+// joshuafolkken/kit#1679: the work most likely to be filed twice is the work that just finished, and
+// a scan reading open issues only cannot see any of it — joshuafolkken/kit#1656 was filed about five
+// hours after the issue that had already done it closed.
+describe('issue_scout_cli.run — a duplicate that has already closed', () => {
+	it('names a recently closed issue whose title restates the draft', async () => {
+		const output = await printed(
+			[DRAFT_TITLE],
+			[row(UNRELATED_NUMBER, UNRELATED_TITLE)],
+			[EPIC_ROW],
+			[row(NEAR_DUPLICATE_NUMBER, NEAR_DUPLICATE_TITLE)],
+		)
+
+		expect(output).toContain(`#${String(NEAR_DUPLICATE_NUMBER)}`)
+	})
+
+	// An open candidate says somebody is already tracking this; a closed one says it may already be
+	// done, and the two send the reader down different exits.
+	it('says which candidates are closed', async () => {
+		const output = await printed(
+			[DRAFT_TITLE],
+			[],
+			[EPIC_ROW],
+			[row(NEAR_DUPLICATE_NUMBER, NEAR_DUPLICATE_TITLE)],
+		)
+
+		expect(output).toContain('(closed)')
+	})
+})
+
+describe('issue_scout_cli.run — the closed listing has its own limits', () => {
+	// `decide_bundle` places a draft among issues still being worked on. A closed one can neither gain
+	// a sibling nor be recommended as an epic, so widening the placement pool with the closed rows
+	// would answer a different question from the one it was asked.
+	it('keeps the closed rows out of the epic half', async () => {
+		// The cited number is not in the *open* listing, so it is read on its own — stubbed as a number
+		// that resolves to nothing, exactly as the standalone case above does.
+		vi.spyOn(git_gh_command, 'issue_get_plan_fields_classified').mockResolvedValue({
+			kind: 'missing',
+		})
+
+		const output = await printed(
+			[DRAFT_TITLE, '--body', `follows on from #${String(RELATED_NUMBER)}`],
+			[],
+			[EPIC_ROW],
+			[row(RELATED_NUMBER, NEAR_DUPLICATE_TITLE)],
+		)
+
+		expect(output).toContain(issue_scout_cli.NO_EPIC_LINE)
+	})
+})
+
+describe('issue_scout_cli.run — what the closed half will not report', () => {
+	// A closed epic is still a container. `epic_bundle_cli` marks the open rows from the *open* epic
+	// listing, which by construction holds none — so the closed half reads the label itself. Reported
+	// as a duplicate it says "this work is already done" about an epic that never had an
+	// implementation of its own, and the run takes the already-done exit instead of filing.
+	it('never offers a closed epic as a duplicate', async () => {
+		const output = await printed(
+			[DRAFT_TITLE],
+			[],
+			[EPIC_ROW],
+			[
+				{
+					number: NEAR_DUPLICATE_NUMBER,
+					title: NEAR_DUPLICATE_TITLE,
+					labels: [{ name: EPIC_LABEL }],
+				},
+			],
+		)
+
+		expect(output).toContain(issue_scout_cli.NO_DUPLICATE_LINE)
+	})
+
+	// The open half ran, so this is a gap in the answer rather than a failure of it — and a run told
+	// nothing would file the duplicate the scan exists to catch.
+	it('warns rather than failing when the closed listing could not be read', async () => {
+		stub_reads([row(UNRELATED_NUMBER, UNRELATED_TITLE)])
+		vi.spyOn(git_gh_command, 'issue_list_recently_closed').mockResolvedValue(
+			listing_outcome(undefined),
+		)
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await issue_scout_cli.run([DRAFT_TITLE])).toBe(SUCCESS_EXIT_CODE)
+		expect(error.mock.calls.join('\n')).toContain(issue_scout_cli.CLOSED_UNREADABLE_LINE)
 	})
 })
 

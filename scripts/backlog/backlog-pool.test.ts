@@ -1,3 +1,5 @@
+import { auto_ok_fixture, CREATED_EARLIER } from '#scripts/auto-ok/auto-ok-fixture'
+import { ALREADY_DONE_LABEL, AUTO_OK_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { describe, expect, it } from 'vitest'
 import { backlog_pool } from './backlog-pool'
@@ -48,5 +50,46 @@ describe('backlog_pool.to_child', () => {
 
 	it('stamps the row itself with the reading repository', () => {
 		expect(backlog_pool.to_child(row([]), READING_REPO).repo).toBe(READING_REPO)
+	})
+})
+
+// joshuafolkken/kit#1679: `already-done` names work that is already merged, and the close that is
+// left is Tier C — so a person is the only thing that resolves it. Bucketed with the rows that are
+// waiting on time, it would be reported as something that resolves itself and nobody would ever be
+// told to close it.
+const STANDALONE_CONTEXT = { tracked: new Map<number, number>(), exclude: [], repo: READING_REPO }
+
+function opted_in(number: number, labels: ReadonlyArray<string>): OpenIssueData {
+	return auto_ok_fixture.issue(number, CREATED_EARLIER, [AUTO_OK_LABEL, ...labels])
+}
+
+function human_numbers(issues: ReadonlyArray<OpenIssueData>): Array<number> {
+	return backlog_pool
+		.classify_standalone(issues, STANDALONE_CONTEXT)
+		.human.map((child) => child.number)
+}
+
+describe('backlog_pool.classify_standalone — the rows a person has to resolve', () => {
+	it('puts an already-done row on the person side', () => {
+		expect(human_numbers([opted_in(ROW_NUMBER, [ALREADY_DONE_LABEL])])).toEqual([ROW_NUMBER])
+	})
+
+	it('puts a parked row there too, unchanged', () => {
+		expect(human_numbers([opted_in(ROW_NUMBER, [NEEDS_DECISION_LABEL])])).toEqual([ROW_NUMBER])
+	})
+
+	// The row is withheld from the offer as well, not merely reported differently — otherwise a
+	// `backlogrun` would start the very issue it has just been told is already merged.
+	it('does not offer an already-done row', () => {
+		const issues = [opted_in(ROW_NUMBER, [ALREADY_DONE_LABEL])]
+
+		expect(backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable).toEqual([])
+	})
+
+	it('still offers a row carrying neither label', () => {
+		const issues = [opted_in(ROW_NUMBER, [])]
+		const offered = backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable
+
+		expect(offered.map((child) => child.number)).toEqual([ROW_NUMBER])
 	})
 })

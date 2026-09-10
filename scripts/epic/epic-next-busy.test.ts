@@ -156,7 +156,7 @@ describe('josh epic:next --repo — a repository that is already running somethi
 	})
 
 	// A read that failed is not an idle repository: reading it as one starts the second child this
-	// guard exists to prevent. It is not an error either — `issue_list_open` swallows a passing rate
+	// guard exists to prevent. It is not an error either — `issue_list` swallows a passing rate
 	// limit into the same `undefined`, and ending an unattended run over a blip is what `wait` avoids.
 	it('waits rather than offering a child when the listing could not be read', async () => {
 		issue_list.mockResolvedValueOnce(listing_outcome(undefined))
