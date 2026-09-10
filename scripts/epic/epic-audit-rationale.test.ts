@@ -1,4 +1,6 @@
-import type { DependencyLink } from '#scripts/git/git-epic-parse'
+import { git_epic_body } from '#scripts/git/git-epic-body'
+import { git_epic_decision } from '#scripts/git/git-epic-decision'
+import { git_epic_parse, type DependencyLink } from '#scripts/git/git-epic-parse'
 import { describe, expect, it } from 'vitest'
 import type { AuditChild } from './epic-audit-checks'
 import { epic_audit_rationale, type OrderPair } from './epic-audit-rationale'
@@ -140,5 +142,24 @@ describe('find_unjustified_orders — what it will not judge', () => {
 		const comments = new Map([[FIRST_KEY, []]])
 
 		expect(findings_of({ pairs: default_pairs(), comments })).toStrictEqual([])
+	})
+})
+
+// The regression round 2 found: an epic created exactly as documented used to fail its own audit at
+// once, so `epicrun #E` stopped at step one on a brand-new epic. Asserted against a body the real
+// builder produced and the real section reader, not a hand-written fixture.
+describe('find_unjustified_orders — an epic created with `--ordered`', () => {
+	it('reports nothing, because the creation records the order it declared', () => {
+		const body = git_epic_body.build_epic_body({
+			children: [101, 102],
+			rationale: '',
+			is_ordered: true,
+		})
+		const links = git_epic_parse.parse_dependency_links(body)
+		const pairs = pairs_of(links, [child(101), child(102)])
+
+		expect(
+			findings_of({ pairs, decisions: git_epic_decision.read_recorded_reasons(body) }),
+		).toStrictEqual([])
 	})
 })
