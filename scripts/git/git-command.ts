@@ -342,9 +342,10 @@ async function push(): Promise<void> {
 // there deliberately because the callers and the conditions differ. Every caller turns out to want
 // the same thing: it is on the default branch, bringing it up to date before doing something else —
 // `main-sync.ts` for `josh ms`, `release-cli.ts` / `release-publish.ts` around the release pull
-// request, and `scripts-ai/prep.ts` before it snapshots the overrides. (`git-branch.ts` →
-// `pull_latest` is a fifth, reachable only through `check_and_create_branch`, which no production
-// entry point calls any more.) **None of them is
+// request, `scripts-ai/prep.ts` before it snapshots the overrides, and `git-branch.ts` →
+// `pull_latest` — reached from `scripts-ai/git-workflow.ts`, so it runs on every `josh git` /
+// `josh pr` started from the default branch, which makes it the hottest of the five rather than a
+// dormant one. **None of them is
 // asking to absorb divergence**, so `merge_branch`'s reasoning inverts here: a default branch that
 // has diverged is a state to fail loudly on rather than to grow a merge commit over. The name says
 // which of the two this is, as `merge_fast_forward` does beside `merge_branch`.
