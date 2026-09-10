@@ -137,8 +137,10 @@ resumption. Count everything the session has, then cut.
 `--started` takes the record's `started_at` and `--merged` its `merged`. That one substitution is what
 makes `--max` and the 8-hour whole-run bound count **across** cuts, as one invocation's worth. **The
 10-filings-per-run ceiling is counted the same way**, from `filed`. **`--idle` is the one budget that
-is not carried, and it needs no carrying** — a cut is taken at a child's merge, so no cut ever falls
-inside a watch: "The hand-off check is not asked during a watch" below.
+is not carried**, and a cut can only reach a watch that opened while this run's own children were
+still merging — the one shape where the two overlap. A resumed session then states its resume moment
+as `--active` and the watch begins again at its full budget, bounded by the 8 hours as everything
+else is: "The hand-off check is not asked during a watch" below.
 
 **The consecutive-failure guard needs no carrying, and that is by construction rather than by
 omission.** The hand-off is asked at every child's _merge_, so a cut is always taken directly after a
@@ -452,8 +454,14 @@ an omission, and three things make it safe:
 
 **So every cut is taken at a merge, and that is what lets a resumed session state its own
 `--active`.** A woken session picks the run up seconds after the merge the cut was taken at, so the
-moment it resumed *is* the moment the run last had work, to within the hand-off itself. Nothing has to
-carry the watch across a cut, because no cut ever falls inside one.
+moment it resumed *is* the moment the run last had work, to within the hand-off itself.
+
+**One shape does put a cut inside a watch, and it is the one where that is right.** The backlog can
+answer `exhausted` while this run's own children are still in lanes — a watch and a drain at once —
+and a cut is taken at each of those merges. A session woken from one has just merged a child, so the
+resume moment is still the moment the run last had work, and the watch begins again at its full
+budget. What keeps that finite is the 8-hour whole-run bound, which is measured from the record's
+`started_at` across every cut.
 
 **The 8-hour whole-run bound is untouched and still outranks all of this** — it is measured from the
 record's `started_at` across every cut, so a run cannot watch its way past it in 30-minute pieces.

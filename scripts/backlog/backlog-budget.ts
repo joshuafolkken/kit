@@ -138,8 +138,13 @@ function idle_watch_reason(left_ms: number): string {
 // backlog can answer `exhausted` while this run's own children are still merging. Two things the
 // sentence above would get wrong there — the working tree is still held, because the hold is released
 // at the *last* child's merge, and a five-minute poll would leave a merge unnoticed for five minutes.
+//
+// **The watch runs down while they drain, and the sentence does not promise otherwise.** Pausing it
+// would mean moving `active_at` on an ask that answered `exhausted`, which is the one thing that
+// moment is defined not to do — so a drain longer than the budget ends the run at the drain. That is
+// the honest ending: the backlog was empty at every ask, which is exactly what the watch measures.
 function running_watch_reason(running: number, left_ms: number): string {
-	return `The backlog is empty and the idle watch has about ${to_minutes(left_ms)} minutes left, with ${String(running)} still running. Keep the working tree until they merge and poll at the polling interval, not the idle poll; the watch goes on once they are drained.`
+	return `The backlog is empty and the idle watch has about ${to_minutes(left_ms)} minutes left, with ${String(running)} still running. Keep the working tree until they merge and poll at the polling interval, not the idle poll — the watch is running down meanwhile.`
 }
 
 function watching_reason(input: BudgetInput, left_ms: number): string {
