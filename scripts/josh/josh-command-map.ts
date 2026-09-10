@@ -115,6 +115,7 @@ const ALIASES: Record<string, string> = {
 	rh: 'run:hold',
 	rr: 'run:release',
 	rc: 'run:carry',
+	rw: 'run:wake',
 	rp: 'run:preflight',
 	rv: 'run:liveness',
 	rg: 'run:progress',

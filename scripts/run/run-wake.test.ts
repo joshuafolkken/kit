@@ -1,0 +1,243 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { CarryRead, RunCarry } from './run-carry'
+import { run_wake, type WakeDecisionInput } from './run-wake'
+
+// joshuafolkken/kit#1719. The decision is the whole safety property: a supervisor that woke on the
+// wrong answer would spend a budget the record calls finished, and one that woke twice for a single
+// cut would put two sessions into one invocation.
+
+const NOW = new Date('2026-09-10T12:00:00.000Z')
+const DEAD_START = 'a start time no live process has'
+const INVOCATION = 'backlogrun --max 5 --idle 30'
+
+function carry(overrides: Partial<RunCarry> = {}): RunCarry {
+	return {
+		invocation: INVOCATION,
+		started_at: '2026-09-10T08:00:00.000Z',
+		merged: 3,
+		filed: 1,
+		cuts: 2,
+		...overrides,
+	}
+}
+
+const NO_ATTEMPTS = 0
+
+// The predecessor is gone by default, which is the ordinary case: `--cut` is the cutting session's
+// last write and its process exits directly afterwards.
+function input(read: CarryRead, woke_at?: string, attempts = NO_ATTEMPTS): WakeDecisionInput {
+	return { read, woke_at, attempts, is_owner_live: false, now: NOW }
+}
+
+function overdue(attempts: number): WakeDecisionInput {
+	const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
+
+	return input({ kind: 'carried', carry: carry({ is_handed_off: true }) }, woke_at, attempts)
+}
+
+describe('run_wake.decide — whether to wake is the record’s answer', () => {
+	it('wakes on a carried record that a cut handed off', () => {
+		const decision = run_wake.decide(
+			input({ kind: 'carried', carry: carry({ is_handed_off: true }) }),
+		)
+
+		expect(decision).toStrictEqual({ kind: 'wake' })
+	})
+
+	it('waits on a carried record no cut handed off, because a session is spending it', () => {
+		const decision = run_wake.decide(input({ kind: 'carried', carry: carry() }))
+
+		expect(decision).toStrictEqual({ kind: 'wait' })
+	})
+
+	// The 8-hour whole-run bound is the carry record's expiry, so this is the only place it is
+	// enforced — and enforcing it means never waking, not waking with a shorter budget.
+	it('never wakes an expired record, and stops instead', () => {
+		const decision = run_wake.decide(
+			input({ kind: 'expired', carry: carry({ is_handed_off: true }) }),
+		)
+
+		expect(decision).toStrictEqual({ kind: 'stop', reason: 'expired' })
+	})
+
+	it('stops when the run ended and no record is left', () => {
+		expect(run_wake.decide(input({ kind: 'none' }))).toStrictEqual({
+			kind: 'stop',
+			reason: 'ended',
+		})
+	})
+
+	it('stops rather than guesses when the record cannot be read', () => {
+		expect(run_wake.decide(input({ kind: 'unreadable' }))).toStrictEqual({
+			kind: 'stop',
+			reason: 'unreadable',
+		})
+	})
+})
+
+describe('run_wake.decide — the grace window after a wake', () => {
+	// Without this the supervisor would forget it had already woken and wake again every interval,
+	// putting several sessions into one budget.
+	it('stays pending inside the grace window instead of waking again', () => {
+		const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS / 2).toISOString()
+		const decision = run_wake.decide(
+			input({ kind: 'carried', carry: carry({ is_handed_off: true }) }, woke_at),
+		)
+
+		expect(decision).toStrictEqual({ kind: 'pending' })
+	})
+
+	// Stopping ends a run nobody is watching, so a lost wake is retried before it is called a failure.
+	it('retries a lost wake while attempts remain', () => {
+		expect(run_wake.decide(overdue(1))).toStrictEqual({ kind: 'wake' })
+	})
+
+	it('calls it failed only once the attempts are exhausted', () => {
+		expect(run_wake.decide(overdue(run_wake.MAX_WAKE_ATTEMPTS))).toStrictEqual({ kind: 'failed' })
+	})
+
+	it('treats a wake stamp it cannot parse as overdue rather than as fresh', () => {
+		const spent = run_wake.MAX_WAKE_ATTEMPTS
+		const stale = input({ kind: 'carried', carry: carry({ is_handed_off: true }) }, 'x', spent)
+
+		expect(run_wake.decide(stale)).toStrictEqual({ kind: 'failed' })
+	})
+
+	// `classify_claim` tests `is_foreign_live_owner` before it tests the hand-off, so a wake issued
+	// while the cutting session is still exiting is answered `busy` and claims nothing.
+	it('waits out a predecessor that has cut but not yet exited', () => {
+		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
+
+		expect(run_wake.decide({ ...input(read), is_owner_live: true })).toStrictEqual({
+			kind: 'pending',
+		})
+	})
+
+	it('stops waiting on the predecessor once a wake is already out', () => {
+		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
+		const woke_at = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
+
+		expect(run_wake.decide({ ...input(read, woke_at, 1), is_owner_live: true })).toStrictEqual({
+			kind: 'wake',
+		})
+	})
+})
+
+const scratch = { directory: '', target: '' }
+
+beforeEach(() => {
+	scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-test-'))
+	scratch.target = path.join(scratch.directory, 'wake.json')
+})
+
+afterEach(() => {
+	rmSync(scratch.directory, { force: true, recursive: true })
+})
+
+describe('run_wake — the supervisor record', () => {
+	it('round-trips a record through disk', () => {
+		const wake = run_wake.fresh_wake(INVOCATION, NOW)
+
+		run_wake.write_wake(scratch.target, wake)
+
+		expect(run_wake.read_wake(scratch.target)).toStrictEqual(wake)
+	})
+
+	it('reads no record where none was written', () => {
+		expect(run_wake.read_wake(scratch.target)).toBeUndefined()
+	})
+
+	it('names the writing process, so a person can stop it', () => {
+		expect(run_wake.fresh_wake(INVOCATION, NOW).pid).toBe(process.pid)
+	})
+
+	it('starts at no wakes and counts one per wake', () => {
+		const wake = run_wake.fresh_wake(INVOCATION, NOW)
+
+		expect(wake.woke).toBe(0)
+		expect(run_wake.count_wake(wake, NOW, 99).woke).toBe(1)
+		expect(run_wake.count_wake(wake, NOW, 99).woke_at).toBe(NOW.toISOString())
+		expect(run_wake.count_wake(wake, NOW, 99).woke_pid).toBe(99)
+	})
+
+	// `woke` is published against the carry record's `cuts`, so a retry of the same cut must not
+	// inflate it — otherwise the invariant reports a discrepancy that never happened.
+	it('counts a retry as another attempt but not as another wake', () => {
+		const first = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
+		const retry = run_wake.count_wake(first, NOW, 100)
+
+		expect(retry.woke).toBe(1)
+		expect(retry.attempts).toBe(2)
+	})
+
+	it('clears the wake mark and the attempts once a session has claimed the carry record', () => {
+		const woken = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
+
+		expect(run_wake.clear_wake_mark(woken).woke_at).toBeUndefined()
+		expect(run_wake.clear_wake_mark(woken).attempts).toBeUndefined()
+		expect(run_wake.clear_wake_mark(woken).woke).toBe(1)
+	})
+})
+
+describe('run_wake.claim — one supervisor per repository', () => {
+	it('refuses a second claim while the first supervisor is running', () => {
+		expect(run_wake.claim(scratch.target, INVOCATION, NOW)).toBeDefined()
+		expect(run_wake.claim(scratch.target, INVOCATION, NOW)).toBeUndefined()
+	})
+
+	// A record naming a process that is provably gone is the crashed supervisor, and it must not lock
+	// the repository out of ever starting another one.
+	it('replaces a record whose supervisor is provably gone', () => {
+		run_wake.write_wake(scratch.target, {
+			...run_wake.fresh_wake(INVOCATION, NOW),
+			pid: 0,
+			process_start: DEAD_START,
+		})
+
+		expect(run_wake.claim(scratch.target, INVOCATION, NOW)).toBeDefined()
+	})
+})
+
+describe('run_wake.claim — what survives a restart', () => {
+	// A `--stop` / `--start` cycle mid-run must not reset the count the invariant is published against.
+	it('carries the wake count across a restart of the same invocation', () => {
+		run_wake.write_wake(scratch.target, {
+			...run_wake.fresh_wake(INVOCATION, NOW),
+			woke: 4,
+			pid: 0,
+			process_start: DEAD_START,
+		})
+
+		expect(run_wake.claim(scratch.target, INVOCATION, NOW)?.woke).toBe(4)
+	})
+
+	it('does not carry a different invocation’s count', () => {
+		run_wake.write_wake(scratch.target, {
+			...run_wake.fresh_wake('some other run', NOW),
+			woke: 4,
+			pid: 0,
+			process_start: DEAD_START,
+		})
+
+		expect(run_wake.claim(scratch.target, INVOCATION, NOW)?.woke).toBe(0)
+	})
+
+	// `--stop` removes the record; a loop pass still in flight must not write it back.
+	it('refuses to write back a record that was removed', () => {
+		const wake = run_wake.fresh_wake(INVOCATION, NOW)
+
+		expect(run_wake.update_wake(scratch.target, wake)).toBe(false)
+
+		run_wake.write_wake(scratch.target, wake)
+
+		expect(run_wake.update_wake(scratch.target, wake)).toBe(true)
+	})
+
+	it('keys on the given directory, so one repository has one supervisor', () => {
+		expect(run_wake.wake_path('/a/.git')).not.toBe(run_wake.wake_path('/b/.git'))
+		expect(run_wake.wake_path('/a/.git')).toBe(run_wake.wake_path('/a/.git'))
+	})
+})

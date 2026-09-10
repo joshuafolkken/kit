@@ -151,6 +151,16 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Carry one invocation’s budget across its own session cuts',
 		category: 'AI tools',
 	},
+	'run:wake': {
+		script: 'scripts/run/run-wake-cli.ts',
+		// `.env` rather than the ambient environment: the wake command is configured there
+		// (`JOSH_WAKE_COMMAND`) and the failure warning needs the Telegram credentials, the same two
+		// reasons `notify` and `followup` carry these flags.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Continue a cut backlogrun by waking the next session from outside the conversation',
+		category: 'AI tools',
+	},
 	'run:preflight': {
 		script: 'scripts/run/run-preflight-cli.ts',
 		description: 'Say what an interrupted run left in this tree, and what to do about it',

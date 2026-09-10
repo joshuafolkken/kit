@@ -2441,6 +2441,52 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:carry --be
 
 Where a `backlogrun` asks it, and what it does with each answer, is `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation".
 
+### `josh run:wake`
+
+Continue a cut `backlogrun` by waking the next session from outside the conversation, so one keystroke spends the whole declared budget instead of the first 50 minutes of it ([#1719](https://github.com/joshuafolkken/kit/issues/1719)).
+
+```bash
+pnpm josh run:wake --start          # alias: josh rw
+pnpm josh run:wake --list           # which supervisor is running, and what it has done
+pnpm josh run:wake --stop           # stop it
+pnpm josh run:wake --loop           # the body itself, in the foreground, to watch what it does
+pnpm josh run:wake --loop --interval 30
+```
+
+`josh run:carry` made the budget survive the cut and left the keystroke in place: a cut still ended with a `confirmation` Telegram and a resume line, and a run measured to cut about every 50 minutes did nothing at all until a person came back to it. This is the thing that starts the next session.
+
+**Whether to wake is the carry record's answer, never a judgement.** The supervisor wakes on one state — `carried`, and handed off by `josh run:carry --cut`. `none`, `expired` and `unreadable` each stop it. A record no cut handed off is a session still spending the budget, so it is waited on rather than woken over.
+
+**The 8-hour whole-run bound therefore needs no check of its own.** It _is_ the carry record's expiry, so a run past it reads `expired` and the supervisor stops. A bound re-derived here would drift, and it would drift in the direction that matters — waking past a budget the record already calls spent.
+
+**The supervisor never declares itself the record's owner.** The owner is meant to be the process _spending_ the budget, and that is the session it wakes, not itself. Named as owner, this long-lived process would still be alive when the woken session ran `--begin`, which is answered `busy` — and the run would never resume. So it reads the carry record and never claims it, while the woken session claims it with `--owner "$PPID"` exactly as before.
+
+**What may be run is untouched.** The waker adds nothing to the argument vector but the invocation the person typed, and writes no label: `auto-ok` is still a person's to apply, so a woken session is offered exactly the issues the first one was.
+
+**The wake command is configurable and its default is conservative.** `JOSH_WAKE_COMMAND` names the agent CLI and its leading arguments, and the invocation is appended as the final argument; the default is `claude -p`. **It deliberately does not carry `--dangerously-skip-permissions`**, which the `josh eval` harness does pass — that suite runs in a throwaway checkout with its credentials taken away, while this wakes a session in the person's own repository with their own credentials. Someone who wants it sets it there.
+
+**It waits out the session it is replacing.** A `--cut` is the cutting session's last _write_, not the moment its process is gone, and `josh run:carry` tests whether the record's owner is still live **before** it tests the hand-off — so a wake issued too early has the new session answered `busy`, which tells it to stop without claiming anything. The supervisor therefore holds off while the recorded owner is still running.
+
+**A launch that fails does not disappear, and is retried before it is called a failure.** The detector is the carry record not being claimed within ten minutes of a wake, which catches a missing binary, a session that dies during boot, and one that runs without ever picking the run up — three failures an exit-code check would have missed. The window has to cover the agent CLI's cold start and everything it reads before its first `run:carry --begin`, and a merely slow start booked as a failure would end the run for the night; so a lost wake is retried up to three times, and only then does the supervisor stop and send a `warning` Telegram. **The last process it launched is named in that warning rather than killed** — a slow session is still doing the run's work, and a supervisor that destroyed what it could not account for would destroy exactly what it exists to keep going.
+
+**A person can always find it and stop it.** `--list` names the invocation, the process, whether it is still running, and how many sessions it has woken beside the run's own cut count — the two being equal is the invariant worth being able to check, and a restart carries the count forward rather than resetting it. `--stop` removes the record, which is what ends the loop, and signals the process only to shorten the wait; a supervisor whose process cannot be signalled still stops at its next pass, because the loop refuses to write back a record that is no longer there.
+
+| Answer        | Meaning                                                                            | Exit code                                  |
+| ------------- | ---------------------------------------------------------------------------------- | ------------------------------------------ |
+| `started`     | A supervisor is now running detached                                               | 0                                          |
+| `running`     | One was already running here; nothing was started                                  | 0                                          |
+| `supervising` | `--list` found one and its process is running                                      | 0                                          |
+| `stale`       | A record is here but its process is gone — a crash or a reboot; `--stop` clears it | 0                                          |
+| `stopped`     | The record was removed and the process signalled                                   | 0                                          |
+| `none`        | Nothing to supervise, list or stop                                                 | 0 for `--list` / `--stop`, 1 for `--start` |
+| `ended`       | The run finished and the supervisor stopped                                        | 0                                          |
+| `expired`     | The 8-hour whole-run bound is spent; nothing was woken                             | 0                                          |
+| `unreadable`  | The carry record could not be read, so the supervisor stopped rather than guessing | 0                                          |
+| `failed`      | A wake could not be launched, or was never claimed; a `warning` Telegram was sent  | 1                                          |
+| `unknown`     | The repository could not be resolved, so nothing was established                   | 1                                          |
+
+Standard output carries exactly one token on every path; the reason and the advice go to standard error. Where a `backlogrun` starts and ends it is `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation".
+
 ### `josh run:preflight`
 
 Say what an interrupted run left in this working tree, and what the rule says to do about it before the next child starts ([#926](https://github.com/joshuafolkken/kit/issues/926)).
