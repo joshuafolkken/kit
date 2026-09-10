@@ -2235,6 +2235,31 @@ Standard output carries the single verdict word and standard error the reason, s
 
 **The entry point that consumes this answer is `backlogrun`**, defined in `.claude/skills/workflow-commands/backlogrun.md` → "The two budgets". The command is read-only, holds no state of its own, and never applies or removes a label.
 
+### `josh depth:share`
+
+Reports the depth-0 share of the open backlog from the depth labels recorded on the Issues ([#1729](https://github.com/joshuafolkken/kit/issues/1729)).
+
+```bash
+pnpm josh depth:share          # → <depth-0>/<denominator> = <n>% ; alias: josh dsh
+pnpm josh depth:share --json   # the same figures as one JSON object
+```
+
+[#1698](https://github.com/joshuafolkken/kit/issues/1698) set the share of open Issues at depth 0 as its measurable target and left nothing that measures it: no Issue recorded a depth, so obtaining the number meant opening every open Issue and classifying it by eye. Two such counts a day apart gave 3/23 ≈ 13% and 3/14 ≈ 21%, and they are **not comparable** — they took different denominators, and neither said which.
+
+**The denominator is a rule rather than a choice.** `.claude/skills/workflow-commands/SKILL.md` → §2i, "The depth-0 share", is its single source, and `scripts/issue/issue-depth-share.ts` is where it is implemented:
+
+| Counted in the denominator                                                                                                        | Not counted                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Every open Issue without the `epic` label, `route:tier-a` and `route:interrupt` included, whether or not it carries a depth label | An open Issue carrying `epic` — a container rather than a deliverable, and with no subject of its own to read a depth off |
+
+- **An Issue with no depth label is inside the denominator** and is reported separately as `unlabelled`. Left out, the share would improve every time a filing skipped the label.
+- **An Issue carrying more than one depth label counts as the lowest depth present**, the one closest to the consumer — a fixed tie-break, so the same backlog measured twice cannot answer twice.
+- **A listing that hit the scan ceiling is reported as capped**, and one that could not be read at all answers `unknown` on stdout with the reason on stderr. **Never a share of zero** — that would be a measurement invented out of a failed fetch.
+
+The plain form prints the headline on stdout and the full breakdown on stderr, so `pnpm josh depth:share 2>/dev/null` is the number alone. `--json` emits one object carrying `share` — the headline, or the string `unknown` — plus `denominator`, `depth_0`, `depth_1`, `depth_2`, `unlabelled`, `epics_excluded`, `share_percent` and `cutoff` (`none` / `row_limit` / `page_ceiling`, from `scripts/git/listing-cutoff.ts`). **`share` is the one key both shapes carry**, so a consumer tells a measured run from an unreadable one by reading it rather than by sniffing for a key only one of them has.
+
+The command is read-only: it applies no label and files nothing. Applying the labels is the filing routes' job, defined in the same §2i.
+
 ### `needs-human-review` — the opposite label
 
 `auto-ok` widens unattended execution past an epic's edge; **`needs-human-review` withholds its last step** ([#1125](https://github.com/joshuafolkken/kit/issues/1125)). An issue carrying it is implemented and taken through the verification gate as usual, and then nothing is committed, pushed, opened as a pull request or merged: the working tree is left uncommitted and unstashed, a `confirmation` notification goes out carrying the resume command, and the run stops there rather than starting the next issue.

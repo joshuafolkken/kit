@@ -72,7 +72,7 @@ gh api "repos/{owner}/{repo}/issues?state=open&per_page=100" --paginate \
 1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。
 
    ```bash
-   gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:interrupt' -f body="<body>"
+   gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:interrupt' -f 'labels[]=depth:<n>' -f body="<body>"
    ```
 
 2. **超過している事実と、当たった条件の番号を本文に 1 行書く**（例:「オープン 37 件で起票。3 条件のうち 2（文書化された手順が完了できない）に該当」）。**どちらか一方では足りない** — 件数だけでは判定が再現できず、条件だけでは上限の可視化が効かない。
