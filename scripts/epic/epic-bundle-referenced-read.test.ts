@@ -40,7 +40,7 @@ describe('epic_bundle_referenced.fetch_referenced', () => {
 	})
 
 	it('carries a failed read through as unreadable', async () => {
-		mocked_read.mockResolvedValueOnce({ kind: 'unreadable' })
+		mocked_read.mockResolvedValueOnce({ kind: 'unreadable', reason: 'rejected', status: 403 })
 
 		await expect(epic_bundle_referenced.fetch_referenced([PRESENT_NUMBER])).resolves.toEqual([
 			{ number: PRESENT_NUMBER, result: 'unreadable' },

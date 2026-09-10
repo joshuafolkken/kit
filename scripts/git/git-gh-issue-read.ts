@@ -1,6 +1,7 @@
 import type { IssueReference } from './git-epic-reference'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
+import { gh_failure, type GhFailure } from './git-gh-failure'
 import { git_gh_helpers } from './git-gh-helpers'
 import {
 	BLOCKED_BY_FIELD,
@@ -8,6 +9,7 @@ import {
 	type BlockedBy,
 	type RestIssue,
 } from './git-gh-issue-rest'
+import { gh_reachability } from './git-gh-reachability'
 
 // Reading one issue. Split out of `git-gh-issue.ts`, which had grown past the file-length limit
 // while holding both the reads and the writes; the reads are what every epic command goes through,
@@ -75,6 +77,37 @@ async function read_blocked_by(
 	return await read_blocked_by_listing(issue_number, repo, exact_total)
 }
 
+// Re-label a failure as belonging to a request made after another had already succeeded. Nothing
+// else about it changes, so a rate limit or a dropped connection still reads exactly as it did.
+function mark_followup(error: unknown): unknown {
+	if (!(error instanceof Error)) return error
+
+	const failure = gh_failure.failure_of(error)
+	if (failure === undefined) return error
+
+	return gh_failure.attach(error, { ...failure, is_followup: true })
+}
+
+// The relations, marked as the follow-up request they are (joshuafolkken/kit#1690).
+//
+// **One read, two requests, one classifier.** The relations endpoint is reached only after the issue
+// itself came back, so by then the number has resolved — and yet the caller catches a single error
+// and cannot tell which of the two produced it. A 404 from the relations endpoint (absent on an
+// older host, which `has_no_relations_endpoint` handles for the other entry point) would otherwise
+// report an issue that exists as `missing`. The mark is set here, where which request failed is
+// still known.
+async function read_relations(
+	issue_number: string,
+	rest: RestIssue,
+	repo?: string,
+): Promise<BlockedBy> {
+	try {
+		return await read_blocked_by(issue_number, rest, repo)
+	} catch (error) {
+		throw mark_followup(error)
+	}
+}
+
 // One issue through REST, answered in the field names `gh issue view --json` used. Every read below
 // goes through it, so the request, the field mapping and the blocker relations are decided once
 // (joshuafolkken/kit#1024).
@@ -93,10 +126,114 @@ async function read_issue_fields(
 	)
 	const requested = git_gh_issue_rest.split_fields(fields)
 	const blocked_by = requested.includes(BLOCKED_BY_FIELD)
-		? await read_blocked_by(issue_number, rest, repo)
+		? await read_relations(issue_number, rest, repo)
 		: undefined
 
 	return git_gh_issue_rest.to_gh_issue(rest, requested, blocked_by)
+}
+
+// Why a read produced no issue. `missing` is GitHub resolving the number to nothing — a typo, or
+// another repository's number quoted in prose — which is an answer rather than a gap. `unreadable`
+// is a gap: a rate limit, expired auth, a dropped connection. Folding the two together had one
+// non-existent number reported as something the command had failed to read, which stops an
+// unattended run for a reference that never existed (joshuafolkken/kit#957).
+//
+// **`reason` splits the gap into the three answers a caller acts on differently**
+// (joshuafolkken/kit#1690). `unreachable` is retryable — nothing answered, or GitHub answered 429 or
+// 5xx — so the same request a moment later can succeed and an unattended run should ask again rather
+// than report the backlog empty. `rejected` is an answer that will not change on its own: expired
+// auth, an org policy, a 403. `malformed` is a response that arrived and could not be used, which is
+// neither a transport problem nor a permission one. `kind` is unchanged so the callers that only
+// separate "there is nothing at that number" from "the read failed" need no edit.
+type IssueReadReason = 'unreachable' | 'rejected' | 'malformed'
+type IssueReadFailure =
+	{ kind: 'missing' } | { kind: 'unreadable'; reason: IssueReadReason; status: number | undefined }
+type IssueRead = IssueReadFailure | { kind: 'read'; json: string }
+type FieldRead = IssueReadFailure | { kind: 'read'; text: string | undefined }
+
+// 404 is the number resolving to nothing. Every other status — 403 and 429 for a rate limit, 5xx,
+// or no status at all — is a read that failed over something the number is not responsible for.
+//
+// GitHub also answers 404 rather than 403 for an issue the token may not see, so that it does not
+// leak the issue's existence — the two are indistinguishable by design, and no reading of the status
+// could separate them. It does not reach the caller this exists for: `epic:bundle` probes the
+// repository whose open issues it has just listed, so a number it cannot see there is one that is
+// not there.
+const NOT_FOUND_STATUS = 404
+
+// Why the read failed, read off **the failed request** rather than off a second one
+// (joshuafolkken/kit#1690).
+//
+// joshuafolkken/kit#957 answered this by probing the same path again for its status, and
+// joshuafolkken/kit#1024 kept the probe because gh surfaces a failure as stderr text and classifying
+// by that wording is prose-matching. Both premises held; the conclusion did not. `gh api` writes the
+// **response body** to stdout, and GitHub's own error document carries the status there — so the
+// status was on the failed request all along, and `git-gh-failure.ts` takes it from there.
+//
+// **A second request cannot answer about the first.** A connection that dropped for a moment fails
+// the read and answers the probe `reachable`, and the read then keeps the meaning the probe gave it.
+// Removing the probe removes that, and removes the extra request with it: the classification is now
+// free, so `epic:bundle`'s bounded lookup no longer trades accuracy against a rate limit it would
+// deepen.
+//
+// An error carrying no classification at all did not come from the request: `parse_rest_issue` and
+// its schema throw for a response that arrived and could not be used, which is `malformed`.
+function is_number_unresolved(failure: GhFailure): boolean {
+	return failure.status === NOT_FOUND_STATUS && failure.is_followup !== true
+}
+
+function to_unreadable_reason(status: number | undefined): IssueReadReason {
+	return gh_reachability.classify_status(status) === 'unreachable' ? 'unreachable' : 'rejected'
+}
+
+function to_read_failure(error: unknown): IssueReadFailure {
+	const failure = gh_failure.failure_of(error)
+
+	if (failure === undefined) return { kind: 'unreadable', reason: 'malformed', status: undefined }
+	// Only the request that resolves the number can report it as resolving to nothing. A follow-up
+	// request's own 404 is about that endpoint (joshuafolkken/kit#1690).
+	if (is_number_unresolved(failure)) return { kind: 'missing' }
+
+	return {
+		kind: 'unreadable',
+		reason: to_unreadable_reason(failure.status),
+		status: failure.status,
+	}
+}
+
+// The same view as `issue_view_json`, plus why it produced nothing when it did.
+async function issue_view_json_classified(
+	issue_number: string,
+	fields: string,
+	repo?: string,
+): Promise<IssueRead> {
+	try {
+		const issue = await read_issue_fields(issue_number, fields, repo)
+
+		return { kind: 'read', json: JSON.stringify(issue) }
+	} catch (error) {
+		return to_read_failure(error)
+	}
+}
+
+// One field of one issue, with the reason it produced nothing when it did.
+//
+// The unwrapped `string | undefined` below is this same read with the reason dropped, rather than a
+// second read that never had one: a caller that only wants the text keeps its signature, and one
+// that has to tell "the body is empty" from "the body could not be read" now can
+// (joshuafolkken/kit#1690).
+async function issue_view_field_classified(
+	issue_number: string,
+	field: string,
+	repo?: string,
+): Promise<FieldRead> {
+	try {
+		const issue = await read_issue_fields(issue_number, field, repo)
+
+		return { kind: 'read', text: git_gh_issue_rest.to_field_text(issue[field]) }
+	} catch (error) {
+		return to_read_failure(error)
+	}
 }
 
 // One field of one issue, unwrapped so the caller gets the value rather than an object.
@@ -105,13 +242,9 @@ async function issue_view_field(
 	field: string,
 	repo?: string,
 ): Promise<string | undefined> {
-	try {
-		const issue = await read_issue_fields(issue_number, field, repo)
+	const read = await issue_view_field_classified(issue_number, field, repo)
 
-		return git_gh_issue_rest.to_field_text(issue[field])
-	} catch {
-		return undefined
-	}
+	return read.kind === 'read' ? read.text : undefined
 }
 
 // An extracted string arrives raw — nothing quotes it — and an empty answer is not a title
@@ -130,6 +263,14 @@ async function issue_get_body(issue_number: string, repo?: string): Promise<stri
 	return await issue_view_field(issue_number, 'body', repo)
 }
 
+// The body, plus why it produced nothing when it did. An epic's body is the one read whose absence
+// is indistinguishable from a legitimate answer — an epic with no task list and an epic nobody could
+// read both parse to zero children — so the caller that builds the dependency graph takes this one
+// (joshuafolkken/kit#1690).
+async function issue_get_body_classified(issue_number: string, repo?: string): Promise<FieldRead> {
+	return await issue_view_field_classified(issue_number, 'body', repo)
+}
+
 // A JSON view of one issue, for every caller that wants several fields at once. Callers differ only
 // in which fields they ask for, and a helper per field list is how four near-identical functions
 // accumulated (joshuafolkken/kit#862).
@@ -141,59 +282,9 @@ async function issue_view_json(
 	fields: string,
 	repo?: string,
 ): Promise<string | undefined> {
-	try {
-		return JSON.stringify(await read_issue_fields(issue_number, fields, repo))
-	} catch {
-		return undefined
-	}
-}
+	const read = await issue_view_json_classified(issue_number, fields, repo)
 
-// Why a read produced no issue. `missing` is GitHub resolving the number to nothing — a typo, or
-// another repository's number quoted in prose — which is an answer rather than a gap. `unreadable`
-// is a gap: a rate limit, expired auth, a dropped connection. Folding the two together had one
-// non-existent number reported as something the command had failed to read, which stops an
-// unattended run for a reference that never existed (joshuafolkken/kit#957).
-type IssueRead = { kind: 'read'; json: string } | { kind: 'missing' } | { kind: 'unreadable' }
-
-// 404 is the number resolving to nothing. Every other status — 403 and 429 for a rate limit, 5xx,
-// or no status at all — is a read that failed over something the number is not responsible for.
-//
-// GitHub also answers 404 rather than 403 for an issue the token may not see, so that it does not
-// leak the issue's existence — the two are indistinguishable by design, and no reading of the status
-// could separate them. It does not reach the caller this exists for: `epic:bundle` probes the
-// repository whose open issues it has just listed, so a number it cannot see there is one that is
-// not there.
-const NOT_FOUND_STATUS = 404
-
-// The same view as `issue_view_json`, plus why it produced nothing when it did.
-//
-// The read itself is REST now, but `exec_gh_api` surfaces a failure as gh's stderr text — the status
-// code is not on the Error — and classifying by that wording is exactly what the status probe exists
-// to avoid: a message is prose that can be reworded between releases. So the probe stays, and the
-// three branches come out on the conditions they came out on before (joshuafolkken/kit#1024). What
-// did change is that both requests now go through the same transport, so the probe can no longer
-// disagree with the read about which API answered.
-//
-// The probe costs one extra request. It is spent **only** on the failure path, and only
-// by callers that need the distinction — which is why it is a separate function rather than a change
-// to `issue_view_json`. That matters most for the caller that does *not* opt in: `epic:bundle` reads
-// relations for the whole open backlog, up to two hundred issues, and a rate limit that failed all
-// of them would spend two hundred more requests finding out why. The classified path is bounded by
-// `REFERENCED_LOOKUP_LIMIT` instead, so a rate limit costs it at most twenty extra probes.
-async function issue_view_json_classified(
-	issue_number: string,
-	fields: string,
-	repo?: string,
-): Promise<IssueRead> {
-	const json = await issue_view_json(issue_number, fields, repo)
-
-	if (json !== undefined) return { kind: 'read', json }
-
-	const status = await git_gh_exec.exec_gh_api_status(
-		git_gh_api_path.issue_api_path(issue_number, repo),
-	)
-
-	return status === NOT_FOUND_STATUS ? { kind: 'missing' } : { kind: 'unreadable' }
+	return read.kind === 'read' ? read.json : undefined
 }
 
 // State, labels and dependency relations in one read: the epic auto-close needs state and relations
@@ -203,11 +294,30 @@ async function issue_view_json_classified(
 // `repo` reads a child in another repository. Cross-repository children are read this way rather
 // than from a local checkout: their state is a GitHub fact, and requiring a clone to learn it is
 // what kept the auto-close from ever running on such an epic (joshuafolkken/kit#864).
+const STATE_AND_RELATIONS_FIELDS = 'number,state,labels,blockedBy'
+
 async function issue_get_state_and_relations(
 	issue_number: string,
 	repo?: string,
 ): Promise<string | undefined> {
-	return await issue_view_json(issue_number, 'number,state,labels,blockedBy', repo)
+	return await issue_view_json(issue_number, STATE_AND_RELATIONS_FIELDS, repo)
+}
+
+// The same read, plus why it produced nothing when it did. An epic's children are read this way, and
+// an unattended run has to tell a child it could not reach from one it may never reach
+// (joshuafolkken/kit#1690).
+async function issue_get_state_and_relations_classified(
+	issue_number: string,
+	repo?: string,
+): Promise<IssueRead> {
+	return await issue_view_json_classified(issue_number, STATE_AND_RELATIONS_FIELDS, repo)
+}
+
+// Whether a failed read is one the same request could succeed at a moment later. Defined beside the
+// classification rather than re-derived per caller: a second spelling of "unreadable and retryable"
+// is where the two would drift apart.
+function is_unreachable_read(failure: IssueReadFailure): boolean {
+	return failure.kind === 'unreadable' && failure.reason === 'unreachable'
 }
 
 // Everything `epic:plan` puts in front of the batch decision. Read separately from the poll above
@@ -265,9 +375,14 @@ async function issue_list_comments(issue_number: string): Promise<string | undef
 }
 
 // Whether the relations endpoint has nothing at that number at all. Probed for its status rather
-// than read off `gh`'s stderr wording, exactly as the issue read's own classification does it — the
-// status code is not on the Error, and classifying by the message is what that probe exists to
-// avoid.
+// than read off `gh`'s stderr wording, because classifying by the message is prose-matching.
+//
+// **This one could read the failed request instead, and deliberately does not** — its caller reaches
+// it from a `catch`, where the error it holds already carries `gh_failure` since
+// joshuafolkken/kit#1690. What is asked here is not "why did that request fail" but "does this
+// endpoint exist on this host", and the answer has to hold for a `read_blocked_by_listing` that
+// failed for some other reason entirely. Reusing the caught failure would fold the two questions
+// into one.
 async function has_no_relations_endpoint(issue_number: string, repo?: string): Promise<boolean> {
 	const status = await git_gh_exec.exec_gh_api_status(
 		git_gh_api_path.blocked_by_api_path(issue_number, repo),
@@ -327,14 +442,17 @@ const git_gh_issue_read = {
 	issue_blocked_by_references,
 	issue_get_title,
 	issue_get_body,
+	issue_get_body_classified,
 	issue_view_json,
 	issue_view_json_classified,
 	issue_get_state_and_relations,
+	issue_get_state_and_relations_classified,
+	is_unreachable_read,
 	issue_get_plan_fields,
 	issue_get_plan_fields_classified,
 	issue_get_labels_and_body,
 	issue_list_comments,
 }
 
-export type { IssueRead }
+export type { FieldRead, IssueRead, IssueReadFailure, IssueReadReason }
 export { git_gh_issue_read, read_blocked_by, NOT_FOUND_STATUS }

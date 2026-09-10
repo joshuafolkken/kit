@@ -32,6 +32,8 @@ function snapshot(overrides: Partial<EpicSnapshot> = {}): EpicSnapshot {
 		unreadable: [],
 		skipped: [],
 		has_external_children: false,
+		body_failure: undefined,
+		is_unreachable: false,
 		...overrides,
 	}
 }
@@ -106,10 +108,42 @@ describe('epic_audit_cli.run — the repository name it needs to resolve referen
 	it('goes on to read the epic when the repository names itself', async () => {
 		vi.spyOn(git_gh_command, GET_REPO).mockResolvedValue(REPO)
 		vi.spyOn(console, 'error').mockImplementation(() => undefined)
-		const get_body = vi.spyOn(git_gh_command, GET_BODY).mockResolvedValue(undefined)
+		const get_body = vi
+			.spyOn(git_gh_command, 'issue_get_body_classified')
+			.mockResolvedValue({ kind: 'read', text: undefined })
 
 		await epic_audit_cli.run([EPIC])
 
 		expect(get_body).toHaveBeenCalledWith(EPIC, undefined)
+	})
+})
+
+// joshuafolkken/kit#1690: a body nobody could read parses to zero children exactly as an unpopulated
+// task list does, so the audit reported an epic it never read as one tracking no children — and sent
+// the reader to fill in a task list that is already there.
+type BodyRead = Awaited<ReturnType<typeof git_gh_command.issue_get_body_classified>>
+
+function stub_body(read: BodyRead): void {
+	vi.spyOn(git_gh_command, GET_REPO).mockResolvedValue(REPO)
+	vi.spyOn(git_gh_command, 'issue_get_body_classified').mockResolvedValue(read)
+}
+
+describe('epic_audit_cli.run — an epic body that could not be read', () => {
+	it('says the body could not be read rather than that the epic tracks nothing', async () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		stub_body({ kind: 'unreadable', reason: 'unreachable', status: undefined })
+
+		expect(await epic_audit_cli.run([EPIC])).toBe(FAILURE_EXIT_CODE)
+		expect(errors.mock.calls.flat().join('\n')).toContain('Could not read the body')
+	})
+
+	it('still reports an epic whose body was read and tracks nothing as tracking nothing', async () => {
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		stub_body({ kind: 'read', text: 'no task list here' })
+
+		expect(await epic_audit_cli.run([EPIC])).toBe(FAILURE_EXIT_CODE)
+		expect(errors.mock.calls.flat().join('\n')).toContain('tracks no children')
 	})
 })

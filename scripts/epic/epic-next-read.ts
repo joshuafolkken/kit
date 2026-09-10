@@ -73,6 +73,17 @@ function unique_references(
 	return unique
 }
 
+// **An epic whose body could not be read is not a childless epic.** The two are indistinguishable
+// downstream — a body that never arrived parses to zero children exactly as an unpopulated task list
+// does — and skipping it drops the epic from the views with no anomaly anywhere, so the run reports
+// the backlog empty and ends. Kept as a read instead, so `epic:next` sees the failed body and says so
+// (joshuafolkken/kit#1690).
+function is_childless(snapshot: EpicSnapshot): boolean {
+	if (snapshot.body_failure !== undefined) return false
+
+	return snapshot.child_numbers.length === NO_CHILDREN
+}
+
 // **A childless epic is skipped; a foreign one refuses.** The distinction is what each says about
 // the caller. A reference naming another owner's tracker is a read we must not make at all, so it
 // stops the command. An epic that is simply not populated yet is a valid, readable epic of ours — an
@@ -84,9 +95,9 @@ async function read_one(reference: EpicReference, current_repo: string): Promise
 	if (epic_repo === undefined) return { refusal: FOREIGN_EPIC }
 	const snapshot = await epic_fetch.fetch_epic(reference.number, epic_repo, current_repo)
 
-	return snapshot.child_numbers.length === NO_CHILDREN
-		? { notice: childless(reference) }
-		: { read: { reference, snapshot } }
+	if (is_childless(snapshot)) return { notice: childless(reference) }
+
+	return { read: { reference, snapshot } }
 }
 
 function collect(outcome: ReadOutcome, reads: Array<EpicRead>, notices: Array<string>): void {
@@ -121,6 +132,7 @@ const epic_next_read = {
 	epic_repo_of,
 	childless,
 	unique_references,
+	is_childless,
 	read_one,
 	read_snapshots,
 }

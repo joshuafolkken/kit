@@ -30,6 +30,8 @@ function snapshot(children: ReadonlyArray<EpicChild>): EpicSnapshot {
 		unreadable: [],
 		skipped: [],
 		has_external_children: false,
+		body_failure: undefined,
+		is_unreachable: false,
 	}
 }
 

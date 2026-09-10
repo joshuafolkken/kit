@@ -176,11 +176,28 @@ function fetch_anomalies(
 	]
 }
 
-async function gather(epic_number: number, repo: string): Promise<AuditInput | undefined> {
-	const snapshot = await epic_fetch.fetch_epic(epic_number, repo)
+// Why a snapshot yields nothing to audit, with the two reasons told apart (joshuafolkken/kit#1690).
+// A body nobody could read parses to zero children exactly as an unpopulated task list does, so
+// without this the audit reported an epic it never read as one tracking no children — and sent the
+// reader to fill in a task list that is already there.
+function no_children_reason(snapshot: EpicSnapshot, epic_number: number): string | undefined {
+	if (snapshot.body_failure !== undefined) {
+		return `Could not read the body of #${String(epic_number)}. Its task list is what names the children — check \`gh auth status\` and the connection.`
+	}
 
 	if (snapshot.child_numbers.length === 0) {
-		console.error(`#${String(epic_number)} tracks no children in a task list.`)
+		return `#${String(epic_number)} tracks no children in a task list.`
+	}
+
+	return undefined
+}
+
+async function gather(epic_number: number, repo: string): Promise<AuditInput | undefined> {
+	const snapshot = await epic_fetch.fetch_epic(epic_number, repo)
+	const reason = no_children_reason(snapshot, epic_number)
+
+	if (reason !== undefined) {
+		console.error(reason)
 
 		return undefined
 	}
