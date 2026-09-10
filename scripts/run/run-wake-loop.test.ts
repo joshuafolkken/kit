@@ -137,6 +137,34 @@ describe('run_wake_loop.run_loop — where it stops', () => {
 	})
 })
 
+describe('run_wake_loop.run_loop — waiting out the session that cut', () => {
+	// The hold must leave a mark, or the wait never expires and the run dies silently on the carry
+	// record's own bound rather than waking anything.
+	it('marks the wait rather than waking while the predecessor is still live', async () => {
+		const scripted = recorder([HANDED_OFF, ENDED])
+		const ports = { ...scripted.ports, is_owner_live: () => true }
+
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(scripted.wakes).toStrictEqual([])
+		expect(run_wake.read_wake(scratch.target)?.woke_at).toBe(NOW.toISOString())
+	})
+
+	it('wakes once the bounded wait on the predecessor has expired', async () => {
+		run_wake.write_wake(scratch.target, {
+			...run_wake.fresh_wake(INVOCATION, NOW),
+			woke_at: new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString(),
+		})
+
+		const scripted = recorder([HANDED_OFF, ENDED])
+		const ports = { ...scripted.ports, is_owner_live: () => true }
+
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(scripted.wakes).toStrictEqual([INVOCATION])
+	})
+})
+
 describe('run_wake_loop.run_loop — a failure that must not be silent', () => {
 	it('reports a launch that could not start, with the reason attached', async () => {
 		const failure: LaunchResult = { kind: 'failed', note: ENOENT_NOTE }

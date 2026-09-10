@@ -105,15 +105,37 @@ describe('run_wake.decide — the grace window after a wake', () => {
 
 		expect(run_wake.decide(stale)).toStrictEqual({ kind: 'failed' })
 	})
+})
 
+describe('run_wake.decide — waiting out the session that cut', () => {
 	// `classify_claim` tests `is_foreign_live_owner` before it tests the hand-off, so a wake issued
 	// while the cutting session is still exiting is answered `busy` and claims nothing.
 	it('waits out a predecessor that has cut but not yet exited', () => {
 		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
 
 		expect(run_wake.decide({ ...input(read), is_owner_live: true })).toStrictEqual({
-			kind: 'pending',
+			kind: 'hold',
 		})
+	})
+
+	// An interactive session's process often outlives its own cut. Waited on without a bound, the
+	// supervisor would pend for the record's whole life, wake nothing, and end on `expired`, which
+	// sends no warning — a silent overnight failure, worse than the `busy` race the wait avoids.
+	it('bounds the wait on the predecessor and wakes anyway once it expires', () => {
+		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
+		const waiting_since = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
+
+		expect(run_wake.decide({ ...input(read, waiting_since), is_owner_live: true })).toStrictEqual({
+			kind: 'wake',
+		})
+	})
+
+	it('marks the wait without spending a retry', () => {
+		const marked = run_wake.mark_wait(run_wake.fresh_wake(INVOCATION, NOW), NOW)
+
+		expect(marked.woke_at).toBe(NOW.toISOString())
+		expect(marked.attempts).toBeUndefined()
+		expect(marked.woke).toBe(0)
 	})
 
 	it('stops waiting on the predecessor once a wake is already out', () => {
@@ -212,6 +234,26 @@ describe('run_wake.claim — what survives a restart', () => {
 		})
 
 		expect(run_wake.claim(scratch.target, INVOCATION, NOW)?.woke).toBe(4)
+	})
+})
+
+describe('run_wake.claim — the wake state a restart keeps', () => {
+	// Dropping these would have a restart inside the grace window launch a second session for the same
+	// cut, count it as another cut served, and leave two sessions racing for one record.
+	it('carries the wake mark and the attempts across a restart too', () => {
+		run_wake.write_wake(scratch.target, {
+			...run_wake.fresh_wake(INVOCATION, NOW),
+			woke: 2,
+			attempts: 2,
+			woke_at: NOW.toISOString(),
+			pid: 0,
+			process_start: DEAD_START,
+		})
+
+		const claimed = run_wake.claim(scratch.target, INVOCATION, NOW)
+
+		expect(claimed?.woke_at).toBe(NOW.toISOString())
+		expect(claimed?.attempts).toBe(2)
 	})
 
 	it('does not carry a different invocation’s count', () => {

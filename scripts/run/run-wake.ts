@@ -96,6 +96,7 @@ type WakeDecision =
 	| { kind: 'wake' }
 	| { kind: 'wait' }
 	| { kind: 'pending' }
+	| { kind: 'hold' }
 	| { kind: 'failed' }
 	| { kind: 'stop'; reason: WakeStopReason }
 
@@ -116,6 +117,7 @@ interface WakeDecisionInput {
 const WAKE_DECISION: WakeDecision = { kind: 'wake' }
 const WAIT_DECISION: WakeDecision = { kind: 'wait' }
 const PENDING_DECISION: WakeDecision = { kind: 'pending' }
+const HOLD_DECISION: WakeDecision = { kind: 'hold' }
 const FAILED_DECISION: WakeDecision = { kind: 'failed' }
 
 // The three carry reads that are not `carried`, each mapped to why the supervisor stops. `none` is the
@@ -160,6 +162,14 @@ function decide_handed_off(input: WakeDecisionInput): WakeDecision {
 
 // Only before the first launch for this cut. Once a wake is out, the record's owner is whatever the
 // woken session declares, and waiting on it again would stall the grace window indefinitely.
+//
+// **The wait is bounded, and the bound is not decoration.** The owner is the agent process of the
+// session that cut, and an interactive one often outlives its own cut — waited on without a bound, the
+// supervisor would pend every interval for the record's whole life, wake nothing, and end on `expired`,
+// which sends no warning. That is a silent overnight failure, which is worse than the `busy` race this
+// wait exists to avoid: a `busy` merely costs one attempt, and attempts are retried. So the wait is
+// marked when it starts and expires into an ordinary wake through the same grace window everything
+// else uses.
 function is_predecessor_exiting(input: WakeDecisionInput): boolean {
 	return input.woke_at === undefined && input.is_owner_live
 }
@@ -168,7 +178,7 @@ function is_predecessor_exiting(input: WakeDecisionInput): boolean {
 function decide(input: WakeDecisionInput): WakeDecision {
 	if (input.read.kind !== 'carried') return { kind: 'stop', reason: STOP_REASONS[input.read.kind] }
 	if (input.read.carry.is_handed_off !== true) return WAIT_DECISION
-	if (is_predecessor_exiting(input)) return PENDING_DECISION
+	if (is_predecessor_exiting(input)) return HOLD_DECISION
 
 	return decide_handed_off(input)
 }
@@ -218,12 +228,17 @@ function is_supervisor_live(wake: RunWake): boolean {
 	return process_identity.is_same_process(wake.pid, wake.process_start) !== false
 }
 
-// A restarted supervisor inherits the count rather than starting it over. `woke` is published against
-// the carry record's `cuts` as an invariant, so a `--stop` / `--start` cycle mid-run that reset it
-// would make `--list` under-report and the published check read as a defect that never happened. The
-// invocation has to match — a different one is a different run, and its count is not this one's.
-function carried_wakes(existing: RunWake | undefined, invocation: string): number {
-	return existing?.invocation === invocation ? existing.woke : NO_WAKES
+// A restarted supervisor inherits the whole wake state rather than starting it over. `woke` is
+// published against the carry record's `cuts` as an invariant, so a `--stop` / `--start` cycle mid-run
+// that reset it would make `--list` under-report and the published check read as a defect that never
+// happened. **`woke_at` and `attempts` come with it, and dropping them is not cosmetic**: a restart
+// inside the grace window would otherwise see no wake mark, launch a second session for the *same*
+// cut, count it as another cut served, and leave two sessions racing for one record. The invocation
+// has to match — a different one is a different run, and its state is not this one's.
+function carried_state(existing: RunWake | undefined, invocation: string): Partial<RunWake> {
+	if (existing?.invocation !== invocation) return { woke: NO_WAKES }
+
+	return { woke: existing.woke, woke_at: existing.woke_at, attempts: existing.attempts }
 }
 
 // `create_stamp` rather than `write_stamp`: two `--start`s racing must not both come away believing
@@ -234,7 +249,7 @@ function claim(target: string, invocation: string, now: Date): RunWake | undefin
 
 	if (existing !== undefined && is_supervisor_live(existing)) return undefined
 
-	const wake = { ...fresh_wake(invocation, now), woke: carried_wakes(existing, invocation) }
+	const wake = { ...fresh_wake(invocation, now), ...carried_state(existing, invocation) }
 
 	remove_wake(target)
 
@@ -248,6 +263,13 @@ function count_wake(wake: RunWake, now: Date, pid: number): RunWake {
 	const woke = attempts === ONE_WAKE ? wake.woke + ONE_WAKE : wake.woke
 
 	return { ...wake, woke, attempts, woke_at: now.toISOString(), woke_pid: pid }
+}
+
+// Starts the clock on a wait without launching anything. `attempts` is deliberately untouched, so the
+// bounded wait costs no retry: what it buys is that the wait expires into an ordinary wake instead of
+// running until the carry record does.
+function mark_wait(wake: RunWake, now: Date): RunWake {
+	return { ...wake, woke_at: now.toISOString() }
 }
 
 // `undefined` rather than a deleted key, because `JSON.stringify` drops it on the way to disk and the
@@ -279,6 +301,7 @@ const run_wake = {
 	decide,
 	fresh_wake,
 	is_supervisor_live,
+	mark_wait,
 	parse_wake,
 	read_wake,
 	remove_wake,

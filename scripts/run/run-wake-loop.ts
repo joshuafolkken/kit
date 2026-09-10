@@ -71,13 +71,17 @@ function wake_step(wake: RunWake, ports: LoopPorts): StepOutcome {
 }
 
 // A `wait` means the woken session has claimed the carry record, so the wake mark is cleared and the
-// next cut starts the grace window afresh. A `pending` keeps it, because the window it is measured
-// from is still open.
-function continue_step(wake: RunWake, decision: WakeDecision): StepOutcome {
-	return {
-		kind: 'continue',
-		wake: decision.kind === 'wait' ? run_wake.clear_wake_mark(wake) : wake,
+// next cut starts the grace window afresh. A `hold` starts that window without launching anything —
+// the bounded wait on a predecessor that has cut but not yet exited. A `pending` keeps what is there,
+// because the window it is measured from is still open.
+function continue_step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): StepOutcome {
+	if (decision.kind === 'wait') return { kind: 'continue', wake: run_wake.clear_wake_mark(wake) }
+
+	if (decision.kind === 'hold') {
+		return { kind: 'continue', wake: run_wake.mark_wait(wake, ports.now()) }
 	}
+
+	return { kind: 'continue', wake }
 }
 
 function step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): StepOutcome {
@@ -85,7 +89,7 @@ function step(wake: RunWake, decision: WakeDecision, ports: LoopPorts): StepOutc
 	if (decision.kind === 'failed') return stopped(FAILED_REASON, wake_failure_note(wake))
 	if (decision.kind === 'wake') return wake_step(wake, ports)
 
-	return continue_step(wake, decision)
+	return continue_step(wake, decision, ports)
 }
 
 function decision_input(wake: RunWake, ports: LoopPorts): WakeDecisionInput {
