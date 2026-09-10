@@ -52,8 +52,17 @@ const UNSAFE_NOTE =
 const FIRST_PRINTABLE_CODE = 0x20
 const DELETE_CODE = 0x7f
 const FIRST_CODE_POINT = 0
-// An invocation is a person's sentence and legitimately contains spaces, quotes and dashes, so length
-// and control characters are the whole of what can be checked about it.
+// **The invocation is held to the shape of the one thing this supervisor exists to continue.** It
+// wakes a `backlogrun` and nothing else, so an allowlist is available here where it would not be for a
+// general-purpose launcher — and it is a real narrowing rather than a formality: without it the
+// supervisor launches a session with whatever text the record happened to hold, which is the record's
+// integrity standing in for a check nobody performs.
+//
+// **Matched rather than tested, so what runs is the text that matched.** A boolean guard leaves the
+// original string in play, and an edit that moved the guard would not change a single character of the
+// value reaching the operating system.
+const SAFE_INVOCATION = /^backlogrun(?: --[a-z][\da-z-]*(?: [\w.:-]+)?)*$/u
+const MATCHED_WHOLE = 0
 const MAX_ARGUMENT_LENGTH = 4096
 const EMPTY_LENGTH = 0
 
@@ -102,10 +111,18 @@ function is_safe_argv(argv: WakeArgv): boolean {
 // The invocation goes last and as one argument, never interpolated into a command string: it is text a
 // person typed, and splitting it on whitespace here would turn `backlogrun --max 5` into arguments of
 // the CLI rather than the prompt it is.
-function wake_argv(invocation: string): WakeArgv | undefined {
+function safe_invocation(invocation: string): string | undefined {
 	if (!is_safe_value(invocation)) return undefined
 
-	return { command: WAKE_COMMAND, args: [...WAKE_FLAGS, invocation] }
+	return SAFE_INVOCATION.exec(invocation)?.[MATCHED_WHOLE]
+}
+
+function wake_argv(invocation: string): WakeArgv | undefined {
+	const matched = safe_invocation(invocation)
+
+	if (matched === undefined) return undefined
+
+	return { command: WAKE_COMMAND, args: [...WAKE_FLAGS, matched] }
 }
 
 // Re-invoking this very script under the same runner, which is what makes the supervisor outlive the

@@ -66,7 +66,16 @@ describe('run_wake_session — what may reach the operating system', () => {
 		expect(run_wake_session.wake_argv('')).toBeUndefined()
 	})
 
-	it('accepts an ordinary invocation, spaces and dashes and all', () => {
+	// The supervisor exists to continue a `backlogrun` and nothing else, so anything else in the record
+	// is a record that has been tampered with or a bug — never something to launch a session with.
+	it('refuses an invocation that is not a backlogrun', () => {
+		expect(run_wake_session.wake_argv('epicrun #1716')).toBeUndefined()
+		expect(run_wake_session.wake_argv('rm -rf /')).toBeUndefined()
+		expect(run_wake_session.wake_argv('backlogrun; rm -rf /')).toBeUndefined()
+	})
+
+	it('accepts a bare backlogrun and one carrying its budget flags', () => {
+		expect(run_wake_session.wake_argv('backlogrun')).toBeDefined()
 		expect(run_wake_session.wake_argv(INVOCATION)).toBeDefined()
 	})
 
