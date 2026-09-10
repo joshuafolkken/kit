@@ -235,7 +235,9 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   it is the one route whose whole procedure is "file it and keep going". **Two things narrow which
   observations reach it**, and both are §2i's: a filing at depth 1 or deeper cites the depth-0 work
   it blocked, and **a delegated child does not take this route at all** — it returns the observation
-  to the parent (joshuafolkken/kit#1698).
+  to the parent (joshuafolkken/kit#1698). **What the narrowing turns away is recorded rather than
+  dropped**, which is §2i's as well: it goes to `docs/observations.md` as one append-only line, and a
+  **second** line under the same key files it (joshuafolkken/kit#1728).
 - **The pre-implementation reading goes to a delegated unit once the count of subject files reaches
   the threshold §2b names** — §2b →
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
@@ -646,7 +648,7 @@ its procedure (joshuafolkken/kit#1649).
 | A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
 | This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `epicrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
-| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked — both §2i's |
+| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; **one that cannot cite it goes to `docs/observations.md` and is filed on its second sighting** rather than being dropped — all of them §2i's |
 
 **File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during
 implementation stays countable by filing route afterwards (joshuafolkken/kit#1083). **This paragraph
@@ -1037,8 +1039,9 @@ it — read off the subject rather than judged**:
 
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
   it stopped or delayed** — named as an Issue number or a run, never as "this would slow runs down".
-  **Cannot cite one, it is not filed**: it goes in the completion report and waits for the blockage
-  to happen. Pull rather than push — the fix follows the jam, not the sighting.
+  **Cannot cite one, it is not filed**: it goes to the ledger below, and what files it later is
+  either the blockage arriving or a second sighting of the same thing. Pull rather than push — the
+  fix follows the jam or the repeat, never the lone sighting.
 - **A depth-0 observation does not take this test.** That is the product, and the two ceilings above
   stay its only limits.
 - **`route:tier-a` and `route:interrupt` do not take it either**, at any depth: a filing the run
@@ -1054,12 +1057,114 @@ citation would drop the one kind of finding both documents agree is never droppe
 lost, and nothing about it says which findings were worth having. This changes what counts as a
 finding at all, so what it excludes is excluded for a reason a reader can check.
 
+### The ledger — where an observation that cannot cite a blockage goes
+
+**"Not filed" used to mean "gone", and that is what walked the depth test past itself.** The
+completion report was the only place such an observation could land, and a completion report is
+read once and then scrolls away — so the next run met the same thing as a first sighting, forever.
+joshuafolkken/kit#1726 is the worked case: its own body says the depth test would not have filed it,
+and it was filed anyway, because **discarding it was the only alternative on offer**
+(joshuafolkken/kit#1728).
+
+- **The destination is `docs/observations.md` in the repository the observation is about** — the same
+  repository the Issue would have been filed into. **The count and the append are both run in that
+  repository's checkout**, resolved the way §2c resolves any cross-repository target, and the file is
+  created on the first append where that repository has none. **The subject decides, never the
+  working directory**: an observation about this package's own orchestration, seen while a run is
+  inside a repository that consumes it, is recorded here rather than there — the append follows the
+  subject, never the working directory. **A third-party target gets no line either** — Tier C covers
+  the ledger exactly as it covers the Issue that would otherwise have been filed there.
+- **It is append-only.** A line is never edited and never deleted, because the count of lines
+  carrying one key is what says whether an observation has recurred; a second sighting is a second
+  line, not a rewrite of the first. **A merge conflict in it is resolved by keeping both sides** —
+  two lanes appending at once is the ordinary case, and a repeated key is the whole signal, so
+  dropping either side destroys exactly what the file is for.
+- **The completion report keeps its line too.** The ledger is what the next run can read; the report
+  is what this run's reader sees. Neither replaces the other.
+
+**One observation is one line: five fields, each separated from the next by a vertical bar with one
+space on either side.**
+
+```
+- k:<slug> | d<n> | <YYYY-MM-DD> | <where> | <what>
+```
+
+| Field          | What it holds                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `k:<slug>`     | The identity key — lowercase letters and digits, in words joined by `-`. This is what makes a repeat machine-readable      |
+| `d<n>`         | The depth of the subject — `d1`, `d2`, or whatever deeper depth the table above may one day name. **There is no `d0` line**: a depth-0 observation is filed outright and never reaches the ledger |
+| `<YYYY-MM-DD>` | The date of **this** sighting                                                                                             |
+| `<where>`      | One file path or one command — where the thing was seen                                                                   |
+| `<what>`       | The phenomenon, one sentence, carrying no vertical bar of its own                                                         |
+
+A sample, in the shape a real entry takes:
+
+```
+- k:example | d1 | 2026-09-10 | pnpm josh run:progress | The report printed a fill-in placeholder where a clock time belonged
+```
+
+**`k:example` is reserved for this sample and is never used by a real observation**, so the count
+below can be run over the whole file without the sample answering for one. **The grammar is defined
+here rather than in the ledger** because this skill is distributed to every repository that consumes
+the package and `docs/` is not — a rule that named a definition the reader never received would
+leave every consumer's ledger shaped by hand.
+
+**The identity key is the whole of the repeat test — never a similarity judgement about the prose.**
+Choose the key from the phenomenon rather than from the run, then count what the ledger already holds
+for it, in that repository's checkout rather than the working directory. **The `|| true` is not
+decoration**: `grep -c` exits non-zero on a count of zero, which is the first-sighting branch and the
+common one, so without it the step reads as a failed command wherever an exit status is being
+watched. **A missing file is not a count of zero, though** — there `grep` exits 2 and prints no
+number at all, so an empty answer means create the ledger, never that this is a first sighting.
+
+```bash
+grep -c '^- k:<slug> |' <that repository's checkout>/docs/observations.md || true
+```
+
+Free-text comparison is what the key exists to replace, so two lines that read alike under different
+keys are two observations, and a mis-keyed entry is corrected by appending a correctly-keyed line
+rather than by editing the one already written.
+
+**The depth gate is not withdrawn, and this is not a way around it.** An observation that *can* cite
+the depth-0 work it stopped is filed exactly as it was before — this route is only for the ones that
+could not, and whose sole previous destination was nothing (joshuafolkken/kit#1698's gate stands
+unchanged).
+
+### The second sighting is what files it
+
+**A repeat is the citation.** joshuafolkken/kit#1698 asked a discretionary filing to be pulled by a
+blockage rather than pushed by a sighting; an observation recorded twice has been pulled — it came
+back on its own, which no single sighting can demonstrate. So the gate has a second way through, and
+it is counted rather than judged:
+
+- **On the count answering exactly `1`, the observation is filed**, at depth 1 or deeper, with no
+  depth-0 citation — `1` and not "1 or more", because a higher count means the Issue was already
+  opened by the sighting that answered `1`. The ledger line is appended as well, because the ledger
+  stays append-only.
+- **The Issue quotes the ledger's own dates — the first sighting's and this one's** — so the reader
+  can check the promotion against the file instead of taking the run's word for it.
+- **Both ceilings still apply**, exactly as they do above: the 10-per-run cap counts a promoted
+  filing, and the WIP cap still bites, since a promoted observation blocks nothing and is therefore
+  still discretionary.
+
+**A third and later sighting appends a line and files nothing more.** The Issue from the second one
+is already open, and `pnpm josh issue:scout` is what finds it; the extra lines are evidence for that
+Issue, not new ones.
+
 ### A delegated child does not take this route
 
 **A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary
 observations are not filed by the child at all: they go back in the summary's "Observations that
 could bite later" line (`epicrun.md` → "What the summary carries, and how long it may be"), and the
 parent files what survives — under the depth test above, and inside the run's ceiling.
+
+**A delegated child does not append to the ledger either — the parent collapses the duplicates and
+appends what is left.** The ledger's whole value is that one key means one phenomenon, and a child
+holding one Issue's worth of context cannot tell its observation from the sibling lane's: eight
+children appending in parallel would write the same thing under eight keys, and every one of them
+would then read as a first sighting. The child's route is unchanged and is the only one it has —
+the summary's "Observations that could bite later" line — and the parent chooses the key, checks the
+count and writes the line.
 
 **Two reasons, and a child can solve neither for itself.** It holds one Issue's worth of context, so
 **it cannot tell its observation from the one a sibling filed twenty minutes earlier** — the 15

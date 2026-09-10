@@ -223,7 +223,12 @@ are written out, and the brief hands them to the unit.
    surprising diff, work a later child will collide with. **This is the only route a child's
    discretionary observation has** (joshuafolkken/kit#1698): a child files `route:tier-a` and
    `route:interrupt` only, and the parent files what survives — `SKILL.md` → §2i, the single source,
-   carries the depth test it is filed under and why a child cannot count the ceiling.
+   carries the depth test it is filed under and why a child cannot count the ceiling. **What the
+   parent does with the rest is append it, not drop it**: an observation that cannot cite the depth-0
+   work it blocked becomes one line in `docs/observations.md`, and a second line under the same key
+   is what files it. **The child never writes that file** — it cannot tell its observation from the
+   sibling lane's, so parallel children would write one phenomenon under several keys and every one
+   of them would read as a first sighting (joshuafolkken/kit#1728).
 4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.
 5. **What was left undone**, and under whose authority — a dropped review finding, a skipped step, a
    scope a comment moved to another Issue.
