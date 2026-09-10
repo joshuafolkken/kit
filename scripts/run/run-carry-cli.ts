@@ -1,12 +1,20 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { parseArgs } from 'node:util'
-import { run_carry, type CarryChange, type CarryRead, type RunCarry } from './run-carry'
+import {
+	run_carry,
+	type CarryChange,
+	type CarryClaim,
+	type CarryClaimRequest,
+	type CarryRead,
+	type RunCarry,
+} from './run-carry'
+import { run_carry_args, type Request } from './run-carry-args'
 
 // `josh run:carry` — the record that carries one invocation's budget across its own session cuts
 // (joshuafolkken/kit#1714). A `backlogrun` begins it, counts a merge and a filing into it, marks each
 // cut, and ends it; a session that resumes after a cut reads the same budget back rather than
-// starting a new one.
+// starting a new one. **Turning `argv` into a request is `run-carry-args.ts`'s**; what is here acts
+// on the record and prints.
 //
 // The contract is `run:hold`'s: **standard output carries exactly one token** and every explanation
 // goes to standard error, so `answer=$(pnpm josh run:carry --begin "backlogrun --max 5")` captures
@@ -16,16 +24,6 @@ import { run_carry, type CarryChange, type CarryRead, type RunCarry } from './ru
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const NO_INCREMENT = 0
-const ONE_CUT = 1
-// The three request groups below are mutually exclusive, so more than one of them named in a single
-// invocation is a usage error rather than an order to guess.
-const ONE_GROUP = 1
-const COUNT_PATTERN = /^\d+$/u
-const EMPTY_INVOCATION = ''
-const USAGE =
-	'Usage: josh run:carry [--json] | --begin <invocation> | --cut | --merged <count> | --filed <count> | --end'
-
 const BEGAN_VERDICT = 'began'
 const RESUMED_VERDICT = 'resumed'
 const CARRIED_VERDICT = 'carried'
@@ -35,102 +33,15 @@ const EXPIRED_VERDICT = 'expired'
 const NONE_VERDICT = 'none'
 const UNREADABLE_VERDICT = 'unreadable'
 const MISMATCH_VERDICT = 'mismatch'
+const BUSY_VERDICT = 'busy'
+const STANDING_VERDICT = 'standing'
 const UNKNOWN_VERDICT = 'unknown'
 
-const OPTIONS = {
-	begin: { type: 'string' },
-	cut: { type: 'boolean' },
-	end: { type: 'boolean' },
-	filed: { type: 'string' },
-	json: { type: 'boolean' },
-	merged: { type: 'string' },
-} as const
-
-type OptionName = keyof typeof OPTIONS
-type ParsedValues = Partial<Record<OptionName, string | boolean>>
-
-type Request =
-	| { kind: 'read' }
-	| { kind: 'begin'; invocation: string }
-	| { kind: 'count'; change: CarryChange }
-	| { kind: 'end' }
-
-const READ_REQUEST: Request = { kind: 'read' }
-const END_REQUEST: Request = { kind: 'end' }
-
-function read_arguments(argv: ReadonlyArray<string>): ParsedValues | undefined {
-	try {
-		return parseArgs({ args: [...argv], options: OPTIONS, strict: true }).values
-	} catch {
-		return undefined
-	}
-}
-
-function text_of(value: string | boolean | undefined): string | undefined {
-	return typeof value === 'string' ? value : undefined
-}
-
-// Absent is zero; present but not a count is `undefined`, which invalidates the whole invocation
-// rather than quietly counting nothing.
-function to_count(value: string | boolean | undefined): number | undefined {
-	const text = text_of(value)
-
-	if (text === undefined) return NO_INCREMENT
-
-	return COUNT_PATTERN.test(text) ? Number(text) : undefined
-}
-
-function to_change(values: ParsedValues): CarryChange | undefined {
-	const merged = to_count(values.merged)
-	const filed = to_count(values.filed)
-
-	if (merged === undefined || filed === undefined) return undefined
-
-	return { merged, filed, cuts: values.cut === true ? ONE_CUT : NO_INCREMENT }
-}
-
-// **A counting flag is what makes a count, never the sum of one.** `--merged 0` is a run reporting
-// that a wave merged nothing, and reading it as a bare read would answer `none` with exit 0 against
-// a record that is not there — the silent zero `docs/josh-commands.md` says exits 1.
-function has_count(values: ParsedValues): boolean {
-	return values.cut === true || values.merged !== undefined || values.filed !== undefined
-}
-
-// The three groups are mutually exclusive: `--begin` starts a run, `--end` finishes one, and the
-// counters change one that is already there. Two groups in one invocation is a usage error, never a
-// guessed order between them.
-function group_count(values: ParsedValues): number {
-	const groups = [values.begin !== undefined, values.end === true, has_count(values)]
-
-	return groups.filter(Boolean).length
-}
-
-// The counting group, split out so the shape below stays a flat list of exits.
-function to_count_request(values: ParsedValues): Request | undefined {
-	const change = to_change(values)
-
-	if (change === undefined) return undefined
-
-	return { kind: 'count', change }
-}
-
-// `--begin ""` is a loop whose invocation variable was unset. A record named by nothing is one every
-// other empty `--begin` then resumes into, which is the cross-run inheritance `resume` below exists
-// to refuse — so it is a usage error rather than a record.
-function to_begin_request(invocation: string): Request | undefined {
-	return invocation === EMPTY_INVOCATION ? undefined : { kind: 'begin', invocation }
-}
-
-function to_request(values: ParsedValues): Request | undefined {
-	if (group_count(values) > ONE_GROUP) return undefined
-
-	const invocation = text_of(values.begin)
-
-	if (invocation !== undefined) return to_begin_request(invocation)
-
-	if (values.end === true) return END_REQUEST
-
-	return has_count(values) ? to_count_request(values) : READ_REQUEST
+const CLAIM_VERDICTS: Record<CarryClaim, string> = {
+	busy: BUSY_VERDICT,
+	mismatch: MISMATCH_VERDICT,
+	resume: RESUMED_VERDICT,
+	standing: STANDING_VERDICT,
 }
 
 function report(
@@ -172,31 +83,134 @@ function report_read(read: CarryRead, is_json: boolean): number {
 	return report_carry(CARRIED_VERDICT, read.carry, is_json)
 }
 
-// A live record belonging to a **different** invocation is not this run's budget to spend. `--end`
-// is only reached on the clean-finish path, so a run that crashed or stopped on a guard leaves its
-// record standing for up to the whole-run bound; answering `resumed` there would hand the new
-// invocation the dead one's `--max`, its spent counts and a `started_at` already hours old.
-function resume(carry: RunCarry, invocation: string, is_json: boolean): number {
-	if (carry.invocation === invocation) return report_carry(RESUMED_VERDICT, carry, is_json)
+function report_busy(carry: RunCarry, is_json: boolean): number {
+	console.error(run_carry.busy_message(carry))
 
-	console.error(run_carry.mismatch_message(carry, invocation))
-
-	return report(MISMATCH_VERDICT, carry, is_json, FAILURE_EXIT_CODE)
+	return report(BUSY_VERDICT, carry, is_json, FAILURE_EXIT_CODE)
 }
 
-// **A live record is never replaced.** Replacing one would restart the budget the cut exists to
-// carry, which is the whole defect this command was written for. An expired one is replaced, because
-// its run has spent the whole-run bound and a person typing the keyword again is starting a new run.
-function begin(target: string, invocation: string, is_json: boolean): number {
+function refusal_message(claim: CarryClaim, carry: RunCarry, invocation: string): string {
+	if (claim === 'busy') return run_carry.busy_message(carry)
+
+	if (claim === 'mismatch') return run_carry.mismatch_message(carry, invocation)
+
+	return run_carry.standing_message(carry)
+}
+
+// The exclusive create lost to another process, which is what `busy` says. It is said without
+// re-reading the record, because a record this caller does not own is not one to report the contents
+// of as though it had established them.
+function report_lost(is_json: boolean): number {
+	console.error(run_carry.lost_message())
+
+	return report(BUSY_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
+}
+
+// The take-over lost that same create, so another process claimed the record in between.
+function report_adoption(
+	target: string,
+	carry: RunCarry,
+	request: CarryClaimRequest,
+	is_json: boolean,
+): number {
+	const adopted = run_carry.adopt_carry(target, carry, request.owner)
+
+	if (adopted === undefined) return report_lost(is_json)
+
+	return report_carry(RESUMED_VERDICT, adopted, is_json)
+}
+
+// **Whose record it is, is the classifier's answer and not this command's guess.** `--end` is only
+// reached on the clean-finish path, so a run that crashed or stopped on a guard leaves its record
+// standing for up to the whole-run bound; `resumed` is reached only where the run itself declared the
+// cut, or where `--resume` says the reader has decided to carry it.
+function report_claim(
+	target: string,
+	carry: RunCarry,
+	request: CarryClaimRequest,
+	is_json: boolean,
+): number {
+	const claim = run_carry.classify_claim(carry, request)
+
+	if (claim === 'resume') return report_adoption(target, carry, request, is_json)
+
+	console.error(refusal_message(claim, carry, request.invocation))
+
+	return report(CLAIM_VERDICTS[claim], carry, is_json, FAILURE_EXIT_CODE)
+}
+
+function start_fresh(
+	target: string,
+	request: CarryClaimRequest,
+	is_replacement: boolean,
+	is_json: boolean,
+): number {
+	const carry = is_replacement
+		? run_carry.replace_carry(target, request.invocation, request.owner)
+		: run_carry.begin_carry(target, request.invocation, request.owner)
+
+	if (carry === undefined) return report_lost(is_json)
+
+	return report_carry(BEGAN_VERDICT, carry, is_json)
+}
+
+// **The bound ends *that* run, so a spent record whose owner is still running is not replaced
+// either.** Replacing it would delete a live parent's budget and answer `began` — two parents on one
+// record, which is the half of the defect the expiry path would otherwise have kept. Only that run,
+// or a person who knows it is over, ends it.
+function begin_over_expired(
+	target: string,
+	carry: RunCarry,
+	request: CarryClaimRequest,
+	is_json: boolean,
+): number {
+	if (run_carry.is_foreign_live_owner(carry, request.owner)) return report_busy(carry, is_json)
+
+	console.error(run_carry.expired_message(carry))
+
+	return start_fresh(target, request, true, is_json)
+}
+
+// **A live record is never replaced, and never resumed into by something else.** Replacing one would
+// restart the budget the cut exists to carry, and resuming into one would put two parents on a single
+// budget — the two halves of the defect this command was written for. An expired one is replaced,
+// because its run has spent the whole-run bound and a person typing the keyword again is starting a
+// new run — unless its owner is still running, which is the case above.
+function begin(target: string, request: CarryClaimRequest, is_json: boolean): number {
 	const read = run_carry.read_carry(target)
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
 
-	if (read.kind === 'carried') return resume(read.carry, invocation, is_json)
+	if (read.kind === 'carried') return report_claim(target, read.carry, request, is_json)
 
-	if (read.kind === 'expired') console.error(run_carry.expired_message(read.carry))
+	if (read.kind === 'expired') return begin_over_expired(target, read.carry, request, is_json)
 
-	return report_carry(BEGAN_VERDICT, run_carry.begin_carry(target, invocation), is_json)
+	return start_fresh(target, request, false, is_json)
+}
+
+function report_nothing_to_resume(is_json: boolean): number {
+	console.error(run_carry.nothing_to_resume_message())
+
+	return report(NONE_VERDICT, undefined, is_json, FAILURE_EXIT_CODE)
+}
+
+// `--resume` is the carry half of the answer `standing` asks for: the reader has decided the standing
+// record's run is over and its budget is this session's to continue. It still refuses a live foreign
+// owner, because deciding that is not the same as being allowed to.
+function adopt(target: string, request: CarryClaimRequest, is_json: boolean): number {
+	const read = run_carry.read_carry(target)
+
+	if (read.kind === 'none') return report_nothing_to_resume(is_json)
+
+	if (read.kind === 'unreadable') return report_unreadable(is_json)
+
+	if (read.kind === 'expired') return report_expired(read.carry, is_json)
+
+	return report_claim(target, read.carry, request, is_json)
+}
+
+function claim_record(target: string, request: CarryClaimRequest, is_json: boolean): number {
+	return request.is_adoption ? adopt(target, request, is_json) : begin(target, request, is_json)
 }
 
 // A count against a record that is not there is `none` and exits non-zero: the loop believed it was
@@ -228,7 +242,7 @@ function finish(target: string, is_json: boolean): number {
 }
 
 function act(target: string, request: Request, is_json: boolean): number {
-	if (request.kind === 'begin') return begin(target, request.invocation, is_json)
+	if (request.kind === 'claim') return claim_record(target, request.claim, is_json)
 
 	if (request.kind === 'end') return finish(target, is_json)
 
@@ -254,7 +268,7 @@ async function answer(request: Request, is_json: boolean): Promise<number> {
 }
 
 function refuse(): number {
-	console.error(USAGE)
+	console.error(run_carry_args.USAGE)
 
 	return FAILURE_EXIT_CODE
 }
@@ -263,11 +277,11 @@ function refuse(): number {
 // standard output matches none of the verdicts, which a loop reads as "nothing to carry" before
 // starting a second budget over the first one's.
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const values = read_arguments(argv)
+	const values = run_carry_args.read_arguments(argv)
 
 	if (values === undefined) return refuse()
 
-	const request = to_request(values)
+	const request = run_carry_args.to_request(values)
 
 	if (request === undefined) return refuse()
 
@@ -284,24 +298,24 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 
 const run_carry_cli = {
 	BEGAN_VERDICT,
+	BUSY_VERDICT,
 	CARRIED_VERDICT,
 	COUNTED_VERDICT,
 	ENDED_VERDICT,
 	EXPIRED_VERDICT,
 	MISMATCH_VERDICT,
 	NONE_VERDICT,
-	OPTIONS,
 	RESUMED_VERDICT,
+	STANDING_VERDICT,
 	UNKNOWN_VERDICT,
 	UNREADABLE_VERDICT,
-	USAGE,
+	// Re-exported rather than restated: the usage line belongs to the half that parses, and a second
+	// copy of it here would drift from the flags it describes.
+	USAGE: run_carry_args.USAGE,
 	main,
-	read_arguments,
 	run,
-	to_request,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
-export type { ParsedValues, Request }
 export { run_carry_cli }
