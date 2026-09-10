@@ -200,7 +200,7 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   "The hand-off", with the rest of the derivation) — so this never stops a run that had nothing to
   hand off. **A dispatched child does not ask it, and that is a
   prohibition rather than an omission.** `epicrun`, `queue` and `backlogrun` already own this
-  question at their own seam — `epicrun.md` → "The hand-off" — where the drain, the lane reading and
+  question at their own seam — `epicrun.md` → "The hand-off" — where the lane hand-over, the lane reading and
   the resume command that continues the batch all live. A child that asked at its own entry would
   answer for whichever session the transcript reader picks — the parent's, in which case every child
   of a long batch stops at once, or its own, in which case a freshly dispatched unit is always

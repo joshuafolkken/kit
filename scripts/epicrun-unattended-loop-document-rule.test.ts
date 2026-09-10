@@ -72,17 +72,28 @@ describe(`${SKILL} — the cost check is asked at every merge`, () => {
 	)
 })
 
-describe(`${SKILL} — reaching the threshold drains the run to a safe seam`, () => {
+describe(`${SKILL} — reaching the threshold hands the lanes over`, () => {
 	const unwrapped = read_unwrapped(SKILL)
 
-	it('drains instead of cutting while a child is in flight', () => {
+	it('takes no new child once the threshold is reached', () => {
 		expect(unwrapped).toContain('Open no new lane and take no new child from `epic:next`')
 	})
 
-	// Without the drain the rule is unreachable under `--lanes`, which keeps the seats full: the run
-	// joshuafolkken/kit#1567 measured would have read `over` at every merge and cut at none of them.
-	it('says why the drain is what makes the cut reachable', () => {
-		expect(unwrapped).toContain('The drain makes the moment rather than waiting for it')
+	// joshuafolkken/kit#1713: the lanes already running are handed to the next session rather than
+	// waited on. A reword that lost this puts the pool decay back — six seats to zero, for as long as
+	// the longest child still running.
+	it('hands the in-flight lanes over instead of waiting for them', () => {
+		expect(unwrapped).toContain('Every lane in flight is handed over')
+		expect(unwrapped).toContain('There is no waiting here at all')
+	})
+
+	// Without a seam the run can reach, the rule is unreachable under `--lanes`, which keeps the seats
+	// full: the run joshuafolkken/kit#1567 measured would have read `over` at every merge and cut at
+	// none of them. The hand-over is what reaches it now; the drain is what used to.
+	it('says why the cut is reachable, and what the drain it replaced cost', () => {
+		expect(unwrapped).toContain(
+			'The hand-over is what makes the cut reachable, and the drain it replaced cost the pool.',
+		)
 		expect(unwrapped).toContain('it would have read `over` at all seven merges')
 	})
 
@@ -120,13 +131,13 @@ describe(`${SKILL} — reaching the threshold drains the run to a safe seam`, ()
 	})
 })
 
-// The drain is the means; the cut is the end of it. A reword that keeps only the first strands a run
-// that drains to an idle pool and then carries on with nothing left to wait for.
-describe(`${SKILL} — the cut the drain arrives at`, () => {
+// The hand-over is the means; the cut is the end of it. A reword that keeps only the first strands a
+// run that recorded every path and then carried on with nothing left to hand over.
+describe(`${SKILL} — the cut the hand-over reaches`, () => {
 	const unwrapped = read_unwrapped(SKILL)
 
-	it('stops and asks once the pool is idle', () => {
-		expect(unwrapped).toContain('**`none`, once drained**')
+	it('stops and asks once every in-flight lane can be polled', () => {
+		expect(unwrapped).toContain('**Every in-flight lane records a path**')
 		expect(unwrapped).toContain('stop and ask the person to cut the session')
 		expect(unwrapped).toContain(
 			'Please run `epicrun #<E>` to continue this epic in a fresh session.',
@@ -134,7 +145,7 @@ describe(`${SKILL} — the cut the drain arrives at`, () => {
 	})
 
 	// The stopping conditions are read as the exhaustive list, so the qualifier has to be there too —
-	// otherwise the list says a bare `over` ends the run and a drained run has no ending at all.
+	// otherwise the list says a bare `over` ends the run whatever state the lanes are in.
 	it('qualifies the stopping condition rather than leaving it bare', () => {
 		const content = read_repo_file(SKILL)
 		const conditions = content
@@ -142,8 +153,10 @@ describe(`${SKILL} — the cut the drain arrives at`, () => {
 			.replaceAll(/\s+/gu, ' ')
 
 		expect(conditions).toContain(COST_COMMAND)
-		expect(conditions).toContain('brought `pnpm josh lane:list` to `none`')
-		expect(conditions).toContain('**The reading on its own is not on this list**')
+		expect(conditions).toContain(
+			'every lane still in flight records the path the next session will poll it on',
+		)
+		expect(conditions).toContain('**The reading stops the run in its own turn**')
 	})
 })
 
@@ -222,7 +235,7 @@ describe(`${SKILL} — the detection can actually run`, () => {
 	// makes.
 	it('gives the detection somewhere to execute', () => {
 		expect(unwrapped).toContain(
-			'**Start the unit without blocking on it, note where it writes, and poll.**',
+			'**Start the unit without blocking on it, record where it writes — `pnpm josh lane:output <N> <path>` when the child runs in a lane — and poll.**',
 		)
 		expect(unwrapped).toContain(
 			'So the parent checks rather than waiting — which means it must not be waiting.',
@@ -314,7 +327,7 @@ describe(`${POINTER} — records the new rules without restating them`, () => {
 
 	it.each([
 		'子のマージごとに必ず問う',
-		'`over` で drain に入り',
+		'`over` を読んだそのターンで停止して',
 		'委譲した実行単位が報告せず停止したことを親が検知する手順',
 	])('names %j as something the skill holds', (marker) => {
 		expect(unwrapped).toContain(marker)

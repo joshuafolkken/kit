@@ -12,10 +12,19 @@ vi.mock('./lane-close', () => ({
 	lane_close: { close_all_lanes: vi.fn(), close_lane: vi.fn(), prune_lanes: vi.fn() },
 }))
 vi.mock('./lane-registry', () => ({ lane_registry: { list_lanes: vi.fn() } }))
+vi.mock('./lane-output', () => ({
+	lane_output: {
+		NO_OUTPUT: 'no output path',
+		describe_refusal: vi.fn(() => 'refused'),
+		read_output: vi.fn(),
+		record_output: vi.fn(),
+	},
+}))
 
 const { lane_open } = await import('./lane-open')
 const { lane_close } = await import('./lane-close')
 const { lane_registry } = await import('./lane-registry')
+const { lane_output } = await import('./lane-output')
 const { lane_cli } = await import('./lane-cli')
 
 const ALREADY_OPEN = 'already-open'
@@ -26,6 +35,7 @@ const FAILURE = 1
 const LANE: LaneInfo = {
 	issue: ISSUE,
 	seed: 6,
+	output: undefined,
 	branch: '1490-lane',
 	directory: '/w/.kit-lanes/1490',
 	is_stranded: false,
@@ -142,6 +152,64 @@ describe('a close that did not finish', () => {
 
 		expect(await lane_cli.run(['close', lane_cli.ALL_FLAG])).toBe(FAILURE)
 		expect(printed).toStrictEqual([OTHER_ISSUE])
+	})
+})
+
+// joshuafolkken/kit#1713: the path goes to standard output on both arms, so
+// `unit_output=$(pnpm josh lane:output <N>) && pnpm josh run:liveness <N> --output "$unit_output"`
+// works in the session that opened the lane and in one that never saw it alike.
+const UNIT_OUTPUT = '/w/.kit-lanes/1490/agent-7.jsonl'
+
+describe('lane:output', () => {
+	it('prints the path it recorded, alone', async () => {
+		vi.mocked(lane_output.record_output).mockResolvedValue({
+			kind: 'recorded',
+			lane: LANE,
+			output: UNIT_OUTPUT,
+		})
+
+		expect(await lane_cli.run(['output', ISSUE, UNIT_OUTPUT])).toBe(SUCCESS)
+		expect(printed).toStrictEqual([UNIT_OUTPUT])
+	})
+
+	it('prints the recorded path alone when asked with no path', async () => {
+		vi.mocked(lane_output.read_output).mockResolvedValue({
+			kind: 'read',
+			lane: LANE,
+			output: UNIT_OUTPUT,
+		})
+
+		expect(await lane_cli.run(['output', ISSUE])).toBe(SUCCESS)
+		expect(printed).toStrictEqual([UNIT_OUTPUT])
+		expect(vi.mocked(lane_output.record_output)).not.toHaveBeenCalled()
+	})
+
+	// The token says what happened, and the non-zero exit is what stops the documented
+	// `pnpm josh lane:output <N> && pnpm josh run:liveness … --output "$path"` chain: `--output none`
+	// is a relative path, which `run:liveness` answers `undetermined` for rather than reporting the
+	// missing record.
+	it('prints the none token for a lane that records nothing yet, and exits non-zero', async () => {
+		vi.mocked(lane_output.read_output).mockResolvedValue({ kind: 'none', lane: LANE })
+
+		expect(await lane_cli.run(['output', ISSUE])).toBe(FAILURE)
+		expect(printed).toStrictEqual([lane_cli.NONE_TOKEN])
+	})
+})
+
+describe('what lane:output refuses', () => {
+	it('prints nothing and exits non-zero when the record is refused', async () => {
+		vi.mocked(lane_output.record_output).mockResolvedValue({ kind: 'no-lane' })
+
+		expect(await lane_cli.run(['output', ISSUE, UNIT_OUTPUT])).toBe(FAILURE)
+		expect(printed).toStrictEqual([])
+	})
+
+	it('refuses a first argument that is not an issue number, and a third argument', async () => {
+		expect(await lane_cli.run(['output'])).toBe(FAILURE)
+		expect(await lane_cli.run(['output', 'main'])).toBe(FAILURE)
+		expect(await lane_cli.run(['output', ISSUE, UNIT_OUTPUT, 'extra'])).toBe(FAILURE)
+		expect(vi.mocked(lane_output.record_output)).not.toHaveBeenCalled()
+		expect(vi.mocked(lane_output.read_output)).not.toHaveBeenCalled()
 	})
 })
 

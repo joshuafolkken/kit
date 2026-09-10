@@ -42,6 +42,7 @@ function build_lane(root: string, issue: string, seed: number): LaneInfo {
 		branch: lane_paths.lane_branch(issue),
 		directory: lane_paths.lane_directory(root, issue),
 		seed,
+		output: undefined,
 		is_stranded: false,
 	}
 }

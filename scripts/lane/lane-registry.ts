@@ -21,6 +21,13 @@ interface LaneInfo {
 	branch: string
 	directory: string
 	seed: number | undefined
+	// Where the delegated unit running this lane's child writes (joshuafolkken/kit#1713), or
+	// `undefined` where the lane records none. It is the one thing about a lane that a session which
+	// did not open it cannot derive: the harness names a unit's file after the dispatching session
+	// and the unit's own id, neither of which is written anywhere else on disk. Recorded here, a
+	// fresh session can poll a running child with `pnpm josh run:liveness <N> --output <path>`
+	// instead of waiting for the pool to drain before it can be cut.
+	output: string | undefined
 	is_stranded: boolean
 }
 
@@ -54,9 +61,16 @@ function seed_from_content(content: string): number | undefined {
 	return has_seed ? lane_environment.read_root_seed(content) : undefined
 }
 
-function read_seed(directory: string): number | undefined {
+/**
+ * The lane's own `.env`, or `undefined` when it cannot be read.
+ *
+ * One read serves both the seat and the recorded output path (joshuafolkken/kit#1713). Reading the
+ * file twice would let the two disagree about whether it could be read at all, and `unreadable` is
+ * a state the report shows rather than a state anything falls back from.
+ */
+function read_environment(directory: string): string | undefined {
 	try {
-		return seed_from_content(readFileSync(path.join(directory, ENV_FILE_NAME), 'utf8'))
+		return readFileSync(path.join(directory, ENV_FILE_NAME), 'utf8')
 	} catch {
 		return undefined
 	}
@@ -87,12 +101,16 @@ function build_lane(
 	directory: string,
 	is_stranded: boolean,
 ): LaneInfo {
+	// A stranded lane binds no ports and runs nothing, so its seat is free and there is nothing to
+	// read — its work tree is gone from disk along with the `.env` that held both records.
+	const content = is_stranded ? undefined : read_environment(directory)
+
 	return {
 		issue,
 		branch,
 		directory,
-		// A stranded lane binds no ports, so its seat is free and there is nothing to read.
-		seed: is_stranded ? undefined : read_seed(directory),
+		seed: content === undefined ? undefined : seed_from_content(content),
+		output: content === undefined ? undefined : lane_environment.read_lane_output(content),
 		is_stranded,
 	}
 }
@@ -185,6 +203,7 @@ const lane_registry = {
 	list_lanes,
 	main_repository_root,
 	parse_block,
+	read_environment,
 	unreadable_lanes,
 	used_seeds,
 }

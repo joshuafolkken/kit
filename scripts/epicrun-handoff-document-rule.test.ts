@@ -29,11 +29,15 @@ const CITATION = '`epicrun.md` → "The hand-off"'
 const AFTER_MERGE = 'immediately after its merge'
 const NEVER_MID_CHILD = 'never mid-child'
 const EVERY_MERGE = "is asked after every child's merge"
-const SAFE_SEAM = '`none` is the safe seam'
+// joshuafolkken/kit#1713: the seam is no longer an idle pool. Every lane in flight records where its
+// unit writes, so the next session polls it — and a reading that waited for the pool to empty first
+// would put back the decay this replaced.
+const HANDED_OVER = 'Every lane in flight is handed over'
 const RESUME_LINE = 'Please run `epicrun #<E>` to continue this epic in a fresh session.'
-// `epic:next --lanes` keeps the seats full, so an idle pool never merely happens: the reading has to
-// drain to one, or the cut is unreachable on exactly the run joshuafolkken/kit#1567 measured.
-const DRAIN = 'Open no new lane and take no new child from `epic:next`'
+// `epic:next --lanes` keeps the seats full, so an idle pool never merely happens. The run therefore
+// stops taking children at the reading — what changed in joshuafolkken/kit#1713 is that it no longer
+// waits for the ones already running.
+const NO_NEW_CHILD = 'Open no new lane and take no new child from `epic:next`'
 
 // A sibling entry point may say what happens; it may not restate when the check is asked, what makes
 // a seam safe, or what the stop report says. Those are the procedure, and a second copy drifts.
@@ -41,8 +45,8 @@ const BODY_ONLY: ReadonlyArray<string> = [
 	AFTER_MERGE,
 	NEVER_MID_CHILD,
 	EVERY_MERGE,
-	SAFE_SEAM,
-	DRAIN,
+	HANDED_OVER,
+	NO_NEW_CHILD,
 	RESUME_LINE,
 ]
 
@@ -256,7 +260,7 @@ describe(`${QUEUE} — cites the hand-off instead of copying it`, () => {
 	// repository's work trees rather than this run's units, so one lane an earlier `epicrun` left
 	// behind would disable a queue's cut permanently, and silently.
 	it('does not gate its cut on the lane listing', () => {
-		expect(unwrapped).toContain('There is no drain here, and no lane reading either')
+		expect(unwrapped).toContain('There is no lane hand-over here, and no lane reading either')
 	})
 
 	it('cites the single source', () => {
