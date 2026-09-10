@@ -85,6 +85,14 @@ interface RunWake {
 	// session that is merely slow is still doing the run's work, and a supervisor that killed what it
 	// could not account for would destroy exactly the work it exists to keep going.
 	woke_pid?: number | undefined
+	// When the wait on a still-running predecessor began. **It is its own field rather than a second
+	// use of `woke_at`, and that is the whole of the bound working as described.** Marked on `woke_at`,
+	// the first pass of a wait was the last one that could see the predecessor exit — every later pass
+	// read the mark as an outstanding wake and answered `pending` — so a predecessor that ended two
+	// seconds after the hold still cost the full grace window on a supervisor whose point is not to
+	// stall. Kept apart, the predecessor's liveness is read on every pass and the mark only bounds how
+	// long the wait may last.
+	held_at?: string | undefined
 }
 
 type WakeStopReason = 'ended' | 'expired' | 'unreadable' | 'failed' | 'stopped'
@@ -111,6 +119,9 @@ interface WakeDecisionInput {
 	// without claiming anything, and the supervisor would eventually call its own wake a failure and end
 	// the run. So the predecessor is waited out first.
 	is_owner_live: boolean
+	// When the wait on that predecessor began, so the wait can be bounded without spending the mark
+	// that measures a launch.
+	held_at: string | undefined
 	now: Date
 }
 
@@ -141,21 +152,22 @@ const run_wake_schema = z.object({
 	// reads as "no attempt has been made yet" and would restart the retry count on every pass.
 	attempts: z.number().optional(),
 	woke_pid: z.number().optional(),
+	held_at: z.string().optional(),
 })
 
-// An unparsable stamp reads as overdue rather than as fresh: a wake whose time cannot be established
+// An unparsable stamp reads as overdue rather than as fresh: a mark whose time cannot be established
 // is one that cannot be confirmed to have worked, and the safe direction is to report the failure.
-function is_wake_overdue(woke_at: string, now: Date): boolean {
-	const woken = Date.parse(woke_at)
+function is_overdue(marked_at: string, now: Date): boolean {
+	const marked = Date.parse(marked_at)
 
-	if (Number.isNaN(woken)) return true
+	if (Number.isNaN(marked)) return true
 
-	return now.getTime() - woken > WAKE_GRACE_MS
+	return now.getTime() - marked > WAKE_GRACE_MS
 }
 
 function decide_handed_off(input: WakeDecisionInput): WakeDecision {
 	if (input.woke_at === undefined) return WAKE_DECISION
-	if (!is_wake_overdue(input.woke_at, input.now)) return PENDING_DECISION
+	if (!is_overdue(input.woke_at, input.now)) return PENDING_DECISION
 
 	return input.attempts < MAX_WAKE_ATTEMPTS ? WAKE_DECISION : FAILED_DECISION
 }
@@ -170,8 +182,15 @@ function decide_handed_off(input: WakeDecisionInput): WakeDecision {
 // wait exists to avoid: a `busy` merely costs one attempt, and attempts are retried. So the wait is
 // marked when it starts and expires into an ordinary wake through the same grace window everything
 // else uses.
+//
+// **And the wait ends the moment the predecessor does, because its liveness is read on every pass.**
+// The bound is the ceiling on the wait, never its length: a predecessor that exits two seconds after
+// the hold is waited two seconds. That is what `held_at` is a separate field for — marked on `woke_at`,
+// this test could not fire a second time, so every wait cost the whole ceiling.
 function is_predecessor_exiting(input: WakeDecisionInput): boolean {
-	return input.woke_at === undefined && input.is_owner_live
+	if (input.woke_at !== undefined || !input.is_owner_live) return false
+
+	return input.held_at === undefined || !is_overdue(input.held_at, input.now)
 }
 
 // The whole policy, in four lines. Nothing else in this module decides whether to wake.
@@ -235,25 +254,54 @@ function is_supervisor_live(wake: RunWake): boolean {
 // inside the grace window would otherwise see no wake mark, launch a second session for the *same*
 // cut, count it as another cut served, and leave two sessions racing for one record. The invocation
 // has to match — a different one is a different run, and its state is not this one's.
+// **`woke_pid` and `held_at` come across too.** Without the first, a restart inside the grace window
+// that then spends its retries reports "the last one was none" in the warning — the one fact the
+// warning exists to hand the person, dropped exactly where it is needed. Without the second, a restart
+// restarts the bounded wait, which is the ceiling sliding by another road.
 function carried_state(existing: RunWake | undefined, invocation: string): Partial<RunWake> {
 	if (existing?.invocation !== invocation) return { woke: NO_WAKES }
 
-	return { woke: existing.woke, woke_at: existing.woke_at, attempts: existing.attempts }
+	return {
+		woke: existing.woke,
+		woke_at: existing.woke_at,
+		attempts: existing.attempts,
+		woke_pid: existing.woke_pid,
+		held_at: existing.held_at,
+	}
 }
 
-// `create_stamp` rather than `write_stamp`: two `--start`s racing must not both come away believing
-// they own the record. A record whose supervisor is provably gone is removed first, which is the
-// dead-marker sweep `unit-worker-share.ts` already does for the unit-suite share.
-function claim(target: string, invocation: string, now: Date): RunWake | undefined {
-	const existing = read_wake(target)
+function is_held_by_live_supervisor(existing: RunWake | undefined): boolean {
+	return existing !== undefined && is_supervisor_live(existing)
+}
 
-	if (existing !== undefined && is_supervisor_live(existing)) return undefined
-
-	const wake = { ...fresh_wake(invocation, now), ...carried_state(existing, invocation) }
+// The second attempt, reached only because something was already at the target: the dead-marker sweep
+// `unit-worker-share.ts` does for the unit-suite share, and then one more exclusive create. The record
+// is re-read first, because between the two creates it may have become a live supervisor's.
+function reclaim(target: string, wake: RunWake): RunWake | undefined {
+	if (is_held_by_live_supervisor(read_wake(target))) return undefined
 
 	remove_wake(target)
 
 	return stamp_file.create_stamp(target, wake) ? wake : undefined
+}
+
+// `create_stamp` rather than `write_stamp`: two `--start`s racing must not both come away believing
+// they own the record.
+//
+// **The create is attempted before anything is removed, and that ordering is the exclusion.** Sweeping
+// first — which this did, unconditionally — gives the exclusive create nothing to exclude: two claims
+// that both read an empty target would each delete what the other had just created, and both would
+// then succeed, leaving two supervisors waking two sessions into one carry budget. Attempted first, the
+// create is what decides between them, and the sweep runs only where it found something already there
+// — including a stamp that could not be parsed at all, which is why the sweep is not simply dropped.
+function claim(target: string, invocation: string, now: Date): RunWake | undefined {
+	const existing = read_wake(target)
+
+	if (is_held_by_live_supervisor(existing)) return undefined
+
+	const wake = { ...fresh_wake(invocation, now), ...carried_state(existing, invocation) }
+
+	return stamp_file.create_stamp(target, wake) ? wake : reclaim(target, wake)
 }
 
 // `woke` counts cuts served and `attempts` counts launches, so a retry of the same cut leaves the
@@ -262,21 +310,25 @@ function count_wake(wake: RunWake, now: Date, pid: number): RunWake {
 	const attempts = (wake.attempts ?? NO_WAKES) + ONE_WAKE
 	const woke = attempts === ONE_WAKE ? wake.woke + ONE_WAKE : wake.woke
 
-	return { ...wake, woke, attempts, woke_at: now.toISOString(), woke_pid: pid }
+	return { ...wake, woke, attempts, woke_at: now.toISOString(), woke_pid: pid, held_at: undefined }
 }
 
 // Starts the clock on a wait without launching anything. `attempts` is deliberately untouched, so the
 // bounded wait costs no retry: what it buys is that the wait expires into an ordinary wake instead of
 // running until the carry record does.
+//
+// **Marked once, so the ceiling does not slide.** A mark rewritten on every pass would measure from the
+// latest pass rather than from the start of the wait, and a predecessor that never exits would then be
+// waited on for ever — the unbounded wait this bound exists to prevent, arrived at by another road.
 function mark_wait(wake: RunWake, now: Date): RunWake {
-	return { ...wake, woke_at: now.toISOString() }
+	return wake.held_at === undefined ? { ...wake, held_at: now.toISOString() } : wake
 }
 
 // `undefined` rather than a deleted key, because `JSON.stringify` drops it on the way to disk and the
 // reader treats absent and undefined alike — the same round-trip `run-carry.ts` documents for its own
 // optional fields.
 function clear_wake_mark(wake: RunWake): RunWake {
-	return { ...wake, woke_at: undefined, attempts: undefined }
+	return { ...wake, woke_at: undefined, attempts: undefined, held_at: undefined }
 }
 
 // **Writes only where the record is still there.** `--stop` removes it, and the loop's pass is not

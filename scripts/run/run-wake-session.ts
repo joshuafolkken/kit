@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { backlog_budget_cli } from '#scripts/backlog/backlog-budget-cli'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
@@ -21,9 +22,9 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 // taking a decision that is the person's, silently, on a machine nobody is watching — which is the
 // case this default exists for.
 //
-// **The waker adds nothing to what may be run.** The argument vector is the configured command plus
-// the recorded invocation, and nothing here writes a label: `auto-ok` stays a person's to apply, so a
-// resumed session is offered exactly the issues the first one was.
+// **The waker adds nothing to what may be run.** The argument vector is the constant command plus an
+// invocation rebuilt to say exactly what the record said, and nothing here writes a label: `auto-ok`
+// stays a person's to apply, so a resumed session is offered exactly the issues the first one was.
 
 // The agent CLI, resolved through `PATH` exactly as `eval-session.ts` resolves it.
 const WAKE_COMMAND = 'claude'
@@ -52,17 +53,28 @@ const UNSAFE_NOTE =
 const FIRST_PRINTABLE_CODE = 0x20
 const DELETE_CODE = 0x7f
 const FIRST_CODE_POINT = 0
-// **The invocation is held to the shape of the one thing this supervisor exists to continue.** It
-// wakes a `backlogrun` and nothing else, so an allowlist is available here where it would not be for a
-// general-purpose launcher — and it is a real narrowing rather than a formality: without it the
-// supervisor launches a session with whatever text the record happened to hold, which is the record's
-// integrity standing in for a check nobody performs.
+// **The invocation is taken apart and rebuilt, rather than inspected and handed on.** This supervisor
+// wakes a `backlogrun` and nothing else, so everything that may reach the operating system is
+// enumerable: one command word, two flag names, and an integer for each. Reading the record as tokens
+// and composing a fresh string out of constants and validated integers means the text the record held
+// never reaches `spawn` at all.
 //
-// **Matched rather than tested, so what runs is the text that matched.** A boolean guard leaves the
-// original string in play, and an edit that moved the guard would not change a single character of the
-// value reaching the operating system.
-const SAFE_INVOCATION = /^backlogrun(?: --[a-z][\da-z-]*(?: [\w.:-]+)?)*$/u
-const MATCHED_WHOLE = 0
+// **A stricter check is not a break in the flow, and that is why three of them changed nothing.**
+// Validating the characters, fixing the binary as a constant and matching against a pattern all left
+// the recorded string flowing into the call; taint tracking follows where a value goes, not how hard
+// it was looked at on the way. Composing the argument from constants is what actually severs it — and
+// it retires the pattern the previous shape needed, whose alternation CodeQL found could backtrack
+// exponentially (joshuafolkken/kit#1719).
+const INVOCATION_COMMAND = 'backlogrun'
+// The flags this supervisor knows how to carry across a session cut. A token is compared against these
+// and the **constant that matched** is what goes into the rebuilt invocation, never the token itself:
+// the two are equal as text and differ in where they came from, and here the origin is the whole point.
+const KNOWN_FLAGS: ReadonlyArray<string> = ['--max', '--idle']
+const TOKEN_SEPARATOR = ' '
+const FIRST_TOKEN = 0
+const FIRST_FLAG_INDEX = 1
+const VALUE_OFFSET = 1
+const FLAG_PAIR_LENGTH = 2
 const MAX_ARGUMENT_LENGTH = 4096
 const EMPTY_LENGTH = 0
 
@@ -70,6 +82,15 @@ interface WakeArgv {
 	command: string
 	args: ReadonlyArray<string>
 }
+
+// One flag of a parsed invocation: a name taken from `KNOWN_FLAGS` and a number. Neither field can
+// hold text that came out of the record, which is what makes rebuilding from it safe by construction.
+interface InvocationPart {
+	flag: string
+	value: number
+}
+
+type InvocationParts = ReadonlyArray<InvocationPart>
 
 type LaunchResult = { kind: 'launched'; pid: number } | { kind: 'failed'; note: string }
 
@@ -108,13 +129,80 @@ function is_safe_argv(argv: WakeArgv): boolean {
 	return is_safe_value(argv.command) && argv.args.every((value) => is_safe_value(value))
 }
 
-// The invocation goes last and as one argument, never interpolated into a command string: it is text a
-// person typed, and splitting it on whitespace here would turn `backlogrun --max 5` into arguments of
-// the CLI rather than the prompt it is.
+// Returns the constant that the token equals, so that what is carried forward is this file's own text.
+function known_flag(token: string): string | undefined {
+	return KNOWN_FLAGS.find((flag) => flag === token)
+}
+
+// **The integer check is `backlog:budget`'s own, imported rather than restated.** It is the command
+// this invocation is going to be handed to, so a second copy of the rule here would be free to drift
+// from the one that actually reads the number.
+function invocation_part(token: string, raw: string | undefined): InvocationPart | undefined {
+	const flag = known_flag(token)
+	const value = backlog_budget_cli.to_count(raw)
+
+	if (flag === undefined || value === undefined) return undefined
+
+	return { flag, value }
+}
+
+// **An unknown flag is refused, never dropped.** Dropping one would wake a session running to a budget
+// the person did not declare the first time `backlogrun` grows a flag this list has not caught up with
+// — which is the failure that is hardest to notice, because the session runs and looks fine.
+function invocation_parts(tokens: ReadonlyArray<string>): InvocationParts | undefined {
+	const parts: Array<InvocationPart> = []
+
+	for (let index = FIRST_FLAG_INDEX; index < tokens.length; index += FLAG_PAIR_LENGTH) {
+		const part = invocation_part(tokens[index] ?? '', tokens[index + VALUE_OFFSET])
+
+		if (part === undefined) return undefined
+
+		parts.push(part)
+	}
+
+	return parts
+}
+
+// A space is the only separator that can survive `is_safe_value`, which has already refused every
+// control character — so the split needs no pattern, and the file is left with no regular expression
+// for a backtracking analysis to find.
+function tokens_of(invocation: string): ReadonlyArray<string> {
+	return invocation.split(TOKEN_SEPARATOR).filter((token) => token.length > EMPTY_LENGTH)
+}
+
+function rebuilt_invocation(parts: InvocationParts): string {
+	const rendered = parts.map((part) => `${part.flag} ${String(part.value)}`)
+
+	return [INVOCATION_COMMAND, ...rendered].join(TOKEN_SEPARATOR)
+}
+
+function parsed_invocation(invocation: string): string | undefined {
+	const tokens = tokens_of(invocation)
+
+	if (tokens[FIRST_TOKEN] !== INVOCATION_COMMAND) return undefined
+
+	const parts = invocation_parts(tokens)
+
+	return parts === undefined ? undefined : rebuilt_invocation(parts)
+}
+
+// **What comes back is always the rebuilt text, and it is refused unless it matches the record.** The
+// two requirements are separate. Returning the rebuilt string is what severs the flow from the file;
+// requiring it to match is what keeps the wake usable, because the woken session hands its prompt
+// straight back to `run:carry --begin`, where `is_handed_off_to` compares it to the record character
+// for character. A record the rebuild would rewrite — odd spacing, or a value written `05` — is
+// therefore refused here, and the supervisor stops at once with a note, where waking on it would launch
+// three sessions that each decline to claim the record and take half an hour to say so.
+//
+// It goes on the command line last and as one argument, never interpolated into a command string: it is
+// the prompt the woken session is given, not a list of arguments to the agent CLI. The split happens
+// here, to read the record; the pieces are one argument again before they leave.
 function safe_invocation(invocation: string): string | undefined {
 	if (!is_safe_value(invocation)) return undefined
 
-	return SAFE_INVOCATION.exec(invocation)?.[MATCHED_WHOLE]
+	const rebuilt = parsed_invocation(invocation)
+
+	return rebuilt === invocation ? rebuilt : undefined
 }
 
 function wake_argv(invocation: string): WakeArgv | undefined {

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -29,7 +29,13 @@ const NO_ATTEMPTS = 0
 // The predecessor is gone by default, which is the ordinary case: `--cut` is the cutting session's
 // last write and its process exits directly afterwards.
 function input(read: CarryRead, woke_at?: string, attempts = NO_ATTEMPTS): WakeDecisionInput {
-	return { read, woke_at, attempts, is_owner_live: false, now: NOW }
+	return { read, woke_at, attempts, is_owner_live: false, held_at: undefined, now: NOW }
+}
+
+const HANDED_OFF: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
+
+function long_ago(): string {
+	return new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
 }
 
 function overdue(attempts: number): WakeDecisionInput {
@@ -122,20 +128,44 @@ describe('run_wake.decide — waiting out the session that cut', () => {
 	// supervisor would pend for the record's whole life, wake nothing, and end on `expired`, which
 	// sends no warning — a silent overnight failure, worse than the `busy` race the wait avoids.
 	it('bounds the wait on the predecessor and wakes anyway once it expires', () => {
-		const read: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
-		const waiting_since = new Date(NOW.getTime() - run_wake.WAKE_GRACE_MS * 2).toISOString()
+		const held = { ...input(HANDED_OFF), is_owner_live: true, held_at: long_ago() }
 
-		expect(run_wake.decide({ ...input(read, waiting_since), is_owner_live: true })).toStrictEqual({
-			kind: 'wake',
-		})
+		expect(run_wake.decide(held)).toStrictEqual({ kind: 'wake' })
 	})
 
-	it('marks the wait without spending a retry', () => {
+	it('goes on holding while the predecessor is live and the ceiling has not passed', () => {
+		const held = { ...input(HANDED_OFF), is_owner_live: true, held_at: NOW.toISOString() }
+
+		expect(run_wake.decide(held)).toStrictEqual({ kind: 'hold' })
+	})
+
+	// **The ceiling is how long the wait may last, never how long it does.** Read once and never again,
+	// the predecessor's liveness made every wait cost the whole window — so a predecessor that exited
+	// two seconds after the hold still stalled a supervisor whose point is not to stall.
+	it('wakes the moment the predecessor exits, without waiting out the ceiling', () => {
+		const held = { ...input(HANDED_OFF), is_owner_live: false, held_at: NOW.toISOString() }
+
+		expect(run_wake.decide(held)).toStrictEqual({ kind: 'wake' })
+	})
+})
+
+describe('run_wake — the mark that bounds the wait', () => {
+	it('marks the wait without spending a retry, and apart from the wake mark', () => {
 		const marked = run_wake.mark_wait(run_wake.fresh_wake(INVOCATION, NOW), NOW)
 
-		expect(marked.woke_at).toBe(NOW.toISOString())
+		expect(marked.held_at).toBe(NOW.toISOString())
+		expect(marked.woke_at).toBeUndefined()
 		expect(marked.attempts).toBeUndefined()
 		expect(marked.woke).toBe(0)
+	})
+
+	// Rewritten on every pass, the mark would measure from the latest pass rather than from the start
+	// of the wait, and a predecessor that never exits would be waited on for ever.
+	it('does not slide the ceiling when the hold is marked again', () => {
+		const marked = run_wake.mark_wait(run_wake.fresh_wake(INVOCATION, NOW), NOW)
+		const later = new Date(NOW.getTime() + run_wake.WAKE_GRACE_MS)
+
+		expect(run_wake.mark_wait(marked, later).held_at).toBe(NOW.toISOString())
 	})
 
 	it('stops waiting on the predecessor once a wake is already out', () => {
@@ -220,6 +250,16 @@ describe('run_wake.claim — one supervisor per repository', () => {
 		})
 
 		expect(run_wake.claim(scratch.target, INVOCATION, NOW)).toBeDefined()
+	})
+
+	// The exclusive create is attempted before anything is removed, so the sweep is what a claim falls
+	// back to. A stamp too damaged to read is the case that makes the fallback necessary rather than
+	// merely tidy: gated on a record having been read, it would lock `--start` out for good.
+	it('replaces a stamp that cannot be read at all', () => {
+		writeFileSync(scratch.target, 'not json')
+
+		expect(run_wake.claim(scratch.target, INVOCATION, NOW)).toBeDefined()
+		expect(run_wake.read_wake(scratch.target)?.invocation).toBe(INVOCATION)
 	})
 })
 

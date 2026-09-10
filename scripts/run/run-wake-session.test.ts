@@ -6,6 +6,9 @@ import { run_wake_session } from './run-wake-session'
 // so the argument vector is pinned rather than left to reading.
 
 const INVOCATION = 'backlogrun --max 5 --idle 30'
+const REORDERED_INVOCATION = 'backlogrun --idle 30 --max 5'
+const ONE_FLAG_INVOCATION = 'backlogrun --max 5'
+const BARE_INVOCATION = 'backlogrun'
 const SCRIPT = '/somewhere/run-wake-cli.ts'
 const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
 
@@ -91,6 +94,62 @@ describe('run_wake_session — what may reach the operating system', () => {
 		)
 
 		expect(result.kind).toBe('failed')
+	})
+})
+
+function prompt_of(invocation: string): string | undefined {
+	return run_wake_session.wake_argv(invocation)?.args.at(-1)
+}
+
+// The recorded invocation is taken apart and composed again out of this file's own constants and the
+// integers that passed, so the text held in the record never reaches the operating system. A check
+// that only inspected the string would leave it flowing into `spawn` unchanged.
+describe('run_wake_session.wake_argv — the invocation is rebuilt, not passed through', () => {
+	it('accepts a bare backlogrun and rebuilds it as the command word alone', () => {
+		expect(prompt_of(BARE_INVOCATION)).toBe(BARE_INVOCATION)
+	})
+
+	it('accepts the budget flags and keeps the order they were recorded in', () => {
+		expect(prompt_of(INVOCATION)).toBe(INVOCATION)
+		expect(prompt_of(REORDERED_INVOCATION)).toBe(REORDERED_INVOCATION)
+	})
+
+	// A check that merely validated the value would accept this: `05` passes the integer test. The
+	// rebuild writes it back as `5`, and a rebuilt string that differs from the record is refused —
+	// the woken session hands its prompt straight to `run:carry --begin`, which compares it to the
+	// record character for character, so continuing on a rewritten one cannot work.
+	it('refuses a value the rebuild would have rewritten, which a bare check would accept', () => {
+		expect(run_wake_session.wake_argv('backlogrun --max 05')).toBeUndefined()
+	})
+
+	it('refuses spacing the rebuild would have collapsed', () => {
+		expect(run_wake_session.wake_argv('backlogrun   --max   5')).toBeUndefined()
+	})
+
+	// Dropping it would wake a session running to a budget the person never declared, the first time
+	// `backlogrun` grows a flag this supervisor has not caught up with.
+	it('refuses an unknown flag rather than dropping it', () => {
+		expect(run_wake_session.wake_argv('backlogrun --lanes 3')).toBeUndefined()
+		expect(run_wake_session.wake_argv(`${ONE_FLAG_INVOCATION} --lanes 3`)).toBeUndefined()
+	})
+
+	it('refuses a flag given without a value', () => {
+		expect(run_wake_session.wake_argv('backlogrun --max')).toBeUndefined()
+	})
+
+	// `Number('')`, `Number(' ')` and `Number('0x10')` are all safe integers, so a check that only asked
+	// `Number.isSafeInteger` would read an unset shell variable as a budget of zero.
+	it('refuses a value that is not a plain non-negative integer', () => {
+		expect(run_wake_session.wake_argv('backlogrun --max 5.5')).toBeUndefined()
+		expect(run_wake_session.wake_argv('backlogrun --max -1')).toBeUndefined()
+		expect(run_wake_session.wake_argv('backlogrun --max 0x10')).toBeUndefined()
+		expect(run_wake_session.wake_argv('backlogrun --max many')).toBeUndefined()
+	})
+
+	// A command word this one is merely a prefix of is a different command, and starts nothing here.
+	it('refuses a first token that is not the command this supervisor continues', () => {
+		expect(run_wake_session.wake_argv('backlogrun-now --max 5')).toBeUndefined()
+		expect(run_wake_session.wake_argv('--max 5')).toBeUndefined()
 	})
 })
 
