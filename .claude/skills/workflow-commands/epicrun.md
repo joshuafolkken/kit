@@ -1636,12 +1636,20 @@ being reported.
 
   **報告は完了報告の書式で書かない。** 区切りは完了でも park でも失敗でもない**第 4 の停止**であり、専用の書式が `prompts/collaboration-workflow/report-format.md` →「区切りの報告（完了報告と区別する・必須）」にある。`原因 / 対応 / 結果` の 3 行は使わない — それは finished なランの形であり、epic はまだ終わっていない。書くのは 4 つ、**終わったこと / 残っていること / 止めた理由 / 次に打つコマンド**である。Telegram 本文も同じ書式で書く。
 
+**`backlogrun` is the one entry point where the cut does not stop the run** (joshuafolkken/kit#1714).
+There the keyword declares a budget — `--max`, `--idle` and this same 8-hour bound — so the cut is an
+execution detail of spending it, and the record `pnpm josh run:carry` keeps carries that budget into
+the next session with nobody retyping the keyword. **Nothing above changes for an `epicrun`**: an
+epic declares which children may run, never how much of a budget, so its cut still ends with the
+resume line and waits for a person. `backlogrun.md` → "The session cut is inside the invocation" is
+that reading's single source.
+
 **The hand-over is what makes the cut reachable, and the drain it replaced cost the pool.**
 `epic:next --lanes` keeps the seats full, so under parallel lanes a merge almost never coincides with
 an idle pool — and `epicrun #1474`, the run joshuafolkken/kit#1567 measured, ran in lanes: gated on an
 idle pool that merely happened, it would have read `over` at all seven merges and cut at none of them,
 which is the never-fires failure this section already indicts `pnpm josh delegate epic-child` for. The
-drain solved that by *making* the moment — open no new lane, let the in-flight ones finish — and paid
+drain solved that by _making_ the moment — open no new lane, let the in-flight ones finish — and paid
 for it with the whole pool: six seats decaying to zero over as long as the longest child still
 running, at 12–28 minutes a child (joshuafolkken/kit#1477) and a reading roughly every 50 minutes at
 the measured throughput of 6.1 children an hour (joshuafolkken/kit#1637). **Recording the path removes

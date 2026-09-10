@@ -36,6 +36,12 @@ authorization:
 - Prompt the user to type it, in the exact phrasing: "Please run `backlogrun` to start this task."
 - An earlier turn's authorization does not carry. Each invocation is re-typed.
 
+**The keystroke starts the invocation; it does not have to land in every session that invocation
+spans.** A `backlogrun` cut mid-run and resumed is still that one invocation, and "The session cut is
+inside the invocation" below is where the boundary is drawn. The last bullet is about an _earlier
+turn's_ authorization, which is a different thing: a run whose budget is spent, or one that never
+began, has nothing to carry and needs the keyword again.
+
 ## What one invocation approves
 
 **One `backlogrun` approves every merge of every issue a person has opted in with `auto-ok`** — the
@@ -56,6 +62,83 @@ inputs would be widening its own authorization, which is exactly the self-wideni
 once, the run.**
 
 A Tier C action inside a child still stops that child, exactly as under `epicrun`.
+
+## The session cut is inside the invocation
+
+**Typing `backlogrun` once authorizes the declared budget, and a session cut is an execution detail of
+spending it** (joshuafolkken/kit#1714). `epicrun.md` → "The hand-off" stops the _session_ at the seam;
+under `backlogrun` that seam does not stop the _run_. The next session picks the same invocation up
+and carries on with the budget already partly spent.
+
+**This is not an exception to the explicit-invocation rule above — it is what that rule already
+says.** What §0 forbids is **inferring** a workflow from the shape of a request; it has never required
+the keystroke to land in every session's own transcript. `epicrun.md` → "Each child runs in a
+delegated unit" applies exactly that reading today: a delegated child runs the whole `fullrun`
+procedure in a unit where nobody typed `fullrun`, on the strength of the keyword a person typed once.
+A resumed session is the same shape — a machine continuing an authorization a person gave, never a
+model deciding on one from a request's shape. Read the other way, the entry point built for
+unattended execution spends most of its unattended hours waiting for a keystroke, which is the defect
+joshuafolkken/kit#1714 was filed for.
+
+**The authorization boundary is carried by the budget, not by the keystroke.** So the budget has to
+survive the cut, and the conversation is the one place it cannot live:
+
+```bash
+pnpm josh run:carry --begin "backlogrun --max 5 --idle 30"   # alias: josh rc
+pnpm josh run:carry --json                                   # read it back in a resumed session
+```
+
+**Ask it before the plan, in the same turn as the first `git switch main && git pull`.** The contract
+is `docs/josh-commands.md` → "`josh run:carry`"; what this loop does with each answer is here:
+
+| It answers   | What the run does                                                                                                                                                                                                          |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `began`      | Nothing was carried. This is the invocation's first session: report the plan and run the decision pass as written below                                                                                                     |
+| `resumed`    | **This session is continuing a run that was cut.** Read the record with `--json` and take the budget figures from it, never from this session's own zero. Report the plan again — the pool has moved — and skip nothing else |
+| `mismatch`   | A live record is here for a **different** invocation — a run that never reached `--end`. **Stop; do not open a lane.** Resuming into it would spend that run's `--max` and its hours. End it deliberately, with `pnpm josh run:carry --end`, once you know that run is over |
+| `expired`    | Printed on standard error ahead of a `began`: the previous invocation spent the 8-hour bound, so a person typing the keyword again is starting a new run and the record is replaced                                          |
+| `unreadable` | Report what it printed and **stop before opening a lane**. A budget that cannot be carried is a run that restarts it at the next cut, which is the whole defect                                                             |
+| `unknown`    | The same — the repository's git directory could not be read, so nothing was established                                                                                                                                    |
+
+**The record is the parent loop's, and a lane never touches it.** The parent is what reads GitHub to
+verify a child merged (`epicrun.md` → "Each child runs in a delegated unit"), so it is also what
+counts that merge — one sequential loop writing one record, with no two lanes writing it at once. A
+delegated unit is briefed with its child and nothing about the invocation's budget, exactly as it is
+told nothing about `run:hold`'s claim on the primary checkout.
+
+**Count into the record rather than into your head** — `--merged 1` at every child's merge, `--filed 1`
+at every Issue this run files, and `--cut` immediately before the cut. Every counter is an increment
+and the command owns the sum, because a run sending a total would be sending arithmetic it had done in
+its head — the one-shot judgement joshuafolkken/kit#1460 measured a run walking straight past.
+
+**`backlog:budget` is then fed from the record, never from a count kept in the conversation:**
+`--started` takes the record's `started_at` and `--merged` its `merged`. That one substitution is what
+makes `--max`, `--idle` and the 8-hour whole-run bound count **across** cuts, as one invocation's
+worth. **The 10-filings-per-run ceiling is counted the same way**, from `filed`.
+
+**The consecutive-failure guard needs no carrying, and that is by construction rather than by
+omission.** The hand-off is asked at every child's _merge_, so a cut is always taken directly after a
+success — the count is zero at every seam it could have had to cross.
+
+**How many cuts the run crossed is named in the completion report**, read from the record's `cuts`. A
+run reporting only what it merged would hide that it had spanned four sessions to do it.
+
+**End the record when the run ends** — `pnpm josh run:carry --end`, in the same turn as the final
+report — so the next `backlogrun` begins a budget of its own rather than resuming a spent one.
+
+**What may be run is untouched.** The record carries a budget and nothing else: `auto-ok` is still
+applied only by a person, so a resumed session is offered exactly the issues the first one was, and
+the invariant in "What one invocation approves" stands unchanged.
+
+**What still waits for a person, today.** This reading and the record are in place; **the supervisor
+outside the conversation — the thing that wakes the next session with nobody typing — is a separate
+deliverable** and is tracked on its own Issue under epic joshuafolkken/kit#1716. Until it lands a cut
+still ends with the `confirmation` Telegram and the resume line, and what the record changes is that
+the session which resumes **continues this invocation** instead of starting a second one over it.
+
+**The reading is scoped to `backlogrun`.** `epicrun` and `fullrun` cuts still wait for a person's
+keystroke — `epicrun.md` → "The hand-off" is unchanged — because neither declares a budget of the kind
+this section leans on.
 
 ## The plan, before the first child starts
 
@@ -268,6 +351,10 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   inside it: `epicrun.md` → "Waiting, and never waiting forever" is still where the figure is stated,
   and `backlog:budget` is what applies it, so a run at the bound stops with candidates in hand and a
   watch still open.
+- **Every one of those budgets is counted across this run's own session cuts**, from the record
+  `pnpm josh run:carry` keeps rather than from a count held in the current session — "The session cut
+  is inside the invocation" above. A resumed run that started its budget over would stop 8 hours after
+  the _last_ cut instead of after the invocation, which is no bound at all.
 - **The guards in `epicrun.md` → "Guards"** apply unchanged, counted over the whole `backlogrun`
   rather than per epic: children per run, Issues filed per run, and consecutive child failures. The
   maximum above is a person's declaration of scale and does not replace any of them — whichever binds
@@ -309,6 +396,10 @@ All of these are `epicrun.md`'s, and are reached here in the same order and for 
 | `pnpm josh run:preflight <N>` before each child that is not in a lane | `epicrun.md` → "Preflight" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `epicrun.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
+
+**One more runs once per session and is this file's own, not `epicrun.md`'s**:
+`pnpm josh run:carry --begin "<the invocation as typed>"` before the plan, and
+`pnpm josh run:carry --end` when the run finishes — "The session cut is inside the invocation" above.
 
 **`pnpm josh epic:audit` is not run.** There is no epic to audit — the run began from the backlog, the
 same reason `epicrun.md` skips it when it began from a bare Issue. The dependency graph the loop acts
