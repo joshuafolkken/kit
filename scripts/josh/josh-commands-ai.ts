@@ -89,6 +89,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Say whether a backlogrun may start more work, keep watching, or finish',
 		category: 'AI tools',
 	},
+	'depth:share': {
+		script: 'scripts/issue/issue-depth-share-cli.ts',
+		description: 'Report the depth-0 share of the open backlog from the recorded depth labels',
+		category: 'AI tools',
+	},
 	cost: {
 		script: 'scripts/cost/cost-cli.ts',
 		description: "Report a run's token and credit cost from Claude Code's session transcripts",

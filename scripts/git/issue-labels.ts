@@ -116,6 +116,64 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 	},
 ]
 
+// joshuafolkken/kit#1729: the depth of an issue's subject, recorded as a label at filing time.
+//
+// **The definition is not here.** `.claude/skills/workflow-commands/SKILL.md` → §2i, "The depth test",
+// is the single source: depth 0 is what a consumer of this package touches, depth 1 the run
+// orchestration that executes an Issue, depth 2 what measures a run. These constants are the
+// recording of that table, never a second copy of it — a label whose description restated the rule
+// would be the clone `CLAUDE.md` prohibits, and the descriptions below therefore name the section
+// rather than paraphrase it.
+//
+// **Why a label at all.** joshuafolkken/kit#1698 set a measurable target — the share of open issues
+// at depth 0 — and left nothing that records a depth, so the share could only be obtained by reading
+// every open issue's body by hand. Two hand counts a day apart disagreed on the denominator and were
+// therefore not comparable, which is the failure a recorded label removes.
+//
+// **The depth is read off the subject, so a run applies it.** Unlike `auto-ok` and
+// `needs-human-review` this is not a person's judgement about authorization; it is the same reading
+// §2i already asks a run to make before it files, and none of the three withholds or widens anything
+// a run may do.
+const DEPTH_0_LABEL = 'depth:0'
+const DEPTH_1_LABEL = 'depth:1'
+const DEPTH_2_LABEL = 'depth:2'
+
+// Ordered shallowest first, which is what makes `depth_label_of` deterministic: an issue carrying
+// more than one depth label counts as the **lowest** depth present, the one closest to the consumer.
+// Without a fixed tie-break the same listing measured twice could answer differently, which is the
+// whole defect joshuafolkken/kit#1729 was filed for.
+const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, DEPTH_2_LABEL]
+
+// The metadata `gh api ... labels` needs, in the shape `FILING_ROUTE_LABELS` above uses and for the
+// same reason: applying a label at issue-creation auto-creates it with a generated color and no
+// description, so provisioning from here is what gives each one a stable color a reader can scan by.
+// Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
+//
+// **The provisioning command lives in `SKILL.md` → §2i**, because prose cannot import this module —
+// the same split `FILING_ROUTE_LABELS` above lives with. `scripts/issue-depth-label.test.ts` keys
+// those three command lines to this array, so a color changed here without the document fails.
+const DEPTH_LABELS: ReadonlyArray<{
+	name: string
+	color: string
+	description: string
+}> = [
+	{
+		name: DEPTH_0_LABEL,
+		color: '0e8a16',
+		description: 'Depth 0 — what a consumer of this package touches (SKILL.md §2i)',
+	},
+	{
+		name: DEPTH_1_LABEL,
+		color: 'fbc02d',
+		description: 'Depth 1 — the run orchestration that executes an Issue (SKILL.md §2i)',
+	},
+	{
+		name: DEPTH_2_LABEL,
+		color: 'c5def5',
+		description: 'Depth 2 — what measures a run (SKILL.md §2i)',
+	},
+]
+
 // The shape `gh issue list --json labels` returns; narrowed here so the predicate below takes any
 // listing row without importing a schema.
 interface LabelReference {
@@ -143,9 +201,24 @@ function has_label_name(labels: ReadonlyArray<string>, wanted: string): boolean 
 	return labels.some((label) => label.toLowerCase() === target)
 }
 
+// The depth recorded on one listing row, or `undefined` where none is — the reading every share
+// measurement makes. Lowercased through the same comparison as every other membership test above,
+// because GitHub keeps the casing a label was created with and `Depth:0` is the same label.
+function depth_label_of(labels: ReadonlyArray<LabelReference> | undefined): string | undefined {
+	const names = new Set((labels ?? []).map((label) => label.name.toLowerCase()))
+
+	return DEPTH_LABEL_ORDER.find((name) => names.has(name))
+}
+
 export {
 	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
+	depth_label_of,
+	DEPTH_0_LABEL,
+	DEPTH_1_LABEL,
+	DEPTH_2_LABEL,
+	DEPTH_LABEL_ORDER,
+	DEPTH_LABELS,
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,
 	has_any_label,

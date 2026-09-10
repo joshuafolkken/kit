@@ -656,7 +656,7 @@ belongs to the prerequisite row, not to the table** — the label means a filing
 by*, so the observation row carries no `route:` label of its own (§2i):
 
 ```bash
-gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f body="<body>"
+gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a' -f 'labels[]=depth:<n>' -f body="<body>"
 ```
 
 Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
@@ -1117,6 +1117,46 @@ it — read off the subject rather than judged**:
 | **1** | The run orchestration that executes an Issue | `fullrun` / `epicrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
 | **2** | What measures a run | `diag`, `josh time`, `josh eval`, `josh cost`, `josh rule:value` |
 
+**The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed**
+(joshuafolkken/kit#1729). `depth:0`, `depth:1` and `depth:2` are the three, defined once in
+`scripts/git/issue-labels.ts` and carrying no definition of their own — **the table above is the
+single source**, and a label description that paraphrased it would be a second copy of the rule.
+**Every filing route applies one**, this route and the other three of §2d's table alike: a `new`
+entry point, a `route:tier-a` prerequisite, a `route:interrupt`, a split child and a review round
+cap's branch-2 filing all pass through a `gh api … issues` call, and the depth label goes in it
+beside whatever `route:` label that call already carries.
+
+```bash
+gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=depth:1' -f body="<body>"
+gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue already filed
+```
+
+**Create the three once per repository**, before the first filing that applies one — REST auto-creates
+a missing label with a generated color and no description, and the three lines below are what give
+each a stable color a reader can scan a listing by. `DEPTH_LABELS` in `scripts/git/issue-labels.ts`
+is the single source of the colors and descriptions, and `scripts/issue-depth-label.test.ts` keys
+these lines to it so the two cannot drift.
+
+```bash
+gh api repos/{owner}/{repo}/labels -f name=depth:0 -f color=0e8a16 -f description="Depth 0 — what a consumer of this package touches (SKILL.md §2i)" --silent 2>/dev/null || true
+gh api repos/{owner}/{repo}/labels -f name=depth:1 -f color=fbc02d -f description="Depth 1 — the run orchestration that executes an Issue (SKILL.md §2i)" --silent 2>/dev/null || true
+gh api repos/{owner}/{repo}/labels -f name=depth:2 -f color=c5def5 -f description="Depth 2 — what measures a run (SKILL.md §2i)" --silent 2>/dev/null || true
+```
+
+- **It is read off the subject, exactly as the table is** — so applying it is not a judgement and not
+  a person's to make, which is what separates it from `auto-ok` and `needs-human-review`. Those two
+  decide what a run may do; this one records what an Issue is about and withholds nothing.
+- **Applied at filing, not at completion.** A depth assigned when the work finishes is assigned by
+  whoever happens to close it, and the share below is a question about the *open* backlog — an Issue
+  that never carried the label was never in the numerator's reach.
+- **An Issue carrying more than one counts as the lowest depth present**, the one closest to the
+  consumer. It is a fixed tie-break rather than a preference: without one the same backlog measured
+  twice can answer twice, which is the whole defect joshuafolkken/kit#1729 was filed for.
+- **An `epic` takes no depth label**, because it has no subject of its own to read one off — its
+  children carry the subjects, and the share below excludes it from the denominator for that same
+  reason. A depth label present on an Issue the count skips is exactly the ambiguity this section
+  exists to remove.
+
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
   it stopped or delayed** — named as an Issue number or a run, never as "this would slow runs down".
   **Cannot cite one, it is not filed**: it goes to the ledger below, and what files it later is
@@ -1140,6 +1180,42 @@ filings whose subject is the epic tooling, which the table above puts at depth 1
 **This is not the count cap that was rejected.** A cap is rationing — past the number the finding is
 lost, and nothing about it says which findings were worth having. This changes what counts as a
 finding at all, so what it excludes is excluded for a reason a reader can check.
+
+### The depth-0 share — what is counted, and the command that counts it
+
+**joshuafolkken/kit#1698 set a measurable target and left nothing that measures it**
+(joshuafolkken/kit#1729). Its acceptance criteria named the share of open Issues at depth 0 — 3/23
+≈ 13% on 2026-09-09 — and no Issue recorded a depth, so the only way to obtain the number was to open
+every open Issue and classify it by eye. Done again on 2026-09-10 that produced 3/14 ≈ 21%, and the
+two figures **are not comparable**: they took different denominators, and neither said which.
+
+```bash
+pnpm josh depth:share          # → <depth-0>/<denominator> = <n>% ; alias: josh dsh
+pnpm josh depth:share --json   # the same figures as one JSON object
+```
+
+**The denominator is a rule, not a choice, and this is it:**
+
+- **Counted: every open Issue that does not carry `epic`.** An epic is a container for other Issues
+  rather than a deliverable of its own — counting one counts its children twice, and an epic has no
+  subject of its own to read a depth off.
+- **`route:tier-a` and `route:interrupt` are counted like anything else.** The depth test above
+  exempts them from its *citation* requirement; it never said they are not work. Excluded, a run
+  could improve the share by choosing a filing route.
+- **An Issue with no depth label is in the denominator**, and the command reports it separately as
+  `unlabelled`. Left out, the share would improve every time a filing skipped the label — the one
+  direction a measurement must never be able to move on its own.
+- **The numerator is what is left**: open, non-epic Issues carrying `depth:0`.
+
+**Two readings of the same backlog give the same number**, which is what the hand counts could not
+do: nothing in the path is sampled or judged, and `scripts/issue/issue-depth-share.test.ts` pins it.
+**A listing that hit the scan ceiling is reported as capped** rather than presented as the whole, and
+a listing that could not be read at all answers `unknown` — never a share of zero, which would be a
+measurement invented out of a failed fetch.
+
+**What the number is for is not decided here.** Changing what `backlog:next` offers on the strength
+of it, and setting a target value, are both deliberately out of scope until the current value has
+been measured the same way more than once (joshuafolkken/kit#1729 → 範囲外).
 
 ### The ledger — where an observation that cannot cite a blockage goes
 
