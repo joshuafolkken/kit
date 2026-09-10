@@ -9,6 +9,7 @@ import { time_format } from './time-format'
 import { time_gaps, type GapTotals } from './time-gaps'
 import { time_invocations, type InvocationTotal } from './time-invocations'
 import { time_model_gaps } from './time-model-gaps'
+import { time_parent_turns, type ParentTurnTotals } from './time-parent-turns'
 import { time_phase_costs, type PhaseCostFacts } from './time-phase-costs'
 import { time_phase_table } from './time-phase-table'
 import { time_phases, type PhaseTotal } from './time-phases'
@@ -144,6 +145,12 @@ interface TimeReport extends TurnSplit {
 	// question whose answer the run already had. Built by `time-single-checks.ts`, which also renders
 	// the block — the shape `time-bundles.ts` and `time-failures.ts` already have.
 	single_checks: SingleCheckTotals
+	// What the run's turns were spent *on*, rather than how long they took (joshuafolkken/kit#1715).
+	// The round-trip block says how often the run stopped and the bundling block how many of those
+	// stops were avoidable; only this says what the stops were for — which is the whole question about
+	// a `backlogrun` parent, since it barely implements anything. Built by `time-parent-turns.ts`,
+	// which also renders the block — the shape `time-bundles.ts` and `time-single-checks.ts` have.
+	parent_turns: ParentTurnTotals
 	// How long each of `followup`'s own stages took (joshuafolkken/kit#1445). The command prints the
 	// rows itself; only this keeps them past the run that printed them, which is what lets two runs be
 	// compared stage by stage. Built by `time-followup-stages.ts`, which also renders the block.
@@ -313,10 +320,16 @@ type ReportTables = Pick<
 	'phases' | 'ci_cycles' | 'segments' | 'by_tool' | 'by_josh_command' | 'by_invocation' | 'by_check'
 >
 
-function report_tables(input: ReportInput, turns: TurnTotals): ReportTables {
+// The tables plus the one walk that is not a table (joshuafolkken/kit#1715). `parent_turns` is built
+// here rather than beside the totals because `build_from_spans` is at its length limit, and a line of
+// its own there would cost the next block the room this one took.
+type ReportWalks = ReportTables & Pick<TimeReport, 'parent_turns'>
+
+function report_tables(input: ReportInput, turns: TurnTotals): ReportWalks {
 	const { spans } = input
 
 	return {
+		parent_turns: time_parent_turns.build_parent_turns(spans),
 		phases: time_phases.build_phases({ spans, ci: input.ci }),
 		ci_cycles: time_cycles.build_cycles(spans, input.ci),
 		segments: time_segments.build_segments(spans),
@@ -477,6 +490,7 @@ function format_report(report: TimeReport): string {
 		...time_gaps.gap_lines(report.gaps, report.elapsed_ms),
 		...time_bundles.bundle_lines(report.bundles, report),
 		...time_single_checks.single_check_lines(report.single_checks, report),
+		...time_parent_turns.parent_turn_lines(report.parent_turns),
 		...time_followup_stages.followup_stage_lines(report.followup_stages),
 		...time_failures.failure_lines(failures, tool_call_count, categories.tool_ms),
 		...time_rework.rework_lines(report.rework),

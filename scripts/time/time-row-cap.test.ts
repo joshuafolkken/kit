@@ -8,6 +8,7 @@ import { time_failures } from './time-failures'
 import { time_followup_stages } from './time-followup-stages'
 import { time_gaps } from './time-gaps'
 import type { InvocationTotal } from './time-invocations'
+import { time_parent_turns } from './time-parent-turns'
 import { time_period_fixture } from './time-period-fixture'
 import type { TimeReport, ToolTotal } from './time-report'
 import { time_rework } from './time-rework'
@@ -120,6 +121,7 @@ function report(notes: ReadonlyArray<string> = []): TimeReport {
 		gaps: { ...time_gaps.NO_GAPS },
 		bundles: { ...time_bundles.NO_BUNDLES },
 		single_checks: { ...time_single_checks.NO_SINGLE_CHECKS },
+		parent_turns: { ...time_parent_turns.NO_PARENT_TURNS },
 		followup_stages: { ...time_followup_stages.NO_FOLLOWUP_STAGES },
 		rework: { ...time_rework.NO_REWORK },
 		failures: { ...time_failures.NO_FAILURES },

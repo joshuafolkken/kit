@@ -805,8 +805,19 @@ delivered to in its own right. The read is one call, made in the same turn as wh
 already needs:
 
 ```bash
+pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch; alias: josh ird
 gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
 ```
+
+**The first line is the one to type, and the second is what it replaced** (joshuafolkken/kit#1715).
+The body and the comments are two reads that need nothing from one another, so typed by hand they are
+two `gh api` calls — and measured over four recorded `backlogrun` parents, `issue bookkeeping` was the
+single largest contributor to the parent's turn count, 110 of 414 turns (26.6%), with one issue read
+at a time its dominant shape. `pnpm josh issue:read` answers both for every number named, in one call,
+and **says when a comment listing could not be read rather than showing no comments** — which matters
+here more than anywhere, because the rule below is that the later text wins and a comment nobody read
+cannot win anything. The `gh api` form stays for a **cross-repository** read: the command takes no
+`--repo`, since the comment listing it uses reads the repository it runs in.
 
 `gh issue view <N> --comments` prints the body and the comments together and is the one to type by
 hand — but it is GraphQL-backed, a cloud session is answered `403`, and `scripts/gh-document-guard.test.ts`
