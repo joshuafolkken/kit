@@ -90,3 +90,70 @@ describe('reading the root seed every lane is offset from', () => {
 		expect(() => lane_environment.read_root_seed('PORT_SEED=abc\n')).toThrow('PORT_SEED')
 	})
 })
+
+// joshuafolkken/kit#1713: the lane also records where the unit running its child writes, in the same
+// file and by the same last-wins rules, so a session that did not open the lane can poll that child.
+const RECORDED_SEED = 6
+const SEED_FILE = `PORT_SEED=${String(RECORDED_SEED)}\n`
+const UNIT_OUTPUT = '/home/dev/.claude/projects/kit/session/subagents/agent-7.jsonl'
+const LATER_UNIT_OUTPUT = '/home/dev/.claude/projects/kit/session/subagents/agent-8.jsonl'
+const RECORDED_LINE = `JOSH_LANE_OUTPUT="${UNIT_OUTPUT}"`
+const LATER_RECORDED_LINE = `JOSH_LANE_OUTPUT="${LATER_UNIT_OUTPUT}"`
+
+describe('writing where a lane’s unit writes', () => {
+	it('appends a quoted record to a file that had none', () => {
+		expect(lane_environment.with_lane_output(SEED_FILE, UNIT_OUTPUT)).toBe(
+			`${SEED_FILE}${RECORDED_LINE}\n`,
+		)
+	})
+
+	it('replaces the record in place rather than leaving two of them', () => {
+		const once = lane_environment.with_lane_output(SEED_FILE, UNIT_OUTPUT)
+
+		expect(lane_environment.with_lane_output(once, LATER_UNIT_OUTPUT)).toBe(
+			`${SEED_FILE}${LATER_RECORDED_LINE}\n`,
+		)
+	})
+
+	it('leaves the seed the same file carries alone', () => {
+		const content = lane_environment.with_lane_output(SEED_FILE, UNIT_OUTPUT)
+
+		expect(lane_environment.read_root_seed(content)).toBe(RECORDED_SEED)
+	})
+})
+
+describe('reading where a lane’s unit writes', () => {
+	it('reads back what it wrote', () => {
+		const content = lane_environment.with_lane_output('', UNIT_OUTPUT)
+
+		expect(lane_environment.read_lane_output(content)).toBe(UNIT_OUTPUT)
+	})
+
+	// An unquoted value is cut at a ` #` by every dotenv reader, so the record would come back
+	// truncated to something that still looks like a path.
+	it('survives a path holding a space and a hash', () => {
+		const awkward = '/home/dev/a b #c.jsonl'
+		const content = lane_environment.with_lane_output('', awkward)
+
+		expect(lane_environment.read_lane_output(content)).toBe(awkward)
+	})
+
+	it('reads an export-prefixed assignment, which dotenv readers accept', () => {
+		const content = `export JOSH_LANE_OUTPUT=${UNIT_OUTPUT}\n`
+
+		expect(lane_environment.read_lane_output(content)).toBe(UNIT_OUTPUT)
+	})
+
+	it('takes the last record, the way .env itself is last-wins', () => {
+		const content = `${RECORDED_LINE}\n${LATER_RECORDED_LINE}\n`
+
+		expect(lane_environment.read_lane_output(content)).toBe(LATER_UNIT_OUTPUT)
+	})
+
+	// A cleared record has nothing to poll, and an empty string handed to `run:liveness --output` is
+	// a relative path — refused there, so the child would answer `undetermined` for ever.
+	it('reads a missing or blank record as undefined, never as an empty path', () => {
+		expect(lane_environment.read_lane_output(SEED_FILE)).toBeUndefined()
+		expect(lane_environment.read_lane_output('JOSH_LANE_OUTPUT=\n')).toBeUndefined()
+	})
+})

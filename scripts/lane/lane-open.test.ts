@@ -86,6 +86,7 @@ function live_lane(issue: string, seed: number | undefined): LaneInfo {
 		branch: `${issue}-lane`,
 		directory: path.join(LANE_ROOT, issue),
 		seed,
+		output: undefined,
 		is_stranded: false,
 	}
 }

@@ -180,6 +180,12 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		default_script_arguments: ['prune'],
 	},
+	'lane:output': {
+		...LANE_ARGUMENTS,
+		description: 'Record, or read back, where the unit running a lane’s child writes',
+		category: 'AI tools',
+		default_script_arguments: ['output'],
+	},
 	'investigation:guard': {
 		script: 'scripts/delegation/investigation-guard.ts',
 		description:

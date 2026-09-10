@@ -147,7 +147,7 @@ Never advance the queue on the summary alone.
 the session. **The resume command is the rest of the queue**, `queue #<next> #<after> …` from the
 first issue that has not run, never the whole queue again.
 
-**There is no drain here, and no lane reading either.** A queue runs one issue at a time, so the merge
+**There is no lane hand-over here, and no lane reading either.** A queue runs one issue at a time, so the merge
 it has just read was the only thing it had in flight and the seam is idle already. And
 `pnpm josh lane:list` reports the **repository's** work trees rather than this run's units, so a lane
 some earlier `epicrun` left behind would gate a queue that never opened one — permanently, and

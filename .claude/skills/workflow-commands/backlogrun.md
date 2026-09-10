@@ -269,7 +269,7 @@ Termination is decided by what the loop is told, never by a judgement that enoug
 - **A `needs-human-review` child stops the whole run** before its commit — `SKILL.md` → §2z, which is
   the single source, and `epicrun.md` → "`needs-human-review` — the one stop that is not a park" for
   what happens to its lane.
-- **The hand-off check** — `pnpm josh cost --over 150000` at every child's merge, and the lane drain
+- **The hand-off check** — `pnpm josh cost --over 150000` at every child's merge, and the lane hand-over
   that follows an `over` — is `epicrun.md` → "The hand-off", unchanged.
 
 ## What happens to a child that cannot finish

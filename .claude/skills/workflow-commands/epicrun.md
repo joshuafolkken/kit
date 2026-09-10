@@ -299,6 +299,13 @@ child is handed over. The timestamp is not — a value copied down forty minutes
 that was read once, and reading it from the file each time is both cheaper and correct across a
 parent that restarted.
 
+**Where the child runs in a lane, that note goes into the lane rather than into the conversation** —
+`pnpm josh lane:output <N> <path>`, in the same turn as the dispatch (joshuafolkken/kit#1713). Written
+down only in the conversation, the path is lost with the session that took it, which is what made a
+session boundary drain the pool before it could be cut; recorded in the lane it comes back from
+`pnpm josh lane:output <N>` in any session, including one that never opened that lane. It is the same
+note either way — the recording is what makes it durable, not a second reading.
+
 **Ask the command rather than combining the traces yourself.** It reads the output, the checkout and
 the child's state, and answers one verdict. Traces are read **in the checkout the unit was given** —
 this session's own unless the unit was handed a separate work tree, in which case run it there, and
@@ -1281,7 +1288,8 @@ per child, and treat a single non-numeric line as the verdict.
    receives that merge and the next child starts on a stale default branch. **In a lane the child
    cannot run it at all**, so it is the parent's, immediately before that lane's `lane:open`.
 
-   **Start the unit without blocking on it, note where it writes, and poll.** Blocking on the return
+   **Start the unit without blocking on it, record where it writes — `pnpm josh lane:output <N> <path>`
+   when the child runs in a lane — and poll.** Blocking on the return
    leaves the parent with no turn in which to notice that the return is never coming, which is the
    whole of "A delegated unit that stopped without reporting" above. Poll at the polling interval; ask
    `pnpm josh run:liveness <N> --output <path> --process none` (or `--process alive`) once that file has been unchanged
@@ -1349,9 +1357,11 @@ per child, and treat a single non-numeric line as the verdict.
 
    Then **ask the hand-off check — at every child's merge, delegated or not**, immediately after the
    merge and `pnpm josh ms`: `pnpm josh cost --over 150000`, beside `pnpm josh lane:list` in the same
-   turn. Go back to step 1 on `under`; on `over` **the run drains** — no new child is taken, the lanes
-   already in flight are allowed to finish, and the cut is taken at the first reading where
-   `lane:list` answers `none` (see "The hand-off" below). **Never read the condition off
+   turn. Go back to step 1 on `under`; on `over` **the run hands its lanes over and stops in that same
+   turn** — no new child is taken, the lanes already in flight keep running, and the next session picks
+   them up from `lane:list` and `pnpm josh lane:output` (see "The hand-off" below). The one reading
+   that does not stop is a lane nobody could poll — `unreadable`, or `open` with no recorded path.
+   **Never read the condition off
    `pnpm josh delegate epic-child`** — it is a static policy lookup that answers `delegate` everywhere,
    so a gate built on it never fires.
 3. **`wait`** — sleep the polling interval and go back to step 1. This also covers "another
@@ -1574,32 +1584,47 @@ moment is the only one where **this** child's work is all written down: the PR i
 tree is on the default branch and clean, and the epic's state on GitHub is complete. A hand-off taken
 anywhere else would have to carry work that is not written down yet.
 
-**A merge is not by itself a safe seam, because another lane may still be running.** The session
-holds the reference to every unit it dispatched, so cutting it while one is in flight does not pause
-that child — the work stays in its lane and the reference to it does not, so what a resumed session
-can do is start it again rather than pick it up. **Read which it is rather than judging it:**
+**A merge is not by itself a safe seam, because another lane may still be running — and until
+joshuafolkken/kit#1713 that was a reason to wait.** The session held the reference to every unit it
+dispatched, so cutting it while one was in flight did not pause that child: the work stayed in its
+lane and the reference to it did not, and what a resumed session could do was start it again rather
+than pick it up. **The reference was one fact — where the unit writes — and it now lives in the
+lane**, so a session that never dispatched the child can poll it and the pool is handed over instead
+of drained. **Read the lanes rather than judging them:**
 
 ```bash
-pnpm josh lane:list   # `none`, or one line per lane with its state
+pnpm josh lane:list   # `none`, or one line per lane with its state and its recorded output path
 ```
 
-**`none` is the safe seam, and `over` is what sends the run to it.** The reading does not wait for an
-idle pool to happen; it drains to one.
+**Every lane in flight is handed over, and the last column is what makes that possible.**
+`pnpm josh lane:output <N>` prints the same path on its own, so the next session polls a lane it
+never opened with two:
+
+```bash
+unit_output=$(pnpm josh lane:output <N>) &&
+  pnpm josh run:liveness <N> --output "$unit_output" --process none
+```
+
+**The `&&` is load-bearing.** A lane that records nothing prints `none` and exits non-zero, so the
+chain stops there; substituted straight into `--output`, that `none` is a relative path and
+`run:liveness` answers `undetermined` — "could not read" — for ever, instead of the missing record
+being reported.
 
 - **`under`** — go back to step 1 of the loop and run the next child.
-- **`over`** — **the run drains.** Open no new lane and take no new child from `epic:next`; let the
-  children already in flight finish, close each lane as its child merges or parks ("What happens to a
-  lane" above), and read `lane:list` again after each. Post the epic progress comment naming what
-  merged, what remains **and that the reading was `over`**, so the drain is on the record rather than
-  only in a context that may be compacted away. A run with no lanes reaches the next bullet at once,
-  because the child that just merged was the only one in flight.
-- **`none`, once drained** — **stop and ask the person to cut the session.** This is
+- **`over`** — **the run hands its lanes over and stops at once.** Open no new lane and take no new
+  child from `epic:next`. Confirm that every lane still in flight records an output path — the
+  recording is made at dispatch, and one missing is filled in now with
+  `pnpm josh lane:output <N> <path>` — then take the next bullet in the same turn. **There is no
+  waiting here at all**: nothing has to finish, because nothing is being abandoned.
+- **Every in-flight lane records a path** — **stop and ask the person to cut the session.** This is
   joshuafolkken/kit#1567's change and it replaces "compact and continue": a session that compacts
   still bills its whole history on every later request, which is how `epicrun #1474` reached $0.241 a
   request while every one of its children ran in a unit. The cut costs about 70,000 tokens — roughly
   56,000 to rewrite the resident documents in a fresh session plus about 15,000 to re-read the epic
   and the child Issue — against a saving measured at about 14,500,000 per cut, **some 200 times more**.
-  Post the epic progress comment, send a **`confirmation`** Telegram with the resume command in its
+  Post the epic progress comment naming **every lane still in flight and the path each one records**,
+  so the next session has the pool in writing rather than only in a context that may be compacted
+  away. Send a **`confirmation`** Telegram with the resume command in its
   body — a hand-off waits for the person to type the next command, which is what `confirmation`
   means; `completion` would announce an epic that has not completed — and stop with:
 
@@ -1607,32 +1632,53 @@ idle pool to happen; it drains to one.
 
   **報告は完了報告の書式で書かない。** 区切りは完了でも park でも失敗でもない**第 4 の停止**であり、専用の書式が `prompts/collaboration-workflow/report-format.md` →「区切りの報告（完了報告と区別する・必須）」にある。`原因 / 対応 / 結果` の 3 行は使わない — それは finished なランの形であり、epic はまだ終わっていない。書くのは 4 つ、**終わったこと / 残っていること / 止めた理由 / 次に打つコマンド**である。Telegram 本文も同じ書式で書く。
 
-**Draining is what makes the cut reachable, and without it this rule would never fire on the run it
-was written for.** `epic:next --lanes` keeps the seats full, so under parallel lanes a merge almost
-never coincides with an idle pool — and `epicrun #1474`, the run joshuafolkken/kit#1567 measured, ran
-in lanes: gated on an idle pool that merely happened, it would have read `over` at all seven merges
-and cut at none of them, which is the never-fires failure this section already indicts
-`pnpm josh delegate epic-child` for. **The drain makes the moment rather than waiting for it**, and it
-is the allowance a `needs-human-review` stop already takes: no new lane is opened, and the ones in
-flight are allowed to finish. It costs at most the longest child already running.
+**The hand-over is what makes the cut reachable, and the drain it replaced cost the pool.**
+`epic:next --lanes` keeps the seats full, so under parallel lanes a merge almost never coincides with
+an idle pool — and `epicrun #1474`, the run joshuafolkken/kit#1567 measured, ran in lanes: gated on an
+idle pool that merely happened, it would have read `over` at all seven merges and cut at none of them,
+which is the never-fires failure this section already indicts `pnpm josh delegate epic-child` for. The
+drain solved that by *making* the moment — open no new lane, let the in-flight ones finish — and paid
+for it with the whole pool: six seats decaying to zero over as long as the longest child still
+running, at 12–28 minutes a child (joshuafolkken/kit#1477) and a reading roughly every 50 minutes at
+the measured throughput of 6.1 children an hour (joshuafolkken/kit#1637). **Recording the path removes
+the cost without giving the moment back up** (joshuafolkken/kit#1713): the cut is taken at the reading
+itself, the lanes keep running, and the next session picks them up from `lane:list`.
 
-**The drain waits only on the lanes that can still finish.** `open` is one. A **`stranded`** lane has
-no work tree and so no running child — `pnpm josh lane:prune` closes it, and the reading is taken
-again. An **`unreadable`** one cannot be told apart from a running child, so it is neither waited on
-nor assumed idle: **the cut does not happen**, the lane is named in the epic progress comment so a
-person can see what is blocking it, and the run goes back to step 1. **Never assume idle.** The
-asymmetry runs the way it runs everywhere else here — a wrong cut abandons a child, a missed cut only
-costs tokens.
+**A lane is handed over only where the next session can actually poll it, and that is read rather
+than assumed.** A lane whose state is `open` **and** whose recorded path is not `-` is handed over. A
+**`stranded`** lane has no work tree and so no running child — `pnpm josh lane:prune` closes it, and
+the reading is taken again. An **`unreadable`** one cannot be told apart from a running child, and an
+`open` lane recording **no path** is the same case one layer up — nothing to poll, and no way to tell
+a finished child from a working one: in both, **the cut does not happen**, the lane is named in the
+epic progress comment so a person can see what is blocking it, and the run goes back to step 1.
+**Never assume idle.** The asymmetry runs the way it runs everywhere else here — a wrong cut abandons
+a child, a missed cut only costs tokens. **That treatment is unchanged from the drain**, deliberately:
+what joshuafolkken/kit#1713 removed is the waiting, not the caution.
 
-**The hand-off report belongs to the stop, not to the reading.** A run that read `over` and is still
-draining has not stopped, so it writes no hand-off report — the four lines say what is left for
-somebody to pick up, and there is nobody to pick it up while the same session is still running. The
-epic progress comment is the record in that case. `report-format.md` → "区切りの報告" states the same
-boundary from the format's side.
+**The hand-off report belongs to the stop, not to the reading.** With the hand-over the stop is
+usually the same turn as the reading, so the two rarely come apart — but the boundary stands for the
+one reading that does not stop: an `unreadable` lane, or an `open` one recording no path, sends the run
+back to step 1, and a run that has not stopped writes no hand-off report. The epic progress comment is
+the record in that case.
+`report-format.md` → "区切りの報告" states the same boundary from the format's side.
 
-**This is not a failure and not a park** — neither the drain nor the cut is. No child needs a
-decision; the run is either on its way to the seam or standing at it. `needs-decision` is not
+**This is not a failure and not a park** — neither the hand-over nor the cut is. No child needs a
+decision; the run is either handing its lanes on or standing at the seam. `needs-decision` is not
 applied, nothing is stashed, and no Issue is filed.
+
+### Picking the lanes up in the fresh session
+
+**The resumed session does not start a child again, and does not open a lane that is already open.**
+Its first reading is `pnpm josh lane:list`: every line with a recorded path is a child that was handed
+over, and it is polled exactly as the session that dispatched it polled it — the two-line form above,
+with the same answer table and the same two-`undetermined`-in-a-row rule as "A delegated unit that
+stopped without reporting" above. **The `--process` argument is the one thing that changes**: a fresh session did not
+start those processes, so it reports `none` unless it has looked for one itself.
+
+**`pnpm josh lane:open <N>` re-attaches to a lane whose branch is already pushed**
+(joshuafolkken/kit#1627), which is what a handed-over lane needs when its child has to be finished by
+hand rather than polled to a merge. Nothing else about the loop changes: `epic:next --lanes` is asked
+as usual, and a lane still in flight is a seat that is taken.
 
 ### The counters live in the conversation
 
@@ -1936,11 +1982,13 @@ never `skip`.
 4. A guard above was reached.
 5. A timeout above elapsed.
 6. `pnpm josh cost --over 150000` answered `over` — or could not answer — just after a child merged,
-   and the drain that reading starts has brought `pnpm josh lane:list` to `none`. The run is then
+   and every lane still in flight records the path the next session will poll it on. The run is then
    cheaper to continue in a fresh session, and the resume command is in the report. This is the one
-   stopping condition that is not a problem: nothing is parked, nothing is filed, and the epic is
-   unchanged. **The reading on its own is not on this list** — it starts a drain, and only the drain
-   arriving at `none` stops the run (joshuafolkken/kit#1567).
+   stopping condition that is not a problem: nothing is parked, nothing is filed, the epic is
+   unchanged, and the lanes keep running. **The reading stops the run in its own turn**
+   (joshuafolkken/kit#1713, which replaced joshuafolkken/kit#1567's drain) — with the one exception
+   that a lane nobody could poll, `unreadable` or `open` with no recorded path, sends it back to step 1
+   instead.
 
 **A child that needs a decision is not on this list.** It is parked, and the run continues.
 

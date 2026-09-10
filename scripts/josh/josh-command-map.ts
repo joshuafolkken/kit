@@ -120,6 +120,7 @@ const ALIASES: Record<string, string> = {
 	lnc: 'lane:close',
 	lnl: 'lane:list',
 	lnp: 'lane:prune',
+	lnv: 'lane:output',
 	ig: 'investigation:guard',
 	rug: 'rule:guard',
 	ruv: 'rule:value',

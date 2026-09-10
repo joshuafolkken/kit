@@ -18,6 +18,7 @@ function lane(overrides: Partial<LaneInfo> = {}): LaneInfo {
 		branch: LANE_BRANCH,
 		directory: LANE_DIRECTORY,
 		seed: SEED,
+		output: undefined,
 		is_stranded: false,
 		...overrides,
 	}
@@ -62,6 +63,31 @@ describe('listing the open lanes', () => {
 
 		expect(line).toContain(lane_report.UNREADABLE_STATE)
 		expect(line).not.toContain(`dev ${String(DEV_BASE)}`)
+	})
+})
+
+// joshuafolkken/kit#1713: the listing is where a session that did not open a lane finds the file to
+// poll, so the record is a labelled column of its own rather than something read off the directory.
+describe('the recorded output path in the listing', () => {
+	const UNIT_OUTPUT = '/home/dev/.claude/projects/kit/session/subagents/agent-7.jsonl'
+
+	it('names the file the lane’s unit writes', () => {
+		const line = lane_report.describe_lane(lane({ output: UNIT_OUTPUT }))
+
+		expect(line).toContain(`output ${UNIT_OUTPUT}`)
+	})
+
+	// A shorter row would read as a field the caller failed to notice; the point is to see that the
+	// record is missing.
+	it('says so plainly when the lane records none', () => {
+		expect(lane_report.describe_lane(lane())).toContain('output -')
+	})
+
+	it('keeps the directory and the path apart', () => {
+		const line = lane_report.describe_lane(lane({ output: UNIT_OUTPUT }))
+
+		expect(line).toContain(LANE_DIRECTORY)
+		expect(line.indexOf(LANE_DIRECTORY)).toBeLessThan(line.indexOf(UNIT_OUTPUT))
 	})
 })
 
