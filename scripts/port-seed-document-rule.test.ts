@@ -58,11 +58,24 @@ const PORT_SEED_KEY = 'PORT_SEED'
 // #820: the docs promised `.env` while only `josh port` read it, so the two answered a consumer's
 // `preview` script and its E2E suite with different ports. Naming both readers is what keeps the
 // documented location and the implemented one from drifting apart again.
+//
+// joshuafolkken/kit#1720: those three guarantees are now pinned at the command reference instead of
+// in the AI document. They describe how `josh port` behaves rather than what an agent must do, so
+// the residency criterion (`.claude/skills/workflow-commands/SKILL.md` → §3) leaves the variable's
+// row resident and puts the body at the command reference the section lead already links to — the
+// deep anchor the deleted bullet carried went with it. Nothing was deleted —
+// each sentence moved onto text `docs/josh-commands.md` already carried, and the assertion moved
+// with it. The conditional default stays resident, because the row is still the reader's only way
+// to learn what a seed changes.
 const AI_DOC_MARKERS: ReadonlyArray<string> = [
 	'| `PORT_SEED`',
-	'An invalid value is a hard error, never a silent fall back to the shared default',
-	'a busy port still fails loudly with no retry on another port',
-	'`josh port` and `playwright.config.ts` both read the seed from `.env`',
+	'unset or blank means `0` (`5173` / `4173`)',
+]
+
+const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
+	'is a hard error rather than a silent fall back to the default',
+	'A busy port still **fails loudly** — nothing retries on another port',
+	'so the E2E suite follows the seed with no configuration',
 ]
 
 describe('PORT_SEED documentation', () => {
@@ -78,6 +91,10 @@ describe('PORT_SEED documentation', () => {
 
 	it('documents the command that prints the resolved port', () => {
 		expect(read_repo_file(JOSH_COMMANDS_DOC)).toContain('### `josh port`')
+	})
+
+	it.each(COMMAND_DOC_MARKERS)('pins the guarantee %s at the command reference', (marker) => {
+		expect(read_repo_file(JOSH_COMMANDS_DOC)).toContain(marker)
 	})
 
 	it.each(PORT_FREE_INSTRUCTION_DOCS)('pins no port number in %s', (document_name) => {
