@@ -97,6 +97,11 @@ interface RunWake {
 
 type WakeStopReason = 'ended' | 'expired' | 'unreadable' | 'failed' | 'stopped'
 
+// What the loop's tidy-up found at its own target (joshuafolkken/kit#1727). `absent` is the ordinary
+// `--stop`, `removed` the ordinary end of a loop, and `superseded` the one that has to be said out
+// loud: another supervisor holds the record and this process is the replaced one.
+type WakeTidyResult = 'absent' | 'removed' | 'superseded'
+
 // `wait` and `pending` are two states rather than one because the wake mark is cleared in the first
 // and must survive the second — collapsed into one answer, a supervisor inside its grace window would
 // forget it had already woken and wake again every interval.
@@ -346,7 +351,7 @@ function clear_wake_mark(wake: RunWake): RunWake {
 // `owner_start` against the owner the caller declares, and whose `is_foreign_live_owner` is that
 // comparison deciding what a caller may touch. `run-hold.ts` is **not** a precedent and reading it as
 // one is the mistake this note exists to prevent: it records a pid for the person reading the stop
-// message and explicitly never reads it back (`run-hold.ts` → `describe_hold`), which is the
+// message and explicitly never reads it back (`run-hold.ts` → `describe_holder`), which is the
 // distinction `RunWake.pid` above already draws.
 //
 // The one difference from `run-carry.ts` is who the owner is. There the owner is declared from
@@ -377,12 +382,22 @@ function read_own_wake(target: string): RunWake | undefined {
 // layer does not offer. What this removes is the case that was certain — the loop ending after a
 // take-over it had already noticed — rather than the one that needs the hand-over to land inside two
 // statements.
-function remove_own_wake(target: string): boolean {
-	if (read_own_wake(target) === undefined) return false
+//
+// **Three answers rather than a boolean, because the caller has to tell two of them apart.** An
+// ordinary `--stop` and a take-over both leave this process with nothing to remove, and only the
+// second is worth saying anything about — a `false` covering both put the caller in the position of
+// re-deriving which one it was from a second read, which is a branch that can be written the wrong
+// way round and would then announce a supersession on every ordinary stop. Answered here, the
+// distinction is decided once, in the place that already holds the record.
+function tidy_own_wake(target: string): WakeTidyResult {
+	const wake = read_wake(target)
+
+	if (wake === undefined) return 'absent'
+	if (!is_own_wake(wake)) return 'superseded'
 
 	remove_wake(target)
 
-	return true
+	return 'removed'
 }
 
 // **Writes only where the record is still there *and* is this process's own.** `--stop` removes it,
@@ -419,12 +434,12 @@ const run_wake = {
 	parse_wake,
 	read_own_wake,
 	read_wake,
-	remove_own_wake,
 	remove_wake,
+	tidy_own_wake,
 	update_wake,
 	wake_path,
 	write_wake,
 }
 
-export type { RunWake, WakeDecision, WakeDecisionInput, WakeStopReason }
+export type { RunWake, WakeDecision, WakeDecisionInput, WakeStopReason, WakeTidyResult }
 export { run_wake }
