@@ -1816,18 +1816,31 @@ Run it right after an issue is filed — by `kickoff`, `fullrun` or `halfrun`, o
 
 An issue belongs to at most one epic, because that is what a task list can express — so there is a branch:
 
-| Candidates                                         | What to do                                                                                     | Tier |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---- |
-| **The new issue itself already has an epic**       | Nothing — an issue belongs to at most one, and moving it between epics is not what this is for | —    |
-| Already a child of an epic                         | **Add to that epic**; do not create a second one                                               | A    |
-| Spread across an epic and its **own parent**       | **Add to the inner epic** — the parent already contains it                                     | A    |
-| Spread across **different** epics                  | **Choose the one you recommend, add to it, and record why**                                    | A    |
-| In no epic, and two or more counting the new issue | **Create an epic** for them                                                                    | A    |
-| No strong signal                                   | Nothing                                                                                        | —    |
+| Candidates                                         | What to do                                                                                      | Tier |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---- |
+| **The new issue itself already has an epic**       | Nothing — an issue belongs to at most one, and moving it between epics is not what this is for  | —    |
+| Already a child of an epic                         | **Add to that epic**; do not create a second one                                                | A    |
+| Spread across an epic and its **own parent**       | **Add to the inner epic** — the parent already contains it                                      | A    |
+| Spread across **different** epics                  | **Choose the one you recommend, add to it, and record why**                                     | A    |
+| In no epic, and two or more counting the new issue | **Create an epic** for them                                                                     | A    |
+| No strong signal                                   | Nothing                                                                                         | —    |
+| **The epic listing was cut short**                 | **Nothing** — every placing row above is withheld, because the membership was never established | —    |
 
 Bundling is reversible — an epic is editable and a child can be removed — so it needs no confirmation, and **that includes the spread row**: one `epic --add` moves an issue to a different epic, so choosing between two candidate epics is Tier A. Record what was taken, what was rejected and why, on both the issue and the epic ([#1339](https://github.com/joshuafolkken/kit/issues/1339)). **The spread row is not a proposal to merge epics**, and since [#1079](https://github.com/joshuafolkken/kit/issues/1079) **an epic and its own parent no longer reach it**: the parent already contains the child, so the pair is narrowed to the inner epic and the issue is added there. The narrowing drops parents, never peers — an unrelated epic beside a nested chain still asks, and so does a cyclic parent declaration, where no inner epic can be picked.
 
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies`, on an addition as much as on a new epic: without it the batch survives and the reason it is a batch does not. An order **nobody declared is not invented** — only relations already recorded are carried over.
+
+**Every row that _places_ the issue asserts a negative, so a cut epic listing withholds all of them** ([#1697](https://github.com/joshuafolkken/kit/issues/1697)). "No epic already tracks this issue" — which `create_epic` asserts about the candidates too — is only as good as the listing it was read from: an epic past the cut tracks its children invisibly, so each of them reads as tracked by nothing. **`add_to_epic` rests on it just as much as `create_epic` does**: adding the issue to the epic a _candidate_ sits in, while an unseen epic already tracks the issue itself, is the same duplicate by another route. The cut was already reported — `⚠ The epic listing …` on standard error — but standard output went on saying `Create an epic for these (Tier A — do it).`, and a warning is not what a run acts on: the rule that reads one as "could not answer" is written for a warning above `Nothing to bundle.` and does not reach this verdict. Acted on as Tier A, the result is a **second epic over an already-tracked issue** — the state the auto-close and `epic:next` cannot both be right about ([#943](https://github.com/joshuafolkken/kit/issues/943)). So the verdict itself changes:
+
+```text
+Could not confirm which epic already tracks these — do not place this issue in one.
+  the epics were not read in full, so an epic already tracking one of these may never have been seen
+  Related: #1662
+```
+
+**The children and the declared order are deliberately absent**: they are the recipe for the placement this line says not to make, and printing them beside the refusal hands a run the very command it must not run. The exit code stays `0` — this is a "do nothing" answer like `Nothing to bundle.`, while a non-zero exit already means the listing could not be read at all. **What survives the cut is a membership that _was_ found**: `Already in an epic — add to that one, do not create a second.` names the epic it read tracking the issue, and epics past the cut cannot unseat it, so that answer stands unchanged.
+
+**A cut is the whole condition.** An epic whose body did not arrive would hide its children the same way, but it cannot arrive: the REST listing mapping coerces a `null` body to an empty string before the epic index parses one, so a gate arm for it would be code no input can reach.
 
 **A reference the open backlog cannot show is read directly.** The candidate search scans open issues, which left a window of minutes in which the command could answer correctly: a follow-up issue names its parent, and the parent's pull request merges right after — on [#943](https://github.com/joshuafolkken/kit/issues/943) the gap between filing and the parent closing was about three minutes. Past it, `Nothing to bundle.` was printed with exit 0, asserting there was no relation rather than that the command had stopped being able to see one. Every issue number the subject's body names is now read on its own, whatever its state ([#947](https://github.com/joshuafolkken/kit/issues/947)):
 
