@@ -152,11 +152,47 @@ report — so the next `backlogrun` begins a budget of its own rather than resum
 applied only by a person, so a resumed session is offered exactly the issues the first one was, and
 the invariant in "What one invocation approves" stands unchanged.
 
-**What still waits for a person, today.** This reading and the record are in place; **the supervisor
-outside the conversation — the thing that wakes the next session with nobody typing — is a separate
-deliverable** and is tracked on its own Issue under epic joshuafolkken/kit#1716. Until it lands a cut
-still ends with the `confirmation` Telegram and the resume line, and what the record changes is that
-the session which resumes **continues this invocation** instead of starting a second one over it.
+**Nothing waits for a person any more, and `pnpm josh run:wake` is what closed that**
+(joshuafolkken/kit#1719). The record made the budget survive the cut and left the keystroke in place,
+so a cut still ended with a `confirmation` Telegram and a resume line — and at a measured cut about
+every 50 minutes, an entry point meant to run unattended for eight hours ran unattended for barely
+one. The supervisor is the thing that starts the next session.
+
+**Start it in the same turn as `--begin`, and stop it in the same turn as `--end`:**
+
+```bash
+pnpm josh run:wake --start   # alias: josh rw ; right after `run:carry --begin`
+pnpm josh run:wake --stop    # in the same turn as `run:carry --end`
+```
+
+**It reads the same record this section already keeps, and decides from nothing else.** It wakes on
+`carried` **and** handed off — which is to say on a cut this run declared with `--cut` — and stops on
+`none`, `expired` and `unreadable`. So the 8-hour whole-run bound binds the waking for free: it is the
+record's own expiry, and a spent budget reads `expired` and wakes nothing. **A new authorization is
+still a person's**, which is decision B's boundary exactly: the supervisor spends the budget that was
+declared and never declares another.
+
+**`--cut` matters more than ever, and for the same reason.** It is what marks the record handed off,
+so a session that skips it leaves a record the supervisor reads as still being spent — and nothing
+wakes. The rule above is unchanged: count everything the session has, then cut, and let `--cut` be the
+session's last write.
+
+**What may be run is still untouched.** The supervisor hands the woken session the invocation the
+person typed and nothing else; it writes no label, so `auto-ok` stays a person's to apply and a woken
+session is offered exactly the issues the first one was.
+
+**A failure is visible rather than silent.** A wake that never claims the carry record is retried, and
+once the retries are spent the supervisor stops and sends a `warning` Telegram — which covers a wake
+command that does not exist, a session that dies during boot, and one that runs without picking the
+run up.
+
+**A person keeps control of it.** `pnpm josh run:wake --list` names the running supervisor and
+`--stop` ends it; the full contract, what it launches and why that is a constant rather than a
+setting are `docs/josh-commands.md` → "`josh run:wake`".
+
+**The completion report names how many sessions were woken beside the record's `cuts`**, and the two
+being equal is the invariant — one wake per cut. `pnpm josh run:wake --list` prints them together, so
+a run that woke fewer sessions than it took cuts is visible rather than argued about.
 
 **The reading is scoped to `backlogrun`.** `epicrun` and `fullrun` cuts still wait for a person's
 keystroke — `epicrun.md` → "The hand-off" is unchanged — because neither declares a budget of the kind
@@ -419,9 +455,20 @@ All of these are `epicrun.md`'s, and are reached here in the same order and for 
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `epicrun.md` → "Progress while the run is quiet" |
 | `pnpm josh release:scope` once, after the last issue has merged and the last lane is closed | `followup.md` → "When `pnpm josh release` runs" |
 
-**One more runs once per session and is this file's own, not `epicrun.md`'s**:
-`pnpm josh run:carry --begin "<the invocation as typed>"` before the plan, and
-`pnpm josh run:carry --end` when the run finishes — "The session cut is inside the invocation" above.
+**Two more run once per session and are this file's own, not `epicrun.md`'s**:
+`pnpm josh run:carry --begin "<the invocation, single-spaced>" --owner "$PPID"` before the plan and
+`pnpm josh run:carry --end` when the run finishes, and beside each of them
+`pnpm josh run:wake --start` and `pnpm josh run:wake --stop` — the supervisor that continues the run
+across a cut. Both pairs are "The session cut is inside the invocation" above.
+
+**Record the invocation in the form the supervisor can rebuild: one space between tokens, and a plain
+integer for each budget value** — `backlogrun --max 3`, never `backlogrun  --max 03`. What the
+supervisor hands the next session is composed from constants and the validated integers rather than
+copied out of the record, and it refuses to wake on a record its own rebuild would rewrite, because the
+woken session hands that text straight back to `run:carry --begin` to be compared character for
+character. A record written some other way is not lost quietly — the first cut ends the run with a
+`warning` Telegram — but it ends the run, so write the canonical form rather than the keystrokes
+(joshuafolkken/kit#1719).
 
 **`pnpm josh epic:audit` is not run.** There is no epic to audit — the run began from the backlog, the
 same reason `epicrun.md` skips it when it began from a bare Issue. The dependency graph the loop acts

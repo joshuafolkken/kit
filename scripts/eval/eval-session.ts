@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { execa } from 'execa'
 import type { Scenario } from './eval-scenario'
 
@@ -19,25 +20,11 @@ const SCRUBBED_ENV: Readonly<Record<string, string>> = {
 	GITHUB_ENTERPRISE_TOKEN: '',
 }
 
-// Cleared to empty is not the same as absent, and these four need to be *absent*. execa runs with
-// `extendEnv: true` by default, so the child inherits this process's whole environment and every one
-// of these names the *parent* Claude session: `CLAUDE_CODE_MESSAGING_SOCKET` is a UNIX socket only
-// the parent listens on, `CLAUDE_CODE_MESSAGING_TOKEN` is that socket's credential, and the two
-// session identifiers claim the parent's session as the child's own. Inherited, the child dials the
-// parent's private socket, is refused, and the session dies as `API Error: Unable to connect to API
-// (ConnectionRefused)` — which the harness could only report as `unmeasured`. Measured under
-// joshuafolkken/kit#1158: removing them restored 5/5 held in 54 seconds, and lowering
-// `JOSH_EVAL_CONCURRENCY` — the suspected cause before this one was found — made it worse.
-//
-// `undefined` rather than `''` because an empty socket path is still a socket path to whatever reads
-// it; Node's spawn omits an environment key whose value is `undefined`, which is the only way to hand
-// the child an environment that does not have the variable at all.
-const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
-	'CLAUDE_CODE_MESSAGING_SOCKET',
-	'CLAUDE_CODE_MESSAGING_TOKEN',
-	'CLAUDE_CODE_SESSION_ID',
-	'CLAUDE_CODE_CHILD_SESSION',
-]
+// Cleared to empty is not the same as absent, and the parent-session variables need to be *absent*:
+// execa runs with `extendEnv: true` by default, so the child inherits this process's whole
+// environment. The list and the reasoning are `agent-session-environment.ts`, shared with `run:wake` since
+// joshuafolkken/kit#1719 — a second launcher of a headless session, and a second copy of the list
+// would be the clone that fails silently.
 
 const GH_CONFIG_KEY = 'GH_CONFIG_DIR'
 const SPAWN_FAILURE_EXIT_CODE = -1
@@ -107,13 +94,9 @@ function session_arguments(scenario: Scenario, model: string): ReadonlyArray<str
 	]
 }
 
-function removed_environment(): Record<string, undefined> {
-	return Object.fromEntries(PARENT_SESSION_KEYS.map((key) => [key, undefined]))
-}
-
 function session_environment(sandbox_path: string): Record<string, string | undefined> {
 	return {
-		...removed_environment(),
+		...agent_session_environment.removed_environment(),
 		...SCRUBBED_ENV,
 		[GH_CONFIG_KEY]: `${sandbox_path}/.gh-config`,
 	}
@@ -154,7 +137,9 @@ async function run_session(
 }
 
 const eval_session = {
-	PARENT_SESSION_KEYS,
+	// Re-exported from its new home rather than dropped, so the tests that pin this suite's environment
+	// hygiene keep asserting against the list both launchers now share.
+	PARENT_SESSION_KEYS: agent_session_environment.PARENT_SESSION_KEYS,
 	run_session,
 	session_arguments,
 	session_environment,

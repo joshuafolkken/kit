@@ -1639,7 +1639,9 @@ being reported.
 **`backlogrun` is the one entry point where the cut does not stop the run** (joshuafolkken/kit#1714).
 There the keyword declares a budget — `--max`, `--idle` and this same 8-hour bound — so the cut is an
 execution detail of spending it, and the record `pnpm josh run:carry` keeps carries that budget into
-the next session with nobody retyping the keyword. **Nothing above changes for an `epicrun`**: an
+the next session with nobody retyping the keyword — which `pnpm josh run:wake` then starts, from
+outside the conversation, so the keystroke goes as well as the budget (joshuafolkken/kit#1719).
+**Nothing above changes for an `epicrun`**: an
 epic declares which children may run, never how much of a budget, so its cut still ends with the
 resume line and waits for a person. `backlogrun.md` → "The session cut is inside the invocation" is
 that reading's single source.
