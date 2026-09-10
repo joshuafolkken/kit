@@ -46,7 +46,9 @@ const BACKLOGRUN_MARKERS: ReadonlyArray<string> = [
 	'The authorization boundary is carried by the budget, not by the keystroke.',
 	'pnpm josh run:carry --begin',
 	'`--started` takes the record',
-	'makes `--max`, `--idle` and the 8-hour whole-run bound count **across** cuts',
+	// The figure is deliberately not in the marker. It lives in `backlog-budget.ts` now, and pinning
+	// "8-hour" here would make a raised budget fail this test instead of updating the prose with it.
+	'whole-run bound count **across** cuts',
 	'The 10-filings-per-run ceiling is counted the same way',
 	'How many cuts the run crossed is named in the completion report',
 	'a resumed session is offered exactly the issues the first one was',

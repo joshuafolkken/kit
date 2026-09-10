@@ -162,6 +162,7 @@ describe('an invocation the command cannot act on', () => {
 		['two groups at once', ['--begin', INVOCATION, '--end']],
 		['a count that is not a number', ['--merged', 'lots']],
 		['an unknown flag', ['--nope']],
+		['a begin with no invocation text', ['--begin', '']],
 	])('refuses %s', async (_name, argv) => {
 		expect(await run_carry_cli.run(argv)).toBe(1)
 		expect(errors).toContain(run_carry_cli.USAGE)

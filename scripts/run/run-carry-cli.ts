@@ -22,6 +22,7 @@ const ONE_CUT = 1
 // invocation is a usage error rather than an order to guess.
 const ONE_GROUP = 1
 const COUNT_PATTERN = /^\d+$/u
+const EMPTY_INVOCATION = ''
 const USAGE =
 	'Usage: josh run:carry [--json] | --begin <invocation> | --cut | --merged <count> | --filed <count> | --end'
 
@@ -113,12 +114,19 @@ function to_count_request(values: ParsedValues): Request | undefined {
 	return { kind: 'count', change }
 }
 
+// `--begin ""` is a loop whose invocation variable was unset. A record named by nothing is one every
+// other empty `--begin` then resumes into, which is the cross-run inheritance `resume` below exists
+// to refuse — so it is a usage error rather than a record.
+function to_begin_request(invocation: string): Request | undefined {
+	return invocation === EMPTY_INVOCATION ? undefined : { kind: 'begin', invocation }
+}
+
 function to_request(values: ParsedValues): Request | undefined {
 	if (group_count(values) > ONE_GROUP) return undefined
 
 	const invocation = text_of(values.begin)
 
-	if (invocation !== undefined) return { kind: 'begin', invocation }
+	if (invocation !== undefined) return to_begin_request(invocation)
 
 	if (values.end === true) return END_REQUEST
 
