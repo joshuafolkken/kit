@@ -9,7 +9,10 @@ const NOW_MS = Date.parse('2026-09-09T12:00:00Z')
 const IDLE_MINUTES = 30
 const MAX_ISSUES = 5
 const MERGED = 2
-const REQUIRED = ['--answer', 'candidates', '--started', STARTED]
+// `--active` is part of every readable invocation now that the idle watch is on by default
+// (joshuafolkken/kit#1676): the watch cannot be measured without it, and only `--idle 0` excuses it.
+const REQUIRED = ['--answer', 'candidates', '--started', STARTED, '--active', ACTIVE]
+const WITHOUT_ACTIVE = ['--answer', 'candidates', '--started', STARTED]
 
 function build(argv: ReadonlyArray<string>): ReturnType<typeof backlog_budget_cli.build_input> {
 	const values = backlog_budget_cli.read_arguments(argv)
@@ -18,26 +21,24 @@ function build(argv: ReadonlyArray<string>): ReturnType<typeof backlog_budget_cl
 }
 
 describe('backlog_budget_cli.build_input — what a readable invocation carries', () => {
-	it('defaults the optional budgets to off and unlimited', () => {
+	it('defaults the idle watch on and the maximum to unlimited', () => {
 		const input = build(REQUIRED)
 
 		expect(input).toEqual({
 			answer: 'candidates',
 			started_at_ms: Date.parse(STARTED),
-			active_at_ms: Date.parse(STARTED),
+			active_at_ms: Date.parse(ACTIVE),
 			now_ms: NOW_MS,
 			merged: 0,
 			running: 0,
 			max_issues: undefined,
-			idle_budget_ms: undefined,
+			idle_budget_ms: backlog_budget.DEFAULT_IDLE_MS,
 		})
 	})
 
 	it('reads the idle watch in minutes and the maximum as a count', () => {
 		const input = build([
 			...REQUIRED,
-			'--active',
-			ACTIVE,
 			'--idle',
 			String(IDLE_MINUTES),
 			'--max',
@@ -52,19 +53,30 @@ describe('backlog_budget_cli.build_input — what a readable invocation carries'
 	})
 
 	it('takes --active as the moment the run last had work', () => {
-		const input = build([...REQUIRED, '--active', ACTIVE])
+		expect(build(REQUIRED)?.active_at_ms).toBe(Date.parse(ACTIVE))
+	})
+})
 
-		expect(input?.active_at_ms).toBe(Date.parse(ACTIVE))
+describe('backlog_budget_cli.build_input — `--idle 0` is how the watch is turned off', () => {
+	it('turns the watch off rather than expiring it instantly', () => {
+		expect(build([...REQUIRED, '--idle', '0'])?.idle_budget_ms).toBeUndefined()
+	})
+
+	it('needs no --active once the watch is off', () => {
+		expect(build([...WITHOUT_ACTIVE, '--idle', '0'])?.idle_budget_ms).toBeUndefined()
 	})
 })
 
 describe('backlog_budget_cli.build_input — an unreadable invocation is refused, never defaulted', () => {
 	it.each([
-		['a missing answer', ['--started', STARTED]],
-		['an unrecognized answer', ['--answer', 'maybe', '--started', STARTED]],
-		['a missing start', ['--answer', 'candidates']],
-		['an unparseable start', ['--answer', 'candidates', '--started', UNPARSEABLE_TIME]],
-		['an unparseable active moment', [...REQUIRED, '--active', UNPARSEABLE_TIME]],
+		['a missing answer', ['--started', STARTED, '--active', ACTIVE]],
+		['an unrecognized answer', ['--answer', 'maybe', '--started', STARTED, '--active', ACTIVE]],
+		['a missing start', ['--answer', 'candidates', '--active', ACTIVE]],
+		[
+			'an unparseable start',
+			['--answer', 'candidates', '--started', UNPARSEABLE_TIME, '--active', ACTIVE],
+		],
+		['an unparseable active moment', [...WITHOUT_ACTIVE, '--active', UNPARSEABLE_TIME]],
 		['a non-numeric idle budget', [...REQUIRED, '--idle', 'half-an-hour']],
 		['a negative maximum', [...REQUIRED, '--max', '-1']],
 		['a fractional merged count', [...REQUIRED, '--merged', '1.5']],
@@ -74,9 +86,9 @@ describe('backlog_budget_cli.build_input — an unreadable invocation is refused
 		['a non-numeric running count', [...REQUIRED, '--running', 'two']],
 		[
 			'an idle watch with nothing to measure it from',
-			[...REQUIRED, '--idle', String(IDLE_MINUTES)],
+			[...WITHOUT_ACTIVE, '--idle', String(IDLE_MINUTES)],
 		],
-		['an idle watch of zero minutes', [...REQUIRED, '--active', ACTIVE, '--idle', '0']],
+		['the default watch with nothing to measure it from', WITHOUT_ACTIVE],
 	])('refuses %s', (_name, argv) => {
 		expect(build(argv)).toBeUndefined()
 	})

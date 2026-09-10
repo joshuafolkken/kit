@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util'
 import { epic_audit_logic } from '#scripts/epic/epic-audit'
 import { epic_bundle, type BacklogIssue, type BundleDecision } from '#scripts/epic/epic-bundle'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
+import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { EPIC_LABEL, has_any_label } from '#scripts/git/issue-labels'
 import { PAGE_CEILING_CAUSE } from '#scripts/git/listing-cutoff'
@@ -227,12 +228,30 @@ function format_epic(decision: BundleDecision): Array<string> {
 const NO_REFERENCE_LINE =
 	'Epic: not asked — no issue number in the summary. Pass --body "…#<N>…", or take the epic printed beside a duplicate above.'
 
-// A draft belongs to no epic yet, so `none` can only mean no signal was found — never `epic:bundle`'s
-// other `none`, which is an issue its own epic already tracks.
-function format_epic_decision(decision: BundleDecision, has_citation: boolean): string {
-	if (!has_citation) return NO_REFERENCE_LINE
+// Every placing verdict above asserts that no epic already tracks the draft's relatives, and a cut
+// epic listing cannot support that: `epic:bundle` withholds them for it (joshuafolkken/kit#1697),
+// while this command drew the same lines out of `ACTION_LINES` and never passed through the gate that
+// does (joshuafolkken/kit#1703). The verdict is `epic:bundle`'s own, reused rather than restated, with
+// only the `Epic:` label the rest of this report is read by put in front of it.
+function format_unconfirmed_epic(decision: BundleDecision): string {
+	const related = epic_bundle_cli.format_numbers(decision.candidates)
 
-	return decision.action === 'none' ? NO_EPIC_LINE : format_epic(decision).join('\n')
+	return `Epic: ${epic_bundle_gaps.unconfirmed_membership(related).join('\n')}`
+}
+
+// A draft belongs to no epic yet, so `none` can only mean no signal was found — never `epic:bundle`'s
+// other `none`, which is an issue its own epic already tracks. `none` is answered before the cut is
+// consulted because it places nothing: there is no candidate for a hidden epic to already track.
+function format_epic_decision(
+	decision: BundleDecision,
+	has_citation: boolean,
+	is_membership_established: boolean,
+): string {
+	if (!has_citation) return NO_REFERENCE_LINE
+	if (decision.action === 'none') return NO_EPIC_LINE
+	if (!is_membership_established) return format_unconfirmed_epic(decision)
+
+	return format_epic(decision).join('\n')
 }
 
 // Whether the summary names an issue at all, read through the same parser the decision itself uses —
@@ -266,16 +285,22 @@ function format_named_epics(epics: ReadonlyArray<number>, decision: BundleDecisi
 	return [...lines, `  Related: ${epic_bundle_cli.format_numbers(decision.candidates)}`]
 }
 
+// The named-epic answer survives a cut listing untouched: the epic it names is one this run actually
+// read — `is_epic` is set from the epic listing, and `named_epics` filters on it — and a membership
+// that was found is exactly what a cut cannot unseat. An epic past the cut is still in `issues`, the
+// open backlog being listed separately, but carries no `is_epic`, so the draft naming it falls
+// through to the decision below and is withheld there as an ordinary candidate.
 function format_epic_answer(
 	draft: BacklogIssue,
 	decision: BundleDecision,
 	issues: ReadonlyArray<BacklogIssue>,
+	is_membership_established: boolean,
 ): string {
 	const named = named_epics(draft, issues)
 
 	if (named.length > 0) return format_named_epics(named, decision).join('\n')
 
-	return format_epic_decision(decision, has_reference(draft))
+	return format_epic_decision(decision, has_reference(draft), is_membership_established)
 }
 
 // The closed rows reach the duplicate half only. `decide_bundle` places a draft among issues that
@@ -285,12 +310,16 @@ function format_epic_answer(
 function format_report(
 	draft: BacklogIssue,
 	issues: ReadonlyArray<BacklogIssue>,
+	is_membership_established: boolean,
 	closed: ReadonlyArray<ScoutIssue> = [],
 ): string {
 	const duplicates = issue_scout.find_duplicates(draft.title ?? '', [...issues, ...closed])
 	const decision = epic_bundle.decide_bundle(draft, issues)
 
-	return [format_duplicates(duplicates), format_epic_answer(draft, decision, issues)].join('\n')
+	return [
+		format_duplicates(duplicates),
+		format_epic_answer(draft, decision, issues, is_membership_established),
+	].join('\n')
 }
 
 // The backlog is read without its `blocked-by` relations: a draft has no number, so no recorded
@@ -316,7 +345,16 @@ async function report(args: ScoutArguments, repo: string): Promise<number> {
 
 	epic_bundle_cli.warn_about_gaps(widened)
 	warn_about_closed(closed)
-	console.info(format_report(draft, widened.issues, closed.rows ?? []))
+	// The same cut `warn_about_gaps` reports on standard error, read once more so standard output is
+	// held to it too — a ⚠ beside an executable instruction is not what stops a run acting on it.
+	console.info(
+		format_report(
+			draft,
+			widened.issues,
+			epic_bundle_gaps.is_membership_established(widened.epic_cutoff),
+			closed.rows ?? [],
+		),
+	)
 
 	return SUCCESS_EXIT_CODE
 }

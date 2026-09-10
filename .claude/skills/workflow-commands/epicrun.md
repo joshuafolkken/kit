@@ -223,7 +223,12 @@ are written out, and the brief hands them to the unit.
    surprising diff, work a later child will collide with. **This is the only route a child's
    discretionary observation has** (joshuafolkken/kit#1698): a child files `route:tier-a` and
    `route:interrupt` only, and the parent files what survives — `SKILL.md` → §2i, the single source,
-   carries the depth test it is filed under and why a child cannot count the ceiling.
+   carries the depth test it is filed under and why a child cannot count the ceiling. **What the
+   parent does with the rest is append it, not drop it**: an observation that cannot cite the depth-0
+   work it blocked becomes one line in `docs/observations.md`, and a second line under the same key
+   is what files it. **The child never writes that file** — it cannot tell its observation from the
+   sibling lane's, so parallel children would write one phenomenon under several keys and every one
+   of them would read as a first sighting (joshuafolkken/kit#1728).
 4. **Decisions taken and why**, where the decision was not already logged as an Issue comment.
 5. **What was left undone**, and under whose authority — a dropped review finding, a skipped step, a
    scope a comment moved to another Issue.
@@ -1887,6 +1892,7 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null 
 | Setting | Value | Why |
 | --- | --- | --- |
 | Polling interval | 60 s | A child's `fullrun` takes minutes; a shorter poll only spends API quota. |
+| `backlogrun` idle-watch poll | 5 min | Not the interval above. What a watch waits on is a person filing an issue and applying `auto-ok`, which happens on human timescales — and every ask bills the parent session's whole history, so asking every minute spends thirty requests to learn nothing thirty times (joshuafolkken/kit#1676). |
 | Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. A working unit rewrites its transcript continuously, so half an hour of no movement is not a slow child; it is a child whose average end-to-end time on joshuafolkken/kit#1176 was 31 min producing nothing at all. Past it, run the four traces above and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Longer than any single child has taken; past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget (joshuafolkken/kit#863). A failed publish never appears. |
