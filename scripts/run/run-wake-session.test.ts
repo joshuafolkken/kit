@@ -1,6 +1,9 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { describe, expect, it } from 'vitest'
-import { run_wake_session } from './run-wake-session'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { run_wake_session, type LaunchResult } from './run-wake-session'
 
 // joshuafolkken/kit#1719. What the supervisor spawns is the one place it could widen what may be run,
 // so the argument vector is pinned rather than left to reading.
@@ -200,5 +203,168 @@ describe('the parent-session environment is single-sourced', () => {
 	it('names the messaging socket and token, which are the two that kill a child session', () => {
 		expect(agent_session_environment.PARENT_SESSION_KEYS).toContain('CLAUDE_CODE_MESSAGING_SOCKET')
 		expect(agent_session_environment.PARENT_SESSION_KEYS).toContain('CLAUDE_CODE_MESSAGING_TOKEN')
+	})
+})
+
+// joshuafolkken/kit#1746. A woken session that exits without claiming the carry record used to leave
+// nothing at all behind, because `stdio: 'ignore'` rode along with `detached` — and the two are
+// separate requirements. These pin the half that changed: the child is still detached, and its output
+// now survives it.
+
+const MARKER = 'wake-log-marker'
+const POLL_LIMIT = 60
+const POLL_INTERVAL_MS = 50
+
+const log_scratch = { directory: '', target: '' }
+
+beforeEach(() => {
+	log_scratch.directory = mkdtempSync(path.join(tmpdir(), 'josh-run-wake-log-test-'))
+	log_scratch.target = path.join(log_scratch.directory, 'wake.log')
+})
+
+afterEach(() => {
+	rmSync(log_scratch.directory, { force: true, recursive: true })
+})
+
+async function settle(): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+}
+
+// The child is detached, so there is no exit event to await here; the file is polled instead, with a
+// ceiling so a failure reports rather than hangs.
+async function logged_text(): Promise<string> {
+	for (let attempt = 0; attempt < POLL_LIMIT; attempt += 1) {
+		const text = readFileSync(log_scratch.target, 'utf8')
+
+		if (text.includes(MARKER)) return text
+
+		await settle()
+	}
+
+	return readFileSync(log_scratch.target, 'utf8')
+}
+
+describe('run_wake_session.launch — the child’s output is kept', () => {
+	it('writes what the child prints to the named log', async () => {
+		const argv = {
+			command: process.execPath,
+			args: ['-e', `console.log(${JSON.stringify(MARKER)})`],
+		}
+
+		const result = run_wake_session.launch(
+			{ argv, cwd: log_scratch.directory, log_path: log_scratch.target },
+			() => undefined,
+		)
+
+		expect(result.kind).toBe('launched')
+		expect(await logged_text()).toContain(MARKER)
+	})
+
+	it('keeps what the child writes to standard error too, which is where a failure says why', async () => {
+		const argv = {
+			command: process.execPath,
+			args: ['-e', `console.error(${JSON.stringify(MARKER)})`],
+		}
+
+		run_wake_session.launch(
+			{ argv, cwd: log_scratch.directory, log_path: log_scratch.target },
+			() => undefined,
+		)
+
+		expect(await logged_text()).toContain(MARKER)
+	})
+})
+
+describe('run_wake_session.launch — where no log is named', () => {
+	// The log is an improvement on the diagnosis, never a precondition for starting a session: a caller
+	// with nowhere to write gets exactly the behavior every launch had before.
+	it('discards the output where no log is named', () => {
+		const argv = { command: process.execPath, args: ['-e', '""'] }
+
+		const result = run_wake_session.launch({ argv, cwd: log_scratch.directory }, () => undefined)
+
+		expect(result.kind).toBe('launched')
+		expect(existsSync(log_scratch.target)).toBe(false)
+	})
+
+	// The safety gate runs before anything is opened, so a refused vector leaves no file behind either.
+	it('opens no log for an argument vector it refuses', () => {
+		run_wake_session.launch(
+			{ argv: { command: 'claude\u{0}', args: [] }, cwd: '.', log_path: log_scratch.target },
+			() => undefined,
+		)
+
+		expect(existsSync(log_scratch.target)).toBe(false)
+	})
+})
+
+// The path is the temp directory plus a digest of the repository, so on a shared `/tmp` anyone who
+// knows the checkout can work it out and leave something at it first. These pin the two halves of the
+// answer: the symlink is not followed, and the file has to be this account's own.
+const PRINTS_MARKER = ['-e', `console.log(${JSON.stringify(MARKER)})`]
+
+function launch_printing(log_path: string, on_error: (note: string) => void): LaunchResult {
+	return run_wake_session.launch(
+		{
+			argv: { command: process.execPath, args: PRINTS_MARKER },
+			cwd: log_scratch.directory,
+			log_path,
+		},
+		on_error,
+	)
+}
+
+function notes_of(log_path: string): Array<string> {
+	const notes: Array<string> = []
+
+	launch_printing(log_path, (note) => {
+		notes.push(note)
+	})
+
+	return notes
+}
+
+// A directory that is not there, which is the ordinary shape of a log that cannot be opened.
+function log_in_missing_directory(): string {
+	return path.join(log_scratch.directory, 'no-such-directory', 'wake.log')
+}
+
+describe('run_wake_session.launch — the log path is not trusted', () => {
+	it('refuses to append through a symlink, and says so', () => {
+		const decoy = path.join(log_scratch.directory, 'decoy.txt')
+
+		writeFileSync(decoy, '')
+		symlinkSync(decoy, log_scratch.target)
+
+		expect(notes_of(log_scratch.target).join('\n')).toContain(log_scratch.target)
+		expect(readFileSync(decoy, 'utf8')).toBe('')
+	})
+
+	// A discarded diagnosis is a reason to say so, never a reason to leave the run asleep — `--list` and
+	// every warning name this path whether or not it could be opened.
+	it('reports a log it could not open rather than discarding the output in silence', () => {
+		expect(notes_of(log_in_missing_directory()).join('\n')).toContain(log_in_missing_directory())
+	})
+
+	it('still starts the session when the log could not be opened', () => {
+		expect(launch_printing(log_in_missing_directory(), () => undefined).kind).toBe('launched')
+	})
+})
+
+// Three sessions were started for one lost cut in joshuafolkken/kit#1746, and they all append to one
+// file — so the log has to say where each launch begins.
+describe('run_wake_session.launch — each launch is delimited', () => {
+	it('writes a header naming the time and the launching process', async () => {
+		const argv = {
+			command: process.execPath,
+			args: ['-e', `console.log(${JSON.stringify(MARKER)})`],
+		}
+
+		run_wake_session.launch(
+			{ argv, cwd: log_scratch.directory, log_path: log_scratch.target },
+			() => undefined,
+		)
+
+		expect(await logged_text()).toContain(`started by process ${String(process.pid)}`)
 	})
 })

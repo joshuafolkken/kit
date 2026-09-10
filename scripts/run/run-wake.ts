@@ -36,6 +36,19 @@ import type { CarryRead } from './run-carry'
 // be confirmed when the waking side's process layout is decided.
 
 const WAKE_PREFIX = 'josh-run-wake-'
+// **Where the output of everything this supervisor starts is kept** (joshuafolkken/kit#1746).
+// `detached` is what puts a child outside the conversation; discarding its output was a second choice
+// riding along with it, and the two are separate requirements. Discarded, a session that exits without
+// claiming the carry record leaves nothing at all to diagnose it by — which is the state
+// joshuafolkken/kit#1746 was filed from, where three sessions died silently and the record could say
+// only that none of them had arrived.
+//
+// One file per repository, appended to, so every attempt of every cut is in one place; keyed exactly
+// as the wake and carry records are, so the three are found together. `.log` rather than `.json`
+// because it holds another process's output verbatim — the distinction `stamp_file.stamp_path`'s
+// `suffix` argument exists for.
+const WAKE_LOG_PREFIX = 'josh-run-wake-log-'
+const WAKE_LOG_SUFFIX = '.log'
 // How long a woken session has to claim the carry record before that wake is treated as lost.
 //
 // **The window is measured from the spawn, so it has to cover everything before the session's first
@@ -74,12 +87,27 @@ interface RunWake {
 	// Criterion: the number of wakes has to match the carry record's `cuts`. Counting them here is what
 	// makes that checkable rather than merely argued from the structure. **It counts cuts served, not
 	// launches**, so a retry of the same cut does not inflate it — `attempts` is what counts those.
+	//
+	// **A cut is served when the woken session claims the carry record, not when a process starts**
+	// (joshuafolkken/kit#1746). Counted at the spawn, the number asserted the very thing the supervisor
+	// had not yet checked: on 2026-09-10 three sessions were launched for one cut and none of them ever
+	// claimed the record, while `--list` went on reporting `woke 1 session(s) across 1 cut(s)` for forty
+	// minutes — the published invariant reading as held throughout the failure it exists to expose. So
+	// the increment moved to the one pass that observes a claim, and a wake nobody claimed now leaves
+	// `woke` behind `cuts`, which is what the invariant was always meant to say.
+	//
+	// **It is observed at a poll, so it lags a claim by up to one polling interval** — a minute by
+	// default. A shortfall read within that window is a claim not yet seen rather than one that never
+	// happened, and the two are told apart by `attempts`: a cut still being retried has launches
+	// outstanding, and one already claimed has none.
 	woke: number
 	// When the last wake happened, cleared as soon as the woken session claims the carry record. Its
 	// presence is what the grace window above is measured from.
 	woke_at?: string | undefined
 	// Launches for the cut currently being served, reset when a session claims the record. Separate
-	// from `woke` so a retried cut still reports as one wake against one cut.
+	// from `woke` so a retried cut still reports as one wake against one cut — and, since
+	// joshuafolkken/kit#1746, so the two say different things: this counts what was started and `woke`
+	// counts what arrived, which is the gap a silent failure lives in.
 	attempts?: number | undefined
 	// The process the last launch produced. It is named in the failure warning rather than killed: a
 	// session that is merely slow is still doing the run's work, and a supervisor that killed what it
@@ -214,6 +242,11 @@ function wake_path(git_directory: string): string {
 	return stamp_file.stamp_path(WAKE_PREFIX, git_directory)
 }
 
+// Keyed on the same directory as the two records, so a person handed one path can find the others.
+function wake_log_path(git_directory: string): string {
+	return stamp_file.stamp_path(WAKE_LOG_PREFIX, git_directory, WAKE_LOG_SUFFIX)
+}
+
 function parse_wake(raw: string): RunWake | undefined {
 	try {
 		return run_wake_schema.parse(JSON.parse(raw))
@@ -309,13 +342,12 @@ function claim(target: string, invocation: string, now: Date): RunWake | undefin
 	return stamp_file.create_stamp(target, wake) ? wake : reclaim(target, wake)
 }
 
-// `woke` counts cuts served and `attempts` counts launches, so a retry of the same cut leaves the
-// published invariant alone.
+// A launch marks the attempt and nothing else. `woke` is left alone here because a process that has
+// started has not yet done the thing `woke` counts — `count_claim` is where that is decided.
 function count_wake(wake: RunWake, now: Date, pid: number): RunWake {
 	const attempts = (wake.attempts ?? NO_WAKES) + ONE_WAKE
-	const woke = attempts === ONE_WAKE ? wake.woke + ONE_WAKE : wake.woke
 
-	return { ...wake, woke, attempts, woke_at: now.toISOString(), woke_pid: pid, held_at: undefined }
+	return { ...wake, attempts, woke_at: now.toISOString(), woke_pid: pid, held_at: undefined }
 }
 
 // Starts the clock on a wait without launching anything. `attempts` is deliberately untouched, so the
@@ -329,11 +361,22 @@ function mark_wait(wake: RunWake, now: Date): RunWake {
 	return wake.held_at === undefined ? { ...wake, held_at: now.toISOString() } : wake
 }
 
+// **The one pass that observes a claim, and therefore the one place `woke` may grow**
+// (joshuafolkken/kit#1746). The supervisor reaches it when the carry record stops reading as handed
+// off, which `run-carry.ts` → `adopt_carry` does only from the session that took the record over — so
+// the count is of records actually claimed rather than of processes started.
+//
+// **The mark is what says a wake was outstanding.** Without it this same state is an ordinary live
+// session working through its budget, which no supervisor woke and which must not be counted; with
+// it, the wake that was pending has just been answered.
+//
 // `undefined` rather than a deleted key, because `JSON.stringify` drops it on the way to disk and the
 // reader treats absent and undefined alike — the same round-trip `run-carry.ts` documents for its own
 // optional fields.
-function clear_wake_mark(wake: RunWake): RunWake {
-	return { ...wake, woke_at: undefined, attempts: undefined, held_at: undefined }
+function count_claim(wake: RunWake): RunWake {
+	const woke = wake.woke_at === undefined ? wake.woke : wake.woke + ONE_WAKE
+
+	return { ...wake, woke, woke_at: undefined, attempts: undefined, held_at: undefined }
 }
 
 // **Whether the record at the target is this process's own** (joshuafolkken/kit#1727). Everything
@@ -425,7 +468,7 @@ const run_wake = {
 	WAKE_GRACE_MS,
 	WAKE_PREFIX,
 	claim,
-	clear_wake_mark,
+	count_claim,
 	count_wake,
 	decide,
 	fresh_wake,
@@ -437,6 +480,7 @@ const run_wake = {
 	remove_wake,
 	tidy_own_wake,
 	update_wake,
+	wake_log_path,
 	wake_path,
 	write_wake,
 }
