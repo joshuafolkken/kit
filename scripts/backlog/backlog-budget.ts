@@ -7,8 +7,9 @@
 // needed a whole new session, or it ran to the 8-hour whole-run bound, which is a limit on waiting
 // rather than a statement of scale.
 //
-// Both budgets are **off by default**, so a `backlogrun` with neither given behaves exactly as it
-// did: it finishes when the backlog empties, and it takes as many issues as the backlog holds.
+// **The idle watch is on by default and the maximum is not** (joshuafolkken/kit#1676). A
+// `backlogrun` with neither flag given watches an empty backlog for `DEFAULT_IDLE_MINUTES` before it
+// finishes, and takes as many issues as the backlog holds. `--idle 0` is how the watch is turned off.
 //
 // The decision is a command's rather than the loop's own arithmetic, for the reason `josh delegate`
 // and `josh review:level` are commands: a count and an elapsed time kept in an agent's head are a
@@ -22,6 +23,26 @@ const MINUTES_PER_HOUR = 60
 const WHOLE_RUN_BUDGET_HOURS = 8
 const WHOLE_RUN_BUDGET_MINUTES = WHOLE_RUN_BUDGET_HOURS * MINUTES_PER_HOUR
 const WHOLE_RUN_BUDGET_MS = WHOLE_RUN_BUDGET_MINUTES * MS_PER_MINUTE
+
+// **The default idle watch, and why it is this number** (joshuafolkken/kit#1676). The documents used
+// 30 as an example, and an example is not a reason; these three are.
+//
+// - **Below it the watch is a coin flip.** What it waits for is a person noticing the run has gone
+//   quiet, filing an issue and applying `auto-ok`. Ten minutes does not reliably outlast that.
+// - **Above it the run pays for nothing.** At `IDLE_POLL_MINUTES` a 30-minute watch is six asks —
+//   about one child's worth of turns, spent while the run holds no working tree and no lane.
+// - **It is about the length of one child** — 12 to 28 minutes measured on joshuafolkken/kit#1477 —
+//   so a run that has emptied its backlog waits roughly as long as one more issue would have taken.
+const DEFAULT_IDLE_MINUTES = 30
+const DEFAULT_IDLE_MS = DEFAULT_IDLE_MINUTES * MS_PER_MINUTE
+
+// **What a watching run sleeps between asks, and it is not the loop's 60-second polling interval.**
+// That one is sized to a child's `fullrun`, which finishes in minutes; a watch is waiting on a person
+// to file an issue and opt it in, which happens on human timescales. Polling a watch every minute
+// would spend thirty of the parent session's own requests — each one billing the whole session
+// history — to learn nothing thirty times. `epicrun.md` → "Waiting, and never waiting forever" holds
+// the row; the figure is here because `idle_watch_reason` below has to say it.
+const IDLE_POLL_MINUTES = 5
 
 const RUN_VERDICT = 'run'
 const WATCH_VERDICT = 'watch'
@@ -57,7 +78,8 @@ interface BudgetInput {
 	// optional property that also admits `undefined` redundant to write and to read (Sonar S4782), and
 	// every construction site here knows whether a budget was given.
 	max_issues: number | undefined
-	// `undefined` means the idle watch is off, which is the default.
+	// `undefined` means the idle watch is off, which is what `--idle 0` asks for. The default is on:
+	// the command resolves an absent `--idle` to `DEFAULT_IDLE_MS` before it reaches here.
 	idle_budget_ms: number | undefined
 }
 
@@ -78,7 +100,7 @@ const BLOCKED_REASON =
 	'Everything opted in is blocked or already running, so waiting can still change the answer. Poll again at the polling interval.'
 
 const NO_IDLE_WATCH_REASON =
-	'The backlog is empty and no idle watch was asked for, so the run finishes here — the default.'
+	'The backlog is empty and the idle watch was turned off with `--idle 0`, so the run finishes here.'
 
 function to_minutes(duration_ms: number): string {
 	return String(Math.ceil(duration_ms / MS_PER_MINUTE))
@@ -99,8 +121,31 @@ function idle_expired_reason(idle_budget_ms: number): string {
 	return `The backlog stayed empty for the whole ${to_minutes(idle_budget_ms)}-minute idle watch. Report what was done, including how many were picked up during the watch, and finish.`
 }
 
+// Never longer than the watch has left: "about 2 minutes left, ask again in 5 minutes" would overrun
+// the budget a person declared, and a sentence that contradicts itself is read as neither half.
+function next_ask_minutes(left_ms: number): string {
+	const left_minutes = Number(to_minutes(left_ms))
+
+	return String(Math.min(IDLE_POLL_MINUTES, left_minutes))
+}
+
 function idle_watch_reason(left_ms: number): string {
-	return `The backlog is empty and the idle watch has about ${to_minutes(left_ms)} minutes left. Release the working tree, poll again at the polling interval, and restart the watch the moment a candidate appears.`
+	return `The backlog is empty and the idle watch has about ${to_minutes(left_ms)} minutes left. Release the working tree, ask again in ${next_ask_minutes(left_ms)} minutes, and restart the watch the moment a candidate appears.`
+}
+
+// **A watch that opens while children are still in lanes is not the idle watch's ordinary shape**, and
+// it became reachable the moment the watch was turned on by default (joshuafolkken/kit#1676): the
+// backlog can answer `exhausted` while this run's own children are still merging. Two things the
+// sentence above would get wrong there — the working tree is still held, because the hold is released
+// at the *last* child's merge, and a five-minute poll would leave a merge unnoticed for five minutes.
+function running_watch_reason(running: number, left_ms: number): string {
+	return `The backlog is empty and the idle watch has about ${to_minutes(left_ms)} minutes left, with ${String(running)} still running. Keep the working tree until they merge and poll at the polling interval, not the idle poll; the watch goes on once they are drained.`
+}
+
+function watching_reason(input: BudgetInput, left_ms: number): string {
+	if (input.running === 0) return idle_watch_reason(left_ms)
+
+	return running_watch_reason(input.running, left_ms)
 }
 
 // What the maximum has already taken: merged issues and the children still running. Counting only
@@ -161,9 +206,9 @@ function max_decision(input: BudgetInput): BudgetDecision | undefined {
 	return stopping(input, max_reached_reason(input.merged, max_issues))
 }
 
-// An empty backlog with no idle watch is the run's ordinary ending, and that stays the default. With
-// one, the emptiness is watched rather than acted on — and the watch lives *inside* the whole-run
-// bound, which `stop_reason` has already applied above.
+// An empty backlog is watched rather than acted on, which is now the default — and the watch lives
+// *inside* the whole-run bound, which `stop_reason` has already applied above. Only `--idle 0` takes
+// the other branch, where an empty backlog is the run's ending.
 function idle_decision(input: BudgetInput): BudgetDecision {
 	const { idle_budget_ms } = input
 
@@ -173,7 +218,7 @@ function idle_decision(input: BudgetInput): BudgetDecision {
 
 	if (left_ms <= 0) return stopping(input, idle_expired_reason(idle_budget_ms))
 
-	return { verdict: WATCH_VERDICT, reason: idle_watch_reason(left_ms) }
+	return { verdict: WATCH_VERDICT, reason: watching_reason(input, left_ms) }
 }
 
 function decide(input: BudgetInput): BudgetDecision {
@@ -194,6 +239,9 @@ const backlog_budget = {
 	ANSWERS,
 	ANSWER_STOP_REASONS,
 	BLOCKED_REASON,
+	DEFAULT_IDLE_MINUTES,
+	DEFAULT_IDLE_MS,
+	IDLE_POLL_MINUTES,
 	MS_PER_MINUTE,
 	NO_IDLE_WATCH_REASON,
 	PARKED_REASON,
@@ -211,6 +259,7 @@ const backlog_budget = {
 	idle_watch_reason,
 	max_reached_reason,
 	run_reason,
+	running_watch_reason,
 	taken_by,
 }
 

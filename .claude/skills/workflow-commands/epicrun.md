@@ -1887,6 +1887,7 @@ gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null 
 | Setting | Value | Why |
 | --- | --- | --- |
 | Polling interval | 60 s | A child's `fullrun` takes minutes; a shorter poll only spends API quota. |
+| `backlogrun` idle-watch poll | 5 min | Not the interval above. What a watch waits on is a person filing an issue and applying `auto-ok`, which happens on human timescales — and every ask bills the parent session's whole history, so asking every minute spends thirty requests to learn nothing thirty times (joshuafolkken/kit#1676). |
 | Silent delegated unit | 30 min | Not the child's duration — the time its output has gone **unchanged**. A working unit rewrites its transcript continuously, so half an hour of no movement is not a slow child; it is a child whose average end-to-end time on joshuafolkken/kit#1176 was 31 min producing nothing at all. Past it, run the four traces above and book a stopped unit as a failure. |
 | Stale `in-progress` | 90 min | Longer than any single child has taken; past it, the other session is gone. |
 | Publish wait | 10 min | `josh propagate`'s own budget (joshuafolkken/kit#863). A failed publish never appears. |
