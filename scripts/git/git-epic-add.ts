@@ -82,11 +82,6 @@ async function apply_plan(plan: AddPlan): Promise<void> {
 // addition gains a task-list row, a relocation moves the row it already had. Either list can be empty
 // — `--before` / `--after` on children the epic already tracks adds nothing at all
 // (joshuafolkken/kit#1701) — so neither line is printed unconditionally.
-// **An order-only move reports the place, because nothing else will** (joshuafolkken/kit#1738). An
-// ordinary insertion is followed by the replaced-relation line and the relation report, which between
-// them say where the child landed; `--order-*` writes neither, so without this line the console says a
-// row moved and never says where to. The position is read from the input rather than the plan: the
-// plan deliberately carries no record of it, the declaration being what it did not change.
 // A row moved onto the wrong side of an order the declaration already states. `epic:next` filters by
 // `blocked_by` before it applies task-list order, so the move cannot change when that child is offered
 // until the declaration itself changes — and the placement line above, read alone, says the opposite.
@@ -99,6 +94,11 @@ function report_contradiction(plan: AddPlan): void {
 	)
 }
 
+// **An order-only move reports the place, because nothing else will** (joshuafolkken/kit#1738). An
+// ordinary insertion is followed by the replaced-relation line and the relation report, which between
+// them say where the child landed; `--order-*` writes neither, so without this line the console says a
+// row moved and never says where to. The position is read from the input rather than the plan: the
+// plan deliberately carries no record of it, the declaration being what it did not change.
 function report_order(input: AddChildrenInput, plan: AddPlan): void {
 	const { position } = input
 	if (position === undefined) return
