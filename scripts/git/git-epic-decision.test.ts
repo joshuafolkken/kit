@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { git_epic_body } from './git-epic-body'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse } from './git-epic-parse'
 
@@ -134,5 +135,29 @@ describe('git_epic_decision.find_decision_error — fenced blocks', () => {
 		const fenced = [NEW_ENTRY, '```text', CHAIN_LINE, '```'].join('\n')
 
 		expect(git_epic_decision.find_decision_error(fenced)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#1712 — `epic:audit`'s unjustified-order check asks the body where a reason was
+// recorded, and a creation records one under `## Split rationale` while an insertion or a removal
+// appends to `## Decisions`. Read against a body the real builder produced, so the heading pattern
+// here cannot drift from the literal `git_epic_body` writes.
+describe('git_epic_decision.read_recorded_reasons', () => {
+	it('reads the Split rationale a creation writes', () => {
+		const body = git_epic_body.build_epic_body({
+			children: [101, 102],
+			rationale: REASON_LINE,
+			is_ordered: true,
+		})
+
+		expect(git_epic_decision.read_recorded_reasons(body)).toContain(REASON_LINE)
+	})
+
+	it('reads the Decisions log an insertion appends to', () => {
+		expect(git_epic_decision.read_recorded_reasons(WITH_SECTION)).toContain(EXISTING_ENTRY)
+	})
+
+	it('answers with an empty string for a body it has nothing to read', () => {
+		expect(git_epic_decision.read_recorded_reasons(undefined)).toBe(BLANK)
 	})
 })

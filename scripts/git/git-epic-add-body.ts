@@ -36,6 +36,16 @@ interface RewriteInput {
 	// would otherwise be written and then read back by `epic:next` as part of the order
 	// (joshuafolkken/kit#1350).
 	decision?: string | undefined
+	// Whether an empty `chains_after` means "write that there is no order" rather than "leave the
+	// declaration alone" (joshuafolkken/kit#1712).
+	//
+	// The two callers mean opposite things by it. An insertion given no position computes no chains
+	// because none were ever declared, so the body is left exactly as it stood. A removal that took out
+	// the last declared link computed the empty declaration deliberately, and leaving the body alone
+	// would keep the chain it was asked to delete — while emptying the section would leave no
+	// machine-readable declaration at all, which `epic:check` refuses and `epic:next` reads as an
+	// error. So that caller writes the unordered sentence instead.
+	does_clear_declaration?: boolean | undefined
 }
 
 type RewriteOutcome = { body: string } | { error: string }
@@ -208,9 +218,11 @@ function to_written_lines(input: RewriteInput): Array<string> {
 // Whether the body already declares exactly the order the caller computed, chain structure included:
 // the comparison is the rendered declaration rather than the link set, since two disjoint chains and
 // one branching chain produce the same links.
-function is_declaration_unchanged(lines: ReadonlyArray<string>, chains_after: Chains): boolean {
+function is_declaration_unchanged(
+	lines: ReadonlyArray<string>,
+	rendered: ReadonlyArray<string>,
+): boolean {
 	const declared = git_epic_parse.parse_dependency_chains(lines.join('\n'))
-	const rendered = git_epic_chains.render_chains(chains_after)
 
 	return git_epic_chains.render_chains(declared).join('\n') === rendered.join('\n')
 }
@@ -223,7 +235,10 @@ function is_declaration_unchanged(lines: ReadonlyArray<string>, chains_after: Ch
 // ends up above them — a rewrite of somebody else's prose in exchange for a body that would have been
 // byte-identical. An insertion given no position computes exactly the declaration it read, so this is
 // the path it takes.
-function to_declared_body(with_rows: ReadonlyArray<string>, chains_after: Chains): BodyOutcome {
+function to_declared_body(
+	with_rows: ReadonlyArray<string>,
+	rendered: ReadonlyArray<string>,
+): BodyOutcome {
 	const stray = find_stray_declaration(with_rows)
 
 	if (stray !== undefined) {
@@ -232,23 +247,33 @@ function to_declared_body(with_rows: ReadonlyArray<string>, chains_after: Chains
 		}
 	}
 
-	if (is_declaration_unchanged(with_rows, chains_after)) return { body: with_rows.join('\n') }
+	if (is_declaration_unchanged(with_rows, rendered)) return { body: with_rows.join('\n') }
 
-	const replaced = replace_declaration(with_rows, git_epic_chains.render_chains(chains_after))
+	const replaced = replace_declaration(with_rows, rendered)
 
 	return replaced === undefined
 		? { error: 'Could not locate the `Dependencies` section to rewrite; nothing was written.' }
 		: { body: replaced.join('\n') }
 }
 
+// The declaration to write. An empty computed order means "nothing was ever declared" to an
+// insertion and "the last link was just deleted" to a removal, and only the second has anything to
+// say — the unordered sentence, since an emptied section carries no machine-readable declaration at
+// all (joshuafolkken/kit#1712).
+function to_rendered_declaration(input: RewriteInput): Array<string> {
+	const rendered = git_epic_chains.render_chains(input.chains_after)
+	if (rendered.length > 0) return rendered
+
+	return input.does_clear_declaration === true ? [UNORDERED_DEPENDENCIES] : []
+}
+
 function build_body(input: RewriteInput): BodyOutcome {
 	const with_rows = to_written_lines(input)
+	const rendered = to_rendered_declaration(input)
 
-	if (git_epic_chains.render_chains(input.chains_after).length === 0) {
-		return { body: with_rows.join('\n') }
-	}
+	if (rendered.length === 0) return { body: with_rows.join('\n') }
 
-	return to_declared_body(with_rows, input.chains_after)
+	return to_declared_body(with_rows, rendered)
 }
 
 function to_link_keys(chains: Chains): Array<string> {
