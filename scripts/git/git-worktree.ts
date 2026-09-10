@@ -70,8 +70,19 @@ async function worktree_prune(): Promise<string> {
 // remote", which a stale ref cannot say, and a non-zero exit is "could not ask" — a different answer
 // again, and the reason the caller cannot use `fetch` for this: `fetch` fails identically for a
 // branch that is gone and for a network that is down, and prunes neither (measured on git 2.x).
+//
+// **The pattern is the full ref path, because `ls-remote` matches a pattern against the *tail* of a
+// ref at a slash boundary** (joshuafolkken/kit#1709). The bare name therefore answered for any
+// branch ending in it: `1641-lane` matched `refs/heads/wip/1641-lane`, and `release/v1.2.0` matched
+// `refs/heads/foo/release/v1.2.0`. **`--heads` does not close it** — that limits which refs are
+// considered, not where inside one the pattern may match. What broke was the truthfulness of the
+// message rather than the safety of the answer: `lane:open` was told origin has the lane branch and
+// then stopped naming a branch nobody could find there, and the release guard refused a name that
+// was free. Anchored at `refs/heads/`, only the exact branch is left, since no shorter tail of
+// `refs/heads/wip/1641-lane` starts with `refs/heads/`. Callers pass a bare branch name, so the
+// prefix goes on once even for a name that already carries a slash.
 async function ls_remote_branch(branch_name: string): Promise<string> {
-	return await git_spawn.read(['ls-remote', '--heads', 'origin', branch_name])
+	return await git_spawn.read(['ls-remote', '--heads', 'origin', `refs/heads/${branch_name}`])
 }
 
 // `-D` rather than `-d`: a lane branch is deleted whatever state its work reached, and `-d` refuses

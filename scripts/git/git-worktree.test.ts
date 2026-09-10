@@ -26,6 +26,14 @@ const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
 const LANE_DIRECTORY = '/w/.kit-lanes/1490'
 const LANE_BRANCH = '1490-lane'
 
+// joshuafolkken/kit#1709: what `ls-remote` is asked for is a full ref path, so that a pattern which
+// matches the tail of some *other* ref cannot answer for this branch. Written out rather than
+// composed from `LANE_BRANCH`, because the wire format is the subject here — a composed expectation
+// would restate the implementation instead of pinning it.
+const LANE_BRANCH_REF = 'refs/heads/1490-lane'
+const RELEASE_BRANCH = 'release/v1.2.0'
+const RELEASE_BRANCH_REF = 'refs/heads/release/v1.2.0'
+
 beforeEach(() => {
 	spawn_mock.state.last_arguments = []
 })
@@ -75,15 +83,31 @@ describe('git_worktree lane reads', () => {
 	})
 
 	// Asked of the remote rather than of a remote-tracking ref, because nothing prunes those and a
-	// stale one cannot say "gone" (joshuafolkken/kit#1627).
-	it('asks the remote itself whether the lane branch is still there', async () => {
+	// stale one cannot say "gone" (joshuafolkken/kit#1627). The pattern is the full ref path, so that
+	// a branch pushed under a prefix — `refs/heads/wip/1490-lane` is the shape that bit — can no
+	// longer answer for this one on a ref-tail match (joshuafolkken/kit#1709).
+	it('asks the remote for the full ref path of the lane branch, not the bare name', async () => {
 		await git_worktree.ls_remote_branch(LANE_BRANCH)
 
 		expect(spawn_mock.state.last_arguments).toStrictEqual([
 			'ls-remote',
 			'--heads',
 			'origin',
-			LANE_BRANCH,
+			LANE_BRANCH_REF,
+		])
+	})
+
+	// A release branch name already carries a slash, which is the case the anchoring could plausibly
+	// get wrong twice over: the prefix has to go on exactly once, and the result still has to exclude
+	// `refs/heads/foo/release/v1.2.0`, which the bare name matched (joshuafolkken/kit#1709).
+	it('prefixes a slash-bearing release branch name exactly once', async () => {
+		await git_worktree.ls_remote_branch(RELEASE_BRANCH)
+
+		expect(spawn_mock.state.last_arguments).toStrictEqual([
+			'ls-remote',
+			'--heads',
+			'origin',
+			RELEASE_BRANCH_REF,
 		])
 	})
 })
