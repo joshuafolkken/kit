@@ -43,6 +43,17 @@ const REPOSITORY_URL = /\/repos\/([\w.-]+\/[\w.-]+)$/u
 const REPOSITORY_URL_GROUP = 1
 
 const BLOCKED_BY_FIELD = 'blockedBy'
+
+// The one field name here that `gh --json` never had, and it is spelled unlike the names beside it on
+// purpose: `blockedBy` is a connection `gh` served inside the issue, while this is the exact count
+// GitHub already puts in the listing's own `issue_dependencies_summary`. A caller that asks for it
+// learns whether an issue has blockers **without** the per-issue request that reading `blockedBy`
+// costs — which is what lets `epic:bundle` stop re-reading every open issue (joshuafolkken/kit#1736).
+//
+// It is `undefined` rather than `0` where the summary is absent — a pull request, which this
+// endpoint serves as readily as an issue, carries none. Reading that as "no blockers" is the one
+// misreading this field can cause, so the absence is preserved all the way to the caller.
+const BLOCKED_BY_COUNT_FIELD = 'blocked_by_count'
 const STATE_FIELD = 'state'
 const BODY_FIELD = 'body'
 const FIELD_SEPARATOR = ','
@@ -86,7 +97,15 @@ function to_issue_state(rest: RestIssue, value: unknown): unknown {
 	return typeof value === 'string' ? to_gh_state(value) : value
 }
 
+// The exact blocker count GitHub reports on the issue itself. `nodes` is one page, so this is what
+// keeps `totalCount` meaning what it meant under GraphQL rather than collapsing to the page size.
+function total_blocked_by(rest: RestIssue): number | undefined {
+	return rest.issue_dependencies_summary?.total_blocked_by
+}
+
 function to_gh_field_value(field: string, rest: RestIssue): unknown {
+	if (field === BLOCKED_BY_COUNT_FIELD) return total_blocked_by(rest)
+
 	const value = rest[rest_field_name(field)]
 
 	if (field === STATE_FIELD) return to_issue_state(rest, value)
@@ -123,12 +142,6 @@ function parse_rest_issues(rest_json: string): Array<RestIssue> {
 	if (parsed === undefined) throw new Error(NOT_AN_ISSUE_LISTING_MESSAGE)
 
 	return parsed
-}
-
-// The exact blocker count GitHub reports on the issue itself. `nodes` is one page, so this is what
-// keeps `totalCount` meaning what it meant under GraphQL rather than collapsing to the page size.
-function total_blocked_by(rest: RestIssue): number | undefined {
-	return rest.issue_dependencies_summary?.total_blocked_by
 }
 
 // The connection for an issue GitHub itself says has no blockers, answered without a request. `gh`
@@ -204,4 +217,4 @@ const git_gh_issue_rest = {
 }
 
 export type { BlockedBy, RestIssue }
-export { git_gh_issue_rest, BLOCKED_BY_FIELD }
+export { git_gh_issue_rest, BLOCKED_BY_FIELD, BLOCKED_BY_COUNT_FIELD }

@@ -204,6 +204,38 @@ describe('total_blocked_by', () => {
 	})
 })
 
+// joshuafolkken/kit#1736: the one field name here `gh --json` never had. A caller that asks for it
+// learns from the listing it already holds whether an issue has blockers, instead of paying a
+// per-issue request to find out — which is what `epic:bundle` used to do for every open issue.
+function mapped_value(field: string, overrides: Record<string, unknown> = {}): unknown {
+	return map(field, overrides)[field]
+}
+
+describe('to_gh_issue — the blocker count the listing already carries', () => {
+	const NO_BLOCKERS = 0
+
+	it('answers the count the summary reports', () => {
+		expect(
+			map('blocked_by_count', { issue_dependencies_summary: { total_blocked_by: NO_BLOCKERS } }),
+		).toEqual({ blocked_by_count: NO_BLOCKERS })
+	})
+
+	it('answers a nonzero count as it stands', () => {
+		expect(
+			map('blocked_by_count', {
+				issue_dependencies_summary: { total_blocked_by: EXACT_BLOCKER_TOTAL },
+			}),
+		).toEqual({ blocked_by_count: EXACT_BLOCKER_TOTAL })
+	})
+
+	// The one misreading this field can cause, and it costs a relation rather than a request: a row
+	// carrying no summary — a pull request, which this endpoint serves as readily as an issue — must
+	// arrive absent so the caller keeps its read.
+	it('leaves it absent when the row carries no summary', () => {
+		expect(mapped_value('blocked_by_count')).toBeUndefined()
+	})
+})
+
 describe('to_field_text — one value as --jq printed it', () => {
 	it('answers a string bare', () => {
 		expect(git_gh_issue_rest.to_field_text(ISSUE_TITLE)).toBe(ISSUE_TITLE)

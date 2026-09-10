@@ -68,6 +68,25 @@ describe('issue_list_recently_closed', () => {
 	})
 })
 
+// joshuafolkken/kit#1736: `epic:bundle` decides from this listing's own blocker count whether a row
+// is worth a per-issue read. Asserted here for the reason the case above is — a field list without
+// it fails silently: every row arrives with no count, no row is skipped, the command goes back to one
+// request per open issue, and every suite downstream stays green because they all mock this wrapper
+// and hand-build rows that carry the field.
+describe('issue_list_open_bodies', () => {
+	it('asks for the blocker count that saves the per-issue reads', async () => {
+		mocked_open.mockResolvedValue(CAPPED)
+
+		await git_gh_issue.issue_list_open_bodies(LIMIT)
+
+		expect(mocked_open).toHaveBeenCalledWith(
+			expect.objectContaining({
+				json_fields: expect.stringContaining('blocked_by_count') as string,
+			}),
+		)
+	})
+})
+
 describe('the issue listings', () => {
 	it.each(WRAPPERS)('%s carries the truncation flag out to its caller', async (_name, call) => {
 		mocked_open.mockResolvedValue(CAPPED)
