@@ -187,8 +187,8 @@ command that does not exist, a session that dies during boot, and one that runs 
 run up.
 
 **A person keeps control of it.** `pnpm josh run:wake --list` names the running supervisor and
-`--stop` ends it; the full contract, the wake command's `JOSH_WAKE_COMMAND` override and why its
-default does not disarm permission checks are `docs/josh-commands.md` → "`josh run:wake`".
+`--stop` ends it; the full contract, what it launches and why that is a constant rather than a
+setting are `docs/josh-commands.md` → "`josh run:wake`".
 
 **The completion report names how many sessions were woken beside the record's `cuts`**, and the two
 being equal is the invariant — one wake per cut. `pnpm josh run:wake --list` prints them together, so

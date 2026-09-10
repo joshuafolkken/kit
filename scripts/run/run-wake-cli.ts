@@ -49,6 +49,8 @@ const UNKNOWN_VERDICT = 'unknown'
 const FAILED_VERDICT = 'failed'
 
 const STOP_COMMAND = 'pnpm josh run:wake --stop'
+const UNSAFE_INVOCATION_NOTE =
+	'the carried invocation is not text that may be passed to a command line'
 const WARNING_TITLE = 'backlogrun supervisor'
 const WARNING_BODY = 'The supervisor could not continue the run and has stopped.'
 const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh run:wake --start\`.`
@@ -161,11 +163,9 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 }
 
 function wake_session(context: WakeContext, invocation: string): LaunchResult {
-	const argv = run_wake_session.to_argv(run_wake_session.configured_command(), invocation)
+	const argv = run_wake_session.wake_argv(invocation)
 
-	if (argv === undefined) {
-		return { kind: 'failed', note: `${run_wake_session.WAKE_COMMAND_KEY} names no command` }
-	}
+	if (argv === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 
 	return run_wake_session.launch({ argv, cwd: context.worktree }, note_to_stderr)
 }

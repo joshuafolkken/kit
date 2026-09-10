@@ -6,21 +6,20 @@ import { run_wake_session } from './run-wake-session'
 // so the argument vector is pinned rather than left to reading.
 
 const INVOCATION = 'backlogrun --max 5 --idle 30'
-const CLAUDE = 'claude'
 const SCRIPT = '/somewhere/run-wake-cli.ts'
-const BLANK = ' '.repeat(3)
-const OTHER_COMMAND = 'my-agent run'
+const SKIP_PERMISSIONS = 'dangerously-skip-permissions'
 
-describe('run_wake_session.to_argv — what the woken session is asked to do', () => {
-	it('appends the recorded invocation as one argument, never split on its spaces', () => {
-		const argv = run_wake_session.to_argv('claude -p', INVOCATION)
-
-		expect(argv).toStrictEqual({ command: CLAUDE, args: ['-p', INVOCATION] })
+describe('run_wake_session.wake_argv — what the woken session is asked to do', () => {
+	it('runs the agent CLI headless with the recorded invocation as its prompt', () => {
+		expect(run_wake_session.wake_argv(INVOCATION)).toStrictEqual({
+			command: run_wake_session.WAKE_COMMAND,
+			args: ['-p', INVOCATION],
+		})
 	})
 
 	// The person typed the invocation; nothing between the record and the session may add to it.
-	it('adds nothing of its own to the arguments', () => {
-		const argv = run_wake_session.to_argv(run_wake_session.DEFAULT_WAKE_COMMAND, INVOCATION)
+	it('appends the invocation as one argument, never split on its spaces', () => {
+		const argv = run_wake_session.wake_argv(INVOCATION)
 
 		expect(argv?.args.at(-1)).toBe(INVOCATION)
 		expect(argv?.args).toHaveLength(2)
@@ -29,28 +28,23 @@ describe('run_wake_session.to_argv — what the woken session is asked to do', (
 	// `auto-ok` decides what may be run unattended and is a person's to apply. A waker that could
 	// write it would be widening its own authorization, so nothing it spawns may mention it.
 	it('never names auto-ok anywhere in what it launches', () => {
-		const argv = run_wake_session.to_argv(run_wake_session.DEFAULT_WAKE_COMMAND, INVOCATION)
-
-		expect(JSON.stringify(argv)).not.toContain('auto-ok')
+		expect(JSON.stringify(run_wake_session.wake_argv(INVOCATION))).not.toContain('auto-ok')
 	})
 
 	// `eval-session.ts` passes it because that suite runs in a throwaway checkout whose credentials
-	// were taken away. This one runs in the person's own repository, so the default must not.
-	it('does not disarm permission checks by default', () => {
-		expect(run_wake_session.DEFAULT_WAKE_COMMAND).not.toContain('dangerously-skip-permissions')
+	// were taken away. This one runs in the person's own repository, so it must not.
+	it('does not disarm permission checks', () => {
+		const argv = JSON.stringify(run_wake_session.wake_argv(INVOCATION))
+
+		expect(argv).not.toContain(SKIP_PERMISSIONS)
 	})
 
-	it('takes extra leading arguments from the configured command', () => {
-		const argv = run_wake_session.to_argv('claude -p --model opus', INVOCATION)
-
-		expect(argv).toStrictEqual({
-			command: CLAUDE,
-			args: ['-p', '--model', 'opus', INVOCATION],
-		})
-	})
-
-	it('refuses a configured command that names nothing', () => {
-		expect(run_wake_session.to_argv(BLANK, INVOCATION)).toBeUndefined()
+	// The binary was an environment variable first, which put the choice of what runs unattended with
+	// the person's credentials in reach of anything that can set an environment. `eval-session.ts`
+	// hard-codes the same binary for the same reason.
+	it('takes the agent CLI from a constant rather than from the environment', () => {
+		expect(run_wake_session.WAKE_COMMAND).toBe('claude')
+		expect(JSON.stringify(run_wake_session)).not.toContain('JOSH_WAKE_COMMAND')
 	})
 })
 
@@ -58,29 +52,25 @@ describe('run_wake_session.to_argv — what the woken session is asked to do', (
 // shell — but "it cannot be exploited the way this is written today" is an argument rather than a
 // check, and an edit that added `shell: true` would silently turn it into nothing.
 describe('run_wake_session — what may reach the operating system', () => {
-	it('refuses a command that is not shaped like an executable name or path', () => {
-		expect(run_wake_session.to_argv('claude; rm -rf /', INVOCATION)).toBeUndefined()
-	})
-
-	// `execve` treats a NUL as the end of a string, so a value carrying one executes as a prefix of
+	// `execve` treats a NUL as the end of a string, so a value carrying one runs as a prefix of
 	// itself — the argument that runs is not the argument that was checked.
-	it('refuses a value carrying a NUL byte', () => {
-		expect(run_wake_session.to_argv('claude', `${INVOCATION}\u{0}--rm`)).toBeUndefined()
-		expect(run_wake_session.is_safe_argv({ command: 'claude\u{0}x', args: [] })).toBe(false)
+	it('refuses an invocation carrying a NUL byte', () => {
+		expect(run_wake_session.wake_argv(`${INVOCATION}\u{0}--rm`)).toBeUndefined()
 	})
 
-	it('refuses any other control character in an argument', () => {
-		expect(run_wake_session.is_safe_argv({ command: 'claude', args: ['a\nb'] })).toBe(false)
+	it('refuses an invocation carrying any other control character', () => {
+		expect(run_wake_session.wake_argv(`${INVOCATION}\nrm -rf /`)).toBeUndefined()
+	})
+
+	it('refuses an empty invocation', () => {
+		expect(run_wake_session.wake_argv('')).toBeUndefined()
 	})
 
 	it('accepts an ordinary invocation, spaces and dashes and all', () => {
-		expect(run_wake_session.is_safe_argv({ command: 'claude', args: ['-p', INVOCATION] })).toBe(
-			true,
-		)
+		expect(run_wake_session.wake_argv(INVOCATION)).toBeDefined()
 	})
 
-	// The gate sits at the call itself, so it holds for what this module builds as well as for what
-	// configuration supplies.
+	// The gate sits at the call itself, so it holds for what this module builds as well.
 	it('accepts the supervisor’s own argument vector', () => {
 		expect(run_wake_session.is_safe_argv(run_wake_session.supervisor_argv(SCRIPT, '15'))).toBe(true)
 	})
@@ -92,26 +82,6 @@ describe('run_wake_session — what may reach the operating system', () => {
 		)
 
 		expect(result.kind).toBe('failed')
-	})
-})
-
-describe('run_wake_session.configured_command — the default and its override', () => {
-	it('uses the conservative default when nothing is configured', () => {
-		expect(run_wake_session.configured_command({})).toBe(run_wake_session.DEFAULT_WAKE_COMMAND)
-	})
-
-	it('uses the default when the variable is set to blank', () => {
-		const environment = { [run_wake_session.WAKE_COMMAND_KEY]: '  ' }
-
-		expect(run_wake_session.configured_command(environment)).toBe(
-			run_wake_session.DEFAULT_WAKE_COMMAND,
-		)
-	})
-
-	it('takes the configured command when one is set', () => {
-		const environment = { [run_wake_session.WAKE_COMMAND_KEY]: OTHER_COMMAND }
-
-		expect(run_wake_session.configured_command(environment)).toBe(OTHER_COMMAND)
 	})
 })
 

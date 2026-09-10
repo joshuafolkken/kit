@@ -153,8 +153,8 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'run:wake': {
 		script: 'scripts/run/run-wake-cli.ts',
-		// `.env` rather than the ambient environment: the wake command is configured there
-		// (`JOSH_WAKE_COMMAND`) and the failure warning needs the Telegram credentials, the same two
+		// `.env` rather than the ambient environment:
+		// the failure warning needs the Telegram credentials, the same
 		// reasons `notify` and `followup` carry these flags.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:

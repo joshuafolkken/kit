@@ -28,9 +28,10 @@ const COMMAND_DOC_MARKERS: ReadonlyArray<string> = [
 	'never declares itself the record',
 	// The invariant that keeps an unattended waker from widening what may be run.
 	'`auto-ok` is still a person',
-	// The configurable command, and the flag whose absence from the default is deliberate rather than
-	// an oversight — the one line that stops someone "fixing" it by copying the eval harness.
-	'JOSH_WAKE_COMMAND',
+	// Why the binary is a constant rather than a setting, and the flag whose absence is deliberate
+	// rather than an oversight — the one line that stops someone "fixing" it by copying the eval
+	// harness.
+	'a constant, not configuration',
 	'does not carry `--dangerously-skip-permissions`',
 	// Why the detector is the unclaimed record rather than an exit code.
 	'not being claimed within ten minutes',
@@ -100,7 +101,7 @@ describe('the command is registered', () => {
 		expect(ALIASES[WAKE_ALIAS]).toBe(WAKE_COMMAND)
 	})
 
-	// It reads `JOSH_WAKE_COMMAND` and sends a Telegram, both of which come from `.env`.
+	// It sends a Telegram on a failed wake, and those credentials come from `.env`.
 	it('is given the environment file flags', () => {
 		expect(COMMAND_MAP[WAKE_COMMAND]?.tsx_arguments).toBeDefined()
 	})
