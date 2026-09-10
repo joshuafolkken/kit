@@ -1,6 +1,8 @@
 import { epic_fetch } from '#scripts/epic/epic-fetch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_epic_add } from './git-epic-add'
+import { EPIC_FIXTURE_REPO, git_epic_add_fixture } from './git-epic-add-fixture'
+import { UNORDERED_DEPENDENCIES } from './git-epic-parse'
 import { git_gh_command } from './git-gh-command'
 
 vi.mock('#scripts/epic/epic-fetch', () => ({
@@ -24,23 +26,26 @@ vi.mock('./git-gh-command', () => ({
 // epic's body carries the decision record before any child is told about it, and a refused comment
 // still leaves the insertion successful (joshuafolkken/kit#1350).
 
-const REPO = 'joshuafolkken/kit'
+const { child } = git_epic_add_fixture
+const REPO = EPIC_FIXTURE_REPO
 const EPIC_NUMBER = 893
+const DEPENDENCIES_HEADING = '## Dependencies'
+const PROGRESS_HEADING = '## Progress'
+const ROW_890 = '- [ ] #890'
 const CHILD = 894
 const BLANK = ''
 const RECORD = ['### Where #894 goes', BLANK, '- 理由: 主題が同じ'].join('\n')
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const UNORDERED = 'None — the children are independent; any execution order works.'
 
 const EPIC_BODY = [
-	'## Dependencies',
+	DEPENDENCIES_HEADING,
 	BLANK,
-	UNORDERED,
+	UNORDERED_DEPENDENCIES,
 	BLANK,
-	'## Progress',
+	PROGRESS_HEADING,
 	BLANK,
-	'- [ ] #890',
+	ROW_890,
 	BLANK,
 ].join('\n')
 
@@ -62,7 +67,7 @@ beforeEach(() => {
 	)
 	mocked_repo.mockResolvedValue(REPO)
 	mocked_fetch.mockResolvedValue({
-		children: [{ number: 890, repo: REPO, state: 'OPEN', labels: [], blocked_by: [] }],
+		children: [child(890)],
 		unreadable: [],
 		skipped: [],
 	})
@@ -119,5 +124,62 @@ describe('git_epic_add.add_children — with a decision record', () => {
 	it('writes nothing at all when the record is refused', async () => {
 		expect(await add(' '.repeat(3))).toBe(FAILURE_EXIT_CODE)
 		expect(order).toStrictEqual([])
+	})
+})
+
+// A move writes no new task-list row, so the `📋 Added …` line would name an empty list. The two
+// edits are reported separately, and neither line is printed unconditionally (joshuafolkken/kit#1701).
+const PAIR_BODY = [
+	DEPENDENCIES_HEADING,
+	BLANK,
+	UNORDERED_DEPENDENCIES,
+	BLANK,
+	PROGRESS_HEADING,
+	BLANK,
+	ROW_890,
+	'- [ ] #891',
+	BLANK,
+].join('\n')
+
+function stub_pair_epic(): void {
+	mocked_read.mockResolvedValue(
+		JSON.stringify({ number: EPIC_NUMBER, labels: [{ name: 'epic' }], body: PAIR_BODY }),
+	)
+	mocked_fetch.mockResolvedValue({
+		children: [child(890), child(891)],
+		unreadable: [],
+		skipped: [],
+	})
+}
+
+async function move_891_after_890(): Promise<number> {
+	return await git_epic_add.add_children({
+		epic_number: EPIC_NUMBER,
+		children: [891],
+		position: { kind: 'after', target: 890 },
+	})
+}
+
+describe('git_epic_add.add_children — a child the epic already tracks', () => {
+	it('reports the move and prints no addition line', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		stub_pair_epic()
+
+		expect(await move_891_after_890()).toBe(SUCCESS_EXIT_CODE)
+
+		const lines = info.mock.calls.map((call) => String(call[0]))
+
+		info.mockRestore()
+		expect(lines).toContain(`📋 Moved #891 within epic #${String(EPIC_NUMBER)}.`)
+		expect(lines.some((line) => line.startsWith('📋 Added'))).toBe(false)
+	})
+
+	it('still edits the epic body', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		stub_pair_epic()
+
+		expect(await move_891_after_890()).toBe(SUCCESS_EXIT_CODE)
+		expect(mocked_edit.mock.calls[0]?.[1]).toContain('#890 -> #891')
 	})
 })

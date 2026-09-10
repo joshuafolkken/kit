@@ -47,6 +47,7 @@ function rewrite(overrides: Partial<RewriteInput>): RewriteOutcome {
 	return git_epic_add_body.rewrite_body({
 		body: ORDERED_BODY,
 		additions: [894],
+		relocations: [],
 		chains_after: APPENDED_CHAINS,
 		...overrides,
 	})
