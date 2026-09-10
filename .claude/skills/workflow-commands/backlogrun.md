@@ -44,24 +44,90 @@ began, has nothing to carry and needs the keyword again.
 
 ## What one invocation approves
 
-**One `backlogrun` approves every merge of every issue a person has opted in with `auto-ok`** — the
-issues carrying the label, every child of an epic whose root carries it, and the issues the run files
-itself — **filing them, not running them**: an issue this run creates carries no `auto-ok`, so
-`backlog:next` never offers it and no later iteration picks it up **unless a person opts it in**.
+**One `backlogrun` approves every merge of every issue `pnpm josh backlog:next` offers** — the issues
+carrying `auto-ok`, every child of an epic whose root carries it, **and an issue this run filed, once
+it has become such a child**. That last clause used to read the other way round: it said a run's own
+filing carries no `auto-ok`, so nothing ever offers it unless a person opts it in. **That was never
+true, and obeying the rules is what broke it** (joshuafolkken/kit#1675). A filing is placed into an
+epic by `pnpm josh epic:bundle`, which `prompts/review.md` → "Review round cap" and `SKILL.md` → §2i
+both make **Tier A rather than optional**; where that epic's root carries `auto-ok`, the child is
+offered from the next ask onwards without anybody having labelled it. Measured on 2026-09-09:
+joshuafolkken/kit#1668 and joshuafolkken/kit#1673 were filed by the run itself, and both reached
+`backlog:plan`'s **Ready now**.
+
+**The promise was withdrawn rather than enforced, because the owner's policy is its opposite**
+(2026-09-10, joshuafolkken/kit#1675): work a run files is work the backlog should drain. So the two
+repairs that would have *kept* it — dropping a run's own filings from the pool, and requiring a
+person's `auto-ok` on a child as well — **are prohibited**, and a run that finds itself writing
+either is reimplementing something that Issue rejected. What replaces the promise is "The brake that
+replaces the promise" below, and withdrawing the promise without it is what that Issue forbids.
+
 That is `epicrun`'s authorization with the epic boundary taken off, and it is why this is a
 **separate keyword rather than an argument to `epicrun`**: `epicrun #E` declares "the children of
 `#E`" and `backlogrun` declares "everything opted in". The declaration *is* the statement of what may
 be executed unattended, and that is the one thing a run must not leave ambiguous. An argument would
 have made the two declarations differ only by whether a number happened to follow the keyword.
 
-**What may be run stays a person's decision.** The run decides the order and what may go in parallel;
-it never decides membership. `auto-ok` is applied only by a person — `epicrun.md` → "After the epic —
-issues opted in with `auto-ok`" is that rule's single source — and a run that could label its own
-inputs would be widening its own authorization, which is exactly the self-widening
-`split-assessment.md` refuses. The split is: **which ones, a person; in what order and how many at
-once, the run.**
+**Which issues may be opted in stays a person's decision.** `auto-ok` is applied only by a person —
+`epicrun.md` → "After the epic — issues opted in with `auto-ok`" is that rule's single source — and a
+run that labelled its own inputs would be widening its own authorization, which is exactly the
+self-widening `split-assessment.md` refuses. The split is: **which ones carry the label, a person; in
+what order and how many at once, the run.** **What a run does move is the pool's contents**, and that
+is now stated rather than denied: an issue it files and bundles into an already opted-in epic is
+offered from the next ask onwards. The brake below is what bounds that, and it bounds a quantity
+rather than a membership.
 
 A Tier C action inside a child still stops that child, exactly as under `epicrun`.
+
+### The brake that replaces the promise
+
+**The promise was an authorization boundary rather than a convenience**, so withdrawing it without
+putting something in its place would leave "file → run → file again" with no ceiling at all — the
+self-widening `split-assessment.md` refuses when it forbids a `fullrun` promoting itself to a batch.
+**What bounds it now is the invocation's own budget, and every part of that is counted in the carry
+record rather than in the conversation** ("The session cut is inside the invocation" below):
+
+| The bound | What it limits | Where it is counted |
+| --- | --- | --- |
+| `--max` | how many issues one invocation may merge — a run's own filing competes for that number rather than extending it | `run:carry --merged` |
+| `--idle`, and the 8-hour whole-run bound | how long one invocation may go on looking for more | the record's `started_at` |
+| **Ten filings per invocation** | how much one invocation may add to the pool at all, on **every** filing route (`SKILL.md` → §2d) | `run:carry --filed` |
+| The WIP cap of 30 open issues | how large the pool may become, across invocations | `prompts/collaboration-workflow/wip-cap.md` |
+
+**The last two are what actually replace the promise, and the first of them is why the loop
+terminates**: one invocation may add at most ten issues to the pool and merge at most `--max` of
+them, after which the run ends and the next one waits for a person to type the keyword. The old
+promise bounded the *kind* of work that could run; these bound the *amount*, which is the only thing
+left to bound once a run's own filings are admitted deliberately.
+
+**Two filing routes are exempt from the depth test (`SKILL.md` → §2i), and both are re-examined here
+rather than left unsaid** — they are the routes a run files on most, so an unstated exemption is
+where self-widening would actually happen:
+
+- **`route:tier-a` and `route:interrupt` stay exempt, and that reason holds.** A filing the run
+  cannot proceed without is citing its own blockage by construction, which is what the depth test
+  asks for. **Their number is not unbounded either** — joshuafolkken/kit#1675 read it as uncapped and
+  it is not: §2d's ten-filings ceiling is stated "at every entry point", so it covers this route, and
+  `run:carry --filed` is what counts it across session cuts.
+- **A review branch-2 filing stays exempt, but not for the reason §2i used to give.** That reason — a
+  defect in a `josh` command's behavior is depth 0 by construction — does not hold:
+  joshuafolkken/kit#1694 and joshuafolkken/kit#1703 are both branch-2 filings whose subject is the
+  epic tooling, which §2i's own table puts at depth 1. **The exemption survives on the other half of
+  the sentence**: such a filing has already cleared a bar the discretionary route has not — a
+  confirmed defect reaching a runtime path, with a written failure scenario — and gating it on a
+  citation as well would drop the one kind of finding both documents agree is never dropped. §2i
+  carries the corrected reason; this names the disposition rather than restating it.
+
+**This section is the single source of how the `epic:bundle` obligation and this authorization
+boundary meet.** Filing puts an issue into an epic, the epic's `auto-ok` puts it into the pool, and
+the four bounds above are what stop that compounding. `SKILL.md` → §2i points here rather than
+restating it.
+
+**It does not contradict joshuafolkken/kit#1668.** That change opened the opposite door — a child of
+an epic that is *not* opted in is offered where the **child** carries `auto-ok` — while this one
+changes no offering condition whatever: not a line of `scripts/backlog/backlog-pool.ts` moves, and
+`scripts/backlog/backlog-next.test.ts` fixes the behavior this section now describes. What changed
+here is the promise written above and the brake written beside it.
 
 ## The session cut is inside the invocation
 
@@ -148,9 +214,11 @@ run reporting only what it merged would hide that it had spanned four sessions t
 **End the record when the run ends** — `pnpm josh run:carry --end`, in the same turn as the final
 report — so the next `backlogrun` begins a budget of its own rather than resuming a spent one.
 
-**What may be run is untouched.** The record carries a budget and nothing else: `auto-ok` is still
-applied only by a person, so a resumed session is offered exactly the issues the first one was, and
-the invariant in "What one invocation approves" stands unchanged.
+**The record widens nothing.** It carries a budget and nothing else: `auto-ok` is still applied only
+by a person, so a cut adds no rule about which issues may be offered. **The pool itself may have
+grown across the cut** — an issue the first session filed, and `epic:bundle` placed under an already
+opted-in epic, is offered to the resumed one — and that is "What one invocation approves" rather than
+anything the record did. The ceiling on it is counted across cuts too, from the record's `filed`.
 
 **Nothing waits for a person any more, and `pnpm josh run:wake` is what closed that**
 (joshuafolkken/kit#1719). The record made the budget survive the cut and left the keystroke in place,
@@ -179,7 +247,8 @@ session's last write.
 
 **What may be run is still untouched.** The supervisor hands the woken session the invocation the
 person typed and nothing else; it writes no label, so `auto-ok` stays a person's to apply and a woken
-session is offered exactly the issues the first one was.
+session is offered by exactly the rules the first one was — a pool that grew across the seam is
+"What one invocation approves", never the supervisor's doing.
 
 **A failure is visible rather than silent.** A wake that never claims the carry record is retried, and
 once the retries are spent the supervisor stops and sends a `warning` Telegram — which covers a wake
@@ -365,9 +434,13 @@ backlogrun --idle 30 --max 5
 | Maximum issues | `--max <count>` | unlimited | How many issues this invocation may take. On reaching it the run reports and finishes |
 
 **Why an idle watch is safe, and why it is not a way in.** A new issue is never implemented the
-moment it is filed: to become a candidate at all it needs `auto-ok`, which only a person applies, and
-that opt-in is the safety valve. There is no route by which an unreviewed issue is picked up during a
-watch.
+moment it is filed: to become a candidate at all it needs `auto-ok`, which only a person applies —
+on the issue itself, or on the epic whose children it stands for. **What that no longer excludes is
+an issue this run filed**: bundled under an already opted-in epic it is offered on the next ask,
+inside the same watch. That is admitted rather than denied ("What one invocation approves"), and what
+bounds it is the brake stated there — ten filings per invocation, `--max` merges, the WIP cap — never
+the watch. There is no route by which an issue **nobody** opted in, on itself or on its epic, is
+picked up during a watch.
 
 **Ask `pnpm josh backlog:budget` on every iteration and act on what it answers** — after
 `backlog:next`, with the word the table above maps its answer to:

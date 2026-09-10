@@ -12,7 +12,7 @@ import {
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import type { IssueRead } from '#scripts/git/git-gh-issue-read'
-import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
+import { AUTO_OK_LABEL, TIER_A_ROUTE_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -86,6 +86,24 @@ describe('the candidate table', () => {
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.complete)
 		expect(stderr()).toContain('No open issue carries')
+	})
+
+	// joshuafolkken/kit#1675: an issue a run files carries no `auto-ok` of its own, and on the
+	// prerequisite route it carries a `route:` label as well. Bundled into an opted-in epic it is
+	// offered all the same — the behavior `backlogrun.md` → "What one invocation approves" now states
+	// rather than denies. **The label is inert today, and that is what this case is for**: nothing
+	// under `scripts/backlog/` reads a `route:` label, so this passes for the same reason the case
+	// above does — and it is the two repairs that section prohibits, dropping a run's own filings from
+	// the pool and requiring a person's `auto-ok` on the child, that would make this the one to go red.
+	it('offers a run-filed child carrying a route label but no auto-ok of its own', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [opted_in_epic()],
+			epics: [{ number: EPIC_NUMBER, children: [CHILD] }],
+			children: [{ number: CHILD, labels: [TIER_A_ROUTE_LABEL] }],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(CHILD))
 	})
 })
 
