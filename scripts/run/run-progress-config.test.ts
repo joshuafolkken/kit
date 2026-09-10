@@ -20,6 +20,9 @@ const PERSONAL = 25
 const TYPED = 5
 const NESTED = 'workspace-'
 const NO_INTERVAL = '{"josh":{}}'
+// Ten hours after the epoch, so every expected stamp below reads `10:mm` in UTC whatever zone the
+// suite runs in.
+const OBSERVED_AT = 10 * 60 * MINUTE
 
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'josh-run-progress-config-'))
 
@@ -84,6 +87,31 @@ describe('resolve_interval_ms — flag, environment, repository, default', () =>
 		const declaring = directory_declaring(COMMITTED)
 
 		expect(run_progress_config.configured_interval_ms(declaring)).toBe(COMMITTED * MINUTE)
+	})
+})
+
+// joshuafolkken/kit#1726. The next report time is printed rather than derived by the run, and what
+// makes that a single implementation rather than a second one is that it is built from the interval
+// this module resolves — so each of the three sources has to move the printed stamp.
+describe('the printed next report time follows the interval this module resolved', () => {
+	it.each([
+		['a typed flag', String(TYPED), String(PERSONAL), '1970-01-01T10:05Z'],
+		['the environment', undefined, String(PERSONAL), '1970-01-01T10:25Z'],
+		['the repository', undefined, '', '1970-01-01T10:15Z'],
+	])('takes %s', (_label, typed, environment, expected) => {
+		vi.stubEnv(run_progress.INTERVAL_KEY, environment)
+		const interval_ms = run_progress_config.resolve_interval_ms(
+			typed,
+			directory_declaring(COMMITTED),
+		)
+
+		expect(run_progress.format_next_report(OBSERVED_AT, interval_ms)).toContain(expected)
+	})
+
+	it('writes it on the local clock as well, with the offset that places it', () => {
+		const stamp = run_progress.format_next_report(OBSERVED_AT, run_progress.DEFAULT_INTERVAL_MS)
+
+		expect(stamp).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}[+-]\d{2}:\d{2} \/ /u)
 	})
 })
 

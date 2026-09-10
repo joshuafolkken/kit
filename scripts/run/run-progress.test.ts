@@ -19,11 +19,16 @@ function observations(overrides: Partial<Observations> = {}): Observations {
 	}
 }
 
-// The local half of the stamp, parsed back with the offset the line itself printed. Both round-trip
-// assertions below read it the same way, so the shape lives here rather than in each of them. A line
+// The local half of a stamp, parsed back with the offset the line itself printed. Every round-trip
+// assertion below reads it the same way, so the shape lives here rather than in each of them. A line
 // with no stamp parses to `NaN`, which fails the comparison rather than passing quietly.
-function parse_stamp(line: string): number {
-	const stamp = /at (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}[+-]\d{2}:\d{2}) \//u.exec(line)
+const AT_STAMP = /at (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}[+-]\d{2}:\d{2}) \//u
+// The schedule half is the same shape behind a different label, so it is a second pattern rather than
+// a second parser (joshuafolkken/kit#1726).
+const NEXT_STAMP = /next (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}[+-]\d{2}:\d{2}) \//u
+
+function parse_stamp(line: string, pattern: RegExp): number {
+	const stamp = pattern.exec(line)
 
 	return Date.parse(`${stamp?.[1] ?? ''}T${stamp?.[2] ?? ''}`)
 }
@@ -117,7 +122,10 @@ describe('next_state — the unchanged-since clock', () => {
 	})
 })
 
+const INTERVAL = run_progress.DEFAULT_INTERVAL_MS
+
 const LINE = run_progress.format_line(observations(), {
+	interval_ms: INTERVAL,
 	now_ms: NOW,
 	quiet_since_ms: NOW - 12 * MINUTE,
 	unchanged_since_ms: NOW - 3 * MINUTE,
@@ -160,6 +168,7 @@ describe('format_line — when the observation was taken', () => {
 
 	it('carries the date, because the run that needed this was suspended across one', () => {
 		const next_day = run_progress.format_line(observations(), {
+			interval_ms: INTERVAL,
 			now_ms: NOW + DAY,
 			quiet_since_ms: NOW,
 			unchanged_since_ms: NOW,
@@ -186,7 +195,7 @@ describe('format_line — when the observation was taken', () => {
 	// the local half back with its own printed offset is what checks that, and it stays deterministic
 	// on every machine because the offset it is read with is the one the line just printed.
 	it('prints one instant twice, not two clocks that disagree', () => {
-		expect(parse_stamp(LINE)).toBe(Math.floor(NOW / MINUTE) * MINUTE)
+		expect(parse_stamp(LINE, AT_STAMP)).toBe(Math.floor(NOW / MINUTE) * MINUTE)
 	})
 })
 
@@ -195,6 +204,38 @@ describe('format_line — when the observation was taken', () => {
 // and the machine running the suite is the only reason neither is normally seen: the minutes field
 // printed `41.26666666666667`, and the local clock read off `getHours` / `getMinutes` truncated the
 // seconds the offset beside it rounded, so the stamp no longer named the instant it was taken at.
+// joshuafolkken/kit#1726. `epicrun.md` asked the run to derive this from the `at` stamp plus the
+// interval in force, and one report reached a person as `20:1x` — placeholder digits, because a time
+// worked out by hand is eventually worked out wrong. Both inputs were already here; only one of them
+// was printed.
+describe('format_line — when the next report is due', () => {
+	it('closes the line with it, rather than leaving a reader to work it out', () => {
+		expect(LINE).toMatch(
+			/· next \d{4}-\d{2}-\d{2} \d{2}:\d{2}[+-]\d{2}:\d{2} \/ \d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u,
+		)
+	})
+
+	it('sets it one interval after the observation this line reports', () => {
+		expect(LINE).toContain('1970-01-01T10:20Z')
+	})
+
+	it('writes it on both clocks, as the observation stamp is written', () => {
+		expect(parse_stamp(LINE, NEXT_STAMP)).toBe(Math.floor((NOW + INTERVAL) / MINUTE) * MINUTE)
+	})
+
+	it('moves with the interval in force rather than with a number of its own', () => {
+		const slow = run_progress.format_line(observations(), {
+			interval_ms: 45 * MINUTE,
+			now_ms: NOW,
+			quiet_since_ms: NOW,
+			unchanged_since_ms: NOW,
+		})
+
+		expect(slow).toContain('next 1970-01-01 ')
+		expect(slow).toContain('1970-01-01T10:45Z')
+	})
+})
+
 describe('format_line — a zone whose offset is not whole minutes', () => {
 	const KATHMANDU_1970_MINUTES = -341.2666666666667
 
@@ -202,6 +243,7 @@ describe('format_line — a zone whose offset is not whole minutes', () => {
 		vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(KATHMANDU_1970_MINUTES)
 
 		return run_progress.format_line(observations(), {
+			interval_ms: INTERVAL,
 			now_ms: NOW,
 			quiet_since_ms: NOW,
 			unchanged_since_ms: NOW,
@@ -217,13 +259,14 @@ describe('format_line — a zone whose offset is not whole minutes', () => {
 	})
 
 	it('still names the instant it was taken at, the clock and the offset agreeing', () => {
-		expect(parse_stamp(line_in_kathmandu())).toBe(NOW)
+		expect(parse_stamp(line_in_kathmandu(), AT_STAMP)).toBe(NOW)
 	})
 })
 
 describe('format_line — what it says when it has nothing to say', () => {
 	it('says an unread record is unread rather than inventing an age for it', () => {
 		const unread = run_progress.format_line(observations({ record_age_ms: undefined }), {
+			interval_ms: INTERVAL,
 			now_ms: NOW,
 			quiet_since_ms: NOW - MINUTE,
 			unchanged_since_ms: NOW,

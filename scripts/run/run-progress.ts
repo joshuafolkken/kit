@@ -203,9 +203,32 @@ function format_record(record_age_ms: number | undefined): string {
 }
 
 interface LineTiming {
+	// The interval in force, already resolved by `run-progress-config.ts` → `resolve_interval_ms`. It
+	// is passed in rather than read here so that the printed schedule and the clock `is_due` consults
+	// can never be two different numbers.
+	interval_ms: number
 	now_ms: number
 	quiet_since_ms: number
 	unchanged_since_ms: number
+}
+
+/**
+ * When the next line is due if the silence holds — printed, never left for a reader to work out.
+ *
+ * **The two inputs were both here already and only one of them was printed** (joshuafolkken/kit#1726).
+ * `epicrun.md` asked the run to derive this from the `at` stamp plus the interval in force, and a run
+ * that derives a time by hand eventually derives it wrong: one report reached a person as `20:1x`,
+ * placeholder digits and all. Every comparable judgement in this repository has moved to the command
+ * that already holds the inputs — `run:preflight`, `delegate`, `review:level`, `latest:scope` — and
+ * this is that same move for one value.
+ *
+ * **It is a schedule rather than an observation, and the two conditions on it are said in prose**
+ * (`docs/josh-commands.md` → `josh run:progress`): it holds only while the silence continues, and a
+ * real report arriving first restarts the clock through `--mark` and supersedes it. The line printing
+ * it is itself a report, so the clock starts at this observation.
+ */
+function format_next_report(now_ms: number, interval_ms: number): string {
+	return format_observed_at(now_ms + interval_ms)
 }
 
 /**
@@ -213,7 +236,8 @@ interface LineTiming {
  * run's own output, and a block would compete with the thing the person is waiting to read.
  *
  * The observation time leads, because it is the field that says whether anything after it is still
- * about now — a stamp read after the elapsed figures is read too late to reframe them.
+ * about now — a stamp read after the elapsed figures is read too late to reframe them. The next report
+ * time closes it for the mirrored reason: it is the one field about a moment that has not happened yet.
  */
 function format_line(observations: Observations, timing: LineTiming): string {
 	const observed_at = format_observed_at(timing.now_ms)
@@ -222,8 +246,9 @@ function format_line(observations: Observations, timing: LineTiming): string {
 	const children = observations.children.map((child) => format_child(child)).join(' · ')
 	const lanes = format_lanes(observations.lanes)
 	const load = observations.load_average.toFixed(1)
+	const next = format_next_report(timing.now_ms, timing.interval_ms)
 
-	return `${QUIET_MARKER} at ${observed_at} · quiet ${quiet} · ${children} · lanes ${lanes} · load ${load} · record ${format_record(observations.record_age_ms)} · unchanged ${unchanged}`
+	return `${QUIET_MARKER} at ${observed_at} · quiet ${quiet} · ${children} · lanes ${lanes} · load ${load} · record ${format_record(observations.record_age_ms)} · unchanged ${unchanged} · next ${next}`
 }
 
 /**
@@ -264,6 +289,7 @@ const run_progress = {
 	format_child,
 	format_lanes,
 	format_line,
+	format_next_report,
 	format_record,
 	is_due,
 	minutes_from,
