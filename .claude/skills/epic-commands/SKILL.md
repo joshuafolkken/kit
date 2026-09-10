@@ -387,6 +387,30 @@ hundred of them, never pay it.
 | Spread across **different** epics | **Choose the one you recommend, add to it, and record why** | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
+| **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |
+
+**Every row that *places* the issue asserts a negative, so a cut epic listing withholds all of them**
+(joshuafolkken/kit#1697). "No epic already tracks this issue" — which `create_epic` asserts about the
+candidates too — is only as good as the listing it was read from, and an epic past the cut tracks its
+children invisibly. **`add_to_epic` rests on it as much as `create_epic` does**: adding the issue to
+the epic a *candidate* sits in, while an unseen epic already tracks the issue itself, is the same
+duplicate by another route. The cut was already on standard error
+(`⚠ The epic listing …`) while standard output went on printing an executable
+instruction such as `Create an epic for these (Tier A — do it).` — and the rule below that reads a warning as "could not answer" is written for one above
+`Nothing to bundle.`, so it never reached this verdict. Acted on as Tier A, that is a **second epic
+over an already-tracked issue**, which the auto-close and `epic:next` cannot both be right about
+(joshuafolkken/kit#943). The verdict now says so itself:
+
+```text
+Could not confirm which epic already tracks these — do not place this issue in one.
+  the epics were not read in full, so an epic already tracking one of these may never have been seen
+  Related: #1662
+```
+
+**The children and the order are deliberately absent** — they are the recipe for the placement that
+line says not to make. The exit code stays `0`, as it does for every other "do nothing" answer. **What
+survives the cut is a membership that *was* found**: the first row above names the epic it read
+tracking the issue, and epics past the cut cannot unseat it.
 
 **Placing an issue is not merging epics, and reading it as one is what used to stop runs.** Bundling
 is reversible — one `epic --add` moves an issue to a different epic — so choosing between two

@@ -6,7 +6,12 @@ import { git_gh_command } from '#scripts/git/git-gh-command'
 import { cutoff_of, type ScanCutoff } from '#scripts/git/listing-cutoff'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
-import { epic_bundle, type BacklogIssue, type BundleDecision } from './epic-bundle'
+import {
+	epic_bundle,
+	type BacklogIssue,
+	type BundleAction,
+	type BundleDecision,
+} from './epic-bundle'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
@@ -227,11 +232,29 @@ function format_order(
 	]
 }
 
+// The verdicts that put the subject into an epic. Each one asserts that no epic already tracks it —
+// `create_epic` asserts as much about the candidates too — and that negative is exactly what a cut
+// epic listing cannot establish (joshuafolkken/kit#1697). `none` is absent on purpose: it either
+// names the epic it *found* tracking the subject, which a cut cannot unseat, or reports no candidate
+// at all, which says nothing about epics.
+const PLACING_ACTIONS: ReadonlySet<BundleAction> = new Set<BundleAction>([
+	'add_to_epic',
+	'create_epic',
+	'ask',
+])
+
+// `is_membership_established` is what separates "no epic tracks these" from "their epics were never
+// read".
 function format_decision(
 	decision: BundleDecision,
 	subject: BacklogIssue,
 	backlog: ReadonlyArray<BacklogIssue>,
+	is_membership_established: boolean,
 ): string {
+	if (!is_membership_established && PLACING_ACTIONS.has(decision.action)) {
+		return epic_bundle_gaps.unconfirmed_membership(format_numbers(decision.candidates)).join('\n')
+	}
+
 	const lines = [headline(decision), `  ${decision.reason}`]
 
 	if (decision.candidates.length > 0) {
@@ -317,10 +340,13 @@ function warn_about_gaps(backlog: FetchedBacklog): void {
 	warn_cutoff(epic_bundle_gaps.epic_gap(backlog.epic_cutoff ?? NO_CUTOFF, BACKLOG_LIMIT))
 }
 
-function report_decision(subject: BacklogIssue, issues: ReadonlyArray<BacklogIssue>): number {
-	const others = issues.filter((issue) => issue.number !== subject.number)
+function report_decision(subject: BacklogIssue, backlog: FetchedBacklog): number {
+	const others = backlog.issues.filter((issue) => issue.number !== subject.number)
+	const cutoff = backlog.epic_cutoff ?? NO_CUTOFF
+	const is_established = epic_bundle_gaps.is_membership_established(cutoff)
+	const decision = epic_bundle.decide_bundle(subject, others)
 
-	console.info(format_decision(epic_bundle.decide_bundle(subject, others), subject, others))
+	console.info(format_decision(decision, subject, others, is_established))
 
 	return SUCCESS_EXIT_CODE
 }
@@ -332,7 +358,7 @@ async function report_widened(subject: BacklogIssue, backlog: FetchedBacklog): P
 
 	warn_about_gaps(widened)
 
-	return report_decision(subject, widened.issues)
+	return report_decision(subject, widened)
 }
 
 // The recommendation for one issue, from the open backlog around it.
