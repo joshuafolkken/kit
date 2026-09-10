@@ -66,6 +66,11 @@ const DOC_MARKERS: ReadonlyArray<string> = [
 	'`--wait` is that loop with an exit at the end, and it exists because relaying "what appears" is not always possible',
 	'relays nothing at all from a process built never to exit',
 	'josh.progress_interval_minutes',
+	// joshuafolkken/kit#1726. The one value the command held and did not print, the two conditions that
+	// keep it a schedule rather than a claim, and the reason it is printed at all.
+	'When the next line is due if the silence holds',
+	'It is a schedule, not an observation',
+	'It exists so that no run has to derive it.',
 ]
 
 const SKILL_MARKERS: ReadonlyArray<string> = [
@@ -146,9 +151,17 @@ const SKILL_MARKERS: ReadonlyArray<string> = [
 	// The question a heartbeat is asked every time it does not answer it — and the two conditions that
 	// keep the answer a schedule rather than a claim.
 	'The presentation closes with the next report time, written as an absolute instant in both clocks',
-	'It is derived, not observed',
+	// joshuafolkken/kit#1726. The value used to be derived from the `at` stamp plus the interval, and a
+	// report reached a person carrying placeholder digits; the command prints it now, and the rule the
+	// presentation follows is to copy it.
+	'It is printed, and the presentation copies it',
+	'is never computed, rounded or filled in',
 	'a real report arriving first resets the clock through `--mark` and supersedes it',
-	'The next report time is the one instant the presentation does derive',
+	'The next report time is printed on the same line and copied across with it',
+	// The gap the same Issue found: a format was defined for the periodic report and for nothing else,
+	// and both broken reports were the ones no rule covered.
+	'It is answered with that line, in the presentation form above, and nothing else supplies a time',
+	'Never write a clock time the command did not print',
 	// The volume budget is unchanged: the five lines stand where the one line stood.
 	'The presentation stands where the relayed line stood, and is not an addition to it',
 ]

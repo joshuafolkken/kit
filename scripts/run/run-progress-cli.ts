@@ -161,8 +161,12 @@ async function emit(options: WatchOptions, context: EmitContext): Promise<EmitRe
 	const key = run_progress.observation_key(read.observations)
 	const state = run_progress.next_state(context.state, key, context.now_ms)
 
+	// The interval reaches the line from the options rather than being resolved a second time, so the
+	// schedule printed and the clock `step` consults are one number (joshuafolkken/kit#1726). Both
+	// reporting forms come through here, which is what puts the field on `--wait` and `--once` alike.
 	console.info(
 		run_progress.format_line(read.observations, {
+			interval_ms: options.interval_ms,
 			now_ms: context.now_ms,
 			quiet_since_ms: context.last_ms,
 			unchanged_since_ms: state.unchanged_since_ms,

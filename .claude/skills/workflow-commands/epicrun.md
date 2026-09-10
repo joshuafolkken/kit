@@ -1019,9 +1019,9 @@ interval is these three moves and there is no fourth:
    next `--wait` waits a full interval from the line just relayed and nothing else has to be timed.
 
 **The line is presented with a label in front of every field, never handed over as it was printed.**
-What the command emits is one `·`-joined run of values with no labels on any of them — six fixed
+What the command emits is one `·`-joined run of values with no labels on any of them — seven fixed
 fields and one further segment per child in flight, so the count moves with the run —
-`⏳ at 2026-09-09 13:27+07:00 / 2026-09-09T06:27Z · quiet 29m · #1631 in-progress,route:split PR:open · lanes none · load 4.7 · record unread · unchanged 0m` —
+`⏳ at 2026-09-09 13:27+07:00 / 2026-09-09T06:27Z · quiet 29m · #1631 in-progress,route:split PR:open · lanes none · load 4.7 · record unread · unchanged 0m · next 2026-09-09 13:47+07:00 / 2026-09-09T06:47Z` —
 and a person reading that cannot say what `record unread` or `unchanged 0m` refers to
 (joshuafolkken/kit#1650). The verbatim rule this replaces was protecting something real — that the
 run must not dress up what it observed — but **handing over an unreadable line does not achieve
@@ -1037,6 +1037,10 @@ that a reader who has seen one report can find a field in the next without re-re
 3. **the children in flight** — each one's number, its labels and its pull request state;
 4. **the lanes, the load average, and the unit-output age** (the `record` field).
 
+**The fifth line is the `next` field, copied across the same way** (joshuafolkken/kit#1726). It is
+the one line that is about a moment yet to come, which is why it closes the presentation and carries
+the schedule wording above rather than being read as an observation.
+
 **Every value is carried across unchanged; the presentation adds a label and nothing else.** No
 rounding, no rephrasing of a value into a state, no figure the line did not carry. **Naming a field
 is not interpreting it**, and the boundary between the two is the whole of what the verbatim rule
@@ -1051,11 +1055,17 @@ arriving at the fields it actually reads.
 **The presentation closes with the next report time, written as an absolute instant in both
 clocks** — `2026-09-09 13:42+07:00 / 2026-09-09T06:42Z`, the same form the stamp itself uses. What a
 person wants from a heartbeat is when to look again, and a run that leaves it out is asked for it
-every time. **It is derived, not observed**: the `at` stamp on the line just presented plus the
-interval in force — `--interval`, else `JOSH_PROGRESS_INTERVAL_MINUTES`, else
-`josh` → `progress_interval_minutes`, else twenty — so it is labelled as a schedule rather than
-reported as a fact. **Two conditions ride with it in the same line**: it is the time *if the silence
-continues*, and a real report arriving first resets the clock through `--mark` and supersedes it.
+every time. **It is printed, and the presentation copies it** (joshuafolkken/kit#1726): the line
+carries a `next` field of its own, so this value is transcribed exactly as `at` is and **is never
+computed, rounded or filled in**. It used to be derived — the `at` stamp plus the interval in force —
+and a time worked out by hand is eventually worked out wrong: one report reached a person as `20:1x`,
+placeholder digits and all, which is what filed the Issue. **Both inputs were already the command's**,
+so the derivation was asking a run to redo arithmetic the printer could do once; this is the move
+`run:preflight`, `delegate`, `review:level` and `latest:scope` each made for their own judgement.
+**It stays labelled as a schedule rather than reported as a fact**, and the two conditions ride with
+it in the same line: it is the time *if the silence continues*, and a real report arriving first
+resets the clock through `--mark` and supersedes it. **A line with no `next` field on it gets no next
+report time in the presentation** — say that the field was absent, never a time of your own.
 
 **The presentation stands where the relayed line stood, and is not an addition to it.** Its five
 lines are that one line rendered readably, and the two lines of the run's own prose that "What the
@@ -1119,7 +1129,27 @@ minutes: one to two reports per child, each with a stage change in it.
 **An explicit ask is not a heartbeat, and it is exempt by construction rather than by exception.**
 What is refused is arming a *timer*. A person asking "how is it going" arrives as a turn with no timer
 in front of it, and `pnpm josh run:progress --once` prints one line whatever the clock says — so there
-is no exception to write and none to get wrong. **A live timer is counted from the record the guard
+is no exception to write and none to get wrong.
+
+**It is answered with that line, in the presentation form above, and nothing else supplies a time**
+(joshuafolkken/kit#1726). **The rule exists because the two reports that broke were the two nobody had
+written a rule for**: on the run that filed the Issue all four periodic reports carried real clock
+times, and the two that carried placeholder digits were the reply to "how is it going" and the
+situation note written just after the run started. A format defined for one shape of report and not
+for the other is not a narrower rule — it is a gap, and the violations collected in it.
+
+- **Run `pnpm josh run:progress --once` and present what it prints**, in the same five field lines.
+  The `at` stamp and the `next` field are both on that line, so neither is worked out.
+- **Every progress statement this run makes takes this route** — the reply to an explicit ask, the
+  note written just after a run starts, and any other unscheduled "where are we". The periodic report
+  keeps its own step above, which already ends in this same presentation.
+- **Never write a clock time the command did not print.** Not an approximation, not a rounded one, and
+  above all not a placeholder — `20:1x` is not a time, and a reader has no way to tell one invented
+  digit from an observed one. Where a field is missing, say it is missing.
+- **`--once` records the report**, so the watcher does not repeat it moments later. That is the
+  command's own behavior and needs no `--mark` beside it.
+
+**A live timer is counted from the record the guard
 writes when it allows one**, never from the `sleep` processes on the machine: a process count cannot
 tell a heartbeat timer from a build step that sleeps, and a timer killed with its shell would leave
 the count wrong for the rest of the run.
@@ -1145,8 +1175,10 @@ how long it has been quiet and when the observation was taken are two different 
 can be reconstructed from the other. **The presented line needs no stamp computed for it** — `josh
 run:progress` prints this one itself, so the presentation's observation field copies that stamp
 across rather than deriving a second one, and the rule above still holds exactly as written. **The
-next report time is the one instant the presentation does derive**, and it is labelled as a schedule
-for exactly that reason.
+next report time is printed on the same line and copied across with it** (joshuafolkken/kit#1726) —
+it used to be the one instant the presentation derived, and deriving it is what produced a report
+carrying `20:1x`. It is still labelled as a schedule rather than as an observation, because it is the
+one field about a moment that has not happened yet.
 
 **The line carries observations, never "still running".** Children in flight with their labels and
 their pull request state, the open lanes, the load average, how long the newest unit transcript has
