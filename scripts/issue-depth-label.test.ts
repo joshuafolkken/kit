@@ -104,6 +104,7 @@ describe('the filing-time rule in SKILL.md §2i', () => {
 		WORKFLOW_SKILL,
 		'prompts/review.md',
 		'prompts/collaboration-workflow/wip-cap.md',
+		'prompts/collaboration-workflow/upstream-interrupt.md',
 	])('is carried by the filing command in %s', (path) => {
 		expect(read_repo_file(path)).toContain(FILING_FLAG)
 	})
