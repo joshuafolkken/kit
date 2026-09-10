@@ -342,8 +342,7 @@ function warn_about_gaps(backlog: FetchedBacklog): void {
 
 function report_decision(subject: BacklogIssue, backlog: FetchedBacklog): number {
 	const others = backlog.issues.filter((issue) => issue.number !== subject.number)
-	const cutoff = backlog.epic_cutoff ?? NO_CUTOFF
-	const is_established = epic_bundle_gaps.is_membership_established(cutoff)
+	const is_established = epic_bundle_gaps.is_membership_established(backlog.epic_cutoff)
 	const decision = epic_bundle.decide_bundle(subject, others)
 
 	console.info(format_decision(decision, subject, others, is_established))

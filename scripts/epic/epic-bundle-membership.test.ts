@@ -42,6 +42,12 @@ describe('epic_bundle_gaps.is_membership_established', () => {
 		expect(epic_bundle_gaps.is_membership_established('row_limit')).toBe(false)
 		expect(epic_bundle_gaps.is_membership_established('page_ceiling')).toBe(false)
 	})
+
+	// A fetched backlog records no cut when nothing capped the listing, so a caller holding that
+	// optional field passes it straight through rather than coercing it (joshuafolkken/kit#1703).
+	it('is established when no cut was recorded at all', () => {
+		expect(epic_bundle_gaps.is_membership_established()).toBe(true)
+	})
 })
 
 // The subject and one candidate, neither of which the index places in an epic — the input that
