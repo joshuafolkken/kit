@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { read_unwrapped } from './ai-document-fixture'
+import { read_repo_file, read_unwrapped } from './ai-document-fixture'
 import { INTERRUPT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './git/issue-labels'
 
 // joshuafolkken/kit#1649: the rules named three things a run can discover mid-run — an upstream
@@ -22,12 +22,18 @@ import { INTERRUPT_ROUTE_LABEL, TIER_A_ROUTE_LABEL } from './git/issue-labels'
 
 const WORKFLOW_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const EPICRUN_SKILL = '.claude/skills/workflow-commands/epicrun.md'
+const OBSERVATION_LEDGER = 'docs/observations.md'
 
 // Read the documents themselves rather than the concatenated rule surface: the surface joins every
 // distributed skill, so a marker checked there would pass on some other file's copy — which is the
 // drift these suites exist to catch.
 const skill_text = read_unwrapped(WORKFLOW_SKILL)
 const epicrun_text = read_unwrapped(EPICRUN_SKILL)
+const ledger_unwrapped = read_unwrapped(OBSERVATION_LEDGER)
+// The ledger's line grammar is the one thing here that whitespace carries meaning in, so it is read
+// raw. `read_unwrapped` collapses every newline, which would merge the entries into one string and
+// make a per-line grammar assertion impossible to write.
+const ledger_raw = read_repo_file(OBSERVATION_LEDGER)
 
 // The route has to be reachable from where the other three are enumerated. A section nothing points
 // at is a section a run never opens, which is indistinguishable from not having written it.
@@ -154,6 +160,117 @@ const CLOSED_ISSUE_MARKERS: ReadonlyArray<string> = [
 	'a run that lists non-findings is a run whose real findings are harder to see',
 ]
 
+// joshuafolkken/kit#1728: an observation that could not cite a blockage went to the completion
+// report, which is read once and then scrolls away — so "not filed" meant "gone", every later
+// sighting looked like the first, and the gate was walked past rather than held (#1726 says so in its
+// own body). The ledger is the third destination. These markers pin the parts a reword loses first:
+// that it is append-only, that the repeat test is a key rather than a similarity judgement, and that
+// the second sighting is what files it.
+const LEDGER_MARKERS: ReadonlyArray<string> = [
+	'### The ledger — where an observation that cannot cite a blockage goes',
+	// The changed default itself. Left as "the completion report", the section below has nothing to
+	// route to and the whole mechanism is inert.
+	'**Cannot cite one, it is not filed**: it goes to the ledger below',
+	`**The destination is \`${OBSERVATION_LEDGER}\` in the repository the observation is about**`,
+	'**It is append-only.**',
+	// The depths that reach the ledger are this package's own subjects, so a run inside a consumer's
+	// repository that appended where it stood would scatter one phenomenon across every consumer.
+	'**Depth 1 and depth 2 name subjects that belong to this package**',
+	'the append follows the subject, never the working directory',
+	'**A third-party target gets no line either**',
+	// An append-only file conflicts on every parallel lane, and the wrong resolution silently deletes
+	// the repeat the whole mechanism reads.
+	'**A merge conflict in it is resolved by keeping both sides**',
+	'**The identity key is the whole of the repeat test — never a similarity judgement about the prose.**',
+	// Without this the ledger reads as a way around joshuafolkken/kit#1698 rather than a destination
+	// for what that gate turned away, which is the one misreading that would undo both changes.
+	'**The depth gate is not withdrawn, and this is not a way around it.**',
+]
+
+// The grammar lives in the distributed skill rather than in `docs/`, which `package.json` does not
+// ship: a consumer repository receives §2i and never receives the ledger, so a definition written
+// only in the ledger would leave every consumer-side file shaped by hand.
+const LEDGER_GRAMMAR_MARKERS: ReadonlyArray<string> = [
+	'**One observation is one line: five fields, each separated from the next by a vertical bar with one space on either side.**',
+	'| `k:<slug>` | The identity key',
+	// `d0` is filed outright and never reaches the ledger, so a grammar admitting it would accept an
+	// entry the routing rule says cannot exist.
+	'**There is no `d0` line**',
+	'`k:example` is reserved for this sample and is never used by a real observation',
+	'**The grammar is defined here rather than in the ledger**',
+	// `grep -c` exits non-zero on a count of zero, which is the first-sighting branch and the common
+	// one — so the documented command has to carry the guard, not just the prose around it.
+	'**The `|| true` is not decoration**',
+	`grep -c '^- k:<slug> |' ${OBSERVATION_LEDGER} || true`,
+]
+
+// The promotion. A count, not a judgement — which is what lets it stand in for the depth-0 citation
+// joshuafolkken/kit#1698 asks for: an observation that came back was pulled by something, and a
+// single sighting can never demonstrate that.
+const SECOND_SIGHTING_MARKERS: ReadonlyArray<string> = [
+	'### The second sighting is what files it',
+	'**A repeat is the citation.**',
+	'**On the count answering `1` or more, the observation is filed**',
+	"**The Issue quotes the ledger's own dates — the first sighting's and this one's**",
+	'**Both ceilings still apply**',
+	'**A third and later sighting appends a line and files nothing more.**',
+]
+
+// The child's exclusion extends to the ledger, and for a reason the filing ceiling does not cover:
+// parallel lanes would write one phenomenon under several keys, and each of those lines would then
+// read as a first sighting — the exact state the ledger exists to end.
+const CHILD_LEDGER_MARKERS: ReadonlyArray<string> = [
+	'**A delegated child does not append to the ledger either — the parent collapses the duplicates and appends what is left.**',
+	'the parent chooses the key, checks the count and writes the line',
+]
+
+// `epicrun.md` holds the child's return path, so the parent's new destination has to be readable from
+// there too — a summary list that names only "the parent files what survives" reads as though an
+// observation the parent does not file is still dropped.
+const EPICRUN_LEDGER_MARKERS: ReadonlyArray<string> = [
+	'**What the parent does with the rest is append it, not drop it**',
+	'**The child never writes that file**',
+]
+
+// The ledger carries the rule it is read under by pointer rather than by copy — the rules this
+// package states prohibit exactly that clone, and a second copy is what drifts.
+const LEDGER_FILE_MARKERS: ReadonlyArray<string> = [
+	'**The ledger is append-only.**',
+	'A second sighting is a **second line with the same key**, not a rewrite of the first.',
+	`\`.claude/skills/workflow-commands/SKILL.md\` → §2i, which is their single source`,
+	'**A merge conflict here is resolved by keeping both sides.**',
+]
+
+// The grammar, written once and asserted against both the documented sample and every real entry. A
+// format defined in prose that no entry is checked against drifts on the first hand-written line.
+const LEDGER_LINE_PATTERN =
+	/^- k:[a-z0-9]+(?:-[a-z0-9]+)* \| d[1-2] \| \d{4}-\d{2}-\d{2} \| [^|]+ \| [^|]+$/u
+const LEDGER_SAMPLE =
+	'- k:example | d1 | 2026-09-10 | pnpm josh run:progress | The report printed a fill-in placeholder where a clock time belonged'
+const LEDGER_SECTION_HEADING = '\n## Ledger\n'
+const LEDGER_ENTRY_PREFIX = '- k:'
+// Deliberately looser than the grammar: a malformed append is what has to fail, and a filter written
+// as `startsWith('- k:')` would drop `* k:foo`, `-  k:foo` and `- key:foo` out of the sample
+// entirely — leaving the suite green in exactly the state it exists to detect, while the documented
+// `grep -c` misses the line too and the next sighting reads as a first one.
+const LEDGER_BULLET_PATTERN = /^\s*[*+-]\s/u
+
+// Entries are taken from below the `## Ledger` heading only: the sample above it is documentation,
+// and counting it as an entry would make the very first real observation look like a repeat.
+function ledger_entries(): ReadonlyArray<string> {
+	const start = ledger_raw.indexOf(LEDGER_SECTION_HEADING)
+	if (start === -1) return []
+
+	return ledger_raw
+		.slice(start + LEDGER_SECTION_HEADING.length)
+		.split('\n')
+		.filter((line) => LEDGER_BULLET_PATTERN.test(line))
+}
+
+// Read once: the ledger only grows, and three separate walks of the same file would drift apart the
+// moment one of them learned to filter something the others do not.
+const LEDGER_ENTRIES = ledger_entries()
+
 describe(`${WORKFLOW_SKILL} — the fourth route is reachable from the other three`, () => {
 	// Named per marker rather than looped inside one case: a failure has to say which marker went
 	// missing, not only that the first one did.
@@ -221,5 +338,60 @@ describe(`${EPICRUN_SKILL} — a closed issue's labels are not a finding`, () =>
 		expect(epicrun_text).toContain(
 			"The rule therefore applies to any open issue in the repository, not only to this epic's children",
 		)
+	})
+
+	it.each(EPICRUN_LEDGER_MARKERS)("names the parent's ledger append: %j", (marker) => {
+		expect(epicrun_text).toContain(marker)
+	})
+})
+
+describe(`${WORKFLOW_SKILL} — an observation with no blockage to cite is recorded, not dropped`, () => {
+	it.each(LEDGER_MARKERS)('states the ledger destination: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+
+	it.each(LEDGER_GRAMMAR_MARKERS)('defines the line grammar where it ships: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+
+	it.each(SECOND_SIGHTING_MARKERS)('promotes a repeat to a filing: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+
+	it.each(CHILD_LEDGER_MARKERS)('withholds the ledger from a child: %j', (marker) => {
+		expect(skill_text).toContain(marker)
+	})
+
+	// The sample is what makes the grammar bite while the ledger is still empty: a pattern nothing is
+	// ever matched against is a pattern that can be wrong without failing.
+	it('carries a sample line that matches the grammar it documents', () => {
+		expect(skill_text).toContain(LEDGER_SAMPLE)
+		expect(LEDGER_SAMPLE).toMatch(LEDGER_LINE_PATTERN)
+	})
+})
+
+describe(`${OBSERVATION_LEDGER} — the ledger is readable by the rule that names it`, () => {
+	it.each(LEDGER_FILE_MARKERS)('points at the single source: %j', (marker) => {
+		expect(ledger_unwrapped).toContain(marker)
+	})
+
+	// Asserted before the two entry checks below, both of which pass vacuously on an empty list: a
+	// renamed heading would otherwise silence the whole entry half of this suite instead of failing it.
+	it('keeps the heading the entries are read from', () => {
+		expect(ledger_raw).toContain(LEDGER_SECTION_HEADING)
+	})
+
+	it('accepts only entries that match the documented grammar', () => {
+		for (const entry of LEDGER_ENTRIES) expect(entry).toMatch(LEDGER_LINE_PATTERN)
+	})
+
+	// The identity key is the whole of the repeat test, so the sample's reserved key appearing as a
+	// real entry would make the documented count command answer for a line that is documentation.
+	it('keeps the reserved sample key out of the ledger itself', () => {
+		const reserved = LEDGER_ENTRIES.filter((entry) =>
+			entry.startsWith(`${LEDGER_ENTRY_PREFIX}example `),
+		)
+
+		expect(reserved).toEqual([])
 	})
 })
