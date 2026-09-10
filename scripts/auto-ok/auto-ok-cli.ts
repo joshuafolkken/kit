@@ -272,8 +272,12 @@ function is_unblocked(issue: OpenIssueData): boolean {
 // a child decides both whether the standalone half withholds it — `epic_index.withheld_children` —
 // and, when it is withheld, the number `backlog:plan` names as the reason. Flattening to a `Set`
 // here threw that number away, so the plan reported a listing cap it had never reached.
+//
+// **And every tracking epic, not one winner** (joshuafolkken/kit#1694). Two epics can name the same
+// child, and a map of one epic per child keeps whichever came last — so an opted-in epic that came
+// earlier vanished, and the child was offered standalone *and* through that epic.
 type TrackingRead =
-	| { kind: 'read'; index: ReadonlyMap<number, number>; cutoff: ScanCutoff }
+	| { kind: 'read'; index: ReadonlyMap<number, ReadonlyArray<number>>; cutoff: ScanCutoff }
 	| { kind: 'epics_unreadable' }
 
 async function read_open_epics(): Promise<FetchedEpics | undefined> {
@@ -301,7 +305,7 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 
 	return {
 		kind: 'read',
-		index: epic_index.build_epic_index(open_epics.epics),
+		index: epic_index.build_tracking_index(open_epics.epics),
 		cutoff: open_epics.cutoff,
 	}
 }
