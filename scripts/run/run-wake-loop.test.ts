@@ -234,6 +234,20 @@ describe('run_wake_loop.run_loop — a failure that must not be silent', () => {
 	})
 })
 
+describe('run_wake_loop.run_loop — a stalled cut is visible while it stalls', () => {
+	// joshuafolkken/kit#1746. The record stayed handed off for the whole of the incident and `--list`
+	// went on reporting one wake against one cut, because the count was taken at the launch. Counted at
+	// the claim, the same forty minutes show a shortfall a person can see at any moment in them.
+	it('leaves the wake count behind the cuts while no session claims the record', async () => {
+		const scripted = recorder([HANDED_OFF, HANDED_OFF, HANDED_OFF])
+
+		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(run_wake.read_wake(scratch.target)?.woke).toBe(0)
+		expect(run_wake.read_wake(scratch.target)?.attempts).toBe(1)
+	})
+})
+
 // A pid that is unmistakably alive — this process — paired with a start time that is not this
 // process's, which is what a successor's record looks like from here.
 function successor(): RunWake {

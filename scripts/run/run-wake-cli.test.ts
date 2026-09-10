@@ -152,12 +152,72 @@ describe('josh run:wake --list — a person can see what is running', () => {
 	// what makes it checkable rather than merely argued.
 	it('reports the wake count beside the run’s cut count', async () => {
 		write_carry(false)
-		const woken = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
+		const claimed = run_wake.count_claim(
+			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99),
+		)
 
-		run_wake.write_wake(wake_target(), woken)
+		run_wake.write_wake(wake_target(), claimed)
 		await run_wake_cli.run(['--list'])
 
 		expect(errors.join('\n')).toContain('woke 1 session(s) across 2 cut(s)')
+	})
+})
+
+// joshuafolkken/kit#1746. `--list` is what a person checking on a stalled backlog reads, so what it
+// leaves out is what they cannot see.
+describe('josh run:wake --list — what a stalled cut looks like', () => {
+	// During the incident this line was the only thing a person could have read, and it said one wake
+	// against one cut for forty minutes while nothing had ever arrived.
+	it('reports the launches still outstanding, so a stalled cut is visible while it stalls', async () => {
+		write_carry(true)
+		run_wake.write_wake(
+			wake_target(),
+			run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99),
+		)
+
+		await run_wake_cli.run(['--list'])
+
+		expect(errors.join('\n')).toContain('woke 0 session(s) across 2 cut(s)')
+		expect(errors.join('\n')).toContain('1 launch(es) outstanding')
+	})
+
+	// A path nobody is told is a file nobody reads, and reading it is the whole point of keeping it.
+	it('names where the woken sessions’ output is kept', async () => {
+		write_carry(false)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
+
+		await run_wake_cli.run(['--list'])
+
+		expect(errors.join('\n')).toContain(run_wake.wake_log_path(REPOSITORY))
+	})
+
+	// Nothing is outstanding before the first launch, and a line saying "0 outstanding" on every listing
+	// is one a reader stops seeing.
+	it('says nothing about outstanding launches where none is', async () => {
+		write_carry(false)
+		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, NOW))
+
+		await run_wake_cli.run(['--list'])
+
+		expect(errors.join('\n')).not.toContain('outstanding')
+	})
+})
+
+// joshuafolkken/kit#1746. `backlogrun.md` promises that a failure is visible rather than silent, and
+// only one of the five reasons a supervisor can stop on was wired to the notification — so a run left
+// asleep by an expired or unreadable carry record reached nobody at all.
+describe('josh run:wake — which stops reach a person', () => {
+	it('warns on the stops that leave a carried run with nobody watching it', () => {
+		expect(run_wake_cli.stop_body('failed')).toBeDefined()
+		expect(run_wake_cli.stop_body('expired')).toBeDefined()
+		expect(run_wake_cli.stop_body('unreadable')).toBeDefined()
+	})
+
+	// The run finished, or a person stopped the supervisor themselves. A warning channel that fires on
+	// those is one that stops being read.
+	it('stays silent where nothing went wrong', () => {
+		expect(run_wake_cli.stop_body('ended')).toBeUndefined()
+		expect(run_wake_cli.stop_body('stopped')).toBeUndefined()
 	})
 })
 

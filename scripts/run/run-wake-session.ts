@@ -1,6 +1,8 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
+import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { backlog_budget_cli } from '#scripts/backlog/backlog-budget-cli'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { stamp_file } from '#scripts/josh/stamp-file'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
 // self. Both go through one `launch`, because the two differ only in what is being run
@@ -99,6 +101,10 @@ type LaunchResult = { kind: 'launched'; pid: number } | { kind: 'failed'; note: 
 interface LaunchRequest {
 	argv: WakeArgv
 	cwd: string
+	// Where to keep what the child writes. **Absent means the output is discarded**, which is what every
+	// launch did before joshuafolkken/kit#1746 and what a caller with nowhere to write still gets — the
+	// log is an improvement on the diagnosis, never a precondition for starting a session.
+	log_path?: string | undefined
 }
 
 function is_control_character(character: string): boolean {
@@ -239,10 +245,82 @@ function launched(pid: number): LaunchResult {
 	return { kind: 'launched', pid }
 }
 
-// **`detached` with `stdio: 'ignore'` is what puts the child outside the conversation.** A process
-// left attached is a child of the agent session, and the session cut is exactly the moment this has to
-// survive — so a supervisor that the harness backgrounds, the way `run:progress` is backgrounded,
-// would die at the one event it exists to handle.
+// **Appended to without following a symlink, and refused unless the file is this account's own.** The
+// path is deterministic — the temp directory plus a digest of the repository — so on a shared `/tmp`
+// anyone who knows the checkout can work it out and pre-create it. `O_NOFOLLOW` is what stops the
+// append landing wherever a symlink pointed, and the ownership test is the second half, against a
+// plain file another account left at the same path. It is `stamp_file`'s own test rather than a second
+// copy of one, and together the two give this file the defense `write_exclusively` already gives the
+// wake and carry records beside it.
+//
+// `LOG_MODE` applies on creation alone, which is why the ownership test is not redundant: a file this
+// account already owns is trusted whatever mode it carries, and one it does not is refused outright.
+// eslint-disable-next-line no-bitwise -- POSIX open flags are a bit field; `||` here would be a bug
+const LOG_FLAGS = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW
+const LOG_MODE = 0o600
+
+// One line in front of each launch, so the three sessions started for a single lost cut can be told
+// apart inside a file they all append to. The child's own pid is not known until `spawn` returns, and
+// a header written afterwards would race the child's first output; the time and the launching process
+// separate the runs, and `--list` names the last pid.
+function log_header(argv: WakeArgv): string {
+	const stamp = new Date().toISOString()
+
+	return `\n=== ${stamp} · started by process ${String(process.pid)} · ${argv.command} ===\n`
+}
+
+function opened_log(
+	log_path: string,
+	argv: WakeArgv,
+	on_error: (note: string) => void,
+): number | undefined {
+	const descriptor = openSync(log_path, LOG_FLAGS, LOG_MODE)
+
+	if (!stamp_file.is_own_regular_file(log_path)) {
+		closeSync(descriptor)
+		on_error(`${log_path} is not this account's own file, so the session output is discarded`)
+
+		return undefined
+	}
+
+	writeSync(descriptor, log_header(argv))
+
+	return descriptor
+}
+
+// **Opening the log is allowed to fail, and a failure is not a failed launch.** A temp directory that
+// cannot be written to is a reason to lose the diagnosis, never a reason to leave the run asleep — so
+// this answers `undefined` and the spawn goes ahead discarding output, exactly as it did before
+// joshuafolkken/kit#1746.
+//
+// **It says so rather than failing quietly, though.** `--list` and every warning name this path
+// unconditionally, so a silent failure would send a person at three in the morning to a file holding
+// nothing of this run — the silent diagnosis joshuafolkken/kit#1746 was filed about, arrived at from
+// the other side.
+function open_log(
+	log_path: string | undefined,
+	argv: WakeArgv,
+	on_error: (note: string) => void,
+): number | undefined {
+	if (log_path === undefined) return undefined
+
+	try {
+		return opened_log(log_path, argv, on_error)
+	} catch (error) {
+		on_error(`the session log at ${log_path} could not be opened: ${note_of(error)}`)
+
+		return undefined
+	}
+}
+
+// **`detached` is what puts the child outside the conversation, and discarding its output was never
+// part of that** (joshuafolkken/kit#1746). A process left attached is a child of the agent session,
+// and the session cut is exactly the moment this has to survive — so a supervisor that the harness
+// backgrounds, the way `run:progress` is backgrounded, would die at the one event it exists to handle.
+// That argument is about the parent link alone. `stdio: 'ignore'` rode along with it and threw away
+// the one record that could say why a woken session exited without claiming the carry record, which is
+// the whole of what joshuafolkken/kit#1746 could not diagnose. Pointed at a file, the child is just as
+// detached and the output survives it.
 //
 // The `error` listener is not decoration: an unhandled `error` on a child process throws in this
 // process, and an agent CLI that is not on `PATH` raises one asynchronously, after `spawn` has
@@ -251,11 +329,11 @@ function launched(pid: number): LaunchResult {
 // and a session that runs without ever picking the run up.
 // Lifted out of the call so the `spawn` fits on one line, which is where the suppression below has to
 // sit: SonarQube's marker applies to the line the issue is raised on and to nothing else.
-function spawn_options(cwd: string): SpawnOptions {
+function spawn_options(cwd: string, log: number | undefined): SpawnOptions {
 	return {
 		cwd,
 		detached: true,
-		stdio: 'ignore',
+		stdio: log === undefined ? 'ignore' : ['ignore', log, log],
 		env: { ...process.env, ...agent_session_environment.removed_environment() },
 	}
 }
@@ -277,21 +355,37 @@ function spawn_options(cwd: string): SpawnOptions {
 //
 // Scoped to that one line on the user's explicit instruction of 2026-09-10 (joshuafolkken/kit#1719).
 // No project-wide exclusion and no change to the Sonar configuration.
+function spawned(
+	request: LaunchRequest,
+	log: number | undefined,
+	on_error: (note: string) => void,
+): LaunchResult {
+	const { command, args } = request.argv
+	const child = spawn(command, [...args], spawn_options(request.cwd, log)) // NOSONAR — see above
+
+	child.on('error', (error) => {
+		on_error(note_of(error))
+	})
+	child.unref()
+
+	return child.pid === undefined ? { kind: 'failed', note: NO_PID_NOTE } : launched(child.pid)
+}
+
+// **The descriptor is closed as soon as the spawn returns, and that loses nothing.** `spawn` forks and
+// execs before it returns, so the child already holds its own duplicate of the descriptor by then;
+// what is closed here is this process's copy. Left open it would outlive the launch in a supervisor
+// that runs for hours and launches once per cut.
 function launch(request: LaunchRequest, on_error: (note: string) => void): LaunchResult {
 	if (!is_safe_argv(request.argv)) return { kind: 'failed', note: UNSAFE_NOTE }
 
+	const log = open_log(request.log_path, request.argv, on_error)
+
 	try {
-		const { command, args } = request.argv
-		const child = spawn(command, [...args], spawn_options(request.cwd)) // NOSONAR — see above
-
-		child.on('error', (error) => {
-			on_error(note_of(error))
-		})
-		child.unref()
-
-		return child.pid === undefined ? { kind: 'failed', note: NO_PID_NOTE } : launched(child.pid)
+		return spawned(request, log, on_error)
 	} catch (error) {
 		return { kind: 'failed', note: note_of(error) }
+	} finally {
+		if (log !== undefined) closeSync(log)
 	}
 }
 

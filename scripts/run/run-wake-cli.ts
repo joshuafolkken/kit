@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
-import { run_wake, type RunWake, type WakeTidyResult } from './run-wake'
+import { run_wake, type RunWake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
@@ -52,8 +52,29 @@ const STOP_COMMAND = 'pnpm josh run:wake --stop'
 const UNSAFE_INVOCATION_NOTE =
 	'the carried invocation is not text that may be passed to a command line'
 const WARNING_TITLE = 'backlogrun supervisor'
-const WARNING_BODY = 'The supervisor could not continue the run and has stopped.'
 const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh run:wake --start\`.`
+// **The stop reasons that reach a person, and what each one tells them** (joshuafolkken/kit#1746). A
+// reason absent from this map is one where nothing went wrong: `ended` is the run finishing through
+// `run:carry --end`, `stopped` is a person's own `--stop` or a supervisor being superseded, and a
+// warning channel that fired on those is one that stops being read.
+//
+// **`expired` and `unreadable` were silent until joshuafolkken/kit#1746, and that was the defect
+// rather than the design.** Both end the supervisor while a carry record is still sitting there handed
+// off, so the run is left asleep with nothing anywhere saying so — `run-wake.ts` →
+// `is_predecessor_exiting` names the `expired` one as a silent overnight failure in as many words, and
+// then only the `failed` reason was wired to the notification.
+// **Every reason is listed, and the silent two are listed as `undefined`.** A partial map would let a
+// sixth stop reason compile straight past this and reach nobody, which is the defect class this
+// section exists to close.
+const STOP_BODIES: Record<WakeStopReason, string | undefined> = {
+	ended: undefined,
+	stopped: undefined,
+	failed: 'The supervisor could not continue the run and has stopped.',
+	expired:
+		'The carried run passed its whole-run bound, so the supervisor stopped without continuing it.',
+	unreadable:
+		'The carry record could not be read, so the supervisor stopped rather than guess at it.',
+}
 const SUPERSEDED_RESULT: WakeTidyResult = 'superseded'
 const SUPERSEDED_NOTE =
 	'another supervisor now holds the record, so it was left alone; this loop is the superseded one'
@@ -76,6 +97,9 @@ type ParsedValues = Partial<Record<keyof typeof OPTIONS, string | boolean>>
 interface WakeContext {
 	carry_target: string
 	wake_target: string
+	// Where everything this supervisor starts writes its output (joshuafolkken/kit#1746). It is named
+	// in `--list` and in every warning, because a path nobody is told is a file nobody reads.
+	log_target: string
 	worktree: string
 }
 
@@ -131,6 +155,7 @@ async function resolve_context(): Promise<WakeContext | undefined> {
 	return {
 		carry_target: run_carry.carry_path(directory),
 		wake_target: run_wake.wake_path(directory),
+		log_target: run_wake.wake_log_path(directory),
 		worktree: path.dirname(directory),
 	}
 }
@@ -151,8 +176,23 @@ function carry_cuts(read: CarryRead): string {
 	return UNKNOWN_CUTS
 }
 
+// **A wake that has gone out and has not been answered is said out loud** (joshuafolkken/kit#1746).
+// Read from `woke` and `cuts` alone, the forty minutes a supervisor spends retrying one lost cut look
+// exactly like the second before its first launch — so a person checking on a stalled backlog was
+// shown nothing to check. `attempts` is present only while a cut is unserved, which is why its
+// absence is what prints nothing.
+function outstanding_line(wake: RunWake): string | undefined {
+	if (wake.attempts === undefined) return undefined
+
+	return `${String(wake.attempts)} launch(es) outstanding for the current cut, none claimed yet`
+}
+
 // The wake count is printed beside the carry record's `cuts` rather than alone, because the two being
-// equal is the property worth being able to check — one wake per cut is the whole invariant.
+// equal is the property worth being able to check — one wake per cut is the whole invariant, and since
+// joshuafolkken/kit#1746 `woke` counts records actually claimed rather than sessions started.
+// **The outstanding line beside it is what makes a shortfall readable**: the count is observed at a
+// poll, so it lags a claim by up to one interval, and launches still outstanding are what say whether
+// a missing wake is one not yet seen or one that never arrived.
 function describe_wake(wake: RunWake, context: WakeContext): string {
 	const live = run_wake.is_supervisor_live(wake) ? 'running' : 'not running'
 	const cuts = carry_cuts(run_carry.read_carry(context.carry_target))
@@ -161,8 +201,12 @@ function describe_wake(wake: RunWake, context: WakeContext): string {
 		`invocation: ${wake.invocation}`,
 		`supervisor: process ${String(wake.pid)} (${live}), watching since ${wake.started_at}`,
 		`woke ${String(wake.woke)} session(s) across ${cuts} cut(s)`,
+		outstanding_line(wake),
+		`output: ${context.log_target}`,
 		`stop it with \`${STOP_COMMAND}\``,
-	].join('\n')
+	]
+		.filter((line) => line !== undefined)
+		.join('\n')
 }
 
 function wake_session(context: WakeContext, invocation: string): LaunchResult {
@@ -170,7 +214,10 @@ function wake_session(context: WakeContext, invocation: string): LaunchResult {
 
 	if (argv === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
 
-	return run_wake_session.launch({ argv, cwd: context.worktree }, note_to_stderr)
+	return run_wake_session.launch(
+		{ argv, cwd: context.worktree, log_path: context.log_target },
+		note_to_stderr,
+	)
 }
 
 function ports_for(context: WakeContext): LoopPorts {
@@ -185,13 +232,19 @@ function ports_for(context: WakeContext): LoopPorts {
 	}
 }
 
-async function warn_of_failure(stop: LoopStop): Promise<void> {
+// The log is named in the warning rather than only in `--list`, because the person reading a warning
+// at three in the morning is the one who needs to know where to look next.
+function log_hint(context: WakeContext): string {
+	return `The output of every session this supervisor started is in ${context.log_target}.`
+}
+
+async function warn_of_stop(stop: LoopStop, body: string, context: WakeContext): Promise<void> {
 	await telegram_notify.send_or_report(
 		{
 			task_type: 'warning',
 			repo_name: gh_spawn.get_repo_name_with_owner_within(REPO_LOOKUP_TIMEOUT_MS),
 			issue_title: WARNING_TITLE,
-			body: [WARNING_BODY, stop.note].filter(Boolean).join('\n'),
+			body: [body, stop.note, log_hint(context)].filter(Boolean).join('\n'),
 			issue_url: undefined,
 			pr_url: undefined,
 		},
@@ -199,20 +252,42 @@ async function warn_of_failure(stop: LoopStop): Promise<void> {
 	)
 }
 
-// A failure that reached nobody is the defect, so the Telegram goes out before the verdict is printed
-// and the command exits non-zero behind it.
-async function finish(stop: LoopStop): Promise<number> {
-	if (stop.reason !== run_wake_loop.FAILED_REASON) return report(stop.reason)
+// **Only a failed wake exits non-zero, and the two reasons that newly warn do not**
+// (joshuafolkken/kit#1746). The verdict-and-exit-code table in `docs/josh-commands.md` is a contract
+// callers branch on; what `expired` and `unreadable` were missing is the notification, not a different
+// exit code, and changing both at once would break a caller to fix a silence.
+function exit_code_of(reason: WakeStopReason): number {
+	return reason === run_wake_loop.FAILED_REASON ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
+}
 
-	console.error(stop.note ?? WARNING_BODY)
-	await warn_of_failure(stop)
+// A failure that reached nobody is the defect, so the Telegram goes out before the verdict is printed.
+// Which stops reach a person, and what each one says — `undefined` for the two where nothing went
+// wrong. It is a function rather than a bare lookup so the decision can be asserted for every reason
+// the loop can end on, which is the contract joshuafolkken/kit#1746 changed.
+function stop_body(reason: WakeStopReason): string | undefined {
+	return STOP_BODIES[reason]
+}
 
-	return report(stop.reason, FAILURE_EXIT_CODE)
+async function finish(stop: LoopStop, context: WakeContext): Promise<number> {
+	const body = stop_body(stop.reason)
+
+	if (body === undefined) return report(stop.reason)
+
+	console.error(stop.note ?? body)
+	await warn_of_stop(stop, body, context)
+
+	return report(stop.reason, exit_code_of(stop.reason))
 }
 
 function spawn_supervisor(context: WakeContext, interval: string | undefined): number {
 	const argv = run_wake_session.supervisor_argv(SCRIPT_PATH, interval)
-	const result = run_wake_session.launch({ argv, cwd: context.worktree }, note_to_stderr)
+	// **The supervisor's own output goes to the same file as the sessions it starts.** It is detached
+	// with the same call, so before joshuafolkken/kit#1746 its `console.error` — the launch note that
+	// says the agent CLI is not on `PATH`, and the stop note behind every warning — went nowhere at all.
+	const result = run_wake_session.launch(
+		{ argv, cwd: context.worktree, log_path: context.log_target },
+		note_to_stderr,
+	)
 
 	if (result.kind === 'failed') {
 		console.error(`Could not start the supervisor: ${result.note}`)
@@ -269,7 +344,7 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 
 	tidy_up(context.wake_target)
 
-	return await finish(stop)
+	return await finish(stop, context)
 }
 
 // **The verdict tracks whether the supervisor is actually running, not merely whether a record is
@@ -354,6 +429,7 @@ const run_wake_cli = {
 	UNKNOWN_VERDICT,
 	USAGE,
 	run,
+	stop_body,
 }
 
 if (process.argv[1] === SCRIPT_PATH) await main(process.argv.slice(ARGV_OFFSET))

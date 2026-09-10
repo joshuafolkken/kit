@@ -215,14 +215,27 @@ describe('run_wake — the supervisor record', () => {
 	it('names the writing process, so a person can stop it', () => {
 		expect(run_wake.fresh_wake(INVOCATION, NOW).pid).toBe(process.pid)
 	})
+})
 
-	it('starts at no wakes and counts one per wake', () => {
+// `attempts` counts what was started and `woke` counts what arrived; the gap between the two is where
+// a silent failure lives (joshuafolkken/kit#1746).
+describe('run_wake — launches counted apart from arrivals', () => {
+	it('marks an attempt when a session is launched', () => {
 		const wake = run_wake.fresh_wake(INVOCATION, NOW)
 
 		expect(wake.woke).toBe(0)
-		expect(run_wake.count_wake(wake, NOW, 99).woke).toBe(1)
+		expect(run_wake.count_wake(wake, NOW, 99).attempts).toBe(1)
 		expect(run_wake.count_wake(wake, NOW, 99).woke_at).toBe(NOW.toISOString())
 		expect(run_wake.count_wake(wake, NOW, 99).woke_pid).toBe(99)
+	})
+
+	// joshuafolkken/kit#1746. Counted at the launch, `woke` asserted the very thing the supervisor had
+	// not checked: three sessions were started for one cut, none of them claimed the record, and
+	// `--list` reported the invariant as held throughout.
+	it('does not count a launched session as a wake until it claims the record', () => {
+		const wake = run_wake.fresh_wake(INVOCATION, NOW)
+
+		expect(run_wake.count_wake(wake, NOW, 99).woke).toBe(0)
 	})
 
 	// `woke` is published against the carry record's `cuts`, so a retry of the same cut must not
@@ -231,16 +244,45 @@ describe('run_wake — the supervisor record', () => {
 		const first = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
 		const retry = run_wake.count_wake(first, NOW, 100)
 
-		expect(retry.woke).toBe(1)
+		expect(retry.woke).toBe(0)
 		expect(retry.attempts).toBe(2)
 	})
 
 	it('clears the wake mark and the attempts once a session has claimed the carry record', () => {
 		const woken = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
 
-		expect(run_wake.clear_wake_mark(woken).woke_at).toBeUndefined()
-		expect(run_wake.clear_wake_mark(woken).attempts).toBeUndefined()
-		expect(run_wake.clear_wake_mark(woken).woke).toBe(1)
+		expect(run_wake.count_claim(woken).woke_at).toBeUndefined()
+		expect(run_wake.count_claim(woken).attempts).toBeUndefined()
+		expect(run_wake.count_claim(woken).woke).toBe(1)
+	})
+
+	// A record with no wake outstanding is an ordinary live session working through its budget, which
+	// no supervisor woke — counting it would put `woke` past `cuts` and break the invariant the other
+	// way round.
+	it('counts no wake where none was outstanding', () => {
+		expect(run_wake.count_claim(run_wake.fresh_wake(INVOCATION, NOW)).woke).toBe(0)
+	})
+
+	// One retried cut is still one cut served, however many launches it took.
+	it('counts a retried cut once when it is finally claimed', () => {
+		const first = run_wake.count_wake(run_wake.fresh_wake(INVOCATION, NOW), NOW, 99)
+		const retry = run_wake.count_wake(first, NOW, 100)
+
+		expect(run_wake.count_claim(retry).woke).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#1746. The log is what a session that exited without claiming the record leaves
+// behind, so it has to be findable from the same directory the other two records key on.
+describe('run_wake.wake_log_path', () => {
+	it('keys on the repository and is not the record path', () => {
+		expect(run_wake.wake_log_path('/a/.git')).toBe(run_wake.wake_log_path('/a/.git'))
+		expect(run_wake.wake_log_path('/a/.git')).not.toBe(run_wake.wake_log_path('/b/.git'))
+		expect(run_wake.wake_log_path('/a/.git')).not.toBe(run_wake.wake_path('/a/.git'))
+	})
+
+	it('names itself a log rather than a record', () => {
+		expect(run_wake.wake_log_path('/a/.git').endsWith('.log')).toBe(true)
 	})
 })
 

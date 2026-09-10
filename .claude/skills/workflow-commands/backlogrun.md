@@ -257,7 +257,17 @@ session is offered by exactly the rules the first one was — a pool that grew a
 **A failure is visible rather than silent.** A wake that never claims the carry record is retried, and
 once the retries are spent the supervisor stops and sends a `warning` Telegram — which covers a wake
 command that does not exist, a session that dies during boot, and one that runs without picking the
-run up.
+run up. **Every other stop that leaves the run asleep sends it too** (joshuafolkken/kit#1746): a
+carry record that has expired or cannot be read ends the supervisor with the record still handed off,
+and both of those were silent, which is this sentence's promise going unkept. `none` — the run having
+finished — and a person's own `--stop` stay silent, because in neither did anything go wrong.
+
+**And what the woken sessions printed is kept, because a silent exit has to be diagnosable after the
+fact** (joshuafolkken/kit#1746). Everything the supervisor starts writes to one log file per
+repository, named by `--list` and by every warning. `detached` is what puts a session outside the
+conversation; discarding its output was a second choice riding along with that, and the two are
+separate requirements — on 2026-09-10 three sessions died without claiming the record and left nothing
+anywhere to say why.
 
 **A person keeps control of it.** `pnpm josh run:wake --list` names the running supervisor and
 `--stop` ends it; the full contract, what it launches and why that is a constant rather than a
@@ -265,7 +275,11 @@ setting are `docs/josh-commands.md` → "`josh run:wake`".
 
 **The completion report names how many sessions were woken beside the record's `cuts`**, and the two
 being equal is the invariant — one wake per cut. `pnpm josh run:wake --list` prints them together, so
-a run that woke fewer sessions than it took cuts is visible rather than argued about.
+a run that woke fewer sessions than it took cuts is visible rather than argued about. **What is
+counted is a carry record actually claimed, never a process started** (joshuafolkken/kit#1746) —
+counted at the launch the number asserted the one thing nobody had checked, and it read as one wake
+against one cut through the whole of the forty minutes in which three sessions started and none of
+them arrived.
 
 **The reading is scoped to `backlogrun`.** `epicrun` and `fullrun` cuts still wait for a person's
 keystroke — `epicrun.md` → "The hand-off" is unchanged — because neither declares a budget of the kind
