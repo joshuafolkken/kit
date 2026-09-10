@@ -33,7 +33,7 @@ const AUTHORIZATION_MARKERS: ReadonlyArray<string> = [
 	// opted-in epic they are offered, and `epic:bundle` makes that bundling Tier A. What replaces the
 	// promise is the brake, so the section is pinned by its heading and by the ceiling that bounds the
 	// loop — a rewrite that drops either is the self-widening the withdrawal had to answer for.
-	'**and an issue this run filed, once',
+	'**and an issue this run filed, once it has become such a child**',
 	'### The brake that replaces the promise',
 	'**Ten filings per invocation**',
 ]

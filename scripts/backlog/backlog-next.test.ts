@@ -92,9 +92,10 @@ describe('the candidate table', () => {
 	// prerequisite route it carries a `route:` label as well. Bundled into an opted-in epic it is
 	// offered all the same — the behavior `backlogrun.md` → "What one invocation approves" now states
 	// rather than denies. **The label is inert today, and that is what this case is for**: nothing
-	// under `scripts/backlog/` reads a `route:` label, so this passes for the same reason the case
-	// above does — and it is the two repairs that section prohibits, dropping a run's own filings from
-	// the pool and requiring a person's `auto-ok` on the child, that would make this the one to go red.
+	// under `scripts/backlog/` reads a `route:` label, so this passes for the same reason
+	// 'offers a runnable child of an epic whose root carries auto-ok' does — and it is the two repairs
+	// that section prohibits, dropping a run's own filings from the pool and requiring a person's
+	// `auto-ok` on the child, that would make this the one to go red.
 	it('offers a run-filed child carrying a route label but no auto-ok of its own', async () => {
 		backlog_fixture.stub_backlog({
 			opted_in: [opted_in_epic()],
