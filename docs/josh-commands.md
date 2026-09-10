@@ -1527,6 +1527,34 @@ Fetch GitHub issue details for use in an AI-assisted workflow.
 pnpm josh issue 42
 ```
 
+### `josh issue:read`
+
+Print each issue's title, state, body and every comment on it — the whole of what `.claude/skills/workflow-commands/SKILL.md` → §2g calls "the Issue", in one call ([#1715](https://github.com/joshuafolkken/kit/issues/1715)).
+
+```bash
+pnpm josh issue:read 1715                    # alias: josh ird
+pnpm josh issue:read 1715 1567 1605
+```
+
+```
+issue: 1715
+title: Measure where a backlogrun parent's requests go
+state: open
+
+The body.
+
+comment by someone at 2026-09-10T00:00:00Z
+The comment.
+```
+
+It replaces the two `gh api` reads the workflow documents prescribed per issue — `repos/{owner}/{repo}/issues/<N>` and `repos/{owner}/{repo}/issues/<N>/comments`. The two need nothing from one another, so typed by hand they are two calls, and a parent reading several issues in a row pays a turn for each. Measured over four recorded `backlogrun` parents, `issue bookkeeping` was the single largest contributor to the parent's turn count — 110 of 414 turns, 26.6% — and one issue read at a time was its dominant shape. A parent's cost grows as n²/2 in its own request count ([#1567](https://github.com/joshuafolkken/kit/issues/1567)), so a turn removed there is worth more than a turn removed inside a child.
+
+- **A comment listing that could not be read is said to be unreadable, never shown as no comments.** The two are opposite answers, and §2g's rule is that of a body and a comment that disagree the later text is in force — so a block showing no comment where the read failed hands the reader a body a comment may already have overturned.
+- **No `--repo`.** The comment listing reads the repository it runs in, so a cross-repository read stays the two `gh api` calls it always was. Naming a flag and ignoring it would print a confident block for a _different_ repository's issue of the same number.
+- Several numbers are read concurrently, under the same bound `issue:state` and `epic:bundle` use, and each block names the number it belongs to — attribute a block by its `issue:` line, never by position, since a number that produced nothing prints no block.
+- **A token that is not a bare number refuses the whole call**, printing the usage; a number repeated in one call is read once.
+- **A non-zero exit is never an issue.** A number that resolves to nothing prints `does not resolve`; a read that failed prints `could not read`. One such number never costs the others their answer.
+
 ### `josh issue:state`
 
 Print each issue's state, labels, and whether it is one a run must stop on — in the spelling the workflow documents compare against.
@@ -2690,6 +2718,16 @@ Single checks:
   answered nothing new            0   0.0 s · no edit between the two calls
   recoverable check time    0.0 min   at 8.1 s model time per round trip
 
+Turns by contributor:
+  implementation                 38   9.2% of the turns that issued a call
+  child dispatch                 33   8.0% of the turns that issued a call
+  progress polling               25   6.0% of the turns that issued a call
+  child confirmation             62   15.0% of the turns that issued a call
+  loop asks                      50   12.1% of the turns that issued a call
+  issue bookkeeping             110   26.6% of the turns that issued a call
+  investigation                  84   20.3% of the turns that issued a call
+  other                          12   2.9% of the turns that issued a call
+
 Followup stages (in run order):
   read from the rows followup printed into the transcript
   closes-and-context          1.2 s   1 invocation(s)
@@ -2751,6 +2789,8 @@ What it cost, by phase:
 ```
 
 **The `Followup stages (in run order):` block is what `followup` printed about itself, kept past the run that printed it** ([#1445](https://github.com/joshuafolkken/kit/issues/1445)). [#1349](https://github.com/joshuafolkken/kit/issues/1349) made the command time its own laps; this reads those rows back out of the Bash span's output, which is the only way anything can see inside one tool call. **The rows are in the order a run passes them, not by descending duration** — every other table here ranks, because its rows are an open set and the question is which is largest, while these are a closed set of named laps and the question is which stage of _this_ run was slower than the same stage of _that_ one, which is read down one column. **A stage no invocation reported says `not measured`, never `0.0 s`**: `merge` is absent from a run that did not merge and every lap after `interrupted` is absent from a run that threw, and a zero would assert a lap that ran and took no time. Two invocations in one window are summed, which is what the `invocation(s)` column says; a body the harness truncated leaves an invocation counted in the run total and reported as unread under the heading. **The whole block is withheld where the window held no `followup` call at all** — a heading over a column of `not measured` rows would assert the question was asked of something.
+
+**The `Turns by contributor:` block says what the run's turns were _for_, which no duration can** ([#1715](https://github.com/joshuafolkken/kit/issues/1715)). `Round trips:` says how often a run stopped and `Bundling:` how many of those stops were avoidable; this says what the stops were spent on — the question a `backlogrun` **parent** raises, because a parent barely implements anything: it polls, it confirms children, it asks its loop what to do next, and it reads issues. **The turn is `time-round-trips.ts`'s and the key is `time-command-key.ts`'s**, so nothing here defines either a second time. **A turn is attributed to exactly one contributor**, by the precedence the rows are printed in — a turn that edited and also read is implementation, because the edit is what it was for — which is what keeps the eight rows reconstructing the turn count instead of summing past it. The figures above are the four recorded `backlogrun` parents of [#1715](https://github.com/joshuafolkken/kit/issues/1715), 414 turns: `issue bookkeeping` is the largest at 26.6%, and one issue read at a time was its dominant shape — which is what [`josh issue:read`](#josh-issueread) exists to collapse. **A contributor being large is a reason to look, never a finding**: whether those turns were avoidable is `Bundling:`'s question, and this block deliberately does not answer it.
 
 **The `Single checks:` block is about the probing in front of that gate, not the gate itself** ([#1383](https://github.com/joshuafolkken/kit/issues/1383)). `CLAUDE.md` has said **one gate per run, not one per edit** since [#1246](https://github.com/joshuafolkken/kit/issues/1246), and the single checks — `josh lint:related`, `josh test:related`, `josh cspell:dot` and the type check — are where that rule sends an implementation loop instead. Nothing measured whether the loop then repeated _them_. **Two calls are the same call only if they named the same files**, so the signature is the subcommand plus its arguments, sorted and with shell redirections dropped — read while the tool input is still in hand, since a span keeps none. `answered nothing new` is the narrow figure the rule in `prompts/review.md` → "A single check answers once per tree" is about: a repeat that only a model turn sat between, whose answer was therefore known before it was asked. **It under-reports on purpose** — a repeat separated by a plain `Read` is not counted, because nothing here can prove that call changed no file — and a consumer project's type check is `josh-app check:ci`, which is not a `pnpm josh <cmd>` call at all and so is invisible. The zero above is the honest reading of that run rather than an empty block: all three of its repeats followed an edit.
 

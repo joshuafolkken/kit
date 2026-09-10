@@ -20,6 +20,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Fetch GitHub issue details',
 		category: 'AI tools',
 	},
+	'issue:read': {
+		script: 'scripts/issue/issue-read-cli.ts',
+		description: "Print each issue's title, body and every comment on it, in one call",
+		category: 'AI tools',
+	},
 	'issue:state': {
 		script: 'scripts/issue/issue-state-cli.ts',
 		description:

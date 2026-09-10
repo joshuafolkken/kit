@@ -98,7 +98,13 @@ an unattended run over and over.
 - **Decide everything decidable from the issue itself.** Read the issue's body **and its comments**
   (`SKILL.md` → §2g), and where the answer is already there, record it as an Issue comment and
   **remove the label** — `CLAUDE.md` → "Decision autonomy" already makes that Tier A, and a child
-  whose decision is recorded while its label still stands is parked for no reason.
+  whose decision is recorded while its label still stands is parked for no reason. **Read every one
+  of them in one call** — `pnpm josh issue:read <N> <N> …`, the numbers the plan just listed under
+  "Waiting on a person" — rather than a `gh api` pair per issue. This pass is where a parent reads the
+  most issues in a row, and joshuafolkken/kit#1715 measured `issue bookkeeping` as the largest single
+  contributor to a `backlogrun` parent's turn count: 110 of 414 turns over four recorded parents,
+  26.6%, one issue at a time. A parent's cost grows as n²/2 in its own request count
+  (joshuafolkken/kit#1567), so a turn removed here is worth more than a turn removed inside a child.
 - **Never measure in order to decide.** A question needing a benchmark, a profile, or a run of the
   thing itself is not settled here: it stays labelled and the plan says so. This pass is a cheap
   read, not a research task, and turning it into one would put the whole backlog behind it.
