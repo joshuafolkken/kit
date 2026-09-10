@@ -152,6 +152,7 @@ export {
 	ai_review_pull_comment_schema,
 	pr_info_schema,
 	epic_issue_schema,
+	issue_label_schema,
 	epic_child_schema,
 	epic_subject_schema,
 	open_issue_schema,

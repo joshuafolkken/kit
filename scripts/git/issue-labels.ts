@@ -28,15 +28,29 @@ const AUTO_OK_LABEL = 'auto-ok'
 // checkout and must go on holding the repository. Read as parked in either place, the next child
 // would start on top of that work.
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
-
-// The three labels that mean an open issue must not be handed to a run as it stands: an `epic`
-// tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
-// a running workflow, and `needs-decision` was parked precisely because it cannot advance without a
-// person. Held here rather than in either caller because both the next-issues display and the
-// `auto-ok` pickup ask the same question, and two copies would answer it differently the first time
-// one of them gained a fourth label.
+// Marks an issue whose work a run verified is **already merged** (joshuafolkken/kit#1679). Closing
+// an Issue is Tier C, so a run that reaches that conclusion may not act on it — and before this
+// label there was no exit that was not Tier C: `fullrun #1656` verified the work was already in
+// `main` from joshuafolkken/kit#1623 and closed the Issue itself.
 //
-// **`needs-human-review` is deliberately not a fourth.** It withholds the end of a run, not its
+// **It is not `needs-decision`, and the difference is the whole reason it exists.** A parked issue
+// waits for an answer nobody has given; this one has its answer already — the work is done, and all
+// that is left is the close, which is a person's. Parked, it goes back into the offer the moment a
+// person clears the label, and the next run repeats the same investigation.
+//
+// **Only a person removes it, by closing the issue.** A run applies it; nothing in the workflow
+// takes it off, because taking it off asserts the work is *not* done, which is the same claim in
+// reverse and is no more a run's to make.
+const ALREADY_DONE_LABEL = 'already-done'
+
+// The four labels that mean an open issue must not be handed to a run as it stands: an `epic`
+// tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
+// a running workflow, `needs-decision` was parked precisely because it cannot advance without a
+// person, and `already-done` names work that is already merged. Held here rather than in either
+// caller because both the next-issues display and the `auto-ok` pickup ask the same question, and
+// two copies would answer it differently the first time one of them gained another label.
+//
+// **`needs-human-review` is deliberately not among them.** It withholds the end of a run, not its
 // start: an issue carrying it is implemented and verified like any other and only stops before the
 // commit. Excluded here it would never be offered, so the work it asks a person to look at would
 // never be produced — the label would silently become a second `needs-decision`.
@@ -44,6 +58,7 @@ const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
 	NEEDS_DECISION_LABEL,
+	ALREADY_DONE_LABEL,
 ])
 
 // joshuafolkken/kit#1083: filing-route labels, applied at filing time so the backlog's composition —
@@ -129,6 +144,7 @@ function has_label_name(labels: ReadonlyArray<string>, wanted: string): boolean 
 }
 
 export {
+	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,

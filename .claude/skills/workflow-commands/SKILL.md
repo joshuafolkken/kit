@@ -662,6 +662,11 @@ gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a'
 Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
 steps after it have to name a number that does not exist until it is.
 
+**`pnpm josh issue:scout "<title>"` goes in front of that call, exactly as it does for a `new` entry**
+(§2e, joshuafolkken/kit#1679). A filing made mid-run is the one most likely to duplicate something —
+it is about the work the run has just been looking at — and joshuafolkken/kit#1656 is that case
+exactly: a `route:tier-a` filing covering work that had merged about five hours earlier.
+
 **Each entry point's own branch stays in that entry's file**, which is where the numbered procedure
 lives:
 
@@ -701,7 +706,7 @@ is a pointer to it (joshuafolkken/kit#1185 rollout of the joshuafolkken/kit#1174
 
 ## 2e. Before filing a new Issue — `pnpm josh issue:scout`
 
-**Every `new` entry point asks two questions before it files, and one command answers both.** Run it
+**Every filing asks two questions before it happens, and one command answers both.** Run it
 the moment the title exists and **before** the `gh api … issues` call that creates the Issue:
 
 ```bash
@@ -716,11 +721,18 @@ issues already covered — one of them filed **three minutes earlier by another 
 (joshuafolkken/kit#1252). The same two answers now take about four seconds, and they are the same two
 answers every time rather than whatever that run's search happened to cover.
 
-- **`Duplicates:` is read, not skimmed.** Open each candidate. When one covers the same work, **do not
-  file**: send a `confirmation` Telegram and stop with the command to run against the existing Issue —
-  "Please run `fullrun #<existing>` to execute this Issue." A second Issue for work already tracked is
-  what this step exists to prevent, and it is invisible afterwards. When none of them covers it, say
-  so in one line and carry on filing.
+- **`Duplicates:` is read, not skimmed.** Open each candidate. When an **open** one covers the same
+  work, **do not file**: send a `confirmation` Telegram and stop with the command to run against the
+  existing Issue — "Please run `fullrun #<existing>` to execute this Issue." A second Issue for work
+  already tracked is what this step exists to prevent, and it is invisible afterwards. When none of
+  them covers it, say so in one line and carry on filing.
+- **A candidate marked `(closed)` is a different answer, and it is the one that was missing.** The
+  scan covers what closed recently as well as what is open (joshuafolkken/kit#1679), because the work
+  most likely to be filed twice is the work that just finished. A closed candidate that covers the
+  same work means **the work is already done**, not that it is tracked elsewhere — so there is
+  nothing to run and no `fullrun #<existing>` to hand over. Verify it against the merged code, and
+  then take the exit in §2g → "When the work turns out to be already merged". A closed candidate that
+  does *not* cover the work is noted in one line and the filing carries on, exactly as an open one is.
 - **`none` is an answer.** The command reports no candidate rather than the closest miss, so a `none`
   is a scan that found nothing — not a scan that was not run.
 - **`Epic:` front-loads the placement.** Its recommendation is `epic:bundle`'s, which makes
@@ -737,8 +749,17 @@ answers every time rather than whatever that run's search happened to cover.
   Issue that does not exist yet, from a title; that one answers about an Issue that does, from its
   number and its recorded relations, and its answer can differ once the Issue is real. Both calls
   happen — the scout before the `issues` call, `epic:bundle` after it.
-- **A `#N` entry point does not run it.** `fullrun #N` / `halfrun #N` / `kickoff #N` are handed an
-  Issue that already exists, so there is nothing to file and nothing to be a duplicate of.
+- **Every filing route runs it, not only a `new` entry point** (joshuafolkken/kit#1679). The scope
+  used to be the `new` entries alone, which left the routes that file *during* a run — §2d's
+  prerequisite, §2i's observation, and the review round cap's branch-2 filing — outside the one check
+  that would have caught a duplicate. joshuafolkken/kit#1656 was filed by exactly that gap: a
+  `route:tier-a` filing made mid-run, covering work joshuafolkken/kit#1623 had merged about five
+  hours earlier. **The trigger is the `gh api … issues` call, never which keyword started the run** —
+  if this run is about to create an Issue, the scout goes in front of it.
+- **A `#N` entry point does not run it *for the Issue it was handed*.** `fullrun #N` / `halfrun #N` /
+  `kickoff #N` are given an Issue that already exists, so there is nothing to file and nothing to be
+  a duplicate of. That says nothing about an Issue such a run goes on to file later, which the bullet
+  above covers.
 - **The split path files each child through the same step** — a split is several filings, and each one
   can duplicate something already open. The epic itself is not scouted: it is created over children
   that were, and `epic:bundle` is what places it afterwards.
@@ -866,12 +887,64 @@ starts.
   not implement it, whatever acceptance criteria the body still lists, and name the Issue it went to
   in the completion report. Implementing it anyway is joshuafolkken/kit#1304 exactly.
 - **A comment saying the Issue no longer has a reason to exist** — the defect does not reproduce, or
-  it was fixed elsewhere — stops the run with a `confirmation` Telegram. Closing an Issue is Tier C,
-  and a run that quietly implemented nothing would report success on work nobody did.
+  it was fixed elsewhere — takes the exit in the next subsection, "When the work turns out to be
+  already merged". Closing an Issue is Tier C, and a run that quietly implemented nothing would
+  report success on work nobody did. **A comment is one of the two ways a run learns this and not a
+  case of its own** (joshuafolkken/kit#1679), which is why the procedure sits below rather than here.
 
 Everything else is the ordinary work of the run, **a widened scope included**: a widening large
 enough to be several separately-mergeable deliverables is the split assessment's business
 (`split-assessment.md`), and not a second kind of stop.
+
+### When the work turns out to be already merged
+
+**A run can learn its Issue is already done in two ways, and both end here** (joshuafolkken/kit#1679).
+A **comment** says so — the bullet above — or the **run itself verifies it**, by reading the merged
+code and finding every acceptance criterion already satisfied. The two differ only in where the claim
+came from; what is left to do afterwards is identical, so there is one procedure and not two.
+
+**Before this, only the first had one, and the second had no exit that was not Tier C.** `fullrun
+#1656`, run as a child of the `backlogrun` of 2026-09-09, verified line by line that its work was
+already in `main` from joshuafolkken/kit#1623 — and then **closed the Issue itself**, which is Tier C
+and not a run's to do. The verification was sound; the child simply had nowhere to put the answer.
+**Parking it is not that place either**: `needs-decision` means "waiting for an answer nobody has
+given", and here the answer exists — so a person clearing the label puts the Issue straight back into
+the offer and the next run repeats the same investigation.
+
+**The exit is the `already-done` label.** It is `needs-decision`'s counterpart rather than a second
+spelling of it: `epic:next`, `backlog:next` and `auto-ok:next` all stop offering the Issue
+(`scripts/git/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`), and
+`epic:busy` stops counting it as holding a lane, because the run that applied it committed nothing
+and left a clean checkout. **Only a person removes it, by closing the Issue** — taking it off asserts
+the work is *not* done, which is the same Tier C claim in reverse.
+
+```bash
+gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it" --silent 2>/dev/null || true
+gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=already-done'
+gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
+```
+
+The procedure, in order:
+
+1. **Record the evidence as an Issue comment, before the label.** Name the pull request or commit
+   that merged the work and, for each acceptance criterion the Issue states, the file and lines that
+   satisfy it. **A claim with no citations is not the finding this exit is for** — it is the
+   suspicion that sends the run back to implementing.
+2. **Apply `already-done` and remove `in-progress`** — the two commands above. Leaving `in-progress`
+   on holds a lane against an Issue nothing will ever run.
+3. **Commit nothing, push nothing, open no pull request.** There is no change to gate, no review to
+   run and no `pnpm josh followup` to reach; the tree is clean, so release the hold with
+   `pnpm josh run:release`.
+4. **Then behave as the entry point does for a parked child.** A `fullrun` / `halfrun` a person typed
+   sends a `confirmation` Telegram naming the Issue and the merge that already covers it, and stops.
+   An `epicrun` / `queue` / `backlogrun` child is park-and-continue: no Telegram of its own, the
+   finding named in the summary it returns, and the batch moves to the next child
+   (`epicrun.md` → "park and continue").
+5. **Never close the Issue.** That is Tier C at every entry point, and the label is what leaves the
+   close one click away for the person who owns it.
+
+**Nothing about this is a license to skip the work when it merely looks familiar.** The bar is step
+1's citations: a criterion you cannot point at merged code for is a criterion this run still owes.
 
 ### A long thread
 
@@ -1010,6 +1083,9 @@ those commands' park-and-continue rule exists to avoid.
   cap** — an observation that does not block the run is *discretionary*, which is the branch the cap
   bites on, so with more than 30 open Issues in the target repository, close one first, and nothing
   honestly closable means do not file (`prompts/collaboration-workflow/wip-cap.md`).
+- **Run `pnpm josh issue:scout "<title>"` before the `gh api … issues` call**, as before any other
+  filing (§2e, joshuafolkken/kit#1679). This route reaches the filing call without a `new` entry
+  point in front of it, which is how it used to skip the one check that catches a duplicate.
 - **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
   tracks is one `epic:next` never offers, so an unbundled observation is parked rather than recorded.
   **Where that epic's root carries `auto-ok` the filing joins the backlog's pool**, which is admitted

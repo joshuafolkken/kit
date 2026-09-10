@@ -1599,7 +1599,7 @@ The state is printed as `OPEN` / `CLOSED` / `MERGED`, not as REST's lower-case `
 
 ### `josh issue:scout`
 
-Before an issue is filed, answer the two questions every `new` entry point asks first: has this already been filed, and which epic does it belong to ([#1252](https://github.com/joshuafolkken/kit/issues/1252)).
+Before an issue is filed, answer the two questions every filing asks first: has this already been filed, and which epic does it belong to ([#1252](https://github.com/joshuafolkken/kit/issues/1252)). Since [#1679](https://github.com/joshuafolkken/kit/issues/1679) the workflow runs it in front of **every** `gh api … issues` call rather than only the `new` entry points, and the duplicate half reads what closed recently as well as what is open.
 
 ```bash
 pnpm josh issue:scout "Stop the gate re-running after every edit"                      # alias: josh isc
@@ -1618,6 +1618,8 @@ Both answers were assembled by hand before this existed, and differently every t
 
 - **The duplicate half compares titles**, as a token overlap: the words each title uses, without the ones every title carries. Two issues about one job are written weeks apart by different sessions and share vocabulary rather than word order — which is what rules out whole-string edit distance and the maintained packages built on it. Bodies are not compared: they are written in the session language, and a token overlap over Japanese prose measures nothing.
 - **The whole open listing is scored, with no prefix and no early exit.** The issue this search exists to catch is the one another session filed minutes ago, and where that one sits in the listing is the single thing nobody controls.
+- **What closed recently is scored beside it, and marked `(closed)`** ([#1679](https://github.com/joshuafolkken/kit/issues/1679)). The work most likely to be filed twice is the work that just finished: [#1656](https://github.com/joshuafolkken/kit/issues/1656) was filed about five hours after [#1623](https://github.com/joshuafolkken/kit/issues/1623) closed having already done it, and an open-only scan could not see any of it. The newest hundred closed issues are read, ordered by their last update — GitHub has no `sort=closed`, and an update is what a close is. The two rank together, because which listing a row came out of says nothing about how well it matches; the `(closed)` marker is there because the reader does two different things with the two answers, an open candidate meaning the work is tracked elsewhere and a closed one meaning it may already be done. A closed listing that could not be read is a warning beside the report rather than a failure of it — the open half ran.
+- **Closed rows reach the duplicate half only.** `epic:bundle` places a draft among issues still being worked on, and a closed one can neither gain a sibling nor be recommended as an epic, so the epic half's pool is unchanged. The closed listing therefore asks for `labels` where the open one asks for `body`: the epic exclusion above is applied to an open row from the open epic listing, which by construction holds no closed epic, so the closed half reads the label itself.
 - **A weak match is not reported.** A candidate has to share at least two significant words _and_ clear a similarity of `0.35`; below that the answer is `none`, because a list nobody trusts is read once and skipped afterwards — the failure this command exists to end rather than reproduce. At most five are shown, and the headline says `N of M` when more cleared the bar than fit — a cap that reported the shown count as the found count would state a truncation as a complete answer.
 - **An epic is never a duplicate candidate**, and the epic tracking one _is_ printed beside it. A container reported as "already filed as #E" sends the caller to run an epic that has no implementation of its own; the epic beside a candidate is the other thing being asked — where similar work already lives.
 - **The epic half needs a number to work from, and says so when it has none.** Its signals are prose references and recorded dependencies, so a title-only draft gives it nothing to decide from and it prints `Epic: not asked` rather than "file it standalone" — a scan reported as empty where none was possible is the confident wrong answer every other gap line here exists to prevent. Pass `--body "…#<N>…"` when the work follows an existing issue; otherwise the epic printed beside a duplicate is the placement answer.
@@ -2185,6 +2187,20 @@ gh api repos/{owner}/{repo}/labels -f name=needs-human-review -f color=d93f0b -f
 ```
 
 The behavior it triggers belongs to the workflow commands rather than to any `josh` subcommand: [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workflow-commands/SKILL.md) → §2z is the single source of the definition.
+
+### `already-done` — the exit for work that is already merged
+
+A run that verifies its issue's work is **already in `main`** has nothing to implement and cannot act on that conclusion either: closing an issue is Tier C ([#1679](https://github.com/joshuafolkken/kit/issues/1679)). Before this label there was no exit that was not, and [#1656](https://github.com/joshuafolkken/kit/issues/1656) is what that cost — a child verified line by line that [#1623](https://github.com/joshuafolkken/kit/issues/1623) had already done the work, and then closed the issue itself.
+
+**It is not `needs-decision`.** A parked issue is waiting for an answer nobody has given; this one has its answer, and only the close is outstanding. Parked, a person clearing the label puts the issue straight back into the offer and the next run repeats the same investigation.
+
+The label is in `NOT_DIRECTLY_RUNNABLE_LABELS`, classifies a child as `human` in `epic:next`, and joins the busy check's parked set — the run that applied it committed nothing, so the checkout it ran in is clean and holds no lane. **A run applies it; only a person removes it, by closing the issue** — taking it off asserts the work is _not_ done, which is the same Tier C claim in reverse.
+
+```bash
+gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it"
+```
+
+The procedure — the evidence the run records before applying it, and what each entry point does afterwards — is [`.claude/skills/workflow-commands/SKILL.md`](../.claude/skills/workflow-commands/SKILL.md) → §2g, "When the work turns out to be already merged", which is the single source.
 
 ### `josh review:brief`
 

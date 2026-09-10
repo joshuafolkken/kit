@@ -296,6 +296,10 @@ describe('what makes a child settled, read from GitHub', () => {
 	it.each([
 		['CLOSED', [], true],
 		['OPEN', ['needs-decision'], true],
+		// joshuafolkken/kit#1679: a child that verified its work was already merged comments the
+		// evidence, applies this label and stops with the checkout clean. Read as not settled, this
+		// command answers `stopped` and a supervisor restarts the investigation it just finished.
+		['OPEN', ['already-done'], true],
 		['OPEN', ['in-progress'], false],
 		// The unit applies `in-progress` itself, after it reads the issue — so a unit that stopped
 		// before applying it leaves exactly this, and reading it as settled loses the stop.
