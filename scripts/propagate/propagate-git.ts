@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { git_location_environment } from '#scripts/git/git-location-environment'
+import { ls_remote_branch_arguments } from '#scripts/git/git-ls-remote'
 import { execaSync } from 'execa'
 
 // The git probes propagation needs before it writes anything into a working tree.
@@ -119,12 +120,13 @@ function commit_ahead(repository_path: string, default_name: string): string | u
 // Whether origin already carries the branch. Asked of the remote itself rather than of a
 // remote-tracking ref: a push that was refused leaves no such ref behind, and neither does a branch
 // that was never pushed at all, so the ref cannot tell the two apart.
+//
+// **The arguments come from `git-ls-remote.ts`, which anchors the pattern at `refs/heads/`**
+// (joshuafolkken/kit#1732). Built here from the bare name, the query answered for any branch whose
+// ref ends in it — so a lane pushed as `wip/1641-lane` reported `1641-lane` as already on origin,
+// and propagation classified an unpushed branch as pushed.
 function has_remote_branch(repository_path: string, branch: string): boolean {
-	const heads = run_git(
-		repository_path,
-		['ls-remote', '--heads', 'origin', branch],
-		REMOTE_TIMEOUT_MS,
-	)
+	const heads = run_git(repository_path, ls_remote_branch_arguments(branch), REMOTE_TIMEOUT_MS)
 
 	return heads !== undefined && heads !== ''
 }
