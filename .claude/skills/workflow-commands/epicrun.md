@@ -1147,7 +1147,9 @@ for the other is not a narrower rule — it is a gap, and the violations collect
   above all not a placeholder — `20:1x` is not a time, and a reader has no way to tell one invented
   digit from an observed one. Where a field is missing, say it is missing.
 - **`--once` records the report**, so the watcher does not repeat it moments later. That is the
-  command's own behavior and needs no `--mark` beside it. **A live timer is counted from the record the guard
+  command's own behavior and needs no `--mark` beside it.
+
+**A live timer is counted from the record the guard
 writes when it allows one**, never from the `sleep` processes on the machine: a process count cannot
 tell a heartbeat timer from a build step that sleeps, and a timer killed with its shell would leave
 the count wrong for the rest of the run.
