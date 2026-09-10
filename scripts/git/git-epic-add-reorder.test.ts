@@ -138,18 +138,41 @@ describe('git_epic_add_plan.build_plan — a move and an addition in one call', 
 		expect(plan_of(both).relocations).toStrictEqual([892])
 	})
 
-	// The moved row lands at the position; the added row is appended, which is where a positioned
-	// addition's row has always gone. So the task list and the declaration disagree about `#894` — a
-	// disagreement a positioned addition already had on its own, pinned here rather than fixed,
-	// because leaving an addition's behavior alone is joshuafolkken/kit#1701's own acceptance
-	// criterion. The task list is presentation order and the declaration is the authority for
-	// execution, so nothing reads the wrong order; joshuafolkken/kit#1704 is where it is reconciled.
-	it('places both in the task list', () => {
-		expect(tracked_of(both)).toStrictEqual([890, 892, 891, 894])
+	// Both rows land at the position, in the order the caller named them — the added one no longer
+	// stays at the end of the list while the declaration puts it in the middle
+	// (joshuafolkken/kit#1704, the reconciliation joshuafolkken/kit#1701 pinned as a known
+	// disagreement).
+	it('places both at the position, in the order given', () => {
+		expect(tracked_of(both)).toStrictEqual([890, 894, 892, 891])
 	})
 
 	it('declares them in the order they were given', () => {
 		expect(declared_of(both)).toStrictEqual(['#890 -> #894 -> #892 -> #891'])
+	})
+})
+
+// joshuafolkken/kit#1704: a positioned addition gained its task-list row at the end of the list
+// while the declaration named the position, so the order the epic declares and the order `epic:next`
+// presents disagreed. The row goes to the position too, and the round trip now checks it.
+describe('git_epic_add_plan.build_plan — a positioned addition', () => {
+	const before = plan({ children: [894], position: { kind: 'before', target: 891 } })
+	const after = plan({ children: [894], position: { kind: 'after', target: 890 } })
+
+	it('puts the added row directly before the target', () => {
+		expect(tracked_of(before)).toStrictEqual([890, 894, 891, 892])
+	})
+
+	it('puts the added row directly after the target', () => {
+		expect(tracked_of(after)).toStrictEqual([890, 894, 891, 892])
+	})
+
+	it('lists the children in the order it declares them', () => {
+		expect(declared_of(before)).toStrictEqual(['#890 -> #894 -> #891 -> #892'])
+	})
+
+	it('still reports it as an addition rather than a move', () => {
+		expect(plan_of(before).additions).toStrictEqual([894])
+		expect(plan_of(before).relocations).toStrictEqual([])
 	})
 })
 

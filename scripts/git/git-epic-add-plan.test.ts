@@ -304,8 +304,10 @@ describe('git_epic_add_plan.build_plan — a child with no order yet', () => {
 			[890, 891, 892],
 			[894, 895],
 		])
+		// The added row sits where the position named, not at the end of the list
+		// (joshuafolkken/kit#1704).
 		expect(git_epic_parse.parse_task_list_issue_numbers(built.body)).toStrictEqual([
-			890, 891, 892, 895, 894,
+			890, 891, 892, 894, 895,
 		])
 	})
 

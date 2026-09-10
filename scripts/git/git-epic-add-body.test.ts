@@ -6,6 +6,7 @@ const DEPENDENCIES_HEADING = '## Dependencies'
 const PROGRESS_HEADING = '## Progress'
 const DECISIONS_HEADING = '## Decisions'
 const STRAY_DECLARATION_MESSAGE = 'outside the `Dependencies` section'
+const MISSING_ROW_MESSAGE = 'would not track #894'
 const SECOND_CHAIN = '#101 -> #102'
 const BLANK = ''
 const ORDERED_CHAIN = '#890 -> #891 -> #892'
@@ -46,8 +47,7 @@ const APPENDED_CHAINS = [[890, 891, 892, 894]]
 function rewrite(overrides: Partial<RewriteInput>): RewriteOutcome {
 	return git_epic_add_body.rewrite_body({
 		body: ORDERED_BODY,
-		additions: [894],
-		relocations: [],
+		placed: [894],
 		chains_after: APPENDED_CHAINS,
 		...overrides,
 	})
@@ -125,7 +125,7 @@ describe('git_epic_add_body.rewrite_body — the declaration', () => {
 		const body = body_of(
 			rewrite({
 				body: UNORDERED_BODY,
-				additions: [103],
+				placed: [103],
 				chains_after: [],
 			}),
 		)
@@ -138,7 +138,7 @@ describe('git_epic_add_body.rewrite_body — the declaration', () => {
 		const body = body_of(
 			rewrite({
 				body: UNORDERED_BODY,
-				additions: [103],
+				placed: [103],
 				chains_after: [[103, 102]],
 			}),
 		)
@@ -215,13 +215,13 @@ describe('git_epic_add_body.rewrite_body — what it refuses to write', () => {
 			chains_after: [[1, 2, 894]],
 		})
 
-		expect(error_of(outcome)).toContain('would not track #894')
+		expect(error_of(outcome)).toContain(MISSING_ROW_MESSAGE)
 	})
 
 	it('refuses a body whose declaration cannot be found at all', () => {
 		const outcome = rewrite({
 			body: `${PROGRESS_HEADING}\n\n${ROW_101}\n`,
-			additions: [102],
+			placed: [102],
 			chains_after: [],
 		})
 
@@ -241,7 +241,7 @@ describe('git_epic_add_body.rewrite_body — locating the section', () => {
 
 	it('needs no Dependencies heading when the batch stays unordered', () => {
 		const headless = [UNORDERED_LITERAL, BLANK, PROGRESS_HEADING, BLANK, ROW_101].join('\n')
-		const body = body_of(rewrite({ body: headless, additions: [103], chains_after: [] }))
+		const body = body_of(rewrite({ body: headless, placed: [103], chains_after: [] }))
 
 		expect(git_epic_parse.parse_task_list_issue_numbers(body)).toStrictEqual([101, 103])
 	})
@@ -321,5 +321,31 @@ describe('git_epic_add_body.rewrite_body — the stray-declaration message', () 
 
 	it('names the unordered sentence for the branch that parses to no chain', () => {
 		expect(stray_error(UNORDERED_LITERAL)).toContain(UNORDERED_LITERAL)
+	})
+})
+
+// joshuafolkken/kit#1704: a positioned addition's row goes to the position rather than to the end of
+// the list, so the task list and the declaration state one order. The round trip covers the added row
+// too — before, only a moved row was checked, and an appended one passed every check while
+// `epic:next` presented an order the epic did not declare.
+describe('git_epic_add_body.rewrite_body — a positioned addition', () => {
+	const BEFORE_891 = { kind: 'before', target: 891 } as const
+
+	it('puts the added row at the position rather than at the end', () => {
+		const body = body_of(rewrite({ position: BEFORE_891, chains_after: [[890, 894, 891, 892]] }))
+
+		expect(git_epic_parse.parse_task_list_issue_numbers(body)).toStrictEqual([890, 894, 891, 892])
+	})
+
+	it('refuses when the position names a target the task list never tracks', () => {
+		const outcome = rewrite({
+			position: { kind: 'before', target: 999 },
+			chains_after: [
+				[890, 891, 892],
+				[894, 999],
+			],
+		})
+
+		expect(error_of(outcome)).toContain(MISSING_ROW_MESSAGE)
 	})
 })
