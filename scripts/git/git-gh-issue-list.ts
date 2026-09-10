@@ -8,12 +8,16 @@ import {
 	type RestIssue,
 } from './git-gh-issue-rest'
 
-// Listing open issues through REST, in the JSON shape `gh issue list --json <fields>` answered with.
+// Listing issues through REST, in the JSON shape `gh issue list --json <fields>` answered with.
 //
 // `gh issue list` goes through GraphQL, which a cloud session is answered 403 for; the REST listing
-// is served normally (joshuafolkken/kit#1022). The six callers differ only in filter and fields, so
+// is served normally (joshuafolkken/kit#1022). The callers differ only in filter and fields, so
 // the request, the paging and the mapping are decided once here and every caller downstream keeps
 // reading the field names it already reads (joshuafolkken/kit#1025).
+//
+// It was `issue_list_open` until joshuafolkken/kit#1679, when the duplicate scan needed the issue
+// that closed an hour ago and `state` became a parameter. The name went with the behavior rather
+// than being left to describe six of seven callers.
 //
 // The field mapping itself is `git-gh-issue-rest.ts`, the same one the single-issue read goes
 // through: a listing row and a read response are the same object, so a second copy of the state
@@ -27,7 +31,20 @@ const FIRST_PAGE = 1
 // `gh issue list` answered newest first, and two callers depend on it: the next-issues display
 // re-sorts by `createdAt`, and both capped listings report that the cap dropped the *oldest* rows.
 // REST already defaults to this, so it is spelled out to keep the guarantee off a default.
-const LISTING_QUERY = 'state=open&sort=created&direction=desc'
+const DEFAULT_STATE = 'open'
+const DEFAULT_SORT = 'created'
+const LISTING_DIRECTION = 'direction=desc'
+
+// `state` and `sort` are parameters rather than constants because the duplicate scan has to see the
+// issue that closed an hour ago: the work most likely to be filed twice is the work that just
+// finished, and a listing fixed at `state=open` cannot show it (joshuafolkken/kit#1679). Ordering a
+// closed listing by `created` would rank it by when each issue was *filed*, which says nothing about
+// when it closed — so the sort travels with the state rather than being fixed alongside it.
+//
+// **The defaults are the six original callers' query, character for character.** Nothing on the open
+// side changed, which is what keeps the guarantee above off a default in both directions.
+type ListingState = 'open' | 'closed'
+type ListingSort = 'created' | 'updated'
 
 // `json_fields` is still the `gh --json` spelling, so no call site changed. `body_term` stands in
 // for `--search "<term> in:body"`, which has no REST equivalent at all — the search API refuses a
@@ -41,13 +58,22 @@ interface IssueListRequest {
 	// optional parameter, which `exactOptionalPropertyTypes` will not narrow for it.
 	repo?: string | undefined
 	body_term?: string
+	state?: ListingState
+	sort?: ListingSort
+}
+
+function listing_query(request: IssueListRequest): string {
+	const state = request.state ?? DEFAULT_STATE
+	const sort = request.sort ?? DEFAULT_SORT
+
+	return `state=${state}&sort=${sort}&${LISTING_DIRECTION}`
 }
 
 function listing_path(request: IssueListRequest, page: number): string {
 	const label = request.label === undefined ? '' : `&labels=${encodeURIComponent(request.label)}`
 	const paging = `&per_page=${String(PER_PAGE)}&page=${String(page)}`
 
-	return `${git_gh_api_path.issues_api_path(request.repo)}?${LISTING_QUERY}${label}${paging}`
+	return `${git_gh_api_path.issues_api_path(request.repo)}?${listing_query(request)}${label}${paging}`
 }
 
 // `--search "<term> in:body"` matched tokens, so `#858` never matched inside `#8580`. A bare
@@ -110,7 +136,7 @@ async function fetch_page(
 // big enough to reach it is *told* rather than handed a shorter answer.
 //
 // **It applies to every listing only because the flag now reaches every caller.** Until
-// joshuafolkken/kit#1067 `issue_list_open` discarded `is_capped`, so bounding a listing whose caller
+// joshuafolkken/kit#1067 `issue_list` discarded `is_capped`, so bounding a listing whose caller
 // could not read the flag would have shortened that listing's answer in silence — the defect the
 // bound exists to prevent, introduced by the fix for it. Threading the flag out came first for that
 // reason, and the two must never be separated again: a ceiling is only ever as safe as the caller's
@@ -199,8 +225,8 @@ interface IssueListOutcome {
 	is_capped: boolean
 }
 
-// One invocation shape for every open-issue listing.
-async function issue_list_open(request: IssueListRequest): Promise<IssueListOutcome> {
+// One invocation shape for every issue listing.
+async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> {
 	try {
 		const { rows, is_capped } = await fetch_selected(request)
 		const fields = git_gh_issue_rest.split_fields(request.json_fields)
@@ -224,7 +250,7 @@ async function issue_list_open(request: IssueListRequest): Promise<IssueListOutc
 // to reach for. Every caller now receives the whole outcome and decides what truncation means for
 // it — `git-gh-issue.ts` records that decision, caller by caller.
 const git_gh_issue_list = {
-	issue_list_open,
+	issue_list,
 }
 
 export type { IssueListOutcome, IssueListRequest }

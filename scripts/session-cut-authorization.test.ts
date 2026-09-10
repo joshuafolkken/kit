@@ -79,7 +79,10 @@ const BACKLOGRUN_MARKERS: ReadonlyArray<string> = [
 	'whole-run bound count **across** cuts',
 	'The 10-filings-per-run ceiling is counted the same way',
 	'How many cuts the run crossed is named in the completion report',
-	'a resumed session is offered exactly the issues the first one was',
+	// joshuafolkken/kit#1675 replaced the sentence pinned here. It used to say a resumed session is
+	// offered exactly the issues the first one was, which stopped being true the moment a run's own
+	// filings were admitted: the record still adds no rule, but the pool can have grown across the cut.
+	'a cut adds no rule about which issues may be offered',
 	'and a lane never touches it',
 	// joshuafolkken/kit#1722: the branch table has to carry the two ownership answers, or a run that
 	// reads one has nothing telling it whether to stop, and the deciding falls back to a guess.

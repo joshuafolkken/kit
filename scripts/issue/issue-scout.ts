@@ -82,7 +82,7 @@ const MIN_SHARED_TOKENS = 2
 // and the ranking already puts the strongest first.
 const MAX_CANDIDATES = 5
 
-// An open issue as the duplicate search sees it. `title` is optional for the same reason it is on
+// An issue as the duplicate search sees it. `title` is optional for the same reason it is on
 // `BacklogIssue`: an issue read one at a time by reference carries none, and one with no title simply
 // scores nothing rather than failing the scan.
 interface ScoutIssue {
@@ -95,6 +95,11 @@ interface ScoutIssue {
 	// already filed as #<E>", and the caller is sent to run an epic that has no implementation of its
 	// own. `epic_bundle.is_strong_signal` excludes them from the other half for the same reason.
 	is_epic?: boolean
+	// A closed issue is a candidate, and the two are not interchangeable to whoever reads the list
+	// (joshuafolkken/kit#1679): an open one says "somebody is already tracking this", a closed one
+	// says "this may already be done". So the state travels with the row rather than being inferred
+	// from which listing it came out of, which the ranking mixes together.
+	is_closed?: boolean
 }
 
 interface DuplicateCandidate {
@@ -102,6 +107,7 @@ interface DuplicateCandidate {
 	title: string
 	score: number
 	epic?: number
+	is_closed?: boolean
 }
 
 // What the scan found: the candidates worth reading, and how many cleared the bar in total. The two
@@ -152,6 +158,10 @@ function to_epic_field(epic: number | undefined): { epic?: number } {
 	return epic === undefined ? {} : { epic }
 }
 
+function to_closed_field(is_closed: boolean | undefined): { is_closed?: boolean } {
+	return is_closed === true ? { is_closed: true } : {}
+}
+
 function to_candidate(
 	query: ReadonlySet<string>,
 	issue: ScoutIssue,
@@ -163,14 +173,22 @@ function to_candidate(
 
 	if (score === undefined) return undefined
 
-	return { number: issue.number, title, score, ...to_epic_field(issue.epic) }
+	return {
+		number: issue.number,
+		title,
+		score,
+		...to_epic_field(issue.epic),
+		...to_closed_field(issue.is_closed),
+	}
 }
 
-// The open issues whose titles look like this one, strongest first.
+// The issues whose titles look like this one, strongest first.
 //
 // Every row is scored — no prefix, no early exit. The issue this search exists to catch is the one
 // another session filed minutes ago, and where that one sits in the listing is the single thing
-// nobody controls (joshuafolkken/kit#1252).
+// nobody controls (joshuafolkken/kit#1252). Since joshuafolkken/kit#1679 the rows may be closed as
+// well as open, and the two rank together: a run about to file has to be shown the strongest match
+// there is, and which listing it came out of says nothing about how well it matches.
 function find_duplicates(title: string, issues: ReadonlyArray<ScoutIssue>): DuplicateSearch {
 	const query = tokenize(title)
 	const matched = issues

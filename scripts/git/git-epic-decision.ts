@@ -1,4 +1,5 @@
-import { git_epic_parse } from './git-epic-parse'
+import { git_epic_parse, type DependencyLink } from './git-epic-parse'
+import { format_replaced_relations } from './git-epic-reference'
 import { git_epic_sections, type BodyLines, type SectionRange } from './git-epic-sections'
 
 // Placing a decision record inside an epic body's `## Decisions` section.
@@ -91,6 +92,30 @@ function append_decision(body: string, record: string): string {
 	)
 }
 
+// The record as it will actually be written, with the relations this insertion replaced appended to
+// it (joshuafolkken/kit#1711).
+//
+// **A positioned `--add` discards the `blocked-by` relation the child already had, and until now the
+// record said nothing about it.** On joshuafolkken/kit#1703 that overwrote a decision whose reasoning
+// was written down, twice in four minutes, leaving the body's declaration, the native relations and
+// the recorded decision disagreeing with one another. The record is the artifact read months later, so
+// it is where what was replaced has to survive — the console line scrolls away.
+//
+// **The policy is to report, not to refuse.** Re-pointing a position is what joshuafolkken/kit#1701
+// deliberately added, so refusing an invocation that carries no `--decision-file` would close a
+// working route to force a record; naming what was dropped costs the caller nothing and loses nothing.
+//
+// `undefined` stays `undefined`: an insertion that records no decision gains none here, and an
+// insertion that replaced nothing gains no line.
+function append_replacements(
+	record: string | undefined,
+	links: ReadonlyArray<DependencyLink>,
+): string | undefined {
+	if (record === undefined || links.length === 0) return record
+
+	return [record.trimEnd(), BLANK_LINE, format_replaced_relations(links)].join('\n')
+}
+
 // What happened to the child half of the record, phrased as a count for the reason the relation report
 // is: the useful signal is whether every child now carries the reasoning, not which comment was
 // refused. The epic half is never reported here — it rode on the body edit, so it landed or the
@@ -137,6 +162,7 @@ function read_recorded_reasons(body: string | undefined): string {
 const git_epic_decision = {
 	DECISIONS_HEADING,
 	append_decision,
+	append_replacements,
 	read_recorded_reasons,
 	find_decision_error,
 	format_decision_report,

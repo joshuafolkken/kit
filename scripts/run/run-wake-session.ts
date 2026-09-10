@@ -24,7 +24,9 @@ import { agent_session_environment } from '#scripts/josh/agent-session-environme
 //
 // **The waker adds nothing to what may be run.** The argument vector is the constant command plus an
 // invocation rebuilt to say exactly what the record said, and nothing here writes a label: `auto-ok`
-// stays a person's to apply, so a resumed session is offered exactly the issues the first one was.
+// stays a person's to apply, so a woken session is offered by exactly the rules the first one was. A
+// pool that grew across the seam is `backlogrun.md` → "What one invocation approves", not the
+// waker's doing (joshuafolkken/kit#1675).
 
 // The agent CLI, resolved through `PATH` exactly as `eval-session.ts` resolves it.
 const WAKE_COMMAND = 'claude'

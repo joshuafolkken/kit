@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+	ALREADY_DONE_LABEL,
 	AUTO_OK_LABEL,
 	EPIC_LABEL,
 	FILING_ROUTE_LABELS,
@@ -28,7 +29,9 @@ const IN_PROGRESS_SPELLING = 'in-progress'
 const NEEDS_DECISION_SPELLING = 'needs-decision'
 const AUTO_OK_SPELLING = 'auto-ok'
 const NEEDS_HUMAN_REVIEW_SPELLING = 'needs-human-review'
-const NOT_DIRECTLY_RUNNABLE_COUNT = 3
+// joshuafolkken/kit#1679: the exit for an Issue whose work a run verified is already merged.
+const ALREADY_DONE_SPELLING = 'already-done'
+const NOT_DIRECTLY_RUNNABLE_COUNT = 4
 // joshuafolkken/kit#1083: the route labels are the same GitHub contract, and the aggregation query
 // (`?labels=route:split`) fails silently on a drifted name exactly as the others do.
 const REVIEW_CAP_ROUTE_SPELLING = 'route:review-cap'
@@ -46,6 +49,7 @@ describe('the label names', () => {
 		[NEEDS_DECISION_LABEL, NEEDS_DECISION_SPELLING],
 		[AUTO_OK_LABEL, AUTO_OK_SPELLING],
 		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
+		[ALREADY_DONE_LABEL, ALREADY_DONE_SPELLING],
 		[INTERRUPT_ROUTE_LABEL, INTERRUPT_ROUTE_SPELLING],
 		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
 		[SPLIT_ROUTE_LABEL, SPLIT_ROUTE_SPELLING],
@@ -80,9 +84,12 @@ describe('FILING_ROUTE_LABELS', () => {
 })
 
 describe('NOT_DIRECTLY_RUNNABLE_LABELS', () => {
-	it.each([EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL])('holds %s', (label) => {
-		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(label)).toBe(true)
-	})
+	it.each([EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL])(
+		'holds %s',
+		(label) => {
+			expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(label)).toBe(true)
+		},
+	)
 
 	// Opting in is what makes an issue runnable outside an epic, so a set that also excluded it would
 	// filter out every candidate the pickup exists to find.
@@ -105,7 +112,7 @@ describe('NOT_DIRECTLY_RUNNABLE_LABELS', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.has(name)).toBe(false)
 	})
 
-	it('holds those three and nothing else', () => {
+	it('holds those four and nothing else', () => {
 		expect(NOT_DIRECTLY_RUNNABLE_LABELS.size).toBe(NOT_DIRECTLY_RUNNABLE_COUNT)
 	})
 })

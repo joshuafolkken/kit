@@ -9,6 +9,8 @@ const RUN_AGE_MINUTES = 60
 const IDLE_BUDGET_MS = IDLE_BUDGET_MINUTES * MINUTE_MS
 const HALF_IDLE_MS = IDLE_HALFWAY_MINUTES * MINUTE_MS
 const RUN_AGE_MS = RUN_AGE_MINUTES * MINUTE_MS
+const LAST_MINUTE_MINUTES = 2
+const LAST_MINUTE_MS = LAST_MINUTE_MINUTES * MINUTE_MS
 const MAX_ISSUES = 5
 const MERGED_UNDER_MAX = 2
 const MANY_MERGED = 99
@@ -26,12 +28,33 @@ function input_of(overrides: Partial<BudgetInput> & { answer: BacklogAnswer }): 
 	}
 }
 
-describe('backlog_budget.decide — the defaults leave the run exactly as it was', () => {
-	it('finishes on an empty backlog when no idle watch was asked for', () => {
+describe('backlog_budget.decide — the defaults', () => {
+	it('finishes on an empty backlog once the watch has been turned off', () => {
 		const decision = backlog_budget.decide(input_of({ answer: 'exhausted' }))
 
 		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
 		expect(decision.reason).toBe(backlog_budget.NO_IDLE_WATCH_REASON)
+	})
+
+	it('watches an empty backlog for the default budget when none was written', () => {
+		const decision = backlog_budget.decide(
+			input_of({ answer: 'exhausted', idle_budget_ms: backlog_budget.DEFAULT_IDLE_MS }),
+		)
+
+		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
+		expect(decision.reason).toContain(String(backlog_budget.DEFAULT_IDLE_MINUTES))
+	})
+
+	it('tells a watching run to ask again on the idle poll, not on the loop interval', () => {
+		const reason = backlog_budget.idle_watch_reason(backlog_budget.DEFAULT_IDLE_MS)
+
+		expect(reason).toContain(`ask again in ${String(backlog_budget.IDLE_POLL_MINUTES)} minutes`)
+	})
+
+	it('never asks for a sleep longer than the watch has left', () => {
+		const reason = backlog_budget.idle_watch_reason(LAST_MINUTE_MS)
+
+		expect(reason).toContain(`ask again in ${String(LAST_MINUTE_MINUTES)} minutes`)
 	})
 
 	it('starts every candidate when no maximum was given', () => {
@@ -75,6 +98,46 @@ describe('backlog_budget.decide — the idle watch', () => {
 
 		expect(decision.verdict).toBe(backlog_budget.STOP_VERDICT)
 		expect(decision.reason).toBe(backlog_budget.idle_expired_reason(IDLE_BUDGET_MS))
+	})
+})
+
+// Reachable only since the watch was turned on by default: the backlog can answer `exhausted` while
+// this run's own children are still merging, and the ordinary watch sentence would tell the loop to
+// release a working tree the drain still holds and to poll five times too slowly.
+describe('backlog_budget.decide — a watch that opens while children are still running', () => {
+	it('keeps the working tree and the fast poll', () => {
+		const decision = backlog_budget.decide(
+			input_of({
+				answer: 'exhausted',
+				idle_budget_ms: IDLE_BUDGET_MS,
+				active_at_ms: NOW_MS - HALF_IDLE_MS,
+				running: MERGED_UNDER_MAX,
+			}),
+		)
+
+		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
+		expect(decision.reason).toBe(
+			backlog_budget.running_watch_reason(MERGED_UNDER_MAX, HALF_IDLE_MS),
+		)
+	})
+
+	it('drains them rather than watching on, once the budget has run out', () => {
+		const decision = backlog_budget.decide(
+			input_of({
+				answer: 'exhausted',
+				idle_budget_ms: IDLE_BUDGET_MS,
+				active_at_ms: NOW_MS - IDLE_BUDGET_MS,
+				running: MERGED_UNDER_MAX,
+			}),
+		)
+
+		expect(decision.verdict).toBe(backlog_budget.WATCH_VERDICT)
+		expect(decision.reason).toBe(
+			backlog_budget.draining_reason(
+				MERGED_UNDER_MAX,
+				backlog_budget.idle_expired_reason(IDLE_BUDGET_MS),
+			),
+		)
 	})
 })
 

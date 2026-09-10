@@ -235,7 +235,9 @@ delegated unit, the preflight, the progress watcher, the hand-off check and the 
   it is the one route whose whole procedure is "file it and keep going". **Two things narrow which
   observations reach it**, and both are §2i's: a filing at depth 1 or deeper cites the depth-0 work
   it blocked, and **a delegated child does not take this route at all** — it returns the observation
-  to the parent (joshuafolkken/kit#1698).
+  to the parent (joshuafolkken/kit#1698). **What the narrowing turns away is recorded rather than
+  dropped**, which is §2i's as well: it goes to `docs/observations.md` as one append-only line, and a
+  **second** line under the same key files it (joshuafolkken/kit#1728).
 - **The pre-implementation reading goes to a delegated unit once the count of subject files reaches
   the threshold §2b names** — §2b →
   "The pre-implementation reading". The line is what a file is *for*: understanding the Issue's
@@ -646,7 +648,7 @@ its procedure (joshuafolkken/kit#1649).
 | A defect originating in **another package**                                 | File the upstream Issue and **stop** — Tier A for a first-party target; a third-party one is Tier C, recorded and drafted rather than filed (`CLAUDE.md` → "Cross-package problems"; `prompts/collaboration-workflow/upstream-interrupt.md`) |
 | This Issue was really **several** (a split)                                 | File the children and the epic and **stop** — except under `epicrun`, whose authorization already covers a batch, so the children are filed and run through (`split-assessment.md`) |
 | Another Issue in **this** repository has to land first (**a prerequisite**) | This section                                                                                                            |
-| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked — both §2i's |
+| Something worth filing that is **none of the three** (**an observation**)   | File it **without asking** — Tier A for a first-party target — and **carry the run straight on**: nothing is stashed, nothing is parked (§2i). **A delegated child does not file here**, and a filing at depth 1 or deeper cites the depth-0 work it blocked; **one that cannot cite it goes to `docs/observations.md` and is filed on its second sighting** rather than being dropped — all of them §2i's |
 
 **File the prerequisite with the `route:tier-a` label**, so a Tier A filing made during
 implementation stays countable by filing route afterwards (joshuafolkken/kit#1083). **This paragraph
@@ -659,6 +661,11 @@ gh api repos/{owner}/{repo}/issues -f title="<title>" -f 'labels[]=route:tier-a'
 
 Every "file the prerequisite" below means that labelled filing, and it always happens **first**: the
 steps after it have to name a number that does not exist until it is.
+
+**`pnpm josh issue:scout "<title>"` goes in front of that call, exactly as it does for a `new` entry**
+(§2e, joshuafolkken/kit#1679). A filing made mid-run is the one most likely to duplicate something —
+it is about the work the run has just been looking at — and joshuafolkken/kit#1656 is that case
+exactly: a `route:tier-a` filing covering work that had merged about five hours earlier.
 
 **Each entry point's own branch stays in that entry's file**, which is where the numbered procedure
 lives:
@@ -699,7 +706,7 @@ is a pointer to it (joshuafolkken/kit#1185 rollout of the joshuafolkken/kit#1174
 
 ## 2e. Before filing a new Issue — `pnpm josh issue:scout`
 
-**Every `new` entry point asks two questions before it files, and one command answers both.** Run it
+**Every filing asks two questions before it happens, and one command answers both.** Run it
 the moment the title exists and **before** the `gh api … issues` call that creates the Issue:
 
 ```bash
@@ -714,11 +721,18 @@ issues already covered — one of them filed **three minutes earlier by another 
 (joshuafolkken/kit#1252). The same two answers now take about four seconds, and they are the same two
 answers every time rather than whatever that run's search happened to cover.
 
-- **`Duplicates:` is read, not skimmed.** Open each candidate. When one covers the same work, **do not
-  file**: send a `confirmation` Telegram and stop with the command to run against the existing Issue —
-  "Please run `fullrun #<existing>` to execute this Issue." A second Issue for work already tracked is
-  what this step exists to prevent, and it is invisible afterwards. When none of them covers it, say
-  so in one line and carry on filing.
+- **`Duplicates:` is read, not skimmed.** Open each candidate. When an **open** one covers the same
+  work, **do not file**: send a `confirmation` Telegram and stop with the command to run against the
+  existing Issue — "Please run `fullrun #<existing>` to execute this Issue." A second Issue for work
+  already tracked is what this step exists to prevent, and it is invisible afterwards. When none of
+  them covers it, say so in one line and carry on filing.
+- **A candidate marked `(closed)` is a different answer, and it is the one that was missing.** The
+  scan covers what closed recently as well as what is open (joshuafolkken/kit#1679), because the work
+  most likely to be filed twice is the work that just finished. A closed candidate that covers the
+  same work means **the work is already done**, not that it is tracked elsewhere — so there is
+  nothing to run and no `fullrun #<existing>` to hand over. Verify it against the merged code, and
+  then take the exit in §2g → "When the work turns out to be already merged". A closed candidate that
+  does *not* cover the work is noted in one line and the filing carries on, exactly as an open one is.
 - **`none` is an answer.** The command reports no candidate rather than the closest miss, so a `none`
   is a scan that found nothing — not a scan that was not run.
 - **`Epic:` front-loads the placement.** Its recommendation is `epic:bundle`'s, which makes
@@ -735,8 +749,17 @@ answers every time rather than whatever that run's search happened to cover.
   Issue that does not exist yet, from a title; that one answers about an Issue that does, from its
   number and its recorded relations, and its answer can differ once the Issue is real. Both calls
   happen — the scout before the `issues` call, `epic:bundle` after it.
-- **A `#N` entry point does not run it.** `fullrun #N` / `halfrun #N` / `kickoff #N` are handed an
-  Issue that already exists, so there is nothing to file and nothing to be a duplicate of.
+- **Every filing route runs it, not only a `new` entry point** (joshuafolkken/kit#1679). The scope
+  used to be the `new` entries alone, which left the routes that file *during* a run — §2d's
+  prerequisite, §2i's observation, and the review round cap's branch-2 filing — outside the one check
+  that would have caught a duplicate. joshuafolkken/kit#1656 was filed by exactly that gap: a
+  `route:tier-a` filing made mid-run, covering work joshuafolkken/kit#1623 had merged about five
+  hours earlier. **The trigger is the `gh api … issues` call, never which keyword started the run** —
+  if this run is about to create an Issue, the scout goes in front of it.
+- **A `#N` entry point does not run it *for the Issue it was handed*.** `fullrun #N` / `halfrun #N` /
+  `kickoff #N` are given an Issue that already exists, so there is nothing to file and nothing to be
+  a duplicate of. That says nothing about an Issue such a run goes on to file later, which the bullet
+  above covers.
 - **The split path files each child through the same step** — a split is several filings, and each one
   can duplicate something already open. The epic itself is not scouted: it is created over children
   that were, and `epic:bundle` is what places it afterwards.
@@ -864,12 +887,64 @@ starts.
   not implement it, whatever acceptance criteria the body still lists, and name the Issue it went to
   in the completion report. Implementing it anyway is joshuafolkken/kit#1304 exactly.
 - **A comment saying the Issue no longer has a reason to exist** — the defect does not reproduce, or
-  it was fixed elsewhere — stops the run with a `confirmation` Telegram. Closing an Issue is Tier C,
-  and a run that quietly implemented nothing would report success on work nobody did.
+  it was fixed elsewhere — takes the exit in the next subsection, "When the work turns out to be
+  already merged". Closing an Issue is Tier C, and a run that quietly implemented nothing would
+  report success on work nobody did. **A comment is one of the two ways a run learns this and not a
+  case of its own** (joshuafolkken/kit#1679), which is why the procedure sits below rather than here.
 
 Everything else is the ordinary work of the run, **a widened scope included**: a widening large
 enough to be several separately-mergeable deliverables is the split assessment's business
 (`split-assessment.md`), and not a second kind of stop.
+
+### When the work turns out to be already merged
+
+**A run can learn its Issue is already done in two ways, and both end here** (joshuafolkken/kit#1679).
+A **comment** says so — the bullet above — or the **run itself verifies it**, by reading the merged
+code and finding every acceptance criterion already satisfied. The two differ only in where the claim
+came from; what is left to do afterwards is identical, so there is one procedure and not two.
+
+**Before this, only the first had one, and the second had no exit that was not Tier C.** `fullrun
+#1656`, run as a child of the `backlogrun` of 2026-09-09, verified line by line that its work was
+already in `main` from joshuafolkken/kit#1623 — and then **closed the Issue itself**, which is Tier C
+and not a run's to do. The verification was sound; the child simply had nowhere to put the answer.
+**Parking it is not that place either**: `needs-decision` means "waiting for an answer nobody has
+given", and here the answer exists — so a person clearing the label puts the Issue straight back into
+the offer and the next run repeats the same investigation.
+
+**The exit is the `already-done` label.** It is `needs-decision`'s counterpart rather than a second
+spelling of it: `epic:next`, `backlog:next` and `auto-ok:next` all stop offering the Issue
+(`scripts/git/issue-labels.ts` → `NOT_DIRECTLY_RUNNABLE_LABELS`, `epic-classify.ts` → `human`), and
+`epic:busy` stops counting it as holding a lane, because the run that applied it committed nothing
+and left a clean checkout. **Only a person removes it, by closing the Issue** — taking it off asserts
+the work is *not* done, which is the same Tier C claim in reverse.
+
+```bash
+gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it" --silent 2>/dev/null || true
+gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=already-done'
+gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
+```
+
+The procedure, in order:
+
+1. **Record the evidence as an Issue comment, before the label.** Name the pull request or commit
+   that merged the work and, for each acceptance criterion the Issue states, the file and lines that
+   satisfy it. **A claim with no citations is not the finding this exit is for** — it is the
+   suspicion that sends the run back to implementing.
+2. **Apply `already-done` and remove `in-progress`** — the two commands above. Leaving `in-progress`
+   on holds a lane against an Issue nothing will ever run.
+3. **Commit nothing, push nothing, open no pull request.** There is no change to gate, no review to
+   run and no `pnpm josh followup` to reach; the tree is clean, so release the hold with
+   `pnpm josh run:release`.
+4. **Then behave as the entry point does for a parked child.** A `fullrun` / `halfrun` a person typed
+   sends a `confirmation` Telegram naming the Issue and the merge that already covers it, and stops.
+   An `epicrun` / `queue` / `backlogrun` child is park-and-continue: no Telegram of its own, the
+   finding named in the summary it returns, and the batch moves to the next child
+   (`epicrun.md` → "park and continue").
+5. **Never close the Issue.** That is Tier C at every entry point, and the label is what leaves the
+   close one click away for the person who owns it.
+
+**Nothing about this is a license to skip the work when it merely looks familiar.** The bar is step
+1's citations: a criterion you cannot point at merged code for is a criterion this run still owes.
 
 ### A long thread
 
@@ -1008,8 +1083,15 @@ those commands' park-and-continue rule exists to avoid.
   cap** — an observation that does not block the run is *discretionary*, which is the branch the cap
   bites on, so with more than 30 open Issues in the target repository, close one first, and nothing
   honestly closable means do not file (`prompts/collaboration-workflow/wip-cap.md`).
+- **Run `pnpm josh issue:scout "<title>"` before the `gh api … issues` call**, as before any other
+  filing (§2e, joshuafolkken/kit#1679). This route reaches the filing call without a `new` entry
+  point in front of it, which is how it used to skip the one check that catches a duplicate.
 - **Run `pnpm josh epic:bundle <new>` on what was filed**, as after any other filing. An Issue no epic
   tracks is one `epic:next` never offers, so an unbundled observation is parked rather than recorded.
+  **Where that epic's root carries `auto-ok` the filing joins the backlog's pool**, which is admitted
+  and bounded rather than denied: `.claude/skills/workflow-commands/backlogrun.md` → "What one
+  invocation approves" is the single source of how this obligation and that authorization boundary
+  meet (joshuafolkken/kit#1675).
 - **The run continues.** Nothing is stashed, nothing is parked, no Telegram is sent, and the Issue in
   hand is implemented as it was. Name what was filed in the completion report.
 
@@ -1037,8 +1119,9 @@ it — read off the subject rather than judged**:
 
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
   it stopped or delayed** — named as an Issue number or a run, never as "this would slow runs down".
-  **Cannot cite one, it is not filed**: it goes in the completion report and waits for the blockage
-  to happen. Pull rather than push — the fix follows the jam, not the sighting.
+  **Cannot cite one, it is not filed**: it goes to the ledger below, and what files it later is
+  either the blockage arriving or a second sighting of the same thing. Pull rather than push — the
+  fix follows the jam or the repeat, never the lone sighting.
 - **A depth-0 observation does not take this test.** That is the product, and the two ceilings above
   stay its only limits.
 - **`route:tier-a` and `route:interrupt` do not take it either**, at any depth: a filing the run
@@ -1047,12 +1130,110 @@ it — read off the subject rather than judged**:
 **It governs this route only — the fourth row of §2d's table.** A review finding routed to branch 2
 of `prompts/review.md` → "Review round cap" is filed under that section's own bar — a confirmed
 defect reaching a runtime path, with a written failure scenario — and **does not take the depth
-test**: a defect in a `josh` command's behavior is depth 0 by construction, so gating it on a
-citation would drop the one kind of finding both documents agree is never dropped.
+test**: it has already cleared a bar this route has not, so gating it on a citation as well would
+drop the one kind of finding both documents agree is never dropped. **That bar is the reason, and the
+subject's depth is not** — the sentence here used to say that a defect in a `josh` command's behavior
+is depth 0 by construction, and joshuafolkken/kit#1694 and joshuafolkken/kit#1703 are both branch-2
+filings whose subject is the epic tooling, which the table above puts at depth 1
+(joshuafolkken/kit#1675).
 
 **This is not the count cap that was rejected.** A cap is rationing — past the number the finding is
 lost, and nothing about it says which findings were worth having. This changes what counts as a
 finding at all, so what it excludes is excluded for a reason a reader can check.
+
+### The ledger — where an observation that cannot cite a blockage goes
+
+**"Not filed" used to mean "gone", and that is what walked the depth test past itself.** The
+completion report was the only place such an observation could land, and a completion report is
+read once and then scrolls away — so the next run met the same thing as a first sighting, forever.
+joshuafolkken/kit#1726 is the worked case: its own body says the depth test would not have filed it,
+and it was filed anyway, because **discarding it was the only alternative on offer**
+(joshuafolkken/kit#1728).
+
+- **The destination is `docs/observations.md` in the repository the observation is about** — the same
+  repository the Issue would have been filed into. **The count and the append are both run in that
+  repository's checkout**, resolved the way §2c resolves any cross-repository target, and the file is
+  created on the first append where that repository has none. **The subject decides, never the
+  working directory**: an observation about this package's own orchestration, seen while a run is
+  inside a repository that consumes it, is recorded here rather than there — the append follows the
+  subject, never the working directory. **A third-party target gets no line either** — Tier C covers
+  the ledger exactly as it covers the Issue that would otherwise have been filed there.
+- **It is append-only.** A line is never edited and never deleted, because the count of lines
+  carrying one key is what says whether an observation has recurred; a second sighting is a second
+  line, not a rewrite of the first. **A merge conflict in it is resolved by keeping both sides** —
+  two lanes appending at once is the ordinary case, and a repeated key is the whole signal, so
+  dropping either side destroys exactly what the file is for.
+- **The completion report keeps its line too.** The ledger is what the next run can read; the report
+  is what this run's reader sees. Neither replaces the other.
+
+**One observation is one line: five fields, each separated from the next by a vertical bar with one
+space on either side.**
+
+```
+- k:<slug> | d<n> | <YYYY-MM-DD> | <where> | <what>
+```
+
+| Field          | What it holds                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `k:<slug>`     | The identity key — lowercase letters and digits, in words joined by `-`. This is what makes a repeat machine-readable      |
+| `d<n>`         | The depth of the subject — `d1`, `d2`, or whatever deeper depth the table above may one day name. **There is no `d0` line**: a depth-0 observation is filed outright and never reaches the ledger |
+| `<YYYY-MM-DD>` | The date of **this** sighting                                                                                             |
+| `<where>`      | One file path or one command — where the thing was seen                                                                   |
+| `<what>`       | The phenomenon, one sentence, carrying no vertical bar of its own                                                         |
+
+A sample, in the shape a real entry takes:
+
+```
+- k:example | d1 | 2026-09-10 | pnpm josh run:progress | The report printed a fill-in placeholder where a clock time belonged
+```
+
+**`k:example` is reserved for this sample and is never used by a real observation**, so the count
+below can be run over the whole file without the sample answering for one. **The grammar is defined
+here rather than in the ledger** because this skill is distributed to every repository that consumes
+the package and `docs/` is not — a rule that named a definition the reader never received would
+leave every consumer's ledger shaped by hand.
+
+**The identity key is the whole of the repeat test — never a similarity judgement about the prose.**
+Choose the key from the phenomenon rather than from the run, then count what the ledger already holds
+for it, in that repository's checkout rather than the working directory. **The `|| true` is not
+decoration**: `grep -c` exits non-zero on a count of zero, which is the first-sighting branch and the
+common one, so without it the step reads as a failed command wherever an exit status is being
+watched. **A missing file is not a count of zero, though** — there `grep` exits 2 and prints no
+number at all, so an empty answer means create the ledger, never that this is a first sighting.
+
+```bash
+grep -c '^- k:<slug> |' <that repository's checkout>/docs/observations.md || true
+```
+
+Free-text comparison is what the key exists to replace, so two lines that read alike under different
+keys are two observations, and a mis-keyed entry is corrected by appending a correctly-keyed line
+rather than by editing the one already written.
+
+**The depth gate is not withdrawn, and this is not a way around it.** An observation that *can* cite
+the depth-0 work it stopped is filed exactly as it was before — this route is only for the ones that
+could not, and whose sole previous destination was nothing (joshuafolkken/kit#1698's gate stands
+unchanged).
+
+### The second sighting is what files it
+
+**A repeat is the citation.** joshuafolkken/kit#1698 asked a discretionary filing to be pulled by a
+blockage rather than pushed by a sighting; an observation recorded twice has been pulled — it came
+back on its own, which no single sighting can demonstrate. So the gate has a second way through, and
+it is counted rather than judged:
+
+- **On the count answering exactly `1`, the observation is filed**, at depth 1 or deeper, with no
+  depth-0 citation — `1` and not "1 or more", because a higher count means the Issue was already
+  opened by the sighting that answered `1`. The ledger line is appended as well, because the ledger
+  stays append-only.
+- **The Issue quotes the ledger's own dates — the first sighting's and this one's** — so the reader
+  can check the promotion against the file instead of taking the run's word for it.
+- **Both ceilings still apply**, exactly as they do above: the 10-per-run cap counts a promoted
+  filing, and the WIP cap still bites, since a promoted observation blocks nothing and is therefore
+  still discretionary.
+
+**A third and later sighting appends a line and files nothing more.** The Issue from the second one
+is already open, and `pnpm josh issue:scout` is what finds it; the extra lines are evidence for that
+Issue, not new ones.
 
 ### A delegated child does not take this route
 
@@ -1060,6 +1241,14 @@ finding at all, so what it excludes is excluded for a reason a reader can check.
 observations are not filed by the child at all: they go back in the summary's "Observations that
 could bite later" line (`epicrun.md` → "What the summary carries, and how long it may be"), and the
 parent files what survives — under the depth test above, and inside the run's ceiling.
+
+**A delegated child does not append to the ledger either — the parent collapses the duplicates and
+appends what is left.** The ledger's whole value is that one key means one phenomenon, and a child
+holding one Issue's worth of context cannot tell its observation from the sibling lane's: eight
+children appending in parallel would write the same thing under eight keys, and every one of them
+would then read as a first sighting. The child's route is unchanged and is the only one it has —
+the summary's "Observations that could bite later" line — and the parent chooses the key, checks the
+count and writes the line.
 
 **Two reasons, and a child can solve neither for itself.** It holds one Issue's worth of context, so
 **it cannot tell its observation from the one a sibling filed twenty minutes earlier** — the 15

@@ -2,7 +2,7 @@ import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_read } from './git-epic-read'
-import { format_dependency_links, format_issue_references } from './git-epic-reference'
+import { format_issue_references, format_replaced_relations } from './git-epic-reference'
 import { git_epic_relations } from './git-epic-relations'
 import { git_gh_command } from './git-gh-command'
 
@@ -82,11 +82,16 @@ function report_placements(epic_number: number, plan: AddPlan): void {
 	}
 }
 
+// **What the insertion discarded, printed from `plan.replaced` rather than `plan.removed`**
+// (joshuafolkken/kit#1711). The two differ by the filter `removed` carries for `gh`'s sake: a link the
+// body declared but nobody ever recorded natively is dropped from the declaration all the same, and
+// reporting from the work list let exactly those go by without a word. A positioned `--add` is the
+// only invocation that can replace anything, so an addition that re-points nothing prints nothing.
 function report_success(epic_number: number, plan: AddPlan): void {
 	report_placements(epic_number, plan)
 
-	if (plan.removed.length > 0) {
-		console.info(`↪ Re-pointed: ${format_dependency_links(plan.removed)} was replaced.`)
+	if (plan.replaced.length > 0) {
+		console.info(`↪ ${format_replaced_relations(plan.replaced)}`)
 	}
 }
 
@@ -106,19 +111,18 @@ async function comment_decision(children: ReadonlyArray<number>, decision: strin
 	)
 }
 
-async function write_plan(
-	epic_number: number,
-	plan: AddPlan,
-	decision: string | undefined,
-): Promise<void> {
+// The record posted to the children is `plan.decision`, not the caller's file: the plan is what folded
+// the replaced relations into it, and reading the raw input here would leave the epic's `## Decisions`
+// carrying a line the child comments do not (joshuafolkken/kit#1711).
+async function write_plan(epic_number: number, plan: AddPlan): Promise<void> {
 	await git_gh_command.issue_edit_body(String(epic_number), plan.body)
 	report_success(epic_number, plan)
 	await apply_plan(plan)
 
 	// A relocation is a placement decision as much as an addition is, so the record reaches the child
 	// that was moved too (joshuafolkken/kit#1701).
-	if (decision !== undefined) {
-		await comment_decision([...plan.additions, ...plan.relocations], decision)
+	if (plan.decision !== undefined) {
+		await comment_decision([...plan.additions, ...plan.relocations], plan.decision)
 	}
 }
 
@@ -150,7 +154,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	await write_plan(input.epic_number, outcome.plan, input.decision)
+	await write_plan(input.epic_number, outcome.plan)
 
 	return SUCCESS_EXIT_CODE
 }

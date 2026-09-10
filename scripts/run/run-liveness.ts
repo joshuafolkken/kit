@@ -3,7 +3,7 @@ import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { git_gh_issue_read } from '#scripts/git/git-gh-issue-read'
-import { NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
 import { issue_state } from '#scripts/issue/issue-state'
 import { run_hold } from './run-hold'
 import { run_issue_number } from './run-issue-number'
@@ -102,7 +102,7 @@ const REASONS: Record<LivenessVerdict, string> = {
 	[ALIVE_VERDICT]:
 		'The unit is still working: its output moved, or a process of the child is alive.',
 	[SETTLED_VERDICT]:
-		'The child is closed, or parked with `needs-decision`, so there is nothing here to recover.',
+		'The child is closed, parked with `needs-decision`, or marked `already-done`, so there is nothing here to recover.',
 	[STOPPED_VERDICT]:
 		'The output has been frozen past the silent window and no process of the child is alive in that checkout.',
 	[UNDETERMINED_VERDICT]:
@@ -290,6 +290,17 @@ function carries_label(labels: ReadonlyArray<string>, wanted: string): boolean {
 	return labels.some((label) => label.toLowerCase() === wanted)
 }
 
+// The labels that say a unit stopped on purpose. `needs-decision` is the park branch; `already-done`
+// is the exit a child takes when it verifies its Issue's work is already merged
+// (joshuafolkken/kit#1679) — it comments the evidence, applies the label and stops with the checkout
+// clean, which is settled by the same reasoning. Left out, this command reports a child that
+// finished correctly as `stopped` and a supervisor restarts the investigation it just completed.
+const SETTLED_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
+
+function carries_settled_label(labels: ReadonlyArray<string>): boolean {
+	return SETTLED_LABELS.some((label) => carries_label(labels, label))
+}
+
 // Settled needs positive evidence that the child is done with: it closed, or the unit parked it and
 // then stopped, which the loop's park branch already owns. **An open child that is not parked is not settled
 // even without `in-progress`** — that label is applied by the unit itself, after it reads the issue,
@@ -305,7 +316,7 @@ async function read_child_settled(issue: string, repo?: string): Promise<boolean
 
 	if (state === undefined) return undefined
 
-	return state.state !== OPEN_STATE || carries_label(state.labels, NEEDS_DECISION_LABEL)
+	return state.state !== OPEN_STATE || carries_settled_label(state.labels)
 }
 
 // The dirty tree is deliberately not one of the traces, so it is the one input that does not answer

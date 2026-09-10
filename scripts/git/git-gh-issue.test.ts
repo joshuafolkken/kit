@@ -3,15 +3,15 @@ import { git_gh_issue } from './git-gh-issue'
 import { git_gh_issue_list } from './git-gh-issue-list'
 
 // joshuafolkken/kit#1067: the page ceiling bounds every listing now, and a bound whose caller cannot
-// see it was reached is a silently shortened answer. These six wrappers are where the flag either
+// see it was reached is a silently shortened answer. These wrappers are where the flag either
 // reaches a caller or is dropped, so the threading is pinned here rather than left to each command's
 // own suite — a wrapper that started discarding it again would leave every one of those green.
 
 vi.mock('./git-gh-issue-list', () => ({
-	git_gh_issue_list: { issue_list_open: vi.fn() },
+	git_gh_issue_list: { issue_list: vi.fn() },
 }))
 
-const mocked_open = vi.mocked(git_gh_issue_list.issue_list_open)
+const mocked_open = vi.mocked(git_gh_issue_list.issue_list)
 
 const LABEL = 'auto-ok'
 const REPO = 'joshuafolkken/app-kit'
@@ -34,13 +34,41 @@ const WRAPPERS: ReadonlyArray<[string, () => Promise<unknown>]> = [
 		'issue_list_by_label_in_repo',
 		async () => await git_gh_issue.issue_list_by_label_in_repo(LABEL, LIMIT, REPO),
 	],
+	['issue_list_recently_closed', async () => await git_gh_issue.issue_list_recently_closed(LIMIT)],
 ]
 
 beforeEach(() => {
 	vi.clearAllMocks()
 })
 
-describe('the six open-issue listings', () => {
+// joshuafolkken/kit#1679: the one wrapper that does not list open issues. It is asserted here rather
+// than in `issue:scout`'s own suite because what it gets wrong fails silently — a listing asked for
+// with the default state answers open issues, which is precisely the scan that already existed.
+describe('issue_list_recently_closed', () => {
+	it('asks for closed issues ordered by their last update', async () => {
+		mocked_open.mockResolvedValue(CAPPED)
+
+		await git_gh_issue.issue_list_recently_closed(LIMIT)
+
+		expect(mocked_open).toHaveBeenCalledWith(
+			expect.objectContaining({ state: 'closed', sort: 'updated', limit: LIMIT }),
+		)
+	})
+
+	// The titles are what the duplicate scan compares, so a field list without them would score every
+	// closed row at zero and report the scan as having found nothing.
+	it('asks for the titles it compares', async () => {
+		mocked_open.mockResolvedValue(CAPPED)
+
+		await git_gh_issue.issue_list_recently_closed(LIMIT)
+
+		expect(mocked_open).toHaveBeenCalledWith(
+			expect.objectContaining({ json_fields: expect.stringContaining('title') as string }),
+		)
+	})
+})
+
+describe('the issue listings', () => {
 	it.each(WRAPPERS)('%s carries the truncation flag out to its caller', async (_name, call) => {
 		mocked_open.mockResolvedValue(CAPPED)
 

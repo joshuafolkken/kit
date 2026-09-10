@@ -1,4 +1,9 @@
-import { has_label_name, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	ALREADY_DONE_LABEL,
+	has_label_name,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/git/issue-labels'
 import { epic_graph, type EpicChild, type IssueReference } from './epic-graph'
 import { epic_nested } from './epic-nested'
 
@@ -47,6 +52,16 @@ function has_label(child: EpicChild, label: string): boolean {
 	return has_label_name(child.labels, label)
 }
 
+// The labels that put a child in `human` on their own. `needs-decision` waits for an answer nobody
+// has given; `already-done` has its answer — the work is merged, and the close that is left is Tier C
+// and so a person's (joshuafolkken/kit#1679). Neither is resolved by waiting, which is what separates
+// them from `in-progress` below.
+const HUMAN_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
+
+function has_human_label(child: EpicChild): boolean {
+	return HUMAN_LABELS.some((label) => has_label(child, label))
+}
+
 // What a child is before its dependencies are considered. A parked child is `human` whatever blocks
 // it, and a child already being worked on is `time` — someone else's session will finish it.
 //
@@ -60,7 +75,7 @@ function has_label(child: EpicChild, label: string): boolean {
 function local_category(child: EpicChild): ChildCategory | undefined {
 	if (child.state === CLOSED) return 'done'
 	if (epic_nested.is_nested_epic(child)) return 'human'
-	if (has_label(child, NEEDS_DECISION_LABEL)) return 'human'
+	if (has_human_label(child)) return 'human'
 	if (has_label(child, IN_PROGRESS_LABEL)) return 'time'
 
 	return undefined

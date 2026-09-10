@@ -1,4 +1,9 @@
-import { EPIC_LABEL, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	ALREADY_DONE_LABEL,
+	EPIC_LABEL,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/git/issue-labels'
 import { describe, expect, it, vi } from 'vitest'
 import { epic_classify, type DependencyVerdict } from './epic-classify'
 import type { EpicChild, IssueReference } from './epic-graph'
@@ -267,6 +272,21 @@ describe('epic_classify.local_category', () => {
 		const parked = child(1, { labels: [IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL] })
 
 		expect(epic_classify.local_category(parked)).toBe('human')
+	})
+
+	// joshuafolkken/kit#1679: the work is already merged, so nothing is waiting to be run and nothing
+	// is waiting on time either — what is left is the close, which is Tier C and so a person's. Read
+	// as `time`, an epic would report it as something that resolves itself and wait on it forever.
+	it('calls an already-done child a person problem', () => {
+		const done = child(1, { labels: [ALREADY_DONE_LABEL] })
+
+		expect(epic_classify.local_category(done)).toBe('human')
+	})
+
+	it('prefers the already-done label over the running one', () => {
+		const done = child(1, { labels: [IN_PROGRESS_LABEL, ALREADY_DONE_LABEL] })
+
+		expect(epic_classify.local_category(done)).toBe('human')
 	})
 
 	it('reports a closed child as done', () => {

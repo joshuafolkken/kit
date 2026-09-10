@@ -48,7 +48,11 @@ function epic_gap(cutoff: ScanCutoff, limit: number): string | undefined {
 // `null` body to `''` before this module's caller ever parses one (`git-gh-issue-rest.ts`,
 // `to_gh_field_value`), so a gate arm for it would be code no input can reach
 // (joshuafolkken/kit#1697).
-function is_membership_established(cutoff: ScanCutoff): boolean {
+//
+// The cutoff is optional because the fetched backlog carries it that way: a listing nothing capped
+// records no cut at all, which is the same answer as `none`. Defaulted here rather than at each call
+// site, so a caller holding the optional field cannot forget the coercion (joshuafolkken/kit#1703).
+function is_membership_established(cutoff: ScanCutoff = 'none'): boolean {
 	return cutoff === 'none'
 }
 

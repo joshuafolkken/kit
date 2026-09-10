@@ -1,5 +1,10 @@
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { has_any_label, IN_PROGRESS_LABEL, NEEDS_DECISION_LABEL } from '#scripts/git/issue-labels'
+import {
+	ALREADY_DONE_LABEL,
+	has_any_label,
+	IN_PROGRESS_LABEL,
+	NEEDS_DECISION_LABEL,
+} from '#scripts/git/issue-labels'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/schemas'
 
@@ -30,7 +35,13 @@ const LISTING_LIMIT = 100
 
 // Read through `has_any_label` rather than compared directly, for the casing reason
 // `issue-labels.ts` records: GitHub keeps the spelling a label was created with.
-const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL])
+//
+// `already-done` joins `needs-decision` here for the same reason it joins it in
+// `epic_classify.local_category` (joshuafolkken/kit#1679): the run that applied it committed
+// nothing, so the checkout it ran in is clean and there is no uncommitted work for the next child to
+// start on top of. That is exactly what separates both from `needs-human-review`, which is
+// deliberately not parked because its work is still sitting in the tree.
+const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL])
 
 // What one repository answered. `unreadable` is kept apart from `idle` for the reason
 // joshuafolkken/kit#950 records: reading a failed read as an empty listing is a confident absence
@@ -38,7 +49,7 @@ const PARKED_LABELS: ReadonlySet<string> = new Set([NEEDS_DECISION_LABEL])
 // direction a guard must never fail in.
 //
 // **`epic:next` answers `wait` for it, rather than exiting.** The other candidate was an error exit,
-// as an unreadable *child* already produces — but `issue_list_open` swallows every failure into
+// as an unreadable *child* already produces — but `issue_list` swallows every failure into
 // `undefined`, a passing rate limit included, and this read happens on every poll of every session,
 // so an exit would end an unattended run over a blip. A persistent failure never arrives here: the
 // children are read first, and one that could not be read is already an anomaly that exits 1. What
