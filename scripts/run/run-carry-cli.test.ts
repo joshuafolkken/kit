@@ -126,6 +126,20 @@ describe('beginning a run over a record that is already there', () => {
 		expect(run_carry.read_carry(target()).kind).toBe('expired')
 	})
 
+	// A hand-off makes the resumption the same run, so its spent bound is this session's. Replaced
+	// here, `started_at` would come back as now and `backlog:budget --started` would never end the run.
+	it('answers expired for a spent record its own cut handed off, keeping its start time', async () => {
+		const spent = run_carry.fresh_carry(INVOCATION, run_carry.NO_OWNER, LONG_AGO)
+
+		run_carry.apply_change(target(), spent, { cuts: 1 })
+
+		expect(await run_carry_cli.run(['--begin', INVOCATION])).toBe(0)
+		expect(out).toStrictEqual([run_carry_cli.EXPIRED_VERDICT])
+		expect(run_carry.read_carry(target())).toMatchObject({
+			carry: { started_at: LONG_AGO.toISOString() },
+		})
+	})
+
 	// `--end` is only reached on the clean-finish path, so a crashed run leaves its record standing.
 	// Resuming into it would spend that run's `--max` and its hours, not this invocation's.
 	it('refuses a standing record belonging to a different invocation', async () => {

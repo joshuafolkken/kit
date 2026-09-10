@@ -166,6 +166,13 @@ function begin_over_expired(
 ): number {
 	if (run_carry.is_foreign_live_owner(carry, request.owner)) return report_busy(carry, is_json)
 
+	// **A hand-off says the resumption *is* that run, so the spent bound is this session's too.**
+	// Replaced here, the record would come back with `started_at` set to now — and `backlog:budget
+	// --started` reads that field, so the 8-hour bound would restart at every cut and never end the
+	// run. The answer is `expired`, and a person who really is starting a new run clears the record
+	// with `--end`, which is what the expiry message says.
+	if (carry.is_handed_off === true) return report_expired(carry, is_json)
+
 	console.error(run_carry.expired_message(carry))
 
 	return start_fresh(target, request, true, is_json)
