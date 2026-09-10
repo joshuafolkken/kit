@@ -2358,6 +2358,52 @@ Standard output carries exactly one token, so `answer=$(pnpm josh run:hold 1091)
 
 The entry points that ask it, and where in each procedure, are `.claude/skills/workflow-commands/SKILL.md` → "2f. The working-tree hold — one run per tree".
 
+### `josh run:carry`
+
+Carry one invocation's budget across its own session cuts, so a resumed `backlogrun` continues the run a person authorized instead of starting a second one over it ([#1714](https://github.com/joshuafolkken/kit/issues/1714)).
+
+```bash
+pnpm josh run:carry --begin "backlogrun --max 5 --idle 30"   # alias: josh rc
+pnpm josh run:carry --json                                   # read the record back in a resumed session
+pnpm josh run:carry --merged 1                               # a child merged
+pnpm josh run:carry --filed 1                                # an issue was filed
+pnpm josh run:carry --cut                                    # a session cut was crossed
+pnpm josh run:carry --end                                    # the invocation is over
+```
+
+**A session cut is an execution detail of the same authorization, and the budget is what carries it.** Typing `backlogrun` once approves the declared budget — `--max`, `--idle` and the 8-hour whole-run bound — and the cut is internal to spending it, the way opening a lane or delegating a child is. What the explicit-invocation rule forbids is **inferring** a workflow from the shape of a request; it has never required the keystroke to land in every session's own transcript, which is the reading `.claude/skills/workflow-commands/epicrun.md` → "Each child runs in a delegated unit" already applies to a delegated child.
+
+**The unit is the repository, not the working tree.** `josh run:hold` keys on the work tree's own git directory because what it guards is one branch, one index and one uncommitted diff. What this record carries is one invocation's budget, and that invocation opens lanes — each a work tree of its own — so the key is the common git directory every lane of one repository shares.
+
+| Answer       | Meaning                                                                       | Exit code |
+| ------------ | ----------------------------------------------------------------------------- | --------- |
+| `began`      | Nothing was carried, so this invocation starts one                            | 0         |
+| `resumed`    | A live record is here — **this session is continuing a run that was cut**     | 0         |
+| `mismatch`   | A live record is here for a **different** invocation; nothing was established | 1         |
+| `carried`    | A read: the record is live, and `--json` puts it on standard output           | 0         |
+| `counted`    | A merge, a filing or a cut was added to the record                            | 0         |
+| `expired`    | The 8-hour whole-run bound is spent; the run ends whatever the counters say   | 0         |
+| `ended`      | The record was cleared                                                        | 0         |
+| `none`       | Nothing is carried — a count exits 1, a read and an end exit 0                | 0 or 1    |
+| `unreadable` | A record is here and could not be parsed; nothing was established             | 1         |
+| `unknown`    | The repository's git directory could not be read                              | 1         |
+
+Standard output carries exactly one token, so `answer=$(pnpm josh run:carry --begin "backlogrun")` captures something a loop can branch on. `--json` is the one exception and is still one line — the whole record has to reach the resumed session, and prose on standard error cannot be read back.
+
+**A live record is never replaced, and never resumed into by something else.** `--begin` naming the same invocation answers `resumed` and leaves the record exactly as it was, because replacing it would restart the budget the cut exists to carry. `--begin` naming a **different** one answers `mismatch` and exits 1 rather than resuming: `--end` is only reached on the clean-finish path, so a run that crashed or stopped on a guard leaves its record standing for up to the whole-run bound, and resuming into it would hand the new invocation the dead run's `--max`, its spent counts and a `started_at` already hours old. End the standing record deliberately once you know that run is over. An **expired** record is replaced whatever it names, because that run has spent the whole-run bound and a person typing the keyword again is starting a new run.
+
+**The whole-run bound is `josh backlog:budget`'s, imported rather than restated.** Two copies of the figure would drift, and the drift is silent in the direction that matters: raised there and not here, this record answers `expired`, `--begin` replaces it, and the budget restarts at zero — the defect the command exists to prevent.
+
+**Every counter is an increment, never a total.** A run that sent a total would be sending arithmetic it had done in its head — the one-shot judgement [#1460](https://github.com/joshuafolkken/kit/issues/1460) measured a run walking straight past — so `--merged`, `--filed` and `--cut` add to what is there and the command owns the sum.
+
+**A count with nothing to count into answers `none` and exits 1.** The loop believed it was carrying a budget and it was not; a silent zero would let the run keep its own tally instead of the record's. **A counting flag is what makes a count, never the sum of one** — `--merged 0` is a wave reporting that nothing merged, so it takes this path rather than being reclassified as a bare read, which would answer `none` with exit 0 and tell the loop its budget was fine.
+
+**The 8-hour whole-run bound is the record's own age.** Held that way it survives the cut too, and a `started_at` that is not a date reads as spent rather than as current — a record nothing can ever expire is the one state the bound exists to make impossible.
+
+**What may be run is untouched.** This command carries a budget and nothing else: `auto-ok` is still applied only by a person, so a resumed session is offered exactly the issues the first one was.
+
+Where a `backlogrun` asks it, and what it does with each answer, is `.claude/skills/workflow-commands/backlogrun.md` → "The session cut is inside the invocation".
+
 ### `josh run:preflight`
 
 Say what an interrupted run left in this working tree, and what the rule says to do about it before the next child starts ([#926](https://github.com/joshuafolkken/kit/issues/926)).

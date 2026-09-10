@@ -1607,6 +1607,14 @@ idle pool to happen; it drains to one.
 
   **報告は完了報告の書式で書かない。** 区切りは完了でも park でも失敗でもない**第 4 の停止**であり、専用の書式が `prompts/collaboration-workflow/report-format.md` →「区切りの報告（完了報告と区別する・必須）」にある。`原因 / 対応 / 結果` の 3 行は使わない — それは finished なランの形であり、epic はまだ終わっていない。書くのは 4 つ、**終わったこと / 残っていること / 止めた理由 / 次に打つコマンド**である。Telegram 本文も同じ書式で書く。
 
+**`backlogrun` is the one entry point where the cut does not stop the run** (joshuafolkken/kit#1714).
+There the keyword declares a budget — `--max`, `--idle` and this same 8-hour bound — so the cut is an
+execution detail of spending it, and the record `pnpm josh run:carry` keeps carries that budget into
+the next session with nobody retyping the keyword. **Nothing above changes for an `epicrun`**: an
+epic declares which children may run, never how much of a budget, so its cut still ends with the
+resume line and waits for a person. `backlogrun.md` → "The session cut is inside the invocation" is
+that reading's single source.
+
 **Draining is what makes the cut reachable, and without it this rule would never fire on the run it
 was written for.** `epic:next --lanes` keeps the seats full, so under parallel lanes a merge almost
 never coincides with an idle pool — and `epicrun #1474`, the run joshuafolkken/kit#1567 measured, ran

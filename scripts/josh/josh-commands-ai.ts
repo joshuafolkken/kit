@@ -141,6 +141,11 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		default_script_arguments: ['--release'],
 	},
+	'run:carry': {
+		script: 'scripts/run/run-carry-cli.ts',
+		description: 'Carry one invocation’s budget across its own session cuts',
+		category: 'AI tools',
+	},
 	'run:preflight': {
 		script: 'scripts/run/run-preflight-cli.ts',
 		description: 'Say what an interrupted run left in this tree, and what to do about it',

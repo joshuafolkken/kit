@@ -29,6 +29,17 @@ resident in the AI documents, because it has to hold when this skill has *not* b
 - The rule applies even when the user authorized a related workflow in an earlier turn. Each
   invocation must be re-typed by the user in the current turn.
 
+**A session cut inside a declared budget is not a new invocation** (joshuafolkken/kit#1714). A
+`backlogrun` that is cut and resumed is still the one invocation a person typed — the keyword
+authorized the declared budget, and the cut is an execution detail of spending it, exactly as opening
+a lane or delegating a child is. What this rule forbids is _inferring_ a workflow from a request's
+shape; it has never required the keystroke to land in every session's own transcript, which is the
+reading `epicrun.md` → "Each child runs in a delegated unit" already applies to a delegated child.
+The last bullet above is untouched, because it is about an _earlier turn's_ authorization: a run with
+no budget left, or none begun, has nothing to carry. **The reading is `backlogrun`'s alone** — an
+`epicrun` or `fullrun` cut still waits for the keyword, and `backlogrun.md` → "The session cut is
+inside the invocation" is its single source.
+
 ## 1. Which file to read
 
 Read this file, then the one for the command that was typed. `fullrun` and `queue` also need
