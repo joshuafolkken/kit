@@ -1,6 +1,7 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_pr_checks } from '#scripts/git/git-pr-checks'
+import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { write_version } from '#scripts/version/bump-version'
 import { version_targets } from '#scripts/version/version-targets'
 import type { ReleasePlan } from './release-plan'
@@ -48,17 +49,34 @@ function existing_branch_message(branch_name: string): string {
 	return `\`${branch_name}\` already exists — a previous release attempt got as far as opening it. Finish or delete that pull request and branch, then run \`pnpm josh release\` again.`
 }
 
+// **A remote that cannot be asked is refused, not read as "no branch there"** (joshuafolkken/kit#1641).
+// `pnpm josh release` pushes, opens a pull request, merges it and waits for a tag, so it cannot
+// finish without the remote in any case: refusing here is the failure the run was going to have
+// anyway, moved in front of the version write and the commit — which is the whole point of this
+// guard. Silently answering "not taken" instead would put the raw error back after two writes.
+function unreachable_remote_message(branch_name: string): string {
+	return `Could not ask origin whether \`${branch_name}\` already exists, so \`pnpm josh release\` stops before writing the version. It needs the remote to push, open the pull request and merge it. Restore the connection and run \`pnpm josh release\` again.`
+}
+
 // **The remote is asked as well as the local branch.** A previous attempt pushed before it opened
 // the pull request, so deleting the local branch — or retrying from a second checkout — leaves the
 // remote one standing on its own. Checking only locally there lets the run write the version, commit
 // it and reach `push`, which then fails with git's non-fast-forward message: the raw error this
 // guard exists to replace, and now after two writes rather than before them.
+//
+// **`git branch --list --remotes` could not answer it, which is why origin is asked directly.** Its
+// short names carry the remote — `origin/x`, never `x` — so the unprefixed pattern this used to pass
+// matched nothing and the remote arm reported "absent" for every branch that has ever existed. The
+// remote-tracking refs it reads are stale anyway, since nothing in this workflow prunes them, so
+// `git_remote_branch.ask` puts the question to origin itself.
 async function is_release_branch_taken(branch_name: string): Promise<boolean> {
 	if (await git_command.branch_exists(branch_name)) return true
 
-	const remote_names = await git_command.branch_names_remote(branch_name)
+	const answer = await git_remote_branch.ask(branch_name)
 
-	return remote_names.length > 0
+	if (answer === 'unreachable') throw new Error(unreachable_remote_message(branch_name))
+
+	return answer === 'present'
 }
 
 async function refuse_existing_branch(branch_name: string): Promise<void> {
@@ -117,8 +135,12 @@ const release_publish = {
 	branch_name_for,
 	commit_message,
 	existing_branch_message,
+	// Exported so the three answers the guard has to separate — here, on origin, on neither — are
+	// asserted directly rather than through `publish`, whose next step writes `package.json`.
+	is_release_branch_taken,
 	publish,
 	pull_request_body,
+	unreachable_remote_message,
 	FAILURE_EXIT_CODE,
 	SUCCESS_EXIT_CODE,
 }

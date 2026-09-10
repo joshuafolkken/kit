@@ -7,11 +7,12 @@ import { git_spawn } from './git-spawn'
 // resolves the git binary and turns a non-zero exit into an error — a second spawn helper next to it
 // would be the clone `CLAUDE.md` prohibits, so this module imports the shared one.
 //
-// **`ls_remote_branch` is here for the same reason, though it registers no work tree**: what groups
-// this module is the lane lifecycle rather than git's `worktree` subcommand, and asking the remote
-// whether a lane branch still exists is a step of that lifecycle — `lane-start-point.ts` reads it to
-// decide which ref a reopened lane is cut from. Left behind in `git-command.ts` it would make that
-// one caller import one responsibility from two modules.
+// **`ls_remote_branch` is here for the same reason, though it registers no work tree**: it is the one
+// raw `git ls-remote` spawn, and a second spawn helper beside it would be that same clone. Its sole
+// caller is now `git-remote-branch.ts`, which turns the raw output into the three-way answer
+// (`absent` / `present` / `unreachable`) that `lane-start-point.ts` and `release-publish.ts` both act
+// on — so this module stops at "what git printed" and the meaning of it is decided there
+// (joshuafolkken/kit#1641; before it, `lane-start-point.ts` was the only reader and did both).
 const WORKTREE = 'worktree'
 
 // Every registered work tree of this repository, in git's own machine-readable form: one `worktree

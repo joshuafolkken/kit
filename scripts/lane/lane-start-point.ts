@@ -1,5 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
-import { git_worktree } from '#scripts/git/git-worktree'
+import { git_remote_branch } from '#scripts/git/git-remote-branch'
 
 // Where a lane is cut from (joshuafolkken/kit#1535).
 //
@@ -91,24 +91,6 @@ function report_unverified(branch_name: string): void {
 	)
 }
 
-type RemoteAnswer = 'absent' | 'present' | 'unreachable'
-
-// **The remote-tracking ref is not evidence that the remote still has the branch.** Nothing in the
-// lane lifecycle prunes it — `lane:close` removes the work tree and the local branch, and GitHub
-// deletes the remote branch at the merge — so the ref survives both, and reading one as "the child's
-// work is on origin" would cut a lane from a commit that merged long ago. `ls-remote` is asked
-// instead, because it separates the two answers a `fetch` failure runs together: a branch that is
-// gone from a remote that cannot be reached.
-async function ask_remote(branch_name: string): Promise<RemoteAnswer> {
-	try {
-		const heads = await git_worktree.ls_remote_branch(branch_name)
-
-		return heads.trim() === '' ? 'absent' : 'present'
-	} catch {
-		return 'unreachable'
-	}
-}
-
 async function refresh_lane_branch(branch_name: string): Promise<void> {
 	try {
 		await git_command.fetch_branch(branch_name)
@@ -147,9 +129,11 @@ async function present_reference(branch_name: string): Promise<string> {
 }
 
 // `absent` is the one answer that refuses the ref: the branch is gone from origin, so a ref still
-// pointing at it is stale and the lane is cut from the default branch as any new one is.
+// pointing at it is stale and the lane is cut from the default branch as any new one is. Why origin
+// itself is asked rather than the remote-tracking ref is `git_remote_branch`'s own comment
+// (joshuafolkken/kit#1641 moved the asking there, so `pnpm josh release` could reuse it).
 async function remote_reference_for(branch_name: string): Promise<string | undefined> {
-	const answer = await ask_remote(branch_name)
+	const answer = await git_remote_branch.ask(branch_name)
 
 	if (answer === 'absent') return undefined
 	if (answer === 'present') return await present_reference(branch_name)
