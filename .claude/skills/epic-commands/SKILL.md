@@ -162,7 +162,14 @@ typed and can change. **Inside one epic the order is that epic's own task list**
 those, the order the task list names them is the order they are offered — so an epic says "do this
 one first" by moving the row, not by declaring a chain, which would stop every child behind a stuck
 one. It was the lowest issue number until then, on the premise that number order is split order —
-false for any epic that gains children as work is found. **A child two epics both track enters once**, keyed by
+false for any epic that gains children as work is found.
+**`pnpm josh epic --add <E> <N> --order-before <M>` is what moves that row**
+(joshuafolkken/kit#1738): the row goes where the flag names, and the declaration and the `blocked-by`
+relations are left exactly as they stood — so "moving the row" is a command rather than the hand edit
+`epic --add` exists to prevent. `--order-after <M>` is its other direction, and both work on a child
+the epic already tracks, which is a pure reorder. **A child a chain still holds is not freed by
+moving its row**: `epic:next` filters by `blocked-by` before it applies task-list order, so the
+command prints a ⚠️ line naming that child rather than reporting a reordering nothing can observe. **A child two epics both track enters once**, keyed by
 `owner/repo#number` and kept by the epic named earlier; withheld there, it stays withheld, because a
 `blocked-by` relation belongs to the issue rather than to the epic listing it. **One unusable graph
 refuses the whole answer**, and **one reference that does not parse fails the read** rather than
@@ -288,6 +295,10 @@ condition, and it is narrower than it sounds:
 - **A mere preference of order is not a dependency.** Wanting one child to go first — to see its
   result early, to get the risky one out of the way — is presentation order, and joshuafolkken/kit#1583
   is where that belongs. Substituting a dependency for it buys the order and pays with the stall below.
+  **Write it with `--order-before <M>` / `--order-after <M>`** (joshuafolkken/kit#1738), which move the
+  task-list row and declare nothing; `--before` / `--after` are for an order that really is a
+  dependency. Neither of the order-only flags helps at a **wave boundary**, which is a dependency by
+  definition — the hub case below stays what it is.
 - **Two children that would edit the same file** are the case with no better answer today: separating
   them into different waves is how it is done, and the price — a fixed order, plus the stall — is
   accepted knowingly rather than by default.

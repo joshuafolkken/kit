@@ -2,12 +2,21 @@ import { git_epic_add_plan, type AddPlan } from './git-epic-add-plan'
 import type { InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_read } from './git-epic-read'
-import { format_issue_references, format_replaced_relations } from './git-epic-reference'
+import {
+	format_issue_references,
+	format_replaced_relations,
+	to_issue_reference,
+} from './git-epic-reference'
 import { git_epic_relations } from './git-epic-relations'
 import { git_gh_command } from './git-gh-command'
 
-// `josh epic --add <E> <N...> [--before <M> | --after <M>] [--decision-file <path|->]` — insert
-// children into an existing epic.
+// `josh epic --add <E> <N...> [--before <M> | --after <M> | --order-before <M> | --order-after <M>]
+// [--decision-file <path|->]` — insert children into an existing epic.
+//
+// **`--order-*` moves the row and writes nothing else** (joshuafolkken/kit#1738). `epic:next` offers
+// children in task-list order, so putting one first meant `--before`, which records a `blocked-by`:
+// "no dependency, but run this one first" had no spelling, and an order written that way stops every
+// child behind the one that stalls.
 //
 // Adding a child by editing the body is what the procedure told an agent to do, and it is what stops
 // an unattended run: the body then declares an order the native `blocked-by` relations do not record,
@@ -28,6 +37,9 @@ interface AddChildrenInput {
 	epic_number: number
 	children: ReadonlyArray<number>
 	position?: InsertPosition | undefined
+	// `--order-before` / `--order-after`: place the row at `position` and write nothing else — no
+	// declaration, no `blocked-by` (joshuafolkken/kit#1738).
+	is_order_only?: boolean | undefined
 	// The decision record to write, from `--decision-file`. It goes to two places, and both used to be
 	// separate calls a run made afterwards: the epic's `## Decisions` section — folded into the body
 	// edit below, so it costs no round trip — and a comment on each child added
@@ -70,8 +82,44 @@ async function apply_plan(plan: AddPlan): Promise<void> {
 // addition gains a task-list row, a relocation moves the row it already had. Either list can be empty
 // — `--before` / `--after` on children the epic already tracks adds nothing at all
 // (joshuafolkken/kit#1701) — so neither line is printed unconditionally.
-function report_placements(epic_number: number, plan: AddPlan): void {
-	const epic = `epic #${String(epic_number)}`
+// **An order-only move reports the place, because nothing else will** (joshuafolkken/kit#1738). An
+// ordinary insertion is followed by the replaced-relation line and the relation report, which between
+// them say where the child landed; `--order-*` writes neither, so without this line the console says a
+// row moved and never says where to. The position is read from the input rather than the plan: the
+// plan deliberately carries no record of it, the declaration being what it did not change.
+// A row moved onto the wrong side of an order the declaration already states. `epic:next` filters by
+// `blocked_by` before it applies task-list order, so the move cannot change when that child is offered
+// until the declaration itself changes — and the placement line above, read alone, says the opposite.
+// It is a warning rather than a refusal for the reason `contradicted` gives (joshuafolkken/kit#1738).
+function report_contradiction(plan: AddPlan): void {
+	if (plan.contradicted.length === 0) return
+
+	console.info(
+		`⚠️ ${format_issue_references(plan.contradicted)} is still held by a declared order, so \`epic:next\` will not offer it any earlier until that order is changed — \`--remove\` deletes one.`,
+	)
+}
+
+function report_order(input: AddChildrenInput, plan: AddPlan): void {
+	const { position } = input
+	if (position === undefined) return
+
+	const placed = format_issue_references([...plan.additions, ...plan.relocations])
+	const target = to_issue_reference(position.target)
+
+	console.info(
+		`📋 Placed ${placed} ${position.kind} ${target} in epic #${String(input.epic_number)} — order only, no dependency written.`,
+	)
+	report_contradiction(plan)
+}
+
+function report_placements(input: AddChildrenInput, plan: AddPlan): void {
+	if (input.is_order_only === true) {
+		report_order(input, plan)
+
+		return
+	}
+
+	const epic = `epic #${String(input.epic_number)}`
 
 	if (plan.additions.length > 0) {
 		console.info(`📋 Added ${format_issue_references(plan.additions)} to ${epic}.`)
@@ -87,8 +135,8 @@ function report_placements(epic_number: number, plan: AddPlan): void {
 // body declared but nobody ever recorded natively is dropped from the declaration all the same, and
 // reporting from the work list let exactly those go by without a word. A positioned `--add` is the
 // only invocation that can replace anything, so an addition that re-points nothing prints nothing.
-function report_success(epic_number: number, plan: AddPlan): void {
-	report_placements(epic_number, plan)
+function report_success(input: AddChildrenInput, plan: AddPlan): void {
+	report_placements(input, plan)
 
 	if (plan.replaced.length > 0) {
 		console.info(`↪ ${format_replaced_relations(plan.replaced)}`)
@@ -114,9 +162,9 @@ async function comment_decision(children: ReadonlyArray<number>, decision: strin
 // The record posted to the children is `plan.decision`, not the caller's file: the plan is what folded
 // the replaced relations into it, and reading the raw input here would leave the epic's `## Decisions`
 // carrying a line the child comments do not (joshuafolkken/kit#1711).
-async function write_plan(epic_number: number, plan: AddPlan): Promise<void> {
-	await git_gh_command.issue_edit_body(String(epic_number), plan.body)
-	report_success(epic_number, plan)
+async function write_plan(input: AddChildrenInput, plan: AddPlan): Promise<void> {
+	await git_gh_command.issue_edit_body(String(input.epic_number), plan.body)
+	report_success(input, plan)
 	await apply_plan(plan)
 
 	// A relocation is a placement decision as much as an addition is, so the record reaches the child
@@ -143,6 +191,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		labels: epic.subject.labels,
 		children: input.children,
 		position: input.position,
+		is_order_only: input.is_order_only,
 		recorded: epic.recorded,
 		repo: epic.repo,
 		decision: input.decision,
@@ -154,7 +203,7 @@ async function add_children(input: AddChildrenInput): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	await write_plan(input.epic_number, outcome.plan)
+	await write_plan(input, outcome.plan)
 
 	return SUCCESS_EXIT_CODE
 }

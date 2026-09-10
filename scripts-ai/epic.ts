@@ -21,6 +21,7 @@ const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS}`,
 	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
+	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
 ].join('\n')
 const FAILURE_EXIT_CODE = 1
@@ -53,6 +54,7 @@ function to_add_input(parsed: AddArguments): AddChildrenInput {
 		epic_number: parsed.epic_number,
 		children: parsed.children,
 		position: parsed.position,
+		is_order_only: parsed.is_order_only,
 		decision: epic_cli.read_decision(parsed.decision_path),
 	}
 }
