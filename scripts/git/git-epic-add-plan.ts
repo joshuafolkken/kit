@@ -1,5 +1,5 @@
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
-import { git_epic_add_body } from './git-epic-add-body'
+import { git_epic_add_body, type RewriteInput } from './git-epic-add-body'
 import { git_epic_chains, type InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse, type DependencyLink } from './git-epic-parse'
@@ -37,6 +37,10 @@ interface PlanInput {
 interface AddPlan {
 	body: string
 	additions: ReadonlyArray<number>
+	// The children the epic already tracked, moved to the position the caller named. Kept apart from
+	// `additions` because the two write different things: an addition gains a task-list row, while a
+	// relocation only moves the row it already had (joshuafolkken/kit#1701).
+	relocations: ReadonlyArray<number>
 	added: ReadonlyArray<DependencyLink>
 	removed: ReadonlyArray<DependencyLink>
 }
@@ -113,13 +117,58 @@ function declared_numbers(chains: ReadonlyArray<ReadonlyArray<number>>): Array<n
 	return [...new Set(chains.flat())]
 }
 
-function find_addition_error(
+// The children the epic already tracks, given a position: what used to be filtered out as "nothing to
+// do" is a reorder the moment `--before` / `--after` says where they go. Without a position there is
+// still nothing to do, so the refusal below stands for that case (joshuafolkken/kit#1701).
+//
+// **The task list decides, not the declaration.** An issue a chain names while no row tracks it is
+// what joshuafolkken/kit#890's cycle came out of, and a move that re-rendered its missing row would
+// repair a body somebody has to reconcile by hand — so it stays outside a move and keeps the refusal
+// it already had.
+function to_relocations(input: PlanInput, tracked: ReadonlyArray<number>): Array<number> {
+	if (input.position === undefined) return []
+
+	return input.children.filter((child) => child !== input.epic_number && tracked.includes(child))
+}
+
+// The issues to place, in the order the caller gave them. Additions and relocations enter one chain
+// segment together, so which comes first is the caller's word rather than which bucket it fell into.
+function to_inserted(
+	children: ReadonlyArray<number>,
 	additions: ReadonlyArray<number>,
+	relocations: ReadonlyArray<number>,
+): Array<number> {
+	const placed = new Set([...additions, ...relocations])
+
+	return [...new Set(children.filter((child) => placed.has(child)))]
+}
+
+// A position naming one of the issues being placed. `--after #N` for `#N` itself is neither an
+// addition nor a move, and falling through to the refusal below would describe the wrong thing.
+function find_self_position_error(input: PlanInput): string | undefined {
+	const { position } = input
+	if (position === undefined || !input.children.includes(position.target)) return undefined
+
+	return `${to_issue_reference(position.target)} cannot position an insertion of itself.`
+}
+
+// Nothing to add and nothing to move. The remedy is named only where it applies: with a position
+// already given, the issues are ones the declaration names but no row tracks, and telling the caller
+// to name a position would send them round the same refusal.
+function to_nothing_to_do_error(position: InsertPosition | undefined): string {
+	const nothing = 'Every issue given is already tracked by this epic; nothing to add.'
+	if (position !== undefined) return nothing
+
+	return `${nothing} Name \`--before <M>\` or \`--after <M>\` to declare an order between children it already tracks.`
+}
+
+function find_movement_error(
+	moves: { additions: ReadonlyArray<number>; relocations: ReadonlyArray<number> },
 	position: InsertPosition | undefined,
 	tracked: ReadonlyArray<number>,
 ): string | undefined {
-	if (additions.length === 0) {
-		return 'Every issue given is already tracked by this epic; nothing to add.'
+	if (moves.additions.length === 0 && moves.relocations.length === 0) {
+		return to_nothing_to_do_error(position)
 	}
 
 	if (position !== undefined && !tracked.includes(position.target)) {
@@ -164,20 +213,31 @@ function to_removed_links(
 	return dropped.filter((link) => !unrecorded.has(format_dependency_link(link)))
 }
 
-// The write itself, once every refusal above has passed. Split out so `build_plan` stays a list of
-// checks rather than a function that both checks and composes.
-function to_plan(context: {
+// What `build_plan` computed, handed to the composition below as one value: the epic's own input, the
+// two kinds of placement, and the declaration before and after.
+interface PlanContext {
 	input: PlanInput
 	additions: ReadonlyArray<number>
+	relocations: ReadonlyArray<number>
 	chains_before: ReadonlyArray<ReadonlyArray<number>>
 	chains_after: ReadonlyArray<ReadonlyArray<number>>
-}): PlanOutcome {
-	const rewritten = git_epic_add_body.rewrite_body({
+}
+
+function to_rewrite_input(context: PlanContext): RewriteInput {
+	return {
 		body: context.input.body ?? '',
 		additions: context.additions,
+		relocations: context.relocations,
+		position: context.input.position,
 		chains_after: context.chains_after,
 		decision: context.input.decision,
-	})
+	}
+}
+
+// The write itself, once every refusal above has passed. Split out so `build_plan` stays a list of
+// checks rather than a function that both checks and composes.
+function to_plan(context: PlanContext): PlanOutcome {
+	const rewritten = git_epic_add_body.rewrite_body(to_rewrite_input(context))
 	if ('error' in rewritten) return { error: rewritten.error }
 
 	const links_after = git_epic_chains.links_of(context.chains_after)
@@ -187,6 +247,7 @@ function to_plan(context: {
 		plan: {
 			body: rewritten.body,
 			additions: context.additions,
+			relocations: context.relocations,
 			added: epic_graph.missing_relations(links_after, context.input.recorded, context.input.repo),
 			removed: to_removed_links(removed, context.input.recorded, context.input.repo),
 		},
@@ -200,8 +261,34 @@ function find_decision_error(decision: string | undefined): string | undefined {
 	return decision === undefined ? undefined : git_epic_decision.find_decision_error(decision)
 }
 
-// Every refusal, in the order a reader needs them: is this an epic, is there anything to add, do the
-// body and the relations already agree, and can the decision record be written.
+// The refusals about what is being placed and where: the position may not name one of the issues
+// being placed, there has to be something to add or move, and the position has to identify one place.
+function find_placement_error(
+	input: PlanInput,
+	tracked: ReadonlyArray<number>,
+	chains_before: ReadonlyArray<ReadonlyArray<number>>,
+): string | undefined {
+	const declared = declared_numbers(chains_before)
+
+	return (
+		find_self_position_error(input) ??
+		find_movement_error(
+			{
+				additions: to_additions(input, tracked, declared),
+				relocations: to_relocations(input, tracked),
+			},
+			input.position,
+			tracked,
+		) ??
+		// Asked of the declaration as it stands, because a relocation's removal can collapse the very
+		// ambiguity this refuses (joshuafolkken/kit#1701).
+		git_epic_chains.find_position_ambiguity(chains_before, input.position)
+	)
+}
+
+// Every refusal, in the order a reader needs them: is this an epic, is there something to place and
+// somewhere to put it, do the body and the relations already agree, and can the decision record be
+// written.
 function find_input_error(
 	input: PlanInput,
 	tracked: ReadonlyArray<number>,
@@ -209,11 +296,7 @@ function find_input_error(
 ): string | undefined {
 	return (
 		find_subject_error(input, tracked) ??
-		find_addition_error(
-			to_additions(input, tracked, declared_numbers(chains_before)),
-			input.position,
-			tracked,
-		) ??
+		find_placement_error(input, tracked, chains_before) ??
 		find_relation_error(git_epic_chains.links_of(chains_before), input.recorded, input.repo) ??
 		find_decision_error(input.decision)
 	)
@@ -225,18 +308,23 @@ function build_plan(input: PlanInput): PlanOutcome {
 	const error = find_input_error(input, tracked, chains_before)
 	if (error !== undefined) return { error }
 
-	const additions = to_additions(input, tracked, declared_numbers(chains_before))
-	// `tracked` reaches the chain builder so it can tell a child with no order yet from a number that
-	// is not a child at all; `find_addition_error` has already refused the second (joshuafolkken/kit#949).
+	const declared = declared_numbers(chains_before)
+	const additions = to_additions(input, tracked, declared)
+	const relocations = to_relocations(input, tracked)
+	// A relocation is a removal followed by the ordinary insertion, so `--before` re-points the chain
+	// it lands in and the vacated chain closes around it — both by construction rather than by a second
+	// code path (joshuafolkken/kit#1701). `tracked` reaches the chain builder so it can tell a child
+	// with no order yet from a number that is not a child at all; `find_movement_error` has already
+	// refused the second (joshuafolkken/kit#949).
 	const inserted = git_epic_chains.insert_children(
-		chains_before,
-		additions,
+		git_epic_chains.remove_children(chains_before, relocations),
+		to_inserted(input.children, additions, relocations),
 		input.position,
 		tracked,
 	)
 	if ('error' in inserted) return { error: inserted.error }
 
-	return to_plan({ input, additions, chains_before, chains_after: inserted.chains })
+	return to_plan({ input, additions, relocations, chains_before, chains_after: inserted.chains })
 }
 
 const git_epic_add_plan = {

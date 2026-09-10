@@ -1,4 +1,4 @@
-import { git_epic_chains, type Chains } from './git-epic-chains'
+import { git_epic_chains, type Chains, type InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse, UNORDERED_DEPENDENCIES } from './git-epic-parse'
 import {
@@ -20,6 +20,13 @@ import { git_epic_sections, type BodyLines, type SectionRange } from './git-epic
 interface RewriteInput {
 	body: string
 	additions: ReadonlyArray<number>
+	// The children the epic already tracks, moved to where `position` names. They gain no task-list
+	// row — they have one — so they are kept apart from `additions`, whose rows are appended
+	// (joshuafolkken/kit#1701).
+	relocations: ReadonlyArray<number>
+	// Where `--before` / `--after` puts them. `undefined` is an insertion that declared no order, and
+	// then nothing is moved.
+	position?: InsertPosition | undefined
 	chains_after: Chains
 	// The decision record to append to the epic's `## Decisions` section, or `undefined` for an
 	// insertion that records none. It is folded in **before** the declaration work below, so the stray
@@ -47,6 +54,53 @@ function insert_task_rows(input: BodyLines, additions: ReadonlyArray<number>): A
 	const rendered = additions.map((issue_number) => to_task_row(issue_number))
 
 	return [...input.lines.slice(0, last + 1), ...rendered, ...input.lines.slice(last + 1)]
+}
+
+// The issue a task-list row names, read through the parser rather than a second pattern of its own —
+// a row this recognizes is exactly a row `epic:next` and the auto-close read.
+function to_row_number(line: string): number | undefined {
+	const [issue_number] = git_epic_parse.parse_task_list_issue_numbers(line)
+
+	return issue_number
+}
+
+function is_relocated_row(line: string, moved: ReadonlySet<number>): boolean {
+	const issue_number = to_row_number(line)
+
+	return issue_number !== undefined && moved.has(issue_number)
+}
+
+// The rows of the relocated children, lifted out of the task list and put back beside the row the
+// position names. **The list order is part of what a reorder declares**: `epic:next` presents an
+// epic's children in task-list order (joshuafolkken/kit#1583), so rewriting only the declaration
+// would leave the two disagreeing (joshuafolkken/kit#1701).
+//
+// The target's row is located after the removal rather than before it, so the index needs no
+// adjusting for the rows that came out above it. Both lookups go through `find_indices`, which skips
+// fenced lines — a `- [ ] #N` inside a code block is an example, not a row.
+function move_task_rows(
+	input: BodyLines,
+	relocations: ReadonlyArray<number>,
+	position: InsertPosition,
+): Array<string> {
+	const moved = new Set(relocations)
+	const dropped = new Set(find_indices(input, (line) => is_relocated_row(line, moved)))
+	const kept = input.lines.filter((_line, index) => !dropped.has(index))
+	const [at] = find_indices(to_body_lines(kept), (line) => to_row_number(line) === position.target)
+	if (at === undefined) return [...input.lines]
+	const rendered = relocations.map((issue_number) => to_task_row(issue_number))
+	const insert_at = position.kind === 'before' ? at : at + 1
+
+	return [...kept.slice(0, insert_at), ...rendered, ...kept.slice(insert_at)]
+}
+
+// The body with any relocation applied, before the additions are appended. An insertion that named
+// no position moves nothing, which is every insertion made before joshuafolkken/kit#1701.
+function to_relocated_lines(input: RewriteInput): Array<string> {
+	const { position } = input
+	if (position === undefined || input.relocations.length === 0) return input.body.split('\n')
+
+	return move_task_rows(to_body_lines(input.body), input.relocations, position)
 }
 
 // Where the `Dependencies` section runs: the lines after its heading, up to the next heading. The
@@ -128,7 +182,7 @@ type BodyOutcome = { body: string } | { error: string }
 // round-trip guards below have to see it — a record appended afterwards would be written unchecked and
 // read back by `epic:next` as part of the order (joshuafolkken/kit#1350).
 function to_written_lines(input: RewriteInput): Array<string> {
-	const with_rows = insert_task_rows(to_body_lines(input.body), input.additions)
+	const with_rows = insert_task_rows(to_body_lines(to_relocated_lines(input)), input.additions)
 	const { decision } = input
 	if (decision === undefined) return with_rows
 
@@ -209,8 +263,27 @@ function missing_rows(body: string, expected: ReadonlyArray<number>): Array<numb
 // The three things `epic:check` and `epic:next` read, verified against the body that would be
 // written. Every failure here means the rewrite could not express the insertion, which is reported
 // rather than written — a body that half-expresses it is exactly the state that stops a run.
+function to_relocation_start(position: InsertPosition, target: number, count: number): number {
+	return position.kind === 'before' ? target - count : target + 1
+}
+
+// Whether the rewritten task list puts the relocated rows where the position asked. The link round
+// trip above says nothing about it — a body whose rows never moved declares exactly the same order
+// and passes every other check here, while `epic:next` goes on presenting the order it was told to
+// replace (joshuafolkken/kit#1701).
+function has_intended_rows(body: string, input: RewriteInput): boolean {
+	const { position, relocations } = input
+	if (position === undefined || relocations.length === 0) return true
+	const tracked = git_epic_parse.parse_task_list_issue_numbers(body)
+	const target = tracked.indexOf(position.target)
+	if (target === -1) return false
+	const start = to_relocation_start(position, target, relocations.length)
+
+	return relocations.every((child, offset) => tracked[start + offset] === child)
+}
+
 function find_rewrite_error(body: string, input: RewriteInput): string | undefined {
-	const missing = missing_rows(body, input.additions)
+	const missing = missing_rows(body, [...input.additions, ...input.relocations])
 
 	if (missing.length > 0) {
 		return `The rewritten body would not track ${format_issue_references(missing)} as a task-list row.`
@@ -222,6 +295,10 @@ function find_rewrite_error(body: string, input: RewriteInput): string | undefin
 
 	if (!has_intended_links(body, input.chains_after)) {
 		return 'The rewritten body would declare a different dependency order than the one computed; nothing was written.'
+	}
+
+	if (!has_intended_rows(body, input)) {
+		return 'The rewritten body would not put the moved task-list rows where the position asked; nothing was written.'
 	}
 
 	return undefined

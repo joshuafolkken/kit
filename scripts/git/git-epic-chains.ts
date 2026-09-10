@@ -167,10 +167,29 @@ function is_branching_after(
 	return indices.every((index) => has_successor(chains[index] ?? [], position.target))
 }
 
-function ambiguous_position_error(position: InsertPosition): InsertOutcome {
-	return {
-		error: `${to_issue_reference(position.target)} appears in more than one declared chain, so "${position.kind}" does not identify one place; edit the declaration by hand.`,
-	}
+function to_ambiguous_position_error(position: InsertPosition): string {
+	return `${to_issue_reference(position.target)} appears in more than one declared chain, so "${position.kind}" does not identify one place; edit the declaration by hand.`
+}
+
+// The hub refusal, asked of a declaration the caller names rather than of the one an insertion is
+// about to work from.
+//
+// A relocation splices its child out of every chain before re-inserting it, and that can **collapse**
+// an ambiguity rather than resolve it: with `#890 -> #891` beside `#892 -> #891`, moving `#892` before
+// `#891` leaves one chain naming `#891`, and the insertion then splices into a place nobody
+// identified — recording `#890 -> #892`, an order the caller never asked for, and dropping
+// `#890 -> #891`, one they never asked to lose. So the plan asks this of the declaration as it stands
+// (joshuafolkken/kit#1701), and the same answer is used inside the insertion below.
+function find_position_ambiguity(
+	chains: Chains,
+	position: InsertPosition | undefined,
+): string | undefined {
+	if (position === undefined) return undefined
+	const indices = chains_containing(chains, position.target)
+	if (indices.length < AMBIGUOUS_MATCH_COUNT) return undefined
+	if (is_branching_after(chains, indices, position)) return undefined
+
+	return to_ambiguous_position_error(position)
 }
 
 // Where a position that is not a branch lands: `--before` always, and `--after` at a chain's tail.
@@ -201,7 +220,10 @@ function insert_at_position(
 
 	if (index === undefined) return insert_outside_chains(chains, additions, position, tracked)
 	if (is_branching_after(chains, indices, position)) return add_chain(chains, additions, position)
-	if (indices.length >= AMBIGUOUS_MATCH_COUNT) return ambiguous_position_error(position)
+
+	if (indices.length >= AMBIGUOUS_MATCH_COUNT) {
+		return { error: to_ambiguous_position_error(position) }
+	}
 
 	return splice_into_chain(chains, index, additions, position)
 }
@@ -294,6 +316,22 @@ function find_insertion_error(
 	return declared === undefined ? undefined : already_declared_error(declared)
 }
 
+// A reorder expressed as a removal followed by the ordinary insertion. Splicing the child out of
+// every chain that names it closes the chain around it — `#A -> #N -> #B` becomes `#A -> #B` — so the
+// re-insertion goes through `insert_children` unchanged, and the relations to drop still fall out of
+// diffing the declaration before against the declaration after (joshuafolkken/kit#1701).
+//
+// A chain left with one reference declares nothing and is dropped rather than rendered as a bare
+// `#N`, which the parser would read as prose. Its remaining child simply has no order any more,
+// which is the state an epic mixing ordered and unordered children is already in.
+function remove_children(chains: Chains, children: ReadonlyArray<number>): Array<Array<number>> {
+	const dropped = new Set(children)
+
+	return chains
+		.map((chain) => chain.filter((issue_number) => !dropped.has(issue_number)))
+		.filter((chain) => chain.length > 1)
+}
+
 function insert_children(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -315,6 +353,8 @@ const git_epic_chains = {
 	render_chains,
 	links_of,
 	diff_links,
+	find_position_ambiguity,
+	remove_children,
 	insert_children,
 }
 

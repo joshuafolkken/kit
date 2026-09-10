@@ -104,10 +104,24 @@ async function apply_plan(plan: AddPlan): Promise<void> {
 	report_relations(plan, { added, removed })
 }
 
-function report_success(epic_number: number, plan: AddPlan): void {
-	const list = format_issue_references(plan.additions)
+// The two things one insertion can do, reported separately because they are different edits: an
+// addition gains a task-list row, a relocation moves the row it already had. Either list can be empty
+// — `--before` / `--after` on children the epic already tracks adds nothing at all
+// (joshuafolkken/kit#1701) — so neither line is printed unconditionally.
+function report_placements(epic_number: number, plan: AddPlan): void {
+	const epic = `epic #${String(epic_number)}`
 
-	console.info(`📋 Added ${list} to epic #${String(epic_number)}.`)
+	if (plan.additions.length > 0) {
+		console.info(`📋 Added ${format_issue_references(plan.additions)} to ${epic}.`)
+	}
+
+	if (plan.relocations.length > 0) {
+		console.info(`📋 Moved ${format_issue_references(plan.relocations)} within ${epic}.`)
+	}
+}
+
+function report_success(epic_number: number, plan: AddPlan): void {
+	report_placements(epic_number, plan)
 
 	if (plan.removed.length > 0) {
 		console.info(`↪ Re-pointed: ${format_dependency_links(plan.removed)} was replaced.`)
@@ -132,14 +146,14 @@ async function read_epic(
 // The child half of the decision record, posted after the epic's body carries its own half. A failure
 // is counted rather than thrown for the reason a relation failure is: the insertion itself has landed,
 // and an exception here would leave the caller unable to tell that from a refusal that wrote nothing.
-async function comment_decision(additions: ReadonlyArray<number>, decision: string): Promise<void> {
+async function comment_decision(children: ReadonlyArray<number>, decision: string): Promise<void> {
 	const posted = await Promise.all(
-		additions.map(async (child) => await git_gh_command.issue_try_comment(String(child), decision)),
+		children.map(async (child) => await git_gh_command.issue_try_comment(String(child), decision)),
 	)
 
 	console.info(
 		git_epic_decision.format_decision_report({
-			total: additions.length,
+			total: children.length,
 			failures: posted.filter((is_posted) => !is_posted).length,
 		}),
 	)
@@ -153,7 +167,12 @@ async function write_plan(
 	await git_gh_command.issue_edit_body(String(epic_number), plan.body)
 	report_success(epic_number, plan)
 	await apply_plan(plan)
-	if (decision !== undefined) await comment_decision(plan.additions, decision)
+
+	// A relocation is a placement decision as much as an addition is, so the record reaches the child
+	// that was moved too (joshuafolkken/kit#1701).
+	if (decision !== undefined) {
+		await comment_decision([...plan.additions, ...plan.relocations], decision)
+	}
 }
 
 // Insert children into an existing epic, or refuse without writing anything. Every refusal happens
