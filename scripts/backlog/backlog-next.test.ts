@@ -9,7 +9,9 @@ import {
 	OLD_ISSUE_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
+import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
+import type { IssueRead } from '#scripts/git/git-gh-issue-read'
 import { AUTO_OK_LABEL } from '#scripts/git/issue-labels'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
@@ -27,6 +29,7 @@ const SECOND_CHILD = 902
 const IN_PROGRESS = 'in-progress'
 const NEEDS_DECISION = 'needs-decision'
 const RATE_LIMITED_STATUS = 429
+const FORBIDDEN_STATUS = 403
 
 const streams = console_streams()
 const { stdout, stderr } = streams
@@ -38,6 +41,12 @@ function unreadable_child(): void {
 		opted_in: [opted_in_epic(), issue(NEW_ISSUE_NUMBER, CREATED_LATER)],
 		epics: [{ number: EPIC_NUMBER, children: [CHILD] }],
 	})
+}
+
+// The failure the child read itself came back with. Overrides what `stub_backlog` installed, so the
+// nature reaching the verdict is the read's own rather than a probe's (joshuafolkken/kit#1690).
+function child_read_failing(read: IssueRead): void {
+	vi.spyOn(git_gh_command, 'issue_get_state_and_relations_classified').mockResolvedValue(read)
 }
 
 beforeEach(() => {
@@ -262,7 +271,7 @@ describe('the verdicts, in epic:next meanings', () => {
 describe('a transport failure, told apart from an unusable graph', () => {
 	it('says retry rather than error when GitHub was never reached', async () => {
 		unreadable_child()
-		vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(undefined)
+		child_read_failing({ kind: 'unreadable', reason: 'unreachable', status: undefined })
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.retry)
@@ -270,7 +279,11 @@ describe('a transport failure, told apart from an unusable graph', () => {
 
 	it('says retry when GitHub answered but the answer was a rate limit', async () => {
 		unreadable_child()
-		vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(RATE_LIMITED_STATUS)
+		child_read_failing({
+			kind: 'unreadable',
+			reason: 'unreachable',
+			status: RATE_LIMITED_STATUS,
+		})
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.retry)
@@ -278,7 +291,7 @@ describe('a transport failure, told apart from an unusable graph', () => {
 
 	it('sends the reader at the connection instead of at gh auth status and the issue', async () => {
 		unreadable_child()
-		vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(undefined)
+		child_read_failing({ kind: 'unreadable', reason: 'unreachable', status: undefined })
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(stderr()).toContain(backlog_next.RETRY_MESSAGE)
@@ -291,5 +304,32 @@ describe('a transport failure, told apart from an unusable graph', () => {
 
 		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(status).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#1690: the nature travels on the read itself, so a probe fired after the answer
+// was otherwise final can no longer overrule what the failed request said.
+describe('the transport nature comes from the read that failed', () => {
+	it('says error, not retry, when GitHub answered and refused', async () => {
+		unreadable_child()
+		child_read_failing({ kind: 'unreadable', reason: 'rejected', status: FORBIDDEN_STATUS })
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.error)
+	})
+
+	// joshuafolkken/kit#1690's symptom 1: the epic's own body is the read whose failure used to be
+	// invisible — it parses to zero children, so the epic was dropped as one tracking none and the
+	// run reported the backlog exhausted.
+	it('says retry rather than none when the epic body itself was never reached', async () => {
+		unreadable_child()
+		vi.spyOn(git_gh_command, 'issue_get_body_classified').mockResolvedValue({
+			kind: 'unreadable',
+			reason: 'unreachable',
+			status: undefined,
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(backlog_next.VERDICT_TOKENS.retry)
 	})
 })

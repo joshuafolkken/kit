@@ -4,6 +4,7 @@ import { epic_schema } from '#scripts/epic/epic-index'
 import { git_gh_command } from '#scripts/git/git-gh-command'
 import { git_gh_exec } from '#scripts/git/git-gh-exec'
 import { listing_outcome } from '#scripts/git/git-gh-issue-list-fixture'
+import type { IssueRead } from '#scripts/git/git-gh-issue-read'
 import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import type { OpenIssueData } from '#scripts/git/schemas'
 import { vi } from 'vitest'
@@ -80,6 +81,15 @@ function epic_bodies(epics: ReadonlyArray<EpicInput>): Map<string, string> {
 	)
 }
 
+// A child the fixture has text for, or a read that failed permanently — the two states the
+// unclassified read expressed as a string and `undefined` (joshuafolkken/kit#1690). A case that wants
+// the transport failure builds its own `unreachable` read instead.
+function to_child_read(json: string | undefined): IssueRead {
+	if (json === undefined) return { kind: 'unreadable', reason: 'rejected', status: 403 }
+
+	return { kind: 'read', json }
+}
+
 function child_texts(children: ReadonlyArray<ChildInput>): Map<string, string> {
 	return new Map(children.map((child) => [String(child.number), gh_child(child)]))
 }
@@ -109,11 +119,15 @@ function stub_backlog(input: BacklogInput): void {
 	vi.spyOn(git_gh_command, 'issue_list_by_label').mockResolvedValue(
 		listing_outcome(auto_ok_fixture.epic_listing(epics)),
 	)
-	vi.spyOn(git_gh_command, 'issue_get_body').mockImplementation(async (number) =>
-		bodies.get(number),
-	)
-	vi.spyOn(git_gh_command, 'issue_get_state_and_relations').mockImplementation(async (number) =>
-		children.get(number),
+	// The classified reads (joshuafolkken/kit#1690). An epic the fixture has no body for is a body that
+	// is simply absent, which is what it always meant here; a child it has no text for is a read that
+	// failed for a reason asking again will not change, which is what an absent payload meant.
+	vi.spyOn(git_gh_command, 'issue_get_body_classified').mockImplementation(async (number) => ({
+		kind: 'read',
+		text: bodies.get(number),
+	}))
+	vi.spyOn(git_gh_command, 'issue_get_state_and_relations_classified').mockImplementation(
+		async (number) => to_child_read(children.get(number)),
 	)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
 }

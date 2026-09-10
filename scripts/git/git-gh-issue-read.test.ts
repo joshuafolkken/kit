@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_gh_exec } from './git-gh-exec'
+import { gh_failure } from './git-gh-failure'
 import { git_gh_issue_read as git_gh_issue, NOT_FOUND_STATUS } from './git-gh-issue-read'
 import {
 	BLOCKED_BY_SEGMENT,
@@ -27,6 +28,7 @@ const mocked_status = vi.mocked(git_gh_exec.exec_gh_api_status)
 const OTHER_REPO = 'joshuafolkken/app-kit'
 const ISSUE_PATH = `${CURRENT_REPO_ISSUES}/${String(ISSUE_NUMBER)}`
 const RATE_LIMITED_STATUS = 429
+const FORBIDDEN_STATUS = 403
 const RATE_LIMIT_MESSAGE = 'API rate limit exceeded'
 const NO_BLOCKERS = '[]'
 const READ_NUMBER = String(ISSUE_NUMBER)
@@ -51,6 +53,13 @@ function serve(issue: string, blockers: string = NO_BLOCKERS): void {
 
 function api_paths(): Array<string> {
 	return mocked_api.mock.calls.map(([request]) => request.path)
+}
+
+// The error `to_gh_error` throws, carrying the classification it takes off the failed request's own
+// response body. The message is deliberately the same in every case: nothing here may read it
+// (joshuafolkken/kit#1690).
+function gh_error(status: number | undefined): Error {
+	return gh_failure.attach(new Error('gh: some wording or other'), { status })
 }
 
 beforeEach(() => {
@@ -201,10 +210,13 @@ describe('issue_view_json_classified', () => {
 	})
 })
 
-describe('issue_view_json_classified — telling the two failures apart', () => {
+// joshuafolkken/kit#1690: the four failures are told apart from the failed request itself. `status`
+// is what GitHub wrote in its own error document, which `to_gh_error` attaches to the error it
+// throws — so the wording of the message never enters the decision, and no second request does
+// either.
+describe('issue_view_json_classified — telling the failures apart', () => {
 	it('reports a number that resolves to nothing as missing', async () => {
-		mocked_api.mockRejectedValueOnce(new Error('Not Found (HTTP 404)'))
-		mocked_status.mockResolvedValueOnce(NOT_FOUND_STATUS)
+		mocked_api.mockRejectedValueOnce(gh_error(NOT_FOUND_STATUS))
 
 		await expect(git_gh_issue.issue_view_json_classified(UNKNOWN_NUMBER, 'state')).resolves.toEqual(
 			{
@@ -213,35 +225,45 @@ describe('issue_view_json_classified — telling the two failures apart', () => 
 		)
 	})
 
-	// The distinction is the point: a rate limit is a gap, because the issue may well exist.
-	it('reports a rate-limited read as unreadable', async () => {
-		mocked_api.mockRejectedValueOnce(new Error(RATE_LIMIT_MESSAGE))
-		mocked_status.mockResolvedValueOnce(RATE_LIMITED_STATUS)
+	// The distinction is the point: a rate limit is a gap, because the issue may well exist — and one
+	// worth asking about again, unlike a refusal.
+	it('reports a rate-limited read as unreachable', async () => {
+		mocked_api.mockRejectedValueOnce(gh_error(RATE_LIMITED_STATUS))
 
 		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual({
 			kind: 'unreadable',
+			reason: 'unreachable',
+			status: RATE_LIMITED_STATUS,
 		})
 	})
 
-	// No status at all — gh missing, a dropped connection — is a failed read, not an absent issue.
-	it('reports a read with no status at all as unreadable', async () => {
-		mocked_api.mockRejectedValueOnce(new Error('connection reset'))
-		mocked_status.mockResolvedValueOnce(undefined)
+	// No status at all is the transport case: the request wrote no response body, so nothing answered.
+	it('reports a read that reached no status at all as unreachable', async () => {
+		mocked_api.mockRejectedValueOnce(gh_error(undefined))
 
 		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual({
 			kind: 'unreadable',
+			reason: 'unreachable',
+			status: undefined,
+		})
+	})
+
+	// A refusal answers the same however often it is asked, so it must not be read as a connection.
+	it('reports a refused read as rejected rather than unreachable', async () => {
+		mocked_api.mockRejectedValueOnce(gh_error(FORBIDDEN_STATUS))
+
+		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual({
+			kind: 'unreadable',
+			reason: 'rejected',
+			status: FORBIDDEN_STATUS,
 		})
 	})
 })
 
-// The classification is a status code, never `gh`'s wording: a message is prose that can be reworded
-// between releases, and a string match on it would silently start answering `unreadable` for every
-// missing number. That is why the probe survived the move to REST — `exec_gh_api` surfaces the
-// stderr text, not the status.
 describe('issue_view_json_classified — what the classification is read from', () => {
-	it('classifies by status code rather than by the error text', async () => {
-		mocked_api.mockRejectedValueOnce(new Error('some entirely different wording'))
-		mocked_status.mockResolvedValueOnce(NOT_FOUND_STATUS)
+	// The message is prose that can be reworded between releases; the status is the protocol.
+	it('classifies by the status the request carried rather than by the error text', async () => {
+		mocked_api.mockRejectedValueOnce(gh_error(NOT_FOUND_STATUS))
 
 		await expect(git_gh_issue.issue_view_json_classified(UNKNOWN_NUMBER, 'state')).resolves.toEqual(
 			{
@@ -250,50 +272,39 @@ describe('issue_view_json_classified — what the classification is read from', 
 		)
 	})
 
-	// A response that is not an issue object is a failed read, not an empty one.
-	it('reports output that is not an issue object as unreadable', async () => {
+	// A response that arrived and could not be used is neither a transport problem nor a permission
+	// one: the parse throws without a classification, and that absence is what says so.
+	it('reports output that is not an issue object as malformed', async () => {
 		serve('<html>proxy error</html>')
-		mocked_status.mockResolvedValueOnce(RATE_LIMITED_STATUS)
 
 		await expect(git_gh_issue.issue_view_json_classified(READ_NUMBER, 'state')).resolves.toEqual({
 			kind: 'unreadable',
+			reason: 'malformed',
+			status: undefined,
 		})
 	})
-})
 
-describe('issue_view_json_classified — which repository it probes', () => {
-	it('probes the current repository when no repo is given', async () => {
-		mocked_api.mockRejectedValueOnce(new Error('nope'))
-		mocked_status.mockResolvedValueOnce(NOT_FOUND_STATUS)
-
-		await git_gh_issue.issue_view_json_classified(UNKNOWN_NUMBER, 'state')
-
-		expect(mocked_status).toHaveBeenCalledWith(`${CURRENT_REPO_ISSUES}/${UNKNOWN_NUMBER}`)
-	})
-
-	// A qualified reference reads another repository's issue, so the probe has to follow it there —
-	// otherwise the status would describe this repository's issue of that number, a different one.
-	it('probes the named repository when one is given', async () => {
-		mocked_api.mockRejectedValueOnce(new Error('nope'))
-		mocked_status.mockResolvedValueOnce(NOT_FOUND_STATUS)
+	// The probe joshuafolkken/kit#957 spent here is gone: judging a failed request from a later one is
+	// what let a connection that recovered in a moment report the graph as permanently broken.
+	it('spends no second request on the failure path', async () => {
+		mocked_api.mockRejectedValueOnce(gh_error(NOT_FOUND_STATUS))
 
 		await git_gh_issue.issue_view_json_classified(UNKNOWN_NUMBER, 'state', OTHER_REPO)
 
-		expect(mocked_status).toHaveBeenCalledWith(`repos/${OTHER_REPO}/issues/${UNKNOWN_NUMBER}`)
+		expect(mocked_status).not.toHaveBeenCalled()
 	})
 })
 
-// The classification is opt-in. A caller that does not need it must keep costing one request even
-// when the read fails, or a rate-limited batch of two hundred reads doubles into four hundred.
+// The unwrapped read is the classified one with the reason dropped, so it answers exactly as it did.
 describe('issue_view_json — unchanged by the classification', () => {
 	it('still answers undefined when the read failed', async () => {
-		mocked_api.mockRejectedValueOnce(new Error('nope'))
+		mocked_api.mockRejectedValueOnce(gh_error(undefined))
 
 		await expect(git_gh_issue.issue_view_json(READ_NUMBER, 'state')).resolves.toBeUndefined()
 	})
 
 	it('spends no status request when the read failed', async () => {
-		mocked_api.mockRejectedValueOnce(new Error('nope'))
+		mocked_api.mockRejectedValueOnce(gh_error(undefined))
 
 		await git_gh_issue.issue_view_json(READ_NUMBER, 'state')
 

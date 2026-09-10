@@ -1,6 +1,7 @@
 import { execa, execaSync } from 'execa'
 import { has_timed_out } from './git-execa-error'
 import { check_gh_installed } from './git-gh-check'
+import { gh_failure } from './git-gh-failure'
 
 const BODY_FROM_STDIN = '-'
 
@@ -97,13 +98,20 @@ function to_error_message(error: unknown): string {
 // reads the reason: a duplicate pull request is `A pull request already exists for <owner>:<branch>.`
 // inside that body, and matching it against stderr alone answers no (measured on
 // joshuafolkken/kit#1029).
+//
+// The same stdout is what carries the request's own failure nature, so the classification is
+// attached here rather than reconstructed by a later probe: GitHub's error document names its status
+// and a request that never arrived wrote no document at all (joshuafolkken/kit#1690).
 function to_gh_error(error: unknown): Error {
 	const stderr = has_stderr_field(error) ? error.stderr.trim() : ''
 	const stdout = has_stdout_field(error) ? error.stdout.trim() : ''
 	const summary = stderr.length > 0 ? stderr : to_error_message(error)
 	const detail = stdout.length > 0 ? `${summary}\n${stdout}` : summary
 
-	return new Error(`${to_timeout_prefix(error)}${detail}`, { cause: error })
+	return gh_failure.attach(
+		new Error(`${to_timeout_prefix(error)}${detail}`, { cause: error }),
+		gh_failure.classify_stdout(stdout),
+	)
 }
 
 async function exec_gh_command(arguments_: Array<string>, timeout_ms?: number): Promise<string> {

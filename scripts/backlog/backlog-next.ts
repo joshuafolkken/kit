@@ -8,7 +8,6 @@ import { epic_next_read, type EpicRead } from '#scripts/epic/epic-next-read'
 import type { EpicView } from '#scripts/epic/epic-next-views'
 import { epic_report, type EpicNextResult, type EpicVerdict } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/git/git-gh-command'
-import { gh_reachability } from '#scripts/git/git-gh-reachability'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { backlog_pool } from './backlog-pool'
 
@@ -189,15 +188,17 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 
 // Whether the `error` verdict is really a transport failure wearing the graph's clothes.
 //
-// Only the `error` verdict is asked about, and the probe is one request made **after** the answer is
-// otherwise final — so a healthy run pays nothing for it. Everything below `error` in this file has
-// already read the opted-in listing, the epic listing and this repository's name through `gh`, so a
-// probe that then reaches no HTTP status at all is not a missing binary and not an expired token: it
-// is the connection. That is why the classification is safe here and would not be at the entry.
-async function is_transport_failure(result: EpicNextResult): Promise<boolean> {
+// **The answer comes from the reads that failed, not from a request made afterwards**
+// (joshuafolkken/kit#1690). joshuafolkken/kit#1663 asked a reachability probe here, once the answer
+// was otherwise final — and a connection that dropped for a few hundred milliseconds failed the read
+// at t=0 and answered that probe `reachable`, leaving the verdict `error` for a fault that had
+// already healed. Judging one request from a different one cannot be made reliable, so the failed
+// request carries its own nature instead: `epic:next` marks the anomaly from the status GitHub wrote
+// on the failed response, and this reads the mark.
+function is_transport_failure(result: EpicNextResult): boolean {
 	if (result.verdict !== 'error') return false
 
-	return (await gh_reachability.probe()) === 'unreachable'
+	return result.anomalies.some((anomaly) => anomaly.is_unreachable === true)
 }
 
 // The unusable-graph report is withheld here rather than printed beside the retry: its anomaly lines
@@ -220,7 +221,7 @@ async function answer_pool(context: PoolContext): Promise<number> {
 	const result = await resolve(context)
 
 	if (result === undefined) return FAILURE_EXIT_CODE
-	if (await is_transport_failure(result)) return report_retry(context)
+	if (is_transport_failure(result)) return report_retry(context)
 
 	return report(result, context)
 }

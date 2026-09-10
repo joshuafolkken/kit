@@ -30,6 +30,17 @@ function snapshot(children: ReadonlyArray<EpicChild>): EpicSnapshot {
 		unreadable: [],
 		skipped: [],
 		has_external_children: false,
+		body_failure: undefined,
+		is_unreachable: false,
+	}
+}
+
+// An epic whose own body read never reached GitHub: no children parsed, and a recorded reason why.
+function unread_body_snapshot(): EpicSnapshot {
+	return {
+		...snapshot([]),
+		body_failure: { kind: 'unreadable', reason: 'unreachable', status: undefined },
+		is_unreachable: true,
 	}
 }
 
@@ -165,5 +176,28 @@ describe('epic_next.refuse_reads', () => {
 		expect(epic_next.refuse_reads(walk)).toBe(FAILURE_EXIT_CODE)
 		expect(errors).toHaveBeenCalledWith(epic_next_read.FOREIGN_EPIC)
 		expect(errors).not.toHaveBeenCalledWith('skipped')
+	})
+})
+
+// joshuafolkken/kit#1690: an epic whose body could not be read parses to zero children exactly as an
+// unpopulated one does. Skipped as childless it leaves no anomaly anywhere, so the run reports the
+// backlog empty over one request that never left the machine.
+describe('epic_next_read.read_snapshots — an epic body that could not be read', () => {
+	it('keeps the epic rather than calling it childless', async () => {
+		fetch_returning({ [FIRST_EPIC]: unread_body_snapshot() })
+
+		const result = await epic_next_read.read_snapshots([{ number: FIRST_EPIC }], REPO)
+
+		expect(result.notices).toEqual([])
+		expect(result.reads.map((entry) => entry.reference.number)).toEqual([FIRST_EPIC])
+	})
+
+	it('still calls an epic with a readable but empty body childless', async () => {
+		fetch_returning({ [FIRST_EPIC]: snapshot([]) })
+
+		const result = await epic_next_read.read_snapshots([{ number: FIRST_EPIC }], REPO)
+
+		expect(result.reads).toEqual([])
+		expect(result.notices).toHaveLength(1)
 	})
 })

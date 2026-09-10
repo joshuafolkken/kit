@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { git_gh_exec } from './git-gh-exec'
+import { describe, expect, it } from 'vitest'
 import { gh_reachability } from './git-gh-reachability'
 
 // The line this module draws is the one joshuafolkken/kit#1663 filed: a failure worth asking again
 // about, against one that answers the same however often it is asked.
+//
+// joshuafolkken/kit#1690 removed the probe that used to ask it of a second request; the status now
+// comes from the failed request itself, so what is left to pin is the classification.
 
 const OK_STATUS = 200
 const NOT_FOUND_STATUS = 404
@@ -12,10 +14,6 @@ const FORBIDDEN_STATUS = 403
 const RATE_LIMITED_STATUS = 429
 const SERVER_ERROR_STATUS = 500
 const GATEWAY_ERROR_STATUS = 503
-
-beforeEach(() => {
-	vi.restoreAllMocks()
-})
 
 describe('classify_status', () => {
 	it('reads no status line at all as the transport failure it is', () => {
@@ -41,17 +39,8 @@ describe('classify_status', () => {
 	})
 })
 
-describe('probe', () => {
-	it('asks the endpoint that does not deepen a rate limit and classifies what it answered', async () => {
-		const status = vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(OK_STATUS)
-
-		expect(await gh_reachability.probe()).toBe('reachable')
-		expect(status).toHaveBeenCalledWith(gh_reachability.REACHABILITY_PATH)
-	})
-
-	it('answers unreachable when the probe itself reached no status', async () => {
-		vi.spyOn(git_gh_exec, 'exec_gh_api_status').mockResolvedValue(undefined)
-
-		expect(await gh_reachability.probe()).toBe('unreachable')
+describe('the follow-up probe is gone', () => {
+	it('exposes no probe, so nothing can classify a failure from a later request', () => {
+		expect('probe' in gh_reachability).toBe(false)
 	})
 })

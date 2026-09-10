@@ -170,11 +170,13 @@ describe('has_stderr_field', () => {
 	})
 })
 
-// joshuafolkken/kit#957: `epic:bundle` has to tell a number that resolves to nothing (404) from a
-// read that failed (403, 429, a dropped connection). The read reports a failure as gh's stderr text
-// — GraphQL before joshuafolkken/kit#1024, `exec_gh_api`'s thrown Error since — so the status comes
-// from this probe, read from the status line `--include` prints and never from `gh`'s wording,
-// which is prose that can be reworded between releases.
+// The HTTP status of one request, read from the status line `--include` prints and never from `gh`'s
+// wording, which is prose that can be reworded between releases.
+//
+// **It is no longer how a failed issue read is classified** (joshuafolkken/kit#1690): that one takes
+// the status GitHub wrote on the failed response itself, so a second request cannot disagree with the
+// first about a connection that has since recovered. What still asks this is the caller with no
+// response to read — `has_no_relations_endpoint`, probing an endpoint for its existence.
 const NOT_FOUND_LINE = 'HTTP/2.0 404 Not Found\nAccess-Control-Allow-Origin: *\n'
 const OK_LINE = 'HTTP/2.0 200 OK\nServer: github.com\n'
 const ISSUE_PATH = 'repos/o/r/issues/1'

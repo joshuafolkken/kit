@@ -32,11 +32,17 @@ interface EpicChild {
 }
 
 // What is wrong with the graph. Both stop the run — neither is something to pick a winner for.
-type GraphAnomalyKind = 'cycle' | 'declaration_mismatch' | 'unreadable_children'
+type GraphAnomalyKind =
+	'cycle' | 'declaration_mismatch' | 'unreadable_children' | 'unreadable_epic_body'
 
 interface GraphAnomaly {
 	kind: GraphAnomalyKind
 	message: string
+	// Set when the reads behind this anomaly failed on the transport, so a caller can ask again
+	// instead of reporting an unusable graph. It travels from the failed request itself rather than
+	// from a probe fired afterwards, which is what let a connection that recovered in a few hundred
+	// milliseconds report the graph as permanently broken (joshuafolkken/kit#1690).
+	is_unreachable?: boolean
 }
 
 // An issue's identity across the whole epic. Issue numbers are unique per repository, not globally:

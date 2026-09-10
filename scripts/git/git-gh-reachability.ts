@@ -1,7 +1,13 @@
-import { git_gh_exec } from './git-gh-exec'
-
 // Whether GitHub answered at all — the question a failed read has to ask before it calls itself a
 // structural failure (joshuafolkken/kit#1663).
+//
+// **The question is now asked of the failed request itself, not of a later one**
+// (joshuafolkken/kit#1690). `probe()` used to fire one request at `rate_limit` after the reads were
+// over and the answer otherwise final; a connection that dropped for a few hundred milliseconds
+// failed a read at t=0 and answered that probe `reachable`, so the run kept the verdict the probe
+// gave it rather than the one the read had. What remains here is the classification — status to
+// retryable-or-not — which `git-gh-issue-read.ts` applies to the status the failed request carried
+// on its own error document.
 //
 // A dropped connection, a name that would not resolve, a rate limit and a 5xx are **retryable**: the
 // same request a moment later can succeed, and nothing about the repository has to change first. A
@@ -15,10 +21,6 @@ import { git_gh_exec } from './git-gh-exec'
 // be reworded between releases, while the status is the protocol. The transport case is the one the
 // protocol expresses by *absence* — no status line at all — which is exactly what
 // `exec_gh_api_status` already answers `undefined` for.
-
-// `rate_limit` is the cheapest endpoint GitHub serves: it is documented as not itself counting
-// against the rate limit, so probing with it cannot deepen the very condition it detects.
-const REACHABILITY_PATH = 'rate_limit'
 
 // **403 is deliberately not retryable.** GitHub does spell some secondary rate limits that way, but
 // it is equally how a SAML-SSO-unauthorized token, an IP allowlist and an org policy each answer —
@@ -40,19 +42,16 @@ function is_retryable_status(status: number): boolean {
 	return status === RATE_LIMITED_STATUS
 }
 
-// `undefined` is the transport case rather than an unknown one: `exec_gh_api_status` returns it when
-// no status line was reached, which a request that never arrived is exactly.
+// `undefined` is the transport case rather than an unknown one: a failed `gh api` request that wrote
+// no response body has no status to report, which a request that never arrived is exactly — the same
+// meaning `exec_gh_api_status` gives it when no status line was reached.
 function classify_status(status: number | undefined): GhReachability {
 	if (status === undefined) return 'unreachable'
 
 	return is_retryable_status(status) ? 'unreachable' : 'reachable'
 }
 
-async function probe(): Promise<GhReachability> {
-	return classify_status(await git_gh_exec.exec_gh_api_status(REACHABILITY_PATH))
-}
-
-const gh_reachability = { REACHABILITY_PATH, classify_status, probe }
+const gh_reachability = { classify_status }
 
 export { gh_reachability }
 export type { GhReachability }

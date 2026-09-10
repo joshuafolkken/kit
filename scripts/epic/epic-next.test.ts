@@ -39,6 +39,8 @@ function snapshot(children: ReadonlyArray<EpicChild>, body?: string): EpicSnapsh
 		unreadable: [],
 		skipped: [],
 		has_external_children: false,
+		body_failure: undefined,
+		is_unreachable: false,
 	}
 }
 

@@ -1,5 +1,6 @@
 import { git_epic_parse, type ExternalChild } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import type { IssueReadFailure } from '#scripts/git/git-gh-issue-read'
 import { epic_cross_repo } from './epic-cross-repo'
 import type { EpicChild, IssueReference } from './epic-graph'
 import { epic_issue, type EpicIssue } from './epic-issue'
@@ -55,15 +56,23 @@ async function read_child_blockers(
 // numbers naming children in the epic's repository, and the qualified rows naming children elsewhere.
 interface EpicBody {
 	body: string | undefined
+	// Why the body produced nothing, when it produced nothing. **The epic's body is the one read whose
+	// failure is invisible downstream**: `parse_task_list_issue_numbers(undefined)` answers `[]`, so a
+	// body nobody could read is indistinguishable from an epic that tracks no children — and that one
+	// is dropped from the views as an ordinary, unpopulated epic. A run whose DNS hiccuped on this one
+	// request therefore reported the backlog empty and ended (joshuafolkken/kit#1690).
+	body_failure: IssueReadFailure | undefined
 	child_numbers: ReadonlyArray<number>
 	external: ReadonlyArray<ExternalChild>
 }
 
 async function fetch_epic_body(epic_number: number, scope?: string): Promise<EpicBody> {
-	const body = await git_gh_command.issue_get_body(String(epic_number), scope)
+	const read = await git_gh_command.issue_get_body_classified(String(epic_number), scope)
+	const body = read.kind === 'read' ? read.text : undefined
 
 	return {
 		body,
+		body_failure: read.kind === 'read' ? undefined : read,
 		child_numbers: git_epic_parse.parse_task_list_issue_numbers(body),
 		external: git_epic_parse.parse_external_task_list_children(body),
 	}
@@ -99,6 +108,33 @@ function to_references(issue_numbers: ReadonlyArray<number>, repo: string): Arra
 	return issue_numbers.map((issue_number) => ({ repo, number: issue_number }))
 }
 
+// One child's read: the child when it came back, and whether the failure was one the same request
+// could succeed at a moment later (joshuafolkken/kit#1690). A response that arrived and would not
+// parse is **not** unreachable — asking again answers the same thing.
+interface ChildRead {
+	child: EpicChild | undefined
+	is_unreachable: boolean
+}
+
+async function fetch_child_read(
+	issue_number: number,
+	repo: string,
+	scope?: string,
+): Promise<ChildRead> {
+	const read = await git_gh_command.issue_get_state_and_relations_classified(
+		String(issue_number),
+		scope,
+	)
+
+	if (read.kind !== 'read') {
+		return { child: undefined, is_unreachable: git_gh_command.is_unreachable_read(read) }
+	}
+
+	const parsed = epic_issue.parse_epic_issue(read.json)
+
+	return { child: parsed === undefined ? undefined : to_child(parsed, repo), is_unreachable: false }
+}
+
 // One child's state, labels and native relations. A child that cannot be read is reported as
 // missing rather than assumed closed: assuming would let an epic advance past a child nobody looked
 // at.
@@ -107,11 +143,9 @@ async function fetch_child(
 	repo: string,
 	scope?: string,
 ): Promise<EpicChild | undefined> {
-	const raw = await git_gh_command.issue_get_state_and_relations(String(issue_number), scope)
-	const parsed = epic_issue.parse_epic_issue(raw)
-	if (parsed === undefined) return undefined
+	const read = await fetch_child_read(issue_number, repo, scope)
 
-	return to_child(parsed, repo)
+	return read.child
 }
 
 // What a batch read produced, with the children it could not read kept rather than dropped.
@@ -129,6 +163,27 @@ interface FetchedChildren {
 	children: ReadonlyArray<EpicChild>
 	unreadable: ReadonlyArray<IssueReference>
 	skipped: ReadonlyArray<IssueReference>
+	// How many of the unreadable ones failed on the transport. Carried from the reads themselves
+	// rather than probed afterwards: a connection that dropped for a moment fails a read at t=0 and
+	// answers a probe fired at t=1 that everything is fine (joshuafolkken/kit#1690).
+	//
+	// **A count rather than a flag, because the question the caller asks is about _every_ failure.**
+	// One child unreachable beside another permanently refused is not a run worth repeating — the
+	// refused one answers the same however often it is asked — so a flag ORed across the groups would
+	// answer `retry` for ever and never reach the verdict that says a person is needed.
+	unreachable_count: number
+}
+
+function to_children(reads: ReadonlyArray<ChildRead>): Array<EpicChild> {
+	return reads.map((read) => read.child).filter((child): child is EpicChild => child !== undefined)
+}
+
+function count_unreachable(reads: ReadonlyArray<ChildRead>): number {
+	return reads.filter((read) => read.is_unreachable).length
+}
+
+function is_body_unreachable(failure: IssueReadFailure | undefined): boolean {
+	return failure !== undefined && git_gh_command.is_unreachable_read(failure)
 }
 
 // Every child the epic's task list tracks, in the order the body lists them.
@@ -138,17 +193,18 @@ async function fetch_children(
 	scope?: string,
 ): Promise<FetchedChildren> {
 	const limited = child_numbers.slice(0, CHILD_LIMIT)
-	const fetched = await Promise.all(
-		limited.map(async (issue_number) => await fetch_child(issue_number, repo, scope)),
+	const reads = await Promise.all(
+		limited.map(async (issue_number) => await fetch_child_read(issue_number, repo, scope)),
 	)
 
 	return {
-		children: fetched.filter((child): child is EpicChild => child !== undefined),
+		children: to_children(reads),
 		unreadable: to_references(
-			limited.filter((_, index) => fetched[index] === undefined),
+			limited.filter((_, index) => reads[index]?.child === undefined),
 			repo,
 		),
 		skipped: to_references(child_numbers.slice(CHILD_LIMIT), repo),
+		unreachable_count: count_unreachable(reads),
 	}
 }
 
@@ -166,8 +222,8 @@ async function fetch_external_children(
 	const allowed = external.filter((child) =>
 		epic_cross_repo.is_same_owner_repo(child.repo, current_owner),
 	)
-	const fetched = await Promise.all(
-		allowed.map(async (child) => await fetch_child(child.number, child.repo, child.repo)),
+	const reads = await Promise.all(
+		allowed.map(async (child) => await fetch_child_read(child.number, child.repo, child.repo)),
 	)
 
 	// A repository the owner restriction refused is reported as unreadable rather than dropped: an
@@ -177,9 +233,11 @@ async function fetch_external_children(
 	)
 
 	return {
-		children: fetched.filter((child): child is EpicChild => child !== undefined),
-		unreadable: [...allowed.filter((_, index) => fetched[index] === undefined), ...refused],
+		children: to_children(reads),
+		unreadable: [...allowed.filter((_, index) => reads[index]?.child === undefined), ...refused],
 		skipped: [],
+		// A refusal is not a transport failure: the owner restriction answers the same tomorrow.
+		unreachable_count: count_unreachable(reads),
 	}
 }
 
@@ -200,6 +258,40 @@ interface EpicSnapshot {
 	unreadable: ReadonlyArray<IssueReference>
 	skipped: ReadonlyArray<IssueReference>
 	has_external_children: boolean
+	// Why the epic's own body produced nothing, when it produced nothing (joshuafolkken/kit#1690).
+	body_failure: IssueReadFailure | undefined
+	// Whether **every** read behind this snapshot that failed — the body and each child — failed on
+	// the transport, and at least one did. What a caller does with it is its own: `epic:next` marks
+	// the anomaly with it, and `backlog:next` asks again instead of reporting the backlog empty.
+	//
+	// It is `every` rather than `any` so the answer terminates: one child refused for good beside one
+	// unreachable would otherwise be retried for ever, and the run would never reach the verdict that
+	// says a person is needed (joshuafolkken/kit#1690).
+	is_unreachable: boolean
+}
+
+// The failed reads behind one snapshot, and how many of them are worth asking about again.
+function to_failure_counts(
+	body_failure: IssueReadFailure | undefined,
+	groups: ReadonlyArray<FetchedChildren>,
+): { failed: number; unreachable: number } {
+	const body_failed = body_failure === undefined ? 0 : 1
+
+	return {
+		failed: body_failed + groups.reduce((total, group) => total + group.unreadable.length, 0),
+		unreachable:
+			(is_body_unreachable(body_failure) ? 1 : 0) +
+			groups.reduce((total, group) => total + group.unreachable_count, 0),
+	}
+}
+
+function is_snapshot_unreachable(
+	body_failure: IssueReadFailure | undefined,
+	groups: ReadonlyArray<FetchedChildren>,
+): boolean {
+	const counts = to_failure_counts(body_failure, groups)
+
+	return counts.failed > 0 && counts.failed === counts.unreachable
 }
 
 // The snapshot the two reads add up to, with the relations looked at a second time where a declared
@@ -210,7 +302,7 @@ async function to_snapshot(
 	local: FetchedChildren,
 	remote: FetchedChildren,
 ): Promise<EpicSnapshot> {
-	const { body, child_numbers, external } = epic_body
+	const { body, body_failure, child_numbers, external } = epic_body
 	const children = await rechecked_children([...local.children, ...remote.children], {
 		body,
 		...scope,
@@ -225,6 +317,8 @@ async function to_snapshot(
 		unreadable: [...local.unreadable, ...remote.unreadable],
 		skipped: local.skipped,
 		has_external_children: external.length > 0,
+		body_failure,
+		is_unreachable: is_snapshot_unreachable(body_failure, [local, remote]),
 	}
 }
 

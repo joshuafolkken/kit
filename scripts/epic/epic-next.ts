@@ -130,6 +130,22 @@ function parse_options(argv: ReadonlyArray<string>): NextOptions {
 // Each one is named with the repository it lives in, through the same writer the audit uses: an epic
 // tracking `- [ ] sveltejs/kit#7` reported `Could not read #7`, and a reader sent to this
 // repository's issue 7 finds a different issue or none (joshuafolkken/kit#1016).
+// **The epic's own body failing to read is its own anomaly, ahead of the children's**
+// (joshuafolkken/kit#1690). Without it the failure is silent: a body that never arrived parses to
+// zero children, the epic is dropped from the views as an unpopulated one, no anomaly is raised, and
+// the verdict falls through to `complete` — which `backlog:next` prints as `none`, so the run reports
+// the backlog exhausted over one request that never left the machine. It is checked first because a
+// body nobody read says nothing about the children either.
+function body_anomaly(snapshot: EpicSnapshot): GraphAnomaly | undefined {
+	if (snapshot.body_failure === undefined) return undefined
+
+	return {
+		kind: 'unreadable_epic_body',
+		message: `Could not read the body of the epic in ${snapshot.repo}. Its task list is what names the children, so nothing is offered — check \`gh auth status\` and that the epic exists.`,
+		is_unreachable: snapshot.is_unreachable,
+	}
+}
+
 function unreadable_anomaly(snapshot: EpicSnapshot): GraphAnomaly | undefined {
 	const missing = epic_fetch.missing_children(snapshot)
 	if (missing.length === 0) return undefined
@@ -138,6 +154,7 @@ function unreadable_anomaly(snapshot: EpicSnapshot): GraphAnomaly | undefined {
 	return {
 		kind: 'unreadable_children',
 		message: `Could not read ${list}. The dependency graph would be missing them, so nothing is offered — check \`gh auth status\` and that the issues exist.`,
+		is_unreachable: snapshot.is_unreachable,
 	}
 }
 
@@ -159,7 +176,7 @@ function decide(
 	paths: ReadonlyMap<string, string> = new Map(),
 ): EpicNextResult {
 	const links = git_epic_parse.parse_dependency_links(snapshot.body)
-	const unreadable = unreadable_anomaly(snapshot)
+	const unreadable = body_anomaly(snapshot) ?? unreadable_anomaly(snapshot)
 	const anomalies =
 		unreadable === undefined
 			? epic_graph.find_anomalies(
@@ -405,6 +422,7 @@ const epic_next = {
 	USAGE,
 	EXTERNAL_NOTICE,
 	FOREIGN_EPIC,
+	body_anomaly,
 	unreadable_anomaly,
 	is_order_declared,
 	repo_verdict,

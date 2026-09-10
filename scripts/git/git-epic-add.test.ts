@@ -70,6 +70,7 @@ beforeEach(() => {
 		children: [child(890)],
 		unreadable: [],
 		skipped: [],
+		unreachable_count: 0,
 	})
 	mocked_edit.mockImplementation(async () => {
 		order.push('body')
@@ -149,6 +150,7 @@ function stub_pair_epic(): void {
 		children: [child(890), child(891)],
 		unreadable: [],
 		skipped: [],
+		unreachable_count: 0,
 	})
 }
 
