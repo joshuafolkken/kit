@@ -1890,6 +1890,25 @@ Bundling is reversible — an epic is editable and a child can be removed — so
 
 **When the relation carries an order, record it** in `blocked-by` and in the epic's `Dependencies`, on an addition as much as on a new epic: without it the batch survives and the reason it is a batch does not. An order **nobody declared is not invented** — only relations already recorded are carried over.
 
+**The facts behind that order are printed under it** ([#1737](https://github.com/joshuafolkken/kit/issues/1737)). The two readings the candidate search already made — a recorded `blocked-by`, and a body naming the other issue's number — reach the output as an `Evidence:` block, each line naming which issue carries the fact, which issue it points at, and which of the two the fact puts first:
+
+```text
+Create an epic for these (Tier A — do it).
+  #1737 and 1 related issue(s) belong to no epic
+  Related: #1712
+  Children: #1712, #1737
+  Order: #1712 -> #1737
+  Evidence:
+    #1737 is recorded as blocked by #1712 — #1712 comes first
+    #1737 names #1712 in its body — that points to #1712 first
+```
+
+- **A recorded dependency states the order; a reference only points at it.** A `blocked-by` says outright that the blocker lands first, and the line says `comes first`. A reference says it by having been written — which stops holding the moment somebody edits an older issue to add a backlink to a newer one — so that line says `points to … first` and asserts nothing further.
+- **The pairs are the bundle's members, not the new issue's alone.** The `Order:` arrows are drawn over every pair of the children, so an arrow between two of the related issues is explained here too.
+- **Two issues that name each other produce two lines pointing opposite ways.** Both are facts, and which one governs depends on intent — so both are shown and the reader decides.
+- **It states facts and stops there**: no line says where to put the issue and none composes a command to run. Ordering depends on intent, so a machine that decided it would write a confident order nobody's data supports.
+- **With neither reading finding anything the block is absent**, and `Order: none declared — do not invent one` stands on its own exactly as before.
+
 **Every row that _places_ the issue asserts a negative, so a cut epic listing withholds all of them** ([#1697](https://github.com/joshuafolkken/kit/issues/1697)). "No epic already tracks this issue" — which `create_epic` asserts about the candidates too — is only as good as the listing it was read from: an epic past the cut tracks its children invisibly, so each of them reads as tracked by nothing. **`add_to_epic` rests on it just as much as `create_epic` does**: adding the issue to the epic a _candidate_ sits in, while an unseen epic already tracks the issue itself, is the same duplicate by another route. The cut was already reported — `⚠ The epic listing …` on standard error — but standard output went on saying `Create an epic for these (Tier A — do it).`, and a warning is not what a run acts on: the rule that reads one as "could not answer" is written for a warning above `Nothing to bundle.` and does not reach this verdict. Acted on as Tier A, the result is a **second epic over an already-tracked issue** — the state the auto-close and `epic:next` cannot both be right about ([#943](https://github.com/joshuafolkken/kit/issues/943)). So the verdict itself changes:
 
 ```text

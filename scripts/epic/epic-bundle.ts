@@ -53,13 +53,18 @@ interface BundleDecision {
 	reason: string
 }
 
+// Whether `from`'s body names `to`. One direction of the citation test, because which direction it
+// was is what `epic-bundle-evidence.ts` reports — and the read is single-sourced here rather than
+// written a second time there, so the candidate search and the evidence beside it cannot drift apart
+// (joshuafolkken/kit#1737).
+function names_in_body(from: BacklogIssue, to: BacklogIssue): boolean {
+	return epic_audit_logic.parse_references(from.body, from.repo).includes(to.number)
+}
+
 // Whether two issues cite each other, in either direction. A one-way citation is enough: the point
 // is that somebody wrote one issue while thinking about the other.
 function has_mutual_reference(subject: BacklogIssue, other: BacklogIssue): boolean {
-	const from_subject = epic_audit_logic.parse_references(subject.body, subject.repo)
-	const from_other = epic_audit_logic.parse_references(other.body, other.repo)
-
-	return from_subject.includes(other.number) || from_other.includes(subject.number)
+	return names_in_body(subject, other) || names_in_body(other, subject)
 }
 
 // Whether `blocked` names `blocker` in its recorded relations. Compared by identity — repository and
@@ -285,6 +290,7 @@ function bundle_children(
 
 const epic_bundle = {
 	names_as_blocker,
+	names_in_body,
 	NO_SIGNAL_REASON,
 	already_tracked_reason,
 	SPREAD_REASON,

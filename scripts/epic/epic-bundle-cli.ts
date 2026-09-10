@@ -12,6 +12,7 @@ import {
 	type BundleAction,
 	type BundleDecision,
 } from './epic-bundle'
+import { epic_bundle_evidence } from './epic-bundle-evidence'
 import { epic_bundle_gaps } from './epic-bundle-gaps'
 import { epic_bundle_referenced, type ReferencedContext } from './epic-bundle-referenced'
 import { epic_index, epic_schema, type FetchedEpics } from './epic-index'
@@ -226,9 +227,12 @@ function format_order(
 	const members = backlog.filter((issue) => decision.candidates.includes(issue.number))
 	const children = epic_bundle.bundle_children(subject, members)
 
+	// The evidence goes under the order rather than beside the verdict: what it explains is the
+	// order, and a reader checking one reads straight on into the other (joshuafolkken/kit#1737).
 	return [
 		`  Children: ${format_numbers(children)}`,
 		format_links(epic_bundle.bundle_dependency_links(subject, members)),
+		...epic_bundle_evidence.format_evidence(subject, members),
 	]
 }
 
