@@ -13,7 +13,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const JSON_KEY = 'budget'
 
-const USAGE = `Usage: josh backlog:budget --answer <${backlog_budget.ANSWERS.join('|')}> --started <ISO-8601> [--active <ISO-8601>] [--merged <count>] [--running <count>] [--max <count>] [--idle <minutes> --active <ISO-8601>] [--json]`
+const USAGE = `Usage: josh backlog:budget --answer <${backlog_budget.ANSWERS.join('|')}> --started <ISO-8601> [--active <ISO-8601>, required unless the watch is off] [--merged <count>] [--running <count>] [--max <count>] [--idle <minutes>, 0 to turn the watch off] [--json]`
 
 const OPTIONS = {
 	active: { type: 'string' },
@@ -71,8 +71,8 @@ function to_count(raw: string | undefined): number | undefined {
 }
 
 // A flag that was given but could not be read makes the whole invocation unreadable. Falling back to
-// the default instead would answer a question nobody asked — a mistyped `--idle` would read as "no
-// idle watch" and end the run at the first empty backlog.
+// the default instead would answer a question nobody asked — a mistyped `--idle 0` would read as the
+// default 30-minute watch and hold a run open that was asked to finish at its first empty backlog.
 function is_readable(raw: string | undefined, parsed: number | undefined): boolean {
 	return raw === undefined || parsed !== undefined
 }
@@ -94,25 +94,35 @@ function are_counts_readable(values: ParsedValues, counts: Counts): boolean {
 	return COUNT_NAMES.every((name) => is_readable(text_of(values[name]), counts[name]))
 }
 
+// **`--idle 0` is how the watch is turned off, and omitting the flag takes the default**
+// (joshuafolkken/kit#1676) — the inverse of what shipped before. The old refusal rested on "the flag
+// is optional, so 0 is not needed", and turning the default on is exactly what removes that footing:
+// an omitted flag now means the default watch, so the number line has to reach a value that means
+// none. Zero reads as "watch for no minutes", which is the same thing said in the flag's own units.
+const NO_IDLE_MINUTES = 0
+
 function to_idle_ms(idle_minutes: number | undefined): number | undefined {
-	return idle_minutes === undefined ? undefined : idle_minutes * backlog_budget.MS_PER_MINUTE
+	if (idle_minutes === undefined) return backlog_budget.DEFAULT_IDLE_MS
+	if (idle_minutes === NO_IDLE_MINUTES) return undefined
+
+	return idle_minutes * backlog_budget.MS_PER_MINUTE
 }
 
-// `--idle 0` is not how the watch is turned off — omitting the flag is. A zero budget expires the
-// instant it starts, so the run would stop reporting that the backlog "stayed empty for the whole
-// 0-minute idle watch", a watch that never happened.
-const MINIMUM_IDLE_MINUTES = 1
-
-// An idle watch measured from the run's start is not the watch that was asked for either. A run
-// already working for longer than the budget would answer `stop` on its very first empty backlog,
-// printing an emptiness it never saw. So `--idle` without `--active` is an unreadable invocation
-// rather than a defaulted one.
+// An idle watch measured from the run's start is not the watch that was asked for. A run already
+// working for longer than the budget would answer `stop` on its very first empty backlog, printing an
+// emptiness it never saw. So an invocation whose watch is on and that carries no `--active` is
+// unreadable rather than defaulted — and since the watch is now on by default, that makes `--active`
+// required of every caller that has not turned it off.
+//
+// **Refused rather than answered with a `stop` that names the missing flag.** A `stop` is the word
+// the loop acts on, and it cannot tell one that ends a run properly from one that means "I could not
+// measure the watch" — which is the emptiness-never-seen failure again, one layer up. A refusal
+// lands on the very first ask, before the run has started anything, and the fix is one flag the loop
+// already holds: it always knows when it last had work.
 function is_watch_readable(values: ParsedValues): boolean {
-	const raw = text_of(values.idle)
+	if (to_idle_ms(to_count(text_of(values.idle))) === undefined) return true
 
-	if (raw === undefined) return true
-
-	return text_of(values.active) !== undefined && (to_count(raw) ?? 0) >= MINIMUM_IDLE_MINUTES
+	return text_of(values.active) !== undefined
 }
 
 function are_values_readable(values: ParsedValues): boolean {

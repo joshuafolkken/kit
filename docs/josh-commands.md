@@ -2127,20 +2127,23 @@ pnpm josh backlog:plan --exclude 1630        # after #1630 merged
 Say whether a `backlogrun` may start more work, keep watching, or finish ([#1632](https://github.com/joshuafolkken/kit/issues/1632)).
 
 ```bash
-pnpm josh backlog:budget --answer candidates --started 2026-09-09T11:00:00Z   # alias: josh bb
-pnpm josh backlog:budget --answer exhausted --started "$started" --active "$active" --idle 30
-pnpm josh backlog:budget --answer candidates --started "$started" --merged 3 --running 2 --max 5
-pnpm josh backlog:budget --answer blocked --started "$started" --json
+pnpm josh backlog:budget --answer candidates --started "$started" --active "$active"   # alias: josh bb
+pnpm josh backlog:budget --answer exhausted --started "$started" --active "$active" --idle 60
+pnpm josh backlog:budget --answer exhausted --started "$started" --idle 0
+pnpm josh backlog:budget --answer candidates --started "$started" --active "$active" --merged 3 --running 2 --max 5
+pnpm josh backlog:budget --answer blocked --started "$started" --active "$active" --json
 ```
 
 **`backlog:next` says what may start; it says nothing about when the run itself should end.** Before this existed a `backlogrun` had exactly two endings and neither could be declared in advance: it finished the moment the backlog read empty, so an issue a person opted in three minutes later needed a whole new session, or it ran to the 8-hour whole-run bound, which is a limit on waiting rather than a statement of scale.
 
-**Both budgets are off by default.** With neither flag given the answer is exactly the behavior a `backlogrun` already had: it finishes when the backlog empties, and it takes as many issues as the backlog holds.
+**The idle watch is on by default and the maximum is not** ([#1676](https://github.com/joshuafolkken/kit/issues/1676)). With neither flag given the run watches an empty backlog for 30 minutes before finishing, and takes as many issues as the backlog holds.
 
-| Budget         | Flag               | Default   | Meaning                                                                                                         |
-| -------------- | ------------------ | --------- | --------------------------------------------------------------------------------------------------------------- |
-| Idle watch     | `--idle <minutes>` | off       | After the candidates run out, keep polling this long for a new one. A candidate that appears restarts the watch |
-| Maximum issues | `--max <count>`    | unlimited | How many issues one invocation may take. On reaching it the run reports and finishes                            |
+| Budget         | Flag               | Default        | Meaning                                                                                                         |
+| -------------- | ------------------ | -------------- | --------------------------------------------------------------------------------------------------------------- |
+| Idle watch     | `--idle <minutes>` | **30 minutes** | After the candidates run out, keep polling this long for a new one. A candidate that appears restarts the watch |
+| Maximum issues | `--max <count>`    | unlimited      | How many issues one invocation may take. On reaching it the run reports and finishes                            |
+
+The default is 30 minutes because a watch has to outlast a person noticing the run has gone quiet, filing an issue and applying `auto-ok`; because at the 5-minute idle poll that is six asks rather than thirty; and because it is about the length of one child (12 to 28 minutes, [#1477](https://github.com/joshuafolkken/kit/issues/1477)). `DEFAULT_IDLE_MINUTES` in `scripts/backlog/backlog-budget.ts` is the single source of the figure.
 
 Standard output carries the single verdict word and standard error the reason, so `verdict=$(pnpm josh backlog:budget …)` captures something a loop can branch on. `--json` collapses both into `{"budget": "<verdict>", "reason": "…"}`.
 
@@ -2155,7 +2158,11 @@ Standard output carries the single verdict word and standard error the reason, s
 
 `--merged` and `--running` are both counted against `--max`, because children run in lanes: a maximum measured on merges alone would let a second wave start before the first had merged and take the run past the number the person declared. **No ending abandons a lane**: whatever would have ended the run — the maximum, a parked backlog, an unreadable listing, an expired watch, the whole-run bound — answers `watch` while `--running` is above zero, so the lanes drain and their merges reach the report. The reason names the ending it is draining towards.
 
-`--idle 0` is refused rather than read as "off"; omitting the flag is how the watch is turned off. A zero budget expires the instant it starts, and the run would stop reporting that the backlog stayed empty for a watch that never happened.
+**`--idle 0` is how the watch is turned off, and omitting the flag takes the default** ([#1676](https://github.com/joshuafolkken/kit/issues/1676)) — the inverse of what shipped first. The old refusal rested on "the flag is optional, so 0 is not needed", and turning the default on is what removes that footing: an omitted flag now means the default watch, so the number line has to reach a value meaning none, and "watch for zero minutes" says it in the flag's own units. A run that wants the old ending writes `--idle 0` and finishes at its first empty backlog.
+
+**`--active` is required unless the watch is off.** It used to be the companion of an optional flag; with the watch on by default it is what every ask needs, and an invocation whose watch is on and that carries no `--active` is refused. Answering `stop` instead — "the watch could not be measured" — is the same failure one layer up: `stop` is the word the loop acts on and it cannot tell that from a run that ended properly, so the run would report an emptiness nobody watched.
+
+**A watch is polled every 5 minutes, not at the loop's 60-second polling interval**, and the reason string names the figure so the loop reads it rather than remembering it. `epicrun.md` → "Waiting, and never waiting forever" holds the row. **The hand-off check (`josh cost --over`) is not asked during a watch** — it is asked at a child's merge and a watch has no merges, so a watch does not count towards the session cut; `backlogrun.md` → "The hand-off check is not asked during a watch" is that decision's single source.
 
 **The whole-run bound is decided here too, rather than by an agent reading a clock.** `epicrun.md` carried the 8 hours as prose, and prose is what joshuafolkken/kit#1460 measured a run walking past. It outranks both budgets, so a run at the bound stops with candidates in hand and an idle watch still open. **What outranks the bound in turn is a `parked` or `unreadable` answer**: the reason printed here is quoted verbatim into the completion report, so a budget reason in front of one of those would report a tidy ending for a run whose backlog actually broke.
 

@@ -135,8 +135,12 @@ resumption. Count everything the session has, then cut.
 
 **`backlog:budget` is then fed from the record, never from a count kept in the conversation:**
 `--started` takes the record's `started_at` and `--merged` its `merged`. That one substitution is what
-makes `--max`, `--idle` and the 8-hour whole-run bound count **across** cuts, as one invocation's
-worth. **The 10-filings-per-run ceiling is counted the same way**, from `filed`.
+makes `--max` and the 8-hour whole-run bound count **across** cuts, as one invocation's worth. **The
+10-filings-per-run ceiling is counted the same way**, from `filed`. **`--idle` is the one budget that
+is not carried**, and a cut can only reach a watch that opened while this run's own children were
+still merging — the one shape where the two overlap. A resumed session then states its resume moment
+as `--active` and the watch begins again at its full budget, bounded by the 8 hours as everything
+else is: "The hand-off check is not asked during a watch" below.
 
 **The consecutive-failure guard needs no carrying, and that is by construction rather than by
 omission.** The hand-off is asked at every child's _merge_, so a cut is always taken directly after a
@@ -349,20 +353,44 @@ iteration.
 ### The two budgets
 
 **A `backlogrun` may declare how long it will watch an empty backlog and how many issues it may
-take** (joshuafolkken/kit#1632). Both are written on the keyword, and **both are off by default**, so
-`backlogrun` with neither behaves exactly as it did before they existed:
+take** (joshuafolkken/kit#1632). Both are written on the keyword, and **the idle watch is on by
+default while the maximum is not** (joshuafolkken/kit#1676):
 
 ```
-backlogrun
-backlogrun --idle 30
+backlogrun               # watches for 30 minutes after the backlog empties
+backlogrun --idle 0      # finishes the moment the backlog empties
+backlogrun --idle 60
 backlogrun --max 5
-backlogrun --idle 30 --max 5
+backlogrun --idle 0 --max 5
 ```
 
 | Budget | Written | Default | What it does |
 | --- | --- | --- | --- |
-| Idle watch | `--idle <minutes>` | off | After the candidates run out, keep polling this long for a new one. A candidate that appears restarts the watch from that moment |
+| Idle watch | `--idle <minutes>` | **30 minutes** | After the candidates run out, keep polling this long for a new one. A candidate that appears restarts the watch from that moment |
 | Maximum issues | `--max <count>` | unlimited | How many issues this invocation may take. On reaching it the run reports and finishes |
+
+**`--idle 0` is how the watch is turned off, and it is the only way**
+(joshuafolkken/kit#1676). Omitting the flag used to mean off, and that spelling is gone the moment
+omitting it means the default — so the disable moved onto the number line, where "watch for zero
+minutes" is the same thing said in the flag's own units. Short runs are not shut out: `backlogrun
+--idle 0` finishes at the first empty backlog, exactly as a bare `backlogrun` did before.
+
+**Why 30 minutes, and not the figure the examples happened to use.** Three things fix it, and the
+single source is `scripts/backlog/backlog-budget.ts` → `DEFAULT_IDLE_MINUTES`:
+
+- **Below it the watch is a coin flip.** What it waits for is a person noticing the run has gone
+  quiet, filing an issue and applying `auto-ok`; ten minutes does not reliably outlast that.
+- **Above it the run pays for nothing.** A watch is polled every 5 minutes, so 30 minutes is six
+  asks — about one child's worth of turns, spent while the run holds no working tree and no lane.
+- **It is about the length of one child** — 12 to 28 minutes measured on joshuafolkken/kit#1477 — so
+  a run that has emptied its backlog waits roughly as long as one more issue would have taken.
+
+**A watch is polled every 5 minutes, not at the loop's 60-second polling interval.** That interval is
+sized to a child's `fullrun`, which finishes in minutes; a watch is waiting on a person, which happens
+on human timescales. Asking every minute would spend thirty of the parent's own requests — each one
+billing the whole session history — to learn nothing thirty times. `epicrun.md` → "Waiting, and never
+waiting forever" holds the row, and the reason `backlog:budget` prints names the interval, so the loop
+reads it rather than remembering it.
 
 **Why an idle watch is safe, and why it is not a way in.** A new issue is never implemented the
 moment it is filed: to become a candidate at all it needs `auto-ok`, which only a person applies, and
@@ -377,14 +405,24 @@ verdict=$(pnpm josh backlog:budget --answer <word> --started "$started" --active
   --merged <count> --running <count> [--idle <minutes>] [--max <count>])
 ```
 
+**`--active` is required of every ask, because the watch is on unless it was turned off.** It used to
+be the companion of an optional flag; with the default on it is what every ask needs, and an
+invocation whose watch is on and that carries no `--active` is **refused**. The alternative — a `stop`
+saying the watch could not be measured — is the failure one layer up: `stop` is the word the loop acts
+on, and it cannot tell that one from a run that ended properly, so the run would report an emptiness
+nobody watched. The refusal lands on the first ask, before anything has started, and the fix is one
+flag the loop already holds. Only `--idle 0` excuses it.
+
 | Verdict | What the loop does |
 | --- | --- |
 | `run` | Start what `backlog:next` offered, up to the free lanes. The reason names how many more the maximum still allows; start no more than that |
-| `watch` | Sleep the polling interval and ask both commands again. **Nothing is held while watching** — the working tree's hold was released at the last child's merge and each drained lane was closed there, so a watching run blocks no other run |
+| `watch` | Sleep and ask both commands again — at the 5-minute idle poll while the backlog is empty **and** nothing of this run's is in flight, and at the 60-second polling interval otherwise, which covers a blocked backlog, a drain, and a watch that opened while children were still merging. The reason names the interval wherever it is the idle poll. **Nothing is held while watching** — the working tree's hold was released at the last child's merge and each drained lane was closed there, so a watching run blocks no other run |
 | `stop` | Report and finish. The reason it printed **is** the termination reason the completion report carries |
 
 `--started` is when the invocation began; `--active` is when it last had work — the most recent ask
-that was **not** `exhausted`, and the run start before there is one. **Refreshing `--active` is what
+that was **not** `exhausted`, and the run start before there is one; in a session that resumed a cut
+run it is the moment that session picked the run up, which the next subsection is why. **Refreshing
+`--active` is what
 restarts the idle watch**, so an issue opted in mid-watch is picked up and the watch begins again at
 its full budget rather than at whatever was left. Both are ordinary ISO-8601 timestamps
 (`date -u +%FT%TZ`), and `--idle` without `--active` is refused rather than measured from the run's
@@ -398,12 +436,42 @@ full contract is `docs/josh-commands.md` → "`josh backlog:budget`".
 took, how many of them were picked up during an idle watch, and the termination reason — quoted from
 what `backlog:budget` printed rather than paraphrased.
 
+### The hand-off check is not asked during a watch
+
+**A watch does not count towards the session cut** (joshuafolkken/kit#1676). The hand-off check —
+`pnpm josh cost --over 150000`, `epicrun.md` → "The hand-off" — is asked **at a child's merge**, and a
+watch has no merges, so a run that is only watching never reaches one. That is a decision rather than
+an omission, and three things make it safe:
+
+- **The cost of a watch is bounded before it starts.** At the 5-minute idle poll, `--idle N` is at
+  most `N / 5` asks — six for the default — which is why the default is a number of minutes and not a
+  number of hours.
+- **A watch holds nothing.** The working tree's hold was released at the last child's merge and every
+  lane was closed there, so the requests it spends are the only thing it costs.
+- **The cut lands where it always did.** When the watch picks something up, the run has work again,
+  that child merges, and the check is asked there in the ordinary way. Nothing is deferred — a cut is
+  simply never taken in the middle of a wait.
+
+**So every cut is taken at a merge, and that is what lets a resumed session state its own
+`--active`.** A woken session picks the run up seconds after the merge the cut was taken at, so the
+moment it resumed *is* the moment the run last had work, to within the hand-off itself.
+
+**One shape does put a cut inside a watch, and it is the one where that is right.** The backlog can
+answer `exhausted` while this run's own children are still in lanes — a watch and a drain at once —
+and a cut is taken at each of those merges. A session woken from one has just merged a child, so the
+resume moment is still the moment the run last had work, and the watch begins again at its full
+budget. What keeps that finite is the 8-hour whole-run bound, which is measured from the record's
+`started_at` across every cut.
+
+**The 8-hour whole-run bound is untouched and still outranks all of this** — it is measured from the
+record's `started_at` across every cut, so a run cannot watch its way past it in 30-minute pieces.
+
 ### Where the run stops
 
 Termination is decided by what the loop is told, never by a judgement that enough has been done:
 
-- **`pnpm josh backlog:budget` answering `stop`** — the single decision, covering the backlog
-  emptying with no idle watch, an idle watch running out, the maximum being reached, a parked
+- **`pnpm josh backlog:budget` answering `stop`** — the single decision, covering an idle watch
+  running out, the backlog emptying with the watch turned off, the maximum being reached, a parked
   backlog, an unreadable listing, and the whole-run bound.
 - **The whole-run 8-hour bound is unchanged and outranks both budgets**, and the idle watch lives
   inside it: `epicrun.md` → "Waiting, and never waiting forever" is still where the figure is stated,
@@ -421,7 +489,8 @@ Termination is decided by what the loop is told, never by a judgement that enoug
   the single source, and `epicrun.md` → "`needs-human-review` — the one stop that is not a park" for
   what happens to its lane.
 - **The hand-off check** — `pnpm josh cost --over 150000` at every child's merge, and the lane hand-over
-  that follows an `over` — is `epicrun.md` → "The hand-off", unchanged.
+  that follows an `over` — is `epicrun.md` → "The hand-off", unchanged. It is **not** asked during an
+  idle watch: "The hand-off check is not asked during a watch" above is why.
 
 ## What happens to a child that cannot finish
 

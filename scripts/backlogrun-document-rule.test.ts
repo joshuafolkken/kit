@@ -49,8 +49,9 @@ const CONTRACT_MARKERS: ReadonlyArray<string> = [
 	// A `wait` whose only candidates are elsewhere never resolves here, so polling it is a dead end.
 	// joshuafolkken/kit#1632 reconciled that arm with the idle watch rather than layering one on top:
 	// waiting still cannot resolve those candidates, but a person opting a new issue in here can, so
-	// the row hands the case to `backlog:budget` as `exhausted` and the ending is the watch's. With no
-	// watch asked for, `exhausted` still answers `stop` and the run finishes exactly as it did.
+	// the row hands the case to `backlog:budget` as `exhausted` and the ending is the watch's. Under
+	// `--idle 0`, `exhausted` still answers `stop` and the run finishes at the first empty backlog
+	// (joshuafolkken/kit#1676 turned the watch on by default and moved the disable onto that flag).
 	'`wait` this checkout can never resolve',
 	'so the ending is the idle watch',
 ]

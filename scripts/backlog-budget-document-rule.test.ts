@@ -9,13 +9,29 @@ import { COMMAND_MAP } from './josh/josh-command-map'
 const BACKLOGRUN_DOC = '.claude/skills/workflow-commands/backlogrun.md'
 const COMMAND_DOC = 'docs/josh-commands.md'
 
-// Both budgets are off by default, so a `backlogrun` with neither flag behaves exactly as it did.
-// Stated in one place only, this is the first thing a rewrite drops.
+// The idle watch is on by default and the maximum is not (joshuafolkken/kit#1676). A default that is
+// stated in one place only is the first thing a rewrite drops — and this one inverted once already,
+// so the disable form and the figure's reason are pinned beside it rather than left to prose.
 const DEFAULT_MARKERS: ReadonlyArray<[string, string]> = [
 	['the idle watch is written in minutes', '`--idle <minutes>`'],
 	['the maximum is written as a count', '`--max <count>`'],
-	['both are off unless asked for', '**both are off by default**'],
+	[
+		'the watch is on unless turned off',
+		'**the idle watch is on by default while the maximum is not**',
+	],
+	['the watch is turned off with a zero', '`--idle 0` is how the watch is turned off'],
+	['the default figure is 30 minutes', '| **30 minutes** |'],
+	['the figure has a recorded reason', 'Why 30 minutes'],
 	['the idle watch restarts on a pickup', 'restarts the watch'],
+]
+
+// The two interactions joshuafolkken/kit#1676 had to settle before the default could be turned on:
+// what a watch costs the session cut, and what the loop has to send now that the watch is always on.
+const WATCH_COST_MARKERS: ReadonlyArray<[string, string]> = [
+	['a watch does not count towards the cut', '**A watch does not count towards the session cut**'],
+	['every cut still lands at a merge', '**So every cut is taken at a merge'],
+	['a watch is polled on its own interval', 'polled every 5 minutes'],
+	['`--active` is required while the watch is on', '**`--active` is required of every ask'],
 ]
 
 // The loop asks a command rather than counting in its head — the failure joshuafolkken/kit#1460
@@ -45,12 +61,15 @@ const BOUND_MARKERS: ReadonlyArray<[string, string]> = [
 const SAFETY_MARKER = 'it needs `auto-ok`, which only a person applies'
 
 describe('backlogrun.md documents the two budgets', () => {
-	it.each([...DEFAULT_MARKERS, ...LOOP_MARKERS, ...REPORT_MARKERS, ...BOUND_MARKERS])(
-		'says %s',
-		(_name, marker) => {
-			expect(read_unwrapped(BACKLOGRUN_DOC)).toContain(marker)
-		},
-	)
+	it.each([
+		...DEFAULT_MARKERS,
+		...WATCH_COST_MARKERS,
+		...LOOP_MARKERS,
+		...REPORT_MARKERS,
+		...BOUND_MARKERS,
+	])('says %s', (_name, marker) => {
+		expect(read_unwrapped(BACKLOGRUN_DOC)).toContain(marker)
+	})
 
 	it('says the opt-in is what keeps an idle watch from being a way in', () => {
 		expect(read_unwrapped(BACKLOGRUN_DOC)).toContain(SAFETY_MARKER)
@@ -75,6 +94,11 @@ describe('josh backlog:budget is a registered command with a reference section',
 		['the verdict words', '| `watch` |'],
 		['the mapping from `backlog:next`', '`none` is `exhausted`'],
 		['that an unreadable flag is never defaulted', 'makes the whole invocation unreadable'],
+		['the disable form', '**`--idle 0` is how the watch is turned off'],
+		[
+			'that `--active` is required while the watch is on',
+			'**`--active` is required unless the watch is off.**',
+		],
 		['the entry point that consumes it', '`backlogrun`'],
 	])('documents %s', (_name, marker) => {
 		expect(read_unwrapped(COMMAND_DOC)).toContain(marker)
