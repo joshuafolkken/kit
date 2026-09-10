@@ -14,6 +14,9 @@ const mocked_git = vi.mocked(execaSync)
 
 const CONSUMER = '/Users/example/Development/mnemecha'
 const BRANCH = '295-upgrade-joshuafolkken-kit-to-1-312-0'
+const BRANCH_REF = 'refs/heads/295-upgrade-joshuafolkken-kit-to-1-312-0'
+const RELEASE_BRANCH = 'release/v1.2.0'
+const RELEASE_BRANCH_REF = 'refs/heads/release/v1.2.0'
 const MAIN = 'main'
 const HEAD_SHA = '8a7ffc4e1b0d9c5a1f2e3d4c5b6a7980f1e2d3c4'
 const SHORT_SHA = '8a7ffc4'
@@ -96,11 +99,26 @@ describe('propagate_git.commit_ahead', () => {
 describe('propagate_git.has_remote_branch', () => {
 	// Asked of the remote itself: a push that was refused leaves no remote-tracking ref behind, and
 	// neither does a branch that was never pushed, so the ref cannot tell the two apart.
-	it('asks the remote rather than a remote-tracking ref', () => {
+	//
+	// The pattern is the full ref path, so that a branch pushed under a prefix — `refs/heads/wip/…`
+	// is the shape that bit — can no longer answer for this one on a ref-tail match
+	// (joshuafolkken/kit#1732, the same defect joshuafolkken/kit#1709 fixed in `git_worktree`).
+	// Written out rather than composed from `BRANCH`, because the wire format is the subject here.
+	it('asks the remote for the full ref path of the branch, not the bare name', () => {
 		answer_with([`${HEAD_SHA}\trefs/heads/${BRANCH}`])
 		propagate_git.has_remote_branch(CONSUMER, BRANCH)
 
-		expect(call_arguments(0)).toEqual(['ls-remote', '--heads', 'origin', BRANCH])
+		expect(call_arguments(0)).toEqual(['ls-remote', '--heads', 'origin', BRANCH_REF])
+	})
+
+	// A release branch name already carries a slash, which is the case the anchoring could plausibly
+	// get wrong twice over: the prefix has to go on exactly once, and the result still has to exclude
+	// `refs/heads/foo/release/v1.2.0`, which the bare name matched.
+	it('prefixes a slash-bearing branch name exactly once', () => {
+		answer_with([''])
+		propagate_git.has_remote_branch(CONSUMER, RELEASE_BRANCH)
+
+		expect(call_arguments(0)).toEqual(['ls-remote', '--heads', 'origin', RELEASE_BRANCH_REF])
 	})
 
 	it('answers true when the remote lists the branch', () => {

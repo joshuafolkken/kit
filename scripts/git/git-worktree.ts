@@ -1,4 +1,5 @@
 import { PORCELAIN_FLAG } from './constants'
+import { ls_remote_branch_arguments } from './git-ls-remote'
 import { git_spawn } from './git-spawn'
 
 // The four worktree reads and writes a lane's lifecycle needs, plus the branch deletion that ends it
@@ -7,8 +8,11 @@ import { git_spawn } from './git-spawn'
 // resolves the git binary and turns a non-zero exit into an error — a second spawn helper next to it
 // would be the clone `CLAUDE.md` prohibits, so this module imports the shared one.
 //
-// **`ls_remote_branch` is here for the same reason, though it registers no work tree**: it is the one
-// raw `git ls-remote` spawn, and a second spawn helper beside it would be that same clone. Its sole
+// **`ls_remote_branch` is here for the same reason, though it registers no work tree**: it is the
+// asynchronous `git ls-remote` spawn, and a second spawn helper beside it would be that same clone.
+// **It is not the only one in this package** — `propagate_git.has_remote_branch` runs the same query
+// synchronously against a consumer's path, and the two share their arguments through
+// `git-ls-remote.ts` rather than the spawn (joshuafolkken/kit#1732). Its sole
 // caller is now `git-remote-branch.ts`, which turns the raw output into the three-way answer
 // (`absent` / `present` / `unreachable`) that `lane-start-point.ts` and `release-publish.ts` both act
 // on — so this module stops at "what git printed" and the meaning of it is decided there
@@ -71,18 +75,13 @@ async function worktree_prune(): Promise<string> {
 // again, and the reason the caller cannot use `fetch` for this: `fetch` fails identically for a
 // branch that is gone and for a network that is down, and prunes neither (measured on git 2.x).
 //
-// **The pattern is the full ref path, because `ls-remote` matches a pattern against the *tail* of a
-// ref at a slash boundary** (joshuafolkken/kit#1709). The bare name therefore answered for any
-// branch ending in it: `1641-lane` matched `refs/heads/wip/1641-lane`, and `release/v1.2.0` matched
-// `refs/heads/foo/release/v1.2.0`. **`--heads` does not close it** — that limits which refs are
-// considered, not where inside one the pattern may match. What broke was the truthfulness of the
-// message rather than the safety of the answer: `lane:open` was told origin has the lane branch and
-// then stopped naming a branch nobody could find there, and the release guard refused a name that
-// was free. Anchored at `refs/heads/`, only the exact branch is left, since no shorter tail of
-// `refs/heads/wip/1641-lane` starts with `refs/heads/`. Callers pass a bare branch name, so the
-// prefix goes on once even for a name that already carries a slash.
+// **The arguments come from `git-ls-remote.ts`, which is the single source of the full ref path**
+// (joshuafolkken/kit#1709 for the anchoring, joshuafolkken/kit#1732 for the sharing). What broke
+// here was the truthfulness of the message rather than the safety of the answer: `lane:open` was
+// told origin has the lane branch and then stopped naming a branch nobody could find there, and the
+// release guard refused a name that was free.
 async function ls_remote_branch(branch_name: string): Promise<string> {
-	return await git_spawn.read(['ls-remote', '--heads', 'origin', `refs/heads/${branch_name}`])
+	return await git_spawn.read(ls_remote_branch_arguments(branch_name))
 }
 
 // `-D` rather than `-d`: a lane branch is deleted whatever state its work reached, and `-d` refuses
