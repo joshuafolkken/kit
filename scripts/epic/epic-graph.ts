@@ -168,6 +168,18 @@ function missing_relations(
 	return links.filter((link) => !is_link_recorded(link, children, declared_repo))
 }
 
+// The other half: declared links a relation actually backs. It is what a caller about to *drop*
+// relations needs — asking `gh` to remove a link that was never recorded is reported as a failure
+// nobody can act on. Written beside `missing_relations` rather than as a subtraction in each caller,
+// so the two answers cannot come to disagree about what "recorded" means (joshuafolkken/kit#1712).
+function recorded_relations(
+	links: ReadonlyArray<DependencyLink>,
+	children: ReadonlyArray<EpicChild>,
+	declared_repo: string,
+): Array<DependencyLink> {
+	return links.filter((link) => is_link_recorded(link, children, declared_repo))
+}
+
 // Every relation recorded on one child, as links between children of this epic.
 //
 // Matched by identity rather than by number (joshuafolkken/kit#1126): keyed by number alone, a child
@@ -257,6 +269,7 @@ const epic_graph = {
 	blockers_of,
 	find_stuck_children,
 	missing_relations,
+	recorded_relations,
 	undeclared_relations,
 	find_anomalies,
 }

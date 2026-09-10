@@ -1,10 +1,13 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { git_epic_parse } from '#scripts/git/git-epic-parse'
+import { git_epic_decision } from '#scripts/git/git-epic-decision'
+import { git_epic_parse, type DependencyLink } from '#scripts/git/git-epic-parse'
 import { git_gh_command } from '#scripts/git/git-gh-command'
+import { issue_read } from '#scripts/issue/issue-read'
 import { epic_audit_logic, type AuditFinding, type ReferenceState } from './epic-audit'
 import { epic_audit_checks, type AuditChild } from './epic-audit-checks'
 import { epic_audit_orphans, type ClaimingSearch } from './epic-audit-orphans'
+import { epic_audit_rationale, type OrderPair } from './epic-audit-rationale'
 import { epic_audit_report, type AuditResult } from './epic-audit-report'
 import { epic_cross_repo } from './epic-cross-repo'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
@@ -121,13 +124,18 @@ interface AuditInput {
 	// as errors — the acceptance criteria are part of the body, so every one of them would otherwise
 	// arrive twice.
 	contradictions: ReadonlyArray<AuditFinding>
+	// The declared orders check 6 may speak about, already resolved to children and narrowed to the
+	// open, local pairs (joshuafolkken/kit#1712).
+	order_pairs: ReadonlyArray<OrderPair>
+	// The epic's `## Decisions` section, and the comments on those pairs' ends — the two places a
+	// placement decision is recorded, and therefore the whole of what check 6 reads.
+	decisions: string
+	order_comments: ReadonlyMap<string, ReadonlyArray<string>>
 }
 
-// The audit itself, from already-gathered data, so the whole decision is testable without GitHub.
-function audit(input: AuditInput): AuditResult {
-	return epic_audit_report.build_result([
-		...input.anomalies,
-		...input.contradictions,
+// The checks that read what the children say about each other.
+function body_findings(input: AuditInput): Array<AuditFinding> {
+	return [
 		...epic_audit_checks.find_implicit_dependencies(
 			input.children,
 			input.repo,
@@ -139,11 +147,33 @@ function audit(input: AuditInput): AuditResult {
 			input.repo,
 		),
 		...epic_audit_checks.find_nested_epics(input.children, input.repo),
+	]
+}
+
+// The checks that read the epic's own declaration and its task list.
+function epic_findings(input: AuditInput): Array<AuditFinding> {
+	return [
+		...epic_audit_rationale.find_unjustified_orders({
+			pairs: input.order_pairs,
+			decisions: input.decisions,
+			comments: input.order_comments,
+			current_repo: input.repo,
+		}),
 		...epic_audit_orphans.search_findings(input.claiming),
 		...epic_audit_checks.find_orphans(
 			input.tracked,
 			epic_audit_orphans.claimed_numbers(input.claiming),
 		),
+	]
+}
+
+// The audit itself, from already-gathered data, so the whole decision is testable without GitHub.
+function audit(input: AuditInput): AuditResult {
+	return epic_audit_report.build_result([
+		...input.anomalies,
+		...input.contradictions,
+		...body_findings(input),
+		...epic_findings(input),
 	])
 }
 
@@ -153,8 +183,8 @@ function audit(input: AuditInput): AuditResult {
 function graph_anomalies(
 	snapshot: EpicSnapshot,
 	children: ReadonlyArray<AuditChild>,
+	links: ReadonlyArray<DependencyLink>,
 ): Array<AuditFinding> {
-	const links = git_epic_parse.parse_dependency_links(snapshot.body)
 	const is_declared = epic_next.is_order_declared(snapshot.body, links)
 
 	return epic_audit_report.anomaly_findings(
@@ -166,14 +196,41 @@ function graph_anomalies(
 function fetch_anomalies(
 	snapshot: EpicSnapshot,
 	children: ReadonlyArray<AuditChild>,
+	links: ReadonlyArray<DependencyLink>,
 ): Array<AuditFinding> {
 	return [
 		...epic_audit_report.unreadable_findings(
 			epic_fetch.missing_children(snapshot),
 			snapshot.current_repo,
 		),
-		...graph_anomalies(snapshot, children),
+		...graph_anomalies(snapshot, children, links),
 	]
+}
+
+// The comments on the ends of the declared orders check 6 asks about — and on nothing else. Most
+// epics declare no order at all, so this reads nothing; an epic that declares a chain pays one
+// listing per issue in it.
+//
+// A listing that could not be read is left out of the map rather than entered as `[]`, so a
+// transport failure reads as "not asked" instead of "nobody recorded anything" — the finding it
+// would otherwise manufacture is an `error`, which stops the epic.
+async function read_order_comments(
+	pairs: ReadonlyArray<OrderPair>,
+): Promise<Map<string, ReadonlyArray<string>>> {
+	const ends = epic_audit_rationale.pair_ends(pairs)
+	const listings = await Promise.all(
+		ends.map(async (child) => await git_gh_command.issue_list_comments(String(child.number))),
+	)
+
+	return new Map(
+		ends.flatMap((child, index) => {
+			const comments = issue_read.parse_comments(listings[index])
+
+			return comments === undefined
+				? []
+				: [[epic_graph.key_of(child), comments.map((comment) => comment.body)] as const]
+		}),
+	)
 }
 
 // Why a snapshot yields nothing to audit, with the two reasons told apart (joshuafolkken/kit#1690).
@@ -190,6 +247,32 @@ function no_children_reason(snapshot: EpicSnapshot, epic_number: number): string
 	}
 
 	return undefined
+}
+
+// Everything the input needs once the children have been read: the declaration is parsed once here
+// and handed to both the graph anomalies and check 6, rather than parsed twice.
+async function to_audit_input(
+	snapshot: EpicSnapshot,
+	children: ReadonlyArray<AuditChild>,
+	epic_number: number,
+	repo: string,
+): Promise<AuditInput> {
+	const links = git_epic_parse.parse_dependency_links(snapshot.body)
+	const order_pairs = epic_audit_rationale.order_pairs(links, children, snapshot.repo, repo)
+
+	return {
+		epic_number,
+		repo,
+		children,
+		tracked: epic_audit_orphans.locally_tracked(snapshot),
+		reference_states: await resolve_reference_states(outside_references(children, repo), repo),
+		claiming: await epic_audit_orphans.find_claiming_issues(epic_number, repo),
+		anomalies: fetch_anomalies(snapshot, children, links),
+		contradictions: epic_audit_checks.find_order_contradictions(children, repo),
+		order_pairs,
+		decisions: git_epic_decision.read_recorded_reasons(snapshot.body),
+		order_comments: await read_order_comments(order_pairs),
+	}
 }
 
 async function gather(epic_number: number, repo: string): Promise<AuditInput | undefined> {
@@ -209,18 +292,7 @@ async function gather(epic_number: number, repo: string): Promise<AuditInput | u
 
 	if (snapshot.has_external_children) console.info(epic_next.EXTERNAL_NOTICE)
 
-	const referenced = outside_references(children, repo)
-
-	return {
-		epic_number,
-		repo,
-		children,
-		tracked: epic_audit_orphans.locally_tracked(snapshot),
-		reference_states: await resolve_reference_states(referenced, repo),
-		claiming: await epic_audit_orphans.find_claiming_issues(epic_number, repo),
-		anomalies: fetch_anomalies(snapshot, children),
-		contradictions: epic_audit_checks.find_order_contradictions(children, repo),
-	}
+	return await to_audit_input(snapshot, children, epic_number, repo)
 }
 
 async function report_audit(epic_number: number, repo: string): Promise<number> {
@@ -268,6 +340,7 @@ const epic_audit_cli = {
 	attach_bodies,
 	resolve_reference_states,
 	outside_references,
+	read_order_comments,
 	audit,
 	run,
 	main,

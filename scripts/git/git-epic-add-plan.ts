@@ -3,12 +3,8 @@ import { git_epic_add_body, type RewriteInput } from './git-epic-add-body'
 import { git_epic_chains, type InsertPosition } from './git-epic-chains'
 import { git_epic_decision } from './git-epic-decision'
 import { git_epic_parse, type DependencyLink } from './git-epic-parse'
-import {
-	format_dependency_link,
-	format_dependency_links,
-	to_issue_reference,
-} from './git-epic-reference'
-import { EPIC_LABEL } from './issue-labels'
+import { format_dependency_links, to_issue_reference } from './git-epic-reference'
+import { git_epic_shape } from './git-epic-shape'
 
 // Everything `josh epic --add` decides before it writes anything.
 //
@@ -46,57 +42,6 @@ interface AddPlan {
 }
 
 type PlanOutcome = { plan: AddPlan } | { error: string }
-
-function missing_declaration_error(epic_number: number): string {
-	const check = `josh epic:check ${String(epic_number)}`
-
-	return `${to_issue_reference(epic_number)} has no unambiguous machine-readable \`Dependencies\` declaration; run \`${check}\` first.`
-}
-
-// What to do about a target that is not an epic. The refusal is deliberate — this command never
-// promotes an issue on its own, because promotion rewrites someone's issue into a container and the
-// choice between promoting and creating a new epic depends on what the target *is*, which only a
-// reader of it knows (`.claude/skills/workflow-commands/split-assessment.md` → promote-or-create).
-// Naming both arms is what keeps the refusal one command away from being actionable rather than a
-// dead end, which is the whole point of `into <target>` (joshuafolkken/kit#985).
-function promote_remedy(epic_number: number): string {
-	const promote = `josh epic --promote ${String(epic_number)} <N...>`
-
-	return `Promote it with \`${promote}\` when it is a request, a discussion or a container; create a new epic over both when it is itself one of the deliverables.`
-}
-
-// Whether the issue is an epic this command may edit. The label and the task list are checked
-// separately from the declaration because they fail differently: without rows there is nowhere to
-// put a new one, and without a declaration there is nothing for an insertion to be relative to.
-function find_epic_shape_error(input: PlanInput, body: string): string | undefined {
-	const reference = to_issue_reference(input.epic_number)
-
-	if (!input.labels.includes(EPIC_LABEL)) {
-		return `${reference} does not carry the \`${EPIC_LABEL}\` label, so it is not an epic. ${promote_remedy(input.epic_number)}`
-	}
-
-	if (git_epic_parse.has_external_task_list_entry(body)) {
-		return `${reference} tracks a child in another repository; inserting into a cross-repository epic is joshuafolkken/kit#864's scope, not this command's.`
-	}
-
-	return undefined
-}
-
-function find_subject_error(input: PlanInput, tracked: ReadonlyArray<number>): string | undefined {
-	const reference = to_issue_reference(input.epic_number)
-	if (input.body === undefined) return `Could not read the body of ${reference}.`
-	const shape_error = find_epic_shape_error(input, input.body)
-	if (shape_error !== undefined) return shape_error
-
-	if (tracked.length === 0) {
-		return `${reference} tracks no child as a \`- [ ] #N\` row; there is nowhere to add one.`
-	}
-
-	// A declaration an insertion can be relative to: exactly one of the two machine-readable forms.
-	return git_epic_parse.has_machine_readable_declaration(input.body)
-		? undefined
-		: missing_declaration_error(input.epic_number)
-}
 
 // The requested children minus the ones there is nothing to do for. The epic itself is dropped
 // rather than refused for the same reason `--promote` drops it: it would be asked to block itself.
@@ -201,20 +146,6 @@ function find_relation_error(
 	return `The epic already records relations its body does not declare (${list}); reconcile them before inserting.`
 }
 
-// The relations to drop: declared before, not declared after, and actually recorded. Filtering by
-// what is recorded keeps the command from asking `gh` to remove a link that was never there, which
-// would be reported as a failure the user cannot act on.
-function to_removed_links(
-	dropped: ReadonlyArray<DependencyLink>,
-	recorded: ReadonlyArray<EpicChild>,
-	repo: string,
-): Array<DependencyLink> {
-	const unapplied = epic_graph.missing_relations(dropped, recorded, repo)
-	const unrecorded = new Set(unapplied.map((link) => format_dependency_link(link)))
-
-	return dropped.filter((link) => !unrecorded.has(format_dependency_link(link)))
-}
-
 // What `build_plan` computed, handed to the composition below as one value: the epic's own input, the
 // two kinds of placement, and the declaration before and after.
 interface PlanContext {
@@ -253,7 +184,9 @@ function to_plan(context: PlanContext): PlanOutcome {
 			additions: context.additions,
 			relocations: context.relocations,
 			added: epic_graph.missing_relations(links_after, context.input.recorded, context.input.repo),
-			removed: to_removed_links(removed, context.input.recorded, context.input.repo),
+			// Only the links a relation actually backs: asking `gh` to remove one that was never
+			// recorded is reported as a failure the user cannot act on.
+			removed: epic_graph.recorded_relations(removed, context.input.recorded, context.input.repo),
 		},
 	}
 }
@@ -299,7 +232,7 @@ function find_input_error(
 	chains_before: ReadonlyArray<ReadonlyArray<number>>,
 ): string | undefined {
 	return (
-		find_subject_error(input, tracked) ??
+		git_epic_shape.find_subject_error(input, tracked) ??
 		find_placement_error(input, tracked, chains_before) ??
 		find_relation_error(git_epic_chains.links_of(chains_before), input.recorded, input.repo) ??
 		find_decision_error(input.decision)

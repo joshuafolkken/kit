@@ -338,6 +338,43 @@ function remove_children(chains: Chains, children: ReadonlyArray<number>): Array
 		.filter((chain) => chain.length > 1)
 }
 
+// Where a chain has to be cut: the index of every reference whose incoming link the caller named.
+function break_indices(chain: Chain, dropped: ReadonlySet<string>): Array<number> {
+	return chain
+		.map((blocked, index) => {
+			const blocker = chain[index - 1]
+
+			return blocker !== undefined && dropped.has(format_dependency_link({ blocker, blocked }))
+				? index
+				: -1
+		})
+		.filter((index) => index !== -1)
+}
+
+function split_chain(chain: Chain, dropped: ReadonlySet<string>): Array<Array<number>> {
+	const bounds = [0, ...break_indices(chain, dropped), chain.length]
+
+	return bounds.slice(0, -1).map((start, index) => chain.slice(start, bounds[index + 1]))
+}
+
+// A declared order removed: every chain is cut at each named link, and **the ends are never
+// reconnected** (joshuafolkken/kit#1712). `#A -> #B -> #C` minus `#B -> #C` leaves `#A -> #B`, and
+// removing a middle child's two links leaves `#A` and `#C` with no order rather than `#A -> #C`.
+//
+// Reconnecting would declare an order nobody stated, which is exactly what the audit shipped beside
+// this reports as unjustified — a command whose whole purpose is to delete a declaration must not
+// write one. It is also the difference from `remove_children` above, which takes a *node* out of a
+// chain and closes it, because a relocation is re-inserting that node somewhere else in the same
+// breath.
+//
+// A piece left with one reference declares nothing and is dropped, for the reason `remove_children`
+// drops one: its child simply has no order any more.
+function remove_links(chains: Chains, links: ReadonlyArray<DependencyLink>): Array<Array<number>> {
+	const dropped = new Set(links.map((link) => format_dependency_link(link)))
+
+	return chains.flatMap((chain) => split_chain(chain, dropped)).filter((chain) => chain.length > 1)
+}
+
 function insert_children(
 	chains: Chains,
 	additions: ReadonlyArray<number>,
@@ -361,6 +398,7 @@ const git_epic_chains = {
 	diff_links,
 	find_position_ambiguity,
 	remove_children,
+	remove_links,
 	insert_children,
 }
 

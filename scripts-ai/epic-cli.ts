@@ -1,6 +1,8 @@
 import type { InsertKind, InsertPosition } from '../scripts/git/git-epic-chains'
 import { git_epic_parse, type ExternalChild } from '../scripts/git/git-epic-parse'
 import { cli_body } from '../scripts/josh/cli-body'
+import { epic_cli_argv, ISSUE_NUMBER_PATTERN } from './epic-cli-argv'
+import { epic_cli_remove } from './epic-cli-remove'
 
 // Parsing lives apart from the entry point so the argument rules can be asserted without spawning a
 // process or reaching GitHub. The entry point is then a thin shell around these two functions.
@@ -16,22 +18,17 @@ const AFTER_FLAG = '--after'
 // from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
 // contributes is placing it in the epic's `## Decisions` and on each child (joshuafolkken/kit#1350).
 const DECISION_FLAG = '--decision-file'
-const FLAG_PREFIX = '--'
-// Which flags consume the argument after them. Per parser rather than module-wide: `--before` takes
-// a value only under `--add`, and treating it as one everywhere had `josh epic "T" 101 102 --after
-// 103` silently drop #103 from the new epic instead of ignoring an unknown flag (joshuafolkken/kit#890).
+// Which flags consume the argument after them — per parser, for the reason `epic-cli-argv.ts` gives.
 const VALUE_FLAGS: ReadonlySet<string> = new Set([RATIONALE_FLAG, ORIGIN_FLAG])
 const ADD_VALUE_FLAGS: ReadonlySet<string> = new Set([BEFORE_FLAG, AFTER_FLAG, DECISION_FLAG])
-// `--add` refuses a flag it does not know, unlike creation and promotion which ignore one. A typo
-// there costs a flag; here a mistyped positioning flag would leave its value positional, so the
-// target becomes a child to add and the insertion silently lands at the end (joshuafolkken/kit#890).
 const ADD_KNOWN_FLAGS: ReadonlySet<string> = new Set([
 	ADD_FLAG,
 	BEFORE_FLAG,
 	AFTER_FLAG,
 	DECISION_FLAG,
 ])
-const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
+
+const { count_flag, is_value_unusable, read_flag_value } = epic_cli_argv
 
 interface CreateArguments {
 	title: string
@@ -51,34 +48,11 @@ interface PromoteArguments {
 	origin?: string | undefined
 }
 
-function read_flag_value(argv: ReadonlyArray<string>, flag: string): string | undefined {
-	const index = argv.indexOf(flag)
-	if (index === -1) return undefined
-
-	return argv[index + 1]
-}
-
-function is_flag(argument: string): boolean {
-	return argument.startsWith(FLAG_PREFIX)
-}
-
-// A value-taking flag's argument must not be mistaken for a child issue number, so the argument
-// directly after one is dropped along with the flag itself.
-function is_flag_value(
-	argv: ReadonlyArray<string>,
-	index: number,
-	value_flags: ReadonlySet<string>,
-): boolean {
-	return value_flags.has(argv[index - 1] ?? '')
-}
-
 function to_positional_arguments(
 	argv: ReadonlyArray<string>,
 	value_flags: ReadonlySet<string> = VALUE_FLAGS,
 ): Array<string> {
-	return argv.filter(
-		(argument, index) => !is_flag(argument) && !is_flag_value(argv, index, value_flags),
-	)
+	return epic_cli_argv.to_positional_arguments(argv, value_flags)
 }
 
 // Deduplicated because a repeated number would render a duplicate task-list row, and with
@@ -159,12 +133,6 @@ interface PositionOutcome {
 const NO_POSITION: PositionOutcome = { is_refused: false }
 const REFUSED_POSITION: PositionOutcome = { is_refused: true }
 
-// The raw target of whichever positioning flag was given. Both flags at once leaves no single
-// position — refused rather than resolved by precedence, which would silently pick one.
-function count_flag(argv: ReadonlyArray<string>, flag: string): number {
-	return argv.filter((argument) => argument === flag).length
-}
-
 // More than one positioning flag names more than one place, whether they are the same flag twice or
 // one of each. `read_flag_value` would answer with the first, which is a silent choice rather than a
 // refusal — the same hazard the two-different-flags case was already refused for.
@@ -195,20 +163,7 @@ function parse_position(argv: ReadonlyArray<string>): PositionOutcome {
 }
 
 function has_unknown_flag(argv: ReadonlyArray<string>): boolean {
-	return argv.some((argument) => is_flag(argument) && !ADD_KNOWN_FLAGS.has(argument))
-}
-
-// A value-taking flag given without a usable value: last on the line, or followed by another flag.
-// **Refused rather than read as "none was asked for"** — `--decision-file` is passed precisely because
-// the record has to exist, so a shell that ate the path would otherwise land the insertion, write no
-// record, post no comment and exit 0: success reported for half the job. Repeated, it names two
-// records, which is refused for the reason two positioning flags are (joshuafolkken/kit#1350).
-function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
-	if (!argv.includes(flag)) return false
-	if (count_flag(argv, flag) > 1) return true
-	const value = read_flag_value(argv, flag)
-
-	return value === undefined || is_flag(value)
+	return epic_cli_argv.has_unknown_flag(argv, ADD_KNOWN_FLAGS)
 }
 
 // Whether *this* is why the insertion could not be read, so the refusal can say so. Without it the
@@ -346,6 +301,7 @@ function read_decision(decision_path: string | undefined): string | undefined {
 const epic_cli = {
 	is_promotion,
 	is_addition,
+	...epic_cli_remove,
 	find_cross_repo_add_target,
 	is_decision_path_unusable,
 	resolve_local_add,
@@ -369,4 +325,6 @@ export {
 	PROMOTE_FLAG,
 	RATIONALE_FLAG,
 }
+export { REMOVE_FLAG } from './epic-cli-remove'
 export type { AddArguments, CreateArguments, CrossRepoAddTarget, PromoteArguments }
+export type { RemoveArguments } from './epic-cli-remove'

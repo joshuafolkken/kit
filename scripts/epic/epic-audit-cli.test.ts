@@ -45,6 +45,9 @@ function audit_input(overrides: Partial<AuditInput> = {}): AuditInput {
 		claiming: read_claiming([]),
 		anomalies: [],
 		contradictions: [],
+		order_pairs: [],
+		decisions: '',
+		order_comments: new Map(),
 		...overrides,
 	}
 }

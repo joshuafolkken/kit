@@ -237,6 +237,16 @@ fenced blocks before it matches, so a `## Dependencies` section whose chains sit
 as **no declaration at all** rather than as an error — and `#A` / `#B` are not issue numbers anyway.
 The lines go into the epic body unfenced, with real numbers.
 
+**Deleting a declared order is `pnpm josh epic --remove <E> <M> <N> [<N2> …]`, and never a hand edit
+either** (joshuafolkken/kit#1712). The arguments are a path, so each consecutive pair is one order and
+a whole chain goes in one call; the body's declaration and the `blocked-by` relations are written from
+that one input, exactly as `--add` writes them. **The ends are never reconnected** — `#A -> #B -> #C`
+minus `#B -> #C` leaves `#A -> #B`, and taking out a middle child's two links leaves `#A` and `#C`
+unordered rather than declaring `#A -> #C`. Deleting the last link writes the unordered sentence, so
+the section never ends up with no machine-readable declaration. Pass `--decision-file` to record why;
+the record lands on the epic's `## Decisions` and on both ends of every deleted order. Doing either
+half by hand is the `declaration_mismatch` below, arrived at from the other direction.
+
 **Write the boundary with `pnpm josh epic --add`, not by hand.** A declared link with no recorded
 `blocked-by` relation is the `declaration_mismatch` that `find_anomalies` reports, and it stops
 `epic:next` and `epicrun` outright; the rule further down — record the order in `blocked-by` **and**

@@ -7,6 +7,11 @@ import { DEPENDENCY_ARROW, to_issue_reference } from './git-epic-reference'
 // disagreeing with each other, or with the run command printed next to them.
 
 const RATIONALE_PLACEHOLDER = '<why the work was split this way>'
+// Where a creation records its reasoning, including the reasoning for the order `--ordered` declares.
+// Exported because `epic:audit`'s unjustified-order check reads it as one of the places a declared
+// order's reason may live, and a second spelling of the heading is one that comes to disagree with
+// the writer (joshuafolkken/kit#1712).
+const SPLIT_RATIONALE_HEADING = '## Split rationale'
 
 interface EpicBodyInput {
 	children: ReadonlyArray<number>
@@ -62,7 +67,7 @@ function to_rationale(rationale: string): string {
 
 function build_epic_body(input: EpicBodyInput): string {
 	return [
-		'## Split rationale',
+		SPLIT_RATIONALE_HEADING,
 		'',
 		to_rationale(input.rationale),
 		format_origin_section(input.origin),
@@ -101,5 +106,5 @@ const git_epic_body = {
 	format_run_command,
 }
 
-export { git_epic_body }
+export { git_epic_body, SPLIT_RATIONALE_HEADING }
 export type { EpicBodyInput }

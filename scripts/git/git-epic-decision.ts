@@ -103,9 +103,41 @@ function format_decision_report(input: { total: number; failures: number }): str
 	return `⚠️  ${String(input.failures)} of ${String(input.total)} child comment(s) could not be posted; the epic's \`${DECISIONS_HEADING}\` entry is intact.`
 }
 
+// The heading a creation writes its reasoning under. Beside a pattern exactly as `DECISIONS_HEADING`
+// is, and tied to `git_epic_body`'s own literal by a test that reads a body the builder produced
+// rather than by a string comparison (joshuafolkken/kit#1712).
+const RATIONALE_HEADING_PATTERN = /^#{1,6}[ \t]+Split rationale\b/u
+
+function read_section(body: string, heading: RegExp): string {
+	const input = git_epic_sections.to_body_lines(body)
+	const range = git_epic_sections.find_section_range(input, heading)
+	if (range === undefined) return ''
+
+	return input.lines.slice(range.start, range.end).join('\n')
+}
+
+// Every place the epic body itself records why something was decided: the `## Decisions` log an
+// insertion or a removal appends to, **and** the `## Split rationale` a creation writes.
+//
+// Both, not just the first. `josh epic … --ordered` declares a whole chain and records its reasoning
+// under `## Split rationale`, writing no `## Decisions` at all — so a reader that looked only at
+// `## Decisions` would report every correctly-documented ordered epic as unjustified the moment it
+// was created (joshuafolkken/kit#1712). It is this module's because the heading patterns are: a
+// second reader with its own copies is one that comes to disagree with the writers about where a
+// record goes.
+function read_recorded_reasons(body: string | undefined): string {
+	if (body === undefined) return ''
+
+	return [
+		read_section(body, DECISIONS_HEADING_PATTERN),
+		read_section(body, RATIONALE_HEADING_PATTERN),
+	].join('\n')
+}
+
 const git_epic_decision = {
 	DECISIONS_HEADING,
 	append_decision,
+	read_recorded_reasons,
 	find_decision_error,
 	format_decision_report,
 }

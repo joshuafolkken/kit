@@ -37,6 +37,9 @@ function audit_input(children: ReadonlyArray<AuditChild>): AuditInput {
 		claiming: { kind: 'read', numbers: [], cutoff: 'none' },
 		anomalies: [],
 		contradictions: [],
+		order_pairs: [],
+		decisions: '',
+		order_comments: new Map(),
 	}
 }
 

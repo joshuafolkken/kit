@@ -7,8 +7,10 @@
  *        tsx scripts-ai/epic.ts --promote <N> <N1> <N2> ... [same flags]
  *        tsx scripts-ai/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
  *                                                      [--decision-file <path|->]
+ *        tsx scripts-ai/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
  */
 import { git_epic_add, type AddChildrenInput } from '../scripts/git/git-epic-add'
+import { git_epic_remove } from '../scripts/git/git-epic-remove'
 import { git_epic_run } from '../scripts/git/git-epic-run'
 import { git_gh_command } from '../scripts/git/git-gh-command'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
@@ -19,6 +21,7 @@ const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS}`,
 	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
+	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
 ].join('\n')
 const FAILURE_EXIT_CODE = 1
 
@@ -105,6 +108,27 @@ async function run_addition(argv: ReadonlyArray<string>): Promise<number> {
 	return await git_epic_add.add_children(to_add_input(parsed))
 }
 
+// Deleting a declared order. No position and no `--ordered`: the path itself says which orders go,
+// and what is deleted is only ever what it names — the ends are never reconnected, since a removal
+// that wrote an order would be declaring one nobody stated (joshuafolkken/kit#1712).
+async function run_removal(argv: ReadonlyArray<string>): Promise<number> {
+	const parsed = epic_cli.parse_remove_arguments(argv)
+
+	if (parsed === undefined) {
+		console.error(
+			`✖ An epic number and at least two child issue numbers are required, and \`--decision-file\` needs exactly one readable path (\`-\` reads stdin).\n${USAGE}`,
+		)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	return await git_epic_remove.remove_order({
+		epic_number: parsed.epic_number,
+		path: parsed.path,
+		decision: epic_cli.read_decision(parsed.decision_path),
+	})
+}
+
 async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_create_arguments(argv)
 
@@ -126,6 +150,7 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 // `--add` is checked before `--promote`: both name an existing issue first, and only the flag
 // distinguishes "insert into this epic" from "turn this issue into one".
 async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (epic_cli.is_removal(argv)) return await run_removal(argv)
 	if (epic_cli.is_addition(argv)) return await run_addition(argv)
 	if (epic_cli.is_promotion(argv)) return await run_promotion(argv)
 
