@@ -233,3 +233,57 @@ describe('run_wake_loop.run_loop — a failure that must not be silent', () => {
 		expect(run_wake.read_wake(scratch.target)?.woke).toBe(1)
 	})
 })
+
+// A pid that is unmistakably alive — this process — paired with a start time that is not this
+// process's, which is what a successor's record looks like from here.
+function successor(): RunWake {
+	return {
+		...run_wake.fresh_wake(INVOCATION, NOW),
+		pid: process.pid,
+		process_start: 'a start time no live process has',
+	}
+}
+
+// joshuafolkken/kit#1727. A `--stop` that removes the record without reaching the process, followed
+// by a person's `--start`, leaves this loop awake beside a new supervisor's record. Everything it
+// could ask about that record other than who owns it answers "fine".
+describe('run_wake_loop.run_loop — a record that has been taken over', () => {
+	// **Before it decides anything, not merely before it writes.** Refusing only the write-back would
+	// still have spawned a session for a cut the new supervisor is already serving.
+	it('ends without waking anything once the record is another supervisor’s', async () => {
+		run_wake.write_wake(scratch.target, successor())
+
+		const scripted = recorder([HANDED_OFF, HANDED_OFF, ENDED])
+		const stop = await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(scripted.wakes).toStrictEqual([])
+		expect(stop.reason).toBe('stopped')
+	})
+
+	// The record it walks away from has to be intact: the successor is the only thing still watching
+	// the run, and its counters are the ones `--list` reports against the carry record's cuts.
+	it('leaves the successor’s record exactly as it found it', async () => {
+		run_wake.write_wake(scratch.target, successor())
+
+		await run_wake_loop.run_loop(scratch.target, recorder([HANDED_OFF, ENDED]).ports, 0)
+
+		expect(run_wake.read_wake(scratch.target)).toStrictEqual(successor())
+	})
+
+	// The hand-over can also land mid-run: this loop owns the record on its first pass and finds it
+	// taken over on the next one.
+	it('stops at the pass on which the record stops being its own', async () => {
+		const scripted = recorder([HANDED_OFF, HANDED_OFF, ENDED])
+		const ports = {
+			...scripted.ports,
+			sleep: async () => {
+				run_wake.write_wake(scratch.target, successor())
+				await Promise.resolve()
+			},
+		}
+
+		await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(scripted.wakes).toStrictEqual([INVOCATION])
+	})
+})

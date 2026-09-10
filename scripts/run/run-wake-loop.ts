@@ -119,8 +119,15 @@ function run_pass(target: string, wake: RunWake, ports: LoopPorts): LoopStop | u
 
 // The record is re-read at the top of every pass rather than carried in a variable, so a `--stop` that
 // removed it ends the loop at the next interval and a `--list` reads what the loop actually wrote.
+//
+// **`read_own_wake` rather than `read_wake`, and the difference is a whole pass** (joshuafolkken/kit#1727).
+// A record that has become a *successor's* is not this loop's to act on, and reading it back would
+// have this pass decide from another supervisor's counters — spawning a session for a cut that
+// supervisor is already serving, and only then finding the write-back refused. Read as owned or not
+// at all, the replaced loop ends here, quietly and before it does anything: the run is not
+// unattended, because the supervisor that took the record over is watching it.
 async function run_loop(target: string, ports: LoopPorts, interval_ms: number): Promise<LoopStop> {
-	let wake = run_wake.read_wake(target)
+	let wake = run_wake.read_own_wake(target)
 
 	while (wake !== undefined) {
 		const stop = run_pass(target, wake, ports)
@@ -128,7 +135,7 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 		if (stop !== undefined) return stop
 
 		await ports.sleep(interval_ms)
-		wake = run_wake.read_wake(target)
+		wake = run_wake.read_own_wake(target)
 	}
 
 	return STOPPED_BY_PERSON

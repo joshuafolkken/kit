@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util'
 import { gh_spawn } from '#scripts/gh-spawn'
 import { telegram_notify } from '#scripts/git/telegram-notify'
 import { run_carry, type CarryRead } from './run-carry'
-import { run_wake, type RunWake } from './run-wake'
+import { run_wake, type RunWake, type WakeTidyResult } from './run-wake'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
@@ -54,6 +54,9 @@ const UNSAFE_INVOCATION_NOTE =
 const WARNING_TITLE = 'backlogrun supervisor'
 const WARNING_BODY = 'The supervisor could not continue the run and has stopped.'
 const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh run:wake --start\`.`
+const SUPERSEDED_RESULT: WakeTidyResult = 'superseded'
+const SUPERSEDED_NOTE =
+	'another supervisor now holds the record, so it was left alone; this loop is the superseded one'
 
 const USAGE = 'Usage: josh run:wake --start | --list | --stop | --loop [--interval <seconds>]'
 
@@ -240,6 +243,19 @@ function start(context: WakeContext, interval: string | undefined): number {
 	return spawn_supervisor(context, interval)
 }
 
+// **The loop removes its record on the way out, and only its own** (joshuafolkken/kit#1727). A loop
+// that ended after its record was taken over used to delete the *successor's* record here, and the
+// run then went on with nobody watching it.
+//
+// **`superseded` is announced, because the two ways of ending look identical otherwise.** A `--stop`
+// and a take-over both leave this loop reporting `stopped` at exit 0, so a supervisor that was
+// replaced would leave no trace of that anywhere. Which of the two happened is `tidy_own_wake`'s
+// answer rather than a second read taken here — the branch that decides it belongs beside the record,
+// where it is tested, not in a CLI that would have to re-derive it.
+function tidy_up(target: string): void {
+	if (run_wake.tidy_own_wake(target) === SUPERSEDED_RESULT) note_to_stderr(SUPERSEDED_NOTE)
+}
+
 async function loop(context: WakeContext, interval_ms: number): Promise<number> {
 	const read = run_carry.read_carry(context.carry_target)
 
@@ -251,7 +267,7 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 
 	const stop = await run_wake_loop.run_loop(context.wake_target, ports_for(context), interval_ms)
 
-	run_wake.remove_wake(context.wake_target)
+	tidy_up(context.wake_target)
 
 	return await finish(stop)
 }
